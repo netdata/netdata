@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 // Compile-time interface check.
@@ -16,11 +15,11 @@ var _ funcapi.MethodHandler = (*funcInterfaces)(nil)
 // funcInterfaces handles the "interfaces" function for SNMP devices.
 // It provides network interface traffic and status metrics from cached SNMP data.
 type funcInterfaces struct {
-	cache *ifaceCache
+	router *funcRouter
 }
 
-func newFuncInterfaces(cache *ifaceCache) *funcInterfaces {
-	return &funcInterfaces{cache: cache}
+func newFuncInterfaces(r *funcRouter) *funcInterfaces {
+	return &funcInterfaces{router: r}
 }
 
 const (
@@ -54,12 +53,12 @@ func (f *funcInterfaces) Handle(_ context.Context, method string, params funcapi
 		return funcapi.NotFoundResponse(method)
 	}
 
-	if f.cache == nil {
+	if f.router.ifaceCache == nil {
 		return funcapi.UnavailableResponse("interface data not available yet, please retry after data collection")
 	}
 
-	f.cache.mu.RLock()
-	defer f.cache.mu.RUnlock()
+	f.router.ifaceCache.mu.RLock()
+	defer f.router.ifaceCache.mu.RUnlock()
 
 	typeGroupFilter := params.GetOne(ifacesParamTypeGroup)
 	if typeGroupFilter == "" {
@@ -67,8 +66,8 @@ func (f *funcInterfaces) Handle(_ context.Context, method string, params funcapi
 	}
 
 	// Build data rows from cache
-	data := make([][]any, 0, len(f.cache.interfaces))
-	for _, entry := range f.cache.interfaces {
+	data := make([][]any, 0, len(f.router.ifaceCache.interfaces))
+	for _, entry := range f.router.ifaceCache.interfaces {
 		if !matchesTypeGroup(entry.ifTypeGroup, typeGroupFilter) {
 			continue
 		}
@@ -284,39 +283,6 @@ func sumRates(vals ...*float64) *float64 {
 		return nil
 	}
 	return &sum
-}
-
-// Package-level registration functions that delegate to funcInterfaces.
-
-func snmpMethods() []module.MethodConfig {
-	return []module.MethodConfig{
-		{
-			ID:          ifacesMethodID,
-			Name:        "Network Interfaces",
-			Help:        "Network interface traffic and status metrics",
-			UpdateEvery: 10,
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:        ifacesParamTypeGroup,
-				Name:      "Type Group",
-				Help:      "Filter by interface type group",
-				Selection: funcapi.ParamSelect,
-				Options: []funcapi.ParamOption{
-					{ID: "ethernet", Name: "Ethernet", Default: true},
-					{ID: "aggregation", Name: "Aggregation"},
-					{ID: "virtual", Name: "Virtual"},
-					{ID: "other", Name: "Other"},
-				},
-			}},
-		},
-	}
-}
-
-func snmpFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil
-	}
-	return c.funcIfaces
 }
 
 // snmpColumn defines a column for SNMP interfaces function.

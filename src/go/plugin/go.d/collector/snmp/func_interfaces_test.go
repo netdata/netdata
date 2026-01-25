@@ -12,6 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// newTestFuncInterfaces creates a funcInterfaces for testing with the given cache.
+func newTestFuncInterfaces(cache *ifaceCache) *funcInterfaces {
+	r := &funcRouter{ifaceCache: cache}
+	return newFuncInterfaces(r)
+}
+
 func TestSnmpMethods(t *testing.T) {
 	methods := snmpMethods()
 
@@ -424,7 +430,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 	}{
 		"unknown method returns 404": {
 			setup: func() *funcInterfaces {
-				return newFuncInterfaces(newIfaceCache())
+				return newTestFuncInterfaces(newIfaceCache())
 			},
 			method: "unknown",
 			params: funcapi.ResolvedParams{},
@@ -435,7 +441,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 		},
 		"nil cache returns 503": {
 			setup: func() *funcInterfaces {
-				return &funcInterfaces{cache: nil}
+				return newTestFuncInterfaces(nil)
 			},
 			method: "interfaces",
 			params: funcapi.ResolvedParams{},
@@ -446,7 +452,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 		},
 		"empty cache returns 200 with empty data": {
 			setup: func() *funcInterfaces {
-				return newFuncInterfaces(newIfaceCache())
+				return newTestFuncInterfaces(newIfaceCache())
 			},
 			method: "interfaces",
 			params: resolveIfaceParams(nil),
@@ -481,7 +487,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 					adminStatus: "down",
 					operStatus:  "down",
 				}
-				return newFuncInterfaces(cache)
+				return newTestFuncInterfaces(cache)
 			},
 			method: "interfaces",
 			params: resolveIfaceParams(nil),
@@ -549,7 +555,7 @@ func TestFuncInterfaces_handle(t *testing.T) {
 					adminStatus: "up",
 					operStatus:  "up",
 				}
-				return newFuncInterfaces(cache)
+				return newTestFuncInterfaces(cache)
 			},
 			method: "interfaces",
 			params: resolveIfaceParams(map[string][]string{"if_type_group": {"other"}}),

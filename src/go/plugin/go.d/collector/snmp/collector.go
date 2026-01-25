@@ -80,7 +80,7 @@ func New() *Collector {
 		},
 	}
 
-	c.funcIfaces = newFuncInterfaces(c.ifaceCache)
+	c.funcRouter = newFuncRouter(c.ifaceCache)
 
 	return c
 }
@@ -97,8 +97,8 @@ type (
 		seenTableMetrics  map[string]bool
 		seenProfiles      map[string]bool
 
-		ifaceCache *ifaceCache     // interface metrics cache for functions
-		funcIfaces *funcInterfaces // interfaces function handler
+		ifaceCache *ifaceCache  // interface metrics cache for functions
+		funcRouter *funcRouter  // function router for method handlers
 
 		prober    ping.Prober
 		newProber func(ping.ProberConfig, *logger.Logger) ping.Prober
