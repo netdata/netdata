@@ -361,7 +361,6 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         dictionary_register_delete_callback(dict_mountpoints, mountpoint_delete_cb, NULL);
 
         is_inside_lxc = is_lxcfs_proc_mounted();
-        inside_lxc_container = is_inside_lxc;
     }
 
     // Skip ZFS datasets, only monitor ZFS pools
