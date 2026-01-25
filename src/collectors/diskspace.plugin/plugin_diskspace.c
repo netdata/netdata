@@ -313,17 +313,12 @@ static inline bool is_zfs_dataset(struct mountinfo *mi) {
 }
 
 static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
-    // Skip ZFS datasets, only monitor ZFS pools
-    // This prevents alert floods when a pool fills up
-    if (is_zfs_dataset(mi)) {
-        return;
-    }
-
     const char *disk = mi->persistent_id;
 
     static SIMPLE_PATTERN *excluded_mountpoints = NULL;
     static SIMPLE_PATTERN *excluded_filesystems = NULL;
     static SIMPLE_PATTERN *excluded_filesystems_inodes = NULL;
+    static SIMPLE_PATTERN *excluded_zfs_datasets = NULL;
 
     usec_t slow_timeout = MAX_STAT_USEC * update_every;
 
@@ -355,8 +350,20 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             SIMPLE_PATTERN_EXACT,
             true);
 
+        excluded_zfs_datasets = simple_pattern_create(
+            inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude zfs datasets on paths", "*"),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
+
         dict_mountpoints = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, &dictionary_stats_category_collectors, sizeof(struct mount_point_metadata));
         dictionary_register_delete_callback(dict_mountpoints, mountpoint_delete_cb, NULL);
+    }
+
+    // Skip ZFS datasets, only monitor ZFS pools
+    // This prevents alert floods when a pool fills up
+    if (!inside_lxc_container && is_zfs_dataset(mi) && simple_pattern_matches(excluded_zfs_datasets, mi->mount_point)) {
+        return;
     }
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dict_mountpoints, mi->mount_point);
