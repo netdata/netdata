@@ -35,6 +35,8 @@ func (m *mockMethodHandler) Handle(ctx context.Context, method string, params fu
 	return nil
 }
 
+func (m *mockMethodHandler) Cleanup(ctx context.Context) {}
+
 func TestExtractParamValues(t *testing.T) {
 	tests := map[string]struct {
 		payload  map[string]any
