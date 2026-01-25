@@ -982,7 +982,7 @@ export class ToolsOrchestrator {
         toolKind: kind,
         remoteIdentifier,
         fatal: false,
-          message: `Tool '${logToolName}' output stored for tool_output (${stored.reason}, ${stored.stats.bytes} bytes).`,
+          message: `Tool '${logToolName}' output stored for tool_output (${stored.reason}, ${String(stored.stats.bytes)} bytes).`,
         details: warnDetails,
       };
       this.log(warnLog, { opId });

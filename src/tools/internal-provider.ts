@@ -17,12 +17,11 @@ import {
   FINAL_REPORT_FIELDS_JSON,
   FINAL_REPORT_FIELDS_SLACK,
   finalReportFieldsText,
-  finalReportXmlInstructions,
   MANDATORY_XML_FINAL_RULES,
-  TASK_STATUS_TOOL_BATCH_RULES,
   TASK_STATUS_TOOL_INSTRUCTIONS,
 } from '../llm-messages.js';
 import { LOG_EVENTS } from '../logging/log-events.js';
+import { loadBatchInstructions, loadFinalReportInstructions } from '../prompts/loader.js';
 import { normalizeSlackMessages, SLACK_BLOCK_KIT_SCHEMA } from '../slack-block-kit.js';
 import { truncateToBytes } from '../truncation.js';
 import { parseJsonRecord, parseJsonValueDetailed } from '../utils.js';
@@ -227,7 +226,7 @@ export class InternalToolProvider extends ToolProvider {
 
     // SECTION 1: Final report instructions FIRST (most critical for first-try success)
     const schemaBlock = this.buildFinalReportSchemaBlock();
-    lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock, this.xmlSessionNonce));
+    lines.push(loadFinalReportInstructions(this.formatId, this.formatDescription, schemaBlock, this.xmlSessionNonce));
 
     // SECTION 2: Mandatory rules (reinforces critical format requirements)
     lines.push('');
@@ -262,33 +261,7 @@ export class InternalToolProvider extends ToolProvider {
 
       if (hasBatchTool) {
         lines.push('');
-        lines.push(`#### ${BATCH_TOOL} — How to Run Tools in Parallel`);
-        lines.push('- Use this helper to execute multiple tools in one request.');
-        lines.push("- Each `calls[]` entry needs an `id`, the real tool name, and a `parameters` object that matches that tool's schema.");
-        lines.push('- Example:');
-        lines.push('  {');
-        lines.push('    "calls": [');
-        if (hasProgressTool) {
-          lines.push(`      { "id": 1, "tool": "${TASK_STATUS_TOOL}", "parameters": { "status": "in-progress", "done": "Collected data about X", "pending": "researching Y and Z" } },`);
-          lines.push('      { "id": 2, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
-          lines.push('      { "id": 3, "tool": "tool2", "parameters": { "param1": "value1" } }');
-        } else {
-          lines.push('      { "id": 1, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
-          lines.push('      { "id": 2, "tool": "tool2", "parameters": { "param1": "value1" } }');
-        }
-        lines.push('      (Tool names must match exactly, and every required parameter must be present.)');
-        lines.push('    ]');
-        lines.push('  }');
-        if (hasProgressTool) {
-          lines.push('- Do not combine `agent__task_status` with your final report; send the final report on its own.');
-        }
-
-        lines.push('');
-        lines.push('### MANDATORY RULE FOR PARALLEL TOOL CALLS');
-        lines.push(`When gathering information from multiple independent sources, use the ${BATCH_TOOL} tool to execute tools in parallel.`);
-        if (hasProgressTool) {
-          lines.push(TASK_STATUS_TOOL_BATCH_RULES);
-        }
+        lines.push(loadBatchInstructions(hasProgressTool));
       }
 
       if (this.hasRouterHandoff) {

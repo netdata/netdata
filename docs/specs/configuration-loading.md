@@ -105,3 +105,34 @@ const cfg = buildUnifiedConfiguration(
 | MCP stdio server starts in wrong directory | `${MCP_ROOT}` blank | Set `MCP_ROOT` explicitly per layer or rely on cwd (warning emitted with verbose flag) |
 | Provider missing `type` warning | Legacy config omitted the field | Add `"type": "openai"` (or another allowed value) to the provider entry |
 | Legacy JSON only partially applied | Running harness or direct `loadConfiguration` without `queues` block | Include `"queues": { "default": { "concurrent": N } }` or let the loader inject the CPU-based fallback |
+
+## LLM Prompt Templates
+**Location**: `src/prompts/loader.ts`, `src/prompts/*.md`
+
+LLM-facing instruction prompts (task_status tool instructions, final report format guidance, batch tool usage, etc.) are stored as Markdown files in `src/prompts/` and loaded at module initialization time.
+
+### Source Files
+- `src/prompts/loader.ts` – Prompt loader (reads files at module init)
+- `src/prompts/task-status.md` – agent__task_status tool instructions
+- `src/prompts/final-report.md` – XML final report format template (with `{{{placeholder}}}` substitutions)
+- `src/prompts/mandatory-rules.md` – Mandatory XML response format rules
+- `src/prompts/batch-with-progress.md` – Batch tool instructions (with task_status)
+- `src/prompts/batch-without-progress.md` – Batch tool instructions (without task_status)
+
+### Loading Behavior
+- All prompts are read synchronously at module initialization (import time), not at runtime request time
+- This satisfies PR-001: "load all configuration at load-time"
+- Templates use `{{{placeholder}}}` syntax for variable substitution (e.g., `{{{slotId}}}`, `{{{formatId}}}`)
+- The loader caches templates in module-scope constants after first load
+
+### Build Pipeline
+- `npm run build` (postbuild): Copies `src/prompts/` to `dist/prompts/`
+- `npm run dev` (predev): Creates `dist/` if missing and copies `src/prompts/` to `dist/prompts/`
+- Prompt files are **not** compiled by TypeScript; they are copied as-is
+
+### Troubleshooting
+| Symptom | Likely Cause | Resolution |
+|---------|--------------|------------|
+| `LLM prompt file not found` on startup | `dist/prompts/` missing or outdated | Run `npm run build` to copy prompt files |
+| Prompt changes not reflected | Stale `dist/prompts/` | Re-run `npm run build` or `npm run dev` |
+| `npm run dev` fails on clean clone | `dist/` directory missing | The predev script now creates it automatically |

@@ -185,8 +185,8 @@ These rules help generate code that passes `npm run lint` and `npm run build` on
 # PRINCIPLES
 
 PR-001:
-ai-agent MUST load all configuration at load-time.
-ai-agent MUST NOT depend on any file or external service for retreiving configuration at runtime.
+ai-agent MUST load all configuration and prompts at load-time, during initialization.
+ai-agent MUST NOT depend on any file or external service for retreiving configuration or prompts at runtime (only during initialization is ok to do so).
 
 PR-002:
 There are no permanent tools available to all agents, except `task_status` and `final_report`.

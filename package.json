@@ -12,8 +12,8 @@
   "scripts": {
     "prebuild": "npm run update-version --silent",
     "build": "tsc",
-    "postbuild": "cp -r src/headends/embed-test dist/headends/",
-    "predev": "npm run update-version --silent",
+    "postbuild": "cp -r src/headends/embed-test dist/headends/ && cp -r src/prompts dist/",
+    "predev": "npm run update-version --silent && mkdir -p dist && cp -r src/prompts dist/",
     "dev": "tsc --watch",
     "prelint": "npm run update-version --silent",
     "start": "node dist/cli.js",
