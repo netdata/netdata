@@ -134,7 +134,8 @@ func (m *Manager) handleMethodFuncInfo(moduleName, methodID string, fn functions
 		return
 	}
 
-	methodParams := m.unionMethodParams(moduleName, methodID, methodCfg, fn)
+	// Use static params for info. Actual requests return job-specific params in the response.
+	methodParams := methodCfg.RequiredParams
 	help := methodCfg.Help
 	if help == "" {
 		help = fmt.Sprintf("%s %s data function", moduleName, methodID)
@@ -253,89 +254,6 @@ func (m *Manager) resolveMethodParamsForJob(ctx context.Context, moduleName, met
 	return funcapi.MergeParamConfigs(methodParams, jobParams), true, nil
 }
 
-func (m *Manager) unionMethodParams(moduleName, methodID string, methodCfg *module.MethodConfig, fn functions.Function) []funcapi.ParamConfig {
-	baseParams := methodCfg.RequiredParams
-
-	creator, ok := m.moduleFuncs.getCreator(moduleName)
-	if !ok || creator.MethodHandler == nil {
-		return baseParams
-	}
-
-	jobs := m.moduleFuncs.getJobNames(moduleName)
-	if len(jobs) == 0 {
-		return baseParams
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), fn.Timeout)
-	defer cancel()
-
-	union := []funcapi.ParamConfig{}
-	for _, jobName := range jobs {
-		job, ok := m.moduleFuncs.getJob(moduleName, jobName)
-		if !ok || job == nil {
-			continue
-		}
-		handler := creator.MethodHandler(job)
-		if handler == nil {
-			continue
-		}
-		params, err := handler.MethodParams(ctx, methodID)
-		if err != nil {
-			m.Debugf("method params unavailable for %s:%s job '%s': %v", moduleName, methodID, jobName, err)
-			continue
-		}
-		if len(params) == 0 {
-			continue
-		}
-		union = mergeParamConfigsUnion(union, params)
-	}
-	if len(union) == 0 {
-		return baseParams
-	}
-
-	out := make([]funcapi.ParamConfig, 0, len(baseParams)+len(union))
-	baseIndex := make(map[string]bool, len(baseParams))
-	unionIndex := make(map[string]int, len(union))
-	for i, cfg := range union {
-		if cfg.ID != "" {
-			unionIndex[cfg.ID] = i
-		}
-	}
-
-	for _, cfg := range baseParams {
-		if cfg.ID != "" {
-			baseIndex[cfg.ID] = true
-		}
-		if i, ok := unionIndex[cfg.ID]; ok {
-			out = append(out, mergeParamConfigMetadata(cfg, union[i]))
-			continue
-		}
-		out = append(out, cfg)
-	}
-
-	for _, cfg := range union {
-		if cfg.ID == "" || baseIndex[cfg.ID] {
-			continue
-		}
-		out = append(out, cfg)
-	}
-	return out
-}
-
-func mergeParamConfigMetadata(base, add funcapi.ParamConfig) funcapi.ParamConfig {
-	out := add
-	if out.Name == "" {
-		out.Name = base.Name
-	}
-	if out.Help == "" {
-		out.Help = base.Help
-	}
-	if base.UniqueView {
-		out.UniqueView = true
-	}
-	return out
-}
-
 func validateParamValues(methodParams []funcapi.ParamConfig, argValues map[string][]string, payload map[string]any, jobName string) error {
 	for _, cfg := range methodParams {
 		values := paramValues(argValues, payload, cfg.ID)
@@ -364,107 +282,6 @@ func allowedOptions(options []funcapi.ParamOption) map[string]bool {
 		allowed[opt.ID] = true
 	}
 	return allowed
-}
-
-func mergeParamConfigsUnion(base, add []funcapi.ParamConfig) []funcapi.ParamConfig {
-	if len(add) == 0 {
-		return base
-	}
-
-	out := make([]funcapi.ParamConfig, len(base))
-	copy(out, base)
-
-	index := make(map[string]int, len(out))
-	for i, cfg := range out {
-		if cfg.ID != "" {
-			index[cfg.ID] = i
-		}
-	}
-
-	for _, cfg := range add {
-		if cfg.ID == "" {
-			continue
-		}
-		if i, ok := index[cfg.ID]; ok {
-			out[i] = mergeParamConfigOptions(out[i], cfg)
-			continue
-		}
-		out = append(out, cfg)
-		index[cfg.ID] = len(out) - 1
-	}
-	return out
-}
-
-func mergeParamConfigOptions(base, add funcapi.ParamConfig) funcapi.ParamConfig {
-	out := base
-	if out.Name == "" {
-		out.Name = add.Name
-	}
-	if out.Help == "" {
-		out.Help = add.Help
-	}
-	if out.Selection == funcapi.ParamSelect && add.Selection == funcapi.ParamMultiSelect {
-		out.Selection = add.Selection
-	}
-	if add.UniqueView {
-		out.UniqueView = true
-	}
-
-	options := make([]funcapi.ParamOption, len(out.Options))
-	copy(options, out.Options)
-
-	optIndex := make(map[string]int, len(options))
-	for i, opt := range options {
-		if opt.ID != "" {
-			optIndex[opt.ID] = i
-		}
-	}
-
-	hasDefault := false
-	for _, opt := range options {
-		if opt.Default {
-			hasDefault = true
-			break
-		}
-	}
-
-	for _, opt := range add.Options {
-		if opt.ID == "" {
-			continue
-		}
-		if i, ok := optIndex[opt.ID]; ok {
-			merged := options[i]
-			if merged.Name == "" {
-				merged.Name = opt.Name
-			}
-			if merged.Sort == nil && opt.Sort != nil {
-				merged.Sort = opt.Sort
-			}
-			if merged.Column == "" {
-				merged.Column = opt.Column
-			}
-			if opt.Default && !hasDefault {
-				merged.Default = true
-				hasDefault = true
-			}
-			// Disabled should remain false if any job supports the option.
-			merged.Disabled = merged.Disabled && opt.Disabled
-			options[i] = merged
-			continue
-		}
-
-		if opt.Default && hasDefault {
-			opt.Default = false
-		}
-		options = append(options, opt)
-		optIndex[opt.ID] = len(options) - 1
-		if opt.Default {
-			hasDefault = true
-		}
-	}
-
-	out.Options = options
-	return out
 }
 
 // respondJSON sends a JSON response to the function request
