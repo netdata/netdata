@@ -1,166 +1,102 @@
 # Internal Guide: Alerts & Notifications Structure (DO NOT PUBLISH)
 
 **For:** Fotis
-**Purpose:** Understand the restructured alerts documentation layout
+**Purpose:** Map CSV structure updates for learn/ documentation
 
 ---
 
-## Why This Restructure?
+## What Fotis Needs to Do
 
-Docs previously lived under nested `/Alerts & Notifications/The Book/` path which didn't surface well on learn.netdata.cloud. Flattened to `/Alerts & Notifications/` for better discoverability.
+**ONLY update `docs/.map/map.csv`** - nothing else. Focus on populating the two placeholder rows:
 
----
-
-## Structure Overview (12 Chapters Total)
-
-```
-docs/alerts/
-├── understanding-alerts/           # Chapter 1 - Fundamentals
-│   ├── README.md                  # Landing page
-│   ├── 1-what-is-a-netdata-alert.md
-│   ├── 2-alert-types-alarm-vs-template.md
-│   └── 3-where-alerts-live.md
-├── creating-alerts-pages/          # Chapter 2 - Getting Started
-│   ├── README.md
-│   ├── 1-quick-start-create-your-first-alert.md
-│   ├── 2-creating-and-editing-alerts-via-config-files.md
-│   ├── 3-creating-and-editing-alerts-via-cloud.md
-│   ├── 4-managing-stock-vs-custom-alerts.md
-│   └── 5-reloading-and-validating-alert-configuration.md
-├── alert-configuration-syntax/    # Chapter 3 - Deep Dive
-│   ├── README.md
-│   ├── 1-alert-definition-lines.md
-│   ├── 2-lookup-and-time-windows.md
-│   ├── 3-calculations-and-transformations.md
-│   ├── 4-expressions-operators-functions.md
-│   ├── 5-variables-and-special-symbols.md
-│   └── 6-optional-metadata.md
-├── controlling-alerts-noise/      # Chapter 4
-│   ├── README.md
-│   ├── 1-disabling-alerts.md
-│   ├── 2-silencing-vs-disabling.md
-│   ├── 3-silencing-cloud.md
-│   └── 4-reducing-flapping.md
-├── receiving-notifications/       # Chapter 5
-│   ├── README.md
-│   ├── 1-notification-concepts.md
-│   ├── 2-agent-parent-notifications.md
-│   ├── 3-cloud-notifications.md
-│   ├── 4-controlling-recipients.md
-│   └── 5-testing-troubleshooting.md
-├── alert-examples/                # Chapter 6
-│   ├── README.md
-│   └── *.md files
-├── troubleshooting-alerts/        # Chapter 7
-│   ├── README.md
-│   └── *.md files
-├── essential-patterns/           # Chapter 8
-│   ├── README.md
-│   └── *.md files
-├── apis-alerts-events/           # Chapter 9
-│   ├── README.md
-│   └── *.md files
-├── cloud-alert-features/         # Chapter 10
-│   ├── README.md
-│   └── *.md files
-├── best-practices/              # Chapter 11
-│   ├── README.md
-│   ├── 1-designing-useful-alerts.md
-│   ├── 2-notification-strategy.md
-│   ├── 3-maintaining-configurations.md
-│   ├── 4-scaling-large-environments.md
-│   └── 5-sli-slo-alerts.md
-└── architecture/                # Chapter 12 (FINAL CHAPTER)
-    ├── README.md
-    ├── 1-evaluation-architecture.md
-    ├── 2-alert-lifecycle.md
-    ├── 3-notification-dispatch.md
-    ├── 4-configuration-layers.md
-    └── 5-scaling-topologies.md
-```
-
-**REMOVED:** stock-alerts directory (no longer exists)
+| Line | Placeholder | What to Add |
+|------|-----------|-------------|
+| ~161 | `agent_notifications_integrations` | Agent-dispatched integration entries |
+| ~165 | `cloud_notifications_integrations` | Cloud-dispatched integration entries |
 
 ---
 
-## File Naming Conventions
+## Current Structure in map.csv
 
-| Category | Pattern | Example |
-|-----------|---------|---------|
-| Landing page | `README.md` | `understanding-alerts/README.md` |
-| Topic | `N-topic-name.md` | `1-what-is-a-netdata-alert.md` |
-| Numbering | Sequential starting at 1 | 1, 2, 3, 4, 5... |
+### Existing Alert Documentation (Already Done)
+See `map.csv` lines ~158-226 for the complete 12-chapter structure under `Alerts & Notifications/`.
+
+### Placeholders to Populate
+
+**Line ~161: Agent Notifications (Agent-DISPATCHED)**
+```
+agent_notifications_integrations,,,,,
+```
+↓ Add entries for each Agent integration here
+
+**Line ~165: Cloud Notifications (Cloud-DISPATCHED)**
+```
+cloud_notifications_integrations,,,,,
+```
+↓ Add entries for each Cloud integration here
 
 ---
 
-## map.csv Entry Format
+## Source: Individual Integration Files in learn/
 
-```
-https://github.com/netdata/netdata/edit/master/docs/alerts/{folder}/{filename}.md,Sidebar Label,Published,Alerts & Notifications/{Folder Name},
-```
+All `.mdx` files already exist. Count them and populate corresponding map.csv entries.
 
-**Critical:** Never use `Alerts & Notifications/The Book/...` - that's been flattened.
+### Agent-DISPATCHED Integrations
+Location: `learn/docs/alerts-&-notifications/notifications/agent-dispatched-notifications/`
 
-Example:
-```
-https://github.com/netdata/netdata/edit/master/docs/alerts/architecture/1-evaluation-architecture.md,Alert Evaluation Architecture,Published,Alerts & Notifications/Alerts and Notifications Architecture,
-```
+**Main files:**
+- `agent-dispatched-notifications.mdx`
+- `agent-notifications-reference.mdx`
 
----
+**Individual integrations (24 total):**
+| alerta | aws-sns | custom | discord | dynatrace |
+|--------|---------|--------|---------|----------|
+| email | flock | gotify | ilert | irc |
+| kavenegar | matrix | microsoft-teams | messagebird | ntfy |
+| opsgenie | pagerduty | prowl | pushbullet | pushover |
+| rocketchat | signal4 | slack | smseagle | sms |
+| syslog | telegram | twilio | | |
 
-## Landing Page Template (README.md)
+### Cloud-DISPATCHED Integrations
+Location: `learn/docs/alerts-&-notifications/notifications/centralized-cloud-notifications/`
 
-```markdown
-# Chapter Title
+**Main files:**
+- `centralized-cloud-notifications.mdx`
+- `centralized-cloud-notifications-reference.mdx`
+- `manage-notification-methods.mdx`
+- `manage-alert-notification-silencing-rules.mdx`
 
-One-paragraph description of what this chapter covers.
-
-## Sections
-
-- [**N. Section Title**](section-link.md) - Description
-- [**N. Section Title**](section-link.md) - Description
-
-## Related
-
-- [Chapter X](../chapter-folder/README.md)
-```
-
----
-
-## Cross-Reference Pattern
-
-Link to other chapters like this:
-
-```markdown
-- **[Chapter X: Title]((../chapter-folder/README.md))** for topic
-- **[Section X.N](/docs/alerts/folder/n-section-title.md)** for specifics
-```
+**Individual integrations (15 total):**
+| amazon-sns | discord | ilert | mattermost | microsoft-teams |
+|-------------|---------|-------|------------|----------------|
+| netdata-mobile-app | opsgenie | pagerduty | rocketchat | servicenow |
+| slack | splunk | splunk-victorops | telegram | webhook |
 
 ---
 
-## Chapters With Sub-sections Numbered
+## Pattern for Integration Entries
 
-| Chapter | Subsection Numbers |
-|---------|-------------------|
-| 1. Understanding Alerts | 1-3 |
-| 2. Creating and Managing Alerts | 1-5 |
-| 3. Alert Configuration Syntax | 1-6 |
-| 4. Controlling Alerts and Noise | 1-4 |
-| 5. Receiving Notifications | 1-5 |
-| 11. Best Practices | 1-5 |
-| 12. Architecture | 1-5 |
+### Example: Agent Email Integration
+```
+https://github.com/netdata/netdata/edit/master/learn/docs/alerts-&-notifications/notifications/agent-dispatched-notifications/email.mdx,Email,Published,Alerts & Notifications/Notifications/Agent Dispatched Notifications,
+```
+
+### Example: Cloud Slack Integration
+```
+https://github.com/netdata/netdata/edit/master/learn/docs/alerts-&-notifications/notifications/centralized-cloud-notifications/slack.mdx,Slack,Published,Alerts & Notifications/Notifications/Centralized Cloud Notifications,
+```
+
+**Key fields:**
+- `learn_rel_path`: `Alerts & Notifications/Notifications/Agent Dispatched Notifications` OR `Alerts & Notifications/Notifications/Centralized Cloud Notifications`
 
 ---
 
-## Testing the Structure
+## What NOT Included in Old Structure
 
-After making changes:
-1. Run docs builder locally to catch broken links
-2. Check `git diff docs/.map/map.csv` - should only show "The Book/" → "" change
-3. Verify numerically-prefixed files sort correctly in file explorer
+The old `docs/alerts-and-notifications/` directory content is intentionally excluded from this map.csv update since we're building fresh structure in `learn/`.
 
 ---
 
 ## Questions?
 
-Check `src/health/*.c` for source of truth on alert terminology.
+Contact the documentation team for clarification. Do not cross-reference source code for terminology - that's handled separately.
