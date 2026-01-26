@@ -157,7 +157,7 @@ static struct basic_mountinfo *basic_mountinfo_create_and_copy(struct mountinfo*
         bmi->root = strdupz(mi->root);
         bmi->mount_point_stat_path = strdupz(mi->mount_point_stat_path);
         bmi->mount_point = strdupz(mi->mount_point);
-        bmi->mount_source = strdupz(mi->mount_source);
+        bmi->mount_source = mi->mount_source ? strdupz(mi->mount_source) : NULL;
         bmi->filesystem = strdupz(mi->filesystem);
     }
 
@@ -407,6 +407,8 @@ static void zfs_collect_pool_capacities(void) {
                 .pool_mount_seen = false
             };
             info = dictionary_set(zfs_pool_info_dict, pool_name, &new_info, sizeof(new_info));
+            if (!info)
+                continue;  // should never happen, but be defensive
         }
 
         // Check if this is the pool itself (no slash = pool mount)
