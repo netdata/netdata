@@ -376,7 +376,6 @@ static void zfs_collect_pool_capacities(void) {
     if (!lxc_checked) {
         zfs_inside_lxc_container = is_lxcfs_proc_mounted();
         lxc_checked = true;
-        collector_info("DISKSPACE: ZFS LXC container detection: %s", zfs_inside_lxc_container ? "inside LXC" : "not in LXC");
     }
 
     if (!zfs_datasets_heuristic || !zfs_cache)
@@ -421,7 +420,6 @@ static void zfs_collect_pool_capacities(void) {
             .excluded = false
         };
         dictionary_set(zfs_cache, mi->mount_source, &new_entry, sizeof(new_entry));
-        collector_info("DISKSPACE: ZFS pool '%s' capacity cached: %lu bytes", mi->mount_source, capacity);
     }
 }
 
@@ -454,9 +452,6 @@ static bool zfs_dataset_cached_excluded(const char *filesystem, const char *moun
 
     dictionary_acquired_item_release(zfs_cache, item);
 
-    if (cached_excluded)
-        collector_info("DISKSPACE: ZFS dataset '%s' skipped (cached as excluded)", mount_source);
-
     return cached_excluded;
 }
 
@@ -481,11 +476,8 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
         return false;
 
     // 5. Heuristic disabled → use pattern matching (default "!*" excludes nothing)
-    if (!zfs_datasets_heuristic) {
-        bool excluded = excluded_zfs_datasets_pattern && simple_pattern_matches(excluded_zfs_datasets_pattern, mount_point);
-        collector_info("DISKSPACE: ZFS dataset '%s' pattern match: %s", mount_source, excluded ? "excluded" : "kept");
-        return excluded;
-    }
+    if (!zfs_datasets_heuristic)
+        return excluded_zfs_datasets_pattern && simple_pattern_matches(excluded_zfs_datasets_pattern, mount_point);
 
     if (!zfs_cache)
         return false;
@@ -498,17 +490,14 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
 
     // Get pool info from cache
     const DICTIONARY_ITEM *pool_item = dictionary_get_and_acquire_item(zfs_cache, pool_name);
-    if (!pool_item) {
-        collector_info("DISKSPACE: ZFS dataset '%s' kept (pool '%s' not in cache)", mount_source, pool_name);
-        return false;
-    }
+    if (!pool_item)
+        return false;  // unknown pool → keep
 
     struct zfs_cache_entry *pool_entry = dictionary_acquired_item_value(pool_item);
 
     // 7. Verify it's a pool entry with valid capacity
     if (!pool_entry->is_pool || !pool_entry->pool_capacity) {
         dictionary_acquired_item_release(zfs_cache, pool_item);
-        collector_info("DISKSPACE: ZFS dataset '%s' kept (pool '%s' has no capacity)", mount_source, pool_name);
         return false;
     }
 
@@ -517,7 +506,6 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
     time_t now = now_realtime_sec();
     if (now - pool_entry->last_checked >= ZFS_DATASET_RECHECK_SECONDS * 2) {
         dictionary_acquired_item_release(zfs_cache, pool_item);
-        collector_info("DISKSPACE: ZFS dataset '%s' kept (pool '%s' cache stale)", mount_source, pool_name);
         return false;
     }
 
@@ -541,13 +529,6 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
         .excluded = excluded
     };
     dictionary_set(zfs_cache, mount_source, &dataset_entry, sizeof(dataset_entry));
-
-    collector_info("DISKSPACE: ZFS dataset '%s' %s (capacity %lu %s pool capacity %lu)",
-                   mount_source,
-                   excluded ? "excluded" : "kept",
-                   dataset_capacity,
-                   excluded ? ">=" : "<",
-                   pool_capacity);
 
     return excluded;
 }
@@ -1158,7 +1139,6 @@ void diskspace_main(void *ptr) {
             DICT_OPTION_FIXED_SIZE,
             &dictionary_stats_category_collectors,
             sizeof(struct zfs_cache_entry));
-        collector_info("DISKSPACE: ZFS dataset heuristic enabled, cache created");
     }
 
     netdata_mutex_init(&slow_mountinfo_mutex);
