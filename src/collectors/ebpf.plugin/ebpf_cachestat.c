@@ -389,7 +389,7 @@ static void ebpf_obsolete_cachestat_services(ebpf_module_t *em, char *id)
         EBPF_CACHESTAT_UNITS_HITS,
         NETDATA_CACHESTAT_SUBMENU,
         NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT,
+        NETDATA_SYSTEMD_CACHESTAT_HIT_FILES_CONTEXT,
         21102,
         em->update_every);
 
@@ -1253,7 +1253,7 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
         .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
         .order = 21102,
         .algorithm = EBPF_CHART_ALGORITHM_ABSOLUTE,
-        .context = NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT,
+        .context = NETDATA_SYSTEMD_CACHESTAT_HIT_FILES_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_CACHESTAT,
         .update_every = 0,
         .suffix = NETDATA_CACHESTAT_HIT_CHART,

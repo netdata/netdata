@@ -3,7 +3,8 @@
 #ifndef NETDATA_EBPF_DCSTAT_H
 #define NETDATA_EBPF_DCSTAT_H 1
 
-#include "ebpf.h"
+#include "libbpf_api/ebpf.h"
+#include "collectors/collectors-ipc/ebpf-ipc.h"
 
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_DCSTAT "dcstat"
@@ -38,7 +39,7 @@
 // ARAL name
 #define NETDATA_EBPF_DCSTAT_ARAL_NAME "ebpf_dcstat"
 
-// Unity
+// Unit
 #define EBPF_COMMON_UNITS_FILES "files"
 
 enum directory_cache_indexes {

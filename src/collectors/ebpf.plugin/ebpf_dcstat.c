@@ -191,7 +191,8 @@ static void ebpf_dc_set_hash_tables(struct dc_bpf *obj)
  */
 netdata_ebpf_program_loaded_t ebpf_dc_update_load(ebpf_module_t *em)
 {
-    if (!strcmp(
+    if (dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].optional &&
+        !strcmp(
             dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].optional,
             dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].function_to_attach))
         return EBPF_LOAD_TRAMPOLINE;
@@ -261,6 +262,8 @@ static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
 void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access, uint64_t not_found)
 {
     NETDATA_DOUBLE successful_access = (NETDATA_DOUBLE)(((long long)cache_access) - ((long long)not_found));
+    if (successful_access < 0)
+        successful_access = 0;
     NETDATA_DOUBLE ratio = (cache_access) ? successful_access / (NETDATA_DOUBLE)cache_access : 0;
 
     out->ratio = (long long)(ratio * 100);
@@ -704,13 +707,14 @@ void ebpf_read_dcstat_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        sem_wait(shm_mutex_ebpf_integration);
-        ebpf_read_dc_apps_table(maps_per_core);
-        ebpf_dc_resume_apps_data();
-        if (cgroups && shm_ebpf_cgroup.header)
-            ebpf_update_dc_cgroup();
+        if (sem_wait(shm_mutex_ebpf_integration) == 0) {
+            ebpf_read_dc_apps_table(maps_per_core);
+            ebpf_dc_resume_apps_data();
+            if (cgroups && shm_ebpf_cgroup.header)
+                ebpf_update_dc_cgroup();
 
-        sem_post(shm_mutex_ebpf_integration);
+            sem_post(shm_mutex_ebpf_integration);
+        }
 
         counter = 0;
 
@@ -1343,7 +1347,7 @@ static void dcstat_collector(ebpf_module_t *em)
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
-    memset(stats, 0, sizeof(em->hash_table_stats));
+    memset(stats, 0, NETDATA_EBPF_GLOBAL_TABLE_STATUS_END * sizeof(netdata_idx_t));
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
 
