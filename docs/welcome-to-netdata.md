@@ -4,7 +4,7 @@
 
 Netdata is a distributed, real-time observability platform that monitors metrics and logs from systems and applications, built on a foundation designed to seamlessly extend to distributed tracing. It collects data at per-second granularity, stores it at (or as close to) the edge where it's generated, provides automated dashboards, machine learning anomaly detection, and AI-powered analysis without requiring configuration or specialized skills.
 
-Instead of centralizing the data, Netdata distributes the monitoring code to each system, keeping data local while providing unified access. This architecture enables linear scaling to millions of metrics per second and terabytes of logs while offering significantly faster queries.
+Instead of centralizing the data, Netdata **distributes the monitoring code** to each system, **keeping data local** while providing **unified access**. This architecture enables **linear scaling** to millions of metrics per second and terabytes of logs, **automated root cause analysis**, faster UX and significantly **lower total cost of ownership**.
 
 We have designed this platform for operations teams, sysadmins, DevOps engineers, and SREs who need comprehensive real-time, low-latency visibility into their infrastructure and applications. Netdata is opinionated — it collects everything, visualizes everything, runs machine learning anomaly detection on everything, with several innovations that make modern observability accessible to lean teams, without the need for specialized skills.
 
