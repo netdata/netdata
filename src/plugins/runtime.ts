@@ -395,6 +395,8 @@ export class FinalReportPluginRuntimeManager {
         return;
       }
 
+      this.logEntry('VRB', turn, `Received META block for plugin '${pluginName}'.`);
+
       const parsed = parseJsonRecordDetailed(metaBlock.content);
       if (parsed.value === undefined) {
         const parseError = parsed.error ?? 'expected_json_object';

@@ -15,6 +15,9 @@ export function makeTTYLogCallbacks(
   },
   write?: (s: string) => void
 ): Pick<AIAgentEventCallbacks, 'onEvent'> {
+  const isAnyTty = process.stdin.isTTY
+    || process.stdout.isTTY
+    || process.stderr.isTTY;
   const logfmtWriter = typeof write === 'function'
     ? write
     : (s: string) => {
@@ -33,8 +36,8 @@ export function makeTTYLogCallbacks(
   if (opts.explicitFormat !== undefined && opts.explicitFormat.length > 0) {
     // User explicitly requested a format
     formats = [opts.explicitFormat as LogFormat];
-  } else if (process.stderr.isTTY && opts.serverMode !== true) {
-    // Interactive console mode - use simplified format
+  } else if (isAnyTty && opts.serverMode !== true) {
+    // Interactive console mode (any TTY) - use simplified format
     formats = ['console'];
   } else {
     // Server mode or non-TTY - use default selection logic
@@ -43,7 +46,7 @@ export function makeTTYLogCallbacks(
 
   const logger = createStructuredLogger({
     formats,
-    color: opts.color ?? process.stderr.isTTY,
+    color: opts.color ?? isAnyTty,
     verbose: opts.verbose === true,
     logfmtWriter,
     labels: baseLabels,

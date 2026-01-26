@@ -66,7 +66,7 @@ FIN 0.0 → INT main: Session complete: 5 turns, 4523 tokens, $0.12
 
 ### Console (stderr)
 
-Default output with TTY detection:
+Default output with TTY detection (any of stdin/stdout/stderr is a TTY):
 
 - **TTY mode**: Colored output with ANSI codes
 - **Non-TTY mode**: Plain text (for piping/files)

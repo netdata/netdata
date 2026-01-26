@@ -51,6 +51,7 @@ Every log originates as a `LogEntry`. The table below lists the fields (all valu
 ### Filtering Behaviour
 
 - CLI logging (`makeTTYLogCallbacks`) suppresses `VRB` unless `--verbose` is set, and drops `TRC` unless the relevant `--trace-llm`/`--trace-mcp` flag is enabled.
+- TTY detection treats the session as interactive if **any** of stdin/stdout/stderr is a TTY.
 - `THK` entries are never emitted to the TTY sink.
 
 ## Structured Event Schema

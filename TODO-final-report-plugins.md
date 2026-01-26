@@ -10,6 +10,9 @@ Introduce a plugin system for extending final report requirements with metadata.
 - Can spawn new sessions without blocking the core
 
 This replaces the current hardcoded `support_request_metadata_json_object` pattern in `neda/support-public.ai` with a generic, extensible mechanism.
+Also required:
+- Explain prompt construction (where final report + META instructions come from)
+- Ensure META is explained once, and **every** `<ai-agent-NONCE-FINAL` example includes META right after it (no FINAL-only examples).
 
 ## Analysis
 
@@ -114,6 +117,11 @@ Evidence from the current codebase:
 7. Final-turn enforcement depends on tool filtering + XML-NEXT; system prompt instructions persist across final turns.
 Evidence: system prompt is enhanced with tool instructions (`src/ai-agent.ts:1715-1717`), final-turn provider messages are not modified (`src/llm-providers/base.ts:1167-1168`), final turn filters tools to `final_report` (+ optional allowed tools) (`src/session-turn-runner.ts:2179-2187`), unknown tool attempts are tracked and cause retry slugs (`src/session-tool-executor.ts:786-792`, `src/session-turn-runner.ts:2422-2424`).
 
+### New Requirement (2026-01-26)
+- One META section in detail, no repeated meta explanations.
+- Every example that shows `<ai-agent-NONCE-FINAL` MUST include the `<ai-agent-NONCE-META ...>` block immediately after it.
+- No examples of FINAL alone anywhere (models learn by example).
+
 ## Decisions
 
 ### Made (with rationale)
@@ -144,6 +152,16 @@ Evidence: system prompt is enhanced with tool instructions (`src/ai-agent.ts:171
 | 22 | Test execution policy | **Phase1 + Phase2 during work; Phase3:tier1 only at end; never Phase3:tier2** | Explicit instruction for this task. |
 | 23 | Mandatory review gates | **Run Claude + Codex + GLM-4.7 after major milestones and at the end** | Required unanimous consensus unless an agent fails twice. |
 | 24 | Model-facing messaging quality bar | **All model-visible instructions/errors must be coherent from the model’s point of view** | Explicit risk called out by Costa; treat as a hard requirement. |
+| 25 | META guidance placement | **Single detailed META section + META in every FINAL example** | Required by Costa; avoids repetition while enforcing examples. |
+| 26 | No-plugins example behavior | **Keep FINAL examples without META when no plugins** | Costa chose 1a. |
+| 27 | Example injection model | **Core template injects plugin META examples into every FINAL example** | Costa: plugin cannot know other plugins; final-report.md must place plugin META snippets after each FINAL example. |
+| 28 | Template engine scope | **Apply to both `.ai` prompts and internal `.md` templates** | Costa: “both/all”. |
+| 29 | Template engine | **LiquidJS** | Costa: “let’s go with liquidjs”. |
+
+### Decisions Needed (2026-01-26)
+1) **Template engine selection (must support variables, assign/set, lists, loops, includes, if/else, and switch-case or equivalent)**
+   - Evidence: current templates only do string replacement, no conditions/loops (`src/prompts/loader.ts:55-89`).
+   - Options: (pending research + recommendation).
 
 ### Decisions (Costa)
 

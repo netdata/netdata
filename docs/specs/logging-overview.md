@@ -164,7 +164,7 @@ ts=1699999999999 level=VRB turn=1 subturn=0 dir=response type=llm remote="openai
 
 - Direct stderr output with rich/logfmt/json rendering
 - ANSI color + verbose options
-- Automatic TTY detection
+- Automatic TTY detection (interactive if any of stdin/stdout/stderr is a TTY)
 
 ### Journald Sink
 **Location**: `src/logging/journald-sink.ts`
