@@ -21,6 +21,8 @@ struct health_plugin_globals health_globals = {
 
         .run_at_least_every_seconds = 10,
         .postpone_alarms_during_hibernation_for_seconds = 60,
+
+        .max_concurrent_workers = 0,  // 0 = auto (will be set to min(4, cpus) during init)
     },
     .prototypes = {
         .dict = NULL,
@@ -88,6 +90,18 @@ void health_load_config_defaults(void) {
         inicfg_get_duration_seconds(&netdata_config, CONFIG_SECTION_HEALTH,
                                     "postpone alarms during hibernation for",
                                     health_globals.config.postpone_alarms_during_hibernation_for_seconds);
+
+    // Get max concurrent workers - default to min(4, cpus), max is cpus
+    {
+        size_t cpus = netdata_conf_cpus();
+        size_t default_workers = MIN(4, cpus);
+        size_t configured = (size_t)inicfg_get_number(&netdata_config, CONFIG_SECTION_HEALTH,
+                                                       "concurrent health workers", (long)default_workers);
+        // Clamp to [1, cpus]
+        if (configured < 1) configured = 1;
+        if (configured > cpus) configured = cpus;
+        health_globals.config.max_concurrent_workers = configured;
+    }
 
     health_globals.config.default_recipient =
         string_strdupz("root");

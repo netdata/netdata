@@ -2,10 +2,9 @@
 
 #include "sqlite_functions.h"
 #include "sqlite_aclk_alert.h"
+#include "health/health_event_loop_uv.h"
 
 #include "../../aclk/aclk_alarm_api.h"
-
-extern __thread bool is_health_thread;
 
 #define SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param)                                                                     \
     ({                                                                                                                 \
@@ -18,17 +17,17 @@ extern __thread bool is_health_thread;
     "WHERE hld.unique_id = @unique_id AND hl.config_hash_id = ah.hash_id AND hld.health_log_id = hl.health_log_id "    \
     "AND hl.host_id = @host_id AND ah.warn IS NULL AND ah.crit IS NULL"
 
-static inline bool is_event_from_alert_variable_config(int64_t unique_id, nd_uuid_t *host_id)
+static inline bool is_event_from_alert_variable_config(int64_t unique_id, nd_uuid_t *host_id, struct health_stmt_set *stmts)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
+    bool use_pool = (stmts != NULL);
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &compiled_res))
+    if (use_pool) {
+        if (!stmts->stmt_is_event_from_alert_variable_config) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &stmts->stmt_is_event_from_alert_variable_config))
                 return false;
         }
-        res = compiled_res;
+        res = stmts->stmt_is_event_from_alert_variable_config;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &res))
             return false;
@@ -45,7 +44,7 @@ static inline bool is_event_from_alert_variable_config(int64_t unique_id, nd_uui
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (use_pool)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
@@ -55,17 +54,17 @@ done:
 #define SQL_UPDATE_ALERT_VERSION_TRANSITION                                                                            \
     "UPDATE alert_version SET unique_id = @unique_id WHERE health_log_id = @health_log_id"
 
-static void update_alert_version_transition(int64_t health_log_id, int64_t unique_id)
+static void update_alert_version_transition(int64_t health_log_id, int64_t unique_id, struct health_stmt_set *stmts)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
+    bool use_pool = (stmts != NULL);
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION_TRANSITION, &compiled_res))
+    if (use_pool) {
+        if (!stmts->stmt_update_alert_version_transition) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION_TRANSITION, &stmts->stmt_update_alert_version_transition))
                 return;
         }
-        res = compiled_res;
+        res = stmts->stmt_update_alert_version_transition;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION_TRANSITION, &res))
             return;
@@ -82,7 +81,7 @@ static void update_alert_version_transition(int64_t health_log_id, int64_t uniqu
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (use_pool)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
@@ -92,17 +91,17 @@ done:
 
 #define SQL_SELECT_LAST_ALERT_STATUS "SELECT status FROM alert_version WHERE health_log_id = @health_log_id "
 
-static bool cloud_status_matches(int64_t health_log_id, RRDCALC_STATUS status)
+static bool cloud_status_matches(int64_t health_log_id, RRDCALC_STATUS status, struct health_stmt_set *stmts)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
+    bool use_pool = (stmts != NULL);
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_LAST_ALERT_STATUS, &compiled_res))
+    if (use_pool) {
+        if (!stmts->stmt_cloud_status_matches) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_LAST_ALERT_STATUS, &stmts->stmt_cloud_status_matches))
                 return true;
         }
-        res = compiled_res;
+        res = stmts->stmt_cloud_status_matches;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_LAST_ALERT_STATUS, &res))
             return true;
@@ -122,7 +121,7 @@ static bool cloud_status_matches(int64_t health_log_id, RRDCALC_STATUS status)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (use_pool)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
@@ -142,25 +141,25 @@ done:
 // - Cloud is already aware of the alert status
 // - The transition refers to a variable
 //
-static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, uint32_t unique_id, RRDCALC_STATUS status)
+static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, uint32_t unique_id, RRDCALC_STATUS status, struct health_stmt_set *stmts)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
+    bool use_pool = (stmts != NULL);
 
-    if (cloud_status_matches(health_log_id, status)) {
-        update_alert_version_transition(health_log_id, unique_id);
+    if (cloud_status_matches(health_log_id, status, stmts)) {
+        update_alert_version_transition(health_log_id, unique_id, stmts);
         return 1;
     }
 
-    if (is_event_from_alert_variable_config(unique_id, &host->host_id.uuid))
+    if (is_event_from_alert_variable_config(unique_id, &host->host_id.uuid, stmts))
         return 2;
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_QUEUE_ALERT_TO_CLOUD, &compiled_res))
+    if (use_pool) {
+        if (!stmts->stmt_insert_alert_to_submit_queue) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_QUEUE_ALERT_TO_CLOUD, &stmts->stmt_insert_alert_to_submit_queue))
                 return -1;
         }
-        res = compiled_res;
+        res = stmts->stmt_insert_alert_to_submit_queue;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_QUEUE_ALERT_TO_CLOUD, &res))
             return -1;
@@ -178,7 +177,7 @@ static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, ui
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (use_pool)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
@@ -548,17 +547,17 @@ done:
 
 #define SQL_DELETE_PROCESSED_ROWS "DELETE FROM alert_queue WHERE host_id = @host_id AND rowid = @row"
 
-static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row)
+static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row, struct health_stmt_set *stmts)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
+    bool use_pool = (stmts != NULL);
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_DELETE_PROCESSED_ROWS, &compiled_res))
+    if (use_pool) {
+        if (!stmts->stmt_delete_alert_from_pending_queue) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_DELETE_PROCESSED_ROWS, &stmts->stmt_delete_alert_from_pending_queue))
                 return;
         }
-        res = compiled_res;
+        res = stmts->stmt_delete_alert_from_pending_queue;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_PROCESSED_ROWS, &res))
             return;
@@ -575,7 +574,7 @@ static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (use_pool)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
@@ -628,20 +627,20 @@ done:
     "SELECT health_log_id, unique_id, status, rowid"                                                                   \
     " FROM alert_queue WHERE host_id = @host_id AND date_scheduled <= UNIXEPOCH() ORDER BY rowid ASC"
 
-bool process_alert_pending_queue(RRDHOST *host)
+bool process_alert_pending_queue(RRDHOST *host, struct health_stmt_set *stmts)
 {
     if (!REQUIRE_HEALTH_DB_OPEN())
         return false;
 
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
+    bool use_pool = (stmts != NULL);
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &compiled_res))
+    if (use_pool) {
+        if (!stmts->stmt_process_alert_pending_queue) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &stmts->stmt_process_alert_pending_queue))
                 return false;
         }
-        res = compiled_res;
+        res = stmts->stmt_process_alert_pending_queue;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, &res))
             return false;
@@ -661,12 +660,12 @@ bool process_alert_pending_queue(RRDHOST *host)
 
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
         if (aclk_host_config) {
-            int ret = insert_alert_to_submit_queue(host, health_log_id, unique_id, new_status);
+            int ret = insert_alert_to_submit_queue(host, health_log_id, unique_id, new_status, stmts);
             if (ret == 0)
                 added++;
         }
 
-        delete_alert_from_pending_queue(host, row);
+        delete_alert_from_pending_queue(host, row, stmts);
 
         count++;
     }
@@ -675,7 +674,7 @@ bool process_alert_pending_queue(RRDHOST *host)
         nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: Processed %d entries, queued %d", rrdhost_hostname(host), count, added);
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (use_pool)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
@@ -697,7 +696,7 @@ void aclk_push_alert_events_for_all_hosts(void)
 
         struct aclk_sync_cfg_t *aclk_host_config = host->aclk_host_config;
         if (!aclk_host_config || false == aclk_host_config->stream_alerts || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
-            (void)process_alert_pending_queue(host);
+            (void)process_alert_pending_queue(host, NULL);
             commit_alert_events(host);
             continue;
         }
@@ -706,7 +705,7 @@ void aclk_push_alert_events_for_all_hosts(void)
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
             if (aclk_host_config->send_snapshot == 1)
                 continue;
-            (void)process_alert_pending_queue(host);
+            (void)process_alert_pending_queue(host, NULL);
             commit_alert_events(host);
             rebuild_host_alert_version_table(host);
             send_alert_snapshot_to_cloud(host);

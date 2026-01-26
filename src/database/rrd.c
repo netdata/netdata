@@ -2,6 +2,7 @@
 
 #define RRDHOST_INTERNALS
 #include "rrd.h"
+#include "health/health_event_loop_uv.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 // globals
@@ -154,8 +155,11 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
     ml_host_start(localhost);
     dyncfg_host_init(localhost);
 
-    if(!unittest)
+    if(!unittest) {
         health_plugin_init();
+        if (health_plugin_enabled())
+            health_event_loop_init();
+    }
 
     global_functions_add();
 
