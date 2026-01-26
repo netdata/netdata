@@ -361,7 +361,7 @@ static inline bool is_zfs_dataset(struct mountinfo *mi) {
            strchr(mi->mount_source, '/') != NULL;
 }
 
-// Cached LXC detection result (rechecked periodically)
+// Cached LXC detection result (checked once at first call, can't change at runtime)
 static bool zfs_inside_lxc_container = false;
 
 // Collect ZFS pool capacities for the heuristic
