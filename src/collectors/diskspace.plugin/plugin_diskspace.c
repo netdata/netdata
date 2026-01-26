@@ -458,23 +458,32 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
     if (!pool_name || !pool_name[0])
         return false;  // can't determine pool → keep
 
-    struct zfs_pool_info *info = dictionary_get(zfs_pool_info_dict, pool_name);
-    if (!info)
+    // Acquire item to hold reference while reading values (prevents use-after-free
+    // if main thread flushes dictionary while slow worker is reading)
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(zfs_pool_info_dict, pool_name);
+    if (!item)
         return false;  // unknown pool → keep
 
+    struct zfs_pool_info *info = dictionary_acquired_item_value(item);
+
     // 7. Pool not mounted → keep all datasets (need at least one to monitor pool capacity)
-    if (!info->pool_mount_seen)
+    if (!info->pool_mount_seen) {
+        dictionary_acquired_item_release(zfs_pool_info_dict, item);
         return false;
+    }
 
     // 8. Calculate this mount's capacity
     unsigned long bsize = buff->f_frsize ? buff->f_frsize : buff->f_bsize;
     uint64_t total_bytes = (uint64_t)buff->f_blocks * bsize;
 
     // 9. Dataset capacity at least 1 block smaller than pool max → has quota → keep
-    if (total_bytes + bsize < info->max_capacity)
+    if (total_bytes + bsize < info->max_capacity) {
+        dictionary_acquired_item_release(zfs_pool_info_dict, item);
         return false;
+    }
 
     // 10. Dataset capacity within 1 block of pool max → no quota → exclude
+    dictionary_acquired_item_release(zfs_pool_info_dict, item);
     return true;
 }
 
