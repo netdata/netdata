@@ -512,20 +512,27 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
         return false;
     }
 
+    // 8. Check if pool cache entry is still fresh (pool may have been unmounted)
+    time_t now = now_realtime_sec();
+    if (now - pool_entry->last_checked >= ZFS_DATASET_RECHECK_SECONDS) {
+        dictionary_acquired_item_release(zfs_cache, pool_item);
+        collector_info("DISKSPACE: ZFS dataset '%s' kept (pool '%s' cache stale)", mount_source, pool_name);
+        return false;
+    }
+
     uint64_t pool_capacity = pool_entry->pool_capacity;
     dictionary_acquired_item_release(zfs_cache, pool_item);
 
-    // 8. Calculate this dataset's capacity
+    // 9. Calculate this dataset's capacity
     unsigned long bsize = buff->f_frsize ? buff->f_frsize : buff->f_bsize;
     uint64_t dataset_capacity = (uint64_t)buff->f_blocks * bsize;
 
-    // 9. Determine exclusion: dataset capacity >= pool capacity → no quota → exclude
+    // 10. Determine exclusion: dataset capacity >= pool capacity → no quota → exclude
     // In ZFS, statvfs total = used + available. Datasets with data show larger
     // total than pool. Datasets with quotas show smaller total (capped by quota).
     bool excluded = (dataset_capacity >= pool_capacity);
 
-    // 10. Cache the decision for this dataset
-    time_t now = now_realtime_sec();
+    // 11. Cache the decision for this dataset
     struct zfs_cache_entry dataset_entry = {
         .last_checked = now,
         .is_pool = false,
