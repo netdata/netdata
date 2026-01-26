@@ -495,13 +495,13 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 
 	for rows.Next() {
 		var (
-			digest       sql.NullString
-			errno        sql.NullInt64
-			sqlState     sql.NullString
-			message      sql.NullString
-			digestText   sql.NullString
-			schemaName   sql.NullString
-			sqlText      sql.NullString
+			digest      sql.NullString
+			errno       sql.NullInt64
+			sqlState    sql.NullString
+			message     sql.NullString
+			digestText  sql.NullString
+			schemaName  sql.NullString
+			sqlText     sql.NullString
 			scanTargets []any
 		)
 

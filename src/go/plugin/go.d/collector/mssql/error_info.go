@@ -497,12 +497,12 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 	var results []mssqlErrorRow
 	for rows.Next() {
 		var (
-			ts       sql.NullTime
-			errNo    sql.NullInt64
-			message  sql.NullString
-			sqlText  sql.NullString
+			ts        sql.NullTime
+			errNo     sql.NullInt64
+			message   sql.NullString
+			sqlText   sql.NullString
 			queryHash sql.NullString
-			errNoPtr *int64
+			errNoPtr  *int64
 		)
 		if err := rows.Scan(&ts, &errNo, &message, &sqlText, &queryHash); err != nil {
 			return mssqlErrorAttrNotSupported, nil, err
