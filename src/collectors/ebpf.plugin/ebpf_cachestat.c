@@ -57,8 +57,7 @@ netdata_ebpf_targets_t cachestat_targets[] = {
     {.name = "add_to_page_cache_lru", .mode = EBPF_LOAD_TRAMPOLINE},
     {.name = "mark_page_accessed", .mode = EBPF_LOAD_TRAMPOLINE},
     {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
-    {.name = "mark_buffer_dirty", .mode = EBPF_LOAD_TRAMPOLINE},
-    {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+    {.name = "mark_buffer_dirty", .mode = EBPF_LOAD_TRAMPOLINE}};
 
 static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] = {
     "account_page_dirtied",
@@ -614,6 +613,11 @@ static void ebpf_cachestat_exit(void *pptr)
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
+
+    freez(cachestat_vector);
+    cachestat_vector = NULL;
+    freez(cachestat_values);
+    cachestat_values = NULL;
 }
 
 /*****************************************************************
@@ -686,11 +690,25 @@ static void calculate_stats(netdata_publish_cachestat_t *publish)
         return;
     }
 
-    uint64_t mpa = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED] - publish->prev.mark_page_accessed;
-    uint64_t mbd = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY] - publish->prev.mark_buffer_dirty;
-    uint64_t apcl =
-        cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU] - publish->prev.add_to_page_cache_lru;
-    uint64_t apd = cachestat_hash_values[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED] - publish->prev.account_page_dirtied;
+    int64_t mpa = (int64_t)cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED] -
+                  (int64_t)publish->prev.mark_page_accessed;
+    if (mpa < 0)
+        mpa = 0;
+
+    int64_t mbd =
+        (int64_t)cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY] - (int64_t)publish->prev.mark_buffer_dirty;
+    if (mbd < 0)
+        mbd = 0;
+
+    int64_t apcl = (int64_t)cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU] -
+                   (int64_t)publish->prev.add_to_page_cache_lru;
+    if (apcl < 0)
+        apcl = 0;
+
+    int64_t apd = (int64_t)cachestat_hash_values[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED] -
+                  (int64_t)publish->prev.account_page_dirtied;
+    if (apd < 0)
+        apd = 0;
 
     save_previous_values(publish);
 
@@ -1092,11 +1110,22 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
         netdata_cachestat_t *current = &w->cachestat.current;
         netdata_cachestat_t *prev = &w->cachestat.prev;
 
-        uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
-        uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
+        int64_t mpa = (int64_t)current->mark_page_accessed - (int64_t)prev->mark_page_accessed;
+        if (mpa < 0)
+            mpa = 0;
+
+        int64_t mbd = (int64_t)current->mark_buffer_dirty - (int64_t)prev->mark_buffer_dirty;
+        if (mbd < 0)
+            mbd = 0;
         w->cachestat.dirty = (long long)mbd;
-        uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
-        uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
+
+        int64_t apcl = (int64_t)current->add_to_page_cache_lru - (int64_t)prev->add_to_page_cache_lru;
+        if (apcl < 0)
+            apcl = 0;
+
+        int64_t apd = (int64_t)current->account_page_dirtied - (int64_t)prev->account_page_dirtied;
+        if (apd < 0)
+            apd = 0;
 
         cachestat_update_publish(&w->cachestat, mpa, mbd, apcl, apd);
 
@@ -1161,11 +1190,22 @@ void ebpf_cachestat_calc_chart_values()
         netdata_cachestat_t *current = &ect->publish_cachestat.current;
         netdata_cachestat_t *prev = &ect->publish_cachestat.prev;
 
-        uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
-        uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
+        int64_t mpa = (int64_t)current->mark_page_accessed - (int64_t)prev->mark_page_accessed;
+        if (mpa < 0)
+            mpa = 0;
+
+        int64_t mbd = (int64_t)current->mark_buffer_dirty - (int64_t)prev->mark_buffer_dirty;
+        if (mbd < 0)
+            mbd = 0;
         ect->publish_cachestat.dirty = (long long)mbd;
-        uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
-        uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
+
+        int64_t apcl = (int64_t)current->add_to_page_cache_lru - (int64_t)prev->add_to_page_cache_lru;
+        if (apcl < 0)
+            apcl = 0;
+
+        int64_t apd = (int64_t)current->account_page_dirtied - (int64_t)prev->account_page_dirtied;
+        if (apd < 0)
+            apd = 0;
 
         cachestat_update_publish(&ect->publish_cachestat, mpa, mbd, apcl, apd);
     }
