@@ -38,7 +38,7 @@ struct zfs_pool_info {
 };
 
 static DICTIONARY *zfs_pool_info_dict = NULL;
-static SIMPLE_PATTERN *zfs_exclude_datasets_pattern = NULL;
+static SIMPLE_PATTERN *excluded_zfs_datasets_pattern = NULL;
 static int zfs_datasets_heuristic = CONFIG_BOOLEAN_YES;
 static time_t zfs_last_checked = 0;     // timestamp of last capacity check
 
@@ -451,7 +451,7 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
 
     // 5. Heuristic disabled → use pattern matching (default "!*" excludes nothing)
     if (!zfs_datasets_heuristic)
-        return zfs_exclude_datasets_pattern && simple_pattern_matches(zfs_exclude_datasets_pattern, mount_point);
+        return excluded_zfs_datasets_pattern && simple_pattern_matches(excluded_zfs_datasets_pattern, mount_point);
 
     // 6. Heuristic enabled - use capacity logic
     char pool_name_buf[256];
@@ -490,10 +490,6 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
     return true;
 }
 
-static inline bool should_exclude_zfs_mount(struct mountinfo *mi, struct statvfs *buff) {
-    return should_exclude_zfs(mi->filesystem, mi->mount_point, mi->mount_source, buff);
-}
-
 static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     const char *disk = mi->persistent_id;
 
@@ -527,6 +523,14 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
         excluded_filesystems_inodes = simple_pattern_create(
             inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude inode metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS_INODES),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
+
+        // ZFS dataset exclusion pattern (used when heuristic is disabled)
+        // Always create so the option appears in config for users to customize
+        excluded_zfs_datasets_pattern = simple_pattern_create(
+            inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude zfs datasets on paths", "!*"),
             NULL,
             SIMPLE_PATTERN_EXACT,
             true);
@@ -670,7 +674,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         m->slow = true;
 
     // Check if this ZFS mount should be excluded (capacity-based heuristic)
-    if (should_exclude_zfs_mount(mi, &buff_statvfs))
+    if (should_exclude_zfs(mi->filesystem, mi->mount_point, mi->mount_source, &buff_statvfs))
         goto cleanup;
 
     m->shown_error = false;
@@ -823,8 +827,8 @@ static void diskspace_main_cleanup(void *ptr) {
     dictionary_destroy(zfs_pool_info_dict);
     zfs_pool_info_dict = NULL;
 
-    simple_pattern_free(zfs_exclude_datasets_pattern);
-    zfs_exclude_datasets_pattern = NULL;
+    simple_pattern_free(excluded_zfs_datasets_pattern);
+    excluded_zfs_datasets_pattern = NULL;
 
     rrd_collector_finished();
     worker_unregister();
@@ -1088,13 +1092,6 @@ void diskspace_main(void *ptr) {
             DICT_OPTION_FIXED_SIZE,
             &dictionary_stats_category_collectors,
             sizeof(struct zfs_pool_info));
-    } else {
-        // Pattern mode: create exclusion pattern
-        zfs_exclude_datasets_pattern = simple_pattern_create(
-            inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude zfs datasets on paths", "!*"),
-            NULL,
-            SIMPLE_PATTERN_EXACT,
-            true);
     }
 
     netdata_mutex_init(&slow_mountinfo_mutex);
