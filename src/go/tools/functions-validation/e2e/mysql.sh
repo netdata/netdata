@@ -12,6 +12,11 @@ MYSQL_PORT="$(reserve_port)"
 write_env "MYSQL_PORT" "$MYSQL_PORT"
 replace_in_file "$WORKDIR/config/go.d/mysql.conf" "127.0.0.1:3306" "127.0.0.1:${MYSQL_PORT}"
 
+MYSQL_VARIANT_LABEL="${MYSQL_VARIANT:-mysql}"
+if [ -n "${MYSQL_IMAGE:-}" ]; then
+  write_env "MYSQL_IMAGE" "$MYSQL_IMAGE"
+fi
+
 compose_up mysql
 wait_healthy mysql 90
 
@@ -79,6 +84,17 @@ path = sys.argv[1]
 with open(path, "r", encoding="utf-8") as fh:
     doc = json.load(fh)
 
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit(f"unexpected status value: {doc.get('status')!r}")
+
+if status != 200:
+    raise SystemExit(f"expected status 200, got {status}")
+
+if doc.get("errorMessage"):
+    raise SystemExit(f"unexpected errorMessage on status 200: {doc.get('errorMessage')!r}")
+
 columns = doc.get("columns") or {}
 field_to_idx = {}
 if isinstance(columns, dict):
@@ -97,7 +113,7 @@ else:
         if field:
             field_to_idx[field] = idx
 
-for required in ("deadlock_id", "is_victim", "lock_mode", "lock_status", "query_text"):
+for required in ("row_id", "deadlock_id", "process_id", "is_victim", "lock_mode", "lock_status", "query_text", "wait_resource", "database"):
     if required not in field_to_idx:
         raise SystemExit(f"missing expected column: {required}")
 
@@ -124,19 +140,36 @@ if not has_expected_query:
 waiting_rows = [row for row in data if norm(get_value(row, "lock_status")).upper() == "WAITING"]
 if any(norm(get_value(row, "lock_mode")) == "" for row in waiting_rows):
     raise SystemExit("WAITING rows must include lock_mode")
+if any(norm(get_value(row, "wait_resource")) == "" for row in waiting_rows):
+    raise SystemExit("WAITING rows must include wait_resource")
+
+lock_mode_re = re.compile(r"^[A-Za-z0-9_-]+$")
+if any(not lock_mode_re.match(norm(get_value(row, "lock_mode"))) for row in waiting_rows):
+    raise SystemExit("WAITING rows must include a valid lock_mode")
 
 victim_counts = {}
+has_database = False
 for row in data:
     deadlock_id = norm(get_value(row, "deadlock_id"))
     if deadlock_id == "":
         raise SystemExit("deadlock_id missing from deadlock-info output")
+    process_id = norm(get_value(row, "process_id"))
+    if process_id == "":
+        raise SystemExit("process_id missing from deadlock-info output")
+    row_id = norm(get_value(row, "row_id"))
+    if row_id != f"{deadlock_id}:{process_id}":
+        raise SystemExit(f"row_id {row_id} does not match deadlock_id/process_id")
     victim_counts.setdefault(deadlock_id, 0)
     if norm(get_value(row, "is_victim")).lower() == "true":
         victim_counts[deadlock_id] += 1
+    if norm(get_value(row, "database")):
+        has_database = True
 
 for deadlock_id, count in victim_counts.items():
     if count != 1:
         raise SystemExit(f"deadlock_id {deadlock_id} has victim count {count}, expected 1")
+if not has_database:
+    raise SystemExit("expected at least one row with database populated")
 PY
   else
     python - "$input" <<'PY'
@@ -148,6 +181,17 @@ path = sys.argv[1]
 with open(path, "r", encoding="utf-8") as fh:
     doc = json.load(fh)
 
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit("unexpected status value: %r" % (doc.get("status"),))
+
+if status != 200:
+    raise SystemExit("expected status 200, got %s" % status)
+
+if doc.get("errorMessage"):
+    raise SystemExit("unexpected errorMessage on status 200: %r" % (doc.get("errorMessage"),))
+
 columns = doc.get("columns") or {}
 field_to_idx = {}
 if isinstance(columns, dict):
@@ -166,7 +210,7 @@ else:
         if field:
             field_to_idx[field] = idx
 
-for required in ("deadlock_id", "is_victim", "lock_mode", "lock_status", "query_text"):
+for required in ("row_id", "deadlock_id", "process_id", "is_victim", "lock_mode", "lock_status", "query_text", "wait_resource", "database"):
     if required not in field_to_idx:
         raise SystemExit(f"missing expected column: {required}")
 
@@ -193,21 +237,101 @@ if not has_expected_query:
 waiting_rows = [row for row in data if norm(get_value(row, "lock_status")).upper() == "WAITING"]
 if any(norm(get_value(row, "lock_mode")) == "" for row in waiting_rows):
     raise SystemExit("WAITING rows must include lock_mode")
+if any(norm(get_value(row, "wait_resource")) == "" for row in waiting_rows):
+    raise SystemExit("WAITING rows must include wait_resource")
+
+lock_mode_re = re.compile(r"^[A-Za-z0-9_-]+$")
+if any(not lock_mode_re.match(norm(get_value(row, "lock_mode"))) for row in waiting_rows):
+    raise SystemExit("WAITING rows must include a valid lock_mode")
 
 victim_counts = {}
+has_database = False
 for row in data:
     deadlock_id = norm(get_value(row, "deadlock_id"))
     if deadlock_id == "":
         raise SystemExit("deadlock_id missing from deadlock-info output")
+    process_id = norm(get_value(row, "process_id"))
+    if process_id == "":
+        raise SystemExit("process_id missing from deadlock-info output")
+    row_id = norm(get_value(row, "row_id"))
+    if row_id != "%s:%s" % (deadlock_id, process_id):
+        raise SystemExit("row_id %s does not match deadlock_id/process_id" % row_id)
     victim_counts.setdefault(deadlock_id, 0)
     if norm(get_value(row, "is_victim")).lower() == "true":
         victim_counts[deadlock_id] += 1
+    if norm(get_value(row, "database")):
+        has_database = True
 
 for deadlock_id, count in victim_counts.items():
     if count != 1:
         raise SystemExit(f"deadlock_id {deadlock_id} has victim count {count}, expected 1")
+if not has_database:
+    raise SystemExit("expected at least one row with database populated")
 PY
   fi
+}
+
+assert_deadlock_info_empty_success() {
+  local input="$1"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit(f"unexpected status value: {doc.get('status')!r}")
+
+if status != 200:
+    raise SystemExit(f"expected status 200, got {status}")
+
+if doc.get("errorMessage"):
+    raise SystemExit(f"unexpected errorMessage on status 200: {doc.get('errorMessage')!r}")
+
+data = doc.get("data") or []
+if len(data) != 0:
+    raise SystemExit(f"expected no rows, got {len(data)}")
+PY
+    return
+  fi
+
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r") as fh:
+    doc = json.load(fh)
+
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit("unexpected status value: %r" % (doc.get("status"),))
+
+if status != 200:
+    raise SystemExit("expected status 200, got %s" % status)
+
+if doc.get("errorMessage"):
+    raise SystemExit("unexpected errorMessage on status 200: %r" % (doc.get("errorMessage"),))
+
+data = doc.get("data") or []
+if len(data) != 0:
+    raise SystemExit("expected no rows, got %s" % len(data))
+PY
+}
+
+verify_deadlock_info_no_deadlock() {
+  local output
+
+  output="$(run_function mysql deadlock-info '__job:local' 'false')"
+  validate "$output"
+  assert_deadlock_info_empty_success "$output"
 }
 
 verify_deadlock_info() {
@@ -233,6 +357,7 @@ verify_deadlock_info() {
   fi
 }
 
+verify_deadlock_info_no_deadlock
 verify_deadlock_info
 
-echo "E2E checks passed for mysql." >&2
+echo "E2E checks passed for ${MYSQL_VARIANT_LABEL}." >&2

@@ -52,6 +52,8 @@ var (
 	reDeadlockThread = regexp.MustCompile(`MySQL thread id (\d+)`)
 	reDeadlockMode   = regexp.MustCompile(`(?i)lock[_ ]mode\s+([A-Z0-9_-]+)`)
 	reDeadlockTS     = regexp.MustCompile(`\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\b`)
+	reDeadlockTable  = regexp.MustCompile(`(?i)\bof\s+table\s+` + "`?" + `([-\w$]+)` + "`?" + `\.` + "`?" + `([-\w$]+)` + "`?")
+	reQueryTableRef  = regexp.MustCompile(`(?i)\b(?:from|update|into|join)\s+` + "`?" + `([-\w$]+)` + "`?" + `\.` + "`?" + `([-\w$]+)` + "`?")
 )
 
 const (
@@ -135,6 +137,9 @@ func (c *Collector) collectDeadlockInfo(ctx context.Context) *funcapi.FunctionRe
 
 	statusText, err := c.queryInnoDBStatus(ctx)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return c.deadlockInfoResponse(504, "deadlock query timed out", nil)
+		}
 		if isMySQLPermissionError(err) {
 			return c.deadlockInfoResponse(
 				403,
@@ -569,6 +574,12 @@ func buildDeadlockRows(parseRes mysqlDeadlockParseResult, deadlockID string) [][
 		lockMode := strings.TrimSpace(txn.lockMode)
 		lockStatus := strings.TrimSpace(txn.lockStatus)
 		waitResource := strmutil.TruncateText(strings.TrimSpace(txn.waitResource), maxQueryTextLength)
+		database := extractDeadlockDatabase(waitResource, queryText)
+
+		var databaseValue any
+		if database != "" {
+			databaseValue = database
+		}
 
 		row := make([]any, deadlockColumnCount)
 		row[deadlockIdxRowID] = fmt.Sprintf("%s:%s", deadlockID, processID)
@@ -582,7 +593,7 @@ func buildDeadlockRows(parseRes mysqlDeadlockParseResult, deadlockID string) [][
 		row[deadlockIdxLockMode] = lockMode
 		row[deadlockIdxLockStatus] = lockStatus
 		row[deadlockIdxWaitResource] = waitResource
-		row[deadlockIdxDatabase] = nil
+		row[deadlockIdxDatabase] = databaseValue
 		rows = append(rows, row)
 	}
 
@@ -684,6 +695,32 @@ func isLikelyQueryLine(line string) bool {
 func isLockResourceLine(line string) bool {
 	upper := strings.ToUpper(strings.TrimSpace(line))
 	return strings.HasPrefix(upper, "RECORD LOCKS") || strings.HasPrefix(upper, "TABLE LOCK")
+}
+
+func extractDeadlockDatabase(waitResource, queryText string) string {
+	if db := extractDatabaseFromLock(waitResource); db != "" {
+		return db
+	}
+	if db := extractDatabaseFromQuery(queryText); db != "" {
+		return db
+	}
+	return ""
+}
+
+func extractDatabaseFromLock(line string) string {
+	m := reDeadlockTable.FindStringSubmatch(line)
+	if len(m) >= 2 {
+		return m[1]
+	}
+	return ""
+}
+
+func extractDatabaseFromQuery(queryText string) string {
+	m := reQueryTableRef.FindStringSubmatch(queryText)
+	if len(m) >= 2 {
+		return m[1]
+	}
+	return ""
 }
 
 func generateDeadlockID(t time.Time) string {

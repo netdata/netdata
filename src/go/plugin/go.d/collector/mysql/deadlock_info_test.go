@@ -211,6 +211,24 @@ func TestCollector_collectDeadlockInfo_QueryError(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestCollector_collectDeadlockInfo_Timeout(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	mock.ExpectQuery(queryShowEngineInnoDBStatus).
+		WillReturnError(context.DeadlineExceeded)
+
+	collr := New()
+	collr.db = db
+
+	resp := collr.collectDeadlockInfo(context.Background())
+	require.NotNil(t, resp)
+	assert.Equal(t, 504, resp.Status)
+	assert.Contains(t, resp.Message, "timed out")
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestCollector_collectDeadlockInfo_PermissionDenied(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	require.NoError(t, err)
@@ -252,6 +270,15 @@ func TestBuildDeadlockRows(t *testing.T) {
 	assert.Equal(t, deadlockID, rows[1][deadlockIdxDeadlockID])
 	assert.Equal(t, deadlockID+":10", rows[0][deadlockIdxRowID])
 	assert.Equal(t, deadlockID+":11", rows[1][deadlockIdxRowID])
+
+	hasDatabase := false
+	for _, row := range rows {
+		if row[deadlockIdxDatabase] == "netdata" {
+			hasDatabase = true
+			break
+		}
+	}
+	assert.True(t, hasDatabase, "expected at least one row with database populated")
 }
 
 func boolPtr(v bool) *bool {

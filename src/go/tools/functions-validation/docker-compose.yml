@@ -17,12 +17,16 @@ services:
       retries: 10
 
   mysql:
-    image: mysql:8.0
+    image: ${MYSQL_IMAGE:-mysql:8.0}
     environment:
       MYSQL_ROOT_PASSWORD: rootpw
       MYSQL_DATABASE: netdata
       MYSQL_USER: netdata
       MYSQL_PASSWORD: netdata
+      MARIADB_ROOT_PASSWORD: rootpw
+      MARIADB_DATABASE: netdata
+      MARIADB_USER: netdata
+      MARIADB_PASSWORD: netdata
     command: ["--performance_schema=ON"]
     ports:
       - "${MYSQL_PORT:-3306}:3306"
@@ -35,7 +39,7 @@ services:
       retries: 10
 
   mssql:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: ${MSSQL_IMAGE:-mcr.microsoft.com/mssql/server:2022-latest}
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "Netdata123!"

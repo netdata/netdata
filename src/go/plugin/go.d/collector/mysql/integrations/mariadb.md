@@ -355,7 +355,7 @@ Query text and wait resource strings are truncated at 4096 characters for displa
 | Require Cloud | yes |
 | Performance | Executes `SHOW ENGINE INNODB STATUS` on demand:<br/>• Not part of regular collection<br/>• Query cost depends on server load and the size of the InnoDB status output |
 | Security | Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to MySQL<br/>• `deadlock_info_function_enabled` is true<br/>• The account can run `SHOW ENGINE INNODB STATUS` (PROCESS privilege)<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when PROCESS privilege is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock section cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled |
+| Availability | Available when:<br/>• The collector has successfully connected to MySQL<br/>• `deadlock_info_function_enabled` is true<br/>• The account can run `SHOW ENGINE INNODB STATUS` (PROCESS privilege)<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when PROCESS privilege is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out<br/>• Returns HTTP 561 when the deadlock section cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled |
 
 #### Prerequisites
 
@@ -678,4 +678,3 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep mysql
 ```
-
