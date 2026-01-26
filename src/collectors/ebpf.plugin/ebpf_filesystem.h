@@ -9,19 +9,16 @@
 
 #include "ebpf.h"
 
+// Maximum length for filesystem distribution name
 #define NETDATA_FS_MAX_DIST_NAME 64UL
 
+// Configuration section and file names
 #define NETDATA_FILESYSTEM_CONFIG_NAME "filesystem"
-
-// Process configuration name
 #define NETDATA_FILESYSTEM_CONFIG_FILE "filesystem.conf"
 
-typedef struct netdata_fs_hist {
-    uint32_t hist_id;
-    uint32_t bin;
-} netdata_fs_hist_t;
-
 enum filesystem_limit {
+    // Histogram bin offsets for different operation types
+    // Each operation type has 24 histogram bins (NETDATA_EBPF_HIST_MAX_BINS)
     NETDATA_KEY_CALLS_READ = 24,
     NETDATA_KEY_CALLS_WRITE = 48,
     NETDATA_KEY_CALLS_OPEN = 72,
@@ -29,7 +26,8 @@ enum filesystem_limit {
 };
 
 enum netdata_filesystem_flags {
-    NETDATA_FILESYSTEM_FLAG_NO_PARTITION = 0,
+    // Flags indicating filesystem module state and operations
+    NETDATA_FILESYSTEM_FLAG_NO_PARTITION,
     NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM = 1,
     NETDATA_FILESYSTEM_FLAG_HAS_PARTITION = 2,
     NETDATA_FILESYSTEM_FLAG_CHART_CREATED = 4,
@@ -50,7 +48,21 @@ enum netdata_filesystem_localfs_idx {
     NETDATA_FS_LOCALFS_END,
 };
 
+/**
+ * Filesystem eBPF collector thread
+ *
+ * Main thread function that monitors filesystem operations (btrfs, ext4, nfs, xfs, zfs)
+ * and collects latency metrics using eBPF.
+ *
+ * @param ptr Pointer to module data (struct ebpf_module *)
+ */
 void ebpf_filesystem_thread(void *ptr);
+
+/**
+ * Filesystem module configuration
+ *
+ * Stores configuration parameters for the filesystem eBPF collector
+ */
 extern struct config fs_config;
 
 #endif /* NETDATA_EBPF_FILESYSTEM_H */

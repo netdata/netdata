@@ -265,52 +265,90 @@ static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functi
     obj->links.netdata_fs_file_write_probe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_probe, false, functions[NETDATA_KEY_BTF_WRITE]);
     if (libbpf_get_error(obj->links.netdata_fs_file_write_probe))
-        return -1;
+        goto cleanup_file_read;
 
     obj->links.netdata_fs_file_open_probe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_probe, false, functions[NETDATA_KEY_BTF_OPEN]);
     if (libbpf_get_error(obj->links.netdata_fs_file_open_probe))
-        return -1;
+        goto cleanup_file_write;
 
     obj->links.netdata_fs_getattr_probe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_probe, false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
     if (libbpf_get_error(obj->links.netdata_fs_getattr_probe))
-        return -1;
+        goto cleanup_file_open;
 
     // kretprobe
     obj->links.netdata_fs_file_read_retprobe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_retprobe, false, functions[NETDATA_KEY_BTF_READ]);
     if (libbpf_get_error(obj->links.netdata_fs_file_read_retprobe))
-        return -1;
+        goto cleanup_getattr;
 
     obj->links.netdata_fs_file_write_retprobe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_retprobe, false, functions[NETDATA_KEY_BTF_WRITE]);
     if (libbpf_get_error(obj->links.netdata_fs_file_write_retprobe))
-        return -1;
+        goto cleanup_file_read_ret;
 
     obj->links.netdata_fs_file_open_retprobe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_retprobe, false, functions[NETDATA_KEY_BTF_OPEN]);
     if (libbpf_get_error(obj->links.netdata_fs_file_open_retprobe))
-        return -1;
+        goto cleanup_file_write_ret;
 
     obj->links.netdata_fs_getattr_retprobe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_retprobe, false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
     if (libbpf_get_error(obj->links.netdata_fs_getattr_retprobe))
-        return -1;
+        goto cleanup_file_open_ret;
 
     if (functions[NETDATA_KEY_BTF_OPEN2]) {
         obj->links.netdata_fs_2nd_file_open_probe = bpf_program__attach_kprobe(
             obj->progs.netdata_fs_2nd_file_open_probe, false, functions[NETDATA_KEY_BTF_OPEN2]);
         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_probe))
-            return -1;
+            goto cleanup_getattr_ret;
 
         obj->links.netdata_fs_2nd_file_open_retprobe = bpf_program__attach_kprobe(
             obj->progs.netdata_fs_2nd_file_open_retprobe, false, functions[NETDATA_KEY_BTF_OPEN2]);
         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_retprobe))
-            return -1;
+            goto cleanup_2nd_open_probe;
     }
 
     return 0;
+
+cleanup_2nd_open_probe:
+    if (obj->links.netdata_fs_2nd_file_open_probe)
+        bpf_link__destroy(obj->links.netdata_fs_2nd_file_open_probe);
+
+cleanup_getattr_ret:
+    if (obj->links.netdata_fs_getattr_retprobe)
+        bpf_link__destroy(obj->links.netdata_fs_getattr_retprobe);
+
+cleanup_file_open_ret:
+    if (obj->links.netdata_fs_file_open_retprobe)
+        bpf_link__destroy(obj->links.netdata_fs_file_open_retprobe);
+
+cleanup_file_write_ret:
+    if (obj->links.netdata_fs_file_write_retprobe)
+        bpf_link__destroy(obj->links.netdata_fs_file_write_retprobe);
+
+cleanup_file_read_ret:
+    if (obj->links.netdata_fs_file_read_retprobe)
+        bpf_link__destroy(obj->links.netdata_fs_file_read_retprobe);
+
+cleanup_getattr:
+    if (obj->links.netdata_fs_getattr_probe)
+        bpf_link__destroy(obj->links.netdata_fs_getattr_probe);
+
+cleanup_file_open:
+    if (obj->links.netdata_fs_file_open_probe)
+        bpf_link__destroy(obj->links.netdata_fs_file_open_probe);
+
+cleanup_file_write:
+    if (obj->links.netdata_fs_file_write_probe)
+        bpf_link__destroy(obj->links.netdata_fs_file_write_probe);
+
+cleanup_file_read:
+    if (obj->links.netdata_fs_file_read_probe)
+        bpf_link__destroy(obj->links.netdata_fs_file_read_probe);
+
+    return -1;
 }
 
 /**
@@ -626,11 +664,15 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                 if (!efp->fs_obj) {
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
+                    em->maps = NULL;
                     netdata_mutex_unlock(&lock);
                     return -1;
                 } else if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj, efp->functions, NULL)) {
+                    filesystem_bpf__destroy(efp->fs_obj);
+                    efp->fs_obj = NULL;
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
+                    em->maps = NULL;
                     netdata_mutex_unlock(&lock);
                     return -1;
                 }
@@ -639,9 +681,10 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
             ebpf_update_kernel_memory(&plugin_statistics, efp->fs_maps, EBPF_ACTION_STAT_ADD);
 
-            // Nedeed for filesystems like btrfs
+            // Needed for filesystems like btrfs
             if ((efp->flags & NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE) && (efp->addresses.function)) {
-                ebpf_load_addresses(&efp->addresses, efp->fs_maps[NETDATA_ADDR_FS_TABLE].map_fd);
+                if (efp->fs_maps && efp->fs_maps[NETDATA_ADDR_FS_TABLE].map_fd >= 0)
+                    ebpf_load_addresses(&efp->addresses, efp->fs_maps[NETDATA_ADDR_FS_TABLE].map_fd);
             }
         }
         efp->flags &= ~NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
@@ -969,6 +1012,9 @@ static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t
  */
 static void read_filesystem_table(ebpf_filesystem_partitions_t *efp, int fd, int maps_per_core)
 {
+    if (!efp || !efp->fs_maps)
+        return;
+
     netdata_idx_t *values = filesystem_hash_values;
     uint32_t key;
     uint32_t idx;
@@ -1008,7 +1054,7 @@ static void read_filesystem_tables(int maps_per_core)
     int i;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
-        if (efp->flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION) {
+        if (efp->flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION && efp->fs_maps) {
             read_filesystem_table(efp, efp->fs_maps[NETDATA_MAIN_FS_TABLE].map_fd, maps_per_core);
         }
     }
