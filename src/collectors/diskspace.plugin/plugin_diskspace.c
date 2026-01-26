@@ -33,7 +33,7 @@ static int cleanup_mount_points = 1;
 #define ZFS_DATASET_RECHECK_SECONDS 300  // recheck every 5 minutes
 
 struct zfs_pool_info {
-    uint64_t max_capacity;      // maximum capacity seen for this pool
+    uint64_t pool_capacity;     // capacity from the pool mount itself (not datasets)
     bool pool_mount_seen;       // true if the pool itself (not a dataset) is mounted
 };
 
@@ -400,10 +400,13 @@ static void zfs_collect_pool_capacities(void) {
         if (!pool_name || !pool_name[0])
             continue;
 
+        // Check if this is the pool itself (no slash = pool mount)
+        bool is_pool_mount = !strchr(mi->mount_source, '/');
+
         struct zfs_pool_info *info = dictionary_get(zfs_pool_info_dict, pool_name);
         if (!info) {
             struct zfs_pool_info new_info = {
-                .max_capacity = 0,
+                .pool_capacity = 0,
                 .pool_mount_seen = false
             };
             info = dictionary_set(zfs_pool_info_dict, pool_name, &new_info, sizeof(new_info));
@@ -411,20 +414,18 @@ static void zfs_collect_pool_capacities(void) {
                 continue;  // should never happen, but be defensive
         }
 
-        // Check if this is the pool itself (no slash = pool mount)
-        if (!strchr(mi->mount_source, '/'))
+        if (is_pool_mount) {
             info->pool_mount_seen = true;
 
-        // Get capacity via statvfs
-        struct statvfs buff;
-        if (statvfs(mi->mount_point_stat_path, &buff) < 0)
-            continue;
-
-        unsigned long bsize = buff.f_frsize ? buff.f_frsize : buff.f_bsize;
-        uint64_t total_bytes = (uint64_t)buff.f_blocks * bsize;
-
-        if (total_bytes > info->max_capacity)
-            info->max_capacity = total_bytes;
+            // Get capacity from the pool mount only (not datasets)
+            // In ZFS, statvfs returns total = used + available, so datasets with
+            // data show larger "total" than the pool. We need the pool's own capacity.
+            struct statvfs buff;
+            if (statvfs(mi->mount_point_stat_path, &buff) == 0) {
+                unsigned long bsize = buff.f_frsize ? buff.f_frsize : buff.f_bsize;
+                info->pool_capacity = (uint64_t)buff.f_blocks * bsize;
+            }
+        }
     }
 }
 
@@ -467,7 +468,7 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
     struct zfs_pool_info *info = dictionary_acquired_item_value(item);
 
     // 7. Pool not mounted → keep all datasets (need at least one to monitor pool capacity)
-    if (!info->pool_mount_seen) {
+    if (!info->pool_mount_seen || !info->pool_capacity) {
         dictionary_acquired_item_release(zfs_pool_info_dict, item);
         return false;
     }
@@ -476,13 +477,15 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
     unsigned long bsize = buff->f_frsize ? buff->f_frsize : buff->f_bsize;
     uint64_t total_bytes = (uint64_t)buff->f_blocks * bsize;
 
-    // 9. Dataset capacity at least 1 block smaller than pool max → has quota → keep
-    if (total_bytes + bsize < info->max_capacity) {
+    // 9. Dataset capacity < pool capacity → has quota → keep
+    // In ZFS, statvfs total = used + available. Datasets with data show larger
+    // total than pool. Datasets with quotas show smaller total (capped by quota).
+    if (total_bytes < info->pool_capacity) {
         dictionary_acquired_item_release(zfs_pool_info_dict, item);
         return false;
     }
 
-    // 10. Dataset capacity within 1 block of pool max → no quota → exclude
+    // 10. Dataset capacity >= pool capacity → no quota → exclude
     dictionary_acquired_item_release(zfs_pool_info_dict, item);
     return true;
 }
