@@ -204,7 +204,7 @@ https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/not
 cloud_notifications_integrations,,,,,
 ,,,,,
 https://github.com/netdata/netdata/edit/master/docs/alerts/alert-examples/README.md,Alert Examples and Common Patterns,Published,Alerts & Notifications/Alert Examples and Common Patterns,,
-https://github.com/netdata/netdata/edit/master/docs/alerts/troubleshooting-alerts/README.md,Troubleshooting Alert Behavior,Published,Alerts & Notifications/Troubleshooting Alert Behaviour,,
+https://github.com/netdata/netdata/edit/master/docs/alerts/troubleshooting-alerts/README.md,Troubleshooting Alert Behavior,Published,Alerts & Notifications/Troubleshooting Alert Behavior,,
 https://github.com/netdata/netdata/edit/master/docs/alerts/essential-patterns/README.md,Essential Alert Patterns,Published,Alerts & Notifications/Essential Alert Patterns,,
 https://github.com/netdata/netdata/edit/master/docs/alerts/apis-alerts-events/README.md,APIs for Alerts and Events,Published,Alerts & Notifications/APIs for Alerts and Events,,
 https://github.com/netdata/netdata/edit/master/src/web/api/health/README.md,Health API Calls,Published,Alerts & Notifications/APIs for Alerts and Events,,
