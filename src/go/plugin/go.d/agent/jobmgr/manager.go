@@ -391,6 +391,14 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) 
 		return nil, fmt.Errorf("can not find %s module", cfg.Module())
 	}
 
+	// Determine if job is function-only (module-level OR config-level)
+	functionOnly := creator.FunctionOnly || cfg.FunctionOnly()
+
+	// Warn if function-only but no methods defined
+	if functionOnly && creator.Methods == nil {
+		m.Warningf("function-only job %s[%s] has no methods defined", cfg.Module(), cfg.Name())
+	}
+
 	var vnode *vnodes.VirtualNode
 
 	if cfg.Vnode() != "" {
@@ -437,6 +445,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) 
 		Out:             m.Out,
 		DumpMode:        m.DumpMode,
 		DumpAnalyzer:    m.DumpAnalyzer,
+		FunctionOnly:    functionOnly,
 	}
 
 	if vnode != nil {

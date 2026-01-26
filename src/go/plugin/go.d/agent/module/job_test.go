@@ -290,3 +290,75 @@ func TestJob_Tick(t *testing.T) {
 		job.Tick(i)
 	}
 }
+
+func newTestFunctionOnlyJob() *Job {
+	return NewJob(
+		JobConfig{
+			PluginName:      pluginName,
+			Name:            jobName,
+			ModuleName:      modName,
+			FullName:        modName + "_" + jobName,
+			Module:          nil,
+			Out:             io.Discard,
+			UpdateEvery:     0,
+			AutoDetectEvery: 0,
+			Priority:        0,
+			FunctionOnly:    true,
+		},
+	)
+}
+
+func TestJob_IsFunctionOnly(t *testing.T) {
+	job := newTestJob()
+	assert.False(t, job.IsFunctionOnly())
+
+	foJob := newTestFunctionOnlyJob()
+	assert.True(t, foJob.IsFunctionOnly())
+}
+
+func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
+	job := newTestFunctionOnlyJob()
+	m := &MockModule{
+		InitFunc: func(context.Context) error {
+			return nil
+		},
+		CheckFunc: func(context.Context) error {
+			return nil
+		},
+		ChartsFunc: func() *Charts {
+			return nil
+		},
+	}
+	job.module = m
+
+	assert.NoError(t, job.AutoDetection())
+}
+
+func TestJob_Start_FunctionOnly(t *testing.T) {
+	collectCalled := false
+	m := &MockModule{
+		ChartsFunc: func() *Charts {
+			return nil
+		},
+		CollectFunc: func(context.Context) map[string]int64 {
+			collectCalled = true
+			return map[string]int64{"id1": 1}
+		},
+	}
+	job := newTestFunctionOnlyJob()
+	job.module = m
+	job.updateEvery = 1
+
+	go func() {
+		for i := 1; i < 3; i++ {
+			job.Tick(i)
+			time.Sleep(time.Second)
+		}
+		job.Stop()
+	}()
+
+	job.Start()
+
+	assert.False(t, collectCalled, "Collect should not be called for function-only jobs")
+	assert.True(t, m.CleanupDone)
+}

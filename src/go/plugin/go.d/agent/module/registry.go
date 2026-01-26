@@ -42,6 +42,11 @@ type (
 		// - Handle(ctx, method, params) for request handling
 		// When nil, methods are disabled for this module.
 		MethodHandler func(job *Job) funcapi.MethodHandler
+
+		// FunctionOnly indicates this module provides only functions, no metrics.
+		// Jobs created from this module skip data collection and chart creation.
+		// The module must still implement Init() and Check() for connectivity validation.
+		FunctionOnly bool
 	}
 	// Registry is a collection of Creators.
 	Registry map[string]Creator
