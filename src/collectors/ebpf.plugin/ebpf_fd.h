@@ -3,6 +3,10 @@
 #ifndef NETDATA_EBPF_FD_H
 #define NETDATA_EBPF_FD_H 1
 
+#include "libnetdata/libnetdata.h"
+#include "collectors/collectors-ipc/ebpf-ipc.h"
+#include "libbpf_api/ebpf.h"
+
 // Module name & File description
 #define NETDATA_EBPF_MODULE_NAME_FD "filedescriptor"
 #define NETDATA_EBPF_FD_MODULE_DESC                                                                                    \
@@ -64,7 +68,7 @@ enum fd_syscalls {
     NETDATA_FD_SYSCALL_OPEN,
     NETDATA_FD_SYSCALL_CLOSE,
 
-    // Do not insert nothing after this value
+    // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_FD_SYSCALL_END
 };
 
@@ -72,6 +76,7 @@ enum fd_close_syscall {
     NETDATA_FD_CLOSE_FD,
     NETDATA_FD___CLOSE_FD,
 
+    // Keep this as last and don't skip numbers as it is used as element counter
     NETDATA_FD_CLOSE_END
 };
 

@@ -280,9 +280,28 @@ static int ebpf_fd_set_target_values()
  */
 static void ebpf_fd_set_hash_tables(struct fd_bpf *obj)
 {
-    fd_maps[NETDATA_FD_GLOBAL_STATS].map_fd = bpf_map__fd(obj->maps.tbl_fd_global);
-    fd_maps[NETDATA_FD_PID_STATS].map_fd = bpf_map__fd(obj->maps.tbl_fd_pid);
-    fd_maps[NETDATA_FD_CONTROLLER].map_fd = bpf_map__fd(obj->maps.fd_ctrl);
+    int map_fd;
+
+    map_fd = bpf_map__fd(obj->maps.tbl_fd_global);
+    if (map_fd < 0) {
+        netdata_log_error("Failed to get fd for tbl_fd_global map");
+        return;
+    }
+    fd_maps[NETDATA_FD_GLOBAL_STATS].map_fd = map_fd;
+
+    map_fd = bpf_map__fd(obj->maps.tbl_fd_pid);
+    if (map_fd < 0) {
+        netdata_log_error("Failed to get fd for tbl_fd_pid map");
+        return;
+    }
+    fd_maps[NETDATA_FD_PID_STATS].map_fd = map_fd;
+
+    map_fd = bpf_map__fd(obj->maps.fd_ctrl);
+    if (map_fd < 0) {
+        netdata_log_error("Failed to get fd for fd_ctrl map");
+        return;
+    }
+    fd_maps[NETDATA_FD_CONTROLLER].map_fd = map_fd;
 }
 
 /**
@@ -604,6 +623,11 @@ static void ebpf_fd_exit(void *pptr)
         em->probe_links = NULL;
     }
 
+    freez(fd_vector);
+    fd_vector = NULL;
+    freez(fd_values);
+    fd_values = NULL;
+
     netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
@@ -711,6 +735,7 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
     uint32_t key = 0, next_key = 0;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, fv)) {
+            netdata_log_error("Failed to lookup PID %u in FD map", key);
             goto end_fd_loop;
         }
 
@@ -1168,7 +1193,7 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20273,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
-        .context = NETDATA_SYSTEMD_FD_OPEN_ERR_CONTEXT,
+        .context = NETDATA_SYSTEMD_FD_CLOSE_ERR_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_FD,
         .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
@@ -1508,8 +1533,13 @@ static int ebpf_fd_load_bpf(ebpf_module_t *em)
         fd_bpf_obj = fd_bpf__open();
         if (!fd_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_fd_load_and_attach(fd_bpf_obj, em);
+            if (ret) {
+                fd_bpf__destroy(fd_bpf_obj);
+                fd_bpf_obj = NULL;
+            }
+        }
     }
 #endif
 
