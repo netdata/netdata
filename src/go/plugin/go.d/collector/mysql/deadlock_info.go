@@ -512,7 +512,7 @@ func parseInnoDBDeadlock(status string, now time.Time) mysqlDeadlockParseResult 
 			// WAITING must win even if HOLDS was seen first in the output.
 			txn.lockStatus = "WAITING"
 			if txn.waitResource == "" && isLockResourceLine(line) {
-				txn.waitResource = strmutil.TruncateText(line, maxQueryTextLength)
+				txn.waitResource = strmutil.TruncateText(line, topQueriesMaxTextLength)
 			}
 			if mode, ok := parseDeadlockLockMode(line); ok {
 				// WAITING lock mode should override any mode captured from HOLDS.
@@ -593,10 +593,10 @@ func buildDeadlockRows(parseRes mysqlDeadlockParseResult, deadlockID string) [][
 			isVictim = "true"
 		}
 
-		queryText := strmutil.TruncateText(strings.TrimSpace(txn.queryText), maxQueryTextLength)
+		queryText := strmutil.TruncateText(strings.TrimSpace(txn.queryText), topQueriesMaxTextLength)
 		lockMode := strings.TrimSpace(txn.lockMode)
 		lockStatus := strings.TrimSpace(txn.lockStatus)
-		waitResource := strmutil.TruncateText(strings.TrimSpace(txn.waitResource), maxQueryTextLength)
+		waitResource := strmutil.TruncateText(strings.TrimSpace(txn.waitResource), topQueriesMaxTextLength)
 		database := extractDeadlockDatabase(waitResource, queryText)
 
 		var databaseValue any

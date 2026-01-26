@@ -638,10 +638,10 @@ func buildDeadlockRows(parseRes mssqlDeadlockParseResult, deadlockID string, dbN
 			isVictim = "true"
 		}
 
-		queryText := strmutil.TruncateText(strings.TrimSpace(txn.queryText), maxQueryTextLength)
+		queryText := strmutil.TruncateText(strings.TrimSpace(txn.queryText), topQueriesMaxTextLength)
 		lockMode := strings.TrimSpace(txn.lockMode)
 		lockStatus := strings.TrimSpace(txn.lockStatus)
-		waitResource := strmutil.TruncateText(strings.TrimSpace(txn.waitResource), maxQueryTextLength)
+		waitResource := strmutil.TruncateText(strings.TrimSpace(txn.waitResource), topQueriesMaxTextLength)
 
 		row := make([]any, deadlockColumnCount)
 		row[deadlockIdxRowID] = fmt.Sprintf("%s:%s", deadlockID, processID)
