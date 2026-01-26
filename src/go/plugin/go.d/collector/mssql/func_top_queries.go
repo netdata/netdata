@@ -288,6 +288,89 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
+	errorStatus, errorDetails := f.router.collector.collectMSSQLErrorDetails(ctx)
+	planOpsByDB := f.router.collector.collectMSSQLPlanOps(ctx, data, cols)
+	extraCols := append(mssqlErrorAttributionColumns(), mssqlPlanAttributionColumns()...)
+
+	queryIdx := -1
+	queryHashIdx := -1
+	dbIdx := -1
+	for i, col := range cols {
+		switch col.Name {
+		case "query":
+			queryIdx = i
+		case "queryHash":
+			queryHashIdx = i
+		case "database":
+			dbIdx = i
+		}
+	}
+
+	if len(extraCols) > 0 {
+		for i := range data {
+			status := errorStatus
+			var errRow mssqlErrorRow
+			if errorStatus == mssqlErrorAttrEnabled {
+				found := false
+				if queryHashIdx >= 0 && queryHashIdx < len(data[i]) {
+					queryHash := rowString(data[i][queryHashIdx])
+					if queryHash != "" {
+						if row, ok := errorDetails[queryHash]; ok {
+							status = mssqlErrorAttrEnabled
+							errRow = row
+							found = true
+						}
+					}
+				}
+				if !found && queryIdx >= 0 && queryIdx < len(data[i]) {
+					queryText := normalizeSQLText(rowString(data[i][queryIdx]))
+					if queryText != "" {
+						if row, ok := errorDetails[queryText]; ok {
+							status = mssqlErrorAttrEnabled
+							errRow = row
+							found = true
+						}
+					}
+				}
+				if !found {
+					status = mssqlErrorAttrNoData
+				}
+			}
+
+			var hashMatch, mergeJoin, nestedLoops, sorts any
+			if dbIdx >= 0 && dbIdx < len(data[i]) && queryHashIdx >= 0 && queryHashIdx < len(data[i]) {
+				dbName := rowString(data[i][dbIdx])
+				queryHash := rowString(data[i][queryHashIdx])
+				if dbName != "" && queryHash != "" {
+					if opsByHash, ok := planOpsByDB[dbName]; ok {
+						if ops, ok := opsByHash[queryHash]; ok {
+							hashMatch = ops.HashMatch
+							mergeJoin = ops.MergeJoin
+							nestedLoops = ops.NestedLoops
+							sorts = ops.Sorts
+						}
+					}
+				}
+			}
+
+			var errNo any
+			if errRow.ErrorNumber != nil {
+				errNo = *errRow.ErrorNumber
+			}
+			data[i] = append(data[i],
+				status,
+				errNo,
+				nil, // SQL State is not available in MSSQL
+				nullableString(rowString(errRow.Message)),
+				hashMatch,
+				mergeJoin,
+				nestedLoops,
+				sorts,
+			)
+		}
+		cols = append(cols, extraCols...)
+	}
+
 	sortParam, sortOptions := f.buildSortParam(cols)
 
 	defaultSort := ""

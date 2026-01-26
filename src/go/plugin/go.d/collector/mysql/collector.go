@@ -71,6 +71,7 @@ type Config struct {
 	Timeout                     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	TopQueriesLimit             int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 	DeadlockInfoFunctionEnabled *bool            `yaml:"deadlock_info_function_enabled,omitempty" json:"deadlock_info_function_enabled,omitempty"`
+	ErrorInfoFunctionEnabled    *bool            `yaml:"error_info_function_enabled,omitempty" json:"error_info_function_enabled,omitempty"`
 }
 
 type Collector struct {
@@ -127,6 +128,14 @@ func (c *Config) GetDeadlockInfoFunctionEnabled() bool {
 		return true
 	}
 	return *c.DeadlockInfoFunctionEnabled
+}
+
+// GetErrorInfoFunctionEnabled returns whether the error-info function is enabled (default: true).
+func (c *Config) GetErrorInfoFunctionEnabled() bool {
+	if c.ErrorInfoFunctionEnabled == nil {
+		return true
+	}
+	return *c.ErrorInfoFunctionEnabled
 }
 
 func (c *Collector) Init(context.Context) error {

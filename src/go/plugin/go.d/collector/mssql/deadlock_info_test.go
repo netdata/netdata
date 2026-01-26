@@ -49,6 +49,67 @@ func TestConfig_GetDeadlockInfoFunctionEnabled(t *testing.T) {
 	}
 }
 
+func TestConfig_GetErrorInfoFunctionEnabled(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  Config
+		want bool
+	}{
+		{
+			name: "default enabled when unset",
+			cfg:  Config{},
+			want: true,
+		},
+		{
+			name: "explicitly enabled",
+			cfg: Config{
+				ErrorInfoFunctionEnabled: boolPtr(true),
+			},
+			want: true,
+		},
+		{
+			name: "explicitly disabled",
+			cfg: Config{
+				ErrorInfoFunctionEnabled: boolPtr(false),
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.cfg.GetErrorInfoFunctionEnabled())
+		})
+	}
+}
+
+func TestConfig_GetErrorInfoSessionName(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  Config
+		want string
+	}{
+		{
+			name: "default session name",
+			cfg:  Config{},
+			want: "netdata_errors",
+		},
+		{
+			name: "explicit session name",
+			cfg: Config{
+				ErrorInfoSessionName: "custom_errors",
+			},
+			want: "custom_errors",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.cfg.GetErrorInfoSessionName())
+		})
+	}
+}
+
 func TestParseDeadlockGraph_WithDeadlock(t *testing.T) {
 	now := time.Date(2026, time.January, 25, 12, 0, 0, 123456000, time.UTC)
 	res := parseDeadlockGraph(sampleDeadlockGraph, now)

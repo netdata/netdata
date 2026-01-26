@@ -24,6 +24,7 @@ func newFuncRouter(c *Collector) *funcRouter {
 	}
 	r.handlers[topQueriesMethodID] = newFuncTopQueries(r)
 	r.handlers[deadlockInfoMethodID] = newFuncDeadlockInfo(r)
+	r.handlers[errorInfoMethodID] = newFuncErrorInfo(r)
 	return r
 }
 
@@ -54,6 +55,7 @@ func mysqlMethods() []funcapi.MethodConfig {
 	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
 		deadlockInfoMethodConfig(),
+		errorInfoMethodConfig(),
 	}
 }
 

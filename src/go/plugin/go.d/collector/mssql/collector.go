@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -79,6 +80,18 @@ type Config struct {
 	// Default: true
 	DeadlockInfoFunctionEnabled *bool `yaml:"deadlock_info_function_enabled,omitempty" json:"deadlock_info_function_enabled"`
 
+	// ErrorInfoFunctionEnabled controls whether the error-info function is available
+	// Uses pointer to distinguish "unset" from explicit "false":
+	//   - nil (unset): Apply default of true (enabled)
+	//   - false: Explicitly disabled
+	//   - true: Explicitly enabled
+	// Default: true
+	ErrorInfoFunctionEnabled *bool `yaml:"error_info_function_enabled,omitempty" json:"error_info_function_enabled"`
+
+	// ErrorInfoSessionName sets the Extended Events session name for error-info
+	// Default: "netdata_errors"
+	ErrorInfoSessionName string `yaml:"error_info_session_name,omitempty" json:"error_info_session_name,omitempty"`
+
 	// TopQueriesLimit is the maximum number of queries to return
 	TopQueriesLimit int `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 }
@@ -105,6 +118,22 @@ func (c *Config) GetDeadlockInfoFunctionEnabled() bool {
 		return true
 	}
 	return *c.DeadlockInfoFunctionEnabled
+}
+
+// GetErrorInfoFunctionEnabled returns whether the error-info function is enabled (default: true)
+func (c *Config) GetErrorInfoFunctionEnabled() bool {
+	if c.ErrorInfoFunctionEnabled == nil {
+		return true
+	}
+	return *c.ErrorInfoFunctionEnabled
+}
+
+// GetErrorInfoSessionName returns the Extended Events session name for error-info.
+func (c *Config) GetErrorInfoSessionName() string {
+	if strings.TrimSpace(c.ErrorInfoSessionName) == "" {
+		return "netdata_errors"
+	}
+	return c.ErrorInfoSessionName
 }
 
 type Collector struct {

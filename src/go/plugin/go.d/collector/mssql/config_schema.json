@@ -56,6 +56,18 @@
         "description": "Enable the deadlock-info function. WARNING: query text may contain unmasked sensitive literals (PII). This function reads deadlock graphs from the system_health session and requires VIEW SERVER STATE. Grant with: GRANT VIEW SERVER STATE TO [netdata_user];",
         "type": "boolean",
         "default": true
+      },
+      "error_info_function_enabled": {
+        "title": "Enable Error Info Function",
+        "description": "Enable the error-info function. WARNING: error messages and query text may contain unmasked sensitive literals (PII). This function reads from a user-managed Extended Events session and requires VIEW SERVER STATE.",
+        "type": "boolean",
+        "default": true
+      },
+      "error_info_session_name": {
+        "title": "Error Info Session Name",
+        "description": "Name of the Extended Events session that captures error_reported events for error-info. The session must be created by an administrator and include a ring_buffer target.",
+        "type": "string",
+        "default": "netdata_errors"
       }
     },
     "required": [
@@ -87,6 +99,12 @@
     },
     "deadlock_info_function_enabled": {
       "ui:help": "When enabled, the deadlock-info function becomes available in the Netdata dashboard. WARNING: query text may contain unmasked sensitive literals and requires VIEW SERVER STATE permission."
+    },
+    "error_info_function_enabled": {
+      "ui:help": "When enabled, the error-info function becomes available in the Netdata dashboard. WARNING: error messages and query text may include sensitive literals."
+    },
+    "error_info_session_name": {
+      "ui:help": "The Extended Events session must be created by an administrator and include a ring_buffer target capturing sqlserver.error_reported with sql_text action."
     },
     "ui:flavour": "tabs",
     "ui:options": {

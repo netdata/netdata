@@ -13,21 +13,25 @@ func TestMySQLMethods(t *testing.T) {
 	methods := mysqlMethods()
 
 	require := assert.New(t)
-	require.Len(methods, 2)
+	require.Len(methods, 3)
 
 	topIdx := -1
 	deadlockIdx := -1
+	errorIdx := -1
 	for i := range methods {
 		switch methods[i].ID {
 		case "top-queries":
 			topIdx = i
 		case "deadlock-info":
 			deadlockIdx = i
+		case "error-info":
+			errorIdx = i
 		}
 	}
 
 	require.NotEqual(-1, topIdx, "expected top-queries method")
 	require.NotEqual(-1, deadlockIdx, "expected deadlock-info method")
+	require.NotEqual(-1, errorIdx, "expected error-info method")
 
 	topMethod := methods[topIdx]
 	require.Equal("Top Queries", topMethod.Name)
@@ -36,6 +40,10 @@ func TestMySQLMethods(t *testing.T) {
 	deadlockMethod := methods[deadlockIdx]
 	require.Equal("Deadlock Info", deadlockMethod.Name)
 	require.Empty(deadlockMethod.RequiredParams)
+
+	errorMethod := methods[errorIdx]
+	require.Equal("Error Info", errorMethod.Name)
+	require.Empty(errorMethod.RequiredParams)
 
 	var sortParam *funcapi.ParamConfig
 	for i := range topMethod.RequiredParams {

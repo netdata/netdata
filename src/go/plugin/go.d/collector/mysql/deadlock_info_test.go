@@ -49,6 +49,40 @@ func TestConfig_GetDeadlockInfoFunctionEnabled(t *testing.T) {
 	}
 }
 
+func TestConfig_GetErrorInfoFunctionEnabled(t *testing.T) {
+	tests := []struct {
+		name     string
+		cfg      Config
+		expected bool
+	}{
+		{
+			name:     "default nil pointer enables function",
+			cfg:      Config{},
+			expected: true,
+		},
+		{
+			name: "explicit true enables function",
+			cfg: Config{
+				ErrorInfoFunctionEnabled: boolPtr(true),
+			},
+			expected: true,
+		},
+		{
+			name: "explicit false disables function",
+			cfg: Config{
+				ErrorInfoFunctionEnabled: boolPtr(false),
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.cfg.GetErrorInfoFunctionEnabled())
+		})
+	}
+}
+
 func TestParseInnoDBDeadlock_WithDeadlock(t *testing.T) {
 	now := time.Date(2026, time.January, 25, 12, 0, 0, 123456000, time.UTC)
 	res := parseInnoDBDeadlock(sampleDeadlockStatus, now)

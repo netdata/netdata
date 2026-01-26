@@ -317,6 +317,14 @@ Aggregated query execution statistics from Query Store runtime views, providing 
 | Query | string |  |  | The SQL query text with literal values truncated at 4096 characters. Use this to identify the actual SQL being executed and spot parameterized queries or injection risks. |
 | Database | string |  |  | Database name where the query was executed. Essential for multi-database analysis to identify which database is experiencing query load. |
 | Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly. |
+| Error Attribution | string |  |  | Status of error detail attribution for this query. Values: enabled, no_data, not_enabled, not_supported. |
+| Error Number | integer |  |  | Most recent error number observed for this query (when error attribution is enabled). |
+| SQL State | string |  | hidden | SQLSTATE code (not available for SQL Server; usually empty). |
+| Error Message | string |  |  | Most recent error message for this query (when error attribution is enabled). |
+| Hash Match Joins | integer |  |  | Count of Hash Match join operators across all stored plans for this query. |
+| Merge Joins | integer |  |  | Count of Merge Join operators across all stored plans for this query. |
+| Nested Loops | integer |  |  | Count of Nested Loops operators across all stored plans for this query. |
+| Sorts | integer |  |  | Count of Sort operators across all stored plans for this query. |
 | Total Time | duration | milliseconds |  | Cumulative execution time across all query executions. This is a key metric for identifying the most resource-intensive queries in terms of total server time consumption. |
 | Avg Time | duration | milliseconds |  | Average execution time per query run, calculated as weighted average when execution count is greater than zero. Compare with Total Time to determine if individual executions or high frequency drives resource usage. |
 | Last Time | duration | milliseconds | hidden | Execution time of the most recent execution for this query pattern. Useful for identifying recent performance changes or individual outlier executions. |
@@ -439,6 +447,61 @@ Parsed deadlock participants from the latest detected deadlock event. Each row r
 | Lock Status | string |  |  | Lock status for the process. WAITING indicates the process was waiting on a lock. |
 | Wait Resource | string |  |  | Lock resource identifier from the deadlock graph showing what the process was waiting on. |
 | Database | string |  |  | Database name mapped from the deadlock graph database ID when available. |
+
+### Error Info
+
+Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
+with the `sql_text` and `query_hash` actions (query_hash enables reliable mapping to top-queries).
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mssql:error-info` |
+| Require Cloud | yes |
+| Performance | Executes on-demand queries against the configured Extended Events ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing |
+| Security | Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has a ring_buffer target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+1. Create an Extended Events session (admin-controlled) that captures `sqlserver.error_reported` with `sql_text` and `query_hash`:
+   ```sql
+   CREATE EVENT SESSION [netdata_errors] ON SERVER
+   ADD EVENT sqlserver.error_reported(
+     ACTION(sqlserver.sql_text, sqlserver.query_hash)
+   )
+   ADD TARGET package0.ring_buffer;
+   GO
+   ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
+   ```
+2. Ensure the account has the required permission:
+   ```sql
+   GRANT VIEW SERVER STATE TO [netdata];
+   ```
+3. Enable the function and (optionally) set the session name in Netdata config:
+   ```yaml
+   jobs:
+     - name: local
+       dsn: "sqlserver://user:pass@localhost:1433"
+       error_info_function_enabled: true
+       error_info_session_name: netdata_errors
+   ```
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Recent error events from the configured Extended Events session.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Timestamp | timestamp |  |  | Timestamp of the error event. |
+| Error Number | integer |  |  | SQL Server error number. |
+| Error Message | string |  |  | Error message text. |
+| Query | string |  |  | SQL text captured with the error event. |
+| Query Hash | string |  | hidden | Query hash captured with the error event (used for mapping into top-queries). |
+| Query Hash | string |  | hidden | Query hash captured with the error event (used for mapping into top-queries). |
 
 
 ## Alerts

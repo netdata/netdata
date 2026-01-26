@@ -306,6 +306,10 @@ Aggregated statement statistics from Performance Schema, grouped by query digest
 | Lock Time | duration | milliseconds |  | Total time spent waiting for table locks across all executions. High lock time may indicate contention from concurrent transactions. |
 | Errors | integer |  |  | Total number of times this query pattern resulted in an error. Non-zero values require investigation into the underlying issue. |
 | Warnings | integer |  |  | Total number of times this query pattern generated warnings. Warnings may indicate data type conversions, NULL handling issues, or other non-critical problems. |
+| Error Attribution | string |  |  | Status of error detail attribution for this query. Values: enabled, no_data, not_enabled, not_supported. |
+| Error Number | integer |  |  | Most recent error number observed for this query digest (when error attribution is enabled). |
+| SQL State | string |  | hidden | SQLSTATE code for the most recent error (when error attribution is enabled). |
+| Error Message | string |  |  | Most recent error message for this query digest (when error attribution is enabled). |
 | Rows Affected | integer |  |  | Total number of rows modified by INSERT, UPDATE, DELETE, or REPLACE statements. Useful for tracking write workloads. |
 | Rows Sent | integer |  |  | Total number of rows returned to the client by SELECT statements. High values may indicate result sets that are too large. |
 | Rows Examined | integer |  |  | Total number of rows read during query execution. A high ratio of rows examined to rows sent suggests missing or inefficient indexes. |
@@ -338,6 +342,14 @@ Aggregated statement statistics from Performance Schema, grouped by query digest
 ### Deadlock Info
 
 Retrieves the latest detected InnoDB deadlock from `SHOW ENGINE INNODB STATUS`.
+
+### Error Info
+
+Retrieves recent SQL errors from Performance Schema statement history tables.
+
+- Requires Performance Schema statement history consumers to be enabled (`events_statements_current` plus `events_statements_history_long` preferred, or `events_statements_history`).
+- Returns HTTP 503 with `errorMessage: "not enabled"` when the history consumer is disabled.
+- Error messages and query text may include unmasked literals (PII); restrict dashboard access.
 
 The output is parsed to attribute the deadlock to participating transactions and their query text, lock mode, lock status, and wait resource.
 

@@ -25,6 +25,65 @@ build_plugin
 run_info mysql
 run_top_queries mysql
 
+assert_top_queries_error_columns() {
+  local input="$1"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+columns = doc.get("columns") or {}
+required = {"errorAttribution", "errorNumber", "sqlState", "errorMessage"}
+
+found = set()
+if isinstance(columns, dict):
+    for key in columns.keys():
+        found.add(key)
+else:
+    for col in columns:
+        if isinstance(col, dict):
+            field = col.get("field")
+            if field:
+                found.add(field)
+
+missing = sorted(required - found)
+if missing:
+    raise SystemExit(f"missing top-queries error columns: {missing}")
+PY
+    return
+  fi
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r") as fh:
+    doc = json.load(fh)
+columns = doc.get("columns") or {}
+required = {"errorAttribution", "errorNumber", "sqlState", "errorMessage"}
+
+found = set()
+if isinstance(columns, dict):
+    for key in columns.keys():
+        found.add(key)
+else:
+    for col in columns:
+        if isinstance(col, dict):
+            field = col.get("field")
+            if field:
+                found.add(field)
+
+missing = sorted(required - found)
+if missing:
+    raise SystemExit("missing top-queries error columns: %s" % missing)
+PY
+}
+
+assert_top_queries_error_columns "$WORKDIR/mysql-top-queries.json"
+
 mysql_container_id() {
   "${COMPOSE[@]}" ps -q mysql
 }
@@ -51,6 +110,30 @@ mysql_exec_root() {
     return 1
   fi
   run docker exec -i "$cid" "$MYSQL_CLIENT_PATH" -uroot -prootpw netdata -e "$sql"
+}
+
+mysql_query_root() {
+  local sql="$1"
+  local cid
+  cid="$(mysql_container_id)"
+  if [ -z "$cid" ]; then
+    echo "MySQL container ID not found" >&2
+    return 1
+  fi
+  run docker exec -i "$cid" "$MYSQL_CLIENT_PATH" -uroot -prootpw -N -s netdata -e "$sql"
+}
+
+mysql_exec_root_allow_error() {
+  local sql="$1"
+  local cid
+  cid="$(mysql_container_id)"
+  if [ -z "$cid" ]; then
+    echo "MySQL container ID not found" >&2
+    return 1
+  fi
+  set +e
+  docker exec -i "$cid" "$MYSQL_CLIENT_PATH" -uroot -prootpw netdata -e "$sql" >/dev/null 2>&1
+  set -e
 }
 
 induce_deadlock_once() {
@@ -162,6 +245,7 @@ if any(not lock_mode_re.match(norm(get_value(row, "lock_mode"))) for row in wait
     raise SystemExit("WAITING rows must include a valid lock_mode")
 
 victim_counts = {}
+expected_db = "netdata"
 has_database = False
 for row in data:
     deadlock_id = norm(get_value(row, "deadlock_id"))
@@ -176,8 +260,11 @@ for row in data:
     victim_counts.setdefault(deadlock_id, 0)
     if norm(get_value(row, "is_victim")).lower() == "true":
         victim_counts[deadlock_id] += 1
-    if norm(get_value(row, "database")):
+    db_val = norm(get_value(row, "database")).lower()
+    if db_val:
         has_database = True
+        if db_val != expected_db:
+            raise SystemExit(f"unexpected database value {db_val!r}, expected {expected_db!r}")
 
 for deadlock_id, count in victim_counts.items():
     if count != 1:
@@ -259,6 +346,7 @@ if any(not lock_mode_re.match(norm(get_value(row, "lock_mode"))) for row in wait
     raise SystemExit("WAITING rows must include a valid lock_mode")
 
 victim_counts = {}
+expected_db = "netdata"
 has_database = False
 for row in data:
     deadlock_id = norm(get_value(row, "deadlock_id"))
@@ -273,8 +361,11 @@ for row in data:
     victim_counts.setdefault(deadlock_id, 0)
     if norm(get_value(row, "is_victim")).lower() == "true":
         victim_counts[deadlock_id] += 1
-    if norm(get_value(row, "database")):
+    db_val = norm(get_value(row, "database")).lower()
+    if db_val:
         has_database = True
+        if db_val != expected_db:
+            raise SystemExit("unexpected database value %r, expected %r" % (db_val, expected_db))
 
 for deadlock_id, count in victim_counts.items():
     if count != 1:
@@ -340,6 +431,416 @@ if len(data) != 0:
 PY
 }
 
+assert_error_info_not_enabled() {
+  local input="$1"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit(f"unexpected status value: {doc.get('status')!r}")
+
+if status < 400:
+    raise SystemExit(f"expected error status, got {status}")
+
+err = str(doc.get("errorMessage") or "").lower()
+if "not enabled" not in err:
+    raise SystemExit(f"expected errorMessage to contain 'not enabled', got {err!r}")
+PY
+    return
+  fi
+
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r") as fh:
+    doc = json.load(fh)
+
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit("unexpected status value: %r" % (doc.get("status"),))
+
+if status < 400:
+    raise SystemExit("expected error status, got %s" % status)
+
+err = str(doc.get("errorMessage") or "").lower()
+if "not enabled" not in err:
+    raise SystemExit("expected errorMessage to contain 'not enabled', got %r" % err)
+PY
+}
+
+assert_error_info_has_error() {
+  local input="$1"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit(f"unexpected status value: {doc.get('status')!r}")
+
+if status != 200:
+    raise SystemExit(f"expected status 200, got {status}")
+
+if doc.get("errorMessage"):
+    raise SystemExit(f"unexpected errorMessage on status 200: {doc.get('errorMessage')!r}")
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("errorNumber", "errorMessage"):
+    if required not in field_to_idx:
+        raise SystemExit(f"missing expected column: {required}")
+
+data = doc.get("data") or []
+if not data:
+    raise SystemExit("error-info returned no rows")
+
+err_idx = field_to_idx["errorMessage"]
+num_idx = field_to_idx["errorNumber"]
+def normalize(val):
+    return "" if val is None else str(val)
+
+matched = False
+for row in data:
+    if num_idx < len(row) and row[num_idx] is not None:
+        msg = normalize(row[err_idx]).lower()
+        if "missing_table" in msg:
+            matched = True
+            break
+
+if not matched:
+    raise SystemExit("no error-info row contained missing_table with errorNumber populated")
+PY
+    return
+  fi
+
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r") as fh:
+    doc = json.load(fh)
+
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit("unexpected status value: %r" % (doc.get("status"),))
+
+if status != 200:
+    raise SystemExit("expected status 200, got %s" % status)
+
+if doc.get("errorMessage"):
+    raise SystemExit("unexpected errorMessage on status 200: %r" % (doc.get("errorMessage"),))
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("errorNumber", "errorMessage"):
+    if required not in field_to_idx:
+        raise SystemExit("missing expected column: %s" % required)
+
+data = doc.get("data") or []
+if not data:
+    raise SystemExit("error-info returned no rows")
+
+err_idx = field_to_idx["errorMessage"]
+num_idx = field_to_idx["errorNumber"]
+def normalize(val):
+    return "" if val is None else str(val)
+
+matched = False
+for row in data:
+    if num_idx < len(row) and row[num_idx] is not None:
+        msg = normalize(row[err_idx]).lower()
+        if "missing_table" in msg:
+            matched = True
+            break
+
+if not matched:
+    raise SystemExit("no error-info row contained missing_table with errorNumber populated")
+PY
+}
+
+assert_top_queries_error_attribution_enabled() {
+  local input="$1"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("errorAttribution", "errorNumber", "errorMessage"):
+    if required not in field_to_idx:
+        raise SystemExit(f"missing expected column: {required}")
+
+data = doc.get("data") or []
+status_idx = field_to_idx["errorAttribution"]
+num_idx = field_to_idx["errorNumber"]
+msg_idx = field_to_idx["errorMessage"]
+
+matched = False
+for row in data:
+    if status_idx >= len(row):
+        continue
+    if str(row[status_idx]) != "enabled":
+        continue
+    num = row[num_idx] if num_idx < len(row) else None
+    msg = str(row[msg_idx]).lower() if msg_idx < len(row) else ""
+    if num is not None and "missing_table" in msg:
+        matched = True
+        break
+
+if not matched:
+    raise SystemExit("no top-queries row had enabled error attribution for missing_table")
+PY
+    return
+  fi
+
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("errorAttribution", "errorNumber", "errorMessage"):
+    if required not in field_to_idx:
+        raise SystemExit("missing expected column: %s" % required)
+
+data = doc.get("data") or []
+status_idx = field_to_idx["errorAttribution"]
+num_idx = field_to_idx["errorNumber"]
+msg_idx = field_to_idx["errorMessage"]
+
+matched = False
+for row in data:
+    if status_idx >= len(row):
+        continue
+    if str(row[status_idx]) != "enabled":
+        continue
+    num = row[num_idx] if num_idx < len(row) else None
+    msg = str(row[msg_idx]).lower() if msg_idx < len(row) else ""
+    if num is not None and "missing_table" in msg:
+        matched = True
+        break
+
+if not matched:
+    raise SystemExit("no top-queries row had enabled error attribution for missing_table")
+PY
+}
+
+assert_top_queries_error_attribution_not_enabled() {
+  local input="$1"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+if "errorAttribution" not in field_to_idx:
+    raise SystemExit("missing expected column: errorAttribution")
+
+data = doc.get("data") or []
+idx = field_to_idx["errorAttribution"]
+for row in data:
+    if idx >= len(row):
+        continue
+    if str(row[idx]) != "not_enabled":
+        raise SystemExit(f"expected errorAttribution 'not_enabled', got {row[idx]!r}")
+PY
+    return
+  fi
+
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+if "errorAttribution" not in field_to_idx:
+    raise SystemExit("missing expected column: errorAttribution")
+
+data = doc.get("data") or []
+idx = field_to_idx["errorAttribution"]
+for row in data:
+    if idx >= len(row):
+        continue
+    if str(row[idx]) != "not_enabled":
+        raise SystemExit("expected errorAttribution 'not_enabled', got %r" % row[idx])
+PY
+}
+
+capture_statement_history_states() {
+  local output
+  output="$(mysql_query_root "
+SELECT
+  COALESCE(MAX(CASE WHEN NAME = 'events_statements_history_long' THEN ENABLED END), 'NO') AS history_long,
+  COALESCE(MAX(CASE WHEN NAME = 'events_statements_history' THEN ENABLED END), 'NO') AS history,
+  COALESCE(MAX(CASE WHEN NAME = 'events_statements_current' THEN ENABLED END), 'NO') AS history_current
+FROM performance_schema.setup_consumers
+WHERE NAME IN ('events_statements_history_long','events_statements_history','events_statements_current');")"
+  local history_long
+  local history
+  local history_current
+  IFS=$'\t' read -r history_long history history_current <<<"$output"
+  MYSQL_HISTORY_LONG_STATE="$history_long"
+  MYSQL_HISTORY_STATE="$history"
+  MYSQL_HISTORY_CURRENT_STATE="$history_current"
+}
+
+disable_statement_history_consumers() {
+  mysql_exec_root "UPDATE performance_schema.setup_consumers SET ENABLED = 'NO' WHERE NAME IN ('events_statements_history_long','events_statements_history','events_statements_current');"
+}
+
+enable_statement_history_consumers() {
+  mysql_exec_root "UPDATE performance_schema.setup_consumers SET ENABLED = 'YES' WHERE NAME IN ('events_statements_history_long','events_statements_history','events_statements_current');"
+}
+
+restore_statement_history_consumers() {
+  if [ -n "${MYSQL_HISTORY_LONG_STATE:-}" ]; then
+    mysql_exec_root "UPDATE performance_schema.setup_consumers SET ENABLED = '${MYSQL_HISTORY_LONG_STATE}' WHERE NAME = 'events_statements_history_long';"
+  fi
+  if [ -n "${MYSQL_HISTORY_STATE:-}" ]; then
+    mysql_exec_root "UPDATE performance_schema.setup_consumers SET ENABLED = '${MYSQL_HISTORY_STATE}' WHERE NAME = 'events_statements_history';"
+  fi
+  if [ -n "${MYSQL_HISTORY_CURRENT_STATE:-}" ]; then
+    mysql_exec_root "UPDATE performance_schema.setup_consumers SET ENABLED = '${MYSQL_HISTORY_CURRENT_STATE}' WHERE NAME = 'events_statements_current';"
+  fi
+}
+
 verify_deadlock_info_no_deadlock() {
   local output
 
@@ -373,5 +874,30 @@ verify_deadlock_info() {
 
 verify_deadlock_info_no_deadlock
 verify_deadlock_info
+
+capture_statement_history_states
+disable_statement_history_consumers
+
+error_output="$(run_function mysql error-info '__job:local' 'false')"
+assert_error_info_not_enabled "$error_output"
+
+run_top_queries mysql
+assert_top_queries_error_attribution_not_enabled "$WORKDIR/mysql-top-queries.json"
+
+enable_statement_history_consumers
+
+for _ in 1 2 3; do
+  mysql_exec_root_allow_error "SELECT * FROM missing_table;"
+done
+
+sleep 1
+
+error_output="$(run_function mysql error-info '__job:local' 'true')"
+assert_error_info_has_error "$error_output"
+
+run_top_queries mysql
+assert_top_queries_error_attribution_enabled "$WORKDIR/mysql-top-queries.json"
+
+restore_statement_history_consumers
 
 echo "E2E checks passed for ${MYSQL_VARIANT_LABEL}." >&2

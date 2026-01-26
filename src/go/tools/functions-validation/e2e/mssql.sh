@@ -231,6 +231,19 @@ mssql_exec_sa() {
   run docker exec -i "$cid" "$MSSQL_SQLCMD_PATH" "${MSSQL_SQLCMD_CFLAG[@]}" -S localhost -U sa -P "Netdata123!" -d netdata -b -y 0 -Y 0 -Q "$sql"
 }
 
+mssql_exec_sa_allow_error() {
+  local sql="$1"
+  local cid
+  cid="$(mssql_container_id)"
+  if [ -z "$cid" ]; then
+    echo "MSSQL container ID not found" >&2
+    return 1
+  fi
+  set +e
+  docker exec -i "$cid" "$MSSQL_SQLCMD_PATH" "${MSSQL_SQLCMD_CFLAG[@]}" -S localhost -U sa -P "Netdata123!" -d netdata -b -y 0 -Y 0 -Q "$sql" >/dev/null 2>&1
+  set -e
+}
+
 induce_deadlock_once() {
   local tx1
   local tx2
@@ -344,6 +357,7 @@ if any(not lock_mode_re.match(norm(get_value(row, "lock_mode"))) for row in wait
     raise SystemExit("WAITING rows must include a valid lock_mode")
 
 victim_counts = {}
+expected_db = "netdata"
 has_database = False
 for row in data:
     deadlock_id = norm(get_value(row, "deadlock_id"))
@@ -358,8 +372,11 @@ for row in data:
     victim_counts.setdefault(deadlock_id, 0)
     if str(get_value(row, "is_victim")).lower() == "true":
         victim_counts[deadlock_id] += 1
-    if norm(get_value(row, "database")):
+    db_val = norm(get_value(row, "database")).lower()
+    if db_val:
         has_database = True
+        if db_val != expected_db:
+            raise SystemExit(f"unexpected database value {db_val!r}, expected {expected_db!r}")
 
 for deadlock_id, count in victim_counts.items():
     if count != 1:
@@ -443,6 +460,7 @@ if any(not lock_mode_re.match(norm(get_value(row, "lock_mode"))) for row in wait
     raise SystemExit("WAITING rows must include a valid lock_mode")
 
 victim_counts = {}
+expected_db = "netdata"
 has_database = False
 for row in data:
     deadlock_id = norm(get_value(row, "deadlock_id"))
@@ -457,8 +475,11 @@ for row in data:
     victim_counts.setdefault(deadlock_id, 0)
     if str(get_value(row, "is_victim")).lower() == "true":
         victim_counts[deadlock_id] += 1
-    if norm(get_value(row, "database")):
+    db_val = norm(get_value(row, "database")).lower()
+    if db_val:
         has_database = True
+        if db_val != expected_db:
+            raise SystemExit("unexpected database value %r, expected %r" % (db_val, expected_db))
 
 for deadlock_id, count in victim_counts.items():
     if count != 1:
@@ -491,9 +512,38 @@ if status != 200:
 if doc.get("errorMessage"):
     raise SystemExit(f"unexpected errorMessage on status 200: {doc.get('errorMessage')!r}")
 
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
 data = doc.get("data") or []
-if len(data) != 0:
+if len(data) == 0:
+    raise SystemExit(0)
+
+query_idx = field_to_idx.get("query_text", None)
+if query_idx is None:
     raise SystemExit(f"expected no rows, got {len(data)}")
+
+for row in data:
+    if query_idx >= len(row):
+        continue
+    query = str(row[query_idx]).lower()
+    if "deadlock_a" in query or "deadlock_b" in query:
+        raise SystemExit(f"unexpected deadlock rows for test tables, got {len(data)} rows")
 PY
     return
   fi
@@ -517,9 +567,38 @@ if status != 200:
 if doc.get("errorMessage"):
     raise SystemExit("unexpected errorMessage on status 200: %r" % (doc.get("errorMessage"),))
 
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
 data = doc.get("data") or []
-if len(data) != 0:
+if len(data) == 0:
+    raise SystemExit(0)
+
+query_idx = field_to_idx.get("query_text", None)
+if query_idx is None:
     raise SystemExit("expected no rows, got %s" % len(data))
+
+for row in data:
+    if query_idx >= len(row):
+        continue
+    query = str(row[query_idx]).lower()
+    if "deadlock_a" in query or "deadlock_b" in query:
+        raise SystemExit("unexpected deadlock rows for test tables, got %s rows" % len(data))
 PY
 }
 
@@ -578,6 +657,751 @@ if expected not in err:
 PY
 }
 
+assert_error_info_not_enabled() {
+  local input="$1"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit(f"unexpected status value: {doc.get('status')!r}")
+
+if status < 400:
+    raise SystemExit(f"expected error status, got {status}")
+
+err = str(doc.get("errorMessage") or "").lower()
+if "not enabled" not in err:
+    raise SystemExit(f"expected errorMessage to contain 'not enabled', got {err!r}")
+PY
+    return
+  fi
+
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r") as fh:
+    doc = json.load(fh)
+
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit("unexpected status value: %r" % (doc.get("status"),))
+
+if status < 400:
+    raise SystemExit("expected error status, got %s" % status)
+
+err = str(doc.get("errorMessage") or "").lower()
+if "not enabled" not in err:
+    raise SystemExit("expected errorMessage to contain 'not enabled', got %r" % err)
+PY
+}
+
+assert_error_info_has_error() {
+  local input="$1"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit(f"unexpected status value: {doc.get('status')!r}")
+
+if status != 200:
+    raise SystemExit(f"expected status 200, got {status}")
+
+if doc.get("errorMessage"):
+    raise SystemExit(f"unexpected errorMessage on status 200: {doc.get('errorMessage')!r}")
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("errorNumber", "errorMessage", "query"):
+    if required not in field_to_idx:
+        raise SystemExit(f"missing expected column: {required}")
+
+data = doc.get("data") or []
+if not data:
+    raise SystemExit("error-info returned no rows")
+
+num_idx = field_to_idx["errorNumber"]
+msg_idx = field_to_idx["errorMessage"]
+query_idx = field_to_idx["query"]
+
+target = "netdata_error_map_e2e"
+matched = False
+for row in data:
+    if num_idx >= len(row):
+        continue
+    err_no = row[num_idx]
+    try:
+        err_no_val = int(err_no)
+    except Exception:
+        continue
+    if err_no_val != 208:
+        continue
+    msg = str(row[msg_idx]).lower() if msg_idx < len(row) else ""
+    query = str(row[query_idx]).lower() if query_idx < len(row) else ""
+    if "invalid object name" in msg and target in query:
+        matched = True
+        break
+
+if not matched:
+    raise SystemExit("no error-info row contained invalid object name for netdata_error_map_e2e")
+PY
+    return
+  fi
+
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r") as fh:
+    doc = json.load(fh)
+
+try:
+    status = int(doc.get("status"))
+except (TypeError, ValueError):
+    raise SystemExit("unexpected status value: %r" % (doc.get("status"),))
+
+if status != 200:
+    raise SystemExit("expected status 200, got %s" % status)
+
+if doc.get("errorMessage"):
+    raise SystemExit("unexpected errorMessage on status 200: %r" % (doc.get("errorMessage"),))
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("errorNumber", "errorMessage", "query"):
+    if required not in field_to_idx:
+        raise SystemExit("missing expected column: %s" % required)
+
+data = doc.get("data") or []
+if not data:
+    raise SystemExit("error-info returned no rows")
+
+num_idx = field_to_idx["errorNumber"]
+msg_idx = field_to_idx["errorMessage"]
+query_idx = field_to_idx["query"]
+
+target = "netdata_error_map_e2e"
+matched = False
+for row in data:
+    if num_idx >= len(row):
+        continue
+    err_no = row[num_idx]
+    try:
+        err_no_val = int(err_no)
+    except Exception:
+        continue
+    if err_no_val != 208:
+        continue
+    msg = str(row[msg_idx]).lower() if msg_idx < len(row) else ""
+    query = str(row[query_idx]).lower() if query_idx < len(row) else ""
+    if "invalid object name" in msg and target in query:
+        matched = True
+        break
+
+if not matched:
+    raise SystemExit("no error-info row contained invalid object name for netdata_error_map_e2e")
+PY
+}
+
+assert_top_queries_error_attribution_not_enabled() {
+  local input="$1"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+if "errorAttribution" not in field_to_idx:
+    raise SystemExit("missing expected column: errorAttribution")
+
+data = doc.get("data") or []
+idx = field_to_idx["errorAttribution"]
+for row in data:
+    if idx >= len(row):
+        continue
+    if str(row[idx]) != "not_enabled":
+        raise SystemExit(f"expected errorAttribution 'not_enabled', got {row[idx]!r}")
+PY
+    return
+  fi
+
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+if "errorAttribution" not in field_to_idx:
+    raise SystemExit("missing expected column: errorAttribution")
+
+data = doc.get("data") or []
+idx = field_to_idx["errorAttribution"]
+for row in data:
+    if idx >= len(row):
+        continue
+    if str(row[idx]) != "not_enabled":
+        raise SystemExit("expected errorAttribution 'not_enabled', got %r" % row[idx])
+PY
+}
+
+assert_top_queries_error_attribution_active() {
+  local input="$1"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("errorAttribution",):
+    if required not in field_to_idx:
+        raise SystemExit(f"missing expected column: {required}")
+
+data = doc.get("data") or []
+status_idx = field_to_idx["errorAttribution"]
+
+for row in data:
+    if status_idx >= len(row):
+        continue
+    status = str(row[status_idx])
+    if status not in ("enabled", "no_data"):
+        raise SystemExit(f"unexpected errorAttribution status {status!r}")
+PY
+    return
+  fi
+
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("errorAttribution",):
+    if required not in field_to_idx:
+        raise SystemExit("missing expected column: %s" % required)
+
+data = doc.get("data") or []
+status_idx = field_to_idx["errorAttribution"]
+
+for row in data:
+    if status_idx >= len(row):
+        continue
+    status = str(row[status_idx])
+    if status not in ("enabled", "no_data"):
+        raise SystemExit("unexpected errorAttribution status %r" % status)
+PY
+}
+
+assert_top_queries_error_attribution_mapped() {
+  local top_queries="$1"
+  local error_info="$2"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$top_queries" "$error_info" <<'PY'
+import json
+import sys
+
+top_path = sys.argv[1]
+err_path = sys.argv[2]
+
+with open(err_path, "r", encoding="utf-8") as fh:
+    err_doc = json.load(fh)
+
+err_cols = err_doc.get("columns") or {}
+err_idx = {}
+if isinstance(err_cols, dict):
+    for field, col in err_cols.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            err_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(err_cols):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            err_idx[field] = idx
+
+for required in ("errorMessage", "errorNumber", "query", "queryHash"):
+    if required not in err_idx:
+        raise SystemExit(f"missing expected error-info column: {required}")
+
+def normalize(text: str) -> str:
+    return " ".join(text.split()).strip().rstrip(";").strip()
+
+error_rows = err_doc.get("data") or []
+candidates = []
+for row in error_rows:
+    msg = str(row[err_idx["errorMessage"]]).lower() if err_idx["errorMessage"] < len(row) else ""
+    err_no = row[err_idx["errorNumber"]] if err_idx["errorNumber"] < len(row) else None
+    query = str(row[err_idx["query"]]).lower() if err_idx["query"] < len(row) else ""
+    qh = row[err_idx["queryHash"]] if err_idx["queryHash"] < len(row) else None
+    try:
+        err_no_val = int(err_no)
+    except Exception:
+        continue
+    if err_no_val != 208:
+        continue
+    if "invalid object name" in msg and "netdata_error_map_e2e" in query:
+        candidates.append((str(qh) if qh else "", normalize(query)))
+
+if not candidates:
+    raise SystemExit("no error-info row contained invalid object name for netdata_error_map_e2e")
+
+with open(top_path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("query", "queryHash", "errorAttribution", "errorNumber", "errorMessage"):
+    if required not in field_to_idx:
+        raise SystemExit(f"missing expected column: {required}")
+
+data = doc.get("data") or []
+status_idx = field_to_idx["errorAttribution"]
+num_idx = field_to_idx["errorNumber"]
+msg_idx = field_to_idx["errorMessage"]
+hash_idx = field_to_idx["queryHash"]
+
+matched = False
+for row in data:
+    if status_idx >= len(row):
+        continue
+    if hash_idx >= len(row):
+        continue
+    status = str(row[status_idx]) if status_idx < len(row) else ""
+    if status != "enabled":
+        continue
+    err_no = row[num_idx] if num_idx < len(row) else None
+    try:
+        err_no_val = int(err_no)
+    except Exception:
+        continue
+    if err_no_val != 208:
+        continue
+    msg = str(row[msg_idx]).lower() if msg_idx < len(row) and row[msg_idx] is not None else ""
+    if "invalid object name" not in msg:
+        continue
+    row_hash = str(row[hash_idx]) if hash_idx < len(row) and row[hash_idx] is not None else ""
+    row_query = normalize(str(row[field_to_idx["query"]]).lower()) if field_to_idx["query"] < len(row) else ""
+    for cand_hash, cand_query in candidates:
+        if cand_hash and row_hash == cand_hash:
+            matched = True
+            break
+        if cand_query and row_query == cand_query:
+            matched = True
+            break
+    if matched:
+        break
+
+if not matched:
+    raise SystemExit("no top-queries row had enabled error attribution for netdata_error_map_e2e")
+PY
+    return
+  fi
+
+  python - "$top_queries" "$error_info" <<'PY'
+import json
+import sys
+
+top_path = sys.argv[1]
+err_path = sys.argv[2]
+
+with open(err_path, "r") as fh:
+    err_doc = json.load(fh)
+
+err_cols = err_doc.get("columns") or {}
+err_idx = {}
+if isinstance(err_cols, dict):
+    for field, col in err_cols.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            err_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(err_cols):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            err_idx[field] = idx
+
+for required in ("errorMessage", "errorNumber", "query", "queryHash"):
+    if required not in err_idx:
+        raise SystemExit("missing expected error-info column: %s" % required)
+
+def normalize(text):
+    return " ".join(text.split()).strip().rstrip(";").strip()
+
+error_rows = err_doc.get("data") or []
+candidates = []
+for row in error_rows:
+    msg = str(row[err_idx["errorMessage"]]).lower() if err_idx["errorMessage"] < len(row) else ""
+    err_no = row[err_idx["errorNumber"]] if err_idx["errorNumber"] < len(row) else None
+    query = str(row[err_idx["query"]]).lower() if err_idx["query"] < len(row) else ""
+    qh = row[err_idx["queryHash"]] if err_idx["queryHash"] < len(row) else None
+    try:
+        err_no_val = int(err_no)
+    except Exception:
+        continue
+    if err_no_val != 208:
+        continue
+    if "invalid object name" in msg and "netdata_error_map_e2e" in query:
+        candidates.append((str(qh) if qh else "", normalize(query)))
+
+if not candidates:
+    raise SystemExit("no error-info row contained invalid object name for netdata_error_map_e2e")
+
+with open(top_path, "r") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("query", "queryHash", "errorAttribution", "errorNumber", "errorMessage"):
+    if required not in field_to_idx:
+        raise SystemExit("missing expected column: %s" % required)
+
+data = doc.get("data") or []
+status_idx = field_to_idx["errorAttribution"]
+num_idx = field_to_idx["errorNumber"]
+msg_idx = field_to_idx["errorMessage"]
+hash_idx = field_to_idx["queryHash"]
+
+matched = False
+for row in data:
+    if status_idx >= len(row):
+        continue
+    if hash_idx >= len(row):
+        continue
+    status = str(row[status_idx]) if status_idx < len(row) else ""
+    if status != "enabled":
+        continue
+    err_no = row[num_idx] if num_idx < len(row) else None
+    try:
+        err_no_val = int(err_no)
+    except Exception:
+        continue
+    if err_no_val != 208:
+        continue
+    msg = str(row[msg_idx]).lower() if msg_idx < len(row) and row[msg_idx] is not None else ""
+    if "invalid object name" not in msg:
+        continue
+    row_hash = str(row[hash_idx]) if hash_idx < len(row) and row[hash_idx] is not None else ""
+    row_query = normalize(str(row[field_to_idx["query"]]).lower()) if field_to_idx["query"] < len(row) else ""
+    for cand_hash, cand_query in candidates:
+        if cand_hash and row_hash == cand_hash:
+            matched = True
+            break
+        if cand_query and row_query == cand_query:
+            matched = True
+            break
+    if matched:
+        break
+
+if not matched:
+    raise SystemExit("no top-queries row had enabled error attribution for netdata_error_map_e2e")
+PY
+}
+
+assert_top_queries_plan_ops() {
+  local input="$1"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("query", "hashMatch", "sorts"):
+    if required not in field_to_idx:
+        raise SystemExit(f"missing expected column: {required}")
+
+data = doc.get("data") or []
+query_idx = field_to_idx["query"]
+hash_idx = field_to_idx["hashMatch"]
+sort_idx = field_to_idx["sorts"]
+
+matched = False
+for row in data:
+    if query_idx >= len(row):
+        continue
+    query = str(row[query_idx]).lower()
+    if "join" not in query or "sample" not in query:
+        continue
+    hash_val = row[hash_idx] if hash_idx < len(row) else 0
+    sort_val = row[sort_idx] if sort_idx < len(row) else 0
+    try:
+        hash_val = int(hash_val)
+    except Exception:
+        hash_val = 0
+    try:
+        sort_val = int(sort_val)
+    except Exception:
+        sort_val = 0
+    if hash_val > 0 and sort_val > 0:
+        matched = True
+        break
+
+if not matched:
+    raise SystemExit("no top-queries row had hashMatch and sorts counts for the join query")
+PY
+    return
+  fi
+
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r") as fh:
+    doc = json.load(fh)
+
+columns = doc.get("columns") or {}
+field_to_idx = {}
+if isinstance(columns, dict):
+    for field, col in columns.items():
+        if not isinstance(col, dict):
+            continue
+        try:
+            field_to_idx[field] = int(col.get("index"))
+        except (TypeError, ValueError):
+            continue
+else:
+    for idx, col in enumerate(columns):
+        if not isinstance(col, dict):
+            continue
+        field = col.get("field")
+        if field:
+            field_to_idx[field] = idx
+
+for required in ("query", "hashMatch", "sorts"):
+    if required not in field_to_idx:
+        raise SystemExit("missing expected column: %s" % required)
+
+data = doc.get("data") or []
+query_idx = field_to_idx["query"]
+hash_idx = field_to_idx["hashMatch"]
+sort_idx = field_to_idx["sorts"]
+
+matched = False
+for row in data:
+    if query_idx >= len(row):
+        continue
+    query = str(row[query_idx]).lower()
+    if "join" not in query or "sample" not in query:
+        continue
+    hash_val = row[hash_idx] if hash_idx < len(row) else 0
+    sort_val = row[sort_idx] if sort_idx < len(row) else 0
+    try:
+        hash_val = int(hash_val)
+    except Exception:
+        hash_val = 0
+    try:
+        sort_val = int(sort_val)
+    except Exception:
+        sort_val = 0
+    if hash_val > 0 and sort_val > 0:
+        matched = True
+        break
+
+if not matched:
+    raise SystemExit("no top-queries row had hashMatch and sorts counts for the join query")
+PY
+}
+
 verify_deadlock_info_no_deadlock() {
   local output
 
@@ -612,5 +1436,44 @@ verify_deadlock_info() {
 
 verify_deadlock_info_no_deadlock
 verify_deadlock_info
+
+assert_top_queries_error_attribution_not_enabled "$WORKDIR/mssql-top-queries.json"
+
+error_output="$(run_mssql_function_with_retry error-info '__job:local' 'false')"
+assert_error_info_not_enabled "$error_output"
+
+mssql_exec_sa "IF EXISTS (SELECT 1 FROM sys.server_event_sessions WHERE name = 'netdata_errors') DROP EVENT SESSION [netdata_errors] ON SERVER;"
+mssql_exec_sa "CREATE EVENT SESSION [netdata_errors] ON SERVER ADD EVENT sqlserver.error_reported(ACTION(sqlserver.sql_text, sqlserver.query_hash)) ADD TARGET package0.ring_buffer;"
+mssql_exec_sa "ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;"
+mssql_exec_sa "ALTER DATABASE netdata SET QUERY_STORE (QUERY_CAPTURE_MODE = ALL, OPERATION_MODE = READ_WRITE);"
+
+mssql_exec_sa "IF OBJECT_ID('dbo.netdata_error_map_e2e', 'U') IS NOT NULL DROP TABLE dbo.netdata_error_map_e2e;"
+mssql_exec_sa "CREATE TABLE dbo.netdata_error_map_e2e (id int NOT NULL PRIMARY KEY);"
+mssql_exec_sa "INSERT INTO dbo.netdata_error_map_e2e (id) VALUES (1), (2), (3);"
+
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  mssql_exec_sa "SELECT COUNT(*) FROM dbo.netdata_error_map_e2e;"
+done
+
+mssql_exec_sa "DROP TABLE dbo.netdata_error_map_e2e;"
+
+for _ in 1 2 3; do
+  mssql_exec_sa_allow_error "SELECT COUNT(*) FROM dbo.netdata_error_map_e2e;"
+done
+
+for _ in 1 2 3 4 5; do
+  mssql_exec_sa "SET NOCOUNT ON; SELECT a.id, b.name FROM dbo.sample a JOIN dbo.sample b ON a.id = b.id ORDER BY a.value + b.value DESC OPTION (HASH JOIN);"
+done
+
+mssql_exec_sa "EXEC sys.sp_query_store_flush_db;"
+sleep 2
+
+error_output="$(run_mssql_function_with_retry error-info '__job:local' 'true')"
+assert_error_info_has_error "$error_output"
+
+run_mssql_top_queries_with_retry
+assert_top_queries_error_attribution_active "$WORKDIR/mssql-top-queries.json"
+assert_top_queries_error_attribution_mapped "$WORKDIR/mssql-top-queries.json" "$WORKDIR/mssql-error-info.json"
+assert_top_queries_plan_ops "$WORKDIR/mssql-top-queries.json"
 
 echo "E2E checks passed for ${MSSQL_VARIANT_LABEL}." >&2
