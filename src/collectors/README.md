@@ -27,7 +27,6 @@ This section outlines the required privileges and how they are configured in dif
 |------------------------|-------------------------------------------------|-----------------------------------------------------|
 | apps.plugin            | CAP_DAC_READ_SEARCH, CAP_SYS_PTRACE             | setuid root                                         |
 | debugfs.plugin         | CAP_DAC_READ_SEARCH                             | setuid root                                         |
-| systemd-journal.plugin | CAP_DAC_READ_SEARCH                             | setuid root                                         |
 | perf.plugin            | CAP_PERFMON                                     | setuid root                                         |
 | slabinfo.plugin        | CAP_DAC_READ_SEARCH                             | setuid root                                         |
 | go.d.plugin            | CAP_DAC_READ_SEARCH, CAP_NET_ADMIN, CAP_NET_RAW | setuid root                                         |

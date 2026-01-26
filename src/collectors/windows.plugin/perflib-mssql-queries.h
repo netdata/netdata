@@ -656,6 +656,7 @@ struct netdata_mssql_conn {
     const char *password;
     int instances;
     bool windows_auth;
+    bool trust_server_certificate;
     bool is_sqlexpress;
 
     SQLCHAR *connectionString;

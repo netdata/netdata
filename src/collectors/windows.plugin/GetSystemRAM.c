@@ -13,7 +13,7 @@ int do_GetSystemRAM(int update_every, usec_t dt __maybe_unused)
     memStat.dwLength = sizeof(memStat);
 
     if (!GlobalMemoryStatusEx(&memStat)) {
-        netdata_log_error("GlobalMemoryStatusEx() failed.");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "GlobalMemoryStatusEx() failed (error: %lu)", GetLastError());
         return 1;
     }
 
@@ -25,9 +25,9 @@ int do_GetSystemRAM(int update_every, usec_t dt __maybe_unused)
     }
 
     {
-        DWORDLONG total_bytes = memStat.ullTotalPageFile;
-        DWORDLONG free_bytes = memStat.ullAvailPageFile;
-        DWORDLONG used_bytes = total_bytes - free_bytes;
+        ULONGLONG total_bytes = memStat.ullTotalPageFile;
+        ULONGLONG free_bytes = memStat.ullAvailPageFile;
+        ULONGLONG used_bytes = total_bytes - free_bytes;
         common_mem_swap(free_bytes, used_bytes, update_every);
     }
 

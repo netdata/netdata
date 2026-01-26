@@ -27,6 +27,9 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         pgMethods,
+		MethodParams:    pgMethodParams,
+		HandleMethod:    pgHandleMethod,
 	})
 }
 
@@ -69,6 +72,7 @@ type Config struct {
 	QueryTimeHistogram []float64        `yaml:"query_time_histogram,omitempty" json:"query_time_histogram"`
 	MaxDBTables        int64            `yaml:"max_db_tables" json:"max_db_tables"`
 	MaxDBIndexes       int64            `yaml:"max_db_indexes" json:"max_db_indexes"`
+	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 }
 
 type (
@@ -83,14 +87,17 @@ type (
 		db      *sql.DB
 		dbConns map[string]*dbConn
 
-		superUser            *bool
-		pgIsInRecovery       *bool
-		pgVersion            int
-		dbSr                 matcher.Matcher
-		recheckSettingsTime  time.Time
-		recheckSettingsEvery time.Duration
-		doSlowTime           time.Time
-		doSlowEvery          time.Duration
+		superUser               *bool
+		pgIsInRecovery          *bool
+		pgVersion               int
+		pgStatStatementsAvail   bool            // cached positive result only
+		pgStatStatementsColumns map[string]bool // cached column names from pg_stat_statements
+		pgStatStatementsMu      sync.RWMutex    // protects pgStatStatements* fields for concurrent access
+		dbSr                    matcher.Matcher
+		recheckSettingsTime     time.Time
+		recheckSettingsEvery    time.Duration
+		doSlowTime              time.Time
+		doSlowEvery             time.Duration
 
 		mx *pgMetrics
 	}

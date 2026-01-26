@@ -58,6 +58,7 @@ AUTHENTICATION_SOURCES = [
 COLLECTOR_RENDER_KEYS = [
     'alerts',
     'metrics',
+    'functions',
     'overview',
     'related_resources',
     'setup',

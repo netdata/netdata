@@ -1,6 +1,6 @@
 # Centralized Cloud Notifications Reference
 
-Netdata Cloud sends Alert notifications for nodes in warning, critical, or unreachable states, ensuring Alerts are managed centrally and efficiently.
+Netdata Cloud sends Alert notifications for nodes in warning, critical, or [unreachable](/docs/netdata-cloud/node-states-and-transitions.md) states, ensuring Alerts are managed centrally and efficiently.
 
 ## Benefits of Centralized Notifications
 

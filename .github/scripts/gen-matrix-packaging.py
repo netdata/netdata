@@ -5,7 +5,7 @@ import sys
 
 from ruamel.yaml import YAML
 
-ALWAYS_RUN_ARCHES = ["amd64", "x86_64"]
+ALWAYS_RUN_ARCHES = ["amd64", "x86_64", 'i386', 'armhf', 'aarch64', 'arm64']
 SHORT_RUN = sys.argv[1]
 yaml = YAML(typ='safe')
 entries = list()

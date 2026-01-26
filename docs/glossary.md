@@ -73,6 +73,10 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Kubernetes Dashboard** or **Kubernetes Tab**](/docs/dashboards-and-charts/kubernetes-tab.md): Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default Overview dashboard.
 
+## L
+
+- [**Live** (node state)](/docs/netdata-cloud/node-states-and-transitions.md): A node state in Netdata Cloud indicating the node is actively streaming metrics. Also referred to as "Online" or "Reachable" in code.
+
 ## M
 
 - [**Metrics Collection**](/src/collectors/README.md): With zero configuration, Netdata auto-detects thousands of data sources upon starting and immediately collects per-second metrics. Netdata can immediately collect metrics from these endpoints thanks to 300+ collectors, which all come pre-installed when you install Netdata.
@@ -96,7 +100,11 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Netdata Functions** or **Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
+- [**Node States**](/docs/netdata-cloud/node-states-and-transitions.md): The connection status of nodes in Netdata Cloud. Nodes can be Live (actively streaming), Stale (not streaming but historical data available via Parent), Offline (disconnected, no data available), or Unseen (claimed but never connected). See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
+
 ## O
+
+- [**Offline** (node state)](/docs/netdata-cloud/node-states-and-transitions.md): A node state in Netdata Cloud indicating the node is disconnected and no data is available. Also referred to as "Unreachable" in code. See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
 
 - [**Obsoletion**(of nodes)](/docs/dashboards-and-charts/nodes-tab.md): Removing nodes from a space.
 
@@ -118,6 +126,8 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Single Node Dashboard**](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata Agent, with thousands of metrics and hundreds of interactive charts that requires no setup.
 
+- [**Stale** (node state)](/docs/netdata-cloud/node-states-and-transitions.md): A node state in Netdata Cloud indicating a child node stopped streaming to its Parent, but the Parent is still online and has historical data available. See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
+
 - [**Space**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#overview): A high-level container and virtual collaboration area where you can organize team members, access levels, and the nodes you want to monitor.
 
 ## T
@@ -130,6 +140,8 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Unlimited Scalability**](https://www.netdata.cloud/#:~:text=love%20community%20contributions!-,Infinite%20Scalability,-By%20storing%20data): With Netdata's distributed architecture, you can seamlessly observe a couple, hundreds or
   even thousands of nodes. There are no actual bottlenecks especially if you retain metrics locally in the Agents.
+
+- [**Unseen** (node state)](/docs/netdata-cloud/node-states-and-transitions.md): A node state in Netdata Cloud indicating the node was claimed but has never connected. Also referred to as "Created" in code. See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
 
 ## V
 

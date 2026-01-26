@@ -376,7 +376,6 @@ Log explorer functions (`has_history: true`) provide advanced log analysis with 
       "id": "priority",
       "name": "Log Level",
       "order": 1,
-      "defaultExpanded": true,
       "options": [
         {"id": "ERROR", "name": "ERROR", "count": 45, "order": 1},
         {"id": "INFO", "name": "INFO", "count": 234, "order": 3}
@@ -416,9 +415,8 @@ Facets provide dynamic filtering with real-time counts computed by the backend:
   "facets": [
     {
       "id": "level",
-      "name": "Log Level", 
+      "name": "Log Level",
       "order": 1,
-      "defaultExpanded": true,
       "options": [
         {"id": "ERROR", "name": "ERROR", "count": 45, "order": 1},
         {"id": "WARN", "name": "WARN", "count": 123, "order": 2},
@@ -875,9 +873,12 @@ For errors, return:
 ```json
 {
   "status": 400,
-  "error_message": "Descriptive error message"
+  "errorMessage": "Descriptive error message"
 }
 ```
+
+**Compatibility note (cloud-frontend):**
+- The Functions UI expects `errorMessage` (camelCase) and does **not** camelize error payloads.
 
 ### Performance Optimization
 

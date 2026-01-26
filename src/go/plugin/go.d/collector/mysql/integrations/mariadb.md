@@ -183,6 +183,159 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+Retrieves aggregated SQL query performance metrics from MySQL [performance_schema.events_statements_summary_by_digest](https://dev.mysql.com/doc/refman/8.4/en/performance-schema-statement-summary-tables.html) table.
+
+This function queries the `events_statements_summary_by_digest` table which contains aggregated statistics for SQL statements grouped by their digest (normalized query pattern). The function dynamically detects available columns based on your MySQL/MariaDB version.
+
+Use cases:
+- Identify slow queries that consume the most execution time
+- Find frequently executed queries that may benefit from optimization
+- Detect queries with high lock time, errors, or table scans
+
+Query text is truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mysql:top-queries` |
+| Require Cloud | yes |
+| Performance | Queries the `events_statements_summary_by_digest` table:<br/>• On busy servers with high query throughput, the digest table can grow large<br/>• Default limit of 500 rows balances usefulness with performance |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to MySQL<br/>• Performance Schema is enabled with statement digest collection<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+##### Enable performance_schema statement digest collection
+
+Performance Schema must be enabled and statement instrumentation must be configured to collect digest statistics.
+
+1. Check if Performance Schema is enabled:
+   ```sql
+   SELECT @@performance_schema;
+   ```
+
+2. Check statement instrumentation configuration:
+   ```sql
+   SELECT * FROM performance_schema.setup_consumers
+   WHERE NAME LIKE '%statement%';
+   ```
+
+3. The following consumers should be enabled:
+   - `events_statements_current`
+   - `events_statements_summary_by_digest`
+
+4. Enable statement consumers if needed:
+   ```sql
+   UPDATE performance_schema.setup_consumers
+   SET ENABLED = 'YES'
+   WHERE NAME LIKE 'events_statements%';
+   ```
+
+   :::info
+
+   - Changes to `setup_consumers` take effect immediately without requiring a server restart.
+   - MariaDB also supports the `events_statements_summary_by_digest` table. Exact consumer names may vary by MariaDB version, so checking `setup_consumers` first as shown above is recommended.
+
+   :::
+
+5. Verify digest table contains data:
+   ```sql
+   SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest;
+   ```
+
+   Note: Statement digest data is accumulated since server startup or since the table was last truncated. To reset statistics:
+   ```sql
+   TRUNCATE TABLE performance_schema.events_statements_summary_by_digest;
+   ```
+
+   Ensure that statement instruments are enabled in the Performance Schema so that statement digest statistics are collected. Refer to your MySQL or MariaDB version documentation for the appropriate configuration options.
+
+
+##### Grant SELECT permission on Performance Schema tables
+
+The netdata user must have SELECT permission on Performance Schema tables. The standard collector permissions
+(USAGE, REPLICATION CLIENT, PROCESS) do not automatically include Performance Schema access.
+
+1. Grant the required permission:
+   ```sql
+   GRANT SELECT ON performance_schema.* TO 'netdata'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+
+   :::info
+
+   The host part (`'localhost'`) should match how the netdata user connects. If connecting via TCP/IP, you may need `'netdata'@'%'` or a specific IP address instead.
+
+   :::
+
+2. Verify access:
+   ```sql
+   -- As the netdata user:
+   SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest;
+   ```
+
+
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column. The available options depend on your MySQL/MariaDB version and include metrics like total execution time, number of calls, lock time, errors, rows examined, and more. Defaults to total execution time. | yes | totalTime |  |
+
+#### Returns
+
+Aggregated statement statistics from Performance Schema, grouped by query digest. Each row represents a unique query pattern with cumulative metrics across all executions.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Digest | string |  | hidden | Unique hash identifier for the normalized query pattern. Queries with the same structure (different literal values) share the same digest. |
+| Query | string |  |  | Normalized SQL query text with literals replaced by placeholders (e.g., '?' for values). Truncated to 4096 characters. |
+| Schema | string |  |  | Database schema name where the query was executed. Empty string for queries without a schema context. |
+| Calls | integer |  |  | Total number of times this query pattern has been executed since server startup or since the digest table was last truncated. |
+| Total Time | duration | milliseconds |  | Cumulative execution time across all executions. High values indicate queries that consume significant server resources. |
+| Min Time | duration | milliseconds | hidden | Minimum execution time observed for a single execution. Helps identify variability in query performance. |
+| Avg Time | duration | milliseconds |  | Average execution time (total time divided by calls). Use this to compare performance across different query patterns. |
+| Max Time | duration | milliseconds | hidden | Maximum execution time observed for a single execution. Large gaps between min and max may indicate performance instability. |
+| Lock Time | duration | milliseconds |  | Total time spent waiting for table locks across all executions. High lock time may indicate contention from concurrent transactions. |
+| Errors | integer |  |  | Total number of times this query pattern resulted in an error. Non-zero values require investigation into the underlying issue. |
+| Warnings | integer |  |  | Total number of times this query pattern generated warnings. Warnings may indicate data type conversions, NULL handling issues, or other non-critical problems. |
+| Rows Affected | integer |  |  | Total number of rows modified by INSERT, UPDATE, DELETE, or REPLACE statements. Useful for tracking write workloads. |
+| Rows Sent | integer |  |  | Total number of rows returned to the client by SELECT statements. High values may indicate result sets that are too large. |
+| Rows Examined | integer |  |  | Total number of rows read during query execution. A high ratio of rows examined to rows sent suggests missing or inefficient indexes. |
+| Temp Disk Tables | integer |  |  | Total number of temporary tables created on disk across all executions. Disk-based temporary tables are significantly slower than in-memory tables and may indicate memory pressure or complex operations requiring sorting/grouping. |
+| Temp Tables | integer |  |  | Total number of temporary tables created (both in-memory and on-disk). High values suggest frequent sorting, grouping, or DISTINCT operations. |
+| Full Joins | integer |  |  | Total number of joins that performed a full table scan without using an index. These are typically very expensive operations that should be optimized. |
+| Full Range Joins | integer |  | hidden | Total number of joins that used a range scan on the first table. Less efficient than indexed joins but better than full scans. |
+| Select Range | integer |  | hidden | Total number of joins that used a range on the first table for row selection. |
+| Select Range Check | integer |  | hidden | Total number of joins that checked each row after scanning for key ranges. Very inefficient operation. |
+| Select Scan | integer |  |  | Total number of joins that performed a full scan of the first table. Indicates missing indexes or suboptimal join order. |
+| Sort Merge Passes | integer |  | hidden | Total number of merge passes performed during sort operations. More passes indicate larger datasets that exceed sort buffer size. |
+| Sort Range | integer |  | hidden | Total number of sorts that used a range scan. |
+| Sort Rows | integer |  |  | Total number of rows sorted across all executions. High values indicate frequent sorting operations on large datasets. |
+| Sort Scan | integer |  | hidden | Total number of sorts that required a full table scan. |
+| No Index Used | integer |  |  | Total number of executions where no index was used for table access. These queries are prime candidates for index optimization. |
+| No Good Index Used | integer |  | hidden | Total number of executions where a non-optimal index was used. Indicates that while an index exists, a better one might improve performance. |
+| First Seen | string |  | hidden | Timestamp when this query pattern was first observed. Helps identify new queries that may have been introduced by application changes. |
+| Last Seen | string |  | hidden | Timestamp when this query pattern was last executed. Can help identify stale queries that are no longer in use. |
+| P95 Time | duration | milliseconds |  | 95th percentile execution time. 95% of executions completed within this time. Available in MySQL 8.0+. Useful for understanding typical performance. |
+| P99 Time | duration | milliseconds |  | 99th percentile execution time. 99% of executions completed within this time. Available in MySQL 8.0+. Helps identify outlier slow executions. |
+| P99.9 Time | duration | milliseconds | hidden | 99.9th percentile execution time. Available in MySQL 8.0+. Identifies extreme outliers in query performance. |
+| Sample Query | string |  | hidden | Example of an actual query execution with literal values preserved. Available in MySQL 8.0+. Helpful for understanding the exact queries being executed. |
+| Sample Seen | string |  | hidden | Timestamp when the sample query was captured. Available in MySQL 8.0+. |
+| Sample Time | duration | milliseconds | hidden | Execution time of the captured sample query. Available in MySQL 8.0+. |
+| CPU Time | duration | milliseconds |  | Total CPU time consumed across all executions. Available in MySQL 8.0.28+. Helps identify CPU-intensive queries. |
+| Max Controlled Memory | integer |  |  | Maximum memory controlled by the query executor for this query pattern. Available in MySQL 8.0.31+. Helps identify memory-intensive operations. |
+| Max Total Memory | integer |  |  | Maximum total memory used by this query pattern including both controlled and uncontrolled allocations. Available in MySQL 8.0.31+. |
+
+
+
 ## Alerts
 
 
@@ -235,21 +388,21 @@ To create the `netdata` user with these permissions, execute the following in th
 
 - **MySQL and MariaDB < 10.5.9**
 
-    ```mysql
-    CREATE USER 'netdata'@'localhost';
-    GRANT USAGE, REPLICATION CLIENT, PROCESS ON *.* TO 'netdata'@'localhost';
-    FLUSH PRIVILEGES;
-    ```
+  ```mysql
+  CREATE USER 'netdata'@'localhost';
+  GRANT USAGE, REPLICATION CLIENT, PROCESS ON *.* TO 'netdata'@'localhost';
+  FLUSH PRIVILEGES;
+  ```
 
 - **MariaDB >= 10.5.9**
 
-    For MariaDB 10.5.9 and later, use the `SLAVE MONITOR` privilege instead of `REPLICATION CLIENT`:
+  For MariaDB 10.5.9 and later, use the `SLAVE MONITOR` privilege instead of `REPLICATION CLIENT`:
 
-    ```mysql
-    CREATE USER 'netdata'@'localhost';
-    GRANT USAGE, SLAVE MONITOR, PROCESS ON *.* TO 'netdata'@'localhost';
-    FLUSH PRIVILEGES;
-    ```
+  ```mysql
+  CREATE USER 'netdata'@'localhost';
+  GRANT USAGE, SLAVE MONITOR, PROCESS ON *.* TO 'netdata'@'localhost';
+  FLUSH PRIVILEGES;
+  ```
 
 The `netdata` user will have the ability to connect to the MySQL server on localhost without a password. 
 It will only be able to gather statistics without being able to alter or affect operations in any way.

@@ -227,6 +227,125 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+Retrieves aggregated SQL query performance metrics from PostgreSQL [pg_stat_statements](https://www.postgresql.org/docs/current/pgstatstatements.html) extension.
+
+This function queries `pg_stat_statements` which tracks execution statistics for all SQL statements. Statistics include execution counts, timing metrics, I/O operations, and resource consumption. Columns are dynamically detected based on your PostgreSQL version.
+
+Use cases:
+- Identify slow queries consuming the most total execution time
+- Find queries with high shared block reads for I/O optimization
+- Analyze temp block usage to detect queries needing memory tuning
+
+Query text is truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Postgres:top-queries` |
+| Require Cloud | yes |
+| Performance | Queries `pg_stat_statements` which maintains statistics in shared memory:<br/>• On busy servers with many unique queries, the extension may consume significant memory<br/>• Default limit of 500 rows balances usefulness with performance |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The `pg_stat_statements` extension is installed in the database<br/>• The collector has successfully connected to PostgreSQL<br/>• Returns HTTP 503 if extension is not installed (with instructions to install)<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+##### Enable pg_stat_statements
+
+The `pg_stat_statements` extension must be installed and configured.
+
+1. Add to `postgresql.conf`:
+
+   ```ini
+   shared_preload_libraries = 'pg_stat_statements'
+   ```
+
+2. Restart PostgreSQL, then create the extension:
+
+   ```sql
+   CREATE EXTENSION pg_stat_statements;
+   ```
+
+3. Verify the extension is working:
+
+   ```sql
+   SELECT COUNT(*) FROM pg_stat_statements;
+   ```
+
+:::info
+
+- `pg_stat_statements` requires a server restart to load the shared library
+- Statistics can be reset with `SELECT pg_stat_statements_reset()`
+- The `pg_stat_statements.max` parameter controls maximum tracked statements (default 5000)
+- Enable `track_io_timing` for block read/write timing metrics (may add slight overhead)
+
+:::
+
+
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column. Options include total time, mean time, calls, rows, shared blocks hit/read, and temp blocks written. Defaults to total time to focus on most resource-intensive queries. | yes | totalTime |  |
+
+#### Returns
+
+Aggregated query statistics from `pg_stat_statements`. Each row represents a unique query pattern with cumulative metrics across all executions.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Query ID | string |  | hidden | Internal hash identifier for the normalized query. Can be used to track queries across statistics resets. |
+| Query | string |  |  | Normalized SQL query text with literals replaced by parameter placeholders. Truncated to 4096 characters. |
+| Database | string |  |  | Database name where the query was executed. |
+| User | string |  |  | PostgreSQL user who executed the query. |
+| Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries. |
+| Total Time | duration | milliseconds |  | Cumulative execution time across all executions. High values indicate queries consuming significant database resources. |
+| Mean Time | duration | milliseconds |  | Average execution time per call. Use this to compare typical performance across different query patterns. |
+| Min Time | duration | milliseconds | hidden | Minimum execution time observed for a single execution. |
+| Max Time | duration | milliseconds | hidden | Maximum execution time observed for a single execution. Large gaps between min and max may indicate performance variability. |
+| Stddev Time | duration | milliseconds | hidden | Standard deviation of execution time. High values indicate inconsistent query performance. |
+| Plans | integer |  | hidden | Number of times the query was planned. Available in PostgreSQL 13+. |
+| Total Plan Time | duration | milliseconds | hidden | Cumulative time spent planning the query. Available in PostgreSQL 13+. |
+| Mean Plan Time | duration | milliseconds | hidden | Average time spent planning per execution. Available in PostgreSQL 13+. |
+| Min Plan Time | duration | milliseconds | hidden | Minimum planning time observed. Available in PostgreSQL 13+. |
+| Max Plan Time | duration | milliseconds | hidden | Maximum planning time observed. Available in PostgreSQL 13+. |
+| Stddev Plan Time | duration | milliseconds | hidden | Standard deviation of planning time. Available in PostgreSQL 13+. |
+| Rows | integer |  |  | Total number of rows retrieved or affected across all executions. |
+| Shared Blocks Hit | integer |  |  | Total shared buffer cache hits. High values indicate good cache utilization. |
+| Shared Blocks Read | integer |  |  | Total shared blocks read from disk. High values indicate queries that bypass the cache and may benefit from more `shared_buffers`. |
+| Shared Blocks Dirtied | integer |  | hidden | Total shared blocks dirtied by the query. |
+| Shared Blocks Written | integer |  | hidden | Total shared blocks written by the query. |
+| Local Blocks Hit | integer |  | hidden | Total local buffer cache hits (temporary tables). |
+| Local Blocks Read | integer |  | hidden | Total local blocks read from disk. |
+| Local Blocks Dirtied | integer |  | hidden | Total local blocks dirtied. |
+| Local Blocks Written | integer |  | hidden | Total local blocks written. |
+| Temp Blocks Read | integer |  |  | Total temp blocks read. Non-zero values indicate queries spilling to disk due to insufficient `work_mem`. |
+| Temp Blocks Written | integer |  |  | Total temp blocks written. High values suggest increasing `work_mem` may improve performance. |
+| Block Read Time | duration | milliseconds |  | Time spent reading blocks from disk. Requires `track_io_timing` to be enabled. |
+| Block Write Time | duration | milliseconds |  | Time spent writing blocks to disk. Requires `track_io_timing` to be enabled. |
+| WAL Records | integer |  | hidden | Total number of WAL records generated. Available in PostgreSQL 13+. |
+| WAL Full Page Images | integer |  | hidden | Total number of WAL full page images generated. Available in PostgreSQL 13+. |
+| WAL Bytes | integer |  | hidden | Total bytes of WAL generated. Available in PostgreSQL 13+. |
+| JIT Functions | integer |  | hidden | Total number of functions JIT-compiled. Available in PostgreSQL 15+. |
+| JIT Generation Time | duration | milliseconds | hidden | Time spent generating JIT code. Available in PostgreSQL 15+. |
+| JIT Inlining Count | integer |  | hidden | Number of times JIT inlining was performed. Available in PostgreSQL 15+. |
+| JIT Inlining Time | duration | milliseconds | hidden | Time spent on JIT inlining. Available in PostgreSQL 15+. |
+| JIT Optimization Count | integer |  | hidden | Number of times JIT optimization was performed. Available in PostgreSQL 15+. |
+| JIT Optimization Time | duration | milliseconds | hidden | Time spent on JIT optimization. Available in PostgreSQL 15+. |
+| JIT Emission Count | integer |  | hidden | Number of times JIT code was emitted. Available in PostgreSQL 15+. |
+| JIT Emission Time | duration | milliseconds | hidden | Time spent emitting JIT code. Available in PostgreSQL 15+. |
+| Temp Block Read Time | duration | milliseconds | hidden | Time spent reading temp blocks. Available in PostgreSQL 15+. Requires `track_io_timing`. |
+| Temp Block Write Time | duration | milliseconds | hidden | Time spent writing temp blocks. Available in PostgreSQL 15+. Requires `track_io_timing`. |
+
+
+
 ## Alerts
 
 

@@ -1,0 +1,972 @@
+plugin_name: go.d.plugin
+modules:
+  - &module
+    meta: &meta
+      id: collector-go.d.plugin-mssql
+      plugin_name: go.d.plugin
+      module_name: mssql
+      monitored_instance:
+        name: Microsoft SQL Server
+        link: https://www.microsoft.com/en-us/sql-server
+        categories:
+          - data-collection.database-servers
+        icon_filename: mssql.svg
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - "db"
+        - "database"
+        - "mssql"
+        - "sql server"
+        - "microsoft"
+      most_popular: false
+    overview:
+      multi_instance: true
+      data_collection:
+        metrics_description: |
+          This collector monitors the health and performance of Microsoft SQL Server instances.
+
+          It collects metrics from:
+          - Performance counters (buffer manager, memory manager, SQL statistics)
+          - Dynamic management views (DMVs) for wait statistics, locks, and sessions
+          - Per-database transaction and lock statistics
+          - SQL Server Agent job status (if permissions allow)
+        method_description: |
+          It connects to the SQL Server instance via TCP using the go-mssqldb driver and executes queries against:
+
+          - `sys.dm_os_performance_counters` - Performance counter values
+          - `sys.dm_exec_sessions` - Connection information
+          - `sys.dm_os_wait_stats` - Wait statistics
+          - `sys.dm_tran_locks` - Lock information
+          - `sys.dm_io_virtual_file_stats` - I/O stall (latency) statistics
+          - `sys.dm_os_process_memory` - SQL Server process memory
+          - `sys.dm_os_sys_memory` - OS physical memory and page file
+          - `sys.master_files` - Database file sizes
+          - `msdb.dbo.sysjobs` - SQL Agent job status (optional)
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it tries to connect to SQL Server on localhost:1433 without authentication.
+            You must configure proper credentials for monitoring.
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            The collector executes lightweight queries against system views.
+            Most queries complete in milliseconds and have minimal impact on server performance.
+      additional_permissions:
+        description: |
+          The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
+          For SQL Agent job monitoring, access to the msdb database is required.
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Create monitoring user
+            description: |
+              Create a SQL Server login with VIEW SERVER STATE permission:
+
+              ```sql
+              -- Create login
+              CREATE LOGIN netdata_user WITH PASSWORD = 'YourStrongPassword!';
+
+              -- Grant VIEW SERVER STATE (required for DMVs)
+              GRANT VIEW SERVER STATE TO netdata_user;
+
+              -- Optional: Grant access to msdb for SQL Agent job monitoring
+              USE msdb;
+              CREATE USER netdata_user FOR LOGIN netdata_user;
+              GRANT SELECT ON dbo.sysjobs TO netdata_user;
+
+              -- Optional: Grant access to distribution database for replication monitoring
+              -- (only if replication is configured)
+              USE distribution;
+              CREATE USER netdata_user FOR LOGIN netdata_user;
+              GRANT SELECT ON dbo.MSreplication_monitordata TO netdata_user;
+              GRANT SELECT ON dbo.MSpublications TO netdata_user;
+              GRANT SELECT ON dbo.MSsubscriptions TO netdata_user;
+              ```
+
+              **Required permissions:**
+              - `VIEW SERVER STATE` - Access to dynamic management views
+
+              **Optional permissions:**
+              - `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
+              - `SELECT on distribution.dbo.MSreplication_monitordata` - Replication monitoring
+              - `SELECT on distribution.dbo.MSpublications` - Publication information
+              - `SELECT on distribution.dbo.MSsubscriptions` - Subscription counts
+      configuration:
+        file:
+          name: go.d/mssql.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval (seconds).
+              default_value: 10
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval (seconds). Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+
+            - name: dsn
+              description: "SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn)."
+              default_value: "sqlserver://localhost:1433"
+              required: true
+              group: Target
+            - name: timeout
+              description: Query timeout (seconds).
+              default_value: 5
+              required: false
+              group: Target
+
+            - name: query_store_function_enabled
+              description: |
+                Enable the Query Store function to expose top queries via Netdata Functions.
+                **WARNING**: Query Store may contain unmasked literal values (customer names, emails, IDs).
+                Only enable after ensuring proper access controls to the Netdata dashboard.
+              default_value: false
+              required: false
+              group: Query Store
+            - name: query_store_time_window_days
+              description: |
+                Number of days of Query Store data to analyze. Set to 0 to include all available data.
+                Smaller values improve query performance but show less history.
+              default_value: 7
+              required: false
+              group: Query Store
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic configuration
+              description: Connect to local SQL Server with SQL authentication.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: "sqlserver://netdata_user:password@localhost:1433"
+            - name: Windows Authentication
+              description: Connect using Windows integrated authentication.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: "sqlserver://localhost:1433?trusted_connection=yes"
+            - name: Named instance
+              description: Connect to a named SQL Server instance.
+              config: |
+                jobs:
+                  - name: named_instance
+                    dsn: "sqlserver://netdata_user:password@localhost/INSTANCENAME"
+            - name: Remote server
+              description: Connect to a remote SQL Server.
+              config: |
+                jobs:
+                  - name: remote
+                    dsn: "sqlserver://netdata_user:password@192.168.1.100:1433"
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Monitoring multiple SQL Server instances.
+              config: |
+                jobs:
+                  - name: production
+                    dsn: "sqlserver://netdata_user:password@prod-sql:1433"
+
+                  - name: development
+                    dsn: "sqlserver://netdata_user:password@dev-sql:1433"
+            - name: With Query Store function
+              description: |
+                Enable the Query Store function to view top queries in the Netdata dashboard.
+
+                > **Warning**: Query Store may contain unmasked literal values (PII).
+                > Only enable in environments with proper access controls.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: "sqlserver://netdata_user:password@localhost:1433"
+                    query_store_function_enabled: true
+                    query_store_time_window_days: 7
+    troubleshooting:
+      problems:
+        list:
+          - name: Connection refused
+            description: |
+              Ensure SQL Server is running and accepting TCP connections on the configured port.
+              Check that the SQL Server Browser service is running if using named instances.
+          - name: Login failed
+            description: |
+              Verify the username and password in the DSN are correct.
+              Ensure SQL Server is configured for mixed mode authentication if using SQL logins.
+          - name: Permission denied
+            description: |
+              The monitoring user needs VIEW SERVER STATE permission.
+              Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
+    alerts: []
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          description: |
+            Retrieves aggregated SQL query performance metrics from Microsoft SQL Server [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store) runtime statistics.
+
+            This function queries `sys.query_store_runtime_stats` and related views across all databases with Query Store enabled, aggregating execution statistics by query hash. It provides comprehensive timing, I/O, memory, and parallelism metrics.
+
+            Use cases:
+            - Identify slow or resource-intensive queries consuming excessive CPU time or memory
+            - Analyze I/O patterns (logical reads, physical reads, writes) to detect bottlenecks
+            - Monitor parallelism (DOP) and tempdb usage for capacity planning
+
+            Query text is truncated at 4096 characters for display purposes. Columns are dynamically detected based on SQL Server version (some metrics only available in 2016+/2017+).
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column. The available options depend on your SQL Server version and include metrics like total execution time, number of calls, CPU time, logical I/O, memory grants, and more. Default is Total Time to focus on most resource-intensive queries.
+              type: select
+              required: true
+              default: totalTime
+              options: []
+          returns:
+            description: Aggregated query execution statistics from Query Store runtime views, providing comprehensive performance analysis across all monitored databases. Each row represents a unique query pattern (normalized query hash) with cumulative metrics across all its executions.
+            columns:
+              - name: Query Hash
+                type: string
+                unit: ""
+                visibility: hidden
+                description: Unique hash identifier for the normalized query pattern. Queries with identical structure but different literal values share the same digest.
+              - name: Query
+                type: string
+                unit: ""
+                description: The SQL query text with literal values truncated at 4096 characters. Use this to identify the actual SQL being executed and spot parameterized queries or injection risks.
+              - name: Database
+                type: string
+                unit: ""
+                description: Database name where the query was executed. Essential for multi-database analysis to identify which database is experiencing query load.
+              - name: Calls
+                type: integer
+                unit: ""
+                description: Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly.
+              - name: Total Time
+                type: duration
+                unit: "milliseconds"
+                description: Cumulative execution time across all query executions. This is a key metric for identifying the most resource-intensive queries in terms of total server time consumption.
+              - name: Avg Time
+                type: duration
+                unit: "milliseconds"
+                description: Average execution time per query run, calculated as weighted average when execution count is greater than zero. Compare with Total Time to determine if individual executions or high frequency drives resource usage.
+              - name: Last Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Execution time of the most recent execution for this query pattern. Useful for identifying recent performance changes or individual outlier executions.
+              - name: Min Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Minimum execution time observed. Helps identify variability in query performance and spot potential optimization opportunities for outliers.
+              - name: Max Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Maximum execution time observed. Large gaps between Min Time and Max Time may indicate performance instability due to parameter sniffing, data skew, or lock contention.
+              - name: StdDev Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Standard deviation of execution time. High values indicate inconsistent query performance, making capacity planning difficult and suggesting need for query optimization or consistent indexing.
+              - name: Avg CPU
+                type: duration
+                unit: "milliseconds"
+                description: Average CPU time consumed per query execution. High values indicate CPU-intensive operations that may include complex calculations, string manipulations, or excessive function calls. Available in SQL Server 2016+.
+              - name: Last CPU
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: CPU time of the most recent execution. Useful for identifying recent changes in query patterns and resource usage.
+              - name: Min CPU
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Minimum CPU time observed. Helps identify variability in CPU consumption and spot efficient vs. inefficient query executions.
+              - name: Max CPU
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Maximum CPU time observed. Spikes may indicate complex queries, large result sets, or parallelism issues.
+              - name: StdDev CPU
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Standard deviation of CPU time. High variability suggests inconsistent performance due to varying data volumes, plan cache hit rates, or changing execution contexts.
+              - name: Avg Logical Reads
+                type: float
+                unit: ""
+                description: Average number of logical read operations (8KB pages) per execution. High values indicate queries scanning large amounts of data through indexes or table scans. Monitor for I/O subsystem impact.
+              - name: Last Logical Reads
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Logical reads from the most recent execution. Useful for identifying immediate query patterns and recent performance changes.
+              - name: Min Logical Reads
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Minimum logical reads observed. Helps identify data access patterns and spot outliers.
+              - name: Max Logical Reads
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Maximum logical reads observed. Very high values may indicate full table scans, missing indexes, or inefficient join operations requiring excessive data access.
+              - name: StdDev Logical Reads
+                type: float
+                unit: ""
+                visibility: hidden
+                description: Standard deviation of logical reads. High variability suggests inconsistent access patterns, potentially indicating performance issues with certain queries or data volumes.
+              - name: Avg Logical Writes
+                type: float
+                unit: ""
+                description: Average number of logical write operations per execution. High values indicate heavy write workloads that may benefit from batching or optimization.
+              - name: Last Logical Writes
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Logical writes from the most recent execution. Helps track recent write activity and identify immediate performance impact.
+              - name: Min Logical Writes
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Minimum logical writes observed. Helps identify read-heavy vs. write-heavy query patterns and data access characteristics.
+              - name: Max Logical Writes
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Maximum logical writes observed. Spikes may indicate bulk insert/update operations, large transactions, or data migration activities.
+              - name: StdDev Logical Writes
+                type: float
+                unit: ""
+                visibility: hidden
+                description: Standard deviation of logical writes. High values indicate write performance variability, potentially suggesting inconsistent transaction sizes or periodic bulk operations.
+              - name: Avg Physical Reads
+                type: float
+                unit: ""
+                description: Average number of physical read operations from storage per execution. High values indicate queries requiring substantial disk I/O for data retrieval, potentially due to full table scans or missing covering indexes.
+              - name: Last Physical Reads
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Physical reads from the most recent execution. Useful for identifying immediate I/O patterns and recent storage subsystem pressure.
+              - name: Min Physical Reads
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Minimum physical reads observed. Helps baseline I/O patterns and identify read-intensive query scenarios.
+              - name: Max Physical Reads
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Maximum physical reads observed. Extremely high values may indicate storage subsystem bottlenecks, full table scans without covering indexes, or queries processing very large data volumes.
+              - name: StdDev Physical Reads
+                type: float
+                unit: ""
+                visibility: hidden
+                description: Standard deviation of physical reads. High variability suggests inconsistent disk access patterns, potentially indicating intermittent I/O performance issues or storage contention.
+              - name: Avg CLR Time
+                type: duration
+                unit: "milliseconds"
+                description: Average CLR (Common Language Runtime) time per execution. High values indicate managed code (stored procedures, functions, triggers) with heavy computations, garbage collection pressure, or inefficient memory allocations. Available in SQL Server 2016+.
+              - name: Last CLR Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: CLR time of the most recent execution. Useful for identifying recent managed code performance changes and detecting inefficient code deployments.
+              - name: Min CLR Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Minimum CLR time observed. Helps identify efficient managed code executions and spot expensive CLR operations.
+              - name: Max CLR Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Maximum CLR time observed. Spikes may indicate complex managed code operations, large object allocations, or expensive .NET framework method calls.
+              - name: StdDev CLR Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Standard deviation of CLR time. High variability suggests inconsistent managed code execution patterns, potentially varying by execution parameters, data volumes, or different code paths being taken.
+              - name: Avg DOP
+                type: float
+                unit: ""
+                description: Average Degree of Parallelism (DOP) per query. Higher values indicate queries utilizing more CPU cores through parallelism, potentially consuming significant server resources. Values above 1 indicate intra-query parallelism; values of 1 indicate serial execution.
+              - name: Last DOP
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: DOP of the most recent execution. Helps track recent parallelism patterns and identify changes in query execution behavior.
+              - name: Min DOP
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Minimum DOP observed. Values of 0 may indicate serial execution; values above 1 suggest parallel query execution within individual queries.
+              - name: Max DOP
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Maximum DOP observed. Very high values (>4) may indicate aggressive parallelism consuming excessive resources and potentially affecting concurrent workloads. Available in SQL Server 2016+.
+              - name: StdDev DOP
+                type: float
+                unit: ""
+                visibility: hidden
+                description: Standard deviation of DOP. High variability suggests inconsistent parallelism patterns across executions, potentially indicating performance variability based on data characteristics or query complexity.
+              - name: Avg Memory (8KB pages)
+                type: float
+                unit: ""
+                description: Average memory grant (in 8KB pages) per execution. High values indicate memory-intensive queries that may benefit from index optimization, reduced result sets, or query tuning to reduce working memory usage.
+              - name: Last Memory (8KB pages)
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Memory grant from the most recent execution. Useful for identifying recent memory pressure and tracking immediate impact of resource-intensive queries.
+              - name: Min Memory (8KB pages)
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Minimum memory grant observed. Helps identify memory-efficient queries and baseline memory requirements for common operations.
+              - name: Max Memory (8KB pages)
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Maximum memory grant observed. Spikes may indicate queries with large sort operations, hash joins, temporary table creation, or excessive parameter lengths consuming working memory.
+              - name: StdDev Memory
+                type: float
+                unit: ""
+                visibility: hidden
+                description: Standard deviation of memory grants. High variability suggests inconsistent memory usage patterns, potentially varying by execution parameters, result set sizes, or different code paths being executed.
+              - name: Avg Rows
+                type: float
+                unit: ""
+                description: Average number of rows processed per query execution. High values indicate queries returning large result sets that may consume significant network bandwidth, memory for result buffers, and client application resources.
+              - name: Last Rows
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Row count from the most recent execution. Helps identify recent query patterns and track immediate data processing requirements.
+              - name: Min Rows
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Minimum rows observed. Helps identify data access patterns and spot outliers in result set sizes.
+              - name: Max Rows
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Maximum rows observed. Extremely high values may indicate full table scans without WHERE clauses, missing or inefficient filters, or data export operations.
+              - name: StdDev Rows
+                type: float
+                unit: ""
+                visibility: hidden
+                description: Standard deviation of rows processed. High variability suggests inconsistent result set sizes, potentially due to varying query filters, parameterized inputs, or different data distributions across executions.
+              - name: Avg Log Bytes
+                type: float
+                unit: ""
+                description: Average transaction log bytes written per query execution (SQL Server 2017+). High values indicate write-intensive operations (INSERT/UPDATE/DELETE), large transactions, or bulk modifications. This measures WAL activity, not diagnostic logging.
+              - name: Last Log Bytes
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Transaction log bytes from the most recent execution. Useful for tracking recent write activity.
+              - name: Min Log Bytes
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Minimum transaction log bytes observed. Helps identify write-efficient queries and baseline requirements.
+              - name: Max Log Bytes
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Maximum transaction log bytes observed. Spikes may indicate bulk operations, large transactions, or queries affecting many rows.
+              - name: StdDev Log Bytes
+                type: float
+                unit: ""
+                visibility: hidden
+                description: Standard deviation of transaction log bytes. High variability suggests inconsistent write patterns, potentially varying by the number of rows affected or transaction sizes.
+              - name: Avg TempDB (8KB pages)
+                type: float
+                unit: ""
+                description: Average tempdb space usage (in 8KB pages) per execution. High values indicate queries that create or use large temporary objects, work tables, sort operations, or have heavy tempdb spillage from disk. High tempdb usage can lead to disk I/O contention and overall performance degradation.
+              - name: Last TempDB (8KB pages)
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Tempdb space from the most recent execution. Useful for identifying recent tempdb pressure and tracking immediate disk I/O impact of resource-intensive queries.
+              - name: Min TempDB (8KB pages)
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Minimum tempdb space observed. Helps identify tempdb-efficient queries and baseline temporary object requirements for common operations.
+              - name: Max TempDB (8KB pages)
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: Maximum tempdb space observed. Spikes may indicate queries with large sort operations, hash joins, index spool usage, or temporary table creation consuming substantial tempdb space. Can lead to tempdb autogrow and disk space issues.
+              - name: StdDev TempDB
+                type: float
+                unit: ""
+                visibility: hidden
+                description: Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation.
+          performance: |
+            Executes dynamic SQL to aggregate Query Store data across all enabled databases:<br/>• Execution time depends on Query Store workload and number of monitored databases<br/>• Default limit of 500 rows balances completeness with performance
+          security: |
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
+          prerequisites:
+            list:
+              - title: Enable Query Store
+                description: |
+                  Query Store must be enabled on each database you want to monitor.
+
+                  1. Verify Query Store is enabled on your databases:
+
+                     ```sql
+                     SELECT name, is_query_store_on
+                     FROM sys.databases
+                     WHERE name NOT IN ('master', 'tempdb', 'model', 'msdb');
+                     ```
+
+                  2. Enable Query Store on databases where it is disabled:
+
+                     ```sql
+                     ALTER DATABASE [YourDatabaseName] SET QUERY_STORE = ON;
+                     ```
+
+                  3. Enable the function in Netdata collector config:
+
+                     ```yaml
+                     jobs:
+                       - name: local
+                         dsn: "sqlserver://user:pass@localhost:1433"
+                         query_store_function_enabled: true
+                     ```
+
+                  :::info
+
+                  - Query Store is available in SQL Server 2016+ and Azure SQL Database
+                  - Requires ALTER DATABASE permission to enable Query Store
+                  - System databases (master, tempdb, model, msdb) are excluded from queries
+
+                  :::
+          availability: |
+            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability:
+        - SQL Server 2016+
+        - Azure SQL Database
+      scopes:
+        - name: global
+          description: These metrics refer to the entire SQL Server instance.
+          labels: []
+          metrics:
+            - name: mssql.user_connections
+              description: User Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: user
+            - name: mssql.session_connections
+              description: Session Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: user
+                - name: internal
+            - name: mssql.blocked_processes
+              description: Blocked Processes
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: blocked
+            - name: mssql.batch_requests
+              description: Batch Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: batch
+            - name: mssql.compilations
+              description: SQL Compilations
+              unit: compilations/s
+              chart_type: line
+              dimensions:
+                - name: compilations
+            - name: mssql.recompilations
+              description: SQL Re-Compilations
+              unit: recompilations/s
+              chart_type: line
+              dimensions:
+                - name: recompilations
+            - name: mssql.auto_param_attempts
+              description: Auto-Parameterization Attempts
+              unit: attempts/s
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: safe
+                - name: failed
+            - name: mssql.sql_errors
+              description: SQL Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: errors
+            - name: mssql.buffer_cache_hit_ratio
+              description: Buffer Cache Hit Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hit_ratio
+            - name: mssql.buffer_page_life_expectancy
+              description: Page Life Expectancy
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: life_expectancy
+            - name: mssql.buffer_page_iops
+              description: Buffer Page I/O
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: mssql.buffer_checkpoint_pages
+              description: Buffer Checkpoint Pages Flushed
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: flushed
+            - name: mssql.buffer_page_lookups
+              description: Buffer Page Lookups
+              unit: lookups/s
+              chart_type: line
+              dimensions:
+                - name: lookups
+            - name: mssql.buffer_lazy_writes
+              description: Buffer Lazy Writes
+              unit: writes/s
+              chart_type: line
+              dimensions:
+                - name: lazy_writes
+            - name: mssql.memory_total
+              description: Total Server Memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: memory
+            - name: mssql.memory_connection
+              description: Connection Memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: memory
+            - name: mssql.memory_pending_grants
+              description: Pending Memory Grants
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: mssql.memory_external_benefit
+              description: External Benefit of Memory
+              unit: benefit
+              chart_type: line
+              dimensions:
+                - name: benefit
+            - name: mssql.page_splits
+              description: Page Splits
+              unit: splits/s
+              chart_type: line
+              dimensions:
+                - name: page
+            - name: mssql.process_memory_resident
+              description: SQL Server Process Resident Memory (Working Set)
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: resident
+            - name: mssql.process_memory_virtual
+              description: SQL Server Process Virtual Memory Committed
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: virtual
+            - name: mssql.process_memory_utilization
+              description: SQL Server Process Memory Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: mssql.process_page_faults
+              description: SQL Server Process Page Faults
+              unit: faults
+              chart_type: line
+              dimensions:
+                - name: page_faults
+            - name: mssql.os_memory
+              description: OS Physical Memory
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: available
+            - name: mssql.os_pagefile
+              description: OS Page File
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: available
+        - name: database
+          description: These metrics refer to individual databases.
+          labels:
+            - name: database
+              description: Database name
+          metrics:
+            - name: mssql.database_active_transactions
+              description: Active Transactions
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: mssql.database_transactions
+              description: Transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: transactions
+            - name: mssql.database_write_transactions
+              description: Write Transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: mssql.database_log_flushes
+              description: Log Flushes
+              unit: flushes/s
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: mssql.database_log_flushed
+              description: Log Bytes Flushed
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: flushed
+            - name: mssql.database_log_growths
+              description: Log Growths
+              unit: growths
+              chart_type: line
+              dimensions:
+                - name: growths
+            - name: mssql.database_io_stall
+              description: I/O Stall Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: mssql.database_data_file_size
+              description: Data File Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: mssql.database_backup_restore_throughput
+              description: Backup/Restore Throughput
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: throughput
+            - name: mssql.database_state
+              description: Database State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: online
+                - name: restoring
+                - name: recovering
+                - name: pending
+                - name: suspect
+                - name: emergency
+                - name: offline
+            - name: mssql.database_read_only
+              description: Database Read-Only Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: read_only
+                - name: read_write
+        - name: lock stats
+          description: These metrics refer to lock statistics by lock resource type (from performance counters).
+          labels:
+            - name: resource
+              description: Lock resource type (Database, File, Object, Page, Key, Extent, RID, HoBT, etc.)
+          metrics:
+            - name: mssql.lock_stats_deadlocks
+              description: Deadlocks by Resource Type
+              unit: deadlocks/s
+              chart_type: line
+              dimensions:
+                - name: deadlocks
+            - name: mssql.lock_stats_waits
+              description: Lock Waits by Resource Type
+              unit: waits/s
+              chart_type: line
+              dimensions:
+                - name: waits
+            - name: mssql.lock_stats_timeouts
+              description: Lock Timeouts by Resource Type
+              unit: timeouts/s
+              chart_type: line
+              dimensions:
+                - name: timeouts
+            - name: mssql.lock_stats_requests
+              description: Lock Requests by Resource Type
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+        - name: lock resource
+          description: These metrics refer to lock resource types (from sys.dm_tran_locks).
+          labels:
+            - name: resource
+              description: Lock resource type (Database, File, Object, Page, Key, etc.)
+          metrics:
+            - name: mssql.locks_by_resource
+              description: Lock Count by Resource Type
+              unit: locks
+              chart_type: line
+              dimensions:
+                - name: locks
+        - name: wait type
+          description: These metrics refer to individual wait types (from sys.dm_os_wait_stats).
+          labels:
+            - name: wait_type
+              description: Wait type name
+            - name: wait_category
+              description: Wait category (CPU, Lock, Latch, Buffer IO, etc.)
+          metrics:
+            - name: mssql.wait_total_time
+              description: Total Wait Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: mssql.wait_resource_time
+              description: Resource Wait Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: mssql.wait_signal_time
+              description: Signal Wait Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: mssql.wait_max_time
+              description: Maximum Wait Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: max_time
+            - name: mssql.wait_count
+              description: Wait Count
+              unit: waits/s
+              chart_type: line
+              dimensions:
+                - name: waits
+        - name: job
+          description: These metrics refer to SQL Server Agent jobs.
+          labels:
+            - name: job_name
+              description: Job name
+          metrics:
+            - name: mssql.job_status
+              description: Job Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: enabled
+                - name: disabled
+        - name: replication
+          description: These metrics refer to SQL Server replication publications.
+          labels:
+            - name: publisher_db
+              description: Publisher database name
+            - name: publication
+              description: Publication name
+          metrics:
+            - name: mssql.replication_status
+              description: Replication Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: started
+                - name: succeeded
+                - name: in_progress
+                - name: idle
+                - name: retrying
+                - name: failed
+            - name: mssql.replication_warning
+              description: Replication Warnings
+              unit: flags
+              chart_type: line
+              dimensions:
+                - name: expiration
+                - name: latency
+                - name: merge_expiration
+                - name: merge_slow_duration
+                - name: merge_fast_duration
+                - name: merge_fast_speed
+                - name: merge_slow_speed
+            - name: mssql.replication_latency
+              description: Replication Latency
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: average
+                - name: best
+                - name: worst
+            - name: mssql.replication_subscriptions
+              description: Replication Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: agents_running

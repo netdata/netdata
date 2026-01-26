@@ -417,17 +417,13 @@ The health module uses the high-level API with IDs like:
 
 It supports multiple configuration objects, validation of alert definitions, and conversion between different configuration formats (JSON and traditional Netdata health configuration syntax).
 
-### systemd-journal.plugin (External Plugin)
+### journal-viewer-plugin (External Plugin)
 
-The systemd-journal.plugin is an external plugin written in C that uses DynCfg to manage journal directory configurations:
+The journal-viewer-plugin is an external plugin written in Rust that provides systemd journal log viewing and analysis:
 
-- `src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c`: Implements DynCfg integration
-- Registers as `systemd-journal:monitored-directories` ID
-- Uses a SINGLE configuration type for its directory list
-- Provides validation of directory paths for security
-- Implements GET and UPDATE commands
-
-This is a good example of an external plugin using the DynCfg system for a single configuration object.
+- **Location**: `src/crates/netdata-log-viewer/journal-viewer-plugin/`
+- Provides systemd journal log querying and visualization capabilities
+- Implements the Netdata plugin protocol for communication with the agent
 
 ### go.d.plugin (External Plugin)
 

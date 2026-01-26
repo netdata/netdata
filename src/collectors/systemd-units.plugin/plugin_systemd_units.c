@@ -1186,7 +1186,7 @@ static void netdata_systemd_units_function_info(const char *transaction)
     buffer_json_finalize(wb);
     netdata_mutex_lock(&stdout_mutex);
     wb->response_code = HTTP_RESP_OK;
-    wb->content_type = CT_TEXT_PLAIN;
+    wb->content_type = CT_APPLICATION_JSON;
     wb->expires = now_realtime_sec() + 3600;
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);

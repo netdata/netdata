@@ -1,9 +1,0 @@
-[package]
-name = "sigbus"
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-
-[dependencies]
-error = { path = "../error" }
-libc = { workspace = true }

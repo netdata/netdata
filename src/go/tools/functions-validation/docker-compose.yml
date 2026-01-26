@@ -1,0 +1,343 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: netdata
+      POSTGRES_PASSWORD: netdata
+      POSTGRES_DB: netdata
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./seed/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netdata -d netdata"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: netdata
+      MYSQL_USER: netdata
+      MYSQL_PASSWORD: netdata
+    command: ["--performance_schema=ON"]
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - ./seed/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Netdata123!"
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -x /opt/mssql-tools18/bin/sqlcmd ]; then /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P $$MSSQL_SA_PASSWORD -Q \"SELECT 1\" > /dev/null; else /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P $$MSSQL_SA_PASSWORD -Q \"SELECT 1\" > /dev/null; fi"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  mssql-init:
+    image: mcr.microsoft.com/mssql-tools
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: "Netdata123!"
+    volumes:
+      - ./seed/mssql/init.sql:/seed/init.sql:ro
+      - ./seed/mssql/init.sh:/seed/init.sh:ro
+    entrypoint: ["/bin/bash", "/seed/init.sh"]
+
+  mongo:
+    image: mongo:6
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpw
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - ./seed/mongodb/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--username", "root", "--password", "rootpw", "--authenticationDatabase", "admin", "--eval", "db.runCommand({ping:1})"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo-init:
+    image: mongo:6
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpw
+    volumes:
+      - ./seed/mongodb/init.js:/seed/init.js:ro
+      - ./seed/mongodb/init.sh:/seed/init.sh:ro
+    entrypoint: ["/bin/bash", "/seed/init.sh"]
+
+  redis:
+    image: redis:7
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis-init:
+    image: redis:7
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./seed/redis/init.sh:/seed/init.sh:ro
+    entrypoint: ["/bin/bash", "/seed/init.sh"]
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: netdata
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --host 127.0.0.1 --user \"$${CLICKHOUSE_USER}\" --password \"$${CLICKHOUSE_PASSWORD}\" --query 'SELECT 1' > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  clickhouse-init:
+    image: clickhouse/clickhouse-server:24.3
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CH_USER: default
+      CH_PASSWORD: netdata
+    volumes:
+      - ./seed/clickhouse/init.sh:/seed/init.sh:ro
+    entrypoint: ["/bin/bash", "/seed/init.sh"]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  elasticsearch-init:
+    image: curlimages/curl:8.5.0
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./seed/elasticsearch/init.sh:/seed/init.sh:ro
+    entrypoint: ["/bin/sh", "/seed/init.sh"]
+
+  elasticsearch-searcher:
+    image: curlimages/curl:8.5.0
+    depends_on:
+      elasticsearch-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./seed/elasticsearch/searcher.sh:/seed/searcher.sh:ro
+    entrypoint: ["/bin/sh", "/seed/searcher.sh"]
+
+  couchbase:
+    image: couchbase/server:7.2.5
+    ports:
+      - "${COUCHBASE_HTTP_PORT:-8091}:8091"
+      - "${COUCHBASE_QUERY_PORT:-8093}:8093"
+    ulimits:
+      nofile:
+        soft: 200000
+        hard: 200000
+    healthcheck:
+      test: ["CMD-SHELL", "code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8091/pools); [ \"$$code\" = \"200\" ] || [ \"$$code\" = \"401\" ]"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  couchbase-init:
+    image: couchbase/server:7.2.5
+    depends_on:
+      couchbase:
+        condition: service_healthy
+    environment:
+      CB_HOST: couchbase
+      CB_ADMIN: Administrator
+      CB_PASS: password
+    volumes:
+      - ./seed/couchbase/init.sh:/seed/init.sh:ro
+    entrypoint: ["/bin/bash", "/seed/init.sh"]
+
+  proxysql:
+    image: proxysql/proxysql:2.6.6
+    ports:
+      - "${PROXYSQL_ADMIN_PORT:-6032}:6032"
+      - "${PROXYSQL_MYSQL_PORT:-6033}:6033"
+    volumes:
+      - proxysql-data:/var/lib/proxysql
+      - ./seed/proxysql/proxysql.cnf:/etc/proxysql.cnf:ro
+
+  proxysql-init:
+    image: mysql:8.0
+    network_mode: "service:proxysql"
+    depends_on:
+      proxysql:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+    environment:
+      PROXY_HOST: 127.0.0.1
+      ADMIN_USER: admin
+      ADMIN_PASS: admin
+      BACKEND_HOST: mysql
+      BACKEND_PORT: 3306
+    volumes:
+      - ./seed/proxysql/init.sh:/seed/init.sh:ro
+    entrypoint: ["/bin/bash", "/seed/init.sh"]
+
+  cockroachdb:
+    image: cockroachdb/cockroach:v24.1.0
+    command:
+      [
+        "start-single-node",
+        "--insecure",
+        "--http-addr",
+        "0.0.0.0:8080",
+        "--listen-addr",
+        "127.0.0.1:26257",
+        "--sql-addr",
+        "0.0.0.0:26258"
+      ]
+    ports:
+      - "${COCKROACH_HTTP_PORT:-8080}:8080"
+      - "${COCKROACH_SQL_PORT:-26258}:26258"
+    healthcheck:
+      test: ["CMD-SHELL", "cockroach sql --insecure --host=localhost:26258 -e \"SELECT 1\" > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  cockroachdb-seed:
+    image: cockroachdb/cockroach:v24.1.0
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    volumes:
+      - ./seed/cockroachdb/seed.sh:/seed/seed.sh:ro
+      - ./seed/cockroachdb/seed.sql:/seed/seed.sql:ro
+    entrypoint: ["/bin/sh", "/seed/seed.sh"]
+
+  cockroachdb-sleep:
+    image: cockroachdb/cockroach:v24.1.0
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    volumes:
+      - ./seed/cockroachdb/sleep.sh:/seed/sleep.sh:ro
+      - ./seed/cockroachdb/sleep.sql:/seed/sleep.sql:ro
+    entrypoint: ["/bin/sh", "/seed/sleep.sh"]
+
+  yugabytedb:
+    image: yugabytedb/yugabyte:2.21.1.0-b271
+    command: ["/home/yugabyte/bin/yugabyted", "start", "--daemon=false"]
+    ports:
+      - "${YUGABYTE_MASTER_PORT:-7000}:7000"
+      - "${YUGABYTE_YSQL_PORT:-5433}:5433"
+    healthcheck:
+      test: ["CMD-SHELL", "/home/yugabyte/bin/ysqlsh -h \"$(hostname -i)\" -U yugabyte -d yugabyte -c \"SELECT 1\" > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  yugabytedb-seed:
+    image: yugabytedb/yugabyte:2.21.1.0-b271
+    depends_on:
+      yugabytedb:
+        condition: service_healthy
+    volumes:
+      - ./seed/yugabytedb/seed.sh:/seed/seed.sh:ro
+      - ./seed/yugabytedb/seed.sql:/seed/seed.sql:ro
+    entrypoint: ["/bin/sh", "/seed/seed.sh"]
+
+  yugabytedb-sleep:
+    image: yugabytedb/yugabyte:2.21.1.0-b271
+    depends_on:
+      yugabytedb:
+        condition: service_healthy
+    volumes:
+      - ./seed/yugabytedb/sleep.sh:/seed/sleep.sh:ro
+      - ./seed/yugabytedb/sleep.sql:/seed/sleep.sql:ro
+    entrypoint: ["/bin/sh", "/seed/sleep.sh"]
+
+  oracledb:
+    image: gvenzl/oracle-free:latest
+    environment:
+      ORACLE_PASSWORD: "Netdata123!"
+      APP_USER: netdata
+      APP_USER_PASSWORD: "Netdata123!"
+    ports:
+      - "${ORACLE_PORT:-1521}:1521"
+    volumes:
+      - ./seed/oracledb/init.sql:/container-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM dual;' | sqlplus -L -s \"sys/$$ORACLE_PASSWORD@//localhost:1521/FREEPDB1 as sysdba\" > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  oracledb-seed:
+    image: gvenzl/oracle-free:latest
+    depends_on:
+      oracledb:
+        condition: service_healthy
+    volumes:
+      - ./seed/oracledb/seed.sh:/seed/seed.sh:ro
+      - ./seed/oracledb/seed.sql:/seed/seed.sql:ro
+    entrypoint: ["/bin/bash", "/seed/seed.sh"]
+
+  oracledb-sleep:
+    image: gvenzl/oracle-free:latest
+    depends_on:
+      oracledb:
+        condition: service_healthy
+    volumes:
+      - ./seed/oracledb/sleep.sh:/seed/sleep.sh:ro
+      - ./seed/oracledb/sleep.sql:/seed/sleep.sql:ro
+    entrypoint: ["/bin/bash", "/seed/sleep.sh"]
+
+  rethinkdb:
+    image: rethinkdb:2.4
+    ports:
+      - "${RETHINKDB_PORT:-28015}:28015"
+    healthcheck:
+      test: ["CMD-SHELL", "rethinkdb --version > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  proxysql-data:

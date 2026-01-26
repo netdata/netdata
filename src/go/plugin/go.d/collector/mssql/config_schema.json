@@ -1,0 +1,104 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Microsoft SQL Server collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "dsn": {
+        "title": "DSN",
+        "description": "Microsoft SQL Server [Data Source Name](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn).",
+        "type": "string",
+        "default": "sqlserver://localhost:1433"
+      },
+      "vnode": {
+        "title": "Virtual Node",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string",
+        "default": ""
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Query timeout, in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 5
+      },
+      "query_store_function_enabled": {
+        "title": "Enable Query Store Function",
+        "description": "Enable the top-queries function using SQL Server Query Store. WARNING: Query Store may contain unmasked PII (customer names, emails, IDs) in query text. Only enable after ensuring proper access controls to the Netdata dashboard.",
+        "type": "boolean",
+        "default": true
+      },
+      "query_store_time_window_days": {
+        "title": "Query Store Time Window (Days)",
+        "description": "How many days of Query Store data to query for the top-queries function. Set to 0 to query all available data (not recommended for busy servers).",
+        "type": "integer",
+        "minimum": 0,
+        "default": 7
+      },
+      "top_queries_limit": {
+        "title": "Top Queries Limit",
+        "description": "Maximum number of queries to return in the top-queries function response.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5000,
+        "default": 500
+      }
+    },
+    "required": [
+      "dsn"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "dsn": {
+      "ui:placeholder": "sqlserver://user:password@localhost:1433"
+    },
+    "vnode": {
+      "ui:help": "Optional: Group metrics under a virtual node for multi-instance setups."
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for sub-second granularity (e.g., 0.5 for 500ms)."
+    },
+    "query_store_function_enabled": {
+      "ui:help": "When enabled, the 'top-queries' function becomes available in the Netdata dashboard. Review the PII warning before enabling."
+    },
+    "query_store_time_window_days": {
+      "ui:help": "Limits Query Store data to recent days. Lower values improve performance on busy servers."
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "dsn",
+            "timeout",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Query Store",
+          "fields": [
+            "query_store_function_enabled",
+            "query_store_time_window_days"
+          ]
+        }
+      ]
+    }
+  }
+}

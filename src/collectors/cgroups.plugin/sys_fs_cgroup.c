@@ -63,7 +63,9 @@ struct cgroups_systemd_config_setting cgroups_systemd_options[] = {
         { .name = NULL,      .setting = SYSTEMD_CGROUP_ERR     },
 };
 
-struct discovery_thread discovery_thread;
+struct discovery_thread discovery_thread = {
+    .exited = 1,  // Start as "exited" until properly initialized
+};
 
 
 /* on Fed systemd is not in PATH for some reason */
@@ -1332,9 +1334,9 @@ static void cgroup_main_cleanup(void *pptr) {
 
     usec_t max = 2 * USEC_PER_SEC, step = 50000;
 
-    if (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED)) {
+    if (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_ACQUIRE)) {
         collector_info("waiting for discovery thread to finish...");
-        while (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED) && max > 0) {
+        while (!__atomic_load_n(&discovery_thread.exited, __ATOMIC_ACQUIRE) && max > 0) {
             netdata_mutex_lock(&discovery_thread.mutex);
             netdata_cond_signal(&discovery_thread.cond_var);
             netdata_mutex_unlock(&discovery_thread.mutex);
@@ -1343,8 +1345,14 @@ static void cgroup_main_cleanup(void *pptr) {
         }
     }
     // We should be done, but just in case, avoid blocking shutdown
-    if (__atomic_load_n(&discovery_thread.exited, __ATOMIC_RELAXED))
-        (void) nd_thread_join(discovery_thread.thread);
+    // Only join and destroy synchronization primitives if thread has exited
+    if (__atomic_load_n(&discovery_thread.exited, __ATOMIC_ACQUIRE)) {
+        if (discovery_thread.thread) {
+            (void) nd_thread_join(discovery_thread.thread);
+            netdata_cond_destroy(&discovery_thread.cond_var);
+            netdata_mutex_destroy(&discovery_thread.mutex);
+        }
+    }
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
@@ -1390,21 +1398,29 @@ void cgroups_main(void *ptr) {
     // for the other nodes, the origin server should register it
     cgroup_netdev_link_init();
 
-    discovery_thread.exited = 0;
-
     if (netdata_mutex_init(&discovery_thread.mutex)) {
         collector_error("CGROUP: cannot initialize mutex for discovery thread");
         return;
     }
     if (netdata_cond_init(&discovery_thread.cond_var)) {
         collector_error("CGROUP: cannot initialize conditional variable for discovery thread");
+        netdata_mutex_destroy(&discovery_thread.mutex);
         return;
     }
+
+    // Mark thread as "running" only after mutex/cond are initialized
+    // but before creating the thread. This ensures cleanup won't try
+    // to access uninitialized synchronization primitives.
+    // Use RELEASE ordering so readers with ACQUIRE see initialized mutex/cond.
+    __atomic_store_n(&discovery_thread.exited, 0, __ATOMIC_RELEASE);
 
     discovery_thread.thread = nd_thread_create("CGDISCOVER", NETDATA_THREAD_OPTION_DEFAULT, cgroup_discovery_worker, NULL);
 
     if (!discovery_thread.thread) {
         collector_error("CGROUP: cannot create thread worker");
+        __atomic_store_n(&discovery_thread.exited, 1, __ATOMIC_RELEASE);  // Reset since thread wasn't created
+        netdata_cond_destroy(&discovery_thread.cond_var);
+        netdata_mutex_destroy(&discovery_thread.mutex);
         return;
     }
 

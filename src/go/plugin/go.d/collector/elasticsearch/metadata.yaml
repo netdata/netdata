@@ -52,7 +52,7 @@ modules:
         auto_detection:
           description: |
             By default, it detects instances running on localhost by attempting to connect to port 9200:
-            
+
             - http://127.0.0.1:9200
             - https://127.0.0.1:9200
         limits:
@@ -243,7 +243,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
@@ -276,6 +276,110 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
         metric: elasticsearch.node_index_health
         info: node index $label:index health status is red.
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          description: |
+            Retrieves currently running search tasks from the Elasticsearch [Tasks API](https://www.elastic.co/guide/en/elasticsearch/reference/current/tasks.html).
+
+            This function queries the `/_tasks` endpoint filtered for search actions (`*search`), providing a real-time snapshot of all active search operations across all nodes in the cluster.
+
+            Use cases:
+            - Identify long-running search queries that may be impacting cluster performance
+            - Monitor active search workload distribution across cluster nodes
+            - Debug slow or stuck search operations in real-time
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column. Options include running time, start time, and task ID. Defaults to running time to show longest-running searches first.
+              type: select
+              required: true
+              default: runningTime
+              options: []
+          returns:
+            description: Real-time snapshot of currently executing search tasks across all cluster nodes. Each row represents a single active search operation.
+            columns:
+              - name: Task ID
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Unique identifier for the task in format `nodeId:taskId`. Can be used with the Task Management API to cancel long-running tasks."
+              - name: Node ID
+                type: string
+                unit: ""
+                description: "Internal identifier of the node executing this search task."
+              - name: Node Name
+                type: string
+                unit: ""
+                description: "Human-readable name of the node executing the search. Useful for identifying workload distribution across the cluster."
+              - name: Action
+                type: string
+                unit: ""
+                description: "The search action being performed (e.g., `indices:data/read/search`). Indicates the type of search operation."
+              - name: Type
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Task type classification (typically `transport` for search tasks)."
+              - name: Description
+                type: string
+                unit: ""
+                description: "Detailed description of the search task including indices being searched and query details. Truncated to 4096 characters."
+              - name: Start Time
+                type: timestamp
+                unit: ""
+                description: "Timestamp when the search task started executing."
+              - name: Running Time
+                type: duration
+                unit: "milliseconds"
+                description: "Time elapsed since the search started. High values indicate long-running searches that may need investigation or cancellation."
+              - name: Cancellable
+                type: boolean
+                unit: ""
+                visibility: hidden
+                description: "Whether the task supports cancellation via the Task Management API."
+              - name: Cancelled
+                type: boolean
+                unit: ""
+                visibility: hidden
+                description: "Whether a cancellation request has been issued for this task."
+          performance: |
+            Queries the `/_tasks` API filtered for search actions:<br/>• Lightweight operation with minimal cluster overhead<br/>• Returns only currently active search tasks, typically a small result set
+          security: |
+            Task descriptions may contain query details including potentially sensitive information:<br/>• Index names and search patterns<br/>• Query terms and filter values<br/>• Access should be restricted to authorized personnel only
+          prerequisites:
+            list:
+              - title: Ensure access to Tasks API
+                description: |
+                  The user must have appropriate privileges to access the Tasks API.
+
+                  1. For secured clusters, grant the `monitor` or `manage` cluster privilege:
+
+                     ```json
+                     {
+                       "cluster": ["monitor"]
+                     }
+                     ```
+
+                  2. Verify access to the Tasks API:
+
+                     ```bash
+                     curl -u user:password "http://localhost:9200/_tasks?actions=*search"
+                     ```
+
+                  :::info
+
+                  - The Tasks API returns only currently running tasks; completed tasks are not stored
+                  - Search tasks can be cancelled using `POST /_tasks/{task_id}/_cancel` if they are cancellable
+                  - Works with both Elasticsearch and OpenSearch clusters
+
+                  :::
+          availability: |
+            Available when:<br/>• The collector has successfully connected to Elasticsearch/OpenSearch<br/>• The user has `monitor` or `manage` cluster privileges<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the Tasks API query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

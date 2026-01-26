@@ -96,6 +96,8 @@ https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/view-plan-and-billing.md,Netdata Plans & Billing,Published,Netdata Cloud,,
 https://github.com/netdata/netdata/edit/master/src/aclk/README.md,Agent-Cloud Link (ACLK),Published,Netdata Cloud,,The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud.
 https://github.com/netdata/netdata/edit/master/docs/learn/remove-node.md,Remove Agent,Published,Netdata Cloud,,
+https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/node-states-and-transitions.md,Node States and Transitions,Published,Netdata Cloud,"node states,live,stale,offline,unseen,transitions",Understanding node connection states and state transitions in Netdata Cloud
+https://github.com/netdata/netdata/edit/master/docs/learn/unclaim-reclaim-node.md,Unclaim and Reclaim a Node,Published,Netdata Cloud,,
 https://github.com/netdata/netdata/edit/master/docs/delete/netdata/account.md,Account Deletion,Published,Netdata Cloud,,
 ,,,,,
 https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/README.md,Netdata Cloud On-Prem,Published,Netdata Cloud On-Prem,,
@@ -107,6 +109,7 @@ https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.c
 https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/poc-without-k8s.md,PoC without K8s,Published,Netdata Cloud On-Prem,,
 https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/ecr-mirror.md,Mirroring image registry,Published,Netdata Cloud On-Prem,,
 https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/troubleshooting.md,Troubleshooting,Published,Netdata Cloud On-Prem,,
+https://github.com/netdata/netdata-cloud-onprem/edit/master/netdata-cloud-onprem/RELEASE-NOTES.md,Release Notes,Published,Netdata Cloud On-Prem,,
 ,,,,,
 ,,,,,
 ,,,,,
@@ -114,7 +117,7 @@ https://github.com/netdata/netdata/edit/master/src/collectors/README.md,Collecti
 https://github.com/netdata/netdata/edit/master/src/collectors/REFERENCE.md,Collectors configuration,Published,Collecting Metrics,,
 https://github.com/netdata/agent-service-discovery/edit/master/README.md,Service discovery,Published,Collecting Metrics,,
 https://github.com/netdata/netdata/edit/master/src/collectors/statsd.plugin/README.md,StatsD,Published,Collecting Metrics,,
-https://github.com/netdata/netdata/edit/master/src/crates/jf/otel-plugin/README.md,OpenTelemetry Metrics,Published,Collecting Metrics/OpenTelemetry,,Ingesting storing and visualizing OpenTelemetry metrics
+https://github.com/netdata/netdata/edit/master/src/crates/netdata-otel/otel-plugin/README.md,OpenTelemetry Metrics,Published,Collecting Metrics/OpenTelemetry,,Ingesting storing and visualizing OpenTelemetry metrics
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/README.md,Metrics Centralization Points,Published,Netdata Parents/Metrics Centralization Points,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/configuration.md,Configuring Metrics Centralization Points,Published,Netdata Parents/Metrics Centralization Points,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/sizing-netdata-parents.md,Sizing Netdata Parents,Published,Netdata Parents/Metrics Centralization Points,,
@@ -140,15 +143,15 @@ https://github.com/netdata/netdata/edit/master/src/web/api/exporters/shell/READM
 ,,,,,
 ,,,,,
 logs_integrations,,,,,
-https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/README.md,Systemd Journal Plugin Reference,Published,Logs/Systemd Journal Logs,,View and analyze logs available in systemd journal
-https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/forward_secure_sealing.md,Forward Secure Sealing (FSS) in Systemd-Journal,Published,Logs/Systemd Journal Logs,,
+https://github.com/netdata/netdata/edit/master/docs/logs/README.md,Journal Viewer Plugin,Published,Logs/Systemd Journal Logs,,View and analyze logs available in systemd journal
+https://github.com/netdata/netdata/edit/master/docs/logs/forward_secure_sealing.md,Forward Secure Sealing (FSS) in Systemd-Journal,Published,Logs/Systemd Journal Logs,,
 https://github.com/netdata/netdata/edit/master/src/collectors/windows-events.plugin/README.md,Windows Events Plugin Reference,Published,Logs/Windows Event Logs,,
 https://github.com/netdata/netdata/edit/master/src/collectors/log2journal/README.md,log2journal,Published,Logs/log2journal,,
 https://github.com/netdata/netdata/edit/master/src/libnetdata/log/systemd-cat-native.md,systemd-cat-native,Published,Logs/systemd-cat-native,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md,Logs Centralization Points with systemd-journald,Published,Logs/Logs Centralization Points with systemd-journald,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates.md,Passive journal centralization with encryption using self-signed certificates,Published,Logs/Logs Centralization Points with systemd-journald,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md,Passive journal centralization without encryption,Published,Logs/Logs Centralization Points with systemd-journald,,
-https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/active_journal_centralization_guide_no_encryption.md,Active journal source without encryption,Published,Logs/Logs Centralization Points with systemd-journald,,
+https://github.com/netdata/netdata/edit/master/docs/logs/active_journal_centralization_guide_no_encryption.md,Active journal source without encryption,Published,Logs/Logs Centralization Points with systemd-journald,,
 ,,,,,
 ,,,,,
 https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md,Top Consumers,Published,Top Consumers,,Present the Netdata Functions what these are and why they should be used.
@@ -253,6 +256,8 @@ https://github.com/netdata/netdata/edit/master/docs/alerts/best-practices/1-desi
 https://github.com/netdata/netdata/edit/master/docs/alerts/best-practices/2-notification-strategy.md,Notification Strategy and On-Call Hygiene,Published,Alerts & Notifications/Best Practices for Alerting,
 https://github.com/netdata/netdata/edit/master/docs/alerts/best-practices/3-maintaining-configurations.md,Maintaining Alert Configurations Over Time,Published,Alerts & Notifications/Best Practices for Alerting,
 https://github.com/netdata/netdata/edit/master/docs/alerts/best-practices/4-scaling-large-environments.md,Patterns for Large and Distributed Environments,Published,Alerts & Notifications/Best Practices for Alerting,
+https://github.com/netdata/netdata/edit/master/src/health/alert-configuration-ordering.md,Alert Configuration Ordering,Published,Alerts & Notifications,"alerts,health,ordering,precedence,templates,alarms",
+https://github.com/netdata/netdata/edit/master/src/health/overriding-stock-alerts.md,Overriding Stock Alerts,Published,Alerts & Notifications,"alerts,health,override,stock,templates,alarms",
 https://github.com/netdata/netdata/edit/master/docs/alerts/best-practices/5-sli-slo-alerts.md,"SLIs, SLOs, and How They Relate to Alerts",Published,Alerts & Notifications/Best Practices for Alerting,
 ,,,,
 https://github.com/netdata/netdata/edit/master/docs/alerts/architecture/README.md,Alerts and Notifications Architecture,Published,Alerts & Notifications/Alerts and Notifications Architecture,
@@ -263,7 +268,7 @@ https://github.com/netdata/netdata/edit/master/docs/alerts/architecture/4-config
 https://github.com/netdata/netdata/edit/master/docs/alerts/architecture/5-scaling-topologies.md,Scaling Alerting in Complex Topologies,Published,Alerts & Notifications/Alerts and Notifications Architecture,
 ,,,,
 https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md,Netdata AI,Published,Netdata AI,,
-https://github.com/netdata/netdata/edit/master/docs/ai-powered-alert-configuration/ai-powered-alert-configuration.md,AI-Powered Alert Configuration,Published,Netdata AI,,
+https://github.com/netdata/netdata/edit/master/docs/netdata-ai/conversations.md,Conversations,Published,Netdata AI,"conversations,chat,real-time,live exhibits",
 https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-insights.md,Insights,Published,Netdata AI/Insights,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/infrastructure-summary.md,Infrastructure Summary,Published,Netdata AI/Insights,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/performance-optimization.md,Performance Optimization,Published,Netdata AI/Insights,,
@@ -277,7 +282,7 @@ https://github.com/netdata/netdata/edit/master/docs/netdata-ai/troubleshooting/i
 https://github.com/netdata/netdata/edit/master/docs/troubleshooting/troubleshoot.md,Alert Troubleshooting,Published,Netdata AI/Troubleshooting,,
 https://github.com/netdata/netdata/edit/master/docs/ml-ai/anomaly-advisor.md,Anomaly Advisor,Published,Netdata AI/Troubleshooting,,
 https://github.com/netdata/netdata/edit/master/docs/metric-correlations.md,Metric Correlations,Published,Netdata AI/Troubleshooting,,Quickly find metrics and charts closely related to a particular timeframe of interest anywhere in your infrastructure to discover the root cause faster.
-https://github.com/netdata/netdata/edit/master/docs/netdata-ai/troubleshooting/troubleshoot-button.md,Troubleshoot Button,Published,Netdata AI/Troubleshooting,,
+https://github.com/netdata/netdata/edit/master/docs/netdata-ai/alerts-automation/alerts-automation.md,Alerts Automation,Published,Netdata AI,"alerts,automation,ai alerts",AI-powered alert creation and suggestions
 https://github.com/netdata/netdata/edit/master/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md,Anomaly Detection,Published,Netdata AI/Anomaly Detection,,
 https://github.com/netdata/netdata/edit/master/src/ml/ml-configuration.md,ML Configuration,Published,Netdata AI/Anomaly Detection,,
 https://github.com/netdata/netdata/edit/master/docs/ml-ai/ml-anomaly-detection/ml-accuracy.md,ML Accuracy,Published,Netdata AI/Anomaly Detection,,"Analysis of Netdata's ML anomaly detection accuracy, false positive rates, and comparison with other approaches"

@@ -24,8 +24,11 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 5,
 		},
-		Create: func() module.Module { return New() },
-		Config: func() any { return &Config{} },
+		Create:       func() module.Module { return New() },
+		Config:       func() any { return &Config{} },
+		Methods:      couchbaseMethods,
+		MethodParams: couchbaseMethodParams,
+		HandleMethod: couchbaseHandleMethod,
 	})
 }
 
@@ -50,6 +53,8 @@ type Config struct {
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	web.HTTPConfig     `yaml:",inline" json:""`
+	QueryURL           string `yaml:"query_url,omitempty" json:"query_url,omitempty"`
+	TopQueriesLimit    int    `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
 }
 
 type Collector struct {

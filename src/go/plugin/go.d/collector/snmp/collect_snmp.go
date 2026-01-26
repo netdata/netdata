@@ -21,9 +21,13 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 		return err
 	}
 
+	c.resetIfaceCache()
+
 	c.collectProfileScalarMetrics(mx, pms)
 	c.collectProfileTableMetrics(mx, pms)
 	c.collectProfileStats(mx, pms)
+
+	c.finalizeIfaceCache()
 
 	return nil
 }
@@ -82,6 +86,10 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnm
 					id := fmt.Sprintf("snmp_device_prof_%s_%s", key, k)
 					mx[id] = v
 				}
+			}
+
+			if isIfaceMetric(m.Name) {
+				c.updateIfaceCacheEntry(m)
 			}
 		}
 	}

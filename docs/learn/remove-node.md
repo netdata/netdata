@@ -6,9 +6,11 @@ You can remove a node from your Space in Netdata Cloud, but the process depends 
 
 Before attempting to remove a node, it's important to understand what each status means:
 
-* **Online**: Node is actively connected and streaming data
+* **Online** (Live): Node is actively connected and streaming data
 * **Stale**: Node is a child that stopped streaming to its parent, but the parent still has its historical data
-* **Offline**: Node is disconnected and no longer has data available for querying
+* **Offline** (Unreachable): Node is disconnected and no longer has data available for querying
+
+For a complete explanation of node states, state transitions, and when nodes move between states, see [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
 
 <details>
 <summary><strong>Why Can't I Delete Stale Nodes?</strong></summary><br/>
@@ -135,6 +137,8 @@ To prevent removed nodes from reappearing:
 **Node reappears after removal**: The agent may still be running and configured to reconnect. Stop the agent and clear claim configuration.
 
 ## Additional Resources
+
+For a complete reference on node states and transitions, see [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
 
 For more advanced configuration options with streaming setups, see [Nodes Ephemerality](/docs/nodes-ephemerality.md).
 

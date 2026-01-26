@@ -380,13 +380,13 @@ jobs:
       - name: Sign Agent Code
         id: sign-agent
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/trusted-signing-action@v0.5.11
+        uses: azure/artifact-signing-action@v1.0.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
           azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
           endpoint: "https://eus.codesigning.azure.net/"
-          trusted-signing-account-name: Netdata
+          signing-account-name: Netdata
           certificate-profile-name: Netdata
           files-folder: ${{ github.workspace }}\build
           files-folder-filter: exe,dll,sys
@@ -403,13 +403,13 @@ jobs:
       - name: Sign Installer
         id: sign-installer
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/trusted-signing-action@v0.5.11
+        uses: azure/artifact-signing-action@v1.0.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
           azure-client-secret: ${{ secrets.CODE_SIGNING_CLIENT_SECRET }}
           endpoint: "https://eus.codesigning.azure.net/"
-          trusted-signing-account-name: Netdata
+          signing-account-name: Netdata
           certificate-profile-name: Netdata
           files-folder: ${{ github.workspace }}\packaging\windows
           files-folder-filter: msi

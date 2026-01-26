@@ -270,11 +270,11 @@ Suggests: %{name}-plugin-freeipmi = %{version}
 %if %{_have_cups}
 Suggests: %{name}-plugin-cups = %{version}
 %endif
-Recommends: %{name}-plugin-systemd-journal = %{version}
+Recommends: %{name}-plugin-journal-viewer = %{version}
 Recommends: %{name}-plugin-systmed-units = %{version}
 Recommends: %{name}-plugin-network-viewer = %{version}
 %else
-Requires: %{name}-plugin-systemd-journal = %{version}
+Requires: %{name}-plugin-journal-viewer = %{version}
 Requires: %{name}-plugin-network-viewer = %{version}
 %endif
 
@@ -326,10 +326,6 @@ BuildRequires: golang >= 1.25
 %endif
 %endif
 # end - go.d.plugin plugin dependencies
-
-# systemd-journal dependencies
-BuildRequires: pkgconfig(libsystemd)
-# end - systemd-journal dependencies
 
 # Prometheus remote write dependencies
 %if 0%{?suse_version}
@@ -702,8 +698,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 # perf belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/perf.plugin
 
-# systemd-journal belongs to a different sub-package
-%exclude %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
+# journal-viewer belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/journal-viewer-plugin
+%exclude %{_libdir}/%{name}/conf.d/journal-viewer.yaml
 
 # xenstat belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/xenstat.plugin
@@ -3121,23 +3118,25 @@ Requires(pre): %{name}-user >= %{version}
 # CAP_DAC_READ_SEARCH required for data collection.
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
 
-%package plugin-systemd-journal
-Summary: The systemd-journal plugin for the Netdata Agent
+%package plugin-journal-viewer
+Summary: The journal viewer plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+Conflicts: %{name}-plugin-systemd-journal
+Obsoletes: %{name}-plugin-systemd-journal < %{version}
 %if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
 %endif
 
-%description plugin-systemd-journal
- This plugin allows the Netdata Agent to present entries from the systemd
- journal on Netdata Cloud or the local Agent Dashboard.
+%description plugin-journal-viewer
+ This plugin provides systemd journal log viewing and querying functionality
+ with histogram analysis and faceted search capabilities for the Netdata Agent.
 
-%files plugin-systemd-journal
+%files plugin-journal-viewer
 %defattr(0750,root,netdata,0750)
-# CAP_DAC_READ_SEARCH required for data collection.
-%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin
+# CAP_DAC_READ_SEARCH required for reading journal files.
+%caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/journal-viewer-plugin
 
 %if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 %package plugin-systemd-units

@@ -81,7 +81,7 @@ Metrics:
 | system.hw.sensor.lux.input | input | lx |
 | system.hw.sensor.color.input | input | Cel |
 | system.hw.sensor.voltage.input | input | V |
-| system.hw.sensor.resistence.input | input | Ohms |
+| system.hw.sensor.resistance.input | input | Ohms |
 | system.hw.sensor.capacitance.input | input | F |
 | system.hw.sensor.inductance.input | input | H |
 | system.hw.sensor.pressure.input | input | Pa |

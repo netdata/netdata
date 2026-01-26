@@ -3,7 +3,7 @@
 - id: "logs-systemd-journal"
   meta:
     name: "Systemd Journal Logs"
-    link: "https://github.com/netdata/netdata/blob/master/src/collectors/systemd-journal.plugin/README.md"
+    link: "https://github.com/netdata/netdata/blob/master/docs/logs/README.md"
     categories:
       - logs
     icon_filename: "netdata.png"

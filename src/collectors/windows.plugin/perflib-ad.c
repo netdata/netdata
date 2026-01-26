@@ -120,27 +120,25 @@ static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TY
 
     if (unlikely(!st_name_cache_lookups_total)) {
         st_name_cache_lookups_total = rrdset_create_localhost(
-                "ad",
-                "name_cache_lookups",
-                NULL,
-                "database",
-                "ad.name_cache_lookups",
-                "Name cache lookups",
-                "lookups/s",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibAD",
-                PRIO_AD_CACHE_LOOKUP_TOTAL,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "ad",
+            "name_cache_lookups",
+            NULL,
+            "database",
+            "ad.name_cache_lookups",
+            "Name cache lookups",
+            "lookups/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_CACHE_LOOKUP_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         rd_name_cache_lookups_total =
-                rrddim_add(st_name_cache_lookups_total, "lookups", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rrddim_add(st_name_cache_lookups_total, "lookups", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-            st_name_cache_lookups_total,
-            rd_name_cache_lookups_total,
-            (collected_number)nameCacheLookupsTotal.current.Data);
+        st_name_cache_lookups_total, rd_name_cache_lookups_total, (collected_number)nameCacheLookupsTotal.current.Data);
     rrdset_done(st_name_cache_lookups_total);
 }
 
@@ -157,25 +155,24 @@ static void netdata_ad_cache_hits(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
 
     if (unlikely(!st_name_cache_hits_total)) {
         st_name_cache_hits_total = rrdset_create_localhost(
-                "ad",
-                "name_cache_hits",
-                NULL,
-                "database",
-                "ad.name_cache_hits",
-                "Name cache hits",
-                "hits/s",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibAD",
-                PRIO_AD_CACHE_HITS_TOTAL,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "ad",
+            "name_cache_hits",
+            NULL,
+            "database",
+            "ad.name_cache_hits",
+            "Name cache hits",
+            "hits/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_CACHE_HITS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
 
-        rd_name_cache_hits_total =
-                rrddim_add(st_name_cache_hits_total, "hits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_name_cache_hits_total = rrddim_add(st_name_cache_hits_total, "hits", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-            st_name_cache_hits_total, rd_name_cache_hits_total, (collected_number)nameCacheHitsTotal.current.Data);
+        st_name_cache_hits_total, rd_name_cache_hits_total, (collected_number)nameCacheHitsTotal.current.Data);
     rrdset_done(st_name_cache_hits_total);
 }
 
@@ -192,25 +189,24 @@ static void netdata_ad_searches(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
 
     if (unlikely(!st_ldap_searches_total)) {
         st_ldap_searches_total = rrdset_create_localhost(
-                "ad",
-                "ldap_searches",
-                NULL,
-                "ldap",
-                "ad.ldap_searches",
-                "LDAP client search operations",
-                "searches/s",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibAD",
-                PRIO_AD_LDAP_SEARCHES_TOTAL,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "ad",
+            "ldap_searches",
+            NULL,
+            "ldap",
+            "ad.ldap_searches",
+            "LDAP client search operations",
+            "searches/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_LDAP_SEARCHES_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
 
-        rd_ldap_searches_total =
-                rrddim_add(st_ldap_searches_total, "searches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ldap_searches_total = rrddim_add(st_ldap_searches_total, "searches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-            st_ldap_searches_total, rd_ldap_searches_total, (collected_number)ldapSearchesTotal.current.Data);
+        st_ldap_searches_total, rd_ldap_searches_total, (collected_number)ldapSearchesTotal.current.Data);
     rrdset_done(st_ldap_searches_total);
 }
 
@@ -292,7 +288,7 @@ static void netdata_ad_compressed_traffic(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
         .key = "DRA Outbound Bytes Compressed (Between Sites, After Compression)/sec"};
 
     static COUNTER_DATA replicationDataInboundIntraSiteBytesTotal = {
-        .key = "DRA Outbound Bytes Compressed (Between Sites, After Compression)/sec"};
+        .key = "DRA Inbound Bytes Compressed (Within Site, After Compression)/sec"};
     static COUNTER_DATA replicationDataOutboundIntraSiteBytesTotal = {
         .key = "DRA Outbound Bytes Not Compressed (Within Site)/sec"};
 
@@ -316,7 +312,7 @@ static void netdata_ad_compressed_traffic(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
             NULL,
             "replication",
             "ad.dra_replication_intersite_compressed_traffic",
-            "DRA replication compressed traffic withing site",
+            "DRA replication compressed traffic between sites",
             "bytes/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
@@ -354,7 +350,7 @@ intraChart:
             NULL,
             "replication",
             "ad.dra_replication_intrasite_compressed_traffic",
-            "DRA replication compressed traffic between sites",
+            "DRA replication compressed traffic within site",
             "bytes/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
@@ -384,14 +380,11 @@ static void netdata_ad_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
 {
     static COUNTER_DATA replicationSyncPending = {.key = "DRA Pending Replication Synchronizations"};
     static COUNTER_DATA replicationSyncRequestsTotal = {.key = "DRA Sync Requests Made"};
-    static COUNTER_DATA replicationPendingSyncs = {.key = "DRA Pending Replication Synchronizations"};
 
     static RRDSET *st_dra_replication_pending_syncs = NULL;
     static RRDDIM *rd_dra_replication_pending_syncs = NULL;
     static RRDSET *st_dra_replication_sync_requests = NULL;
     static RRDDIM *rd_dra_replication_sync_requests = NULL;
-    static RRDSET *st_dra_replication_sync_objects_remaining = NULL;
-    static RRDDIM *rd_dra_replication_sync_objects_remaining = NULL;
 
     if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationSyncPending)) {
         goto totalSyncChart;
@@ -424,7 +417,7 @@ static void netdata_ad_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
 
 totalSyncChart:
     if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationSyncRequestsTotal)) {
-        goto RemainingSyncChart;
+        return;
     }
 
     if (unlikely(!st_dra_replication_sync_requests)) {
@@ -451,36 +444,6 @@ totalSyncChart:
         rd_dra_replication_sync_requests,
         (collected_number)replicationSyncRequestsTotal.current.Data);
     rrdset_done(st_dra_replication_sync_requests);
-
-RemainingSyncChart:
-    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationPendingSyncs)) {
-        return;
-    }
-
-    if (unlikely(!st_dra_replication_sync_objects_remaining)) {
-        st_dra_replication_sync_objects_remaining = rrdset_create_localhost(
-            "ad",
-            "dra_replication_sync_objects_remaining",
-            NULL,
-            "replication",
-            "ad.dra_replication_sync_objects_remaining",
-            "DRA replication full sync objects remaining",
-            "objects",
-            PLUGIN_WINDOWS_NAME,
-            "PerflibAD",
-            PRIO_AD_SYNC_OBJECTS_REMAINING,
-            update_every,
-            RRDSET_TYPE_LINE);
-
-        rd_dra_replication_sync_objects_remaining =
-            rrddim_add(st_dra_replication_sync_objects_remaining, "object", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    }
-
-    rrddim_set_by_pointer(
-        st_dra_replication_sync_objects_remaining,
-        rd_dra_replication_sync_objects_remaining,
-        (collected_number)replicationPendingSyncs.current.Data);
-    rrdset_done(st_dra_replication_sync_objects_remaining);
 }
 
 static void
@@ -497,27 +460,27 @@ netdata_ad_service_threads_in_use(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
 
     if (unlikely(!st_directory_services_threads)) {
         st_directory_services_threads = rrdset_create_localhost(
-                "ad",
-                "ds_threads",
-                NULL,
-                "threads",
-                "ad.ds_threads",
-                "Directory Service threads",
-                "threads",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibAD",
-                PRIO_AD_THREADS_IN_USE,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "ad",
+            "ds_threads",
+            NULL,
+            "threads",
+            "ad.ds_threads",
+            "Directory Service threads",
+            "threads",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_THREADS_IN_USE,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         rd_directory_services_threads =
-                rrddim_add(st_directory_services_threads, "thread", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st_directory_services_threads, "thread", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
-            st_directory_services_threads,
-            rd_directory_services_threads,
-            (collected_number)directoryServiceThreads.current.Data);
+        st_directory_services_threads,
+        rd_directory_services_threads,
+        (collected_number)directoryServiceThreads.current.Data);
     rrdset_done(st_directory_services_threads);
 }
 
@@ -533,27 +496,27 @@ static void netdata_ad_bind_time(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
 
     if (unlikely(!st_ldap_last_bind_time_seconds_total)) {
         st_ldap_last_bind_time_seconds_total = rrdset_create_localhost(
-                "ad",
-                "ldap_last_bind_time",
-                NULL,
-                "bind",
-                "ad.ldap_last_bind_time",
-                "LDAP last successful bind time",
-                "seconds",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibAD",
-                PRIO_AD_BIND_TIME,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "ad",
+            "ldap_last_bind_time",
+            NULL,
+            "bind",
+            "ad.ldap_last_bind_time",
+            "LDAP last successful bind time",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_BIND_TIME,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         rd_ldap_last_bind_time_seconds_total =
-                rrddim_add(st_ldap_last_bind_time_seconds_total, "last_bind", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st_ldap_last_bind_time_seconds_total, "last_bind", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
-            st_ldap_last_bind_time_seconds_total,
-            rd_ldap_last_bind_time_seconds_total,
-            (collected_number)ldapLastBindTimeSecondsTotal.current.Data);
+        st_ldap_last_bind_time_seconds_total,
+        rd_ldap_last_bind_time_seconds_total,
+        (collected_number)ldapLastBindTimeSecondsTotal.current.Data);
     rrdset_done(st_ldap_last_bind_time_seconds_total);
 }
 
@@ -644,27 +607,27 @@ static void netdata_ad_atq_latency(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE
 
     if (unlikely(!st_atq_average_request_latency)) {
         st_atq_average_request_latency = rrdset_create_localhost(
-                "ad",
-                "atq_average_request_latency",
-                NULL,
-                "queue",
-                "ad.atq_average_request_latency",
-                "Average request processing time",
-                "seconds",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibAD",
-                PRIO_AD_AVG_REQUEST_LATENCY,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "ad",
+            "atq_average_request_latency",
+            NULL,
+            "queue",
+            "ad.atq_average_request_latency",
+            "Average request processing time",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_AVG_REQUEST_LATENCY,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         rd_atq_average_request_latency =
-                rrddim_add(st_atq_average_request_latency, "time", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st_atq_average_request_latency, "time", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
-            st_atq_average_request_latency,
-            rd_atq_average_request_latency,
-            (collected_number)atqAverageRequestLatency.current.Data);
+        st_atq_average_request_latency,
+        rd_atq_average_request_latency,
+        (collected_number)atqAverageRequestLatency.current.Data);
     rrdset_done(st_atq_average_request_latency);
 }
 
@@ -744,17 +707,17 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every)
         return false;
 
     static void (*doAD[])(PERF_DATA_BLOCK *, PERF_OBJECT_TYPE *, int) = {
-            netdata_ad_directory,
-            netdata_ad_cache_lookups,
-            netdata_ad_properties,
-            netdata_ad_compressed_traffic,
-            netdata_ad_sync,
-            netdata_ad_cache_hits,
-            netdata_ad_service_threads_in_use,
-            netdata_ad_bind,
-            netdata_ad_searches,
-            netdata_ad_atq_latency,
-            netdata_ad_op_total,
+        netdata_ad_directory,
+        netdata_ad_cache_lookups,
+        netdata_ad_properties,
+        netdata_ad_compressed_traffic,
+        netdata_ad_sync,
+        netdata_ad_cache_hits,
+        netdata_ad_service_threads_in_use,
+        netdata_ad_bind,
+        netdata_ad_searches,
+        netdata_ad_atq_latency,
+        netdata_ad_op_total,
 
         // This must be the end
         NULL};

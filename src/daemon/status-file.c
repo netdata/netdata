@@ -1562,8 +1562,8 @@ void daemon_status_file_shutdown_timeout(BUFFER *trace) {
 
     safecpy(session_status.fatal.function, "shutdown_timeout");
 
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    daemon_status_file_save(wb, &session_status, false);
+    static_save_buffer_init();
+    daemon_status_file_save(static_save_buffer, &session_status, false);
 
     // keep the spinlock locked, to prevent further steps updating the status
 }
