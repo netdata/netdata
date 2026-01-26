@@ -2,6 +2,7 @@
 
 #include "health.h"
 #include "health-alert-entry.h"
+#include "health_event_loop_uv.h"
 
 // ----------------------------------------------------------------------------
 // ARAL memory management for ALARM_ENTRY structures
@@ -40,16 +41,15 @@ void health_alarm_entry_destroy(ALARM_ENTRY *ae) {
 }
 
 // ----------------------------------------------------------------------------
-extern __thread bool is_health_thread;
 
-inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async)
+inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async, struct health_stmt_set *stmts)
 {
     if (async) {
-        bool queued = metadata_queue_ae_save(host, ae);
-        if (!queued && is_health_thread && service_running(SERVICE_HEALTH))
-            sql_health_alarm_log_save(host, ae);
+        bool queued = health_queue_alert_save(host, ae);
+        if (!queued && stmts && !health_should_stop())
+            sql_health_alarm_log_save(host, ae, stmts);
     } else
-        sql_health_alarm_log_save(host, ae);
+        sql_health_alarm_log_save(host, ae, stmts);
 }
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function) {
@@ -240,7 +240,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     return ae;
 }
 
-inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async)
+inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async, struct health_stmt_set *stmts)
 {
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
 
@@ -274,43 +274,46 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
     }
     rw_spinlock_read_unlock(&host->health_log.spinlock);
     if (update_ae)
-        health_alarm_log_save(host, update_ae, async);
+        health_alarm_log_save(host, update_ae, async, stmts);
 
-    health_alarm_log_save(host, ae, async);
+    health_alarm_log_save(host, ae, async, stmts);
+}
+
+void health_alarm_entry_free_direct(ALARM_ENTRY *ae) {
+    string_freez(ae->name);
+    string_freez(ae->chart);
+    string_freez(ae->chart_name);
+    string_freez(ae->chart_context);
+    string_freez(ae->classification);
+    string_freez(ae->component);
+    string_freez(ae->type);
+    string_freez(ae->exec);
+    string_freez(ae->recipient);
+    string_freez(ae->source);
+    string_freez(ae->units);
+    string_freez(ae->info);
+    string_freez(ae->old_value_string);
+    string_freez(ae->new_value_string);
+    string_freez(ae->summary);
+
+    if (ae->popen_instance) {
+        spawn_popen_kill(ae->popen_instance, 0);
+        ae->popen_instance = NULL;
+    }
+
+    health_alarm_entry_destroy(ae);
 }
 
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
-    if(__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED))
-        metadata_queue_ae_deletion(ae);
+    // Use ACQUIRE to synchronize with RELEASE in health_process_pending_alerts()
+    // This ensures all save operations are complete before we decide to free
+    if (__atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE))
+        health_queue_alert_deletion(ae);
     else {
-        string_freez(ae->name);
-        string_freez(ae->chart);
-        string_freez(ae->chart_name);
-        string_freez(ae->chart_context);
-        string_freez(ae->classification);
-        string_freez(ae->component);
-        string_freez(ae->type);
-        string_freez(ae->exec);
-        string_freez(ae->recipient);
-        string_freez(ae->source);
-        string_freez(ae->units);
-        string_freez(ae->info);
-        string_freez(ae->old_value_string);
-        string_freez(ae->new_value_string);
-        string_freez(ae->summary);
-
-        if(ae->popen_instance) {
-            spawn_popen_kill(ae->popen_instance, 0);
-            ae->popen_instance = NULL;
-        }
-
-        if(ae->next || ae->prev)
+        if (ae->next || ae->prev)
             fatal("HEALTH: alarm entry to delete is still linked!");
 
-//        if(ae->prev_in_progress || ae->next_in_progress)
-//            fatal("HEALTH: alarm entry to be delete is linked in progress!");
-
-        health_alarm_entry_destroy(ae);
+        health_alarm_entry_free_direct(ae);
     }
 }
 
@@ -342,9 +345,10 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     ALARM_ENTRY *ae = host->health_log.alarms;
     while(ae) {
         // Check if entry is old enough to be deleted
-        if(ae->when < now - retention && 
+        // Use ACQUIRE for pending_save_count to synchronize with RELEASE in health_process_pending_alerts()
+        if(ae->when < now - retention &&
            (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) && // Only remove entries that have been processed/updated
-           __atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED) == 0) { // Only remove entries not pending save
+           __atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE) == 0) { // Only remove entries not pending save
             
             // Remove from linked list
             ALARM_ENTRY *next = ae->next;

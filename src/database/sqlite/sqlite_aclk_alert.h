@@ -5,6 +5,9 @@
 
 extern sqlite3 *db_meta;
 
+// Forward declaration for statement set (defined in health_event_loop_uv.h)
+struct health_stmt_set;
+
 void aclk_send_alert_configuration(char *config_hash);
 void aclk_push_alert_config_event(char *node_id, char *config_hash);
 bool alert_hash_has_transitioned(nd_uuid_t *hash_id);
@@ -13,7 +16,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version);
 void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_version);
 
 void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused);
-bool process_alert_pending_queue(RRDHOST *host);
+bool process_alert_pending_queue(RRDHOST *host, struct health_stmt_set *stmts);
 void aclk_push_alert_events_for_all_hosts(void);
 uint64_t calculate_node_alert_version(RRDHOST *host);
 
