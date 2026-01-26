@@ -394,9 +394,10 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) 
 	// Determine if job is function-only (module-level OR config-level)
 	functionOnly := creator.FunctionOnly || cfg.FunctionOnly()
 
-	// Warn if function-only but no methods defined
-	if functionOnly && creator.Methods == nil {
-		m.Warningf("function-only job %s[%s] has no methods defined", cfg.Module(), cfg.Name())
+	// Reject if config sets function_only but module has no methods
+	// Note: module-level FunctionOnly without Methods is caught at registration time
+	if cfg.FunctionOnly() && creator.Methods == nil {
+		return nil, fmt.Errorf("function_only is set but %s module has no methods defined", cfg.Module())
 	}
 
 	var vnode *vnodes.VirtualNode

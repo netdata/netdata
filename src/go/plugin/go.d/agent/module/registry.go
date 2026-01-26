@@ -65,6 +65,9 @@ func (r Registry) Register(name string, creator Creator) {
 	if _, ok := r[name]; ok {
 		panic(fmt.Sprintf("%s is already in registry", name))
 	}
+	if creator.FunctionOnly && creator.Methods == nil {
+		panic(fmt.Sprintf("%s is FunctionOnly but has no Methods defined", name))
+	}
 	r[name] = creator
 }
 
