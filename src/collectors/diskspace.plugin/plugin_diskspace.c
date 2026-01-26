@@ -26,6 +26,11 @@ static int cleanup_mount_points = 1;
 // ZFS datasets without quotas report the same capacity as their parent pool,
 // causing duplicate metrics and alert floods. This heuristic excludes datasets
 // that mirror pool capacity while keeping datasets with quotas.
+//
+// To avoid calling statvfs() twice per ZFS mount on every collection,
+// we cache pool capacities and recheck periodically.
+
+#define ZFS_DATASET_RECHECK_SECONDS 300  // recheck every 5 minutes
 
 struct zfs_pool_info {
     uint64_t max_capacity;      // maximum capacity seen for this pool
@@ -35,6 +40,7 @@ struct zfs_pool_info {
 static DICTIONARY *zfs_pool_info_dict = NULL;
 static SIMPLE_PATTERN *zfs_exclude_datasets_pattern = NULL;
 static int zfs_datasets_heuristic = CONFIG_BOOLEAN_YES;
+static time_t zfs_last_checked = 0;     // timestamp of last capacity check
 
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
@@ -352,16 +358,28 @@ static inline bool is_zfs_dataset(struct mountinfo *mi) {
            strchr(mi->mount_source, '/') != NULL;
 }
 
-// Cache LXC detection result for the current collection cycle
-// Avoids reading /proc/self/mounts for every ZFS mount check
+// Cached LXC detection result (rechecked periodically)
 static bool zfs_inside_lxc_container = false;
 
-// Pass 1: Collect maximum capacity for each ZFS pool
-// This is called before processing mounts when heuristic is enabled
+// Collect ZFS pool capacities for the heuristic
+// Called periodically (every ZFS_DATASET_RECHECK_SECONDS) to avoid
+// extra statvfs() calls on every collection cycle
 static void zfs_collect_pool_capacities(void) {
-    // Cache LXC detection at the start of each collection cycle
+    if (!zfs_pool_info_dict)
+        return;
+
+    time_t now = now_realtime_sec();
+
+    // Only recheck at intervals (capacities/quotas don't change frequently)
+    if (zfs_last_checked && now - zfs_last_checked < ZFS_DATASET_RECHECK_SECONDS)
+        return;
+
+    zfs_last_checked = now;
+
+    // Update LXC detection
     zfs_inside_lxc_container = is_lxcfs_proc_mounted();
-    if (!zfs_datasets_heuristic || !zfs_pool_info_dict)
+
+    if (!zfs_datasets_heuristic)
         return;
 
     dictionary_flush(zfs_pool_info_dict);
