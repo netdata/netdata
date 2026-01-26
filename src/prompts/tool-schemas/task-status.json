@@ -1,0 +1,48 @@
+{% comment %}
+Variables:
+- (none)
+{% endcomment %}
+{
+  "description": "Provides live feedback to the user about your accomplishments, pending items and goals. This tool is only updating the user. It does not perform any other actions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "done",
+    "pending",
+    "now",
+    "ready_for_final_report",
+    "need_to_run_more_tools"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "starting",
+        "in-progress",
+        "completed"
+      ],
+      "description": "The current status of the task assigned to you (pick one of the values)"
+    },
+    "done": {
+      "type": "string",
+      "description": "What has been completed so far (up to 15 words). MUST be in the user's language - this is visible to users."
+    },
+    "pending": {
+      "type": "string",
+      "description": "What remains to be done (up to 15 words). MUST be in the user's language - this is visible to users."
+    },
+    "now": {
+      "type": "string",
+      "description": "Your immediate step - what you want to achieve with the tools you call now? (up to 15 words). MUST be in the user's language - this is visible to users."
+    },
+    "ready_for_final_report": {
+      "type": "boolean",
+      "description": "Set to true when you have enough information to provide your final report/answer, false otherwise"
+    },
+    "need_to_run_more_tools": {
+      "type": "boolean",
+      "description": "Set to true when you need to run more tools, false if you are done with tools"
+    }
+  }
+}

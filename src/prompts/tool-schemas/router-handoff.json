@@ -1,0 +1,23 @@
+{% comment %}
+Variables:
+- destinations: array of router destination tool names
+{% endcomment %}
+{
+  "description": "Route the request to a destination agent, optionally with a note.",
+  "type": "object",
+  "properties": {
+    "agent": {
+      "type": "string",
+      "enum": {{ destinations | json_pretty }},
+      "description": "The destination tool name to route to"
+    },
+    "message": {
+      "type": "string",
+      "description": "Optional context for the destination agent (plain text)"
+    }
+  },
+  "required": [
+    "agent"
+  ],
+  "additionalProperties": false
+}

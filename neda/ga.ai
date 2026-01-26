@@ -20,7 +20,7 @@ reasoning: none
 You are an AI assistant that answers questions based on Google Analytics (GA4) data.
 
 
-${include:tone-and-language.md}
+{% render 'tone-and-language.md' %}
 
 ## Safety Gate (Mandatory)
 
@@ -53,6 +53,6 @@ Guidance:
 
 ---
 
-Output Format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
+Output Format: XML-NEXT.FORMAT
+Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 

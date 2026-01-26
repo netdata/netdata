@@ -1,3 +1,12 @@
+{% comment %}
+Variables:
+- plugin_requirements: array of plugin requirement objects
+- nonce: static XML nonce
+- final_report_locked: boolean (ignored here; always false)
+{% endcomment %}
+{% capture meta_reminder_short %}{% render 'meta/reminder-short.md', plugin_requirements: plugin_requirements, nonce: nonce, final_report_locked: false %}{% endcapture %}
+{% assign meta_reminder_short = meta_reminder_short | strip %}
+
 #### agent__batch — How to Run Tools in Parallel
 
 - Use this helper to execute multiple tools in one request.
@@ -11,7 +20,7 @@
       (Tool names must match exactly, and every required parameter must be present.)
     ]
   }
-- Do not combine `agent__task_status` with your final report; send the final report on its own. ({{{metaReminderShort}}})
+- Do not combine `agent__task_status` with your final report; send the final report on its own. ({{ meta_reminder_short }})
 
 ### MANDATORY RULE FOR PARALLEL TOOL CALLS
 When gathering information from multiple independent sources, use the agent__batch tool to execute tools in parallel.

@@ -1,5 +1,7 @@
 import type { ToolOutputStats } from './types.js';
 
+import { renderPromptTemplate } from '../prompts/templates.js';
+
 // --- Grep-friendly content formatting ---
 
 const SOFT_BREAK_CHARS = 1000;
@@ -169,7 +171,12 @@ export const formatForGrep = (content: string): string => {
 // --- Handle/message formatting ---
 
 export function formatHandleMessage(handle: string, stats: ToolOutputStats): string {
-  return `Tool output is too large (${String(stats.bytes)} bytes, ${String(stats.lines)} lines, ${String(stats.tokens)} tokens).\nCall tool_output(handle = "${handle}", extract = "what to extract").\nThe handle is a relative path under the tool_output root.\nProvide precise and detailed instructions in \`extract\` about what you are looking for.`;
+  return renderPromptTemplate('toolOutputHandle', {
+    handle,
+    bytes: stats.bytes,
+    lines: stats.lines,
+    tokens: stats.tokens,
+  });
 }
 
 export function formatToolOutputSuccess(args: {
@@ -178,7 +185,12 @@ export function formatToolOutputSuccess(args: {
   mode: string;
   body: string;
 }): string {
-  return `ABSTRACT FROM TOOL OUTPUT ${args.toolName} WITH HANDLE ${args.handle}, STRATEGY:${args.mode}:\n\n${args.body}`;
+  return renderPromptTemplate('toolOutputSuccess', {
+    tool_name: args.toolName,
+    handle: args.handle,
+    mode: args.mode,
+    body: args.body,
+  });
 }
 
 export function formatToolOutputFailure(args: {
@@ -187,5 +199,10 @@ export function formatToolOutputFailure(args: {
   mode: string;
   error: string;
 }): string {
-  return `TOOL_OUTPUT FAILED FOR ${args.toolName} WITH HANDLE ${args.handle}, STRATEGY:${args.mode}:\n\n${args.error}`;
+  return renderPromptTemplate('toolOutputFailure', {
+    tool_name: args.toolName,
+    handle: args.handle,
+    mode: args.mode,
+    error: args.error,
+  });
 }

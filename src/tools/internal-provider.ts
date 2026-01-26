@@ -14,17 +14,9 @@ const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
 import { describeFormatParameter, formatPromptValue, getFormatSchema } from '../formats.js';
 import { FINAL_REPORT_TOOL } from '../internal-tools.js';
-import {
-  FINAL_REPORT_FIELDS_JSON,
-  FINAL_REPORT_FIELDS_SLACK,
-  finalReportFieldsText,
-  renderMandatoryXmlFinalRules,
-  renderTaskStatusToolInstructions,
-} from '../llm-messages.js';
 import { LOG_EVENTS } from '../logging/log-events.js';
-import { buildMetaPromptGuidance } from '../plugins/meta-guidance.js';
-import { loadBatchInstructions, loadFinalReportInstructions } from '../prompts/loader.js';
-import { normalizeSlackMessages, SLACK_BLOCK_KIT_SCHEMA } from '../slack-block-kit.js';
+import { renderPromptTemplate } from '../prompts/templates.js';
+import { normalizeSlackMessages, SLACK_BLOCK_KIT_MRKDWN_RULES, SLACK_BLOCK_KIT_SCHEMA } from '../slack-block-kit.js';
 import { truncateToBytes } from '../truncation.js';
 import { parseJsonRecord, parseJsonValueDetailed } from '../utils.js';
 
@@ -52,7 +44,6 @@ interface InternalToolProviderOptions {
 
 const TASK_STATUS_TOOL = 'agent__task_status';
 const BATCH_TOOL = 'agent__batch';
-const ROUTER_HANDOFF_TOOL = 'router__handoff-to';
 const SLACK_BLOCK_KIT_FORMAT: OutputFormatId = 'slack-block-kit';
 const DEFAULT_PARAMETERS_DESCRIPTION = 'Parameters for selected tool';
 const VALID_TASK_STATUSES = ['starting', 'in-progress', 'completed'] as const;
@@ -119,41 +110,11 @@ export class InternalToolProvider extends ToolProvider {
     const tools: MCPTool[] = [];
     try {
       if (!this.disableProgressTool) {
+        const schema = this.renderToolSchema('toolSchemaTaskStatus', {});
         tools.push({
           name: TASK_STATUS_TOOL,
-          description: 'Provides live feedback to the user about your accomplishments, pending items and goals. This tool is only updating the user. It does not perform any other actions.',
-          inputSchema: {
-            type: 'object',
-            additionalProperties: false,
-            required: ['status', 'done', 'pending', 'now', 'ready_for_final_report', 'need_to_run_more_tools'],
-            properties: {
-              status: {
-                type: 'string',
-                enum: [...VALID_TASK_STATUSES],
-                description: 'The current status of the task assigned to you (pick one of the values)'
-              },
-              done: {
-                type: 'string',
-                description: 'What has been completed so far (up to 15 words). MUST be in the user\'s language - this is visible to users.'
-              },
-              pending: {
-                type: 'string',
-                description: 'What remains to be done (up to 15 words). MUST be in the user\'s language - this is visible to users.'
-              },
-              now: {
-                type: 'string',
-                description: 'Your immediate step - what you want to achieve with the tools you call now? (up to 15 words). MUST be in the user\'s language - this is visible to users.'
-              },
-              ready_for_final_report: {
-                type: 'boolean',
-                description: 'Set to true when you have enough information to provide your final report/answer, false otherwise'
-              },
-              need_to_run_more_tools: {
-                type: 'boolean',
-                description: 'Set to true when you need to run more tools, false if you are done with tools'
-              }
-            }
-          }
+          description: schema.description ?? 'Provides live feedback to the user about your accomplishments, pending items and goals. This tool is only updating the user. It does not perform any other actions.',
+          inputSchema: schema.inputSchema
         });
       }
       // Final report: included for internal filtering (final-turn enforcement).
@@ -177,21 +138,11 @@ export class InternalToolProvider extends ToolProvider {
           }
         };
         const itemsSchema = schemas.length > 0 ? { anyOf: schemas } : fallbackItemSchema;
+        const batchSchema = this.renderToolSchema('toolSchemaBatch', { items_schema: itemsSchema });
         tools.push({
           name: BATCH_TOOL,
-          description: 'Execute multiple tools in one call, reusing the schemas of all available tools.',
-          inputSchema: {
-            type: 'object',
-            additionalProperties: false,
-            required: ['calls'],
-            properties: {
-              calls: {
-                type: 'array',
-                minItems: 1,
-                items: itemsSchema
-              }
-            }
-          }
+          description: batchSchema.description ?? 'Execute multiple tools in one call, reusing the schemas of all available tools.',
+          inputSchema: batchSchema.inputSchema,
         });
       }
       return tools;
@@ -230,242 +181,49 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   private buildInstructions(): string {
-    const lines: string[] = [];
-    const metaGuidance = buildMetaPromptGuidance(this.finalReportPluginRequirements, this.xmlSessionNonce);
-
-    // SECTION 1: Final report instructions FIRST (most critical for first-try success)
-    const schemaBlock = this.buildFinalReportSchemaBlock();
-    lines.push(loadFinalReportInstructions(
-      this.formatId,
-      this.formatDescription,
-      schemaBlock,
-      this.xmlSessionNonce,
-      this.finalReportPluginRequirements,
-    ));
-
-    // SECTION 2: Mandatory rules (reinforces critical format requirements)
-    lines.push('');
-    lines.push(renderMandatoryXmlFinalRules(metaGuidance.reminderShort));
-
-    // SECTION 3: Internal tools (only if any are available)
-    const hasProgressTool = !this.disableProgressTool;
-    const hasBatchTool = this.opts.enableBatch;
-    const hasAnyTools = hasProgressTool || hasBatchTool || this.opts.hasExternalTools === true || this.hasRouterHandoff;
-
-    // Tool limits (only when tools exist)
-    if (hasAnyTools) {
-      lines.push('');
-      lines.push('### Tool Limits');
-      if (this.opts.enableBatch) {
-        lines.push(`- You can invoke at most ${String(this.maxToolCallsPerTurn)} tools per turn/step (including those inside a batch request). Plan your tools accordingly.`);
-      } else {
-        lines.push(`- You can invoke at most ${String(this.maxToolCallsPerTurn)} tools per turn/step.`);
-      }
-    }
-
-    if (hasProgressTool || hasBatchTool || this.hasRouterHandoff) {
-      lines.push('');
-      lines.push('### Internal Tools');
-      lines.push('');
-      lines.push('The following internal tools are available. They expect valid JSON input according to their schemas.');
-
-      if (hasProgressTool) {
-        lines.push('');
-        lines.push(renderTaskStatusToolInstructions(metaGuidance.reminderShort));
-      }
-
-      if (hasBatchTool) {
-        lines.push('');
-        lines.push(loadBatchInstructions(hasProgressTool, metaGuidance.reminderShort));
-      }
-
-      if (this.hasRouterHandoff) {
-        lines.push('');
-        lines.push(`#### ${ROUTER_HANDOFF_TOOL} — Router Handoff`);
-        lines.push('- This tool delegates the ORIGINAL user request to another agent.');
-        lines.push('- The destination agent will answer the user directly.');
-        lines.push('- You can include an optional message for the destination agent.');
-      }
-    }
-
-    return lines.join('\n');
-  }
-
-  private buildFinalReportFormatFields(): string {
-    if (this.formatId === 'json') {
-      return FINAL_REPORT_FIELDS_JSON;
-    } else if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
-      return FINAL_REPORT_FIELDS_SLACK;
-    }
-    return finalReportFieldsText(this.formatId);
-  }
-
-  private buildFinalReportSchemaBlock(): string {
-    if (this.formatId === 'json' && this.opts.expectedJsonSchema !== undefined) {
-      return `\n**Your response must be a JSON object matching this schema:**\n\`\`\`json\n${JSON.stringify(this.opts.expectedJsonSchema, null, 2)}\n\`\`\`\n`;
-    }
-    if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
-      // For XML mode: show messages array schema directly (no wrapper - format is in XML attribute)
-      // The LLM should output just the messages array [...] inside the XML tags
-      const slackSchema = getFormatSchema(SLACK_BLOCK_KIT_FORMAT);
-      if (slackSchema !== undefined) {
-        return `\n**Your response must be a JSON array (the messages array directly, NOT wrapped in an object):**\n\`\`\`json\n${JSON.stringify(slackSchema, null, 2)}\n\`\`\`\n`;
-      }
-    }
-    return '';
+    const expectedSchema = this.opts.expectedJsonSchema ?? { type: 'object' };
+    const slackSchema = getFormatSchema(SLACK_BLOCK_KIT_FORMAT) ?? { type: 'array', items: {} };
+    return renderPromptTemplate('internalTools', {
+      format_id: this.formatId,
+      format_description: this.formatDescription,
+      expected_json_schema: expectedSchema,
+      slack_schema: slackSchema,
+      slack_mrkdwn_rules: SLACK_BLOCK_KIT_MRKDWN_RULES,
+      plugin_requirements: this.finalReportPluginRequirements,
+      nonce: this.xmlSessionNonce,
+      max_tool_calls_per_turn: this.maxToolCallsPerTurn,
+      batch_enabled: this.opts.enableBatch,
+      progress_tool_enabled: !this.disableProgressTool,
+      has_external_tools: this.opts.hasExternalTools === true,
+      has_router_handoff: this.hasRouterHandoff,
+    });
   }
 
   private buildFinalReportTool(): MCPTool {
-    const metadataProp = { type: 'object' };
-    // Description is for internal use only - tool is filtered from SDK ToolSet
-    const baseDescription = 'Internal: final report tool for turn enforcement.';
-
-    if (this.formatId === 'json') {
-      const schema = this.opts.expectedJsonSchema ?? { type: 'object' };
-      return {
-        name: FINAL_REPORT_TOOL,
-        description: `${baseDescription} Use the exact JSON expected. ${this.formatDescription}`.trim(),
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['report_format', 'content_json'],
-          properties: {
-            report_format: { type: 'string', const: 'json', description: this.formatDescription },
-            content_json: schema,
-            metadata: metadataProp,
-          },
-        },
-      };
-    }
-
-    if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
-      const desc = `${baseDescription} Use Slack mrkdwn (not GitHub markdown). ${this.formatDescription}`.trim();
-      return {
-        name: FINAL_REPORT_TOOL,
-        description: desc,
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['report_format', 'messages'],
-          properties: {
-            report_format: { type: 'string', const: SLACK_BLOCK_KIT_FORMAT, description: this.formatDescription },
-            messages: {
-              type: 'array',
-              minItems: 1,
-              maxItems: 20,
-              items: {
-                type: 'object',
-                additionalProperties: true,
-                required: ['blocks'],
-                properties: {
-                  blocks: {
-                    type: 'array',
-                    minItems: 1,
-                    maxItems: 50,
-                    items: {
-                      oneOf: [
-                        {
-                          type: 'object',
-                          additionalProperties: true,
-                          required: ['type', 'text'],
-                          properties: {
-                            type: { const: 'section' },
-                            text: {
-                              type: 'object',
-                              additionalProperties: true,
-                              required: ['type', 'text'],
-                              properties: {
-                                type: { const: 'mrkdwn' },
-                                text: { type: 'string', minLength: 1, maxLength: 2900 }
-                              }
-                            },
-                            fields: {
-                              type: 'array',
-                              maxItems: 10,
-                              items: {
-                                type: 'object',
-                                additionalProperties: true,
-                                required: ['type', 'text'],
-                                properties: {
-                                  type: { const: 'mrkdwn' },
-                                  text: { type: 'string', minLength: 1, maxLength: 2000 }
-                                }
-                              }
-                            }
-                          }
-                        },
-                        {
-                          type: 'object',
-                          additionalProperties: true,
-                          required: ['type', 'text'],
-                          properties: {
-                            type: { const: 'header' },
-                            text: {
-                              type: 'object',
-                              additionalProperties: true,
-                              required: ['type', 'text'],
-                              properties: {
-                                type: { const: 'plain_text' },
-                                text: { type: 'string', minLength: 1, maxLength: 150 }
-                              }
-                            }
-                          }
-                        },
-                        {
-                          type: 'object',
-                          additionalProperties: true,
-                          required: ['type'],
-                          properties: { type: { const: 'divider' } }
-                        },
-                        {
-                          type: 'object',
-                          additionalProperties: true,
-                          required: ['type', 'elements'],
-                          properties: {
-                            type: { const: 'context' },
-                            elements: {
-                              type: 'array',
-                              minItems: 1,
-                              maxItems: 10,
-                              items: {
-                                type: 'object',
-                                additionalProperties: true,
-                                required: ['type', 'text'],
-                                properties: {
-                                  type: { const: 'mrkdwn' },
-                                  text: { type: 'string', minLength: 1, maxLength: 2000 }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      ]
-                    }
-                  }
-                }
-              }
-            },
-            metadata: metadataProp,
-          },
-        },
-      };
-    }
-
-    const descSuffix = this.formatDescription.length > 0 ? this.formatDescription : this.formatId;
+    const schema = this.renderToolSchema('toolSchemaFinalReport', {
+      format_id: this.formatId,
+      format_description: this.formatDescription,
+      expected_json_schema: this.opts.expectedJsonSchema ?? { type: 'object' },
+      slack_schema: getFormatSchema(SLACK_BLOCK_KIT_FORMAT) ?? { type: 'array', items: {} },
+    });
     return {
       name: FINAL_REPORT_TOOL,
-      description: `${baseDescription}. ${descSuffix}`.trim(),
-      inputSchema: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['report_format', 'report_content'],
-        properties: {
-          report_format: { type: 'string', const: this.formatId, description: this.formatDescription },
-          report_content: { type: 'string', minLength: 1, description: 'MANDATORY: the content of your final report.' },
-          metadata: metadataProp,
-        },
-      },
+      description: schema.description ?? 'Internal: final report tool for turn enforcement.',
+      inputSchema: schema.inputSchema,
     };
+  }
+
+  private renderToolSchema(
+    key: 'toolSchemaFinalReport' | 'toolSchemaTaskStatus' | 'toolSchemaBatch',
+    context: Record<string, unknown>,
+  ): { description?: string; inputSchema: Record<string, unknown> } {
+    const raw = renderPromptTemplate(key, context);
+    const parsed = parseJsonRecord(raw);
+    if (parsed === undefined) {
+      throw new Error(`Tool schema template '${key}' did not produce a JSON object`);
+    }
+    const description = typeof parsed.description === 'string' ? parsed.description : undefined;
+    return { description, inputSchema: parsed };
   }
 
   private validateAndProcessTaskStatus(parameters: Record<string, unknown>): { status: TaskStatusValue; done: string; pending: string; now: string; ready_for_final_report: boolean; need_to_run_more_tools: boolean; taskStatusCompleted: boolean; statusMessage: string } {
@@ -1005,19 +763,8 @@ export class InternalToolProvider extends ToolProvider {
     }
 
     if (!this.disableProgressTool && !summaries.some((summary) => summary.name === TASK_STATUS_TOOL)) {
-      pushSchema(TASK_STATUS_TOOL, {
-        type: 'object',
-        additionalProperties: false,
-        required: ['status', 'done', 'pending', 'now', 'ready_for_final_report', 'need_to_run_more_tools'],
-        properties: {
-          status: { type: 'string', enum: ['starting', 'in-progress', 'completed'] },
-          done: { type: 'string' },
-          pending: { type: 'string' },
-          now: { type: 'string' },
-          ready_for_final_report: { type: 'boolean' },
-          need_to_run_more_tools: { type: 'boolean' }
-        }
-      });
+      const fallbackSchema = this.renderToolSchema('toolSchemaTaskStatus', {}).inputSchema;
+      pushSchema(TASK_STATUS_TOOL, fallbackSchema);
     }
 
     this.cachedBatchSchemas = { schemas, summaries };

@@ -28,7 +28,6 @@ import { shouldStreamOutput } from '../../headends/shared-event-filter.js';
 import { resolveIncludes } from '../../include-resolver.js';
 import { DEFAULT_TOOL_INPUT_SCHEMA } from '../../input-contract.js';
 import { LLMClient } from '../../llm-client.js';
-import { XML_NEXT_SLUGS } from '../../llm-messages-xml-next.js';
 import { unknownToolFailureMessage } from '../../llm-messages.js';
 import { AnthropicProvider } from '../../llm-providers/anthropic.js';
 import { BaseLLMProvider, type ResponseMessage } from '../../llm-providers/base.js';
@@ -390,7 +389,8 @@ const baseCreate = AIAgentSession.create.bind(AIAgentSession);
 const COVERAGE_ALIAS_BASENAME = 'parent.ai';
 const TRUNCATION_MARKER_PATTERN = /\[···TRUNCATED \d+ (?:bytes|chars|tokens)···\]/;
 const CONFIG_FILE_NAME = 'config.json';
-const INCLUDE_DIRECTIVE_TOKEN = '${include:';
+const LEGACY_INCLUDE_DIRECTIVE_TOKEN = '${include:';
+const LIQUID_INCLUDE_DIRECTIVE_TOKEN = '{% render';
 const FINAL_REPORT_CALL_ID = 'agent-final-report';
 const MCP_TEST_REMOTE = 'mcp:test:test';
 const RATE_LIMIT_FINAL_CONTENT = 'Final report after rate limit.';
@@ -437,9 +437,9 @@ const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
 // Prompt + instructions currently estimate to ~2198 tokens (ctx + new, schema excluded from projection).
-const THRESHOLD_CONTEXT_WINDOW_BELOW = 2258; // limit = 2258 - 8 - 32 = 2218 (> projected ~2198)
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 2238; // limit = 2238 - 8 - 32 = 2198 (matches projected)
-const THRESHOLD_CONTEXT_WINDOW_ABOVE = 2218; // limit = 2218 - 8 - 32 = 2178 (< projected ~2198)
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 826; // limit = 826 - 8 - 32 = 786 (> projected ~766)
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 806; // limit = 806 - 8 - 32 = 766 (matches projected)
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 788; // limit = 788 - 8 - 32 = 748 (< projected ~768)
 const PREFLIGHT_CONTEXT_WINDOW = 80;
 const PREFLIGHT_BUFFER_TOKENS = 8;
 const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;
@@ -4388,7 +4388,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const nestedIncludePath = path.join(partialDir, 'nested.md');
         fs.writeFileSync(nestedIncludePath, nestedIncludeMarker);
         const mainIncludePath = path.join(partialDir, 'main.md');
-        fs.writeFileSync(mainIncludePath, ['Part1 include content.', '${include:nested.md}', ''].join('\n'));
+        fs.writeFileSync(mainIncludePath, ['Part1 include content.', "{% render 'nested.md' %}", ''].join('\n'));
 
         const subAgentPath = path.join(tempDir, 'sub-agent.ai');
         fs.writeFileSync(subAgentPath, [
@@ -4398,7 +4398,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           `  - primary/${MODEL_NAME}`,
           '---',
           'Sub-agent body start.',
-          '${include:partials/nested.md}',
+          "{% render 'partials/nested.md' %}",
           '',
         ].join('\n'));
 
@@ -4432,7 +4432,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           '  - sub-agent.ai',
           '---',
           'Main body start.',
-          '${include:partials/main.md}',
+          "{% render 'partials/main.md' %}",
           '',
         ].join('\n'));
 
@@ -4470,7 +4470,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         ].join('\n'));
 
         const loaded = loadAgent(mainPromptPath, undefined, { configPath });
-        invariant(!loaded.systemTemplate.includes(INCLUDE_DIRECTIVE_TOKEN), 'System prompt should not contain include directives post-flatten.');
+        invariant(!loaded.systemTemplate.includes(LIQUID_INCLUDE_DIRECTIVE_TOKEN), 'System prompt should not contain include directives post-flatten.');
         invariant(loaded.systemTemplate.includes('Main body start.'), 'System prompt missing main body content.');
         invariant(loaded.systemTemplate.includes('Part1 include content.'), 'System prompt missing included content.');
         invariant(loaded.systemTemplate.includes(nestedIncludeMarker), 'System prompt missing nested include content.');
@@ -4514,7 +4514,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(internalChildren instanceof Map, 'Sub-agent registry children map missing.');
         const subAgentInfo = internalChildren.get('sub-agent');
         invariant(subAgentInfo !== undefined, 'Sub-agent child info missing.');
-        invariant(!subAgentInfo.systemTemplate.includes('${include:'), 'Sub-agent system prompt should not contain include directives post-flatten.');
+        invariant(!subAgentInfo.systemTemplate.includes(LIQUID_INCLUDE_DIRECTIVE_TOKEN), 'Sub-agent system prompt should not contain include directives post-flatten.');
         invariant(subAgentInfo.systemTemplate.includes('Sub-agent body start.'), 'Sub-agent system prompt missing body content.');
         invariant(subAgentInfo.systemTemplate.includes(nestedIncludeMarker), 'Sub-agent system prompt missing nested include content.');
 
@@ -4650,7 +4650,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
           '---',
           FRONTMATTER_BODY_PREFIX,
-          '${include:include.md}',
+          "{% render 'include.md' %}",
           FRONTMATTER_BODY_SUFFIX,
           '',
         ].join('\n'));
@@ -4873,7 +4873,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     id: RUN_TEST_MAX_TURN_LIMIT,
     description: 'Session max-turn enforcement when no final report is produced.',
     configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults: NonNullable<Configuration['defaults']>, context: TestContext) => {
-      context.FINAL_TURN_INSTRUCTION = XML_NEXT_SLUGS.final_turn_max_turns.message;
+      context.FINAL_TURN_INSTRUCTION = 'You are not allowed to run more turns.';
       context.capturedRequests = [] as TurnRequest[];
       context.capturedLogs = [] as LogEntry[];
       configuration.providers = {
@@ -6754,21 +6754,21 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const nestedPath = path.join(includeBaseDir, 'nested.txt');
         fs.writeFileSync(nestedPath, 'Nested content', 'utf-8');
         fs.writeFileSync(subPath, `Sub before {{include:${path.basename(nestedPath)}}} after`, 'utf-8');
-        const baseContent = `Start ${INCLUDE_DIRECTIVE_TOKEN}${path.basename(subPath)}} End`;
+        const baseContent = `Start ${LEGACY_INCLUDE_DIRECTIVE_TOKEN}${path.basename(subPath)}} End`;
         const resolved = resolveIncludes(baseContent, includeBaseDir);
         let forbiddenError: string | undefined;
         let depthError: string | undefined;
         try {
-          resolveIncludes(`${INCLUDE_DIRECTIVE_TOKEN}.env}`, includeBaseDir);
+          resolveIncludes(`${LEGACY_INCLUDE_DIRECTIVE_TOKEN}.env}`, includeBaseDir);
         } catch (e) {
           forbiddenError = e instanceof Error ? e.message : String(e);
         }
         const depthPathA = path.join(includeBaseDir, 'a.txt');
         const depthPathB = path.join(includeBaseDir, 'b.txt');
-        fs.writeFileSync(depthPathA, `${INCLUDE_DIRECTIVE_TOKEN}b.txt}`, 'utf-8');
-        fs.writeFileSync(depthPathB, `${INCLUDE_DIRECTIVE_TOKEN}a.txt}`, 'utf-8');
+        fs.writeFileSync(depthPathA, `${LEGACY_INCLUDE_DIRECTIVE_TOKEN}b.txt}`, 'utf-8');
+        fs.writeFileSync(depthPathB, `${LEGACY_INCLUDE_DIRECTIVE_TOKEN}a.txt}`, 'utf-8');
         try {
-          resolveIncludes(`${INCLUDE_DIRECTIVE_TOKEN}a.txt}`, includeBaseDir, 2);
+          resolveIncludes(`${LEGACY_INCLUDE_DIRECTIVE_TOKEN}a.txt}`, includeBaseDir, 2);
         } catch (e) {
           depthError = e instanceof Error ? e.message : String(e);
         }
@@ -6924,9 +6924,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const stage2Name = path.basename(stage2);
       const stage1Name = path.basename(stage1);
       fs.writeFileSync(stage3, 'Stage3 final', 'utf-8');
-      fs.writeFileSync(stage2, `Mid ${INCLUDE_DIRECTIVE_TOKEN}${stage3Name}}`, 'utf-8');
-      fs.writeFileSync(stage1, `Top ${INCLUDE_DIRECTIVE_TOKEN}${stage2Name}}`, 'utf-8');
-      const resolved = resolveIncludes(`${INCLUDE_DIRECTIVE_TOKEN}${stage1Name}}`, tempDir);
+      fs.writeFileSync(stage2, `Mid ${LEGACY_INCLUDE_DIRECTIVE_TOKEN}${stage3Name}}`, 'utf-8');
+      fs.writeFileSync(stage1, `Top ${LEGACY_INCLUDE_DIRECTIVE_TOKEN}${stage2Name}}`, 'utf-8');
+      const resolved = resolveIncludes(`${LEGACY_INCLUDE_DIRECTIVE_TOKEN}${stage1Name}}`, tempDir);
       includeAsyncSummary = { staged: resolved, depth: 3 };
       const configPath = path.join(tempDir, CONFIG_FILE_NAME);
       fs.writeFileSync(configPath, JSON.stringify({ providers: {}, mcpServers: {} }), 'utf-8');
@@ -10679,14 +10679,14 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-budget-truncation-preserves-output',
     configure: (configuration, sessionConfig, defaults) => {
-      // Keep the window above the prompt (~2900 tokens) but below prompt+budget payload (~3407)
+      // Keep the window above the prompt (~1900 tokens) but below prompt+budget payload
       // so budget truncation triggers after the tool call instead of at preflight.
       configuration.providers = {
         [PRIMARY_PROVIDER]: {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 3600,
+              contextWindow: 3000,
               tokenizer: 'approximate',
             },
           },

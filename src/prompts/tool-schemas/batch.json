@@ -1,0 +1,19 @@
+{% comment %}
+Variables:
+- items_schema: JSON schema object for batch items
+{% endcomment %}
+{
+  "description": "Execute multiple tools in one call, reusing the schemas of all available tools.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "calls"
+  ],
+  "properties": {
+    "calls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {{ items_schema | json_pretty }}
+    }
+  }
+}

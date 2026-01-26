@@ -30,7 +30,7 @@ Do NOT rush into conclusions. Investigate every possibility, seek code-based evi
 Always cite concrete evidence: path/url, file, line numbers.
 
 <netdata_repositories>
-${include:docs/netdata-repos.md}
+{% render 'docs/netdata-repos.md' %}
 </netdata_repositories>
 
 <netdata_documentation_paths>
@@ -174,15 +174,15 @@ For complex questions that require investigation:
 </research_strategy>
 
 <netdata_product_description>
-${include:docs/netdata-complete-product-description.md}
+{% render 'docs/netdata-complete-product-description.md' %}
 </netdata_product_description>
 
 <special_netdata_support_instructions>
-${include:docs/netdata-support-instructions.md}
+{% render 'docs/netdata-support-instructions.md' %}
 </special_netdata_support_instructions>
 
 <final_compliance>
-${include:final-compliance.md}
+{% render 'final-compliance.md' %}
 </final_compliance>
 
 ---
@@ -275,8 +275,8 @@ Iterate as necessary until your final report/answer is fully and accurately addr
 
 ---
 
-Output format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
+Output format: XML-NEXT.FORMAT
+Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 
 ---
 

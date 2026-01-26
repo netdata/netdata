@@ -16,6 +16,7 @@ export interface XmlNextPayload {
   nonce: string;
   turn: number;
   maxTurns?: number;
+  maxTools?: number;
   tools: { name: string; schema?: Record<string, unknown> }[];
   slotTemplates: XmlSlotTemplate[];
   taskStatusToolEnabled: boolean;
@@ -151,6 +152,7 @@ export function renderXmlNext(payload: XmlNextPayload): string {
     nonce: payload.nonce,
     turn: payload.turn,
     maxTurns: payload.maxTurns,
+    maxTools: payload.maxTools,
     attempt: payload.attempt,
     maxRetries: payload.maxRetries,
     contextPercentUsed: payload.contextPercentUsed,

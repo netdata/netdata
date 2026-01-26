@@ -19,7 +19,7 @@ reasoning: high
 ---
 Your Mission: Extract deal signals from meeting transcripts to assess opportunity quality and progression.
 
-${include:tone-and-language.md}
+{% render 'tone-and-language.md' %}
 
 ---
 
@@ -51,12 +51,12 @@ IMPORTANT: fireflies does not allow searching transcripts using company domain n
 - "No budget"
 - No senior stakeholder present
 
-${include:netdata-employees.md}
+{% render 'netdata-employees.md' %}
 
 ---
 
-Output Format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
+Output Format: XML-NEXT.FORMAT
+Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 
 Your report should be evidence-based, with quotes, not opinions. If unsure, state it explicitly.
 

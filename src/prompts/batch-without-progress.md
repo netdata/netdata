@@ -1,3 +1,8 @@
+{% comment %}
+Variables:
+- (none)
+{% endcomment %}
+
 #### agent__batch — How to Run Tools in Parallel
 
 - Use this helper to execute multiple tools in one request.

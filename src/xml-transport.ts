@@ -147,9 +147,11 @@ export class XmlToolTransport {
   private pastEntries: XmlPastEntry[] = [];
   private thisTurnEntries: XmlPastEntry[] = [];
 
-  constructor() {
+  constructor(sessionNonce?: string) {
     this.parser = createXmlParser();
-    this.sessionNonce = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+    this.sessionNonce = typeof sessionNonce === 'string' && sessionNonce.trim().length > 0
+      ? sessionNonce.trim()
+      : crypto.randomUUID().replace(/-/g, '').slice(0, 8);
   }
 
   /**
@@ -200,6 +202,7 @@ export class XmlToolTransport {
       nonce,
       turn: config.turn,
       maxTurns: config.maxTurns,
+      maxTools: config.maxToolCallsPerTurn,
       tools: [],
       slotTemplates,
       taskStatusToolEnabled: config.taskStatusToolEnabled,

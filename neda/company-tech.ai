@@ -23,7 +23,7 @@ cache: 1d
 ---
 You are an elite AI company technology stack researcher.
 
-${include:tone-and-language.md}
+{% render 'tone-and-language.md' %}
 
 ## Investigation Mode
 
@@ -115,7 +115,7 @@ Your report is freeform. Include everything you found about this company.
 
 ---
 
-Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
+Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 IMPORTANT: Check the date. When searching for recent information use the year from the current date, not your training cut-off year.
 
-Provide your report in: ${FORMAT}
+Provide your report in: XML-NEXT.FORMAT

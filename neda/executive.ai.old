@@ -20,12 +20,12 @@ Your Mission: provide business intelligence.
 
 ---
 
-${include:tone-and-language.md}
+{% render 'tone-and-language.md' %}
 
 ---
 
-Output Format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
+Output Format: XML-NEXT.FORMAT
+Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 
 Tools at Hand:
 - execute_sql: Run SQL queries on production data
@@ -6409,8 +6409,8 @@ ORDER BY
 --   run_date
 
 -- SELECT CURRENT_DATE() AS calculation_date,
--- DATE('{{ ds }}') AS run_date,
--- DATE('{{ ds }}') AS metric_date,
+-- DATE('[[ ds ]]') AS run_date,
+-- DATE('[[ ds ]]') AS metric_date,
 -- "business_reachable_node_sum_avg" AS metric_name,
 SELECT
 ae_reachable_nodes AS metric_value,
@@ -6442,8 +6442,8 @@ and ae_reachable_nodes > 0
 --   run_date
 
 -- SELECT CURRENT_DATE() AS calculation_date,
--- DATE('{{ ds }}') AS run_date,
--- DATE('{{ ds }}') AS metric_date,
+-- DATE('[[ ds ]]') AS run_date,
+-- DATE('[[ ds ]]') AS metric_date,
 -- "business_reachable_node_sum_avg" AS metric_name,
 SELECT
 ae_reachable_nodes AS metric_value,
@@ -6561,8 +6561,8 @@ ORDER BY
 --   run_date
 
 SELECT CURRENT_DATE() AS calculation_date,
--- DATE('{{ ds }}') AS run_date,
--- DATE('{{ ds }}') AS metric_date,
+-- DATE('[[ ds ]]') AS run_date,
+-- DATE('[[ ds ]]') AS metric_date,
 -- "business_reachable_node_sum_avg" AS metric_name,
 ae_reachable_nodes AS metric_value,
 "asat" AS metric_granularity,
@@ -6682,8 +6682,8 @@ ORDER BY
 
   SELECT 
   -- CURRENT_DATE() AS calculation_date,
-    -- DATE('{{ ds }}') AS run_date,
-    -- DATE('{{ ds }}') AS metric_date,
+    -- DATE('[[ ds ]]') AS run_date,
+    -- DATE('[[ ds ]]') AS metric_date,
     -- "business_reachable_node_sum_avg" AS metric_name,
     ae_reachable_nodes AS metric_value,
     -- "asat" AS metric_granularity,
@@ -6895,8 +6895,8 @@ ORDER BY
 
 
   SELECT CURRENT_DATE() AS calculation_date,
-    -- DATE('{{ ds }}') AS run_date,
-    -- DATE('{{ ds }}') AS metric_date,
+    -- DATE('[[ ds ]]') AS run_date,
+    -- DATE('[[ ds ]]') AS metric_date,
     -- "business_reachable_node_sum_avg" AS metric_name,
     ae_reachable_nodes AS metric_value,
     "asat" AS metric_granularity,

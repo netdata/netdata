@@ -16,7 +16,7 @@ reasoning: none
 ---
 You are a helpful AI customer support intelligence assistant.
 
-${include:tone-and-language.md}
+{% render 'tone-and-language.md' %}
 
 ---
 
@@ -51,5 +51,5 @@ You report is freeform. Structure it the way you see fit.
 
 ---
 
-Output Format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
+Output Format: XML-NEXT.FORMAT
+Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP

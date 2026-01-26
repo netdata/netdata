@@ -20,6 +20,7 @@ import type {
 } from '../types.js';
 import type { ToolOutputConfig, ToolOutputExtractionResult, ToolOutputMode, ToolOutputTarget } from './types.js';
 
+import { renderPromptTemplate } from '../prompts/templates.js';
 import { SessionTreeBuilder, type SessionNode } from '../session-tree.js';
 import { stripLeadingThinkBlock } from '../think-tag-filter.js';
 import { TRUNCATE_PREVIEW_BYTES, buildTruncationPrefix, truncateToBytes, truncateToBytesWithInfo } from '../truncation.js';
@@ -78,13 +79,6 @@ interface ToolOutputExtractOptions {
   parentContext?: ToolExecutionContext;
 }
 
-const NO_RELEVANT_DATA = 'NO RELEVANT DATA FOUND';
-const SOURCE_TOOL_LABEL = 'THE DATA COME FROM A TOOL OUTPUT AS OF THE FOLLOWING REQUEST';
-const WHAT_TO_EXTRACT_LABEL = 'WHAT TO EXTRACT';
-const OUTPUT_FORMAT_LABEL = 'OUTPUT FORMAT (required)';
-const OUTPUT_WRAPPER_LABEL = '- Emit exactly one XML final-report wrapper:';
-const NO_RELEVANT_LABEL = '- If no relevant data exists your XML final report must contain:';
-const EXTRACTOR_PREAMBLE = 'You are a helpful information extractor and summarizer. ';
 const MODE_AUTO: ToolOutputMode = 'auto';
 const MODE_FULL_CHUNKED: Exclude<ToolOutputMode, 'auto'> = 'full-chunked';
 const MODE_READ_GREP: Exclude<ToolOutputMode, 'auto'> = 'read-grep';
@@ -101,36 +95,18 @@ const buildMapSystemPrompt = (args: {
   extract: string;
   nonce: string;
 }): string => {
-  return [
-    EXTRACTOR_PREAMBLE +
-    'Your mission is to find relevant information from a document chunk you receive from the user.' +
-    'CRITICAL: DO NOT CALL ANY TOOLS. YOU DONT HAVE ANY TOOLS. Read the information the user provided and extract the relevant data.' +
-    'Think step by step and make sure you extract all relevant information',
-    '',
-    SOURCE_TOOL_LABEL,
-    `- Name: ${args.toolName}`,
-    `- Arguments (verbatim JSON): ${args.toolArgsJson}`,
-    '',
-    'DOCUMENT STATS',
-    `- Bytes: ${String(args.stats.bytes)}`,
-    `- Lines: ${String(args.stats.lines)}`,
-    `- Tokens (estimate): ${String(args.stats.tokens)}`,
-    '',
-    'CHUNK INFO',
-    `- Index: ${String(args.chunkIndex)} of ${String(args.chunkTotal)}`,
-    `- Overlap: ${String(args.overlapPercent)}%`,
-    '',
-    WHAT_TO_EXTRACT_LABEL,
-    args.extract,
-    '',
-    OUTPUT_FORMAT_LABEL,
-    OUTPUT_WRAPPER_LABEL,
-    `  <ai-agent-${args.nonce}-FINAL format="text"> ... </ai-agent-${args.nonce}-FINAL>`,
-    '- Put your extracted result inside the wrapper.',
-    NO_RELEVANT_LABEL,
-    `  ${NO_RELEVANT_DATA}`,
-    '  <short description of what kind of information is available in this chunk>',
-  ].join('\n');
+  return renderPromptTemplate('toolOutputMapSystem', {
+    tool_name: args.toolName,
+    tool_args_json: args.toolArgsJson,
+    stats_bytes: args.stats.bytes,
+    stats_lines: args.stats.lines,
+    stats_tokens: args.stats.tokens,
+    chunk_index: args.chunkIndex,
+    chunk_total: args.chunkTotal,
+    overlap_percent: args.overlapPercent,
+    extract: args.extract,
+    nonce: args.nonce,
+  });
 };
 
 const buildReduceSystemPrompt = (args: {
@@ -140,49 +116,21 @@ const buildReduceSystemPrompt = (args: {
   chunkOutputs: string;
   nonce: string;
 }): string => {
-  return [
-    EXTRACTOR_PREAMBLE +
-    'Your mission is to synthesize multiple chunks of information from the document chunks you receive from the user.' +
-    'CRITICAL: DO NOT CALL ANY TOOLS. Read the information the user provided and extract the relevant data.' +
-    'Think step by step and make sure you extract all relevant information',
-    '',
-    SOURCE_TOOL_LABEL,
-    `- Name: ${args.toolName}`,
-    `- Arguments (verbatim JSON): ${args.toolArgsJson}`,
-    '',
-    WHAT_TO_EXTRACT_LABEL,
-    args.extract,
-    '',
-    'CHUNK OUTPUTS',
-    args.chunkOutputs,
-    '',
-    OUTPUT_FORMAT_LABEL,
-    OUTPUT_WRAPPER_LABEL,
-    `  <ai-agent-${args.nonce}-FINAL format="text"> ... </ai-agent-${args.nonce}-FINAL>`,
-    NO_RELEVANT_LABEL,
-    `  ${NO_RELEVANT_DATA}`,
-    '  <short description of what kind of information is available across the chunks>',
-  ].join('\n');
+  return renderPromptTemplate('toolOutputReduceSystem', {
+    tool_name: args.toolName,
+    tool_args_json: args.toolArgsJson,
+    extract: args.extract,
+    chunk_outputs: args.chunkOutputs,
+    nonce: args.nonce,
+  });
 };
 
 const buildReadGrepSystemPrompt = (args: {
   nonce: string;
 }): string => {
-  return [
-    EXTRACTOR_PREAMBLE +
-    'Your mission is to extract relevant information from a handle file using the tools provided. ' +
-    'Think step by step and make sure you extract all relevant information. Do not give up on the first match. ' +
-    'CRITICAL: YOU MUST ENSURE YOU EXTRACTED ALL POSSIBLE RELEVANT INFORMATION BY USING THE TOOLS PROVIDED.',
-    '',
-    'You run in an isolated environment. If the extracted information includes other tools or filenames, you do not have access to them. ' +
-    'Your job is to extract the required information from the single filename/handle you have been provided with. ' +
-    'Do not attempt any other calls to any other file. Your tools will work exclusively on the filename/handle provided to you. ' +
-    'They will not work on any other file.',
-    '',
-    OUTPUT_FORMAT_LABEL,
-    OUTPUT_WRAPPER_LABEL,
-    `  <ai-agent-${args.nonce}-FINAL format="text"> ... </ai-agent-${args.nonce}-FINAL>`,
-  ].join('\n');
+  return renderPromptTemplate('toolOutputReadGrepSystem', {
+    nonce: args.nonce,
+  });
 };
 
 const buildReadGrepUserPrompt = (args: {
@@ -191,30 +139,12 @@ const buildReadGrepUserPrompt = (args: {
   handle: string;
   extract: string;
 }): string => {
-  return [
-    WHAT_TO_EXTRACT_LABEL,
-    args.extract,
-    '',
-    'FROM WHERE TO EXTRACT IT',
-    `The handle file is named \`${args.handle}\`, and you have direct access to it via your tools \`tool_output_fs__Read\` and \`tool_output_fs__Grep\`. Both tools accept a filename. Pass this filename to them.`,
-    '',
-    'ADDITIONAL CONTEXT',
-    'Use the following information ONLY for context:',
-    `The handle file has been created from an oversized output of a tool called \`${args.toolName}\` of another agent.`,
-    `That tool was run with parameters: ${args.toolArgsJson}`,
-    '',
-    'WHAT IS EXPECTED FROM YOU',
-    'You are expected to use your tools (`tool_output_fs__Read` and `tool_output_fs__Grep`) to find relevant and potentially useful information and provide your findings with your final report/answer.',
-    '',
-    'WHAT TO REPORT IF YOU FIND NOTHING RELEVANT',
-    `If you can't find anything relevant, your final report must start with: ${NO_RELEVANT_DATA}`,
-    'Then provide a short description of what kind of information is available in the handle file.',
-    '',
-    'IMPORTANT LIMITATION',
-    'You operate in an isolated environment with access only to the handle file specified above. ' +
-    'If the handle file contains references to other files or tools, you cannot access them. ' +
-    'Focus exclusively on extracting information from the handle file content itself.',
-  ].join('\n');
+  return renderPromptTemplate('toolOutputReadGrepUser', {
+    tool_name: args.toolName,
+    tool_args_json: args.toolArgsJson,
+    handle: args.handle,
+    extract: args.extract,
+  });
 };
 
 const extractFinalContent = (nonce: string, raw: string): string | undefined => {
@@ -469,7 +399,7 @@ export class ToolOutputExtractor {
     });
     const reduceMessages: ConversationMessage[] = [
       { role: 'system', content: reduceSystem },
-      { role: 'user', content: 'Synthesize the extracted content into a final answer.' },
+      { role: 'user', content: renderPromptTemplate('toolOutputReduceUser', {}) },
     ];
     const reduceRequest = this.buildLlmRequest(reduceMessages, target, onChunk);
     let reduceResult: TurnResult;
@@ -575,12 +505,12 @@ export class ToolOutputExtractor {
     const childOpTree = result.opTree;
     const content = result.finalReport?.content ?? '';
     if (!result.success || content.trim().length === 0) {
-      const message = result.error ?? 'read-grep extraction failed';
+      const message = result.error ?? renderPromptTemplate('toolOutputErrorReadGrepFailed', {});
       return { ok: false, text: message, mode: MODE_READ_GREP, childOpTree };
     }
     const isSynthetic = (result as { finalReportSource?: string }).finalReportSource === 'synthetic';
     if (isSynthetic) {
-      return { ok: false, text: 'read-grep extraction produced synthetic final report', mode: MODE_READ_GREP, childOpTree };
+      return { ok: false, text: renderPromptTemplate('toolOutputErrorReadGrepSynthetic', {}), mode: MODE_READ_GREP, childOpTree };
     }
     return { ok: true, text: content.trim(), mode: MODE_READ_GREP, childOpTree };
   }
@@ -618,7 +548,7 @@ export class ToolOutputExtractor {
   }
 
   private truncateResult(content: string, reason: string): { text: string; warning: string } {
-    const warning = `WARNING: tool_output fallback to truncate (${reason}).`;
+    const warning = renderPromptTemplate('toolOutputWarningTruncate', { reason });
     const limit = this.deps.toolResponseMaxBytes;
     if (typeof limit !== 'number' || limit <= 0) {
       return { text: content, warning };

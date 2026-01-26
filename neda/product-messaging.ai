@@ -294,9 +294,9 @@ Find strong messaging that addresses the key pain-points of the industry/segment
 
 ---
 
-${include:docs/netdata.md}
+{% render 'docs/netdata.md' %}
 
 ---
 
-Current date and time: ${DATETIME}, day ${DAY}. Important: the year is 2025, not 2024 (unix epoch: ${TIMESTAMP})
-Provide your report in ${FORMAT}
+Current date and time: XML-NEXT.DATETIME, day XML-NEXT.DAY. Important: the year is 2025, not 2024 (unix epoch: XML-NEXT.TIMESTAMP)
+Provide your report in XML-NEXT.FORMAT

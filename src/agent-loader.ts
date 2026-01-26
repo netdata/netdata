@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -13,14 +14,14 @@ import { sha256Hex } from './cache/hash.js';
 import { stableStringify } from './cache/stable-stringify.js';
 import { parseCacheDurationMsStrict } from './cache/ttl.js';
 import { buildUnifiedConfiguration, discoverLayers, resolveDefaults, type ResolvedConfigLayer } from './config-resolver.js';
-import { parseFrontmatter, parseList, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
-import { resolveIncludes } from './include-resolver.js';
+import { parseFrontmatter, parseList, parsePairs } from './frontmatter.js';
 import { DEFAULT_TOOL_INPUT_SCHEMA, DEFAULT_TOOL_INPUT_SCHEMA_JSON, cloneJsonSchema, cloneOptionalJsonSchema } from './input-contract.js';
 import { isReservedAgentName } from './internal-tools.js';
 import { validateOrchestrationGraph } from './orchestration/cycle-detection.js';
 import { resolveEffectiveOptions } from './options-resolver.js';
 import { buildEffectiveOptionsSchema } from './options-schema.js';
 import { prepareFinalReportPluginDescriptors } from './plugins/loader.js';
+import { collectTemplateSourcesFromContent, createTemplateEngine, loadTemplate, renderTemplate, templateKeyFromFilePath } from './prompts/template-engine.js';
 import { openApiToRestTools, parseOpenAPISpec } from './tools/openapi-importer.js';
 import { queueManager } from './tools/queue-manager.js';
 import { clampToolName, sanitizeToolName } from './utils.js';
@@ -34,6 +35,7 @@ export interface LoadedAgent {
   promptPath: string;
   agentHash: string;
   systemTemplate: string;
+  systemNonce: string;
   description?: string;
   usage?: string;
   toolName?: string;
@@ -107,6 +109,37 @@ function deriveAgentIdFromPath(p: string): string {
   return path.basename(p).replace(/\.[^.]+$/, '');
 }
 
+const buildSystemNonce = (): string => crypto.randomBytes(4).toString('hex');
+
+const splitPromptContent = (raw: string): { header: string; body: string } => {
+  let text = raw;
+  let header = '';
+  if (text.startsWith('#!')) {
+    const nl = text.indexOf('\n');
+    const shebang = nl >= 0 ? text.slice(0, nl + 1) : text;
+    header += shebang;
+    text = nl >= 0 ? text.slice(nl + 1) : '';
+  }
+  const fmMatch = /^---\n[\s\S]*?\n---\n/.exec(text);
+  if (fmMatch !== null) {
+    header += fmMatch[0];
+    text = text.slice(fmMatch[0].length);
+  }
+  return { header, body: text };
+};
+
+const renderPromptBodyLiquid = (body: string, baseDir: string, filePath: string): string => {
+  if (INCLUDE_DIRECTIVE_PATTERN.test(body)) {
+    throw new Error(`Prompt '${filePath}' uses legacy include syntax. Use Liquid {% render 'path' %} includes instead.`);
+  }
+  const entryPath = path.resolve(baseDir, filePath);
+  const templates = collectTemplateSourcesFromContent(baseDir, { filePath: entryPath, source: body });
+  const engine = createTemplateEngine(templates);
+  const templateKey = templateKeyFromFilePath(baseDir, entryPath);
+  const template = loadTemplate(engine, templateKey);
+  return renderTemplate(engine, template, {});
+};
+
 function resolveToolName(promptPath: string, configured?: string): string {
   if (typeof configured === 'string' && configured.trim().length > 0) {
     return configured;
@@ -132,19 +165,19 @@ function ensureUniqueToolName(
 function loadFlattenedPrompt(promptPath: string): { content: string; systemTemplate: string } {
   const raw = readFileText(promptPath);
   const baseDir = path.dirname(promptPath);
-  const content = resolveIncludes(raw, baseDir);
-  if (INCLUDE_DIRECTIVE_PATTERN.test(content)) {
-    throw new Error(`Prompt '${promptPath}' still contains include directives after expansion. Check for circular includes or malformed syntax.`);
-  }
-  return { content, systemTemplate: extractBodyWithoutFrontmatter(content) };
+  const { header, body } = splitPromptContent(raw);
+  const renderedBody = renderPromptBodyLiquid(body, baseDir, promptPath);
+  const content = `${header}${renderedBody}`;
+  return { content, systemTemplate: renderedBody };
 }
 
 function flattenPromptContent(content: string, baseDir?: string): { content: string; systemTemplate: string } {
-  const resolved = resolveIncludes(content, baseDir);
-  if (INCLUDE_DIRECTIVE_PATTERN.test(resolved)) {
-    throw new Error('Provided prompt content still contains include directives after expansion.');
-  }
-  return { content: resolved, systemTemplate: extractBodyWithoutFrontmatter(resolved) };
+  const base = baseDir ?? process.cwd();
+  const { header, body } = splitPromptContent(content);
+  const syntheticPath = path.join(base, '__inline__.ai');
+  const renderedBody = renderPromptBodyLiquid(body, base, syntheticPath);
+  const rendered = `${header}${renderedBody}`;
+  return { content: rendered, systemTemplate: renderedBody };
 }
 
 export interface GlobalOverrides {
@@ -369,6 +402,8 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
 
   const fmBaseDir = frontmatterBaseDir ?? baseDir;
   const fm = parseFrontmatter(promptContent, { baseDir: fmBaseDir });
+  const systemNonce = buildSystemNonce();
+  const runtimePromptHashes: string[] = [];
 
   const fmModels = parsePairs(fm?.options?.models);
   const fmTools = parseList(fm?.options?.tools);
@@ -819,6 +854,8 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       targets: selectedTargets,
       tools: selectedTools,
       agentId: agentName,
+      systemNonce,
+      runtimePromptHashes,
       subAgents: subAgentInfos,
       orchestration: orchestrationConfig,
       orchestrationRuntime,
@@ -932,6 +969,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     promptPath,
     agentHash,
     systemTemplate,
+    systemNonce,
     description: fm?.description,
     usage: fm?.usage,
     toolName: resolveToolName(promptPath, fm?.toolName),

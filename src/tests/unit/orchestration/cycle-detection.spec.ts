@@ -19,6 +19,7 @@ function createMockAgent(
     promptPath: "test-agent.ai",
     agentHash: "hash",
     systemTemplate: "You are a test agent.",
+    systemNonce: "deadbeef",
     description: "Test agent",
     usage: "Test usage",
     input: { format: "json", schema: {} },

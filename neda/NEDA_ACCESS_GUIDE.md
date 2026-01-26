@@ -681,7 +681,7 @@ FORMAT="${3:-markdown}"
 
 curl -G "http://10.20.1.106:8800/v1/${AGENT}" \
   --data-urlencode "q=${QUERY}" \
-  --data-urlencode "format=${FORMAT}"
+  --data-urlencode "format=XML-NEXT.FORMAT"
 ```
 
 Usage:

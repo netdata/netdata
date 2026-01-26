@@ -15,7 +15,7 @@
  * - XML_TEMPLATES: Templates for XML-mode tool/report rendering
  */
 
-import { loadMandatoryRules, loadTaskStatusInstructions } from './prompts/loader.js';
+import { renderPromptTemplate } from './prompts/templates.js';
 // Re-export Slack rules from slack-block-kit.ts for backward compatibility
 export { SLACK_BLOCK_KIT_MRKDWN_RULES, SLACK_BLOCK_KIT_MRKDWN_RULES_TITLE } from './slack-block-kit.js';
 
@@ -57,8 +57,7 @@ export const formatSchemaMismatchSummary = (value?: string): string => {
  * CONDITION: final_report tool called && expectedFormat === 'json'
  *            && content_json is undefined after parsing attempts
  */
-export const FINAL_REPORT_JSON_REQUIRED =
-  'Final report must be a JSON object that matches the provided schema. Provide a JSON object (not a string) and retry.';
+export const FINAL_REPORT_JSON_REQUIRED = renderPromptTemplate('toolResultFinalReportJsonRequired', {});
 
 /**
  * When Slack Block Kit messages array is missing.
@@ -67,8 +66,7 @@ export const FINAL_REPORT_JSON_REQUIRED =
  * CONDITION: final_report tool called && expectedFormat === 'slack-block-kit'
  *            && messagesArray is undefined or empty
  */
-export const FINAL_REPORT_SLACK_MESSAGES_MISSING =
-  'Slack Block Kit final report is missing a `messages` array. Provide valid Block Kit messages and retry.';
+export const FINAL_REPORT_SLACK_MESSAGES_MISSING = renderPromptTemplate('toolResultFinalReportSlackMissing', {});
 
 /**
  * Check if a tool name matches the XML final report tag pattern.
@@ -86,8 +84,7 @@ export const isXmlFinalReportTagName = (name: string): boolean =>
  * Error when the XML wrapper tag is called as a tool instead of being output as text.
  * Used in: llm-providers/base.ts injectMissingToolResults()
  */
-export const XML_WRAPPER_CALLED_AS_TOOL_RESULT =
-  'You called the XML wrapper tag as if it were a tool. The XML wrapper is NOT a tool — it is plain text you output directly in your response. Do NOT use tool calling for your final report/answer. Instead, write the XML tags directly in your response text, exactly as instructed.';
+export const XML_WRAPPER_CALLED_AS_TOOL_RESULT = renderPromptTemplate('toolResultXmlWrapperCalledAsTool', {});
 
 /**
  * Placeholder for tool output when context budget exceeded.
@@ -97,7 +94,7 @@ export const XML_WRAPPER_CALLED_AS_TOOL_RESULT =
  * CONDITION: Tool output would exceed context budget
  * (content.length > 0 && content !== TOOL_NO_OUTPUT checked to avoid counting)
  */
-export const TOOL_NO_OUTPUT = '(tool failed: context window budget exceeded)';
+export const TOOL_NO_OUTPUT = renderPromptTemplate('toolOutputNoOutput', {});
 
 const UNKNOWN_TOOL_FAILURE_PREFIX = 'Unknown tool `';
 
@@ -106,25 +103,12 @@ const UNKNOWN_TOOL_FAILURE_PREFIX = 'Unknown tool `';
  * Returned as tool result to the LLM.
  * Used in: session-tool-executor.ts, session-turn-runner.ts, tests
  */
-export const unknownToolFailureMessage = (name: string): string =>
-  `${UNKNOWN_TOOL_FAILURE_PREFIX}${name}\`: you called tool \`${name}\` but it does not match any of the tools in this session. Review carefully the tools available and copy the tool name verbatim. Tool names are made of a namespace (or tool provider) + double underscore + the tool name of this namespace/provider. When you call a tool, you must include both the namespace/provider and the tool name. You may now repeat the call to the tool, but this time you MUST supply the exact tool name as given in your list of tools.`;
+export const unknownToolFailureMessage = (name: string): string => (
+  renderPromptTemplate('toolResultUnknownTool', { tool_name: name })
+);
 
 export const isUnknownToolFailureMessage = (content: string): boolean =>
   content.includes(UNKNOWN_TOOL_FAILURE_PREFIX);
-
-// =============================================================================
-// =============================================================================
-// TASK STATUS INSTRUCTIONS
-// Single source of truth for agent__task_status tool guidance.
-// Used by: internal-provider.ts (system prompt, tool schema), xml-tools.ts (XML-NEXT)
-// =============================================================================
-
-export const renderTaskStatusToolInstructions = (metaReminderShort: string): string =>
-  loadTaskStatusInstructions(metaReminderShort);
-
-export const TASK_STATUS_TOOL_BATCH_RULES = `- Include at most one task_status per batch
-- task_status updates the user; to perform actions, use other tools in the same batch
-- task_status can be called standalone to track task progress`;
 
 // XML System Notices (moved from xml-tools.ts to keep all LLM-facing strings here)
 export interface XmlPastTemplateEntry {
@@ -141,43 +125,14 @@ export interface XmlPastTemplatePayload {
 }
 
 export const renderXmlPastTemplate = (past: XmlPastTemplatePayload): string => {
-  const lines: string[] = [];
-  lines.push('# System Notice');
-  lines.push('');
-  lines.push('## Previous Turn Tool Responses');
-  lines.push('');
-  past.entries.forEach((entry) => {
-    const duration = entry.durationText !== undefined ? ` ${entry.durationText}` : '';
-    lines.push(`<ai-agent-${entry.slotId} tool="${entry.tool}" status="${entry.status}"${duration}>`);
-    lines.push('<request>');
-    lines.push(entry.request);
-    lines.push('</request>');
-    lines.push('<response>');
-    lines.push(entry.response);
-    lines.push('</response>');
-    lines.push(`</ai-agent-${entry.slotId}>`);
-    lines.push('');
+  return renderPromptTemplate('xmlPast', {
+    entries: past.entries.map((entry) => ({
+      slot_id: entry.slotId,
+      tool: entry.tool,
+      status: entry.status,
+      duration_text: entry.durationText ?? '',
+      request: entry.request,
+      response: entry.response,
+    })),
   });
-  return lines.join('\n');
 };
-
-// =============================================================================
-// FINAL REPORT INSTRUCTIONS
-// Single source of truth for agent__final_report guidance.
-// Used by: internal-provider.ts (system prompt)
-// =============================================================================
-
-/**
- * Format-specific required fields for tool-based instructions.
- */
-export const FINAL_REPORT_FIELDS_JSON =
-  '  - `report_format`: "json".\n  - `content_json`: MUST match the required JSON Schema exactly.';
-
-export const FINAL_REPORT_FIELDS_SLACK =
-  '  - `report_format`: "slack-block-kit".\n  - `messages`: array of Slack Block Kit messages (no plain `report_content`).\n    • Up to 20 messages, each with ≤50 blocks. Sections/context mrkdwn ≤2000 chars; headers plain_text ≤150.';
-
-export const finalReportFieldsText = (formatId: string): string =>
-  `  - \`report_format\`: "${formatId}".\n  - \`report_content\`: the content of your final report, in the requested format.`;
-
-export const renderMandatoryXmlFinalRules = (metaReminderShort: string): string =>
-  loadMandatoryRules(metaReminderShort);

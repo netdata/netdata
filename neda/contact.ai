@@ -83,12 +83,12 @@ Although your task is to provide a complete professional profile for the individ
 1. Provide enough context to your `web-search` terms. It is an AI agent that executes them and it needs to know a much details are possible.
 2. The `web-search` agent performs multiple searches to bring the requested information. Use its response to understand what it did and do not repeat searches already performed.
 
-${include:tone-and-language.md}
+{% render 'tone-and-language.md' %}
 
-Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
+Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 IMPORTANT: Check the date. When searching for recent information use the year from the current date, not your training cut-off year.
 
-Provide your report in this format: ${FORMAT}
+Provide your report in this format: XML-NEXT.FORMAT
 
 ---
 

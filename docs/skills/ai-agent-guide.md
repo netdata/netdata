@@ -155,21 +155,23 @@ Note: `storeDir` is ignored; root always `/tmp/ai-agent-<run-hash>`.
 
 ## 3. Prompt Variables
 
-### Available in All Contexts
+### XML-NEXT Runtime Values (use in `.ai` prompts)
 
-| Placeholder | Description |
-|-------------|-------------|
-| `${DATETIME}` | RFC 3339 local timestamp |
-| `${TIMESTAMP}` | Unix epoch seconds |
-| `${DAY}` | Local weekday name (e.g., "Friday") |
-| `${TIMEZONE}` | Olson timezone ID |
-| `${FORMAT}` | **Always include** - output format instructions |
-| `${MAX_TURNS}` | Effective `maxTurns` after overrides |
-| `${MAX_TOOLS}` | Effective `maxToolCallsPerTurn` (≥1) |
+Use these **static markers** in prompts. Values arrive in the XML-NEXT block each turn.
 
-### CLI-Only Variables
+| Marker | Description |
+|--------|-------------|
+| `XML-NEXT.DATETIME` | RFC 3339 local timestamp |
+| `XML-NEXT.TIMESTAMP` | Unix epoch seconds |
+| `XML-NEXT.DAY` | Local weekday name (e.g., "Friday") |
+| `XML-NEXT.TIMEZONE` | Olson timezone ID |
+| `XML-NEXT.FORMAT` | **Always include** - output format instructions |
+| `XML-NEXT.MAX_TURNS` | Effective `maxTurns` after overrides |
+| `XML-NEXT.MAX_TOOLS` | Effective `maxToolCallsPerTurn` (≥1) |
 
-Available only in **inline prompts** (command-line strings), NOT in `.ai` files:
+### CLI-Only Expansion (for `--system` / `--user`)
+
+Placeholders in CLI prompt files are expanded at runtime.
 
 | Placeholder | Description |
 |-------------|-------------|
@@ -180,30 +182,33 @@ Available only in **inline prompts** (command-line strings), NOT in `.ai` files:
 | `${HOSTNAME}` | Machine hostname |
 | `${USER}` | Current username |
 
-Example: `ai-agent "Hello from ${USER} on ${HOSTNAME}"`
+Also supported (equivalent to `${VAR}`): `{{VAR}}`.
+
+Example: `ai-agent --system system.md "Hello from ${USER} on ${HOSTNAME}"`
 
 ### Variable Behavior
-- **Unknown variables**: Variables not recognized are left unchanged (literal `${UNKNOWN}` in output)
-- **Environment placeholders**: `${VAR_NAME}` in config resolved from `.ai-agent.env` then `process.env`
-- **Unresolved config placeholders**: Throw error with layer origin information
+- **`.ai` prompts**: Liquid templates run at load-time. Unknown variables or missing includes **fail agent load**.
+- **CLI prompts**: Unknown placeholders remain unchanged (literal `${UNKNOWN}`).
+- **Environment placeholders**: `${VAR_NAME}` in config resolved from `.ai-agent.env` then `process.env`.
+- **Unresolved config placeholders**: Throw error with layer origin information.
 
 ### Include Directive
 ```yaml
-${include:relative/path.md}
+{% render 'relative/path.md' %}
 # or
-{{include:relative/path.md}}
+{% include 'relative/path.md' %}
 ```
-- Paths relative to current file's directory
+- Paths are relative to the current file's directory
 - Max depth: 8 levels
 - Cannot include files named exactly `.env` (security protection)
 - Files like `.env.local`, `.env.production` are NOT blocked
-- Resolved before variable substitution
+- Includes are resolved at load-time for `.ai` prompts only
 - **Include errors**: Missing file → error with path; circular → error with chain; depth exceeded → error at level 8
 
 ### FORMAT Values by Context
 
-| Context | `${FORMAT}` expands to |
-|---------|------------------------|
+| Context | `XML-NEXT.FORMAT` describes |
+|---------|-----------------------------|
 | Terminal (TTY) | TTY-compatible monospaced text with ANSI colors |
 | Piped output | Plain text without formatting |
 | JSON expected | `json` |
@@ -215,12 +220,12 @@ ${include:relative/path.md}
 ### Example Prompt
 ```markdown
 ## Operating Context
-- Today is ${DAY} (${DATETIME} in ${TIMEZONE}).
-- You have up to ${MAX_TURNS} tool turns.
-- Per turn you can make up to ${MAX_TOOLS} tool calls.
-- Deliver the final response in ${FORMAT}.
+- Today is XML-NEXT.DAY (XML-NEXT.DATETIME in XML-NEXT.TIMEZONE).
+- You have up to XML-NEXT.MAX_TURNS tool turns.
+- Per turn you can make up to XML-NEXT.MAX_TOOLS tool calls.
+- Deliver the final response in XML-NEXT.FORMAT.
 
-${include:shared/safety-rules.md}
+{% render 'shared/safety-rules.md' %}
 ```
 
 ---

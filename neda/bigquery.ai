@@ -24,12 +24,12 @@ Your Mission: Query production data to validate infrastructure claims, analyze s
 
 ---
 
-${include:tone-and-language.md}
+{% render 'tone-and-language.md' %}
 
 ---
 
-Output Format: ${FORMAT}
-Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
+Output Format: XML-NEXT.FORMAT
+Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 
 ---
 
@@ -339,7 +339,7 @@ When you receive a user request, you MUST go through this process:
 4. You are expected to answer any question related to the available data. You MUST think carefully the safest way to combine the data, starting from the provided examples/templates and following **Template Usage Decision (canonical)**, then cross-checking that the result is consistent.
 
 ## How to run queries
-- Use `bigquery__execute_sql` with "dry_run": false; inline ISO dates (DATE 'YYYY-MM-DD'). Templates show `{{from_date}}`/`{{to_date}}`/`{{snapshot_date}}`: substitute concrete ISO dates before executing (no @parameters sent to the tool).
+- Use `bigquery__execute_sql` with "dry_run": false; inline ISO dates (DATE 'YYYY-MM-DD'). Templates show `[[from_date]]`/`[[to_date]]`/`[[snapshot_date]]`: substitute concrete ISO dates before executing (no @parameters sent to the tool).
 - Use **only** `bigquery__execute_sql`. Do **not** invent or call non-existent tools (e.g., `bigquery__execute_sqljson`, `execute_sql_json`).
 - The **only valid BigQuery tool name** is exactly `bigquery__execute_sql`. Do not append any suffixes or extra characters.
 - **HARD STOP:** Tool names must match exactly. If you need extra explanation, put it in `notes` and still call `bigquery__execute_sql`.
@@ -378,7 +378,7 @@ This is the **single source of truth** for date windows, explicit `to_date` prec
 - **Fixed‑lookback templates are exceptions**: when a template specifies a lookback window (e.g., 90/120 days), follow it exactly; `to_date` still ends the window after applying the effective‑to‑date logic above.
 
 **SQL substitution rules**
-- Replace `{{from_date}}`, `{{to_date}}`, `{{snapshot_date}}` with **effective** dates before execution.
+- Replace `[[from_date]]`, `[[to_date]]`, `[[snapshot_date]]` with **effective** dates before execution.
 - If a template includes `run_date < CURRENT_DATE()` and the user explicitly asks to include today, change it to `run_date <= CURRENT_DATE()`.
 - When an explicit `to_date` is provided, do **not** allow `CURRENT_DATE()` to **extend beyond** `effective_to_date`; `CURRENT_DATE()` may remain only as a safety cap that does not widen the window.
 
@@ -420,7 +420,7 @@ This is the **single source of truth** for when to use templates verbatim vs ada
 **Step 1 — Exact template match**
 - If a request **exactly matches** a documented template (same metric intent, same scope, same output shape), use the template **verbatim**.
 - Allowed edits to a “verbatim” template:
-  - Replace `{{from_date}}`, `{{to_date}}`, `{{snapshot_date}}` with concrete ISO dates **after** applying **Date Handling Precedence (canonical)**.
+  - Replace `[[from_date]]`, `[[to_date]]`, `[[snapshot_date]]` with concrete ISO dates **after** applying **Date Handling Precedence (canonical)**.
   - Apply include‑today comparator change (`< CURRENT_DATE()` → `<= CURRENT_DATE()`) **only** when the user explicitly asks to include today.
   - Add SQL aliases to match schema field names (no new fields, no logic changes).
   - If a stat template does not exist but single‑row is required, apply `ORDER BY date DESC LIMIT 1` (this counts as an **adaptation**; disclose it).
@@ -1087,7 +1087,7 @@ These appear as sources in ETL; access may depend on permissions.
 - `bm_mrr` = bl_arr / 12
 - `bn_inactive_days_bins_prev_date` = IF (
         old_inactive_days_bins != ak_inactive_days_bins,
-        '{{ ds }}',
+        '[[ ds ]]',
         old_inactive_days_bins_prev_date
     )
 - `bo_plan_change_completed_date`
@@ -2400,7 +2400,7 @@ WITH daily AS (
     MAX(IF(metric_name = 'ai_credits_space_revenue', metric_value, NULL)) AS ai_bundles,
     MAX(IF(metric_name = 'onprem_arr', metric_value, NULL)) AS onprem_arr
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
     AND run_date > DATE '2023-11-28'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
@@ -2476,9 +2476,9 @@ SELECT
   run_date AS date,
   __METRIC_SELECT__
 FROM `netdata-analytics-bi.metrics.metrics_daily`
-WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
   AND run_date < CURRENT_DATE()
-  {{min_date_filter}}
+  [[min_date_filter]]
 GROUP BY run_date
 HAVING __NON_NULL_PREDICATE__
 ORDER BY date DESC
@@ -2536,9 +2536,9 @@ SELECT
   run_date AS date,
   __METRIC_SELECT__
 FROM `netdata-analytics-bi.metrics.metrics_daily`
-WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
   AND run_date < CURRENT_DATE()
-  {{min_date_filter}}
+  [[min_date_filter]]
 GROUP BY run_date
 HAVING __NON_NULL_PREDICATE__
 ORDER BY date;
@@ -2577,15 +2577,15 @@ Use this when you must **preserve missing dates** in a time range (null‑preser
 ```sql
 WITH dates AS (
   SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '[[from_date]]', DATE '[[to_date]]')) AS date
 ),
 series AS (
   SELECT
     run_date AS date,
     __METRIC_SELECT__
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
-    {{min_date_filter}}
+  WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
+    [[min_date_filter]]
   GROUP BY run_date
 )
 SELECT
@@ -2593,7 +2593,7 @@ SELECT
   __OUTPUT_SELECT__
 FROM dates d
 LEFT JOIN series s ON d.date = s.date
-WHERE d.date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+WHERE d.date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
 ORDER BY d.date;
 ```
 
@@ -2629,14 +2629,14 @@ Use this when the user asks for **7/30/90 growth %** over a window. It preserves
 ```sql
 WITH dates AS (
   SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '[[from_date]]', DATE '[[to_date]]')) AS date
 ),
 series AS (
   SELECT
     run_date AS date,
     __METRIC_EXPR__ AS metric
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
     AND run_date > DATE '2023-11-28'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
@@ -2651,9 +2651,9 @@ calc AS (
 )
 SELECT
   d.date,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 7 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_7 END AS pct_7,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 30 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_30 END AS pct_30,
-  CASE WHEN DATE_SUB(d.date, INTERVAL 90 DAY) < DATE '{{from_date}}' THEN NULL ELSE c.pct_90 END AS pct_90
+  CASE WHEN DATE_SUB(d.date, INTERVAL 7 DAY) < DATE '[[from_date]]' THEN NULL ELSE c.pct_7 END AS pct_7,
+  CASE WHEN DATE_SUB(d.date, INTERVAL 30 DAY) < DATE '[[from_date]]' THEN NULL ELSE c.pct_30 END AS pct_30,
+  CASE WHEN DATE_SUB(d.date, INTERVAL 90 DAY) < DATE '[[from_date]]' THEN NULL ELSE c.pct_90 END AS pct_90
 FROM dates d
 LEFT JOIN calc c ON d.date = c.date
 WHERE d.date < CURRENT_DATE()
@@ -2674,7 +2674,7 @@ WITH series AS (
     run_date AS date,
     MAX(IF(metric_name = 'onprem_customers', metric_value, NULL)) AS customers
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
 ),
@@ -2702,7 +2702,7 @@ LIMIT 1;
 ```
 WITH dates AS (
   SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '[[from_date]]', DATE '[[to_date]]')) AS date
 ),
 realized AS (
   SELECT
@@ -2712,7 +2712,7 @@ realized AS (
     MAX(IF(metric_name = 'arr_homelab_discount', metric_value, NULL)) AS homelab,
     MAX(IF(metric_name = 'ai_credits_space_revenue', metric_value, NULL)) AS ai_bundles
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
     AND run_date > DATE '2023-11-28'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
@@ -2752,7 +2752,7 @@ ORDER BY date;
 ```
 WITH dates AS (
   SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '[[from_date]]', DATE '[[to_date]]')) AS date
 ),
 realized AS (
   SELECT
@@ -2762,7 +2762,7 @@ realized AS (
     MAX(IF(metric_name = 'arr_homelab_discount', metric_value, NULL)) AS homelab,
     MAX(IF(metric_name = 'ai_credits_space_revenue', metric_value, NULL)) AS ai_bundles
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
     AND run_date > DATE '2023-11-28'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
@@ -2805,7 +2805,7 @@ LIMIT 1;
 ```
 WITH dates AS (
   SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '[[from_date]]', DATE '[[to_date]]')) AS date
 ),
 realized AS (
   SELECT
@@ -2815,7 +2815,7 @@ realized AS (
     MAX(IF(metric_name = 'ai_credits_space_revenue', metric_value, NULL)) AS ai_bundles,
     MAX(IF(metric_name = 'onprem_arr', metric_value, NULL)) AS onprem_arr
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
     AND run_date > DATE '2023-11-28'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
@@ -2857,7 +2857,7 @@ WITH series AS (
     MAX(IF(metric_name = 'ai_credits_space_revenue', metric_value, NULL)) AS ai_bundles,
     MAX(IF(metric_name = 'onprem_arr', metric_value, NULL)) AS onprem_arr
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
     AND run_date > DATE '2023-11-28'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
@@ -2922,7 +2922,7 @@ FROM ends;
 ```
 WITH dates AS (
   SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '[[from_date]]', DATE '[[to_date]]')) AS date
 ),
 realized AS (
   SELECT
@@ -2932,7 +2932,7 @@ realized AS (
     MAX(IF(metric_name = 'arr_homelab_discount', metric_value, NULL)) AS homelab,
     MAX(IF(metric_name = 'ai_credits_space_revenue', metric_value, NULL)) AS ai_bundles
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
     AND run_date > DATE '2023-11-28'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
@@ -2981,10 +2981,10 @@ ORDER BY date;
 
 ## Template: realized_arr_deltas_7_30_90 (use verbatim for 7/30/90-day realized ARR deltas)
 ```
--- Inputs: {{to_date}} (DATE). Window is fixed: last 90 days ending at {{to_date}} (usually yesterday). Do **not** change the 90-day span to 7/30 or to a user-provided shorter window.
+-- Inputs: [[to_date]] (DATE). Window is fixed: last 90 days ending at [[to_date]] (usually yesterday). Do **not** change the 90-day span to 7/30 or to a user-provided shorter window.
 WITH dates AS (
   SELECT d AS date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE_SUB(DATE '{{to_date}}', INTERVAL 90 DAY), DATE '{{to_date}}')) AS d
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE_SUB(DATE '[[to_date]]', INTERVAL 90 DAY), DATE '[[to_date]]')) AS d
 ),
 realized AS (
   SELECT
@@ -2996,7 +2996,7 @@ realized AS (
       + COALESCE(MAX(IF(metric_name = 'onprem_arr', metric_value, NULL)), 0)
     ) AS realized_arr
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE_SUB(DATE '{{to_date}}', INTERVAL 90 DAY) AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE_SUB(DATE '[[to_date]]', INTERVAL 90 DAY) AND DATE '[[to_date]]'
     AND run_date > DATE '2023-11-28'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
@@ -3048,7 +3048,7 @@ WITH series AS (
     run_date AS date,
     __METRIC_EXPR__ AS metric
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE_SUB(DATE '{{to_date}}', INTERVAL 120 DAY) AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE_SUB(DATE '[[to_date]]', INTERVAL 120 DAY) AND DATE '[[to_date]]'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
   ORDER BY run_date
@@ -3083,7 +3083,7 @@ WITH series AS (
     run_date AS date,
     MAX(IF(metric_name IN ('subscriptions_total','total_business_subscriptions'), metric_value, NULL)) AS metric
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE_SUB(DATE '{{to_date}}', INTERVAL 120 DAY) AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE_SUB(DATE '[[to_date]]', INTERVAL 120 DAY) AND DATE '[[to_date]]'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
   ORDER BY run_date
@@ -3114,7 +3114,7 @@ SELECT
   DATE(cx_arr_realized_at) AS date,
   SUM(bq_arr_discount) AS to_be_realized
 FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{snapshot_date}}')
+WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '[[snapshot_date]]')
   AND ax_trial_ends_at IS NULL
   AND ce_plan_class IN ('Business_45d_monthly_newcomer', 'Homelab_45d_monthly_newcomer')
   AND bq_arr_discount > 0
@@ -3131,7 +3131,7 @@ SELECT
   DATE(ax_trial_ends_at) AS date,
   SUM(ae_reachable_nodes) AS reachable_nodes_sum
 FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{snapshot_date}}')
+WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '[[snapshot_date]]')
   AND ax_trial_ends_at IS NOT NULL
 GROUP BY date
 ORDER BY date
@@ -3158,7 +3158,7 @@ Use this when the user asks for **segment counts or percent mix** on a single `s
 - Percent mix = segment / total * 100 (must use SAFE_DIVIDE; no client‑side recompute).
 
 **Pitfalls / best practices**:
-- Always use `_TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{snapshot_date}}')`.
+- Always use `_TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '[[snapshot_date]]')`.
 - Do **not** re‑normalize or rescale; templates already output 0–100 percentages.
 - Always return the `check` column for percent templates.
 - Do **not** swap space counts with node sums; they are different datasets and totals.
@@ -3194,14 +3194,14 @@ Use this when the user asks for **segment counts or percent mix** on a single `s
 ```
 WITH dates AS (
   SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '[[from_date]]', DATE '[[to_date]]')) AS date
 ),
 customers AS (
   SELECT
     run_date AS date,
     MAX(IF(metric_name = 'onprem_customers', metric_value, NULL)) AS customers
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
     AND run_date > DATE '2023-11-28'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
@@ -3231,7 +3231,7 @@ LIMIT 1;
 ```
 WITH dates AS (
   SELECT date
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '{{from_date}}', DATE '{{to_date}}')) AS date
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '[[from_date]]', DATE '[[to_date]]')) AS date
 ),
 daily AS (
   SELECT
@@ -3246,7 +3246,7 @@ daily AS (
       + COALESCE(MAX(IF(metric_name = 'business_overrides_arr', metric_value, NULL)), 0)
     ) AS total_arr_discounted
   FROM `netdata-analytics-bi.metrics.metrics_daily`
-  WHERE run_date BETWEEN DATE '{{from_date}}' AND DATE '{{to_date}}'
+  WHERE run_date BETWEEN DATE '[[from_date]]' AND DATE '[[to_date]]'
     AND run_date > DATE '2023-11-28'
     AND run_date < CURRENT_DATE()
   GROUP BY run_date
@@ -3289,7 +3289,7 @@ WITH t0 AS (
     ce_plan_class AS plan_class,
     COALESCE(bq_arr_discount, 0) AS arr
   FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{from_date}}')
+  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '[[from_date]]')
 ),
 t1 AS (
   SELECT
@@ -3298,7 +3298,7 @@ t1 AS (
     ce_plan_class AS plan_class,
     COALESCE(bq_arr_discount, 0) AS arr
   FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{to_date}}')
+  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '[[to_date]]')
 ),
 joined AS (
   SELECT
@@ -3361,7 +3361,7 @@ WITH t0 AS (
     ce_plan_class AS plan_class,
     COALESCE(ae_reachable_nodes, 0) AS nodes
   FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{from_date}}')
+  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '[[from_date]]')
     AND ax_trial_ends_at IS NULL
     AND (ce_plan_class = 'Business' OR aw_sub_plan IN ('Business','Business2024.03'))
 ),
@@ -3372,7 +3372,7 @@ t1 AS (
     ce_plan_class AS plan_class,
     COALESCE(ae_reachable_nodes, 0) AS nodes
   FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{to_date}}')
+  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '[[to_date]]')
     AND ax_trial_ends_at IS NULL
     AND (ce_plan_class = 'Business' OR aw_sub_plan IN ('Business','Business2024.03'))
 ),
@@ -3434,7 +3434,7 @@ WITH t0 AS (
     ce_plan_class AS plan_class,
     COALESCE(ae_reachable_nodes, 0) AS nodes
   FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{from_date}}')
+  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '[[from_date]]')
     AND ax_trial_ends_at IS NULL
     AND ce_plan_class = 'Homelab'
 ),
@@ -3445,7 +3445,7 @@ t1 AS (
     ce_plan_class AS plan_class,
     COALESCE(ae_reachable_nodes, 0) AS nodes
   FROM `netdata-analytics-bi.watch_towers.spaces_asat_*`
-  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '{{to_date}}')
+  WHERE _TABLE_SUFFIX = FORMAT_DATE('%Y%m%d', DATE '[[to_date]]')
     AND ax_trial_ends_at IS NULL
     AND ce_plan_class = 'Homelab'
 ),

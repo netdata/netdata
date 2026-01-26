@@ -2,8 +2,10 @@ import type { ToolExecuteOptions, ToolExecuteResult, ToolKind } from '../tools/t
 import type { MCPTool } from '../types.js';
 import type { RouterToolConfig } from './types.js';
 
+import { renderPromptTemplate } from '../prompts/templates.js';
 import { ToolExecutionError } from '../tools/tool-errors.js';
 import { ToolProvider } from '../tools/types.js';
+import { parseJsonRecord } from '../utils.js';
 
 export interface RouterToolProviderOptions {
   config: RouterToolConfig;
@@ -31,28 +33,12 @@ export class RouterToolProvider extends ToolProvider {
     if (this.config.destinations.length === 0) {
       return [];
     }
+    const schema = this.renderToolSchema();
     return [
       {
         name: RouterToolProvider.FULL_TOOL_NAME,
-        description:
-          'Route the request to a destination agent, optionally with a note.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            agent: {
-              type: 'string',
-              enum: this.config.destinations,
-              description: 'The destination tool name to route to',
-            },
-            message: {
-              type: 'string',
-              description:
-                'Optional context for the destination agent (plain text)',
-            },
-          },
-          required: ['agent'],
-          additionalProperties: false,
-        },
+        description: schema.description ?? 'Route the request to a destination agent, optionally with a note.',
+        inputSchema: schema.inputSchema,
       },
     ];
   }
@@ -119,6 +105,18 @@ export class RouterToolProvider extends ToolProvider {
     if (this.config.destinations.length === 0) {
       return '';
     }
-    return `Use ${RouterToolProvider.FULL_TOOL_NAME} to route to one of: ${this.config.destinations.join(', ')}`;
+    return renderPromptTemplate('routerInstructions', { destinations: this.config.destinations });
+  }
+
+  private renderToolSchema(): { description?: string; inputSchema: Record<string, unknown> } {
+    const raw = renderPromptTemplate('toolSchemaRouter', {
+      destinations: this.config.destinations,
+    });
+    const parsed = parseJsonRecord(raw);
+    if (parsed === undefined) {
+      throw new Error('router-handoff tool schema template did not produce a JSON object');
+    }
+    const description = typeof parsed.description === 'string' ? parsed.description : undefined;
+    return { description, inputSchema: parsed };
   }
 }

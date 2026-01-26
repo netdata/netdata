@@ -140,12 +140,12 @@ Reminder: the `status` field is boolean and it only indicates if you fetched the
 
 ---
 
-${include:tone-and-language.md}
+{% render 'tone-and-language.md' %}
 
 ---
 
-Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
-Output format: ${FORMAT}
+Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
+Output format: XML-NEXT.FORMAT
 
 ---
 

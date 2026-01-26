@@ -1,0 +1,243 @@
+{% comment %}
+Variables:
+- format_id: output format id
+- format_description: output format description
+- expected_json_schema: JSON schema object for json format
+- slack_schema: Slack Block Kit schema object for messages (array)
+{% endcomment %}
+{% assign base_desc = "Internal: final report tool for turn enforcement." %}
+{% if format_id == 'json' %}
+{% assign description = base_desc | append: " Use the exact JSON expected." %}
+{% if format_description != '' %}
+{% assign description = description | append: " " | append: format_description %}
+{% endif %}
+{
+  "description": {{ description | json }},
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_format",
+    "content_json"
+  ],
+  "properties": {
+    "report_format": {
+      "type": "string",
+      "const": "json",
+      "description": {{ format_description | json }}
+    },
+    "content_json": {{ expected_json_schema | json_pretty }},
+    "metadata": {
+      "type": "object"
+    }
+  }
+}
+{% elsif format_id == 'slack-block-kit' %}
+{% assign description = base_desc | append: " Use Slack mrkdwn (not GitHub markdown)." %}
+{% if format_description != '' %}
+{% assign description = description | append: " " | append: format_description %}
+{% endif %}
+{
+  "description": {{ description | json }},
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_format",
+    "messages"
+  ],
+  "properties": {
+    "report_format": {
+      "type": "string",
+      "const": "slack-block-kit",
+      "description": {{ format_description | json }}
+    },
+    "messages": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "blocks"
+        ],
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "type",
+                    "text"
+                  ],
+                  "properties": {
+                    "type": {
+                      "const": "section"
+                    },
+                    "text": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "required": [
+                        "type",
+                        "text"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "mrkdwn"
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2900
+                        }
+                      }
+                    },
+                    "fields": {
+                      "type": "array",
+                      "maxItems": 10,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "required": [
+                          "type",
+                          "text"
+                        ],
+                        "properties": {
+                          "type": {
+                            "const": "mrkdwn"
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2000
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "type",
+                    "text"
+                  ],
+                  "properties": {
+                    "type": {
+                      "const": "header"
+                    },
+                    "text": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "required": [
+                        "type",
+                        "text"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "plain_text"
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 150
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "properties": {
+                    "type": {
+                      "const": "divider"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "type",
+                    "elements"
+                  ],
+                  "properties": {
+                    "type": {
+                      "const": "context"
+                    },
+                    "elements": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 10,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "required": [
+                          "type",
+                          "text"
+                        ],
+                        "properties": {
+                          "type": {
+                            "const": "mrkdwn"
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2000
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}
+{% else %}
+{% assign desc_suffix = format_description %}
+{% if desc_suffix == '' %}
+{% assign desc_suffix = format_id %}
+{% endif %}
+{% assign description = base_desc | append: ". " | append: desc_suffix %}
+{
+  "description": {{ description | json }},
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_format",
+    "report_content"
+  ],
+  "properties": {
+    "report_format": {
+      "type": "string",
+      "const": {{ format_id | json }},
+      "description": {{ format_description | json }}
+    },
+    "report_content": {
+      "type": "string",
+      "minLength": 1,
+      "description": "MANDATORY: the content of your final report."
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}
+{% endif %}

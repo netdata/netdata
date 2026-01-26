@@ -66,6 +66,7 @@
     "js-yaml": "^4.1.1",
     "json-schema-library": "^10.5.2",
     "jsonrepair": "^3.13.2",
+    "liquidjs": "^10.24.0",
     "ollama-ai-provider-v2": "^1.5.5",
     "redis": "^5.10.0",
     "undici": "^7.19.1",

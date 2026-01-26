@@ -753,6 +753,8 @@ export interface AIAgentSessionConfig {
   pendingHandoffCount?: number;
   systemPrompt: string;
   userPrompt: string;
+  // Static XML nonce for this agent (fixed for process lifetime)
+  systemNonce?: string;
   cacheTtlMs?: number;
   agentHash?: string;
   // Resolved output format for this session (must be provided by caller)
@@ -804,6 +806,8 @@ export interface AIAgentSessionConfig {
   executeTurnOverride?: (request: TurnRequest) => Promise<TurnResult>;
   // DI override for queue manager (for testing - enables parallel test execution)
   queueManager?: QueueManager;
+  // Mutable list of recent runtime prompt hashes (shared across sessions per agent)
+  runtimePromptHashes?: string[];
 }
 
 // Session result

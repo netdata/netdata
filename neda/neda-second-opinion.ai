@@ -34,15 +34,15 @@ The following is the context Neda, your AI user, has.
 This describes the latest developments of Netdata.
 The tools mentioned are Neda's tools. You have them here for reference.
 
-${include:neda-core.md}
+{% render 'neda-core.md' %}
 
 ---
 
-${include:tone-and-language.md}
+{% render 'tone-and-language.md' %}
 
 ---
 
 Think hard what is best.
 
-**Now:** ${DATETIME} (${DAY}) (unix epoch: ${TIMESTAMP})
+**Now:** XML-NEXT.DATETIME (XML-NEXT.DAY) (unix epoch: XML-NEXT.TIMESTAMP)
 

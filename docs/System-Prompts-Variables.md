@@ -1,6 +1,6 @@
 # Prompt Variables Reference
 
-Complete reference for all runtime variables available in system prompts.
+Reference for runtime values delivered via XML-NEXT, plus CLI-only `${VAR}` expansion.
 
 ---
 
@@ -18,20 +18,35 @@ Complete reference for all runtime variables available in system prompts.
 
 ## Overview
 
-Prompt variables let you inject dynamic values into your system prompt at runtime. They're useful for:
+Runtime values are provided via XML-NEXT each turn. Direct CLI prompts (`--system` / `--user`) still support `${VAR}` expansion.
+Use these values for:
 
 - **Context**: Provide current time, date, timezone
 - **Environment**: Include OS, architecture, working directory
 - **Self-documentation**: Show the agent its own limits (max turns, max tools)
-- **Output control**: Ensure correct output format via `${FORMAT}`
+- **Output control**: Ensure correct output format via `XML-NEXT.FORMAT`
 
-Variables are substituted after include resolution, right before the prompt is sent to the LLM.
+**Important**:
+- `.ai` system prompts are static per agent load (no `${VAR}` expansion).
+- XML-NEXT carries per-session/per-turn values.
+- CLI prompt files still support `${VAR}` expansion.
 
 ---
 
 ## Syntax
 
-Two syntaxes are supported (equivalent):
+### XML-NEXT (for `.ai` prompts)
+
+Reference runtime values as **static markers** in your prompt. The values arrive in the XML-NEXT block each turn:
+
+```markdown
+Current time: XML-NEXT.DATETIME
+Output format: XML-NEXT.FORMAT
+```
+
+### CLI prompt expansion (only for `--system` / `--user`)
+
+Two syntaxes are supported (equivalent) for CLI prompt files:
 
 ```markdown
 ${VARIABLE_NAME}
@@ -40,24 +55,23 @@ ${VARIABLE_NAME}
 
 Variables are case-sensitive and use `UPPER_SNAKE_CASE`.
 
-**Example**:
+**Example (system.md)**:
 
 ```markdown
 Current time: ${DATETIME}
-Current time: {{DATETIME}}
 ```
 
-Both produce:
+Run:
 
-```markdown
-Current time: 2025-08-31T14:30:00+03:00
+```
+ai-agent --system system.md "hello"
 ```
 
 ---
 
-## Variable Reference
+## Variable Reference (XML-NEXT)
 
-### Date and Time Variables
+### Date and Time Variables (XML-NEXT)
 
 | Variable    | Description                      | Example Value               |
 | ----------- | -------------------------------- | --------------------------- |
@@ -70,9 +84,8 @@ Current time: 2025-08-31T14:30:00+03:00
 
 - `DATETIME` includes timezone offset for unambiguous time references
 - `TIMEZONE` comes from system detection or `TZ` environment variable
-- All time values are computed at prompt load time
 
-### System Information Variables
+### System Information Variables (CLI-only)
 
 | Variable   | Description                   | Example Value                       |
 | ---------- | ----------------------------- | ----------------------------------- |
@@ -85,12 +98,10 @@ Current time: 2025-08-31T14:30:00+03:00
 
 **Notes**:
 
-- These variables are **only available when running from CLI** (not via headends)
-- They are **not injected when running via headends** (Slack, API, MCP, etc.) or the agent registry
-- `OS` attempts to read `/etc/os-release` on Linux for a friendly name
-- `USER` falls back to `USER` or `USERNAME` environment variables if `os.userInfo()` fails
+- These variables expand **only** for CLI prompt files.
+- They do **not** apply to `.ai` system prompts.
 
-### Agent Configuration Variables
+### Agent Configuration Variables (XML-NEXT)
 
 | Variable    | Description                 | Example Value |
 | ----------- | --------------------------- | ------------- |
@@ -102,7 +113,7 @@ Current time: 2025-08-31T14:30:00+03:00
 - Values come from frontmatter or defaults
 - Useful for self-aware agents that plan within constraints
 
-### Output Format Variable
+### Output Format Variable (XML-NEXT)
 
 | Variable | Description                                        |
 | -------- | -------------------------------------------------- |
@@ -110,7 +121,7 @@ Current time: 2025-08-31T14:30:00+03:00
 
 **FORMAT values by context**:
 
-| Context          | `${FORMAT}` expands to                                                                                                                                                             |
+| Context          | XML-NEXT.FORMAT value                                                                                                                                                              |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Terminal (TTY)   | `a TTY-compatible plain monospaced text response. Use literal "\\x1b[...m" sequences for ANSI colours and avoid decorative boxes. Do not output markdown. Do not wrap long lines.` |
 | Piped output     | `Plain text without any formatting or markdown. Do not wrap long lines.`                                                                                                           |
@@ -120,7 +131,7 @@ Current time: 2025-08-31T14:30:00+03:00
 | Markdown+Mermaid | `GiHub Markdown with Mermaid diagrams`                                                                                                                                             |
 | Sub-agent        | `Internal agent-to-agent exchange format (not user-facing).`                                                                                                                       |
 
-**Important**: Always include `${FORMAT}` in your prompts to ensure consistent output across all invocation contexts.
+**Important**: Always include `XML-NEXT.FORMAT` in your prompts to ensure consistent output across all invocation contexts.
 
 ---
 
@@ -138,31 +149,23 @@ models:
 You are a scheduling assistant.
 
 ## Context
-Current time: ${DATETIME}
-Day of week: ${DAY}
-Timezone: ${TIMEZONE}
+Current time: XML-NEXT.DATETIME
+Day of week: XML-NEXT.DAY
+Timezone: XML-NEXT.TIMEZONE
 
 Help users manage their calendar, considering:
 - Current day and time for availability
 - Timezone differences for international meetings
 - Business hours (9am-6pm local time)
 
-Respond in ${FORMAT}.
+Respond in XML-NEXT.FORMAT.
 ```
 
-### System Administration Agent
+### System Administration Prompt (CLI)
 
-Include system context for environment-appropriate commands:
+Use CLI-only variables for environment-specific guidance:
 
-```yaml
----
-models:
-  - openai/gpt-4o
-tools:
-  - filesystem
----
-You are a system administration assistant.
-
+```markdown
 ## System Context
 Operating system: ${OS}
 Architecture: ${ARCH}
@@ -170,14 +173,15 @@ Kernel: ${KERNEL}
 Hostname: ${HOSTNAME}
 Current directory: ${CD}
 Running as user: ${USER}
-
-Provide commands appropriate for this specific environment.
-Do not assume sudo access unless the user confirms.
-
-Respond in ${FORMAT}.
 ```
 
-**Note**: `${OS}`, `${ARCH}`, `${KERNEL}`, `${HOSTNAME}`, `${CD}`, and `${USER}` variables are **only available when running from CLI** (not via headends). They are not available when running via headends (Slack, API, MCP, etc.).
+Run:
+
+```
+ai-agent --system system.md "help me with disk cleanup"
+```
+
+**Note**: `${OS}`, `${ARCH}`, `${KERNEL}`, `${HOSTNAME}`, `${CD}`, and `${USER}` are **only available when running from CLI** (not via headends). They are not available in `.ai` prompts.
 
 ### Self-Limiting Agent
 
@@ -196,15 +200,15 @@ maxToolCallsPerTurn: 10
 You are an autonomous research agent.
 
 ## Your Operational Limits
-- Maximum turns available: ${MAX_TURNS}
-- Maximum tools per turn: ${MAX_TOOLS}
+- Maximum turns available: XML-NEXT.MAX_TURNS
+- Maximum tools per turn: XML-NEXT.MAX_TOOLS
 
 Plan your research within these constraints:
 - Prioritize the most important queries
 - Batch related tool calls in the same turn
 - Leave 2-3 turns for synthesis and reporting
 
-Respond in ${FORMAT}.
+Respond in XML-NEXT.FORMAT.
 ```
 
 ### News and Current Events Agent
@@ -221,20 +225,20 @@ tools:
 You are a news analyst.
 
 ## Context
-Current date and time: ${DATETIME}
-Unix timestamp: ${TIMESTAMP}
+Current date and time: XML-NEXT.DATETIME
+Unix timestamp: XML-NEXT.TIMESTAMP
 
 When evaluating news sources:
 - Prefer articles from the last 24 hours
 - Note the publication date of all sources
 - Flag if information might be outdated
 
-Respond in ${FORMAT}.
+Respond in XML-NEXT.FORMAT.
 ```
 
 ### Multi-Format Output Agent
 
-Rely on `${FORMAT}` for context-appropriate output:
+Rely on `XML-NEXT.FORMAT` for context-appropriate output:
 
 ```yaml
 ---
@@ -244,7 +248,7 @@ models:
 You are a report generator.
 
 ## Output Instructions
-Format your response in ${FORMAT}.
+Format your response in XML-NEXT.FORMAT.
 
 Structure all reports as:
 1. Executive Summary
@@ -261,83 +265,24 @@ based on the required output format.
 
 ## Substitution Order
 
-Processing happens in this order:
+Processing differs by prompt type:
 
-1. **Include resolution**: `${include:...}` directives are replaced with file contents
-2. **Variable substitution**: `${VAR}` and `{{VAR}}` are replaced with values
-3. **Prompt sent to LLM**: Final text is used as the system prompt
-
-This means:
-
-- Included files can contain variables (they'll be substituted)
-- Variable names cannot be dynamic (no `${${OTHER_VAR}}`)
-
-**Example**:
-
-`shared/context.md`:
-
-```markdown
-## Context
-
-Time: ${DATETIME}
-User: ${USER}
-```
-
-`agent.ai`:
-
-```yaml
----
-models:
-  - openai/gpt-4o
----
-You are an assistant.
-
-${include:shared/context.md}
-```
-
-**Step 1** - Include resolved:
-
-```markdown
-You are an assistant.
-
-## Context
-
-Time: ${DATETIME}
-User: ${USER}
-```
-
-**Step 2** - Variables substituted:
-
-```markdown
-You are an assistant.
-
-## Context
-
-Time: 2025-08-31T14:30:00+03:00
-User: costa
-```
+1. **`.ai` prompts (Liquid templates)**:
+   - Includes are resolved at load-time.
+   - Liquid variables must be defined; unknown variables fail agent load.
+   - XML-NEXT markers are **static** and are not substituted.
+2. **CLI prompt files** (`--system`, `--user`):
+   - `${VAR}` / `{{VAR}}` placeholders are expanded at runtime.
+   - Unknown placeholders remain unchanged.
 
 ---
 
 ## Unknown Variables
 
-Unknown variables are left unchanged in the prompt:
+Behavior depends on the prompt type:
 
-```markdown
-Hello ${UNKNOWN_VARIABLE}!
-```
-
-Becomes:
-
-```markdown
-Hello ${UNKNOWN_VARIABLE}!
-```
-
-This behavior:
-
-- Prevents accidental data leakage from environment
-- Lets you catch typos (variable appears literally in output)
-- Allows literal `${}` syntax if needed (though rare)
+- **`.ai` prompts (Liquid templates)**: Unknown variables **fail agent load**.
+- **CLI prompt files**: Unknown placeholders remain unchanged (literal `${UNKNOWN}`).
 
 ---
 
@@ -367,37 +312,21 @@ The available variables are a fixed set (listed above). If you need environment 
 
 ### Variable not substituted
 
-**Symptom**: `${DATETIME}` appears literally in the LLM's context.
+**Symptom**: A CLI placeholder remains literal (e.g., `${DATETIME}`).
 
 **Causes and fixes**:
 
-1. **Typo in variable name**: Check spelling and case
-
-   ```markdown
-   ${DATETIME}     # Correct
-   ${datetime} # Wrong - lowercase
-   ${DATE_TIME} # Wrong - extra underscore
-   ```
-
-2. **Syntax error**: Check for spaces or typos
-
-   ```markdown
-   ${DATETIME}     # Correct
-   ${ DATETIME} # Wrong - space after {
-   ${DATETIME } # Wrong - space before }
-   ```
-
-3. **Variable doesn't exist**: Only the documented variables are available
+1. **Not using a CLI prompt file**: `${VAR}` only expands in `--system` / `--user` files.
+2. **Typo in variable name**: Check spelling and case (must be `UPPER_SNAKE_CASE`).
+3. **Unsupported variable**: Only the documented CLI variables exist.
 
 ### Getting current values for debugging
 
-Use `--verbose` and `--trace-llm` flags to see variable expansion in action:
+Use `--verbose` and `--trace-llm` to inspect the actual XML-NEXT block and CLI expansions:
 
 ```bash
 ai-agent --agent my-agent.ai --verbose --trace-llm "test"
 ```
-
-This shows verbose logs including the expanded system prompt sent to the LLM.
 
 ### FORMAT not working as expected
 
@@ -405,10 +334,10 @@ This shows verbose logs including the expanded system prompt sent to the LLM.
 
 **Causes and fixes**:
 
-1. **Missing ${FORMAT}**: Add it to your prompt
+1. **Missing XML-NEXT.FORMAT**: Add it to your prompt
 
    ```markdown
-   Respond in ${FORMAT}.
+   Respond in XML-NEXT.FORMAT.
    ```
 
 2. **Conflicting instructions**: Don't override FORMAT with specific format instructions
@@ -416,12 +345,12 @@ This shows verbose logs including the expanded system prompt sent to the LLM.
    ```markdown
    # Bad - conflicts with FORMAT
 
-   Respond in ${FORMAT}.
+   Respond in XML-NEXT.FORMAT.
    Always use JSON format.
 
    # Good - relies on FORMAT
 
-   Respond in ${FORMAT}.
+   Respond in XML-NEXT.FORMAT.
    ```
 
 3. **Format determined by context**: FORMAT is set based on:
@@ -432,7 +361,7 @@ This shows verbose logs including the expanded system prompt sent to the LLM.
 
 ### Time showing wrong timezone
 
-**Symptom**: `${DATETIME}` shows wrong timezone.
+**Symptom**: `XML-NEXT.DATETIME` shows wrong timezone.
 
 **Fix**: Set the `TZ` environment variable:
 
@@ -451,7 +380,7 @@ Or ensure your system timezone is configured correctly.
 Every prompt should specify output format:
 
 ```markdown
-Respond in ${FORMAT}.
+Respond in XML-NEXT.FORMAT.
 ```
 
 ### 2. Use Context Variables When Relevant
@@ -459,17 +388,17 @@ Respond in ${FORMAT}.
 If the task benefits from time/environment awareness, include them:
 
 ```markdown
-Current time: ${DATETIME}
+Current time: XML-NEXT.DATETIME
 ```
 
-**Note**: Time variables (`${DATETIME}`, `${TIMESTAMP}`, `${DAY}`, `${TIMEZONE}`) are available in all contexts. System variables (`${OS}`, `${ARCH}`, `${KERNEL}`, `${HOSTNAME}`, `${CD}`, `${USER}`) are **only available when running from CLI** (not via headends).
+**Note**: Time variables (`XML-NEXT.DATETIME`, `XML-NEXT.TIMESTAMP`, `XML-NEXT.DAY`, `XML-NEXT.TIMEZONE`) are available in all contexts. System variables (`${OS}`, `${ARCH}`, `${KERNEL}`, `${HOSTNAME}`, `${CD}`, `${USER}`) are **only available when running from CLI** (not via headends).
 
 ### 3. Help Agents Self-Limit
 
 For complex agents, expose their limits:
 
 ```markdown
-You have ${MAX_TURNS} turns and ${MAX_TOOLS} tools per turn.
+You have XML-NEXT.MAX_TURNS turns and XML-NEXT.MAX_TOOLS tools per turn.
 Plan accordingly.
 ```
 

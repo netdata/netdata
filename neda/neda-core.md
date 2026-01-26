@@ -612,7 +612,7 @@ When researching customers you must:
 5. `fireflies`: our recent meetings with them, to review transcripts and extract their pain points and how satisfied they are with Netdata
 6. `stripe`: for payments information
 
-${include:netdata-employees.md}
+{% render 'netdata-employees.md' %}
 
 ---
 

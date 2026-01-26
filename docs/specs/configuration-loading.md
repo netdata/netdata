@@ -63,7 +63,7 @@ const cfg = buildUnifiedConfiguration(
 
 ## Placeholder Sanitization
 - After building the config, `validateNoPlaceholders(config)` rejects any remaining `${VAR}` sequences in providers, MCP servers, or `accounting.file` to ensure secrets never leak into runtime objects (`src/agent-loader.ts:250-303`).
-- CLI merges all layer env files plus `process.env` into a single `mergedEnv` so downstream prompt interpolation (`${FORMAT}`, `${VAR}` in frontmatter) sees the same values (`src/agent-loader.ts:390-409`).
+- CLI merges all layer env files plus `process.env` into a single `mergedEnv` so configuration placeholder expansion sees the same values (`src/agent-loader.ts:390-409`).
 
 ## Legacy `loadConfiguration()` Path
 **Location**: `src/config.ts:180-364`
@@ -107,23 +107,25 @@ const cfg = buildUnifiedConfiguration(
 | Legacy JSON only partially applied | Running harness or direct `loadConfiguration` without `queues` block | Include `"queues": { "default": { "concurrent": N } }` or let the loader inject the CPU-based fallback |
 
 ## LLM Prompt Templates
-**Location**: `src/prompts/loader.ts`, `src/prompts/*.md`
+**Location**: `src/prompts/` (LiquidJS templates)
 
-LLM-facing instruction prompts (task_status tool instructions, final report format guidance, batch tool usage, etc.) are stored as Markdown files in `src/prompts/` and loaded at module initialization time.
+LLM-facing instruction prompts (final report guidance, task status, batch tool usage, XML-NEXT, tool-output prompts, tool-result notices) live in `src/prompts/` as Liquid templates and are rendered via the template registry.
 
-### Source Files
-- `src/prompts/loader.ts` – Prompt loader (reads files at module init)
-- `src/prompts/task-status.md` – agent__task_status tool instructions
-- `src/prompts/final-report.md` – XML final report format template (with `{{{placeholder}}}` substitutions)
-- `src/prompts/mandatory-rules.md` – Mandatory XML response format rules
-- `src/prompts/batch-with-progress.md` – Batch tool instructions (with task_status)
-- `src/prompts/batch-without-progress.md` – Batch tool instructions (without task_status)
+### Source Files (examples)
+- `src/prompts/templates.ts` – Template registry (preloads templates at module init)
+- `src/prompts/template-engine.ts` – LiquidJS engine + include preflight
+- `src/prompts/final-report.md` – XML final report guidance (Liquid)
+- `src/prompts/internal-tools.md` – Internal tools instructions (Liquid)
+- `src/prompts/xml-next.md` – Runtime XML-NEXT notice (Liquid)
+- `src/prompts/tool-schemas/*.json` – Internal tool schemas (Liquid)
+- `src/prompts/tool-output/*.md` – Tool-output prompts (Liquid)
+- `src/prompts/tool-results/*.md` – Tool-result notices (Liquid)
 
 ### Loading Behavior
-- All prompts are read synchronously at module initialization (import time), not at runtime request time
-- This satisfies PR-001: "load all configuration at load-time"
-- Templates use `{{{placeholder}}}` syntax for variable substitution (e.g., `{{{slotId}}}`, `{{{formatId}}}`)
-- The loader caches templates in module-scope constants after first load
+- Templates are read and parsed at module initialization (`src/prompts/templates.ts`).
+- Liquid runs in strict mode (unknown variables and missing includes fail).
+- Includes resolve relative to the file containing the directive; max depth 8; `.env` blocked.
+- Rendering happens on demand via `renderPromptTemplate(...)`.
 
 ### Build Pipeline
 - `npm run build` (postbuild): Copies `src/prompts/` to `dist/prompts/`

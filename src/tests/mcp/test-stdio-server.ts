@@ -53,7 +53,7 @@ const longPayload = '#'.repeat(3200);
 const guardOverflowPayload = '@'.repeat(1200);
 const guardBudgetPayload = '%'.repeat(10000);
 // Payloads for budget truncation tests
-const budgetTruncatablePayload = 'X'.repeat(2000);  // Large enough to truncate (>512 bytes)
+const budgetTruncatablePayload = 'X'.repeat(6000);  // Large enough to trigger budget truncation while staying below size cap
 const smallFitsPayload = 'Y'.repeat(100);           // Small, fits any reasonable limit
 const smallOverLimitPayload = 'Z'.repeat(300);      // Between limit (100) and MIN_PAYLOAD_BYTES (512)
 

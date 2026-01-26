@@ -44,11 +44,11 @@ Failure reports MUST start with "FAILURE REPORT" and you must explain the reason
 
 ---
 
-${include:tone-and-language.md}
+{% render 'tone-and-language.md' %}
 
 ---
 
-Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
+Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 IMPORTANT: Check the date. We are in 2025. Not 2024.
 
-Output format: ${FORMAT}
+Output format: XML-NEXT.FORMAT

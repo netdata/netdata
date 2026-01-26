@@ -136,7 +136,7 @@ Persistence guidance: The CLI demonstrates persisting accounting to JSONL. As a 
 1. Validate configuration and prompts.
 2. Preflight `tool_output`: ensure `/tmp/ai-agent-<run-hash>` exists and the filesystem MCP server script is present; failures abort session creation.
 3. Initialize MCP servers (non-fatal; initialization failures logged as `WRN`).
-4. Build the effective system prompt (adds tools’ instructions; schemas are passed as tool defs, not appended to prompt).
+4. Build the effective system prompt (base `.ai` + internal tools + MCP instructions; tool schemas are still passed via tool defs, while JSON/Slack final-report formats may embed schema guidance in prompt text).
 5. Execute multi-turn loop with fallback across `targets`:
    - Streams assistant text via `onEvent(type='output')`.
    - Emits instrumentation via `onEvent(type='log' | 'accounting')`.

@@ -1,6 +1,6 @@
 # Include Directives
 
-Reuse prompt content across multiple agents with `${include:path}`.
+Reuse prompt content across multiple agents with `{% render 'path' %}`.
 
 ---
 
@@ -28,7 +28,7 @@ Include directives let you share prompt content across multiple agents. This is 
 
 **Key facts**:
 
-- Includes are resolved at load time, before variable substitution
+- Includes are resolved at load time; missing includes fail agent load
 - Nested includes are supported (includes can include other files)
 - Maximum nesting depth is 8 levels (prevents infinite recursion)
 - `.env` files cannot be included (security protection)
@@ -40,8 +40,8 @@ Include directives let you share prompt content across multiple agents. This is 
 Both forms are supported:
 
 ```markdown
-${include:path/to/file.md}
-{{include:path/to/file.md}}
+{% render 'path/to/file.md' %}
+{% include 'path/to/file.md' %}
 ```
 
 The content of the referenced file replaces the directive entirely.
@@ -67,7 +67,7 @@ models:
 ---
 You are a helpful assistant.
 
-${include:shared/tone.md}
+{% render 'shared/tone.md' %}
 
 Answer the user's questions clearly.
 ```
@@ -95,9 +95,9 @@ Paths are resolved relative to the file containing the include directive.
 ### Relative Paths (Recommended)
 
 ```markdown
-${include:shared/file.md}          # Same directory, then shared/
-${include:../common/file.md} # Parent directory, then common/
-${include:./helpers/file.md} # Explicit current directory
+{% render 'shared/file.md' %}          # Same directory, then shared/
+{% render '../common/file.md' %} # Parent directory, then common/
+{% render './helpers/file.md' %} # Explicit current directory
 ```
 
 ### Project Structure Example
@@ -105,8 +105,8 @@ ${include:./helpers/file.md} # Explicit current directory
 ```
 my-project/
 ├── agents/
-│   ├── main.ai              # Contains ${include:../shared/tone.md}
-│   └── helper.ai            # Contains ${include:../shared/tone.md}
+│   ├── main.ai              # Contains {% render '../shared/tone.md' %}
+│   └── helper.ai            # Contains {% render '../shared/tone.md' %}
 ├── shared/
 │   ├── tone.md
 │   ├── safety.md
@@ -117,8 +117,8 @@ my-project/
 From `agents/main.ai`:
 
 ```markdown
-${include:../shared/tone.md}              # Goes up one level, into shared/
-${include:../shared/domain/product-info.md}
+{% render '../shared/tone.md' %}              # Goes up one level, into shared/
+{% render '../shared/domain/product-info.md' %}
 ```
 
 ### Absolute Paths (Supported but Not Recommended)
@@ -126,7 +126,7 @@ ${include:../shared/domain/product-info.md}
 Absolute paths work but are discouraged for portability:
 
 ```markdown
-${include:/home/user/project/shared/file.md} # Works but not portable
+{% render '/home/user/project/shared/file.md' %} # Works but not portable
 ```
 
 Use relative paths for better portability across different environments.
@@ -144,8 +144,8 @@ Includes can contain other includes. Each file's includes are resolved relative 
 ```markdown
 ## Guidelines
 
-${include:safety.md}
-${include:tone.md}
+{% render 'safety.md' %}
+{% render 'tone.md' %}
 ```
 
 `shared/safety.md`:
@@ -175,7 +175,7 @@ models:
 ---
 You are a helpful assistant.
 
-${include:../shared/all-guidelines.md}
+{% render '../shared/all-guidelines.md' %}
 ```
 
 **Final result**:
@@ -234,7 +234,7 @@ models:
 ---
 You are a research assistant.
 
-${include:shared/guidelines.md}
+{% render 'shared/guidelines.md' %}
 
 Help users find accurate information.
 ```
@@ -346,13 +346,13 @@ description: Company research agent
 models:
   - openai/gpt-4o
 ---
-${include:tone-and-language.md}
+{% render 'tone-and-language.md' %}
 
 You are a company research specialist.
 
-${include:neda-core.md}
+{% render 'neda-core.md' %}
 
-${include:safety-gates.md}
+{% render 'safety-gates.md' %}
 ```
 
 ---
@@ -410,13 +410,13 @@ models:
 You are a customer support agent.
 
 # Standard tone for customer-facing agents
-${include:shared/tone/professional.md}
+{% render 'shared/tone/professional.md' %}
 
 # Product knowledge
-${include:shared/domain/product-info.md}
+{% render 'shared/domain/product-info.md' %}
 
 # Safety rules for handling customer data
-${include:shared/safety/customer-data.md}
+{% render 'shared/safety/customer-data.md' %}
 ```
 
 ### 4. Version Control Shared Files
@@ -434,15 +434,15 @@ Keep nesting shallow (2-3 levels max). Deep nesting makes debugging harder.
 **Prefer**:
 
 ```markdown
-${include:safety.md}
-${include:tone.md}
-${include:output.md}
+{% render 'safety.md' %}
+{% render 'tone.md' %}
+{% render 'output.md' %}
 ```
 
 **Over**:
 
 ```markdown
-${include:all-config.md} # Which includes safety.md, which includes...
+{% render 'all-config.md' %} # Which includes safety.md, which includes...
 ```
 
 ---
@@ -464,8 +464,8 @@ ${include:all-config.md} # Which includes safety.md, which includes...
 ```markdown
 # If you're in agents/main.ai and shared/ is at the project root:
 
-${include:../shared/tone.md}    # Correct - go up one level
-${include:shared/tone.md} # Wrong - looks in agents/shared/
+{% render '../shared/tone.md' %}    # Correct - go up one level
+{% render 'shared/tone.md' %} # Wrong - looks in agents/shared/
 ```
 
 ### "including this file is forbidden"
@@ -502,9 +502,9 @@ ${include:shared/tone.md} # Wrong - looks in agents/shared/
 **Fix**: Check for circular includes and verify syntax:
 
 ```markdown
-${include:file.md}     # Correct
-${include:file.md } # Correct (spaces inside braces are trimmed)
-{{include:file.md}} # Also correct (alternative syntax)
+{% render 'file.md' %}     # Correct
+{% render 'file.md' %} # Correct (spaces inside braces are trimmed)
+{% render 'file.md' %} # Also correct (alternative syntax)
 
 # Incorrect - missing colon or wrong format
 
@@ -525,7 +525,7 @@ For circular references, check that no file includes a file that eventually incl
 ```
 project/
 ├── agents/
-│   └── main.ai         # ${include:../shared/tone.md}
+│   └── main.ai         # {% render '../shared/tone.md' %}
 └── shared/
     └── tone.md
 ```

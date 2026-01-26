@@ -4,43 +4,20 @@ import type { ToolOutputExtractor } from './extractor.js';
 import type { ToolOutputStore } from './store.js';
 import type { ToolOutputConfig, ToolOutputExtractionResult, ToolOutputMode, ToolOutputTarget } from './types.js';
 
+import { renderPromptTemplate } from '../prompts/templates.js';
 import { ToolProvider } from '../tools/types.js';
 import { truncateToBytesWithInfo } from '../truncation.js';
+import { parseJsonRecord } from '../utils.js';
 
 import { resolveToolOutputTargets } from './config.js';
 import { formatToolOutputFailure, formatToolOutputSuccess } from './formatter.js';
 
 const TOOL_OUTPUT_NAME = 'tool_output';
-const TOOL_OUTPUT_SCHEMA: MCPTool = {
-  name: TOOL_OUTPUT_NAME,
-  description: 'Extract information from a stored oversized tool output by handle.',
-  inputSchema: {
-    type: 'object',
-    additionalProperties: false,
-    required: ['handle', 'extract'],
-    properties: {
-      handle: {
-        type: 'string',
-        minLength: 1,
-        description: 'Handle of the stored tool output (relative path under the tool_output root, e.g. session-<uuid>/<file-uuid>; provided in the tool-result message: tool_output(handle = "...", ...)).'
-      },
-      extract: {
-        type: 'string',
-        minLength: 1,
-        description: 'Provide precise, detailed instructions about what you need from the tool output (be specific, include keys/fields/sections if known).'
-      },
-      mode: {
-        type: 'string',
-        enum: ['auto', 'full-chunked', 'read-grep', 'truncate'],
-        description: 'Use auto for optimal extraction strategy. Other modes: full-chunked (spawn a subagent to process all content in chunks), read-grep (spawn a subagent to search for relevant lines), truncate (keep the top and bottom of the content, truncate in the middle). Default: auto.'
-      }
-    }
-  }
-};
 
 export class ToolOutputProvider extends ToolProvider {
   readonly kind = 'agent' as const;
   readonly namespace = 'tool-output' as const;
+  private readonly toolSchema: MCPTool;
 
   constructor(
     private readonly store: ToolOutputStore,
@@ -50,12 +27,13 @@ export class ToolOutputProvider extends ToolProvider {
     private readonly toolResponseMaxBytes: number | undefined,
   ) {
     super();
+    this.toolSchema = this.buildToolSchema();
   }
 
   listTools(): MCPTool[] {
     if (!this.config.enabled) return [];
     if (!this.store.hasEntries()) return [];
-    return [TOOL_OUTPUT_SCHEMA];
+    return [this.toolSchema];
   }
 
   hasTool(name: string): boolean {
@@ -65,13 +43,7 @@ export class ToolOutputProvider extends ToolProvider {
   override getInstructions(): string {
     if (!this.config.enabled) return '';
     if (!this.store.hasEntries()) return '';
-    return [
-      '### tool_output — Extract from oversized tool results',
-      '- When a tool result is too large, you will receive a handle and instructions to call tool_output.',
-      '- The handle is a relative path under the tool_output root (session-<uuid>/<file-uuid>).',
-      '- Always provide a detailed `extract` instruction describing exactly what you need from the stored output.',
-      '- Use auto for optimal extraction strategy. Other modes: full-chunked (spawn a subagent to process all content in chunks), read-grep (spawn a subagent to search for relevant lines), truncate (keep the top and bottom of the content, truncate in the middle). Default: auto.',
-    ].join('\n');
+    return renderPromptTemplate('toolOutputInstructions', {});
   }
 
   async execute(name: string, parameters: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
@@ -92,14 +64,14 @@ export class ToolOutputProvider extends ToolProvider {
         toolName: 'unknown',
         handle: handle.length > 0 ? handle : '<missing>',
         mode: mode ?? 'auto',
-        error: 'Invalid tool_output parameters: handle and extract are required.',
+        error: renderPromptTemplate('toolOutputErrorInvalidParams', {}),
       });
       return { ok: false, result: failure, latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
 
     const read = await this.store.read(handle);
     if (read === undefined) {
-      const body = `No stored tool output found for handle ${handle}. It may have expired or been cleaned up.`;
+      const body = renderPromptTemplate('toolOutputErrorHandleMissing', { handle });
       const message = formatToolOutputSuccess({ toolName: 'unknown', handle, mode: 'auto', body });
       return { ok: true, result: message, latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
@@ -164,6 +136,22 @@ export class ToolOutputProvider extends ToolProvider {
     await this.store.cleanup();
   }
 
+  private buildToolSchema(): MCPTool {
+    const raw = renderPromptTemplate('toolSchemaToolOutput', {});
+    const parsed = parseJsonRecord(raw);
+    if (parsed === undefined) {
+      throw new Error('tool_output schema template did not produce a JSON object');
+    }
+    const description = typeof parsed.description === 'string'
+      ? parsed.description
+      : 'Extract information from a stored oversized tool output by handle.';
+    return {
+      name: TOOL_OUTPUT_NAME,
+      description,
+      inputSchema: parsed,
+    };
+  }
+
   private applyWarning(extraction: ToolOutputExtractionResult): string {
     if (extraction.warning === undefined) return extraction.text;
     return `${extraction.warning}\n${extraction.text}`;
@@ -176,7 +164,7 @@ export class ToolOutputProvider extends ToolProvider {
     const headerBytes = Buffer.byteLength(header, 'utf8');
     const budget = limit - headerBytes;
     if (budget <= 0) {
-      return 'tool_output response truncated: size cap too small for payload.';
+      return renderPromptTemplate('toolOutputTruncated', {});
     }
     const truncated = truncateToBytesWithInfo(body, budget);
     return truncated?.value ?? body;

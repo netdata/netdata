@@ -82,9 +82,9 @@ Session is created via a static factory; `AIAgent.run()` wraps orchestration (ad
 4. If verbose: log settings summary
 5. Log tools banner (MCP, REST, subagent counts)
 6. Check pricing coverage, warn on missing entries
-7. Expand system prompt (apply format placeholder, variable expansion)
-8. Expand user prompt
-9. Build enhanced system prompt with tool instructions (native only; XML transport omits tool instructions)
+7. Use static system prompt from agent load-time render (no runtime variable expansion)
+8. Expand user prompt with runtime prompt variables (CLI-only placeholders)
+9. Build enhanced system prompt by appending internal tools + MCP instructions (runtime sections)
 10. Initialize conversation:
     - If conversationHistory: merge with enhanced system prompt
     - Else: create new with system + user messages

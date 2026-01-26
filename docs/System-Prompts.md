@@ -45,8 +45,7 @@ You are a [role] that [primary function].
 
 # 2. Context
 
-Current time: ${DATETIME}
-User: ${USER}
+Current time: XML-NEXT.DATETIME
 
 # 3. Capabilities
 
@@ -64,7 +63,7 @@ You must NOT:
 
 # 5. Output Format
 
-Respond in ${FORMAT}.
+Respond in XML-NEXT.FORMAT.
 
 # 6. Workflow (for complex agents)
 
@@ -76,10 +75,10 @@ Follow these steps:
 
 # 7. Shared Content (optional)
 
-${include:shared/guidelines.md}
+{% render 'shared/guidelines.md' %}
 ```
 
-Both `${include:...}` and `{{include:...}}` syntaxes are supported for include directives.
+Both `{% render '...' %}` and `{% include '...' %}` syntaxes are supported for includes.
 
 **Key insight**: The prompt is regular Markdown text. Use headings, lists, and formatting to make it clear and scannable for the LLM.
 
@@ -101,8 +100,8 @@ maxTurns: 10
 You are a research assistant that helps users find accurate information.
 
 ## Context
-Current time: ${DATETIME}
-Timezone: ${TIMEZONE}
+Current time: XML-NEXT.DATETIME
+Timezone: XML-NEXT.TIMEZONE
 
 ## Your Approach
 1. Search for relevant information using available tools
@@ -111,7 +110,7 @@ Timezone: ${TIMEZONE}
 4. Acknowledge uncertainty when appropriate
 
 ## Output Format
-Respond in ${FORMAT}.
+Respond in XML-NEXT.FORMAT.
 
 ## Guidelines
 - Be concise but thorough
@@ -123,42 +122,33 @@ Respond in ${FORMAT}.
 
 ## Key Features
 
-### Variable Substitution
+### Runtime Variables (XML-NEXT)
 
-Insert dynamic values into your prompt:
+System prompts are **static per agent load**. Runtime values are delivered in the XML-NEXT notice each turn.
+If you want to reference them in your prompt, use static markers like `XML-NEXT.DATETIME` and `XML-NEXT.FORMAT`.
 
-```markdown
-Current time: ${DATETIME}
-Running on: ${OS}
-User: ${USER}
-```
+**Provided in XML-NEXT**: `DATETIME`, `TIMESTAMP`, `DAY`, `TIMEZONE`, `FORMAT`, `MAX_TURNS`, `MAX_TOOLS`, `MAX_RETRIES`
 
-**Available variables (always)**: `DATETIME`, `TIMESTAMP`, `DAY`, `TIMEZONE`
-
-**Additional variables (CLI, agent registry, AI agent)**: `MAX_TURNS`, `MAX_TOOLS`, `FORMAT`
-
-**Additional CLI-only variables**: `OS`, `ARCH`, `KERNEL`, `HOSTNAME`, `USER`, `CD`
-
-See [System-Prompts-Variables](System-Prompts-Variables) for the complete reference.
+See [System-Prompts-Variables](System-Prompts-Variables) for details.
 
 ### Include Directives
 
 Reuse content across multiple agents:
 
 ```markdown
-${include:shared/tone.md}
-{{include:shared/safety-rules.md}}
+{% render 'shared/tone.md' %}
+{% render 'shared/safety-rules.md' %}
 ```
 
-Both `${include:...}` and `{{include:...}}` syntaxes are supported.
+Both `{% render '...' %}` and `{% include '...' %}` syntaxes are supported.
 
-Includes are resolved before variable substitution. Nested includes are supported.
+Includes are resolved at load-time. Missing includes fail agent load. Nested includes are supported.
 
 See [System-Prompts-Includes](System-Prompts-Includes) for syntax and patterns.
 
 ### Output Format
 
-The `${FORMAT}` variable contains output format instructions based on how the agent is invoked:
+The XML-NEXT `FORMAT` value contains output format instructions based on how the agent is invoked:
 
 | Context              | FORMAT value                                                                                                                                                                      |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -170,7 +160,7 @@ The `${FORMAT}` variable contains output format instructions based on how the ag
 | Slack headend        | `Slack Block Kit JSON array of messages (not raw text or GitHub markdown).`                                                                                                       |
 | Sub-agent            | `Internal agent-to-agent exchange format (not user-facing).`                                                                                                                      |
 
-Always include `${FORMAT}` in your prompt to ensure consistent output across contexts.
+Always include `XML-NEXT.FORMAT` in your prompt to ensure consistent output across contexts.
 
 ---
 

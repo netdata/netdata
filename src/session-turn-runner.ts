@@ -36,7 +36,6 @@ import {
   TOOL_NO_OUTPUT,
 } from './llm-messages.js';
 import { LOG_EVENTS } from './logging/log-events.js';
-import { buildMetaPromptGuidance } from './plugins/meta-guidance.js';
 import {
   TOOL_SANITIZATION_FAILED_KEY,
   TOOL_SANITIZATION_ORIGINAL_PAYLOAD_KEY,
@@ -606,6 +605,7 @@ export class TurnRunner {
                         nonce: this.ctx.xmlTransport.getSessionNonce(),
                         turn: currentTurn,
                         maxTurns,
+                        maxTools: Math.max(1, this.ctx.sessionConfig.maxToolCallsPerTurn ?? 10),
                         attempt: attempts + 1,
                         maxRetries,
                         contextPercentUsed,
@@ -2356,14 +2356,11 @@ export class TurnRunner {
             return;
         const sessionNonce = this.ctx.xmlTransport.getSessionNonce();
         const requirements = this.ctx.pluginRuntime.getResolvedRequirements();
-        const metaGuidance = requirements.length > 0 ? buildMetaPromptGuidance(requirements, sessionNonce) : undefined;
         const finalReportLocked = this.ctx.finalReportManager.isFinalReportLocked();
-        const metaReminderShort = metaGuidance !== undefined
-            ? (finalReportLocked ? metaGuidance.reminderShortLocked : metaGuidance.reminderShort)
-            : undefined;
         const feedback = buildTurnFailedNotice(this.state.turnFailedEvents, {
             sessionNonce,
-            metaReminderShort,
+            pluginRequirements: requirements,
+            finalReportLocked,
         });
         conversation.push({ role: 'user', content: feedback });
         this.state.turnFailedEvents = [];

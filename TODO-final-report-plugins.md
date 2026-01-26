@@ -13,6 +13,33 @@ This replaces the current hardcoded `support_request_metadata_json_object` patte
 Also required:
 - Explain prompt construction (where final report + META instructions come from)
 - Ensure META is explained once, and **every** `<ai-agent-NONCE-FINAL` example includes META right after it (no FINAL-only examples).
+- Update all prompts in `neda/` to LiquidJS syntax.
+- Enforce strict template validation: missing includes and unknown variables must fail.
+- Replace BigQuery prompt placeholders `{{...}}` with `[[...]]` where they are only illustrative.
+- Implement LiquidJS infrastructure first (static system prompts, XML-NEXT via template), then convert `neda/` prompts.
+
+## Implementation Status (2026-01-26)
+
+Current repo state (facts from code review):
+
+- **DONE**: LiquidJS engine + template registry (`src/prompts/template-engine.ts`, `src/prompts/templates.ts`).
+- **DONE**: Core templates created (xml-next, turn-failed, internal-tools, tool-schemas, tool-output, tool-results, xml-past, router instructions, META snippets).
+- **DONE**: xml-next and turn-failed render via Liquid templates (`src/llm-messages-xml-next.ts`, `src/llm-messages-turn-failed.ts`).
+- **DONE**: internal tools instructions + tool schemas render via templates (`src/tools/internal-provider.ts`).
+- **DONE**: tool_output formatter/extractor prompts and tool-result messages render via templates (`src/tool-output/*`, `src/llm-messages.ts`).
+- **DONE**: base `.ai` system prompt rendered at load-time only; no per-session expansion (`src/agent-loader.ts`, `src/ai-agent.ts`, `src/agent-registry.ts`).
+- **DONE**: static nonce per agent (load-time) is passed to XML transport and templates (`src/agent-loader.ts`, `src/xml-transport.ts`).
+- **DONE**: XML-NEXT includes runtime ephemerals (FORMAT/DATETIME/TIMESTAMP/DAY/TIMEZONE/MAX_TURNS/MAX_TOOLS) (`src/llm-messages-xml-next.ts`, `src/prompts/xml-next.md`).
+- **DONE**: runtime prompt hash warning (last 5 unique hashes) for internal + MCP sections (`src/ai-agent.ts`).
+- **DONE**: `neda/` prompts converted to Liquid includes; placeholder braces replaced with `[[...]]` where needed.
+- **DONE**: docs/specs updated for Liquid templating + static system prompt lifecycle (Agent-Files, System-Prompts, Variables, Includes, templated-prompts, session-lifecycle, configuration-loading, implementation, internal API).
+- **DONE**: tests updated for Liquid template rendering and include syntax (`src/tests/unit/prompts-loader.spec.ts`, `src/tests/phase2-harness-scenarios/phase2-runner.ts`).
+- **DONE**: runtime tool-output reduce user prompt moved into Liquid template (`src/prompts/tool-output/reduce-user.md`, `src/tool-output/extractor.ts`).
+- **DONE**: lint/build/phase1/phase2/phase3:tier1 executed cleanly (see terminal logs).
+
+Remaining gaps:
+
+- **NONE** (implementation complete; awaiting Costa review).
 
 ## Analysis
 
@@ -147,7 +174,7 @@ Evidence: system prompt is enhanced with tool instructions (`src/ai-agent.ts:171
 | 17 | Final-report replacement policy | **5A: lock first final-report while META is missing** | Prevents double streaming and answer drift during META-only retries. |
 | 18 | Plugin session spawning (V1) | **4A: include `createSession` now** | Enables plugins to fan out and run follow-up sessions immediately. |
 | 19 | META wrapper contract | **6A: per-plugin META wrappers** | Enables targeted retries and isolated validation per plugin. |
-| 20 | XML-NEXT rendering strategy | **NONCE-only input; renderer builds FINAL + META guidance** | Keeps XML-NEXT short while guaranteeing META guidance is always paired with FINAL guidance. |
+| 20 | XML-NEXT rendering strategy | **Runtime template receives per-turn ephemerals (nonce, format, limits, context, tool availability) + META guidance; renders FINAL+META guidance** | Keeps per-turn data in XML-NEXT while pairing FINAL+META guidance. |
 | 21 | Execution autonomy contract | **Proceed autonomously; ask Costa only for design conflicts** | Required by Costa for this task; all other uncertainty must be resolved via code review and/or second opinions. |
 | 22 | Test execution policy | **Phase1 + Phase2 during work; Phase3:tier1 only at end; never Phase3:tier2** | Explicit instruction for this task. |
 | 23 | Mandatory review gates | **Run Claude + Codex + GLM-4.7 after major milestones and at the end** | Required unanimous consensus unless an agent fails twice. |
@@ -157,11 +184,28 @@ Evidence: system prompt is enhanced with tool instructions (`src/ai-agent.ts:171
 | 27 | Example injection model | **Core template injects plugin META examples into every FINAL example** | Costa: plugin cannot know other plugins; final-report.md must place plugin META snippets after each FINAL example. |
 | 28 | Template engine scope | **Apply to both `.ai` prompts and internal `.md` templates** | Costa: “both/all”. |
 | 29 | Template engine | **LiquidJS** | Costa: “let’s go with liquidjs”. |
-
-### Decisions Needed (2026-01-26)
-1) **Template engine selection (must support variables, assign/set, lists, loops, includes, if/else, and switch-case or equivalent)**
-   - Evidence: current templates only do string replacement, no conditions/loops (`src/prompts/loader.ts:55-89`).
-   - Options: (pending research + recommendation).
+| 30 | Template strictness | **Fail on missing includes and unknown variables** | Costa requirement. |
+| 31 | `neda/` prompt scope | **All files under `neda/` (including `.old` / `*.backup*`)** | Costa: “1b”. |
+| 32 | BigQuery placeholders | **Change `{{...}}` placeholders to `[[...]]` when not required by SQL** | Costa: “if placeholders only, change them”. |
+| 33 | Include strictness enforcement | **Test LiquidJS missing-include behavior; if it does not throw, add explicit include validation** | Costa: “test it—if it does not throw, handle includes ourselves”. |
+| 34 | Grafana `{{ ds }}` placeholders | **Keep as-is; file not included in prompts** | Costa: “keep it - this file is not included in prompts”. |
+| 35 | System prompt processing | **Base .ai prompt is static per agent; LiquidJS expansion at load-time only; restart required to change base** | Costa: “stop session-start expansion; immutable base prompt”. |
+| 36 | XML-NEXT processing | **Single `xml-next.md` LiquidJS template; per-turn ephemerals live here** | Costa: “XML-NEXT carries per-session ephemerals”. |
+| 37 | Sequencing | **Build LiquidJS infrastructure + tests first, then convert `neda/` prompts** | Costa: “ONLY THEN convert all existing `.ai` files”. |
+| 38 | Failed-turn messaging | **Render from `failed-turn.md` LiquidJS template** | Costa: “all failed turn permanent messages from template”. |
+| 39 | Prompt sources | **All internal prompt strings moved to markdown templates; eliminate code-built strings** | Costa: “complete XML-NEXT construction by LiquidJS; no code strings”. |
+| 40 | XML-NEXT variables | **Inventory and expose variables like FORMAT/DATETIME/TIMESTAMP for xml-next Liquid template** | Costa: “find out variables used; use in xml-next template”. |
+| 41 | Runtime templates scope | **xml-next + turn-failed + internal tool schemas; verify if more are runtime** | Costa: “2b; verify if more”. |
+| 42 | LiquidJS goal | **Port all dynamically constructed model-facing prompts/schemas into Liquid templates with identical output; do not delete behavior** | Costa: “move hardcoded strings to templates; keep exact result”. |
+| 43 | Template targets (design) | **xml-next.md, turn-failed.md, internal-tools.md, tool-schema templates (.json)** | Costa: “need these four; analyze and design before implementation”. |
+| 44 | Nonce lifetime | **Static for the lifetime of the ai-agent process (not per session)** | Costa: “OK only if nonce does not change per session”. |
+| 45 | Per-session variables | **Move FORMAT, turn limits, DATETIME/TIMESTAMP/DAY/TIMEZONE to XML-NEXT; base system prompt stays static** | Costa: “all per-session ephemerals in xml-next; base prompt only static nonce”. |
+| 46 | JSON schema overrides | **Allow load-time overrides (no behavior change)** | Costa: “allow load-time overrides; keep current behavior”. |
+| 47 | Liquid template headers | **Add non-output comment at top listing all available variables + meanings** | Costa requirement. |
+| 48 | Processing order | **Render tool schemas before any prompt sections that include them (base .ai or runtime internal tools)** | Costa requirement. |
+| 49 | Variable sets | **Standardize two variable sets: load-time (static) and runtime (ephemeral)** | Costa requirement. |
+| 50 | System prompt composition | **Total system prompt = base .ai (static, load-time) + runtime internal tools + runtime MCP instructions; restart required to update base** | Costa clarification: base never changes; runtime sections appended per session. |
+| 51 | Runtime prompt hash warning | **Warn only when new hash differs from last 5 unique hashes; store new hash** | Costa requirement. |
 
 ### Decisions (Costa)
 
@@ -207,9 +251,9 @@ Decision:
 
 3e) XML-NEXT rendering strategy — DECIDED
 Decision:
-- Pass only the NONCE and plugin requirement snippets to the XML-NEXT renderer.
-- The XML-NEXT renderer itself must render both FINAL and META guidance together.
-- Rationale: avoid large per-turn payloads while keeping the FINAL+META pairing unconditional.
+- Pass the runtime variable set (nonce, format, limits, context %, tool availability, META guidance) to the XML-NEXT template.
+- The XML-NEXT template renders both FINAL and META guidance together, plus per-turn warnings.
+- Rationale: keep all per-turn ephemerals in XML-NEXT while preserving FINAL+META pairing and avoiding runtime system prompt edits.
 
 5) Final-report replacement policy when final-report exists but META is missing — DECIDED: 5A (lock first final-report)
 Context:
@@ -230,6 +274,28 @@ Decision:
 - Rationale: enables targeted retries and isolated validation per plugin.
 
 ## Plan
+
+### Phase 0: LiquidJS Prompt Infrastructure (new)
+
+1. **Add LiquidJS engine** with strict mode:
+   - Unknown variables → fail
+   - Missing includes → fail (preflight if LiquidJS doesn’t throw)
+2. **Render base .ai prompt at load-time only** (static per agent):
+   - Remove per-session system prompt expansion (`FORMAT`, `DATETIME`, etc.)
+3. **Runtime prompt sections (per session / per turn)**:
+   - `xml-next.md` (per-turn ephemerals: FORMAT, limits, time)
+   - `turn-failed.md`
+   - `internal-tools.md` (+ MCP instructions section)
+4. **Template-based tool schemas** (JSON templates):
+   - `agent__final_report`, `agent__task_status`, `agent__batch`, `router__handoff-to`
+5. **Template-based tool-output prompts**:
+   - map/reduce/read-grep system & user prompts
+6. **Template variable sets**:
+   - Load-time: static vars + schema outputs
+   - Runtime: load-time vars + per-session/per-turn ephemerals
+7. **Nonce**: static per agent lifetime (load-time)
+8. **Runtime hash warning**: keep last 5 unique hashes of runtime sections; warn only on new hash
+9. **After infra is verified**: convert all `neda/` prompts to LiquidJS syntax
 
 ### Phase 1: Core Infrastructure
 
@@ -443,8 +509,9 @@ Injection point at `getInstructions()` (line 212):
 **File:** `src/llm-messages-xml-next.ts`
 
 - Render FINAL and META requirements together inside XML-NEXT.
-- Use NONCE-only rendering inputs plus plugin-provided `xmlNextSnippet` values.
-- Do not depend on template loops/Handlebars; render via explicit string assembly aligned with current loader capabilities (`src/prompts/loader.ts:70`).
+- Use the XML-NEXT Liquid template with the full runtime variable set (nonce, format, limits, context, tool availability, META guidance).
+- Plugin-provided `xmlNextSnippet` values are included via template variables/blocks.
+- Do not build XML-NEXT strings in code; the template is the single source of truth.
 
 #### 4.4 Turn Failure Slugs
 

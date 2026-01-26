@@ -50,7 +50,7 @@ You are a helpful assistant.
 
 Your task is to help the user with their questions.
 
-Respond in ${FORMAT}.
+Respond in the runtime format provided in XML-NEXT.
 ```
 
 ### Frontmatter Rules
@@ -64,8 +64,8 @@ Respond in ${FORMAT}.
 ### System Prompt
 
 - Plain text instructions for the agent
-- Supports [variable substitution](System-Prompts-Variables) (e.g., `${FORMAT}`)
-- Supports include directives (`${include:filename}` or `{{include:filename}}`) for reusable content
+- Supports Liquid includes (`{% render 'path/to/file.md' %}` or `{% include 'path/to/file.md' %}`) for reusable content
+- System prompts are rendered at load-time only; runtime values (format, date/time, limits) are provided via XML-NEXT
 - Can be as simple or complex as needed
 
 ---
@@ -84,7 +84,7 @@ models:
 ---
 You are a helpful assistant. Answer questions clearly and concisely.
 
-Respond in ${FORMAT}.
+Respond in the runtime format provided in XML-NEXT.
 ```
 
 Save as `assistant.ai` and run:
@@ -114,7 +114,7 @@ You are a research assistant with access to web search.
 2. Verify facts from multiple sources
 3. Provide a clear summary
 
-Respond in ${FORMAT}.
+Respond in the runtime format provided in XML-NEXT.
 ```
 
 ### Agent with Structured Output

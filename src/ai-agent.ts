@@ -14,6 +14,7 @@ import type { SessionNode, StepKind } from './session-tree.js';
 import type { AIAgentEvent, AIAgentEventCallbacks, AIAgentEventMeta, AIAgentSessionConfig, AIAgentResult, AccountingEntry, AccountingFlushPayload, Configuration, ConversationMessage, LogDetailValue, LogEntry, LLMAccountingEntry, MCPTool, OrchestrationConfig, OrchestrationRuntimeAgent, OrchestrationRuntimeConfig, ProgressMetrics, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, RestToolConfig, SessionSnapshotPayload, TaskStatusData, ToolAccountingEntry, ToolChoiceMode, TurnRequestContextMetrics, LogPayload } from './types.js';
 
 import { getResponseCache } from './cache/cache-factory.js';
+import { sha256Hex } from './cache/hash.js';
 import { createToolCacheResolver } from './cache/tool-cache-resolver.js';
 import { validateMCPServers, validatePrompts, validateProviders } from './config.js';
 import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluation, type TargetContextConfig } from './context-guard.js';
@@ -28,7 +29,7 @@ import { buildAdvisoryBlock, buildOriginalUserRequestBlock, joinTaggedBlocks } f
 import { RouterToolProvider } from './orchestration/router.js';
 import { spawnOrchestrationChild } from './orchestration/spawn-child.js';
 import { FinalReportPluginRuntimeManager } from './plugins/runtime.js';
-import { applyFormat, buildPromptVars, expandVars } from './prompt-builder.js';
+import { buildPromptVars, expandVars } from './prompt-builder.js';
 import { SessionProgressReporter } from './session-progress-reporter.js';
 import { SessionToolExecutor, type SessionContext } from './session-tool-executor.js';
 import { SessionTreeBuilder } from './session-tree.js';
@@ -692,7 +693,7 @@ export class AIAgentSession {
         this.emitEvent({ type: 'status', event });
       }
     });
-    this.xmlTransport = new XmlToolTransport();
+    this.xmlTransport = new XmlToolTransport(this.sessionConfig.systemNonce);
     const toolBudgetCallbacks = this.contextGuard.createToolBudgetCallbacks();
     const toolOutputConfig = resolveToolOutputConfig({
       config: sessionConfig.config.toolOutput,
@@ -1725,18 +1726,14 @@ export class AIAgentSession {
         }
       } catch (e) { warn(`pricing coverage check failed: ${e instanceof Error ? e.message : String(e)}`); }
 
-      // Apply ${FORMAT} replacement first, then expand variables
-      // Safety: strip any shebang/frontmatter from system prompt to avoid leaking YAML to the LLM
-      const sysBody = extractBodyWithoutFrontmatter(this.sessionConfig.systemPrompt);
-      // Inject plain format description only where ${FORMAT} or {{FORMAT}} exists; do not prepend extra text
-      const fmtDesc = this.resolvedFormatPromptValue ?? '';
-      const withFormat = applyFormat(sysBody, fmtDesc);
+      // System prompt is pre-rendered at load-time; do not expand per session.
+      // Safety: strip any shebang/frontmatter from system prompt to avoid leaking YAML to the LLM.
+      const systemExpanded = extractBodyWithoutFrontmatter(this.sessionConfig.systemPrompt);
       const vars = {
         ...buildPromptVars(),
         MAX_TURNS: String(this.sessionConfig.maxTurns ?? 10),
         MAX_TOOLS: String(Math.max(1, this.sessionConfig.maxToolCallsPerTurn ?? 10))
       };
-      const systemExpanded = expandVars(withFormat, vars);
       const userExpanded = expandVars(this.sessionConfig.userPrompt, vars);
       this.resolvedUserPrompt = userExpanded;
 
@@ -1764,6 +1761,7 @@ export class AIAgentSession {
 
       // Build enhanced system prompt with tool instructions (xml-final only)
       const toolInstructions = this.toolsOrchestrator?.getCombinedInstructions() ?? '';
+      this.maybeWarnRuntimePromptChange(toolInstructions, currentTurn);
       const enhancedSystemPrompt = this.enhanceSystemPrompt(systemExpanded, toolInstructions);
       this.resolvedSystemPrompt = enhancedSystemPrompt;
 
@@ -2382,6 +2380,34 @@ export class AIAgentSession {
     const trimmed = reason.trim();
     if (trimmed.length === 0) return;
     this.turnFailureReasons.push(trimmed);
+  }
+
+  private maybeWarnRuntimePromptChange(toolsInstructions: string, turn: number): void {
+    const hashes = this.sessionConfig.runtimePromptHashes;
+    if (!Array.isArray(hashes)) return;
+    const nextHash = sha256Hex(toolsInstructions);
+    if (hashes.includes(nextHash)) return;
+    const hadPrior = hashes.length > 0;
+    hashes.push(nextHash);
+    if (hashes.length > 5) {
+      hashes.splice(0, hashes.length - 5);
+    }
+    if (!hadPrior) return;
+    const entry: LogEntry = {
+      timestamp: Date.now(),
+      severity: 'WRN',
+      turn,
+      subturn: 0,
+      direction: 'response',
+      type: 'llm',
+      remoteIdentifier: 'agent:runtime-prompt',
+      fatal: false,
+      message: 'Runtime tool instructions changed since previous session start; provider caching may be invalidated.',
+      details: {
+        runtime_prompt_hash: nextHash,
+      },
+    };
+    this.log(entry);
   }
 
   private enhanceSystemPrompt(systemPrompt: string, toolsInstructions: string): string {

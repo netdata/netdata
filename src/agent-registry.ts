@@ -6,9 +6,7 @@ import type { OutputFormatId } from './formats.js';
 import type { AIAgentEventCallbacks, ConversationMessage } from './types.js';
 
 import { loadAgent, loadAgentFromContent, LoadedAgentCache } from './agent-loader.js';
-import { formatPromptValue } from './formats.js';
 import { cloneJsonSchema, cloneOptionalJsonSchema } from './input-contract.js';
-import { applyFormat, buildPromptVars, expandVars } from './prompt-builder.js';
 
 const OUTPUT_FORMAT_VALUES: readonly OutputFormatId[] = ['markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'json', 'sub-agent'] as const;
 const isOutputFormatId = (value: string): value is OutputFormatId => OUTPUT_FORMAT_VALUES.includes(value as OutputFormatId);
@@ -132,18 +130,8 @@ export class AgentRegistry {
     });
   }
 
-  private buildSystemPrompt(agent: LoadedAgent, format: OutputFormatId, payload: Record<string, unknown>): string {
-    const templ = applyFormat(agent.systemTemplate, formatPromptValue(format));
-    const vars = { ...buildPromptVars() } as Record<string, string>;
-    vars.MAX_TURNS = String(agent.effective.maxTurns);
-    vars.MAX_TOOLS = String(agent.effective.maxToolCallsPerTurn);
-    Object.entries(payload).forEach(([key, value]) => {
-      if (typeof value !== 'string') return;
-      vars[key] = value;
-      const upper = key.toUpperCase();
-      if (!(upper in vars)) vars[upper] = value;
-    });
-    return expandVars(templ, vars);
+  private buildSystemPrompt(agent: LoadedAgent, _format: OutputFormatId, _payload: Record<string, unknown>): string {
+    return agent.systemTemplate;
   }
 
   public resolveAgentId(alias: string): string | undefined {

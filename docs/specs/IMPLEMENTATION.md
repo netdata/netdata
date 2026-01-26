@@ -9,7 +9,7 @@ Why this design
 
 - Let the LLM + AI SDK decide when/how to call tools. This maximizes provider‑native capabilities (e.g., OpenAI parallel function calls), minimizes bespoke orchestration, and reduces drift across providers.
 - Use the official MCP SDK for complete protocol coverage (capabilities, transports, instructions, prompts, structured outputs, future extensions), rather than a thin/experimental client.
-- Append only MCP instructions to the system prompt once; expose tool schemas via request tool definitions. This matches best practices documented in README.md and avoids confusing the LLM with pasted JSON schemas.
+- Append internal tool instructions and MCP instructions to the system prompt once; expose tool schemas via request tool definitions. JSON/Slack final-report formats may also embed schema guidance in the prompt for clarity.
 
 Architecture
 
