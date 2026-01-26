@@ -4,7 +4,6 @@ package cockroachdb
 
 import (
 	"context"
-	"database/sql"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -29,11 +28,10 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: dbSamplingInterval,
 		},
-		Methods:      cockroachMethods,
-		MethodParams: cockroachMethodParams,
-		HandleMethod: cockroachHandleMethod,
-		Create:       func() module.Module { return New() },
-		Config:       func() any { return &Config{} },
+		Methods:       cockroachMethods,
+		MethodHandler: cockroachFunctionHandler,
+		Create:        func() module.Module { return New() },
+		Config:        func() any { return &Config{} },
 	})
 }
 
@@ -72,7 +70,7 @@ type Collector struct {
 
 	prom prometheus.Prometheus
 
-	db *sql.DB
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -89,6 +87,8 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("error on initializing prometheus client: %v", err)
 	}
 	c.prom = prom
+
+	c.funcRouter = newFuncRouter(c)
 
 	if c.UpdateEvery < dbSamplingInterval {
 		c.Warningf("'update_every'(%d) is lower then CockroachDB default sampling interval (%d)",
@@ -126,11 +126,11 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
 	if c.prom != nil && c.prom.HTTPClient() != nil {
 		c.prom.HTTPClient().CloseIdleConnections()
 	}
-	if c.db != nil {
-		_ = c.db.Close()
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
 	}
 }

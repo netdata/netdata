@@ -42,13 +42,9 @@ func TestRedisMethods(t *testing.T) {
 func TestRedisAllColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"timestamp", "command", "duration"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range redisAllColumns {
-		uiKeys[col.id] = true
-	}
-
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	cs := redisColumnSet(redisAllColumns)
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }
 

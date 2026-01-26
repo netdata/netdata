@@ -21,13 +21,12 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         rethinkdbMethods,
-		MethodParams:    rethinkdbMethodParams,
-		HandleMethod:    rethinkdbHandleMethod,
+		MethodHandler:   rethinkdbFunctionHandler,
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			Address: "127.0.0.1:28015",
 			Timeout: confopt.Duration(time.Second * 1),
@@ -37,6 +36,10 @@ func New() *Collector {
 		newConn:     newRethinkdbConn,
 		seenServers: make(map[string]bool),
 	}
+
+	c.funcRouter = newFuncRouter(c)
+
+	return c
 }
 
 type Config struct {
@@ -58,6 +61,8 @@ type Collector struct {
 
 	newConn func(cfg Config) (rdbConn, error)
 	rdb     rdbConn
+
+	funcRouter *funcRouter // function router for method handlers
 
 	seenServers map[string]bool
 }
@@ -100,7 +105,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return ms
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.rdb != nil {
 		if err := c.rdb.close(); err != nil {
 			c.Warningf("cleanup: error on closing client [%s]: %v", c.Address, err)

@@ -34,13 +34,12 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         redisMethods,
-		MethodParams:    redisMethodParams,
-		HandleMethod:    redisHandleMethod,
+		MethodHandler:   redisFunctionHandler,
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			Address:     "redis://@localhost:6379",
 			Timeout:     confopt.Duration(time.Second),
@@ -53,6 +52,8 @@ func New() *Collector {
 		collectedCommands:      make(map[string]bool),
 		collectedDbs:           make(map[string]bool),
 	}
+	c.funcRouter = newFuncRouter(c)
+	return c
 }
 
 type Config struct {
@@ -78,6 +79,8 @@ type (
 		addReplSlaveChartsOnce *sync.Once
 
 		rdb redisClient
+
+		funcRouter *funcRouter
 
 		server            string
 		version           *semver.Version
@@ -145,7 +148,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return ms
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.rdb == nil {
 		return
 	}

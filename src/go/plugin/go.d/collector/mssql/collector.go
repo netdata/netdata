@@ -25,11 +25,10 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:       func() module.Module { return New() },
-		Config:       func() any { return &Config{} },
-		Methods:      mssqlMethods,
-		MethodParams: mssqlMethodParams,
-		HandleMethod: mssqlHandleMethod,
+		Create:        func() module.Module { return New() },
+		Config:        func() any { return &Config{} },
+		Methods:       mssqlMethods,
+		MethodHandler: mssqlFunctionHandler,
 	})
 }
 
@@ -112,6 +111,8 @@ type Collector struct {
 	// Query Store column cache (per-instance to handle different SQL Server versions)
 	queryStoreColsMu sync.RWMutex // protects queryStoreCols for concurrent access
 	queryStoreCols   map[string]bool
+
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -123,6 +124,9 @@ func (c *Collector) Init(context.Context) error {
 		return errors.New("config: dsn not set")
 	}
 	c.Debugf("using DSN [%s]", c.DSN)
+
+	c.funcRouter = newFuncRouter(c)
+
 	return nil
 }
 
@@ -150,7 +154,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.db == nil {
 		return
 	}

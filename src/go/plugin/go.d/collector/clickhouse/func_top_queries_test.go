@@ -29,46 +29,45 @@ func TestClickHouseMethods(t *testing.T) {
 	require.NotEmpty(sortParam.Options)
 }
 
-func TestClickHouseAllColumns_HasRequiredColumns(t *testing.T) {
+func TestTopQueriesColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"query", "calls", "totalTime"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range clickhouseAllColumns {
-		uiKeys[col.uiKey] = true
-	}
+	f := &funcTopQueries{}
+	cs := f.columnSet(topQueriesColumns)
 
 	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+		assert.True(t, cs.ContainsColumn(key), "column %s should be defined", key)
 	}
 }
 
-func TestCollector_mapAndValidateClickHouseSortColumn(t *testing.T) {
+func TestFuncTopQueries_MapAndValidateSortColumn(t *testing.T) {
 	tests := map[string]struct {
-		available []clickhouseColumnMeta
-		input     string
-		expected  string
+		columns  []topQueriesColumn
+		input    string
+		expected string
 	}{
 		"valid totalTime": {
-			available: []clickhouseColumnMeta{{uiKey: "totalTime"}, {uiKey: "calls"}},
-			input:     "totalTime",
-			expected:  "totalTime",
+			columns:  []topQueriesColumn{{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime"}}, {ColumnMeta: funcapi.ColumnMeta{Name: "calls"}}},
+			input:    "totalTime",
+			expected: "totalTime",
 		},
 		"invalid falls back to totalTime": {
-			available: []clickhouseColumnMeta{{uiKey: "totalTime"}, {uiKey: "calls"}},
-			input:     "bad",
-			expected:  "totalTime",
+			columns:  []topQueriesColumn{{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime"}}, {ColumnMeta: funcapi.ColumnMeta{Name: "calls"}}},
+			input:    "bad",
+			expected: "totalTime",
 		},
 		"fallback to calls": {
-			available: []clickhouseColumnMeta{{uiKey: "calls"}},
-			input:     "bad",
-			expected:  "calls",
+			columns:  []topQueriesColumn{{ColumnMeta: funcapi.ColumnMeta{Name: "calls"}}},
+			input:    "bad",
+			expected: "calls",
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			c := &Collector{}
-			assert.Equal(t, tc.expected, c.mapAndValidateClickHouseSortColumn(tc.input, tc.available))
+			f := &funcTopQueries{}
+			cs := f.columnSet(tc.columns)
+			assert.Equal(t, tc.expected, f.mapAndValidateSortColumn(tc.input, cs))
 		})
 	}
 }

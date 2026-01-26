@@ -24,8 +24,7 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         mongoMethods,
-		MethodParams:    mongoMethodParams,
-		HandleMethod:    mongoHandleMethod,
+		MethodHandler:   mongoFunctionHandler,
 	})
 }
 
@@ -90,6 +89,8 @@ type Collector struct {
 	// Top queries column cache with double-checked locking
 	topQueriesColsMu sync.RWMutex
 	topQueriesCols   map[string]bool
+
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -104,6 +105,8 @@ func (c *Collector) Init(context.Context) error {
 	if err := c.initDatabaseSelector(); err != nil {
 		return fmt.Errorf("init database selector: %v", err)
 	}
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -137,7 +140,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.conn == nil {
 		return
 	}

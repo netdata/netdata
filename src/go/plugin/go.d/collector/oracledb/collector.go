@@ -22,9 +22,8 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
-		Methods:         oracleMethods,
-		MethodParams:    oracleMethodParams,
-		HandleMethod:    oracleHandleMethod,
+		Methods:         oracledbMethods,
+		MethodHandler:   oracledbFunctionHandler,
 	})
 }
 
@@ -60,6 +59,8 @@ type Collector struct {
 	Config `yaml:",inline" json:""`
 
 	db *sql.DB
+
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -73,6 +74,8 @@ func (c *Collector) Init(context.Context) error {
 	}
 
 	c.publicDSN = dsn
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -106,7 +109,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.db != nil {
 		if err := c.db.Close(); err != nil {
 			c.Errorf("cleanup: error on closing connection [%s]: %v", c.publicDSN, err)
