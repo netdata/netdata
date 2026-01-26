@@ -385,8 +385,7 @@ static void zfs_collect_pool_capacities(void) {
 
     zfs_last_checked = now;
 
-    dictionary_flush(zfs_pool_info_dict);
-
+    // Update pool info in place (don't flush - keep previous values if update fails)
     char pool_name_buf[256];
 
     for (struct mountinfo *mi = disk_mountinfo_root; mi; mi = mi->next) {
@@ -396,36 +395,28 @@ static void zfs_collect_pool_capacities(void) {
         if (!mi->mount_source || !mi->mount_source[0])
             continue;
 
+        // Only process pool mounts (no '/' in mount_source), not datasets
+        if (strchr(mi->mount_source, '/'))
+            continue;
+
         const char *pool_name = extract_zfs_pool_name(mi->mount_source, pool_name_buf, sizeof(pool_name_buf));
         if (!pool_name || !pool_name[0])
             continue;
 
-        // Check if this is the pool itself (no slash = pool mount)
-        bool is_pool_mount = !strchr(mi->mount_source, '/');
+        // Get capacity from the pool mount
+        struct statvfs buff;
+        if (statvfs(mi->mount_point_stat_path, &buff) != 0)
+            continue;
 
-        struct zfs_pool_info *info = dictionary_get(zfs_pool_info_dict, pool_name);
-        if (!info) {
-            struct zfs_pool_info new_info = {
-                .pool_capacity = 0,
-                .pool_mount_seen = false
-            };
-            info = dictionary_set(zfs_pool_info_dict, pool_name, &new_info, sizeof(new_info));
-            if (!info)
-                continue;  // should never happen, but be defensive
-        }
+        unsigned long bsize = buff.f_frsize ? buff.f_frsize : buff.f_bsize;
+        uint64_t capacity = (uint64_t)buff.f_blocks * bsize;
 
-        if (is_pool_mount) {
-            info->pool_mount_seen = true;
-
-            // Get capacity from the pool mount only (not datasets)
-            // In ZFS, statvfs returns total = used + available, so datasets with
-            // data show larger "total" than the pool. We need the pool's own capacity.
-            struct statvfs buff;
-            if (statvfs(mi->mount_point_stat_path, &buff) == 0) {
-                unsigned long bsize = buff.f_frsize ? buff.f_frsize : buff.f_bsize;
-                info->pool_capacity = (uint64_t)buff.f_blocks * bsize;
-            }
-        }
+        struct zfs_pool_info new_info = {
+            .pool_capacity = capacity,
+            .pool_mount_seen = true
+        };
+        // dictionary_set overwrites existing entries, preserving data if statvfs succeeded
+        dictionary_set(zfs_pool_info_dict, pool_name, &new_info, sizeof(new_info));
     }
 }
 
