@@ -24,8 +24,7 @@ func init() {
 		Config:          func() any { return &Config{} },
 		JobConfigSchema: configSchema,
 		Methods:         clickhouseMethods,
-		MethodParams:    clickhouseMethodParams,
-		HandleMethod:    clickhouseHandleMethod,
+		MethodHandler:   clickhouseFunctionHandler,
 	})
 }
 
@@ -66,6 +65,9 @@ type (
 
 		seenDisks    map[string]*seenDisk
 		seenDbTables map[string]*seenTable
+
+		// Function handler (singleton, initialized in Init)
+		funcRouter *funcRouter
 	}
 	seenDisk  struct{ disk string }
 	seenTable struct{ db, table string }
@@ -85,6 +87,8 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	c.httpClient = httpClient
+
+	c.funcRouter = newFuncRouter(c)
 
 	c.Debugf("using URL %s", c.URL)
 	c.Debugf("using timeout: %s", c.Timeout)
@@ -122,7 +126,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.httpClient != nil {
 		c.httpClient.CloseIdleConnections()
 	}

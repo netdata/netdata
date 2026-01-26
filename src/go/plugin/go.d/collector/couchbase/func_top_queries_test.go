@@ -29,20 +29,17 @@ func TestCouchbaseMethods(t *testing.T) {
 	require.NotEmpty(sortParam.Options)
 }
 
-func TestCouchbaseAllColumns_HasRequiredColumns(t *testing.T) {
+func TestTopQueriesColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"requestId", "statement", "elapsedTime"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range couchbaseAllColumns {
-		uiKeys[col.id] = true
-	}
-
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	f := &funcTopQueries{}
+	cs := f.columnSet(topQueriesColumns)
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }
 
-func TestMapCouchbaseSortColumn(t *testing.T) {
+func TestFuncTopQueries_MapSortColumn(t *testing.T) {
 	tests := map[string]struct {
 		input    string
 		expected string
@@ -54,9 +51,10 @@ func TestMapCouchbaseSortColumn(t *testing.T) {
 		"invalid":     {input: "bad", expected: "elapsedTime"},
 	}
 
+	f := &funcTopQueries{}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, mapCouchbaseSortColumn(tc.input))
+			assert.Equal(t, tc.expected, f.mapSortColumn(tc.input))
 		})
 	}
 }

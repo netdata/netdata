@@ -35,25 +35,17 @@ func TestCockroachDBMethods(t *testing.T) {
 func TestCockroachDBTopColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"fingerprintId", "query", "executions", "totalTime"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range crdbTopColumns {
-		uiKeys[col.id] = true
-	}
-
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	cs := funcapi.Columns(topQueriesColumns, func(c topQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }
 
 func TestCockroachDBRunningColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"queryId", "query", "elapsedMs"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range crdbRunningColumns {
-		uiKeys[col.id] = true
-	}
-
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	cs := funcapi.Columns(runningQueriesColumns, func(c runningQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }

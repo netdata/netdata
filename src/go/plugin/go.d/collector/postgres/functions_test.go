@@ -45,46 +45,43 @@ func TestPgMethods(t *testing.T) {
 
 func TestPgAllColumns_HasRequiredColumns(t *testing.T) {
 	// Verify all required base columns are defined
-	requiredUIKeys := []string{
+	requiredIDs := []string{
 		"queryid", "query", "database", "user", "calls",
 		"totalTime", "meanTime", "minTime", "maxTime",
 		"rows", "sharedBlksHit", "sharedBlksRead", "tempBlksWritten",
 	}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range pgAllColumns {
-		uiKeys[col.uiKey] = true
-	}
+	cs := pgColumnSet(pgAllColumns)
 
-	for _, key := range requiredUIKeys {
-		assert.True(t, uiKeys[key], "column %s should be defined in pgAllColumns", key)
+	for _, id := range requiredIDs {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined in pgAllColumns", id)
 	}
 }
 
 func TestPgAllColumns_HasValidMetadata(t *testing.T) {
 	for _, col := range pgAllColumns {
-		// Every column must have a UI key
-		assert.NotEmpty(t, col.uiKey, "column %s must have uiKey", col.dbColumn)
+		// Every column must have an ID
+		assert.NotEmpty(t, col.Name, "column %s must have Name", col.DBColumn)
 
-		// Every column must have a display name
-		assert.NotEmpty(t, col.displayName, "column %s must have displayName", col.uiKey)
+		// Every column must have a display name (tooltip)
+		assert.NotEmpty(t, col.Tooltip, "column %s must have Tooltip", col.Name)
 
 		// Every column must have a data type
-		assert.NotEqual(t, funcapi.FieldTypeNone, col.dataType, "column %s must have dataType", col.uiKey)
+		assert.NotEqual(t, funcapi.FieldTypeNone, col.Type, "column %s must have Type", col.Name)
 
 		// Duration columns must have units
-		if col.dataType == ftDuration {
-			assert.NotEmpty(t, col.units, "duration column %s must have units", col.uiKey)
+		if col.Type == funcapi.FieldTypeDuration {
+			assert.NotEmpty(t, col.Units, "duration column %s must have Units", col.Name)
 		}
 
 		// Sort options must have labels
-		if col.isSortOption {
-			assert.NotEmpty(t, col.sortLabel, "sort option column %s must have sortLabel", col.uiKey)
+		if col.IsSortOption {
+			assert.NotEmpty(t, col.SortLabel, "sort option column %s must have SortLabel", col.Name)
 		}
 	}
 }
 
-func TestCollector_mapAndValidateSortColumn(t *testing.T) {
+func TestFuncTopQueries_mapAndValidateSortColumn(t *testing.T) {
 	tests := map[string]struct {
 		pgVersion     int
 		availableCols map[string]bool
@@ -132,18 +129,20 @@ func TestCollector_mapAndValidateSortColumn(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Collector{pgVersion: tc.pgVersion}
-			result := c.mapAndValidateSortColumn(tc.input, tc.availableCols)
+			r := &funcRouter{collector: c}
+			f := &funcTopQueries{router: r}
+			result := f.mapAndValidateSortColumn(tc.input, tc.availableCols)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
 }
 
-func TestCollector_buildAvailableColumns(t *testing.T) {
+func TestFuncTopQueries_buildAvailableColumns(t *testing.T) {
 	tests := map[string]struct {
 		pgVersion     int
 		availableCols map[string]bool
-		expectCols    []string // UI keys we expect to see
-		notExpectCols []string // UI keys we don't expect
+		expectCols    []string // Column IDs we expect to see
+		notExpectCols []string // Column IDs we don't expect
 	}{
 		"PG12 with basic columns": {
 			pgVersion: pgVersionOld,
@@ -170,25 +169,22 @@ func TestCollector_buildAvailableColumns(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Collector{pgVersion: tc.pgVersion}
-			cols := c.buildAvailableColumns(tc.availableCols)
+			r := &funcRouter{collector: c}
+			f := &funcTopQueries{router: r}
+			cols := f.buildAvailableColumns(tc.availableCols)
+			cs := pgColumnSet(cols)
 
-			// Build map of UI keys for easy lookup
-			uiKeys := make(map[string]bool)
-			for _, col := range cols {
-				uiKeys[col.uiKey] = true
+			for _, id := range tc.expectCols {
+				assert.True(t, cs.ContainsColumn(id), "expected column %s to be present", id)
 			}
-
-			for _, key := range tc.expectCols {
-				assert.True(t, uiKeys[key], "expected column %s to be present", key)
-			}
-			for _, key := range tc.notExpectCols {
-				assert.False(t, uiKeys[key], "did not expect column %s to be present", key)
+			for _, id := range tc.notExpectCols {
+				assert.False(t, cs.ContainsColumn(id), "did not expect column %s to be present", id)
 			}
 		})
 	}
 }
 
-func TestCollector_buildDynamicSQL(t *testing.T) {
+func TestFuncTopQueries_buildDynamicSQL(t *testing.T) {
 	tests := map[string]struct {
 		pgVersion  int
 		sortColumn string
@@ -209,16 +205,18 @@ func TestCollector_buildDynamicSQL(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Collector{pgVersion: tc.pgVersion}
+			r := &funcRouter{collector: c}
+			f := &funcTopQueries{router: r}
 
 			// Build minimal column set for test
-			cols := []pgColumnMeta{
-				{dbColumn: "s.queryid", uiKey: "queryid", dataType: ftString},
-				{dbColumn: "s.query", uiKey: "query", dataType: ftString},
-				{dbColumn: "s.calls", uiKey: "calls", dataType: ftInteger},
-				{dbColumn: "total_time", uiKey: "totalTime", dataType: ftDuration},
+			cols := []pgColumn{
+				{ColumnMeta: funcapi.ColumnMeta{Name: "queryid", Type: funcapi.FieldTypeString}, DBColumn: "s.queryid"},
+				{ColumnMeta: funcapi.ColumnMeta{Name: "query", Type: funcapi.FieldTypeString}, DBColumn: "s.query"},
+				{ColumnMeta: funcapi.ColumnMeta{Name: "calls", Type: funcapi.FieldTypeInteger}, DBColumn: "s.calls"},
+				{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Type: funcapi.FieldTypeDuration}, DBColumn: "total_time"},
 			}
 
-			sql := c.buildDynamicSQL(cols, tc.sortColumn, 500)
+			sql := f.buildDynamicSQL(cols, tc.sortColumn, 500)
 
 			assert.Contains(t, sql, "pg_stat_statements")
 			assert.Contains(t, sql, tc.sortColumn)
@@ -228,16 +226,15 @@ func TestCollector_buildDynamicSQL(t *testing.T) {
 	}
 }
 
-func TestCollector_buildDynamicColumns(t *testing.T) {
-	c := &Collector{}
-
-	cols := []pgColumnMeta{
-		{uiKey: "queryid", displayName: "Query ID", dataType: ftString, visible: false, isUniqueKey: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
-		{uiKey: "query", displayName: "Query", dataType: ftString, visible: true, isSticky: true, fullWidth: true, transform: trNone, sortDir: sortAsc, summary: summaryCount, filter: filterMulti},
-		{uiKey: "totalTime", displayName: "Total Time", dataType: ftDuration, units: "seconds", visible: true, transform: trDuration, decimalPoints: 2, sortDir: sortDesc, summary: summarySum, filter: filterRange},
+func TestPgColumnSet_BuildColumns(t *testing.T) {
+	cols := []pgColumn{
+		{ColumnMeta: funcapi.ColumnMeta{Name: "queryid", Tooltip: "Query ID", Type: funcapi.FieldTypeString, Visible: false, UniqueKey: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "s.queryid"},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query", Type: funcapi.FieldTypeString, Visible: true, Sticky: true, FullWidth: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "s.query"},
+		{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Tooltip: "Total Time", Type: funcapi.FieldTypeDuration, Units: "seconds", Visible: true, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "total_time"},
 	}
 
-	columns := c.buildDynamicColumns(cols)
+	cs := pgColumnSet(cols)
+	columns := cs.BuildColumns()
 
 	// Verify column count
 	assert.Len(t, columns, 3)

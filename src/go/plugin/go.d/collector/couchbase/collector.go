@@ -24,11 +24,10 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 5,
 		},
-		Create:       func() module.Module { return New() },
-		Config:       func() any { return &Config{} },
-		Methods:      couchbaseMethods,
-		MethodParams: couchbaseMethodParams,
-		HandleMethod: couchbaseHandleMethod,
+		Create:        func() module.Module { return New() },
+		Config:        func() any { return &Config{} },
+		Methods:       couchbaseMethods,
+		MethodHandler: couchbaseFunctionHandler,
 	})
 }
 
@@ -65,6 +64,8 @@ type Collector struct {
 	charts     *module.Charts
 
 	collectedBuckets map[string]bool
+
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -88,6 +89,8 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("init charts: %v", err)
 	}
 	c.charts = charts
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -120,7 +123,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.httpClient == nil {
 		return
 	}

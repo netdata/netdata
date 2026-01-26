@@ -25,13 +25,12 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         proxysqlMethods,
-		MethodParams:    proxysqlMethodParams,
-		HandleMethod:    proxysqlHandleMethod,
+		MethodHandler:   proxysqlFunctionHandler,
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			DSN:     "stats:stats@tcp(127.0.0.1:6032)/",
 			Timeout: confopt.Duration(time.Second),
@@ -46,6 +45,10 @@ func New() *Collector {
 			hostgroups: make(map[string]*hostgroupCache),
 		},
 	}
+
+	c.funcRouter = newFuncRouter(c)
+
+	return c
 }
 
 type Config struct {
@@ -67,6 +70,8 @@ type Collector struct {
 
 	once  *sync.Once
 	cache *cache
+
+	funcRouter *funcRouter // function router for method handlers
 
 	queryDigestCols   map[string]bool
 	queryDigestColsMu sync.RWMutex
@@ -113,7 +118,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.db == nil {
 		return
 	}

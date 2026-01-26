@@ -28,8 +28,7 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         mysqlMethods,
-		MethodParams:    mysqlMethodParams,
-		HandleMethod:    mysqlHandleMethod,
+		MethodHandler:   mysqlFunctionHandler,
 	})
 }
 
@@ -113,6 +112,8 @@ type Collector struct {
 
 	stmtSummaryCols   map[string]bool // cached column names from events_statements_summary_by_digest
 	stmtSummaryColsMu sync.RWMutex    // protects stmtSummaryCols for concurrent access
+
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -141,6 +142,8 @@ func (c *Collector) Init(context.Context) error {
 	c.safeDSN = cfg.FormatDSN()
 
 	c.Debugf("using DSN [%s]", c.DSN)
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -172,7 +175,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.db == nil {
 		return
 	}

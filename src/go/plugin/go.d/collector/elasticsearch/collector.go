@@ -25,11 +25,10 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 5,
 		},
-		Create:       func() module.Module { return New() },
-		Config:       func() any { return &Config{} },
-		Methods:      elasticsearchMethods,
-		MethodParams: elasticsearchMethodParams,
-		HandleMethod: elasticsearchHandleMethod,
+		Create:        func() module.Module { return New() },
+		Config:        func() any { return &Config{} },
+		Methods:       elasticsearchMethods,
+		MethodHandler: elasticsearchFunctionHandler,
 	})
 }
 
@@ -86,6 +85,8 @@ type Collector struct {
 	clusterName string
 	nodes       map[string]bool
 	indices     map[string]bool
+
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -103,6 +104,8 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	c.httpClient = httpClient
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -135,7 +138,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.httpClient != nil {
 		c.httpClient.CloseIdleConnections()
 	}
