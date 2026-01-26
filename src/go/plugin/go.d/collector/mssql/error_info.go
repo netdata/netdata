@@ -320,8 +320,9 @@ func (c *Collector) collectMSSQLErrorDetails(ctx context.Context) (string, map[s
 		if status == mssqlErrorAttrNotEnabled {
 			return mssqlErrorAttrNotEnabled, nil
 		}
-		c.Debugf("error attribution query failed: %v", err)
-		return mssqlErrorAttrNotSupported, nil
+		mapped := classifyMSSQLErrorAttrError(err)
+		c.Debugf("error attribution query failed: %v (status=%s)", err, mapped)
+		return mapped, nil
 	}
 
 	if len(rows) == 0 {
@@ -343,6 +344,25 @@ func (c *Collector) collectMSSQLErrorDetails(ctx context.Context) (string, map[s
 		}
 	}
 	return mssqlErrorAttrEnabled, out
+}
+
+func classifyMSSQLErrorAttrError(err error) string {
+	if err == nil {
+		return mssqlErrorAttrNotEnabled
+	}
+	if isDeadlockPermissionError(err) {
+		return mssqlErrorAttrNotEnabled
+	}
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "permission") || strings.Contains(msg, "denied") {
+		return mssqlErrorAttrNotEnabled
+	}
+	if strings.Contains(msg, "invalid column") ||
+		strings.Contains(msg, "invalid object") ||
+		strings.Contains(msg, "could not find") {
+		return mssqlErrorAttrNotSupported
+	}
+	return mssqlErrorAttrNotEnabled
 }
 
 func (c *Collector) collectMSSQLPlanOps(ctx context.Context, data [][]any, cols []topQueriesColumn) map[string]map[string]mssqlPlanOps {

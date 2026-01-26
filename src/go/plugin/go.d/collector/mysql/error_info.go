@@ -360,10 +360,6 @@ WHERE NAME IN ('events_statements_history_long','events_statements_history','eve
 		return mysqlErrorSource{status: mysqlErrorAttrNotEnabled, reason: "unable to read performance_schema.setup_consumers"}, err
 	}
 
-	if present["events_statements_current"] && !enabled["events_statements_current"] {
-		return mysqlErrorSource{status: mysqlErrorAttrNotEnabled, reason: "statement history consumer events_statements_current is disabled"}, nil
-	}
-
 	table := ""
 	fallback := ""
 	switch {
