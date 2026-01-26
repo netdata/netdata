@@ -56,6 +56,8 @@ static netdata_idx_t *disk_hash_values = NULL;
 ebpf_publish_disk_t *plot_disks = NULL;
 netdata_mutex_t plot_mutex;
 
+static netdata_mutex_t tracepoint_mutex;
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Set hash table
@@ -113,11 +115,8 @@ static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *filename)
         return -1;
     }
 
-    ssize_t file_length = read(fd, content, 4095);
+    ssize_t file_length = read(fd, content, FILENAME_MAX);
     if (file_length > 0) {
-        if (file_length > FILENAME_MAX)
-            file_length = FILENAME_MAX;
-
         content[file_length] = '\0';
         w->start = strtoul(content, NULL, 10);
     }
@@ -146,9 +145,6 @@ static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *filename)
 
     ssize_t file_length = read(fd, content, FILENAME_MAX);
     if (file_length > 0) {
-        if (file_length > FILENAME_MAX)
-            file_length = FILENAME_MAX;
-
         content[file_length] = '\0';
 
         char *s = strstr(content, "PARTNAME=EFI");
@@ -181,9 +177,6 @@ static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *filename)
 
     ssize_t file_length = read(fd, content, FILENAME_MAX);
     if (file_length > 0) {
-        if (file_length > FILENAME_MAX)
-            file_length = FILENAME_MAX;
-
         content[file_length] = '\0';
         w->end = w->start + strtoul(content, NULL, 10) - 1;
     }
@@ -197,13 +190,14 @@ static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *filename)
  *
  * Read disk information from /sys/block
  *
- * @param w    structure where data is stored
- * @param name disk name
+ * @param w             structure where data is stored
+ * @param name          disk name
+ * @param main_disk     pointer to main disk structure
+ * @param bootsector_key bootsector key for the disk
  */
-static void ebpf_read_disk_info(netdata_ebpf_disks_t *w, char *name)
+static void
+ebpf_read_disk_info(netdata_ebpf_disks_t *w, char *name, netdata_ebpf_disks_t **main_disk, uint32_t *bootsector_key)
 {
-    static netdata_ebpf_disks_t *main_disk = NULL;
-    static uint32_t key = 0;
     char *path = {"/sys/block"};
     char disk[NETDATA_DISK_NAME_LEN + 1];
     char filename[FILENAME_MAX + 1];
@@ -214,20 +208,23 @@ static void ebpf_read_disk_info(netdata_ebpf_disks_t *w, char *name)
     }
 
     length--;
-    size_t curr = length;
-    while (isdigit((int)disk[length])) {
+    int has_digits = 0;
+    while (length != (size_t)-1 && isdigit((int)disk[length])) {
         disk[length--] = '\0';
+        has_digits = 1;
     }
 
-    // We are looking for partition information, if it is a device we will ignore it.
-    if (curr == length) {
-        main_disk = w;
-        key = MKDEV(w->major, w->minor);
-        w->bootsector_key = key;
+    // We are looking for partition information, if it is a device we will set it as main disk
+    if (!has_digits) {
+        *main_disk = w;
+        *bootsector_key = MKDEV(w->major, w->minor);
+        w->bootsector_key = *bootsector_key;
         return;
     }
-    w->bootsector_key = key;
-    w->main = main_disk;
+
+    // This is a partition, link it to main disk
+    w->bootsector_key = *bootsector_key;
+    w->main = *main_disk;
 
     snprintfz(filename, FILENAME_MAX, "%s/%s/%s/uevent", path, disk, name);
     if (ebpf_parse_uevent(w, filename))
@@ -291,6 +288,9 @@ static int ebpf_compare_disks(void *a, void *b)
  */
 static void update_disk_table(char *name, int major, int minor, time_t current_time)
 {
+    static netdata_ebpf_disks_t *main_disk = NULL;
+    static uint32_t bootsector_key = 0;
+
     netdata_ebpf_disks_t find;
     netdata_ebpf_disks_t *w;
     size_t length;
@@ -341,7 +341,7 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
         w = disk_list;
     }
 
-    ebpf_read_disk_info(w, name);
+    ebpf_read_disk_info(w, name, &main_disk, &bootsector_key);
 
     netdata_ebpf_disks_t *check;
     check = (netdata_ebpf_disks_t *)avl_insert_lock(&disk_tree, (avl_t *)w);
@@ -428,12 +428,20 @@ void ebpf_update_disks(ebpf_module_t *em)
 static void ebpf_disk_disable_tracepoints()
 {
     char *default_message = {"Cannot disable the tracepoint"};
-    if (!was_block_issue_enabled) {
+    int block_issue_enabled;
+    int block_rq_complete_enabled;
+
+    netdata_mutex_lock(&tracepoint_mutex);
+    block_issue_enabled = was_block_issue_enabled;
+    block_rq_complete_enabled = was_block_rq_complete_enabled;
+    netdata_mutex_unlock(&tracepoint_mutex);
+
+    if (block_issue_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_block_type, tracepoint_block_issue))
             netdata_log_error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_issue);
     }
 
-    if (!was_block_rq_complete_enabled) {
+    if (block_rq_complete_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_block_type, tracepoint_block_rq_complete))
             netdata_log_error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_rq_complete);
     }
@@ -521,12 +529,11 @@ static void ebpf_disk_exit(void *pptr)
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         netdata_mutex_lock(&lock);
-
         ebpf_obsolete_disk_global(em);
-
         netdata_mutex_unlock(&lock);
         fflush(stdout);
     }
+
     ebpf_disk_disable_tracepoints();
 
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, disk_maps, EBPF_ACTION_STAT_REMOVE);
@@ -537,15 +544,22 @@ static void ebpf_disk_exit(void *pptr)
         em->probe_links = NULL;
     }
 
-    if (dimensions)
+    if (dimensions) {
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+        dimensions = NULL;
+    }
 
     freez(disk_hash_values);
     disk_hash_values = NULL;
-    netdata_mutex_destroy(&plot_mutex);
 
-    ebpf_cleanup_plot_disks();
-    ebpf_cleanup_disk_list();
+    netdata_mutex_destroy(&plot_mutex);
+    netdata_mutex_destroy(&tracepoint_mutex);
+
+    if (plot_disks)
+        ebpf_cleanup_plot_disks();
+
+    if (disk_list)
+        ebpf_cleanup_disk_list();
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
@@ -855,7 +869,10 @@ static int ebpf_disk_enable_tracepoints()
         if (ebpf_enable_tracing_values(tracepoint_block_type, tracepoint_block_issue))
             return -1;
     }
+
+    netdata_mutex_lock(&tracepoint_mutex);
     was_block_issue_enabled = test;
+    netdata_mutex_unlock(&tracepoint_mutex);
 
     test = ebpf_is_tracepoint_enabled(tracepoint_block_type, tracepoint_block_rq_complete);
     if (test == -1)
@@ -864,7 +881,10 @@ static int ebpf_disk_enable_tracepoints()
         if (ebpf_enable_tracing_values(tracepoint_block_type, tracepoint_block_rq_complete))
             return -1;
     }
+
+    netdata_mutex_lock(&tracepoint_mutex);
     was_block_rq_complete_enabled = test;
+    netdata_mutex_unlock(&tracepoint_mutex);
 
     return 0;
 }
@@ -937,6 +957,11 @@ void ebpf_disk_thread(void *ptr)
         goto enddisk;
     }
 
+    if (netdata_mutex_init(&tracepoint_mutex)) {
+        netdata_log_error("Cannot initialize tracepoint mutex");
+        goto enddisk;
+    }
+
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_define_map_type(disk_maps, em->maps_per_core, running_on_kernel);
     ebpf_adjust_thread_load(em, default_btf);
@@ -948,6 +973,10 @@ void ebpf_disk_thread(void *ptr)
     int algorithms[NETDATA_EBPF_HIST_MAX_BINS];
     ebpf_fill_algorithms(algorithms, NETDATA_EBPF_HIST_MAX_BINS, NETDATA_EBPF_INCREMENTAL_IDX);
     dimensions = ebpf_fill_histogram_dimension(NETDATA_EBPF_HIST_MAX_BINS);
+    if (!dimensions) {
+        netdata_log_error("Cannot allocate histogram dimensions");
+        goto enddisk;
+    }
 
     ebpf_global_labels(
         disk_aggregated_data, disk_publish_aggregated, dimensions, dimensions, algorithms, NETDATA_EBPF_HIST_MAX_BINS);
