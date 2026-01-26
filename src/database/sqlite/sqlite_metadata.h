@@ -52,12 +52,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory);
 void cleanup_agent_event_log(void);
 void add_agent_event(event_log_type_t event_id, int64_t value);
 usec_t get_agent_event_time_median(event_log_type_t event_id);
-bool metadata_queue_ae_save(RRDHOST *host, ALARM_ENTRY *ae);
-void metadata_queue_ae_deletion(ALARM_ENTRY *ae);
-void commit_alert_transitions(RRDHOST *host);
 
-//void metadata_sync_shutdown_background(void);
-//void metadata_sync_shutdown_background_wait(void);
 void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context);
 void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer);
 void metadata_execute_store_statement(sqlite3_stmt *stmt);

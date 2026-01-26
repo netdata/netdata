@@ -82,4 +82,7 @@ struct alarm_entry {
 // Function to clean up old alarm entries based on retention settings
 void health_alarm_log_cleanup(RRDHOST *host);
 
+// Free an alarm entry directly (no pending_save_count check, no linked-list check)
+void health_alarm_entry_free_direct(ALARM_ENTRY *ae);
+
 #endif //NETDATA_HEALTH_ALERT_ENTRY_H

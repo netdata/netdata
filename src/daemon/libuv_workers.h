@@ -104,7 +104,6 @@ enum event_loop_job {
 typedef struct worker_data {
     uv_work_t request;
     void *config;
-    void *pending_alert_list;
     void *pending_ctx_cleanup_list;
     void *pending_uuid_deletion;
     void *pending_sql_statement;
