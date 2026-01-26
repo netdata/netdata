@@ -19,7 +19,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const deadlockInfoHelp = "Latest deadlock from the system_health Extended Events ring buffer. WARNING: query text may include unmasked sensitive literals; restrict dashboard access."
+const (
+	deadlockInfoHelp         = "Latest deadlock from the system_health Extended Events ring buffer. WARNING: query text may include unmasked sensitive literals; restrict dashboard access."
+	deadlockParseErrorStatus = 561
+)
 
 const deadlockInfoMethodID = "deadlock-info"
 
@@ -164,7 +167,7 @@ func (c *Collector) deadlockInfoParams(context.Context) ([]funcapi.ParamConfig, 
 func (c *Collector) collectDeadlockInfo(ctx context.Context) *funcapi.FunctionResponse {
 	if !c.Config.GetDeadlockInfoFunctionEnabled() {
 		return &funcapi.FunctionResponse{
-			Status: 403,
+			Status: 503,
 			Message: "deadlock-info function has been disabled in configuration. " +
 				"To enable, set deadlock_info_function_enabled: true in the MSSQL collector config.",
 		}
@@ -195,7 +198,7 @@ func (c *Collector) collectDeadlockInfo(ctx context.Context) *funcapi.FunctionRe
 	parseRes := parseDeadlockGraph(deadlockXML, deadlockTime)
 	if parseRes.parseErr != nil {
 		c.Warningf("deadlock-info: parse failed: %v", parseRes.parseErr)
-		return c.deadlockInfoResponse(200, "deadlock graph could not be parsed", nil)
+		return c.deadlockInfoResponse(deadlockParseErrorStatus, "deadlock graph could not be parsed", nil)
 	}
 	if !parseRes.found {
 		return c.deadlockInfoResponse(200, "no deadlock found in system_health ring buffer", nil)

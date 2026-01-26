@@ -375,6 +375,71 @@ Aggregated query execution statistics from Query Store runtime views, providing 
 | StdDev TempDB | float |  | hidden | Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation. |
 
 
+### Deadlock Info
+
+Retrieves the most recent deadlock event from SQL Server's `system_health` Extended Events ring buffer (`xml_deadlock_report`).
+
+The deadlock graph XML is parsed to attribute the deadlock to the participating processes and their query text, lock mode, lock status, and wait resource.
+
+Use cases:
+- Identify which process was chosen as the deadlock victim
+- Inspect the waiting resource and lock mode involved in the deadlock
+- Correlate deadlocks with recent application changes or deployments
+
+Query text and wait resource strings are truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mssql:deadlock-info` |
+| Require Cloud | yes |
+| Performance | Executes on-demand queries against the `system_health` ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing |
+| Security | Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `deadlock_info_function_enabled` is true<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+1. Ensure the account has the required permission:
+   ```sql
+   GRANT VIEW SERVER STATE TO [netdata];
+   ```
+2. Enable the function in Netdata collector config:
+   ```yaml
+   jobs:
+     - name: local
+       dsn: "sqlserver://user:pass@localhost:1433"
+       deadlock_info_function_enabled: true
+   ```
+3. Verify the deadlock source is accessible:
+   ```sql
+   SELECT name
+   FROM sys.dm_xe_sessions
+   WHERE name = 'system_health';
+   ```
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Parsed deadlock participants from the latest detected deadlock event. Each row represents one process involved in the deadlock.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Row ID | string |  | hidden | Unique row identifier composed of deadlock ID and process ID. |
+| Deadlock ID | string |  |  | Identifier for the deadlock event, derived from the deadlock timestamp to group participating processes. |
+| Timestamp | timestamp |  |  | Timestamp of the deadlock event from the ring buffer when available; otherwise the function execution time. |
+| Process ID | string |  |  | Deadlock graph process identifier for the process involved in the deadlock. |
+| SPID | integer |  |  | SQL Server session ID (SPID) for the process when available. |
+| ECID | integer |  |  | Execution context ID (ECID) for parallel execution contexts when available. |
+| Victim | string |  |  | "true" when the process was chosen as the deadlock victim and rolled back; otherwise "false". |
+| Query | string |  |  | SQL query text for the process involved in the deadlock. Truncated to 4096 characters. |
+| Lock Mode | string |  |  | Lock mode reported for the process within the deadlock graph (for example X or S). |
+| Lock Status | string |  |  | Lock status for the process. WAITING indicates the process was waiting on a lock. |
+| Wait Resource | string |  |  | Lock resource identifier from the deadlock graph showing what the process was waiting on. |
+| Database | string |  |  | Database name mapped from the deadlock graph database ID when available. |
+
 
 ## Alerts
 

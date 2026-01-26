@@ -335,6 +335,70 @@ Aggregated statement statistics from Performance Schema, grouped by query digest
 | Max Total Memory | integer |  |  | Maximum total memory used by this query pattern including both controlled and uncontrolled allocations. Available in MySQL 8.0.31+. |
 
 
+### Deadlock Info
+
+Retrieves the latest detected InnoDB deadlock from `SHOW ENGINE INNODB STATUS`.
+
+The output is parsed to attribute the deadlock to participating transactions and their query text, lock mode, lock status, and wait resource.
+
+Use cases:
+- Identify which query was chosen as the deadlock victim
+- Inspect the waiting lock resource and lock mode
+- Correlate deadlocks with application changes or deployments
+
+Query text and wait resource strings are truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mysql:deadlock-info` |
+| Require Cloud | yes |
+| Performance | Executes `SHOW ENGINE INNODB STATUS` on demand:<br/>• Not part of regular collection<br/>• Query cost depends on server load and the size of the InnoDB status output |
+| Security | Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to MySQL<br/>• `deadlock_info_function_enabled` is true<br/>• The account can run `SHOW ENGINE INNODB STATUS` (PROCESS privilege)<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when PROCESS privilege is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock section cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled |
+
+#### Prerequisites
+
+1. Ensure the account has the required privilege:
+   ```sql
+   GRANT PROCESS ON *.* TO 'netdata'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+2. Enable the function in Netdata collector config:
+   ```yaml
+   jobs:
+     - name: local
+       dsn: "mysql://user:pass@tcp(127.0.0.1:3306)/"
+       deadlock_info_function_enabled: true
+   ```
+3. Verify the deadlock source is accessible:
+   ```sql
+   SHOW ENGINE INNODB STATUS\G
+   ```
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Parsed deadlock participants from the latest detected deadlock. Each row represents one transaction involved in the deadlock.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Row ID | string |  | hidden | Unique row identifier composed of deadlock ID and process ID. |
+| Deadlock ID | string |  |  | Identifier for the deadlock event, used to group participating transactions. |
+| Timestamp | timestamp |  |  | Timestamp of the deadlock event. Parsed from the deadlock section when available; otherwise the function execution time. |
+| Process ID | string |  |  | MySQL thread id of the transaction involved in the deadlock. |
+| Connection ID | integer |  |  | Numeric connection identifier when the process id is numeric. |
+| ECID | integer |  |  | Execution context id (engine-specific). This is typically null for MySQL and reserved for cross-engine consistency. |
+| Victim | string |  |  | "true" when the transaction was chosen as the deadlock victim and rolled back; otherwise "false". |
+| Query | string |  |  | SQL query text for the transaction involved in the deadlock. Truncated to 4096 characters. |
+| Lock Mode | string |  |  | Lock mode reported for the waiting lock (for example X or S). |
+| Lock Status | string |  |  | Lock status for the transaction. WAITING indicates the transaction was waiting on a lock. |
+| Wait Resource | string |  |  | Lock resource line from InnoDB status showing what the transaction was waiting on. |
+| Database | string |  |  | Database name when it can be inferred. This may be empty or null depending on the deadlock output. |
+
 
 ## Alerts
 
@@ -614,5 +678,4 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep mysql
 ```
-
 

@@ -4,6 +4,7 @@ package mssql
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -127,6 +128,45 @@ func TestParseDeadlockGraph_Malformed(t *testing.T) {
 	assert.Error(t, res.parseErr)
 }
 
+func TestCollectDeadlockInfo_ParseError(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	deadlockTime := time.Date(2026, time.January, 25, 12, 34, 56, 0, time.UTC)
+	deadlockRows := sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}).
+		AddRow(deadlockTime, "<deadlock><broken>")
+	mock.ExpectQuery("WITH xevents").WillReturnRows(deadlockRows)
+
+	dbNameRows := sqlmock.NewRows([]string{"database_id", "name"})
+	mock.ExpectQuery("SELECT\\s+database_id").WillReturnRows(dbNameRows)
+
+	c := New()
+	c.db = db
+
+	resp := c.collectDeadlockInfo(context.Background())
+	require.Equal(t, deadlockParseErrorStatus, resp.Status)
+	assert.Contains(t, strings.ToLower(resp.Message), "could not be parsed")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCollectDeadlockInfo_QueryError(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery("WITH xevents").
+		WillReturnError(errors.New("boom"))
+
+	c := New()
+	c.db = db
+
+	resp := c.collectDeadlockInfo(context.Background())
+	require.Equal(t, 500, resp.Status)
+	assert.Contains(t, strings.ToLower(resp.Message), "deadlock query failed")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestBuildDeadlockRows(t *testing.T) {
 	now := time.Date(2026, time.January, 25, 12, 0, 0, 654321000, time.UTC)
 	res := parseDeadlockGraph(sampleDeadlockGraph, now)
@@ -171,7 +211,7 @@ func TestCollectDeadlockInfo_Disabled(t *testing.T) {
 	c.Config.DeadlockInfoFunctionEnabled = boolPtr(false)
 
 	resp := c.collectDeadlockInfo(context.Background())
-	require.Equal(t, 403, resp.Status)
+	require.Equal(t, 503, resp.Status)
 	assert.Contains(t, strings.ToLower(resp.Message), "disabled")
 }
 
