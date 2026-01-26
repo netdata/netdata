@@ -513,8 +513,9 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
     }
 
     // 8. Check if pool cache entry is still fresh (pool may have been unmounted)
+    // Use 2x interval: if entry missed one refresh cycle, pool is likely unmounted
     time_t now = now_realtime_sec();
-    if (now - pool_entry->last_checked >= ZFS_DATASET_RECHECK_SECONDS) {
+    if (now - pool_entry->last_checked >= ZFS_DATASET_RECHECK_SECONDS * 2) {
         dictionary_acquired_item_release(zfs_cache, pool_item);
         collector_info("DISKSPACE: ZFS dataset '%s' kept (pool '%s' cache stale)", mount_source, pool_name);
         return false;
