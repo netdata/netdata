@@ -517,8 +517,8 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
     uint64_t dataset_capacity = (uint64_t)buff->f_blocks * bsize;
 
     // 10. Determine exclusion: dataset capacity >= pool capacity → no quota → exclude
-    // In ZFS, statvfs total = used + available. Datasets with data show larger
-    // total than pool. Datasets with quotas show smaller total (capped by quota).
+    // Datasets without quotas report same capacity as pool.
+    // Datasets with quotas report smaller capacity (capped by quota).
     bool excluded = (dataset_capacity >= pool_capacity);
 
     // 11. Cache the decision for this dataset
