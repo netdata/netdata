@@ -45,15 +45,18 @@ const (
 
 var (
 	reDeadlockHeader = regexp.MustCompile(`LATEST DETECTED DEADLOCK`)
-	reDeadlockTxn    = regexp.MustCompile(`^\*\*\* \((\d+)\) TRANSACTION:`)
-	reDeadlockWait   = regexp.MustCompile(`^\*\*\* \((\d+)\) WAITING FOR THIS LOCK TO BE GRANTED:`)
-	reDeadlockHolds  = regexp.MustCompile(`^\*\*\* \((\d+)\) HOLDS THE LOCK\(S\):`)
-	reDeadlockVictim = regexp.MustCompile(`^\*\*\* WE ROLL BACK TRANSACTION \((\d+)\)`)
-	reDeadlockThread = regexp.MustCompile(`MySQL thread id (\d+)`)
+	reDeadlockTxn    = regexp.MustCompile(`(?i)^\*\*\* \((\d+)\) TRANSACTION:?`)
+	reDeadlockWait   = regexp.MustCompile(`(?i)^\*\*\* \((\d+)\) WAITING FOR THIS LOCK TO BE GRANTED:?`)
+	reDeadlockHolds  = regexp.MustCompile(`(?i)^\*\*\* \((\d+)\) HOLDS THE LOCK\(S\):?`)
+	reDeadlockWaitNoTxn  = regexp.MustCompile(`(?i)^\*\*\*\s*WAITING FOR THIS LOCK TO BE GRANTED:?`)
+	reDeadlockHoldsNoTxn = regexp.MustCompile(`(?i)^\*\*\*\s*HOLDS THE LOCK\(S\):?`)
+	reDeadlockVictim = regexp.MustCompile(`(?i)^\*\*\* WE ROLL BACK TRANSACTION \((\d+)\)`)
+	reDeadlockThread = regexp.MustCompile(`(?i)\b(?:mysql|mariadb)?\s*thread id\s+(\d+)`)
 	reDeadlockMode   = regexp.MustCompile(`(?i)lock[_ ]mode\s+([A-Z0-9_-]+)`)
 	reDeadlockTS     = regexp.MustCompile(`\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\b`)
 	reDeadlockTable  = regexp.MustCompile(`(?i)\bof\s+table\s+` + "`?" + `([-\w$]+)` + "`?" + `\.` + "`?" + `([-\w$]+)` + "`?")
 	reQueryTableRef  = regexp.MustCompile(`(?i)\b(?:from|update|into|join)\s+` + "`?" + `([-\w$]+)` + "`?" + `\.` + "`?" + `([-\w$]+)` + "`?")
+	reSQLStatement   = regexp.MustCompile(`(?i)^(?:/\*.*\*/\s*)?(SELECT|UPDATE|INSERT|DELETE|REPLACE|WITH|ALTER|CREATE|DROP|TRUNCATE|LOCK|UNLOCK|SET|SHOW|CALL|EXEC|EXECUTE|DO|BEGIN|COMMIT|ROLLBACK|MERGE)\b`)
 )
 
 const (
@@ -461,6 +464,21 @@ func parseInnoDBDeadlock(status string, now time.Time) mysqlDeadlockParseResult 
 			continue
 		}
 
+		if currentTxnNum != 0 {
+			if isDeadlockWaitNoTxn(line) {
+				currentSection = deadlockSectionWaiting
+				expectingQueryTxn = 0
+				ensureTxn(currentTxnNum)
+				continue
+			}
+			if isDeadlockHoldsNoTxn(line) {
+				currentSection = deadlockSectionHolds
+				expectingQueryTxn = 0
+				ensureTxn(currentTxnNum)
+				continue
+			}
+		}
+
 		if num, ok := parseDeadlockVictim(line); ok {
 			victimTxnNum = num
 			continue
@@ -478,9 +496,14 @@ func parseInnoDBDeadlock(status string, now time.Time) mysqlDeadlockParseResult 
 			continue
 		}
 
-		if expectingQueryTxn == currentTxnNum && txn.queryText == "" && isLikelyQueryLine(line) {
+		if expectingQueryTxn == currentTxnNum && txn.queryText == "" && isSQLStatementLine(line) {
 			txn.queryText = line
 			expectingQueryTxn = 0
+			continue
+		}
+
+		if expectingQueryTxn == 0 && txn.queryText == "" && isSQLStatementLine(line) {
+			txn.queryText = line
 			continue
 		}
 
@@ -650,6 +673,14 @@ func parseDeadlockTxnSection(line string) (int, string, bool) {
 	return 0, "", false
 }
 
+func isDeadlockWaitNoTxn(line string) bool {
+	return reDeadlockWaitNoTxn.MatchString(line)
+}
+
+func isDeadlockHoldsNoTxn(line string) bool {
+	return reDeadlockHoldsNoTxn.MatchString(line)
+}
+
 func parseDeadlockVictim(line string) (int, bool) {
 	m := reDeadlockVictim.FindStringSubmatch(line)
 	if len(m) != 2 {
@@ -679,17 +710,19 @@ func parseDeadlockLockMode(line string) (string, bool) {
 }
 
 func isLikelyQueryLine(line string) bool {
-	upper := strings.ToUpper(strings.TrimSpace(line))
-	if upper == "" {
+	return isSQLStatementLine(line)
+}
+
+func isSQLStatementLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
 		return false
 	}
-	if strings.HasPrefix(upper, "***") {
+	upper := strings.ToUpper(trimmed)
+	if strings.HasPrefix(upper, "LOCK WAIT") {
 		return false
 	}
-	if strings.HasPrefix(upper, "RECORD LOCKS") || strings.HasPrefix(upper, "TABLE LOCK") {
-		return false
-	}
-	return true
+	return reSQLStatement.MatchString(trimmed)
 }
 
 func isLockResourceLine(line string) bool {

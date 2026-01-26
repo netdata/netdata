@@ -65,6 +65,57 @@ func TestParseInnoDBDeadlock_WithDeadlock(t *testing.T) {
 	assert.Equal(t, "GRANTED", res.transactions[1].lockStatus)
 }
 
+func TestParseInnoDBDeadlock_MariaDBThreadID(t *testing.T) {
+	now := time.Date(2026, time.January, 25, 12, 0, 0, 0, time.UTC)
+	res := parseInnoDBDeadlock(sampleDeadlockStatusMariaDB, now)
+
+	require.True(t, res.found)
+	require.NoError(t, res.parseErr)
+	require.Len(t, res.transactions, 2)
+
+	txnByNum := make(map[int]*mysqlDeadlockTxn, len(res.transactions))
+	for _, txn := range res.transactions {
+		txnByNum[txn.txnNum] = txn
+	}
+
+	require.Contains(t, txnByNum, 1)
+	require.Contains(t, txnByNum, 2)
+
+	assert.Equal(t, "55", txnByNum[1].threadID)
+	assert.Contains(t, txnByNum[1].queryText, "deadlock_a")
+	assert.NotEmpty(t, txnByNum[1].waitResource)
+}
+
+func TestParseInnoDBDeadlock_SkipsLockWaitLine(t *testing.T) {
+	now := time.Date(2026, time.January, 25, 12, 0, 0, 0, time.UTC)
+	res := parseInnoDBDeadlock(sampleDeadlockStatusLockWaitLine, now)
+
+	require.True(t, res.found)
+	require.NoError(t, res.parseErr)
+	require.Len(t, res.transactions, 1)
+
+	txn := res.transactions[0]
+	require.NotNil(t, txn)
+	assert.Equal(t, "90", txn.threadID)
+	assert.Equal(t, "UPDATE deadlock_a SET value = value + 1 WHERE id = 1", txn.queryText)
+}
+
+func TestParseInnoDBDeadlock_WaitingHeaderWithoutTxn(t *testing.T) {
+	now := time.Date(2026, time.January, 25, 12, 0, 0, 0, time.UTC)
+	res := parseInnoDBDeadlock(sampleDeadlockStatusWaitNoTxn, now)
+
+	require.True(t, res.found)
+	require.NoError(t, res.parseErr)
+	require.Len(t, res.transactions, 1)
+
+	txn := res.transactions[0]
+	require.NotNil(t, txn)
+	assert.Equal(t, "99", txn.threadID)
+	assert.Equal(t, "WAITING", txn.lockStatus)
+	assert.Equal(t, "X", txn.lockMode)
+	assert.NotEmpty(t, txn.waitResource)
+}
+
 func TestParseInnoDBDeadlock_HoldsBeforeWaiting(t *testing.T) {
 	now := time.Date(2026, time.January, 25, 12, 0, 0, 0, time.UTC)
 	res := parseInnoDBDeadlock(sampleDeadlockStatusHoldsFirst, now)
@@ -302,6 +353,53 @@ UPDATE Birds SET value = value + 1 WHERE name='Buzzard'
 *** (2) HOLDS THE LOCK(S):
 RECORD LOCKS space id 1 page no 3 n bits 72 index PRIMARY of table netdata.Animals trx id 101 lock mode X
 *** WE ROLL BACK TRANSACTION (2)
+`
+
+const sampleDeadlockStatusMariaDB = `
+------------------------
+LATEST DETECTED DEADLOCK
+------------------------
+*** (1) TRANSACTION:
+TRANSACTION 500, ACTIVE 1 sec
+MariaDB thread id 55, OS thread handle 1, query id 500 localhost root updating
+mysql tables in use 1, locked 1
+UPDATE deadlock_a SET value = value + 1 WHERE id = 1
+*** (1) waiting for this lock to be granted:
+RECORD LOCKS space id 5 page no 6 n bits 72 index PRIMARY of table netdata.deadlock_a trx id 500 lock_mode X locks rec but not gap waiting
+*** (2) TRANSACTION:
+TRANSACTION 501, ACTIVE 1 sec
+MariaDB thread id 56, OS thread handle 1, query id 501 localhost root updating
+UPDATE deadlock_b SET value = value + 1 WHERE id = 1
+*** (2) HOLDS THE LOCK(S):
+RECORD LOCKS space id 5 page no 6 n bits 72 index PRIMARY of table netdata.deadlock_a trx id 501 lock_mode X locks rec but not gap
+*** WE ROLL BACK TRANSACTION (2)
+`
+
+const sampleDeadlockStatusLockWaitLine = `
+------------------------
+LATEST DETECTED DEADLOCK
+------------------------
+*** (1) TRANSACTION:
+TRANSACTION 900, ACTIVE 1 sec
+MySQL thread id 90, OS thread handle 1, query id 900 localhost root updating
+LOCK WAIT 4 lock struct(s), heap size 1128, 2 row lock(s), undo log entries 1
+UPDATE deadlock_a SET value = value + 1 WHERE id = 1
+*** (1) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 3 page no 4 n bits 72 index PRIMARY of table netdata.deadlock_a trx id 900 lock_mode X locks rec but not gap waiting
+*** WE ROLL BACK TRANSACTION (1)
+`
+
+const sampleDeadlockStatusWaitNoTxn = `
+------------------------
+LATEST DETECTED DEADLOCK
+------------------------
+*** (1) TRANSACTION:
+TRANSACTION 990, ACTIVE 1 sec
+MariaDB thread id 99, OS thread handle 1, query id 990 localhost root Updating
+UPDATE deadlock_b SET value = value + 1 WHERE id = 1
+*** WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 7 page no 3 n bits 320 index PRIMARY of table netdata.deadlock_b trx id 42 lock_mode X locks rec but not gap waiting
+*** WE ROLL BACK TRANSACTION (1)
 `
 
 const sampleDeadlockStatusHoldsFirst = `

@@ -33,7 +33,7 @@ services:
     volumes:
       - ./seed/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD > /dev/null"]
+      test: ["CMD-SHELL", "if command -v mysqladmin >/dev/null 2>&1; then mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD > /dev/null; elif command -v mariadb-admin >/dev/null 2>&1; then mariadb-admin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD > /dev/null; else exit 127; fi"]
       interval: 5s
       timeout: 5s
       retries: 10

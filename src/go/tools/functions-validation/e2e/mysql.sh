@@ -18,7 +18,8 @@ if [ -n "${MYSQL_IMAGE:-}" ]; then
 fi
 
 compose_up mysql
-wait_healthy mysql 90
+MYSQL_HEALTH_TIMEOUT="${MYSQL_HEALTH_TIMEOUT:-180}"
+wait_healthy mysql "$MYSQL_HEALTH_TIMEOUT"
 
 build_plugin
 run_info mysql
@@ -28,6 +29,19 @@ mysql_container_id() {
   "${COMPOSE[@]}" ps -q mysql
 }
 
+mysql_client_path() {
+  local cid
+  cid="$(mysql_container_id)"
+  if [ -z "$cid" ]; then
+    echo "MySQL container ID not found" >&2
+    return 1
+  fi
+  docker exec -i "$cid" sh -lc 'command -v mysql || command -v mariadb'
+}
+
+MYSQL_CLIENT_PATH="$(mysql_client_path)"
+echo "Using mysql client: $MYSQL_CLIENT_PATH" >&2
+
 mysql_exec_root() {
   local sql="$1"
   local cid
@@ -36,7 +50,7 @@ mysql_exec_root() {
     echo "MySQL container ID not found" >&2
     return 1
   fi
-  run docker exec -i "$cid" mysql -uroot -prootpw netdata -e "$sql"
+  run docker exec -i "$cid" "$MYSQL_CLIENT_PATH" -uroot -prootpw netdata -e "$sql"
 }
 
 induce_deadlock_once() {

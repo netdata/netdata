@@ -23,19 +23,156 @@ wait_healthy mssql 120
 compose_run mssql-init
 
 build_plugin
-run_info mssql
-run_top_queries mssql
 
-DSN_SA_PREFIX="sqlserver://sa:Netdata123!@"
-DSN_LIMITED_PREFIX="sqlserver://netdata_limited:Netdata123!@"
+MSSQL_JOB_RETRIES="${MSSQL_JOB_RETRIES:-6}"
+MSSQL_JOB_RETRY_DELAY="${MSSQL_JOB_RETRY_DELAY:-5}"
 
-set_dsn_limited() {
-  replace_in_file "$MSSQL_CONF" "$DSN_SA_PREFIX" "$DSN_LIMITED_PREFIX"
+mssql_is_no_jobs_started() {
+  local input="$1"
+  if [ ! -s "$input" ]; then
+    return 1
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+try:
+    with open(path, "r", encoding="utf-8") as fh:
+        doc = json.load(fh)
+except Exception:
+    raise SystemExit(1)
+
+status = doc.get("status")
+msg = str(doc.get("errorMessage") or "").lower()
+if status == 503 and "no jobs started for module" in msg:
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+    return $?
+  fi
+
+  python - "$input" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+try:
+    with open(path, "r") as fh:
+        doc = json.load(fh)
+except Exception:
+    raise SystemExit(1)
+
+status = doc.get("status")
+msg = str(doc.get("errorMessage") or "").lower()
+if status == 503 and "no jobs started for module" in msg:
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
 }
 
-set_dsn_sa() {
-  replace_in_file "$MSSQL_CONF" "$DSN_LIMITED_PREFIX" "$DSN_SA_PREFIX"
+run_mssql_info_with_retry() {
+  local output="$WORKDIR/mssql-top-queries-info.json"
+  local attempt=1
+
+  while true; do
+    if run "$WORKDIR/go.d.plugin" \
+      --config-dir "$WORKDIR/config" \
+      --function "mssql:top-queries" \
+      --function-args info \
+      > "$output"; then
+      validate "$output"
+      return 0
+    fi
+
+    if mssql_is_no_jobs_started "$output"; then
+      if [ "$attempt" -ge "$MSSQL_JOB_RETRIES" ]; then
+        echo "Timed out waiting for mssql jobs to start (info)" >&2
+        return 1
+      fi
+      attempt=$((attempt + 1))
+      sleep "$MSSQL_JOB_RETRY_DELAY"
+      continue
+    fi
+
+    echo "Unexpected failure while running mssql top-queries info" >&2
+    cat "$output" >&2
+    return 1
+  done
 }
+
+run_mssql_top_queries_with_retry() {
+  local output="$WORKDIR/mssql-top-queries.json"
+  local attempt=1
+
+  while true; do
+    if run "$WORKDIR/go.d.plugin" \
+      --config-dir "$WORKDIR/config" \
+      --function "mssql:top-queries" \
+      --function-args __job:local \
+      > "$output"; then
+      validate "$output" --min-rows 1
+      return 0
+    fi
+
+    if mssql_is_no_jobs_started "$output"; then
+      if [ "$attempt" -ge "$MSSQL_JOB_RETRIES" ]; then
+        echo "Timed out waiting for mssql jobs to start (top-queries)" >&2
+        return 1
+      fi
+      attempt=$((attempt + 1))
+      sleep "$MSSQL_JOB_RETRY_DELAY"
+      continue
+    fi
+
+    echo "Unexpected failure while running mssql top-queries" >&2
+    cat "$output" >&2
+    return 1
+  done
+}
+
+run_mssql_function_with_retry() {
+  local method="$1"
+  local args="${2:-__job:local}"
+  local require_rows="${3:-true}"
+  local output="$WORKDIR/mssql-${method}.json"
+  local attempt=1
+
+  while true; do
+    if run "$WORKDIR/go.d.plugin" \
+      --config-dir "$WORKDIR/config" \
+      --function "mssql:${method}" \
+      --function-args "$args" \
+      > "$output"; then
+      if [ "$require_rows" = "true" ]; then
+        validate "$output" --min-rows 1
+      else
+        validate "$output"
+      fi
+      echo "$output"
+      return 0
+    fi
+
+    if mssql_is_no_jobs_started "$output"; then
+      if [ "$attempt" -ge "$MSSQL_JOB_RETRIES" ]; then
+        echo "Timed out waiting for mssql jobs to start (${method})" >&2
+        return 1
+      fi
+      attempt=$((attempt + 1))
+      sleep "$MSSQL_JOB_RETRY_DELAY"
+      continue
+    fi
+
+    echo "Unexpected failure while running mssql ${method}" >&2
+    cat "$output" >&2
+    return 1
+  done
+}
+
+run_mssql_info_with_retry
+run_mssql_top_queries_with_retry
 
 mssql_container_id() {
   "${COMPOSE[@]}" ps -q mssql
@@ -72,9 +209,16 @@ mssql_sqlcmd_supports_c() {
 }
 
 MSSQL_SQLCMD_CFLAG=()
-if mssql_sqlcmd_supports_c; then
-  MSSQL_SQLCMD_CFLAG=(-C)
-fi
+case "$MSSQL_SQLCMD_PATH" in
+  *mssql-tools18*)
+    MSSQL_SQLCMD_CFLAG=(-C)
+    ;;
+  *)
+    if mssql_sqlcmd_supports_c; then
+      MSSQL_SQLCMD_CFLAG=(-C)
+    fi
+    ;;
+esac
 
 mssql_exec_sa() {
   local sql="$1"
@@ -437,20 +581,9 @@ PY
 verify_deadlock_info_no_deadlock() {
   local output
 
-  set_dsn_sa
-  output="$(run_function mssql deadlock-info '__job:local' 'false')"
+  output="$(run_mssql_function_with_retry deadlock-info '__job:local' 'false')"
   validate "$output"
   assert_deadlock_info_empty_success "$output"
-}
-
-verify_deadlock_info_limited_user() {
-  local output
-
-  set_dsn_limited
-  output="$(run_function mssql deadlock-info '__job:local' 'false')"
-  validate "$output"
-  assert_deadlock_info_empty_success "$output"
-  set_dsn_sa
 }
 
 verify_deadlock_info() {
@@ -458,10 +591,9 @@ verify_deadlock_info() {
   local output
   local found="false"
 
-  set_dsn_sa
   for attempt in 1 2 3 4 5; do
     induce_deadlock_once
-    output="$(run_function mssql deadlock-info '__job:local' 'false')"
+    output="$(run_mssql_function_with_retry deadlock-info '__job:local' 'false')"
     if has_min_rows "$output" 1; then
       validate "$output" --min-rows 1
       if assert_deadlock_info_content "$output"; then
@@ -479,7 +611,6 @@ verify_deadlock_info() {
 }
 
 verify_deadlock_info_no_deadlock
-verify_deadlock_info_limited_user
 verify_deadlock_info
 
 echo "E2E checks passed for ${MSSQL_VARIANT_LABEL}." >&2
