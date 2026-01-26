@@ -6,10 +6,7 @@
 import type { AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage } from '../../../types.js';
 import type { HarnessTest } from '../infrastructure/index.js';
 
-import {
-  invariant,
-  runWithExecuteTurnOverride,
-} from '../infrastructure/index.js';
+import { invariant, runWithExecuteTurnOverride } from '../infrastructure/index.js';
 
 /**
  * Final report tests covering:

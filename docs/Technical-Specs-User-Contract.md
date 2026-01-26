@@ -54,7 +54,7 @@ The user contract defines what you can **rely on**:
 | Session NEVER exceeds `maxTurns`                   | Absolute limit on LLM turns  |
 | 1 turn = 1 LLM request/response + tool phase       | Definition of a turn         |
 | Retries don't count toward limit                   | Retries happen within a turn |
-| Max turns without final_report → synthetic failure | Always produces output       |
+| Max turns without finalization readiness → synthetic failure | Always produces output       |
 
 **Behavior**:
 
@@ -62,7 +62,7 @@ The user contract defines what you can **rely on**:
 Turn 1: LLM → Tools → (retry if needed)
 Turn 2: LLM → Tools
 ...
-Turn N (maxTurns): LLM → final_report ONLY
+Turn N (maxTurns): LLM → final_report (+ required META when configured)
 ```
 
 ### maxToolCallsPerTurn Contract
@@ -121,7 +121,7 @@ limit = contextWindow - contextWindowBufferTokens - maxOutputTokens
 | Condition               | Guarantee                             |
 | ----------------------- | ------------------------------------- |
 | `projected > limit`     | Forced final turn                     |
-| Forced final turn       | Tools restricted to `final_report`    |
+| Forced final turn       | Tools restricted to `final_report` (router handoff allowed only when configured and no locked FINAL)    |
 | Still over after shrink | Proceed best-effort (may fail at API) |
 
 ---
@@ -155,8 +155,8 @@ limit = contextWindow - contextWindowBufferTokens - maxOutputTokens
 
 | Scenario                       | Result                                     |
 | ------------------------------ | ------------------------------------------ |
-| Model provides final_report    | `success: true`, `finalReport` populated   |
-| Max turns without final_report | `success: false`, synthetic failure report |
+| Model provides finalization-ready report | `success: true`, `finalReport` populated   |
+| Max turns without finalization readiness | `success: false`, synthetic failure report |
 | Fatal error                    | `success: false`, `error` field populated  |
 
 ### CLI Exit Codes
@@ -219,7 +219,7 @@ Attempt N: targets[(N-1) % targets.length]
 
 **Cycle continues until:**
 
-- Success (tool calls or final_report received)
+- Turn success (finalization readiness achieved, or at least one non-progress tool executed)
 - `maxRetries` exhausted across all targets
 - Fatal error encountered
 
@@ -229,11 +229,17 @@ Attempt N: targets[(N-1) % targets.length]
 
 ## Final Report Contract
 
-### Every Session Produces ONE OF
+### Every Session Produces One Final Report Outcome
 
-1. **Tool-provided**: LLM calls `final_report` tool successfully (source: `tool-call`)
-2. **Tool-message adoption**: Tool message containing valid final report payload (source: `tool-message`)
-3. **Synthetic failure**: Max turns exhausted without valid report (source: `synthetic`)
+1. **Model-provided and finalization-ready**: the final report exists AND all required META blocks are valid. Sources can be `tool-call`, `tool-message`, or text fallback.
+2. **Synthetic failure**: the system generates a failure report when finalization readiness cannot be achieved (no final report, final-report tool failures, or required META missing/invalid on exhaustion).
+
+### Finalization Readiness (Final Report + META)
+
+- Success requires BOTH the final report and all required META blocks.
+- When the final report exists but required META is missing or invalid, the final report is locked and retries switch to META-only guidance.
+- During META-only retries, extra final-turn tools (such as router handoff) are removed.
+- Exhaustion in this state can synthesize `metadata.reason = "final_meta_missing"`.
 
 ### Final Report Structure
 
@@ -249,8 +255,8 @@ Attempt N: targets[(N-1) % targets.length]
 
 **Final report sources** (tracked via `FinalReportSource`):
 - `tool-call`: LLM successfully called `final_report` tool
-- `tool-message`: Tool message containing valid final report payload
-- `synthetic`: Generated on max turns exhaustion or retry failure
+- `tool-message`: Tool message fallback adopted as final report payload
+- `synthetic`: Generated when finalization readiness cannot be achieved (max turns exhaustion, retry failure, or required META missing/invalid)
 
 **Session-level status**: The `success` field in `AIAgentResult` indicates overall session success/failure. This is distinct from the final report payload itself.
 
@@ -303,7 +309,7 @@ Every tool execution produces an accounting entry with:
 1. System messages (initial)
 2. User message (task prompt)
 3. Alternating: assistant → tool → assistant → tool
-4. Final: assistant with `final_report` (or text extraction fallback)
+4. Finalization: assistant provides the final report AND any required META blocks (the last assistant message may be FINAL or META-only)
 
 Note: Conversation order may include internal system notices (e.g., `xml-next`, `xml-past`, `agent:final-turn`) and retry messages. These are implementation details used for orchestration and are not guaranteed to maintain a fixed order across implementations.
 
@@ -350,7 +356,7 @@ Note: Conversation order may include internal system notices (e.g., `xml-next`, 
 | -------------------- | -------------------------------------------- |
 | Turn limit exceeded  | 4 assistant messages when `maxTurns: 3`      |
 | Context overflow     | Provider rejects due to context overflow     |
-| Missing final report | `success: true` but `finalReport` undefined  |
+| Missing finalization readiness | `success: true` but final report is missing or required META is missing/invalid  |
 | Wrong exit code      | CLI exits 0 when `success: false`            |
 | Config ignored       | `temperature: 0.5` but provider receives 1.0 |
 | Accounting missing   | LLM request without accounting entry         |

@@ -36,6 +36,7 @@ import {
   TOOL_NO_OUTPUT,
 } from './llm-messages.js';
 import { LOG_EVENTS } from './logging/log-events.js';
+import { buildMetaPromptGuidance } from './plugins/meta-guidance.js';
 import {
   TOOL_SANITIZATION_FAILED_KEY,
   TOOL_SANITIZATION_ORIGINAL_PAYLOAD_KEY,
@@ -334,8 +335,6 @@ export class TurnRunner {
                 }
             }
             this.ctx.xmlTransport.beginTurn();
-            this.state.turnFailedEvents = [];
-            this.state.turnFailedCounter = 0;
             this.state.currentTurn = currentTurn;
             this.callbacks.setCurrentTurn(currentTurn);
             this.logTurnStart(currentTurn);
@@ -366,6 +365,7 @@ export class TurnRunner {
             let lastError: string | undefined;
             let lastErrorType: string | undefined;
         let turnSuccessful = false;
+        let wasFinalTurn = false;
         let lastTurnResult: (TurnResult & { shownThinking?: boolean; incompleteFinalReportDetected?: boolean }) | undefined;
             let turnHadFinalReportAttempt = false;
             let collapseLoggedThisTurn = false;
@@ -659,6 +659,7 @@ export class TurnRunner {
                         }
                         this.logEnteringFinalTurn(logReason, currentTurn, this.state.maxTurns, maxTurns);
                     }
+                    wasFinalTurn = isFinalTurn;
                     this.state.llmAttempts++;
                     attempts += 1;
                     const attemptNumber = attempts;
@@ -1966,6 +1967,13 @@ export class TurnRunner {
                         isFinalTurn: currentTurn === maxTurns,
                     });
                     this.logTurnFailure(failureInfo);
+                    const finalReportExists = this.ctx.finalReportManager.hasReport();
+                    const finalizationReady = this.ctx.finalReportManager.isFinalizationReady();
+                    if (finalReportExists && !finalizationReady) {
+                        this.state.lastTurnError = typeof lastError === 'string' ? lastError : undefined;
+                        this.state.lastTurnErrorType = typeof lastErrorType === 'string' ? lastErrorType : undefined;
+                        return this.finalizeMissingMetaFailure(conversation, logs, accounting, maxTurns);
+                    }
                     return this.finalizeSessionFailure(conversation, logs, accounting, failureInfo, currentTurn);
                     }
                     // Normal case: trigger graceful final turn
@@ -1991,6 +1999,14 @@ export class TurnRunner {
             catch (e) {
                 warn(`endTurn/op_tree emit failed: ${e instanceof Error ? e.message : String(e)}`);
             }
+            // Preserve lastError for post-loop access
+            this.state.lastTurnError = typeof lastError === 'string' ? lastError : undefined;
+            this.state.lastTurnErrorType = typeof lastErrorType === 'string' ? lastErrorType : undefined;
+            const finalReportExists = this.ctx.finalReportManager.hasReport();
+            const finalizationReady = this.ctx.finalReportManager.isFinalizationReady();
+            if (finalReportExists && !finalizationReady && wasFinalTurn) {
+                return this.finalizeMissingMetaFailure(conversation, logs, accounting, maxTurns);
+            }
             if (this.state.routerSelection !== undefined) {
                 this.logExit('EXIT-ROUTER-HANDOFF', 'Router selected destination', currentTurn, { fatal: false, severity: 'VRB' });
                 this.emitFinalSummary(logs, accounting);
@@ -2005,12 +2021,6 @@ export class TurnRunner {
                     routerSelection: this.state.routerSelection,
                 };
             }
-            // Preserve lastError for post-loop access
-            this.state.lastTurnError = typeof lastError === 'string' ? lastError : undefined;
-            this.state.lastTurnErrorType = typeof lastErrorType === 'string' ? lastErrorType : undefined;
-        }
-        if (this.ctx.finalReportManager.hasReport() && !this.ctx.finalReportManager.isFinalizationReady()) {
-            return this.finalizeMissingMetaFailure(conversation, logs, accounting, maxTurns);
         }
         // Max turns exceeded - synthesize final report if missing (unless final_report tool itself failed)
         if (this.finalReport === undefined && !this.state.finalReportToolFailedEver) {
@@ -2216,7 +2226,9 @@ export class TurnRunner {
             return { availableTools, allowedToolNames, toolsForTurn: availableTools };
         }
         const finalAllowed = new Set<string>([FINAL_REPORT_TOOL]);
-        if (this.ctx.finalTurnAllowedTools !== undefined) {
+        const finalReportLocked = this.ctx.finalReportManager.isFinalReportLocked();
+        if (!finalReportLocked && this.ctx.finalTurnAllowedTools !== undefined) {
+            // META-only retries must not expose extra tools (e.g., router handoff).
             this.ctx.finalTurnAllowedTools.forEach((tool) => {
                 finalAllowed.add(sanitizeToolName(tool));
             });
@@ -2342,7 +2354,17 @@ export class TurnRunner {
     private flushTurnFailureReasons(conversation: ConversationMessage[]): void {
         if (this.state.turnFailedEvents.length === 0)
             return;
-        const feedback = buildTurnFailedNotice(this.state.turnFailedEvents);
+        const sessionNonce = this.ctx.xmlTransport.getSessionNonce();
+        const requirements = this.ctx.pluginRuntime.getResolvedRequirements();
+        const metaGuidance = requirements.length > 0 ? buildMetaPromptGuidance(requirements, sessionNonce) : undefined;
+        const finalReportLocked = this.ctx.finalReportManager.isFinalReportLocked();
+        const metaReminderShort = metaGuidance !== undefined
+            ? (finalReportLocked ? metaGuidance.reminderShortLocked : metaGuidance.reminderShort)
+            : undefined;
+        const feedback = buildTurnFailedNotice(this.state.turnFailedEvents, {
+            sessionNonce,
+            metaReminderShort,
+        });
         conversation.push({ role: 'user', content: feedback });
         this.state.turnFailedEvents = [];
         this.state.turnFailedCounter = 0;
@@ -3854,14 +3876,17 @@ export class TurnRunner {
         let xmlFilter: XmlFinalReportFilter | undefined;
         const thinkFilter = new ThinkTagStreamFilter();
         const nonce = this.ctx.xmlTransport.getNonce();
+        const finalReportLockedForAttempt = this.ctx.finalReportManager.isFinalReportLocked();
         if (nonce !== undefined) {
             // Use non-strict filter for all targets - streams content before final report
             // while still stripping the XML wrapper tags from the final report itself
-            xmlFilter = new XmlFinalReportFilter(nonce);
+            xmlFilter = new XmlFinalReportFilter(nonce, { suppressStreaming: finalReportLockedForAttempt });
         }
-        // Reset streaming flag for this attempt
-        this.finalReportStreamed = false;
-        this.resetStreamedOutputTail();
+        // Reset streaming state only when the final report is not already locked.
+        if (!finalReportLockedForAttempt) {
+            this.finalReportStreamed = false;
+            this.resetStreamedOutputTail();
+        }
 
         const emitThinking = (thinkingChunk: string): void => {
             if (thinkingChunk.length === 0)

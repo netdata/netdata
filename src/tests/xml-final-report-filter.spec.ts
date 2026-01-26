@@ -6,6 +6,8 @@ describe('XmlFinalReportFilter', () => {
   const nonce = 'af834d4d';
   const openTag = `<ai-agent-${nonce}-FINAL format="markdown">`;
   const closeTag = `</ai-agent-${nonce}-FINAL>`;
+  const metaOpenTag = `<ai-agent-${nonce}-META plugin="support-metadata">`;
+  const metaCloseTag = `</ai-agent-${nonce}-META>`;
 
   it('passes through content when no tags are present', () => {
     const filter = new XmlFinalReportFilter(nonce);
@@ -74,10 +76,39 @@ describe('XmlFinalReportFilter', () => {
     expect(filter.process(chunk)).toBe('Report Trailing');
   });
 
-  it('handles flush correctly', () => {
+  it('does not leak partial internal wrapper prefixes on flush', () => {
     const filter = new XmlFinalReportFilter(nonce);
     filter.process('<ai-agent-'); // Partial buffer
-    expect(filter.flush()).toBe('<ai-agent-');
+    expect(filter.flush()).toBe('');
+  });
+
+  it('strips META blocks and their content from the stream', () => {
+    const filter = new XmlFinalReportFilter(nonce);
+    const chunk = `before${metaOpenTag}secret${metaCloseTag}after`;
+    expect(filter.process(chunk)).toBe('beforeafter');
+    expect(filter.hasStreamedContent).toBe(false);
+  });
+
+  it('strips META blocks even when they appear inside FINAL', () => {
+    const filter = new XmlFinalReportFilter(nonce);
+    const chunk = `${openTag}answer${metaOpenTag}secret${metaCloseTag}${closeTag}`;
+    expect(filter.process(chunk)).toBe('answer');
+    expect(filter.hasStreamedContent).toBe(true);
+  });
+
+  it('suppresses all streaming output when suppression mode is enabled', () => {
+    const filter = new XmlFinalReportFilter(nonce, { suppressStreaming: true });
+    const chunk = `preamble ${openTag}Report${closeTag} ${metaOpenTag}secret${metaCloseTag}`;
+    expect(filter.process(chunk)).toBe('');
+    expect(filter.flush()).toBe('');
+    expect(filter.hasStreamedContent).toBe(false);
+  });
+
+  it('keeps META content suppressed until the closing tag arrives', () => {
+    const filter = new XmlFinalReportFilter(nonce);
+    expect(filter.process(`start${metaOpenTag}secret`)).toBe('start');
+    expect(filter.process('still-hidden')).toBe('');
+    expect(filter.process(`${metaCloseTag}end`)).toBe('end');
   });
 
   it('skips <think> block at start and extracts content after', () => {

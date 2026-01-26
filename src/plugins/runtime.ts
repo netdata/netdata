@@ -74,6 +74,8 @@ const buildMetaWrapper = (nonce: string, pluginName: string): string => (
   `<ai-agent-${nonce}-META plugin="${pluginName}">{...}</ai-agent-${nonce}-META>`
 );
 
+const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
 const requireNonEmptyString = (
   value: unknown,
   field: string,
@@ -460,22 +462,23 @@ export class FinalReportPluginRuntimeManager {
     this.completionExecuted = true;
 
     const pluginMetas = this.finalReportManager.getPluginMetasRecord();
-    const baseContext: Omit<FinalReportPluginContext, 'pluginData'> = {
+    const baseContext: Omit<FinalReportPluginContext, 'pluginData' | 'finalReport'> = {
       sessionId: this.sessionInfo.sessionId,
       originId: this.sessionInfo.originId,
       agentId: this.sessionInfo.agentId,
       agentPath: this.sessionInfo.agentPath,
       userRequest: context.userRequest,
       messages: context.messages,
-      finalReport: context.finalReport,
       fromCache: context.fromCache,
       createSession: this.createSession,
     };
 
     const runPluginCompletion = async (entry: RuntimePluginEntry): Promise<void> => {
       const pluginData = pluginMetas[entry.requirements.name] ?? {};
+      const safeFinalReport = cloneJson(context.finalReport);
+      const safePluginData = cloneJson(pluginData);
       try {
-        await entry.plugin.onComplete({ ...baseContext, pluginData });
+        await entry.plugin.onComplete({ ...baseContext, finalReport: safeFinalReport, pluginData: safePluginData });
       } catch (error: unknown) {
         this.logEntry('WRN', this.getCurrentTurn(), `Final report plugin '${entry.requirements.name}' onComplete failed: ${toErrorMessage(error)}`);
       }

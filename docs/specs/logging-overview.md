@@ -205,10 +205,10 @@ All logs enriched with:
 - `agent:final-turn` - Final turn detected (WRN)
 - `agent:context` - Context guard events
 - `{provider}:{model}` - LLM request/response
-- `agent:text-extraction` - Parsed a final report candidate from assistant text/tool output (still pending)
-- `agent:fallback-report` - Pending fallback accepted because retries exhausted on the final turn
-- `agent:final-report-accepted` - Final report committed; `details.source` ∈ {`tool-call`,`text-fallback`,`tool-message`,`synthetic`}
-- `agent:failure-report` - Synthetic failure report generated when no valid final report was produced
+- `agent:text-extraction` - Parsed a final report candidate from assistant text/tool output
+- `agent:fallback-report` - Final report synthesized from tool message fallback accepted
+- `agent:final-report-accepted` - Final report committed; `details.source` ∈ {`tool-call`,`tool-message`,`synthetic`}, but finalization readiness may still require META
+- `agent:failure-report` - Synthetic failure report generated when finalization readiness cannot be achieved (no final report, tool failures, or required META missing/invalid on exhaustion)
 
 ### Tool Events
 - `{namespace}:{tool}` - Tool execution

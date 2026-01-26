@@ -93,6 +93,8 @@ describe('XML streaming parser', () => {
       expectedFinalFormat: 'markdown',
       finalSchema: undefined,
       finalReportPluginRequirements: EMPTY_PLUGIN_REQUIREMENTS,
+      finalReportLocked: false,
+      missingMetaPluginNames: [],
       attempt: 1,
       maxRetries: 3,
       contextPercentUsed: 12,
@@ -116,6 +118,8 @@ describe('XML streaming parser', () => {
       expectedFinalFormat: 'markdown',
       finalSchema: undefined,
       finalReportPluginRequirements: SAMPLE_REQUIREMENTS,
+      finalReportLocked: false,
+      missingMetaPluginNames: [],
       attempt: 1,
       maxRetries: 3,
       contextPercentUsed: 12,
@@ -126,6 +130,33 @@ describe('XML streaming parser', () => {
     expect(xml).toContain(META_REQUIRED_PHRASE);
     expect(xml).toContain(SAMPLE_META_WRAPPER);
     expect(xml).toContain(SAMPLE_XML_NEXT_SNIPPET);
+  });
+
+  it('switches to META-only guidance when the final report is locked', () => {
+    const xml = renderXmlNext({
+      nonce: NONCE,
+      turn: 2,
+      maxTurns: 5,
+      tools: [{ name: 'final_xml_only' }],
+      slotTemplates: [{ slotId: `${NONCE}-FINAL`, tools: ['final_xml_only'] }],
+      taskStatusToolEnabled: false,
+      expectedFinalFormat: 'markdown',
+      finalSchema: undefined,
+      finalReportPluginRequirements: SAMPLE_REQUIREMENTS,
+      finalReportLocked: true,
+      missingMetaPluginNames: [SAMPLE_PLUGIN_NAME],
+      attempt: 2,
+      maxRetries: 3,
+      contextPercentUsed: 40,
+      hasExternalTools: true,
+    });
+
+    expect(xml).toContain('FINAL already accepted. Do NOT resend the FINAL wrapper.');
+    expect(xml).toContain(`Missing META plugins: ${SAMPLE_PLUGIN_NAME}.`);
+    expect(xml).toContain('## META Requirements — FINAL Already Accepted');
+    expect(xml).toContain(SAMPLE_META_WRAPPER);
+    expect(xml).not.toContain(META_REQUIRED_PHRASE);
+    expect(xml).not.toContain(`<ai-agent-${NONCE}-FINAL`);
   });
 
   it('mentions router handoff option on final turn when allowed', () => {
@@ -139,6 +170,8 @@ describe('XML streaming parser', () => {
       expectedFinalFormat: 'markdown',
       finalSchema: undefined,
       finalReportPluginRequirements: EMPTY_PLUGIN_REQUIREMENTS,
+      finalReportLocked: false,
+      missingMetaPluginNames: [],
       attempt: 1,
       maxRetries: 3,
       contextPercentUsed: 90,
@@ -148,6 +181,30 @@ describe('XML streaming parser', () => {
     });
     expect(xml).toContain(ROUTER_HANDOFF_TOOL);
     expect(xml).toContain(`OR call \`${ROUTER_HANDOFF_TOOL}\``);
+  });
+
+  it('does not mention router handoff when the final report is locked', () => {
+    const xml = renderXmlNext({
+      nonce: NONCE,
+      turn: 3,
+      maxTurns: 3,
+      tools: [{ name: 'agent__final_report' }, { name: ROUTER_HANDOFF_TOOL }],
+      slotTemplates: [{ slotId: `${NONCE}-FINAL`, tools: ['agent__final_report'] }],
+      taskStatusToolEnabled: false,
+      expectedFinalFormat: 'markdown',
+      finalSchema: undefined,
+      finalReportPluginRequirements: SAMPLE_REQUIREMENTS,
+      finalReportLocked: true,
+      missingMetaPluginNames: [SAMPLE_PLUGIN_NAME],
+      attempt: 1,
+      maxRetries: 3,
+      contextPercentUsed: 90,
+      hasExternalTools: true,
+      forcedFinalTurnReason: 'max_turns',
+      finalTurnTools: [ROUTER_HANDOFF_TOOL],
+    });
+
+    expect(xml).not.toContain(ROUTER_HANDOFF_TOOL);
   });
 
   it('skips <think> block and parses actual XML tag after it', () => {

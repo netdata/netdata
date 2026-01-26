@@ -131,7 +131,7 @@ The deterministic harness tests are organized into category-based suites:
 | Suite File                    | Tests | Coverage Area                        |
 | ----------------------------- | ----- | ------------------------------------ |
 | `core-orchestration.test.ts`  | 3     | Turn loop basics, session lifecycle  |
-| `final-report.test.ts`        | 3     | Report validation, format handling   |
+| `final-report.test.ts`        | 17    | Report validation, format handling   |
 | `tool-execution.test.ts`      | 3     | MCP tools, unknown tools, batching   |
 | `context-guard.test.ts`       | 3     | Context limits, token tracking       |
 | `task-status.test.ts`         | 4     | Progress reporting, task completion  |

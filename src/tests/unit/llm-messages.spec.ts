@@ -42,10 +42,22 @@ describe('llm-messages helpers', () => {
     expect(isXmlFinalReportTagName('agent-deadbeef-FINAL')).toBe(false);
   });
 
-  it('builds TURN-FAILED message with nonce and format', () => {
-    const message = renderTurnFailedSlug('xml_wrapper_as_tool', 'wrapper: <ai-agent-cafebabe-FINAL format=\"markdown\">');
-    expect(message).toContain('ai-agent-cafebabe-FINAL');
-    expect(message).toContain('format="markdown"');
+  it('replaces NONCE placeholders in TURN-FAILED messages', () => {
+    const sessionNonce = 'cafebabe';
+    const message = renderTurnFailedSlug('final_meta_missing', undefined, sessionNonce);
+    expect(message).toContain(`ai-agent-${sessionNonce}-META`);
+    expect(message).toContain('FINAL already accepted');
+    expect(message).not.toContain('NONCE');
+  });
+
+  it('appends detailed reasons for final_meta_invalid TURN-FAILED messages', () => {
+    const sessionNonce = 'cafebabe';
+    const reason = 'plugin="meta-required" schema_mismatch=/ticketId must be string';
+    const message = renderTurnFailedSlug('final_meta_invalid', reason, sessionNonce);
+    expect(message).toContain('Reason:');
+    expect(message).toContain('schema_mismatch=');
+    expect(message).toContain(`ai-agent-${sessionNonce}-META`);
+    expect(message).not.toContain('NONCE');
   });
 });
 

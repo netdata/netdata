@@ -18,7 +18,7 @@ Orchestration (advisors/router/handoff) is layered **outside** the session loop 
 - Main agent loop orchestrating turns, retries, and provider switching
 - Session state management and immutable operations
 - **Does NOT care about LLM details or tool execution mechanics**
-- XML transport is fixed to `xml-final` via `XmlToolTransport` (`src/xml-transport.ts`): XML-NEXT notices carry the nonce and final slot; the model must emit `<ai-agent-NONCE-XXXX tool=\"agent__final_report\">…</ai-agent-NONCE-XXXX>` for the final report while provider tool lists remain native (tool_calls). Progress follows the native path.
+- XML transport is fixed to `xml-final` via `XmlToolTransport` (`src/xml-transport.ts`): XML-NEXT notices carry the nonce, the FINAL wrapper, and META guidance. The model must emit `<ai-agent-NONCE-FINAL format=\"...\">…</ai-agent-NONCE-FINAL>` plus any required META wrappers `<ai-agent-NONCE-META plugin=\"name\">{...}</ai-agent-NONCE-META>`, while provider tool lists remain native (tool_calls). Progress follows the native path.
 
 #### llm-client.ts (Single Turn Implementation)
 - Complete implementation of single LLM turn execution
@@ -108,7 +108,7 @@ interface ToolResult {
    - Receives `TurnResult` with clear status
    - Makes decisions on retries/provider switching based on status
    - Calls **mcp-client.ts** for tool execution when needed
-   - A turn is successful only when an accepted/valid final report is produced or at least one non-progress/batch tool is executed. **Executed** means the tool passed validation and execution started; schema/unknown-tool rejections do **not** count, while timeouts/transport errors after execution do. Otherwise it fails and does not advance. Retry exhaustion fails the session immediately with one ERR log and a synthetic session report.
+  - A turn is successful only when **finalization readiness** is achieved (accepted final report plus all required plugin META blocks) or at least one non-progress/batch tool is executed. **Executed** means the tool passed validation and execution started; schema/unknown-tool rejections do **not** count, while timeouts/transport errors after execution do. Missing META after a final report sets `invalid_response`, triggers META-only retries, and exhaustion can synthesize `reason: "final_meta_missing"`.
 
 2. **llm-client.ts** handles single turns:
    - Uses **llm-providers/** for provider-specific operations
@@ -304,13 +304,12 @@ for turn in 0..maxTurns:
 ## Error Handling
 
 ### Final Turn Behavior
-- Tools disabled on final turn (turn >= maxTurns - 1) except `router__handoff-to` when router destinations are configured; `logEnteringFinalTurn` emits `agent:final-turn` (WRN) so telemetry/alerts can key off the last-turn window.
-- Special "no more tools" message is appended and deduped through `pushSystemRetryMessage`.
-- `pendingFinalReport` caches any report parsed from assistant text or tool output but defers acceptance until retries are exhausted **and** we are inside the forced final turn. Earlier turns keep retrying instead of short‑circuiting.
-- `finalReportAttempts` increments in both the sanitizer (invalid payload dropped) and tool executor (valid call). When either `incompleteFinalReportDetected` or `finalReportAttempts > 0` fires, `maxTurns` collapses to `currentTurn + 1` and we log `agent:orchestrator` plus fire a telemetry counter (see below).
-- Fallback acceptance is logged explicitly via `agent:fallback-report` (WRN) indicating whether the cache originated from text extraction or tool-message adoption.
-- `logFinalReportAccepted` records the source (`tool-call`, `text-fallback`, `tool-message`, or `synthetic`) so downstream systems can alert on anything other than the happy path.
-- If no assistant response arrives even after enforcing the final turn, `logFailureReport` synthesizes a structured `status: failure` report, marks `finalReportSource = 'synthetic'`, and ensures `(no output)` never escapes to headends.
+- Final turn tool filtering keeps only `agent__final_report`. `router__handoff-to` may be allowed when router destinations are configured and the final report is not locked; META-only retries remove extra tools.
+- XML-NEXT is the only per-turn system notice. It carries final-turn instructions, FINAL+META guidance, and META-only guidance when the final report is locked. TURN-FAILED provides persistent failure feedback with nonce replacement and META reminders when plugins are configured.
+- Finalization readiness ends the session: the final report plus all required META blocks. Missing or invalid META locks the final report, triggers `invalid_response`, and switches guidance to META-only retries.
+- Remaining turns collapse to `currentTurn + 1` when a final report attempt is observed, an incomplete final report is detected, or META is missing/invalid after a final report.
+- Fallback acceptance is logged explicitly via `agent:fallback-report` (WRN) when a final report is synthesized from tool-message fallback. META requirements still apply.
+- Synthetic failure reports are produced when finalization readiness cannot be achieved (including missing META), using explicit reasons such as `final_meta_missing`, ensuring `(no output)` never escapes to headends.
 
 ### Retry Exhaustion
 - After max retries: return session with error
@@ -360,7 +359,7 @@ The agent MUST properly display both content output and thinking/reasoning strea
 #### Exit Code Categories and Requirements
 
 1. **SUCCESS**: Normal completion
-   - `EXIT-FINAL-ANSWER`: Final answer received from LLM
+   - `EXIT-FINAL-ANSWER`: Finalization readiness achieved (final report + required META when configured)
    - `EXIT-MAX-TURNS-WITH-RESPONSE`: Max turns reached with final response
    - `EXIT-USER-STOP`: User-initiated stop signal
 
@@ -399,11 +398,13 @@ The agent MUST properly display both content output and thinking/reasoning strea
 [LEVEL] ← [X.X] agent {EXIT-CODE}: {detailed_reason} (fatal={true|false})
 
 // Example outputs:
-[VRB] ← [5.0] agent EXIT-FINAL-ANSWER: Final answer received, session complete (fatal=false)
+[VRB] ← [5.0] agent EXIT-FINAL-ANSWER: Final report received (agent__final_report), session complete (fatal=false)
 [ERR] ← [3.0] agent EXIT-NO-LLM-RESPONSE: No LLM response after 3 retries across 2 providers (fatal=true)
 [ERR] ← [10.0] agent EXIT-MAX-TURNS-NO-RESPONSE: Max turns (10) reached without final response (fatal=true)
 [ERR] ← [2.0] agent EXIT-INACTIVITY-TIMEOUT: Inactivity timeout after 300000ms waiting for LLM (fatal=true)
 ```
+
+Note: `EXIT-FINAL-ANSWER` is emitted only after finalization readiness is achieved. When required META blocks exist, the exit log occurs only after META validation succeeds.
 
 #### Implementation Requirements
 1. **Every exit path** in the code MUST have a unique exit code
@@ -414,7 +415,7 @@ The agent MUST properly display both content output and thinking/reasoning strea
 
 ### Final Report Telemetry & Observability
 - `recordFinalReportMetrics` (src/telemetry/index.ts) emits `ai_agent_final_report_total`, `ai_agent_final_report_attempts_total`, and `ai_agent_final_report_turns` with labels `source`, `status`, `forced_final_reason`, `headend`, and `synthetic_reason`. Dashboards must alarm whenever `source != 'tool-call'` exceeds historical baselines.
-- `recordRetryCollapseMetrics` feeds `ai_agent_retry_collapse_total` (`reason = 'final_report_attempt' | 'incomplete_final_report'`) whenever `maxTurns` collapses early. This was added so we can observe LLM compliance regressions before they impact `(no output)` rates.
+- `recordRetryCollapseMetrics` feeds `ai_agent_retry_collapse_total` (`reason = 'final_report_attempt' | 'incomplete_final_report'`) whenever `maxTurns` collapses early. The `incomplete_final_report` bucket now also covers missing or invalid required META after a final report is captured.
 - `agent:turn-start`, `agent:text-extraction`, `agent:fallback-report`, `agent:final-report-accepted`, and `agent:failure-report` logs are part of the lifecycle contract and must remain documented; follow-on tooling consumes them to annotate live headends and page SREs when synthetic failures spike.
 
 ## Implementation Notes

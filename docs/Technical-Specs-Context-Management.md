@@ -22,7 +22,7 @@ Token budget tracking, context guard enforcement, and overflow handling to preve
 
 ## TL;DR
 
-ai-agent tracks token usage across the conversation and enforces limits before they cause LLM API errors. When approaching the context window limit, the guard forces a final turn (tools restricted to `final_report` only). Tool outputs that exceed size limits are stored on disk and replaced with handles.
+ai-agent tracks token usage across the conversation and enforces limits before they cause LLM API errors. When approaching the context window limit, the guard forces final-turn mode. Final-turn tool filtering always keeps `agent__final_report`, may allow configured extra tools (such as router handoff) when the final report is not locked, and still requires finalization readiness (final report + required META when configured).
 
 ---
 
@@ -136,7 +136,7 @@ When the guard triggers:
 | 2    | Log context guard enforcement                |
 | 3    | Commit pending tokens to current             |
 | 4    | Reset new tokens counter                     |
-| 5    | Restrict tools to `agent__final_report` only |
+| 5    | Downstream tool filtering narrows to `agent__final_report` (extra tools allowed only when configured and the final report is not locked) |
 | 6    | Emit telemetry event                         |
 
 ---
@@ -430,7 +430,7 @@ These rules MUST hold:
 2. **Buffer preserved**: `bufferTokens` always subtracted from capacity
 3. **Output space reserved**: `maxOutputTokens` always carved out
 4. **Monotonic growth**: Counters only increase until turn commits
-5. **Final turn enforcement**: Triggered BEFORE next LLM/tool execution
+5. **Final turn enforcement**: Triggered BEFORE next LLM/tool execution, and final-turn tool filtering respects final report lock state during META-only retries
 6. **Reasoning included**: Reasoning/thinking tokens are INSIDE `maxOutputTokens`, not added on top
 
 ---

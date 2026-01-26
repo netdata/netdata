@@ -280,10 +280,10 @@ ai-agent --agent test.ai --trace-llm --trace-mcp "query"
 | `agent:turn-start`            | New LLM turn begins                       |
 | `agent:final-turn`            | Final turn detected (VRB/WRN)             |
 | `agent:context`               | Context guard triggered                   |
-| `agent:text-extraction`       | Parsed a final report candidate from text |
-| `agent:fallback-report`       | Fallback accepted after retries exhausted |
-| `agent:final-report-accepted` | Final report committed                    |
-| `agent:failure-report`        | Synthetic failure report generated        |
+| `agent:text-extraction`       | Parsed a final report candidate from text/tool output |
+| `agent:fallback-report`       | Final report synthesized from tool message fallback accepted |
+| `agent:final-report-accepted` | Final report committed (finalization readiness may still require META) |
+| `agent:failure-report`        | Synthetic failure report generated when finalization readiness cannot be achieved |
 
 ### Tool Events
 
@@ -304,7 +304,7 @@ ai-agent --agent test.ai --trace-llm --trace-mcp "query"
 
 | Event ID                       | Description                        |
 | ------------------------------ | ---------------------------------- |
-| `EXIT-FINAL-ANSWER`            | Normal completion                  |
+| `EXIT-FINAL-ANSWER`            | Normal completion (finalization readiness achieved) |
 | `EXIT-MAX-TURNS-WITH-RESPONSE` | Turn limit with output             |
 | `EXIT-USER-STOP`               | User initiated stop                |
 | `EXIT-TOKEN-LIMIT`             | Context window exhausted           |

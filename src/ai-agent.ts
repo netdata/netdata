@@ -1869,7 +1869,7 @@ export class AIAgentSession {
           fromCache: false,
         });
       }
-      if (cache !== undefined && cacheKeyPayload !== undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0 && resultShape.success && resultShape.finalReport !== undefined) {
+      if (cache !== undefined && cacheKeyPayload !== undefined && typeof cacheTtlMs === 'number' && cacheTtlMs > 0 && resultShape.success && resultShape.finalReport !== undefined && this.finalReportManager.isFinalizationReady()) {
         const metadata = {
           kind: 'agent' as const,
           agentName: this.getAgentIdLabel(),

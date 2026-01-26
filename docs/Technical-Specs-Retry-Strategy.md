@@ -23,7 +23,7 @@ Error handling, provider cycling, backoff algorithms, and recovery mechanisms fo
 
 ## TL;DR
 
-ai-agent implements per-turn retry with round-robin provider cycling, exponential backoff for rate limits, and synthetic retries for invalid LLM responses. When retries are exhausted or limits are reached, the session forces a final turn with tools restricted to `final_report` only.
+ai-agent implements per-turn retry with round-robin provider cycling, exponential backoff for rate limits, and synthetic retries for invalid LLM responses. When retries are exhausted or limits are reached, the session forces a final turn with tools restricted to `final_report`, and success requires finalization readiness (final report plus required META when plugins are configured).
 
 ---
 
@@ -243,7 +243,7 @@ fallbackWait = min(max((attempt + 1) * 1000, 1000), 30000)
 
 ### Content Without Tools
 
-**Trigger**: LLM returns text content but no tool calls and no `final_report`.
+**Trigger**: LLM returns text content but no tool calls and no finalization-ready final report.
 
 ```mermaid
 flowchart TD
@@ -294,9 +294,9 @@ stateDiagram-v2
     ForcedFinal --> Restricted: Tools = [final_report]
     Restricted --> Instruction: Inject guidance
     Instruction --> Execute: Continue turn
-    Execute --> Retry: Model doesn't call final_report
+    Execute --> Retry: Finalization not ready
     Retry --> Execute: Retry with guidance
-    Execute --> Complete: final_report called
+    Execute --> Complete: Finalization ready
     Complete --> [*]
 ```
 
@@ -304,9 +304,9 @@ stateDiagram-v2
 
 1. Set `forcedFinalTurnReason = 'context'`
 2. Inject instruction message
-3. Restrict tools to `agent__final_report`
+3. Restrict tools to `agent__final_report` (and `router__handoff-to` only when configured and the final report is not locked)
 4. Log warning
-5. Retry if model doesn't call `final_report`
+5. Retry if finalization readiness is not achieved (missing final report or required META)
 
 ### Max Turns Final Turn
 
@@ -318,9 +318,9 @@ stateDiagram-v2
 
 1. Set `isFinalTurn = true` (forced turn detected)
 2. Inject instruction message
-3. Restrict tools to `agent__final_report`
+3. Restrict tools to `agent__final_report` (and `router__handoff-to` only when configured and the final report is not locked)
 4. Log warning
-5. Retry if model doesn't call `final_report`
+5. Retry if finalization readiness is not achieved (missing final report or required META)
 
 ---
 
@@ -332,6 +332,7 @@ stateDiagram-v2
 
 - Sanitizer drops malformed `final_report` calls
 - Tool executor receives legitimate `final_report` call
+- Finalization fails after a final report because required META is missing or invalid
 
 ### Turn Collapse
 
@@ -345,20 +346,20 @@ When final report is attempted or incomplete detection triggers:
 
 ### Final Report Storage
 
-When a valid final report is committed:
+When a final report payload is committed:
 
-| Step | Action                                                                  |
-| ---- | ----------------------------------------------------------------------- | -------------- | ----------- |
-| 1    | Validate against expected schema (if applicable)                        |
-| 2    | Store in `finalReport`                                                  |
-| 3    | Track source: 'tool-call'                                               | 'tool-message' | 'synthetic' |
-| 4    | On forced final turn with existing report: Finalize session immediately |
+| Step | Action |
+| ---- | ------ |
+| 1    | Validate against expected schema (if applicable) and commit to `FinalReportManager` |
+| 2    | Track the source (`tool-call` \| `tool-message` \| `synthetic`) |
+| 3    | If required META is missing/invalid, lock the final report and continue with META-only retries (no immediate finalize) |
+| 4    | Finalize only when finalization readiness is achieved; exhaustion can synthesize `final_meta_missing` |
 
-**Purpose**: Preserves final report across retry attempts.
+**Purpose**: Preserve the best final report across retries while enforcing finalization readiness.
 
 ### Synthetic Failure
 
-When exhausted without valid final report:
+When exhausted without finalization readiness (no final report, or required META missing/invalid):
 
 1. Synthesize failure report
 2. Log `agent:failure-report`
@@ -507,7 +508,7 @@ These rules MUST hold:
 3. **Backoff respected**: Wait before retry when directed
 4. **Skip-provider errors**: `auth_error`/`quota_exceeded`/non-retryable `model_error` skip to next provider
 5. **Conversation integrity**: Failed attempts don't corrupt history
-6. **Final turn enforcement**: Last turn restricted to `final_report`
+6. **Final turn enforcement**: Last turn restricted to `final_report` (router handoff allowed only when configured and not locked), and locked finals switch to META-only retries until finalization readiness is achieved or exhaustion synthesizes `final_meta_missing`
 
 ---
 

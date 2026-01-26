@@ -1,7 +1,7 @@
 # Retry Strategy
 
 ## TL;DR
-Per-turn retry with provider cycling, exponential backoff for rate limits, synthetic retries for invalid responses, context-aware final turn enforcement.
+Per-turn retry with provider cycling, exponential backoff for rate limits, synthetic retries for invalid responses, and context-aware final turn enforcement. Finalization now requires **finalization readiness**: the final report plus any required plugin META blocks.
 
 ## Source Files
 - `src/session-turn-runner.ts` - executeAgentLoop retry logic
@@ -132,7 +132,7 @@ Note: Non‑200 HTTP responses skip the current provider/model pair before retry
 ## Provider Cycling
 
 ### Round-Robin Selection
-**Location**: `src/ai-agent.ts:1484-1486`
+**Location**: `src/session-turn-runner.ts`
 
 ```typescript
 const pair = pairs[pairCursor % pairs.length];
@@ -147,7 +147,7 @@ const { provider, model } = pair;
 - Continue until maxRetries exhausted
 
 ### Rate Limit Tracking
-**Location**: `src/ai-agent.ts:1456-1457`
+**Location**: `src/session-turn-runner.ts`
 
 ```typescript
 let rateLimitedInCycle = 0;
@@ -187,46 +187,50 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
 ## Final Turn Enforcement
 
 ### Context-Forced Final Turn
-**Location**: `src/ai-agent.ts:1568-1597`
+**Location**: `src/session-turn-runner.ts`
 
 **Trigger**: Context guard detects token budget exceeded
 
 **Behavior**:
 1. Set `forcedFinalTurnReason = 'context'`
-2. Inject instruction: "The conversation is at the context window limit..."
-3. Restrict tools to `agent__final_report` (and `router__handoff-to` when router destinations are configured)
-4. Log warning about context enforcement
-5. Retry if model doesn't call final_report
+2. XML-NEXT includes the context final-turn warning plus FINAL + META guidance
+3. Restrict tools to `agent__final_report` (and `router__handoff-to` when allowed and the final report is not locked)
+4. Enforce finalization readiness (final report + required META)
+5. Retry if finalization readiness is not achieved
 
 ### Max Turns Final Turn
-**Location**: `src/ai-agent.ts:1569-1574`
+**Location**: `src/session-turn-runner.ts`
 
 **Trigger**: `currentTurn === maxTurns`
 
 **Behavior**:
-1. Inject instruction: "Maximum number of turns/steps reached..."
-2. Restrict tools to `agent__final_report` (and `router__handoff-to` when router destinations are configured)
-3. Log warning about final turn
-4. Retry if model doesn't call final_report
+1. XML-NEXT includes the max-turns final-turn warning plus FINAL + META guidance
+2. Restrict tools to `agent__final_report` (and `router__handoff-to` when allowed and the final report is not locked)
+3. Enforce finalization readiness (final report + required META)
+4. Retry if finalization readiness is not achieved
 
 ### Final Report Attempt Tracking & Turn Collapse
-**Location**: `src/ai-agent.ts:1671-1678` (flag setting), `src/ai-agent.ts:2213-2240` (collapse logic), `src/ai-agent.ts:3707` (sanitizer increment), `src/ai-agent.ts:3884` (executor increment)
+**Location**: `src/session-turn-runner.ts`
 
 - `finalReportAttempts` increments twice: when the sanitizer drops malformed `agent__final_report` calls and when the tool executor receives a legitimate call. Either event sets `finalReportAttempted = true` for the turn.
-- If `incompleteFinalReportDetected === true` **or** the attempt flag is set, `maxTurns` collapses to `currentTurn + 1`. The orchestrator logs `agent:orchestrator` with the old/new limits so operators can trace why the session ended early.
+- If `incompleteFinalReportDetected === true`, the attempt flag is set, or the final report exists but required META is missing/invalid, `maxTurns` collapses to `currentTurn + 1`.
+- When the final report is locked due to missing META, the extra turn becomes META-only.
 - Every collapse emits `recordRetryCollapseMetrics({ reason, turn, previousMaxTurns, newMaxTurns })`, which backs the `ai_agent_retry_collapse_total` metric.
 
-### Pending Final Report Cache
-**Location**: `src/ai-agent.ts:1862-1990` (extraction/storage), `src/ai-agent.ts:2592-2599` (acceptance check), `src/ai-agent.ts:3421-3439` (commit/accept methods), `src/ai-agent.ts:3355-3370` (fallback logging)
+### Agent Cache Gate
+**Location**: `src/ai-agent.ts`, `src/plugins/runtime.ts`, `src/final-report-manager.ts`
 
-- Text extraction and tool-message adoption no longer fabricate tool calls. Instead, valid payloads populate `pendingFinalReport = { source, payload }` and the retry loop proceeds as if no tool call existed.
-- Cached payloads are only accepted via `acceptPendingFinalReport()` after the session enters the forced final turn (context guard or `currentTurn === maxTurns`). This guarantees retries always happen before fallbacks.
-- Accepting a cache logs `agent:fallback-report` (including the source) and preserves `finalReportSource` so final telemetry/logs distinguish fallback exits from tool-call exits.
+- Agent cache is checked before the first LLM turn.
+- Cache acceptance requires `pluginRuntime.validateCachePayload(...)`, which enforces finalization readiness (final report + required META).
+- Cache entries missing META or failing META schema validation are rejected as cache misses with explicit logs.
+- Cache writes are gated on finalization readiness.
+- Cache hits trigger plugin `onComplete` only after META validation succeeds.
 
 ### Synthetic Failure Contract
-**Location**: `src/ai-agent.ts:2593-2645`
+**Location**: `src/session-turn-runner.ts`
 
-- When max turns or context guard exhausts the run without a pending cache, the session synthesizes a failure final report, logs `agent:failure-report`, and commits it with metadata `{ reason, turns_completed, final_report_attempts, last_stop_reason }`.
+- Synthetic failure occurs when finalization readiness cannot be achieved (no final report, final report tool failures, or required META missing on exhaustion).
+- Missing META produces `reason: "final_meta_missing"` and includes diagnostics such as `missing_meta_plugins` and `missing_meta_reason`.
 - FIN + `agent:final-report-accepted` (with `source='synthetic'`) ensure headends render an explicit explanation instead of `(no output)`.
 - `recordFinalReportMetrics` captures the synthetic reason so dashboards can alert whenever these spike.
 
@@ -305,16 +309,25 @@ EITHER
 - Together with these tool calls, also call `agent__task_status` to inform your user about what you are doing and why you are calling these tools.
 OR
 - Provide your final report/answer in the expected format (format) using the XML wrapper: <ai-agent-NONCE-FINAL format="format">...
+- Provide all required META wrappers together with the final report: <ai-agent-NONCE-META plugin="name">{...}</ai-agent-NONCE-META>
 ```
 
 Final turn (router allowed example):
 ```
-You must now provide your final report/answer in the expected format (format) using the XML wrapper: <ai-agent-NONCE-FINAL format="format">... OR call `router__handoff-to` to hand off the user request to another agent.
+You must now provide your final report/answer in the expected format (format) using the XML wrapper: <ai-agent-NONCE-FINAL format="format">...
+You must also provide all required META wrappers: <ai-agent-NONCE-META plugin="name">{...}</ai-agent-NONCE-META>
+OR call `router__handoff-to` to hand off the user request to another agent.
 
 Allowed tools for this final turn: tool1, tool2
 ```
 
-When router is not configured, the OR clause is omitted and the footer instructs only the final report.
+META-only turn (final report locked example):
+```
+The final report is already captured. Do NOT repeat the FINAL wrapper.
+Provide only the missing META wrappers: <ai-agent-NONCE-META plugin="name">{...}</ai-agent-NONCE-META>
+```
+
+When router is not configured, the OR clause is omitted and the footer instructs only the final report plus required META wrappers.
 
 ## Wasted Turn Detection
 
@@ -390,7 +403,7 @@ a final report/answer, so a turn has been wasted without any progress on your ta
 3. **Backoff respected**: Wait before retry when directed
 4. **Fatal errors immediate**: No retry on auth_error/quota_exceeded
 5. **Conversation integrity**: Failed attempts don't corrupt history
-6. **Final turn enforcement**: Last turn restricted to final_report
+6. **Final turn enforcement**: Last turn restricts tools to final_report, and locked finals switch to META-only retries
 
 ## Undocumented Behaviors
 
@@ -400,7 +413,8 @@ a final report/answer, so a turn has been wasted without any progress on your ta
    - Location: `src/session-turn-runner.ts`
 
 2. **Final turn retry exhaustion fallback**:
-   - Synthesizes failure report when final turn exhausts retries
+   - Synthesizes failure report when final turn exhausts retries or finalization readiness cannot be achieved
+   - Missing META produces `reason: "final_meta_missing"` with diagnostics
    - Records last error in metadata
    - Location: `src/session-turn-runner.ts`
 

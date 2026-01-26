@@ -1,19 +1,20 @@
 # Context Management
 
 ## TL;DR
-Token budget tracking with context guard. Projects token usage, enforces limits per model, forces final turn when approaching limit, manages tool output sizes.
+Token budget tracking with `ContextGuard`. The guard projects token usage, enforces limits per provider/model, forces final-turn mode when approaching limits, and manages tool output sizes. Final-turn mode still requires finalization readiness (final report + required META when configured).
 
 ## Source Files
-- `src/ai-agent.ts:94-115` - TargetContextConfig, ContextGuardBlockedEntry
-- `src/ai-agent.ts:441-458` - targetContextConfigs initialization
-- `src/ai-agent.ts:516-530` - toolBudgetCallbacks
-- `src/ai-agent.ts` - evaluateContextGuard(), enforceContextFinalTurn()
+- `src/context-guard.ts` - TargetContextConfig, guard evaluation, enforcement, tool budget mutex
+- `src/ai-agent.ts` - ContextGuard construction and callbacks wiring
+- `src/session-turn-runner.ts` - Preflight evaluation, forced-final schema shrink, tool filtering
+- `src/final-report-manager.ts` - Final report lock state that narrows final-turn tools during META-only retries
+- `src/llm-messages-xml-next.ts` - Final-turn and META-only model guidance
 - `src/tokenizer-registry.ts` - Token estimation
 
 ## Data Structures
 
 ### TargetContextConfig
-**Location**: `src/ai-agent.ts:94-100`
+**Location**: `src/context-guard.ts`
 
 ```typescript
 interface TargetContextConfig {
@@ -26,7 +27,7 @@ interface TargetContextConfig {
 ```
 
 ### ContextGuardBlockedEntry
-**Location**: `src/ai-agent.ts:102-110`
+**Location**: `src/context-guard.ts`
 
 ```typescript
 interface ContextGuardBlockedEntry {
@@ -41,7 +42,7 @@ interface ContextGuardBlockedEntry {
 ```
 
 ### ContextGuardEvaluation
-**Location**: `src/ai-agent.ts:112-115`
+**Location**: `src/context-guard.ts`
 
 ```typescript
 interface ContextGuardEvaluation {
@@ -52,7 +53,7 @@ interface ContextGuardEvaluation {
 
 ## Token Counters
 
-**Session State** (`src/ai-agent.ts:151-154`):
+**Session State** (`src/context-guard.ts`):
 - `currentCtxTokens: number` - Tokens in committed conversation
 - `pendingCtxTokens: number` - Tokens pending commit
 - `newCtxTokens: number` - New tokens this turn
@@ -61,7 +62,7 @@ interface ContextGuardEvaluation {
 ## Context Guard Flow
 
 ### 1. Initialization
-**Location**: `src/ai-agent.ts:441-458`
+**Location**: `src/ai-agent.ts`
 
 ```typescript
 this.targetContextConfigs = sessionTargets.map((target) => {
@@ -78,14 +79,19 @@ this.currentCtxTokens = this.estimateTokensForCounters(this.conversation);
 ```
 
 ### 2. Pre-Turn Evaluation
-**Location**: `src/ai-agent.ts:1490-1553`
+**Location**: `src/session-turn-runner.ts`
 
 ```typescript
+const toolSelection = this.selectToolsForTurn(provider, isFinalTurn);
+this.schemaCtxTokens = this.estimateToolSchemaTokens(toolSelection.toolsForTurn);
+
 const providerContextStatus = this.evaluateContextForProvider(provider, model);
 if (providerContextStatus === 'final') {
+  const evaluation = this.evaluateContextGuard();
   this.enforceContextFinalTurn(evaluation.blocked, 'turn_preflight');
-}
-if (providerContextStatus === 'skip') {
+  this.schemaCtxTokens = this.computeForcedFinalSchemaTokens(provider);
+  this.evaluateContextGuard(); // Post-shrink warning if still blocked
+} else if (providerContextStatus === 'skip') {
   // Log warning, provider cannot fit context
 }
 ```
@@ -105,28 +111,33 @@ return { blocked, projectedTokens };
 ```
 
 ### 4. Enforcement
-**Function**: `enforceContextFinalTurn(blocked, trigger)`
+**Function**: `ContextGuard.enforceFinalTurn(blocked, trigger)`
 
 **Actions**:
 1. Set `forcedFinalTurnReason = 'context'`
-2. Log context guard enforcement
-3. Restrict tools to final_report only
-4. Emit telemetry event
+2. Emit callback side effects (logs + telemetry via `handleContextGuardForcedFinalTurn`)
+3. SessionTurnRunner shrinks schema tokens for final-turn tools and re-evaluates the guard
+4. Final-turn tool filtering still respects final report lock state (META-only retries remove extra tools), and finalization readiness remains required
 
 ### 5. Tool Budget Callback
-**Location**: `src/ai-agent.ts:516-530`
+**Location**: `src/context-guard.ts`
 
 ```typescript
 toolBudgetCallbacks = {
   reserveToolOutput: async (output) => {
-    const tokens = estimateTokens(output);
-    const guard = evaluateContextGuard(tokens);
-    if (guard.blocked.length > 0) {
-      this.toolBudgetExceeded = true;
-      enforceContextFinalTurn(guard.blocked, 'tool_preflight');
-      return { ok: false, tokens, reason: 'token_budget_exceeded' };
-    }
-    return { ok: true, tokens };
+    return await this.mutex.runExclusive(() => {
+      const tokens = this.estimateTokens([{ role: 'tool', content: output }]);
+      const guard = this.evaluate(tokens);
+      if (guard.blocked.length > 0) {
+        if (!this.toolBudgetExceeded) {
+          this.toolBudgetExceeded = true;
+          this.enforceFinalTurn(guard.blocked, 'tool_preflight');
+        }
+        return { ok: false, tokens, reason: 'token_budget_exceeded' };
+      }
+      this.newCtxTokens += tokens;
+      return { ok: true, tokens };
+    });
   },
   canExecuteTool: () => !this.toolBudgetExceeded,
 };
@@ -196,23 +207,25 @@ Before committing tool output:
 
 ## Post-Shrink Behavior
 
-**Location**: `src/ai-agent.ts:1493-1516`
+**Location**: `src/session-turn-runner.ts`
 
 When forced final turn but still over limit:
-1. Recompute schema tokens (final_report only)
+1. Recompute schema tokens for the forced final-turn tool set (`agent__final_report` plus any allowed extra tools)
 2. Re-evaluate guard
 3. If still blocked, log warning
 4. Proceed anyway (best effort)
 
-**Warning**: "Context guard post-shrink still over projected limit"
+If a final report is captured without required META, the final report becomes locked and extra tools are removed so retries focus only on META completion.
 
-## Business Logic Coverage (Verified 2025-11-16)
+**Warning**: "Context limit exceeded; forcing final turn."
 
-- **Per-provider outcomes**: `evaluateContextForProvider` returns `ok`, `skip`, or `final` so large-context providers can be skipped without forcing the entire session into final-turn mode (`src/ai-agent.ts:1386-1516`).
-- **Context telemetry**: Every enforcement emits `recordContextGuardMetrics` with `{provider, model, trigger, outcome, remaining_tokens}` so dashboards can alert on chronic guard hits (`src/ai-agent.ts:2323-2368`).
-- **Tool budget mutex**: Tool output reservations and tool_output handle checks run inside a mutex so overlapping tool calls cannot race on `toolResponseMaxBytes` or `toolBudgetExceeded` (`src/ai-agent.ts:516-562`).
-- **Schema shrink logic**: When the guard fires, the session recomputes schema tokens for the remaining tools (usually just `agent__final_report`) and logs explicit WARN entries if still over limit before proceeding (`src/ai-agent.ts:2345-2405`).
-- **Forced-final messaging**: Guard activations push a deterministic system message plus `forcedFinalTurnReason='context'`, which later controls exit code selection and FIN summaries (`src/ai-agent.ts:2370-2650`).
+## Business Logic Coverage (Verified 2026-01-25)
+
+- **Per-provider outcomes**: `ContextGuard.evaluateForProvider` returns `ok`, `skip`, or `final`, and `SessionTurnRunner` applies the result during turn preflight (`src/context-guard.ts`, `src/session-turn-runner.ts`).
+- **Context telemetry**: Guard enforcement emits `recordContextGuardMetrics` with `{provider, model, trigger, outcome, remaining_tokens}` for observability (`src/session-turn-runner.ts`, `src/telemetry/index.ts`).
+- **Tool budget mutex**: Tool output reservations run under a mutex so overlapping tool calls cannot race token projections or forced-final enforcement (`src/context-guard.ts`).
+- **Schema shrink logic**: When forced-final mode is triggered, the runner recomputes schema tokens for the final-turn tool set and re-evaluates the guard before proceeding (`src/session-turn-runner.ts`).
+- **Forced-final messaging + META-only gating**: The guard sets `forcedFinalTurnReason='context'`, XML-NEXT renders forced-final guidance, and final report lock state can further narrow tools and guidance to META-only retries (`src/context-guard.ts`, `src/llm-messages-xml-next.ts`, `src/final-report-manager.ts`).
 
 ## Configuration Effects
 

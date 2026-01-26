@@ -142,7 +142,7 @@ Persistence guidance: The CLI demonstrates persisting accounting to JSONL. As a 
    - Emits instrumentation via `onEvent(type='log' | 'accounting')`.
    - Preserves message history (assistant/tool/tool-result order).
 6. Completion conditions:
-   - Success: model calls internal `agent_final_report` tool → `EXIT-FINAL-ANSWER` logged, `FIN` summaries emitted, returns `success: true`.
+   - Success: model achieves finalization readiness (internal `agent_final_report` tool plus required META blocks when plugins are configured) → `EXIT-FINAL-ANSWER` logged, `FIN` summaries emitted, returns `success: true`.
    - Context guard: projected token use exceeds `contextWindow` → tool call rejected, `EXIT-TOKEN-LIMIT` logged, forced final turn instructs the model to answer with existing information.
    - Max turns exceeded: `EXIT-MAX-TURNS-NO-RESPONSE` logged, `FIN` summaries emitted, returns failure.
    - Other failures (auth/quota/timeouts/model errors or uncaught exception): logs error, logs an `agent:EXIT-...` reason, emits `FIN` summaries, returns failure.

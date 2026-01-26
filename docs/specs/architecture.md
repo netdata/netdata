@@ -1,10 +1,17 @@
 # Architecture
 
 ## TL;DR
-Layered architecture with strict separation: CLI → Session → LLM Client → Providers. Session orchestrates turns, LLM Client executes single requests, Providers handle protocol.
+Layered architecture with strict separation: CLI → Session wrapper → Session turn runner → LLM client → Providers. `SessionTurnRunner` owns retries, context guard enforcement, finalization readiness (final report + required META), and router short-circuit.
 
 ## Source Files
-- `src/ai-agent.ts` - Session orchestration (AIAgentSession)
+- `src/ai-agent.ts` - Orchestration wrapper, session factory, top-level run wiring
+- `src/session-turn-runner.ts` - Core turn loop (retries, final turns, finalization readiness, router short-circuit)
+- `src/final-report-manager.ts` - Final report + plugin META state (lock state and finalization readiness)
+- `src/plugins/runtime.ts` - Final-report plugins, META validation, cache gating
+- `src/context-guard.ts` - Token budgets, forced-final enforcement, tool budget mutex
+- `src/xml-transport.ts` - xml-final transport (FINAL/META extraction, XML-NEXT pairing)
+- `src/llm-messages-xml-next.ts` - Model-facing XML-NEXT guidance (FINAL + META, META-only mode)
+- `src/llm-messages-turn-failed.ts` - Persistent TURN-FAILED feedback with detailed repair instructions
 - `src/llm-client.ts` - Single turn execution (LLMClient)
 - `src/cli.ts` - CLI entry point
 - `src/index.ts` - Library exports
@@ -31,7 +38,7 @@ Layered architecture with strict separation: CLI → Session → LLM Client → 
 - `opTree: SessionTreeBuilder` - Hierarchical operation tracking
 - `toolsOrchestrator: ToolsOrchestrator` - Tool execution engine
 - `llmClient: LLMClient` - LLM request executor
-- `finalReport` - Captured final_report tool result
+- `finalReportManager: FinalReportManager` - Tracks final report, required plugin META blocks, lock state, and finalization readiness
 - `targetContextConfigs` - Per-model context window limits
 - `forcedFinalTurnReason` - Context guard enforcement state
 
@@ -128,10 +135,10 @@ Tool results added to conversation
 ```
 
 ## Exit Codes
-Defined in `src/ai-agent.ts:16-44`:
+Defined in `src/ai-agent.ts` and emitted by `src/session-turn-runner.ts`.
 
 **Success**:
-- `EXIT-FINAL-ANSWER` - Agent called final_report
+- `EXIT-FINAL-ANSWER` - Finalization readiness achieved (final report + required META when configured)
 - `EXIT-MAX-TURNS-WITH-RESPONSE` - Max turns reached with response
 - `EXIT-USER-STOP` - User-initiated graceful stop
 
@@ -174,17 +181,17 @@ Defined in `src/ai-agent.ts:16-44`:
 6. **Stop Signal Propagation**: `stopRef` with reason ('stop'/'abort'/'shutdown') propagates to every wait loop; 'stop' triggers final turn, 'abort'/'shutdown' trigger AbortSignal
 7. **OpTree Consistency**: Every operation has begin/end lifecycle calls
 
-## Business Logic Coverage (Verified 2025-11-16)
+## Business Logic Coverage (Verified 2026-01-25)
 
-- **Synthetic final-report enforcement**: `executeAgentLoop` retries any turn that returns plain content without tool calls or `agent__final_report`, injects reminder messages, and validates the final JSON payload via AJV before emitting success (`src/ai-agent.ts:1900-2098`).
-- **Context guard + forced final turn**: Each provider/model pair carries a `TargetContextConfig`; when `evaluateContextForProvider` projects an overflow, tools are disabled, the forced-final message is injected, and exit bookkeeping switches to `EXIT-TOKEN-LIMIT` (`src/ai-agent.ts:1490-1660`, `src/ai-agent.ts:3102-3268`).
-- **Pending retry deduplication**: System retry messages are de-duped and appended exactly once per turn using `pendingRetryMessages` so models do not see duplicate warnings when multiple providers are tried (`src/ai-agent.ts:2959-3042`).
-- **Rate-limit cycle gating**: The session counts rate-limit responses per provider/model cycle and only sleeps when *all* targets rate-limit simultaneously, honoring provider-specific `retryAfter` bounds before retrying (`src/ai-agent.ts:1456-2560`).
-- **Tool-budget mutex**: Tool output reservations and budget checks run under a mutex so concurrent tool executions cannot race on `toolResponseMaxBytes` or the context guard (`src/ai-agent.ts:516-562`).
-- **Progress + opTree sync**: `SessionProgressReporter` drives structured `[PROGRESS UPDATE]` logs, emits opTree snapshots via `onEvent(type='op_tree')`, and is wired to Slack/CLI renderers in headends (`src/ai-agent.ts:600-720`).
-- **Stop handling & sleepWithAbort**: Every wait (rate-limit backoffs, queue delays) invokes `sleepWithAbort` so `stopRef`/`AbortSignal` cancellations short-circuit loops and emit `EXIT-USER-STOP` when requested (`src/ai-agent.ts:2487-2510`, `src/ai-agent.ts:2757-2804`).
-- **Sub-agent isolation**: `SubAgentRegistry` spawns children with independent trace context (`originTxnId`, `parentTxnId`, `agentPath`) and aggregates child conversations for auditing (`src/ai-agent.ts:700-838`).
-- **Tool failure overrides**: Tool errors can be replaced with curated fallback messages via `toolFailureMessages`, guaranteeing downstream final reports mention failures consistently (`src/ai-agent.ts:1671-1895`, `src/ai-agent.ts:3707-3952`).
+- **Finalization readiness (FINAL + required META)**: Success requires both the final report and all required plugin META blocks; missing META locks the final report, triggers META-only retries, and exhaustion can synthesize `reason: "final_meta_missing"` (`src/final-report-manager.ts`, `src/plugins/runtime.ts`, `src/session-turn-runner.ts`).
+- **Final-turn tool filtering with router gating**: Final turns keep `agent__final_report` and only allow extra tools (such as router handoff) when configured and the final report is not locked (`src/ai-agent.ts`, `src/session-turn-runner.ts`, `src/llm-messages-xml-next.ts`).
+- **TURN-FAILED repair guidance**: Retry feedback is accumulated as TURN-FAILED events and injected as a single user message before each attempt, so the model gets specific repair instructions without duplicate spam (`src/session-turn-runner.ts`, `src/llm-messages-turn-failed.ts`).
+- **Context guard + forced final turn**: Per-provider guard evaluation can skip oversized targets or force final turns; enforcement and telemetry live in `ContextGuard`, with runner-level preflight decisions (`src/context-guard.ts`, `src/session-turn-runner.ts`).
+- **Rate-limit cycle gating + abort-aware sleep**: The runner sleeps only when all provider/model pairs rate-limit in the same cycle, and every wait uses `sleepWithAbort` to honor cancel/stop signals (`src/session-turn-runner.ts`).
+- **Tool-budget mutex**: Tool budget reservations run under a mutex to prevent concurrent tool executions from racing on token projections (`src/context-guard.ts`).
+- **Progress + opTree sync**: Structured progress events and opTree snapshots are emitted via `SessionProgressReporter` and `SessionTreeBuilder` (`src/session-progress-reporter.ts`, `src/session-tree.ts`).
+- **Sub-agent isolation**: `SubAgentRegistry` preserves trace ancestry and conversation capture for nested sessions (`src/subagent-registry.ts`, `src/session-turn-runner.ts`).
+- **Tool failure overrides**: Tool failures can be replaced with curated fallback messages that are later surfaced to the model and final reports (`src/session-tool-executor.ts`, `src/session-turn-runner.ts`).
 
 ## Configuration
 

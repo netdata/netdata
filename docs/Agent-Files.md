@@ -11,6 +11,7 @@ Agent files (`.ai` files) are the building blocks of ai-agent. Each file defines
 - [Quick Start](#quick-start) - Create your first agent file
 - [Configuration Categories](#configuration-categories) - Overview of all configuration options
 - [File Locations](#file-locations) - Where to put agent files
+- [Final-Report Plugins (META)](#final-report-plugins-meta) - Require META wrappers for finalization
 - [See Also](#see-also) - Related documentation
 
 ---
@@ -155,6 +156,7 @@ Agent configuration is organized into these categories:
 | **Identity**      | `description`, `toolName`, `usage`                                                                                                                       | Name and describe your agent        | [Agent-Files-Identity](Agent-Files-Identity)           |
 | **Models**        | `models`, `reasoning`, `reasoningTokens`, `caching`                                                                                                      | Select LLMs and configure reasoning | [Agent-Files-Models](Agent-Files-Models)               |
 | **Tools**         | `tools`, `toolResponseMaxBytes`, `toolOutput`                                                                                                            | Give your agent capabilities        | [Agent-Files-Tools](Agent-Files-Tools)                 |
+| **Plugins**       | `plugins`                                                                                                                                               | Final report META requirements      | [Final-Report Plugins](#final-report-plugins-meta)     |
 | **Sub-Agents**    | `agents`                                                                                                                                                 | Delegate to other agents            | [Agent-Files-Sub-Agents](Agent-Files-Sub-Agents)       |
 | **Orchestration** | `advisors`, `router`, `handoff`                                                                                                                          | Multi-agent patterns                | [Agent-Files-Orchestration](Agent-Files-Orchestration) |
 | **Behavior**      | `maxTurns`, `maxRetries`, `maxToolCallsPerTurn`, `temperature`, `topP`, `topK`, `llmTimeout`, `toolTimeout`, `maxOutputTokens`, `repeatPenalty`, `cache` | Limits and sampling                 | [Agent-Files-Behavior](Agent-Files-Behavior)           |
@@ -194,10 +196,23 @@ project/
 
 ### Path Resolution
 
-- **Relative paths** in frontmatter (`agents:`, `schemaRef:`, include directives) resolve relative to the agent file's directory
+- **Relative paths** in frontmatter (`agents:`, `schemaRef:`, `plugins:`, include directives) resolve relative to the agent file's directory
 - **Absolute paths** are used as-is
 
 ---
+
+## Final-Report Plugins (META)
+
+Use `plugins:` to require META blocks alongside the final report.
+
+```yaml
+plugins:
+  - ./support-metadata.js
+```
+
+- Each entry is a relative path to a `.js` module (resolved from the agent file directory).
+- Modules must default-export a plugin factory.
+- When plugins are configured, the session only completes after FINAL + required META wrappers are present.
 
 ## Common Patterns
 

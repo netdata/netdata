@@ -57,11 +57,11 @@ stateDiagram-v2
 
     Turn --> LLMRequest: select provider
     LLMRequest --> ToolExec: has tool calls
-    LLMRequest --> Finalizing: has final_report
+    LLMRequest --> Finalizing: finalization readiness achieved
     LLMRequest --> Turn: retry/continue
 
     ToolExec --> Turn: tools complete
-    ToolExec --> Finalizing: final_report called
+    ToolExec --> Finalizing: finalization readiness achieved
 
     Turn --> Finalizing: max turns reached
     Turn --> Canceled: abort signal
@@ -261,7 +261,7 @@ for turn = 1 to maxTurns:
         update opTree
 
     end turn in opTree
-    if final_report captured: break
+    if finalization readiness achieved: break
 ```
 
 **Key State During Loop**:
@@ -278,6 +278,8 @@ for turn = 1 to maxTurns:
 | `finalReportToolFailedEver` | Whether final_report tool ever failed                        |
 | `finalReportInvalidFormat`  | Whether final report format was invalid                      |
 | `finalReportSchemaFailed`   | Whether final report schema validation failed                |
+| `finalReportLocked`         | Derived: final report exists but required META is missing/invalid |
+| `finalizationReady`         | Derived: final report exists and required META is valid      |
 
 > **Note**: `pairCursor` (provider cycling index) and `attempts` (retry counter) are local variables within the turn execution loop, not stored state fields. |
 
@@ -384,6 +386,7 @@ Executes tool calls after a successful LLM turn. The executor wraps each tool ca
 
 - Tool name auto-correction via `resolveAutoCorrectedToolName()`
 - Special handling for `agent__final_report` tool (increment attempts, parse nested calls)
+- Finalization readiness gating: a final report can be locked until required META blocks validate, switching retries to META-only guidance and synthesizing `final_meta_missing` on exhaustion
 - Progress tool detection (`agent__task_status`)
 - Queue slot acquisition via `orchestrator.executeWithManagement()`
 - Size cap application (central and per-tool)
@@ -436,7 +439,7 @@ flowchart TD
 
 **Triggers**:
 
-- `agent__final_report` tool called successfully
+- Finalization readiness achieved (final report + required META when configured)
 - Max turns reached
 - Context guard enforced (forced final turn)
 - Task status completed with `status: 'completed'`
@@ -545,10 +548,10 @@ AbortSignal → Session → LLMClient → Provider
 | `agent:start`                 | VRB      | Master LLM start (verbose)                      |
 | `agent:final-turn`            | WRN      | Final turn detected                             |
 | `agent:context`               | WRN      | Context guard events                            |
-| `agent:fallback-report`       | WRN      | Cached pending final report accepted            |
-| `agent:text-extraction`       | VRB      | Final report payload extracted from text        |
-| `agent:final-report-accepted` | WRN      | Final report committed                          |
-| `agent:failure-report`        | ERR      | Synthetic failure final report (context-forced) |
+| `agent:fallback-report`       | WRN      | Final report synthesized from tool message fallback accepted |
+| `agent:text-extraction`       | VRB      | Final report payload extracted from text/tool message fallback |
+| `agent:final-report-accepted` | WRN      | Final report committed (finalization readiness may still require META) |
+| `agent:failure-report`        | ERR      | Synthetic failure final report when finalization readiness cannot be achieved |
 | `agent:fin`                   | INF      | Session finalized                               |
 
 ---

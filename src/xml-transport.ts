@@ -369,12 +369,12 @@ export class XmlToolTransport {
     const pluginAttrRegex = /plugin=["']([^"']+)["']/;
     const completeMatches = Array.from(stripped.matchAll(completeMetaRegex));
     const metaBlocks = completeMatches.map((match) => {
-      const attrs = match[1] ?? '';
+      const attrs = match[1];
       const pluginMatch = pluginAttrRegex.exec(attrs);
       const plugin = pluginMatch?.[1]?.trim();
       return {
         plugin: plugin !== undefined && plugin.length > 0 ? plugin : undefined,
-        content: match[2] ?? '',
+        content: match[2],
       } satisfies XmlMetaBlock;
     });
 
@@ -475,7 +475,7 @@ export class XmlToolTransport {
         // Not JSON - wrap as text content
         if (expectedFormat === 'json') {
           // JSON expected but got text - this is an error even for unclosed tags
-          const failureMessage = renderTurnFailedSlug('xml_final_report_not_json');
+          const failureMessage = renderTurnFailedSlug('xml_final_report_not_json', undefined, this.nonce);
           callbacks.recordTurnFailure('xml_final_report_not_json');
           callbacks.logWarning({
             severity: 'WRN',
@@ -535,7 +535,7 @@ export class XmlToolTransport {
       const capturedSlot = slotMatch?.[1] ?? `(partial: ${sanitizedLeftover.slice(0, 60).replace(/\n/g, ' ')})`;
       const slug: TurnFailedSlug = hasClosing ? 'xml_slot_mismatch' : 'xml_missing_closing_tag';
       const reasonDetail = `slot: ${capturedSlot}`;
-      const reasonMessage = renderTurnFailedSlug(slug, reasonDetail);
+      const reasonMessage = renderTurnFailedSlug(slug, reasonDetail, this.nonce);
 
       callbacks.recordTurnFailure(slug, reasonDetail);
 
@@ -573,7 +573,7 @@ export class XmlToolTransport {
         const slotInfo = slotMatch?.[1] ?? `(partial: ${snippet})`;
         const slug: TurnFailedSlug = missingClosing ? 'xml_missing_closing_tag' : 'xml_malformed_mismatch';
         const reasonDetail = `slot: ${slotInfo}`;
-        const reasonMessage = renderTurnFailedSlug(slug, reasonDetail);
+        const reasonMessage = renderTurnFailedSlug(slug, reasonDetail, this.nonce);
 
         callbacks.recordTurnFailure(slug, reasonDetail);
         callbacks.logWarning({
@@ -638,7 +638,7 @@ export class XmlToolTransport {
           call.parameters = parsedJson;
         } else {
           const reasonDetail = `tool: ${call.name}`;
-          const reasonMessage = renderTurnFailedSlug('xml_tool_payload_not_json', reasonDetail);
+          const reasonMessage = renderTurnFailedSlug('xml_tool_payload_not_json', reasonDetail, this.nonce);
           callbacks.recordTurnFailure('xml_tool_payload_not_json', reasonDetail);
 
           const errorEntry: XmlPastEntry = {

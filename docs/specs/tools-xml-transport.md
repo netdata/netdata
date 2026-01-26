@@ -1,57 +1,65 @@
 # XML Tool Transport
 
 ## TL;DR
-XML transport is fixed to xml-final: native tool_calls remain for regular tools, while the final report must be sent over XML. Each turn advertises XML-NEXT (nonce, final slot, optional schema; progress slot omitted). Tags are parsed by substring; valid tags map to existing tools with the same orchestrator, budgets, and accounting. CLI override for transport has been removed.
+XML transport is fixed to `xml-final`: native `tool_calls` remain for regular tools, while the final report and final-report plugin META blocks are sent over XML. Each turn advertises XML-NEXT (nonce, FINAL wrapper, optional schema, and META reminders). XML-PAST stays suppressed.
 
 ## Turn Messages
-- **XML-NEXT (ephemeral)**: user notice with nonce, final-report slot, and optional schema; counts toward context like any user message. It reminds the model that non-final tools must be called via native tool_calls. On forced-final turns, it also allows `router__handoff-to` when configured.
-- **XML-PAST**: suppressed; native tool results stay in the normal transcript.
+- XML-NEXT (ephemeral) is the only per-turn system notice. It carries the nonce, FINAL wrapper, optional schema, and META guidance.
+- The system prompt may still include full tool/final-report/META instructions loaded at initialization time.
+- XML-PAST is suppressed; native tool results stay in the normal transcript.
 
 ## Slots & Validation
 - Nonce per session: `ai-agent-<8hex>` (fixed across all turns).
-- Slots: dedicated `NONCE-FINAL` slot for the final report.
-- Valid tag: matching nonce, declared slot, allowed tool, non-empty content. Allowed tools via XML are restricted to `agent__final_report`; non-final tools must use native tool_calls; progress uses native tool_calls.
-- Status enum for final-report: `success|failure|partial` (extracted from XML tag attributes); payload format must match the agent's expected format.
+- Special slots: `NONCE-FINAL` for the final report and `NONCE-META` for per-plugin META blocks.
+- FINAL wrapper: `<ai-agent-NONCE-FINAL format="<expected-format>">...</ai-agent-NONCE-FINAL>`.
+- META wrapper: `<ai-agent-NONCE-META plugin="<name>">{...}</ai-agent-NONCE-META>`.
+- META blocks can appear before, after, or inside FINAL content.
+- META wrappers are extracted before XML tool parsing, so they never become malformed tool calls.
+- FINAL tag attributes: `format` is required and must match the expected output format; `status` is optional and treated as diagnostics only (transport success is based on source).
 
 ## Execution Flow
-1) Build XML-NEXT each turn; provider tool definitions remain visible for native tool_calls.
-2) Model emits XML tag for final report; parser extracts tag into toolCalls. Native tool_calls are preserved and merged with the parsed XML final-report.
-3) Orchestrator executes tools unchanged (`source: xml` in accounting); final-report uses `agent__final_report`.
-4) Final-report ends session (no response message).
+1. Build XML-NEXT each turn; provider tool definitions remain visible for native tool calls.
+2. Extract META blocks first, then parse the FINAL wrapper.
+3. Execute native tool calls and the parsed final-report tool call through the standard orchestrator (`source: xml`).
+4. Enforce finalization readiness.
 
-## Progress
-- Progress follows native tool_calls; there is no XML progress slot.
+## Finalization Readiness
+- Finalization requires BOTH the final report and all required plugin META blocks.
+- When FINAL exists but META is missing/invalid, the FINAL report is locked and XML-NEXT switches to META-only guidance.
+- Synthetic failures may finalize with `reason: "final_meta_missing"` even when META is still missing.
 
 ## Context Guard
-- XML-NEXT contributes context tokens for nonce/final slot and any final-report schema; guard still runs on messages/tool outputs.
+- XML-NEXT contributes context tokens for nonce, FINAL wrapper, optional schema, and META guidance.
+- Guard behavior is unchanged; it still evaluates messages and tool outputs.
 
 ## Error Handling
-- Invalid/mismatched tags: ignored.
-- Leading `<think>...</think>` blocks (including leading whitespace) are stripped before XML parsing, unclosed-final extraction, and malformed-tag checks, so XML examples inside reasoning are never treated as final reports.
-- Truncated structured output (stopReason=length/max_tokens) is rejected for JSON/slack-block-kit; the failure reason includes the token limit (e.g., `token_limit: N tokens`) and no JSON repair is attempted on truncated XML wrappers.
-- Payload JSON parsing/validation still done at orchestrator (same repair/validation path as native).
-- Over-budget tool outputs replaced with `(tool failed: context window budget exceeded)` as usual.
+- Invalid or mismatched tags are ignored.
+- Malformed META wrappers are stripped. When plugins are configured, they also emit `final_meta_invalid` feedback.
+- Unknown META plugin names are ignored with WRN logs.
+- Leading `<think>...</think>` blocks (including leading whitespace) are stripped before XML parsing and malformed-tag checks.
+- Truncated structured output (`stopReason=length|max_tokens`) is rejected for `json` and `slack-block-kit`.
+- Payload JSON parsing/validation still occurs in the orchestrator (same repair/validation path as native).
+
+## Streaming Behavior
+- FINAL wrapper content is streamed with tags stripped; non-wrapper text may still stream when using `XmlFinalReportFilter`.
+- META wrappers are always stripped from streaming output.
+- When the final report is locked (META-only retries), streaming output is fully suppressed to avoid duplicate final output.
+- Partial or unclosed META wrappers are buffered and dropped on flush to prevent wrapper leakage.
 
 ## Accounting & Telemetry
-- Tool accounting: `source: xml`, `command` = real tool name; final-report `command: agent__final_report_xml`.
-- Metrics unchanged; toolChoice=auto recorded in provider options.
+- Tool accounting uses `source: xml`, and `command` is the real tool name.
+- Final report accounting uses `command: agent__final_report_xml`.
+- Metrics remain unchanged.
 
 ## Final Report Processing (3-Layer Architecture)
 When processing XML final reports, the system uses a 3-layer architecture:
-1. **Layer 1 (Transport)**: Extract wrapper fields (`status`, `report_format`) from XML tag attributes; extract raw payload from tag content via `_rawPayload` internal field.
-2. **Layer 2 (Format Processing)**: Process payload based on expected format:
-   - `sub-agent`: Opaque blob passthrough (no validation, no parsing)
-   - `json`: Parse JSON, validate against schema if provided
-   - `slack-block-kit`: Parse JSON, expect the messages array directly (`[...]`); legacy `{messages: [...]}` wrappers are tolerated but not recommended. Payload is sanitized to Slack mrkdwn and validated against the strict Block Kit schema; invalid payloads fall back to a safe single-section message.
-   - Text formats (`text`, `markdown`, `tty`, `pipe`): Use raw payload directly
-3. **Layer 3 (Final Report)**: Construct clean final report object with status, format, content, and optional metadata.
+1. Layer 1 (Transport): Extract wrapper fields (format/status) from XML tag attributes and capture raw payload from tag content.
+2. Layer 2 (Format Processing): Process payload based on expected format (`sub-agent` passthrough, `json` parsing/validation, `slack-block-kit` messages validation, text formats raw).
+3. Layer 3 (Final Report): Construct a clean final report object. Wrapper fields never pollute payload content.
 
-This separation ensures wrapper fields (transport metadata) never pollute the payload content.
-
-## Test Requirements (planned)
-- Parser chunking/nonce/slot/tool validation
-- XML-NEXT rendering (nonce + final slot)
-- Final-report precedence in XML
-- Accounting `source: xml`
-- Phase 2 harness scenarios covering: native tools + XML final-report, invalid tag/nonce ignored
-- 3-layer final report processing for each format type
+## Test Requirements
+- Parser: nonce/slot/tool validation, truncation handling, malformed META wrappers.
+- XML-NEXT rendering: FINAL and META guidance must stay paired.
+- Finalization readiness: FINAL-only responses retry for missing META; META-only retries do not re-stream FINAL.
+- Streaming filters: META stripped, locked-final suppression, partial META buffers dropped.
+- Cache: cache hits require valid META; cache entries missing META are rejected.

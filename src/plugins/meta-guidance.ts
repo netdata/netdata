@@ -2,7 +2,9 @@ import type { ResolvedFinalReportPluginRequirement } from './types.js';
 
 export interface MetaPromptGuidance {
   reminderShort: string;
+  reminderShortLocked: string;
   reminderFull: string;
+  reminderFullLocked: string;
   detailedBlock: string;
   exampleSnippets: string;
   xmlNextSnippets: string;
@@ -11,6 +13,8 @@ export interface MetaPromptGuidance {
 export const buildMetaWrapper = (nonce: string, pluginName: string): string => (
   `<ai-agent-${nonce}-META plugin="${pluginName}">{...}</ai-agent-${nonce}-META>`
 );
+
+const META_NONE_REQUIRED = 'META: none required for this session.';
 
 const formatSchemaBlock = (schema: Record<string, unknown>): string => {
   const serialized = JSON.stringify(schema, null, 2);
@@ -40,10 +44,21 @@ const buildReminderShort = (
   nonce: string,
 ): string => {
   if (requirements.length === 0) {
-    return 'META: none required for this session.';
+    return META_NONE_REQUIRED;
   }
   const pluginNames = requirements.map((requirement) => requirement.name).join(', ');
   return `META REQUIRED WITH FINAL. Plugins: ${pluginNames}. Use <ai-agent-${nonce}-META plugin="name">{...}</ai-agent-${nonce}-META>.`;
+};
+
+const buildReminderShortLocked = (
+  requirements: ResolvedFinalReportPluginRequirement[],
+  nonce: string,
+): string => {
+  if (requirements.length === 0) {
+    return META_NONE_REQUIRED;
+  }
+  const pluginNames = requirements.map((requirement) => requirement.name).join(', ');
+  return `FINAL already accepted. Provide required META wrappers only. Plugins: ${pluginNames}. Use <ai-agent-${nonce}-META plugin="name">{...}</ai-agent-${nonce}-META>.`;
 };
 
 const buildReminderFull = (
@@ -51,10 +66,21 @@ const buildReminderFull = (
   nonce: string,
 ): string => {
   if (requirements.length === 0) {
-    return 'META: none required for this session.';
+    return META_NONE_REQUIRED;
   }
   const wrappers = requirements.map((requirement) => buildMetaWrapper(nonce, requirement.name)).join(' | ');
   return `META REQUIRED WITH FINAL. Exact META wrappers: ${wrappers}.`;
+};
+
+const buildReminderFullLocked = (
+  requirements: ResolvedFinalReportPluginRequirement[],
+  nonce: string,
+): string => {
+  if (requirements.length === 0) {
+    return META_NONE_REQUIRED;
+  }
+  const wrappers = requirements.map((requirement) => buildMetaWrapper(nonce, requirement.name)).join(' | ');
+  return `FINAL already accepted. Provide required META wrappers only: ${wrappers}.`;
 };
 
 const buildDetailedBlock = (
@@ -104,7 +130,9 @@ export const buildMetaPromptGuidance = (
   nonce: string,
 ): MetaPromptGuidance => ({
   reminderShort: buildReminderShort(requirements, nonce),
+  reminderShortLocked: buildReminderShortLocked(requirements, nonce),
   reminderFull: buildReminderFull(requirements, nonce),
+  reminderFullLocked: buildReminderFullLocked(requirements, nonce),
   detailedBlock: buildDetailedBlock(requirements, nonce),
   exampleSnippets: buildExampleSnippets(requirements),
   xmlNextSnippets: buildXmlNextSnippets(requirements),

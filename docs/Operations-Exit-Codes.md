@@ -35,11 +35,11 @@ AI Agent uses standardized exit codes:
 
 ### Exit Code 0: Success
 
-**Meaning**: Agent completed successfully with a final report.
+**Meaning**: Agent completed successfully with finalization readiness (final report + required META when configured).
 
 **Conditions**:
 
-- Agent produced a valid final report
+- Agent produced a finalization-ready report (final report + required META when configured)
 - All required outputs generated
 - No fatal errors occurred
 
@@ -194,9 +194,9 @@ Internal exit codes logged during session execution (visible in logs and snapsho
 | Exit Reason                  | Description                                         | Fatal |
 | ---------------------------- | --------------------------------------------------- | ----- |
 | **Success Exits**            |                                                     |       |
-| `EXIT-FINAL-ANSWER`          | Normal completion with final report                 | No    |
+| `EXIT-FINAL-ANSWER`          | Normal completion with finalization readiness (final report + required META when configured) | No    |
 | `EXIT-ROUTER-HANDOFF`        | Router selected destination                         | No    |
-| `EXIT-TOKEN-LIMIT`           | Final report received after context guard triggered | No    |
+| `EXIT-TOKEN-LIMIT`           | Finalization readiness achieved after context guard triggered | No    |
 | **Limits/Failures**          |                                                     |       |
 | `EXIT-MAX-TURNS-NO-RESPONSE` | Turn limit reached without final response           | Yes   |
 | `EXIT-UNCAUGHT-EXCEPTION`    | Uncaught exception in agent                         | Yes   |
@@ -212,6 +212,8 @@ zcat "$SNAPSHOT" | jq '[.. | objects | select(.remoteIdentifier | test("agent:EX
 ```
 EXIT-FINAL-ANSWER: Final report received (final_report), session complete (fatal=false)
 ```
+
+Note: the exit log is emitted only after finalization readiness is achieved. When required META is configured, the exit will not occur until META validation succeeds.
 
 ---
 

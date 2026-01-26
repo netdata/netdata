@@ -29,6 +29,8 @@ describe('harness helpers', () => {
       attempt: 1,
       maxRetries: 3,
       contextPercentUsed: 5,
+      finalReportLocked: false,
+      missingMetaPluginNames: [],
     });
 
     const extracted = extractNonceFromMessages([build.nextMessage], 'unit-harness-nonce');

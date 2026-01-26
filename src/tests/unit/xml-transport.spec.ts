@@ -15,7 +15,6 @@ const baseTools: MCPTool[] = [
   { name: 'agent__final_report', description: 'final', inputSchema: { type: 'object' } },
   { name: 'agent__task_status', description: 'task_status', inputSchema: { type: 'object' } },
 ];
-
 interface XmlWarningEntry {
   severity: 'WRN';
   message: string;
@@ -43,6 +42,8 @@ describe('XmlToolTransport', () => {
       attempt: 1,
       maxRetries: 3,
       contextPercentUsed: 10,
+      finalReportLocked: false,
+      missingMetaPluginNames: [],
     });
 
     expect(first.nonce).toBe(NONCE);
@@ -67,6 +68,8 @@ describe('XmlToolTransport', () => {
       attempt: 1,
       maxRetries: 3,
       contextPercentUsed: 15,
+      finalReportLocked: false,
+      missingMetaPluginNames: [],
     });
 
     expect(second.pastMessage).toBeUndefined();
@@ -88,6 +91,8 @@ describe('XmlToolTransport', () => {
       attempt: 1,
       maxRetries: 3,
       contextPercentUsed: 5,
+      finalReportLocked: false,
+      missingMetaPluginNames: [],
     });
 
     const slotId = build.slotTemplates[0].slotId;
@@ -124,6 +129,8 @@ describe('XmlToolTransport', () => {
       attempt: 1,
       maxRetries: 3,
       contextPercentUsed: 8,
+      finalReportLocked: false,
+      missingMetaPluginNames: [],
     });
 
     const finalSlot = build.slotTemplates.find((s) => s.slotId.endsWith('FINAL'))?.slotId ?? `${NONCE}-FINAL`;
@@ -159,6 +166,8 @@ describe('XmlToolTransport', () => {
         attempt: 1,
         maxRetries: 3,
         contextPercentUsed: 8,
+        finalReportLocked: false,
+        missingMetaPluginNames: [],
       });
 
       const nonFinalSlot = `${NONCE}-0001`;
@@ -195,6 +204,8 @@ describe('XmlToolTransport', () => {
         attempt: 1,
         maxRetries: 3,
         contextPercentUsed: 8,
+        finalReportLocked: false,
+        missingMetaPluginNames: [],
       });
 
       const slotId = build.slotTemplates[0].slotId;
@@ -236,6 +247,8 @@ describe('XmlToolTransport', () => {
         attempt: 1,
         maxRetries: 3,
         contextPercentUsed: 8,
+        finalReportLocked: false,
+        missingMetaPluginNames: [],
       });
 
       const nonFinalSlot = `${NONCE}-0001`;
@@ -274,6 +287,8 @@ describe('XmlToolTransport', () => {
         attempt: 1,
         maxRetries: 3,
         contextPercentUsed: 8,
+        finalReportLocked: false,
+        missingMetaPluginNames: [],
       });
 
       const finalSlot = `${NONCE}-FINAL`;
@@ -320,6 +335,8 @@ describe('XmlToolTransport', () => {
         attempt: 1,
         maxRetries: 3,
         contextPercentUsed: 8,
+        finalReportLocked: false,
+        missingMetaPluginNames: [],
       });
 
       const finalSlot = `${NONCE}-FINAL`;
@@ -365,6 +382,8 @@ describe('XmlToolTransport', () => {
         attempt: 1,
         maxRetries: 3,
         contextPercentUsed: 8,
+        finalReportLocked: false,
+        missingMetaPluginNames: [],
       });
 
       const finalSlot = `${NONCE}-FINAL`;
@@ -414,6 +433,8 @@ describe('XmlToolTransport', () => {
         attempt: 1,
         maxRetries: 3,
         contextPercentUsed: 8,
+        finalReportLocked: false,
+        missingMetaPluginNames: [],
       });
 
       const finalSlot = `${NONCE}-FINAL`;
@@ -454,6 +475,8 @@ describe('XmlToolTransport', () => {
         attempt: 1,
         maxRetries: 3,
         contextPercentUsed: 8,
+        finalReportLocked: false,
+        missingMetaPluginNames: [],
       });
 
       const finalSlot = `${NONCE}-FINAL`;
@@ -489,6 +512,8 @@ describe('XmlToolTransport', () => {
         attempt: 1,
         maxRetries: 3,
         contextPercentUsed: 8,
+        finalReportLocked: false,
+        missingMetaPluginNames: [],
       });
 
       const finalSlot = `${NONCE}-FINAL`;

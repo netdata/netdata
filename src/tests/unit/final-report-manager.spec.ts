@@ -7,6 +7,7 @@ const SLACK_BLOCK_KIT_FORMAT = 'slack-block-kit' as const;
 const JSON_OK_TRUE = '{"ok":true}';
 const JSON_OK_INVALID = '{"ok":"yes"}';
 const JSON_INVALID_CONTENT_JSON = { ok: 'yes' };
+const META_REQUIRED_PLUGIN = 'meta-required';
 const JSON_SCHEMA = {
   type: 'object',
   required: ['ok'],
@@ -179,5 +180,76 @@ describe('FinalReportManager', () => {
 
     const output = manager.getFinalOutput();
     expect(output).toBe(JSON_OK_TRUE);
+  });
+
+  it('locks the final report when required META is missing and prevents replacement', () => {
+    const manager = createManager();
+    manager.setRequiredPlugins([META_REQUIRED_PLUGIN]);
+
+    manager.commit(
+      {
+        format: 'markdown',
+        content: 'locked report',
+        metadata: { status: 'success' },
+      },
+      'tool-call'
+    );
+
+    expect(manager.isFinalReportLocked()).toBe(true);
+    expect(manager.isFinalizationReady()).toBe(false);
+
+    manager.commit(
+      {
+        format: 'markdown',
+        content: 'replacement should be ignored',
+        metadata: { status: 'failure' },
+      },
+      'synthetic'
+    );
+
+    expect(manager.getReport()?.content).toBe('locked report');
+    expect(manager.getSource()).toBe('tool-call');
+  });
+
+  it('becomes ready after required META is committed', () => {
+    const manager = createManager();
+    manager.setRequiredPlugins([META_REQUIRED_PLUGIN]);
+
+    manager.commit(
+      {
+        format: 'markdown',
+        content: 'report with META',
+      },
+      'tool-call'
+    );
+
+    manager.commitPluginMeta(META_REQUIRED_PLUGIN, { ticketId: 'T-1' });
+
+    expect(manager.isFinalizationReady()).toBe(true);
+    expect(manager.isFinalReportLocked()).toBe(false);
+    expect(manager.getMissingRequiredPluginMetas()).toStrictEqual([]);
+  });
+
+  it('clear() resets report state but preserves META and required plugin names', () => {
+    const manager = createManager();
+    manager.setRequiredPlugins([META_REQUIRED_PLUGIN]);
+
+    manager.commit(
+      {
+        format: 'markdown',
+        content: 'report before clear',
+      },
+      'tool-call'
+    );
+    manager.commitPluginMeta(META_REQUIRED_PLUGIN, { ticketId: 'T-2' });
+
+    manager.clear();
+
+    expect(manager.hasReport()).toBe(false);
+    expect(manager.getPluginMeta(META_REQUIRED_PLUGIN)).toStrictEqual({ ticketId: 'T-2' });
+    expect(manager.getRequiredPlugins()).toStrictEqual([META_REQUIRED_PLUGIN]);
+    expect(manager.getMissingRequiredPluginMetas()).toStrictEqual([]);
+    expect(manager.isFinalizationReady()).toBe(false);
+    expect(manager.isFinalReportLocked()).toBe(false);
   });
 });

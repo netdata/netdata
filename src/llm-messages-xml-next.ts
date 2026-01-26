@@ -192,15 +192,19 @@ const appendRouterHandoffOption = (message: string, allowRouterHandoff: boolean)
   return `${message} OR call \`${ROUTER_HANDOFF_TOOL}\` to hand off the user request to another agent.`;
 };
 
-const appendMetaReminder = (message: string, metaGuidance: MetaGuidance): string => (
-  `${message}\n${metaGuidance.reminderShort}`
+const selectMetaReminder = (metaGuidance: MetaGuidance, finalReportLocked: boolean): string => (
+  finalReportLocked ? metaGuidance.reminderShortLocked : metaGuidance.reminderShort
+);
+
+const appendMetaReminder = (message: string, metaGuidance: MetaGuidance, finalReportLocked: boolean): string => (
+  `${message}\n${selectMetaReminder(metaGuidance, finalReportLocked)}`
 );
 
 const buildWastedTurnWarning = (consecutiveCount: number, metaGuidance: MetaGuidance): Warning | undefined => {
   if (consecutiveCount <= 0) return undefined;
 
   // Use base message from slugs, append occurrence count
-  const baseMessage = appendMetaReminder(XML_NEXT_SLUGS.turn_wasted_task_status_only.message, metaGuidance);
+  const baseMessage = appendMetaReminder(XML_NEXT_SLUGS.turn_wasted_task_status_only.message, metaGuidance, false);
   return {
     type: 'wasted_turn',
     message: `${baseMessage}\n(This is occurrence ${String(consecutiveCount)} of 5 before forced finalization)`,
@@ -216,6 +220,7 @@ const buildFinalTurnWarning = (
   const message = appendMetaReminder(
     appendRouterHandoffOption(XML_NEXT_SLUGS[slugKey].message, allowRouterHandoff),
     metaGuidance,
+    false,
   );
   return {
     type: 'final_turn',
@@ -231,7 +236,7 @@ const buildMetaOnlyWarning = (context: XmlNextNoticeContext, metaGuidance: MetaG
   const baseMessage = `${XML_NEXT_SLUGS.meta_only_locked.message} ${missingLine}`;
   return {
     type: 'final_turn',
-    message: appendMetaReminder(baseMessage, metaGuidance),
+    message: appendMetaReminder(baseMessage, metaGuidance, true),
   };
 };
 
@@ -274,7 +279,7 @@ const buildNonFinalFooter = (context: XmlNextNoticeContext, metaGuidance: MetaGu
     return [
       'FINAL already accepted. Do NOT resend the FINAL wrapper.',
       'Provide the missing META wrappers now. Do NOT call tools.',
-      metaGuidance.reminderShort,
+      metaGuidance.reminderShortLocked,
     ].join('\n');
   }
   const wrapperExample = buildFinalWrapperExample(context);
@@ -306,7 +311,7 @@ const buildFinalTurnFooter = (context: XmlNextNoticeContext, metaGuidance: MetaG
     return [
       'FINAL already accepted. Do NOT resend the FINAL wrapper.',
       'Provide the missing META wrappers now. Do NOT call tools.',
-      metaGuidance.reminderShort,
+      metaGuidance.reminderShortLocked,
     ].join('\n');
   }
   const wrapperExample = buildFinalWrapperExample(context);
@@ -378,7 +383,7 @@ const buildLastRetryReminder = (context: XmlNextNoticeContext, metaGuidance: Met
     : true;
 
   if (context.attempt === context.maxRetries && context.maxRetries > 0 && lastRetryNonFinal) {
-    return appendMetaReminder(XML_NEXT_SLUGS.last_retry_tool_reminder.message, metaGuidance);
+    return appendMetaReminder(XML_NEXT_SLUGS.last_retry_tool_reminder.message, metaGuidance, context.finalReportLocked);
   }
 
   return undefined;

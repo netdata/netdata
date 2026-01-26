@@ -94,6 +94,7 @@ Each layer has paired `.ai-agent.env` for secrets. Higher layers override lower 
 | `toolName` | string | filename | Callable identifier as sub-agent (`agent__<toolName>`) |
 | `models` | string/string[] | **required** | `provider/model` pairs (fallback chain) |
 | `tools` | string[] | `[]` | MCP server names, REST tool config keys |
+| `plugins` | string[] | `[]` | Final report plugin modules (relative `.js` paths) |
 | `agents` | string[] | `[]` | Sub-agent paths (relative to agent file) |
 | `advisors` | string/string[] | - | Advisor agent paths (run pre-session in parallel) |
 | `router.destinations` | string[] | - | Agent paths; router tool enum exposes destination toolName (frontmatter `toolName` or derived from filename) |
@@ -922,9 +923,10 @@ When projected size approaches context limit:
 
 ### Final Report Requirements
 - Must end with `agent__final_report` wrapped in XML tag
+- When final-report plugins are configured, required META wrappers must be provided together with the final report: `<ai-agent-NONCE-META plugin="name">{...}</ai-agent-NONCE-META>`
 - Plain-text answers NOT accepted
 - Missing/malformed XML → turn fails or retries triggered
-- Turn succeeds only if valid final report OR at least one non-progress tool executed. **Executed** means the tool passed validation and execution started; schema/unknown-tool rejections do **not** count, while timeouts/transport errors after execution do.
+- Turn succeeds only if **finalization readiness** is achieved (final report + required META) OR at least one non-progress tool executed. **Executed** means the tool passed validation and execution started; schema/unknown-tool rejections do **not** count, while timeouts/transport errors after execution do.
 
 ### Reasoning
 - `none` or `unset` → disables reasoning
@@ -987,7 +989,7 @@ DEBUG=true CONTEXT_DEBUG=true ai-agent --agent myagent.ai "query"
 
 | Code | Description |
 |------|-------------|
-| `EXIT-FINAL-ANSWER` | Successful final answer |
+| `EXIT-FINAL-ANSWER` | Finalization readiness achieved (final report + required META when configured) |
 | `EXIT-MAX-TURNS-WITH-RESPONSE` | Turn limit reached with response |
 | `EXIT-USER-STOP` | User stopped session |
 | `EXIT-NO-LLM-RESPONSE` | No LLM response |

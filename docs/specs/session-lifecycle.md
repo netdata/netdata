@@ -1,20 +1,22 @@
 # Session Lifecycle
 
 ## TL;DR
-Session created via static factory; `AIAgent.run()` wraps orchestration (advisors/router/handoff) around the inner `AIAgentSession.run()` loop.
+Session is created via a static factory; `AIAgent.run()` wraps orchestration (advisors/router/handoff) around the inner `SessionTurnRunner` loop. A session is complete only when finalization readiness is achieved (final report + required META when configured) or a synthetic failure report is emitted.
 
 ## Source Files
-- `src/ai-agent.ts:769-837` - `AIAgentSession.create()`
-- `src/ai-agent.ts:1037-1388` - `AIAgentSession.run()` (inner loop)
-- `src/ai-agent.ts:2332-2460` - `AIAgent.run()` (orchestration wrapper)
+- `src/ai-agent.ts` - `AIAgentSession.create()` and top-level `run()` wiring
+- `src/session-turn-runner.ts` - Main agent loop (retries, final turns, finalization readiness)
+- `src/final-report-manager.ts` - Final report + required META state
+- `src/context-guard.ts` - Context guard budgets and forced-final enforcement
+- `src/plugins/runtime.ts` - Final-report plugin validation and cache gating
+- `src/xml-transport.ts` - XML FINAL/META transport pairing
 - `src/orchestration/*` - advisors/router/handoff helpers
-- `src/session-tool-executor.ts` - router selection capture
-- `src/session-turn-runner.ts` - router short-circuit
+- `src/session-tool-executor.ts` - tool execution, failure overrides, router selection capture
 
 ## Lifecycle Phases
 
 ### 1. Creation (`AIAgentSession.create`)
-**Location**: `src/ai-agent.ts:769-837`
+**Location**: `src/ai-agent.ts`
 
 **Steps**:
 1. Validate config: `validateProviders()`, `validateMCPServers()`, `validatePrompts()`
@@ -32,7 +34,7 @@ Session created via static factory; `AIAgent.run()` wraps orchestration (advisor
 - parentTxnId undefined for root agents
 
 ### 2. Initialization (Constructor)
-**Location**: `src/ai-agent.ts:410-767`
+**Location**: `src/ai-agent.ts`
 
 **Steps**:
 1. Store config references (defensive copies)
@@ -59,7 +61,7 @@ Session created via static factory; `AIAgent.run()` wraps orchestration (advisor
 - All providers registered synchronously
 
 ### 3. Orchestration Wrapper (`AIAgent.run`)
-**Location**: `src/ai-agent.ts:2332-2460`
+**Location**: `src/ai-agent.ts`
 
 **Steps**:
 1. If no orchestration is configured, call `AIAgentSession.run()` directly.
@@ -71,7 +73,7 @@ Session created via static factory; `AIAgent.run()` wraps orchestration (advisor
 7. Merge results (parent conversation/logs + child accounting/logs; child final report becomes top-level).
 
 ### 4. Execution (`AIAgentSession.run`)
-**Location**: `src/ai-agent.ts:1037-1388`
+**Location**: `src/ai-agent.ts`
 
 **Steps**:
 1. Create OpenTelemetry span with session attributes
@@ -100,7 +102,7 @@ Session created via static factory; `AIAgent.run()` wraps orchestration (advisor
 - Always cleanup toolsOrchestrator in finally block
 
 ### 5. Agent Loop (`executeAgentLoop`)
-**Location**: `src/ai-agent.ts:1390-2600+`
+**Location**: `src/session-turn-runner.ts`
 
 **Structure**:
 ```
@@ -121,7 +123,8 @@ for turn = 1 to maxTurns:
 
     handle status:
       - success with tools: execute tools, continue turn
-      - success with final_report: finalize
+      - success with finalization readiness: finalize
+      - success with final report but missing/invalid required META: retry (final report locked, META-only guidance)
       - success without tools: retry (synthetic failure)
       - rate_limit: skip provider/model pair on non-200; otherwise backoff and retry
       - auth_error: skip provider/model pair
@@ -136,7 +139,7 @@ for turn = 1 to maxTurns:
 
   end turn in opTree
 
-  if final_report captured: break
+  if finalization readiness achieved: break
   if max turns reached: finalize
 ```
 
@@ -145,7 +148,7 @@ for turn = 1 to maxTurns:
 - Provider cycling: round-robin through targets array
 - Backoff for rate limits: only when retrying (no non-200 skip)
 - Synthetic retries: content without tools triggers retry
-- Final turn enforcement: last turn allows final_report (plus `router__handoff-to` when router destinations are configured)
+- Final turn enforcement: last turn allows final report and required META; extra tools (such as `router__handoff-to`) are allowed only when configured and the final report is not locked
 
 **Context Guard**:
 - Before each LLM request: evaluate projected token usage
@@ -186,16 +189,17 @@ for turn = 1 to maxTurns:
 
 ### 8. Finalization
 **Triggered by**:
-- `agent__final_report` tool called
-- Max turns reached
-- Context guard enforced
-- Error conditions
+- Finalization readiness achieved (final report + required META when configured)
+- Max turns reached without finalization readiness
+- Context guard enforcement, retry exhaustion, or cancellation/stop handling
+- Error conditions that require synthetic finalization
 
 **Steps**:
-1. Capture final report (status, format, content)
-2. Validate JSON schema if applicable
-3. Log finalization
-4. End all open operations in opTree
+1. Capture the final report and required plugin META blocks; if META is missing, lock the final report and retry with META-only guidance
+2. Validate final report and required META schemas
+3. When finalization readiness is achieved, run plugin `onComplete` hooks and emit final output once (locked-final retries suppress duplicate streaming)
+4. Log finalization details (source, reasons, missing META diagnostics) and end all open operations in opTree
+5. If finalization readiness cannot be achieved, synthesize a failure report with an explicit reason (for example, `final_meta_missing`)
 5. Return AIAgentResult
 
 ### 9. Cleanup
@@ -219,7 +223,7 @@ Constructor → run() entry → executeAgentLoop() → finalization → cleanup
 - **Creation**: `AIAgentSession.create()` factory returns instance
 - **Initialization**: Constructor configures tools, context, tracers
 - **Execution**: `run()` warms tools, then enters `executeAgentLoop()`
-- **Finalization**: Final report captured or max turns exhausted
+- **Finalization**: Finalization readiness achieved (final report + required META) or a synthetic failure report is emitted on exhaustion
 - **Cleanup**: `finally` block closes the tool orchestrator (logs/FIN events already emitted before returning)
 
 The flow is **procedural**, not state-machine driven. Error handling is inline via try/catch blocks, not state transitions.
@@ -238,8 +242,8 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
   - `'stop'`: Graceful stop - triggers final turn with `forcedFinalReason='user_stop'`, allows model to summarize, success=true
   - `'abort'`: Immediate cancel - no final turn, success=false, abortSignal fired
   - `'shutdown'`: Global shutdown - no final turn, success=false, abortSignal fired
-- Tool execution during final turn: `final_report` is allowed, plus `router__handoff-to` when router destinations are configured (including reason='stop')
-- Exit code: `EXIT-USER-STOP` when reason='stop' and final report received
+- Tool execution during final turn: `final_report` is always allowed; `router__handoff-to` is allowed only when router destinations are configured and the final report is not locked
+- Exit code: `EXIT-USER-STOP` when reason='stop' and finalization readiness is achieved
 
 ## Configuration Effects
 
@@ -283,10 +287,10 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 - `agent:turn-start` - Each LLM turn begins (VRB)
 - `agent:final-turn` - Final turn detected (WRN)
 - `agent:context` - Context guard events
-- `agent:text-extraction` - Final report payload parsed from assistant text/tool message (still pending)
-- `agent:fallback-report` - Cached pending payload accepted on the forced final turn
-- `agent:final-report-accepted` - Final report committed; `details.source` disambiguates tool-call vs fallback vs synthetic
-- `agent:failure-report` - Synthetic failure final report synthesized (ERR)
+- `agent:text-extraction` - Final report payload parsed from assistant text/tool message fallback
+- `agent:fallback-report` - Final report synthesized from tool message fallback and accepted
+- `agent:final-report-accepted` - Final report committed; `details.source` disambiguates tool-call vs fallback vs synthetic, but finalization readiness may still require META
+- `agent:failure-report` - Synthetic failure final report synthesized when finalization readiness cannot be achieved (ERR)
 - `agent:fin` - Session finalized
 - `agent:error` - Uncaught exception
 - Exit codes: `agent:EXIT-*`
@@ -298,18 +302,18 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 - `agent_finished` - Success completion
 - `agent_failed` - Error completion
 
-## Business Logic Coverage (Verified 2025-11-16)
+## Business Logic Coverage (Verified 2026-01-25)
 
-- **Pending final report cache & fallback acceptance**: `tryAdoptFinalReportFromText` now returns a payload that is stored in `pendingFinalReport` (instead of fabricating a tool call). The orchestrator keeps retrying until the forced final turn, then optionally accepts the cached payload (logging `agent:fallback-report` and preserving `finalReportSource`). (`src/ai-agent.ts:1862-1960`, `src/ai-agent.ts:3337-3410`).
-- **Context-forced fallback report**: When the context guard blocks further turns, the session synthesizes a `failure` final report, logs `agent:failure-report` + `EXIT-TOKEN-LIMIT`, and surfaces the reason in the FIN summary and telemetry (`src/ai-agent.ts:2593-2625`).
-- **Incomplete final report detection**: If the assistant calls the final-report tool without required fields, the session shortens `maxTurns`, injects instructions, and retries within the same provider cycle (`src/ai-agent.ts:2252-2275`).
-- **Tool failure overrides**: `toolFailureMessages` / `toolFailureFallbacks` let MCP/REST providers replace low-level errors with curated text so final answers consistently describe which tool failed (`src/ai-agent.ts:1671-1895`, `src/ai-agent.ts:3707-3952`).
-- **sleepWithAbort + retry directives**: Backoff waits respect aborts, and `buildFallbackRetryDirective` crafts deterministic retry metadata when providers omit guidance (covers rate_limit, auth, quota, timeout, and network errors) (`src/ai-agent.ts:2470-2545`, `src/ai-agent.ts:3298-3338`).
-- **Tool budget mutex**: Concurrent tool executions acquire a mutex before accounting for output bytes, ensuring the `(tool failed: response exceeded ...)` guard is deterministic (`src/ai-agent.ts:155-562`, `src/ai-agent.ts:516-562`).
-- **Pending retry deduplication**: `pushSystemRetryMessage` keeps a deduped queue of system reminders so multi-provider retries don't spam instructions in conversation history (`src/ai-agent.ts:198, 2959-3042`).
-- **Context limit warning gating**: `contextLimitWarningLogged` prevents repetitive warnings; once logged the session suppresses duplicate notices to keep logs clean (`src/ai-agent.ts:159, 2338-2368`).
-- **Snapshot + accounting flush**: After `executeAgentLoop()` succeeds, `persistSessionSnapshot('final')` emits `onEvent(type='snapshot')` and `flushAccounting()` emits `onEvent(type='accounting_flush')`; on uncaught exceptions the catch path skips both calls (`src/ai-agent.ts:360-420`, `src/ai-agent.ts:1256-1310`).
-- **Child session capture**: `childConversations` stores prompt paths, agent IDs, and conversations for every sub-agent call, and FIN summaries aggregate their accounting so parent sessions can render nested timelines (`src/ai-agent.ts:700-884`, `src/ai-agent.ts:3120-3220`).
+- **Finalization readiness contract**: Session success requires both the final report and all required plugin META blocks. Missing/invalid META locks the final report, triggers META-only retries, and exhaustion can synthesize `reason: "final_meta_missing"` (`src/final-report-manager.ts`, `src/plugins/runtime.ts`, `src/session-turn-runner.ts`).
+- **Cache gating requires META validation**: Cache hits and writes are accepted only when required META blocks validate; cache entries without META are treated as misses (`src/plugins/runtime.ts`, `src/ai-agent.ts`).
+- **Final-turn tool filtering with locked-final gating**: Final turns keep `agent__final_report` and only allow extra tools (such as router handoff) when configured and the final report is not locked (`src/session-turn-runner.ts`, `src/ai-agent.ts`, `src/llm-messages-xml-next.ts`).
+- **TURN-FAILED repair guidance**: Retry feedback is accumulated as TURN-FAILED events and flushed as a single user message before each attempt, keeping guidance specific while avoiding duplicate spam (`src/session-turn-runner.ts`, `src/llm-messages-turn-failed.ts`).
+- **Context guard enforcement**: Per-provider evaluations can skip oversized targets or force final-turn mode; enforcement, counters, and telemetry live in `ContextGuard`, with runner-level preflight decisions (`src/context-guard.ts`, `src/session-turn-runner.ts`).
+- **Rate-limit cycle gating + abort-aware sleep**: The runner backs off only when all provider/model pairs rate-limit within the same cycle, and every wait honors cancel/stop signals via `sleepWithAbort` (`src/session-turn-runner.ts`).
+- **Tool budget mutex**: Tool budget reservations run under a mutex so concurrent tool executions cannot race token projections (`src/context-guard.ts`).
+- **Tool failure overrides**: Tool failures can be replaced with curated fallback messages that are later surfaced to the model and final reports (`src/session-tool-executor.ts`, `src/session-turn-runner.ts`).
+- **Snapshot + accounting flush**: Final snapshots and accounting flushes still emit deterministic events for headends and billing hooks (`src/ai-agent.ts`, `src/persistence.ts`).
+- **Child session capture**: Sub-agent runs preserve ancestry (`originTxnId`, `parentTxnId`, `agentPath`) and capture nested conversations for auditing (`src/subagent-registry.ts`, `src/session-turn-runner.ts`).
 
 10. **evaluateContextForProvider()**:
     - Returns: 'ok' | 'skip' | 'final'
@@ -356,6 +360,6 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 - Check tool output sizes
 
 ### Final report missing
-- Check tool call validation
-- Check schema compliance
-- Check format parameter matches expected
+- Check final report tool call validation
+- Check required META blocks are present and schema-valid when plugins are configured
+- Check XML wrappers use the session nonce and the correct FINAL/META structure

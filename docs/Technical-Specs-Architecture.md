@@ -146,7 +146,7 @@ graph TB
 | `opTree`                | Hierarchical operation tracking for snapshots                        |
 | `toolsOrchestrator`     | Tool execution engine                                                |
 | `llmClient`             | LLM request executor                                                 |
-| `finalReport`           | Captured `final_report` tool result (via FinalReportManager)         |
+| `finalReportManager`    | Tracks final report, required META, lock state, and finalization readiness |
 | `targetContextConfigs`  | Per-model context window and buffer settings                         |
 | `forcedFinalTurnReason` | Context guard enforcement state (context/max_turns/task_status/etc.) |
 | `pendingToolSelection`  | Cached tool selection for current turn (planned subturns tracking)   |
@@ -159,7 +159,7 @@ for turn = 1 to maxTurns:
     check context guard
     execute LLM request
     if tool calls: execute tools
-    if final_report: finalize
+    if finalization readiness achieved: finalize
     record accounting
 ```
 
@@ -323,9 +323,9 @@ flowchart TD
     Execute --> AddResults[Add Tool Results to Conversation]
     AddResults --> NextTurn[Continue to Next Turn]
 
-    Check -->|No| Final{Has Final Report or Content?}
+    Check -->|No| Final{Finalization Ready?}
     Final -->|Yes| Finalize[Finalize Session]
-    Final -->|No| Retry[Synthetic Retry with Guidance]
+    Final -->|No| Retry[Retry with Guidance]
 
     Retry --> NextTurn
     TurnRunner --> FinalResult[Return AIAgentResult]
@@ -349,7 +349,7 @@ Session termination states returned in `AIAgentResult.exitCode`.
 
 | Exit Code                      | Description                                   |
 | ------------------------------ | --------------------------------------------- |
-| `EXIT-FINAL-ANSWER`            | Agent called `final_report` tool successfully |
+| `EXIT-FINAL-ANSWER`            | Finalization readiness achieved (final report + required META when configured) |
 | `EXIT-MAX-TURNS-WITH-RESPONSE` | Max turns reached with valid response         |
 | `EXIT-USER-STOP`               | User-initiated graceful stop                  |
 

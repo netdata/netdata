@@ -28,11 +28,11 @@ export const TURN_FAILED_SLUGS: Record<string, TurnFailedSlugConfig> = {
     priority: 'high',
   },
   final_meta_missing: {
-    message: 'Final report is incomplete: required META blocks are missing. Provide every required `<ai-agent-NONCE-META plugin="name">...</ai-agent-NONCE-META>` block with valid JSON alongside your final report.',
+    message: 'Final report is incomplete: required META blocks are missing. FINAL already accepted; provide every required `<ai-agent-NONCE-META plugin="name">...</ai-agent-NONCE-META>` block with valid JSON. Do NOT resend the FINAL wrapper.',
     priority: 'critical',
   },
   final_meta_invalid: {
-    message: 'Final report META failed validation. Fix the META JSON for the specified plugin(s) and resend the required `<ai-agent-NONCE-META plugin="name">...</ai-agent-NONCE-META>` blocks.',
+    message: 'Final report META failed validation. FINAL already accepted; fix the META JSON for the specified plugin(s) and resend the required `<ai-agent-NONCE-META plugin="name">...</ai-agent-NONCE-META>` blocks only.',
     priority: 'critical',
   },
   tool_message_fallback_schema_failed: {
@@ -101,6 +101,11 @@ export interface TurnFailedNoticeEvent {
   order: number;
 }
 
+export interface TurnFailedNoticeRenderContext {
+  sessionNonce?: string;
+  metaReminderShort?: string;
+}
+
 export const TURN_FAILURE_PRIORITY_WEIGHT: Record<TurnFailurePriority, number> = {
   critical: 3,
   high: 2,
@@ -116,9 +121,14 @@ const lookupTurnFailedConfig = (slug: string): TurnFailedSlugConfig | undefined 
   return TURN_FAILED_SLUGS[slug];
 };
 
-export const renderTurnFailedSlug = (slug: TurnFailedSlug, reason?: string): string => {
+const replaceNoncePlaceholders = (message: string, sessionNonce?: string): string => (
+  sessionNonce === undefined ? message : message.replaceAll('NONCE', sessionNonce)
+);
+
+export const renderTurnFailedSlug = (slug: TurnFailedSlug, reason?: string, sessionNonce?: string): string => {
   const config = lookupTurnFailedConfig(slug);
-  const base = config?.message.trimEnd() ?? `Turn failed due to an unknown error (slug=${slug}). Follow the latest instructions and retry.`;
+  const baseMessage = config?.message.trimEnd() ?? `Turn failed due to an unknown error (slug=${slug}). Follow the latest instructions and retry.`;
+  const base = replaceNoncePlaceholders(baseMessage, sessionNonce);
   if (reason === undefined || reason.trim().length === 0) {
     return base;
   }
@@ -147,8 +157,16 @@ const selectTurnFailedEntries = (events: TurnFailedNoticeEvent[]): TurnFailedNot
   return sorted.slice(0, MAX_TURN_FAILED_REASONS);
 };
 
-export const buildTurnFailedNotice = (events: TurnFailedNoticeEvent[]): string => {
+export const buildTurnFailedNotice = (
+  events: TurnFailedNoticeEvent[],
+  context?: TurnFailedNoticeRenderContext,
+): string => {
   const selected = selectTurnFailedEntries(events);
-  const reasons = selected.map((entry) => renderTurnFailedSlug(entry.slug, entry.reason));
-  return `TURN-FAILED: ${reasons.join(' | ')}`;
+  const reasons = selected.map((entry) => renderTurnFailedSlug(entry.slug, entry.reason, context?.sessionNonce));
+  const base = `TURN-FAILED: ${reasons.join(' | ')}`;
+  const metaReminder = typeof context?.metaReminderShort === 'string' ? context.metaReminderShort.trim() : '';
+  if (metaReminder.length === 0) {
+    return base;
+  }
+  return `${base} ${metaReminder}`;
 };

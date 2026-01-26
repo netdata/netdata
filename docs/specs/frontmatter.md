@@ -30,6 +30,8 @@ output:
 # Runtime options
 models: anthropic/claude-3-5-sonnet
 tools: mcp-server-1,mcp-server-2
+plugins:
+  - ./support-metadata.js
 agents: sub-agent-1,sub-agent-2
 advisors:
   - ./agents/compliance.ai
@@ -131,6 +133,7 @@ function parseFrontmatter(
 interface FrontmatterOptions {
   models?: string | string[];
   tools?: string | string[];
+  plugins?: string | string[];
   agents?: string | string[];
   advisors?: string | string[];
   router?: { destinations?: string | string[] };
@@ -161,6 +164,10 @@ interface FrontmatterOptions {
 - `handoff`: string (single agent path). Arrays are rejected with an error.
 
 Validation occurs during frontmatter parsing (`src/frontmatter.ts`), and reference resolution happens in the loader (`src/agent-loader.ts`).
+
+## Final-Report Plugins
+
+- `plugins`: string or string[] (relative `.js` module paths). Resolved relative to the agent file directory and loaded at initialization. Modules must default-export a plugin factory.
 
 ## Schema Loading
 

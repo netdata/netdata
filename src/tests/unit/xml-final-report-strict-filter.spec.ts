@@ -6,11 +6,20 @@ describe('XmlFinalReportStrictFilter', () => {
   const nonce = 'af834d4d';
   const openTag = `<ai-agent-${nonce}-FINAL format="markdown">`;
   const closeTag = `</ai-agent-${nonce}-FINAL>`;
+  const metaOpenTag = `<ai-agent-${nonce}-META plugin="support-metadata">`;
+  const metaCloseTag = `</ai-agent-${nonce}-META>`;
 
   it('drops content outside FINAL tag', () => {
     const filter = new XmlFinalReportStrictFilter(nonce);
     const chunk = `preamble ${openTag}report${closeTag} tail`;
     expect(filter.process(chunk)).toBe('report');
+    expect(filter.hasStreamedContent).toBe(true);
+  });
+
+  it('strips META blocks that appear inside FINAL content', () => {
+    const filter = new XmlFinalReportStrictFilter(nonce);
+    const chunk = `${openTag}answer${metaOpenTag}secret${metaCloseTag}${closeTag}`;
+    expect(filter.process(chunk)).toBe('answer');
     expect(filter.hasStreamedContent).toBe(true);
   });
 
@@ -44,5 +53,13 @@ describe('XmlFinalReportStrictFilter', () => {
     const chunk = `<think>Using ${openTag} in thinking.</think>${openTag}${content}${closeTag}`;
     expect(filter.process(chunk)).toBe(content);
     expect(filter.hasStreamedContent).toBe(true);
+  });
+
+  it('suppresses all streaming output when suppression mode is enabled', () => {
+    const filter = new XmlFinalReportStrictFilter(nonce, { suppressStreaming: true });
+    const chunk = `${openTag}report${closeTag}`;
+    expect(filter.process(chunk)).toBe('');
+    expect(filter.flush()).toBe('');
+    expect(filter.hasStreamedContent).toBe(false);
   });
 });

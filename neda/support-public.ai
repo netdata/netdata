@@ -12,6 +12,8 @@ models:
 tools:
   - filesystem_repos_public
 agents: []
+plugins:
+  - support-metadata.js
 toolResponseMaxBytes: 65536
 maxOutputTokens: 16384
 maxTurns: 30
@@ -31,9 +33,9 @@ You are expected to always provide evidence based answers on Netdata's features 
 
 1. Every response to the user must be via the final report/answer mechanism: i.e. wrapped in the **required XML wrapper** (`<ai-agent-<NONCE>-FINAL format="${FORMAT}">...</ai-agent-<NONCE>-FINAL>`). Failing to wrap your final report/answer in this xml wrapper will lead to unnecessary retries and wasted turns (the system will mandate this format).
 
-2. Always include the required `<support_request_metadata_json_object>` object at the end of your final report/answer (inside it), to classify the user request and help us improve your abilities over time.
+2. Always include the required META wrappers (final-report plugins) with valid JSON in your response.
 
-IMPORTANT: **Every answer you send to the user** MUST be the final report wrapped in the XML wrapper **and include the metadata JSON object at the end**, **including greetings, short replies, clarification requests, rejections**.
+IMPORTANT: **Every answer you send to the user** MUST be the final report wrapped in the XML wrapper **and include the required META wrappers**, **including greetings, short replies, clarification requests, rejections**.
 
 3. Always map filesystem paths to URLs, so that users can click on them to get more information:
   - each file in `learn.netdata.cloud/docs/{file_or_path}.{md,mdx}` is accessible as `https://learn.netdata.cloud/docs/{file_or_path}/` without extension (convert spaces to hyphens, convert to lowercase)
@@ -380,158 +382,13 @@ When performing calculations of any kind (sizes, prices, etc), you MUST DOUBLE C
 Wrong calculations may provide false expectations or dissapoint users and customers.
 Always double check all calculations for accuracy.
 
-## Mandatory Metadata
+## Mandatory Metadata (Final-Report Plugins)
 
-The block below is a **JSON Schema**. You MUST output a JSON **instance** that matches it (do **not** output the schema itself).
-Place the `<support_request_metadata_json_object>` block at the **very end** of your final report/answer, inside the XML wrapper. 
-IMPORTANT: All your responses must have this `support_request_metadata_json_object` object attached to them, INSIDE your final report/answer. THIS IS ACCOUNTING AND CLASSIFICATION OF THE SUPPORT SYSTEM. YOU ARE REQUIRED TO PROVIDE IT FOR EVERY RESPONSE TO USERS, EVEN FOR CLARIFICATIONS, GREETINGS, REJECTIONS, ETC.
+This agent requires a META wrapper for the `support-metadata` plugin on every response.
 
-<support_request_metadata_json_object>
-{
-  "type": "object",
-  "required": [
-    "user_language",
-    "what_the_user_needs_from_netdata_in_english",
-    "categories",
-    "search_terms",
-    "stopped_before_completion",
-    "response_accuracy",
-    "response_completeness",
-    "user_frustration",
-    "netdata_completeness",
-    "documentation_completeness"
-  ],
-  "properties": {
-    "user_language": {
-      "type": "string",
-      "description": "The language the user speaks. If unsure use English."
-    },
-    "what_the_user_needs_from_netdata_in_english": {
-      "type": "string",
-      "description": "Describe in English what the user needs from Netdata. If the request is off-topic, say 'off-topic'."
-    },
-    "categories": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": [
-          "Overview and Concepts",
-          "Netdata Agent Installation",
-          "Netdata Agent Configuration",
-          "Netdata Parents",
-          "Data Collection",
-          "Logs",
-          "OTEL",
-          "Alerts / Notifications",
-          "Dashboards",
-          "Netdata Cloud",
-          "Billing and Pricing",
-          "Security and Access",
-          "Exporting",
-          "Data Access / API",
-          "Troubleshooting / Errors",
-          "Off-Topic / Irrelevant to Netdata",
-          "Greeting",
-          "Cannot Understand Request / Clarifications",
-          "Meta-Query / Introspection",
-          "Other"
-        ]
-      },
-      "description": "Ordered categories by priority (left-to-right)."
-    },
-    "search_terms": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "Related search terms and phrases (do not add 'Netdata' to them)"
-    },
-    "stopped_before_completion": {
-      "type": "boolean",
-      "description": "Set to true if you were stopped before completing the test, set it to false if the task was completed."
-    },
-    "response_accuracy": {
-      "type": "object",
-      "required": ["score"],
-      "properties": {
-        "score": {
-          "type": "string",
-          "pattern": "^[0-9]+%$"
-        }
-      },
-      "description": "How accurately we followed the `instructions_for_netdata_support_engineers_in_english` field of the advisory (0-100%)? If the response answers precisely and exclusively the `instructions_for_netdata_support_engineers_in_english` set it to 100%. If the response includes more, less, or different information, set it <100%."
-    },
-    "response_completeness": {
-      "type": "object",
-      "required": ["score", "limitations"],
-      "properties": {
-        "score": {
-          "type": "string",
-          "pattern": "^[0-9]+%$"
-        }
-      },
-      "limitations": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "description": "Provide a list of limitations of your response. What your response should include to be ideal for this request. If no limitation is found, set this to empty array []."
-      },
-      "description": "Did you answer the user request in whole (0-100%)? If the response covers all aspects of `instructions_for_netdata_support_engineers_in_english` set 100%. If there are still any details missing set it to <100%."
-    },
-    "user_frustration": {
-      "type": "object",
-      "required": ["score"],
-      "properties": {
-        "score": {
-          "type": "string",
-          "pattern": "^[0-9]+%$"
-        }
-      },
-      "description": "Are there any indications of user frustration? 0% = no, 100% = the user is mad. If everything looks normal set it to 0%. If there are indications of user discomfort, frustration, or stress, set it to >0%, with 100% being a mad user."
-    },
-    "netdata_completeness": {
-      "type": "object",
-      "required": ["score", "limitations"],
-      "properties": {
-        "score": {
-          "type": "string",
-          "pattern": "^[0-9]+%$"
-        },
-        "limitations": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Provide a list of netdata limitation based on your research. What netdata should do to support this user better Be detailed. If no limitation is found, set this to empty array []."
-        }
-      },
-      "description": "How complete is Netdata for satisfying the user request (0-100%)? If Netdata can do what `instructions_for_netdata_support_engineers_in_english` asks for, set it to 100%. If Netdata has limitations, set it to <100%."
-    },
-    "documentation_completeness": {
-      "type": "object",
-      "required": ["score", "limitations"],
-      "properties": {
-        "score": {
-          "type": "string",
-          "pattern": "^[0-9]+%$"
-        },
-        "limitations": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Provide a list of documentation limitation. If no limitation is found, set this to empty array []."
-        }
-      },
-      "description": "How complete is Netdata's documentation (0-100%)? If the response is answered purely based on documentation, set it to 100%. If you have identified missing or contradicting documentation, set it to <100%."
-    }
-  },
-  "additionalProperties": false
-}
-</support_request_metadata_json_object>
-
-Always include the `support_request_metadata_json_object` section at the end of your final report (inside your final report).
+- Required wrapper: `<ai-agent-NONCE-META plugin="support-metadata">{...}</ai-agent-NONCE-META>`
+- The JSON must match the plugin schema exactly (see system prompt META instructions).
+- Always include the META wrapper along with your final report/answer, even for greetings or clarifications.
 
 ## Self-Reflection Investigation Process
 
@@ -633,7 +490,7 @@ This is a high level diagram of your workflow:
         In the user's language
 Polish it: polite, friendly, warm, natural
       State the facts, the truth
-Add the `support_request_metadata_json_object` object
+Add the required META wrapper(s) (support-metadata)
 ```
 
 ## Success Criteria
@@ -645,7 +502,7 @@ Add the `support_request_metadata_json_object` object
 - [ ] Present your findings with clear evidence
 - [ ] If you were forced to stop, summarize what you found and make it prominent in your response that you were stopped before finishing the task
 - [ ] Provide your final report/answer wrapped in the required XML wrapper
-- [ ] Include the `support_request_metadata_json_object` object inside your final report/answer
+- [ ] Include the required META wrapper(s) (support-metadata)
 
 Output format: ${FORMAT}
 Current Date and Time: ${DATETIME}, ${DAY}, unix epoch in seconds ${TIMESTAMP}
@@ -655,7 +512,7 @@ Reminders:
 - **ALWAYS PROVIDE URLS TO RELEVANT DOCUMENTS FOR USERS TO READ MORE.**
 - **ALWAYS DOUBLE-CHECK CONFIGURATION KEYWORDS, FORMAT, PLACEMENT.**
 - **ALWAYS WRAP YOUR FINAL REPORT/ANSWER IN THE REQUIRED XML WRAPPER.**
-- **ALWAYS APPEND THE REQUIRED METADATA OBJECT AT THE END OF YOUR FINAL REPORT/ANSWER.**
+- **ALWAYS APPEND THE REQUIRED META WRAPPER(S) (SUPPORT-METADATA).**
 - **NEVER ASSUME, GUESS, OR INFER.** IF YOU DON'T FIND EVIDENCE OF SOMETHING, SAY IT CLEARLY.
 
 ---
@@ -665,7 +522,7 @@ Now think step by step, and answer the user's question.
 Before finalizing any response, automatically verify:
 - [ ] Opening XML tag present?
 - [ ] Closing XML tag present?
-- [ ] Metadata JSON object included inside final report/answer?
+- [ ] Required META wrapper(s) included?
 - [ ] All paths rewritten to URLs?
 - [ ] Configuration instructions verified from docs/code?
 - [ ] Calculations double checked?

@@ -1,14 +1,16 @@
 # final_report Tool
 
 ## TL;DR
-Mandatory tool for agent to deliver final answer. Captures format, encoding, content, optional JSON payload, and metadata. Terminates session execution. `report_content` may be `raw` or `base64`; `content_json` is schema-validated with a light repair loop for stringified nested JSON. The model must call `agent__final_report` via the XML slot in XML-NEXT (single transport path: native tools + XML final report). Provider tool definitions remain native, but the final report must be sent via the XML tag. When streaming is enabled, the session runner deduplicates output so the final report is not emitted twice (streaming + finalize).
+Mandatory tool for agent to deliver the final answer. Captures format, encoding, content, optional JSON payload, and metadata. Successful completion now requires **finalization readiness**: the final report plus any required final-report plugin META blocks. The model must call `agent__final_report` via the XML FINAL wrapper in XML-NEXT; plugin META blocks use the XML META wrapper. Streaming is deduplicated and suppressed during META-only retries.
 
 ## Source Files
 - `src/tools/internal-provider.ts` - Tool definition and handler
-- `src/ai-agent.ts:123` - Tool name constant
-- `src/ai-agent.ts:678-688` - setFinalReport callback
-- `src/ai-agent.ts:1891-1948` - Result adoption logic
-- `src/ai-agent.ts:2018-2034` - Schema validation
+- `src/session-turn-runner.ts` - Finalization readiness, retries, and synthetic failures
+- `src/final-report-manager.ts` - Final report locking and META readiness gate
+- `src/plugins/runtime.ts` - Plugin META validation, cache gating, onComplete
+- `src/plugins/meta-guidance.ts` - System prompt, XML-NEXT, and example guidance
+- `src/xml-transport.ts` - XML FINAL/META extraction and streaming filters
+- `src/ai-agent.ts` - Cache gating and completion hooks
 
 ## Tool Definition
 
@@ -86,17 +88,34 @@ Mandatory tool for agent to deliver final answer. Captures format, encoding, con
 
 ## Format Values
 
-**Supported Formats** (`src/ai-agent.ts:47`):
+**Supported Formats** (`src/final-report-manager.ts`):
 - `json` - Structured JSON output (validated against schema if provided)
 - `markdown` - Markdown formatted text
 - `markdown+mermaid` - Markdown with Mermaid diagrams
- - `slack-block-kit` - Slack Block Kit payload (messages array)
+- `slack-block-kit` - Slack Block Kit payload (messages array)
 - `tty` - Terminal-optimized text with ANSI color codes
 - `pipe` - Plain text for piping
 - `sub-agent` - Internal agent-to-agent exchange format (opaque blob, no validation)
 - `text` - Legacy plain text
 
 **Default**: Session's `outputFormat` setting
+
+## Final-Report Plugins (META Contract)
+
+- Finalization readiness requires BOTH the final report and all required plugin META blocks.
+- META blocks are sent via XML wrappers: `<ai-agent-NONCE-META plugin="name">{...}</ai-agent-NONCE-META>`.
+- META blocks can appear before, after, or inside the FINAL wrapper; they are extracted before XML tool parsing.
+- When FINAL exists but META is missing/invalid, the final report is locked, XML-NEXT switches to META-only guidance, and streaming is suppressed to avoid duplicate final output.
+- Cache hits and cache writes both require valid META blocks; cache entries missing META are rejected.
+- Plugin `onComplete` runs only when finalization readiness is achieved.
+
+**Each plugin MUST provide:**
+1. `schema`
+2. `systemPromptInstructions`
+3. `xmlNextSnippet`
+4. `finalReportExampleSnippet`
+
+**Configuration:** Use agent frontmatter `plugins:` with relative `.js` module paths. Modules must default-export a plugin factory and are loaded during initialization.
 
 ## Execution Flow
 
@@ -112,12 +131,12 @@ if (name === 'agent__final_report') {
   const metadata = params.metadata;
 
   setFinalReport({ status, format, content, content_json: contentJson, metadata });
-  return { ok: true, result: 'Final report captured.' };
+  return { ok: true, result: JSON.stringify({ ok: true }) };
 }
 ```
 
 ### 2. Report Capture
-**Location**: `src/ai-agent.ts:678-688`
+**Location**: `src/ai-agent.ts`
 
 ```typescript
 setFinalReport: (p) => {
@@ -131,38 +150,43 @@ setFinalReport: (p) => {
 }
 ```
 
-### 3. Session Termination
-**Location**: `src/ai-agent.ts:2018-2019`
+### 3. Finalization Gate (Finalization Readiness)
+**Location**: `src/session-turn-runner.ts`, `src/final-report-manager.ts`
 
 ```typescript
-if (this.finalReport !== undefined) {
-  // Deterministic finalization
-  // Break from turn loop
+const finalizationReady = this.ctx.finalReportManager.isFinalizationReady();
+if (finalizationReady) {
+  return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
 }
 ```
+
+- Finalization readiness means the final report exists AND required plugin META blocks are valid.
+- A final report without required META locks the report and triggers META-only retries.
 
 ### 4. JSON Schema Validation
-**Location**: `src/ai-agent.ts:2022-2034`
+**Location**: `src/final-report-manager.ts`, `src/session-turn-runner.ts`
 
-If format is `json` and schema provided:
 ```typescript
-if (fr.format === 'json' && schema !== undefined && fr.content_json !== undefined) {
-  const validate = this.ajv.compile(schema);
-  const valid = validate(fr.content_json);
-  if (!valid) {
-    // Log validation errors but don't fail
-  }
+const validationResult = this.ctx.finalReportManager.validateSchema(schema);
+if (!validationResult.valid) {
+  // Log ERR details and replace with a synthetic failure report
 }
 ```
 
+- Pre-commit validation failures trigger retries.
+- Post-commit validation failures are treated as transport failures and replaced with synthetic reports.
+
 ### 5. Output Emission (Streaming Deduplication)
-When a headend supplies `onEvent`, the session runner streams output in real time (`event.type='output'`, `meta.source='stream'`). When the final report is accepted, any additional output derived from the final report is emitted as `event.type='output'` with `meta.source='finalize'`, allowing headends to suppress duplicates (especially when handoff is pending).
+- When a headend supplies `onEvent`, the session runner streams only FINAL wrapper content (`event.type='output'`, `meta.source='stream'`).
+- META wrappers are stripped from streaming output.
+- When finalization readiness is achieved, additional output derived from the final report is emitted with `meta.source='finalize'`, allowing headends to suppress duplicates.
+- During META-only retries after a locked final report, streaming output is fully suppressed to avoid duplicate final output.
 
 **Handoff note**: When a handoff is configured or a router handoff is selected, the final report payload is emitted as `event.type='handoff'` (not `final_report`). This payload is the input to the next agent and should not be treated as the user-visible final answer.
 
 ## Final Report Structure
 
-**Session State** (`src/ai-agent.ts:189-197`):
+**Session State** (`src/ai-agent.ts`):
 ```typescript
 private finalReport?: {
   format: FormatType;
@@ -220,7 +244,7 @@ Final report processing uses a 3-layer architecture to cleanly separate transpor
 This separation ensures user schema fields (e.g., a `status` field in their JSON schema) are never overwritten by transport-level metadata.
 
 ### From Tool Call
-**Location**: `src/ai-agent.ts:1892-1926`
+**Location**: `src/ai-agent.ts`
 
 When LLM explicitly calls final_report:
 1. Parse tool call parameters
@@ -230,7 +254,7 @@ When LLM explicitly calls final_report:
 5. Mark turn as having tool calls
 
 ### From Text Content
-**Location**: `src/ai-agent.ts:1885-1889`
+**Location**: `src/ai-agent.ts`
 
 Fallback when LLM provides text:
 ```typescript
@@ -242,7 +266,7 @@ if (this.finalReport === undefined && !hasToolCalls && hasText) {
 ```
 
 ### From Tool Message
-**Location**: `src/ai-agent.ts:1927-1942`
+**Location**: `src/ai-agent.ts`
 
 When adoption from call fails:
 ```typescript
@@ -272,20 +296,20 @@ Before committing a final report, the runner validates the payload against the e
 3. **On Success**: Proceeds to `commitFinalReport()`
 
 ### Retry Semantics
-**Location**: `src/session-turn-runner.ts:1500-1507`
+**Location**: `src/session-turn-runner.ts`
 
 When pre-commit validation fails:
 - The turn is NOT marked successful
-- Error state is reset at the start of each attempt (line 390-393) to prevent poisoning later successful attempts
+- Error state is reset at the start of each attempt to prevent poisoning later successful attempts
 - Retries continue until `maxRetries` is exhausted
 - If all retries fail, remaining turns are collapsed to force a final turn
-- A synthetic failure report is generated only when: no final report exists AND `finalReportToolFailedEver` is false (i.e., no prior final report attempt)
+- A synthetic failure report is generated when finalization readiness cannot be achieved (no final report, final report tool failures, or required META missing on exhaustion)
 
 ### Post-Commit Safety Net
-**Location**: `src/session-turn-runner.ts:2262-2282` (in `finalizeWithCurrentFinalReport`)
+**Location**: `src/session-turn-runner.ts` (in `finalizeWithCurrentFinalReport`)
 
 If validation somehow fails after commit (shouldn't happen with pre-commit validation):
-1. Report is cleared: `ctx.finalReportManager.clear()`
+1. Report is cleared: `ctx.finalReportManager.clear()` (plugin META records are preserved)
 2. Replaced with synthetic failure report
 3. Session marked as failed
 
@@ -300,13 +324,10 @@ When parsing slack-block-kit payloads wrapped in XML or markdown:
 ## Final Turn Enforcement
 
 When `isFinalTurn === true`:
-1. Tools restricted to `agent__final_report` (plus `router__handoff-to` when router destinations are configured)
-2. System message injected: "You must provide your final report now..."
-3. If no final_report: synthetic retry triggered
-
-**Messages** (`src/ai-agent.ts:125-126`):
-- MAX_TURNS_FINAL_MESSAGE
-- CONTEXT_FINAL_MESSAGE
+1. Tools are filtered to `agent__final_report` (plus `router__handoff-to` when router handoff is allowed and the final report is not locked).
+2. XML-NEXT carries the final-turn instruction; tool filtering is authoritative even if the system prompt mentions other tools.
+3. Finalization requires BOTH the final report and any required plugin META blocks.
+4. If the final report exists but META is missing/invalid, XML-NEXT switches to META-only mode and streaming output is suppressed.
 
 ## Configuration Effects
 
@@ -315,15 +336,18 @@ When `isFinalTurn === true`:
 | `outputFormat` | Default format if not specified |
 | `expectedOutput.format` | Expected format validation |
 | `expectedOutput.schema` | JSON schema validation |
+| `finalReportPluginDescriptors` | Requires valid plugin META blocks for finalization readiness and cache writes |
 | `maxTurns` | When to enforce final turn |
 
 ## Telemetry
 
 **Captured on finalization**:
 - Final report status
+- Finalization readiness (final report + required META)
 - Format used
 - Content size
 - JSON validation result
+- Synthetic reason (e.g., `final_meta_missing`, `max_turns_exhausted`)
 - Timestamp
 
 ## Logging
@@ -332,6 +356,7 @@ When `isFinalTurn === true`:
 - Tool invocation logged
 - Schema validation errors logged
 - Final report capture logged
+- META validation failures logged (`final_meta_missing`, `final_meta_invalid`)
 - Session finalization logged
 
 ## Business Logic Coverage (Verified 2025-11-16)
@@ -346,11 +371,11 @@ When `isFinalTurn === true`:
 
 ## Invariants
 
-1. **Required parameters**: Varies by format (always includes status and report_format)
-2. **Terminates session**: Once captured, session ends
-3. **Format validation**: Must match known format values via `const` enforcement
-4. **Schema validation**: JSON validated but errors don't fail
-5. **Single report**: Only one final report per session
+1. **Required parameters**: Varies by format; `report_format` is enforced, while `status` is optional diagnostics.
+2. **Finalization readiness**: Successful termination requires BOTH the final report and all required plugin META blocks.
+3. **Format validation**: `report_format` is normalized to the session’s expected format.
+4. **Schema validation**: Invalid payloads trigger retries and can end in synthetic failure on exhaustion.
+5. **Single final report outcome**: The session returns a single final report, but locked finals may be replaced by a synthetic failure report when META requirements cannot be satisfied.
 
 ## Test Coverage
 

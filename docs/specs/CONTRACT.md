@@ -17,7 +17,7 @@ Every user-configurable setting has a guarantee that MUST be respected under ALL
 - Application will NEVER exceed this number of conversation turns
 - 1 turn = 1 LLM request/response cycle + tool execution phase
 - Retries within the same turn do NOT count toward the limit
-- When limit is reached WITHOUT a final_report → synthetic failure report generated
+- When the limit is reached without **finalization readiness** (final report missing, or required META missing) → synthetic failure report generated
 
 **`maxToolCallsPerTurn`**
 - LLM cannot request more tools than this limit in a single turn
@@ -87,11 +87,11 @@ These rules MUST hold in all cases, regardless of configuration.
 ### Always Return Output
 
 **The application NEVER crashes without returning `AIAgentResult`**
-- Model-provided final report: `success: true`, `finalReport` populated with expected format/content
+- Model-provided and finalization-ready report: `success: true`, `finalReport` populated with expected format/content (requires required META when plugins are configured)
 - Synthetic failure (max turns, context overflow): `success: false`, `finalReport` populated with failure content/metadata
 - Fatal errors (auth, quota): `success: false`, `error` field populated
 
-**Note**: The `status` field is determined by the source of the final report, not by model input. Models do not provide a status field; the system sets it based on whether the report was model-provided (success) or synthetic (failure).
+**Note**: The `status` field is determined by the source of the final report, not by model input. Models may provide a status, but it is treated as diagnostics; the system sets transport success/failure based on whether the report was model-provided (success) or synthetic (failure).
 
 ### CLI Exit Codes
 
@@ -116,7 +116,7 @@ Note: Exit codes map to failure categories, not specific error types. Check `res
 - Every `LLM request prepared` log MUST satisfy `expectedTokens = ctxTokens + pendingCtxTokens + schemaCtxTokens`.
 - `ctxTokens` MUST match the provider-reported `ctx` from the previous response (0 on the very first turn).
 - `new tokens` shown in the log equal `pendingCtxTokens` at the moment of logging and therefore represent the prompt delta the model is about to receive.
-- Any retry-only system/user nudges included via `pendingRetryMessages` count toward `pendingCtxTokens` before the log is emitted.
+- TURN-FAILED repair guidance is flushed into the conversation before each attempt (`flushTurnFailureReasons(...)`), so it becomes part of the request payload and prompt-size metrics.
 
 #### Guard Projection
 - Projection formula: `projected = currentCtxTokens + pendingCtxTokens + newCtxTokens + schemaCtxTokens`.
@@ -264,16 +264,28 @@ The `accounting` array in `AIAgentResult` provides observable telemetry for veri
 
 ### Final Report Guarantees
 
-**Every session produces EITHER:**
-1. **Tool-provided report**: LLM calls `final_report` tool successfully
-2. **Text extraction fallback**: Final turn contains text content without `final_report`
-3. **Synthetic failure**: Max turns exhausted without final answer
+**Every session produces a final report**, and it is either:
+1. **Model-provided and finalization ready**: final report exists AND all required META blocks are valid (tool call, tool-message adoption, or text fallback).
+2. **Synthetic failure**: the system generates a failure report when finalization readiness cannot be achieved.
+
+### Finalization Readiness (Success Gate)
+
+Finalization readiness is required for transport success, caching, and plugin completion hooks:
+- Final report is committed.
+- All required final-report plugin META blocks are present and schema-valid.
+- When no plugins are configured, this reduces to “final report exists”.
+
+If a final report exists but required META is missing or invalid:
+- The final report is locked.
+- The turn fails with `final_meta_missing` or `final_meta_invalid`.
+- Retries switch to META-only guidance to avoid re-streaming the final report.
+- Synthetic failures may finalize with `reason: "final_meta_missing"` even though META is still missing.
 
 ### Final Report Structure
 
 **System-determined fields:**
 - `status`: `'success'` | `'failure'` — determined by source, not model input:
-  - `'success'`: Model provided a final report via tool call or text fallback
+  - `'success'`: Model provided a finalization-ready report (final report + required META) via tool call, tool-message adoption, or text fallback
   - `'failure'`: System generated a synthetic failure report (max turns, context overflow)
 - `format`: Output format (must match session `expectedOutputFormat`)
 - `ts`: Timestamp when report was captured
@@ -304,7 +316,7 @@ The `conversation` array in `AIAgentResult` contains the full message history.
 1. System messages (initial)
 2. User message (task prompt)
 3. Alternating: assistant → tool → assistant → tool → ...
-4. Final: assistant with `final_report` tool call OR text response
+4. Finalization: a final report is accepted AND any required META blocks are present (the last assistant message may be final-report content or META-only corrections)
 
 ### Tool Message Handling
 
@@ -449,30 +461,36 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 ## 11. XML Tool Transport Contract (XML-PAST / XML-NEXT)
 
 **Modes**
-- `xml-final` (default and only supported transport): provider tools stay native (tool_calls), but the final report must be emitted via XML. Progress follows tools transport (native). Tool choice set to `auto`; provider tool definitions remain visible to the LLM for native calls. Legacy `native`/`xml` transports have been removed.
-- `native`: unchanged tool-call behavior, tool choice may be `required`.
-- `xml`: all tools may be invoked via XML tags; tool choice set to `auto`, and provider tool definitions are withheld (XML is the only invocation path). Progress uses the XML channel when enabled.
+- `xml-final` (default and only supported transport): provider tools stay native (tool_calls), while the final report and plugin META wrappers travel via XML. Tool choice is `auto`; provider tool definitions remain visible to the LLM for native calls. Legacy `native`/`xml` transports have been removed.
 
 **Session nonce and slots**
 - Each session defines a fixed nonce (e.g., `<8hex>`) that remains constant across all turns.
 - Numbered invocation slots increment across turns: turn 1 uses `NONCE-0001`, `NONCE-0002`, etc.; turn 2 continues from where turn 1 left off (e.g., `NONCE-0004`, `NONCE-0005`).
-- Special slots: `NONCE-FINAL` for final report. (Progress slot via XML was used only in the deprecated `xml` transport.)
+- Special slots: `NONCE-FINAL` for the final report and `NONCE-META` for final-report plugin META blocks.
 - Tags are detected by substring only (no XML parser): `<ai-agent-NONCE-000X tool="...">payload</ai-agent-NONCE-000X>`.
+
+**Final-report plugins (META wrappers)**
+- META wrapper format: `<ai-agent-NONCE-META plugin="name">{...}</ai-agent-NONCE-META>`.
+- META blocks can appear before, after, or inside the final-report content.
+- META wrappers are extracted before XML tool parsing so they never become malformed tool calls.
+- META is validated per plugin schema; unknown plugin names are ignored with WRN logs.
+- Finalization readiness requires both the final report and all required META blocks.
 
 **Messages**
 - XML-PAST (permanent): a user message containing prior turn tool results (slot id, tool, status, duration, request, response). Suppressed in `xml-final` mode. Intended for the model’s context; may be capped to last turn.
-- XML-NEXT (ephemeral, not stored/cached): the **only** per-turn system notice. It carries the current nonce, the XML final wrapper, and tool-vs-final guidance. In forced-final turns it advertises the final-report wrapper and, when allowed, the `router__handoff-to` alternative. Tool schemas remain in native tool definitions, not in XML-NEXT.
+- XML-NEXT (ephemeral, not stored/cached): the **only** per-turn system notice. It carries the current nonce, the XML final wrapper, and tool-vs-final guidance. In forced-final turns it advertises the final-report wrapper and, when allowed, the `router__handoff-to` alternative. Tool schemas remain in native tool definitions, not in XML-NEXT. Full tool/final-report/META instructions may still appear in the system prompt.
 
 **Final-report via XML**
 - Final-report uses a reserved slot in XML-NEXT (reserved FINAL slot, format attribute, raw content).
 - Tag attributes: `format="<expected-format>"`.
-- Status is not provided by the model; system determines status based on source (model-provided = success, synthetic = failure).
+- Status attributes may be present but are treated as model diagnostics; session success/failure is determined by source (model-provided vs synthetic).
 - Processing uses 3-layer architecture:
   1. **Layer 1 (Transport)**: Extract `format` from XML tag attributes; extract raw payload from tag content.
   2. **Layer 2 (Format Processing)**: Process payload based on format—`sub-agent` is opaque passthrough (no validation), `json` parses and validates, `slack-block-kit` expects messages array, text formats use raw content.
   3. **Layer 3 (Final Report)**: Construct clean final report object with status='success'. Wrapper fields never pollute payload content.
 - This separation ensures user schema fields are never overwritten by transport metadata.
 - Misuse handling: If the model emits the XML final wrapper tag (`ai-agent-<nonce>-FINAL`) as a tool call, the agent injects a specific tool failure message, emits TURN-FAILED guidance with the actual nonce/format, and collapses remaining turns to a single final attempt.
+- Final-report lock + META-only retries: if the final report exists but required META is missing/invalid, the report is locked, XML-NEXT switches to META-only guidance, and streaming output is suppressed to avoid duplicate final output.
 
 **Unclosed final-report tag handling**
 - When a valid final-report opening tag is detected (`<ai-agent-NONCE-FINAL format="...">`) with content following it, the closing tag requirement depends on the LLM's `stopReason`:
@@ -506,13 +524,15 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 - Missing or invalid tags follow the existing retry logic for missing final-report/tool calls; empty/reasoning-only outputs are treated as missing. Retry budgets and provider cycling are unchanged.
 
 **Prompting and schemas**
-- The system prompt contains no tool/final-report text in XML modes; all per-turn instructions live in XML-NEXT. This allows forced-final turns to hide non-final tools by omitting them from XML-NEXT. No other system notices are injected beyond XML-NEXT (ephemeral) and TURN-FAILED (persistent).
+- XML-NEXT remains the only per-turn system notice, but the system prompt MAY include tool/final-report/META instructions loaded at initialization time. Forced-final turns are enforced by tool filtering plus XML-NEXT guidance (including META-only mode when the final report is locked). No other per-turn system notices are injected beyond XML-NEXT (ephemeral) and TURN-FAILED (persistent).
 
 **Accounting/telemetry**
 - Accounting entries use the real tool name with `source: xml`. Final-report emits `command: agent__final_report_xml` with status from the tag. Metrics/histograms remain, now distinguishable by source.
 
 **Streaming**
-- Streaming output is buffered once an opening-tag fragment for the current nonce appears and stops at the matching closing tag. Content outside matched tags is ignored.
+- FINAL wrapper content is streamed with tags stripped; non-wrapper text may still stream when using `XmlFinalReportFilter`.
+- META wrappers are stripped from streaming output.
+- When the final report is locked (META missing/invalid), streaming output is fully suppressed to avoid duplicate final output.
 
 **Unchanged**
 - Context guard logic and limits are unchanged. Tool output handling uses tool_output handle storage; no size guard is applied to final outputs.
