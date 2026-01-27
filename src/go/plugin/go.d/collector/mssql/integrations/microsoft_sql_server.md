@@ -49,7 +49,7 @@ This collector is supported on all platforms.
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
-For SQL Agent job monitoring (queried during collector startup), access to
+SQL Agent job monitoring is part of collector startup, so access to
 `msdb.dbo.sysjobs` is required.
 
 
@@ -382,7 +382,6 @@ Aggregated query execution statistics from Query Store runtime views, providing 
 | Max TempDB (8KB pages) | integer |  | hidden | Maximum tempdb space observed. Spikes may indicate queries with large sort operations, hash joins, index spool usage, or temporary table creation consuming substantial tempdb space. Can lead to tempdb autogrow and disk space issues. |
 | StdDev TempDB | float |  | hidden | Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation. |
 
-
 ### Deadlock Info
 
 Retrieves the most recent deadlock event from SQL Server's `system_health` Extended Events ring buffer (`xml_deadlock_report`).
@@ -407,23 +406,7 @@ Query text and wait resource strings are truncated at 4096 characters for displa
 
 #### Prerequisites
 
-1. Ensure the account has the required permission:
-   ```sql
-   GRANT VIEW SERVER STATE TO [netdata];
-   ```
-2. Enable the function in Netdata collector config:
-   ```yaml
-   jobs:
-     - name: local
-       dsn: "sqlserver://user:pass@localhost:1433"
-       deadlock_info_function_enabled: true
-   ```
-3. Verify the deadlock source is accessible:
-   ```sql
-   SELECT name
-   FROM sys.dm_xe_sessions
-   WHERE name = 'system_health';
-   ```
+No additional configuration is required.
 
 #### Parameters
 
@@ -451,7 +434,17 @@ Parsed deadlock participants from the latest detected deadlock event. Each row r
 ### Error Info
 
 Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
-with the `sql_text` and `query_hash` actions (query_hash enables reliable mapping to top-queries).
+with both the `sql_text` and `query_hash` actions.
+
+The session must be created by an administrator and include a `ring_buffer` target. Netdata reads the ring buffer
+and returns recent error events with error number, message, and SQL text. The `query_hash` action is required for
+reliable mapping into `top-queries` (query text fallback is best-effort).
+
+Use cases:
+- Identify recent query errors and their messages
+- Correlate errors to query text
+- Validate error rates seen in top-queries
+
 
 | Aspect | Description |
 |:-------|:------------|
@@ -463,28 +456,7 @@ with the `sql_text` and `query_hash` actions (query_hash enables reliable mappin
 
 #### Prerequisites
 
-1. Create an Extended Events session (admin-controlled) that captures `sqlserver.error_reported` with `sql_text` and `query_hash`:
-   ```sql
-   CREATE EVENT SESSION [netdata_errors] ON SERVER
-   ADD EVENT sqlserver.error_reported(
-     ACTION(sqlserver.sql_text, sqlserver.query_hash)
-   )
-   ADD TARGET package0.ring_buffer;
-   GO
-   ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
-   ```
-2. Ensure the account has the required permission:
-   ```sql
-   GRANT VIEW SERVER STATE TO [netdata];
-   ```
-3. Enable the function and (optionally) set the session name in Netdata config:
-   ```yaml
-   jobs:
-     - name: local
-       dsn: "sqlserver://user:pass@localhost:1433"
-       error_info_function_enabled: true
-       error_info_session_name: netdata_errors
-   ```
+No additional configuration is required.
 
 #### Parameters
 
@@ -502,6 +474,7 @@ Recent error events from the configured Extended Events session.
 | Error Message | string |  |  | Error message text. |
 | Query | string |  |  | SQL text captured with the error event. |
 | Query Hash | string |  | hidden | Query hash captured with the error event (used for mapping into top-queries). |
+
 
 
 ## Alerts
@@ -807,3 +780,6 @@ Ensure SQL Server is configured for mixed mode authentication if using SQL login
 
 The monitoring user needs VIEW SERVER STATE permission.
 Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
+
+
+
