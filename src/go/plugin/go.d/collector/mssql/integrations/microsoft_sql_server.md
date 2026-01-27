@@ -501,7 +501,6 @@ Recent error events from the configured Extended Events session.
 | Error Message | string |  |  | Error message text. |
 | Query | string |  |  | SQL text captured with the error event. |
 | Query Hash | string |  | hidden | Query hash captured with the error event (used for mapping into top-queries). |
-| Query Hash | string |  | hidden | Query hash captured with the error event (used for mapping into top-queries). |
 
 
 ## Alerts

@@ -29,11 +29,12 @@ assert_top_queries_error_columns() {
   local input="$1"
   if command -v python3 >/dev/null 2>&1; then
     python3 - "$input" <<'PY'
+import io
 import json
 import sys
 
 path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as fh:
+with io.open(path, "r", encoding="utf-8") as fh:
     doc = json.load(fh)
 columns = doc.get("columns") or {}
 required = {"errorAttribution", "errorNumber", "sqlState", "errorMessage"}
@@ -51,11 +52,12 @@ else:
 
 missing = sorted(required - found)
 if missing:
-    raise SystemExit(f"missing top-queries error columns: {missing}")
+    raise SystemExit("missing top-queries error columns: {}".format(missing))
 PY
     return
   fi
   python - "$input" <<'PY'
+import io
 import json
 import sys
 
@@ -173,24 +175,25 @@ assert_deadlock_info_content() {
   local input="$1"
   if command -v python3 >/dev/null 2>&1; then
     python3 - "$input" <<'PY'
+import io
 import json
 import re
 import sys
 
 path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as fh:
+with io.open(path, "r", encoding="utf-8") as fh:
     doc = json.load(fh)
 
 try:
     status = int(doc.get("status"))
 except (TypeError, ValueError):
-    raise SystemExit(f"unexpected status value: {doc.get('status')!r}")
+    raise SystemExit("unexpected status value: {!r}".format(doc.get("status")))
 
 if status != 200:
-    raise SystemExit(f"expected status 200, got {status}")
+    raise SystemExit("expected status 200, got {}".format(status))
 
 if doc.get("errorMessage"):
-    raise SystemExit(f"unexpected errorMessage on status 200: {doc.get('errorMessage')!r}")
+    raise SystemExit("unexpected errorMessage on status 200: {!r}".format(doc.get("errorMessage")))
 
 columns = doc.get("columns") or {}
 field_to_idx = {}
@@ -212,7 +215,7 @@ else:
 
 for required in ("row_id", "deadlock_id", "process_id", "is_victim", "lock_mode", "lock_status", "query_text", "wait_resource", "database"):
     if required not in field_to_idx:
-        raise SystemExit(f"missing expected column: {required}")
+        raise SystemExit("missing expected column: {}".format(required))
 
 data = doc.get("data") or []
 if not data:
@@ -255,8 +258,8 @@ for row in data:
     if process_id == "":
         raise SystemExit("process_id missing from deadlock-info output")
     row_id = norm(get_value(row, "row_id"))
-    if row_id != f"{deadlock_id}:{process_id}":
-        raise SystemExit(f"row_id {row_id} does not match deadlock_id/process_id")
+    if row_id != "{}:{}".format(deadlock_id, process_id):
+        raise SystemExit("row_id {} does not match deadlock_id/process_id".format(row_id))
     victim_counts.setdefault(deadlock_id, 0)
     if norm(get_value(row, "is_victim")).lower() == "true":
         victim_counts[deadlock_id] += 1
@@ -264,22 +267,23 @@ for row in data:
     if db_val:
         has_database = True
         if db_val != expected_db:
-            raise SystemExit(f"unexpected database value {db_val!r}, expected {expected_db!r}")
+            raise SystemExit("unexpected database value {!r}, expected {!r}".format(db_val, expected_db))
 
 for deadlock_id, count in victim_counts.items():
     if count != 1:
-        raise SystemExit(f"deadlock_id {deadlock_id} has victim count {count}, expected 1")
+        raise SystemExit("deadlock_id {} has victim count {}, expected 1".format(deadlock_id, count))
 if not has_database:
     raise SystemExit("expected at least one row with database populated")
 PY
   else
     python - "$input" <<'PY'
+import io
 import json
 import re
 import sys
 
 path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as fh:
+with io.open(path, "r", encoding="utf-8") as fh:
     doc = json.load(fh)
 
 try:
@@ -313,7 +317,7 @@ else:
 
 for required in ("row_id", "deadlock_id", "process_id", "is_victim", "lock_mode", "lock_status", "query_text", "wait_resource", "database"):
     if required not in field_to_idx:
-        raise SystemExit(f"missing expected column: {required}")
+        raise SystemExit("missing expected column: {}".format(required))
 
 data = doc.get("data") or []
 if not data:
@@ -369,7 +373,7 @@ for row in data:
 
 for deadlock_id, count in victim_counts.items():
     if count != 1:
-        raise SystemExit(f"deadlock_id {deadlock_id} has victim count {count}, expected 1")
+        raise SystemExit("deadlock_id {} has victim count {}, expected 1".format(deadlock_id, count))
 if not has_database:
     raise SystemExit("expected at least one row with database populated")
 PY
@@ -381,32 +385,34 @@ assert_deadlock_info_empty_success() {
 
   if command -v python3 >/dev/null 2>&1; then
     python3 - "$input" <<'PY'
+import io
 import json
 import sys
 
 path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as fh:
+with io.open(path, "r", encoding="utf-8") as fh:
     doc = json.load(fh)
 
 try:
     status = int(doc.get("status"))
 except (TypeError, ValueError):
-    raise SystemExit(f"unexpected status value: {doc.get('status')!r}")
+    raise SystemExit("unexpected status value: {!r}".format(doc.get("status")))
 
 if status != 200:
-    raise SystemExit(f"expected status 200, got {status}")
+    raise SystemExit("expected status 200, got {}".format(status))
 
 if doc.get("errorMessage"):
-    raise SystemExit(f"unexpected errorMessage on status 200: {doc.get('errorMessage')!r}")
+    raise SystemExit("unexpected errorMessage on status 200: {!r}".format(doc.get("errorMessage")))
 
 data = doc.get("data") or []
 if len(data) != 0:
-    raise SystemExit(f"expected no rows, got {len(data)}")
+    raise SystemExit("expected no rows, got {}".format(len(data)))
 PY
     return
   fi
 
   python - "$input" <<'PY'
+import io
 import json
 import sys
 
@@ -436,29 +442,31 @@ assert_error_info_not_enabled() {
 
   if command -v python3 >/dev/null 2>&1; then
     python3 - "$input" <<'PY'
+import io
 import json
 import sys
 
 path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as fh:
+with io.open(path, "r", encoding="utf-8") as fh:
     doc = json.load(fh)
 
 try:
     status = int(doc.get("status"))
 except (TypeError, ValueError):
-    raise SystemExit(f"unexpected status value: {doc.get('status')!r}")
+    raise SystemExit("unexpected status value: {!r}".format(doc.get("status")))
 
 if status < 400:
-    raise SystemExit(f"expected error status, got {status}")
+    raise SystemExit("expected error status, got {}".format(status))
 
 err = str(doc.get("errorMessage") or "").lower()
 if "not enabled" not in err:
-    raise SystemExit(f"expected errorMessage to contain 'not enabled', got {err!r}")
+    raise SystemExit("expected errorMessage to contain 'not enabled', got {!r}".format(err))
 PY
     return
   fi
 
   python - "$input" <<'PY'
+import io
 import json
 import sys
 
@@ -485,23 +493,24 @@ assert_error_info_has_error() {
 
   if command -v python3 >/dev/null 2>&1; then
     python3 - "$input" <<'PY'
+import io
 import json
 import sys
 
 path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as fh:
+with io.open(path, "r", encoding="utf-8") as fh:
     doc = json.load(fh)
 
 try:
     status = int(doc.get("status"))
 except (TypeError, ValueError):
-    raise SystemExit(f"unexpected status value: {doc.get('status')!r}")
+    raise SystemExit("unexpected status value: {!r}".format(doc.get("status")))
 
 if status != 200:
-    raise SystemExit(f"expected status 200, got {status}")
+    raise SystemExit("expected status 200, got {}".format(status))
 
 if doc.get("errorMessage"):
-    raise SystemExit(f"unexpected errorMessage on status 200: {doc.get('errorMessage')!r}")
+    raise SystemExit("unexpected errorMessage on status 200: {!r}".format(doc.get("errorMessage")))
 
 columns = doc.get("columns") or {}
 field_to_idx = {}
@@ -523,7 +532,7 @@ else:
 
 for required in ("errorNumber", "errorMessage"):
     if required not in field_to_idx:
-        raise SystemExit(f"missing expected column: {required}")
+        raise SystemExit("missing expected column: {}".format(required))
 
 data = doc.get("data") or []
 if not data:
@@ -549,6 +558,7 @@ PY
   fi
 
   python - "$input" <<'PY'
+import io
 import json
 import sys
 
@@ -616,11 +626,12 @@ assert_top_queries_error_attribution_enabled() {
 
   if command -v python3 >/dev/null 2>&1; then
     python3 - "$input" <<'PY'
+import io
 import json
 import sys
 
 path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as fh:
+with io.open(path, "r", encoding="utf-8") as fh:
     doc = json.load(fh)
 
 columns = doc.get("columns") or {}
@@ -643,7 +654,7 @@ else:
 
 for required in ("errorAttribution", "errorNumber", "errorMessage"):
     if required not in field_to_idx:
-        raise SystemExit(f"missing expected column: {required}")
+        raise SystemExit("missing expected column: {}".format(required))
 
 data = doc.get("data") or []
 status_idx = field_to_idx["errorAttribution"]
@@ -669,6 +680,7 @@ PY
   fi
 
   python - "$input" <<'PY'
+import io
 import json
 import sys
 
@@ -725,11 +737,12 @@ assert_top_queries_error_attribution_not_enabled() {
 
   if command -v python3 >/dev/null 2>&1; then
     python3 - "$input" <<'PY'
+import io
 import json
 import sys
 
 path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as fh:
+with io.open(path, "r", encoding="utf-8") as fh:
     doc = json.load(fh)
 
 columns = doc.get("columns") or {}
@@ -759,12 +772,13 @@ for row in data:
     if idx >= len(row):
         continue
     if str(row[idx]) != "not_enabled":
-        raise SystemExit(f"expected errorAttribution 'not_enabled', got {row[idx]!r}")
+        raise SystemExit("expected errorAttribution 'not_enabled', got {!r}".format(row[idx]))
 PY
     return
   fi
 
   python - "$input" <<'PY'
+import io
 import json
 import sys
 
