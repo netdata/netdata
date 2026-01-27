@@ -307,7 +307,7 @@ modules:
               - name: Error Attribution
                 type: string
                 unit: ""
-                description: "Status of error detail attribution for this query. Values: enabled (error details available), no_data (no recent error for this digest), not_enabled (statement history consumers disabled, including events_statements_current), not_supported (required columns unavailable)."
+                description: "Status of error detail attribution for this query. Values: enabled (error details available), no_data (no recent error for this digest), not_enabled (statement history consumers disabled), not_supported (required columns unavailable)."
               - name: Error Number
                 type: integer
                 unit: ""
@@ -463,8 +463,7 @@ modules:
                      WHERE NAME LIKE '%statement%';
                      ```
 
-                  3. The following consumers should be enabled:
-                     - `events_statements_current`
+                  3. The following consumer should be enabled:
                      - `events_statements_summary_by_digest`
 
                   4. Enable statement consumers if needed:
@@ -587,6 +586,14 @@ modules:
             Executes `SHOW ENGINE INNODB STATUS` on demand:<br/>• Not part of regular collection<br/>• Query cost depends on server load and the size of the InnoDB status output
           security: |
             Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only
+          prerequisites:
+            list:
+              - title: Enable deadlock-info function in Netdata
+                description: |
+                  Set `deadlock_info_function_enabled: true` in the `go.d/mysql.conf` job.
+              - title: Grant PROCESS privilege
+                description: |
+                  The monitoring user must have PROCESS privilege to run `SHOW ENGINE INNODB STATUS`.
           availability: |
             Available when:<br/>• The collector has successfully connected to MySQL<br/>• `deadlock_info_function_enabled` is true<br/>• The account can run `SHOW ENGINE INNODB STATUS` (PROCESS privilege)<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when PROCESS privilege is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out<br/>• Returns HTTP 561 when the deadlock section cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled
           require_cloud: true
@@ -638,6 +645,17 @@ modules:
             Reads Performance Schema statement history tables on demand:<br/>• Not part of regular collection<br/>• Query cost depends on history table size and server load
           security: |
             Error messages and query text may include unmasked literals (PII/secrets).<br/>• Restrict dashboard access to authorized personnel only
+          prerequisites:
+            list:
+              - title: Enable error-info function in Netdata
+                description: |
+                  Set `error_info_function_enabled: true` in the `go.d/mysql.conf` job.
+              - title: Enable statement history consumers
+                description: |
+                  Ensure `events_statements_history` and/or `events_statements_history_long` consumers are enabled.
+              - title: Grant SELECT on Performance Schema
+                description: |
+                  The monitoring user must have SELECT on `performance_schema.*` to read statement history tables.
           availability: |
             Available when:<br/>• The collector has successfully connected to MySQL<br/>• `error_info_function_enabled` is true<br/>• Performance Schema statement history consumers are enabled (history and/or history_long)<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 503 when required consumers are not enabled or function disabled<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
           require_cloud: true

@@ -227,8 +227,7 @@ Performance Schema must be enabled and statement instrumentation must be configu
    WHERE NAME LIKE '%statement%';
    ```
 
-3. The following consumers should be enabled:
-   - `events_statements_current`
+3. The following consumer should be enabled:
    - `events_statements_summary_by_digest`
 
 4. Enable statement consumers if needed:
@@ -306,7 +305,7 @@ Aggregated statement statistics from Performance Schema, grouped by query digest
 | Lock Time | duration | milliseconds |  | Total time spent waiting for table locks across all executions. High lock time may indicate contention from concurrent transactions. |
 | Errors | integer |  |  | Total number of times this query pattern resulted in an error. Non-zero values require investigation into the underlying issue. |
 | Warnings | integer |  |  | Total number of times this query pattern generated warnings. Warnings may indicate data type conversions, NULL handling issues, or other non-critical problems. |
-| Error Attribution | string |  |  | Status of error detail attribution for this query. Values: enabled (error details available), no_data (no recent error for this digest), not_enabled (statement history consumers disabled, including events_statements_current), not_supported (required columns unavailable). |
+| Error Attribution | string |  |  | Status of error detail attribution for this query. Values: enabled (error details available), no_data (no recent error for this digest), not_enabled (statement history consumers disabled), not_supported (required columns unavailable). |
 | Error Number | integer |  |  | Most recent error number observed for this query digest (when error attribution is enabled). |
 | SQL State | string |  | hidden | SQLSTATE code for the most recent error (when error attribution is enabled). |
 | Error Message | string |  |  | Most recent error message for this query digest (when error attribution is enabled). |
@@ -362,7 +361,16 @@ Query text is truncated at 4096 characters for display purposes.
 
 #### Prerequisites
 
-No additional configuration is required.
+##### Enable deadlock-info function in Netdata
+
+Set `deadlock_info_function_enabled: true` in the `go.d/mysql.conf` job.
+
+
+##### Grant PROCESS privilege
+
+The monitoring user must have PROCESS privilege to run `SHOW ENGINE INNODB STATUS`.
+
+
 
 #### Parameters
 
@@ -413,7 +421,21 @@ Error messages are truncated by Performance Schema (usually 128 characters).
 
 #### Prerequisites
 
-No additional configuration is required.
+##### Enable error-info function in Netdata
+
+Set `error_info_function_enabled: true` in the `go.d/mysql.conf` job.
+
+
+##### Enable statement history consumers
+
+Ensure `events_statements_history` and/or `events_statements_history_long` consumers are enabled.
+
+
+##### Grant SELECT on Performance Schema
+
+The monitoring user must have SELECT on `performance_schema.*` to read statement history tables.
+
+
 
 #### Parameters
 

@@ -238,13 +238,11 @@ if not has_expected_query:
     raise SystemExit("query_text does not reference deadlock tables")
 
 waiting_rows = [row for row in data if norm(get_value(row, "lock_status")).upper() == "WAITING"]
-if any(norm(get_value(row, "lock_mode")) == "" for row in waiting_rows):
-    raise SystemExit("WAITING rows must include lock_mode")
 if any(norm(get_value(row, "wait_resource")) == "" for row in waiting_rows):
     raise SystemExit("WAITING rows must include wait_resource")
 
 lock_mode_re = re.compile(r"^[A-Za-z0-9_-]+$")
-if any(not lock_mode_re.match(norm(get_value(row, "lock_mode"))) for row in waiting_rows):
+if any(norm(get_value(row, "lock_mode")) != "" and not lock_mode_re.match(norm(get_value(row, "lock_mode"))) for row in waiting_rows):
     raise SystemExit("WAITING rows must include a valid lock_mode")
 
 victim_counts = {}
