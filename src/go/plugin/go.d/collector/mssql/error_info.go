@@ -68,6 +68,7 @@ func (f *funcErrorInfo) Cleanup(ctx context.Context) {}
 type mssqlErrorRow struct {
 	Time        time.Time
 	ErrorNumber *int64
+	ErrorState  *int64
 	Message     string
 	Query       string
 	QueryHash   string
@@ -111,12 +112,17 @@ func (c *Collector) collectErrorInfo(ctx context.Context) *funcapi.FunctionRespo
 	data := make([][]any, 0, len(rows))
 	for _, row := range rows {
 		var errNo any
+		var errState any
 		if row.ErrorNumber != nil {
 			errNo = *row.ErrorNumber
+		}
+		if row.ErrorState != nil {
+			errState = *row.ErrorState
 		}
 		data = append(data, []any{
 			row.Time,
 			errNo,
+			errState,
 			row.Message,
 			row.Query,
 			row.QueryHash,
@@ -148,8 +154,15 @@ func buildMSSQLErrorInfoColumns() map[string]any {
 			Sortable:     true,
 			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNumber},
 		}.BuildColumn(),
-		"errorMessage": funcapi.Column{
+		"errorState": funcapi.Column{
 			Index:        2,
+			Name:         "Error State",
+			Type:         funcapi.FieldTypeInteger,
+			Sortable:     true,
+			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNumber},
+		}.BuildColumn(),
+		"errorMessage": funcapi.Column{
+			Index:        3,
 			Name:         "Error Message",
 			Type:         funcapi.FieldTypeString,
 			Sortable:     false,
@@ -157,7 +170,7 @@ func buildMSSQLErrorInfoColumns() map[string]any {
 			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
 		}.BuildColumn(),
 		"query": funcapi.Column{
-			Index:        3,
+			Index:        4,
 			Name:         "Query",
 			Type:         funcapi.FieldTypeString,
 			Sortable:     false,
@@ -165,7 +178,7 @@ func buildMSSQLErrorInfoColumns() map[string]any {
 			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
 		}.BuildColumn(),
 		"queryHash": funcapi.Column{
-			Index:        4,
+			Index:        5,
 			Name:         "Query Hash",
 			Type:         funcapi.FieldTypeString,
 			Sortable:     true,
@@ -208,14 +221,14 @@ func mssqlErrorAttributionColumns() []topQueriesColumn {
 		},
 		{
 			ColumnMeta: funcapi.ColumnMeta{
-				Name:      "sqlState",
-				Tooltip:   "SQL State",
-				Type:      funcapi.FieldTypeString,
+				Name:      "errorState",
+				Tooltip:   "Error State",
+				Type:      funcapi.FieldTypeInteger,
 				Visible:   false,
-				Transform: funcapi.FieldTransformNone,
-				Sort:      funcapi.FieldSortAscending,
-				Summary:   funcapi.FieldSummaryCount,
-				Filter:    funcapi.FieldFilterMultiselect,
+				Transform: funcapi.FieldTransformNumber,
+				Sort:      funcapi.FieldSortDescending,
+				Summary:   funcapi.FieldSummaryMax,
+				Filter:    funcapi.FieldFilterRange,
 			},
 		},
 		{
@@ -501,23 +514,30 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 	var results []mssqlErrorRow
 	for rows.Next() {
 		var (
-			ts        sql.NullTime
-			errNo     sql.NullInt64
-			message   sql.NullString
-			sqlText   sql.NullString
-			queryHash sql.NullString
-			errNoPtr  *int64
+			ts          sql.NullTime
+			errNo       sql.NullInt64
+			errState    sql.NullInt64
+			message     sql.NullString
+			sqlText     sql.NullString
+			queryHash   sql.NullString
+			errNoPtr    *int64
+			errStatePtr *int64
 		)
-		if err := rows.Scan(&ts, &errNo, &message, &sqlText, &queryHash); err != nil {
+		if err := rows.Scan(&ts, &errNo, &errState, &message, &sqlText, &queryHash); err != nil {
 			return mssqlErrorAttrNotSupported, nil, err
 		}
 		if errNo.Valid {
 			val := errNo.Int64
 			errNoPtr = &val
 		}
+		if errState.Valid {
+			val := errState.Int64
+			errStatePtr = &val
+		}
 		results = append(results, mssqlErrorRow{
 			Time:        ts.Time,
 			ErrorNumber: errNoPtr,
+			ErrorState:  errStatePtr,
 			Message:     message.String,
 			Query:       sqlText.String,
 			QueryHash:   queryHash.String,

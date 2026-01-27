@@ -280,11 +280,11 @@ modules:
                 type: integer
                 unit: ""
                 description: "Most recent error number observed for this query (when error attribution is enabled)."
-              - name: SQL State
-                type: string
+              - name: Error State
+                type: integer
                 unit: ""
                 visibility: hidden
-                description: "SQLSTATE code (not available for SQL Server; usually empty)."
+                description: "SQL Server error state for the most recent error (when error attribution is enabled)."
               - name: Error Message
                 type: string
                 unit: ""
@@ -715,6 +715,10 @@ modules:
                 type: integer
                 unit: ""
                 description: "SQL Server error number."
+              - name: Error State
+                type: integer
+                unit: ""
+                description: "SQL Server error state."
               - name: Error Message
                 type: string
                 unit: ""

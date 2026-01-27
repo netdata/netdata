@@ -357,10 +357,14 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 			if errRow.ErrorNumber != nil {
 				errNo = *errRow.ErrorNumber
 			}
+			var errState any
+			if errRow.ErrorState != nil {
+				errState = *errRow.ErrorState
+			}
 			data[i] = append(data[i],
 				status,
 				errNo,
-				nil, // SQL State is not available in MSSQL
+				errState,
 				nullableString(rowString(errRow.Message)),
 				hashMatch,
 				mergeJoin,

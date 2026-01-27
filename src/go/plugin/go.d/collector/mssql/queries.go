@@ -259,6 +259,7 @@ WITH xevents AS (
 SELECT TOP (@limit)
   xevent.value('@timestamp', 'datetime2(7)') AS event_time,
   xevent.value('(data[@name="error_number"]/value)[1]', 'int') AS error_number,
+  xevent.value('(data[@name="state"]/value)[1]', 'int') AS error_state,
   xevent.value('(data[@name="message"]/value)[1]', 'nvarchar(max)') AS message,
   xevent.value('(action[@name="sql_text"]/value)[1]', 'nvarchar(max)') AS sql_text,
   CONVERT(VARCHAR(64), xevent.value('(action[@name="query_hash"]/value)[1]', 'varbinary(8)'), 1) AS query_hash

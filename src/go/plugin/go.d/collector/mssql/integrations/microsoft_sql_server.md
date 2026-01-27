@@ -319,7 +319,7 @@ Aggregated query execution statistics from Query Store runtime views, providing 
 | Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly. |
 | Error Attribution | string |  |  | Status of error detail attribution for this query. Values: enabled, no_data, not_enabled, not_supported. |
 | Error Number | integer |  |  | Most recent error number observed for this query (when error attribution is enabled). |
-| SQL State | string |  | hidden | SQLSTATE code (not available for SQL Server; usually empty). |
+| Error State | integer |  | hidden | SQL Server error state for the most recent error (when error attribution is enabled). |
 | Error Message | string |  |  | Most recent error message for this query (when error attribution is enabled). |
 | Hash Match Joins | integer |  |  | Count of Hash Match join operators across all stored plans for this query. |
 | Merge Joins | integer |  |  | Count of Merge Join operators across all stored plans for this query. |
@@ -498,6 +498,7 @@ Recent error events from the configured Extended Events session.
 |:-------|:-----|:-----|:-----------|:------------|
 | Timestamp | timestamp |  |  | Timestamp of the error event. |
 | Error Number | integer |  |  | SQL Server error number. |
+| Error State | integer |  |  | SQL Server error state. |
 | Error Message | string |  |  | Error message text. |
 | Query | string |  |  | SQL text captured with the error event. |
 | Query Hash | string |  | hidden | Query hash captured with the error event (used for mapping into top-queries). |
