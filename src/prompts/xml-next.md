@@ -46,7 +46,11 @@ Variables:
 # System Notice
 
 This is turn/step {{ turn }}{% if max_turns %} of {{ max_turns }}{% endif %}{% if attempt > 1 %}, attempt {{ attempt }} of {{ max_retries }}{% endif %}. Your context window is {{ context_percent_used }}% full.
-Runtime vars: FORMAT={{ format_prompt_value }}; DATETIME={{ datetime }}; TIMESTAMP={{ timestamp }}; DAY={{ day }}; TIMEZONE={{ timezone }}; MAX_TURNS={% if max_turns %}{{ max_turns }}{% else %}unlimited{% endif %}; MAX_TOOLS={% if max_tools %}{{ max_tools }}{% else %}unknown{% endif %}.
+Current date and time (RFC3339): {{ datetime }}
+Unix epoch timestamp: {{ timestamp }}
+Day: {{ day }}
+Timezone: {{ timezone }}{% if has_external_tools and max_tools %}
+You can execute up to {{ max_tools }} tools per turn.{% endif %}
 {% if has_warnings %}
 
 {% if final_report_locked %}

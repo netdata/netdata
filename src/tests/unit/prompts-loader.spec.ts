@@ -16,7 +16,6 @@ const JSON_SCHEMA_BLOCK = { type: 'object', additionalProperties: false, propert
 const JSON_EXAMPLE = '{ ... your JSON here ... }';
 const EMPTY_REQUIREMENTS: ResolvedFinalReportPluginRequirement[] = [];
 const META_REQUIRED_PHRASE = '### META Requirements (Mandatory With FINAL)';
-const META_NONE_PHRASE = 'No META blocks are required for this session.';
 const SAMPLE_META_WRAPPER = '<ai-agent-cafebabe-META plugin="support-metadata">{...}</ai-agent-cafebabe-META>';
 
 const SAMPLE_REQUIREMENTS: ResolvedFinalReportPluginRequirement[] = [
@@ -60,7 +59,8 @@ describe('prompts loader', () => {
 
     expect(rendered).toContain(FINAL_SLOT);
     expect(rendered).toContain(`format="${FORMAT_ID}"`);
-    expect(rendered).toContain(META_NONE_PHRASE);
+    // When no plugins configured, META should not be mentioned at all
+    expect(rendered).not.toContain('META');
     expect(rendered).not.toContain('{{{slotId}}}');
     expect(rendered).not.toContain('{{{formatId}}}');
   });

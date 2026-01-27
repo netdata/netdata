@@ -1,26 +1,22 @@
 export function buildPromptVars(): Record<string, string> {
   const pad2 = (n: number): string => (n < 10 ? `0${String(n)}` : String(n));
-  const formatRFC3339Local = (d: Date): string => {
-    const y = d.getFullYear();
-    const m = pad2(d.getMonth() + 1);
-    const da = pad2(d.getDate());
-    const hh = pad2(d.getHours());
-    const mm = pad2(d.getMinutes());
-    const ss = pad2(d.getSeconds());
-    const tzMin = -d.getTimezoneOffset();
-    const sign = tzMin >= 0 ? '+' : '-';
-    const abs = Math.abs(tzMin);
-    const tzh = pad2(Math.floor(abs / 60));
-    const tzm = pad2(abs % 60);
-    return `${String(y)}-${m}-${da}T${hh}:${mm}:${ss}${sign}${tzh}:${tzm}`;
+  const formatRFC3339UTC = (d: Date): string => {
+    const y = d.getUTCFullYear();
+    const m = pad2(d.getUTCMonth() + 1);
+    const da = pad2(d.getUTCDate());
+    const hh = pad2(d.getUTCHours());
+    const mm = pad2(d.getUTCMinutes());
+    const ss = pad2(d.getUTCSeconds());
+    return `${String(y)}-${m}-${da}T${hh}:${mm}:${ss}+00:00`;
   };
-  const detectTimezone = (): string => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return process.env.TZ ?? 'UTC'; } };
+  // TODO: Support per-session timezone via headend user detection
+  const timezone = 'UTC';
   const now = new Date();
   return {
-    DATETIME: formatRFC3339Local(now),
+    DATETIME: formatRFC3339UTC(now),
     TIMESTAMP: String(Math.floor(now.getTime() / 1000)),
-    DAY: now.toLocaleDateString(undefined, { weekday: 'long' }),
-    TIMEZONE: detectTimezone(),
+    DAY: now.toLocaleDateString('en-US', { weekday: 'long', timeZone: timezone }),
+    TIMEZONE: timezone,
   };
 }
 

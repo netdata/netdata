@@ -7,6 +7,7 @@ models:
   - nova/glm-4.7
   - nova/glm-4.6
 tools:
+  - netdata-parents-sizing
   - filesystem_repos
   - github-support
   - discourse

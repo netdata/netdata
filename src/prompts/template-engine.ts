@@ -176,12 +176,23 @@ export const loadTemplate = (
   };
 };
 
+/**
+ * Normalize whitespace in rendered template output:
+ * - Trim leading/trailing whitespace
+ * - Collapse 3+ consecutive empty lines (which may contain whitespace) to 2 empty lines
+ */
+const normalizeWhitespace = (text: string): string => (
+  text
+    .trim()
+    .replace(/\n([ \t]*\n){3,}/g, '\n\n\n')
+);
+
 export const renderTemplate = (
   templateEngine: TemplateEngine,
   template: LoadedTemplate,
   context: Record<string, unknown>,
 ): string => {
   const rendered = templateEngine.engine.renderSync(template.parsed, context) as unknown;
-  if (typeof rendered === 'string') return rendered;
-  return String(rendered);
+  const text = typeof rendered === 'string' ? rendered : String(rendered);
+  return normalizeWhitespace(text);
 };

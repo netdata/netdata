@@ -3,6 +3,8 @@ Variables:
 - plugin_requirements: array of plugin requirement objects
 - nonce: static XML nonce
 - final_report_locked: boolean
+
+Outputs nothing when no plugins are configured.
 {% endcomment %}
 {% assign meta_required = plugin_requirements.size > 0 %}
 {% if meta_required %}
@@ -12,6 +14,4 @@ FINAL already accepted. Provide required META wrappers only. Plugins: {{ plugin_
 {% else %}
 META REQUIRED WITH FINAL. Plugins: {{ plugin_names }}. Use <ai-agent-{{ nonce }}-META plugin="name">{...}</ai-agent-{{ nonce }}-META>.
 {% endif %}
-{% else %}
-META: none required for this session.
 {% endif %}

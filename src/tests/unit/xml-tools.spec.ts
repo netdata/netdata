@@ -11,7 +11,6 @@ const ALLOWED_SLOTS = new Set([SLOT_ONE]);
 const ALLOWED_TOOLS = new Set(['echo']);
 const ROUTER_HANDOFF_TOOL = 'router__handoff-to';
 const META_REQUIRED_PHRASE = 'META REQUIRED WITH FINAL.';
-const META_NONE_PHRASE = 'META: none required for this session.';
 const EMPTY_PLUGIN_REQUIREMENTS: ResolvedFinalReportPluginRequirement[] = [];
 const SAMPLE_PLUGIN_NAME = 'support-metadata';
 const SAMPLE_XML_NEXT_SNIPPET = 'Support META must include ticketId.';
@@ -103,7 +102,8 @@ describe('XML streaming parser', () => {
     // xml-final: XML-NEXT describes the XML wrapper with nonce-FINAL
     expect(xml).toContain(`${NONCE}-FINAL`);
     expect(xml).toContain('markdown');
-    expect(xml).toContain(META_NONE_PHRASE);
+    // When no plugins configured, META should not be mentioned at all
+    expect(xml).not.toContain('META');
     expect(xml).not.toContain('mock_tool');
   });
 

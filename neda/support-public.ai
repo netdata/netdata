@@ -10,6 +10,7 @@ models:
   - zai/glm-4.6
   - zai/glm-4.5-air
 tools:
+  - netdata-parents-sizing
   - filesystem_repos_public
 agents: []
 plugins:

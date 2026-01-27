@@ -2,6 +2,8 @@
 Variables:
 - plugin_requirements: array of plugin requirement objects
 - nonce: static XML nonce
+
+Outputs nothing when no plugins are configured.
 {% endcomment %}
 {% assign meta_required = plugin_requirements.size > 0 %}
 {% if meta_required %}
@@ -28,7 +30,4 @@ Schema (must match exactly):
 ```
 
 {% endfor %}
-{% else %}
-### META Requirements
-No META blocks are required for this session.
 {% endif %}

@@ -1079,6 +1079,18 @@
         "*"
       ],
       "toolsDenied": []
+    },
+    "netdata-parents-sizing": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/opt/ai-agent/mcp/netdata-parents-sizing/netdata-parents-sizing-mcp-server.js"
+      ],
+      "enabled": true,
+      "toolsAllowed": [
+        "*"
+      ],
+      "toolsDenied": []
     }
   },
   "slack": {
