@@ -637,7 +637,7 @@ modules:
           security: |
             Error messages and query text may include unmasked literals (PII/secrets).<br/>• Restrict dashboard access to authorized personnel only
           availability: |
-            Available when:<br/>• The collector has successfully connected to MySQL<br/>• `error_info_function_enabled` is true<br/>• Performance Schema statement history consumers are enabled (events_statements_current + history/history_long)<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 503 when required consumers are not enabled or function disabled<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to MySQL<br/>• `error_info_function_enabled` is true<br/>• Performance Schema statement history consumers are enabled (history and/or history_long)<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 503 when required consumers are not enabled or function disabled<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
     metrics:
       folding:

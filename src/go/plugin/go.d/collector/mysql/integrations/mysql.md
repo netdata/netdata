@@ -347,19 +347,13 @@ Retrieves the latest detected InnoDB deadlock from `SHOW ENGINE INNODB STATUS`.
 
 Retrieves recent SQL errors from Performance Schema statement history tables.
 
-- Requires Performance Schema statement history consumers to be enabled (`events_statements_current` plus `events_statements_history_long` preferred, or `events_statements_history`).
+- Requires Performance Schema statement history consumers to be enabled (`events_statements_history_long` preferred, or `events_statements_history`).
 - Returns HTTP 503 with `errorMessage: "not enabled"` when the history consumer is disabled.
 - Error messages and query text may include unmasked literals (PII); restrict dashboard access.
 
-The output is parsed to attribute the deadlock to participating transactions and their query text, lock mode, lock status, and wait resource.
-
 Use cases:
-- Identify which query was chosen as the deadlock victim
-- Inspect the waiting lock resource and lock mode
-- Correlate deadlocks with application changes or deployments
-
-Query text and wait resource strings are truncated at 4096 characters for display purposes.
-
+- Identify recent query errors and their messages
+- Correlate errors to query patterns (digest)
 
 | Aspect | Description |
 |:-------|:------------|
