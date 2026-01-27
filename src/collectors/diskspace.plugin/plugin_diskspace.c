@@ -20,6 +20,32 @@ static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
 static int cleanup_mount_points = 1;
 
+// ----------------------------------------------------------------------------
+// ZFS dataset deduplication
+//
+// ZFS datasets without quotas report the same capacity as their parent pool,
+// causing duplicate metrics and alert floods. This heuristic excludes datasets
+// that mirror pool capacity while keeping datasets with quotas.
+//
+// To avoid calling statvfs() on every dataset on every collection cycle,
+// we cache both pool capacities and dataset exclusion decisions.
+// Cache entries are refreshed every ZFS_DATASET_RECHECK_SECONDS.
+
+#define ZFS_DATASET_RECHECK_SECONDS 300  // recheck every 5 minutes
+
+// Combined cache for ZFS pools and datasets
+// Key: mount_source (e.g., "tank" for pool, "tank/home" for dataset)
+struct zfs_cache_entry {
+    time_t last_checked;        // when this entry was last checked
+    bool is_pool;               // true = pool, false = dataset
+    uint64_t pool_capacity;     // only for pools: capacity in bytes
+    bool excluded;              // only for datasets: true if excluded from monitoring
+};
+
+static DICTIONARY *zfs_cache = NULL;
+static SIMPLE_PATTERN *excluded_zfs_datasets_pattern = NULL;
+static int zfs_datasets_heuristic = CONFIG_BOOLEAN_YES;
+
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
     time_t now = now_realtime_sec();
@@ -113,11 +139,12 @@ void mountpoint_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *entr
 
 // a copy of basic mountinfo fields
 struct basic_mountinfo {
-    char *persistent_id;    
-    char *root;             
+    char *persistent_id;
+    char *root;
     char *mount_point_stat_path;
-    char *mount_point;      
-    char *filesystem;       
+    char *mount_point;
+    char *mount_source;
+    char *filesystem;
 
     struct basic_mountinfo *next;
 };
@@ -134,6 +161,7 @@ static struct basic_mountinfo *basic_mountinfo_create_and_copy(struct mountinfo*
         bmi->root = strdupz(mi->root);
         bmi->mount_point_stat_path = strdupz(mi->mount_point_stat_path);
         bmi->mount_point = strdupz(mi->mount_point);
+        bmi->mount_source = mi->mount_source ? strdupz(mi->mount_source) : NULL;
         bmi->filesystem = strdupz(mi->filesystem);
     }
 
@@ -158,6 +186,7 @@ static void free_basic_mountinfo(struct basic_mountinfo *bmi)
         freez(bmi->root);
         freez(bmi->mount_point_stat_path);
         freez(bmi->mount_point);
+        freez(bmi->mount_source);
         freez(bmi->filesystem);
 
         freez(bmi);
@@ -299,26 +328,212 @@ static void calculate_values_and_show_charts(
         m->collected++;
 }
 
+// ----------------------------------------------------------------------------
+// ZFS helper functions
+
+// Extract pool name from ZFS mount_source
+// "tank" → "tank", "tank/data/set" → "tank"
+static const char *extract_zfs_pool_name(const char *mount_source, char *buf, size_t buf_size) {
+    if (!mount_source || !mount_source[0] || buf_size == 0)
+        return NULL;
+
+    const char *slash = strchr(mount_source, '/');
+    if (slash) {
+        size_t len = slash - mount_source;
+        if (len >= buf_size)
+            len = buf_size - 1;
+        memcpy(buf, mount_source, len);
+        buf[len] = '\0';
+    } else {
+        strncpyz(buf, mount_source, buf_size - 1);
+    }
+
+    return buf;
+}
+
+static inline bool is_zfs_filesystem(struct mountinfo *mi) {
+    return mi && mi->filesystem && strcmp(mi->filesystem, "zfs") == 0;
+}
+
 // Check if a ZFS filesystem entry is a dataset (not a pool)
+// Dataset = has '/' in mount_source (e.g., "tank/home")
+// Pool = no '/' in mount_source (e.g., "tank")
 static inline bool is_zfs_dataset(struct mountinfo *mi) {
-    if(!mi || !mi->filesystem || !mi->mount_source || !mi->mount_source[0])
+    return is_zfs_filesystem(mi) &&
+           mi->mount_source &&
+           mi->mount_source[0] &&
+           strchr(mi->mount_source, '/') != NULL;
+}
+
+// Cached LXC detection result (checked once at first call, can't change at runtime)
+static bool zfs_inside_lxc_container = false;
+
+// Collect ZFS pool capacities for the heuristic
+// Called on every collection cycle but only updates pools (quick operation)
+static void zfs_collect_pool_capacities(void) {
+    // LXC detection - only once (can't change at runtime)
+    static bool lxc_checked = false;
+    if (!lxc_checked) {
+        zfs_inside_lxc_container = is_lxcfs_proc_mounted();
+        lxc_checked = true;
+    }
+
+    if (!zfs_datasets_heuristic || !zfs_cache)
+        return;
+
+    time_t now = now_realtime_sec();
+
+    for (struct mountinfo *mi = disk_mountinfo_root; mi; mi = mi->next) {
+        if (!is_zfs_filesystem(mi))
+            continue;
+
+        if (!mi->mount_source || !mi->mount_source[0])
+            continue;
+
+        // Only process pool mounts (no '/' in mount_source), not datasets
+        if (strchr(mi->mount_source, '/'))
+            continue;
+
+        // Check if this pool entry needs refresh
+        const DICTIONARY_ITEM *existing = dictionary_get_and_acquire_item(zfs_cache, mi->mount_source);
+        if (existing) {
+            struct zfs_cache_entry *entry = dictionary_acquired_item_value(existing);
+            if (entry->is_pool && now - entry->last_checked < ZFS_DATASET_RECHECK_SECONDS) {
+                dictionary_acquired_item_release(zfs_cache, existing);
+                continue;  // still fresh
+            }
+            dictionary_acquired_item_release(zfs_cache, existing);
+        }
+
+        // Get capacity from the pool mount
+        struct statvfs buff;
+        if (statvfs(mi->mount_point_stat_path, &buff) != 0)
+            continue;
+
+        unsigned long bsize = buff.f_frsize ? buff.f_frsize : buff.f_bsize;
+        uint64_t capacity = (uint64_t)buff.f_blocks * bsize;
+
+        struct zfs_cache_entry new_entry = {
+            .last_checked = now,
+            .is_pool = true,
+            .pool_capacity = capacity,
+            .excluded = false
+        };
+        dictionary_set(zfs_cache, mi->mount_source, &new_entry, sizeof(new_entry));
+    }
+}
+
+// Check if a ZFS dataset has a cached exclusion decision that's still valid
+// Returns: true if cached as excluded (skip statvfs), false otherwise
+static bool zfs_dataset_cached_excluded(const char *filesystem, const char *mount_point, const char *mount_source) {
+    // Quick checks that don't need cache
+    if (!filesystem || strcmp(filesystem, "zfs") != 0)
+        return false;
+    if (!zfs_datasets_heuristic || !zfs_cache)
+        return false;
+    if (zfs_inside_lxc_container)
+        return false;
+    if (mount_point && strcmp(mount_point, "/") == 0)
+        return false;
+    if (!mount_source || !mount_source[0] || !strchr(mount_source, '/'))
+        return false;  // not a dataset
+
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(zfs_cache, mount_source);
+    if (!item)
+        return false;  // not in cache
+
+    struct zfs_cache_entry *entry = dictionary_acquired_item_value(item);
+
+    // Only use cache for datasets (not pools), and only if still fresh
+    time_t now = now_realtime_sec();
+    bool cached_excluded = !entry->is_pool &&
+                           entry->excluded &&
+                           (now - entry->last_checked < ZFS_DATASET_RECHECK_SECONDS);
+
+    dictionary_acquired_item_release(zfs_cache, item);
+
+    return cached_excluded;
+}
+
+// Determine if a ZFS mount should be excluded and cache the decision
+// Returns: true if should exclude, false if should keep
+static bool should_exclude_zfs(const char *filesystem, const char *mount_point, const char *mount_source, struct statvfs *buff) {
+    // 1. Not ZFS → keep
+    if (!filesystem || strcmp(filesystem, "zfs") != 0)
         return false;
 
-    if(strcmp(mi->filesystem, "zfs") != 0)
+    // 2. Root mount → always keep
+    if (mount_point && strcmp(mount_point, "/") == 0)
         return false;
-    
-    // For ZFS, the mount_source contains the dataset name (e.g., "tank" or "tank/install")
-    // Pools have no slash, datasets have at least one slash
-    return strchr(mi->mount_source, '/') != NULL;
+
+    // 3. Inside LXC container → keep all (container sees virtualized mounts)
+    if (zfs_inside_lxc_container)
+        return false;
+
+    // 4. Not a dataset (it's a pool) → keep
+    // Dataset = has '/' in mount_source, Pool = no '/'
+    if (!mount_source || !mount_source[0] || !strchr(mount_source, '/'))
+        return false;
+
+    // 5. Heuristic disabled → use pattern matching (default "!*" excludes nothing)
+    if (!zfs_datasets_heuristic)
+        return excluded_zfs_datasets_pattern && simple_pattern_matches(excluded_zfs_datasets_pattern, mount_point);
+
+    if (!zfs_cache)
+        return false;
+
+    // 6. Heuristic enabled - use capacity logic
+    char pool_name_buf[256];
+    const char *pool_name = extract_zfs_pool_name(mount_source, pool_name_buf, sizeof(pool_name_buf));
+    if (!pool_name || !pool_name[0])
+        return false;  // can't determine pool → keep
+
+    // Get pool info from cache
+    const DICTIONARY_ITEM *pool_item = dictionary_get_and_acquire_item(zfs_cache, pool_name);
+    if (!pool_item)
+        return false;  // unknown pool → keep
+
+    struct zfs_cache_entry *pool_entry = dictionary_acquired_item_value(pool_item);
+
+    // 7. Verify it's a pool entry with valid capacity
+    if (!pool_entry->is_pool || !pool_entry->pool_capacity) {
+        dictionary_acquired_item_release(zfs_cache, pool_item);
+        return false;
+    }
+
+    // 8. Check if pool cache entry is still fresh (pool may have been unmounted)
+    // Use 2x interval: if entry missed one refresh cycle, pool is likely unmounted
+    time_t now = now_realtime_sec();
+    if (now - pool_entry->last_checked >= ZFS_DATASET_RECHECK_SECONDS * 2) {
+        dictionary_acquired_item_release(zfs_cache, pool_item);
+        return false;
+    }
+
+    uint64_t pool_capacity = pool_entry->pool_capacity;
+    dictionary_acquired_item_release(zfs_cache, pool_item);
+
+    // 9. Calculate this dataset's capacity
+    unsigned long bsize = buff->f_frsize ? buff->f_frsize : buff->f_bsize;
+    uint64_t dataset_capacity = (uint64_t)buff->f_blocks * bsize;
+
+    // 10. Determine exclusion: dataset capacity >= pool capacity → no quota → exclude
+    // Datasets without quotas report same capacity as pool.
+    // Datasets with quotas report smaller capacity (capped by quota).
+    bool excluded = (dataset_capacity >= pool_capacity);
+
+    // 11. Cache the decision for this dataset
+    struct zfs_cache_entry dataset_entry = {
+        .last_checked = now,
+        .is_pool = false,
+        .pool_capacity = 0,
+        .excluded = excluded
+    };
+    dictionary_set(zfs_cache, mount_source, &dataset_entry, sizeof(dataset_entry));
+
+    return excluded;
 }
 
 static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
-    // Skip ZFS datasets, only monitor ZFS pools
-    // This prevents alert floods when a pool fills up
-    if (is_zfs_dataset(mi)) {
-        return;
-    }
-
     const char *disk = mi->persistent_id;
 
     static SIMPLE_PATTERN *excluded_mountpoints = NULL;
@@ -351,6 +566,14 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
         excluded_filesystems_inodes = simple_pattern_create(
             inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude inode metrics on filesystems", DEFAULT_EXCLUDED_FILESYSTEMS_INODES),
+            NULL,
+            SIMPLE_PATTERN_EXACT,
+            true);
+
+        // ZFS dataset exclusion pattern (used when heuristic is disabled)
+        // Always create so the option appears in config for users to customize
+        excluded_zfs_datasets_pattern = simple_pattern_create(
+            inicfg_get(&netdata_config, CONFIG_SECTION_DISKSPACE, "exclude zfs datasets on paths", "!*"),
             NULL,
             SIMPLE_PATTERN_EXACT,
             true);
@@ -474,6 +697,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
         goto cleanup;
     }
 
+    // Check if this ZFS dataset has a cached exclusion decision (skip statvfs entirely)
+    if (zfs_dataset_cached_excluded(mi->filesystem, mi->mount_point, mi->mount_source))
+        goto cleanup;
+
     usec_t start_time = now_monotonic_high_precision_usec();
     struct statvfs buff_statvfs;
 
@@ -492,6 +719,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     if ((now_monotonic_high_precision_usec() - start_time) > slow_timeout)
         m->slow = true;
+
+    // Check if this ZFS mount should be excluded (capacity-based heuristic)
+    if (should_exclude_zfs(mi->filesystem, mi->mount_point, mi->mount_source, &buff_statvfs))
+        goto cleanup;
 
     m->shown_error = false;
 
@@ -528,6 +759,10 @@ static inline void do_slow_disk_space_stats(struct basic_mountinfo *mi, int upda
         goto cleanup;
     }
     m->shown_error = false;
+
+    // Check if this ZFS mount should be excluded (same logic as fast path)
+    if (should_exclude_zfs(mi->filesystem, mi->mount_point, mi->mount_source, &buff_statvfs))
+        goto cleanup;
 
     calculate_values_and_show_charts(mi, m, &buff_statvfs, update_every);
 
@@ -634,6 +869,13 @@ static void diskspace_main_cleanup(void *ptr) {
     // Free the mountpoints dictionary
     dictionary_destroy(dict_mountpoints);
     dict_mountpoints = NULL;
+
+    // Free ZFS deduplication resources
+    dictionary_destroy(zfs_cache);
+    zfs_cache = NULL;
+
+    simple_pattern_free(excluded_zfs_datasets_pattern);
+    excluded_zfs_datasets_pattern = NULL;
 
     rrd_collector_finished();
     worker_unregister();
@@ -884,6 +1126,21 @@ void diskspace_main(void *ptr) {
     if(check_for_new_mountpoints_every < update_every)
         check_for_new_mountpoints_every = update_every;
 
+    // ZFS dataset deduplication configuration
+    zfs_datasets_heuristic = inicfg_get_boolean(
+        &netdata_config,
+        CONFIG_SECTION_DISKSPACE,
+        "zfs datasets heuristic",
+        CONFIG_BOOLEAN_YES);
+
+    if (zfs_datasets_heuristic) {
+        // Heuristic mode: create cache for pool capacities and dataset exclusion decisions
+        zfs_cache = dictionary_create_advanced(
+            DICT_OPTION_FIXED_SIZE,
+            &dictionary_stats_category_collectors,
+            sizeof(struct zfs_cache_entry));
+    }
+
     netdata_mutex_init(&slow_mountinfo_mutex);
 
     struct slow_worker_data slow_worker_data = { .update_every = update_every };
@@ -914,6 +1171,9 @@ void diskspace_main(void *ptr) {
         netdata_mutex_lock(&slow_mountinfo_mutex);
         free_basic_mountinfo_list(slow_mountinfo_tmp_root);
         slow_mountinfo_tmp_root = NULL;
+
+        // Collect ZFS pool capacities for the heuristic (Pass 1)
+        zfs_collect_pool_capacities();
 
         struct mountinfo *mi;
         for(mi = disk_mountinfo_root; mi; mi = mi->next) {
