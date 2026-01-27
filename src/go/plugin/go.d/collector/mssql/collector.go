@@ -106,7 +106,10 @@ func (c Config) topQueriesLimit() int {
 }
 
 func (c Config) topQueriesTimeWindowDays() int {
-	if c.Functions.TopQueries.TimeWindowDays < 0 {
+	if c.Functions.TopQueries.TimeWindowDays == -1 {
+		return 0 // -1 means "query all history"
+	}
+	if c.Functions.TopQueries.TimeWindowDays <= 0 {
 		return 7
 	}
 	return c.Functions.TopQueries.TimeWindowDays

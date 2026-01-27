@@ -62,9 +62,9 @@
               },
               "time_window_days": {
                 "title": "Time Window (Days)",
-                "description": "How many days of Query Store data to query. Set to 0 to query all available data (not recommended for busy servers).",
+                "description": "How many days of Query Store data to query. Set to 0 to use the default (7). Set to -1 to query all available data (not recommended for busy servers).",
                 "type": "integer",
-                "minimum": 0,
+                "minimum": -1,
                 "default": 7
               }
             }
