@@ -624,6 +624,45 @@ Replace SSH access with browser-based diagnostics:
 - Secure execution via ACLK
 - Same per-second precision as console tools
 
+### 8.4 Database Query Functions
+
+Deep visibility into SQL and NoSQL database performance through Netdata's Top tab. Identify problematic queries, detect deadlocks, and understand error patterns—all from the dashboard.
+
+**Capabilities:**
+
+| Capability | Description |
+|------------|-------------|
+| **Top Queries** | Identify expensive queries by execution time, I/O, rows processed, CPU, memory, or locks |
+| **Running Queries** | Real-time view of currently executing queries |
+| **Deadlock Detection** | View the latest detected deadlock with full transaction details |
+| **Error Attribution** | Correlate SQL errors with the queries that caused them |
+
+**Supported Databases:**
+
+| Database | Top Queries | Running Queries | Deadlock Info | Error Info |
+|----------|:-----------:|:---------------:|:-------------:|:----------:|
+| ClickHouse | ✅ | - | - | - |
+| CockroachDB | ✅ | ✅ | - | - |
+| Couchbase | ✅ | - | - | - |
+| Elasticsearch | ✅ | - | - | - |
+| MongoDB | ✅ | - | - | - |
+| Microsoft SQL Server | ✅ | - | ✅ | ✅ |
+| MySQL | ✅ | - | ✅ | ✅ |
+| MariaDB | ✅ | - | ✅ | ✅ |
+| Percona Server | ✅ | - | ✅ | ✅ |
+| Oracle Database | ✅ | ✅ | - | - |
+| PostgreSQL | ✅ | - | - | - |
+| ProxySQL | ✅ | - | - | - |
+| Redis | ✅ | - | - | - |
+| RethinkDB | - | ✅ | - | - |
+| YugabyteDB | ✅ | ✅ | - | - |
+
+**Key Features:**
+- Filter and sort by execution time, call count, rows processed, I/O metrics, resource usage
+- Configurable query limits (default: 500 queries)
+- Error details embedded directly in Top Queries results
+- Works without SSH access—browser-based diagnostics with full history
+
 ## 9. Deployment Options
 
 ### 9.1 Standalone Deployment
