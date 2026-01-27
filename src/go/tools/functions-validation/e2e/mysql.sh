@@ -544,20 +544,26 @@ def normalize(val):
 # Error categories to verify:
 # 1146 - Table doesn't exist (missing_table)
 # 1062 - Duplicate key (constraint violation)
-# Note: Syntax errors (1064) are not captured in events_statements_history
-#       because they fail during parsing before instrumentation.
+# 1064 - Syntax error (should be captured with synthetic digest)
 error_categories = {
-    "table_not_found": {"patterns": ["missing_table", "doesn't exist", "does not exist"], "found": False},
-    "duplicate_key": {"patterns": ["duplicate", "primary", "unique"], "found": False},
+    "table_not_found": {"patterns": ["missing_table", "doesn't exist", "does not exist"], "error_nums": [1146], "found": False},
+    "duplicate_key": {"patterns": ["duplicate", "primary", "unique"], "error_nums": [1062], "found": False},
+    "syntax_error": {"patterns": ["syntax", "error in your sql"], "error_nums": [1064], "found": False},
 }
 
 for row in data:
     if num_idx >= len(row) or row[num_idx] is None:
         continue
+    err_num = row[num_idx]
     msg = normalize(row[err_idx]).lower()
     for cat, info in error_categories.items():
         if info["found"]:
             continue
+        # Check by error number first
+        if err_num in info.get("error_nums", []):
+            info["found"] = True
+            continue
+        # Fallback to pattern matching
         for pattern in info["patterns"]:
             if pattern in msg:
                 info["found"] = True
@@ -624,19 +630,23 @@ def normalize(val):
 # Error categories to verify:
 # 1146 - Table doesn't exist (missing_table)
 # 1062 - Duplicate key (constraint violation)
-# Note: Syntax errors (1064) are not captured in events_statements_history
-#       because they fail during parsing before instrumentation.
+# 1064 - Syntax error (should be captured with synthetic digest)
 error_categories = {
-    "table_not_found": {"patterns": ["missing_table", "doesn't exist", "does not exist"], "found": False},
-    "duplicate_key": {"patterns": ["duplicate", "primary", "unique"], "found": False},
+    "table_not_found": {"patterns": ["missing_table", "doesn't exist", "does not exist"], "error_nums": [1146], "found": False},
+    "duplicate_key": {"patterns": ["duplicate", "primary", "unique"], "error_nums": [1062], "found": False},
+    "syntax_error": {"patterns": ["syntax", "error in your sql"], "error_nums": [1064], "found": False},
 }
 
 for row in data:
     if num_idx >= len(row) or row[num_idx] is None:
         continue
+    err_num = row[num_idx]
     msg = normalize(row[err_idx]).lower()
     for cat, info in error_categories.items():
         if info["found"]:
+            continue
+        if err_num in info.get("error_nums", []):
+            info["found"] = True
             continue
         for pattern in info["patterns"]:
             if pattern in msg:
@@ -912,6 +922,9 @@ verify_deadlock_info() {
     echo "deadlock-info did not produce valid deadlock attribution after 5 attempts" >&2
     return 1
   fi
+
+  # Verify column visibility rules
+  assert_column_visibility "$output" "deadlock-info"
 }
 
 verify_deadlock_info_no_deadlock
@@ -935,20 +948,29 @@ for _ in 1 2 3; do
 done
 
 # 2. Duplicate key / constraint violation (error 1062)
-# Note: Syntax errors (1064) are NOT captured in events_statements_history
-#       because they fail during parsing before instrumentation records them.
 for _ in 1 2 3; do
   mysql_exec_root_allow_error "INSERT INTO error_test (id, unique_col, int_col) VALUES (1, 'new_value', 200);"
   mysql_exec_root_allow_error "INSERT INTO error_test (id, unique_col, int_col) VALUES (99, 'existing_value', 300);"
+done
+
+# 3. Syntax errors (error 1064)
+# These have NULL DIGEST in performance_schema because they fail during parsing
+# before instrumentation. The collector should generate a synthetic digest.
+for _ in 1 2 3; do
+  mysql_exec_root_allow_error "SELECT * FROM WHERE 1=1;"
+  mysql_exec_root_allow_error "SELEC * FROM error_test;"
 done
 
 sleep 1
 
 error_output="$(run_function mysql error-info '__job:local' 'true')"
 assert_error_info_has_errors "$error_output"
+assert_column_visibility "$error_output" "error-info"
+assert_unique_key_populated "$error_output" "error-info"
 
 run_top_queries mysql
 assert_top_queries_error_attribution_enabled "$WORKDIR/mysql-top-queries.json"
+assert_column_visibility "$WORKDIR/mysql-top-queries.json" "top-queries"
 
 restore_statement_history_consumers
 

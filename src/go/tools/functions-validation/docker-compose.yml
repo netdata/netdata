@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: ${POSTGRES_IMAGE:-postgres:16}
     environment:
       POSTGRES_USER: netdata
       POSTGRES_PASSWORD: netdata
