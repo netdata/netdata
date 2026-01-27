@@ -935,19 +935,21 @@ ARAL *ebpf_allocate_pid_aral(char *name, size_t size)
  */
 static inline void ebpf_check_before2go()
 {
-    int i = EBPF_OPTION_ALL_CHARTS;
+    int i;
     usec_t max = USEC_PER_SEC, step = 200000;
-    while (i && max) {
+    int j;
+    while (max) {
         max -= step;
         sleep_usec(step);
         i = 0;
-        int j;
         netdata_mutex_lock(&ebpf_exit_cleanup);
         for (j = 0; ebpf_modules[j].info.thread_name != NULL; j++) {
             if (ebpf_modules[j].enabled < NETDATA_THREAD_EBPF_STOPPING)
                 i++;
         }
         netdata_mutex_unlock(&ebpf_exit_cleanup);
+        if (!i)
+            break;
     }
 
     if (i) {
@@ -1022,25 +1024,17 @@ void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe
  */
 static void ebpf_unload_unique_maps()
 {
-    int i;
-    for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
-        if (i != EBPF_MODULE_SOCKET_IDX)
-            continue;
+    ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SOCKET_IDX];
+    if (em->enabled != NETDATA_THREAD_EBPF_STOPPED)
+        return;
 
-        if (ebpf_modules[i].enabled != NETDATA_THREAD_EBPF_STOPPED) {
-            continue;
-        }
-
-        if (ebpf_modules[i].load == EBPF_LOAD_LEGACY) {
-            ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
-            continue;
-        }
+    if (em->load == EBPF_LOAD_LEGACY)
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
 
 #ifdef LIBBPF_MAJOR_VERSION
-        if (socket_bpf_obj)
-            socket_bpf__destroy(socket_bpf_obj);
+    if (socket_bpf_obj)
+        socket_bpf__destroy(socket_bpf_obj);
 #endif
-    }
 }
 
 /**
@@ -1168,7 +1162,6 @@ static void ebpf_allocate_common_vectors()
 {
     ebpf_judy_pid.pid_table =
         ebpf_allocate_pid_aral(NETDATA_EBPF_PID_SOCKET_ARAL_TABLE_NAME, sizeof(netdata_ebpf_judy_pid_stats_t));
-    //    ebpf_pids = callocz((size_t)pid_max, sizeof(ebpf_pid_data_t));
     ebpf_aral_init();
 }
 
@@ -2059,8 +2052,10 @@ static char *ebpf_get_process_name(pid_t pid)
     }
 
     ff = procfile_readall(ff);
-    if (unlikely(!ff))
+    if (unlikely(!ff)) {
+        procfile_close(ff);
         return name;
+    }
 
     unsigned long i, lines = procfile_lines(ff);
     for (i = 0; i < lines; i++) {
@@ -2148,6 +2143,7 @@ static void ebpf_initialize_data_sharing()
                 ebpf_set_apps_mode(NETDATA_EBPF_APPS_FLAG_NO);
                 ebpf_disable_cgroups();
             }
+            break;
         case NETDATA_EBPF_INTEGRATION_DISABLED:
         default:
             break;
