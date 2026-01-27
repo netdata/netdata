@@ -310,11 +310,9 @@ static void logger_event_loop(void *arg) {
 // ----------------------------------------------------------------------------
 // Public API
 
-void nd_log_queue_init(void) {
+void nd_log_queue_init(void)
+{
     FUNCTION_RUN_ONCE();
-
-    if (__atomic_load_n(&log_ev.initialized, __ATOMIC_ACQUIRE))
-        return;
 
     // Initialize command pool
     cmd_pool_init(&log_ev.cmd_pool, ND_LOG_QUEUE_CMD_POOL_SIZE);
@@ -364,20 +362,16 @@ void nd_log_queue_shutdown(void) {
     // The thread checks this flag in its main loop.
     __atomic_store_n(&log_ev.shutdown_requested, true, __ATOMIC_RELEASE);
 
-    // Send shutdown command for synchronization (allows waiting for completion)
-    struct completion shutdown_complete;
-    completion_init(&shutdown_complete);
-
     struct nd_log_queue_cmd cmd = {
         .opcode = ND_LOG_OP_SHUTDOWN,
-        .sync.completion = &shutdown_complete
+        .sync.completion = &log_ev.start_stop_complete
     };
 
     if (cmd_pool_push(&log_ev.cmd_pool, &cmd)) {
         // Wake the thread - if this fails (handle closed), the atomic flag above
         // ensures the thread will still exit on its next loop iteration
         uv_async_send(&log_ev.async);
-        if (!completion_timedwait_for(&shutdown_complete, ND_LOG_SHUTDOWN_TIMEOUT_S)) {
+        if (!completion_timedwait_for(&log_ev.start_stop_complete, ND_LOG_SHUTDOWN_TIMEOUT_S)) {
             // Timeout - logger thread may be dead, proceed with cleanup anyway
             fprintf(stderr, "LOGGER: shutdown wait timed out after %d seconds\n", ND_LOG_SHUTDOWN_TIMEOUT_S);
         }
@@ -393,9 +387,6 @@ void nd_log_queue_shutdown(void) {
         nd_thread_join(log_ev.thread);
         log_ev.thread = NULL;
     }
-
-    // Now safe to destroy - thread has exited and won't access completion
-    completion_destroy(&shutdown_complete);
 
     // Cleanup
     cmd_pool_destroy(&log_ev.cmd_pool);
