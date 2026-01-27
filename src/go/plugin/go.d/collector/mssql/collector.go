@@ -38,6 +38,12 @@ func New() *Collector {
 		Config: Config{
 			DSN:     "sqlserver://localhost:1433",
 			Timeout: confopt.Duration(time.Second * 5),
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit:          500,
+					TimeWindowDays: 7,
+				},
+			},
 		},
 
 		charts: instanceCharts.Copy(),

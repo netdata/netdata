@@ -44,6 +44,11 @@ func New() *Collector {
 			Address:     "redis://@localhost:6379",
 			Timeout:     confopt.Duration(time.Second),
 			PingSamples: 5,
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		addAOFChartsOnce:       &sync.Once{},

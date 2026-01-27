@@ -43,6 +43,14 @@ func New() *Collector {
 					Timeout: confopt.Duration(time.Second),
 				},
 			},
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+				RunningQueries: RunningQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 		charts: &module.Charts{},
 

@@ -43,6 +43,11 @@ func New() *Collector {
 			// https://discord.com/channels/847502280503590932/1022693928874549368
 			MaxDBTables:  50,
 			MaxDBIndexes: 250,
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 		charts:  baseCharts.Copy(),
 		dbConns: make(map[string]*dbConn),

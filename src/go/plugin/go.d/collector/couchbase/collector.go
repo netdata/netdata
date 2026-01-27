@@ -42,6 +42,11 @@ func New() *Collector {
 					Timeout: confopt.Duration(time.Second),
 				},
 			},
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 		collectedBuckets: make(map[string]bool),
 	}

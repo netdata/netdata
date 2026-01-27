@@ -30,6 +30,11 @@ func New() *Collector {
 		Config: Config{
 			Address: "127.0.0.1:28015",
 			Timeout: confopt.Duration(time.Second * 1),
+			Functions: FunctionsConfig{
+				RunningQueries: RunningQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		charts:      clusterCharts.Copy(),

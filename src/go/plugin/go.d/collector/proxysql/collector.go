@@ -34,6 +34,11 @@ func New() *Collector {
 		Config: Config{
 			DSN:     "stats:stats@tcp(127.0.0.1:6032)/",
 			Timeout: confopt.Duration(time.Second),
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		charts: baseCharts.Copy(),

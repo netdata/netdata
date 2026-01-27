@@ -37,6 +37,11 @@ func New() *Collector {
 				Includes: []string{},
 				Excludes: []string{},
 			},
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		conn: &mongoClient{},

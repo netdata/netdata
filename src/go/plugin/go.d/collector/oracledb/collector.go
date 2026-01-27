@@ -30,7 +30,15 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			Timeout:         confopt.Duration(time.Second * 2),
+			Timeout: confopt.Duration(time.Second * 2),
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+				RunningQueries: RunningQueriesConfig{
+					Limit: 500,
+				},
+			},
 			charts:          globalCharts.Copy(),
 			seenTablespaces: make(map[string]bool),
 			seenWaitClasses: make(map[string]bool),

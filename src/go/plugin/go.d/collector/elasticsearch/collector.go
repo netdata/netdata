@@ -49,6 +49,11 @@ func New() *Collector {
 			DoClusterStats:  true,
 			DoClusterHealth: true,
 			DoIndicesStats:  false,
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		charts:                     &module.Charts{},
