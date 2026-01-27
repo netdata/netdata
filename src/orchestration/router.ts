@@ -5,7 +5,7 @@ import type { RouterToolConfig } from './types.js';
 import { renderPromptTemplate } from '../prompts/templates.js';
 import { ToolExecutionError } from '../tools/tool-errors.js';
 import { ToolProvider } from '../tools/types.js';
-import { parseJsonRecord } from '../utils.js';
+import { parseJsonRecordStrict } from '../utils.js';
 
 export interface RouterToolProviderOptions {
   config: RouterToolConfig;
@@ -19,10 +19,12 @@ export class RouterToolProvider extends ToolProvider {
   readonly kind: ToolKind = 'agent';
   readonly namespace = 'agent';
   private readonly config: RouterToolConfig;
+  private readonly toolSchema?: { description?: string; inputSchema: Record<string, unknown> };
 
   constructor(opts: RouterToolProviderOptions) {
     super();
     this.config = opts.config;
+    this.toolSchema = this.config.destinations.length > 0 ? this.renderToolSchema() : undefined;
   }
 
   static getToolName(): string {
@@ -33,7 +35,7 @@ export class RouterToolProvider extends ToolProvider {
     if (this.config.destinations.length === 0) {
       return [];
     }
-    const schema = this.renderToolSchema();
+    const schema = this.toolSchema ?? this.renderToolSchema();
     return [
       {
         name: RouterToolProvider.FULL_TOOL_NAME,
@@ -112,10 +114,7 @@ export class RouterToolProvider extends ToolProvider {
     const raw = renderPromptTemplate('toolSchemaRouter', {
       destinations: this.config.destinations,
     });
-    const parsed = parseJsonRecord(raw);
-    if (parsed === undefined) {
-      throw new Error('router-handoff tool schema template did not produce a JSON object');
-    }
+    const parsed = parseJsonRecordStrict(raw, 'router-handoff tool schema template');
     const description = typeof parsed.description === 'string' ? parsed.description : undefined;
     return { description, inputSchema: parsed };
   }

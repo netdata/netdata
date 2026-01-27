@@ -118,6 +118,7 @@ LLM-facing instruction prompts (final report guidance, task status, batch tool u
 - `src/prompts/internal-tools.md` – Internal tools instructions (Liquid)
 - `src/prompts/xml-next.md` – Runtime XML-NEXT notice (Liquid)
 - `src/prompts/tool-schemas/*.json` – Internal tool schemas (Liquid)
+- `src/prompts/tool-schemas/slack-block-kit.json` – Slack Block Kit schema (static file; loaded at runtime)
 - `src/prompts/tool-output/*.md` – Tool-output prompts (Liquid)
 - `src/prompts/tool-results/*.md` – Tool-result notices (Liquid)
 
@@ -125,6 +126,7 @@ LLM-facing instruction prompts (final report guidance, task status, batch tool u
 - Templates are read and parsed at module initialization (`src/prompts/templates.ts`).
 - Liquid runs in strict mode (unknown variables and missing includes fail).
 - Includes resolve relative to the file containing the directive; max depth 8; `.env` blocked.
+- Tool schema templates are rendered and JSON-parsed strictly at provider initialization (no repair); invalid schemas fail fast.
 - Rendering happens on demand via `renderPromptTemplate(...)`.
 
 ### Build Pipeline

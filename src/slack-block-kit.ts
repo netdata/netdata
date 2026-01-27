@@ -1,4 +1,8 @@
-import { parseJsonValueDetailed } from './utils.js';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { isPlainObject, parseJsonValueDetailed } from './utils.js';
 
 // =============================================================================
 // SLACK MRKDWN RULES (LLM-facing instructions)
@@ -64,106 +68,32 @@ const SLACK_LIMITS = {
   contextText: 2000,
 } as const;
 
-export const SLACK_BLOCK_KIT_SCHEMA: Record<string, unknown> = {
-  type: 'array',
-  minItems: 1,
-  maxItems: SLACK_LIMITS.maxMessages,
-  items: {
-    type: 'object',
-    additionalProperties: true,
-    required: ['blocks'],
-    properties: {
-      blocks: {
-        type: 'array',
-        minItems: 1,
-        maxItems: SLACK_LIMITS.maxBlocks,
-        items: {
-          oneOf: [
-            {
-              type: 'object',
-              additionalProperties: true,
-              required: ['type'],
-              properties: {
-                type: { const: 'section' },
-                text: {
-                  type: 'object',
-                  additionalProperties: true,
-                  required: ['type', 'text'],
-                  properties: {
-                    type: { const: 'mrkdwn' },
-                    text: { type: 'string', maxLength: SLACK_LIMITS.sectionText },
-                  },
-                },
-                fields: {
-                  type: 'array',
-                  maxItems: SLACK_LIMITS.maxFields,
-                  items: {
-                    type: 'object',
-                    additionalProperties: true,
-                    required: ['type', 'text'],
-                    properties: {
-                      type: { const: 'mrkdwn' },
-                      text: { type: 'string', maxLength: SLACK_LIMITS.fieldText },
-                    },
-                  },
-                },
-              },
-              anyOf: [
-                { required: ['text'] },
-                { required: ['fields'] },
-              ],
-            },
-            {
-              type: 'object',
-              additionalProperties: true,
-              required: ['type'],
-              properties: { type: { const: 'divider' } },
-            },
-            {
-              type: 'object',
-              additionalProperties: true,
-              required: ['type', 'text'],
-              properties: {
-                type: { const: 'header' },
-                text: {
-                  type: 'object',
-                  additionalProperties: true,
-                  required: ['type', 'text'],
-                  properties: {
-                    type: { const: 'plain_text' },
-                    text: { type: 'string', maxLength: SLACK_LIMITS.headerText },
-                  },
-                },
-              },
-            },
-            {
-              type: 'object',
-              additionalProperties: true,
-              required: ['type', 'elements'],
-              properties: {
-                type: { const: 'context' },
-                elements: {
-                  type: 'array',
-                  minItems: 1,
-                  maxItems: SLACK_LIMITS.maxContext,
-                  items: {
-                    type: 'object',
-                    additionalProperties: true,
-                    required: ['type', 'text'],
-                    properties: {
-                      type: { const: 'mrkdwn' },
-                      text: { type: 'string', maxLength: SLACK_LIMITS.contextText },
-                    },
-                  },
-                },
-              },
-            },
-          ],
-        },
-      },
-    },
-  },
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const SLACK_SCHEMA_PATH = join(__dirname, 'prompts', 'tool-schemas', 'slack-block-kit.json');
+
+const loadSlackBlockKitSchema = (): Record<string, unknown> => {
+  let raw = '';
+  try {
+    raw = readFileSync(SLACK_SCHEMA_PATH, 'utf-8');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to read Slack Block Kit schema file at ${SLACK_SCHEMA_PATH}: ${message}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Slack Block Kit schema JSON parse failed at ${SLACK_SCHEMA_PATH}: ${message}`);
+  }
+  if (!isPlainObject(parsed)) {
+    throw new Error(`Slack Block Kit schema must be a JSON object at ${SLACK_SCHEMA_PATH}.`);
+  }
+  return parsed;
 };
+
+export const SLACK_BLOCK_KIT_SCHEMA: Record<string, unknown> = loadSlackBlockKitSchema();
 
 export type SlackMrkdwnRepair =
   | 'markdownBold'

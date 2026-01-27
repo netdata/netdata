@@ -36,6 +36,7 @@
 - Tool-output prompts: `src/tool-output/*` + `src/prompts/tool-output/*`
 - Tool schemas: `src/tools/internal-provider.ts` + `src/prompts/tool-schemas/*.json`
 - Tool results: `src/xml-tools.ts` + `src/prompts/tool-results/*`
+- Tool schema templates are JSON-parsed strictly at provider initialization and cached; invalid JSON fails fast.
 
 ## Template Inventory
 
@@ -58,6 +59,9 @@
 - `tool-schemas/batch.json`
 - `tool-schemas/router-handoff.json`
 - `tool-schemas/tool-output.json`
+
+### Static schema files
+- `tool-schemas/slack-block-kit.json` (single source of truth for Slack Block Kit schema; loaded at runtime and injected into templates)
 
 ### Tool-output templates
 - `tool-output/instructions.md`
@@ -123,8 +127,13 @@ Use template header comments as the source of truth. Highlights:
 4. Compute runtime hash and warn only on new hashes (last 5 unique).
 5. Render `xml-next.md` per turn.
 6. Render `turn-failed.md` when needed.
-7. Render tool schemas and tool-output prompts on demand.
+7. Render tool schemas at provider initialization (strict JSON parse) and cache them; batch schemas update when tool lists change.
+8. Render tool-output prompts on demand.
 
 ## XML-NEXT and runtime markers
 - Prompts should reference XML-NEXT markers (e.g., `XML-NEXT.DATETIME`, `XML-NEXT.FORMAT`) for runtime values.
 - These markers are static text; values are delivered in the XML-NEXT block each turn.
+
+## Tests
+- `src/tests/unit/template-engine.spec.ts` uses `src/tests/fixtures/liquid/*` to verify include resolution (including `{%- -%}`), strict variables, missing includes, and `.env` blocking.
+- `src/tests/unit/json-repair.spec.ts` covers strict JSON schema parsing errors (`parseJsonRecordStrict`).

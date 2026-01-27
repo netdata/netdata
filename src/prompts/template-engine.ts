@@ -15,8 +15,8 @@ export interface TemplateEngine {
   templates: Record<string, string>;
 }
 
-const INCLUDE_TAG_REGEX = /\{%\s*(?:render|include)\s+(['"])([^'"]+)\1[^%]*%\}/g;
-const INCLUDE_ANY_TAG_REGEX = /\{%\s*(render|include)\s+([^%]+)%\}/g;
+const INCLUDE_TAG_REGEX = /\{%-?\s*(?:render|include)\s+(['"])([^'"]+)\1[^%]*-?%\}/g;
+const INCLUDE_ANY_TAG_REGEX = /\{%-?\s*(render|include)\s+([^%]+)-?%\}/g;
 const DEFAULT_MAX_DEPTH = 8;
 
 const isForbiddenInclude = (filePath: string): boolean => (

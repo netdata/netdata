@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseJsonRecordDetailed, parseJsonValueDetailed } from '../../utils.js';
+import { parseJsonRecordDetailed, parseJsonRecordStrict, parseJsonValueDetailed } from '../../utils.js';
 
 describe('json repair pipeline', () => {
   it('repairs trailing comma via jsonrepair', () => {
@@ -21,6 +21,16 @@ describe('json repair pipeline', () => {
     const result = parseJsonRecordDetailed(input);
     expect(result.value).toEqual({ data: { value: 'ok' }, extra: true });
     expect(result.repairs).toContain('jsonrepair');
+  });
+});
+
+describe('parseJsonRecordStrict', () => {
+  it('throws on invalid JSON', () => {
+    expect(() => parseJsonRecordStrict('{"data":', 'test strict')).toThrowError(/JSON parse failed/i);
+  });
+
+  it('throws when JSON is not an object', () => {
+    expect(() => parseJsonRecordStrict('["ok"]', 'test strict')).toThrowError(/JSON object/i);
   });
 });
 

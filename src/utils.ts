@@ -501,6 +501,23 @@ export const parseJsonRecord = (raw: unknown): Record<string, unknown> | undefin
   return value;
 };
 
+export const parseJsonRecordStrict = (raw: unknown, context: string): Record<string, unknown> => {
+  if (typeof raw !== 'string') {
+    throw new Error(`${context} template did not return a string`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${context} JSON parse failed: ${message}`);
+  }
+  if (!isPlainObject(parsed)) {
+    throw new Error(`${context} did not produce a JSON object`);
+  }
+  return parsed;
+};
+
 
 
 interface ToolCallSummary {

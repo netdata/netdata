@@ -18,7 +18,7 @@ import { LOG_EVENTS } from '../logging/log-events.js';
 import { renderPromptTemplate } from '../prompts/templates.js';
 import { normalizeSlackMessages, SLACK_BLOCK_KIT_MRKDWN_RULES, SLACK_BLOCK_KIT_SCHEMA } from '../slack-block-kit.js';
 import { truncateToBytes } from '../truncation.js';
-import { parseJsonRecord, parseJsonValueDetailed } from '../utils.js';
+import { parseJsonRecord, parseJsonRecordStrict, parseJsonValueDetailed } from '../utils.js';
 
 import { ToolExecutionError } from './tool-errors.js';
 import { ToolProvider } from './types.js';
@@ -73,7 +73,14 @@ export class InternalToolProvider extends ToolProvider {
   private readonly formatDescription: string;
   private readonly maxToolCallsPerTurn: number;
   private instructions: string;
-  private cachedBatchSchemas?: { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] };
+  private readonly slackSchema: Record<string, unknown>;
+  private readonly taskStatusSchema: { description?: string; inputSchema: Record<string, unknown> };
+  private readonly finalReportSchema: { description?: string; inputSchema: Record<string, unknown> };
+  private cachedBatchSchemas?: {
+    schemas: Record<string, unknown>[];
+    summaries: { name: string; required: string[] }[];
+    toolSchema: { description?: string; inputSchema: Record<string, unknown> };
+  };
   private cachedBatchSchemasKey?: string;
   private listingTools = false;
   private readonly disableProgressTool: boolean;
@@ -102,6 +109,14 @@ export class InternalToolProvider extends ToolProvider {
     this.disableProgressTool = opts.disableProgressTool === true;
     this.hasRouterHandoff = opts.hasRouterHandoff === true;
     this.xmlSessionNonce = opts.xmlSessionNonce;
+    this.slackSchema = getFormatSchema(SLACK_BLOCK_KIT_FORMAT) ?? SLACK_BLOCK_KIT_SCHEMA;
+    this.taskStatusSchema = this.renderToolSchema('toolSchemaTaskStatus', {});
+    this.finalReportSchema = this.renderToolSchema('toolSchemaFinalReport', {
+      format_id: this.formatId,
+      format_description: this.formatDescription,
+      expected_json_schema: opts.expectedJsonSchema ?? { type: 'object' },
+      slack_schema: this.slackSchema,
+    });
     this.instructions = this.buildInstructions();
   }
 
@@ -110,7 +125,7 @@ export class InternalToolProvider extends ToolProvider {
     const tools: MCPTool[] = [];
     try {
       if (!this.disableProgressTool) {
-        const schema = this.renderToolSchema('toolSchemaTaskStatus', {});
+        const schema = this.taskStatusSchema;
         tools.push({
           name: TASK_STATUS_TOOL,
           description: schema.description ?? 'Provides live feedback to the user about your accomplishments, pending items and goals. This tool is only updating the user. It does not perform any other actions.',
@@ -122,27 +137,11 @@ export class InternalToolProvider extends ToolProvider {
       // so session-turn-runner can filter to it on final turn.
       tools.push(this.buildFinalReportTool());
       if (this.opts.enableBatch) {
-        const { schemas } = this.ensureBatchSchemas();
-        const fallbackItemSchema: Record<string, unknown> = {
-          type: 'object',
-          additionalProperties: true,
-          required: ['id', 'tool', 'parameters'],
-          properties: {
-            id: { oneOf: [ { type: 'string', minLength: 1 }, { type: 'number' } ] },
-            tool: { type: 'string', minLength: 1 },
-            parameters: {
-              type: 'object',
-              additionalProperties: true,
-              description: DEFAULT_PARAMETERS_DESCRIPTION
-            }
-          }
-        };
-        const itemsSchema = schemas.length > 0 ? { anyOf: schemas } : fallbackItemSchema;
-        const batchSchema = this.renderToolSchema('toolSchemaBatch', { items_schema: itemsSchema });
+        const { toolSchema } = this.ensureBatchSchemas();
         tools.push({
           name: BATCH_TOOL,
-          description: batchSchema.description ?? 'Execute multiple tools in one call, reusing the schemas of all available tools.',
-          inputSchema: batchSchema.inputSchema,
+          description: toolSchema.description ?? 'Execute multiple tools in one call, reusing the schemas of all available tools.',
+          inputSchema: toolSchema.inputSchema,
         });
       }
       return tools;
@@ -182,12 +181,11 @@ export class InternalToolProvider extends ToolProvider {
 
   private buildInstructions(): string {
     const expectedSchema = this.opts.expectedJsonSchema ?? { type: 'object' };
-    const slackSchema = getFormatSchema(SLACK_BLOCK_KIT_FORMAT) ?? { type: 'array', items: {} };
     return renderPromptTemplate('internalTools', {
       format_id: this.formatId,
       format_description: this.formatDescription,
       expected_json_schema: expectedSchema,
-      slack_schema: slackSchema,
+      slack_schema: this.slackSchema,
       slack_mrkdwn_rules: SLACK_BLOCK_KIT_MRKDWN_RULES,
       plugin_requirements: this.finalReportPluginRequirements,
       nonce: this.xmlSessionNonce,
@@ -200,12 +198,7 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   private buildFinalReportTool(): MCPTool {
-    const schema = this.renderToolSchema('toolSchemaFinalReport', {
-      format_id: this.formatId,
-      format_description: this.formatDescription,
-      expected_json_schema: this.opts.expectedJsonSchema ?? { type: 'object' },
-      slack_schema: getFormatSchema(SLACK_BLOCK_KIT_FORMAT) ?? { type: 'array', items: {} },
-    });
+    const schema = this.finalReportSchema;
     return {
       name: FINAL_REPORT_TOOL,
       description: schema.description ?? 'Internal: final report tool for turn enforcement.',
@@ -218,10 +211,7 @@ export class InternalToolProvider extends ToolProvider {
     context: Record<string, unknown>,
   ): { description?: string; inputSchema: Record<string, unknown> } {
     const raw = renderPromptTemplate(key, context);
-    const parsed = parseJsonRecord(raw);
-    if (parsed === undefined) {
-      throw new Error(`Tool schema template '${key}' did not produce a JSON object`);
-    }
+    const parsed = parseJsonRecordStrict(raw, `Tool schema template '${key}'`);
     const description = typeof parsed.description === 'string' ? parsed.description : undefined;
     return { description, inputSchema: parsed };
   }
@@ -710,9 +700,30 @@ export class InternalToolProvider extends ToolProvider {
     }
   }
 
-  private ensureBatchSchemas(): { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] } {
+  private ensureBatchSchemas(): { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[]; toolSchema: { description?: string; inputSchema: Record<string, unknown> } } {
+    const fallbackItemSchema: Record<string, unknown> = {
+      type: 'object',
+      additionalProperties: true,
+      required: ['id', 'tool', 'parameters'],
+      properties: {
+        id: { oneOf: [ { type: 'string', minLength: 1 }, { type: 'number' } ] },
+        tool: { type: 'string', minLength: 1 },
+        parameters: {
+          type: 'object',
+          additionalProperties: true,
+          description: DEFAULT_PARAMETERS_DESCRIPTION
+        }
+      }
+    };
+    const buildToolSchema = (schemas: Record<string, unknown>[]): { description?: string; inputSchema: Record<string, unknown> } => {
+      const itemsSchema = schemas.length > 0 ? { anyOf: schemas } : fallbackItemSchema;
+      return this.renderToolSchema('toolSchemaBatch', { items_schema: itemsSchema });
+    };
     if (this.listingTools) {
-      return this.cachedBatchSchemas ?? { schemas: [], summaries: [] };
+      if (this.cachedBatchSchemas !== undefined) {
+        return this.cachedBatchSchemas;
+      }
+      return { schemas: [], summaries: [], toolSchema: buildToolSchema([]) };
     }
     let available: MCPTool[] | undefined;
     let toolKey: string | undefined;
@@ -763,11 +774,12 @@ export class InternalToolProvider extends ToolProvider {
     }
 
     if (!this.disableProgressTool && !summaries.some((summary) => summary.name === TASK_STATUS_TOOL)) {
-      const fallbackSchema = this.renderToolSchema('toolSchemaTaskStatus', {}).inputSchema;
+      const fallbackSchema = this.taskStatusSchema.inputSchema;
       pushSchema(TASK_STATUS_TOOL, fallbackSchema);
     }
 
-    this.cachedBatchSchemas = { schemas, summaries };
+    const toolSchema = buildToolSchema(schemas);
+    this.cachedBatchSchemas = { schemas, summaries, toolSchema };
     this.cachedBatchSchemasKey = toolKey;
     return this.cachedBatchSchemas;
   }

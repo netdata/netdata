@@ -36,10 +36,14 @@ Current repo state (facts from code review):
 - **DONE**: tests updated for Liquid template rendering and include syntax (`src/tests/unit/prompts-loader.spec.ts`, `src/tests/phase2-harness-scenarios/phase2-runner.ts`).
 - **DONE**: runtime tool-output reduce user prompt moved into Liquid template (`src/prompts/tool-output/reduce-user.md`, `src/tool-output/extractor.ts`).
 - **DONE**: lint/build/phase1/phase2/phase3:tier1 executed cleanly (see terminal logs).
+- **DONE**: Slack Block Kit schema moved to a single file and injected into templates (no inline duplication).
 
 Remaining gaps:
 
-- **NONE** (implementation complete; awaiting Costa review).
+- Add Liquid test suite + fixtures (includes, strict vars, render snapshots). **DONE**
+- Extend include regex to handle `{%-` / `-%}` Liquid tags. **DONE**
+- Add strict JSON parsing for tool schema templates; render at agent init and cache. **DONE**
+- Update docs/specs for Liquid test suite + strict schema parsing behavior. **DONE**
 
 ## Analysis
 
@@ -198,6 +202,13 @@ Evidence: system prompt is enhanced with tool instructions (`src/ai-agent.ts:171
 | 41 | Runtime templates scope | **xml-next + turn-failed + internal tool schemas; verify if more are runtime** | Costa: “2b; verify if more”. |
 | 42 | LiquidJS goal | **Port all dynamically constructed model-facing prompts/schemas into Liquid templates with identical output; do not delete behavior** | Costa: “move hardcoded strings to templates; keep exact result”. |
 | 43 | Template targets (design) | **xml-next.md, turn-failed.md, internal-tools.md, tool-schema templates (.json)** | Costa: “need these four; analyze and design before implementation”. |
+| 44 | Tool schema strict parsing timing | **Agent load-time (per .ai)** | Costa: “ok, per agent at load time.” |
+| 45 | Slack Block Kit schema source | **Option A: keep strict Slack validation, but load schema from file and inject** | Costa: “A”. |
+
+### Pending (needs Costa decision)
+
+| # | Decision | Options | Notes |
+|---|----------|---------|-------|
 | 44 | Nonce lifetime | **Static for the lifetime of the ai-agent process (not per session)** | Costa: “OK only if nonce does not change per session”. |
 | 45 | Per-session variables | **Move FORMAT, turn limits, DATETIME/TIMESTAMP/DAY/TIMEZONE to XML-NEXT; base system prompt stays static** | Costa: “all per-session ephemerals in xml-next; base prompt only static nonce”. |
 | 46 | JSON schema overrides | **Allow load-time overrides (no behavior change)** | Costa: “allow load-time overrides; keep current behavior”. |

@@ -7,7 +7,7 @@ import type { ToolOutputConfig, ToolOutputExtractionResult, ToolOutputMode, Tool
 import { renderPromptTemplate } from '../prompts/templates.js';
 import { ToolProvider } from '../tools/types.js';
 import { truncateToBytesWithInfo } from '../truncation.js';
-import { parseJsonRecord } from '../utils.js';
+import { parseJsonRecordStrict } from '../utils.js';
 
 import { resolveToolOutputTargets } from './config.js';
 import { formatToolOutputFailure, formatToolOutputSuccess } from './formatter.js';
@@ -138,10 +138,7 @@ export class ToolOutputProvider extends ToolProvider {
 
   private buildToolSchema(): MCPTool {
     const raw = renderPromptTemplate('toolSchemaToolOutput', {});
-    const parsed = parseJsonRecord(raw);
-    if (parsed === undefined) {
-      throw new Error('tool_output schema template did not produce a JSON object');
-    }
+    const parsed = parseJsonRecordStrict(raw, 'tool_output schema template');
     const description = typeof parsed.description === 'string'
       ? parsed.description
       : 'Extract information from a stored oversized tool output by handle.';
