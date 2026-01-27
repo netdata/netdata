@@ -76,11 +76,6 @@ modules:
               default_value: 1
               required: false
               group: Target
-            - name: top_queries_limit
-              description: Maximum number of rows returned by the `running-queries` function.
-              default_value: 500
-              required: false
-              group: Limits
 
             - name: username
               description: Username for authentication.
@@ -92,6 +87,22 @@ modules:
               default_value: ""
               required: false
               group: Auth
+
+            - name: functions.running_queries.disabled
+              description: Disable the [running-queries](#running-queries) function.
+              default_value: false
+              required: false
+              group: Functions
+            - name: functions.running_queries.timeout
+              description: Timeout for the running-queries function query (seconds). If not set, uses the collector's timeout.
+              default_value: (collector timeout)
+              required: false
+              group: Functions
+            - name: functions.running_queries.limit
+              description: Maximum number of rows returned by the running-queries function.
+              default_value: 500
+              required: false
+              group: Functions
 
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).

@@ -52,10 +52,7 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 }
 
 func (r *funcRouter) topQueriesLimit() int {
-	if r.collector.TopQueriesLimit > 0 {
-		return r.collector.TopQueriesLimit
-	}
-	return 500
+	return r.collector.topQueriesLimit()
 }
 
 func oracledbMethods() []funcapi.MethodConfig {

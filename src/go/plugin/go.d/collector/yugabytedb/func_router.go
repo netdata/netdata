@@ -19,7 +19,7 @@ var errSQLDSNNotSet = errors.New("SQL DSN is not set")
 // funcRouter routes method calls to appropriate function handlers.
 // Owns shared SQL connection used by all function handlers.
 type funcRouter struct {
-	collector *Collector // for config (DSN, SQLTimeout, TopQueriesLimit, logger)
+	collector *Collector // for config (Functions.DSN, logger)
 
 	handlers map[string]funcapi.MethodHandler
 
@@ -79,11 +79,11 @@ func (r *funcRouter) ensureDB(ctx context.Context) error {
 	if r.db != nil {
 		return nil
 	}
-	if r.collector.DSN == "" {
+	if r.collector.Functions.DSN == "" {
 		return errSQLDSNNotSet
 	}
 
-	db, err := sql.Open("pgx", r.collector.DSN)
+	db, err := sql.Open("pgx", r.collector.Functions.DSN)
 	if err != nil {
 		return fmt.Errorf("error opening SQL connection: %w", err)
 	}
@@ -104,17 +104,14 @@ func (r *funcRouter) ensureDB(ctx context.Context) error {
 }
 
 func (r *funcRouter) sqlTimeout() time.Duration {
-	if r.collector.SQLTimeout.Duration() > 0 {
-		return r.collector.SQLTimeout.Duration()
+	if r.collector.Timeout.Duration() > 0 {
+		return r.collector.Timeout.Duration()
 	}
 	return time.Second
 }
 
 func (r *funcRouter) topQueriesLimit() int {
-	if r.collector.TopQueriesLimit > 0 {
-		return r.collector.TopQueriesLimit
-	}
-	return 500
+	return r.collector.topQueriesLimit()
 }
 
 func yugabyteMethods() []funcapi.MethodConfig {

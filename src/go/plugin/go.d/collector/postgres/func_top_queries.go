@@ -175,6 +175,9 @@ func newFuncTopQueries(r *funcRouter) *funcTopQueries {
 
 // MethodParams implements funcapi.MethodHandler.
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return nil, fmt.Errorf("top-queries function disabled in configuration")
+	}
 	if f.router.collector.db == nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
@@ -183,10 +186,15 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 
 // Handle implements funcapi.MethodHandler.
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
+	}
 	if f.router.collector.db == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
-	return f.collectTopQueries(ctx, params.Column(paramSort))
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
+	defer cancel()
+	return f.collectTopQueries(queryCtx, params.Column(paramSort))
 }
 
 // buildPgSortOptions builds sort options from pgAllColumns.
@@ -237,10 +245,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 	actualSortCol := f.mapAndValidateSortColumn(sortColumn, availableCols)
 
 	// Get query limit (default 500)
-	limit := c.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
+	limit := c.topQueriesLimit()
 
 	// Build and execute query
 	query := f.buildDynamicSQL(queryCols, actualSortCol, limit)

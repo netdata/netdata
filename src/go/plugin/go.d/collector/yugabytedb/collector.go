@@ -43,7 +43,14 @@ func New() *Collector {
 					Timeout: confopt.Duration(time.Second),
 				},
 			},
-			SQLTimeout: confopt.Duration(time.Second),
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+				RunningQueries: RunningQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 		charts: &module.Charts{},
 
@@ -52,13 +59,57 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	DSN                string           `yaml:"dsn,omitempty" json:"dsn,omitempty"`
-	SQLTimeout         confopt.Duration `yaml:"sql_timeout,omitempty" json:"sql_timeout,omitempty"`
-	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	Vnode              string          `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int             `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int             `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	Functions          FunctionsConfig `yaml:"functions,omitempty" json:"functions"`
 	web.HTTPConfig     `yaml:",inline" json:""`
+}
+
+type FunctionsConfig struct {
+	DSN            string               `yaml:"dsn,omitempty" json:"dsn,omitempty"`
+	TopQueries     TopQueriesConfig     `yaml:"top_queries,omitempty" json:"top_queries"`
+	RunningQueries RunningQueriesConfig `yaml:"running_queries,omitempty" json:"running_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+type RunningQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
+}
+
+func (c Config) runningQueriesTimeout() time.Duration {
+	if c.Functions.RunningQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.RunningQueries.Timeout.Duration()
+}
+
+func (c Config) runningQueriesLimit() int {
+	if c.Functions.RunningQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.RunningQueries.Limit
 }
 
 type Collector struct {

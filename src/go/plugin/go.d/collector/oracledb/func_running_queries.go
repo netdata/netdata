@@ -72,19 +72,28 @@ func newFuncRunningQueries(r *funcRouter) *funcRunningQueries {
 var _ funcapi.MethodHandler = (*funcRunningQueries)(nil)
 
 func (f *funcRunningQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.router.collector.Functions.RunningQueries.Disabled {
+		return nil, fmt.Errorf("running-queries function disabled in configuration")
+	}
 	return []funcapi.ParamConfig{funcapi.BuildSortParam(runningQueriesColumns)}, nil
 }
 
 func (f *funcRunningQueries) Cleanup(ctx context.Context) {}
 
 func (f *funcRunningQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.router.collector.Functions.RunningQueries.Disabled {
+		return funcapi.UnavailableResponse("running-queries function has been disabled in configuration")
+	}
 	if f.router.collector.db == nil {
 		if err := f.router.collector.openConnection(); err != nil {
 			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 		}
 	}
 
-	limit := f.router.topQueriesLimit()
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.runningQueriesTimeout())
+	defer cancel()
+
+	limit := f.router.collector.runningQueriesLimit()
 
 	sortColumn := f.resolveSortColumn(params.Column("__sort"))
 	if sortColumn == "" {
@@ -103,9 +112,9 @@ ORDER BY %s DESC NULLS LAST
 FETCH FIRST %d ROWS ONLY
 `, f.buildSelectClause(), sortColumn, limit)
 
-	rows, err := f.router.collector.db.QueryContext(ctx, query)
+	rows, err := f.router.collector.db.QueryContext(queryCtx, query)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+		if queryCtx.Err() == context.DeadlineExceeded {
 			return funcapi.ErrorResponse(504, "query timed out")
 		}
 		return funcapi.InternalErrorResponse("running queries query failed: %v", err)

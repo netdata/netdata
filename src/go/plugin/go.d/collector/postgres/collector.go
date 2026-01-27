@@ -43,6 +43,11 @@ func New() *Collector {
 			// https://discord.com/channels/847502280503590932/1022693928874549368
 			MaxDBTables:  50,
 			MaxDBIndexes: 250,
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 		charts:  baseCharts.Copy(),
 		dbConns: make(map[string]*dbConn),
@@ -71,7 +76,31 @@ type Config struct {
 	QueryTimeHistogram []float64        `yaml:"query_time_histogram,omitempty" json:"query_time_histogram"`
 	MaxDBTables        int64            `yaml:"max_db_tables" json:"max_db_tables"`
 	MaxDBIndexes       int64            `yaml:"max_db_indexes" json:"max_db_indexes"`
-	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	Functions          FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	TopQueries TopQueriesConfig `yaml:"top_queries,omitempty" json:"top_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
 }
 
 type (

@@ -83,12 +83,18 @@ func newFuncTopQueries(r *funcRouter) *funcTopQueries {
 var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return nil, fmt.Errorf("top-queries function disabled in configuration")
+	}
 	return []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)}, nil
 }
 
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
+	}
 	if err := f.router.ensureDB(ctx); err != nil {
 		status := 503
 		if errors.Is(err, errSQLDSNNotSet) {
@@ -101,7 +107,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	limit := f.router.topQueriesLimit()
 
 	query := f.buildSQL(sortColumn)
-	queryCtx, cancel := context.WithTimeout(ctx, f.router.sqlTimeout())
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
 	defer cancel()
 
 	rows, err := f.router.db.QueryContext(queryCtx, query, limit)

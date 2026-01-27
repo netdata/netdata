@@ -130,7 +130,7 @@ func newFuncErrorInfo(r *funcRouter) *funcErrorInfo {
 var _ funcapi.MethodHandler = (*funcErrorInfo)(nil)
 
 func (f *funcErrorInfo) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if !f.router.collector.Config.GetErrorInfoFunctionEnabled() {
+	if f.router.collector.Functions.ErrorInfo.Disabled {
 		return nil, fmt.Errorf("error-info function disabled in configuration")
 	}
 	return []funcapi.ParamConfig{}, nil
@@ -142,18 +142,16 @@ func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcap
 			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 		}
 	}
-	return f.collectData(ctx)
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.errorInfoTimeout())
+	defer cancel()
+	return f.collectData(queryCtx)
 }
 
 func (f *funcErrorInfo) Cleanup(ctx context.Context) {}
 
 func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionResponse {
-	if !f.router.collector.Config.GetErrorInfoFunctionEnabled() {
-		return &funcapi.FunctionResponse{
-			Status: 503,
-			Message: "error-info not enabled: function disabled in configuration. " +
-				"To enable, set error_info_function_enabled: true in the MySQL collector config.",
-		}
+	if f.router.collector.Functions.ErrorInfo.Disabled {
+		return funcapi.UnavailableResponse("error-info function has been disabled in configuration")
 	}
 
 	available, err := f.checkPerformanceSchema(ctx)
@@ -179,10 +177,7 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 		return &funcapi.FunctionResponse{Status: 503, Message: msg}
 	}
 
-	limit := f.router.collector.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
+	limit := f.router.collector.topQueriesLimit()
 
 	rows, err := f.router.collector.fetchMySQLErrorRows(ctx, source, nil, limit)
 	if err != nil {

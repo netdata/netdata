@@ -108,6 +108,9 @@ func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 func (f *funcTopQueries) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
 	switch method {
 	case topQueriesMethodID:
+		if f.router.collector.Functions.TopQueries.Disabled {
+			return nil, fmt.Errorf("top-queries function disabled in configuration")
+		}
 		return []funcapi.ParamConfig{funcapi.BuildSortParam(topQueriesColumns)}, nil
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
@@ -122,17 +125,19 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 
 	switch method {
 	case topQueriesMethodID:
-		return f.collectData(ctx, params.Column("__sort"))
+		if f.router.collector.Functions.TopQueries.Disabled {
+			return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
+		}
+		queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
+		defer cancel()
+		return f.collectData(queryCtx, params.Column("__sort"))
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
 }
 
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
-	limit := f.router.collector.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
+	limit := f.router.collector.topQueriesLimit()
 
 	req, err := web.NewHTTPRequestWithPath(f.router.collector.RequestConfig, "/_tasks")
 	if err != nil {

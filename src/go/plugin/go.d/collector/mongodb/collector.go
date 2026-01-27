@@ -37,6 +37,11 @@ func New() *Collector {
 				Includes: []string{},
 				Excludes: []string{},
 			},
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		conn: &mongoClient{},
@@ -52,23 +57,37 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode                     string             `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery               int                `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry        int                `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	URI                       string             `yaml:"uri" json:"uri"`
-	Timeout                   confopt.Duration   `yaml:"timeout,omitempty" json:"timeout"`
-	Databases                 matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
-	TopQueriesFunctionEnabled *bool              `yaml:"top_queries_function_enabled,omitempty" json:"top_queries_function_enabled,omitempty"`
-	TopQueriesLimit           int                `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	Vnode              string             `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int                `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int                `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	URI                string             `yaml:"uri" json:"uri"`
+	Timeout            confopt.Duration   `yaml:"timeout,omitempty" json:"timeout"`
+	Databases          matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
+	Functions          FunctionsConfig    `yaml:"functions,omitempty" json:"functions"`
 }
 
-// GetTopQueriesFunctionEnabled returns whether the top queries function is enabled.
-// Defaults to true if not explicitly configured.
-func (c *Config) GetTopQueriesFunctionEnabled() bool {
-	if c.TopQueriesFunctionEnabled == nil {
-		return true
+type FunctionsConfig struct {
+	TopQueries TopQueriesConfig `yaml:"top_queries,omitempty" json:"top_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
 	}
-	return *c.TopQueriesFunctionEnabled
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
 }
 
 type Collector struct {

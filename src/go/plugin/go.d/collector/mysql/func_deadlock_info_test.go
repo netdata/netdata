@@ -15,72 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConfig_GetDeadlockInfoFunctionEnabled(t *testing.T) {
-	tests := []struct {
-		name     string
-		cfg      Config
-		expected bool
-	}{
-		{
-			name:     "default nil pointer enables function",
-			cfg:      Config{},
-			expected: true,
-		},
-		{
-			name: "explicit true enables function",
-			cfg: Config{
-				DeadlockInfoFunctionEnabled: boolPtr(true),
-			},
-			expected: true,
-		},
-		{
-			name: "explicit false disables function",
-			cfg: Config{
-				DeadlockInfoFunctionEnabled: boolPtr(false),
-			},
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.cfg.GetDeadlockInfoFunctionEnabled())
-		})
-	}
-}
-
-func TestConfig_GetErrorInfoFunctionEnabled(t *testing.T) {
-	tests := []struct {
-		name     string
-		cfg      Config
-		expected bool
-	}{
-		{
-			name:     "default nil pointer enables function",
-			cfg:      Config{},
-			expected: true,
-		},
-		{
-			name: "explicit true enables function",
-			cfg: Config{
-				ErrorInfoFunctionEnabled: boolPtr(true),
-			},
-			expected: true,
-		},
-		{
-			name: "explicit false disables function",
-			cfg: Config{
-				ErrorInfoFunctionEnabled: boolPtr(false),
-			},
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.cfg.GetErrorInfoFunctionEnabled())
-		})
-	}
+func TestConfig_FunctionsDisabledDefaults(t *testing.T) {
+	cfg := Config{}
+	assert.False(t, cfg.Functions.DeadlockInfo.Disabled, "deadlock_info should be enabled by default")
+	assert.False(t, cfg.Functions.ErrorInfo.Disabled, "error_info should be enabled by default")
+	assert.False(t, cfg.Functions.TopQueries.Disabled, "top_queries should be enabled by default")
 }
 
 func TestParseInnoDBDeadlock_WithDeadlock(t *testing.T) {
@@ -347,7 +286,7 @@ func TestFuncDeadlockInfo_collectData_PermissionDenied(t *testing.T) {
 
 func TestFuncDeadlockInfo_collectData_Disabled(t *testing.T) {
 	c := New()
-	c.Config.DeadlockInfoFunctionEnabled = boolPtr(false)
+	c.Config.Functions.DeadlockInfo.Disabled = true
 	handler := newTestDeadlockHandler(c)
 
 	resp := handler.collectData(context.Background())
@@ -375,10 +314,6 @@ func TestBuildDeadlockRows(t *testing.T) {
 		}
 	}
 	assert.True(t, hasDatabase, "expected at least one row with database populated")
-}
-
-func boolPtr(v bool) *bool {
-	return &v
 }
 
 const sampleDeadlockStatus = `

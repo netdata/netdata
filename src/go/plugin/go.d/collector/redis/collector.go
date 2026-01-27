@@ -44,6 +44,11 @@ func New() *Collector {
 			Address:     "redis://@localhost:6379",
 			Timeout:     confopt.Duration(time.Second),
 			PingSamples: 5,
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		addAOFChartsOnce:       &sync.Once{},
@@ -65,8 +70,32 @@ type Config struct {
 	Username           string           `yaml:"username,omitempty" json:"username"`
 	Password           string           `yaml:"password,omitempty" json:"password"`
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
-	PingSamples        int `yaml:"ping_samples" json:"ping_samples"`
-	TopQueriesLimit    int `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	PingSamples        int             `yaml:"ping_samples" json:"ping_samples"`
+	Functions          FunctionsConfig `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	TopQueries TopQueriesConfig `yaml:"top_queries,omitempty" json:"top_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
 }
 
 type (

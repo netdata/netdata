@@ -37,6 +37,11 @@ func New() *Collector {
 		Config: Config{
 			DSN:     "root@tcp(localhost:3306)/",
 			Timeout: confopt.Duration(time.Second),
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		charts:                         baseCharts.Copy(),
@@ -63,15 +68,63 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode                       string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery                 int              `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry          int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	DSN                         string           `yaml:"dsn" json:"dsn"`
-	MyCNF                       string           `yaml:"my.cnf,omitempty" json:"my.cnf"`
-	Timeout                     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	TopQueriesLimit             int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
-	DeadlockInfoFunctionEnabled *bool            `yaml:"deadlock_info_function_enabled,omitempty" json:"deadlock_info_function_enabled,omitempty"`
-	ErrorInfoFunctionEnabled    *bool            `yaml:"error_info_function_enabled,omitempty" json:"error_info_function_enabled,omitempty"`
+	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	DSN                string           `yaml:"dsn" json:"dsn"`
+	MyCNF              string           `yaml:"my.cnf,omitempty" json:"my.cnf"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Functions          FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	TopQueries   TopQueriesConfig   `yaml:"top_queries,omitempty" json:"top_queries"`
+	DeadlockInfo DeadlockInfoConfig `yaml:"deadlock_info,omitempty" json:"deadlock_info"`
+	ErrorInfo    ErrorInfoConfig    `yaml:"error_info,omitempty" json:"error_info"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+type DeadlockInfoConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+}
+
+type ErrorInfoConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
+}
+
+func (c Config) deadlockInfoTimeout() time.Duration {
+	if c.Functions.DeadlockInfo.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.DeadlockInfo.Timeout.Duration()
+}
+
+func (c Config) errorInfoTimeout() time.Duration {
+	if c.Functions.ErrorInfo.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.ErrorInfo.Timeout.Duration()
 }
 
 type Collector struct {
@@ -120,22 +173,6 @@ type Collector struct {
 
 func (c *Collector) Configuration() any {
 	return c.Config
-}
-
-// GetDeadlockInfoFunctionEnabled returns whether the deadlock-info function is enabled (default: true).
-func (c *Config) GetDeadlockInfoFunctionEnabled() bool {
-	if c.DeadlockInfoFunctionEnabled == nil {
-		return true
-	}
-	return *c.DeadlockInfoFunctionEnabled
-}
-
-// GetErrorInfoFunctionEnabled returns whether the error-info function is enabled (default: true).
-func (c *Config) GetErrorInfoFunctionEnabled() bool {
-	if c.ErrorInfoFunctionEnabled == nil {
-		return true
-	}
-	return *c.ErrorInfoFunctionEnabled
 }
 
 func (c *Collector) Init(context.Context) error {

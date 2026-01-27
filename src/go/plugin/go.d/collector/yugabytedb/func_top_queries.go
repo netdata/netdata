@@ -74,6 +74,9 @@ func newFuncTopQueries(r *funcRouter) *funcTopQueries {
 var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return nil, fmt.Errorf("top-queries function disabled in configuration")
+	}
 	if err := f.router.ensureDB(ctx); err != nil {
 		return nil, nil // Use static RequiredParams
 	}
@@ -87,6 +90,9 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
+	}
 	if err := f.router.ensureDB(ctx); err != nil {
 		status := 503
 		if errors.Is(err, errSQLDSNNotSet) {
@@ -115,7 +121,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	limit := f.router.topQueriesLimit()
 
 	query := f.buildSQL(cols, sortColumn)
-	queryCtx, cancel := context.WithTimeout(ctx, f.router.sqlTimeout())
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
 	defer cancel()
 
 	rows, err := f.router.db.QueryContext(queryCtx, query, limit)
@@ -162,7 +168,7 @@ func (f *funcTopQueries) availableColumns(ctx context.Context) ([]topQueriesColu
 
 func (f *funcTopQueries) pgStatStatementsEnabled(ctx context.Context) (bool, error) {
 	query := `SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'`
-	queryCtx, cancel := context.WithTimeout(ctx, f.router.sqlTimeout())
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
 	defer cancel()
 
 	var exists int
@@ -200,7 +206,7 @@ func (f *funcTopQueries) detectPgStatStatementsColumns(ctx context.Context) (map
 		WHERE table_name = 'pg_stat_statements'
 		AND table_schema = 'public'
 	`
-	queryCtx, cancel := context.WithTimeout(ctx, f.router.sqlTimeout())
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
 	defer cancel()
 
 	rows, err := f.router.db.QueryContext(queryCtx, query)
