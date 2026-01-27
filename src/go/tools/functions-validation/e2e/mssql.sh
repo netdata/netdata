@@ -706,7 +706,7 @@ if "not enabled" not in err:
 PY
 }
 
-assert_error_info_has_error() {
+assert_error_info_has_errors() {
   local input="$1"
 
   if command -v python3 >/dev/null 2>&1; then
@@ -759,26 +759,37 @@ num_idx = field_to_idx["errorNumber"]
 msg_idx = field_to_idx["errorMessage"]
 query_idx = field_to_idx["query"]
 
-target = "netdata_error_map_e2e"
-matched = False
+# Error categories to verify:
+# 208 - Invalid object name (table not found)
+# 102 - Syntax error
+# 2627 - Duplicate key / unique constraint violation
+# 245 - Data type conversion error
+# 8134 - Division by zero
+error_categories = {
+    "table_not_found": {"patterns": ["invalid object name", "netdata_error_map_e2e"], "found": False},
+    "syntax_error": {"patterns": ["incorrect syntax", "form"], "found": False},
+    "duplicate_key": {"patterns": ["duplicate key", "unique", "primary key", "error_test"], "found": False},
+    "data_type": {"patterns": ["conversion failed", "converting"], "found": False},
+    "divide_by_zero": {"patterns": ["divide by zero"], "found": False},
+}
+
 for row in data:
-    if num_idx >= len(row):
-        continue
-    err_no = row[num_idx]
-    try:
-        err_no_val = int(err_no)
-    except Exception:
-        continue
-    if err_no_val != 208:
+    if num_idx >= len(row) or row[num_idx] is None:
         continue
     msg = str(row[msg_idx]).lower() if msg_idx < len(row) else ""
     query = str(row[query_idx]).lower() if query_idx < len(row) else ""
-    if "invalid object name" in msg and target in query:
-        matched = True
-        break
+    combined = msg + " " + query
+    for cat, info in error_categories.items():
+        if info["found"]:
+            continue
+        for pattern in info["patterns"]:
+            if pattern in combined:
+                info["found"] = True
+                break
 
-if not matched:
-    raise SystemExit("no error-info row contained invalid object name for netdata_error_map_e2e")
+missing = [cat for cat, info in error_categories.items() if not info["found"]]
+if missing:
+    raise SystemExit(f"error-info missing error categories: {', '.join(missing)}")
 PY
     return
   fi
@@ -832,26 +843,37 @@ num_idx = field_to_idx["errorNumber"]
 msg_idx = field_to_idx["errorMessage"]
 query_idx = field_to_idx["query"]
 
-target = "netdata_error_map_e2e"
-matched = False
+# Error categories to verify:
+# 208 - Invalid object name (table not found)
+# 102 - Syntax error
+# 2627 - Duplicate key / unique constraint violation
+# 245 - Data type conversion error
+# 8134 - Division by zero
+error_categories = {
+    "table_not_found": {"patterns": ["invalid object name", "netdata_error_map_e2e"], "found": False},
+    "syntax_error": {"patterns": ["incorrect syntax", "form"], "found": False},
+    "duplicate_key": {"patterns": ["duplicate key", "unique", "primary key", "error_test"], "found": False},
+    "data_type": {"patterns": ["conversion failed", "converting"], "found": False},
+    "divide_by_zero": {"patterns": ["divide by zero"], "found": False},
+}
+
 for row in data:
-    if num_idx >= len(row):
-        continue
-    err_no = row[num_idx]
-    try:
-        err_no_val = int(err_no)
-    except Exception:
-        continue
-    if err_no_val != 208:
+    if num_idx >= len(row) or row[num_idx] is None:
         continue
     msg = str(row[msg_idx]).lower() if msg_idx < len(row) else ""
     query = str(row[query_idx]).lower() if query_idx < len(row) else ""
-    if "invalid object name" in msg and target in query:
-        matched = True
-        break
+    combined = msg + " " + query
+    for cat, info in error_categories.items():
+        if info["found"]:
+            continue
+        for pattern in info["patterns"]:
+            if pattern in combined:
+                info["found"] = True
+                break
 
-if not matched:
-    raise SystemExit("no error-info row contained invalid object name for netdata_error_map_e2e")
+missing = [cat for cat, info in error_categories.items() if not info["found"]]
+if missing:
+    raise SystemExit("error-info missing error categories: %s" % ", ".join(missing))
 PY
 }
 
@@ -1457,8 +1479,31 @@ done
 
 mssql_exec_sa "DROP TABLE dbo.netdata_error_map_e2e;"
 
+# Generate errors for multiple categories:
+# 1. Table not found (error 208)
 for _ in 1 2 3; do
   mssql_exec_sa_allow_error "SELECT COUNT(*) FROM dbo.netdata_error_map_e2e;"
+done
+
+# 2. Syntax error (error 102)
+for _ in 1 2 3; do
+  mssql_exec_sa_allow_error "SELECT * FORM dbo.sample;"
+done
+
+# 3. Duplicate key / constraint violation (error 2627)
+for _ in 1 2 3; do
+  mssql_exec_sa_allow_error "INSERT INTO dbo.error_test (id, unique_col, int_col) VALUES (1, 'new_value', 200);"
+  mssql_exec_sa_allow_error "INSERT INTO dbo.error_test (id, unique_col, int_col) VALUES (99, 'existing_value', 300);"
+done
+
+# 4. Data type conversion error (error 245)
+for _ in 1 2 3; do
+  mssql_exec_sa_allow_error "SELECT CAST('not_a_number' AS INT);"
+done
+
+# 5. Division by zero (error 8134)
+for _ in 1 2 3; do
+  mssql_exec_sa_allow_error "SELECT 1/0;"
 done
 
 for _ in 1 2 3 4 5; do
@@ -1469,7 +1514,7 @@ mssql_exec_sa "EXEC sys.sp_query_store_flush_db;"
 sleep 2
 
 error_output="$(run_mssql_function_with_retry error-info '__job:local' 'true')"
-assert_error_info_has_error "$error_output"
+assert_error_info_has_errors "$error_output"
 
 run_mssql_top_queries_with_retry
 assert_top_queries_error_attribution_active "$WORKDIR/mssql-top-queries.json"

@@ -486,7 +486,7 @@ if "not enabled" not in err:
 PY
 }
 
-assert_error_info_has_error() {
+assert_error_info_has_errors() {
   local input="$1"
 
   if command -v python3 >/dev/null 2>&1; then
@@ -541,16 +541,31 @@ num_idx = field_to_idx["errorNumber"]
 def normalize(val):
     return "" if val is None else str(val)
 
-matched = False
-for row in data:
-    if num_idx < len(row) and row[num_idx] is not None:
-        msg = normalize(row[err_idx]).lower()
-        if "missing_table" in msg:
-            matched = True
-            break
+# Error categories to verify:
+# 1146 - Table doesn't exist (missing_table)
+# 1062 - Duplicate key (constraint violation)
+# Note: Syntax errors (1064) are not captured in events_statements_history
+#       because they fail during parsing before instrumentation.
+error_categories = {
+    "table_not_found": {"patterns": ["missing_table", "doesn't exist", "does not exist"], "found": False},
+    "duplicate_key": {"patterns": ["duplicate", "primary", "unique"], "found": False},
+}
 
-if not matched:
-    raise SystemExit("no error-info row contained missing_table with errorNumber populated")
+for row in data:
+    if num_idx >= len(row) or row[num_idx] is None:
+        continue
+    msg = normalize(row[err_idx]).lower()
+    for cat, info in error_categories.items():
+        if info["found"]:
+            continue
+        for pattern in info["patterns"]:
+            if pattern in msg:
+                info["found"] = True
+                break
+
+missing = [cat for cat, info in error_categories.items() if not info["found"]]
+if missing:
+    raise SystemExit("error-info missing error categories: {}".format(", ".join(missing)))
 PY
     return
   fi
@@ -606,16 +621,31 @@ num_idx = field_to_idx["errorNumber"]
 def normalize(val):
     return "" if val is None else str(val)
 
-matched = False
-for row in data:
-    if num_idx < len(row) and row[num_idx] is not None:
-        msg = normalize(row[err_idx]).lower()
-        if "missing_table" in msg:
-            matched = True
-            break
+# Error categories to verify:
+# 1146 - Table doesn't exist (missing_table)
+# 1062 - Duplicate key (constraint violation)
+# Note: Syntax errors (1064) are not captured in events_statements_history
+#       because they fail during parsing before instrumentation.
+error_categories = {
+    "table_not_found": {"patterns": ["missing_table", "doesn't exist", "does not exist"], "found": False},
+    "duplicate_key": {"patterns": ["duplicate", "primary", "unique"], "found": False},
+}
 
-if not matched:
-    raise SystemExit("no error-info row contained missing_table with errorNumber populated")
+for row in data:
+    if num_idx >= len(row) or row[num_idx] is None:
+        continue
+    msg = normalize(row[err_idx]).lower()
+    for cat, info in error_categories.items():
+        if info["found"]:
+            continue
+        for pattern in info["patterns"]:
+            if pattern in msg:
+                info["found"] = True
+                break
+
+missing = [cat for cat, info in error_categories.items() if not info["found"]]
+if missing:
+    raise SystemExit("error-info missing error categories: %s" % ", ".join(missing))
 PY
 }
 
@@ -898,14 +928,24 @@ assert_top_queries_error_attribution_not_enabled "$WORKDIR/mysql-top-queries.jso
 
 enable_statement_history_consumers
 
+# Generate errors for multiple categories:
+# 1. Table not found (error 1146)
 for _ in 1 2 3; do
   mysql_exec_root_allow_error "SELECT * FROM missing_table;"
+done
+
+# 2. Duplicate key / constraint violation (error 1062)
+# Note: Syntax errors (1064) are NOT captured in events_statements_history
+#       because they fail during parsing before instrumentation records them.
+for _ in 1 2 3; do
+  mysql_exec_root_allow_error "INSERT INTO error_test (id, unique_col, int_col) VALUES (1, 'new_value', 200);"
+  mysql_exec_root_allow_error "INSERT INTO error_test (id, unique_col, int_col) VALUES (99, 'existing_value', 300);"
 done
 
 sleep 1
 
 error_output="$(run_function mysql error-info '__job:local' 'true')"
-assert_error_info_has_error "$error_output"
+assert_error_info_has_errors "$error_output"
 
 run_top_queries mysql
 assert_top_queries_error_attribution_enabled "$WORKDIR/mysql-top-queries.json"

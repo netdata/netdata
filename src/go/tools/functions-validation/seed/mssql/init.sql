@@ -85,6 +85,23 @@ BEGIN
 END
 GO
 
+-- Table for error category testing (constraint violations, data type errors).
+IF OBJECT_ID('dbo.error_test', 'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.error_test (
+    id INT PRIMARY KEY,
+    unique_col NVARCHAR(64) NOT NULL UNIQUE,
+    int_col INT NOT NULL
+  );
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.error_test WHERE id = 1)
+BEGIN
+  INSERT INTO dbo.error_test (id, unique_col, int_col) VALUES (1, 'existing_value', 100);
+END
+GO
+
 INSERT INTO dbo.sample (name, value)
 VALUES ('alpha', 10), ('beta', 20), ('gamma', 30);
 GO
