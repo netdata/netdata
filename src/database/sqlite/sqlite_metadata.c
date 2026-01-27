@@ -152,16 +152,16 @@ sqlite3 *db_meta = NULL;
 #define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid"
 
 #define SQL_STORE_HOST_LABEL                                                                                           \
-    "INSERT INTO host_label (host_id, source_type, label_key, label_value, date_created) "                             \
-    "VALUES (@uuid, @source, @key, @value, UNIXEPOCH()) "                                                              \
-    "ON CONFLICT (host_id, label_key) DO UPDATE SET source_type = excluded.source_type, "                              \
-    "label_value = excluded.label_value, date_created = UNIXEPOCH()"
+    "INSERT INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES "
+
+#define SQL_STORE_HOST_LABEL_CONFLICT  " ON CONFLICT (host_id, label_key) "                                            \
+    "DO UPDATE SET source_type = excluded.source_type, label_value = excluded.label_value, date_created = UNIXEPOCH()"
 
 #define SQL_STORE_CHART_LABEL                                                                                          \
-    "INSERT INTO chart_label (chart_id, source_type, label_key, label_value, date_created) "                           \
-    "VALUES (@uuid, @source, @key, @value, UNIXEPOCH()) "                                                              \
-    "ON CONFLICT (chart_id, label_key) DO UPDATE SET source_type = excluded.source_type, "                             \
-    "label_value = excluded.label_value, date_created = UNIXEPOCH()"
+    "INSERT INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES "
+
+#define SQL_STORE_CHART_LABEL_CONFLICT  " ON CONFLICT (chart_id, label_key) "                                          \
+    "DO UPDATE SET source_type = excluded.source_type, label_value = excluded.label_value, date_created = UNIXEPOCH()"
 
 #define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid"
 
@@ -883,11 +883,10 @@ static int store_label_batch(
     // Build SQL: INSERT INTO table (...) VALUES (?,?,?,?,UNIXEPOCH()), (?,?,?,?,UNIXEPOCH()), ... ON CONFLICT ...
     buffer_flush(sql);
 
-    if (type == STORE_HOST_LABELS) {
-        buffer_strcat(sql, "INSERT INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES ");
-    } else {
-        buffer_strcat(sql, "INSERT INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES ");
-    }
+    if (type == STORE_HOST_LABELS)
+        buffer_strcat(sql, SQL_STORE_HOST_LABEL);
+    else
+        buffer_strcat(sql, SQL_STORE_CHART_LABEL);
 
     for (size_t i = 0; i < count; i++) {
         if (i > 0)
@@ -895,13 +894,10 @@ static int store_label_batch(
         buffer_strcat(sql, "(?, ?, ?, ?, UNIXEPOCH())");
     }
 
-    if (type == STORE_HOST_LABELS) {
-        buffer_strcat(sql, " ON CONFLICT (host_id, label_key) DO UPDATE SET source_type = excluded.source_type, "
-                          "label_value = excluded.label_value, date_created = UNIXEPOCH()");
-    } else {
-        buffer_strcat(sql, " ON CONFLICT (chart_id, label_key) DO UPDATE SET source_type = excluded.source_type, "
-                          "label_value = excluded.label_value, date_created = UNIXEPOCH()");
-    }
+    if (type == STORE_HOST_LABELS)
+        buffer_strcat(sql, SQL_STORE_HOST_LABEL_CONFLICT);
+    else
+        buffer_strcat(sql, SQL_STORE_CHART_LABEL_CONFLICT);
 
     sqlite3_stmt *stmt = NULL;
 
