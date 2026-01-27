@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	deadlockInfoHelp         = "Latest deadlock from the system_health Extended Events ring buffer. WARNING: query text may include unmasked sensitive literals; restrict dashboard access."
+	deadlockInfoHelp         = "Latest deadlock from the system_health Extended Events session. WARNING: query text may include unmasked sensitive literals; restrict dashboard access."
 	deadlockParseErrorStatus = 561
 )
 
@@ -69,74 +69,17 @@ var deadlockColumns = []deadlockColumn{
 	},
 	{
 		ColumnMeta: funcapi.ColumnMeta{
-			Name:     "deadlock_id",
-			Tooltip:  "Unique identifier for this deadlock event",
-			Type:     funcapi.FieldTypeString,
-			Sort:     funcapi.FieldSortDescending,
-			Sortable: true,
-			Sticky:   true,
-			Summary:  funcapi.FieldSummaryCount,
-			Filter:   funcapi.FieldFilterMultiselect,
-			Visible:  true,
-		},
-		Value: func(r *deadlockRowData) any { return r.deadlockID },
-	},
-	{
-		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "timestamp",
 			Tooltip:   "When the deadlock occurred",
 			Type:      funcapi.FieldTypeTimestamp,
 			Sort:      funcapi.FieldSortDescending,
 			Sortable:  true,
-			Sticky:    true,
 			Summary:   funcapi.FieldSummaryMax,
 			Filter:    funcapi.FieldFilterRange,
 			Visible:   true,
 			Transform: funcapi.FieldTransformDatetime,
 		},
 		Value: func(r *deadlockRowData) any { return r.timestamp },
-	},
-	{
-		ColumnMeta: funcapi.ColumnMeta{
-			Name:     "process_id",
-			Tooltip:  "Internal process identifier from the deadlock graph",
-			Type:     funcapi.FieldTypeString,
-			Sort:     funcapi.FieldSortAscending,
-			Sortable: true,
-			Sticky:   true,
-			Summary:  funcapi.FieldSummaryCount,
-			Filter:   funcapi.FieldFilterMultiselect,
-			Visible:  true,
-		},
-		Value: func(r *deadlockRowData) any { return r.processID },
-	},
-	{
-		ColumnMeta: funcapi.ColumnMeta{
-			Name:      "spid",
-			Tooltip:   "Server Process ID (SQL Server session ID)",
-			Type:      funcapi.FieldTypeInteger,
-			Sort:      funcapi.FieldSortAscending,
-			Sortable:  true,
-			Summary:   funcapi.FieldSummaryCount,
-			Filter:    funcapi.FieldFilterRange,
-			Visible:   true,
-			Transform: funcapi.FieldTransformNumber,
-		},
-		Value: func(r *deadlockRowData) any { return r.spid },
-	},
-	{
-		ColumnMeta: funcapi.ColumnMeta{
-			Name:      "ecid",
-			Tooltip:   "Execution Context ID for parallel query threads",
-			Type:      funcapi.FieldTypeInteger,
-			Sort:      funcapi.FieldSortAscending,
-			Sortable:  true,
-			Summary:   funcapi.FieldSummaryCount,
-			Filter:    funcapi.FieldFilterRange,
-			Visible:   true,
-			Transform: funcapi.FieldTransformNumber,
-		},
-		Value: func(r *deadlockRowData) any { return r.ecid },
 	},
 	{
 		ColumnMeta: funcapi.ColumnMeta{
@@ -159,6 +102,7 @@ var deadlockColumns = []deadlockColumn{
 			Type:      funcapi.FieldTypeString,
 			Sort:      funcapi.FieldSortAscending,
 			Sortable:  false,
+			Sticky:    true,
 			Summary:   funcapi.FieldSummaryCount,
 			Filter:    funcapi.FieldFilterMultiselect,
 			FullWidth: true,
@@ -166,6 +110,19 @@ var deadlockColumns = []deadlockColumn{
 			Visible:   true,
 		},
 		Value: func(r *deadlockRowData) any { return r.queryText },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "database",
+			Tooltip:  "Database where the deadlock occurred",
+			Type:     funcapi.FieldTypeString,
+			Sort:     funcapi.FieldSortAscending,
+			Sortable: true,
+			Summary:  funcapi.FieldSummaryCount,
+			Filter:   funcapi.FieldFilterMultiselect,
+			Visible:  true,
+		},
+		Value: func(r *deadlockRowData) any { return r.database },
 	},
 	{
 		ColumnMeta: funcapi.ColumnMeta{
@@ -211,8 +168,36 @@ var deadlockColumns = []deadlockColumn{
 	},
 	{
 		ColumnMeta: funcapi.ColumnMeta{
-			Name:     "database",
-			Tooltip:  "Database where the deadlock occurred",
+			Name:      "spid",
+			Tooltip:   "Server Process ID (SQL Server session ID)",
+			Type:      funcapi.FieldTypeInteger,
+			Sort:      funcapi.FieldSortAscending,
+			Sortable:  true,
+			Summary:   funcapi.FieldSummaryCount,
+			Filter:    funcapi.FieldFilterRange,
+			Visible:   true,
+			Transform: funcapi.FieldTransformNumber,
+		},
+		Value: func(r *deadlockRowData) any { return r.spid },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "ecid",
+			Tooltip:   "Execution Context ID for parallel query threads",
+			Type:      funcapi.FieldTypeInteger,
+			Sort:      funcapi.FieldSortAscending,
+			Sortable:  true,
+			Summary:   funcapi.FieldSummaryCount,
+			Filter:    funcapi.FieldFilterRange,
+			Visible:   true,
+			Transform: funcapi.FieldTransformNumber,
+		},
+		Value: func(r *deadlockRowData) any { return r.ecid },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "process_id",
+			Tooltip:  "Internal process identifier from the deadlock graph",
 			Type:     funcapi.FieldTypeString,
 			Sort:     funcapi.FieldSortAscending,
 			Sortable: true,
@@ -220,7 +205,20 @@ var deadlockColumns = []deadlockColumn{
 			Filter:   funcapi.FieldFilterMultiselect,
 			Visible:  true,
 		},
-		Value: func(r *deadlockRowData) any { return r.database },
+		Value: func(r *deadlockRowData) any { return r.processID },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "deadlock_id",
+			Tooltip:  "Unique identifier for this deadlock event",
+			Type:     funcapi.FieldTypeString,
+			Sort:     funcapi.FieldSortAscending,
+			Sortable: true,
+			Summary:  funcapi.FieldSummaryCount,
+			Filter:   funcapi.FieldFilterMultiselect,
+			Visible:  true,
+		},
+		Value: func(r *deadlockRowData) any { return r.deadlockID },
 	},
 }
 
@@ -289,7 +287,7 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 	}
 
 	if deadlockXML == "" {
-		return f.buildResponse(200, "no deadlock found in system_health ring buffer", nil)
+		return f.buildResponse(200, "no deadlock found in system_health Extended Events", nil)
 	}
 
 	dbNames, dbErr := f.queryDatabaseNames(ctx)
@@ -303,12 +301,14 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 		f.router.collector.Warningf("deadlock-info: parse failed: %v", parseRes.parseErr)
 		return f.buildResponse(deadlockParseErrorStatus, "deadlock graph could not be parsed", nil)
 	}
+
 	if !parseRes.found {
-		return f.buildResponse(200, "no deadlock found in system_health ring buffer", nil)
+		return f.buildResponse(200, "no deadlock found in system_health Extended Events", nil)
 	}
 
 	deadlockID := generateDeadlockID(parseRes.deadlockTime)
 	rows := buildDeadlockRows(parseRes, deadlockID, dbNames)
+
 	if len(rows) == 0 {
 		return f.buildResponse(200, "deadlock detected but no processes could be parsed", nil)
 	}
@@ -611,7 +611,7 @@ func buildDeadlockRows(parseRes mssqlDeadlockParseResult, deadlockID string, dbN
 		}
 
 		queryText := strmutil.TruncateText(strings.TrimSpace(txn.queryText), topQueriesMaxTextLength)
-		lockMode := strings.TrimSpace(txn.lockMode)
+		lockMode := formatLockMode(strings.TrimSpace(txn.lockMode))
 		lockStatus := strings.TrimSpace(txn.lockStatus)
 		waitResource := strmutil.TruncateText(strings.TrimSpace(txn.waitResource), topQueriesMaxTextLength)
 
@@ -685,4 +685,22 @@ func isDeadlockPermissionError(err error) bool {
 
 func deadlockPermissionMessage() string {
 	return "deadlock info requires VIEW SERVER STATE permission. Grant with: GRANT VIEW SERVER STATE TO [netdata_user];"
+}
+
+func formatLockMode(mode string) string {
+	names := map[string]string{
+		"X":     "Exclusive",
+		"S":     "Shared",
+		"U":     "Update",
+		"IX":    "Intent Exclusive",
+		"IS":    "Intent Shared",
+		"SIX":   "Shared Intent Exclusive",
+		"Sch-S": "Schema Stability",
+		"Sch-M": "Schema Modification",
+		"BU":    "Bulk Update",
+	}
+	if name, ok := names[mode]; ok {
+		return fmt.Sprintf("%s (%s)", name, mode)
+	}
+	return mode
 }

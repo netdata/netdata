@@ -202,21 +202,14 @@ WHERE object_name LIKE '%SQL Errors%'
 `
 
 // querySystemHealthLatestDeadlock retrieves the latest xml_deadlock_report event
-// from the system_health Extended Events ring buffer.
+// from the system_health Extended Events file target.
 const querySystemHealthLatestDeadlock = `
-WITH xevents AS (
-  SELECT CAST(xet.target_data AS XML) AS target_data
-  FROM sys.dm_xe_session_targets AS xet
-  JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
-  WHERE xs.name = 'system_health'
-    AND xet.target_name = 'ring_buffer'
-)
 SELECT TOP (1)
-  xevent.value('@timestamp', 'datetime2(7)') AS deadlock_time,
-  CONVERT(nvarchar(max), xevent.query('(data/value/deadlock)[1]')) AS deadlock_xml
-FROM xevents
-CROSS APPLY target_data.nodes('RingBufferTarget/event[@name="xml_deadlock_report"]') AS T(xevent)
-ORDER BY deadlock_time DESC;
+  timestamp_utc AS deadlock_time,
+  CONVERT(nvarchar(max), CAST(event_data AS XML).query('(event/data[@name="xml_report"]/value/deadlock)[1]')) AS deadlock_xml
+FROM sys.fn_xe_file_target_read_file('system_health*.xel', NULL, NULL, NULL)
+WHERE object_name = 'xml_deadlock_report'
+ORDER BY timestamp_utc DESC;
 `
 
 // queryDatabaseStatus gets database state and read-only status

@@ -619,7 +619,7 @@ modules:
         - id: deadlock-info
           name: Deadlock Info
           description: |
-            Retrieves the most recent deadlock event from SQL Server's `system_health` Extended Events ring buffer (`xml_deadlock_report`).
+            Retrieves the most recent deadlock event from SQL Server's `system_health` Extended Events session (`xml_deadlock_report`).
 
             The deadlock graph XML is parsed to attribute the deadlock to the participating processes and their query text, lock mode, lock status, and wait resource.
 
@@ -645,7 +645,7 @@ modules:
               - name: Timestamp
                 type: timestamp
                 unit: ""
-                description: "Timestamp of the deadlock event from the ring buffer when available; otherwise the function execution time."
+                description: "Timestamp of the deadlock event from Extended Events when available; otherwise the function execution time."
               - name: Process ID
                 type: string
                 unit: ""
