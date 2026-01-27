@@ -15,6 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func newTestDeadlockHandler(c *Collector) *funcDeadlockInfo {
+	r := &funcRouter{collector: c}
+	return &funcDeadlockInfo{router: r}
+}
+
 func TestConfig_GetDeadlockInfoFunctionEnabled(t *testing.T) {
 	tests := []struct {
 		name string
@@ -150,9 +155,9 @@ func TestParseDeadlockGraph_ThreeWayDeadlock(t *testing.T) {
 
 	victimCount := 0
 	for _, row := range rows {
-		assert.Equal(t, deadlockID, row[deadlockIdxDeadlockID])
-		assert.True(t, strings.HasPrefix(row[deadlockIdxRowID].(string), deadlockID+":"))
-		if row[deadlockIdxIsVictim] == "true" {
+		assert.Equal(t, deadlockID, row.deadlockID)
+		assert.True(t, strings.HasPrefix(row.rowID, deadlockID+":"))
+		if row.isVictim == "true" {
 			victimCount++
 		}
 	}
@@ -204,8 +209,9 @@ func TestCollectDeadlockInfo_ParseError(t *testing.T) {
 
 	c := New()
 	c.db = db
+	handler := newTestDeadlockHandler(c)
 
-	resp := c.collectDeadlockInfo(context.Background())
+	resp := handler.collectData(context.Background())
 	require.Equal(t, deadlockParseErrorStatus, resp.Status)
 	assert.Contains(t, strings.ToLower(resp.Message), "could not be parsed")
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -221,8 +227,9 @@ func TestCollectDeadlockInfo_QueryError(t *testing.T) {
 
 	c := New()
 	c.db = db
+	handler := newTestDeadlockHandler(c)
 
-	resp := c.collectDeadlockInfo(context.Background())
+	resp := handler.collectData(context.Background())
 	require.Equal(t, 500, resp.Status)
 	assert.Contains(t, strings.ToLower(resp.Message), "deadlock query failed")
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -240,9 +247,9 @@ func TestBuildDeadlockRows(t *testing.T) {
 	require.Len(t, rows, 2)
 
 	row := rows[0]
-	assert.Equal(t, deadlockID, row[deadlockIdxDeadlockID])
-	assert.Equal(t, deadlockID+":"+row[deadlockIdxProcessID].(string), row[deadlockIdxRowID])
-	assert.Equal(t, "netdata", row[deadlockIdxDatabase])
+	assert.Equal(t, deadlockID, row.deadlockID)
+	assert.Equal(t, deadlockID+":"+row.processID, row.rowID)
+	assert.Equal(t, "netdata", row.database)
 }
 
 func TestDeadlockPermissionErrorDetection(t *testing.T) {
@@ -260,8 +267,9 @@ func TestCollectDeadlockInfo_PermissionDenied(t *testing.T) {
 
 	c := New()
 	c.db = db
+	handler := newTestDeadlockHandler(c)
 
-	resp := c.collectDeadlockInfo(context.Background())
+	resp := handler.collectData(context.Background())
 	require.Equal(t, 403, resp.Status)
 	assert.Contains(t, strings.ToLower(resp.Message), "view server state")
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -270,8 +278,9 @@ func TestCollectDeadlockInfo_PermissionDenied(t *testing.T) {
 func TestCollectDeadlockInfo_Disabled(t *testing.T) {
 	c := New()
 	c.Config.DeadlockInfoFunctionEnabled = boolPtr(false)
+	handler := newTestDeadlockHandler(c)
 
-	resp := c.collectDeadlockInfo(context.Background())
+	resp := handler.collectData(context.Background())
 	require.Equal(t, 503, resp.Status)
 	assert.Contains(t, strings.ToLower(resp.Message), "disabled")
 }
@@ -286,8 +295,9 @@ func TestCollectDeadlockInfo_Timeout(t *testing.T) {
 
 	c := New()
 	c.db = db
+	handler := newTestDeadlockHandler(c)
 
-	resp := c.collectDeadlockInfo(context.Background())
+	resp := handler.collectData(context.Background())
 	require.Equal(t, 504, resp.Status)
 	assert.Contains(t, strings.ToLower(resp.Message), "timed out")
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -314,8 +324,9 @@ func TestCollectDeadlockInfo_Success(t *testing.T) {
 
 	c := New()
 	c.db = db
+	handler := newTestDeadlockHandler(c)
 
-	resp := c.collectDeadlockInfo(context.Background())
+	resp := handler.collectData(context.Background())
 	require.Equal(t, 200, resp.Status)
 	require.NotEmpty(t, resp.Data)
 	require.NoError(t, mock.ExpectationsWereMet())

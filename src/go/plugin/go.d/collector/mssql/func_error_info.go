@@ -22,6 +22,110 @@ const (
 
 const errorInfoMethodID = "error-info"
 
+type mssqlErrorRow struct {
+	Time        time.Time
+	ErrorNumber *int64
+	ErrorState  *int64
+	Message     string
+	Query       string
+	QueryHash   string
+}
+
+type mssqlPlanOps struct {
+	HashMatch   int64
+	MergeJoin   int64
+	NestedLoops int64
+	Sorts       int64
+}
+
+// errorInfoColumn defines a column for the error-info function.
+type errorInfoColumn struct {
+	funcapi.ColumnMeta
+	Value func(*mssqlErrorRow) any
+}
+
+func errorInfoColumnSet(cols []errorInfoColumn) funcapi.ColumnSet[errorInfoColumn] {
+	return funcapi.Columns(cols, func(c errorInfoColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+var errorInfoColumns = []errorInfoColumn{
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "timestamp",
+			Tooltip:   "Timestamp",
+			Type:      funcapi.FieldTypeTimestamp,
+			Sortable:  true,
+			Visible:   true,
+			Transform: funcapi.FieldTransformDatetime,
+		},
+		Value: func(r *mssqlErrorRow) any { return r.Time },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "errorNumber",
+			Tooltip:   "Error Number",
+			Type:      funcapi.FieldTypeInteger,
+			Sortable:  true,
+			Visible:   true,
+			Transform: funcapi.FieldTransformNumber,
+		},
+		Value: func(r *mssqlErrorRow) any {
+			if r.ErrorNumber == nil {
+				return nil
+			}
+			return *r.ErrorNumber
+		},
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "errorState",
+			Tooltip:   "Error State",
+			Type:      funcapi.FieldTypeInteger,
+			Sortable:  true,
+			Visible:   true,
+			Transform: funcapi.FieldTransformNumber,
+		},
+		Value: func(r *mssqlErrorRow) any {
+			if r.ErrorState == nil {
+				return nil
+			}
+			return *r.ErrorState
+		},
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "errorMessage",
+			Tooltip:   "Error Message",
+			Type:      funcapi.FieldTypeString,
+			Sortable:  false,
+			FullWidth: true,
+			Visible:   true,
+		},
+		Value: func(r *mssqlErrorRow) any { return r.Message },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "query",
+			Tooltip:   "Query",
+			Type:      funcapi.FieldTypeString,
+			Sortable:  false,
+			FullWidth: true,
+			Visible:   true,
+		},
+		Value: func(r *mssqlErrorRow) any { return r.Query },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "queryHash",
+			Tooltip:  "Query Hash",
+			Type:     funcapi.FieldTypeString,
+			Sortable: true,
+			Visible:  false,
+		},
+		Value: func(r *mssqlErrorRow) any { return r.QueryHash },
+	},
+}
+
 func errorInfoMethodConfig() funcapi.MethodConfig {
 	return funcapi.MethodConfig{
 		ID:             errorInfoMethodID,
@@ -60,36 +164,13 @@ func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcap
 		}
 		f.router.collector.db = db
 	}
-	return f.router.collector.collectErrorInfo(ctx)
+	return f.collectData(ctx)
 }
 
 func (f *funcErrorInfo) Cleanup(ctx context.Context) {}
 
-type mssqlErrorRow struct {
-	Time        time.Time
-	ErrorNumber *int64
-	ErrorState  *int64
-	Message     string
-	Query       string
-	QueryHash   string
-}
-
-type mssqlPlanOps struct {
-	HashMatch   int64
-	MergeJoin   int64
-	NestedLoops int64
-	Sorts       int64
-}
-
-func (c *Collector) errorInfoParams(context.Context) ([]funcapi.ParamConfig, error) {
-	if !c.Config.GetErrorInfoFunctionEnabled() {
-		return nil, fmt.Errorf("error-info function disabled in configuration")
-	}
-	return []funcapi.ParamConfig{}, nil
-}
-
-func (c *Collector) collectErrorInfo(ctx context.Context) *funcapi.FunctionResponse {
-	if !c.Config.GetErrorInfoFunctionEnabled() {
+func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionResponse {
+	if !f.router.collector.Config.GetErrorInfoFunctionEnabled() {
 		return &funcapi.FunctionResponse{
 			Status: 503,
 			Message: "error-info not enabled: function disabled in configuration. " +
@@ -97,8 +178,8 @@ func (c *Collector) collectErrorInfo(ctx context.Context) *funcapi.FunctionRespo
 		}
 	}
 
-	sessionName := c.Config.GetErrorInfoSessionName()
-	status, rows, err := c.fetchMSSQLErrorRows(ctx, sessionName, c.TopQueriesLimit)
+	sessionName := f.router.collector.Config.GetErrorInfoSessionName()
+	status, rows, err := f.router.collector.fetchMSSQLErrorRows(ctx, sessionName, f.router.collector.TopQueriesLimit)
 	if err != nil {
 		if isDeadlockPermissionError(err) {
 			return &funcapi.FunctionResponse{Status: 403, Message: errorInfoPermissionMessage()}
@@ -110,83 +191,23 @@ func (c *Collector) collectErrorInfo(ctx context.Context) *funcapi.FunctionRespo
 	}
 
 	data := make([][]any, 0, len(rows))
-	for _, row := range rows {
-		var errNo any
-		var errState any
-		if row.ErrorNumber != nil {
-			errNo = *row.ErrorNumber
+	for i := range rows {
+		row := make([]any, len(errorInfoColumns))
+		for j, col := range errorInfoColumns {
+			row[j] = col.Value(&rows[i])
 		}
-		if row.ErrorState != nil {
-			errState = *row.ErrorState
-		}
-		data = append(data, []any{
-			row.Time,
-			errNo,
-			errState,
-			row.Message,
-			row.Query,
-			row.QueryHash,
-		})
+		data = append(data, row)
 	}
+
+	cs := errorInfoColumnSet(errorInfoColumns)
 
 	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Recent SQL errors from Extended Events error_reported",
-		Columns:           buildMSSQLErrorInfoColumns(),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: "timestamp",
 	}
-}
-
-func buildMSSQLErrorInfoColumns() map[string]any {
-	columns := map[string]any{
-		"timestamp": funcapi.Column{
-			Index:        0,
-			Name:         "Timestamp",
-			Type:         funcapi.FieldTypeTimestamp,
-			Sortable:     true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformDatetime},
-		}.BuildColumn(),
-		"errorNumber": funcapi.Column{
-			Index:        1,
-			Name:         "Error Number",
-			Type:         funcapi.FieldTypeInteger,
-			Sortable:     true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNumber},
-		}.BuildColumn(),
-		"errorState": funcapi.Column{
-			Index:        2,
-			Name:         "Error State",
-			Type:         funcapi.FieldTypeInteger,
-			Sortable:     true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNumber},
-		}.BuildColumn(),
-		"errorMessage": funcapi.Column{
-			Index:        3,
-			Name:         "Error Message",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     false,
-			FullWidth:    true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-		"query": funcapi.Column{
-			Index:        4,
-			Name:         "Query",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     false,
-			FullWidth:    true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-		"queryHash": funcapi.Column{
-			Index:        5,
-			Name:         "Query Hash",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     true,
-			Visible:      false,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-	}
-	return columns
 }
 
 func errorInfoPermissionMessage() string {
@@ -330,6 +351,12 @@ func nullableString(value string) any {
 	}
 	return value
 }
+
+// TODO: Refactor error data access into a shared mssqlErrorData type.
+// Currently these methods live on Collector because they're used by both:
+// - funcErrorInfo (for error-info function)
+// - funcTopQueries (for error attribution columns)
+// A cleaner design would be a mssqlErrorData type on funcRouter that both handlers use.
 
 func (c *Collector) collectMSSQLErrorDetails(ctx context.Context) (string, map[string]mssqlErrorRow) {
 	status, rows, err := c.fetchMSSQLErrorRows(ctx, c.Config.GetErrorInfoSessionName(), c.TopQueriesLimit)
