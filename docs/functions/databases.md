@@ -25,7 +25,7 @@ Database query functions provide deep visibility into SQL and NoSQL database per
 | MariaDB | ✅ | - | ✅ | ✅* | [MariaDB](/src/go/plugin/go.d/collector/mysql/integrations/mariadb.md) |
 | Percona Server | ✅ | - | ✅ | ✅* | [Percona](/src/go/plugin/go.d/collector/mysql/integrations/percona_mysql.md) |
 | Oracle Database | ✅ | ✅ | - | - | [Oracle](/src/go/plugin/go.d/collector/oracledb/integrations/oracle_db.md) |
-| PostgreSQL | ✅ | - | - | - | [PostgreSQL](/src/go/plugin/go.d/collector/postgres/integrations/postgresql.md) |
+| PostgreSQL | ✅ | ✅ | - | - | [PostgreSQL](/src/go/plugin/go.d/collector/postgres/integrations/postgresql.md) |
 | ProxySQL | ✅ | - | - | - | [ProxySQL](/src/go/plugin/go.d/collector/proxysql/integrations/proxysql.md) |
 | Redis | ✅ | - | - | - | [Redis](/src/go/plugin/go.d/collector/redis/integrations/redis.md) |
 | RethinkDB | - | ✅ | - | - | [RethinkDB](/src/go/plugin/go.d/collector/rethinkdb/integrations/rethinkdb.md) |
@@ -54,7 +54,7 @@ The number of queries returned is configurable (default: 500). This is a two-sta
 
 Shows **currently executing queries** at the moment of request. Essential for diagnosing stuck queries, long-running transactions, or unexpected load.
 
-**Supported**: CockroachDB, Oracle, RethinkDB, YugabyteDB
+**Supported**: CockroachDB, Oracle, PostgreSQL, RethinkDB, YugabyteDB
 
 ### Deadlock Info
 

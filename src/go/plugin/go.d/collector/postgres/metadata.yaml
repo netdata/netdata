@@ -486,6 +486,152 @@ modules:
           availability: |
             Available when:<br/>• The `pg_stat_statements` extension is installed in the database<br/>• The collector has successfully connected to PostgreSQL<br/>• Returns HTTP 503 if extension is not installed (with instructions to install)<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
+        - id: running-queries
+          name: Running Queries
+          description: |
+            Retrieves currently executing queries from PostgreSQL [pg_stat_activity](https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW) system view.
+
+            This function queries `pg_stat_activity` which shows real-time information about each server process including the SQL query being executed, wait events, and session state. Unlike Top Queries which shows aggregated historical statistics, Running Queries shows live snapshots of active queries.
+
+            Use cases:
+            - Identify long-running queries that may be blocking other operations
+            - Debug stuck transactions or hanging connections
+            - Monitor active workload during performance issues
+            - Investigate wait events and lock contention in real-time
+
+            Query text is truncated at 4096 characters for display purposes.
+          parameters:
+            - id: __sort
+              name: Sort By
+              description: Select the sort column. Defaults to query duration (longest running first).
+              type: select
+              required: true
+              default: durationMs
+              options: []
+          returns:
+            description: Live query data from `pg_stat_activity`. Each row represents a currently active backend process.
+            columns:
+              - name: PID
+                type: integer
+                unit: ""
+                description: "Process ID of this backend."
+              - name: Leader PID
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: "Process ID of parallel group leader (NULL if this is leader or not parallel). Available in PostgreSQL 13+."
+              - name: Database ID
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: "OID of the database this backend is connected to."
+              - name: Database
+                type: string
+                unit: ""
+                description: "Name of the database this backend is connected to."
+              - name: User ID
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: "OID of the user logged into this backend."
+              - name: User
+                type: string
+                unit: ""
+                description: "Name of the user logged into this backend."
+              - name: Application Name
+                type: string
+                unit: ""
+                description: "Name of the application connected to this backend."
+              - name: Client Address
+                type: string
+                unit: ""
+                description: "IP address of the client (NULL for Unix socket or internal process)."
+              - name: Client Hostname
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Hostname of the client via reverse DNS (only if log_hostname enabled)."
+              - name: Client Port
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: "TCP port of client (-1 for Unix socket, NULL for internal process)."
+              - name: Backend Start
+                type: timestamp
+                unit: ""
+                visibility: hidden
+                description: "Time when this process/connection started."
+              - name: Transaction Start
+                type: timestamp
+                unit: ""
+                visibility: hidden
+                description: "Time when current transaction started (NULL if no transaction)."
+              - name: Query Start
+                type: timestamp
+                unit: ""
+                description: "Time when the currently active query was started."
+              - name: State Change
+                type: timestamp
+                unit: ""
+                visibility: hidden
+                description: "Time when state was last changed."
+              - name: Duration
+                type: duration
+                unit: "milliseconds"
+                description: "Query duration in milliseconds (since query_start). High values indicate long-running queries."
+              - name: Wait Event Type
+                type: string
+                unit: ""
+                description: "Type of event the backend is waiting for (Activity, BufferPin, Client, Extension, IO, IPC, Lock, LWLock, Timeout)."
+              - name: Wait Event
+                type: string
+                unit: ""
+                description: "Specific wait event name if backend is currently waiting."
+              - name: State
+                type: string
+                unit: ""
+                description: "Current state: active, idle, idle in transaction, idle in transaction (aborted), fastpath function call, disabled."
+              - name: Backend Xid
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Top-level transaction identifier of this backend."
+              - name: Backend Xmin
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Backend's xmin horizon."
+              - name: Query ID
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Query identifier (requires compute_query_id or extension). Available in PostgreSQL 14+."
+              - name: Query
+                type: string
+                unit: ""
+                description: "Query text of the currently executing or most recent query. May be truncated at track_activity_query_size."
+              - name: Backend Type
+                type: string
+                unit: ""
+                description: "Type of backend: client backend, autovacuum worker, parallel worker, walsender, walreceiver, etc. Available in PostgreSQL 10+."
+          performance: |
+            Queries `pg_stat_activity` which is a live system view:<br/>• Very lightweight query, no impact on database performance<br/>• Returns only active queries by default (state = 'active')<br/>• Limited to 500 rows
+          security: |
+            Query text contains actual SQL being executed, which may include:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
+          prerequisites:
+            list:
+              - title: Database user permissions
+                description: |
+                  The monitoring user needs `pg_monitor` role to view all sessions:
+
+                  ```sql
+                  GRANT pg_monitor TO netdata;
+                  ```
+
+                  Without this role, the user can only see their own sessions.
+          availability: |
+            Available when:<br/>• The collector has successfully connected to PostgreSQL<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

@@ -21,8 +21,16 @@ compose_up postgres
 wait_healthy postgres 90
 
 build_plugin
+
+# Test top-queries (pg_stat_statements)
 run_info postgres
 run_top_queries postgres
 assert_column_visibility "$WORKDIR/postgres-top-queries.json" "top-queries"
+
+# Test running-queries (pg_stat_activity)
+# Note: running-queries may return 0 rows if no active queries at test time
+run_info_method postgres running-queries
+run_running_queries postgres 0
+assert_column_visibility "$WORKDIR/postgres-running-queries.json" "running-queries"
 
 echo "E2E checks passed for ${POSTGRES_VARIANT_LABEL}." >&2
