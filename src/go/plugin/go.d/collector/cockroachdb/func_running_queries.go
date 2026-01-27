@@ -93,7 +93,7 @@ func (f *funcRunningQueries) Handle(ctx context.Context, method string, params f
 	}
 
 	sortColumn := f.resolveSortColumn(params.Column("__sort"))
-	limit := f.router.topQueriesLimit()
+	limit := f.router.collector.runningQueriesLimit()
 
 	query := f.buildSQL(sortColumn)
 	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.runningQueriesTimeout())
