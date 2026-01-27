@@ -27,7 +27,7 @@ Your configuration file contains these main sections:
 | [`[environment variables]`](#configuration-section-details) | Environment variables                                    |
 | [`[sqlite]`](#configuration-section-details)                | SQLite                                                   |
 | `[ml]`                                                      | [Machine Learning](/src/ml/README.md)                    |
-| [`[health]`](#configuration-section-details)                | [Health monitoring](/src/health/README.md)               |
+| [`[health]`](#configuration-section-details)                | [Health monitoring](/docs/alerts/understanding-alerts/README.md)               |
 | `[web]`                                                     | [Web Server](/src/web/server/README.md)                  |
 | `[registry]`                                                | [Registry](/src/registry/README.md)                      |
 | `[telemetry]`                                               | Internal monitoring                                      |
@@ -206,7 +206,7 @@ There are additional configuration options for the logs. For more info, see [Net
 
 This section controls the general behavior of the Health monitoring capabilities of Netdata.
 
-Specific Alerts are configured in per-collector config files under the `health.d` directory. For more info, see [health monitoring](/src/health/README.md).
+Specific Alerts are configured in per-collector config files under the `health.d` directory. For more info, see [creating and managing alerts](/docs/alerts/creating-alerts-pages/README.md).
 
 [Alert notifications](/src/health/notifications/README.md) are configured in `health_alarm_notify.conf`.
 

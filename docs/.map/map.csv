@@ -157,7 +157,6 @@ https://github.com/netdata/netdata/edit/master/docs/logs/active_journal_centrali
 https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md,Top Consumers,Published,Top Consumers,,Present the Netdata Functions what these are and why they should be used.
 https://github.com/netdata/netdata/edit/master/docs/functions/processes.md,Processes,Published,Top Consumers,,
 ,,,,,
-https://github.com/netdata/netdata/edit/master/src/health/README.md,Alerts & Notifications,Published,Alerts & Notifications,,
 https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/README.md,Understanding Alerts,Published,Alerts & Notifications/Understanding Alerts,,
 https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/1-what-is-a-netdata-alert.md,What is a Netdata Alert,Published,Alerts & Notifications/Understanding Alerts,,
 https://github.com/netdata/netdata/edit/master/docs/alerts/understanding-alerts/2-alert-types-alarm-vs-template.md,Alert Types,Published,Alerts & Notifications/Understanding Alerts,,
