@@ -362,7 +362,12 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | dsn | Oracle server DSN (Data Source Name). Format: `oracle://username:password@host:port/service?param1=value1&...&paramN=valueN`. |  | yes |
 |  | timeout | Query timeout (seconds). | 1 | no |
-| **Limits** | top_queries_limit | Maximum number of rows returned by the `top-queries` and `running-queries` functions. | 500 | no |
+| **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
+|  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
+|  | functions.running_queries.disabled | Disable the [running-queries](#running-queries) function. | no | no |
+|  | functions.running_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.running_queries.limit | Maximum number of queries to return. | 500 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 

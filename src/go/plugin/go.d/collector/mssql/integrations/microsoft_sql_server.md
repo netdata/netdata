@@ -384,7 +384,7 @@ Aggregated query execution statistics from Query Store runtime views, providing 
 
 ### Deadlock Info
 
-Retrieves the most recent deadlock event from SQL Server's `system_health` Extended Events ring buffer (`xml_deadlock_report`).
+Retrieves the most recent deadlock event from SQL Server's `system_health` Extended Events session (`xml_deadlock_report`).
 
 The deadlock graph XML is parsed to attribute the deadlock to the participating processes and their query text, lock mode, lock status, and wait resource.
 
@@ -420,7 +420,7 @@ Parsed deadlock participants from the latest detected deadlock event. Each row r
 |:-------|:-----|:-----|:-----------|:------------|
 | Row ID | string |  | hidden | Unique row identifier composed of deadlock ID and process ID. |
 | Deadlock ID | string |  |  | Identifier for the deadlock event, derived from the deadlock timestamp to group participating processes. |
-| Timestamp | timestamp |  |  | Timestamp of the deadlock event from the ring buffer when available; otherwise the function execution time. |
+| Timestamp | timestamp |  |  | Timestamp of the deadlock event from Extended Events when available; otherwise the function execution time. |
 | Process ID | string |  |  | Deadlock graph process identifier for the process involved in the deadlock. |
 | SPID | integer |  |  | SQL Server session ID (SPID) for the process when available. |
 | ECID | integer |  |  | Execution context ID (ECID) for parallel execution contexts when available. |
@@ -436,7 +436,7 @@ Parsed deadlock participants from the latest detected deadlock event. Each row r
 Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
 with both the `sql_text` and `query_hash` actions.
 
-The session must be created by an administrator and include a `ring_buffer` target. Netdata reads the ring buffer
+The session must be created by an administrator and include an `event_file` target. Netdata reads the event file
 and returns recent error events with error number, message, and SQL text. The `query_hash` action is required for
 reliable mapping into `top-queries` (query text fallback is best-effort).
 
@@ -450,13 +450,43 @@ Use cases:
 |:-------|:------------|
 | Name | `Mssql:error-info` |
 | Require Cloud | yes |
-| Performance | Executes on-demand queries against the configured Extended Events ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing |
+| Performance | Executes on-demand queries against the configured Extended Events event file:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time |
 | Security | Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has a ring_buffer target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out |
+| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has an event_file target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out |
 
 #### Prerequisites
 
-No additional configuration is required.
+##### Create Extended Events session for error capture
+
+Create an Extended Events session that captures `sqlserver.error_reported` with `sql_text` and `query_hash` actions:
+
+```sql
+-- Create the Extended Events session with event_file target
+CREATE EVENT SESSION [netdata_errors] ON SERVER
+ADD EVENT sqlserver.error_reported(
+  ACTION(sqlserver.sql_text, sqlserver.query_hash)
+)
+ADD TARGET package0.event_file(SET filename=N'netdata_errors');
+GO
+
+-- Start the session
+ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
+GO
+
+-- Grant required permission
+GRANT VIEW SERVER STATE TO [netdata_user];
+```
+
+If you use a different session name, set it in the collector config:
+
+```yaml
+jobs:
+  - name: local
+    dsn: "sqlserver://user:pass@localhost:1433"
+    error_info_session_name: your_session_name
+```
+
+
 
 #### Parameters
 
@@ -554,8 +584,17 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). | sqlserver://localhost:1433 | yes |
 |  | timeout | Query timeout (seconds). | 5 | no |
-| **Query Store** | query_store_function_enabled | Enable the Query Store function to expose top queries via Netdata Functions. **WARNING**: Query Store may contain unmasked literal values (customer names, emails, IDs). Only enable after ensuring proper access controls to the Netdata dashboard. | no | no |
-|  | query_store_time_window_days | Number of days of Query Store data to analyze. Set to 0 to include all available data. Smaller values improve query performance but show less history. | 7 | no |
+| **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
+|  | functions.top_queries.timeout | Query timeout for top-queries function (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.top_queries.limit | Maximum number of queries to return in the top-queries response. | 500 | no |
+|  | functions.top_queries.time_window_days | Number of days of Query Store data to analyze. Set to 0 to include all available data. Smaller values improve query performance but show less history. | 7 | no |
+|  | functions.deadlock_info.disabled | Disable the [deadlock-info](#deadlock-info) function. | no | no |
+|  | functions.deadlock_info.timeout | Query timeout for deadlock-info function (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.deadlock_info.use_ring_buffer | Use ring_buffer instead of event_file for system_health session.<br/><br/>WARNING: Not recommended for production:<br/>• Data cleared on failover/restart<br/>• 4 MB capacity limit<br/>• High CPU load during queries<br/><br/>Use only for Azure SQL Database without Blob Storage or testing. | no | no |
+|  | functions.error_info.disabled | Disable the [error-info](#error-info) function. | no | no |
+|  | functions.error_info.timeout | Query timeout for error-info function (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.error_info.session_name | Extended Events session name capturing error_reported events.<br/>Must be created by administrator with event_file (recommended) or ring_buffer target. | netdata_errors | no |
+|  | functions.error_info.use_ring_buffer | Use ring_buffer instead of event_file for error events.<br/><br/>WARNING: Not recommended for production:<br/>• Data cleared on failover/restart<br/>• 4 MB capacity limit<br/>• High CPU load during queries<br/><br/>Use only for Azure SQL Database without Blob Storage or testing. | no | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
@@ -675,12 +714,12 @@ jobs:
 ```
 </details>
 
-###### With Query Store function
+###### With custom function settings
 
-Enable the Query Store function to view top queries in the Netdata dashboard.
+Configure function-specific settings like timeouts and limits.
 
 > **Warning**: Query Store may contain unmasked literal values (PII).
-> Only enable in environments with proper access controls.
+> Disable functions if not needed or ensure proper access controls.
 
 
 <details open><summary>Config</summary>
@@ -689,8 +728,14 @@ Enable the Query Store function to view top queries in the Netdata dashboard.
 jobs:
   - name: local
     dsn: "sqlserver://netdata_user:password@localhost:1433"
-    query_store_function_enabled: true
-    query_store_time_window_days: 7
+    functions:
+      top_queries:
+        limit: 100
+        time_window_days: 7
+      deadlock_info:
+        use_ring_buffer: true
+      error_info:
+        session_name: custom_errors
 
 ```
 </details>
