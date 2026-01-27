@@ -37,7 +37,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "digest",
-			Tooltip:   "Digest",
+			Tooltip:   "Normalized hash of the query for grouping similar statements",
 			Type:      funcapi.FieldTypeString,
 			Sortable:  true,
 			Visible:   false,
@@ -48,7 +48,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "query",
-			Tooltip:   "Query",
+			Tooltip:   "The SQL statement that caused the error",
 			Type:      funcapi.FieldTypeString,
 			Sortable:  true,
 			Visible:   true,
@@ -60,7 +60,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:     "schema",
-			Tooltip:  "Schema",
+			Tooltip:  "Database/schema where the error occurred",
 			Type:     funcapi.FieldTypeString,
 			Sortable: true,
 			Visible:  true,
@@ -70,7 +70,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "errorNumber",
-			Tooltip:   "Error Number",
+			Tooltip:   "MySQL error number (MYSQL_ERRNO)",
 			Type:      funcapi.FieldTypeInteger,
 			Sortable:  true,
 			Visible:   true,
@@ -86,7 +86,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:     "sqlState",
-			Tooltip:  "SQL State",
+			Tooltip:  "5-character SQLSTATE error code",
 			Type:     funcapi.FieldTypeString,
 			Sortable: true,
 			Visible:  true,
@@ -96,7 +96,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "errorMessage",
-			Tooltip:   "Error Message",
+			Tooltip:   "The error message text",
 			Type:      funcapi.FieldTypeString,
 			Sortable:  false,
 			Visible:   true,
@@ -267,7 +267,7 @@ func mysqlErrorAttributionColumns() []topQueriesColumn {
 		{
 			ColumnMeta: funcapi.ColumnMeta{
 				Name:      "errorAttribution",
-				Tooltip:   "Error Attribution",
+				Tooltip:   "Source of error data (enabled, not_enabled, no_data)",
 				Type:      funcapi.FieldTypeString,
 				Visible:   true,
 				Transform: funcapi.FieldTransformNone,
