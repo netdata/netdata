@@ -736,6 +736,37 @@ modules:
             Executes on-demand queries against the configured Extended Events ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing
           security: |
             Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only
+          prerequisites:
+            list:
+              - title: Create Extended Events session for error capture
+                description: |
+                  Create an Extended Events session that captures `sqlserver.error_reported` with `sql_text` and `query_hash` actions:
+
+                  ```sql
+                  -- Create the Extended Events session
+                  CREATE EVENT SESSION [netdata_errors] ON SERVER
+                  ADD EVENT sqlserver.error_reported(
+                    ACTION(sqlserver.sql_text, sqlserver.query_hash)
+                  )
+                  ADD TARGET package0.ring_buffer;
+                  GO
+
+                  -- Start the session
+                  ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
+                  GO
+
+                  -- Grant required permission
+                  GRANT VIEW SERVER STATE TO [netdata_user];
+                  ```
+
+                  If you use a different session name, set it in the collector config:
+
+                  ```yaml
+                  jobs:
+                    - name: local
+                      dsn: "sqlserver://user:pass@localhost:1433"
+                      error_info_session_name: your_session_name
+                  ```
           availability: |
             Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has a ring_buffer target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
