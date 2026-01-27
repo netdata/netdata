@@ -214,9 +214,11 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | address | RethinkDB server address (IP:PORT). | 127.0.0.1:28015 | yes |
 |  | timeout | Connection, read, and write timeout duration (seconds). Includes name resolution. | 1 | no |
-| **Limits** | top_queries_limit | Maximum number of rows returned by the `running-queries` function. | 500 | no |
 | **Auth** | username | Username for authentication. |  | no |
 |  | password | Password for authentication. |  | no |
+| **Functions** | functions.running_queries.disabled | Disable the [running-queries](#running-queries) function. | no | no |
+|  | functions.running_queries.timeout | Timeout for the running-queries function query (seconds). If not set, uses the collector's timeout. | (collector timeout) | no |
+|  | functions.running_queries.limit | Maximum number of rows returned by the running-queries function. | 500 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 

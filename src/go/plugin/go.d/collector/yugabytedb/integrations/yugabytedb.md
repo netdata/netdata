@@ -523,9 +523,6 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | url | Target endpoint URL. | http://127.0.0.1:7000/prometheus-metrics | yes |
 |  | timeout | HTTP request timeout (seconds). | 1 | no |
-| **Query Functions** | dsn | SQL DSN used by `top-queries` and `running-queries` functions. |  | no |
-|  | sql_timeout | SQL query timeout (seconds) for query functions. | 1 | no |
-| **Limits** | top_queries_limit | Maximum number of rows returned by the `top-queries` and `running-queries` functions. | 500 | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -541,6 +538,13 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | headers | Additional HTTP headers (one per line as key: value). |  | no |
 |  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
 |  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
+| **Functions** | functions.dsn | SQL DSN (required for query functions). |  | no |
+|  | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
+|  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
+|  | functions.running_queries.disabled | Disable the [running-queries](#running-queries) function. | no | no |
+|  | functions.running_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.running_queries.limit | Maximum number of queries to return. | 500 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
@@ -607,7 +611,8 @@ Enable SQL query functions (YSQL).
 jobs:
   - name: local
     url: http://127.0.0.1:7000/prometheus-metrics
-    dsn: postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable
+    functions:
+      dsn: postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable
 
 ```
 </details>

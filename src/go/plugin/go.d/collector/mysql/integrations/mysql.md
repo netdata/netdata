@@ -547,6 +547,13 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Target** | dsn | MySQL server DSN (Data Source Name). See [DSN syntax](https://github.com/go-sql-driver/mysql#dsn-data-source-name). | root@tcp(localhost:3306)/ | yes |
 |  | my.cnf | Path to a `my.cnf` file to read connection settings from the `[client]` section. |  | no |
 |  | timeout | Query timeout (seconds). | 1 | no |
+| **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
+|  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
+|  | functions.deadlock_info.disabled | Disable the [deadlock-info](#deadlock-info) function. | no | no |
+|  | functions.deadlock_info.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.error_info.disabled | Disable the [error-info](#error-info) function. | no | no |
+|  | functions.error_info.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 

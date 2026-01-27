@@ -212,6 +212,9 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
 |  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
 |  | tls_key | Path to client TLS private key (for mTLS). |  | no |
+| **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
+|  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 

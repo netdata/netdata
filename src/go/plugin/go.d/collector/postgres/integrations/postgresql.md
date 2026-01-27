@@ -426,6 +426,9 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Filters** | collect_databases_matching | Database selector. Controls which databases are included. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher). |  | no |
 | **Limits** | max_db_tables | Maximum number of tables per database to collect metrics for (0 = no limit). | 50 | no |
 |  | max_db_indexes | Maximum number of indexes per database to collect metrics for (0 = no limit). | 250 | no |
+| **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
+|  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
