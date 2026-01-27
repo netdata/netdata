@@ -22,17 +22,17 @@ import (
 
 const (
 	deadlockIdxRowID = iota
-	deadlockIdxDeadlockID
 	deadlockIdxTimestamp
-	deadlockIdxProcessID
-	deadlockIdxSpid
-	deadlockIdxEcid
 	deadlockIdxIsVictim
 	deadlockIdxQueryText
+	deadlockIdxDatabase
 	deadlockIdxLockMode
 	deadlockIdxLockStatus
 	deadlockIdxWaitResource
-	deadlockIdxDatabase
+	deadlockIdxSpid
+	deadlockIdxProcessID
+	deadlockIdxDeadlockID
+	deadlockIdxEcid
 	deadlockColumnCount
 )
 
@@ -120,13 +120,6 @@ type mysqlDeadlockParseResult struct {
 	victimTxnNum int
 	transactions []*mysqlDeadlockTxn
 	parseErr     error
-}
-
-func (c *Collector) deadlockInfoParams(context.Context) ([]funcapi.ParamConfig, error) {
-	if !c.Config.GetDeadlockInfoFunctionEnabled() {
-		return nil, fmt.Errorf("deadlock-info function disabled in configuration")
-	}
-	return []funcapi.ParamConfig{}, nil
 }
 
 func (c *Collector) collectDeadlockInfo(ctx context.Context) *funcapi.FunctionResponse {
@@ -309,7 +302,7 @@ func (c *Collector) buildDeadlockColumns() map[string]any {
 			Sortable:      true,
 			Summary:       summaryCount,
 			Filter:        filterRange,
-			Visible:       true,
+			Visible:       false, // SQL Server concept, not applicable to MySQL/MariaDB
 			ValueOptions: funcapi.ValueOptions{
 				Transform: trNumber,
 			},
@@ -594,7 +587,7 @@ func buildDeadlockRows(parseRes mysqlDeadlockParseResult, deadlockID string) [][
 		}
 
 		queryText := strmutil.TruncateText(strings.TrimSpace(txn.queryText), topQueriesMaxTextLength)
-		lockMode := strings.TrimSpace(txn.lockMode)
+		lockMode := formatLockMode(strings.TrimSpace(txn.lockMode))
 		lockStatus := strings.TrimSpace(txn.lockStatus)
 		waitResource := strmutil.TruncateText(strings.TrimSpace(txn.waitResource), topQueriesMaxTextLength)
 		database := extractDeadlockDatabase(waitResource, queryText)
@@ -776,4 +769,18 @@ func isMySQLPermissionError(err error) bool {
 	return strings.Contains(msg, "access denied") ||
 		strings.Contains(msg, "permission denied") ||
 		strings.Contains(msg, "process privilege")
+}
+
+// formatLockMode converts InnoDB lock mode abbreviations to human-readable format.
+func formatLockMode(mode string) string {
+	names := map[string]string{
+		"X":  "Exclusive",
+		"S":  "Shared",
+		"IX": "Intent Exclusive",
+		"IS": "Intent Shared",
+	}
+	if name, ok := names[mode]; ok {
+		return fmt.Sprintf("%s (%s)", name, mode)
+	}
+	return mode
 }
