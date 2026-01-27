@@ -351,14 +351,14 @@ func TestBuildDeadlockRows(t *testing.T) {
 	rows := buildDeadlockRows(res, deadlockID)
 
 	assert.Len(t, rows, 2)
-	assert.Equal(t, deadlockID, rows[0][deadlockIdxDeadlockID])
-	assert.Equal(t, deadlockID, rows[1][deadlockIdxDeadlockID])
-	assert.Equal(t, deadlockID+":10", rows[0][deadlockIdxRowID])
-	assert.Equal(t, deadlockID+":11", rows[1][deadlockIdxRowID])
+	assert.Equal(t, deadlockID, rows[0].deadlockID)
+	assert.Equal(t, deadlockID, rows[1].deadlockID)
+	assert.Equal(t, deadlockID+":10", rows[0].rowID)
+	assert.Equal(t, deadlockID+":11", rows[1].rowID)
 
 	hasDatabase := false
 	for _, row := range rows {
-		if row[deadlockIdxDatabase] == "netdata" {
+		if row.database == "netdata" {
 			hasDatabase = true
 			break
 		}

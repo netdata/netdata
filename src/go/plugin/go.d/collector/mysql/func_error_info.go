@@ -23,6 +23,89 @@ const (
 
 const errorInfoMethodID = "error-info"
 
+// errorInfoColumn defines a column for the error-info function.
+type errorInfoColumn struct {
+	funcapi.ColumnMeta
+	Value func(*mysqlErrorRow) any
+}
+
+func errorInfoColumnSet(cols []errorInfoColumn) funcapi.ColumnSet[errorInfoColumn] {
+	return funcapi.Columns(cols, func(c errorInfoColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+var errorInfoColumns = []errorInfoColumn{
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "digest",
+			Tooltip:   "Digest",
+			Type:      funcapi.FieldTypeString,
+			Sortable:  true,
+			Visible:   false,
+			UniqueKey: true,
+		},
+		Value: func(r *mysqlErrorRow) any { return r.Digest },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "query",
+			Tooltip:   "Query",
+			Type:      funcapi.FieldTypeString,
+			Sortable:  true,
+			Visible:   true,
+			Sticky:    true,
+			FullWidth: true,
+		},
+		Value: func(r *mysqlErrorRow) any { return r.Query },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "schema",
+			Tooltip:  "Schema",
+			Type:     funcapi.FieldTypeString,
+			Sortable: true,
+			Visible:  true,
+		},
+		Value: func(r *mysqlErrorRow) any { return r.Schema },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "errorNumber",
+			Tooltip:   "Error Number",
+			Type:      funcapi.FieldTypeInteger,
+			Sortable:  true,
+			Visible:   true,
+			Transform: funcapi.FieldTransformNumber,
+		},
+		Value: func(r *mysqlErrorRow) any {
+			if r.ErrorNumber == nil {
+				return nil
+			}
+			return *r.ErrorNumber
+		},
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "sqlState",
+			Tooltip:  "SQL State",
+			Type:     funcapi.FieldTypeString,
+			Sortable: true,
+			Visible:  true,
+		},
+		Value: func(r *mysqlErrorRow) any { return r.SQLState },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "errorMessage",
+			Tooltip:   "Error Message",
+			Type:      funcapi.FieldTypeString,
+			Sortable:  false,
+			Visible:   true,
+			FullWidth: true,
+		},
+		Value: func(r *mysqlErrorRow) any { return r.Message },
+	},
+}
+
 func errorInfoMethodConfig() funcapi.MethodConfig {
 	return funcapi.MethodConfig{
 		ID:             errorInfoMethodID,
@@ -225,86 +308,23 @@ func (c *Collector) collectErrorInfo(ctx context.Context) *funcapi.FunctionRespo
 	}
 
 	data := make([][]any, 0, len(rows))
-	for _, row := range rows {
-		var errNo any
-		if row.ErrorNumber != nil {
-			errNo = *row.ErrorNumber
+	for i := range rows {
+		row := make([]any, len(errorInfoColumns))
+		for j, col := range errorInfoColumns {
+			row[j] = col.Value(&rows[i])
 		}
-		data = append(data, []any{
-			row.Digest,
-			row.Query,
-			row.Schema,
-			errNo,
-			row.SQLState,
-			row.Message,
-		})
+		data = append(data, row)
 	}
+
+	cs := errorInfoColumnSet(errorInfoColumns)
 
 	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Recent SQL errors from performance_schema statement history tables",
-		Columns:           buildMySQLErrorInfoColumns(),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: "errorNumber",
 	}
-}
-
-func buildMySQLErrorInfoColumns() map[string]any {
-	columns := map[string]any{
-		"digest": funcapi.Column{
-			Index:        0,
-			Name:         "Digest",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     true,
-			Visible:      false,
-			UniqueKey:    true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-		"query": funcapi.Column{
-			Index:        1,
-			Name:         "Query",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     true,
-			Visible:      true,
-			Sticky:       true,
-			FullWidth:    true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-		"schema": funcapi.Column{
-			Index:        2,
-			Name:         "Schema",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     true,
-			Visible:      true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-		"errorNumber": funcapi.Column{
-			Index:        3,
-			Name:         "Error Number",
-			Type:         funcapi.FieldTypeInteger,
-			Sortable:     true,
-			Visible:      true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNumber},
-		}.BuildColumn(),
-		"sqlState": funcapi.Column{
-			Index:        4,
-			Name:         "SQL State",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     true,
-			Visible:      true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-		"errorMessage": funcapi.Column{
-			Index:        5,
-			Name:         "Error Message",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     false,
-			Visible:      true,
-			FullWidth:    true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-	}
-	return columns
 }
 
 func (c *Collector) checkPerformanceSchema(ctx context.Context) (bool, error) {

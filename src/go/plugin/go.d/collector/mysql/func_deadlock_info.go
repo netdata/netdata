@@ -20,22 +20,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
-const (
-	deadlockIdxRowID = iota
-	deadlockIdxTimestamp
-	deadlockIdxIsVictim
-	deadlockIdxQueryText
-	deadlockIdxDatabase
-	deadlockIdxLockMode
-	deadlockIdxLockStatus
-	deadlockIdxWaitResource
-	deadlockIdxSpid
-	deadlockIdxProcessID
-	deadlockIdxDeadlockID
-	deadlockIdxEcid
-	deadlockColumnCount
-)
-
 const deadlockInfoMethodID = "deadlock-info"
 
 const (
@@ -63,6 +47,199 @@ const (
 	deadlockInfoHelp         = "Latest detected deadlock from SHOW ENGINE INNODB STATUS. WARNING: query text may include unmasked sensitive literals; restrict dashboard access."
 	deadlockParseErrorStatus = 561
 )
+
+// deadlockRowData holds computed values for a single deadlock row.
+type deadlockRowData struct {
+	rowID        string
+	deadlockID   string
+	timestamp    string
+	processID    string
+	spid         any
+	isVictim     string
+	queryText    string
+	lockMode     string
+	lockStatus   string
+	waitResource string
+	database     any
+}
+
+// deadlockColumn defines a column for the deadlock-info function.
+type deadlockColumn struct {
+	funcapi.ColumnMeta
+	Value func(*deadlockRowData) any
+}
+
+func deadlockColumnSet(cols []deadlockColumn) funcapi.ColumnSet[deadlockColumn] {
+	return funcapi.Columns(cols, func(c deadlockColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+var deadlockColumns = []deadlockColumn{
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "row_id",
+			Tooltip:   "Row ID",
+			Type:      funcapi.FieldTypeString,
+			Sort:      funcapi.FieldSortAscending,
+			Sortable:  true,
+			Summary:   funcapi.FieldSummaryCount,
+			Filter:    funcapi.FieldFilterMultiselect,
+			UniqueKey: true,
+			Visible:   false,
+		},
+		Value: func(r *deadlockRowData) any { return r.rowID },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:          "timestamp",
+			Tooltip:       "Timestamp",
+			Type:          funcapi.FieldTypeTimestamp,
+			Sort:          funcapi.FieldSortDescending,
+			Sortable:      true,
+			Summary:       funcapi.FieldSummaryMax,
+			Filter:        funcapi.FieldFilterRange,
+			Visible:       true,
+			Transform:     funcapi.FieldTransformDatetime,
+		},
+		Value: func(r *deadlockRowData) any { return r.timestamp },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:          "is_victim",
+			Tooltip:       "Victim",
+			Type:          funcapi.FieldTypeString,
+			Visualization: funcapi.FieldVisualPill,
+			Sort:          funcapi.FieldSortAscending,
+			Sortable:      true,
+			Summary:       funcapi.FieldSummaryCount,
+			Filter:        funcapi.FieldFilterMultiselect,
+			Visible:       true,
+		},
+		Value: func(r *deadlockRowData) any { return r.isVictim },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "query_text",
+			Tooltip:   "Query",
+			Type:      funcapi.FieldTypeString,
+			Sort:      funcapi.FieldSortAscending,
+			Sortable:  false,
+			Sticky:    true,
+			Summary:   funcapi.FieldSummaryCount,
+			Filter:    funcapi.FieldFilterMultiselect,
+			FullWidth: true,
+			Wrap:      true,
+			Visible:   true,
+		},
+		Value: func(r *deadlockRowData) any { return r.queryText },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "database",
+			Tooltip:  "Database",
+			Type:     funcapi.FieldTypeString,
+			Sort:     funcapi.FieldSortAscending,
+			Sortable: true,
+			Summary:  funcapi.FieldSummaryCount,
+			Filter:   funcapi.FieldFilterMultiselect,
+			Visible:  true,
+		},
+		Value: func(r *deadlockRowData) any { return r.database },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "lock_mode",
+			Tooltip:  "Lock Mode",
+			Type:     funcapi.FieldTypeString,
+			Sort:     funcapi.FieldSortAscending,
+			Sortable: true,
+			Summary:  funcapi.FieldSummaryCount,
+			Filter:   funcapi.FieldFilterMultiselect,
+			Visible:  true,
+		},
+		Value: func(r *deadlockRowData) any { return r.lockMode },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:          "lock_status",
+			Tooltip:       "Lock Status",
+			Type:          funcapi.FieldTypeString,
+			Visualization: funcapi.FieldVisualPill,
+			Sort:          funcapi.FieldSortAscending,
+			Sortable:      true,
+			Summary:       funcapi.FieldSummaryCount,
+			Filter:        funcapi.FieldFilterMultiselect,
+			Visible:       true,
+		},
+		Value: func(r *deadlockRowData) any { return r.lockStatus },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "wait_resource",
+			Tooltip:  "Wait Resource",
+			Type:     funcapi.FieldTypeString,
+			Sort:     funcapi.FieldSortAscending,
+			Sortable: false,
+			Summary:  funcapi.FieldSummaryCount,
+			Filter:   funcapi.FieldFilterMultiselect,
+			Visible:  true,
+		},
+		Value: func(r *deadlockRowData) any { return r.waitResource },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "spid",
+			Tooltip:   "Connection ID",
+			Type:      funcapi.FieldTypeInteger,
+			Sort:      funcapi.FieldSortAscending,
+			Sortable:  true,
+			Summary:   funcapi.FieldSummaryCount,
+			Filter:    funcapi.FieldFilterRange,
+			Visible:   true,
+			Transform: funcapi.FieldTransformNumber,
+		},
+		Value: func(r *deadlockRowData) any { return r.spid },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "process_id",
+			Tooltip:  "Process ID",
+			Type:     funcapi.FieldTypeString,
+			Sort:     funcapi.FieldSortAscending,
+			Sortable: true,
+			Summary:  funcapi.FieldSummaryCount,
+			Filter:   funcapi.FieldFilterMultiselect,
+			Visible:  true,
+		},
+		Value: func(r *deadlockRowData) any { return r.processID },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "deadlock_id",
+			Tooltip:  "Deadlock ID",
+			Type:     funcapi.FieldTypeString,
+			Sort:     funcapi.FieldSortAscending,
+			Sortable: true,
+			Summary:  funcapi.FieldSummaryCount,
+			Filter:   funcapi.FieldFilterMultiselect,
+			Visible:  true,
+		},
+		Value: func(r *deadlockRowData) any { return r.deadlockID },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "ecid",
+			Tooltip:   "ECID",
+			Type:      funcapi.FieldTypeInteger,
+			Sort:      funcapi.FieldSortAscending,
+			Sortable:  true,
+			Summary:   funcapi.FieldSummaryCount,
+			Filter:    funcapi.FieldFilterRange,
+			Visible:   false, // SQL Server concept, not applicable to MySQL/MariaDB
+			Transform: funcapi.FieldTransformNumber,
+		},
+		Value: func(r *deadlockRowData) any { return nil },
+	},
+}
 
 func deadlockInfoMethodConfig() funcapi.MethodConfig {
 	return funcapi.MethodConfig{
@@ -166,15 +343,23 @@ func (c *Collector) collectDeadlockInfo(ctx context.Context) *funcapi.FunctionRe
 	return c.deadlockInfoResponse(200, "latest detected deadlock", rows)
 }
 
-func (c *Collector) deadlockInfoResponse(status int, message string, data [][]any) *funcapi.FunctionResponse {
-	if data == nil {
-		data = make([][]any, 0)
+func (c *Collector) deadlockInfoResponse(status int, message string, rowsData []deadlockRowData) *funcapi.FunctionResponse {
+	data := make([][]any, 0, len(rowsData))
+	for i := range rowsData {
+		row := make([]any, len(deadlockColumns))
+		for j, col := range deadlockColumns {
+			row[j] = col.Value(&rowsData[i])
+		}
+		data = append(data, row)
 	}
+
+	cs := deadlockColumnSet(deadlockColumns)
+
 	return &funcapi.FunctionResponse{
 		Status:            status,
 		Help:              deadlockInfoHelp,
 		Message:           message,
-		Columns:           c.buildDeadlockColumns(),
+		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: "timestamp",
 	}
@@ -192,210 +377,6 @@ func (c *Collector) queryInnoDBStatus(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("innodb status response was empty")
 	}
 	return status.String, nil
-}
-
-func (c *Collector) buildDeadlockColumns() map[string]any {
-	const (
-		ftString    = funcapi.FieldTypeString
-		ftInteger   = funcapi.FieldTypeInteger
-		ftTimestamp = funcapi.FieldTypeTimestamp
-
-		trNone     = funcapi.FieldTransformNone
-		trNumber   = funcapi.FieldTransformNumber
-		trDatetime = funcapi.FieldTransformDatetime
-
-		visValue = funcapi.FieldVisualValue
-		visPill  = funcapi.FieldVisualPill
-
-		sortAsc  = funcapi.FieldSortAscending
-		sortDesc = funcapi.FieldSortDescending
-
-		summaryCount = funcapi.FieldSummaryCount
-		summaryMax   = funcapi.FieldSummaryMax
-
-		filterMulti = funcapi.FieldFilterMultiselect
-		filterRange = funcapi.FieldFilterRange
-	)
-
-	columns := map[string]any{
-		"row_id": funcapi.Column{
-			Index:         deadlockIdxRowID,
-			Name:          "Row ID",
-			Type:          ftString,
-			Visualization: visValue,
-			Sort:          sortAsc,
-			Sortable:      true,
-			Sticky:        false,
-			Summary:       summaryCount,
-			Filter:        filterMulti,
-			FullWidth:     false,
-			Wrap:          false,
-			UniqueKey:     true,
-			Visible:       false,
-			ValueOptions: funcapi.ValueOptions{
-				Transform:     trNone,
-				DecimalPoints: 0,
-			},
-		}.BuildColumn(),
-		"deadlock_id": funcapi.Column{
-			Index:         deadlockIdxDeadlockID,
-			Name:          "Deadlock ID",
-			Type:          ftString,
-			Visualization: visValue,
-			Sort:          sortAsc,
-			Sortable:      true,
-			Summary:       summaryCount,
-			Filter:        filterMulti,
-			Visible:       true,
-			ValueOptions: funcapi.ValueOptions{
-				Transform: trNone,
-			},
-		}.BuildColumn(),
-		"timestamp": funcapi.Column{
-			Index:         deadlockIdxTimestamp,
-			Name:          "Timestamp",
-			Type:          ftTimestamp,
-			Visualization: visValue,
-			Sort:          sortDesc,
-			Sortable:      true,
-			Summary:       summaryMax,
-			Filter:        filterRange,
-			Visible:       true,
-			ValueOptions: funcapi.ValueOptions{
-				Transform: trDatetime,
-			},
-		}.BuildColumn(),
-		"process_id": funcapi.Column{
-			Index:         deadlockIdxProcessID,
-			Name:          "Process ID",
-			Type:          ftString,
-			Visualization: visValue,
-			Sort:          sortAsc,
-			Sortable:      true,
-			Summary:       summaryCount,
-			Filter:        filterMulti,
-			Visible:       true,
-			ValueOptions: funcapi.ValueOptions{
-				Transform: trNone,
-			},
-		}.BuildColumn(),
-		"spid": funcapi.Column{
-			Index:         deadlockIdxSpid,
-			Name:          "Connection ID",
-			Type:          ftInteger,
-			Visualization: visValue,
-			Sort:          sortAsc,
-			Sortable:      true,
-			Summary:       summaryCount,
-			Filter:        filterRange,
-			Visible:       true,
-			ValueOptions: funcapi.ValueOptions{
-				Transform: trNumber,
-			},
-		}.BuildColumn(),
-		"ecid": funcapi.Column{
-			Index:         deadlockIdxEcid,
-			Name:          "ECID",
-			Type:          ftInteger,
-			Visualization: visValue,
-			Sort:          sortAsc,
-			Sortable:      true,
-			Summary:       summaryCount,
-			Filter:        filterRange,
-			Visible:       false, // SQL Server concept, not applicable to MySQL/MariaDB
-			ValueOptions: funcapi.ValueOptions{
-				Transform: trNumber,
-			},
-		}.BuildColumn(),
-		"is_victim": funcapi.Column{
-			Index:         deadlockIdxIsVictim,
-			Name:          "Victim",
-			Type:          ftString,
-			Visualization: visPill,
-			Sort:          sortAsc,
-			Sortable:      true,
-			Summary:       summaryCount,
-			Filter:        filterMulti,
-			Visible:       true,
-			ValueOptions: funcapi.ValueOptions{
-				Transform: trNone,
-			},
-		}.BuildColumn(),
-		"query_text": funcapi.Column{
-			Index:         deadlockIdxQueryText,
-			Name:          "Query",
-			Type:          ftString,
-			Visualization: visValue,
-			Sort:          sortAsc,
-			Sortable:      false,
-			Sticky:        true,
-			Summary:       summaryCount,
-			Filter:        filterMulti,
-			FullWidth:     true,
-			Wrap:          true,
-			Visible:       true,
-			ValueOptions: funcapi.ValueOptions{
-				Transform: trNone,
-			},
-		}.BuildColumn(),
-		"lock_mode": funcapi.Column{
-			Index:         deadlockIdxLockMode,
-			Name:          "Lock Mode",
-			Type:          ftString,
-			Visualization: visValue,
-			Sort:          sortAsc,
-			Sortable:      true,
-			Summary:       summaryCount,
-			Filter:        filterMulti,
-			Visible:       true,
-			ValueOptions: funcapi.ValueOptions{
-				Transform: trNone,
-			},
-		}.BuildColumn(),
-		"lock_status": funcapi.Column{
-			Index:         deadlockIdxLockStatus,
-			Name:          "Lock Status",
-			Type:          ftString,
-			Visualization: visPill,
-			Sort:          sortAsc,
-			Sortable:      true,
-			Summary:       summaryCount,
-			Filter:        filterMulti,
-			Visible:       true,
-			ValueOptions: funcapi.ValueOptions{
-				Transform: trNone,
-			},
-		}.BuildColumn(),
-		"wait_resource": funcapi.Column{
-			Index:         deadlockIdxWaitResource,
-			Name:          "Wait Resource",
-			Type:          ftString,
-			Visualization: visValue,
-			Sort:          sortAsc,
-			Sortable:      false,
-			Summary:       summaryCount,
-			Filter:        filterMulti,
-			Visible:       true,
-			ValueOptions: funcapi.ValueOptions{
-				Transform: trNone,
-			},
-		}.BuildColumn(),
-		"database": funcapi.Column{
-			Index:         deadlockIdxDatabase,
-			Name:          "Database",
-			Type:          ftString,
-			Visualization: visValue,
-			Sort:          sortAsc,
-			Sortable:      true,
-			Summary:       summaryCount,
-			Filter:        filterMulti,
-			Visible:       true,
-			ValueOptions: funcapi.ValueOptions{
-				Transform: trNone,
-			},
-		}.BuildColumn(),
-	}
-	return columns
 }
 
 func parseInnoDBDeadlock(status string, now time.Time) mysqlDeadlockParseResult {
@@ -560,8 +541,8 @@ func parseInnoDBDeadlock(status string, now time.Time) mysqlDeadlockParseResult 
 	return result
 }
 
-func buildDeadlockRows(parseRes mysqlDeadlockParseResult, deadlockID string) [][]any {
-	rows := make([][]any, 0, len(parseRes.transactions))
+func buildDeadlockRows(parseRes mysqlDeadlockParseResult, deadlockID string) []deadlockRowData {
+	rows := make([]deadlockRowData, 0, len(parseRes.transactions))
 	timestamp := parseRes.deadlockTime.UTC().Format(time.RFC3339Nano)
 
 	for _, txn := range parseRes.transactions {
@@ -597,20 +578,19 @@ func buildDeadlockRows(parseRes mysqlDeadlockParseResult, deadlockID string) [][
 			databaseValue = database
 		}
 
-		row := make([]any, deadlockColumnCount)
-		row[deadlockIdxRowID] = fmt.Sprintf("%s:%s", deadlockID, processID)
-		row[deadlockIdxDeadlockID] = deadlockID
-		row[deadlockIdxTimestamp] = timestamp
-		row[deadlockIdxProcessID] = processID
-		row[deadlockIdxSpid] = spid
-		row[deadlockIdxEcid] = nil
-		row[deadlockIdxIsVictim] = isVictim
-		row[deadlockIdxQueryText] = queryText
-		row[deadlockIdxLockMode] = lockMode
-		row[deadlockIdxLockStatus] = lockStatus
-		row[deadlockIdxWaitResource] = waitResource
-		row[deadlockIdxDatabase] = databaseValue
-		rows = append(rows, row)
+		rows = append(rows, deadlockRowData{
+			rowID:        fmt.Sprintf("%s:%s", deadlockID, processID),
+			deadlockID:   deadlockID,
+			timestamp:    timestamp,
+			processID:    processID,
+			spid:         spid,
+			isVictim:     isVictim,
+			queryText:    queryText,
+			lockMode:     lockMode,
+			lockStatus:   lockStatus,
+			waitResource: waitResource,
+			database:     databaseValue,
+		})
 	}
 
 	return rows
