@@ -286,6 +286,69 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
 	}
 
+	errorCols := mysqlErrorAttributionColumns()
+	errorStatus := mysqlErrorAttrNotSupported
+	errorDetails := map[string]mysqlErrorRow{}
+	digestIdx := -1
+	for i, col := range cols {
+		if col.Name == "digest" {
+			digestIdx = i
+			break
+		}
+	}
+	if digestIdx >= 0 {
+		digests := make([]string, 0, len(data))
+		seen := make(map[string]bool)
+		for _, row := range data {
+			if digestIdx >= len(row) {
+				continue
+			}
+			digest, ok := row[digestIdx].(string)
+			if !ok || digest == "" {
+				continue
+			}
+			if seen[digest] {
+				continue
+			}
+			seen[digest] = true
+			digests = append(digests, digest)
+		}
+		if len(digests) > 0 {
+			errorStatus, errorDetails = f.router.collector.collectMySQLErrorDetailsForDigests(ctx, digests)
+		} else {
+			errorStatus = mysqlErrorAttrNoData
+		}
+	}
+
+	if len(errorCols) > 0 {
+		for i := range data {
+			status := errorStatus
+			var errRow mysqlErrorRow
+			var errNo any
+			if digestIdx >= 0 && digestIdx < len(data[i]) {
+				if digest, ok := data[i][digestIdx].(string); ok && digest != "" {
+					if row, ok := errorDetails[digest]; ok {
+						status = mysqlErrorAttrEnabled
+						errRow = row
+						if errRow.ErrorNumber != nil {
+							errNo = *errRow.ErrorNumber
+						}
+					} else if status == mysqlErrorAttrEnabled {
+						status = mysqlErrorAttrNoData
+					}
+				}
+			}
+
+			data[i] = append(data[i],
+				status,
+				errNo,
+				nullableString(errRow.SQLState),
+				nullableString(errRow.Message),
+			)
+		}
+		cols = append(cols, errorCols...)
+	}
+
 	// Build dynamic sort options from available columns (only those actually detected)
 	sortParam := f.buildSortParam(cols)
 	sortOptions := sortParam.Options

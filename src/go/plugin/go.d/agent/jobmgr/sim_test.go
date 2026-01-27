@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
@@ -66,6 +67,9 @@ func (s *runSim) run(t *testing.T) {
 	var lines []string
 	for _, s := range strings.Split(buf.String(), "\n") {
 		if strings.HasPrefix(s, "CONFIG") && strings.Contains(s, " template ") {
+			continue
+		}
+		if strings.HasPrefix(s, "FUNCTION GLOBAL") {
 			continue
 		}
 		if strings.HasPrefix(s, "FUNCTION_RESULT_BEGIN") {
@@ -147,6 +151,47 @@ func prepareMockRegistry() module.Registry {
 			return &module.MockModule{
 				InitFunc: func(context.Context) error { return errors.New("mock failed init") },
 			}
+		},
+	})
+
+	// Module without Methods - for testing function_only config rejection
+	reg.Register("nofuncs", module.Creator{
+		Create: func() module.Module {
+			return &module.MockModule{
+				ChartsFunc: func() *module.Charts {
+					return &module.Charts{&module.Chart{ID: "id", Title: "title", Units: "units", Dims: module.Dims{{ID: "id1"}}}}
+				},
+				CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"id1": 1} },
+			}
+		},
+	})
+
+	// Module with Methods - for testing config-level function_only
+	reg.Register("withfuncs", module.Creator{
+		Create: func() module.Module {
+			return &module.MockModule{
+				ChartsFunc: func() *module.Charts {
+					return &module.Charts{&module.Chart{ID: "id", Title: "title", Units: "units", Dims: module.Dims{{ID: "id1"}}}}
+				},
+				CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"id1": 1} },
+			}
+		},
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{ID: "test-method", Name: "Test Method"}}
+		},
+	})
+
+	// FunctionOnly module - for testing module-level function-only
+	reg.Register("funconly", module.Creator{
+		FunctionOnly: true,
+		Create: func() module.Module {
+			return &module.MockModule{
+				ChartsFunc:  func() *module.Charts { return nil },
+				CollectFunc: func(context.Context) map[string]int64 { return nil },
+			}
+		},
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{ID: "test-method", Name: "Test Method"}}
 		},
 	})
 

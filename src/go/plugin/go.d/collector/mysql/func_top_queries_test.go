@@ -7,26 +7,54 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMySQLMethods(t *testing.T) {
 	methods := mysqlMethods()
 
-	require := assert.New(t)
-	require.Len(methods, 1)
-	require.Equal("top-queries", methods[0].ID)
-	require.Equal("Top Queries", methods[0].Name)
-	require.NotEmpty(methods[0].RequiredParams)
+	req := require.New(t)
+	req.Len(methods, 3)
+
+	topIdx := -1
+	deadlockIdx := -1
+	errorIdx := -1
+	for i := range methods {
+		switch methods[i].ID {
+		case "top-queries":
+			topIdx = i
+		case "deadlock-info":
+			deadlockIdx = i
+		case "error-info":
+			errorIdx = i
+		}
+	}
+
+	req.NotEqual(-1, topIdx, "expected top-queries method")
+	req.NotEqual(-1, deadlockIdx, "expected deadlock-info method")
+	req.NotEqual(-1, errorIdx, "expected error-info method")
+
+	topMethod := methods[topIdx]
+	req.Equal("Top Queries", topMethod.Name)
+	req.NotEmpty(topMethod.RequiredParams)
+
+	deadlockMethod := methods[deadlockIdx]
+	req.Equal("Deadlock Info", deadlockMethod.Name)
+	req.Empty(deadlockMethod.RequiredParams)
+
+	errorMethod := methods[errorIdx]
+	req.Equal("Error Info", errorMethod.Name)
+	req.Empty(errorMethod.RequiredParams)
 
 	var sortParam *funcapi.ParamConfig
-	for i := range methods[0].RequiredParams {
-		if methods[0].RequiredParams[i].ID == "__sort" {
-			sortParam = &methods[0].RequiredParams[i]
+	for i := range topMethod.RequiredParams {
+		if topMethod.RequiredParams[i].ID == "__sort" {
+			sortParam = &topMethod.RequiredParams[i]
 			break
 		}
 	}
-	require.NotNil(sortParam, "expected __sort required param")
-	require.NotEmpty(sortParam.Options)
+	req.NotNil(sortParam, "expected __sort required param")
+	req.NotEmpty(sortParam.Options)
 }
 
 func TestTopQueriesColumns_HasRequiredColumns(t *testing.T) {

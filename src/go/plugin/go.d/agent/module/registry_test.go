@@ -24,11 +24,22 @@ func TestRegister(t *testing.T) {
 
 	require.True(t, exist)
 
-	// Panic case
+	// Panic case: duplicate registration
 	assert.Panics(
 		t,
 		func() {
 			registry.Register(modName, Creator{})
 		})
 
+}
+
+func TestRegister_FunctionOnlyWithoutMethods(t *testing.T) {
+	registry := make(Registry)
+
+	// Panic case: FunctionOnly without Methods
+	assert.Panics(
+		t,
+		func() {
+			registry.Register("funcOnly", Creator{FunctionOnly: true})
+		})
 }

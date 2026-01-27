@@ -23,6 +23,8 @@ func newFuncRouter(c *Collector) *funcRouter {
 		handlers:  make(map[string]funcapi.MethodHandler),
 	}
 	r.handlers[topQueriesMethodID] = newFuncTopQueries(r)
+	r.handlers[deadlockInfoMethodID] = newFuncDeadlockInfo(r)
+	r.handlers[errorInfoMethodID] = newFuncErrorInfo(r)
 	return r
 }
 
@@ -52,6 +54,8 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 func mssqlMethods() []funcapi.MethodConfig {
 	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
+		deadlockInfoMethodConfig(),
+		errorInfoMethodConfig(),
 	}
 }
 

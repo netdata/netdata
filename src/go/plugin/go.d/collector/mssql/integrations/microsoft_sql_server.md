@@ -28,7 +28,7 @@ It collects metrics from:
 - Performance counters (buffer manager, memory manager, SQL statistics)
 - Dynamic management views (DMVs) for wait statistics, locks, and sessions
 - Per-database transaction and lock statistics
-- SQL Server Agent job status (if permissions allow)
+- SQL Server Agent job status
 
 
 It connects to the SQL Server instance via TCP using the go-mssqldb driver and executes queries against:
@@ -41,7 +41,7 @@ It connects to the SQL Server instance via TCP using the go-mssqldb driver and e
 - `sys.dm_os_process_memory` - SQL Server process memory
 - `sys.dm_os_sys_memory` - OS physical memory and page file
 - `sys.master_files` - Database file sizes
-- `msdb.dbo.sysjobs` - SQL Agent job status (optional)
+- `msdb.dbo.sysjobs` - SQL Agent job status
 
 
 This collector is supported on all platforms.
@@ -49,7 +49,8 @@ This collector is supported on all platforms.
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
-For SQL Agent job monitoring, access to the msdb database is required.
+SQL Agent job monitoring is part of collector startup, so access to
+`msdb.dbo.sysjobs` is required.
 
 
 ### Default Behavior
@@ -316,6 +317,14 @@ Aggregated query execution statistics from Query Store runtime views, providing 
 | Query | string |  |  | The SQL query text with literal values truncated at 4096 characters. Use this to identify the actual SQL being executed and spot parameterized queries or injection risks. |
 | Database | string |  |  | Database name where the query was executed. Essential for multi-database analysis to identify which database is experiencing query load. |
 | Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly. |
+| Error Attribution | string |  |  | Status of error detail attribution for this query. Values: enabled, no_data, not_enabled, not_supported. |
+| Error Number | integer |  |  | Most recent error number observed for this query (when error attribution is enabled). |
+| Error State | integer |  | hidden | SQL Server error state for the most recent error (when error attribution is enabled). |
+| Error Message | string |  |  | Most recent error message for this query (when error attribution is enabled). |
+| Hash Match Joins | integer |  |  | Count of Hash Match join operators across all stored plans for this query. |
+| Merge Joins | integer |  |  | Count of Merge Join operators across all stored plans for this query. |
+| Nested Loops | integer |  |  | Count of Nested Loops operators across all stored plans for this query. |
+| Sorts | integer |  |  | Count of Sort operators across all stored plans for this query. |
 | Total Time | duration | milliseconds |  | Cumulative execution time across all query executions. This is a key metric for identifying the most resource-intensive queries in terms of total server time consumption. |
 | Avg Time | duration | milliseconds |  | Average execution time per query run, calculated as weighted average when execution count is greater than zero. Compare with Total Time to determine if individual executions or high frequency drives resource usage. |
 | Last Time | duration | milliseconds | hidden | Execution time of the most recent execution for this query pattern. Useful for identifying recent performance changes or individual outlier executions. |
@@ -373,6 +382,99 @@ Aggregated query execution statistics from Query Store runtime views, providing 
 | Max TempDB (8KB pages) | integer |  | hidden | Maximum tempdb space observed. Spikes may indicate queries with large sort operations, hash joins, index spool usage, or temporary table creation consuming substantial tempdb space. Can lead to tempdb autogrow and disk space issues. |
 | StdDev TempDB | float |  | hidden | Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation. |
 
+### Deadlock Info
+
+Retrieves the most recent deadlock event from SQL Server's `system_health` Extended Events ring buffer (`xml_deadlock_report`).
+
+The deadlock graph XML is parsed to attribute the deadlock to the participating processes and their query text, lock mode, lock status, and wait resource.
+
+Use cases:
+- Identify which process was chosen as the deadlock victim
+- Inspect the waiting resource and lock mode involved in the deadlock
+- Correlate deadlocks with recent application changes or deployments
+
+Query text and wait resource strings are truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mssql:deadlock-info` |
+| Require Cloud | yes |
+| Performance | Executes on-demand queries against the `system_health` ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing |
+| Security | Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `deadlock_info_function_enabled` is true<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Parsed deadlock participants from the latest detected deadlock event. Each row represents one process involved in the deadlock.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Row ID | string |  | hidden | Unique row identifier composed of deadlock ID and process ID. |
+| Deadlock ID | string |  |  | Identifier for the deadlock event, derived from the deadlock timestamp to group participating processes. |
+| Timestamp | timestamp |  |  | Timestamp of the deadlock event from the ring buffer when available; otherwise the function execution time. |
+| Process ID | string |  |  | Deadlock graph process identifier for the process involved in the deadlock. |
+| SPID | integer |  |  | SQL Server session ID (SPID) for the process when available. |
+| ECID | integer |  |  | Execution context ID (ECID) for parallel execution contexts when available. |
+| Victim | string |  |  | "true" when the process was chosen as the deadlock victim and rolled back; otherwise "false". |
+| Query | string |  |  | SQL query text for the process involved in the deadlock. Truncated to 4096 characters. |
+| Lock Mode | string |  |  | Lock mode reported for the process within the deadlock graph (for example X or S). |
+| Lock Status | string |  |  | Lock status for the process. WAITING indicates the process was waiting on a lock. |
+| Wait Resource | string |  |  | Lock resource identifier from the deadlock graph showing what the process was waiting on. |
+| Database | string |  |  | Database name mapped from the deadlock graph database ID when available. |
+
+### Error Info
+
+Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
+with both the `sql_text` and `query_hash` actions.
+
+The session must be created by an administrator and include a `ring_buffer` target. Netdata reads the ring buffer
+and returns recent error events with error number, message, and SQL text. The `query_hash` action is required for
+reliable mapping into `top-queries` (query text fallback is best-effort).
+
+Use cases:
+- Identify recent query errors and their messages
+- Correlate errors to query text
+- Validate error rates seen in top-queries
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mssql:error-info` |
+| Require Cloud | yes |
+| Performance | Executes on-demand queries against the configured Extended Events ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing |
+| Security | Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has a ring_buffer target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Recent error events from the configured Extended Events session.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Timestamp | timestamp |  |  | Timestamp of the error event. |
+| Error Number | integer |  |  | SQL Server error number. |
+| Error State | integer |  |  | SQL Server error state. |
+| Error Message | string |  |  | Error message text. |
+| Query | string |  |  | SQL text captured with the error event. |
+| Query Hash | string |  | hidden | Query hash captured with the error event (used for mapping into top-queries). |
+
 
 
 ## Alerts
@@ -410,7 +512,7 @@ CREATE LOGIN netdata_user WITH PASSWORD = 'YourStrongPassword!';
 -- Grant VIEW SERVER STATE (required for DMVs)
 GRANT VIEW SERVER STATE TO netdata_user;
 
--- Optional: Grant access to msdb for SQL Agent job monitoring
+-- Grant access to msdb for SQL Agent job monitoring (required)
 USE msdb;
 CREATE USER netdata_user FOR LOGIN netdata_user;
 GRANT SELECT ON dbo.sysjobs TO netdata_user;
@@ -426,9 +528,9 @@ GRANT SELECT ON dbo.MSsubscriptions TO netdata_user;
 
 **Required permissions:**
 - `VIEW SERVER STATE` - Access to dynamic management views
+- `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
 
 **Optional permissions:**
-- `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
 - `SELECT on distribution.dbo.MSreplication_monitordata` - Replication monitoring
 - `SELECT on distribution.dbo.MSpublications` - Publication information
 - `SELECT on distribution.dbo.MSsubscriptions` - Subscription counts

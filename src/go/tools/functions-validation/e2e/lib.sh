@@ -206,6 +206,28 @@ run_info() {
   run_info_method "$module" "top-queries"
 }
 
+run_function() {
+  local module="$1"
+  local method="$2"
+  local args="${3:-__job:local}"
+  local require_rows="${4:-true}"
+  local output="$WORKDIR/${module}-${method}.json"
+
+  run "$WORKDIR/go.d.plugin" \
+    --config-dir "$WORKDIR/config" \
+    --function "${module}:${method}" \
+    --function-args "$args" \
+    > "$output"
+
+  if [ "$require_rows" = "true" ]; then
+    validate "$output" --min-rows 1
+  else
+    validate "$output"
+  fi
+
+  echo "$output"
+}
+
 run_top_queries() {
   local module="$1"
   local output="$WORKDIR/${module}-top-queries.json"
