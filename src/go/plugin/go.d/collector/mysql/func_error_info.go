@@ -4,8 +4,11 @@ package mysql
 
 import (
 	"context"
+	"crypto/md5"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -19,6 +22,89 @@ const (
 )
 
 const errorInfoMethodID = "error-info"
+
+// errorInfoColumn defines a column for the error-info function.
+type errorInfoColumn struct {
+	funcapi.ColumnMeta
+	Value func(*mysqlErrorRow) any
+}
+
+func errorInfoColumnSet(cols []errorInfoColumn) funcapi.ColumnSet[errorInfoColumn] {
+	return funcapi.Columns(cols, func(c errorInfoColumn) funcapi.ColumnMeta { return c.ColumnMeta })
+}
+
+var errorInfoColumns = []errorInfoColumn{
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "digest",
+			Tooltip:   "Digest",
+			Type:      funcapi.FieldTypeString,
+			Sortable:  true,
+			Visible:   false,
+			UniqueKey: true,
+		},
+		Value: func(r *mysqlErrorRow) any { return r.Digest },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "query",
+			Tooltip:   "Query",
+			Type:      funcapi.FieldTypeString,
+			Sortable:  true,
+			Visible:   true,
+			Sticky:    true,
+			FullWidth: true,
+		},
+		Value: func(r *mysqlErrorRow) any { return r.Query },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "schema",
+			Tooltip:  "Schema",
+			Type:     funcapi.FieldTypeString,
+			Sortable: true,
+			Visible:  true,
+		},
+		Value: func(r *mysqlErrorRow) any { return r.Schema },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "errorNumber",
+			Tooltip:   "Error Number",
+			Type:      funcapi.FieldTypeInteger,
+			Sortable:  true,
+			Visible:   true,
+			Transform: funcapi.FieldTransformNumber,
+		},
+		Value: func(r *mysqlErrorRow) any {
+			if r.ErrorNumber == nil {
+				return nil
+			}
+			return *r.ErrorNumber
+		},
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:     "sqlState",
+			Tooltip:  "SQL State",
+			Type:     funcapi.FieldTypeString,
+			Sortable: true,
+			Visible:  true,
+		},
+		Value: func(r *mysqlErrorRow) any { return r.SQLState },
+	},
+	{
+		ColumnMeta: funcapi.ColumnMeta{
+			Name:      "errorMessage",
+			Tooltip:   "Error Message",
+			Type:      funcapi.FieldTypeString,
+			Sortable:  false,
+			Visible:   true,
+			FullWidth: true,
+		},
+		Value: func(r *mysqlErrorRow) any { return r.Message },
+	},
+}
 
 func errorInfoMethodConfig() funcapi.MethodConfig {
 	return funcapi.MethodConfig{
@@ -56,10 +142,108 @@ func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcap
 			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 		}
 	}
-	return f.router.collector.collectErrorInfo(ctx)
+	return f.collectData(ctx)
 }
 
 func (f *funcErrorInfo) Cleanup(ctx context.Context) {}
+
+func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionResponse {
+	if !f.router.collector.Config.GetErrorInfoFunctionEnabled() {
+		return &funcapi.FunctionResponse{
+			Status: 503,
+			Message: "error-info not enabled: function disabled in configuration. " +
+				"To enable, set error_info_function_enabled: true in the MySQL collector config.",
+		}
+	}
+
+	available, err := f.checkPerformanceSchema(ctx)
+	if err != nil {
+		return &funcapi.FunctionResponse{
+			Status:  500,
+			Message: fmt.Sprintf("failed to check performance_schema availability: %v", err),
+		}
+	}
+	if !available {
+		return &funcapi.FunctionResponse{Status: 503, Message: "performance_schema is not enabled"}
+	}
+
+	source, err := f.router.collector.detectMySQLErrorHistorySource(ctx)
+	if err != nil {
+		return &funcapi.FunctionResponse{Status: 503, Message: fmt.Sprintf("error-info not enabled: %v", err)}
+	}
+	if source.status != mysqlErrorAttrEnabled {
+		msg := "error-info not enabled"
+		if source.reason != "" {
+			msg = fmt.Sprintf("%s: %s", msg, source.reason)
+		}
+		return &funcapi.FunctionResponse{Status: 503, Message: msg}
+	}
+
+	limit := f.router.collector.TopQueriesLimit
+	if limit <= 0 {
+		limit = 500
+	}
+
+	rows, err := f.router.collector.fetchMySQLErrorRows(ctx, source, nil, limit)
+	if err != nil {
+		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("error-info query failed: %v", err)}
+	}
+	if len(rows) == 0 && source.fallbackTable != "" {
+		fallback, ferr := f.router.collector.buildMySQLErrorSource(ctx, source.fallbackTable)
+		if ferr == nil && fallback.status == mysqlErrorAttrEnabled {
+			fallbackRows, ferr := f.router.collector.fetchMySQLErrorRows(ctx, fallback, nil, limit)
+			if ferr == nil && len(fallbackRows) > 0 {
+				rows = fallbackRows
+			}
+		}
+	}
+
+	data := make([][]any, 0, len(rows))
+	for i := range rows {
+		row := make([]any, len(errorInfoColumns))
+		for j, col := range errorInfoColumns {
+			row[j] = col.Value(&rows[i])
+		}
+		data = append(data, row)
+	}
+
+	cs := errorInfoColumnSet(errorInfoColumns)
+
+	return &funcapi.FunctionResponse{
+		Status:            200,
+		Help:              "Recent SQL errors from performance_schema statement history tables",
+		Columns:           cs.BuildColumns(),
+		Data:              data,
+		DefaultSortColumn: "errorNumber",
+	}
+}
+
+func (f *funcErrorInfo) checkPerformanceSchema(ctx context.Context) (bool, error) {
+	c := f.router.collector
+
+	c.varPerfSchemaMu.RLock()
+	cached := c.varPerformanceSchema
+	c.varPerfSchemaMu.RUnlock()
+	if cached != "" {
+		return cached == "ON" || cached == "1", nil
+	}
+
+	c.varPerfSchemaMu.Lock()
+	defer c.varPerfSchemaMu.Unlock()
+
+	if c.varPerformanceSchema != "" {
+		return c.varPerformanceSchema == "ON" || c.varPerformanceSchema == "1", nil
+	}
+
+	var value string
+	query := "SELECT @@performance_schema"
+	if err := c.db.QueryRowContext(ctx, query).Scan(&value); err != nil {
+		return false, err
+	}
+
+	c.varPerformanceSchema = value
+	return value == "ON" || value == "1", nil
+}
 
 type mysqlErrorSource struct {
 	table         string
@@ -132,6 +316,12 @@ func mysqlErrorAttributionColumns() []topQueriesColumn {
 	}
 }
 
+// TODO: Refactor error data access into a shared mysqlErrorData type.
+// Currently these methods live on Collector because they're used by both:
+// - funcErrorInfo (for error-info function)
+// - funcTopQueries (for error attribution columns)
+// A cleaner design would be a mysqlErrorData type on funcRouter that both handlers use.
+
 func (c *Collector) collectMySQLErrorDetailsForDigests(ctx context.Context, digests []string) (string, map[string]mysqlErrorRow) {
 	source, err := c.detectMySQLErrorHistorySource(ctx)
 	if err != nil {
@@ -170,167 +360,6 @@ func (c *Collector) collectMySQLErrorDetailsForDigests(ctx context.Context, dige
 	return mysqlErrorAttrEnabled, out
 }
 
-func (c *Collector) errorInfoParams(context.Context) ([]funcapi.ParamConfig, error) {
-	if !c.Config.GetErrorInfoFunctionEnabled() {
-		return nil, fmt.Errorf("error-info function disabled in configuration")
-	}
-	return []funcapi.ParamConfig{}, nil
-}
-
-func (c *Collector) collectErrorInfo(ctx context.Context) *funcapi.FunctionResponse {
-	if !c.Config.GetErrorInfoFunctionEnabled() {
-		return &funcapi.FunctionResponse{
-			Status: 503,
-			Message: "error-info not enabled: function disabled in configuration. " +
-				"To enable, set error_info_function_enabled: true in the MySQL collector config.",
-		}
-	}
-
-	available, err := c.checkPerformanceSchema(ctx)
-	if err != nil {
-		return &funcapi.FunctionResponse{
-			Status:  500,
-			Message: fmt.Sprintf("failed to check performance_schema availability: %v", err),
-		}
-	}
-	if !available {
-		return &funcapi.FunctionResponse{Status: 503, Message: "performance_schema is not enabled"}
-	}
-
-	source, err := c.detectMySQLErrorHistorySource(ctx)
-	if err != nil {
-		return &funcapi.FunctionResponse{Status: 503, Message: fmt.Sprintf("error-info not enabled: %v", err)}
-	}
-	if source.status != mysqlErrorAttrEnabled {
-		msg := "error-info not enabled"
-		if source.reason != "" {
-			msg = fmt.Sprintf("%s: %s", msg, source.reason)
-		}
-		return &funcapi.FunctionResponse{Status: 503, Message: msg}
-	}
-
-	limit := c.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
-
-	rows, err := c.fetchMySQLErrorRows(ctx, source, nil, limit)
-	if err != nil {
-		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("error-info query failed: %v", err)}
-	}
-	if len(rows) == 0 && source.fallbackTable != "" {
-		fallback, ferr := c.buildMySQLErrorSource(ctx, source.fallbackTable)
-		if ferr == nil && fallback.status == mysqlErrorAttrEnabled {
-			fallbackRows, ferr := c.fetchMySQLErrorRows(ctx, fallback, nil, limit)
-			if ferr == nil && len(fallbackRows) > 0 {
-				rows = fallbackRows
-			}
-		}
-	}
-
-	data := make([][]any, 0, len(rows))
-	for _, row := range rows {
-		var errNo any
-		if row.ErrorNumber != nil {
-			errNo = *row.ErrorNumber
-		}
-		data = append(data, []any{
-			row.Digest,
-			row.Query,
-			row.Schema,
-			errNo,
-			row.SQLState,
-			row.Message,
-		})
-	}
-
-	return &funcapi.FunctionResponse{
-		Status:            200,
-		Help:              "Recent SQL errors from performance_schema statement history tables",
-		Columns:           buildMySQLErrorInfoColumns(),
-		Data:              data,
-		DefaultSortColumn: "errorNumber",
-	}
-}
-
-func buildMySQLErrorInfoColumns() map[string]any {
-	columns := map[string]any{
-		"digest": funcapi.Column{
-			Index:        0,
-			Name:         "Digest",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     true,
-			Visible:      false,
-			UniqueKey:    true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-		"query": funcapi.Column{
-			Index:        1,
-			Name:         "Query",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     true,
-			Sticky:       true,
-			FullWidth:    true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-		"schema": funcapi.Column{
-			Index:        2,
-			Name:         "Schema",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-		"errorNumber": funcapi.Column{
-			Index:        3,
-			Name:         "Error Number",
-			Type:         funcapi.FieldTypeInteger,
-			Sortable:     true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNumber},
-		}.BuildColumn(),
-		"sqlState": funcapi.Column{
-			Index:        4,
-			Name:         "SQL State",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-		"errorMessage": funcapi.Column{
-			Index:        5,
-			Name:         "Error Message",
-			Type:         funcapi.FieldTypeString,
-			Sortable:     false,
-			FullWidth:    true,
-			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
-		}.BuildColumn(),
-	}
-	return columns
-}
-
-func (c *Collector) checkPerformanceSchema(ctx context.Context) (bool, error) {
-	c.varPerfSchemaMu.RLock()
-	cached := c.varPerformanceSchema
-	c.varPerfSchemaMu.RUnlock()
-	if cached != "" {
-		return cached == "ON" || cached == "1", nil
-	}
-
-	c.varPerfSchemaMu.Lock()
-	defer c.varPerfSchemaMu.Unlock()
-
-	if c.varPerformanceSchema != "" {
-		return c.varPerformanceSchema == "ON" || c.varPerformanceSchema == "1", nil
-	}
-
-	var value string
-	query := "SELECT @@performance_schema"
-	if err := c.db.QueryRowContext(ctx, query).Scan(&value); err != nil {
-		return false, err
-	}
-
-	c.varPerformanceSchema = value
-	return value == "ON" || value == "1", nil
-}
-
 func (c *Collector) detectMySQLErrorHistorySource(ctx context.Context) (mysqlErrorSource, error) {
 	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
@@ -346,7 +375,6 @@ WHERE NAME IN ('events_statements_history_long','events_statements_history','eve
 	defer rows.Close()
 
 	enabled := map[string]bool{}
-	present := map[string]bool{}
 	for rows.Next() {
 		var name, enabledVal string
 		if err := rows.Scan(&name, &enabledVal); err != nil {
@@ -354,7 +382,6 @@ WHERE NAME IN ('events_statements_history_long','events_statements_history','eve
 		}
 		key := strings.ToLower(name)
 		enabled[key] = strings.EqualFold(enabledVal, "YES")
-		present[key] = true
 	}
 	if err := rows.Err(); err != nil {
 		return mysqlErrorSource{status: mysqlErrorAttrNotEnabled, reason: "unable to read performance_schema.setup_consumers"}, err
@@ -442,8 +469,15 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 	if source.columns["DIGEST_TEXT"] {
 		selectCols = append(selectCols, "DIGEST_TEXT")
 	}
+	// MySQL uses SCHEMA_NAME, MariaDB uses CURRENT_SCHEMA
+	schemaCol := ""
 	if source.columns["SCHEMA_NAME"] {
-		selectCols = append(selectCols, "SCHEMA_NAME")
+		schemaCol = "SCHEMA_NAME"
+	} else if source.columns["CURRENT_SCHEMA"] {
+		schemaCol = "CURRENT_SCHEMA"
+	}
+	if schemaCol != "" {
+		selectCols = append(selectCols, schemaCol)
 	}
 	if source.columns["SQL_TEXT"] {
 		selectCols = append(selectCols, "SQL_TEXT")
@@ -509,7 +543,7 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 		if source.columns["DIGEST_TEXT"] {
 			scanTargets = append(scanTargets, &digestText)
 		}
-		if source.columns["SCHEMA_NAME"] {
+		if schemaCol != "" {
 			scanTargets = append(scanTargets, &schemaName)
 		}
 		if source.columns["SQL_TEXT"] {
@@ -520,13 +554,21 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 			return nil, err
 		}
 
-		if !digest.Valid || strings.TrimSpace(digest.String) == "" {
+		digestKey := ""
+		if digest.Valid && strings.TrimSpace(digest.String) != "" {
+			digestKey = digest.String
+		} else if sqlText.Valid && strings.TrimSpace(sqlText.String) != "" {
+			// Generate synthetic digest from SQL_TEXT + MYSQL_ERRNO when DIGEST is NULL.
+			// This happens for statements that fail during parsing (syntax errors, etc.).
+			digestKey = generateSyntheticDigest(sqlText.String, errno.Int64)
+		} else {
 			continue
 		}
-		if seen[digest.String] {
+
+		if seen[digestKey] {
 			continue
 		}
-		seen[digest.String] = true
+		seen[digestKey] = true
 
 		queryText := ""
 		switch {
@@ -543,7 +585,7 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 		}
 
 		row := mysqlErrorRow{
-			Digest:      digest.String,
+			Digest:      digestKey,
 			Query:       queryText,
 			Schema:      schemaName.String,
 			ErrorNumber: errNoPtr,
@@ -558,6 +600,17 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 	}
 
 	return results, nil
+}
+
+// generateSyntheticDigest creates a digest-like identifier for error rows
+// where the real DIGEST is NULL (e.g., syntax errors that fail during parsing).
+// It combines SQL_TEXT and MYSQL_ERRNO to provide meaningful deduplication.
+func generateSyntheticDigest(sqlText string, errno int64) string {
+	h := md5.New()
+	h.Write([]byte(sqlText))
+	h.Write([]byte("_"))
+	h.Write([]byte(strconv.FormatInt(errno, 10)))
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func nullableString(value string) any {
