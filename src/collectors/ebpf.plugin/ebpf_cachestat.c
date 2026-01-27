@@ -64,6 +64,20 @@ static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] = {
     "__set_page_dirty",
     "__folio_mark_dirty"};
 
+static inline int netdata_get_dirty_account_idx(void)
+{
+    if (!strcmp(
+            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+            account_page[NETDATA_CACHESTAT_FOLIO_DIRTY]))
+        return NETDATA_CACHESTAT_FOLIO_DIRTY;
+    else if (!strcmp(
+                 cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                 account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY]))
+        return NETDATA_CACHESTAT_SET_PAGE_DIRTY;
+    else
+        return NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY;
+}
+
 struct netdata_static_thread ebpf_read_cachestat = {
     .name = "EBPF_READ_CACHESTAT",
     .config_section = NULL,
@@ -101,14 +115,11 @@ static void ebpf_cachestat_disable_probe(struct cachestat_bpf *obj)
  */
 static void ebpf_cachestat_disable_specific_probe(struct cachestat_bpf *obj)
 {
-    if (!strcmp(
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
-            account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
+    int idx = netdata_get_dirty_account_idx();
+    if (idx == NETDATA_CACHESTAT_FOLIO_DIRTY) {
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
         bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_kprobe, false);
-    } else if (!strcmp(
-                   cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
-                   account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
+    } else if (idx == NETDATA_CACHESTAT_SET_PAGE_DIRTY) {
         bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_kprobe, false);
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
     } else {
@@ -143,14 +154,11 @@ static void ebpf_cachestat_disable_trampoline(struct cachestat_bpf *obj)
  */
 static void ebpf_cachestat_disable_specific_trampoline(struct cachestat_bpf *obj)
 {
-    if (!strcmp(
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
-            account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
+    int idx = netdata_get_dirty_account_idx();
+    if (idx == NETDATA_CACHESTAT_FOLIO_DIRTY) {
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
         bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_fentry, false);
-    } else if (!strcmp(
-                   cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
-                   account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
+    } else if (idx == NETDATA_CACHESTAT_SET_PAGE_DIRTY) {
         bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_fentry, false);
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
     } else {
@@ -176,25 +184,14 @@ static inline void netdata_set_trampoline_target(struct cachestat_bpf *obj)
     bpf_program__set_attach_target(
         obj->progs.netdata_mark_page_accessed_fentry, 0, cachestat_targets[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED].name);
 
-    if (!strcmp(
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
-            account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
-        bpf_program__set_attach_target(
-            obj->progs.netdata_folio_mark_dirty_fentry,
-            0,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
-    } else if (!strcmp(
-                   cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
-                   account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
-        bpf_program__set_attach_target(
-            obj->progs.netdata_set_page_dirty_fentry,
-            0,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+    int idx = netdata_get_dirty_account_idx();
+    const char *target_name = cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name;
+    if (idx == NETDATA_CACHESTAT_FOLIO_DIRTY) {
+        bpf_program__set_attach_target(obj->progs.netdata_folio_mark_dirty_fentry, 0, target_name);
+    } else if (idx == NETDATA_CACHESTAT_SET_PAGE_DIRTY) {
+        bpf_program__set_attach_target(obj->progs.netdata_set_page_dirty_fentry, 0, target_name);
     } else {
-        bpf_program__set_attach_target(
-            obj->progs.netdata_account_page_dirtied_fentry,
-            0,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        bpf_program__set_attach_target(obj->progs.netdata_account_page_dirtied_fentry, 0, target_name);
     }
 
     bpf_program__set_attach_target(
@@ -228,27 +225,19 @@ static int ebpf_cachestat_attach_probe(struct cachestat_bpf *obj)
     if (ret)
         return -1;
 
-    if (!strcmp(
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
-            account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
-        obj->links.netdata_folio_mark_dirty_kprobe = bpf_program__attach_kprobe(
-            obj->progs.netdata_folio_mark_dirty_kprobe,
-            false,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+    int idx = netdata_get_dirty_account_idx();
+    const char *target_name = cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name;
+    if (idx == NETDATA_CACHESTAT_FOLIO_DIRTY) {
+        obj->links.netdata_folio_mark_dirty_kprobe =
+            bpf_program__attach_kprobe(obj->progs.netdata_folio_mark_dirty_kprobe, false, target_name);
         ret = libbpf_get_error(obj->links.netdata_folio_mark_dirty_kprobe);
-    } else if (!strcmp(
-                   cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
-                   account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
-        obj->links.netdata_set_page_dirty_kprobe = bpf_program__attach_kprobe(
-            obj->progs.netdata_set_page_dirty_kprobe,
-            false,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+    } else if (idx == NETDATA_CACHESTAT_SET_PAGE_DIRTY) {
+        obj->links.netdata_set_page_dirty_kprobe =
+            bpf_program__attach_kprobe(obj->progs.netdata_set_page_dirty_kprobe, false, target_name);
         ret = libbpf_get_error(obj->links.netdata_set_page_dirty_kprobe);
     } else {
-        obj->links.netdata_account_page_dirtied_kprobe = bpf_program__attach_kprobe(
-            obj->progs.netdata_account_page_dirtied_kprobe,
-            false,
-            cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
+        obj->links.netdata_account_page_dirtied_kprobe =
+            bpf_program__attach_kprobe(obj->progs.netdata_account_page_dirtied_kprobe, false, target_name);
         ret = libbpf_get_error(obj->links.netdata_account_page_dirtied_kprobe);
     }
 
@@ -720,7 +709,8 @@ static void save_previous_values(netdata_publish_cachestat_t *publish)
  */
 static void calculate_stats(netdata_publish_cachestat_t *publish)
 {
-    if (!publish->prev.mark_page_accessed) {
+    if (!publish->prev.mark_page_accessed && !publish->prev.add_to_page_cache_lru && !publish->prev.mark_buffer_dirty &&
+        !publish->prev.account_page_dirtied) {
         save_previous_values(publish);
         return;
     }
@@ -754,20 +744,18 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_pe
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_cachestat_pid_t *total = &out[0];
-    uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
         netdata_cachestat_pid_t *w = &out[i];
         total->account_page_dirtied += w->account_page_dirtied;
         total->add_to_page_cache_lru += w->add_to_page_cache_lru;
         total->mark_buffer_dirty += w->mark_buffer_dirty;
         total->mark_page_accessed += w->mark_page_accessed;
-        if (w->ct > ct)
-            ct = w->ct;
+        if (w->ct > total->ct)
+            total->ct = w->ct;
 
         if (!total->name[0] && w->name[0])
             strncpyz(total->name, w->name, sizeof(total->name) - 1);
     }
-    total->ct = ct;
 }
 
 /**
@@ -864,14 +852,6 @@ static void ebpf_update_cachestat_cgroup()
     netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
-/**
- * Sum single PID cache statistics
- *
- * Add values from a single PID to destination cache statistics.
- *
- * @param dst destination cache statistics.
- * @param src source cache statistics to add.
- */
 static inline void sum_single_pid_cachestat(netdata_cachestat_t *dst, const netdata_cachestat_t *src)
 {
     dst->account_page_dirtied += src->account_page_dirtied;
@@ -880,13 +860,31 @@ static inline void sum_single_pid_cachestat(netdata_cachestat_t *dst, const netd
     dst->mark_page_accessed += src->mark_page_accessed;
 }
 
-/**
- * Write four cachestat charts for a given context
- *
- * @param family    chart family.
- * @param name      chart name suffix.
- * @param npc       cache statistics containing the data to write.
- */
+static void cachestat_sum_pids_internal(netdata_publish_cachestat_t *publish, void *root, bool is_cgroup)
+{
+    netdata_cachestat_t new_prev = publish->current;
+    memset(&publish->current, 0, sizeof(publish->current));
+    netdata_cachestat_t *dst = &publish->current;
+
+    if (is_cgroup) {
+        struct pid_on_target2 *r = (struct pid_on_target2 *)root;
+        for (; r; r = r->next)
+            sum_single_pid_cachestat(dst, &r->cachestat.current);
+    } else {
+        struct ebpf_pid_on_target *r = (struct ebpf_pid_on_target *)root;
+        for (; r; r = r->next) {
+            uint32_t pid = r->pid;
+            netdata_ebpf_pid_stats_t *local_pid =
+                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
+            if (!local_pid)
+                continue;
+            netdata_publish_cachestat_t *w = &local_pid->cachestat;
+            sum_single_pid_cachestat(dst, &w->current);
+        }
+    }
+    publish->prev = new_prev;
+}
+
 static void write_cachestat_charts(const char *family, const char *name, const netdata_publish_cachestat_t *npc)
 {
     ebpf_write_begin_chart(family, name, "_ebpf_cachestat_hit_ratio");
@@ -906,17 +904,6 @@ static void write_cachestat_charts(const char *family, const char *name, const n
     ebpf_write_end_chart();
 }
 
-/**
- * Write four cachestat charts with custom dimension names
- *
- * @param family         chart family.
- * @param name           chart name.
- * @param npc            cache statistics containing the data to write.
- * @param ratio_name     dimension name for ratio.
- * @param dirty_name     dimension name for dirty pages.
- * @param hit_name       dimension name for hits.
- * @param miss_name      dimension name for misses.
- */
 static void write_cachestat_charts_with_dims(
     const char *family,
     const char *name,
@@ -943,29 +930,9 @@ static void write_cachestat_charts_with_dims(
     ebpf_write_end_chart();
 }
 
-/**
- * Cachestat sum PIDs
- *
- * Sum values for all PIDs associated to a group
- *
- * @param publish  output structure.
- * @param root     structure with listed IPs
- */
 void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_pid_on_target *root)
 {
-    memcpy(&publish->prev, &publish->current, sizeof(publish->current));
-    memset(&publish->current, 0, sizeof(publish->current));
-
-    netdata_cachestat_t *dst = &publish->current;
-    for (; root; root = root->next) {
-        uint32_t pid = root->pid;
-        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
-        if (!local_pid)
-            continue;
-        netdata_publish_cachestat_t *w = &local_pid->cachestat;
-
-        sum_single_pid_cachestat(dst, &w->current);
-    }
+    cachestat_sum_pids_internal(publish, root, false);
 }
 
 /**
@@ -1027,11 +994,10 @@ void ebpf_read_cachestat_thread(void *ptr)
         counter = 0;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
-
+        else
+            running_time = update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
@@ -1207,23 +1173,9 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
     netdata_mutex_unlock(&collect_data_mutex);
 }
 
-/**
- * Cachestat sum PIDs
- *
- * Sum values for all PIDs associated to a group
- *
- * @param publish  output structure.
- * @param root     structure with listed IPs
- */
 void ebpf_cachestat_sum_cgroup_pids(netdata_publish_cachestat_t *publish, struct pid_on_target2 *root)
 {
-    memcpy(&publish->prev, &publish->current, sizeof(publish->current));
-    memset(&publish->current, 0, sizeof(publish->current));
-
-    netdata_cachestat_t *dst = &publish->current;
-    for (; root; root = root->next) {
-        sum_single_pid_cachestat(dst, &root->cachestat.current);
-    }
+    cachestat_sum_pids_internal(publish, root, true);
 }
 
 /**
@@ -1581,11 +1533,10 @@ static void cachestat_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
-
+        else
+            running_time = update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
