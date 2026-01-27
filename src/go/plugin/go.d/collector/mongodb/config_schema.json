@@ -87,13 +87,13 @@
                 "title": "Timeout",
                 "description": "Query timeout in seconds. Uses collector timeout if not set.",
                 "type": "number",
-                "minimum": 0.5
+                "minimum": 0
               },
               "limit": {
                 "title": "Limit",
                 "description": "Maximum number of queries to return in the response.",
                 "type": "integer",
-                "minimum": 1,
+                "minimum": 0,
                 "maximum": 5000,
                 "default": 500
               }
