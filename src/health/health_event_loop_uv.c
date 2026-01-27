@@ -571,9 +571,6 @@ static void health_event_loop(void *arg) {
             cmd_data_t cmd = health_deq_cmd();
             opcode = cmd.opcode;
 
-            if (likely(opcode != HEALTH_NOOP))
-                worker_is_busy(opcode);
-
             switch (opcode) {
                 case HEALTH_NOOP:
                     break;
