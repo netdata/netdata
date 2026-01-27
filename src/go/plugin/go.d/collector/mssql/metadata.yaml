@@ -629,6 +629,7 @@ modules:
             - Correlate deadlocks with recent application changes or deployments
 
             Query text and wait resource strings are truncated at 4096 characters for display purposes.
+          parameters: []
           returns:
             description: Parsed deadlock participants from the latest detected deadlock event. Each row represents one process involved in the deadlock.
             columns:
@@ -702,6 +703,7 @@ modules:
             - Identify recent query errors and their messages
             - Correlate errors to query text
             - Validate error rates seen in top-queries
+          parameters: []
           returns:
             description: Recent error events from the configured Extended Events session.
             columns:

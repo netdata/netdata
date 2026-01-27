@@ -530,6 +530,7 @@ modules:
             - Correlate deadlocks with application changes or deployment events
 
             Query text is truncated at 4096 characters for display purposes.
+          parameters: []
           returns:
             description: Parsed deadlock participants from the latest detected deadlock. Each row represents one transaction involved in the deadlock.
             columns:
@@ -604,6 +605,7 @@ modules:
             - Validate error rates seen in top-queries
 
             Error messages are truncated by Performance Schema (usually 128 characters).
+          parameters: []
           returns:
             description: Most recent error per query digest from Performance Schema history tables.
             columns:
