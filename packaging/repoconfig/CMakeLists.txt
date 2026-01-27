@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.16.0...3.30)
 
-list(APPEND RHEL_DISTROS centos centos-stream rocky almalinux cloudlinux)
+list(APPEND RHEL_DISTROS centos centos-stream rhel rocky almalinux cloudlinux)
 list(APPEND SUSE_DISTROS opensuse-leap opensuse-tumbleweed)
 list(APPEND RPM_DISTROS rhel opensuse ol amzn fedora)
 list(APPEND DEB_DISTROS debian ubuntu)
@@ -10,7 +10,7 @@ list(APPEND DEB_DISTROS debian ubuntu)
 set(DEB_GPG_KEY_SOURCE "https://repo.netdata.cloud/netdatabot.gpg.key")
 
 set(PACKAGE_VERSION 5)
-set(PACKAGE_RELEASE 4)
+set(PACKAGE_RELEASE 5)
 
 set(CPACK_THREADS 0)
 set(CPACK_STRIP_FILES NO)
@@ -96,6 +96,10 @@ endif()
 
 if(${DISTRO} IN_LIST RHEL_DISTROS)
   set(DISTRO "rhel")
+  string(FIND "${DISTRO_VERSION}" "." DECIMAL_INDEX)
+  if("${DECIMAL_INDEX}" GREATER 0)
+    string(SUBSTRING "${DISTRO_VERSION}" 0 "${DECIMAL_INDEX}" DISTRO_VERSION)
+  endif()
 elseif(${DISTRO} STREQUAL "opensuse-leap")
   set(DISTRO "opensuse")
 elseif(${DISTRO} STREQUAL "opensuse-tumbleweed")
@@ -219,12 +223,11 @@ elseif(${DISTRO} IN_LIST RPM_DISTROS)
     endif()
   elseif(${DISTRO} STREQUAL "rhel")
     set(DIST_NAME "el")
+    set(DIST_VERSION "${DISTRO_VERSION}")
     set(CPACK_RPM_PACKAGE_REQUIRES "epel-release")
 
     if(${DISTRO_VERSION} VERSION_LESS 8)
       set(CPACK_RPM_PACKAGE_REQUIRES "yum-plugin-priorities, epel-release")
-    elseif(${DISTRO_VERSION} VERSION_GREATER_EQUAL 9)
-      set(DIST_VERSION "$releasever_major")
     endif()
   endif()
 
