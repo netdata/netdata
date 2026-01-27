@@ -31,7 +31,7 @@ void ebpf_parse_service_name_section(struct config *cfg);
  *
  *****************************************************************/
 
-void write_chart_dimension(char *dim, long long value)
+void write_chart_dimension(const char *dim, long long value)
 {
     printf("SET %s = %lld\n", dim, value);
 }

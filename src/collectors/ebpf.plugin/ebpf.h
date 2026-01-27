@@ -233,7 +233,7 @@ static inline void ebpf_commit_label()
  * @param name   the chart name
  * @param metric the chart suffix (used with apps and cgroups)
  */
-static inline void ebpf_write_begin_chart(char *family, char *name, char *metric)
+static inline void ebpf_write_begin_chart(const char *family, const char *name, const char *metric)
 {
     printf("BEGIN %s.%s%s\n", family, name, metric);
 }

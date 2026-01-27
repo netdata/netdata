@@ -20,7 +20,7 @@ typedef struct config config;
  *
  *****************************************************************/
 
-void write_chart_dimension(char *dim, long long value);
+void write_chart_dimension(const char *dim, long long value);
 void ebpf_write_global_dimension(char *name, char *id, char *algorithm);
 void ebpf_create_global_dimension(void *ptr, int end);
 
