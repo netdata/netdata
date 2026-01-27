@@ -688,21 +688,6 @@ static void cachestat_calculate_from_values(
 }
 
 /**
- * Save previous values
- *
- * Save values used this time.
- *
- * @param publish
- */
-static void save_previous_values(netdata_publish_cachestat_t *publish)
-{
-    publish->prev.mark_page_accessed = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED];
-    publish->prev.account_page_dirtied = cachestat_hash_values[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED];
-    publish->prev.add_to_page_cache_lru = cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU];
-    publish->prev.mark_buffer_dirty = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY];
-}
-
-/**
  * Calculate statistics
  *
  * @param publish the structure where we will store the data.
@@ -711,7 +696,10 @@ static void calculate_stats(netdata_publish_cachestat_t *publish)
 {
     if (!publish->prev.mark_page_accessed && !publish->prev.add_to_page_cache_lru && !publish->prev.mark_buffer_dirty &&
         !publish->prev.account_page_dirtied) {
-        save_previous_values(publish);
+        publish->prev.mark_page_accessed = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED];
+        publish->prev.account_page_dirtied = cachestat_hash_values[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED];
+        publish->prev.add_to_page_cache_lru = cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU];
+        publish->prev.mark_buffer_dirty = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY];
         return;
     }
 
@@ -721,9 +709,12 @@ static void calculate_stats(netdata_publish_cachestat_t *publish)
         .add_to_page_cache_lru = cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU],
         .account_page_dirtied = cachestat_hash_values[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED]};
 
-    save_previous_values(publish);
-
     cachestat_calculate_from_values(publish, &current, &publish->prev);
+
+    publish->prev.mark_page_accessed = current.mark_page_accessed;
+    publish->prev.account_page_dirtied = current.account_page_dirtied;
+    publish->prev.add_to_page_cache_lru = current.add_to_page_cache_lru;
+    publish->prev.mark_buffer_dirty = current.mark_buffer_dirty;
 }
 
 /*****************************************************************
