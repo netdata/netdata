@@ -20,75 +20,14 @@ func newTestDeadlockHandler(c *Collector) *funcDeadlockInfo {
 	return &funcDeadlockInfo{router: r}
 }
 
-func TestConfig_GetDeadlockInfoFunctionEnabled(t *testing.T) {
-	tests := []struct {
-		name string
-		cfg  Config
-		want bool
-	}{
-		{
-			name: "default enabled when unset",
-			cfg:  Config{},
-			want: true,
-		},
-		{
-			name: "explicitly enabled",
-			cfg: Config{
-				DeadlockInfoFunctionEnabled: boolPtr(true),
-			},
-			want: true,
-		},
-		{
-			name: "explicitly disabled",
-			cfg: Config{
-				DeadlockInfoFunctionEnabled: boolPtr(false),
-			},
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.cfg.GetDeadlockInfoFunctionEnabled())
-		})
-	}
+func TestConfig_FunctionsDisabledDefaults(t *testing.T) {
+	cfg := Config{}
+	assert.False(t, cfg.Functions.DeadlockInfo.Disabled, "deadlock_info should be enabled by default")
+	assert.False(t, cfg.Functions.ErrorInfo.Disabled, "error_info should be enabled by default")
+	assert.False(t, cfg.Functions.TopQueries.Disabled, "top_queries should be enabled by default")
 }
 
-func TestConfig_GetErrorInfoFunctionEnabled(t *testing.T) {
-	tests := []struct {
-		name string
-		cfg  Config
-		want bool
-	}{
-		{
-			name: "default enabled when unset",
-			cfg:  Config{},
-			want: true,
-		},
-		{
-			name: "explicitly enabled",
-			cfg: Config{
-				ErrorInfoFunctionEnabled: boolPtr(true),
-			},
-			want: true,
-		},
-		{
-			name: "explicitly disabled",
-			cfg: Config{
-				ErrorInfoFunctionEnabled: boolPtr(false),
-			},
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.cfg.GetErrorInfoFunctionEnabled())
-		})
-	}
-}
-
-func TestConfig_GetErrorInfoSessionName(t *testing.T) {
+func TestConfig_ErrorInfoSessionName(t *testing.T) {
 	tests := []struct {
 		name string
 		cfg  Config
@@ -102,7 +41,11 @@ func TestConfig_GetErrorInfoSessionName(t *testing.T) {
 		{
 			name: "explicit session name",
 			cfg: Config{
-				ErrorInfoSessionName: "custom_errors",
+				Functions: FunctionsConfig{
+					ErrorInfo: ErrorInfoConfig{
+						SessionName: "custom_errors",
+					},
+				},
 			},
 			want: "custom_errors",
 		},
@@ -110,7 +53,7 @@ func TestConfig_GetErrorInfoSessionName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.cfg.GetErrorInfoSessionName())
+			assert.Equal(t, tt.want, tt.cfg.errorInfoSessionName())
 		})
 	}
 }
@@ -277,7 +220,7 @@ func TestCollectDeadlockInfo_PermissionDenied(t *testing.T) {
 
 func TestCollectDeadlockInfo_Disabled(t *testing.T) {
 	c := New()
-	c.Config.DeadlockInfoFunctionEnabled = boolPtr(false)
+	c.Config.Functions.DeadlockInfo.Disabled = true
 	handler := newTestDeadlockHandler(c)
 
 	resp := handler.collectData(context.Background())
@@ -340,8 +283,6 @@ func findTxn(txns []*mssqlDeadlockTxn, id string) *mssqlDeadlockTxn {
 	}
 	return nil
 }
-
-func boolPtr(v bool) *bool { return &v }
 
 const sampleDeadlockGraph = `
 <deadlock>

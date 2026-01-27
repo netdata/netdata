@@ -32,25 +32,71 @@
         "minimum": 0.5,
         "default": 1
       },
-      "dsn": {
-        "title": "SQL DSN",
-        "description": "YSQL Data Source Name for query functions (top-queries, running-queries).",
-        "type": "string"
-      },
-      "sql_timeout": {
-        "title": "SQL Timeout",
-        "description": "Timeout in seconds for SQL query functions.",
-        "type": "number",
-        "minimum": 0.5,
-        "default": 1
-      },
-      "top_queries_limit": {
-        "title": "Top Queries Limit",
-        "description": "Maximum number of rows returned by the top-queries and running-queries functions.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 5000,
-        "default": 500
+      "functions": {
+        "title": "Functions",
+        "description": "Configuration for Netdata functions exposed by this collector.",
+        "type": "object",
+        "properties": {
+          "dsn": {
+            "title": "SQL DSN",
+            "description": "YSQL Data Source Name (required for query functions).",
+            "type": "string"
+          },
+          "top_queries": {
+            "title": "Top Queries",
+            "description": "Configuration for the top-queries function.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the top-queries function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "type": "number",
+                "minimum": 0.5
+              },
+              "limit": {
+                "title": "Limit",
+                "description": "Maximum number of queries to return in the response.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "default": 500
+              }
+            }
+          },
+          "running_queries": {
+            "title": "Running Queries",
+            "description": "Configuration for the running-queries function.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the running-queries function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "type": "number",
+                "minimum": 0.5
+              },
+              "limit": {
+                "title": "Limit",
+                "description": "Maximum number of queries to return in the response.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "default": 500
+              }
+            }
+          }
+        }
       },
       "not_follow_redirects": {
         "title": "Not follow redirects",
@@ -174,13 +220,6 @@
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     },
-    "dsn": {
-      "ui:help": "Format is `postgres://username:password@host:port/dbname?sslmode=disable`.",
-      "ui:placeholder": "postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable"
-    },
-    "sql_timeout": {
-      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
-    },
     "username": {
       "ui:widget": "password"
     },
@@ -207,11 +246,9 @@
           ]
         },
         {
-          "title": "SQL",
+          "title": "Functions",
           "fields": [
-            "dsn",
-            "sql_timeout",
-            "top_queries_limit"
+            "functions"
           ]
         },
         {

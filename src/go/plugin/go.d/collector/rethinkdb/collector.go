@@ -50,7 +50,31 @@ type Config struct {
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	Username           string           `yaml:"username,omitempty" json:"username"`
 	Password           string           `yaml:"password,omitempty" json:"password"`
-	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	Functions          FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	RunningQueries RunningQueriesConfig `yaml:"running_queries,omitempty" json:"running_queries"`
+}
+
+type RunningQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) runningQueriesTimeout() time.Duration {
+	if c.Functions.RunningQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.RunningQueries.Timeout.Duration()
+}
+
+func (c Config) runningQueriesLimit() int {
+	if c.Functions.RunningQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.RunningQueries.Limit
 }
 
 type Collector struct {

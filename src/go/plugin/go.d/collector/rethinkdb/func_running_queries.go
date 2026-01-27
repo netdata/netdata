@@ -47,6 +47,9 @@ func (f *funcRunningQueries) MethodParams(_ context.Context, method string) ([]f
 	if method != runningQueriesMethodID {
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
+	if f.router.collector.Functions.RunningQueries.Disabled {
+		return nil, fmt.Errorf("running-queries function disabled in configuration")
+	}
 	return []funcapi.ParamConfig{funcapi.BuildSortParam(rethinkRunningColumns)}, nil
 }
 
@@ -55,6 +58,9 @@ func (f *funcRunningQueries) Handle(ctx context.Context, method string, params f
 	if method != runningQueriesMethodID {
 		return funcapi.NotFoundResponse(method)
 	}
+	if f.router.collector.Functions.RunningQueries.Disabled {
+		return funcapi.UnavailableResponse("running-queries function has been disabled in configuration")
+	}
 
 	return f.collectRunningQueries(ctx, params.Column("__sort"))
 }
@@ -62,18 +68,19 @@ func (f *funcRunningQueries) Handle(ctx context.Context, method string, params f
 func (f *funcRunningQueries) collectRunningQueries(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	c := f.router.collector
 
-	limit := c.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
+	limit := c.runningQueriesLimit()
+	timeout := c.runningQueriesTimeout()
 
-	if ctx.Err() == context.DeadlineExceeded {
+	queryCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	if queryCtx.Err() == context.DeadlineExceeded {
 		return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
 	}
 
-	rows, err := c.rdb.jobs(ctx)
+	rows, err := c.rdb.jobs(queryCtx)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+		if queryCtx.Err() == context.DeadlineExceeded {
 			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
 		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("jobs query failed: %v", err)}

@@ -101,6 +101,9 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 	}
 
 	c := f.router.collector
+	if c.Functions.TopQueries.Disabled {
+		return nil, fmt.Errorf("top-queries function disabled in configuration")
+	}
 	if c.db == nil {
 		if err := c.openConnection(); err != nil {
 			return nil, err
@@ -117,13 +120,18 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	}
 
 	c := f.router.collector
+	if c.Functions.TopQueries.Disabled {
+		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
+	}
 	if c.db == nil {
 		if err := c.openConnection(); err != nil {
 			return funcapi.UnavailableResponse(fmt.Sprintf("failed to open connection: %v", err))
 		}
 	}
 
-	return c.collectTopQueries(ctx, params.Column(paramSort))
+	queryCtx, cancel := context.WithTimeout(ctx, c.topQueriesTimeout())
+	defer cancel()
+	return c.collectTopQueries(queryCtx, params.Column(paramSort))
 }
 
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
@@ -305,10 +313,7 @@ func (c *Collector) collectTopQueries(ctx context.Context, sortColumn string) *f
 	cs := proxysqlColumnSet(cols)
 	sortColumn = c.mapAndValidateProxySQLSortColumn(sortColumn, cs)
 
-	limit := c.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
+	limit := c.topQueriesLimit()
 
 	query := c.buildProxySQLDynamicSQL(cols, sortColumn, limit)
 	rows, err := c.db.QueryContext(ctx, query)

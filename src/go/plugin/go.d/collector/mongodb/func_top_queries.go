@@ -160,6 +160,9 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 	}
 	switch method {
 	case topQueriesMethodID:
+		if f.router.collector.Functions.TopQueries.Disabled {
+			return nil, fmt.Errorf("top-queries function disabled in configuration")
+		}
 		return f.methodParams(ctx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
@@ -174,19 +177,18 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 
 	switch method {
 	case topQueriesMethodID:
-		if !f.router.collector.Config.GetTopQueriesFunctionEnabled() {
-			return funcapi.ErrorResponse(403, "Top Queries function has been disabled in configuration. Set 'top_queries_function_enabled: true' to enable.")
+		if f.router.collector.Functions.TopQueries.Disabled {
+			return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
 		}
-		return f.collectData(ctx, params.Column(topQueriesParamSort))
+		queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
+		defer cancel()
+		return f.collectData(queryCtx, params.Column(topQueriesParamSort))
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
 }
 
 func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
-	if !f.router.collector.Config.GetTopQueriesFunctionEnabled() {
-		return nil, fmt.Errorf("top queries function disabled")
-	}
 
 	databases, err := f.getDatabases()
 	if err != nil {
@@ -204,10 +206,7 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 }
 
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
-	limit := f.router.collector.Config.TopQueriesLimit
-	if limit <= 0 {
-		limit = topQueriesDefaultLimit
-	}
+	limit := f.router.collector.topQueriesLimit()
 
 	// Build valid sort columns map from metadata
 	validSortCols := make(map[string]bool)

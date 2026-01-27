@@ -98,6 +98,9 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 	}
 	switch method {
 	case topQueriesMethodID:
+		if f.router.collector.Functions.TopQueries.Disabled {
+			return nil, fmt.Errorf("top-queries function disabled in configuration")
+		}
 		return f.methodParams(ctx)
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
@@ -111,7 +114,12 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	}
 	switch method {
 	case topQueriesMethodID:
-		return f.collectData(ctx, params.Column("__sort"))
+		if f.router.collector.Functions.TopQueries.Disabled {
+			return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
+		}
+		queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
+		defer cancel()
+		return f.collectData(queryCtx, params.Column("__sort"))
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
@@ -177,10 +185,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	cs := f.columnSet(cols)
 	sortColumn = f.mapAndValidateSortColumn(sortColumn, cs)
 
-	limit := f.router.collector.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
+	limit := f.router.collector.topQueriesLimit()
 
 	groupKey := "normalized_query_hash"
 	if !availableCols[groupKey] {

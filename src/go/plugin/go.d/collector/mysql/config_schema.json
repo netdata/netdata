@@ -41,25 +41,77 @@
         "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
         "type": "string"
       },
-      "top_queries_limit": {
-        "title": "Top Queries Limit",
-        "description": "Maximum number of queries to return in the top-queries function response.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 5000,
-        "default": 500
-      },
-      "deadlock_info_function_enabled": {
-        "title": "Enable Deadlock Info Function",
-        "description": "Enable the deadlock-info function. WARNING: query text may contain unmasked sensitive literals (PII). Only enable after ensuring proper access controls to the Netdata dashboard. This function reads SHOW ENGINE INNODB STATUS and may require PROCESS privilege.",
-        "type": "boolean",
-        "default": true
-      },
-      "error_info_function_enabled": {
-        "title": "Enable Error Info Function",
-        "description": "Enable the error-info function. WARNING: error messages and query text may contain unmasked sensitive literals (PII). This function reads Performance Schema statement history tables; ensure proper access controls to the Netdata dashboard.",
-        "type": "boolean",
-        "default": true
+      "functions": {
+        "title": "Functions",
+        "description": "Configuration for Netdata functions exposed by this collector.",
+        "type": "object",
+        "properties": {
+          "top_queries": {
+            "title": "Top Queries",
+            "description": "Configuration for the top-queries function.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the top-queries function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "type": "number",
+                "minimum": 0.5
+              },
+              "limit": {
+                "title": "Limit",
+                "description": "Maximum number of queries to return in the response.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "default": 500
+              }
+            }
+          },
+          "deadlock_info": {
+            "title": "Deadlock Info",
+            "description": "Configuration for the deadlock-info function.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the deadlock-info function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "type": "number",
+                "minimum": 0.5
+              }
+            }
+          },
+          "error_info": {
+            "title": "Error Info",
+            "description": "Configuration for the error-info function.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the error-info function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "type": "number",
+                "minimum": 0.5
+              }
+            }
+          }
+        }
       }
     },
     "required": [
@@ -82,11 +134,44 @@
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     },
-    "deadlock_info_function_enabled": {
-      "ui:help": "When enabled, the deadlock-info function becomes available in the Netdata dashboard. WARNING: query text may contain unmasked sensitive literals; restrict dashboard access."
+    "functions": {
+      "top_queries": {
+        "disabled": {
+          "ui:help": "WARNING: Query text may contain unmasked sensitive literals (PII)."
+        }
+      },
+      "deadlock_info": {
+        "disabled": {
+          "ui:help": "WARNING: Query text may contain unmasked sensitive literals. Requires PROCESS privilege."
+        }
+      },
+      "error_info": {
+        "disabled": {
+          "ui:help": "WARNING: Error messages and query text may contain unmasked sensitive literals."
+        }
+      }
     },
-    "error_info_function_enabled": {
-      "ui:help": "When enabled, the error-info function becomes available in the Netdata dashboard. WARNING: error messages and query text may include sensitive literals."
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "dsn",
+            "timeout",
+            "my.cnf",
+            "vnode",
+            "autodetection_retry"
+          ]
+        },
+        {
+          "title": "Functions",
+          "fields": [
+            "functions"
+          ]
+        }
+      ]
     }
   }
 }

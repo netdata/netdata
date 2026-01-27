@@ -205,7 +205,9 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	}
 	switch method {
 	case topQueriesMethodID:
-		return f.collectData(ctx, params.Column(topQueriesParamSort))
+		queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
+		defer cancel()
+		return f.collectData(queryCtx, params.Column(topQueriesParamSort))
 	default:
 		return funcapi.NotFoundResponse(method)
 	}
@@ -215,8 +217,8 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 
 func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
-	if !f.router.collector.Config.GetQueryStoreFunctionEnabled() {
-		return nil, fmt.Errorf("query store function disabled")
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return nil, fmt.Errorf("top-queries function disabled in configuration")
 	}
 
 	availableCols, err := f.detectQueryStoreColumns(ctx)
@@ -234,12 +236,8 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 }
 
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
-	if !f.router.collector.Config.GetQueryStoreFunctionEnabled() {
-		return &funcapi.FunctionResponse{
-			Status: 403,
-			Message: "Query Store function has been disabled in configuration. " +
-				"To enable, set query_store_function_enabled: true in the MSSQL collector config.",
-		}
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
 	}
 
 	availableCols, err := f.detectQueryStoreColumns(ctx)
@@ -260,11 +258,8 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 
 	validatedSortColumn := f.mapAndValidateSortColumn(sortColumn, cols)
 
-	timeWindowDays := f.router.collector.Config.GetQueryStoreTimeWindowDays()
-	limit := f.router.collector.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
+	timeWindowDays := f.router.collector.topQueriesTimeWindowDays()
+	limit := f.router.collector.topQueriesLimit()
 	query := f.buildDynamicSQL(cols, validatedSortColumn, timeWindowDays, limit)
 
 	rows, err := f.router.collector.db.QueryContext(ctx, query)

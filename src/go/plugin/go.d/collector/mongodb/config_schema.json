@@ -67,19 +67,39 @@
           }
         }
       },
-      "top_queries_function_enabled": {
-        "title": "Enable Top Queries function",
-        "description": "Enables or disables the Top Queries function that exposes slow queries from MongoDB Profiler (system.profile). **WARNING**: Query text may contain unmasked literals (potential PII). Requires profiling to be enabled on target databases.",
-        "type": "boolean",
-        "default": true
-      },
-      "top_queries_limit": {
-        "title": "Top Queries limit",
-        "description": "Maximum number of queries to return from the Top Queries function. Set to 0 to use the default limit (500).",
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 10000,
-        "default": 500
+      "functions": {
+        "title": "Functions",
+        "description": "Configuration for Netdata functions exposed by this collector.",
+        "type": "object",
+        "properties": {
+          "top_queries": {
+            "title": "Top Queries",
+            "description": "Configuration for the top-queries function (MongoDB Profiler).",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the top-queries function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "type": "number",
+                "minimum": 0.5
+              },
+              "limit": {
+                "title": "Limit",
+                "description": "Maximum number of queries to return in the response.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "default": 500
+              }
+            }
+          }
+        }
       },
       "vnode": {
         "title": "Vnode",
@@ -110,11 +130,12 @@
     "databases": {
       "ui:help": "The logic for inclusion and exclusion is as follows: `(include1 OR include2) AND !(exclude1 OR exclude2)`."
     },
-    "top_queries_function_enabled": {
-      "ui:help": "When enabled, the Top Queries function allows you to view slow queries from MongoDB's system.profile collection. Note: Query text may contain unmasked literals which could include sensitive information (PII)."
-    },
-    "top_queries_limit": {
-      "ui:help": "Controls how many queries are returned. Higher values provide more data but may impact performance."
+    "functions": {
+      "top_queries": {
+        "disabled": {
+          "ui:help": "WARNING: Query text from MongoDB Profiler may contain unmasked literals (PII). Requires profiling to be enabled on target databases."
+        }
+      }
     },
     "ui:flavour": "tabs",
     "ui:options": {
@@ -136,10 +157,9 @@
           ]
         },
         {
-          "title": "Top Queries",
+          "title": "Functions",
           "fields": [
-            "top_queries_function_enabled",
-            "top_queries_limit"
+            "functions"
           ]
         }
       ]

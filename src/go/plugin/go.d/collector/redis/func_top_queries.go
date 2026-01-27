@@ -76,6 +76,9 @@ func (f *funcTopQueries) MethodParams(_ context.Context, method string) ([]funca
 	if method != topQueriesMethodID {
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return nil, fmt.Errorf("top-queries function disabled in configuration")
+	}
 	return []funcapi.ParamConfig{funcapi.BuildSortParam(redisAllColumns)}, nil
 }
 
@@ -84,12 +87,17 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 	if method != topQueriesMethodID {
 		return funcapi.NotFoundResponse(method)
 	}
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
+	}
 
 	if f.router.collector.rdb == nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
-	return f.collectTopQueries(ctx, params.Column("__sort"))
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
+	defer cancel()
+	return f.collectTopQueries(queryCtx, params.Column("__sort"))
 }
 
 // Cleanup implements funcapi.MethodHandler.
@@ -98,10 +106,7 @@ func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	c := f.router.collector
 
-	limit := c.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
+	limit := c.topQueriesLimit()
 
 	entries, err := c.rdb.SlowLogGet(ctx, -1).Result()
 	if err != nil {

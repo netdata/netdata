@@ -150,7 +150,7 @@ func newFuncErrorInfo(r *funcRouter) *funcErrorInfo {
 var _ funcapi.MethodHandler = (*funcErrorInfo)(nil)
 
 func (f *funcErrorInfo) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if !f.router.collector.Config.GetErrorInfoFunctionEnabled() {
+	if f.router.collector.Functions.ErrorInfo.Disabled {
 		return nil, fmt.Errorf("error-info function disabled in configuration")
 	}
 	return []funcapi.ParamConfig{}, nil
@@ -164,29 +164,28 @@ func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcap
 		}
 		f.router.collector.db = db
 	}
-	return f.collectData(ctx)
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.errorInfoTimeout())
+	defer cancel()
+	return f.collectData(queryCtx)
 }
 
 func (f *funcErrorInfo) Cleanup(ctx context.Context) {}
 
 func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionResponse {
-	if !f.router.collector.Config.GetErrorInfoFunctionEnabled() {
-		return &funcapi.FunctionResponse{
-			Status: 503,
-			Message: "error-info not enabled: function disabled in configuration. " +
-				"To enable, set error_info_function_enabled: true in the MSSQL collector config.",
-		}
+	if f.router.collector.Functions.ErrorInfo.Disabled {
+		return funcapi.UnavailableResponse("error-info function has been disabled in configuration")
 	}
 
-	sessionName := f.router.collector.Config.GetErrorInfoSessionName()
-	status, rows, err := f.router.collector.fetchMSSQLErrorRows(ctx, sessionName, f.router.collector.TopQueriesLimit)
+	sessionName := f.router.collector.errorInfoSessionName()
+	limit := f.router.collector.topQueriesLimit()
+	status, rows, err := f.router.collector.fetchMSSQLErrorRows(ctx, sessionName, limit)
 	if err != nil {
 		if isDeadlockPermissionError(err) {
 			return &funcapi.FunctionResponse{Status: 403, Message: errorInfoPermissionMessage()}
 		}
 		if status == mssqlErrorAttrNotEnabled {
 			targetName := "event_file"
-			if f.router.collector.Config.GetErrorInfoUseRingBuffer() {
+			if f.router.collector.Functions.ErrorInfo.UseRingBuffer {
 				targetName = "ring_buffer"
 			}
 			return &funcapi.FunctionResponse{Status: 503, Message: fmt.Sprintf("error-info not enabled: Extended Events session not found or %s target missing", targetName)}
@@ -363,7 +362,7 @@ func nullableString(value string) any {
 // A cleaner design would be a mssqlErrorData type on funcRouter that both handlers use.
 
 func (c *Collector) collectMSSQLErrorDetails(ctx context.Context) (string, map[string]mssqlErrorRow) {
-	status, rows, err := c.fetchMSSQLErrorRows(ctx, c.Config.GetErrorInfoSessionName(), c.TopQueriesLimit)
+	status, rows, err := c.fetchMSSQLErrorRows(ctx, c.errorInfoSessionName(), c.topQueriesLimit())
 	if err != nil {
 		if status == mssqlErrorAttrNotEnabled {
 			return mssqlErrorAttrNotEnabled, nil
@@ -537,7 +536,7 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 	defer cancel()
 
 	query := queryMSSQLErrorInfoEventFile
-	if c.Config.GetErrorInfoUseRingBuffer() {
+	if c.Functions.ErrorInfo.UseRingBuffer {
 		query = queryMSSQLErrorInfoRingBuffer
 	}
 
@@ -600,7 +599,7 @@ func (c *Collector) mssqlErrorSessionAvailable(ctx context.Context, sessionName 
 	}
 
 	targetQuery := queryMSSQLErrorSessionHasEventFile
-	if c.Config.GetErrorInfoUseRingBuffer() {
+	if c.Functions.ErrorInfo.UseRingBuffer {
 		targetQuery = queryMSSQLErrorSessionHasRingBuffer
 	}
 

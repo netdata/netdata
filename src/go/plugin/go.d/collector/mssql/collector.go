@@ -56,116 +56,75 @@ type Config struct {
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	DSN         string           `yaml:"dsn" json:"dsn"`
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-
-	// QueryStoreTimeWindowDays controls how far back to look in Query Store
-	// Uses pointer to distinguish "unset" from explicit "0":
-	//   - nil (unset): Apply default of 7 days
-	//   - 0: Query ALL available data (not recommended for busy servers)
-	//   - N > 0: Query last N days
-	QueryStoreTimeWindowDays *int `yaml:"query_store_time_window_days,omitempty" json:"query_store_time_window_days"`
-
-	// QueryStoreFunctionEnabled controls whether the top-queries function is available
-	// Uses pointer to distinguish "unset" from explicit "false":
-	//   - nil (unset): Apply default of true (enabled)
-	//   - false: Explicitly disabled
-	//   - true: Explicitly enabled
-	// Default: true - MSSQL Query Store may contain unmasked PII in query text
-	QueryStoreFunctionEnabled *bool `yaml:"query_store_function_enabled,omitempty" json:"query_store_function_enabled"`
-
-	// DeadlockInfoFunctionEnabled controls whether the deadlock-info function is available
-	// Uses pointer to distinguish "unset" from explicit "false":
-	//   - nil (unset): Apply default of true (enabled)
-	//   - false: Explicitly disabled
-	//   - true: Explicitly enabled
-	// Default: true
-	DeadlockInfoFunctionEnabled *bool `yaml:"deadlock_info_function_enabled,omitempty" json:"deadlock_info_function_enabled"`
-
-	// DeadlockInfoUseRingBuffer uses ring_buffer target instead of event_file for deadlock-info
-	// Uses pointer to distinguish "unset" from explicit "true":
-	//   - nil (unset): Apply default of false (use event_file)
-	//   - false: Use event_file target (faster, recommended for on-prem)
-	//   - true: Use ring_buffer target (required for Azure SQL DB without blob storage)
-	// Default: false
-	DeadlockInfoUseRingBuffer *bool `yaml:"deadlock_info_use_ring_buffer,omitempty" json:"deadlock_info_use_ring_buffer"`
-
-	// ErrorInfoFunctionEnabled controls whether the error-info function is available
-	// Uses pointer to distinguish "unset" from explicit "false":
-	//   - nil (unset): Apply default of true (enabled)
-	//   - false: Explicitly disabled
-	//   - true: Explicitly enabled
-	// Default: true
-	ErrorInfoFunctionEnabled *bool `yaml:"error_info_function_enabled,omitempty" json:"error_info_function_enabled"`
-
-	// ErrorInfoSessionName sets the Extended Events session name for error-info
-	// Default: "netdata_errors"
-	ErrorInfoSessionName string `yaml:"error_info_session_name,omitempty" json:"error_info_session_name,omitempty"`
-
-	// ErrorInfoUseRingBuffer uses ring_buffer target instead of event_file for error-info
-	// Uses pointer to distinguish "unset" from explicit "true":
-	//   - nil (unset): Apply default of false (use event_file)
-	//   - false: Use event_file target (faster, recommended for on-prem)
-	//   - true: Use ring_buffer target (required for Azure SQL DB without blob storage)
-	// Default: false
-	ErrorInfoUseRingBuffer *bool `yaml:"error_info_use_ring_buffer,omitempty" json:"error_info_use_ring_buffer"`
-
-	// TopQueriesLimit is the maximum number of queries to return
-	TopQueriesLimit int `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	Functions   FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
 }
 
-// GetQueryStoreTimeWindowDays returns the time window for Query Store queries (default: 7)
-func (c *Config) GetQueryStoreTimeWindowDays() int {
-	if c.QueryStoreTimeWindowDays == nil {
+type FunctionsConfig struct {
+	TopQueries   TopQueriesConfig   `yaml:"top_queries,omitempty" json:"top_queries"`
+	DeadlockInfo DeadlockInfoConfig `yaml:"deadlock_info,omitempty" json:"deadlock_info"`
+	ErrorInfo    ErrorInfoConfig    `yaml:"error_info,omitempty" json:"error_info"`
+}
+
+type TopQueriesConfig struct {
+	Disabled       bool             `yaml:"disabled" json:"disabled"`
+	Timeout        confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit          int              `yaml:"limit,omitempty" json:"limit"`
+	TimeWindowDays int              `yaml:"time_window_days,omitempty" json:"time_window_days"`
+}
+
+type DeadlockInfoConfig struct {
+	Disabled      bool             `yaml:"disabled" json:"disabled"`
+	Timeout       confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	UseRingBuffer bool             `yaml:"use_ring_buffer" json:"use_ring_buffer"`
+}
+
+type ErrorInfoConfig struct {
+	Disabled      bool             `yaml:"disabled" json:"disabled"`
+	Timeout       confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	SessionName   string           `yaml:"session_name,omitempty" json:"session_name,omitempty"`
+	UseRingBuffer bool             `yaml:"use_ring_buffer" json:"use_ring_buffer"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
+}
+
+func (c Config) topQueriesTimeWindowDays() int {
+	if c.Functions.TopQueries.TimeWindowDays < 0 {
 		return 7
 	}
-	return *c.QueryStoreTimeWindowDays
+	return c.Functions.TopQueries.TimeWindowDays
 }
 
-// GetQueryStoreFunctionEnabled returns whether the Query Store function is enabled (default: true)
-func (c *Config) GetQueryStoreFunctionEnabled() bool {
-	if c.QueryStoreFunctionEnabled == nil {
-		return true
+func (c Config) deadlockInfoTimeout() time.Duration {
+	if c.Functions.DeadlockInfo.Timeout == 0 {
+		return c.Timeout.Duration()
 	}
-	return *c.QueryStoreFunctionEnabled
+	return c.Functions.DeadlockInfo.Timeout.Duration()
 }
 
-// GetDeadlockInfoFunctionEnabled returns whether the deadlock-info function is enabled (default: true)
-func (c *Config) GetDeadlockInfoFunctionEnabled() bool {
-	if c.DeadlockInfoFunctionEnabled == nil {
-		return true
+func (c Config) errorInfoTimeout() time.Duration {
+	if c.Functions.ErrorInfo.Timeout == 0 {
+		return c.Timeout.Duration()
 	}
-	return *c.DeadlockInfoFunctionEnabled
+	return c.Functions.ErrorInfo.Timeout.Duration()
 }
 
-// GetDeadlockInfoUseRingBuffer returns whether to use ring_buffer target instead of event_file (default: false)
-func (c *Config) GetDeadlockInfoUseRingBuffer() bool {
-	if c.DeadlockInfoUseRingBuffer == nil {
-		return false
-	}
-	return *c.DeadlockInfoUseRingBuffer
-}
-
-// GetErrorInfoFunctionEnabled returns whether the error-info function is enabled (default: true)
-func (c *Config) GetErrorInfoFunctionEnabled() bool {
-	if c.ErrorInfoFunctionEnabled == nil {
-		return true
-	}
-	return *c.ErrorInfoFunctionEnabled
-}
-
-// GetErrorInfoSessionName returns the Extended Events session name for error-info.
-func (c *Config) GetErrorInfoSessionName() string {
-	if strings.TrimSpace(c.ErrorInfoSessionName) == "" {
+func (c Config) errorInfoSessionName() string {
+	if strings.TrimSpace(c.Functions.ErrorInfo.SessionName) == "" {
 		return "netdata_errors"
 	}
-	return c.ErrorInfoSessionName
-}
-
-// GetErrorInfoUseRingBuffer returns whether to use ring_buffer target instead of event_file (default: false)
-func (c *Config) GetErrorInfoUseRingBuffer() bool {
-	if c.ErrorInfoUseRingBuffer == nil {
-		return false
-	}
-	return *c.ErrorInfoUseRingBuffer
+	return c.Functions.ErrorInfo.SessionName
 }
 
 type Collector struct {

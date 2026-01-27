@@ -72,12 +72,18 @@ func newFuncRunningQueries(r *funcRouter) *funcRunningQueries {
 var _ funcapi.MethodHandler = (*funcRunningQueries)(nil)
 
 func (f *funcRunningQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.router.collector.Functions.RunningQueries.Disabled {
+		return nil, fmt.Errorf("running-queries function disabled in configuration")
+	}
 	return []funcapi.ParamConfig{funcapi.BuildSortParam(runningQueriesColumns)}, nil
 }
 
 func (f *funcRunningQueries) Cleanup(ctx context.Context) {}
 
 func (f *funcRunningQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.router.collector.Functions.RunningQueries.Disabled {
+		return funcapi.UnavailableResponse("running-queries function has been disabled in configuration")
+	}
 	if err := f.router.ensureDB(ctx); err != nil {
 		status := 503
 		if errors.Is(err, errSQLDSNNotSet) {
@@ -90,7 +96,7 @@ func (f *funcRunningQueries) Handle(ctx context.Context, method string, params f
 	limit := f.router.topQueriesLimit()
 
 	query := f.buildSQL(sortColumn)
-	queryCtx, cancel := context.WithTimeout(ctx, f.router.sqlTimeout())
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.runningQueriesTimeout())
 	defer cancel()
 
 	rows, err := f.router.db.QueryContext(queryCtx, query, limit)

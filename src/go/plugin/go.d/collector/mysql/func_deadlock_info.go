@@ -265,7 +265,7 @@ func newFuncDeadlockInfo(r *funcRouter) *funcDeadlockInfo {
 var _ funcapi.MethodHandler = (*funcDeadlockInfo)(nil)
 
 func (f *funcDeadlockInfo) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if !f.router.collector.Config.GetDeadlockInfoFunctionEnabled() {
+	if f.router.collector.Functions.DeadlockInfo.Disabled {
 		return nil, fmt.Errorf("deadlock-info function disabled in configuration")
 	}
 	return []funcapi.ParamConfig{}, nil
@@ -277,18 +277,16 @@ func (f *funcDeadlockInfo) Handle(ctx context.Context, method string, params fun
 			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 		}
 	}
-	return f.collectData(ctx)
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.deadlockInfoTimeout())
+	defer cancel()
+	return f.collectData(queryCtx)
 }
 
 func (f *funcDeadlockInfo) Cleanup(ctx context.Context) {}
 
 func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionResponse {
-	if !f.router.collector.Config.GetDeadlockInfoFunctionEnabled() {
-		return &funcapi.FunctionResponse{
-			Status: 503,
-			Message: "deadlock-info function has been disabled in configuration. " +
-				"To enable, set deadlock_info_function_enabled: true in the MySQL collector config.",
-		}
+	if f.router.collector.Functions.DeadlockInfo.Disabled {
+		return funcapi.UnavailableResponse("deadlock-info function has been disabled in configuration")
 	}
 
 	statusText, err := f.queryInnoDBStatus(ctx)

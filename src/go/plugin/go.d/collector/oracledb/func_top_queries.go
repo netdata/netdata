@@ -83,6 +83,9 @@ func newFuncTopQueries(r *funcRouter) *funcTopQueries {
 var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return nil, fmt.Errorf("top-queries function disabled in configuration")
+	}
 	cols := topQueriesColumns
 	if f.router.collector.db != nil {
 		cols = f.layout(ctx).cols
@@ -93,13 +96,19 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if f.router.collector.Functions.TopQueries.Disabled {
+		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
+	}
 	if f.router.collector.db == nil {
 		if err := f.router.collector.openConnection(); err != nil {
 			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 		}
 	}
 
-	layout := f.layout(ctx)
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
+	defer cancel()
+
+	layout := f.layout(queryCtx)
 	cols := layout.cols
 	limit := f.router.topQueriesLimit()
 
@@ -121,9 +130,9 @@ ORDER BY %s DESC NULLS LAST
 FETCH FIRST %d ROWS ONLY
 `, f.buildSelectClause(cols), joinClause, sortColumn, limit)
 
-	rows, err := f.router.collector.db.QueryContext(ctx, query)
+	rows, err := f.router.collector.db.QueryContext(queryCtx, query)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+		if queryCtx.Err() == context.DeadlineExceeded {
 			return funcapi.ErrorResponse(504, "query timed out")
 		}
 		return funcapi.InternalErrorResponse("top queries query failed: %v", err)

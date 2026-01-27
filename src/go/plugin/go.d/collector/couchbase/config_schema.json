@@ -38,13 +38,39 @@
         "minimum": 0.5,
         "default": 1
       },
-      "top_queries_limit": {
-        "title": "Top Queries Limit",
-        "description": "Maximum number of queries to return in the top-queries function response.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 5000,
-        "default": 500
+      "functions": {
+        "title": "Functions",
+        "description": "Configuration for Netdata functions exposed by this collector.",
+        "type": "object",
+        "properties": {
+          "top_queries": {
+            "title": "Top Queries",
+            "description": "Configuration for the top-queries function.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the top-queries function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "type": "number",
+                "minimum": 0.5
+              },
+              "limit": {
+                "title": "Limit",
+                "description": "Maximum number of queries to return in the response.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "default": 500
+              }
+            }
+          }
+        }
       },
       "not_follow_redirects": {
         "title": "Not follow redirects",
@@ -155,7 +181,6 @@
             "query_url",
             "timeout",
             "not_follow_redirects",
-            "top_queries_limit",
             "vnode"
           ]
         },
@@ -187,6 +212,12 @@
           "title": "Headers",
           "fields": [
             "headers"
+          ]
+        },
+        {
+          "title": "Functions",
+          "fields": [
+            "functions"
           ]
         }
       ]

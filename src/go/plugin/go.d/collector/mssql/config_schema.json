@@ -30,56 +30,102 @@
         "minimum": 0.5,
         "default": 5
       },
-      "query_store_function_enabled": {
-        "title": "Enable Query Store Function",
-        "description": "Enable the top-queries function using SQL Server Query Store. WARNING: Query Store may contain unmasked PII (customer names, emails, IDs) in query text. Only enable after ensuring proper access controls to the Netdata dashboard.",
-        "type": "boolean",
-        "default": true
-      },
-      "query_store_time_window_days": {
-        "title": "Query Store Time Window (Days)",
-        "description": "How many days of Query Store data to query for the top-queries function. Set to 0 to query all available data (not recommended for busy servers).",
-        "type": "integer",
-        "minimum": 0,
-        "default": 7
-      },
-      "top_queries_limit": {
-        "title": "Top Queries Limit",
-        "description": "Maximum number of queries to return in the top-queries function response.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 5000,
-        "default": 500
-      },
-      "deadlock_info_function_enabled": {
-        "title": "Enable Deadlock Info Function",
-        "description": "Enable the deadlock-info function. WARNING: query text may contain unmasked sensitive literals (PII). This function reads deadlock graphs from the system_health session and requires VIEW SERVER STATE. Grant with: GRANT VIEW SERVER STATE TO [netdata_user];",
-        "type": "boolean",
-        "default": true
-      },
-      "deadlock_info_use_ring_buffer": {
-        "title": "Use Ring Buffer for Deadlock Info",
-        "description": "Use ring_buffer target instead of event_file for system_health session. Enable for Azure SQL Database without blob storage. Note: ring_buffer can be slower with large buffers.",
-        "type": "boolean",
-        "default": false
-      },
-      "error_info_function_enabled": {
-        "title": "Enable Error Info Function",
-        "description": "Enable the error-info function. WARNING: error messages and query text may contain unmasked sensitive literals (PII). This function reads from a user-managed Extended Events session and requires VIEW SERVER STATE.",
-        "type": "boolean",
-        "default": true
-      },
-      "error_info_session_name": {
-        "title": "Error Info Session Name",
-        "description": "Name of the Extended Events session that captures error_reported events for error-info. The session must be created by an administrator and include an event_file target.",
-        "type": "string",
-        "default": "netdata_errors"
-      },
-      "error_info_use_ring_buffer": {
-        "title": "Use Ring Buffer for Error Info",
-        "description": "Use ring_buffer target instead of event_file. Enable for Azure SQL Database without blob storage. Note: ring_buffer can be slower with large buffers.",
-        "type": "boolean",
-        "default": false
+      "functions": {
+        "title": "Functions",
+        "description": "Configuration for Netdata functions exposed by this collector.",
+        "type": "object",
+        "properties": {
+          "top_queries": {
+            "title": "Top Queries",
+            "description": "Configuration for the top-queries function using SQL Server Query Store.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the top-queries function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "type": "number",
+                "minimum": 0.5
+              },
+              "limit": {
+                "title": "Limit",
+                "description": "Maximum number of queries to return in the response.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "default": 500
+              },
+              "time_window_days": {
+                "title": "Time Window (Days)",
+                "description": "How many days of Query Store data to query. Set to 0 to query all available data (not recommended for busy servers).",
+                "type": "integer",
+                "minimum": 0,
+                "default": 7
+              }
+            }
+          },
+          "deadlock_info": {
+            "title": "Deadlock Info",
+            "description": "Configuration for the deadlock-info function.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the deadlock-info function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "type": "number",
+                "minimum": 0.5
+              },
+              "use_ring_buffer": {
+                "title": "Use Ring Buffer",
+                "description": "Use ring_buffer target instead of event_file for system_health session. Enable for Azure SQL Database without blob storage.",
+                "type": "boolean",
+                "default": false
+              }
+            }
+          },
+          "error_info": {
+            "title": "Error Info",
+            "description": "Configuration for the error-info function.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the error-info function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "type": "number",
+                "minimum": 0.5
+              },
+              "session_name": {
+                "title": "Session Name",
+                "description": "Name of the Extended Events session that captures error_reported events.",
+                "type": "string",
+                "default": "netdata_errors"
+              },
+              "use_ring_buffer": {
+                "title": "Use Ring Buffer",
+                "description": "Use ring_buffer target instead of event_file. Enable for Azure SQL Database without blob storage.",
+                "type": "boolean",
+                "default": false
+              }
+            }
+          }
+        }
       }
     },
     "required": [
@@ -103,26 +149,34 @@
     "timeout": {
       "ui:help": "Accepts decimals for sub-second granularity (e.g., 0.5 for 500ms)."
     },
-    "query_store_function_enabled": {
-      "ui:help": "When enabled, the 'top-queries' function becomes available in the Netdata dashboard. Review the PII warning before enabling."
-    },
-    "query_store_time_window_days": {
-      "ui:help": "Limits Query Store data to recent days. Lower values improve performance on busy servers."
-    },
-    "deadlock_info_function_enabled": {
-      "ui:help": "When enabled, the deadlock-info function becomes available in the Netdata dashboard. WARNING: query text may contain unmasked sensitive literals and requires VIEW SERVER STATE permission."
-    },
-    "deadlock_info_use_ring_buffer": {
-      "ui:help": "Enable for Azure SQL Database or environments without event_file access. Ring buffer can be slower with large buffers."
-    },
-    "error_info_function_enabled": {
-      "ui:help": "When enabled, the error-info function becomes available in the Netdata dashboard. WARNING: error messages and query text may include sensitive literals."
-    },
-    "error_info_session_name": {
-      "ui:help": "The Extended Events session must be created by an administrator and include an event_file target capturing sqlserver.error_reported with sql_text action."
-    },
-    "error_info_use_ring_buffer": {
-      "ui:help": "Enable for Azure SQL Database or environments without event_file access. Ring buffer can be slower with large buffers."
+    "functions": {
+      "top_queries": {
+        "disabled": {
+          "ui:help": "WARNING: Query Store may contain unmasked PII (customer names, emails, IDs) in query text."
+        },
+        "time_window_days": {
+          "ui:help": "Limits Query Store data to recent days. Lower values improve performance on busy servers."
+        }
+      },
+      "deadlock_info": {
+        "disabled": {
+          "ui:help": "WARNING: Query text may contain unmasked sensitive literals. Requires VIEW SERVER STATE permission."
+        },
+        "use_ring_buffer": {
+          "ui:help": "Enable for Azure SQL Database or environments without event_file access. Ring buffer can be slower."
+        }
+      },
+      "error_info": {
+        "disabled": {
+          "ui:help": "WARNING: Error messages and query text may contain unmasked sensitive literals. Requires VIEW SERVER STATE permission."
+        },
+        "session_name": {
+          "ui:help": "The Extended Events session must be created by an administrator and include an event_file target capturing sqlserver.error_reported with sql_text action."
+        },
+        "use_ring_buffer": {
+          "ui:help": "Enable for Azure SQL Database or environments without event_file access. Ring buffer can be slower."
+        }
+      }
     },
     "ui:flavour": "tabs",
     "ui:options": {
@@ -133,15 +187,13 @@
             "update_every",
             "dsn",
             "timeout",
-            "vnode",
-            "deadlock_info_function_enabled"
+            "vnode"
           ]
         },
         {
-          "title": "Query Store",
+          "title": "Functions",
           "fields": [
-            "query_store_function_enabled",
-            "query_store_time_window_days"
+            "functions"
           ]
         }
       ]

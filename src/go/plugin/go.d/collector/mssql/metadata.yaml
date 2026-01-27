@@ -137,21 +137,65 @@ modules:
               required: false
               group: Target
 
-            - name: query_store_function_enabled
-              description: |
-                Enable the Query Store function to expose top queries via Netdata Functions.
-                **WARNING**: Query Store may contain unmasked literal values (customer names, emails, IDs).
-                Only enable after ensuring proper access controls to the Netdata dashboard.
+            - name: functions.top_queries.disabled
+              description: Disable the [top-queries](#top-queries) function.
               default_value: false
               required: false
-              group: Query Store
-            - name: query_store_time_window_days
+              group: Functions
+            - name: functions.top_queries.timeout
+              description: Query timeout for top-queries function (seconds). Uses collector timeout if not set.
+              default_value: ""
+              required: false
+              group: Functions
+            - name: functions.top_queries.limit
+              description: Maximum number of queries to return in the top-queries response.
+              default_value: 500
+              required: false
+              group: Functions
+            - name: functions.top_queries.time_window_days
               description: |
                 Number of days of Query Store data to analyze. Set to 0 to include all available data.
                 Smaller values improve query performance but show less history.
               default_value: 7
               required: false
-              group: Query Store
+              group: Functions
+
+            - name: functions.deadlock_info.disabled
+              description: Disable the [deadlock-info](#deadlock-info) function.
+              default_value: false
+              required: false
+              group: Functions
+            - name: functions.deadlock_info.timeout
+              description: Query timeout for deadlock-info function (seconds). Uses collector timeout if not set.
+              default_value: ""
+              required: false
+              group: Functions
+            - name: functions.deadlock_info.use_ring_buffer
+              description: "Use ring_buffer instead of event_file for system_health session.<br/><br/>WARNING: Not recommended for production:<br/>• Data cleared on failover/restart<br/>• 4 MB capacity limit<br/>• High CPU load during queries<br/><br/>Use only for Azure SQL Database without Blob Storage or testing."
+              default_value: false
+              required: false
+              group: Functions
+
+            - name: functions.error_info.disabled
+              description: Disable the [error-info](#error-info) function.
+              default_value: false
+              required: false
+              group: Functions
+            - name: functions.error_info.timeout
+              description: Query timeout for error-info function (seconds). Uses collector timeout if not set.
+              default_value: ""
+              required: false
+              group: Functions
+            - name: functions.error_info.session_name
+              description: "Extended Events session name capturing error_reported events.<br/>Must be created by administrator with event_file (recommended) or ring_buffer target."
+              default_value: netdata_errors
+              required: false
+              group: Functions
+            - name: functions.error_info.use_ring_buffer
+              description: "Use ring_buffer instead of event_file for error events.<br/><br/>WARNING: Not recommended for production:<br/>• Data cleared on failover/restart<br/>• 4 MB capacity limit<br/>• High CPU load during queries<br/><br/>Use only for Azure SQL Database without Blob Storage or testing."
+              default_value: false
+              required: false
+              group: Functions
 
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
@@ -199,18 +243,24 @@ modules:
 
                   - name: development
                     dsn: "sqlserver://netdata_user:password@dev-sql:1433"
-            - name: With Query Store function
+            - name: With custom function settings
               description: |
-                Enable the Query Store function to view top queries in the Netdata dashboard.
+                Configure function-specific settings like timeouts and limits.
 
                 > **Warning**: Query Store may contain unmasked literal values (PII).
-                > Only enable in environments with proper access controls.
+                > Disable functions if not needed or ensure proper access controls.
               config: |
                 jobs:
                   - name: local
                     dsn: "sqlserver://netdata_user:password@localhost:1433"
-                    query_store_function_enabled: true
-                    query_store_time_window_days: 7
+                    functions:
+                      top_queries:
+                        limit: 100
+                        time_window_days: 7
+                      deadlock_info:
+                        use_ring_buffer: true
+                      error_info:
+                        session_name: custom_errors
     troubleshooting:
       problems:
         list:
