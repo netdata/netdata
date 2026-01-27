@@ -4,8 +4,11 @@ package mysql
 
 import (
 	"context"
+	"crypto/md5"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -170,13 +173,6 @@ func (c *Collector) collectMySQLErrorDetailsForDigests(ctx context.Context, dige
 	return mysqlErrorAttrEnabled, out
 }
 
-func (c *Collector) errorInfoParams(context.Context) ([]funcapi.ParamConfig, error) {
-	if !c.Config.GetErrorInfoFunctionEnabled() {
-		return nil, fmt.Errorf("error-info function disabled in configuration")
-	}
-	return []funcapi.ParamConfig{}, nil
-}
-
 func (c *Collector) collectErrorInfo(ctx context.Context) *funcapi.FunctionResponse {
 	if !c.Config.GetErrorInfoFunctionEnabled() {
 		return &funcapi.FunctionResponse{
@@ -269,6 +265,7 @@ func buildMySQLErrorInfoColumns() map[string]any {
 			Name:         "Query",
 			Type:         funcapi.FieldTypeString,
 			Sortable:     true,
+			Visible:      true,
 			Sticky:       true,
 			FullWidth:    true,
 			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
@@ -278,6 +275,7 @@ func buildMySQLErrorInfoColumns() map[string]any {
 			Name:         "Schema",
 			Type:         funcapi.FieldTypeString,
 			Sortable:     true,
+			Visible:      true,
 			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
 		}.BuildColumn(),
 		"errorNumber": funcapi.Column{
@@ -285,6 +283,7 @@ func buildMySQLErrorInfoColumns() map[string]any {
 			Name:         "Error Number",
 			Type:         funcapi.FieldTypeInteger,
 			Sortable:     true,
+			Visible:      true,
 			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNumber},
 		}.BuildColumn(),
 		"sqlState": funcapi.Column{
@@ -292,6 +291,7 @@ func buildMySQLErrorInfoColumns() map[string]any {
 			Name:         "SQL State",
 			Type:         funcapi.FieldTypeString,
 			Sortable:     true,
+			Visible:      true,
 			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
 		}.BuildColumn(),
 		"errorMessage": funcapi.Column{
@@ -299,6 +299,7 @@ func buildMySQLErrorInfoColumns() map[string]any {
 			Name:         "Error Message",
 			Type:         funcapi.FieldTypeString,
 			Sortable:     false,
+			Visible:      true,
 			FullWidth:    true,
 			ValueOptions: funcapi.ValueOptions{Transform: funcapi.FieldTransformNone},
 		}.BuildColumn(),
@@ -346,7 +347,6 @@ WHERE NAME IN ('events_statements_history_long','events_statements_history','eve
 	defer rows.Close()
 
 	enabled := map[string]bool{}
-	present := map[string]bool{}
 	for rows.Next() {
 		var name, enabledVal string
 		if err := rows.Scan(&name, &enabledVal); err != nil {
@@ -354,7 +354,6 @@ WHERE NAME IN ('events_statements_history_long','events_statements_history','eve
 		}
 		key := strings.ToLower(name)
 		enabled[key] = strings.EqualFold(enabledVal, "YES")
-		present[key] = true
 	}
 	if err := rows.Err(); err != nil {
 		return mysqlErrorSource{status: mysqlErrorAttrNotEnabled, reason: "unable to read performance_schema.setup_consumers"}, err
@@ -442,8 +441,15 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 	if source.columns["DIGEST_TEXT"] {
 		selectCols = append(selectCols, "DIGEST_TEXT")
 	}
+	// MySQL uses SCHEMA_NAME, MariaDB uses CURRENT_SCHEMA
+	schemaCol := ""
 	if source.columns["SCHEMA_NAME"] {
-		selectCols = append(selectCols, "SCHEMA_NAME")
+		schemaCol = "SCHEMA_NAME"
+	} else if source.columns["CURRENT_SCHEMA"] {
+		schemaCol = "CURRENT_SCHEMA"
+	}
+	if schemaCol != "" {
+		selectCols = append(selectCols, schemaCol)
 	}
 	if source.columns["SQL_TEXT"] {
 		selectCols = append(selectCols, "SQL_TEXT")
@@ -509,7 +515,7 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 		if source.columns["DIGEST_TEXT"] {
 			scanTargets = append(scanTargets, &digestText)
 		}
-		if source.columns["SCHEMA_NAME"] {
+		if schemaCol != "" {
 			scanTargets = append(scanTargets, &schemaName)
 		}
 		if source.columns["SQL_TEXT"] {
@@ -520,13 +526,21 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 			return nil, err
 		}
 
-		if !digest.Valid || strings.TrimSpace(digest.String) == "" {
+		digestKey := ""
+		if digest.Valid && strings.TrimSpace(digest.String) != "" {
+			digestKey = digest.String
+		} else if sqlText.Valid && strings.TrimSpace(sqlText.String) != "" {
+			// Generate synthetic digest from SQL_TEXT + MYSQL_ERRNO when DIGEST is NULL.
+			// This happens for statements that fail during parsing (syntax errors, etc.).
+			digestKey = generateSyntheticDigest(sqlText.String, errno.Int64)
+		} else {
 			continue
 		}
-		if seen[digest.String] {
+
+		if seen[digestKey] {
 			continue
 		}
-		seen[digest.String] = true
+		seen[digestKey] = true
 
 		queryText := ""
 		switch {
@@ -543,7 +557,7 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 		}
 
 		row := mysqlErrorRow{
-			Digest:      digest.String,
+			Digest:      digestKey,
 			Query:       queryText,
 			Schema:      schemaName.String,
 			ErrorNumber: errNoPtr,
@@ -558,6 +572,17 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 	}
 
 	return results, nil
+}
+
+// generateSyntheticDigest creates a digest-like identifier for error rows
+// where the real DIGEST is NULL (e.g., syntax errors that fail during parsing).
+// It combines SQL_TEXT and MYSQL_ERRNO to provide meaningful deduplication.
+func generateSyntheticDigest(sqlText string, errno int64) string {
+	h := md5.New()
+	h.Write([]byte(sqlText))
+	h.Write([]byte("_"))
+	h.Write([]byte(strconv.FormatInt(errno, 10)))
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func nullableString(value string) any {
