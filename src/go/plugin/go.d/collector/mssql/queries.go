@@ -201,10 +201,71 @@ WHERE object_name LIKE '%SQL Errors%'
   AND counter_name = 'Errors/sec';
 `
 
+// querySystemHealthLatestDeadlock retrieves the latest xml_deadlock_report event
+// from the system_health Extended Events ring buffer.
+const querySystemHealthLatestDeadlock = `
+WITH xevents AS (
+  SELECT CAST(xet.target_data AS XML) AS target_data
+  FROM sys.dm_xe_session_targets AS xet
+  JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
+  WHERE xs.name = 'system_health'
+    AND xet.target_name = 'ring_buffer'
+)
+SELECT TOP (1)
+  xevent.value('@timestamp', 'datetime2(7)') AS deadlock_time,
+  CONVERT(nvarchar(max), xevent.query('(data/value/deadlock)[1]')) AS deadlock_xml
+FROM xevents
+CROSS APPLY target_data.nodes('RingBufferTarget/event[@name="xml_deadlock_report"]') AS T(xevent)
+ORDER BY deadlock_time DESC;
+`
+
 // queryDatabaseStatus gets database state and read-only status
 const queryDatabaseStatus = `
 SELECT name, state, is_read_only
 FROM sys.databases;
+`
+
+// queryDatabaseNamesByID retrieves database_id to name mappings.
+const queryDatabaseNamesByID = `
+SELECT database_id, name
+FROM sys.databases;
+`
+
+// queryMSSQLErrorSessionExists checks for the configured Extended Events session.
+const queryMSSQLErrorSessionExists = `
+SELECT COUNT(*)
+FROM sys.dm_xe_sessions
+WHERE name = @sessionName;
+`
+
+// queryMSSQLErrorSessionHasRingBuffer verifies that the session has a ring_buffer target.
+const queryMSSQLErrorSessionHasRingBuffer = `
+SELECT COUNT(*)
+FROM sys.dm_xe_session_targets AS xet
+JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
+WHERE xs.name = @sessionName
+  AND xet.target_name = 'ring_buffer';
+`
+
+// queryMSSQLErrorInfo reads recent error_reported events from the ring_buffer target.
+const queryMSSQLErrorInfo = `
+WITH xevents AS (
+  SELECT CAST(xet.target_data AS XML) AS target_data
+  FROM sys.dm_xe_session_targets AS xet
+  JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
+  WHERE xs.name = @sessionName
+    AND xet.target_name = 'ring_buffer'
+)
+SELECT TOP (@limit)
+  xevent.value('@timestamp', 'datetime2(7)') AS event_time,
+  xevent.value('(data[@name="error_number"]/value)[1]', 'int') AS error_number,
+  xevent.value('(data[@name="state"]/value)[1]', 'int') AS error_state,
+  xevent.value('(data[@name="message"]/value)[1]', 'nvarchar(max)') AS message,
+  xevent.value('(action[@name="sql_text"]/value)[1]', 'nvarchar(max)') AS sql_text,
+  CONVERT(VARCHAR(64), xevent.value('(action[@name="query_hash"]/value)[1]', 'varbinary(8)'), 1) AS query_hash
+FROM xevents
+CROSS APPLY target_data.nodes('RingBufferTarget/event[@name="error_reported"]') AS T(xevent)
+ORDER BY event_time DESC;
 `
 
 // queryReplicationStatus gets replication publication status (if configured)

@@ -63,13 +63,15 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	DSN                string           `yaml:"dsn" json:"dsn"`
-	MyCNF              string           `yaml:"my.cnf,omitempty" json:"my.cnf"`
-	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	Vnode                       string           `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery                 int              `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry          int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	DSN                         string           `yaml:"dsn" json:"dsn"`
+	MyCNF                       string           `yaml:"my.cnf,omitempty" json:"my.cnf"`
+	Timeout                     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	TopQueriesLimit             int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	DeadlockInfoFunctionEnabled *bool            `yaml:"deadlock_info_function_enabled,omitempty" json:"deadlock_info_function_enabled,omitempty"`
+	ErrorInfoFunctionEnabled    *bool            `yaml:"error_info_function_enabled,omitempty" json:"error_info_function_enabled,omitempty"`
 }
 
 type Collector struct {
@@ -118,6 +120,22 @@ type Collector struct {
 
 func (c *Collector) Configuration() any {
 	return c.Config
+}
+
+// GetDeadlockInfoFunctionEnabled returns whether the deadlock-info function is enabled (default: true).
+func (c *Config) GetDeadlockInfoFunctionEnabled() bool {
+	if c.DeadlockInfoFunctionEnabled == nil {
+		return true
+	}
+	return *c.DeadlockInfoFunctionEnabled
+}
+
+// GetErrorInfoFunctionEnabled returns whether the error-info function is enabled (default: true).
+func (c *Config) GetErrorInfoFunctionEnabled() bool {
+	if c.ErrorInfoFunctionEnabled == nil {
+		return true
+	}
+	return *c.ErrorInfoFunctionEnabled
 }
 
 func (c *Collector) Init(context.Context) error {

@@ -227,8 +227,7 @@ Performance Schema must be enabled and statement instrumentation must be configu
    WHERE NAME LIKE '%statement%';
    ```
 
-3. The following consumers should be enabled:
-   - `events_statements_current`
+3. The following consumer should be enabled:
    - `events_statements_summary_by_digest`
 
 4. Enable statement consumers if needed:
@@ -306,6 +305,10 @@ Aggregated statement statistics from Performance Schema, grouped by query digest
 | Lock Time | duration | milliseconds |  | Total time spent waiting for table locks across all executions. High lock time may indicate contention from concurrent transactions. |
 | Errors | integer |  |  | Total number of times this query pattern resulted in an error. Non-zero values require investigation into the underlying issue. |
 | Warnings | integer |  |  | Total number of times this query pattern generated warnings. Warnings may indicate data type conversions, NULL handling issues, or other non-critical problems. |
+| Error Attribution | string |  |  | Status of error detail attribution for this query. Values: enabled (error details available), no_data (no recent error for this digest), not_enabled (statement history consumers disabled), not_supported (required columns unavailable). |
+| Error Number | integer |  |  | Most recent error number observed for this query digest (when error attribution is enabled). |
+| SQL State | string |  | hidden | SQLSTATE code for the most recent error (when error attribution is enabled). |
+| Error Message | string |  |  | Most recent error message for this query digest (when error attribution is enabled). |
 | Rows Affected | integer |  |  | Total number of rows modified by INSERT, UPDATE, DELETE, or REPLACE statements. Useful for tracking write workloads. |
 | Rows Sent | integer |  |  | Total number of rows returned to the client by SELECT statements. High values may indicate result sets that are too large. |
 | Rows Examined | integer |  |  | Total number of rows read during query execution. A high ratio of rows examined to rows sent suggests missing or inefficient indexes. |
@@ -333,6 +336,123 @@ Aggregated statement statistics from Performance Schema, grouped by query digest
 | CPU Time | duration | milliseconds |  | Total CPU time consumed across all executions. Available in MySQL 8.0.28+. Helps identify CPU-intensive queries. |
 | Max Controlled Memory | integer |  |  | Maximum memory controlled by the query executor for this query pattern. Available in MySQL 8.0.31+. Helps identify memory-intensive operations. |
 | Max Total Memory | integer |  |  | Maximum total memory used by this query pattern including both controlled and uncontrolled allocations. Available in MySQL 8.0.31+. |
+
+### Deadlock Info
+
+Retrieves the latest detected InnoDB deadlock from `SHOW ENGINE INNODB STATUS`.
+
+The output is parsed to attribute the deadlock to the participating transactions and their query text, lock mode, lock status, and wait resource.
+
+Use cases:
+- Identify which query was chosen as the deadlock victim
+- Inspect the waiting lock resource and lock mode
+- Correlate deadlocks with application changes or deployment events
+
+Query text is truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mysql:deadlock-info` |
+| Require Cloud | yes |
+| Performance | Executes `SHOW ENGINE INNODB STATUS` on demand:<br/>• Not part of regular collection<br/>• Query cost depends on server load and the size of the InnoDB status output |
+| Security | Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to MySQL<br/>• `deadlock_info_function_enabled` is true<br/>• The account can run `SHOW ENGINE INNODB STATUS` (PROCESS privilege)<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when PROCESS privilege is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out<br/>• Returns HTTP 561 when the deadlock section cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled |
+
+#### Prerequisites
+
+##### Enable deadlock-info function in Netdata
+
+Set `deadlock_info_function_enabled: true` in the `go.d/mysql.conf` job.
+
+
+##### Grant PROCESS privilege
+
+The monitoring user must have PROCESS privilege to run `SHOW ENGINE INNODB STATUS`.
+
+
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Parsed deadlock participants from the latest detected deadlock. Each row represents one transaction involved in the deadlock.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Row ID | string |  | hidden | Unique row identifier composed of deadlock ID and process ID. |
+| Deadlock ID | string |  |  | Identifier for the deadlock event, used to group participating transactions. |
+| Timestamp | timestamp |  |  | Timestamp of the deadlock event. Parsed from the deadlock section when available; otherwise the function execution time. |
+| Process ID | string |  |  | MySQL thread id of the transaction involved in the deadlock. |
+| Connection ID | integer |  |  | Numeric connection identifier when the process id is numeric. |
+| ECID | integer |  |  | Execution context id (engine-specific). This is typically null for MySQL and reserved for cross-engine consistency. |
+| Victim | string |  |  | "true" when the transaction was chosen as the deadlock victim and rolled back; otherwise "false". |
+| Query | string |  |  | SQL query text for the transaction involved in the deadlock. Truncated to 4096 characters. |
+| Lock Mode | string |  |  | Lock mode reported for the waiting lock (for example X or S). |
+| Lock Status | string |  |  | Lock status for the transaction. WAITING indicates the transaction was waiting on a lock. |
+| Wait Resource | string |  |  | Lock resource line from InnoDB status showing what the transaction was waiting on. |
+| Database | string |  |  | Database name when it can be inferred. This may be empty or null depending on the deadlock output. |
+
+### Error Info
+
+Retrieves recent SQL errors from Performance Schema statement history tables.
+
+This function reads `performance_schema.events_statements_history_long` when enabled,
+otherwise falls back to `performance_schema.events_statements_history`. It reports the
+most recent error per query digest, including error number, SQLSTATE, and message.
+
+Use cases:
+- Identify recent query errors and their messages
+- Correlate errors to query patterns (digest)
+- Validate error rates seen in top-queries
+
+Error messages are truncated by Performance Schema (usually 128 characters).
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mysql:error-info` |
+| Require Cloud | yes |
+| Performance | Reads Performance Schema statement history tables on demand:<br/>• Not part of regular collection<br/>• Query cost depends on history table size and server load |
+| Security | Error messages and query text may include unmasked literals (PII/secrets).<br/>• Restrict dashboard access to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to MySQL<br/>• `error_info_function_enabled` is true<br/>• Performance Schema statement history consumers are enabled (history and/or history_long)<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 503 when required consumers are not enabled or function disabled<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+##### Enable error-info function in Netdata
+
+Set `error_info_function_enabled: true` in the `go.d/mysql.conf` job.
+
+
+##### Enable statement history consumers
+
+Ensure `events_statements_history` and/or `events_statements_history_long` consumers are enabled.
+
+
+##### Grant SELECT on Performance Schema
+
+The monitoring user must have SELECT on `performance_schema.*` to read statement history tables.
+
+
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Most recent error per query digest from Performance Schema history tables.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Digest | string |  | hidden | Unique hash identifier for the normalized query pattern. |
+| Query | string |  |  | Normalized query text when available (digest text or SQL text). |
+| Schema | string |  |  | Database schema name when available. |
+| Error Number | integer |  |  | MySQL error number for the most recent error of this digest. |
+| SQL State | string |  |  | SQLSTATE code for the most recent error. |
+| Error Message | string |  |  | Error message for the most recent error. |
 
 
 

@@ -37,7 +37,7 @@ modules:
           - Performance counters (buffer manager, memory manager, SQL statistics)
           - Dynamic management views (DMVs) for wait statistics, locks, and sessions
           - Per-database transaction and lock statistics
-          - SQL Server Agent job status (if permissions allow)
+          - SQL Server Agent job status
         method_description: |
           It connects to the SQL Server instance via TCP using the go-mssqldb driver and executes queries against:
 
@@ -49,7 +49,7 @@ modules:
           - `sys.dm_os_process_memory` - SQL Server process memory
           - `sys.dm_os_sys_memory` - OS physical memory and page file
           - `sys.master_files` - Database file sizes
-          - `msdb.dbo.sysjobs` - SQL Agent job status (optional)
+          - `msdb.dbo.sysjobs` - SQL Agent job status
       default_behavior:
         auto_detection:
           description: |
@@ -64,7 +64,8 @@ modules:
       additional_permissions:
         description: |
           The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
-          For SQL Agent job monitoring, access to the msdb database is required.
+          SQL Agent job monitoring is part of collector startup, so access to
+          `msdb.dbo.sysjobs` is required.
       supported_platforms:
         include: []
         exclude: []
@@ -82,7 +83,7 @@ modules:
               -- Grant VIEW SERVER STATE (required for DMVs)
               GRANT VIEW SERVER STATE TO netdata_user;
 
-              -- Optional: Grant access to msdb for SQL Agent job monitoring
+              -- Grant access to msdb for SQL Agent job monitoring (required)
               USE msdb;
               CREATE USER netdata_user FOR LOGIN netdata_user;
               GRANT SELECT ON dbo.sysjobs TO netdata_user;
@@ -98,9 +99,9 @@ modules:
 
               **Required permissions:**
               - `VIEW SERVER STATE` - Access to dynamic management views
+              - `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
 
               **Optional permissions:**
-              - `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
               - `SELECT on distribution.dbo.MSreplication_monitordata` - Replication monitoring
               - `SELECT on distribution.dbo.MSpublications` - Publication information
               - `SELECT on distribution.dbo.MSsubscriptions` - Subscription counts
@@ -271,6 +272,39 @@ modules:
                 type: integer
                 unit: ""
                 description: Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly.
+              - name: Error Attribution
+                type: string
+                unit: ""
+                description: "Status of error detail attribution for this query. Values: enabled, no_data, not_enabled, not_supported."
+              - name: Error Number
+                type: integer
+                unit: ""
+                description: "Most recent error number observed for this query (when error attribution is enabled)."
+              - name: Error State
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: "SQL Server error state for the most recent error (when error attribution is enabled)."
+              - name: Error Message
+                type: string
+                unit: ""
+                description: "Most recent error message for this query (when error attribution is enabled)."
+              - name: Hash Match Joins
+                type: integer
+                unit: ""
+                description: "Count of Hash Match join operators across all stored plans for this query."
+              - name: Merge Joins
+                type: integer
+                unit: ""
+                description: "Count of Merge Join operators across all stored plans for this query."
+              - name: Nested Loops
+                type: integer
+                unit: ""
+                description: "Count of Nested Loops operators across all stored plans for this query."
+              - name: Sorts
+                type: integer
+                unit: ""
+                description: "Count of Sort operators across all stored plans for this query."
               - name: Total Time
                 type: duration
                 unit: "milliseconds"
@@ -581,6 +615,129 @@ modules:
                   :::
           availability: |
             Available when:<br/>• The collector has successfully connected to SQL Server<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
+        - id: deadlock-info
+          name: Deadlock Info
+          description: |
+            Retrieves the most recent deadlock event from SQL Server's `system_health` Extended Events ring buffer (`xml_deadlock_report`).
+
+            The deadlock graph XML is parsed to attribute the deadlock to the participating processes and their query text, lock mode, lock status, and wait resource.
+
+            Use cases:
+            - Identify which process was chosen as the deadlock victim
+            - Inspect the waiting resource and lock mode involved in the deadlock
+            - Correlate deadlocks with recent application changes or deployments
+
+            Query text and wait resource strings are truncated at 4096 characters for display purposes.
+          parameters: []
+          returns:
+            description: Parsed deadlock participants from the latest detected deadlock event. Each row represents one process involved in the deadlock.
+            columns:
+              - name: Row ID
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Unique row identifier composed of deadlock ID and process ID."
+              - name: Deadlock ID
+                type: string
+                unit: ""
+                description: "Identifier for the deadlock event, derived from the deadlock timestamp to group participating processes."
+              - name: Timestamp
+                type: timestamp
+                unit: ""
+                description: "Timestamp of the deadlock event from the ring buffer when available; otherwise the function execution time."
+              - name: Process ID
+                type: string
+                unit: ""
+                description: "Deadlock graph process identifier for the process involved in the deadlock."
+              - name: SPID
+                type: integer
+                unit: ""
+                description: "SQL Server session ID (SPID) for the process when available."
+              - name: ECID
+                type: integer
+                unit: ""
+                description: "Execution context ID (ECID) for parallel execution contexts when available."
+              - name: Victim
+                type: string
+                unit: ""
+                description: "\"true\" when the process was chosen as the deadlock victim and rolled back; otherwise \"false\"."
+              - name: Query
+                type: string
+                unit: ""
+                description: "SQL query text for the process involved in the deadlock. Truncated to 4096 characters."
+              - name: Lock Mode
+                type: string
+                unit: ""
+                description: "Lock mode reported for the process within the deadlock graph (for example X or S)."
+              - name: Lock Status
+                type: string
+                unit: ""
+                description: "Lock status for the process. WAITING indicates the process was waiting on a lock."
+              - name: Wait Resource
+                type: string
+                unit: ""
+                description: "Lock resource identifier from the deadlock graph showing what the process was waiting on."
+              - name: Database
+                type: string
+                unit: ""
+                description: "Database name mapped from the deadlock graph database ID when available."
+          performance: |
+            Executes on-demand queries against the `system_health` ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing
+          security: |
+            Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only
+          availability: |
+            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `deadlock_info_function_enabled` is true<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
+        - id: error-info
+          name: Error Info
+          description: |
+            Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
+            with both the `sql_text` and `query_hash` actions.
+
+            The session must be created by an administrator and include a `ring_buffer` target. Netdata reads the ring buffer
+            and returns recent error events with error number, message, and SQL text. The `query_hash` action is required for
+            reliable mapping into `top-queries` (query text fallback is best-effort).
+
+            Use cases:
+            - Identify recent query errors and their messages
+            - Correlate errors to query text
+            - Validate error rates seen in top-queries
+          parameters: []
+          returns:
+            description: Recent error events from the configured Extended Events session.
+            columns:
+              - name: Timestamp
+                type: timestamp
+                unit: ""
+                description: "Timestamp of the error event."
+              - name: Error Number
+                type: integer
+                unit: ""
+                description: "SQL Server error number."
+              - name: Error State
+                type: integer
+                unit: ""
+                description: "SQL Server error state."
+              - name: Error Message
+                type: string
+                unit: ""
+                description: "Error message text."
+              - name: Query
+                type: string
+                unit: ""
+                description: "SQL text captured with the error event."
+              - name: Query Hash
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Query hash captured with the error event (used for mapping into top-queries)."
+          performance: |
+            Executes on-demand queries against the configured Extended Events ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing
+          security: |
+            Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only
+          availability: |
+            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has a ring_buffer target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
     metrics:
       folding:

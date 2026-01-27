@@ -48,6 +48,18 @@
         "minimum": 1,
         "maximum": 5000,
         "default": 500
+      },
+      "deadlock_info_function_enabled": {
+        "title": "Enable Deadlock Info Function",
+        "description": "Enable the deadlock-info function. WARNING: query text may contain unmasked sensitive literals (PII). Only enable after ensuring proper access controls to the Netdata dashboard. This function reads SHOW ENGINE INNODB STATUS and may require PROCESS privilege.",
+        "type": "boolean",
+        "default": true
+      },
+      "error_info_function_enabled": {
+        "title": "Enable Error Info Function",
+        "description": "Enable the error-info function. WARNING: error messages and query text may contain unmasked sensitive literals (PII). This function reads Performance Schema statement history tables; ensure proper access controls to the Netdata dashboard.",
+        "type": "boolean",
+        "default": true
       }
     },
     "required": [
@@ -69,6 +81,12 @@
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "deadlock_info_function_enabled": {
+      "ui:help": "When enabled, the deadlock-info function becomes available in the Netdata dashboard. WARNING: query text may contain unmasked sensitive literals; restrict dashboard access."
+    },
+    "error_info_function_enabled": {
+      "ui:help": "When enabled, the error-info function becomes available in the Netdata dashboard. WARNING: error messages and query text may include sensitive literals."
     }
   }
 }
