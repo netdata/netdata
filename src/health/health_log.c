@@ -46,7 +46,9 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async, st
 {
     if (async) {
         bool queued = health_queue_alert_save(host, ae);
-        if (!queued && stmts && !health_should_stop())
+        // Fallback to synchronous save if queue failed (full or shutting down).
+        // sql_health_alarm_log_save() handles stmts==NULL by preparing ad-hoc statements.
+        if (!queued && !health_should_stop())
             sql_health_alarm_log_save(host, ae, stmts);
     } else
         sql_health_alarm_log_save(host, ae, stmts);
