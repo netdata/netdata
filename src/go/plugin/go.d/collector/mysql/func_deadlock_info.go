@@ -90,15 +90,15 @@ var deadlockColumns = []deadlockColumn{
 	},
 	{
 		ColumnMeta: funcapi.ColumnMeta{
-			Name:          "timestamp",
-			Tooltip:       "Timestamp",
-			Type:          funcapi.FieldTypeTimestamp,
-			Sort:          funcapi.FieldSortDescending,
-			Sortable:      true,
-			Summary:       funcapi.FieldSummaryMax,
-			Filter:        funcapi.FieldFilterRange,
-			Visible:       true,
-			Transform:     funcapi.FieldTransformDatetime,
+			Name:      "timestamp",
+			Tooltip:   "Timestamp",
+			Type:      funcapi.FieldTypeTimestamp,
+			Sort:      funcapi.FieldSortDescending,
+			Sortable:  true,
+			Summary:   funcapi.FieldSummaryMax,
+			Filter:    funcapi.FieldFilterRange,
+			Visible:   true,
+			Transform: funcapi.FieldTransformDatetime,
 		},
 		Value: func(r *deadlockRowData) any { return r.timestamp },
 	},
@@ -277,30 +277,13 @@ func (f *funcDeadlockInfo) Handle(ctx context.Context, method string, params fun
 			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 		}
 	}
-	return f.router.collector.collectDeadlockInfo(ctx)
+	return f.collectData(ctx)
 }
 
 func (f *funcDeadlockInfo) Cleanup(ctx context.Context) {}
 
-type mysqlDeadlockTxn struct {
-	txnNum       int
-	threadID     string
-	queryText    string
-	lockMode     string
-	lockStatus   string
-	waitResource string
-}
-
-type mysqlDeadlockParseResult struct {
-	found        bool
-	deadlockTime time.Time
-	victimTxnNum int
-	transactions []*mysqlDeadlockTxn
-	parseErr     error
-}
-
-func (c *Collector) collectDeadlockInfo(ctx context.Context) *funcapi.FunctionResponse {
-	if !c.Config.GetDeadlockInfoFunctionEnabled() {
+func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionResponse {
+	if !f.router.collector.Config.GetDeadlockInfoFunctionEnabled() {
 		return &funcapi.FunctionResponse{
 			Status: 503,
 			Message: "deadlock-info function has been disabled in configuration. " +
@@ -308,42 +291,42 @@ func (c *Collector) collectDeadlockInfo(ctx context.Context) *funcapi.FunctionRe
 		}
 	}
 
-	statusText, err := c.queryInnoDBStatus(ctx)
+	statusText, err := f.queryInnoDBStatus(ctx)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return c.deadlockInfoResponse(504, "deadlock query timed out", nil)
+			return f.buildResponse(504, "deadlock query timed out", nil)
 		}
 		if isMySQLPermissionError(err) {
-			return c.deadlockInfoResponse(
+			return f.buildResponse(
 				403,
 				"Deadlock info requires permission to run SHOW ENGINE INNODB STATUS. "+
 					"Grant with: GRANT USAGE, REPLICATION CLIENT, PROCESS ON *.* TO 'netdata'@'%';",
 				nil,
 			)
 		}
-		c.Warningf("deadlock-info: query failed: %v", err)
-		return c.deadlockInfoResponse(500, fmt.Sprintf("deadlock query failed: %v", err), nil)
+		f.router.collector.Warningf("deadlock-info: query failed: %v", err)
+		return f.buildResponse(500, fmt.Sprintf("deadlock query failed: %v", err), nil)
 	}
 
 	parseRes := parseInnoDBDeadlock(statusText, time.Now().UTC())
 	if parseRes.parseErr != nil {
-		c.Warningf("deadlock-info: parse failed: %v", parseRes.parseErr)
-		return c.deadlockInfoResponse(deadlockParseErrorStatus, "deadlock section could not be parsed", nil)
+		f.router.collector.Warningf("deadlock-info: parse failed: %v", parseRes.parseErr)
+		return f.buildResponse(deadlockParseErrorStatus, "deadlock section could not be parsed", nil)
 	}
 	if !parseRes.found {
-		return c.deadlockInfoResponse(200, "no deadlock found in SHOW ENGINE INNODB STATUS", nil)
+		return f.buildResponse(200, "no deadlock found in SHOW ENGINE INNODB STATUS", nil)
 	}
 
 	deadlockID := generateDeadlockID(parseRes.deadlockTime)
 	rows := buildDeadlockRows(parseRes, deadlockID)
 	if len(rows) == 0 {
-		return c.deadlockInfoResponse(200, "deadlock detected but no transactions could be parsed", nil)
+		return f.buildResponse(200, "deadlock detected but no transactions could be parsed", nil)
 	}
 
-	return c.deadlockInfoResponse(200, "latest detected deadlock", rows)
+	return f.buildResponse(200, "latest detected deadlock", rows)
 }
 
-func (c *Collector) deadlockInfoResponse(status int, message string, rowsData []deadlockRowData) *funcapi.FunctionResponse {
+func (f *funcDeadlockInfo) buildResponse(status int, message string, rowsData []deadlockRowData) *funcapi.FunctionResponse {
 	data := make([][]any, 0, len(rowsData))
 	for i := range rowsData {
 		row := make([]any, len(deadlockColumns))
@@ -365,18 +348,35 @@ func (c *Collector) deadlockInfoResponse(status int, message string, rowsData []
 	}
 }
 
-func (c *Collector) queryInnoDBStatus(ctx context.Context) (string, error) {
-	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
+func (f *funcDeadlockInfo) queryInnoDBStatus(ctx context.Context) (string, error) {
+	qctx, cancel := context.WithTimeout(ctx, f.router.collector.Timeout.Duration())
 	defer cancel()
 
 	var typ, name, status sql.NullString
-	if err := c.db.QueryRowContext(qctx, queryShowEngineInnoDBStatus).Scan(&typ, &name, &status); err != nil {
+	if err := f.router.collector.db.QueryRowContext(qctx, queryShowEngineInnoDBStatus).Scan(&typ, &name, &status); err != nil {
 		return "", err
 	}
 	if !status.Valid {
 		return "", fmt.Errorf("innodb status response was empty")
 	}
 	return status.String, nil
+}
+
+type mysqlDeadlockTxn struct {
+	txnNum       int
+	threadID     string
+	queryText    string
+	lockMode     string
+	lockStatus   string
+	waitResource string
+}
+
+type mysqlDeadlockParseResult struct {
+	found        bool
+	deadlockTime time.Time
+	victimTxnNum int
+	transactions []*mysqlDeadlockTxn
+	parseErr     error
 }
 
 func parseInnoDBDeadlock(status string, now time.Time) mysqlDeadlockParseResult {

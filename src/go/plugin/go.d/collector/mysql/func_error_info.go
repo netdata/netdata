@@ -142,10 +142,108 @@ func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcap
 			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 		}
 	}
-	return f.router.collector.collectErrorInfo(ctx)
+	return f.collectData(ctx)
 }
 
 func (f *funcErrorInfo) Cleanup(ctx context.Context) {}
+
+func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionResponse {
+	if !f.router.collector.Config.GetErrorInfoFunctionEnabled() {
+		return &funcapi.FunctionResponse{
+			Status: 503,
+			Message: "error-info not enabled: function disabled in configuration. " +
+				"To enable, set error_info_function_enabled: true in the MySQL collector config.",
+		}
+	}
+
+	available, err := f.checkPerformanceSchema(ctx)
+	if err != nil {
+		return &funcapi.FunctionResponse{
+			Status:  500,
+			Message: fmt.Sprintf("failed to check performance_schema availability: %v", err),
+		}
+	}
+	if !available {
+		return &funcapi.FunctionResponse{Status: 503, Message: "performance_schema is not enabled"}
+	}
+
+	source, err := f.router.collector.detectMySQLErrorHistorySource(ctx)
+	if err != nil {
+		return &funcapi.FunctionResponse{Status: 503, Message: fmt.Sprintf("error-info not enabled: %v", err)}
+	}
+	if source.status != mysqlErrorAttrEnabled {
+		msg := "error-info not enabled"
+		if source.reason != "" {
+			msg = fmt.Sprintf("%s: %s", msg, source.reason)
+		}
+		return &funcapi.FunctionResponse{Status: 503, Message: msg}
+	}
+
+	limit := f.router.collector.TopQueriesLimit
+	if limit <= 0 {
+		limit = 500
+	}
+
+	rows, err := f.router.collector.fetchMySQLErrorRows(ctx, source, nil, limit)
+	if err != nil {
+		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("error-info query failed: %v", err)}
+	}
+	if len(rows) == 0 && source.fallbackTable != "" {
+		fallback, ferr := f.router.collector.buildMySQLErrorSource(ctx, source.fallbackTable)
+		if ferr == nil && fallback.status == mysqlErrorAttrEnabled {
+			fallbackRows, ferr := f.router.collector.fetchMySQLErrorRows(ctx, fallback, nil, limit)
+			if ferr == nil && len(fallbackRows) > 0 {
+				rows = fallbackRows
+			}
+		}
+	}
+
+	data := make([][]any, 0, len(rows))
+	for i := range rows {
+		row := make([]any, len(errorInfoColumns))
+		for j, col := range errorInfoColumns {
+			row[j] = col.Value(&rows[i])
+		}
+		data = append(data, row)
+	}
+
+	cs := errorInfoColumnSet(errorInfoColumns)
+
+	return &funcapi.FunctionResponse{
+		Status:            200,
+		Help:              "Recent SQL errors from performance_schema statement history tables",
+		Columns:           cs.BuildColumns(),
+		Data:              data,
+		DefaultSortColumn: "errorNumber",
+	}
+}
+
+func (f *funcErrorInfo) checkPerformanceSchema(ctx context.Context) (bool, error) {
+	c := f.router.collector
+
+	c.varPerfSchemaMu.RLock()
+	cached := c.varPerformanceSchema
+	c.varPerfSchemaMu.RUnlock()
+	if cached != "" {
+		return cached == "ON" || cached == "1", nil
+	}
+
+	c.varPerfSchemaMu.Lock()
+	defer c.varPerfSchemaMu.Unlock()
+
+	if c.varPerformanceSchema != "" {
+		return c.varPerformanceSchema == "ON" || c.varPerformanceSchema == "1", nil
+	}
+
+	var value string
+	query := "SELECT @@performance_schema"
+	if err := c.db.QueryRowContext(ctx, query).Scan(&value); err != nil {
+		return false, err
+	}
+
+	c.varPerformanceSchema = value
+	return value == "ON" || value == "1", nil
+}
 
 type mysqlErrorSource struct {
 	table         string
@@ -218,6 +316,12 @@ func mysqlErrorAttributionColumns() []topQueriesColumn {
 	}
 }
 
+// TODO: Refactor error data access into a shared mysqlErrorData type.
+// Currently these methods live on Collector because they're used by both:
+// - funcErrorInfo (for error-info function)
+// - funcTopQueries (for error attribution columns)
+// A cleaner design would be a mysqlErrorData type on funcRouter that both handlers use.
+
 func (c *Collector) collectMySQLErrorDetailsForDigests(ctx context.Context, digests []string) (string, map[string]mysqlErrorRow) {
 	source, err := c.detectMySQLErrorHistorySource(ctx)
 	if err != nil {
@@ -254,102 +358,6 @@ func (c *Collector) collectMySQLErrorDetailsForDigests(ctx context.Context, dige
 		out[row.Digest] = row
 	}
 	return mysqlErrorAttrEnabled, out
-}
-
-func (c *Collector) collectErrorInfo(ctx context.Context) *funcapi.FunctionResponse {
-	if !c.Config.GetErrorInfoFunctionEnabled() {
-		return &funcapi.FunctionResponse{
-			Status: 503,
-			Message: "error-info not enabled: function disabled in configuration. " +
-				"To enable, set error_info_function_enabled: true in the MySQL collector config.",
-		}
-	}
-
-	available, err := c.checkPerformanceSchema(ctx)
-	if err != nil {
-		return &funcapi.FunctionResponse{
-			Status:  500,
-			Message: fmt.Sprintf("failed to check performance_schema availability: %v", err),
-		}
-	}
-	if !available {
-		return &funcapi.FunctionResponse{Status: 503, Message: "performance_schema is not enabled"}
-	}
-
-	source, err := c.detectMySQLErrorHistorySource(ctx)
-	if err != nil {
-		return &funcapi.FunctionResponse{Status: 503, Message: fmt.Sprintf("error-info not enabled: %v", err)}
-	}
-	if source.status != mysqlErrorAttrEnabled {
-		msg := "error-info not enabled"
-		if source.reason != "" {
-			msg = fmt.Sprintf("%s: %s", msg, source.reason)
-		}
-		return &funcapi.FunctionResponse{Status: 503, Message: msg}
-	}
-
-	limit := c.TopQueriesLimit
-	if limit <= 0 {
-		limit = 500
-	}
-
-	rows, err := c.fetchMySQLErrorRows(ctx, source, nil, limit)
-	if err != nil {
-		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("error-info query failed: %v", err)}
-	}
-	if len(rows) == 0 && source.fallbackTable != "" {
-		fallback, ferr := c.buildMySQLErrorSource(ctx, source.fallbackTable)
-		if ferr == nil && fallback.status == mysqlErrorAttrEnabled {
-			fallbackRows, ferr := c.fetchMySQLErrorRows(ctx, fallback, nil, limit)
-			if ferr == nil && len(fallbackRows) > 0 {
-				rows = fallbackRows
-			}
-		}
-	}
-
-	data := make([][]any, 0, len(rows))
-	for i := range rows {
-		row := make([]any, len(errorInfoColumns))
-		for j, col := range errorInfoColumns {
-			row[j] = col.Value(&rows[i])
-		}
-		data = append(data, row)
-	}
-
-	cs := errorInfoColumnSet(errorInfoColumns)
-
-	return &funcapi.FunctionResponse{
-		Status:            200,
-		Help:              "Recent SQL errors from performance_schema statement history tables",
-		Columns:           cs.BuildColumns(),
-		Data:              data,
-		DefaultSortColumn: "errorNumber",
-	}
-}
-
-func (c *Collector) checkPerformanceSchema(ctx context.Context) (bool, error) {
-	c.varPerfSchemaMu.RLock()
-	cached := c.varPerformanceSchema
-	c.varPerfSchemaMu.RUnlock()
-	if cached != "" {
-		return cached == "ON" || cached == "1", nil
-	}
-
-	c.varPerfSchemaMu.Lock()
-	defer c.varPerfSchemaMu.Unlock()
-
-	if c.varPerformanceSchema != "" {
-		return c.varPerformanceSchema == "ON" || c.varPerformanceSchema == "1", nil
-	}
-
-	var value string
-	query := "SELECT @@performance_schema"
-	if err := c.db.QueryRowContext(ctx, query).Scan(&value); err != nil {
-		return false, err
-	}
-
-	c.varPerformanceSchema = value
-	return value == "ON" || value == "1", nil
 }
 
 func (c *Collector) detectMySQLErrorHistorySource(ctx context.Context) (mysqlErrorSource, error) {

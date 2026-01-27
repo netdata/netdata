@@ -259,7 +259,13 @@ func TestParseInnoDBDeadlock_MalformedSection(t *testing.T) {
 	assert.Len(t, res.transactions, 0)
 }
 
-func TestCollector_collectDeadlockInfo_ParseError(t *testing.T) {
+// newTestDeadlockHandler creates a funcDeadlockInfo handler for testing.
+func newTestDeadlockHandler(c *Collector) *funcDeadlockInfo {
+	router := &funcRouter{collector: c}
+	return newFuncDeadlockInfo(router)
+}
+
+func TestFuncDeadlockInfo_collectData_ParseError(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	require.NoError(t, err)
 	defer func() { _ = db.Close() }()
@@ -270,15 +276,16 @@ func TestCollector_collectDeadlockInfo_ParseError(t *testing.T) {
 
 	collr := New()
 	collr.db = db
+	handler := newTestDeadlockHandler(collr)
 
-	resp := collr.collectDeadlockInfo(context.Background())
+	resp := handler.collectData(context.Background())
 	require.NotNil(t, resp)
 	assert.Equal(t, deadlockParseErrorStatus, resp.Status)
 	assert.Contains(t, resp.Message, "could not be parsed")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestCollector_collectDeadlockInfo_QueryError(t *testing.T) {
+func TestFuncDeadlockInfo_collectData_QueryError(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	require.NoError(t, err)
 	defer func() { _ = db.Close() }()
@@ -288,15 +295,16 @@ func TestCollector_collectDeadlockInfo_QueryError(t *testing.T) {
 
 	collr := New()
 	collr.db = db
+	handler := newTestDeadlockHandler(collr)
 
-	resp := collr.collectDeadlockInfo(context.Background())
+	resp := handler.collectData(context.Background())
 	require.NotNil(t, resp)
 	assert.Equal(t, 500, resp.Status)
 	assert.Contains(t, resp.Message, "deadlock query failed")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestCollector_collectDeadlockInfo_Timeout(t *testing.T) {
+func TestFuncDeadlockInfo_collectData_Timeout(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	require.NoError(t, err)
 	defer func() { _ = db.Close() }()
@@ -306,21 +314,23 @@ func TestCollector_collectDeadlockInfo_Timeout(t *testing.T) {
 
 	collr := New()
 	collr.db = db
+	handler := newTestDeadlockHandler(collr)
 
-	resp := collr.collectDeadlockInfo(context.Background())
+	resp := handler.collectData(context.Background())
 	require.NotNil(t, resp)
 	assert.Equal(t, 504, resp.Status)
 	assert.Contains(t, resp.Message, "timed out")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestCollector_collectDeadlockInfo_PermissionDenied(t *testing.T) {
+func TestFuncDeadlockInfo_collectData_PermissionDenied(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	require.NoError(t, err)
 	defer func() { _ = db.Close() }()
 
 	collr := New()
 	collr.db = db
+	handler := newTestDeadlockHandler(collr)
 
 	permErr := &mysqlDriver.MySQLError{
 		Number:  1227,
@@ -328,18 +338,19 @@ func TestCollector_collectDeadlockInfo_PermissionDenied(t *testing.T) {
 	}
 	mock.ExpectQuery(queryShowEngineInnoDBStatus).WillReturnError(permErr)
 
-	resp := collr.collectDeadlockInfo(context.Background())
+	resp := handler.collectData(context.Background())
 	require.NotNil(t, resp)
 	assert.Equal(t, 403, resp.Status)
 	assert.Contains(t, resp.Message, "PROCESS")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestCollector_collectDeadlockInfo_Disabled(t *testing.T) {
+func TestFuncDeadlockInfo_collectData_Disabled(t *testing.T) {
 	c := New()
 	c.Config.DeadlockInfoFunctionEnabled = boolPtr(false)
+	handler := newTestDeadlockHandler(c)
 
-	resp := c.collectDeadlockInfo(context.Background())
+	resp := handler.collectData(context.Background())
 	require.Equal(t, 503, resp.Status)
 	assert.Contains(t, resp.Message, "disabled")
 }
