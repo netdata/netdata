@@ -62,6 +62,7 @@ void pci_aer_plugin_cleanup(void);
 // metrics that need to be shared among data collectors
 extern unsigned long long zfs_arcstats_shrinkable_cache_size_bytes;
 extern bool inside_lxc_container;
+bool is_lxcfs_proc_mounted(void);
 
 extern bool is_mem_swap_enabled;
 extern bool is_mem_zswap_enabled;
