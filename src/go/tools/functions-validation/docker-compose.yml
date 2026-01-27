@@ -5,7 +5,7 @@ services:
       POSTGRES_USER: netdata
       POSTGRES_PASSWORD: netdata
       POSTGRES_DB: netdata
-    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
+    command: ["postgres", "-c", "shared_preload_libraries=${POSTGRES_PRELOAD_LIBRARIES:-pg_stat_statements}"]
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:

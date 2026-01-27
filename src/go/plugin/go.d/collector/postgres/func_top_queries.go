@@ -18,19 +18,24 @@ const (
 	paramSort          = "__sort"
 )
 
-// pgColumn defines metadata for a pg_stat_statements column.
+// pgColumn defines metadata for a pg_stat_statements/pg_stat_monitor column.
 // Embeds funcapi.ColumnMeta for UI rendering and adds PG-specific fields.
 type pgColumn struct {
 	funcapi.ColumnMeta
 
 	// DBColumn is the database column expression (e.g., "s.queryid::text", "d.datname")
 	DBColumn string
+	// DBColumnMonitor is the column expression for pg_stat_monitor (if different from DBColumn)
+	// If empty, DBColumn is used for both sources
+	DBColumnMonitor string
 	// IsSortOption indicates whether this column appears in the sort dropdown
 	IsSortOption bool
 	// SortLabel is the label shown in the sort dropdown (if IsSortOption)
 	SortLabel string
 	// IsDefaultSort indicates whether this is the default sort column
 	IsDefaultSort bool
+	// OnlyPgStatMonitor indicates this column only exists in pg_stat_monitor
+	OnlyPgStatMonitor bool
 }
 
 // pgColumnSet creates a ColumnSet from a slice of pgColumn.
@@ -108,6 +113,20 @@ var pgAllColumns = []pgColumn{
 	// Temp file statistics (PG 15+ only)
 	{ColumnMeta: funcapi.ColumnMeta{Name: "tempBlkReadTime", Tooltip: "Temp Block Read Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.temp_blk_read_time"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "tempBlkWriteTime", Tooltip: "Temp Block Write Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.temp_blk_write_time"},
+
+	// pg_stat_monitor-specific columns (only available with pg_stat_monitor extension)
+	{ColumnMeta: funcapi.ColumnMeta{Name: "applicationName", Tooltip: "Application Name", Type: funcapi.FieldTypeString, Visible: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "s.application_name", OnlyPgStatMonitor: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "clientIp", Tooltip: "Client IP Address", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "s.client_ip::text", OnlyPgStatMonitor: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cmdType", Tooltip: "Query Type", Type: funcapi.FieldTypeString, Visible: true, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Visualization: funcapi.FieldVisualPill, Sortable: true}, DBColumn: "s.cmd_type_text", OnlyPgStatMonitor: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "comments", Tooltip: "Query Comments", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Sortable: true}, DBColumn: "s.comments", OnlyPgStatMonitor: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "relations", Tooltip: "Involved Tables", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Sortable: true}, DBColumn: "array_to_string(s.relations, ', ')", OnlyPgStatMonitor: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cpuUserTime", Tooltip: "User CPU Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.cpu_user_time", IsSortOption: true, SortLabel: "User CPU Time", OnlyPgStatMonitor: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "cpuSysTime", Tooltip: "System CPU Time", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: false, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.cpu_sys_time", IsSortOption: true, SortLabel: "System CPU Time", OnlyPgStatMonitor: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "elevel", Tooltip: "Error Level", Type: funcapi.FieldTypeInteger, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax, Filter: funcapi.FieldFilterRange, Sortable: true}, DBColumn: "s.elevel", OnlyPgStatMonitor: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "sqlcode", Tooltip: "SQL Error Code", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "s.sqlcode", OnlyPgStatMonitor: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "message", Tooltip: "Error Message", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, FullWidth: true, Sortable: true}, DBColumn: "s.message", OnlyPgStatMonitor: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "toplevel", Tooltip: "Top-level Statement", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, DBColumn: "s.toplevel::text", OnlyPgStatMonitor: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "bucketStartTime", Tooltip: "Bucket Start Time", Type: funcapi.FieldTypeString, Visible: false, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortDescending, Sortable: true}, DBColumn: "s.bucket_start_time::text", OnlyPgStatMonitor: true},
 }
 
 // pgChartGroupDefs defines chart groupings for columns. These are applied at runtime via decoratePgColumns.
@@ -131,12 +150,17 @@ var pgChartGroupDefs = []struct {
 	{key: "JITCounts", title: "JIT Counts", columns: []string{"jitFunctions", "jitInliningCount", "jitOptimizationCount", "jitEmissionCount"}},
 	{key: "JITTime", title: "JIT Time", columns: []string{"jitGenerationTime", "jitInliningTime", "jitOptimizationTime", "jitEmissionTime"}},
 	{key: "TempIOTime", title: "Temp Block I/O Time", columns: []string{"tempBlkReadTime", "tempBlkWriteTime"}},
+	// pg_stat_monitor-specific chart groups
+	{key: "CPUTime", title: "CPU Time", columns: []string{"cpuUserTime", "cpuSysTime"}},
+	{key: "Errors", title: "Error Info", columns: []string{"elevel", "sqlcode", "message"}},
 }
 
 // pgLabelColumnIDs defines which columns are available for group-by.
 var pgLabelColumnIDs = map[string]bool{
-	"database": true,
-	"user":     true,
+	"database":        true,
+	"user":            true,
+	"applicationName": true, // pg_stat_monitor only
+	"cmdType":         true, // pg_stat_monitor only
 }
 
 const pgPrimaryLabelID = "database"
@@ -207,30 +231,44 @@ func buildPgSortOptions() []funcapi.ParamOption {
 	return opts
 }
 
-// collectTopQueries queries pg_stat_statements for top queries.
+// collectTopQueries queries pg_stat_statements or pg_stat_monitor for top queries.
+// It auto-detects pg_stat_monitor and uses it when available, falling back to pg_stat_statements.
 func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	c := f.router.collector
 
-	// Check pg_stat_statements availability (lazy check)
-	available, err := c.checkPgStatStatements(ctx)
+	// Auto-detect best available query stats source
+	source, err := c.getQueryStatsSource(ctx)
 	if err != nil {
-		return funcapi.InternalErrorResponse("failed to check pg_stat_statements availability: %v", err)
+		return funcapi.InternalErrorResponse("failed to detect query stats source: %v", err)
 	}
-	if !available {
-		return funcapi.UnavailableResponse("pg_stat_statements extension is not installed in this database. " +
-			"Run 'CREATE EXTENSION pg_stat_statements;' in the database the collector connects to.")
+	if source == queryStatsSourceNone {
+		return funcapi.UnavailableResponse("No query statistics extension is installed in this database. " +
+			"Install pg_stat_monitor (recommended) or pg_stat_statements:\n\n" +
+			"For pg_stat_monitor:\n" +
+			"  ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_monitor';\n" +
+			"  -- restart PostgreSQL\n" +
+			"  CREATE EXTENSION pg_stat_monitor;\n\n" +
+			"For pg_stat_statements:\n" +
+			"  ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';\n" +
+			"  -- restart PostgreSQL\n" +
+			"  CREATE EXTENSION pg_stat_statements;")
 	}
 
-	// Detect available columns (lazy detection, cached)
-	availableCols, err := c.detectPgStatStatementsColumns(ctx)
+	// Detect available columns based on source
+	var availableCols map[string]bool
+	if source == queryStatsSourcePgStatMonitor {
+		availableCols, err = c.detectPgStatMonitorColumns(ctx)
+	} else {
+		availableCols, err = c.detectPgStatStatementsColumns(ctx)
+	}
 	if err != nil {
 		return funcapi.InternalErrorResponse("failed to detect available columns: %v", err)
 	}
 
-	// Build list of columns to query based on what's available
-	queryCols := f.buildAvailableColumns(availableCols)
+	// Build list of columns to query based on what's available and source
+	queryCols := f.buildAvailableColumns(availableCols, source)
 	if len(queryCols) == 0 {
-		return funcapi.InternalErrorResponse("no queryable columns found in pg_stat_statements")
+		return funcapi.InternalErrorResponse("no queryable columns found in %s", source)
 	}
 
 	// Map and validate sort column
@@ -243,7 +281,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 	}
 
 	// Build and execute query
-	query := f.buildDynamicSQL(queryCols, actualSortCol, limit)
+	query := f.buildDynamicSQL(queryCols, actualSortCol, limit, source)
 	rows, err := c.db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -264,7 +302,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 	}
 
 	// Build dynamic sort options from available columns (only those actually detected)
-	sortParam, sortOptions := f.topQueriesSortParam(queryCols)
+	sortParam, sortOptions := f.topQueriesSortParam(queryCols, source)
 
 	// Find default sort column from metadata
 	defaultSort := ""
@@ -280,12 +318,18 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 	}
 
 	// Decorate columns with chart/label metadata and build using ColumnSet
-	annotatedCols := decoratePgColumns(queryCols)
+	annotatedCols := decoratePgColumns(queryCols, source)
 	cs := pgColumnSet(annotatedCols)
+
+	// Build help message based on source
+	helpMsg := "Top SQL queries from pg_stat_statements"
+	if source == queryStatsSourcePgStatMonitor {
+		helpMsg = "Top SQL queries from pg_stat_monitor (includes application, client IP, CPU time, and error info)"
+	}
 
 	return &funcapi.FunctionResponse{
 		Status:            200,
-		Help:              "Top SQL queries from pg_stat_statements",
+		Help:              helpMsg,
 		Columns:           cs.BuildColumns(),
 		Data:              data,
 		DefaultSortColumn: defaultSort,
@@ -295,7 +339,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 }
 
 // decoratePgColumns adds label and chart metadata to columns for ColumnSet builders.
-func decoratePgColumns(cols []pgColumn) []pgColumn {
+func decoratePgColumns(cols []pgColumn, source queryStatsSourceName) []pgColumn {
 	out := make([]pgColumn, len(cols))
 	index := make(map[string]int, len(cols))
 	for i, col := range cols {
@@ -330,12 +374,18 @@ func decoratePgColumns(cols []pgColumn) []pgColumn {
 	return out
 }
 
-// buildAvailableColumns returns column metadata for columns that exist in this PG version.
-func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool) []pgColumn {
+// buildAvailableColumns returns column metadata for columns that exist in this PG version and source.
+func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool, source queryStatsSourceName) []pgColumn {
 	c := f.router.collector
 	var result []pgColumn
+	isPgStatMonitor := source == queryStatsSourcePgStatMonitor
 
 	for _, col := range pgAllColumns {
+		// Skip pg_stat_monitor-only columns when using pg_stat_statements
+		if col.OnlyPgStatMonitor && !isPgStatMonitor {
+			continue
+		}
+
 		// Extract the actual column name (remove table prefix and type cast)
 		colName := col.DBColumn
 		if idx := strings.LastIndex(colName, "."); idx != -1 {
@@ -344,6 +394,14 @@ func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool) []
 		// Remove PostgreSQL type cast suffix (e.g., "::text")
 		if idx := strings.Index(colName, "::"); idx != -1 {
 			colName = colName[:idx]
+		}
+		// Remove array_to_string wrapper
+		if strings.HasPrefix(colName, "array_to_string(") {
+			colName = strings.TrimPrefix(colName, "array_to_string(")
+			if idx := strings.Index(colName, ","); idx != -1 {
+				colName = colName[:idx]
+			}
+			colName = strings.TrimPrefix(colName, "s.")
 		}
 
 		// Handle version-specific column names for time columns
@@ -366,7 +424,12 @@ func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool) []
 
 		// Check if column exists (either directly or via join)
 		// Join columns (database, user) come from other tables (d.datname, u.usename)
+		// pg_stat_monitor has datname directly, pg_stat_statements needs join
 		isJoinCol := col.Name == "database" || col.Name == "user"
+		if isPgStatMonitor && col.Name == "database" {
+			// pg_stat_monitor has datname directly
+			isJoinCol = false
+		}
 		if isJoinCol || availableCols[actualColName] {
 			// Create a copy with the actual column name for this version
 			colCopy := col
@@ -375,6 +438,10 @@ func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool) []
 				if strings.HasPrefix(col.DBColumn, "s.") {
 					colCopy.DBColumn = "s." + actualColName
 				}
+			}
+			// For pg_stat_monitor, database comes from s.datname directly
+			if isPgStatMonitor && col.Name == "database" {
+				colCopy.DBColumn = "s.datname"
 			}
 			result = append(result, colCopy)
 		}
@@ -430,7 +497,7 @@ func (f *funcTopQueries) mapAndValidateSortColumn(sortColumn string, availableCo
 }
 
 // buildDynamicSQL builds the SQL query with only available columns.
-func (f *funcTopQueries) buildDynamicSQL(cols []pgColumn, sortColumn string, limit int) string {
+func (f *funcTopQueries) buildDynamicSQL(cols []pgColumn, sortColumn string, limit int, source queryStatsSourceName) string {
 	c := f.router.collector
 	var selectCols []string
 
@@ -468,6 +535,19 @@ func (f *funcTopQueries) buildDynamicSQL(cols []pgColumn, sortColumn string, lim
 		selectCols = append(selectCols, fmt.Sprintf("%s AS \"%s\"", colExpr, col.Name))
 	}
 
+	// Build query based on source
+	if source == queryStatsSourcePgStatMonitor {
+		// pg_stat_monitor has datname and username columns directly
+		return fmt.Sprintf(`
+SELECT %s
+FROM pg_stat_monitor s
+JOIN pg_user u ON s.userid = u.usesysid
+ORDER BY "%s" DESC
+LIMIT %d
+`, strings.Join(selectCols, ", "), sortColumn, limit)
+	}
+
+	// pg_stat_statements needs joins for database and user names
 	return fmt.Sprintf(`
 SELECT %s
 FROM pg_stat_statements s
@@ -569,7 +649,7 @@ func (f *funcTopQueries) buildDynamicSortOptions(cols []pgColumn) []funcapi.Para
 	return sortOpts
 }
 
-func (f *funcTopQueries) topQueriesSortParam(queryCols []pgColumn) (funcapi.ParamConfig, []funcapi.ParamOption) {
+func (f *funcTopQueries) topQueriesSortParam(queryCols []pgColumn, source queryStatsSourceName) (funcapi.ParamConfig, []funcapi.ParamOption) {
 	sortOptions := f.buildDynamicSortOptions(queryCols)
 	sortParam := funcapi.ParamConfig{
 		ID:         paramSort,
@@ -585,25 +665,32 @@ func (f *funcTopQueries) topQueriesSortParam(queryCols []pgColumn) (funcapi.Para
 func (f *funcTopQueries) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
 	c := f.router.collector
 
-	available, err := c.checkPgStatStatements(ctx)
+	// Auto-detect best available query stats source
+	source, err := c.getQueryStatsSource(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !available {
-		return nil, fmt.Errorf("pg_stat_statements extension is not installed")
+	if source == queryStatsSourceNone {
+		return nil, fmt.Errorf("no query statistics extension is installed (pg_stat_monitor or pg_stat_statements)")
 	}
 
-	availableCols, err := c.detectPgStatStatementsColumns(ctx)
+	// Detect available columns based on source
+	var availableCols map[string]bool
+	if source == queryStatsSourcePgStatMonitor {
+		availableCols, err = c.detectPgStatMonitorColumns(ctx)
+	} else {
+		availableCols, err = c.detectPgStatStatementsColumns(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	queryCols := f.buildAvailableColumns(availableCols)
+	queryCols := f.buildAvailableColumns(availableCols, source)
 	if len(queryCols) == 0 {
-		return nil, fmt.Errorf("no queryable columns found in pg_stat_statements")
+		return nil, fmt.Errorf("no queryable columns found in %s", source)
 	}
 
-	sortParam, _ := f.topQueriesSortParam(queryCols)
+	sortParam, _ := f.topQueriesSortParam(queryCols, source)
 	return []funcapi.ParamConfig{sortParam}, nil
 }
 

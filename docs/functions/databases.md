@@ -25,13 +25,15 @@ Database query functions provide deep visibility into SQL and NoSQL database per
 | MariaDB | ✅ | - | ✅ | ✅* | [MariaDB](/src/go/plugin/go.d/collector/mysql/integrations/mariadb.md) |
 | Percona Server | ✅ | - | ✅ | ✅* | [Percona](/src/go/plugin/go.d/collector/mysql/integrations/percona_mysql.md) |
 | Oracle Database | ✅ | ✅ | - | - | [Oracle](/src/go/plugin/go.d/collector/oracledb/integrations/oracle_db.md) |
-| PostgreSQL | ✅ | ✅ | - | - | [PostgreSQL](/src/go/plugin/go.d/collector/postgres/integrations/postgresql.md) |
+| PostgreSQL | ✅ | ✅ | - | ✅** | [PostgreSQL](/src/go/plugin/go.d/collector/postgres/integrations/postgresql.md) |
 | ProxySQL | ✅ | - | - | - | [ProxySQL](/src/go/plugin/go.d/collector/proxysql/integrations/proxysql.md) |
 | Redis | ✅ | - | - | - | [Redis](/src/go/plugin/go.d/collector/redis/integrations/redis.md) |
 | RethinkDB | - | ✅ | - | - | [RethinkDB](/src/go/plugin/go.d/collector/rethinkdb/integrations/rethinkdb.md) |
 | YugabyteDB | ✅ | ✅ | - | - | [YugabyteDB](/src/go/plugin/go.d/collector/yugabytedb/integrations/yugabytedb.md) |
 
 *\* Error Info is integrated directly into Top Queries results—each query row shows its associated errors.*
+
+*\*\* PostgreSQL error info requires [pg_stat_monitor](https://docs.percona.com/pg-stat-monitor/) (Percona). The collector auto-detects and uses it when available.*
 
 ## Function Types
 
@@ -73,7 +75,7 @@ Information provided:
 
 Shows **recent SQL errors** from the database's error history. Error attribution is embedded directly in Top Queries results—each query row includes error details when available.
 
-**Supported**: MySQL/MariaDB/Percona, Microsoft SQL Server
+**Supported**: MySQL/MariaDB/Percona, Microsoft SQL Server, PostgreSQL (with pg_stat_monitor)
 
 Attribution status values:
 - `enabled` — Error details available for this query

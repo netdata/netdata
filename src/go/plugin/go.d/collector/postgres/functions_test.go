@@ -16,10 +16,12 @@ func TestPgMethods(t *testing.T) {
 	methods := pgMethods()
 
 	require := assert.New(t)
-	require.Len(methods, 1)
+	require.Len(methods, 2)
 	require.Equal("top-queries", methods[0].ID)
 	require.Equal("Top Queries", methods[0].Name)
 	require.NotEmpty(methods[0].RequiredParams)
+	require.Equal("running-queries", methods[1].ID)
+	require.Equal("Running Queries", methods[1].Name)
 
 	// Verify at least one default sort option exists
 	var sortParam *funcapi.ParamConfig
@@ -171,7 +173,7 @@ func TestFuncTopQueries_buildAvailableColumns(t *testing.T) {
 			c := &Collector{pgVersion: tc.pgVersion}
 			r := &funcRouter{collector: c}
 			f := &funcTopQueries{router: r}
-			cols := f.buildAvailableColumns(tc.availableCols)
+			cols := f.buildAvailableColumns(tc.availableCols, queryStatsSourcePgStatStatements)
 			cs := pgColumnSet(cols)
 
 			for _, id := range tc.expectCols {
@@ -216,7 +218,7 @@ func TestFuncTopQueries_buildDynamicSQL(t *testing.T) {
 				{ColumnMeta: funcapi.ColumnMeta{Name: "totalTime", Type: funcapi.FieldTypeDuration}, DBColumn: "total_time"},
 			}
 
-			sql := f.buildDynamicSQL(cols, tc.sortColumn, 500)
+			sql := f.buildDynamicSQL(cols, tc.sortColumn, 500, queryStatsSourcePgStatStatements)
 
 			assert.Contains(t, sql, "pg_stat_statements")
 			assert.Contains(t, sql, tc.sortColumn)
@@ -275,11 +277,16 @@ func TestPgMethods_SortOptionsHaveLabels(t *testing.T) {
 				break
 			}
 		}
-		assert.NotNil(t, sortParam)
+		if sortParam == nil {
+			continue // Some methods may not have sort params
+		}
 		for _, opt := range sortParam.Options {
 			assert.NotEmpty(t, opt.ID, "sort option must have ID")
 			assert.NotEmpty(t, opt.Name, "sort option %s must have Name", opt.ID)
-			assert.Contains(t, opt.Name, "Top queries by", "label should have standard prefix")
+			// Top-queries uses "Top queries by X", running-queries uses plain labels
+			if method.ID == "top-queries" {
+				assert.Contains(t, opt.Name, "Top queries by", "label should have standard prefix for top-queries")
+			}
 		}
 	}
 }

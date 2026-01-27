@@ -229,14 +229,19 @@ modules:
         - id: top-queries
           name: Top Queries
           description: |
-            Retrieves aggregated SQL query performance metrics from PostgreSQL [pg_stat_statements](https://www.postgresql.org/docs/current/pgstatstatements.html) extension.
+            Retrieves aggregated SQL query performance metrics from PostgreSQL using either [pg_stat_monitor](https://docs.percona.com/pg-stat-monitor/) (preferred) or [pg_stat_statements](https://www.postgresql.org/docs/current/pgstatstatements.html).
 
-            This function queries `pg_stat_statements` which tracks execution statistics for all SQL statements. Statistics include execution counts, timing metrics, I/O operations, and resource consumption. Columns are dynamically detected based on your PostgreSQL version.
+            The collector automatically detects which extension is available:
+            - **pg_stat_monitor** (Percona): Enhanced statistics with additional columns like application name, client IP, CPU time, error info, and query classification
+            - **pg_stat_statements** (standard): Core execution statistics available in all PostgreSQL installations
+
+            Statistics include execution counts, timing metrics, I/O operations, and resource consumption. Columns are dynamically detected based on your PostgreSQL version and available extension.
 
             Use cases:
             - Identify slow queries consuming the most total execution time
             - Find queries with high shared block reads for I/O optimization
             - Analyze temp block usage to detect queries needing memory tuning
+            - With pg_stat_monitor: Track queries by application, identify error patterns
 
             Query text is truncated at 4096 characters for display purposes.
           parameters:
@@ -447,15 +452,77 @@ modules:
                 unit: "milliseconds"
                 visibility: hidden
                 description: "Time spent writing temp blocks. Available in PostgreSQL 15+. Requires `track_io_timing`."
+              - name: Application Name
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Name of the application that executed the query. Available with pg_stat_monitor only."
+              - name: Client IP
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "IP address of the client that executed the query. Available with pg_stat_monitor only."
+              - name: Command Type
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Type of SQL command (SELECT, INSERT, UPDATE, DELETE, etc.). Available with pg_stat_monitor only."
+              - name: Comments
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "SQL comments extracted from the query. Available with pg_stat_monitor only."
+              - name: Relations
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Tables/relations involved in the query. Available with pg_stat_monitor only."
+              - name: CPU User Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: "CPU time spent in user mode. Available with pg_stat_monitor only."
+              - name: CPU System Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: "CPU time spent in system/kernel mode. Available with pg_stat_monitor only."
+              - name: Error Level
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "PostgreSQL error level if query produced an error (LOG, WARNING, ERROR, etc.). Available with pg_stat_monitor only."
+              - name: SQL Code
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "PostgreSQL SQLSTATE error code if query produced an error. Available with pg_stat_monitor only."
+              - name: Error Message
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Error message if query produced an error. Available with pg_stat_monitor only."
+              - name: Top Level
+                type: boolean
+                unit: ""
+                visibility: hidden
+                description: "Whether this is a top-level statement (true) or nested (false). Available with pg_stat_monitor only."
+              - name: Bucket Start Time
+                type: timestamp
+                unit: ""
+                visibility: hidden
+                description: "Start time of the statistics bucket. Available with pg_stat_monitor only."
           performance: |
-            Queries `pg_stat_statements` which maintains statistics in shared memory:<br/>• On busy servers with many unique queries, the extension may consume significant memory<br/>• Default limit of 500 rows balances usefulness with performance
+            Queries `pg_stat_statements` or `pg_stat_monitor` which maintain statistics in shared memory:<br/>• On busy servers with many unique queries, the extension may consume significant memory<br/>• Default limit of 500 rows balances usefulness with performance<br/>• pg_stat_monitor uses time-based buckets which may have different memory characteristics
           security: |
             Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
           prerequisites:
             list:
-              - title: Enable pg_stat_statements
+              - title: Enable pg_stat_statements or pg_stat_monitor
                 description: |
-                  The `pg_stat_statements` extension must be installed and configured.
+                  Either `pg_stat_statements` (standard) or `pg_stat_monitor` (Percona) must be installed. The collector auto-detects which is available, preferring pg_stat_monitor when both are present.
+
+                  **Option 1: pg_stat_statements (standard PostgreSQL)**
 
                   1. Add to `postgresql.conf`:
 
@@ -469,22 +536,33 @@ modules:
                      CREATE EXTENSION pg_stat_statements;
                      ```
 
-                  3. Verify the extension is working:
+                  **Option 2: pg_stat_monitor (Percona - recommended)**
+
+                  Provides additional columns: application name, client IP, CPU time, error tracking, and query classification.
+
+                  1. Install pg_stat_monitor (available in Percona distribution or as separate package)
+
+                  2. Add to `postgresql.conf`:
+
+                     ```ini
+                     shared_preload_libraries = 'pg_stat_monitor'
+                     ```
+
+                  3. Restart PostgreSQL, then create the extension:
 
                      ```sql
-                     SELECT COUNT(*) FROM pg_stat_statements;
+                     CREATE EXTENSION pg_stat_monitor;
                      ```
 
                   :::info
 
-                  - `pg_stat_statements` requires a server restart to load the shared library
-                  - Statistics can be reset with `SELECT pg_stat_statements_reset()`
-                  - The `pg_stat_statements.max` parameter controls maximum tracked statements (default 5000)
-                  - Enable `track_io_timing` for block read/write timing metrics (may add slight overhead)
+                  - Both extensions require a server restart to load the shared library
+                  - Statistics can be reset with `SELECT pg_stat_statements_reset()` or `SELECT pg_stat_monitor_reset()`
+                  - Enable `track_io_timing` for block read/write timing metrics
 
                   :::
           availability: |
-            Available when:<br/>• The `pg_stat_statements` extension is installed in the database<br/>• The collector has successfully connected to PostgreSQL<br/>• Returns HTTP 503 if extension is not installed (with instructions to install)<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• Either `pg_stat_statements` or `pg_stat_monitor` extension is installed<br/>• The collector has successfully connected to PostgreSQL<br/>• Returns HTTP 503 if no query statistics extension is installed<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
         - id: running-queries
           name: Running Queries
