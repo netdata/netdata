@@ -100,7 +100,7 @@ func (c *Collector) collectErrorInfo(ctx context.Context) *funcapi.FunctionRespo
 	status, rows, err := c.fetchMSSQLErrorRows(ctx, sessionName, c.TopQueriesLimit)
 	if err != nil {
 		if isDeadlockPermissionError(err) {
-			return &funcapi.FunctionResponse{Status: 403, Message: deadlockPermissionMessage()}
+			return &funcapi.FunctionResponse{Status: 403, Message: errorInfoPermissionMessage()}
 		}
 		if status == mssqlErrorAttrNotEnabled {
 			return &funcapi.FunctionResponse{Status: 503, Message: "error-info not enabled: Extended Events session not found or ring_buffer target missing"}
@@ -174,6 +174,10 @@ func buildMSSQLErrorInfoColumns() map[string]any {
 		}.BuildColumn(),
 	}
 	return columns
+}
+
+func errorInfoPermissionMessage() string {
+	return "error-info requires VIEW SERVER STATE permission. Grant with: GRANT VIEW SERVER STATE TO [netdata_user];"
 }
 
 func mssqlErrorAttributionColumns() []topQueriesColumn {

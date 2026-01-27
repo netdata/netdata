@@ -11,7 +11,6 @@ MSSQL_VARIANTS=(
 
 for entry in "${MSSQL_VARIANTS[@]}"; do
   IFS='|' read -r image label <<< "$entry"
-  echo "\n=== Running MSSQL collector E2E for ${label} (${image}) ===" >&2
+  printf '\n=== Running MSSQL collector E2E for %s (%s) ===\n' "$label" "$image" >&2
   MSSQL_IMAGE="$image" MSSQL_VARIANT="$label" bash "$SCRIPT_DIR/mssql.sh"
 done
-

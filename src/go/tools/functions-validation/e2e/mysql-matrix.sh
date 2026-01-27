@@ -16,7 +16,6 @@ MYSQL_VARIANTS=(
 
 for entry in "${MYSQL_VARIANTS[@]}"; do
   IFS='|' read -r image label <<< "$entry"
-  echo "\n=== Running MySQL collector E2E for ${label} (${image}) ===" >&2
+  printf '\n=== Running MySQL collector E2E for %s (%s) ===\n' "$label" "$image" >&2
   MYSQL_IMAGE="$image" MYSQL_VARIANT="$label" bash "$SCRIPT_DIR/mysql.sh"
 done
-
