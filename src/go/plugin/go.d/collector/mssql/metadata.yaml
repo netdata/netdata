@@ -153,6 +153,74 @@ modules:
               required: false
               group: Query Store
 
+            - name: deadlock_info_function_enabled
+              description: |
+                Enable the deadlock-info function to retrieve deadlock events via Netdata Functions.
+                **WARNING**: Query text may contain unmasked literal values (customer names, emails, IDs).
+                Only enable after ensuring proper access controls to the Netdata dashboard.
+              default_value: true
+              required: false
+              group: Extended Events
+            - name: deadlock_info_use_ring_buffer
+              description: |
+                Use the `ring_buffer` target instead of `event_file` for reading deadlock events from the `system_health` session.
+
+                **WARNING: `ring_buffer` is NOT recommended for production use.**
+
+                Microsoft recommends `event_file` (the default) for production monitoring because:
+                - Ring buffer data is **cleared on failover/restart** (common in Azure SQL maintenance)
+                - Ring buffer has a **4 MB capacity limit**
+                - Ring buffer queries cause **high CPU load on SQL Server** due to XML parsing
+                - Ring buffer uses **database resources** to maintain and query data
+
+                Only enable this option for:
+                - Azure SQL Database **without** Azure Blob Storage configured
+                - Testing or development environments
+                - Short-term ad-hoc troubleshooting
+
+                For production Azure SQL deployments, configure an `event_file` target with Azure Blob Storage instead.
+                See [Microsoft's guidance](https://learn.microsoft.com/en-us/azure/azure-sql/database/analyze-prevent-deadlocks).
+              default_value: false
+              required: false
+              group: Extended Events
+            - name: error_info_function_enabled
+              description: |
+                Enable the error-info function to retrieve SQL errors via Netdata Functions.
+                **WARNING**: Error messages and query text may contain unmasked sensitive literals (PII).
+                Only enable after ensuring proper access controls to the Netdata dashboard.
+              default_value: true
+              required: false
+              group: Extended Events
+            - name: error_info_session_name
+              description: |
+                Name of the Extended Events session that captures `sqlserver.error_reported` events.
+                The session must be created by an administrator with an `event_file` target (recommended)
+                or `ring_buffer` target (not recommended for production).
+              default_value: "netdata_errors"
+              required: false
+              group: Extended Events
+            - name: error_info_use_ring_buffer
+              description: |
+                Use the `ring_buffer` target instead of `event_file` for reading error events.
+
+                **WARNING: `ring_buffer` is NOT recommended for production use.**
+
+                The same limitations apply as for `deadlock_info_use_ring_buffer`:
+                - Data cleared on failover/restart
+                - 4 MB capacity limit
+                - High CPU load on SQL Server during queries
+                - Uses database resources
+
+                Only enable for Azure SQL Database without Blob Storage, testing, or ad-hoc troubleshooting.
+              default_value: false
+              required: false
+              group: Extended Events
+            - name: top_queries_limit
+              description: Maximum number of queries to return from top-queries and error-info functions.
+              default_value: 500
+              required: false
+              group: Extended Events
+
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
@@ -211,6 +279,23 @@ modules:
                     dsn: "sqlserver://netdata_user:password@localhost:1433"
                     query_store_function_enabled: true
                     query_store_time_window_days: 7
+            - name: Azure SQL Database with ring_buffer (not recommended)
+              description: |
+                For Azure SQL Database **without Azure Blob Storage**, you can use ring_buffer as a fallback.
+
+                > **Warning**: Ring buffer is NOT recommended for production use.
+                > - Data is lost on failover/restart (common in Azure SQL)
+                > - Limited to 4 MB capacity
+                > - Queries cause high CPU load on SQL Server
+                >
+                > For production, configure event_file with Azure Blob Storage instead.
+                > See [Microsoft's guidance](https://learn.microsoft.com/en-us/azure/azure-sql/database/analyze-prevent-deadlocks).
+              config: |
+                jobs:
+                  - name: azure_sql
+                    dsn: "sqlserver://netdata_user:password@yourserver.database.windows.net:1433?database=yourdb"
+                    deadlock_info_use_ring_buffer: true
+                    error_info_use_ring_buffer: true
     troubleshooting:
       problems:
         list:
@@ -623,6 +708,24 @@ modules:
 
             The deadlock graph XML is parsed to attribute the deadlock to the participating processes and their query text, lock mode, lock status, and wait resource.
 
+            **Data Source (Important for Production):**
+
+            By default, this function reads from the `event_file` target using `sys.fn_xe_file_target_read_file()`.
+            This is **Microsoft's recommended approach** for production monitoring because:
+            - Data persists across failovers and restarts
+            - Queries are fast and efficient
+            - Minimal impact on SQL Server resources
+
+            The `ring_buffer` target is available as an opt-in (`deadlock_info_use_ring_buffer: true`) but is
+            **NOT recommended for production** because:
+            - Data is cleared on any failover or restart (common in Azure SQL)
+            - Limited to 4 MB capacity
+            - Queries cause high CPU load on SQL Server (XML parsing overhead)
+            - Can timeout with large buffers
+
+            For Azure SQL Database, configure an `event_file` target with Azure Blob Storage.
+            Only use `ring_buffer` if Blob Storage is not available and you accept the limitations.
+
             Use cases:
             - Identify which process was chosen as the deadlock victim
             - Inspect the waiting resource and lock mode involved in the deadlock
@@ -683,7 +786,7 @@ modules:
                 unit: ""
                 description: "Database name mapped from the deadlock graph database ID when available."
           performance: |
-            Executes on-demand queries against the `system_health` ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing
+            Executes on-demand queries against the `system_health` Extended Events session:<br/>• **event_file (default)**: Fast queries via `sys.fn_xe_file_target_read_file()` with minimal SQL Server overhead<br/>• **ring_buffer (opt-in)**: Can cause high CPU load and timeouts due to XML parsing - not recommended for production<br/>• Not part of regular metric collection
           security: |
             Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only
           availability: |
@@ -695,9 +798,23 @@ modules:
             Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
             with both the `sql_text` and `query_hash` actions.
 
-            The session must be created by an administrator and include an `event_file` target. Netdata reads the event file
-            and returns recent error events with error number, message, and SQL text. The `query_hash` action is required for
-            reliable mapping into `top-queries` (query text fallback is best-effort).
+            **Data Source (Important for Production):**
+
+            By default, this function reads from an `event_file` target. This is **Microsoft's recommended approach**
+            for production monitoring because:
+            - Data persists across failovers and restarts
+            - Queries are fast and efficient
+            - No capacity limits (stored in files/blob storage)
+
+            The `ring_buffer` target is available as an opt-in (`error_info_use_ring_buffer: true`) but is
+            **NOT recommended for production** because:
+            - Data is cleared on any failover or restart
+            - Limited to 4 MB capacity
+            - Queries cause high CPU load on SQL Server
+            - Can timeout with large buffers
+
+            For Azure SQL Database, configure an `event_file` target with Azure Blob Storage.
+            Only use `ring_buffer` if Blob Storage is not available and you accept the limitations.
 
             Use cases:
             - Identify recent query errors and their messages
@@ -733,33 +850,86 @@ modules:
                 visibility: hidden
                 description: "Query hash captured with the error event (used for mapping into top-queries)."
           performance: |
-            Executes on-demand queries against the configured Extended Events event file:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time
+            Executes on-demand queries against the configured Extended Events session:<br/>• **event_file (default)**: Fast queries with minimal SQL Server overhead<br/>• **ring_buffer (opt-in)**: Can cause high CPU load and timeouts due to XML parsing - not recommended for production<br/>• Not part of regular metric collection
           security: |
             Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only
           prerequisites:
             list:
               - title: Create Extended Events session for error capture
                 description: |
-                  Create an Extended Events session that captures `sqlserver.error_reported` with `sql_text` and `query_hash` actions:
+                  Create an Extended Events session that captures `sqlserver.error_reported` with `sql_text` and `query_hash` actions.
+
+                  **Option 1: event_file target (RECOMMENDED for production)**
+
+                  For on-premises SQL Server:
 
                   ```sql
-                  -- Create the Extended Events session with event_file target
                   CREATE EVENT SESSION [netdata_errors] ON SERVER
                   ADD EVENT sqlserver.error_reported(
                     ACTION(sqlserver.sql_text, sqlserver.query_hash)
                   )
-                  ADD TARGET package0.event_file(SET filename=N'netdata_errors');
+                  ADD TARGET package0.event_file(SET filename=N'netdata_errors')
+                  WITH (STARTUP_STATE = ON);
                   GO
 
-                  -- Start the session
                   ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
                   GO
 
-                  -- Grant required permission
                   GRANT VIEW SERVER STATE TO [netdata_user];
                   ```
 
-                  If you use a different session name, set it in the collector config:
+                  For Azure SQL Database with Blob Storage:
+
+                  ```sql
+                  -- First, create a database-scoped credential for Azure Blob Storage
+                  -- See: https://learn.microsoft.com/en-us/azure/azure-sql/database/xevent-code-event-file
+
+                  CREATE EVENT SESSION [netdata_errors] ON DATABASE
+                  ADD EVENT sqlserver.error_reported(
+                    ACTION(sqlserver.sql_text, sqlserver.query_hash)
+                  )
+                  ADD TARGET package0.event_file(
+                    SET filename='https://yourstorageaccount.blob.core.windows.net/container/netdata_errors.xel'
+                  )
+                  WITH (STARTUP_STATE = ON);
+                  GO
+
+                  ALTER EVENT SESSION [netdata_errors] ON DATABASE STATE = START;
+                  ```
+
+                  **Option 2: ring_buffer target (NOT recommended for production)**
+
+                  Only use this if you cannot configure Blob Storage for Azure SQL Database.
+                  Be aware of the limitations:
+                  - Data is **lost on failover/restart** (common in Azure SQL)
+                  - **4 MB capacity limit**
+                  - Queries cause **high CPU load** on SQL Server
+                  - May **timeout** with accumulated events
+
+                  ```sql
+                  CREATE EVENT SESSION [netdata_errors] ON SERVER
+                  ADD EVENT sqlserver.error_reported(
+                    ACTION(sqlserver.sql_text, sqlserver.query_hash)
+                  )
+                  ADD TARGET package0.ring_buffer;
+                  GO
+
+                  ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
+                  GO
+
+                  GRANT VIEW SERVER STATE TO [netdata_user];
+                  ```
+
+                  Then enable ring_buffer mode in the collector config:
+
+                  ```yaml
+                  jobs:
+                    - name: local
+                      dsn: "sqlserver://user:pass@localhost:1433"
+                      error_info_use_ring_buffer: true
+                  ```
+
+                  If you use a different session name:
 
                   ```yaml
                   jobs:
@@ -768,7 +938,7 @@ modules:
                       error_info_session_name: your_session_name
                   ```
           availability: |
-            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has an event_file target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out
+            Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists with an event_file or ring_buffer target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out
           require_cloud: true
     metrics:
       folding:

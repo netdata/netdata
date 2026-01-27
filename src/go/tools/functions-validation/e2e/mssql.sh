@@ -1454,6 +1454,9 @@ verify_deadlock_info() {
     echo "deadlock-info did not produce valid deadlock attribution after 5 attempts" >&2
     return 1
   fi
+
+  # Verify column visibility rules
+  assert_column_visibility "$output" "deadlock-info"
 }
 
 verify_deadlock_info_no_deadlock
@@ -1515,10 +1518,13 @@ sleep 2
 
 error_output="$(run_mssql_function_with_retry error-info '__job:local' 'true')"
 assert_error_info_has_errors "$error_output"
+assert_column_visibility "$error_output" "error-info"
+assert_unique_key_populated "$error_output" "error-info"
 
 run_mssql_top_queries_with_retry
 assert_top_queries_error_attribution_active "$WORKDIR/mssql-top-queries.json"
 assert_top_queries_error_attribution_mapped "$WORKDIR/mssql-top-queries.json" "$WORKDIR/mssql-error-info.json"
 assert_top_queries_plan_ops "$WORKDIR/mssql-top-queries.json"
+assert_column_visibility "$WORKDIR/mssql-top-queries.json" "top-queries"
 
 echo "E2E checks passed for ${MSSQL_VARIANT_LABEL}." >&2
