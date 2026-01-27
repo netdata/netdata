@@ -306,7 +306,7 @@ Aggregated statement statistics from Performance Schema, grouped by query digest
 | Lock Time | duration | milliseconds |  | Total time spent waiting for table locks across all executions. High lock time may indicate contention from concurrent transactions. |
 | Errors | integer |  |  | Total number of times this query pattern resulted in an error. Non-zero values require investigation into the underlying issue. |
 | Warnings | integer |  |  | Total number of times this query pattern generated warnings. Warnings may indicate data type conversions, NULL handling issues, or other non-critical problems. |
-| Error Attribution | string |  |  | Status of error detail attribution for this query. Values: enabled, no_data, not_enabled, not_supported. |
+| Error Attribution | string |  |  | Status of error detail attribution for this query. Values: enabled (error details available), no_data (no recent error for this digest), not_enabled (statement history consumers disabled, including events_statements_current), not_supported (required columns unavailable). |
 | Error Number | integer |  |  | Most recent error number observed for this query digest (when error attribution is enabled). |
 | SQL State | string |  | hidden | SQLSTATE code for the most recent error (when error attribution is enabled). |
 | Error Message | string |  |  | Most recent error message for this query digest (when error attribution is enabled). |
@@ -338,22 +338,18 @@ Aggregated statement statistics from Performance Schema, grouped by query digest
 | Max Controlled Memory | integer |  |  | Maximum memory controlled by the query executor for this query pattern. Available in MySQL 8.0.31+. Helps identify memory-intensive operations. |
 | Max Total Memory | integer |  |  | Maximum total memory used by this query pattern including both controlled and uncontrolled allocations. Available in MySQL 8.0.31+. |
 
-
 ### Deadlock Info
 
 Retrieves the latest detected InnoDB deadlock from `SHOW ENGINE INNODB STATUS`.
 
-### Error Info
-
-Retrieves recent SQL errors from Performance Schema statement history tables.
-
-- Requires Performance Schema statement history consumers to be enabled (`events_statements_history_long` preferred, or `events_statements_history`).
-- Returns HTTP 503 with `errorMessage: "not enabled"` when the history consumer is disabled.
-- Error messages and query text may include unmasked literals (PII); restrict dashboard access.
+The output is parsed to attribute the deadlock to the participating transactions and their query text, lock mode, lock status, and wait resource.
 
 Use cases:
-- Identify recent query errors and their messages
-- Correlate errors to query patterns (digest)
+- Identify which query was chosen as the deadlock victim
+- Inspect the waiting lock resource and lock mode
+- Correlate deadlocks with application changes or deployment events
+
+Query text is truncated at 4096 characters for display purposes.
 
 
 | Aspect | Description |
@@ -366,22 +362,7 @@ Use cases:
 
 #### Prerequisites
 
-1. Ensure the account has the required privilege:
-   ```sql
-   GRANT PROCESS ON *.* TO 'netdata'@'localhost';
-   FLUSH PRIVILEGES;
-   ```
-2. Enable the function in Netdata collector config:
-   ```yaml
-   jobs:
-     - name: local
-       dsn: "mysql://user:pass@tcp(127.0.0.1:3306)/"
-       deadlock_info_function_enabled: true
-   ```
-3. Verify the deadlock source is accessible:
-   ```sql
-   SHOW ENGINE INNODB STATUS\G
-   ```
+No additional configuration is required.
 
 #### Parameters
 
@@ -405,6 +386,52 @@ Parsed deadlock participants from the latest detected deadlock. Each row represe
 | Lock Status | string |  |  | Lock status for the transaction. WAITING indicates the transaction was waiting on a lock. |
 | Wait Resource | string |  |  | Lock resource line from InnoDB status showing what the transaction was waiting on. |
 | Database | string |  |  | Database name when it can be inferred. This may be empty or null depending on the deadlock output. |
+
+### Error Info
+
+Retrieves recent SQL errors from Performance Schema statement history tables.
+
+This function reads `performance_schema.events_statements_history_long` when enabled,
+otherwise falls back to `performance_schema.events_statements_history`. It reports the
+most recent error per query digest, including error number, SQLSTATE, and message.
+
+Use cases:
+- Identify recent query errors and their messages
+- Correlate errors to query patterns (digest)
+- Validate error rates seen in top-queries
+
+Error messages are truncated by Performance Schema (usually 128 characters).
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mysql:error-info` |
+| Require Cloud | yes |
+| Performance | Reads Performance Schema statement history tables on demand:<br/>• Not part of regular collection<br/>• Query cost depends on history table size and server load |
+| Security | Error messages and query text may include unmasked literals (PII/secrets).<br/>• Restrict dashboard access to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to MySQL<br/>• `error_info_function_enabled` is true<br/>• Performance Schema statement history consumers are enabled (history and/or history_long)<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 503 when required consumers are not enabled or function disabled<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Most recent error per query digest from Performance Schema history tables.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Digest | string |  | hidden | Unique hash identifier for the normalized query pattern. |
+| Query | string |  |  | Normalized query text when available (digest text or SQL text). |
+| Schema | string |  |  | Database schema name when available. |
+| Error Number | integer |  |  | MySQL error number for the most recent error of this digest. |
+| SQL State | string |  |  | SQLSTATE code for the most recent error. |
+| Error Message | string |  |  | Error message for the most recent error. |
+
 
 
 ## Alerts
@@ -685,3 +712,5 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep mysql
 ```
+
+
