@@ -64,13 +64,13 @@
               },
               "timeout": {
                 "title": "Timeout",
-                "description": "Timeout for the running-queries function query in seconds. If not set, uses the collector's timeout.",
+                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
                 "type": "number",
                 "minimum": 0
               },
               "limit": {
                 "title": "Limit",
-                "description": "Maximum number of queries to return.",
+                "description": "Maximum number of queries to return. Set to 0 to use the default (500).",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 5000,

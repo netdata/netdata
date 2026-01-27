@@ -55,13 +55,13 @@
               },
               "timeout": {
                 "title": "Timeout",
-                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
                 "type": "number",
                 "minimum": 0
               },
               "limit": {
                 "title": "Limit",
-                "description": "Maximum number of queries to return in the response.",
+                "description": "Maximum number of queries to return. Set to 0 to use the default (500).",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 5000,
@@ -82,13 +82,13 @@
               },
               "timeout": {
                 "title": "Timeout",
-                "description": "Query timeout in seconds. Uses collector timeout if not set.",
+                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
                 "type": "number",
                 "minimum": 0
               },
               "limit": {
                 "title": "Limit",
-                "description": "Maximum number of queries to return in the response.",
+                "description": "Maximum number of queries to return. Set to 0 to use the default (500).",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 5000,
