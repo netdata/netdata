@@ -342,9 +342,14 @@ func (f *funcDeadlockInfo) queryLatestDeadlock(ctx context.Context) (time.Time, 
 	qctx, cancel := context.WithTimeout(ctx, f.router.collector.Timeout.Duration())
 	defer cancel()
 
+	query := querySystemHealthLatestDeadlockEventFile
+	if f.router.collector.Config.GetDeadlockInfoUseRingBuffer() {
+		query = querySystemHealthLatestDeadlockRingBuffer
+	}
+
 	var deadlockTime sql.NullTime
 	var deadlockXML sql.NullString
-	err := f.router.collector.db.QueryRowContext(qctx, querySystemHealthLatestDeadlock).Scan(&deadlockTime, &deadlockXML)
+	err := f.router.collector.db.QueryRowContext(qctx, query).Scan(&deadlockTime, &deadlockXML)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return time.Time{}, "", nil

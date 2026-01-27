@@ -185,7 +185,11 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 			return &funcapi.FunctionResponse{Status: 403, Message: errorInfoPermissionMessage()}
 		}
 		if status == mssqlErrorAttrNotEnabled {
-			return &funcapi.FunctionResponse{Status: 503, Message: "error-info not enabled: Extended Events session not found or ring_buffer target missing"}
+			targetName := "event_file"
+			if f.router.collector.Config.GetErrorInfoUseRingBuffer() {
+				targetName = "ring_buffer"
+			}
+			return &funcapi.FunctionResponse{Status: 503, Message: fmt.Sprintf("error-info not enabled: Extended Events session not found or %s target missing", targetName)}
 		}
 		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("error-info query failed: %v", err)}
 	}
@@ -532,7 +536,12 @@ func (c *Collector) fetchMSSQLErrorRows(ctx context.Context, sessionName string,
 	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
 
-	rows, err := c.db.QueryContext(qctx, queryMSSQLErrorInfo, sql.Named("sessionName", sessionName), sql.Named("limit", limit))
+	query := queryMSSQLErrorInfoEventFile
+	if c.Config.GetErrorInfoUseRingBuffer() {
+		query = queryMSSQLErrorInfoRingBuffer
+	}
+
+	rows, err := c.db.QueryContext(qctx, query, sql.Named("sessionName", sessionName), sql.Named("limit", limit))
 	if err != nil {
 		return mssqlErrorAttrNotSupported, nil, err
 	}
@@ -590,7 +599,12 @@ func (c *Collector) mssqlErrorSessionAvailable(ctx context.Context, sessionName 
 		return false, nil
 	}
 
-	err = c.db.QueryRowContext(qctx, queryMSSQLErrorSessionHasRingBuffer, sql.Named("sessionName", sessionName)).Scan(&count)
+	targetQuery := queryMSSQLErrorSessionHasEventFile
+	if c.Config.GetErrorInfoUseRingBuffer() {
+		targetQuery = queryMSSQLErrorSessionHasRingBuffer
+	}
+
+	err = c.db.QueryRowContext(qctx, targetQuery, sql.Named("sessionName", sessionName)).Scan(&count)
 	if err != nil {
 		return false, err
 	}

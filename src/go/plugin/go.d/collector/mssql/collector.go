@@ -80,6 +80,14 @@ type Config struct {
 	// Default: true
 	DeadlockInfoFunctionEnabled *bool `yaml:"deadlock_info_function_enabled,omitempty" json:"deadlock_info_function_enabled"`
 
+	// DeadlockInfoUseRingBuffer uses ring_buffer target instead of event_file for deadlock-info
+	// Uses pointer to distinguish "unset" from explicit "true":
+	//   - nil (unset): Apply default of false (use event_file)
+	//   - false: Use event_file target (faster, recommended for on-prem)
+	//   - true: Use ring_buffer target (required for Azure SQL DB without blob storage)
+	// Default: false
+	DeadlockInfoUseRingBuffer *bool `yaml:"deadlock_info_use_ring_buffer,omitempty" json:"deadlock_info_use_ring_buffer"`
+
 	// ErrorInfoFunctionEnabled controls whether the error-info function is available
 	// Uses pointer to distinguish "unset" from explicit "false":
 	//   - nil (unset): Apply default of true (enabled)
@@ -91,6 +99,14 @@ type Config struct {
 	// ErrorInfoSessionName sets the Extended Events session name for error-info
 	// Default: "netdata_errors"
 	ErrorInfoSessionName string `yaml:"error_info_session_name,omitempty" json:"error_info_session_name,omitempty"`
+
+	// ErrorInfoUseRingBuffer uses ring_buffer target instead of event_file for error-info
+	// Uses pointer to distinguish "unset" from explicit "true":
+	//   - nil (unset): Apply default of false (use event_file)
+	//   - false: Use event_file target (faster, recommended for on-prem)
+	//   - true: Use ring_buffer target (required for Azure SQL DB without blob storage)
+	// Default: false
+	ErrorInfoUseRingBuffer *bool `yaml:"error_info_use_ring_buffer,omitempty" json:"error_info_use_ring_buffer"`
 
 	// TopQueriesLimit is the maximum number of queries to return
 	TopQueriesLimit int `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
@@ -120,6 +136,14 @@ func (c *Config) GetDeadlockInfoFunctionEnabled() bool {
 	return *c.DeadlockInfoFunctionEnabled
 }
 
+// GetDeadlockInfoUseRingBuffer returns whether to use ring_buffer target instead of event_file (default: false)
+func (c *Config) GetDeadlockInfoUseRingBuffer() bool {
+	if c.DeadlockInfoUseRingBuffer == nil {
+		return false
+	}
+	return *c.DeadlockInfoUseRingBuffer
+}
+
 // GetErrorInfoFunctionEnabled returns whether the error-info function is enabled (default: true)
 func (c *Config) GetErrorInfoFunctionEnabled() bool {
 	if c.ErrorInfoFunctionEnabled == nil {
@@ -134,6 +158,14 @@ func (c *Config) GetErrorInfoSessionName() string {
 		return "netdata_errors"
 	}
 	return c.ErrorInfoSessionName
+}
+
+// GetErrorInfoUseRingBuffer returns whether to use ring_buffer target instead of event_file (default: false)
+func (c *Config) GetErrorInfoUseRingBuffer() bool {
+	if c.ErrorInfoUseRingBuffer == nil {
+		return false
+	}
+	return *c.ErrorInfoUseRingBuffer
 }
 
 type Collector struct {
