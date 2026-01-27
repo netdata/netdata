@@ -52,7 +52,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "timestamp",
-			Tooltip:   "Timestamp",
+			Tooltip:   "When the error occurred",
 			Type:      funcapi.FieldTypeTimestamp,
 			Sortable:  true,
 			Visible:   true,
@@ -63,7 +63,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "errorNumber",
-			Tooltip:   "Error Number",
+			Tooltip:   "SQL Server error number",
 			Type:      funcapi.FieldTypeInteger,
 			Sortable:  true,
 			Visible:   true,
@@ -79,7 +79,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "errorState",
-			Tooltip:   "Error State",
+			Tooltip:   "Diagnostic code indicating where the error was raised (1-255)",
 			Type:      funcapi.FieldTypeInteger,
 			Sortable:  true,
 			Visible:   true,
@@ -95,7 +95,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "errorMessage",
-			Tooltip:   "Error Message",
+			Tooltip:   "The error message text",
 			Type:      funcapi.FieldTypeString,
 			Sortable:  false,
 			FullWidth: true,
@@ -106,7 +106,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "query",
-			Tooltip:   "Query",
+			Tooltip:   "The SQL statement that caused the error",
 			Type:      funcapi.FieldTypeString,
 			Sortable:  false,
 			FullWidth: true,
@@ -117,7 +117,7 @@ var errorInfoColumns = []errorInfoColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:     "queryHash",
-			Tooltip:  "Query Hash",
+			Tooltip:  "Hash of the query for grouping similar statements",
 			Type:     funcapi.FieldTypeString,
 			Sortable: true,
 			Visible:  false,
@@ -219,7 +219,7 @@ func mssqlErrorAttributionColumns() []topQueriesColumn {
 		{
 			ColumnMeta: funcapi.ColumnMeta{
 				Name:      "errorAttribution",
-				Tooltip:   "Error Attribution",
+				Tooltip:   "Source of error data (enabled, not_enabled, no_data)",
 				Type:      funcapi.FieldTypeString,
 				Visible:   true,
 				Transform: funcapi.FieldTransformNone,

@@ -56,7 +56,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "row_id",
-			Tooltip:   "Row ID",
+			Tooltip:   "Unique identifier for this row",
 			Type:      funcapi.FieldTypeString,
 			Sort:      funcapi.FieldSortAscending,
 			Sortable:  true,
@@ -70,7 +70,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:     "deadlock_id",
-			Tooltip:  "Deadlock ID",
+			Tooltip:  "Unique identifier for this deadlock event",
 			Type:     funcapi.FieldTypeString,
 			Sort:     funcapi.FieldSortDescending,
 			Sortable: true,
@@ -84,7 +84,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "timestamp",
-			Tooltip:   "Timestamp",
+			Tooltip:   "When the deadlock occurred",
 			Type:      funcapi.FieldTypeTimestamp,
 			Sort:      funcapi.FieldSortDescending,
 			Sortable:  true,
@@ -99,7 +99,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:     "process_id",
-			Tooltip:  "Process ID",
+			Tooltip:  "Internal process identifier from the deadlock graph",
 			Type:     funcapi.FieldTypeString,
 			Sort:     funcapi.FieldSortAscending,
 			Sortable: true,
@@ -113,7 +113,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "spid",
-			Tooltip:   "SPID",
+			Tooltip:   "Server Process ID (SQL Server session ID)",
 			Type:      funcapi.FieldTypeInteger,
 			Sort:      funcapi.FieldSortAscending,
 			Sortable:  true,
@@ -127,7 +127,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "ecid",
-			Tooltip:   "ECID",
+			Tooltip:   "Execution Context ID for parallel query threads",
 			Type:      funcapi.FieldTypeInteger,
 			Sort:      funcapi.FieldSortAscending,
 			Sortable:  true,
@@ -141,7 +141,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:          "is_victim",
-			Tooltip:       "Victim",
+			Tooltip:       "Whether this process was rolled back to resolve the deadlock",
 			Type:          funcapi.FieldTypeString,
 			Visualization: funcapi.FieldVisualPill,
 			Sort:          funcapi.FieldSortAscending,
@@ -155,7 +155,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "query_text",
-			Tooltip:   "Query",
+			Tooltip:   "The SQL statement being executed",
 			Type:      funcapi.FieldTypeString,
 			Sort:      funcapi.FieldSortAscending,
 			Sortable:  false,
@@ -170,7 +170,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:     "lock_mode",
-			Tooltip:  "Lock Mode",
+			Tooltip:  "Type of lock (S=Shared, X=Exclusive, U=Update, etc.)",
 			Type:     funcapi.FieldTypeString,
 			Sort:     funcapi.FieldSortAscending,
 			Sortable: true,
@@ -183,7 +183,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:          "lock_status",
-			Tooltip:       "Lock Status",
+			Tooltip:       "Whether the lock was granted or still waiting",
 			Type:          funcapi.FieldTypeString,
 			Visualization: funcapi.FieldVisualPill,
 			Sort:          funcapi.FieldSortAscending,
@@ -197,7 +197,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:      "wait_resource",
-			Tooltip:   "Wait Resource",
+			Tooltip:   "The resource this process was waiting to acquire",
 			Type:      funcapi.FieldTypeString,
 			Sort:      funcapi.FieldSortAscending,
 			Sortable:  false,
@@ -212,7 +212,7 @@ var deadlockColumns = []deadlockColumn{
 	{
 		ColumnMeta: funcapi.ColumnMeta{
 			Name:     "database",
-			Tooltip:  "Database",
+			Tooltip:  "Database where the deadlock occurred",
 			Type:     funcapi.FieldTypeString,
 			Sort:     funcapi.FieldSortAscending,
 			Sortable: true,
