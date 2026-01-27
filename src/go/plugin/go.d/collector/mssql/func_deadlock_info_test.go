@@ -202,7 +202,7 @@ func TestCollectDeadlockInfo_ParseError(t *testing.T) {
 	deadlockTime := time.Date(2026, time.January, 25, 12, 34, 56, 0, time.UTC)
 	deadlockRows := sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}).
 		AddRow(deadlockTime, "<deadlock><broken>")
-	mock.ExpectQuery("WITH xevents").WillReturnRows(deadlockRows)
+	mock.ExpectQuery("fn_xe_file_target_read_file").WillReturnRows(deadlockRows)
 
 	dbNameRows := sqlmock.NewRows([]string{"database_id", "name"})
 	mock.ExpectQuery("SELECT\\s+database_id").WillReturnRows(dbNameRows)
@@ -222,7 +222,7 @@ func TestCollectDeadlockInfo_QueryError(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("WITH xevents").
+	mock.ExpectQuery("fn_xe_file_target_read_file").
 		WillReturnError(errors.New("boom"))
 
 	c := New()
@@ -262,7 +262,7 @@ func TestCollectDeadlockInfo_PermissionDenied(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("WITH xevents").
+	mock.ExpectQuery("fn_xe_file_target_read_file").
 		WillReturnError(mssqlDriver.Error{Number: 297, Message: "VIEW SERVER STATE permission was denied"})
 
 	c := New()
@@ -290,7 +290,7 @@ func TestCollectDeadlockInfo_Timeout(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	mock.ExpectQuery("WITH xevents").
+	mock.ExpectQuery("fn_xe_file_target_read_file").
 		WillReturnError(context.DeadlineExceeded)
 
 	c := New()
@@ -310,7 +310,7 @@ func TestCollectDeadlockInfo_Success(t *testing.T) {
 
 	now := time.Date(2026, time.January, 25, 12, 0, 0, 0, time.UTC)
 
-	mock.ExpectQuery("WITH xevents").
+	mock.ExpectQuery("fn_xe_file_target_read_file").
 		WillReturnRows(
 			sqlmock.NewRows([]string{"deadlock_time", "deadlock_xml"}).
 				AddRow(now, sampleDeadlockGraph),
