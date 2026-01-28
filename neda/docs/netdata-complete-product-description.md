@@ -244,6 +244,8 @@ For aggregated tiers, each point also includes:
 
 ## 4. Machine Learning & Anomaly Detection
 
+Machine Learning based anomaly detection is applied on **all metrics, of all sources** (including SNMP, Prometheus, OTEL, StatsD, custom applications and plugins, etc). ML and anomaly detection is integrated to metrics ingestion and storage, so it is automatically applied to all metrics independently of their source.
+
 ### 4.1 Edge-Based ML Architecture
 
 Netdata runs unsupervised machine learning **directly on each Agent**, eliminating cloud dependencies and data egress:
@@ -1375,10 +1377,11 @@ Whether you're monitoring a single server or a global infrastructure, Netdata's 
 
 ---
 
-## Features that Netdata does **NOT** have
+## Clarifications
 
-- No native IPFIX (IP Flow Information eXport) support: IPFIX can be supported via community provided OpenMetrics/Prometheus/OpenTelemetry exporters and plugins.
-- No native SASE integration: SASE platforms sit in the traffic path and enforce policy. Netdata stays out of the path and measures what really happens on your systems and networks, at per-second resolution. That separation matters, because it gives you an independent view.
+- NetFlow/sFlow/IPFIX: supported via community provided OpenMetrics/Prometheus/OpenTelemetry exporters and plugins which extract metrics from NetFlow/sFlow/IPFIX.
+- SNMP Traps: supported via `snmptrapd` to convert traps to systemd-journal logs and statsd metrics.
+- SASE: SASE platforms sit in the traffic path and enforce policy. Netdata stays out of the path and measures what really happens on your systems and networks, at per-second resolution. That separation matters, because it gives you an independent view.
 
 ## Contact & Resources
 

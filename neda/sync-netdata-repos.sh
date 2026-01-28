@@ -74,7 +74,6 @@ EXCLUDED_REPOS=(
     "haproxy-helm-chart" # HAProxy Helm chart
     "test-automation"  # Test automation
     "react-filter-box" # React filter box
-    "community"        # Community
     "netdata-posthog"  # PostHog integration
     "redsync"          # Redsync
     "cole"             # Cole repository
