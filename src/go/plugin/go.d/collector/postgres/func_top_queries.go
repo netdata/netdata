@@ -18,6 +18,171 @@ const (
 	paramSort          = "__sort"
 )
 
+// queryStatsSourceName is the type for query stats source
+type queryStatsSourceName string
+
+const (
+	queryStatsSourcePgStatMonitor    queryStatsSourceName = "pg_stat_monitor"
+	queryStatsSourcePgStatStatements queryStatsSourceName = "pg_stat_statements"
+	queryStatsSourceNone             queryStatsSourceName = ""
+)
+
+// getQueryStatsSource detects and returns the best available query stats source.
+// Prefers pg_stat_monitor if available, falls back to pg_stat_statements.
+// Result is cached after first detection.
+func (f *funcTopQueries) getQueryStatsSource(ctx context.Context) (queryStatsSourceName, error) {
+	c := f.router.collector
+
+	// Fast path: return cached result
+	c.pgStatStatementsMu.RLock()
+	source := c.queryStatsSource
+	c.pgStatStatementsMu.RUnlock()
+	if source != "" {
+		return queryStatsSourceName(source), nil
+	}
+
+	// Slow path: detect and cache
+	c.pgStatStatementsMu.Lock()
+	defer c.pgStatStatementsMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if c.queryStatsSource != "" {
+		return queryStatsSourceName(c.queryStatsSource), nil
+	}
+
+	// Check pg_stat_monitor first (preferred)
+	var hasPgStatMonitor bool
+	query := `SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_monitor')`
+	if err := c.db.QueryRowContext(ctx, query).Scan(&hasPgStatMonitor); err != nil {
+		return queryStatsSourceNone, fmt.Errorf("failed to check pg_stat_monitor: %v", err)
+	}
+	if hasPgStatMonitor {
+		c.queryStatsSource = string(queryStatsSourcePgStatMonitor)
+		c.pgStatMonitorAvail = true
+		return queryStatsSourcePgStatMonitor, nil
+	}
+
+	// Fall back to pg_stat_statements
+	var hasPgStatStatements bool
+	query = `SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements')`
+	if err := c.db.QueryRowContext(ctx, query).Scan(&hasPgStatStatements); err != nil {
+		return queryStatsSourceNone, fmt.Errorf("failed to check pg_stat_statements: %v", err)
+	}
+	if hasPgStatStatements {
+		c.queryStatsSource = string(queryStatsSourcePgStatStatements)
+		c.pgStatStatementsAvail = true
+		return queryStatsSourcePgStatStatements, nil
+	}
+
+	return queryStatsSourceNone, nil
+}
+
+// detectPgStatStatementsColumns queries the database to find available columns
+func (f *funcTopQueries) detectPgStatStatementsColumns(ctx context.Context) (map[string]bool, error) {
+	c := f.router.collector
+
+	// Fast path: return cached result
+	c.pgStatStatementsMu.RLock()
+	if c.pgStatStatementsColumns != nil {
+		cols := c.pgStatStatementsColumns
+		c.pgStatStatementsMu.RUnlock()
+		return cols, nil
+	}
+	c.pgStatStatementsMu.RUnlock()
+
+	// Slow path: query and cache
+	c.pgStatStatementsMu.Lock()
+	defer c.pgStatStatementsMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if c.pgStatStatementsColumns != nil {
+		return c.pgStatStatementsColumns, nil
+	}
+
+	// Query available columns from pg_stat_statements
+	query := `
+		SELECT column_name
+		FROM information_schema.columns
+		WHERE table_name = 'pg_stat_statements'
+		AND table_schema = 'public'
+	`
+	rows, err := c.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query columns: %v", err)
+	}
+	defer rows.Close()
+
+	cols := make(map[string]bool)
+	for rows.Next() {
+		var colName string
+		if err := rows.Scan(&colName); err != nil {
+			return nil, fmt.Errorf("failed to scan column name: %v", err)
+		}
+		cols[colName] = true
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %v", err)
+	}
+
+	// Cache the result
+	c.pgStatStatementsColumns = cols
+	return cols, nil
+}
+
+// detectPgStatMonitorColumns queries the database to find available columns
+func (f *funcTopQueries) detectPgStatMonitorColumns(ctx context.Context) (map[string]bool, error) {
+	c := f.router.collector
+
+	// Fast path: return cached result
+	c.pgStatStatementsMu.RLock()
+	if c.pgStatMonitorColumns != nil {
+		cols := c.pgStatMonitorColumns
+		c.pgStatStatementsMu.RUnlock()
+		return cols, nil
+	}
+	c.pgStatStatementsMu.RUnlock()
+
+	// Slow path: query and cache
+	c.pgStatStatementsMu.Lock()
+	defer c.pgStatStatementsMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if c.pgStatMonitorColumns != nil {
+		return c.pgStatMonitorColumns, nil
+	}
+
+	// Query available columns from pg_stat_monitor
+	query := `
+		SELECT column_name
+		FROM information_schema.columns
+		WHERE table_name = 'pg_stat_monitor'
+		AND table_schema = 'public'
+	`
+	rows, err := c.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query columns: %v", err)
+	}
+	defer rows.Close()
+
+	cols := make(map[string]bool)
+	for rows.Next() {
+		var colName string
+		if err := rows.Scan(&colName); err != nil {
+			return nil, fmt.Errorf("failed to scan column name: %v", err)
+		}
+		cols[colName] = true
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %v", err)
+	}
+
+	// Cache the result
+	c.pgStatMonitorColumns = cols
+	return cols, nil
+}
+
 // pgColumn defines metadata for a pg_stat_statements/pg_stat_monitor column.
 // Embeds funcapi.ColumnMeta for UI rendering and adds PG-specific fields.
 type pgColumn struct {
@@ -234,7 +399,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 	c := f.router.collector
 
 	// Auto-detect best available query stats source
-	source, err := c.getQueryStatsSource(ctx)
+	source, err := f.getQueryStatsSource(ctx)
 	if err != nil {
 		return funcapi.InternalErrorResponse("failed to detect query stats source: %v", err)
 	}
@@ -254,9 +419,9 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 	// Detect available columns based on source
 	var availableCols map[string]bool
 	if source == queryStatsSourcePgStatMonitor {
-		availableCols, err = c.detectPgStatMonitorColumns(ctx)
+		availableCols, err = f.detectPgStatMonitorColumns(ctx)
 	} else {
-		availableCols, err = c.detectPgStatStatementsColumns(ctx)
+		availableCols, err = f.detectPgStatStatementsColumns(ctx)
 	}
 	if err != nil {
 		return funcapi.InternalErrorResponse("failed to detect available columns: %v", err)
@@ -670,10 +835,8 @@ func (f *funcTopQueries) topQueriesSortParam(queryCols []pgColumn, source queryS
 }
 
 func (f *funcTopQueries) topQueriesParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
-	c := f.router.collector
-
 	// Auto-detect best available query stats source
-	source, err := c.getQueryStatsSource(ctx)
+	source, err := f.getQueryStatsSource(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -684,9 +847,9 @@ func (f *funcTopQueries) topQueriesParams(ctx context.Context) ([]funcapi.ParamC
 	// Detect available columns based on source
 	var availableCols map[string]bool
 	if source == queryStatsSourcePgStatMonitor {
-		availableCols, err = c.detectPgStatMonitorColumns(ctx)
+		availableCols, err = f.detectPgStatMonitorColumns(ctx)
 	} else {
-		availableCols, err = c.detectPgStatStatementsColumns(ctx)
+		availableCols, err = f.detectPgStatStatementsColumns(ctx)
 	}
 	if err != nil {
 		return nil, err
@@ -698,6 +861,7 @@ func (f *funcTopQueries) topQueriesParams(ctx context.Context) ([]funcapi.ParamC
 	}
 
 	sortParam, _ := f.topQueriesSortParam(queryCols, source)
+
 	return []funcapi.ParamConfig{sortParam}, nil
 }
 
