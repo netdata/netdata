@@ -406,10 +406,10 @@ func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool, so
 		}
 
 		// Handle version-specific column names for time columns.
-		// pg_stat_statements renamed time columns in PG 13: total_time -> total_exec_time, etc.
-		// pg_stat_monitor uses the original names (total_time, mean_time) regardless of PG version.
+		// pg_stat_statements PG 13+ and pg_stat_monitor both use: total_exec_time, mean_exec_time, etc.
+		// pg_stat_statements < PG 13 uses: total_time, mean_time, etc.
 		actualColName := colName
-		if !isPgStatMonitor && c.pgVersion >= pgVersion13 {
+		if isPgStatMonitor || c.pgVersion >= pgVersion13 {
 			switch colName {
 			case "total_time":
 				actualColName = "total_exec_time"
@@ -469,10 +469,10 @@ func (f *funcTopQueries) mapAndValidateSortColumn(sortColumn string, availableCo
 				colName = colName[:idx]
 			}
 
-			// Handle version-specific mapping for pg_stat_statements only.
-			// pg_stat_statements renamed time columns in PG 13: total_time -> total_exec_time, etc.
-			// pg_stat_monitor uses the original names regardless of PG version.
-			if !isPgStatMonitor && c.pgVersion >= pgVersion13 {
+			// Handle version-specific mapping for time columns.
+			// pg_stat_statements PG 13+ and pg_stat_monitor both use: total_exec_time, mean_exec_time, etc.
+			// pg_stat_statements < PG 13 uses: total_time, mean_time, etc.
+			if isPgStatMonitor || c.pgVersion >= pgVersion13 {
 				switch colName {
 				case "total_time":
 					colName = "total_exec_time"
@@ -495,7 +495,7 @@ func (f *funcTopQueries) mapAndValidateSortColumn(sortColumn string, availableCo
 	}
 
 	// Default fallback
-	if !isPgStatMonitor && c.pgVersion >= pgVersion13 {
+	if isPgStatMonitor || c.pgVersion >= pgVersion13 {
 		return "total_exec_time"
 	}
 	return "total_time"
@@ -509,10 +509,10 @@ func (f *funcTopQueries) buildDynamicSQL(cols []pgColumn, sortColumn string, lim
 	for _, col := range cols {
 		colExpr := col.DBColumn
 
-		// Handle version-specific column names for pg_stat_statements only.
-		// pg_stat_statements renamed time columns in PG 13: total_time -> total_exec_time, etc.
-		// pg_stat_monitor uses the original names (total_time, mean_time) regardless of PG version.
-		if source == queryStatsSourcePgStatStatements && c.pgVersion >= pgVersion13 {
+		// Handle version-specific column names for time columns.
+		// pg_stat_statements PG 13+ and pg_stat_monitor both use: total_exec_time, mean_exec_time, etc.
+		// pg_stat_statements < PG 13 uses: total_time, mean_time, etc.
+		if source == queryStatsSourcePgStatMonitor || c.pgVersion >= pgVersion13 {
 			switch {
 			case strings.HasSuffix(colExpr, ".total_time"):
 				colExpr = strings.Replace(colExpr, ".total_time", ".total_exec_time", 1)
@@ -677,6 +677,7 @@ func (f *funcTopQueries) topQueriesParams(ctx context.Context) ([]funcapi.ParamC
 	if err != nil {
 		return nil, err
 	}
+	c.Infof("topQueriesParams: detected source=%s", source)
 	if source == queryStatsSourceNone {
 		return nil, fmt.Errorf("no query statistics extension is installed (pg_stat_monitor or pg_stat_statements)")
 	}
@@ -691,13 +692,16 @@ func (f *funcTopQueries) topQueriesParams(ctx context.Context) ([]funcapi.ParamC
 	if err != nil {
 		return nil, err
 	}
+	c.Infof("topQueriesParams: detected %d columns from %s", len(availableCols), source)
 
 	queryCols := f.buildAvailableColumns(availableCols, source)
+	c.Infof("topQueriesParams: built %d query columns", len(queryCols))
 	if len(queryCols) == 0 {
 		return nil, fmt.Errorf("no queryable columns found in %s", source)
 	}
 
 	sortParam, _ := f.topQueriesSortParam(queryCols, source)
+	c.Infof("topQueriesParams: built %d sort options", len(sortParam.Options))
 	return []funcapi.ParamConfig{sortParam}, nil
 }
 
