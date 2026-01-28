@@ -383,22 +383,26 @@ func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool, so
 			continue
 		}
 
-		// Extract the actual column name (remove table prefix and type cast)
+		// Extract the actual column name for availability check
 		colName := col.DBColumn
-		if idx := strings.LastIndex(colName, "."); idx != -1 {
-			colName = colName[idx+1:]
-		}
-		// Remove PostgreSQL type cast suffix (e.g., "::text")
-		if idx := strings.Index(colName, "::"); idx != -1 {
-			colName = colName[:idx]
-		}
-		// Remove array_to_string wrapper
+
+		// Strip array_to_string wrapper FIRST (before table prefix removal)
+		// e.g., "array_to_string(s.relations, ', ')" -> "s.relations"
 		if strings.HasPrefix(colName, "array_to_string(") {
 			colName = strings.TrimPrefix(colName, "array_to_string(")
 			if idx := strings.Index(colName, ","); idx != -1 {
 				colName = colName[:idx]
 			}
-			colName = strings.TrimPrefix(colName, "s.")
+		}
+
+		// Remove table prefix (e.g., "s.relations" -> "relations")
+		if idx := strings.LastIndex(colName, "."); idx != -1 {
+			colName = colName[idx+1:]
+		}
+
+		// Remove PostgreSQL type cast suffix (e.g., "queryid::text" -> "queryid")
+		if idx := strings.Index(colName, "::"); idx != -1 {
+			colName = colName[:idx]
 		}
 
 		// Handle version-specific column names for time columns.
