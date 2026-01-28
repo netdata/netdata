@@ -25,9 +25,6 @@ type pgColumn struct {
 
 	// DBColumn is the database column expression (e.g., "s.queryid::text", "d.datname")
 	DBColumn string
-	// DBColumnMonitor is the column expression for pg_stat_monitor (if different from DBColumn)
-	// If empty, DBColumn is used for both sources
-	DBColumnMonitor string
 	// IsSortOption indicates whether this column appears in the sort dropdown
 	IsSortOption bool
 	// SortLabel is the label shown in the sort dropdown (if IsSortOption)
