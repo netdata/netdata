@@ -480,7 +480,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 	}
 
 	// Decorate columns with chart/label metadata and build using ColumnSet
-	annotatedCols := decoratePgColumns(queryCols, source)
+	annotatedCols := decoratePgColumns(queryCols)
 	cs := pgColumnSet(annotatedCols)
 
 	// Build help message based on source
@@ -501,7 +501,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 }
 
 // decoratePgColumns adds label and chart metadata to columns for ColumnSet builders.
-func decoratePgColumns(cols []pgColumn, source queryStatsSourceName) []pgColumn {
+func decoratePgColumns(cols []pgColumn) []pgColumn {
 	out := make([]pgColumn, len(cols))
 	index := make(map[string]int, len(cols))
 	for i, col := range cols {
