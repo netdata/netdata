@@ -21,6 +21,8 @@ func init() {
 		Create:          func() module.Module { return New() },
 		JobConfigSchema: configSchema,
 		Config:          func() any { return &Config{} },
+		Methods:         sqlMethods,
+		MethodHandler:   sqlMethodHandler,
 	})
 }
 
@@ -44,6 +46,8 @@ type Collector struct {
 	db *sql.DB
 
 	seenCharts map[string]bool
+
+	funcTable *funcTable
 }
 
 func (c *Collector) Configuration() any {
@@ -51,14 +55,33 @@ func (c *Collector) Configuration() any {
 }
 
 func (c *Collector) Charts() *module.Charts {
+	if c.Config.FunctionOnly {
+		return nil
+	}
 	return c.charts
 }
 
 func (c *Collector) Init(context.Context) error {
-	return c.validateConfig()
+	if err := c.validateConfig(); err != nil {
+		return err
+	}
+
+	c.funcTable = newFuncTable(c)
+
+	return nil
 }
 
 func (c *Collector) Check(ctx context.Context) error {
+	if c.db == nil {
+		if err := c.openConnection(ctx); err != nil {
+			return err
+		}
+	}
+
+	if c.Config.FunctionOnly {
+		return nil
+	}
+
 	mx, err := c.collect(ctx)
 	if err != nil {
 		return err
@@ -70,6 +93,10 @@ func (c *Collector) Check(ctx context.Context) error {
 }
 
 func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	if c.Config.FunctionOnly {
+		return nil
+	}
+
 	mx, err := c.collect(ctx)
 	if err != nil {
 		c.Error(err)
