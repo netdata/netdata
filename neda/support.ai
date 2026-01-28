@@ -276,8 +276,6 @@ Iterate as necessary until your final report/answer is fully and accurately addr
 
 ---
 
-Output format: XML-NEXT.FORMAT
-Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 
 ---
 

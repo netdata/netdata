@@ -55,8 +55,6 @@ IMPORTANT: fireflies does not allow searching transcripts using company domain n
 
 ---
 
-Output Format: XML-NEXT.FORMAT
-Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 
 Your report should be evidence-based, with quotes, not opinions. If unsure, state it explicitly.
 

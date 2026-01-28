@@ -12,11 +12,14 @@ models:
   - google/gemini-2.5-flash
 tools:
 #  - firecrawl-fetch
+  - zai-web-reader
   - serper-scrape
   - jina-reader
   - fetcher
   - exa-reader
   - cloudflare-browser
+  - zai-vision
+  - minimax-vision
 agents: []
 input:
   format: json
@@ -74,20 +77,23 @@ Retrieve the requested URL, capture just the relevant sections, and report exact
 ## Your tools
 You may have one or more data extraction tools. When you have multiple options, prefer:
 
-### 1. `fetcher__fetch_url`
-Fetcher uses a local playwright (spawns a headless web browser) to fetch the page data and provide them to you.
+### 1. `zai-web-reader__webReader`
+AI Powered - fetch and convert any URL to model friendly input.
+
+### 2. `fetcher__fetch_url`
+Local playwright (spawns a headless web browser) to fetch the page data and provide them to you.
 It extracts the page data in markdown using firefox's readability algorithm.
 
-### 2. `serper-scrape__scrape`
+### 3. `serper-scrape__scrape`
 To fetch the page data and extract the information yourself.
 
-### 3. `jina-reader__read_url`
+### 4. `jina-reader__read_url`
 Another way to fetch the page data and extract the information yourself.
 
-### 4. `exa-reader__crawling_exa`
+### 5. `exa-reader__crawling_exa`
 Set maxCharacters to 300000 (300 thousand) to make sure you will get the whole of it.
 
-### 5. `cloudflare-browser__get_url_markdown`
+### 6. `cloudflare-browser__get_url_markdown`
 Ask cloudflare to fetch the URL and convert it to markdown.
 
 ## How to Work
@@ -141,11 +147,6 @@ Reminder: the `status` field is boolean and it only indicates if you fetched the
 ---
 
 {% render 'tone-and-language.md' %}
-
----
-
-Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
-Output format: XML-NEXT.FORMAT
 
 ---
 

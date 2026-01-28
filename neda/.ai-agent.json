@@ -447,6 +447,93 @@
       ],
       "toolsDenied": []
     },
+    "minimax-web-search": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "minimax-coding-plan-mcp",
+        "-y"
+      ],
+      "env": {
+        "MINIMAX_API_KEY": "${MINIMAX_API_KEY}",
+        "MINIMAX_API_HOST": "https://api.minimax.io"
+      },
+      "enabled": true,
+      "toolsAllowed": [
+        "web_search"
+      ],
+      "toolsDenied": []
+    },
+    "minimax-vision": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "minimax-coding-plan-mcp",
+        "-y"
+      ],
+      "env": {
+        "MINIMAX_API_KEY": "${MINIMAX_API_KEY}",
+        "MINIMAX_API_HOST": "https://api.minimax.io"
+      },
+      "enabled": true,
+      "toolsAllowed": [
+        "understand_image"
+      ],
+      "toolsDenied": []
+    },
+    "zai-vision": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [ 
+        "-y",
+        "@z_ai/mcp-server"
+      ],
+      "env": {
+        "ZAI_API_KEY": "${ZAI_API_KEY}",
+        "ZAI_API_MODE": "ZAI"
+      },
+      "enabled": true,
+      "toolsAllowed": [
+        "*"
+      ],
+      "toolsDenied": []
+    },
+    "zai-web-search": {
+      "type": "http",
+      "url": "https://api.z.ai/api/mcp/web_search_prime/mcp",
+      "headers": {
+      "Authorization": "Bearer ${ZAI_API_KEY}"
+      },
+      "enabled": true,
+      "toolsAllowed": [
+      "*"
+      ],
+      "toolsDenied": []
+    },
+    "zai-web-reader": {
+      "type": "http",
+      "url": "https://api.z.ai/api/mcp/web_reader/mcp",
+      "headers": {
+      "Authorization": "Bearer ${ZAI_API_KEY}"
+      },
+      "enabled": true,
+      "toolsAllowed": [
+      "*"
+      ],
+      "toolsDenied": []
+    },
+    "zai-zread": {
+      "type": "http",
+      "url": "https://api.z.ai/api/mcp/zread/mcp",
+      "headers": {
+      "Authorization": "Bearer ${ZAI_API_KEY}"
+      },
+      "enabled": true,
+      "toolsAllowed": [
+      "*"
+      ],
+      "toolsDenied": []
+    },
     "brave": {
       "type": "stdio",
       "command": "npx",

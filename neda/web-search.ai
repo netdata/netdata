@@ -9,6 +9,8 @@ models:
   - openai/gpt-5-mini
   - google/gemini-2.5-flash
 tools:
+  - zai-web-search
+  - minimax-web-search
   - serper-search
   - jina-search
   - brave
@@ -49,7 +51,7 @@ The process looks like this:
 - While you discover more insights relevant to the user's request, iterate as many times as required: 3 -> 4 -> 5
 - Finally: 6
 
-This process of research may lead to multiple iterations/turns (you have up to XML-NEXT.MAX_TURNS turns). Insist researching while you discover new relevant and valuable information that affects your final report, stop researching when the last SEARCH-EXTRACT set did not reveal anything relevant or not already known.
+This process of research may lead to multiple iterations/turns. Insist researching while you discover new relevant and valuable information that affects your final report, stop researching when the last SEARCH-EXTRACT set did not reveal anything relevant or not already known.
 
 How to interpret ambiguous user requests:
 - "top", "popular", "common", etc., imply to query enough to get the most probable
@@ -61,8 +63,6 @@ At each turn/step, run tools in parallel as needed. Default strategy: the first 
 
 - Use one or more searches to gather leads and/or `web-fetch` agent requests to extract page content.
 - Provide the final report when ready to complete the task.
-
-You can call up to XML-NEXT.MAX_TOOLS tools in one turn.
 
 ### Stop Conditions
 You gather insights for answering the user's request, using SEARCH-EXTRACT sets.
@@ -99,6 +99,14 @@ A few search providers return just URLs and page titles, others are able to extr
 
 When to use these search providers: generic web searches not covered by the specialized agents you have access to.
 When not to use these search providers: use the `sourcegraph` agent when searching for source code examples or patterns; use the `github-search` agent when looking for issues, PRs, discussions, releases of publicly available open-source codebases' use the `reddit` agent when looking for reddit discussions.
+
+### Z.AI Web Search
+
+Web search results.
+
+### Minimax Web Search
+
+Web search results.
 
 ### Serper
 
@@ -239,13 +247,6 @@ When sources contradict:
 
 ---
 
-Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
-IMPORTANT: We are in 2025. Prioritize recent sources.
-
-Output format: XML-NEXT.FORMAT
-
----
-
 ## Checklist
 
 ### Starting
@@ -261,5 +262,7 @@ Output format: XML-NEXT.FORMAT
 - [ ] provide your final report/answer to deliver the findings to the user
 
 ---
+
+IMPORTANT: We are in 2026. Prioritize recent sources.
 
 Now start the investigation, by calling the search providers as described.

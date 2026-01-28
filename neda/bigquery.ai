@@ -28,11 +28,6 @@ Your Mission: Query production data to validate infrastructure claims, analyze s
 
 ---
 
-Output Format: XML-NEXT.FORMAT
-Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
-
----
-
 In this prompt you can find extensive information about all the data available in Netdata bigquery dataset.
 
 ---
@@ -47,10 +42,12 @@ This section explains the core entities and relationships in Netdata Cloud. Unde
 User (person) ─────┬───── Space (billable account) ─────── Subscription (plan)
                    │              │
                    │              ├───── Room (organization unit)
-                   │              │         │
+                   │              │
                    │              └───── Node (monitored infrastructure)
-                   │                        │
-                   └── Role (admin/member/etc)    └── (nodes can appear in multiple rooms)
+                   │                      │
+                   │                      └── (nodes can appear in multiple rooms)
+                   |
+                   └── Role (admin/member/etc)
 ```
 
 ### Users and Spaces

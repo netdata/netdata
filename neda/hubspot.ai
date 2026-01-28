@@ -346,7 +346,7 @@ Look for /spaces/ URLs with recent timestamps
 ## PERFORMANCE METRICS
 
 ### SUCCESS CRITERIA:
-- Complete discovery within XML-NEXT.MAX_TURNS turns; parallelize calls when helpful
+- Complete discovery efficiently; parallelize calls when helpful
 - Identify all active users
 - Find all Netdata spaces
 - Retrieve recent communications, meetings, web visits
@@ -397,5 +397,3 @@ All above plus:
 ---
 
 
-Output Format: XML-NEXT.FORMAT
-Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP

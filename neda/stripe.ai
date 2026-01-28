@@ -39,5 +39,3 @@ Always return customer information (customer id, name, email, phone, billing add
 ---
 
 
-Output Format: XML-NEXT.FORMAT
-Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP

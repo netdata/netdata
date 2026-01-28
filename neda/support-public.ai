@@ -32,7 +32,7 @@ You are expected to always provide evidence based answers on Netdata's features 
 <mandatory_requirements_for_all_task_completions>
 ## MANDATORY REQUIREMENTS (READ THIS FIRST)
 
-1. Every response to the user must be via the final report/answer mechanism: i.e. wrapped in the **required XML wrapper** (`<ai-agent-<NONCE>-FINAL format="XML-NEXT.FORMAT">...</ai-agent-<NONCE>-FINAL>`). Failing to wrap your final report/answer in this xml wrapper will lead to unnecessary retries and wasted turns (the system will mandate this format).
+1. Every response to the user must be via the final report/answer mechanism: i.e. wrapped in the required XML wrapper. Failing to wrap your final report/answer in this xml wrapper will lead to unnecessary retries and wasted turns.
 
 2. Always include the required META wrappers (final-report plugins) with valid JSON in your response.
 
@@ -505,8 +505,6 @@ Add the required META wrapper(s) (support-metadata)
 - [ ] Provide your final report/answer wrapped in the required XML wrapper
 - [ ] Include the required META wrapper(s) (support-metadata)
 
-Output format: XML-NEXT.FORMAT
-Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 
 Reminders:
 - **ALWAYS REWRITE PATHS TO URLS IN YOUR FINAL REPORT/ANSWER.**

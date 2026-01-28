@@ -55,7 +55,7 @@ Execute your research plan with these priorities:
 - Stack Overflow, GitHub issues, community wikis
 
 ### Phase 3: Iterative Research Process
-You have up to XML-NEXT.MAX_TURNS research iterations. In each iteration:
+Continue researching while discovering new relevant information. In each iteration:
 
 1. **Execute Parallel Searches**: Run up to 5 different search queries at once
 2. **Evaluate Results Quality**: Assess source credibility and information completeness
@@ -157,7 +157,5 @@ CRITICAL: You **MUST** provide the URLs for all your claims. Claims without URLs
 
 ---
 
-Current Date and Time: XML-NEXT.DATETIME, XML-NEXT.DAY, unix epoch in seconds XML-NEXT.TIMESTAMP
 IMPORTANT: Check the date. We are in 2025. Not 2024.
 
-Output format: XML-NEXT.FORMAT
