@@ -716,6 +716,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
         }
 
         ae = health_alarm_entry_create();
+        ae->host = host;
 
         ae->unique_id = unique_id;
         ae->alarm_id = alarm_id;

@@ -45,7 +45,7 @@ void health_alarm_entry_destroy(ALARM_ENTRY *ae) {
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async, struct health_stmt_set *stmts)
 {
     if (async) {
-        bool queued = health_queue_alert_save(host, ae);
+        bool queued = health_queue_alert_save(ae);
         // Fallback to synchronous save if queue failed (full or shutting down).
         // sql_health_alarm_log_save() handles stmts==NULL by preparing ad-hoc statements.
         if (!queued && !health_should_stop())
@@ -195,6 +195,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
     ALARM_ENTRY *ae = health_alarm_entry_create();
+    ae->host = host;
     ae->name = string_dup(name);
     ae->chart = string_dup(chart);
     ae->chart_context = string_dup(chart_context);
