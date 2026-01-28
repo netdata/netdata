@@ -51,53 +51,55 @@ func (c runningQueriesColumn) IsDefaultSort() bool { return c.defaultSort }
 func (c runningQueriesColumn) ColumnName() string  { return c.Name }
 func (c runningQueriesColumn) SortColumn() string  { return "" }
 
-// runningQueriesColumns defines ALL columns from pg_stat_activity (PostgreSQL 14+).
-// Order matters - this determines column index in the response.
+// runningQueriesColumns defines ALL columns from pg_stat_activity.
+// Order matters - this determines column display order. Visible columns first, then hidden.
 var runningQueriesColumns = []runningQueriesColumn{
-	// Session identification
-	{ColumnMeta: funcapi.ColumnMeta{Name: "pid", Tooltip: "Process ID of this backend", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "pid"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "leaderPid", Tooltip: "Process ID of parallel group leader (NULL if this is leader or not parallel)", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "leader_pid", minVersion: pgVersion13},
+	// === VISIBLE COLUMNS (most important first) ===
 
-	// Database and user
-	{ColumnMeta: funcapi.ColumnMeta{Name: "datid", Tooltip: "OID of the database", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: false, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "datid"},
+	// Key metrics
+	{ColumnMeta: funcapi.ColumnMeta{Name: "durationMs", Tooltip: "Query duration in milliseconds (since query_start)", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, DBColumn: "EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - query_start)) * 1000", sortOpt: true, sortLbl: "Query Duration", defaultSort: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query text (may be truncated at track_activity_query_size)", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sticky: true, FullWidth: true, Wrap: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "query"},
+
+	// Context: who/where
 	{ColumnMeta: funcapi.ColumnMeta{Name: "datname", Tooltip: "Name of the database", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "datname"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "usesysid", Tooltip: "OID of the user", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: false, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "usesysid"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "usename", Tooltip: "Name of the user logged into this backend", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "usename"},
-
-	// Application/client info
 	{ColumnMeta: funcapi.ColumnMeta{Name: "applicationName", Tooltip: "Name of the application connected to this backend", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "application_name"},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "clientAddr", Tooltip: "IP address of the client (NULL for Unix socket or internal process)", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "client_addr::text"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "clientHostname", Tooltip: "Hostname of the client via reverse DNS (only if log_hostname enabled)", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "client_hostname"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "clientPort", Tooltip: "TCP port of client (-1 for Unix socket, NULL for internal process)", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "client_port"},
 
-	// Timestamps
-	{ColumnMeta: funcapi.ColumnMeta{Name: "backendStart", Tooltip: "Time when this process/connection started", Type: funcapi.FieldTypeTimestamp, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, DBColumn: "backend_start"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "xactStart", Tooltip: "Time when current transaction started (NULL if no transaction)", Type: funcapi.FieldTypeTimestamp, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, DBColumn: "xact_start"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "queryStart", Tooltip: "Time when current/last query started", Type: funcapi.FieldTypeTimestamp, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, DBColumn: "query_start", sortOpt: true, sortLbl: "Query Start Time"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "stateChange", Tooltip: "Time when state was last changed", Type: funcapi.FieldTypeTimestamp, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, DBColumn: "state_change"},
-
-	// Calculated duration
-	{ColumnMeta: funcapi.ColumnMeta{Name: "durationMs", Tooltip: "Query duration in milliseconds (since query_start)", Type: funcapi.FieldTypeDuration, Units: "milliseconds", Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDuration, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, DBColumn: "EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - query_start)) * 1000", sortOpt: true, sortLbl: "Query Duration", defaultSort: true},
-
-	// Wait events
-	{ColumnMeta: funcapi.ColumnMeta{Name: "waitEventType", Tooltip: "Type of event the backend is waiting for (Activity, BufferPin, Client, Extension, IO, IPC, Lock, LWLock, Timeout)", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "wait_event_type"},
+	// Status
 	{ColumnMeta: funcapi.ColumnMeta{Name: "waitEvent", Tooltip: "Specific wait event name if backend is currently waiting", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "wait_event"},
 
-	// State
-	{ColumnMeta: funcapi.ColumnMeta{Name: "state", Tooltip: "Current state: active, idle, idle in transaction, idle in transaction (aborted), fastpath function call, disabled", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Visualization: funcapi.FieldVisualPill}, DBColumn: "state"},
+	// Process ID (useful for pg_terminate_backend)
+	{ColumnMeta: funcapi.ColumnMeta{Name: "pid", Tooltip: "Process ID of this backend", Type: funcapi.FieldTypeInteger, Visible: true, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, UniqueKey: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "pid"},
 
-	// Transaction IDs
-	{ColumnMeta: funcapi.ColumnMeta{Name: "backendXid", Tooltip: "Top-level transaction identifier of this backend", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "backend_xid::text"},
-	{ColumnMeta: funcapi.ColumnMeta{Name: "backendXmin", Tooltip: "Backend's xmin horizon", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "backend_xmin::text"},
+	// === HIDDEN COLUMNS ===
+
+	// Additional status info
+	{ColumnMeta: funcapi.ColumnMeta{Name: "waitEventType", Tooltip: "Type of event the backend is waiting for (Activity, BufferPin, Client, Extension, IO, IPC, Lock, LWLock, Timeout)", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "wait_event_type"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "state", Tooltip: "Current state: active, idle, idle in transaction, idle in transaction (aborted), fastpath function call, disabled", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Visualization: funcapi.FieldVisualPill}, DBColumn: "state"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "backendType", Tooltip: "Type of backend: client backend, autovacuum worker, parallel worker, walsender, walreceiver, etc.", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "backend_type", minVersion: pgVersion10},
+
+	// Timestamps
+	{ColumnMeta: funcapi.ColumnMeta{Name: "queryStart", Tooltip: "Time when current/last query started", Type: funcapi.FieldTypeTimestamp, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, DBColumn: "query_start", sortOpt: true, sortLbl: "Query Start Time"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "xactStart", Tooltip: "Time when current transaction started (NULL if no transaction)", Type: funcapi.FieldTypeTimestamp, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, DBColumn: "xact_start"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "backendStart", Tooltip: "Time when this process/connection started", Type: funcapi.FieldTypeTimestamp, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, DBColumn: "backend_start"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "stateChange", Tooltip: "Time when state was last changed", Type: funcapi.FieldTypeTimestamp, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformDatetime, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummaryMax}, DBColumn: "state_change"},
 
 	// Query identification
 	{ColumnMeta: funcapi.ColumnMeta{Name: "queryId", Tooltip: "Query identifier (requires compute_query_id or extension)", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "query_id::text", minVersion: pgVersion14},
 
-	// Query text
-	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query text (may be truncated at track_activity_query_size)", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sticky: true, FullWidth: true, Wrap: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "query"},
+	// Session IDs
+	{ColumnMeta: funcapi.ColumnMeta{Name: "leaderPid", Tooltip: "Process ID of parallel group leader (NULL if this is leader or not parallel)", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "leader_pid", minVersion: pgVersion13},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "datid", Tooltip: "OID of the database", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: false, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "datid"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "usesysid", Tooltip: "OID of the user", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: false, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "usesysid"},
 
-	// Backend type
-	{ColumnMeta: funcapi.ColumnMeta{Name: "backendType", Tooltip: "Type of backend: client backend, autovacuum worker, parallel worker, walsender, walreceiver, etc.", Type: funcapi.FieldTypeString, Visible: true, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "backend_type", minVersion: pgVersion10},
+	// Client details
+	{ColumnMeta: funcapi.ColumnMeta{Name: "clientHostname", Tooltip: "Hostname of the client via reverse DNS (only if log_hostname enabled)", Type: funcapi.FieldTypeString, Visible: false, Sortable: true, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "client_hostname"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "clientPort", Tooltip: "TCP port of client (-1 for Unix socket, NULL for internal process)", Type: funcapi.FieldTypeInteger, Visible: false, Sortable: true, Filter: funcapi.FieldFilterRange, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "client_port"},
+
+	// Transaction IDs
+	{ColumnMeta: funcapi.ColumnMeta{Name: "backendXid", Tooltip: "Top-level transaction identifier of this backend", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "backend_xid::text"},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "backendXmin", Tooltip: "Backend's xmin horizon", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "backend_xmin::text"},
 }
 
 // funcRunningQueries handles the running-queries function.
