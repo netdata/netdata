@@ -272,7 +272,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 	}
 
 	// Map and validate sort column
-	actualSortCol := f.mapAndValidateSortColumn(sortColumn, availableCols)
+	actualSortCol := f.mapAndValidateSortColumn(sortColumn, availableCols, source)
 
 	// Get query limit (default 500)
 	limit := c.TopQueriesLimit
@@ -404,10 +404,11 @@ func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool, so
 			colName = strings.TrimPrefix(colName, "s.")
 		}
 
-		// Handle version-specific column names for time columns
-		// PG 13+ renamed time columns: total_time -> total_exec_time, etc.
+		// Handle version-specific column names for time columns.
+		// pg_stat_statements renamed time columns in PG 13: total_time -> total_exec_time, etc.
+		// pg_stat_monitor uses the original names (total_time, mean_time) regardless of PG version.
 		actualColName := colName
-		if c.pgVersion >= pgVersion13 {
+		if !isPgStatMonitor && c.pgVersion >= pgVersion13 {
 			switch colName {
 			case "total_time":
 				actualColName = "total_exec_time"
@@ -451,8 +452,9 @@ func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool, so
 }
 
 // mapAndValidateSortColumn maps the semantic sort column to actual SQL column.
-func (f *funcTopQueries) mapAndValidateSortColumn(sortColumn string, availableCols map[string]bool) string {
+func (f *funcTopQueries) mapAndValidateSortColumn(sortColumn string, availableCols map[string]bool, source queryStatsSourceName) string {
 	c := f.router.collector
+	isPgStatMonitor := source == queryStatsSourcePgStatMonitor
 
 	// Map column ID back to DBColumn
 	for _, col := range pgAllColumns {
@@ -466,8 +468,10 @@ func (f *funcTopQueries) mapAndValidateSortColumn(sortColumn string, availableCo
 				colName = colName[:idx]
 			}
 
-			// Handle version-specific mapping
-			if c.pgVersion >= pgVersion13 {
+			// Handle version-specific mapping for pg_stat_statements only.
+			// pg_stat_statements renamed time columns in PG 13: total_time -> total_exec_time, etc.
+			// pg_stat_monitor uses the original names regardless of PG version.
+			if !isPgStatMonitor && c.pgVersion >= pgVersion13 {
 				switch colName {
 				case "total_time":
 					colName = "total_exec_time"
@@ -490,7 +494,7 @@ func (f *funcTopQueries) mapAndValidateSortColumn(sortColumn string, availableCo
 	}
 
 	// Default fallback
-	if c.pgVersion >= pgVersion13 {
+	if !isPgStatMonitor && c.pgVersion >= pgVersion13 {
 		return "total_exec_time"
 	}
 	return "total_time"
@@ -504,8 +508,10 @@ func (f *funcTopQueries) buildDynamicSQL(cols []pgColumn, sortColumn string, lim
 	for _, col := range cols {
 		colExpr := col.DBColumn
 
-		// Handle version-specific column names
-		if c.pgVersion >= pgVersion13 {
+		// Handle version-specific column names for pg_stat_statements only.
+		// pg_stat_statements renamed time columns in PG 13: total_time -> total_exec_time, etc.
+		// pg_stat_monitor uses the original names (total_time, mean_time) regardless of PG version.
+		if source == queryStatsSourcePgStatStatements && c.pgVersion >= pgVersion13 {
 			switch {
 			case strings.HasSuffix(colExpr, ".total_time"):
 				colExpr = strings.Replace(colExpr, ".total_time", ".total_exec_time", 1)

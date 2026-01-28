@@ -88,35 +88,6 @@ func (c *Collector) checkPgStatStatements(ctx context.Context) (bool, error) {
 	return exists, nil
 }
 
-// checkPgStatMonitor checks if pg_stat_monitor extension is available
-// Only positive results are cached - negative results are re-checked each time
-func (c *Collector) checkPgStatMonitor(ctx context.Context) (bool, error) {
-	// Fast path: return cached positive result
-	c.pgStatStatementsMu.RLock()
-	avail := c.pgStatMonitorAvail
-	c.pgStatStatementsMu.RUnlock()
-	if avail {
-		return true, nil
-	}
-
-	// Slow path: query the database
-	var exists bool
-	query := `SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_monitor')`
-	err := c.db.QueryRowContext(ctx, query).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-
-	// Only cache positive results
-	if exists {
-		c.pgStatStatementsMu.Lock()
-		c.pgStatMonitorAvail = true
-		c.pgStatStatementsMu.Unlock()
-	}
-
-	return exists, nil
-}
-
 // detectPgStatMonitorColumns queries the database to find available columns
 func (c *Collector) detectPgStatMonitorColumns(ctx context.Context) (map[string]bool, error) {
 	// Fast path: return cached result

@@ -91,7 +91,7 @@ var runningQueriesColumns = []runningQueriesColumn{
 	{ColumnMeta: funcapi.ColumnMeta{Name: "backendXmin", Tooltip: "Backend's xmin horizon", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "backend_xmin::text"},
 
 	// Query identification
-	{ColumnMeta: funcapi.ColumnMeta{Name: "queryId", Tooltip: "Query identifier (requires compute_query_id or extension)", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "query_id::text", minVersion: 14_00_00},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "queryId", Tooltip: "Query identifier (requires compute_query_id or extension)", Type: funcapi.FieldTypeString, Visible: false, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "query_id::text", minVersion: pgVersion14},
 
 	// Query text
 	{ColumnMeta: funcapi.ColumnMeta{Name: "query", Tooltip: "Query text (may be truncated at track_activity_query_size)", Type: funcapi.FieldTypeString, Visible: true, Sortable: false, Filter: funcapi.FieldFilterMultiselect, Transform: funcapi.FieldTransformNone, Sticky: true, FullWidth: true, Wrap: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount}, DBColumn: "query"},
@@ -172,7 +172,7 @@ func (f *funcRunningQueries) Handle(ctx context.Context, method string, params f
 func (f *funcRunningQueries) getColumnsForVersion() []runningQueriesColumn {
 	version := f.router.collector.pgVersion
 	if version == 0 {
-		version = 14_00_00 // Assume recent version if not detected
+		version = pgVersion14 // Assume recent version if not detected
 	}
 
 	var cols []runningQueriesColumn

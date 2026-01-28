@@ -253,7 +253,7 @@ modules:
               default: totalTime
               options: []
           returns:
-            description: Aggregated query statistics from `pg_stat_statements`. Each row represents a unique query pattern with cumulative metrics across all executions.
+            description: Aggregated query statistics from `pg_stat_statements` or `pg_stat_monitor`. Each row represents a unique query pattern with cumulative metrics across all executions.
             columns:
               - name: Query ID
                 type: string
@@ -455,7 +455,6 @@ modules:
               - name: Application Name
                 type: string
                 unit: ""
-                visibility: hidden
                 description: "Name of the application that executed the query. Available with pg_stat_monitor only."
               - name: Client IP
                 type: string
@@ -465,7 +464,6 @@ modules:
               - name: Command Type
                 type: string
                 unit: ""
-                visibility: hidden
                 description: "Type of SQL command (SELECT, INSERT, UPDATE, DELETE, etc.). Available with pg_stat_monitor only."
               - name: Comments
                 type: string
@@ -488,10 +486,10 @@ modules:
                 visibility: hidden
                 description: "CPU time spent in system/kernel mode. Available with pg_stat_monitor only."
               - name: Error Level
-                type: string
+                type: integer
                 unit: ""
                 visibility: hidden
-                description: "PostgreSQL error level if query produced an error (LOG, WARNING, ERROR, etc.). Available with pg_stat_monitor only."
+                description: "PostgreSQL error level if query produced an error. Available with pg_stat_monitor only."
               - name: SQL Code
                 type: string
                 unit: ""
@@ -503,12 +501,12 @@ modules:
                 visibility: hidden
                 description: "Error message if query produced an error. Available with pg_stat_monitor only."
               - name: Top Level
-                type: boolean
+                type: string
                 unit: ""
                 visibility: hidden
                 description: "Whether this is a top-level statement (true) or nested (false). Available with pg_stat_monitor only."
               - name: Bucket Start Time
-                type: timestamp
+                type: string
                 unit: ""
                 visibility: hidden
                 description: "Start time of the statistics bucket. Available with pg_stat_monitor only."

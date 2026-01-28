@@ -133,7 +133,7 @@ func TestFuncTopQueries_mapAndValidateSortColumn(t *testing.T) {
 			c := &Collector{pgVersion: tc.pgVersion}
 			r := &funcRouter{collector: c}
 			f := &funcTopQueries{router: r}
-			result := f.mapAndValidateSortColumn(tc.input, tc.availableCols)
+			result := f.mapAndValidateSortColumn(tc.input, tc.availableCols, queryStatsSourcePgStatStatements)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
