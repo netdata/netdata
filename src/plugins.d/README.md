@@ -546,6 +546,34 @@ After this line, Netdata resumes processing collected metrics from the plugin.
 
 The maximum uncompressed payload size Netdata will accept is 100MB.
 
+##### Function naming conventions
+
+Function names can follow a **colon-separated hierarchical naming convention** to organize related functions under a common namespace. This is particularly useful for plugins that expose multiple related functions.
+
+The recommended format for module-level functions is:
+
+```
+module:method
+```
+
+Where:
+- `module` is the collector or module name (e.g., `mysql`, `postgres`, `snmp`)
+- `method` is the specific function/operation (e.g., `top-queries`, `deadlock-info`, `interfaces`)
+
+Examples:
+- `mysql:top-queries` - Top queries function for MySQL collector
+- `mysql:deadlock-info` - Deadlock information for MySQL collector
+- `postgres:top-queries` - Top queries function for PostgreSQL collector
+- `snmp:interfaces` - Network interfaces function for SNMP collector
+
+This naming convention:
+- Groups related functions under a single module namespace
+- Allows collectors to expose multiple methods
+- Improves discoverability in the Functions API
+- Follows the same colon-separator pattern used by [Dynamic Configuration (DynCfg)](#config) for consistency
+
+> **Note**: This naming convention is distinct from DynCfg configuration IDs. DynCfg commands are sent through the special `config` function (e.g., `config go.d:mysql:local get`), while module functions use their own unique names directly (e.g., `mysql:top-queries`).
+
 ##### Functions cancellation
 
 Netdata is able to detect when a user made an API request, but abandoned it before it was completed. If this happens to an API called for a function served by the plugin, Netdata will generate a `FUNCTION_CANCEL` request to let the plugin know that it can stop processing the query.
