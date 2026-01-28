@@ -677,7 +677,6 @@ func (f *funcTopQueries) topQueriesParams(ctx context.Context) ([]funcapi.ParamC
 	if err != nil {
 		return nil, err
 	}
-	c.Infof("topQueriesParams: detected source=%s", source)
 	if source == queryStatsSourceNone {
 		return nil, fmt.Errorf("no query statistics extension is installed (pg_stat_monitor or pg_stat_statements)")
 	}
@@ -692,16 +691,13 @@ func (f *funcTopQueries) topQueriesParams(ctx context.Context) ([]funcapi.ParamC
 	if err != nil {
 		return nil, err
 	}
-	c.Infof("topQueriesParams: detected %d columns from %s", len(availableCols), source)
 
 	queryCols := f.buildAvailableColumns(availableCols, source)
-	c.Infof("topQueriesParams: built %d query columns", len(queryCols))
 	if len(queryCols) == 0 {
 		return nil, fmt.Errorf("no queryable columns found in %s", source)
 	}
 
 	sortParam, _ := f.topQueriesSortParam(queryCols, source)
-	c.Infof("topQueriesParams: built %d sort options", len(sortParam.Options))
 	return []funcapi.ParamConfig{sortParam}, nil
 }
 

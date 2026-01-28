@@ -134,14 +134,6 @@ func (c *Collector) detectPgStatMonitorColumns(ctx context.Context) (map[string]
 		return nil, fmt.Errorf("rows iteration error: %v", err)
 	}
 
-	// Log detected columns for debugging
-	var colNames []string
-	for col := range cols {
-		colNames = append(colNames, col)
-	}
-	c.Infof("detectPgStatMonitorColumns: found %d columns: %v", len(cols), colNames)
-	c.Infof("detectPgStatMonitorColumns: total_time exists: %v", cols["total_time"])
-
 	// Cache the result
 	c.pgStatMonitorColumns = cols
 	return cols, nil
