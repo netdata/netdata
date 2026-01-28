@@ -147,21 +147,20 @@ static bool health_enq_cmd(cmd_data_t *cmd, bool wait_on_full) {
 // ---------------------------------------------------------------------------------------------------------------------
 // Alert transition save queue
 
-bool health_queue_alert_save(RRDHOST *host, ALARM_ENTRY *ae) {
-    if (unlikely(!host || !ae))
+bool health_queue_alert_save(ALARM_ENTRY *ae) {
+    if (unlikely(!ae || !ae->host))
         return false;
 
-    __atomic_add_fetch(&host->health.pending_transitions, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ae->host->health.pending_transitions, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
 
     cmd_data_t cmd = { 0 };
     cmd.opcode = HEALTH_SAVE_ALERT_TRANSITION;
-    cmd.param[0] = host;
-    cmd.param[1] = ae;
+    cmd.param[0] = ae;
 
     if (unlikely(!health_enq_cmd(&cmd, false))) {
         // Failed to queue, reset counters
-        __atomic_sub_fetch(&host->health.pending_transitions, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&ae->host->health.pending_transitions, 1, __ATOMIC_RELAXED);
         __atomic_sub_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
         return false;
     }
@@ -229,13 +228,8 @@ static void health_process_pending_alerts(struct health_event_loop_config *confi
     bool first = true;
 
     while ((Pvalue = JudyLFirstThenNext(pending->JudyL, &Index, &first))) {
-        RRDHOST *host = (RRDHOST *)*Pvalue;
-
-        Pvalue = JudyLGet(pending->JudyL, ++Index, PJE0);
-        if (!Pvalue)
-            break;
-
         ALARM_ENTRY *ae = (ALARM_ENTRY *)*Pvalue;
+        RRDHOST *host = ae->host;
 
         sql_health_alarm_log_save(host, ae, &config->main_loop_stmts);
 
@@ -249,7 +243,7 @@ static void health_process_pending_alerts(struct health_event_loop_config *confi
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "HEALTH: Stored %zu alert transitions in %.2f ms",
-           entries / 2, (double)(ended - started) / USEC_PER_MS);
+           entries, (double)(ended - started) / USEC_PER_MS);
 
     (void)JudyLFreeArray(&pending->JudyL, PJE0);
     freez(pending);
@@ -591,20 +585,13 @@ static void health_event_loop(void *arg) {
 
                 case HEALTH_SAVE_ALERT_TRANSITION: {
                     // Collect alert transitions for batch processing
-                    RRDHOST *host = (RRDHOST *)cmd.param[0];
-                    ALARM_ENTRY *ae = (ALARM_ENTRY *)cmd.param[1];
+                    ALARM_ENTRY *ae = (ALARM_ENTRY *)cmd.param[0];
 
                     if (!config->pending_alerts)
                         config->pending_alerts = callocz(1, sizeof(*config->pending_alerts));
 
                     Pvoid_t *Pvalue = JudyLIns(&config->pending_alerts->JudyL,
                                                ++config->pending_alerts->count, PJE0);
-                    if (unlikely(Pvalue == PJERR))
-                        fatal("HEALTH: Failed to insert host into pending_alerts Judy array");
-                    *Pvalue = (void *)host;
-
-                    Pvalue = JudyLIns(&config->pending_alerts->JudyL,
-                                      ++config->pending_alerts->count, PJE0);
                     if (unlikely(Pvalue == PJERR))
                         fatal("HEALTH: Failed to insert ae into pending_alerts Judy array");
                     *Pvalue = (void *)ae;

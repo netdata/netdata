@@ -17,7 +17,7 @@ enum health_opcode {
     HEALTH_NOOP = 0,
     HEALTH_TIMER_TICK,           // Timer fired, check which hosts need processing
     HEALTH_HOST_COMPLETED,       // A host finished processing (param[0] = work ptr)
-    HEALTH_SAVE_ALERT_TRANSITION,// Save an alert transition (param[0] = host, param[1] = ae)
+    HEALTH_SAVE_ALERT_TRANSITION,// Save an alert transition (param[0] = ae)
     HEALTH_DELETE_ALERT_ENTRY,   // Delete an alert entry when saves complete (param[0] = ae)
     HEALTH_SYNC_SHUTDOWN,        // Clean shutdown request
     HEALTH_MAX_ENUMERATIONS_DEFINED
@@ -130,7 +130,7 @@ bool health_should_stop(void);
 
 // Queue an alert transition to be saved asynchronously by the health event loop
 // Returns true if queued successfully, false if health loop is not running
-bool health_queue_alert_save(RRDHOST *host, ALARM_ENTRY *ae);
+bool health_queue_alert_save(ALARM_ENTRY *ae);
 
 // Queue an alert entry for deletion (will be freed when pending saves complete)
 // Returns true if queued successfully, false if health loop is not running
