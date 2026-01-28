@@ -182,8 +182,11 @@ Netdata's auto-discovery eliminates manual configuration:
 - **Logs as first-class signals**: systemd-journal, `log2journal`, `weblog`, `otelcol.plugin`, and `otel-plugin` provide raw log search and logs-to-metrics conversion for web services, applications, and cloud-native sources.
 - **Custom metrics ingestion**: Prometheus/OpenMetrics scraping, StatsD, and OTLP metrics via `otel-plugin` let instrumented code feed business or application KPIs into Netdata dashboards.
 - **Synthetic monitoring**: go.d collectors like `httpcheck`, `ping`, `portcheck`, `dnsquery`, and `testrandom` run uptime/performance probes against services, APIs, and endpoints, feeding directly into alerts and dashboards + `scripts.d` provides access to 4000+ Nagios plugins.
+- **Databases monitoring**: Netdata provides top-queries, running-queries and for the most popular databases (PostgreSQL, MySQL, MSSQL) deadlocks and errors attribution.
+- **Network connections**: `network-viewer.plugin` provides live monitoring of all network connections per process.
 - **APM gaps (explicit)**: No distributed tracing or span storage today (OTLP trace ingestion planned for Q2 2026), no code-level profiling/flame graphs, no transactional/user-experience monitoring, and limited error tracking (logs/process crashes only).
-- **Positioning**: Netdata bridges infrastructure monitoring and APM—ideal for zero-instrumentation observability, but designed to complement trace-centric APM platforms for microservice call flows and deep code analysis.
+
+So, although Netdata is not an APM solution, it bridges infrastructure monitoring and APM - ideal for zero-instrumentation observability, but designed to complement trace-centric APM platforms for microservice call flows and deep code analysis.
 
 ## 3. Storage & Data Management
 
@@ -1381,6 +1384,7 @@ Whether you're monitoring a single server or a global infrastructure, Netdata's 
 
 - NetFlow/sFlow/IPFIX: supported via community provided OpenMetrics/Prometheus/OpenTelemetry exporters and plugins which extract metrics from NetFlow/sFlow/IPFIX.
 - SNMP Traps: supported via `snmptrapd` to convert traps to systemd-journal logs and statsd metrics.
+- syslog logs access: supported by systemd-journald (on Linux) and WEL/ETW on Windows. So, syslog messages should be sent to the system's native logger, so that Netdata dashboards can access them. 
 - SASE: SASE platforms sit in the traffic path and enforce policy. Netdata stays out of the path and measures what really happens on your systems and networks, at per-second resolution. That separation matters, because it gives you an independent view.
 
 ## Contact & Resources
