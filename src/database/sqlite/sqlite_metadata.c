@@ -1542,10 +1542,9 @@ static cmd_data_t metadata_deq_cmd()
     return ret;
 }
 
-static void async_cb(uv_async_t *handle)
+static void async_cb(uv_async_t *handle __maybe_unused)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
+    ;
 }
 
 #define TIMER_INITIAL_PERIOD_MS (1000)
@@ -1553,9 +1552,6 @@ static void async_cb(uv_async_t *handle)
 
 static void timer_cb(uv_timer_t *handle)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
-
    struct meta_config_s *config = handle->data;
    if (config->metadata_check_after <  now_realtime_sec())
        config->store_metadata = true;
