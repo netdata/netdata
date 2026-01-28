@@ -2168,7 +2168,7 @@ send_awssns() {
 # Matrix sender
 
 send_matrix() {
-  local homeserver="${1}" webhook accesstoken rooms="${2}" httpcode sent=0 payload
+  local homeserver="${1}" webhook accesstoken rooms="${2}" httpcode sent=0 payload txnid
 
   [ "${SEND_MATRIX}" != "YES" ] && return 1
   [ -z "${MATRIX_ACCESSTOKEN}" ] && return 1
@@ -2183,7 +2183,8 @@ send_matrix() {
   esac
 
   for room in ${rooms}; do
-    webhook="$homeserver/_matrix/client/r0/rooms/$(urlencode $room)/send/m.room.message?access_token=$accesstoken"
+    txnid="nd_$(date +%s)_$$_$RANDOM"
+    webhook="$homeserver/_matrix/client/r0/rooms/$(urlencode $room)/send/m.room.message/$txnid"
     payload="$(
   cat <<EOF
   {
@@ -2195,7 +2196,7 @@ send_matrix() {
 EOF
     )"
 
-    httpcode=$(docurl -X POST --data "${payload}" "${webhook}")
+    httpcode=$(docurl -X PUT -H "Authorization: Bearer ${accesstoken}" --data "${payload}" "${webhook}")
     if [ "${httpcode}" == "200" ]; then
       info "sent Matrix notification to '${room}' for ${notification_description}"
       sent=$((sent + 1))
