@@ -652,6 +652,9 @@ bool process_alert_pending_queue(RRDHOST *host, struct health_stmt_set *stmts)
 
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        // Cloud submission can be skipped during shutdown - alerts are already saved in the database
+        if (unlikely(health_should_stop()))
+            break;
 
         int64_t health_log_id = sqlite3_column_int64(res, 0);
         uint32_t unique_id = sqlite3_column_int64(res, 1);

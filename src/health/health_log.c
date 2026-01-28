@@ -275,9 +275,27 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
             break;
         }
     }
-    rw_spinlock_read_unlock(&host->health_log.spinlock);
+
+    // Protect update_ae from being freed while we save it.
+    // Increment before releasing the lock to prevent cleanup from freeing it.
+    // Note: health_queue_alert_save() has its own increment that will be decremented
+    // by health_process_pending_alerts(). Our protection increment is only decremented
+    // if async queueing fails (fallback to sync) or if doing sync save directly.
     if (update_ae)
-        health_alarm_log_save(host, update_ae, async, stmts);
+        __atomic_add_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELAXED);
+
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
+
+    if (update_ae) {
+        const bool queued_async = async && health_queue_alert_save(update_ae);
+        const bool do_sync_save = !queued_async && (!async || !health_should_stop());
+
+        if (do_sync_save)
+            sql_health_alarm_log_save(host, update_ae, stmts);
+
+        // Release our protection increment (async path has its own pending_save_count management).
+        __atomic_sub_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELEASE);
+    }
 
     health_alarm_log_save(host, ae, async, stmts);
 }

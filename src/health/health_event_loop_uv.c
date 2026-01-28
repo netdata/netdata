@@ -705,7 +705,10 @@ static void health_event_loop(void *arg) {
 // ---------------------------------------------------------------------------------------------------------------------
 // Public API
 
-void health_event_loop_init(void) {
+void health_event_loop_init(void)
+{
+    FUNCTION_RUN_ONCE();
+
     memset(&health_config, 0, sizeof(health_config));
     completion_init(&health_config.start_stop_complete);
 
