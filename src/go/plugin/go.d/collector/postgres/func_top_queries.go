@@ -464,7 +464,7 @@ func (f *funcTopQueries) collectTopQueries(ctx context.Context, sortColumn strin
 	}
 
 	// Build dynamic sort options from available columns (only those actually detected)
-	sortParam, sortOptions := f.topQueriesSortParam(queryCols, source)
+	sortParam, sortOptions := f.topQueriesSortParam(queryCols)
 
 	// Find default sort column from metadata
 	defaultSort := ""
@@ -821,7 +821,7 @@ func (f *funcTopQueries) buildDynamicSortOptions(cols []pgColumn) []funcapi.Para
 	return sortOpts
 }
 
-func (f *funcTopQueries) topQueriesSortParam(queryCols []pgColumn, source queryStatsSourceName) (funcapi.ParamConfig, []funcapi.ParamOption) {
+func (f *funcTopQueries) topQueriesSortParam(queryCols []pgColumn) (funcapi.ParamConfig, []funcapi.ParamOption) {
 	sortOptions := f.buildDynamicSortOptions(queryCols)
 	sortParam := funcapi.ParamConfig{
 		ID:         paramSort,
@@ -860,7 +860,7 @@ func (f *funcTopQueries) topQueriesParams(ctx context.Context) ([]funcapi.ParamC
 		return nil, fmt.Errorf("no queryable columns found in %s", source)
 	}
 
-	sortParam, _ := f.topQueriesSortParam(queryCols, source)
+	sortParam, _ := f.topQueriesSortParam(queryCols)
 
 	return []funcapi.ParamConfig{sortParam}, nil
 }
