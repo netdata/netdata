@@ -122,7 +122,11 @@ func (m *Manager) makeMethodFuncHandler(moduleName, methodID string) func(functi
 		}
 
 		// Core injects required_params into the response before sending
-		m.respondWithParams(fn, moduleName, dataResp, methodParams)
+		updateEvery := 1
+		if methodCfg.UpdateEvery > 1 {
+			updateEvery = methodCfg.UpdateEvery
+		}
+		m.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery)
 	}
 }
 
@@ -161,7 +165,7 @@ func (m *Manager) handleMethodFuncInfo(moduleName, methodID string, fn functions
 }
 
 // respondWithParams wraps the module's data response with current required_params
-func (m *Manager) respondWithParams(fn functions.Function, moduleName string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig) {
+func (m *Manager) respondWithParams(fn functions.Function, moduleName string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
 	// Nil guard: if module returns nil, treat as internal error
 	if dataResp == nil {
 		m.respondError(fn, 500, "internal error: module returned nil response")
@@ -182,6 +186,7 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName string, da
 	// Use dynamic sort options from response if provided (reflects actual DB capabilities)
 	resp := map[string]any{
 		"v":               3,
+		"update_every":    updateEvery,
 		"status":          dataResp.Status,
 		"type":            "table",
 		"has_history":     false,

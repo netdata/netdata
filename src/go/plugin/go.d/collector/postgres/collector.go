@@ -120,7 +120,10 @@ type (
 		pgVersion               int
 		pgStatStatementsAvail   bool            // cached positive result only
 		pgStatStatementsColumns map[string]bool // cached column names from pg_stat_statements
-		pgStatStatementsMu      sync.RWMutex    // protects pgStatStatements* fields for concurrent access
+		pgStatMonitorAvail      bool            // cached positive result only
+		pgStatMonitorColumns    map[string]bool // cached column names from pg_stat_monitor
+		queryStatsSource        string          // "pg_stat_monitor" or "pg_stat_statements" (auto-detected)
+		pgStatStatementsMu      sync.RWMutex    // protects pgStatStatements*/pgStatMonitor* fields for concurrent access
 		dbSr                    matcher.Matcher
 		recheckSettingsTime     time.Time
 		recheckSettingsEvery    time.Duration
