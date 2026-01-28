@@ -2196,7 +2196,7 @@ send_matrix() {
 EOF
     )"
 
-    httpcode=$(docurl -X PUT -H "Authorization: Bearer ${accesstoken}" --data "${payload}" "${webhook}")
+    httpcode=$(docurl -X PUT -H "Authorization: Bearer ${accesstoken}" -H "Content-Type: application/json" --data "${payload}" "${webhook}")
     if [ "${httpcode}" == "200" ]; then
       info "sent Matrix notification to '${room}' for ${notification_description}"
       sent=$((sent + 1))
