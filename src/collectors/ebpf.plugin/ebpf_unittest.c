@@ -70,13 +70,16 @@ int ebpf_ut_load_real_binary()
  */
 int ebpf_ut_load_fake_binary()
 {
-    const char *original = test_em.info.thread_name;
+    char *fake_name = strdupz("I_am_not_here");
+    if (!fake_name)
+        return -1;
 
-    test_em.info.thread_name = strdupz("I_am_not_here");
+    const char *original = test_em.info.thread_name;
+    test_em.info.thread_name = fake_name;
+
     int ret = ebpf_ut_load_binary();
 
-    ebpf_ut_cleanup_memory();
-
+    freez(fake_name);
     test_em.info.thread_name = original;
 
     return !ret;
