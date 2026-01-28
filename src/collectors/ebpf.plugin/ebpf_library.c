@@ -214,8 +214,8 @@ void ebpf_create_chart(
 int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 {
     static int priority = NETATA_EBPF_ORDER_STAT_ARAL_BEGIN;
-    char *mem = {NETDATA_EBPF_STAT_DIMENSION_MEMORY};
-    char *aral = {NETDATA_EBPF_STAT_DIMENSION_ARAL};
+    char *mem = NETDATA_EBPF_STAT_DIMENSION_MEMORY;
+    char *aral = NETDATA_EBPF_STAT_DIMENSION_ARAL;
 
     snprintfz(em->memory_usage, NETDATA_EBPF_CHART_MEM_LENGTH - 1, "aral_%s_size", name);
     snprintfz(em->memory_allocations, NETDATA_EBPF_CHART_MEM_LENGTH - 1, "aral_%s_alloc", name);
@@ -285,8 +285,8 @@ void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em)
     if (!memory)
         return;
 
-    char *mem = {NETDATA_EBPF_STAT_DIMENSION_MEMORY};
-    char *aral = {NETDATA_EBPF_STAT_DIMENSION_ARAL};
+    char *mem = NETDATA_EBPF_STAT_DIMENSION_MEMORY;
+    char *aral = NETDATA_EBPF_STAT_DIMENSION_ARAL;
 
     struct aral_statistics *stats = aral_get_statistics(memory);
 
@@ -380,14 +380,12 @@ void ebpf_update_map_per_core()
 
 void ebpf_set_ipc_value(const char *integration)
 {
-    if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SHM)) {
+    if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SHM))
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_SHM;
-        return;
-    } else if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SOCKET)) {
+    else if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SOCKET))
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_SOCKET;
-        return;
-    }
-    integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
+    else
+        integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
 }
 
 void ebpf_parse_ipc_section()
@@ -953,11 +951,6 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
                 netdata_log_info("The specified CIDR %s is not valid, the IP %s will be ignored.", end, ip);
                 goto cleanipdup;
             }
-
-            last.addr32[0] = htonl(ebpf_broadcast(ntohl(first.addr32[0]), select));
-            // This was added to remove
-            // https://app.codacy.com/manual/netdata/netdata/pullRequest?prid=5810941&bid=19021977
-            UNUSED(last.addr32[0]);
 
             uint32_t ipv4_test = htonl(ebpf_ipv4_network(ntohl(first.addr32[0]), select));
             if (first.addr32[0] != ipv4_test) {
