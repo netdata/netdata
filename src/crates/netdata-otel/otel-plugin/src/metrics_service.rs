@@ -102,7 +102,7 @@ impl MetricsService for NetdataMetricsService {
                     netdata_chart.ingest(fp);
                 } else if newly_created_charts < self.config.metrics.throttle_charts {
                     let mut netdata_chart =
-                        NetdataChart::from_flattened_point(fp, self.config.metrics.buffer_samples);
+                        NetdataChart::from_flattened_point(fp, &self.config.metrics);
                     netdata_chart.ingest(fp);
                     guard.insert(fp.nd_instance_name.clone(), netdata_chart);
 
@@ -116,8 +116,9 @@ impl MetricsService for NetdataMetricsService {
             let mut guard = self.charts.write().await;
             let mut output_buffer = String::new();
 
+            let now = std::time::SystemTime::now();
             for netdata_chart in guard.values_mut() {
-                netdata_chart.process(&mut output_buffer);
+                netdata_chart.process(&mut output_buffer, now);
             }
 
             // Write chart data to stdout
@@ -131,8 +132,7 @@ impl MetricsService for NetdataMetricsService {
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
             if prev_count % 60 == 0 {
-                let one_hour = std::time::Duration::from_secs(3600);
-                self.cleanup_stale_charts(one_hour).await;
+                self.cleanup_stale_charts(self.config.metrics.dimension_archive_timeout).await;
             }
         }
 

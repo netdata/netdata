@@ -1,18 +1,18 @@
 use serde_json::{Map as JsonMap, Value as JsonValue};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::flattened_point::FlattenedPoint;
-use crate::samples_table::{CollectionInterval, SamplesTable};
+use crate::samples_table::{AggregationType, GapFillStrategy, SamplesTable, CollectionInterval, SlotState};
+use crate::plugin_config::MetricsConfig;
 
 // Use a simple string buffer for chart protocol output
 pub type ChartOutputBuffer = String;
 
-#[derive(Debug, Default, Clone)]
-enum ChartState {
-    #[default]
-    Uninitialized,
-    InGap,
-    Initialized,
-    Empty,
+#[derive(Debug, Clone, Copy)]
+pub struct MetricSemantics {
+    pub aggregation_type: AggregationType,
+    pub gap_fill_strategy: GapFillStrategy,
+    pub netdata_algorithm: &'static str,
 }
 
 #[derive(Debug)]
@@ -23,35 +23,50 @@ pub struct NetdataChart {
     metric_unit: String,
     metric_type: String,
     is_monotonic: Option<bool>,
+    aggregation_temporality: Option<String>,
     attributes: JsonMap<String, JsonValue>,
 
     samples_table: SamplesTable,
-    last_samples_table_interval: Option<CollectionInterval>,
-    last_collection_interval: Option<CollectionInterval>,
-    chart_state: ChartState,
-    samples_threshold: usize,
+    next_slot_start_nano: Option<u64>,
+    
+    collection_interval_nano: u64,
+    grace_period_nano: u64,
+    archive_timeout_nano: u64,
 
+    last_collection_interval: Option<CollectionInterval>,
+    
     multiplier: i32,
     divisor: i32,
 }
 
 impl NetdataChart {
-    pub fn from_flattened_point(fp: &FlattenedPoint, samples_threshold: usize) -> Self {
+    pub fn from_flattened_point(fp: &FlattenedPoint, config: &MetricsConfig) -> Self {
+        let mut interval_nano = config.collection_interval.as_nanos() as u64;
+
+        if let Some(metric_config) = config.metric_configs.get(&fp.metric_name) {
+            if let Some(custom_interval) = metric_config.collection_interval {
+                interval_nano = custom_interval.as_nanos() as u64;
+            }
+        }
+
         Self {
             chart_id: fp.nd_instance_name.clone(),
             metric_name: fp.metric_name.clone(),
             metric_description: fp.metric_description.clone(),
             metric_unit: fp.metric_unit.clone(),
             metric_type: fp.metric_type.clone(),
-            attributes: fp.attributes.clone(),
             is_monotonic: fp.metric_is_monotonic,
+            aggregation_temporality: fp.metric_aggregation_temporality.clone(),
+            attributes: fp.attributes.clone(),
 
             samples_table: SamplesTable::default(),
-            last_samples_table_interval: None,
-            last_collection_interval: None,
-            chart_state: ChartState::Uninitialized,
+            next_slot_start_nano: None,
 
-            samples_threshold,
+            collection_interval_nano: interval_nano,
+            grace_period_nano: config.grace_period.as_nanos() as u64,
+            archive_timeout_nano: config.dimension_archive_timeout.as_nanos() as u64,
+
+            last_collection_interval: None,
 
             multiplier: 1,
             divisor: 1,
@@ -62,111 +77,191 @@ impl NetdataChart {
         self.metric_type == "histogram"
     }
 
+    fn get_semantics(&self) -> MetricSemantics {
+        let temporality = self.aggregation_temporality.as_deref().unwrap_or("unknown");
+        let is_monotonic = self.is_monotonic.unwrap_or(false);
+        
+        match self.metric_type.as_str() {
+            "gauge" => MetricSemantics {
+                aggregation_type: AggregationType::LastValue,
+                gap_fill_strategy: GapFillStrategy::RepeatLastValue,
+                netdata_algorithm: "absolute",
+            },
+            "sum" => {
+                if temporality == "delta" {
+                    MetricSemantics {
+                        aggregation_type: AggregationType::Sum,
+                        gap_fill_strategy: GapFillStrategy::FillWithZero,
+                        netdata_algorithm: "absolute",
+                    }
+                } else if is_monotonic {
+                    MetricSemantics {
+                        aggregation_type: AggregationType::LastValue,
+                        gap_fill_strategy: GapFillStrategy::RepeatLastValue,
+                        netdata_algorithm: "incremental",
+                    }
+                } else {
+                    MetricSemantics {
+                        aggregation_type: AggregationType::LastValue,
+                        gap_fill_strategy: GapFillStrategy::RepeatLastValue,
+                        netdata_algorithm: "absolute",
+                    }
+                }
+            },
+            "histogram" => {
+                if temporality == "delta" {
+                    MetricSemantics {
+                        aggregation_type: AggregationType::Sum,
+                        gap_fill_strategy: GapFillStrategy::FillWithZero,
+                        netdata_algorithm: "absolute",
+                    }
+                } else {
+                    MetricSemantics {
+                        aggregation_type: AggregationType::LastValue,
+                        gap_fill_strategy: GapFillStrategy::RepeatLastValue,
+                        netdata_algorithm: "incremental",
+                    }
+                }
+            },
+            _ => MetricSemantics {
+                aggregation_type: AggregationType::LastValue,
+                gap_fill_strategy: GapFillStrategy::RepeatLastValue,
+                netdata_algorithm: "absolute",
+            }
+        }
+    }
+
     pub fn ingest(&mut self, fp: &FlattenedPoint) {
-        let dimension_name = &fp.nd_dimension_name;
-        let value = fp.metric_value;
-        let unix_time = fp.metric_time_unix_nano;
-
-        let new_dimension = self.samples_table.insert(dimension_name, unix_time, value);
-
-        if new_dimension {
-            self.chart_state = ChartState::Uninitialized;
-            self.last_samples_table_interval = None;
+        let semantics = self.get_semantics();
+        if self.samples_table.insert(
+            &fp.nd_dimension_name,
+            fp.metric_time_unix_nano,
+            fp.metric_value,
+            self.collection_interval_nano,
+            semantics.aggregation_type,
+        ) {
             self.last_collection_interval = None;
         }
     }
 
-    fn initialize(&mut self, buffer: &mut ChartOutputBuffer) -> bool {
-        // Clean up stale samples if we have a previous interval
-        if let Some(ci) = &self.last_samples_table_interval {
-            self.samples_table.drop_stale_samples(ci);
-        }
-
-        // Check if we have enough samples to determine frequency
-        if self.samples_table.total_samples() < self.samples_threshold {
-            return false;
-        }
-
-        // Store the old interval before calculating the new one
-        let old_lci = self.last_collection_interval;
-
-        // Set up collection intervals
-        self.last_samples_table_interval =
-            self.samples_table
-                .collection_interval()
-                .map(|ci| CollectionInterval {
-                    end_time: ci.end_time - ci.update_every.get(),
-                    update_every: ci.update_every,
-                });
-
-        self.last_collection_interval = self
-            .last_samples_table_interval
-            .and_then(|ci| ci.aligned_interval());
-
+    pub fn process(&mut self, buffer: &mut ChartOutputBuffer, now: SystemTime) {
+        let now_nano = now.duration_since(UNIX_EPOCH).unwrap_or(Duration::ZERO).as_nanos() as u64;
+        
+        self.samples_table.finalize_slots(now_nano, self.grace_period_nano, self.collection_interval_nano);
+        self.samples_table.archive_stale_dimensions(now_nano, self.archive_timeout_nano);
+        
         (self.multiplier, self.divisor) = self.samples_table.scaling_factors();
+        let semantics = self.get_semantics();
+        let interval = self.collection_interval_nano;
 
-        // Check if we need to emit a chart definition
-        if let Some(new_lci) = &self.last_collection_interval {
-            if let Some(old_lci) = old_lci {
-                if old_lci.update_every != new_lci.update_every {
-                    // Update every changed, emit the chart definition again
-                    self.emit_chart_definition(buffer);
-                }
-            } else {
-                // No previous collection interval, we need to emit the
-                // chart definition first
-                self.emit_chart_definition(buffer);
-            }
-        }
-
-        true
-    }
-
-    pub fn process(&mut self, buffer: &mut ChartOutputBuffer) {
         loop {
-            match &self.chart_state {
-                ChartState::Uninitialized | ChartState::InGap => {
-                    if !self.initialize(buffer) {
-                        return;
+            let target_slot_nano = if let Some(start) = self.next_slot_start_nano {
+                start
+            } else {
+                let mut earliest_finalized: Option<u64> = None;
+                for dim_name in self.samples_table.iter_dimensions() {
+                    if let Some(db) = self.samples_table.get_buffer_mut(dim_name) {
+                        if let Some(slot) = db.slots.front() {
+                            if slot.state == SlotState::Finalized {
+                                earliest_finalized = match earliest_finalized {
+                                    Some(current) => Some(current.min(slot.slot_start_nano)),
+                                    None => Some(slot.slot_start_nano),
+                                };
+                            }
+                        }
                     }
+                }
+                if let Some(start) = earliest_finalized {
+                    self.next_slot_start_nano = Some(start);
+                    start
+                } else {
+                    return;
+                }
+            };
 
-                    self.chart_state = ChartState::Initialized;
-                }
-                ChartState::Initialized => {
-                    self.chart_state = self.process_next_interval(buffer);
-                }
-                ChartState::Empty => {
-                    self.chart_state = ChartState::Initialized;
+            if now_nano <= target_slot_nano + interval + self.grace_period_nano {
+                return;
+            }
+
+            if self.last_collection_interval.is_none() {
+                let interval_secs = interval / 1_000_000_000;
+                if interval_secs > 0 {
+                    self.emit_chart_definition(buffer);
+                    self.last_collection_interval = CollectionInterval::from_secs(target_slot_nano / 1_000_000_000, interval_secs);
+                } else {
                     return;
                 }
             }
+
+            let mut samples_to_emit = Vec::new();
+            let dimension_names: Vec<String> = self.samples_table.iter_dimensions().cloned().collect();
+            for dim_name in dimension_names {
+                if let Some(db) = self.samples_table.get_buffer_mut(&dim_name) {
+                    let value_opt = if let Some(slot) = db.slots.front() {
+                        if slot.slot_start_nano == target_slot_nano {
+                            let val = slot.aggregate(semantics.aggregation_type);
+                            db.slots.pop_front();
+                            val
+                        } else if slot.slot_start_nano < target_slot_nano {
+                            tracing::debug!(
+                                "Skipping old slot for dimension '{}' with start {} ns (target {} ns)",
+                                dim_name,
+                                slot.slot_start_nano,
+                                target_slot_nano
+                            );
+                            db.slots.pop_front();
+                            None
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    let emit_val = match value_opt {
+                        Some(v) => {
+                            db.last_value = Some(v);
+                            Some(v)
+                        }
+                        None => {
+                            match semantics.gap_fill_strategy {
+                                GapFillStrategy::RepeatLastValue => db.last_value,
+                                GapFillStrategy::FillWithZero => Some(0.0),
+                            }
+                        }
+                    };
+
+                    if let Some(v) = emit_val {
+                        samples_to_emit.push((dim_name, v));
+                    }
+                }
+            }
+
+            if !samples_to_emit.is_empty() {
+                self.emit_begin(buffer, interval);
+                for (dim_name, val) in samples_to_emit {
+                    self.emit_set(buffer, &dim_name, val);
+                }
+                self.emit_end(buffer, target_slot_nano + interval);
+            }
+
+            self.next_slot_start_nano = Some(target_slot_nano + interval);
         }
     }
 
     fn emit_chart_definition(&self, buffer: &mut ChartOutputBuffer) {
-        let ci = self.last_collection_interval.unwrap();
-        let ue = ci.update_every;
-
+        let ue_secs = (self.collection_interval_nano / 1_000_000_000).max(1);
         let type_id = &self.chart_id;
-        let name = "";
         let title = &self.metric_description;
         let units = &self.metric_unit;
         let context = format!("otel.{}", &self.metric_name);
         let family = self.metric_name.replace('.', "/");
-        let chart_type = if self.is_histogram() {
-            "heatmap"
-        } else {
-            "line"
-        };
-        let priority = 1;
-        let update_every = std::time::Duration::from_nanos(ue.get()).as_secs();
-
-        // CHART command
+        let chart_type = if self.is_histogram() { "heatmap" } else { "line" };
+        
         buffer.push_str(&format!(
-            "CHART {type_id} '{name}' '{title}' '{units}' '{family}' '{context}' {chart_type} {priority} {update_every}\n"
+            "CHART {type_id} '' '{title}' '{units}' '{family}' '{context}' {chart_type} 1 {ue_secs}\n"
         ));
 
-        // CLABEL commands
         for (key, value) in self.attributes.iter() {
             let value_str = match value {
                 JsonValue::String(s) => s.clone(),
@@ -174,128 +269,124 @@ impl NetdataChart {
                 JsonValue::Bool(b) => b.to_string(),
                 _ => continue,
             };
-
             buffer.push_str(&format!("CLABEL '{key}' '{value_str}' 1\n"));
         }
         buffer.push_str("CLABEL_COMMIT\n");
 
-        // Emit dimensions
-        if self.is_histogram() {
-            let mut dimension_names = self.samples_table.iter_dimensions().collect::<Vec<_>>();
-
-            dimension_names.sort_by(|a, b| {
-                let a_val = if *a == "+Inf" {
-                    f64::INFINITY
-                } else {
-                    a.parse::<f64>().unwrap()
-                };
-                let b_val = if *b == "+Inf" {
-                    f64::INFINITY
-                } else {
-                    b.parse::<f64>().unwrap()
-                };
-                a_val.partial_cmp(&b_val).unwrap()
-            });
-
-            for dimension_name in dimension_names {
-                let algorithm = match self.is_monotonic {
-                    Some(true) => "incremental",
-                    _ => "absolute",
-                };
-                buffer.push_str(&format!(
-                    "DIMENSION {} {} {} 1 {}\n",
-                    dimension_name, dimension_name, algorithm, self.divisor
-                ));
-            }
-        } else {
-            for dimension_name in self.samples_table.iter_dimensions() {
-                let algorithm = match self.is_monotonic {
-                    Some(true) => "incremental",
-                    _ => "absolute",
-                };
-                buffer.push_str(&format!(
-                    "DIMENSION {} {} {} 1 {}\n",
-                    dimension_name, dimension_name, algorithm, self.divisor
-                ));
-            }
-        }
-    }
-
-    fn process_next_interval(&mut self, buffer: &mut ChartOutputBuffer) -> ChartState {
-        let lsti = match &self.last_samples_table_interval {
-            Some(interval) => interval,
-            None => return ChartState::Empty,
-        };
-
-        let lci = match &self.last_collection_interval {
-            Some(interval) => interval,
-            None => return ChartState::Empty,
-        };
-
-        // Clean stale samples
-        self.samples_table.drop_stale_samples(lsti);
-        if self.samples_table.is_empty() {
-            return ChartState::Empty;
-        }
-
-        // Check for gaps
-        let have_gap = self
-            .samples_table
-            .iter_samples_buffers()
-            .all(|sb| sb.first().is_none_or(|sp| lsti.is_in_gap(sp)));
-
-        if have_gap {
-            return ChartState::InGap;
-        }
-
-        // Collect samples to emit
-        let mut samples_to_emit = Vec::new();
-        for (dimension_name, sb) in &mut self.samples_table.iter_mut() {
-            if let Some(sp) = sb.first() {
-                if lsti.is_on_time(sp) {
-                    if let Some(sample) = sb.pop() {
-                        samples_to_emit.push((dimension_name.clone(), sample.value));
-                    }
+        let mut dimension_names: Vec<String> = self.samples_table.iter_dimensions().cloned().collect();
+        dimension_names.sort_by(|a, b| {
+            let a_val = if a == "+Inf" { Some(f64::INFINITY) } else { a.parse::<f64>().ok() };
+            let b_val = if b == "+Inf" { Some(f64::INFINITY) } else { b.parse::<f64>().ok() };
+            match (a_val, b_val) {
+                (Some(a_num), Some(b_num)) => {
+                    a_num.partial_cmp(&b_num).unwrap_or(std::cmp::Ordering::Equal)
                 }
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => a.cmp(b),
             }
+        });
+
+        let semantics = self.get_semantics();
+        for dim_name in dimension_names {
+            buffer.push_str(&format!(
+                "DIMENSION {dim_name} {dim_name} {} 1 {}\n",
+                semantics.netdata_algorithm, self.divisor
+            ));
         }
-
-        // Emit data if we have samples
-        if !samples_to_emit.is_empty() {
-            self.emit_begin(buffer, lci.update_every.get());
-            for (dimension_name, value) in samples_to_emit {
-                self.emit_set(buffer, &dimension_name, value);
-            }
-            self.emit_end(buffer);
-        }
-
-        // Move to next interval
-        self.last_samples_table_interval = Some(lsti.next_interval());
-        self.last_collection_interval = Some(lci.next_interval());
-
-        ChartState::Initialized
     }
 
-    fn emit_begin(&self, buffer: &mut ChartOutputBuffer, update_every: u64) {
-        let ue = std::time::Duration::from_nanos(update_every).as_micros() as u64;
-        buffer.push_str(&format!("BEGIN {} {}\n", self.chart_id, ue));
+    fn emit_begin(&self, buffer: &mut ChartOutputBuffer, update_every_nano: u64) {
+        let ue_micro = update_every_nano / 1000;
+        buffer.push_str(&format!("BEGIN {} {}\n", self.chart_id, ue_micro));
     }
 
     fn emit_set(&self, buffer: &mut ChartOutputBuffer, dimension_name: &str, value: f64) {
-        buffer.push_str(&format!("SET {} {}\n", dimension_name, value * self.divisor as f64));
+        buffer.push_str(&format!("SET {dimension_name} {}\n", value * self.divisor as f64));
     }
 
-    fn emit_end(&self, buffer: &mut ChartOutputBuffer) {
-        let collection_time = std::time::Duration::from_nanos(
-            self.last_collection_interval.unwrap().collection_time(),
-        )
-        .as_secs();
+    fn emit_end(&self, buffer: &mut ChartOutputBuffer, end_time_nano: u64) {
+        let collection_time = end_time_nano / 1_000_000_000;
         buffer.push_str(&format!("END {collection_time}\n"));
     }
 
-    pub fn last_collection_time(&self) -> Option<std::time::SystemTime> {
-        self.last_collection_interval.as_ref().map(|lci| {
-            std::time::UNIX_EPOCH + std::time::Duration::from_nanos(lci.collection_time())
+    pub fn last_collection_time(&self) -> Option<SystemTime> {
+        self.next_slot_start_nano.map(|nano| {
+            UNIX_EPOCH + Duration::from_nanos(nano)
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::plugin_config::MetricsConfig;
+    use crate::flattened_point::FlattenedPoint;
+    use serde_json::Map;
+
+    fn create_test_fp(name: &str, value: f64, time_nano: u64, temporality: Option<&str>, is_monotonic: Option<bool>, metric_type: &str) -> FlattenedPoint {
+        FlattenedPoint {
+            nd_instance_name: "test_instance".to_string(),
+            nd_dimension_name: "test_dim".to_string(),
+            metric_name: name.to_string(),
+            metric_description: "test desc".to_string(),
+            metric_unit: "units".to_string(),
+            metric_type: metric_type.to_string(),
+            metric_value: value,
+            metric_time_unix_nano: time_nano,
+            metric_is_monotonic: is_monotonic,
+            metric_aggregation_temporality: temporality.map(|s| s.to_string()),
+            attributes: Map::new(),
+        }
+    }
+
+    #[test]
+    fn test_delta_counter_gap_fill() {
+        let config = MetricsConfig {
+            collection_interval: Duration::from_secs(10),
+            grace_period: Duration::from_secs(5),
+            ..Default::default()
+        };
+        
+        let mut chart = NetdataChart::from_flattened_point(&create_test_fp("metric", 0.0, 0, Some("delta"), None, "sum"), &config);
+        let mut buffer = String::new();
+        
+        // Slot 0: [0, 10s). Insert point at 1s.
+        chart.ingest(&create_test_fp("metric", 10.0, 1_000_000_000, Some("delta"), None, "sum"));
+        
+        // Process at 16s (grace period passed for slot 0)
+        chart.process(&mut buffer, UNIX_EPOCH + Duration::from_secs(16));
+        assert!(buffer.contains("SET test_dim 10000"));
+        buffer.clear();
+        
+        // Slot 1: [10s, 20s) -> Gap. Process at 26s.
+        chart.process(&mut buffer, UNIX_EPOCH + Duration::from_secs(26));
+        // For delta counter, gap should be filled with 0 (divisor=1000 applied)
+        assert!(buffer.contains("SET test_dim 0"));
+    }
+
+    #[test]
+    fn test_cumulative_counter_gap_fill() {
+        let config = MetricsConfig {
+            collection_interval: Duration::from_secs(10),
+            grace_period: Duration::from_secs(5),
+            ..Default::default()
+        };
+        
+        let mut chart = NetdataChart::from_flattened_point(&create_test_fp("metric", 0.0, 0, Some("cumulative"), Some(true), "sum"), &config);
+        let mut buffer = String::new();
+        
+        // Slot 0: [0, 10s). Insert point at 1s.
+        chart.ingest(&create_test_fp("metric", 100.0, 1_000_000_000, Some("cumulative"), Some(true), "sum"));
+        
+        // Process at 16s
+        chart.process(&mut buffer, UNIX_EPOCH + Duration::from_secs(16));
+        assert!(buffer.contains("SET test_dim 100000"));
+        buffer.clear();
+        
+        // Slot 1: [10s, 20s) -> Gap. Process at 26s.
+        chart.process(&mut buffer, UNIX_EPOCH + Duration::from_secs(26));
+        // For cumulative counter, gap should be filled with last value (100 * divisor=1000)
+        assert!(buffer.contains("SET test_dim 100000"));
     }
 }

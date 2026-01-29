@@ -19,6 +19,7 @@ pub struct FlattenedPoint {
     pub metric_value: f64,
 
     pub metric_is_monotonic: Option<bool>,
+    pub metric_aggregation_temporality: Option<String>,
 }
 
 use crate::chart_config::ChartConfig;
@@ -29,7 +30,7 @@ impl FlattenedPoint {
         chart_config: Option<&ChartConfig>,
         regex_cache: &RegexCache,
     ) -> Option<Self> {
-        let Some(JsonValue::String(metric_name)) = json_map.remove("metric.name") else {
+        let Some(JsonValue::String(mut metric_name)) = json_map.remove("metric.name") else {
             debug_assert!(false, "metric.name missing from json map");
             return None;
         };
@@ -70,6 +71,10 @@ impl FlattenedPoint {
             .remove("metric.is_monotonic")
             .and_then(|v| v.as_bool());
 
+        let metric_aggregation_temporality = json_map
+            .remove("metric.aggregation_temporality")
+            .and_then(|v| v.as_str().map(String::from));
+
         if let Some(config) = chart_config {
             if let Some(chart_instance_pattern) = &config.extract.chart_instance_pattern {
                 if !json_map.contains_key("metric.attributes._nd_chart_instance") {
@@ -88,6 +93,15 @@ impl FlattenedPoint {
                     );
                 }
             }
+        }
+
+        let name_suffix = json_map
+            .remove("_nd_name_suffix")
+            .and_then(|v| v.as_str().map(String::from))
+            .unwrap_or_default();
+
+        if !name_suffix.is_empty() {
+            metric_name = format!("{}{}", metric_name, name_suffix);
         }
 
         let nd_dimension_name = {
@@ -166,6 +180,7 @@ impl FlattenedPoint {
             metric_time_unix_nano,
             metric_value,
             metric_is_monotonic,
+            metric_aggregation_temporality,
         })
     }
 }
