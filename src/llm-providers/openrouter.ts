@@ -83,7 +83,8 @@ export class OpenRouterProvider extends BaseLLMProvider {
       const model = this.provider(request.model);
       const filteredTools = this.filterToolsForFinalTurn(request.tools, request.isFinalTurn);
       const tools = this.convertTools(filteredTools, request.toolExecutor);
-      const messages = super.convertMessages(request.messages, { interleaved: request.interleaved });
+      const normalizedMessages = this.normalizeRequestMessages(request);
+      const messages = super.convertMessages(normalizedMessages, { interleaved: request.interleaved });
       
       // Add final turn message if needed
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);

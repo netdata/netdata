@@ -246,6 +246,7 @@ const countFinalReportToolCalls = (conversation: readonly ConversationMessage[])
     ? message.toolCalls.filter((call) => call.name === FINAL_REPORT_TOOL).length
     : 0)
 ), 0);
+const FINAL_REPORT_TOOL_CALL_FORBIDDEN = 'Final report tool call should not appear in conversation.';
 
 const parseTurnFailureSlugs = (result: AIAgentResult, scenarioId: string, required: string[] = []): string[] => {
   const entry = expectTurnFailureSlugs(result.logs, scenarioId, required);
@@ -384,7 +385,7 @@ PLUGINS_TESTS.push({
     invariant(result.success, 'META-only retry should succeed');
     invariant(result.finalReport !== undefined, FINAL_REPORT_PRESENT_MSG);
     invariant(result.finalReport.content === FIRST_REPORT_CONTENT, 'Locked final report should be preserved');
-    invariant(countFinalReportToolCalls(result.conversation) === 1, 'Final report tool call should occur only once');
+    invariant(countFinalReportToolCalls(result.conversation) === 0, FINAL_REPORT_TOOL_CALL_FORBIDDEN);
     parseTurnFailureSlugs(result, SCENARIO_META_RETRY, ['final_meta_missing']);
     const nonce = extractNonceFromMessages(result.conversation, SCENARIO_META_RETRY);
     const turnFailed = findTurnFailedMessage(result.conversation, TURN_FAILED_MARKER);
@@ -458,7 +459,7 @@ PLUGINS_TESTS.push({
     invariant(result.success, 'Invalid META should be recoverable via META-only retry.');
     invariant(result.finalReport !== undefined, FINAL_REPORT_PRESENT_MSG);
     invariant(result.finalReport.content === VALID_REPORT_CONTENT, 'Final report content should remain locked.');
-    invariant(countFinalReportToolCalls(result.conversation) === 1, 'Final report tool call should not repeat.');
+    invariant(countFinalReportToolCalls(result.conversation) === 0, FINAL_REPORT_TOOL_CALL_FORBIDDEN);
     parseTurnFailureSlugs(result, SCENARIO_META_INVALID, ['final_meta_missing', 'final_meta_invalid']);
     const nonce = extractNonceFromMessages(result.conversation, SCENARIO_META_INVALID);
     const turnFailed = findTurnFailedMessage(result.conversation, TURN_FAILED_MARKER);
@@ -519,7 +520,7 @@ PLUGINS_TESTS.push({
     invariant(result.success, 'Valid META should keep finalization ready even if invalid META is also present.');
     invariant(result.finalReport !== undefined, FINAL_REPORT_PRESENT_MSG);
     invariant(result.finalReport.content === VALID_REPORT_CONTENT, 'Final report content should match.');
-    invariant(countFinalReportToolCalls(result.conversation) === 1, 'Final report tool call should occur once.');
+    invariant(countFinalReportToolCalls(result.conversation) === 0, FINAL_REPORT_TOOL_CALL_FORBIDDEN);
     invariant(!hasTurnFailureSlugs(result, SCENARIO_META_VALID_AND_INVALID), 'No TURN-FAILED slugs should be emitted when finalization is ready.');
     const turnFailed = findTurnFailedMessage(result.conversation, TURN_FAILED_MARKER);
     invariant(turnFailed === undefined, 'TURN-FAILED feedback should not be emitted when valid META is present.');

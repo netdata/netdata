@@ -167,11 +167,11 @@ FINAL_REPORT_TESTS.push({
   },
 } satisfies HarnessTest);
 
-// Test: Final report with empty content still succeeds (suite version)
-// Note: Empty content is accepted by the validation - the model decided to produce an empty report
+// Test: Final report with empty content is rejected (suite version)
+// Note: Empty content is treated as missing content and should fail validation
 FINAL_REPORT_TESTS.push({
   id: 'suite-final-report-empty-content',
-  description: 'Suite: Session accepts final report with empty content',
+  description: 'Suite: Session rejects final report with empty content',
   execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
     sessionConfig.maxTurns = 1;
     sessionConfig.maxRetries = 1;
@@ -203,9 +203,7 @@ FINAL_REPORT_TESTS.push({
     }));
   },
   expect: (result: AIAgentResult) => {
-    // Empty content is valid - the session succeeds
-    invariant(result.success, 'Empty content is accepted');
+    invariant(!result.success, 'Empty content should be rejected');
     invariant(result.finalReport !== undefined, FINAL_REPORT_PRESENT_MSG);
-    // Content might be empty or have default value - just verify it exists
   },
 } satisfies HarnessTest);

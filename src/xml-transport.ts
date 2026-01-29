@@ -107,12 +107,19 @@ export interface XmlMetaIssue {
   reason: string;
 }
 
+export interface XmlFinalReportPayload {
+  slotId: string;
+  parameters: Record<string, unknown>;
+  rawContent?: string;
+}
+
 // Result from parsing a single message
 export interface XmlParseMessageResult {
   toolCalls: ToolCall[] | undefined;
   errors: XmlPastEntry[];
   metaBlocks: XmlMetaBlock[];
   metaIssues: XmlMetaIssue[];
+  finalReportPayload?: XmlFinalReportPayload;
 }
 
 // Result from recording a tool execution
@@ -437,13 +444,14 @@ export class XmlToolTransport {
     callbacks: XmlParseCallbacks
   ): XmlParseMessageResult {
     if (this.nonce === undefined || this.slots === undefined || this.allowedTools === undefined) {
-      return { toolCalls: undefined, errors: [], metaBlocks: [], metaIssues: [] };
+      return { toolCalls: undefined, errors: [], metaBlocks: [], metaIssues: [], finalReportPayload: undefined };
     }
 
     const metaExtraction = this.extractMetaBlocks(content, context.turn, callbacks);
     const sanitizedContent = metaExtraction.contentWithoutMeta;
     const metaBlocks = metaExtraction.metaBlocks;
     const metaIssues = metaExtraction.metaIssues;
+    let finalReportPayload: XmlFinalReportPayload | undefined;
 
     // First, try to extract unclosed final report if stop reason indicates normal completion
     const unclosedFinal = this.tryExtractUnclosedFinalReport(
@@ -458,8 +466,8 @@ export class XmlToolTransport {
       // Check if this was a structured format truncation that was rejected
       if ('truncatedRejected' in unclosedFinal) {
         // Structured format truncation - already reported error via recordTurnFailure, don't add more errors
-        return { toolCalls: undefined, errors: [], metaBlocks, metaIssues };
-      }
+          return { toolCalls: undefined, errors: [], metaBlocks, metaIssues, finalReportPayload: undefined };
+        }
 
       const expectedFormat = context.resolvedFormat ?? 'text';
       const finalReportToolName = 'agent__final_report';
@@ -501,6 +509,7 @@ export class XmlToolTransport {
             }],
             metaBlocks,
             metaIssues,
+            finalReportPayload: undefined,
           };
         }
         parameters = {
@@ -514,13 +523,13 @@ export class XmlToolTransport {
         parameters._truncated = true;
       }
 
-      const toolCall: ToolCall = {
-        id: unclosedFinal.slotId,
-        name: finalReportToolName,
+      finalReportPayload = {
+        slotId: unclosedFinal.slotId,
         parameters,
+        rawContent: sanitizedContent,
       };
 
-      return { toolCalls: [toolCall], errors: [], metaBlocks, metaIssues };
+      return { toolCalls: undefined, errors: [], metaBlocks, metaIssues, finalReportPayload };
     }
 
     const allowedSlots = new Set(this.slots.map((slot) => slot.slotId));
@@ -601,7 +610,7 @@ export class XmlToolTransport {
         errors.push(errorEntry);
         this.thisTurnEntries.push(errorEntry);
       }
-      return { toolCalls: undefined, errors, metaBlocks, metaIssues };
+      return { toolCalls: undefined, errors, metaBlocks, metaIssues, finalReportPayload };
     }
 
     // Process valid slots into tool calls
@@ -627,8 +636,11 @@ export class XmlToolTransport {
           report_format: wrapperFormat,
           _rawPayload: asString,  // Raw payload for downstream processing
         };
-        call.parameters = finalParams;
-        validCalls.push(call);
+        finalReportPayload ??= {
+          slotId: slot.slotId,
+          parameters: finalParams,
+          rawContent: sanitizedContent,
+        };
         return;
       }
 
@@ -665,6 +677,7 @@ export class XmlToolTransport {
       errors,
       metaBlocks,
       metaIssues,
+      finalReportPayload,
     };
   }
 

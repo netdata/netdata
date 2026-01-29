@@ -8,7 +8,7 @@
 
 - **Recursive Autonomous Agents**: Every agent continuously plans, executes, observes, and adapts
 - **100% Session Isolation**: Each agent run is a completely independent universe with ZERO shared state (MCP clients, providers, conversation, accounting)
-- **TypeScript + Vercel AI SDK 5**: Full type safety with unified provider interface
+- **TypeScript + Vercel AI SDK 6**: Full type safety with unified provider interface
 - **Library-First Design**: Core functionality as embeddable library; CLI is thin wrapper
 
 ---

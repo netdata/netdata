@@ -1,7 +1,7 @@
 # XML Tool Transport
 
 ## TL;DR
-XML transport is fixed to `xml-final`: native `tool_calls` remain for regular tools, while the final report and final-report plugin META blocks are sent over XML. Each turn advertises XML-NEXT (nonce, FINAL wrapper, optional schema, and META reminders). XML-PAST stays suppressed.
+XML transport is fixed to `xml-final`: native `tool_calls` remain for regular tools, while the final report and final-report plugin META blocks are sent over XML. The FINAL wrapper is parsed into an internal payload (it is not emitted as a tool call). Each turn advertises XML-NEXT (nonce, FINAL wrapper, optional schema, and META reminders). XML-PAST stays suppressed.
 
 ## Turn Messages
 - XML-NEXT (ephemeral) is the only per-turn system notice. It carries the nonce, FINAL wrapper, optional schema, and META guidance.
@@ -20,7 +20,7 @@ XML transport is fixed to `xml-final`: native `tool_calls` remain for regular to
 ## Execution Flow
 1. Build XML-NEXT each turn; provider tool definitions remain visible for native tool calls.
 2. Extract META blocks first, then parse the FINAL wrapper.
-3. Execute native tool calls and the parsed final-report tool call through the standard orchestrator (`source: xml`).
+3. Execute native tool calls and parse the FINAL wrapper into an internal final-report payload (not a tool call) through the standard orchestrator (`source: xml`).
 4. Enforce finalization readiness.
 
 ## Finalization Readiness

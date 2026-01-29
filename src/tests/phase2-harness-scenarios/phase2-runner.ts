@@ -3521,7 +3521,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(finalReport !== undefined, 'Final report missing for run-test-32.');
       invariant(result.success && finalReport.format === 'json', 'Final report should indicate JSON success for run-test-32.');
       const toolFailureMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('final_report(json) requires'));
-      invariant(toolFailureMessage !== undefined, 'Final report failure message expected for run-test-32.');
+      invariant(toolFailureMessage === undefined, 'Final report tool failure message should not appear for run-test-32.');
       const turnFailed = findTurnFailedMessage(result.conversation, 'Final report must be a JSON object');
       invariant(turnFailed !== undefined, 'TURN-FAILED JSON guidance expected for run-test-32.');
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;

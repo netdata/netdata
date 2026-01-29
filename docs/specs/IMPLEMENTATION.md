@@ -2,7 +2,7 @@ AI Agent Integration Plan: Vercel AI SDK + MCP TypeScript SDK
 
 Overview
 
-- Goal: Combine Vercel AI SDK v5 (in `libs/ai`) with the MCP TypeScript SDK (in `libs/typescript-sdk`) to build a robust, streaming, tool‑calling agent that discovers and executes MCP tools automatically while the LLM orchestrates tool selection.
+- Goal: Combine Vercel AI SDK v6 (in `libs/ai`) with the MCP TypeScript SDK (in `libs/typescript-sdk`) to build a robust, streaming, tool‑calling agent that discovers and executes MCP tools automatically while the LLM orchestrates tool selection.
 - Approach: Use MCP SDK for protocol‑compliant tool discovery and invocation (stdio, websocket, streamable HTTP, or SSE). Convert discovered tool schemas into AI SDK tools; delegate tool call planning, sequencing, and parallelization to the AI SDK. Stream assistant tokens to stdout and perform structured accounting.
 
 Why this design
@@ -277,7 +277,7 @@ References (code entry points)
 
 https://www.npmjs.com/package/@openrouter/ai-sdk-provider/v/beta
 
-This is compatible with AI SDK 5. The page examples. Read it.
+This is compatible with AI SDK 6. The page examples. Read it.
 
 ---
 
@@ -285,7 +285,7 @@ This is compatible with AI SDK 5. The page examples. Read it.
 
 Provider
 
-- Uses the community AI SDK 5 provider `ollama-ai-provider-v2` with the native REST API under `/api` (not the OpenAI compatibility layer).
+- Uses the community AI SDK 6 provider `ollama-ai-provider-v2` with the native REST API under `/api` (not the OpenAI compatibility layer).
 - Base URL normalization: if a config `baseUrl` ends with `/v1`, it is rewritten to `/api`; if it lacks `/api`, it is appended.
 - Tracing: provider is initialized with `fetch: tracedFetch` so `--trace-llm` logs HTTP requests and SSE headers.
 

@@ -143,8 +143,13 @@ describe('XmlToolTransport', () => {
       { recordTurnFailure: recordFailure, logWarning }
     );
 
-    expect(parse.toolCalls).toHaveLength(1);
-    expect(parse.toolCalls?.[0].name).toBe('agent__final_report');
+    expect(parse.toolCalls).toBeUndefined();
+    expect(parse.finalReportPayload).toBeDefined();
+    expect(parse.finalReportPayload?.parameters).toMatchObject({
+      report_format: 'json',
+      status: 'success',
+      _rawPayload: 'not-json',
+    });
     expect(parse.errors).toHaveLength(0);
     expect(recordFailure).not.toHaveBeenCalled();
     expect(logWarning).not.toHaveBeenCalled();
@@ -400,11 +405,10 @@ describe('XmlToolTransport', () => {
         { recordTurnFailure: recordFailure, logWarning }
       );
 
-      // Should accept - tool call returned with truncated flag
-      expect(parse.toolCalls).toHaveLength(1);
-      expect(parse.toolCalls?.[0].name).toBe('agent__final_report');
-      expect(parse.toolCalls?.[0].parameters).toHaveProperty('_truncated', true);
-      expect(parse.toolCalls?.[0].parameters).toHaveProperty('report_content', truncatedContent);
+      // Should accept - final report payload returned with truncated flag
+      expect(parse.toolCalls).toBeUndefined();
+      expect(parse.finalReportPayload?.parameters).toHaveProperty('_truncated', true);
+      expect(parse.finalReportPayload?.parameters).toHaveProperty('report_content', truncatedContent);
       expect(parse.errors).toHaveLength(0);
       // Should NOT call recordTurnFailure (we're accepting it)
       expect(recordFailure).not.toHaveBeenCalled();
@@ -448,8 +452,8 @@ describe('XmlToolTransport', () => {
       );
 
       // Should accept
-      expect(parse.toolCalls).toHaveLength(1);
-      expect(parse.toolCalls?.[0].parameters).toHaveProperty('_truncated', true);
+      expect(parse.toolCalls).toBeUndefined();
+      expect(parse.finalReportPayload?.parameters).toHaveProperty('_truncated', true);
       expect(recordFailure).not.toHaveBeenCalled();
       expect(logWarning).toHaveBeenCalledTimes(1);
       const warningEntry = logWarning.mock.calls[0]?.[0] as XmlWarningEntry | undefined;
@@ -491,8 +495,8 @@ describe('XmlToolTransport', () => {
       );
 
       // Should accept without truncated flag
-      expect(parse.toolCalls).toHaveLength(1);
-      expect(parse.toolCalls?.[0].parameters).not.toHaveProperty('_truncated');
+      expect(parse.toolCalls).toBeUndefined();
+      expect(parse.finalReportPayload?.parameters).not.toHaveProperty('_truncated');
       expect(recordFailure).not.toHaveBeenCalled();
       expect(logWarning).not.toHaveBeenCalled();
     });

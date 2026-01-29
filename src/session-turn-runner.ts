@@ -51,7 +51,7 @@ import { ThinkTagStreamFilter } from './think-tag-filter.js';
 import { processLeakedToolCalls, type LeakedToolFallbackResult } from './tool-call-fallback.js';
 import { TRUNCATE_PREVIEW_BYTES, truncateToBytes } from './truncation.js';
 import { estimateMessagesBytes, formatToolRequestCompact, isPlainObject, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
-import { XmlFinalReportFilter, type XmlMetaBlock, type XmlMetaIssue, type XmlToolTransport } from './xml-transport.js';
+import { XmlFinalReportFilter, type XmlFinalReportPayload, type XmlMetaBlock, type XmlMetaIssue, type XmlToolTransport } from './xml-transport.js';
 
 const TOOL_FAILED_PREFIX = '(tool failed:';
 const TEXT_EXTRACTION_REMOTE_ID = 'agent:text-extraction';
@@ -745,7 +745,7 @@ export class TurnRunner {
                 }
                     const turnResult = await this.executeSingleTurn(attemptConversation, provider, model, isFinalTurn, currentTurn, logs, accounting, lastShownThinkingHeaderTurn, attempts, maxRetries, sessionReasoningLevel, sessionReasoningValue ?? undefined);
                     lastTurnResult = turnResult;
-                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted, syntheticToolMessages, metaBlocks, metaIssues } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason, maxOutputTokens: this.ctx.sessionConfig.maxOutputTokens });
+                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted, syntheticToolMessages, metaBlocks, metaIssues, finalReportPayload } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason, maxOutputTokens: this.ctx.sessionConfig.maxOutputTokens });
                     const metaBlocksThisAttempt = metaBlocks;
                     const metaIssuesFromTransport = metaIssues;
                     this.state.droppedInvalidToolCalls = droppedInvalidToolCalls;
@@ -1095,7 +1095,7 @@ export class TurnRunner {
                         }
                         // FALLBACK: Extract and execute tool calls from leaked XML-like patterns
                         // Handles models that emit <tools>, <tool_call>, etc. instead of native tool calls
-                        if (!sanitizedHasToolCalls && sanitizedHasText && assistantForAdoption !== undefined && textContent !== undefined) {
+                        if (!sanitizedHasToolCalls && sanitizedHasText && finalReportPayload === undefined && assistantForAdoption !== undefined && textContent !== undefined) {
                             const fallbackResult = await this.processLeakedToolCallsFallback(textContent, currentTurn, provider, model, allowedToolNamesForAttempt);
                             if (fallbackResult !== undefined) {
                                 assistantForAdoption.toolCalls = fallbackResult.toolCalls;
@@ -1154,28 +1154,38 @@ export class TurnRunner {
                                     type: 'llm' as const,
                                     remoteIdentifier: TEXT_EXTRACTION_REMOTE_ID,
                                     fatal: false,
-                                    message: 'Retrying for proper tool call after text-only final_report payload (no callable tools detected).',
+                                    message: 'Retrying for proper XML final report wrapper after text-only final_report payload (no callable tools detected).',
                                 });
                             }
                         }
                         const existingFinalReportSource = this.ctx.finalReportManager.getSource();
-                        const canAdoptFinalReport = (existingFinalReportSource === undefined || existingFinalReportSource === 'synthetic') && sanitizedHasToolCalls;
+                        const hasFinalReportPayload = finalReportPayload !== undefined;
+                        const canAdoptFinalReport = (existingFinalReportSource === undefined || existingFinalReportSource === 'synthetic')
+                            && (sanitizedHasToolCalls || hasFinalReportPayload);
                         if (canAdoptFinalReport) {
                             const adoptFromToolCall = () => {
                                 if (toolFailureDetected)
                                     return false;
-                                const assistantWithCall = sanitizedMessages.find((msg) => msg.role === 'assistant' && Array.isArray(msg.toolCalls));
-                                if (assistantWithCall === undefined)
+                                const payloadOverride = finalReportPayload;
+                                const assistantWithCall = payloadOverride === undefined
+                                    ? sanitizedMessages.find((msg) => msg.role === 'assistant' && Array.isArray(msg.toolCalls))
+                                    : undefined;
+                                if (payloadOverride === undefined && assistantWithCall === undefined)
                                     return false;
                                 // Capture raw content for debugging dumps
-                                const rawContent = typeof assistantWithCall.content === 'string' ? assistantWithCall.content : undefined;
-                                const toolCalls = assistantWithCall.toolCalls;
-                                if (toolCalls === undefined)
+                                const rawContent = payloadOverride?.rawContent
+                                    ?? (typeof assistantWithCall?.content === 'string' ? assistantWithCall.content : undefined);
+                                const toolCalls = payloadOverride === undefined ? assistantWithCall?.toolCalls : undefined;
+                                if (payloadOverride === undefined && toolCalls === undefined)
                                     return false;
-                                const finalReportCall = toolCalls.find((call) => sanitizeToolName(call.name) === FINAL_REPORT_TOOL);
-                                if (finalReportCall === undefined)
+                                const finalReportCall = payloadOverride === undefined
+                                    ? toolCalls?.find((call) => sanitizeToolName(call.name) === FINAL_REPORT_TOOL)
+                                    : undefined;
+                                if (payloadOverride === undefined && finalReportCall === undefined)
                                     return false;
-                                const params = finalReportCall.parameters;
+                                const params = payloadOverride?.parameters ?? finalReportCall?.parameters;
+                                if (params === undefined)
+                                    return false;
                                 const expectedFormat = this.ctx.resolvedFormat ?? 'text';
 
                                 const formatParamRaw = params.report_format;
@@ -1202,7 +1212,10 @@ export class TurnRunner {
                                 const messagesParam = Array.isArray(messagesValue) ? messagesValue : undefined;
                                 const contentJsonCandidate = params.content_json;
                                 const setFinalReportFailureMessage = (content: string): void => {
-                                    const callId = typeof finalReportCall.id === 'string' ? finalReportCall.id : undefined;
+                                    if (payloadOverride !== undefined) {
+                                        return;
+                                    }
+                                    const callId = typeof finalReportCall?.id === 'string' ? finalReportCall.id : undefined;
                                     const existing = callId === undefined
                                         ? undefined
                                         : sanitizedMessages.find((msg) => msg.role === 'tool' && msg.toolCallId === callId);
@@ -1298,11 +1311,7 @@ export class TurnRunner {
                                         this.addTurnFailure('final_report_json_required', parseReason);
                                         this.logFinalReportDump(currentTurn, params, 'expected JSON content', rawContent);
                                         const failureMessage = `final_report(json) requires \`content_json\` (object). invalid_json: ${parseErrorHint}`;
-                                        sanitizedMessages.push({
-                                            role: 'tool',
-                                            content: `${TOOL_FAILED_PREFIX} ${failureMessage})`,
-                                            toolCallId: typeof finalReportCall.id === 'string' ? finalReportCall.id : undefined,
-                                        });
+                                        setFinalReportFailureMessage(`${TOOL_FAILED_PREFIX} ${failureMessage})`);
                                         this.state.finalReportToolFailedThisTurn = true;
                                         this.state.finalReportToolFailedEver = true;
                                         toolFailureDetected = true;
@@ -3280,12 +3289,13 @@ export class TurnRunner {
         this.state.toolNameCorrections.clear();
     }
 
-    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string; maxOutputTokens?: number }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean; syntheticToolMessages: ConversationMessage[]; metaBlocks: XmlMetaBlock[]; metaIssues: XmlMetaIssue[] } {
+    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string; maxOutputTokens?: number }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean; syntheticToolMessages: ConversationMessage[]; metaBlocks: XmlMetaBlock[]; metaIssues: XmlMetaIssue[]; finalReportPayload?: XmlFinalReportPayload } {
         let dropped = 0;
         let finalReportAttempted = false;
         const syntheticToolMessages: ConversationMessage[] = [];
         const metaBlocks: XmlMetaBlock[] = [];
         const metaIssues: XmlMetaIssue[] = [];
+        let finalReportPayload: XmlFinalReportPayload | undefined;
         const formatPayload = (value: unknown): string => {
             if (typeof value === 'string') {
                 return value;
@@ -3368,6 +3378,11 @@ export class TurnRunner {
                 }
                 if (parseResult.metaIssues.length > 0) {
                     metaIssues.push(...parseResult.metaIssues);
+                }
+                if (parseResult.finalReportPayload !== undefined && finalReportPayload === undefined) {
+                    finalReportPayload = parseResult.finalReportPayload;
+                    finalReportAttempted = true;
+                    this.ctx.finalReportManager.incrementAttempts();
                 }
                 if (parseResult.toolCalls !== undefined && parseResult.toolCalls.length > 0) {
                     // Merge XML-parsed tool calls with native tool calls (xml-final mode)
@@ -3454,10 +3469,18 @@ export class TurnRunner {
                         const reason = `tool=${normalizedName}; ${invalidReason}`;
                         dropped++;
                         logInvalidToolCall(reason, payload, normalizedName, id);
-                        if (isFinalReportCall) {
-                            this.ctx.finalReportManager.incrementAttempts();
-                        }
                         const sanitized = buildSanitizationParams(reason, payload);
+                        if (isFinalReportCall) {
+                            if (finalReportPayload === undefined) {
+                                finalReportPayload = {
+                                    slotId: id,
+                                    parameters: sanitized.params,
+                                    rawContent: typeof msg.content === 'string' ? msg.content : undefined,
+                                };
+                                this.ctx.finalReportManager.incrementAttempts();
+                            }
+                            return;
+                        }
                         const failureMessage = `(tool failed: ${sanitized.failureDetail})`;
                         this.state.toolFailureMessages.set(id, failureMessage);
                         this.state.toolFailureKinds.set(id, 'invalid_parameters');
@@ -3467,6 +3490,17 @@ export class TurnRunner {
                             id,
                             parameters: sanitized.params,
                         });
+                        return;
+                    }
+                    if (isFinalReportCall) {
+                        if (finalReportPayload === undefined) {
+                            finalReportPayload = {
+                                slotId: id,
+                                parameters,
+                                rawContent: typeof msg.content === 'string' ? msg.content : undefined,
+                            };
+                            this.ctx.finalReportManager.incrementAttempts();
+                        }
                         return;
                     }
                     calls.push({ name: normalizedName, id, parameters });
@@ -3479,7 +3513,7 @@ export class TurnRunner {
             }
             return result;
         });
-        return { messages: sanitized, dropped, finalReportAttempted, syntheticToolMessages, metaBlocks, metaIssues };
+        return { messages: sanitized, dropped, finalReportAttempted, syntheticToolMessages, metaBlocks, metaIssues, finalReportPayload };
     }
     private emitReasoningChunks(chunks: string[]): void {
         chunks.forEach((chunk: string) => {

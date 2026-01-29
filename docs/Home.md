@@ -70,7 +70,7 @@ See [Getting Started](Getting-Started) for the complete walkthrough.
 
 - **Recursive Autonomous Agents**: Each agent plans, executes, observes, and adapts
 - **100% Session Isolation**: Every agent run is independent with zero shared state
-- **TypeScript + Vercel AI SDK 5**: Type safety with unified provider interface
+- **TypeScript + Vercel AI SDK 6**: Type safety with unified provider interface
 - **Library-First Design**: Core is an embeddable library; CLI is a thin wrapper
 
 ---

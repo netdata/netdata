@@ -16,7 +16,7 @@ import type {
   TurnRetryDirective,
 } from '../types.js';
 import type { ProviderOptions } from '@ai-sdk/provider-utils';
-import type { LanguageModel, ModelMessage, ProviderMetadata, ReasoningOutput, StreamTextResult, ToolSet } from 'ai';
+import type { LanguageModel, ModelMessage, Output as OutputNamespace, ProviderMetadata, ReasoningOutput, StreamTextResult, ToolSet } from 'ai';
 
 import { XML_WRAPPER_CALLED_AS_TOOL_RESULT, isXmlFinalReportTagName } from '../llm-messages.js';
 import { ThinkTagStreamFilter } from '../think-tag-filter.js';
@@ -113,6 +113,16 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
   protected shouldForceToolChoice(_request: TurnRequest): boolean {
     return false;
+  }
+
+  protected normalizeRequestMessages(request: TurnRequest): ConversationMessage[] {
+    const zeroTokens: TokenUsage = {
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedTokens: 0,
+      totalTokens: 0,
+    };
+    return this.injectMissingToolResults(request.messages, request.provider, request.model, zeroTokens);
   }
 
   protected resolveToolChoice(request: TurnRequest): 'auto' | 'required' | undefined {
@@ -1232,7 +1242,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return { controller, resetIdle, clearIdle, didTimeout: () => timedOut };
   }
 
-  protected async drainTextStream(stream: StreamTextResult<ToolSet, boolean>): Promise<string> {
+  protected async drainTextStream(stream: StreamTextResult<ToolSet, OutputNamespace.Output>): Promise<string> {
     const iterator = stream.textStream[Symbol.asyncIterator]();
     let response = '';
     let step = await iterator.next();
@@ -1454,7 +1464,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       const shouldSuppressStreamError = (): boolean => controller.signal.aborted || didTimeout();
 
-      const awaitWithSuppression = async <T>(promise: Promise<T>): Promise<T | undefined> => {
+      const awaitWithSuppression = async <T>(promise: PromiseLike<T>): Promise<T | undefined> => {
         try {
           return await promise;
         } catch (err) {

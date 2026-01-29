@@ -1,5 +1,5 @@
 import type { ConversationMessage, ProviderConfig, TokenUsage, TurnRequest, TurnResult } from '../types.js';
-import type { LanguageModelV2, LanguageModelV2CallOptions, LanguageModelV2Content, LanguageModelV2FinishReason, LanguageModelV2StreamPart, LanguageModelV2Usage } from '@ai-sdk/provider';
+import type { JSONValue, LanguageModelV2, LanguageModelV2CallOptions, LanguageModelV2Content, LanguageModelV2FinishReason, LanguageModelV2StreamPart, LanguageModelV2Usage, SharedV2ProviderMetadata } from '@ai-sdk/provider';
 import type { ReasoningOutput } from 'ai';
 
 import { getScenario, listScenarioIds, type ScenarioDefinition, type ScenarioStepResponse, type ScenarioTurn } from '../tests/fixtures/test-llm-scenarios.js';
@@ -59,6 +59,28 @@ const applyFailureStatusDetails = (
   if (details.code !== undefined && typeof target.code !== 'string') {
     target.code = details.code;
   }
+};
+
+const normalizeProviderMetadataForV2 = (
+  metadata: ReasoningOutput['providerMetadata'] | undefined,
+): SharedV2ProviderMetadata | undefined => {
+  if (metadata === undefined) {
+    return undefined;
+  }
+  const cleaned: SharedV2ProviderMetadata = {};
+  Object.entries(metadata).forEach(([providerName, providerValue]) => {
+    const providerRecord = providerValue as Record<string, JSONValue | undefined>;
+    const cleanedProvider: Record<string, JSONValue> = {};
+    Object.entries(providerRecord).forEach(([key, value]) => {
+      if (value !== undefined) {
+        cleanedProvider[key] = value;
+      }
+    });
+    if (Object.keys(cleanedProvider).length > 0) {
+      cleaned[providerName] = cleanedProvider;
+    }
+  });
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 };
 
 // Extract XML nonce from messages (looks for xml-next notice with ai-agent-{nonce}-FINAL pattern)
@@ -291,7 +313,8 @@ export class TestLLMProvider extends BaseLLMProvider {
       ? this.filterToolsForFinalTurn(request.tools, request.isFinalTurn === true)
       : request.tools;
     const tools = this.convertTools(toolsForTurn, request.toolExecutor);
-    const messages = super.convertMessages(request.messages, { interleaved: request.interleaved });
+    const normalizedMessages = this.normalizeRequestMessages(request);
+    const messages = super.convertMessages(normalizedMessages, { interleaved: request.interleaved });
     const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn === true);
 
     const start = Date.now();
@@ -402,7 +425,8 @@ export class TestLLMProvider extends BaseLLMProvider {
 
     const model = createScenarioLanguageModel(context);
     const tools = this.convertTools([], request.toolExecutor);
-    const messages = super.convertMessages(request.messages, { interleaved: request.interleaved });
+    const normalizedMessages = this.normalizeRequestMessages(request);
+    const messages = super.convertMessages(normalizedMessages, { interleaved: request.interleaved });
     const finalMessages = this.buildFinalTurnMessages(messages, true);
     const start = Date.now();
     return await super.executeNonStreamingTurn(model, finalMessages, tools, request, start, undefined);
@@ -590,10 +614,11 @@ function appendReasoningParts(content: LanguageModelV2Content[], response: Scena
   }
 
   segments.forEach((segment) => {
+    const providerMetadata = normalizeProviderMetadataForV2(segment.providerMetadata);
     content.push({
       type: 'reasoning',
       text: segment.text,
-      ...(segment.providerMetadata !== undefined ? { providerMetadata: segment.providerMetadata } : {}),
+      ...(providerMetadata !== undefined ? { providerMetadata } : {}),
     });
   });
 }

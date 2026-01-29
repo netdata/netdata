@@ -714,7 +714,11 @@ export class LLMClient {
     if (result.status.type === 'success') {
       const tokens = result.tokens;
       const cacheRead = tokens?.cacheReadInputTokens ?? tokens?.cachedTokens ?? 0;
-      const cacheWrite = tokens?.cacheWriteInputTokens ?? 0;
+      const cacheWriteFromMetadata = metadata?.cacheWriteInputTokens;
+      const cacheWrite = tokens?.cacheWriteInputTokens ?? cacheWriteFromMetadata ?? 0;
+      if (tokens !== undefined && tokens.cacheWriteInputTokens === undefined && cacheWriteFromMetadata !== undefined) {
+        tokens.cacheWriteInputTokens = cacheWriteFromMetadata;
+      }
       const responseBytes = result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
       const reasoningStatus = this.describeReasoningState(request);
       this.lastCostInfo = (costToUse !== undefined || metadata?.upstreamCostUsd !== undefined)
