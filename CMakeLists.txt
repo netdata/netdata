@@ -2375,15 +2375,9 @@ else()
         target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
 endif()
 
-# lz4 - try to find a version that is compatible with streaming compression
-# otherwise pick whichever one we can find to support dbengine but don't set
-# ENABLE_LZ4.
-pkg_check_modules(LIBLZ4 liblz4>=1.9.0)
-if(LIBLZ4_FOUND)
-        set(ENABLE_LZ4 On)
-else()
-        pkg_check_modules(LIBLZ4 REQUIRED liblz4)
-endif()
+# lz4
+pkg_check_modules(LIBLZ4 liblz4>=1.7.1)
+set(ENABLE_LZ4 On)
 
 target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
 target_compile_options(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
