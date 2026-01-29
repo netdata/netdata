@@ -572,7 +572,12 @@ This naming convention:
 - Improves discoverability in the Functions API
 - Follows the same colon-separator pattern used by [Dynamic Configuration (DynCfg)](#config) for consistency
 
-> **Note**: This naming convention is distinct from DynCfg configuration IDs. DynCfg commands are sent through the special `config` function (e.g., `config go.d:mysql:local get`), while module functions use their own unique names directly (e.g., `mysql:top-queries`).
+:::note
+
+This naming convention is distinct from DynCfg configuration IDs. DynCfg commands are sent through the special `config` function (e.g., `config go.d:mysql:local get`), while module functions use their own unique names directly (e.g., 
+`mysql:top-queries`).
+
+:::
 
 ##### Functions cancellation
 
