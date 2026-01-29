@@ -173,6 +173,9 @@ func (f *ConfigFunction) validate(idx int, seen map[string]bool) []error {
 	}
 
 	if f.ID != "" {
+		if strings.Contains(f.ID, ":") {
+			errs = append(errs, fmt.Errorf("functions[%d] id %q cannot contain ':'", fidx, f.ID))
+		}
 		if _, dup := seen[f.ID]; dup {
 			errs = append(errs, fmt.Errorf("functions[%d] duplicate id %q", fidx, f.ID))
 		}

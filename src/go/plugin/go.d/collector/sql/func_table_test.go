@@ -85,6 +85,12 @@ func TestConfigFunction_Validate(t *testing.T) {
 			errorCount:  2,
 		},
 		{
+			name:        "id contains colon",
+			cfg:         ConfigFunction{ID: "test:query", Query: "SELECT 1"},
+			expectError: true,
+			errorCount:  1,
+		},
+		{
 			name:        "negative limit",
 			cfg:         ConfigFunction{ID: "test", Query: "SELECT 1", Limit: -1},
 			expectError: true,
