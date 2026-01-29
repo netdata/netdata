@@ -38,8 +38,11 @@ modules:
           configuration**. There is no fixed metric reference: each job can expose
           different metrics depending on its `metrics` and `queries` blocks.
 
-          To see what a specific job collects, open that job’s dashboard in Netdata
+          To see what a specific job collects, open that job's dashboard in Netdata
           and inspect the charts and dimensions it created.
+
+          Jobs can also define **functions** that provide interactive table views in
+          Netdata's Top tab. A job can have metrics only, functions only, or both.
 
           :::tip
 
@@ -60,6 +63,10 @@ modules:
           For each metric block you define, it executes the SQL query (inline or via
           `query_ref`), reads the result set, and maps it to Netdata charts and
           dimensions.
+
+          Additionally, you can define **functions** that expose SQL query results as
+          interactive table views in Netdata's Top tab. Functions support filtering,
+          sorting, and searching without creating persistent metrics.
 
           ### Result Processing Modes
 
@@ -204,6 +211,29 @@ modules:
                           equals: <string|number|bool>    # Active (1) if value == this literal.
                           # in: [ <v1>, <v2>, ... ]       # Active if value is in the list.
                           # match: '^regex$'              # Active if value matches this regex.
+
+            # ---------- FUNCTIONS ----------
+            # Set function_only: true if this job only provides functions (no metrics).
+            function_only: <true|false>                    # OPTIONAL. Default: false.
+
+            # Expose SQL queries as interactive table views in Netdata's Top tab.
+            functions:
+              - id: <function_id>                          # REQUIRED. Unique identifier.
+                name: <display_name>                       # OPTIONAL. Derived from id if not set.
+                description: <help_text>                   # OPTIONAL. Shown in the UI.
+                query: |                                   # REQUIRED. SQL to execute.
+                  SELECT ...
+                timeout: <seconds>                         # OPTIONAL. Query timeout.
+                limit: <max_rows>                          # OPTIONAL. Default: 100.
+                default_sort: <column_name>                # OPTIONAL. Initial sort column.
+                default_sort_desc: <true|false>            # OPTIONAL. Default: true.
+                columns:                                   # OPTIONAL. Override column metadata.
+                  <column_name>:
+                    type: <string|integer|float|boolean|duration|timestamp>
+                    units: <unit_string>
+                    tooltip: <hover_text>
+                    visible: <true|false>
+                    sortable: <true|false>
             ```
           folding:
             title: Config options
@@ -260,8 +290,71 @@ modules:
               description: >
                 A list of metric blocks. Each block defines how a query is executed and how its result is transformed into one or more charts. See [Configuration Structure](#configuration) for details.
               default_value: "[]"
-              required: true
+              required: false
               group: Queries & Metrics
+
+            - name: functions
+              description: >
+                A list of SQL functions exposed as interactive table views in Netdata's Top tab.
+                Each function runs a SQL query and displays results in a filterable, sortable table.
+                See [Functions](#functions) for details.
+              default_value: "[]"
+              required: false
+              group: Functions
+            - name: functions[].id
+              description: Unique identifier for this function.
+              default_value: ""
+              required: true
+              group: Functions
+            - name: functions[].name
+              description: Display name shown in the UI. Auto-derived from ID if not set.
+              default_value: ""
+              required: false
+              group: Functions
+            - name: functions[].description
+              description: Help text shown in the UI.
+              default_value: ""
+              required: false
+              group: Functions
+            - name: functions[].query
+              description: SQL query to execute when this function is called.
+              default_value: ""
+              required: true
+              group: Functions
+            - name: functions[].timeout
+              description: Query timeout (seconds). Uses collector timeout if not set.
+              default_value: ""
+              required: false
+              group: Functions
+            - name: functions[].limit
+              description: Maximum rows to return.
+              default_value: 100
+              required: false
+              group: Functions
+            - name: functions[].default_sort
+              description: Column name for initial sort order.
+              default_value: ""
+              required: false
+              group: Functions
+            - name: functions[].default_sort_desc
+              description: Sort in descending order by default.
+              default_value: true
+              required: false
+              group: Functions
+            - name: functions[].columns
+              description: >
+                Override auto-detected column metadata. Map of column name to settings
+                (type, units, tooltip, visible, sortable).
+              default_value: "{}"
+              required: false
+              group: Functions
+            - name: function_only
+              description: >
+                Set to true if this job only provides functions (no metrics).
+                When enabled, metrics configuration is not required and no charts are created.
+              default_value: false
+              required: false
+              group: Functions
 
             - name: vnode
               description: Associates this data collection job with a Virtual Node.
@@ -508,10 +601,169 @@ modules:
                                 source: pg_is_in_recovery
                                 status_when:
                                   equals: "f"
+
+            - name: Function-only mode – slow query analysis
+              description: |
+                PostgreSQL example that provides an interactive slow query analysis view
+                without collecting any time-series metrics.
+
+                This is useful for ad-hoc troubleshooting via the Netdata **Top** tab.
+                The function queries `pg_stat_statements` to show the slowest queries
+                sorted by total execution time.
+              config: |
+                jobs:
+                  - name: pg_slow_queries
+                    driver: pgx
+                    dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
+                    timeout: 10
+                    function_only: true
+
+                    functions:
+                      - id: slow-queries
+                        name: Slow Queries
+                        description: Top queries by total execution time from pg_stat_statements
+                        query: |
+                          SELECT
+                            queryid,
+                            LEFT(query, 100) AS query,
+                            calls,
+                            total_exec_time,
+                            mean_exec_time,
+                            rows
+                          FROM pg_stat_statements
+                          ORDER BY total_exec_time DESC
+                        limit: 100
+                        default_sort: total_exec_time
+                        default_sort_desc: true
+                        columns:
+                          total_exec_time:
+                            type: duration
+                            units: milliseconds
+                            tooltip: Total time spent executing this query
+                          mean_exec_time:
+                            type: duration
+                            units: milliseconds
+                            tooltip: Average execution time per call
+
+            - name: Combined metrics and functions
+              description: |
+                PostgreSQL example that collects time-series metrics AND provides
+                interactive function views in the same job.
+
+                - The `metrics` block creates charts for connection states.
+                - The `functions` block provides an interactive activity view.
+              config: |
+                jobs:
+                  - name: pg_combined
+                    driver: pgx
+                    dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
+                    timeout: 5
+
+                    # Time-series metrics
+                    metrics:
+                      - id: connections
+                        mode: kv
+                        query: |
+                          SELECT state, count(*) AS cnt
+                          FROM pg_stat_activity
+                          GROUP BY state
+                        kv_mode:
+                          name_col: state
+                          value_col: cnt
+                        charts:
+                          - title: "Connection states"
+                            context: sql.pg_connections
+                            family: connections
+                            units: connections
+                            type: stacked
+                            dims:
+                              - name: active
+                                source: active
+                              - name: idle
+                                source: idle
+
+                    # Interactive functions
+                    functions:
+                      - id: active-sessions
+                        name: Active Sessions
+                        description: Currently running queries
+                        query: |
+                          SELECT
+                            pid,
+                            usename,
+                            datname,
+                            state,
+                            query_start,
+                            LEFT(query, 200) AS query
+                          FROM pg_stat_activity
+                          WHERE state = 'active'
+                        limit: 50
+                        columns:
+                          query_start:
+                            type: timestamp
     troubleshooting:
       problems:
         list: []
     alerts: []
+    functions:
+      description: |
+        This collector supports user-defined SQL functions that expose query results as
+        interactive table views in Netdata's **Top** tab.
+
+        Unlike metrics which create time-series charts, functions provide on-demand,
+        tabular data views that users can filter, sort, and search.
+
+        ### Use Cases
+
+        - **Slow query analysis**: Query `pg_stat_statements` or `performance_schema` to show queries by execution time.
+        - **Active connections**: List current sessions from `pg_stat_activity` or `information_schema.processlist`.
+        - **Lock monitoring**: Display blocking locks from `pg_locks` or `sys.dm_tran_locks`.
+        - **Table statistics**: Show per-table row counts, bloat, or index usage.
+
+        ### Configuration
+
+        Functions are defined in the `functions` list in your job configuration:
+
+        ```yaml
+        functions:
+          - id: slow-queries          # Required: unique identifier
+            name: Slow Queries        # Optional: display name (derived from id if not set)
+            description: Top queries  # Optional: help text
+            query: |                  # Required: SQL to execute
+              SELECT query, calls, total_time
+              FROM pg_stat_statements
+              ORDER BY total_time DESC
+            timeout: 10               # Optional: query timeout (seconds)
+            limit: 100                # Optional: max rows (default: 100)
+            default_sort: total_time  # Optional: initial sort column
+            default_sort_desc: true   # Optional: descending sort (default: true)
+            columns:                  # Optional: column overrides
+              total_time:
+                type: duration
+                units: milliseconds
+        ```
+
+        ### Column Types
+
+        Column types are auto-detected from database metadata but can be overridden:
+
+        | Type        | Description                              | Example columns            |
+        |-------------|------------------------------------------|----------------------------|
+        | `string`    | Text values                              | query, schema, username    |
+        | `integer`   | Whole numbers                            | calls, rows, connections   |
+        | `float`     | Decimal numbers                          | ratio, percentage          |
+        | `boolean`   | True/false values                        | is_active, enabled         |
+        | `duration`  | Time intervals (specify units)           | execution_time, wait_time  |
+        | `timestamp` | Date/time values                         | start_time, last_seen      |
+
+        ### Function-Only Mode
+
+        Jobs can be configured to only provide functions by setting `function_only: true`.
+        In this mode:
+        - No charts are created (metrics configuration is not required)
+        - The job only provides interactive table views via the Top tab
+        - Useful for ad-hoc analysis without ongoing metric collection
+      list: []
     metrics:
       folding:
         title: Metrics

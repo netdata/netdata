@@ -22,7 +22,181 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestCollector_Charts(t *testing.T) {
+	// Default: Charts() returns non-nil (metrics mode)
 	assert.NotNil(t, New().Charts())
+
+	// With metrics configured, Charts() returns non-nil
+	c := New()
+	c.Config.Metrics = []ConfigMetricBlock{{ID: "test"}}
+	assert.NotNil(t, c.Charts())
+
+	// Function-only mode: Charts() returns nil
+	c2 := New()
+	c2.Config.FunctionOnly = true
+	assert.Nil(t, c2.Charts())
+
+	// Combined mode (function_only: false with both): Charts() returns non-nil
+	c3 := New()
+	c3.Config.Metrics = []ConfigMetricBlock{{ID: "test"}}
+	c3.Config.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+	assert.NotNil(t, c3.Charts())
+}
+
+func TestCollector_Init_ConfigValidation(t *testing.T) {
+	tests := map[string]struct {
+		setup    func(*Collector)
+		wantFail bool
+	}{
+		"no metrics fails": {
+			setup: func(c *Collector) {
+				c.Driver = "pgx"
+				c.DSN = "postgres://user:pass@localhost/db"
+				// no metrics, function_only not set
+			},
+			wantFail: true,
+		},
+		"metrics only succeeds": {
+			setup: func(c *Collector) {
+				c.Driver = "pgx"
+				c.DSN = "postgres://user:pass@localhost/db"
+				c.Metrics = []ConfigMetricBlock{{
+					ID:    "test",
+					Mode:  "columns",
+					Query: "SELECT 1 AS val",
+					Charts: []ConfigChartConfig{{
+						Title: "test", Context: "test", Family: "test", Units: "x",
+						Dims: []ConfigDimConfig{{Name: "val", Source: "val"}},
+					}},
+				}}
+			},
+			wantFail: false,
+		},
+		"function_only with functions succeeds": {
+			setup: func(c *Collector) {
+				c.Driver = "pgx"
+				c.DSN = "postgres://user:pass@localhost/db"
+				c.FunctionOnly = true
+				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+			},
+			wantFail: false,
+		},
+		"function_only without functions fails": {
+			setup: func(c *Collector) {
+				c.Driver = "pgx"
+				c.DSN = "postgres://user:pass@localhost/db"
+				c.FunctionOnly = true
+				// no functions
+			},
+			wantFail: true,
+		},
+		"function_only with metrics fails": {
+			setup: func(c *Collector) {
+				c.Driver = "pgx"
+				c.DSN = "postgres://user:pass@localhost/db"
+				c.FunctionOnly = true
+				c.Functions = []ConfigFunction{{ID: "func", Query: "SELECT 1"}}
+				c.Metrics = []ConfigMetricBlock{{
+					ID:    "test",
+					Mode:  "columns",
+					Query: "SELECT 1 AS val",
+					Charts: []ConfigChartConfig{{
+						Title: "test", Context: "test", Family: "test", Units: "x",
+						Dims: []ConfigDimConfig{{Name: "val", Source: "val"}},
+					}},
+				}}
+			},
+			wantFail: true,
+		},
+		"combined metrics and functions succeeds": {
+			setup: func(c *Collector) {
+				c.Driver = "pgx"
+				c.DSN = "postgres://user:pass@localhost/db"
+				c.Metrics = []ConfigMetricBlock{{
+					ID:    "test",
+					Mode:  "columns",
+					Query: "SELECT 1 AS val",
+					Charts: []ConfigChartConfig{{
+						Title: "test", Context: "test", Family: "test", Units: "x",
+						Dims: []ConfigDimConfig{{Name: "val", Source: "val"}},
+					}},
+				}}
+				c.Functions = []ConfigFunction{{ID: "func", Query: "SELECT 1"}}
+			},
+			wantFail: false,
+		},
+		"missing driver fails": {
+			setup: func(c *Collector) {
+				c.Driver = ""
+				c.DSN = "postgres://user:pass@localhost/db"
+				c.FunctionOnly = true
+				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+			},
+			wantFail: true,
+		},
+		"missing dsn fails": {
+			setup: func(c *Collector) {
+				c.Driver = "pgx"
+				c.DSN = ""
+				c.FunctionOnly = true
+				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+			},
+			wantFail: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			tc.setup(c)
+
+			err := c.Init(context.Background())
+
+			if tc.wantFail {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCollector_Check_FunctionOnly(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	c := New()
+	c.db = db
+	c.Driver = "pgx"
+	c.DSN = "postgres://user:pass@localhost/db"
+	c.FunctionOnly = true
+	c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+
+	require.NoError(t, c.Init(context.Background()))
+
+	// Check should succeed without collecting metrics
+	err = c.Check(context.Background())
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCollector_Collect_FunctionOnly(t *testing.T) {
+	db, _, err := sqlmock.New()
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	c := New()
+	c.db = db
+	c.Driver = "pgx"
+	c.DSN = "postgres://user:pass@localhost/db"
+	c.FunctionOnly = true
+	c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+
+	require.NoError(t, c.Init(context.Background()))
+
+	// Collect should return nil in function-only mode
+	mx := c.Collect(context.Background())
+	assert.Nil(t, mx)
 }
 
 func TestCollector_Cleanup(t *testing.T) {
