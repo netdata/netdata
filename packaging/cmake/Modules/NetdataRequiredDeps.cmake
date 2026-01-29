@@ -7,7 +7,7 @@ include(NetdataUtil)
 
 # Locate a usable copy of zlib
 macro(netdata_detect_zlib)
-    if(MACOS)
+    if(OS_MACOS)
         find_package(ZLIB REQUIRED)
         set(ZLIB_LIBRARIES "ZLIB::ZLIB")
     else()
