@@ -6,18 +6,10 @@
 include(NetdataUtil)
 
 # Look for a usable copy of LZ4
-#
-# Special handling is required here because the dbengine requires LZ4,
-# but we want a specific minimum version if possible.
 macro(netdata_detect_lz4)
-    pkg_check_modules(LZ4 liblz4>=1.9.0)
+    pkg_check_modules(LZ4 liblz4>=1.7.0)
     if(LZ4_FOUND)
         set(ENABLE_LZ4 True)
-    elseif(ENABLE_DBENGINE)
-        pkg_check_modules(LZ4 REQUIRED liblz4)
-    endif()
-
-    if(LZ4_FOUND)
         set(NETDATA_LINK_LZ4 True)
     endif()
 endmacro()
