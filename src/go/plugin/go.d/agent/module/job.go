@@ -12,6 +12,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -79,6 +80,7 @@ type JobConfig struct {
 	Vnode           vnodes.VirtualNode
 	DumpMode        bool
 	DumpAnalyzer    interface{}
+	FunctionOnly    bool
 }
 
 const (
@@ -105,6 +107,7 @@ func NewJob(cfg JobConfig) *Job {
 		updateEvery:          cfg.UpdateEvery,
 		priority:             cfg.Priority,
 		isStock:              cfg.IsStock,
+		functionOnly:         cfg.FunctionOnly,
 		module:               cfg.Module,
 		labels:               cfg.Labels,
 		out:                  cfg.Out,
@@ -148,9 +151,13 @@ type Job struct {
 
 	*logger.Logger
 
-	isStock bool
+	isStock      bool
+	functionOnly bool
 
 	module Module
+
+	// running tracks whether the job's main loop is active (set in Start, cleared in Start's defer)
+	running atomic.Bool
 
 	initialized bool
 	panicked    bool
@@ -305,7 +312,7 @@ func (j *Job) Tick(clock int) {
 	select {
 	case j.tick <- clock:
 	default:
-		if j.shouldCollect(clock) {
+		if !j.functionOnly && j.shouldCollect(clock) {
 			j.skipStateMu.Lock()
 			j.consecutiveSkips++
 			consecutiveSkips := j.consecutiveSkips
@@ -323,10 +330,35 @@ func (j *Job) Tick(clock int) {
 	}
 }
 
+// IsRunning returns true if the job's main loop is currently running.
+// This is safe to call from any goroutine.
+func (j *Job) IsRunning() bool {
+	return j.running.Load()
+}
+
+// Module returns the underlying module instance.
+// This allows function handlers to access the collector for querying data.
+func (j *Job) Module() Module {
+	return j.module
+}
+
+// IsFunctionOnly returns true if this job is function-only (no metrics collection).
+func (j *Job) IsFunctionOnly() bool {
+	return j.functionOnly
+}
+
 // Start starts job main loop.
 func (j *Job) Start() {
-	j.Infof("started, data collection interval %ds", j.updateEvery)
-	defer func() { j.Info("stopped") }()
+	j.running.Store(true)
+	if j.functionOnly {
+		j.Info("started in function-only mode")
+	} else {
+		j.Infof("started, data collection interval %ds", j.updateEvery)
+	}
+	defer func() {
+		j.running.Store(false)
+		j.Info("stopped")
+	}()
 
 LOOP:
 	for {
@@ -334,7 +366,7 @@ LOOP:
 		case <-j.stop:
 			break LOOP
 		case t := <-j.tick:
-			if j.shouldCollect(t) {
+			if !j.functionOnly && j.shouldCollect(t) {
 				j.skipStateMu.Lock()
 				if j.consecutiveSkips > 0 {
 					if j.collectStopTime.IsZero() {
@@ -444,13 +476,16 @@ func (j *Job) check() error {
 }
 
 func (j *Job) postCheck() error {
-	if j.charts = j.module.Charts(); j.charts == nil {
+	j.charts = j.module.Charts()
+	if j.charts == nil && !j.functionOnly {
 		j.Error("nil charts")
 		return errors.New("nil charts")
 	}
-	if err := checkCharts(*j.charts...); err != nil {
-		j.Errorf("charts check: %v", err)
-		return err
+	if j.charts != nil {
+		if err := checkCharts(*j.charts...); err != nil {
+			j.Errorf("charts check: %v", err)
+			return err
+		}
 	}
 	return nil
 }

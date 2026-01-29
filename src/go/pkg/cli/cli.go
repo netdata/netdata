@@ -12,16 +12,20 @@ import (
 
 // Option defines command line options.
 type Option struct {
-	UpdateEvery int
-	Module      string   `short:"m" long:"modules" description:"module name to run" default:"all"`
-	Job         []string `short:"j" long:"job" description:"job name to run"`
-	ConfDir     []string `short:"c" long:"config-dir" description:"config dir to read"`
-	WatchPath   []string `short:"w" long:"watch-path" description:"config path to watch"`
-	Debug       bool     `short:"d" long:"debug" description:"debug mode"`
-	Version     bool     `short:"v" long:"version" description:"display the version and exit"`
-	DumpMode    string   `long:"dump" description:"run in dump mode for specified duration (e.g. 30s, 5m) and analyze metric structure"`
-	DumpSummary bool     `long:"dump-summary" description:"show consolidated summary across all jobs in dump mode"`
-	DumpDataDir string   `long:"dump-data" description:"write structured dump artifacts for the selected module to the given directory"`
+	UpdateEvery     int
+	Module          string   `short:"m" long:"modules" description:"module name to run" default:"all"`
+	Job             []string `short:"j" long:"job" description:"job name to run"`
+	ConfDir         []string `short:"c" long:"config-dir" description:"config dir to read"`
+	WatchPath       []string `short:"w" long:"watch-path" description:"config path to watch"`
+	Debug           bool     `short:"d" long:"debug" description:"debug mode"`
+	Version         bool     `short:"v" long:"version" description:"display the version and exit"`
+	DumpMode        string   `long:"dump" description:"run in dump mode for specified duration (e.g. 30s, 5m) and analyze metric structure"`
+	DumpSummary     bool     `long:"dump-summary" description:"show consolidated summary across all jobs in dump mode"`
+	DumpDataDir     string   `long:"dump-data" description:"write structured dump artifacts for the selected module to the given directory"`
+	Function        string   `long:"function" description:"execute function once (module name)"`
+	FunctionArgs    []string `long:"function-args" description:"function args (repeatable, e.g. info)"`
+	FunctionPayload string   `long:"function-payload" description:"function payload JSON or @file.json"`
+	FunctionTimeout string   `long:"function-timeout" description:"function timeout (e.g. 60s)"`
 }
 
 // Parse returns parsed command-line flags in Option struct

@@ -195,7 +195,8 @@ collectors/systemd-journal:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - src/collectors/systemd-journal.plugin/**
+              - src/crates/netdata-log-viewer/**
+              - docs/logs/**
 
 collectors/tc:
   - any:

@@ -29,13 +29,15 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: 10,
 		},
-		Create: func() module.Module { return New() },
-		Config: func() any { return &Config{} },
+		Create:        func() module.Module { return New() },
+		Config:        func() any { return &Config{} },
+		Methods:       snmpMethods,
+		MethodHandler: snmpFunctionHandler,
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			CreateVnode:              true,
 			VnodeDeviceDownThreshold: 3,
@@ -69,12 +71,18 @@ func New() *Collector {
 		seenTableMetrics:  make(map[string]bool),
 		seenProfiles:      make(map[string]bool),
 
+		ifaceCache: newIfaceCache(),
+
 		newProber:     ping.NewProber,
 		newSnmpClient: gosnmp.NewHandler,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
 	}
+
+	c.funcRouter = newFuncRouter(c.ifaceCache)
+
+	return c
 }
 
 type (
@@ -88,6 +96,9 @@ type (
 		seenScalarMetrics map[string]bool
 		seenTableMetrics  map[string]bool
 		seenProfiles      map[string]bool
+
+		ifaceCache *ifaceCache // interface metrics cache for functions
+		funcRouter *funcRouter // function router for method handlers
 
 		prober    ping.Prober
 		newProber func(ping.ProberConfig, *logger.Logger) ping.Prober
@@ -168,7 +179,10 @@ func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.snmpClient != nil {
 		_ = c.snmpClient.Close()
 	}

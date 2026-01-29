@@ -227,6 +227,228 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Top Queries
+
+Retrieves aggregated SQL query performance metrics from PostgreSQL using either [pg_stat_monitor](https://docs.percona.com/pg-stat-monitor/) (preferred) or [pg_stat_statements](https://www.postgresql.org/docs/current/pgstatstatements.html).
+
+The collector automatically detects which extension is available:
+- **pg_stat_monitor** (Percona): Enhanced statistics with additional columns like application name, client IP, CPU time, error info, and query classification
+- **pg_stat_statements** (standard): Core execution statistics available in all PostgreSQL installations
+
+Statistics include execution counts, timing metrics, I/O operations, and resource consumption. Columns are dynamically detected based on your PostgreSQL version and available extension.
+
+Use cases:
+- Identify slow queries consuming the most total execution time
+- Find queries with high shared block reads for I/O optimization
+- Analyze temp block usage to detect queries needing memory tuning
+- With pg_stat_monitor: Track queries by application, identify error patterns
+
+Query text is truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Postgres:top-queries` |
+| Require Cloud | yes |
+| Performance | Queries `pg_stat_statements` or `pg_stat_monitor` which maintain statistics in shared memory:<br/>• On busy servers with many unique queries, the extension may consume significant memory<br/>• Default limit of 500 rows balances usefulness with performance<br/>• pg_stat_monitor uses time-based buckets which may have different memory characteristics |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• Either `pg_stat_statements` or `pg_stat_monitor` extension is installed<br/>• The collector has successfully connected to PostgreSQL<br/>• Returns HTTP 503 if no query statistics extension is installed<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+##### Enable pg_stat_statements or pg_stat_monitor
+
+Either `pg_stat_statements` (standard) or `pg_stat_monitor` (Percona) must be installed. The collector auto-detects which is available, preferring pg_stat_monitor when both are present.
+
+**Option 1: pg_stat_statements (standard PostgreSQL)**
+
+1. Add to `postgresql.conf`:
+
+   ```ini
+   shared_preload_libraries = 'pg_stat_statements'
+   ```
+
+2. Restart PostgreSQL, then create the extension:
+
+   ```sql
+   CREATE EXTENSION pg_stat_statements;
+   ```
+
+**Option 2: pg_stat_monitor (Percona - recommended)**
+
+Provides additional columns: application name, client IP, CPU time, error tracking, and query classification.
+
+1. Install pg_stat_monitor (available in Percona distribution or as separate package)
+
+2. Add to `postgresql.conf`:
+
+   ```ini
+   shared_preload_libraries = 'pg_stat_monitor'
+   ```
+
+3. Restart PostgreSQL, then create the extension:
+
+   ```sql
+   CREATE EXTENSION pg_stat_monitor;
+   ```
+
+:::info
+
+- Both extensions require a server restart to load the shared library
+- Statistics can be reset with `SELECT pg_stat_statements_reset()` or `SELECT pg_stat_monitor_reset()`
+- Enable `track_io_timing` for block read/write timing metrics
+
+:::
+
+
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column. Options include total time, mean time, calls, rows, shared blocks hit/read, and temp blocks written. Defaults to total time to focus on most resource-intensive queries. | yes | totalTime |  |
+
+#### Returns
+
+Aggregated query statistics from `pg_stat_statements` or `pg_stat_monitor`. Each row represents a unique query pattern with cumulative metrics across all executions.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Query ID | string |  | hidden | Internal hash identifier for the normalized query. Can be used to track queries across statistics resets. |
+| Query | string |  |  | Normalized SQL query text with literals replaced by parameter placeholders. Truncated to 4096 characters. |
+| Database | string |  |  | Database name where the query was executed. |
+| User | string |  |  | PostgreSQL user who executed the query. |
+| Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries. |
+| Total Time | duration | milliseconds |  | Cumulative execution time across all executions. High values indicate queries consuming significant database resources. |
+| Mean Time | duration | milliseconds |  | Average execution time per call. Use this to compare typical performance across different query patterns. |
+| Min Time | duration | milliseconds | hidden | Minimum execution time observed for a single execution. |
+| Max Time | duration | milliseconds | hidden | Maximum execution time observed for a single execution. Large gaps between min and max may indicate performance variability. |
+| Stddev Time | duration | milliseconds | hidden | Standard deviation of execution time. High values indicate inconsistent query performance. |
+| Plans | integer |  | hidden | Number of times the query was planned. Available in PostgreSQL 13+. |
+| Total Plan Time | duration | milliseconds | hidden | Cumulative time spent planning the query. Available in PostgreSQL 13+. |
+| Mean Plan Time | duration | milliseconds | hidden | Average time spent planning per execution. Available in PostgreSQL 13+. |
+| Min Plan Time | duration | milliseconds | hidden | Minimum planning time observed. Available in PostgreSQL 13+. |
+| Max Plan Time | duration | milliseconds | hidden | Maximum planning time observed. Available in PostgreSQL 13+. |
+| Stddev Plan Time | duration | milliseconds | hidden | Standard deviation of planning time. Available in PostgreSQL 13+. |
+| Rows | integer |  |  | Total number of rows retrieved or affected across all executions. |
+| Shared Blocks Hit | integer |  |  | Total shared buffer cache hits. High values indicate good cache utilization. |
+| Shared Blocks Read | integer |  |  | Total shared blocks read from disk. High values indicate queries that bypass the cache and may benefit from more `shared_buffers`. |
+| Shared Blocks Dirtied | integer |  | hidden | Total shared blocks dirtied by the query. |
+| Shared Blocks Written | integer |  | hidden | Total shared blocks written by the query. |
+| Local Blocks Hit | integer |  | hidden | Total local buffer cache hits (temporary tables). |
+| Local Blocks Read | integer |  | hidden | Total local blocks read from disk. |
+| Local Blocks Dirtied | integer |  | hidden | Total local blocks dirtied. |
+| Local Blocks Written | integer |  | hidden | Total local blocks written. |
+| Temp Blocks Read | integer |  |  | Total temp blocks read. Non-zero values indicate queries spilling to disk due to insufficient `work_mem`. |
+| Temp Blocks Written | integer |  |  | Total temp blocks written. High values suggest increasing `work_mem` may improve performance. |
+| Block Read Time | duration | milliseconds |  | Time spent reading blocks from disk. Requires `track_io_timing` to be enabled. |
+| Block Write Time | duration | milliseconds |  | Time spent writing blocks to disk. Requires `track_io_timing` to be enabled. |
+| WAL Records | integer |  | hidden | Total number of WAL records generated. Available in PostgreSQL 13+. |
+| WAL Full Page Images | integer |  | hidden | Total number of WAL full page images generated. Available in PostgreSQL 13+. |
+| WAL Bytes | integer |  | hidden | Total bytes of WAL generated. Available in PostgreSQL 13+. |
+| JIT Functions | integer |  | hidden | Total number of functions JIT-compiled. Available in PostgreSQL 15+. |
+| JIT Generation Time | duration | milliseconds | hidden | Time spent generating JIT code. Available in PostgreSQL 15+. |
+| JIT Inlining Count | integer |  | hidden | Number of times JIT inlining was performed. Available in PostgreSQL 15+. |
+| JIT Inlining Time | duration | milliseconds | hidden | Time spent on JIT inlining. Available in PostgreSQL 15+. |
+| JIT Optimization Count | integer |  | hidden | Number of times JIT optimization was performed. Available in PostgreSQL 15+. |
+| JIT Optimization Time | duration | milliseconds | hidden | Time spent on JIT optimization. Available in PostgreSQL 15+. |
+| JIT Emission Count | integer |  | hidden | Number of times JIT code was emitted. Available in PostgreSQL 15+. |
+| JIT Emission Time | duration | milliseconds | hidden | Time spent emitting JIT code. Available in PostgreSQL 15+. |
+| Temp Block Read Time | duration | milliseconds | hidden | Time spent reading temp blocks. Available in PostgreSQL 15+. Requires `track_io_timing`. |
+| Temp Block Write Time | duration | milliseconds | hidden | Time spent writing temp blocks. Available in PostgreSQL 15+. Requires `track_io_timing`. |
+| Application Name | string |  |  | Name of the application that executed the query. Available with pg_stat_monitor only. |
+| Client IP | string |  | hidden | IP address of the client that executed the query. Available with pg_stat_monitor only. |
+| Command Type | string |  |  | Type of SQL command (SELECT, INSERT, UPDATE, DELETE, etc.). Available with pg_stat_monitor only. |
+| Comments | string |  | hidden | SQL comments extracted from the query. Available with pg_stat_monitor only. |
+| Relations | string |  | hidden | Tables/relations involved in the query. Available with pg_stat_monitor only. |
+| CPU User Time | duration | milliseconds | hidden | CPU time spent in user mode. Available with pg_stat_monitor only. |
+| CPU System Time | duration | milliseconds | hidden | CPU time spent in system/kernel mode. Available with pg_stat_monitor only. |
+| Error Level | integer |  | hidden | PostgreSQL error level if query produced an error. Available with pg_stat_monitor only. |
+| SQL Code | string |  | hidden | PostgreSQL SQLSTATE error code if query produced an error. Available with pg_stat_monitor only. |
+| Error Message | string |  | hidden | Error message if query produced an error. Available with pg_stat_monitor only. |
+| Top Level | string |  | hidden | Whether this is a top-level statement (true) or nested (false). Available with pg_stat_monitor only. |
+| Bucket Start Time | string |  | hidden | Start time of the statistics bucket. Available with pg_stat_monitor only. |
+
+### Running Queries
+
+Retrieves currently executing queries from PostgreSQL [pg_stat_activity](https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW) system view.
+
+This function queries `pg_stat_activity` which shows real-time information about each server process including the SQL query being executed, wait events, and session state. Unlike Top Queries which shows aggregated historical statistics, Running Queries shows live snapshots of active queries.
+
+Use cases:
+- Identify long-running queries that may be blocking other operations
+- Debug stuck transactions or hanging connections
+- Monitor active workload during performance issues
+- Investigate wait events and lock contention in real-time
+
+Query text is truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Postgres:running-queries` |
+| Require Cloud | yes |
+| Performance | Queries `pg_stat_activity` which is a live system view:<br/>• Very lightweight query, no impact on database performance<br/>• Returns only active queries by default (state = 'active')<br/>• Limited to 500 rows |
+| Security | Query text contains actual SQL being executed, which may include:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to PostgreSQL<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+##### Database user permissions
+
+The monitoring user needs `pg_monitor` role to view all sessions:
+
+```sql
+GRANT pg_monitor TO netdata;
+```
+
+Without this role, the user can only see their own sessions.
+
+
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Sort By | select | Select the sort column. Defaults to query duration (longest running first). | yes | durationMs |  |
+
+#### Returns
+
+Live query data from `pg_stat_activity`. Each row represents a currently active backend process.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Duration | duration | milliseconds |  | Query duration in milliseconds (since query_start). High values indicate long-running queries. |
+| Query | string |  |  | Query text of the currently executing or most recent query. May be truncated at track_activity_query_size. |
+| Database | string |  |  | Name of the database this backend is connected to. |
+| User | string |  |  | Name of the user logged into this backend. |
+| Application Name | string |  |  | Name of the application connected to this backend. |
+| Client Address | string |  |  | IP address of the client (NULL for Unix socket or internal process). |
+| Wait Event | string |  |  | Specific wait event name if backend is currently waiting. |
+| PID | integer |  |  | Process ID of this backend. Use with pg_terminate_backend() to kill a query. |
+| Wait Event Type | string |  | hidden | Type of event the backend is waiting for (Activity, BufferPin, Client, Extension, IO, IPC, Lock, LWLock, Timeout). |
+| State | string |  | hidden | Current state: active, idle, idle in transaction, idle in transaction (aborted), fastpath function call, disabled. |
+| Backend Type | string |  | hidden | Type of backend: client backend, autovacuum worker, parallel worker, walsender, walreceiver, etc. Available in PostgreSQL 10+. |
+| Query Start | timestamp |  | hidden | Time when the currently active query was started. |
+| Transaction Start | timestamp |  | hidden | Time when current transaction started (NULL if no transaction). |
+| Backend Start | timestamp |  | hidden | Time when this process/connection started. |
+| State Change | timestamp |  | hidden | Time when state was last changed. |
+| Query ID | string |  | hidden | Query identifier (requires compute_query_id or extension). Available in PostgreSQL 14+. |
+| Leader PID | integer |  | hidden | Process ID of parallel group leader (NULL if this is leader or not parallel). Available in PostgreSQL 13+. |
+| Database ID | integer |  | hidden | OID of the database this backend is connected to. |
+| User ID | integer |  | hidden | OID of the user logged into this backend. |
+| Client Hostname | string |  | hidden | Hostname of the client via reverse DNS (only if log_hostname enabled). |
+| Client Port | integer |  | hidden | TCP port of client (-1 for Unix socket, NULL for internal process). |
+| Backend Xid | string |  | hidden | Top-level transaction identifier of this backend. |
+| Backend Xmin | string |  | hidden | Backend's xmin horizon. |
+
+
+
 ## Alerts
 
 
@@ -307,6 +529,9 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Filters** | collect_databases_matching | Database selector. Controls which databases are included. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher). |  | no |
 | **Limits** | max_db_tables | Maximum number of tables per database to collect metrics for (0 = no limit). | 50 | no |
 |  | max_db_indexes | Maximum number of indexes per database to collect metrics for (0 = no limit). | 250 | no |
+| **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
+|  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 

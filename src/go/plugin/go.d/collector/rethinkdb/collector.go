@@ -20,20 +20,31 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         rethinkdbMethods,
+		MethodHandler:   rethinkdbFunctionHandler,
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			Address: "127.0.0.1:28015",
 			Timeout: confopt.Duration(time.Second * 1),
+			Functions: FunctionsConfig{
+				RunningQueries: RunningQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		charts:      clusterCharts.Copy(),
 		newConn:     newRethinkdbConn,
 		seenServers: make(map[string]bool),
 	}
+
+	c.funcRouter = newFuncRouter(c)
+
+	return c
 }
 
 type Config struct {
@@ -44,6 +55,31 @@ type Config struct {
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	Username           string           `yaml:"username,omitempty" json:"username"`
 	Password           string           `yaml:"password,omitempty" json:"password"`
+	Functions          FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	RunningQueries RunningQueriesConfig `yaml:"running_queries,omitempty" json:"running_queries"`
+}
+
+type RunningQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) runningQueriesTimeout() time.Duration {
+	if c.Functions.RunningQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.RunningQueries.Timeout.Duration()
+}
+
+func (c Config) runningQueriesLimit() int {
+	if c.Functions.RunningQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.RunningQueries.Limit
 }
 
 type Collector struct {
@@ -54,6 +90,8 @@ type Collector struct {
 
 	newConn func(cfg Config) (rdbConn, error)
 	rdb     rdbConn
+
+	funcRouter *funcRouter // function router for method handlers
 
 	seenServers map[string]bool
 }
@@ -96,7 +134,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return ms
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.rdb != nil {
 		if err := c.rdb.close(); err != nil {
 			c.Warningf("cleanup: error on closing client [%s]: %v", c.Address, err)

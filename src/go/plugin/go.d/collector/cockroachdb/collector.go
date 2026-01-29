@@ -28,8 +28,10 @@ func init() {
 		Defaults: module.Defaults{
 			UpdateEvery: dbSamplingInterval,
 		},
-		Create: func() module.Module { return New() },
-		Config: func() any { return &Config{} },
+		Methods:       cockroachMethods,
+		MethodHandler: cockroachFunctionHandler,
+		Create:        func() module.Module { return New() },
+		Config:        func() any { return &Config{} },
 	})
 }
 
@@ -44,16 +46,71 @@ func New() *Collector {
 					Timeout: confopt.Duration(time.Second),
 				},
 			},
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+				RunningQueries: RunningQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 		charts: charts.Copy(),
 	}
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	Vnode              string          `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int             `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int             `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	Functions          FunctionsConfig `yaml:"functions,omitempty" json:"functions"`
 	web.HTTPConfig     `yaml:",inline" json:""`
+}
+
+type FunctionsConfig struct {
+	DSN            string               `yaml:"dsn,omitempty" json:"dsn,omitempty"`
+	TopQueries     TopQueriesConfig     `yaml:"top_queries,omitempty" json:"top_queries"`
+	RunningQueries RunningQueriesConfig `yaml:"running_queries,omitempty" json:"running_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+type RunningQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
+}
+
+func (c Config) runningQueriesTimeout() time.Duration {
+	if c.Functions.RunningQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.RunningQueries.Timeout.Duration()
+}
+
+func (c Config) runningQueriesLimit() int {
+	if c.Functions.RunningQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.RunningQueries.Limit
 }
 
 type Collector struct {
@@ -63,6 +120,8 @@ type Collector struct {
 	charts *Charts
 
 	prom prometheus.Prometheus
+
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -79,6 +138,8 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("error on initializing prometheus client: %v", err)
 	}
 	c.prom = prom
+
+	c.funcRouter = newFuncRouter(c)
 
 	if c.UpdateEvery < dbSamplingInterval {
 		c.Warningf("'update_every'(%d) is lower then CockroachDB default sampling interval (%d)",
@@ -116,8 +177,11 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
 	if c.prom != nil && c.prom.HTTPClient() != nil {
 		c.prom.HTTPClient().CloseIdleConnections()
+	}
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
 	}
 }

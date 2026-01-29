@@ -453,7 +453,7 @@ void netdata_adfs_db_config_query_time_seconds(
             "seconds/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibADFS",
-            PRIO_ADFS_DB_CONFIG_QUERY_TYME_SECONDS_TOTAL,
+            PRIO_ADFS_DB_CONFIG_QUERY_TIME_SECONDS_TOTAL,
             update_every,
             RRDSET_TYPE_LINE);
 

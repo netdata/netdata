@@ -38,8 +38,8 @@ The Netdata container requires specific **privileges** and **mounts** to provide
 |      go.d.plugin       |          /var/log          | Web servers logs tailing. See [weblog](https://github.com/netdata/go.d.plugin/tree/master/modules/weblog#readme) collector.                      |
 |      apps.plugin       |  /etc/passwd, /etc/group   | Monitoring of host system resource usage by each user and user group.                                                                            |
 |      proc.plugin       |           /proc            | Host system monitoring (CPU, memory, network interfaces, disks, etc.).                                                                           |
-| systemd-journal.plugin |          /var/log          | Viewing, exploring and analyzing systemd journal logs.                                                                                           |
-| systemd-journal.plugin |         /run/dbus          | Systemd-list-units function: information about all systemd units, including their active state, description, whether they are enabled, and more. |
+| journal-viewer-plugin  |          /var/log          | Viewing, exploring and analyzing systemd journal logs.                                                                                           |
+| systemd-units.plugin   |         /run/dbus          | Systemd-list-units function: information about all systemd units, including their active state, description, whether they are enabled, and more. |
 |      go.d.plugin       |         /run/dbus          | [go.d/systemdunits](https://github.com/netdata/go.d.plugin/tree/master/modules/systemdunits#readme)                                              |
 
 </details>
@@ -475,7 +475,7 @@ The following components won't work:
 - freeipmi.plugin
 - perf.plugin
 - slabinfo.plugin
-- systemd-journal.plugin
+- journal-viewer-plugin
 
 This method creates a [volume](https://docs.docker.com/storage/volumes/) for Netdata's configuration files
 _within the container_ at `/etc/netdata`.

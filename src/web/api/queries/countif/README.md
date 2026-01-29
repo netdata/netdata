@@ -7,7 +7,7 @@ CountIf returns the percentage of points in the database that satisfy the condit
 The following conditions are available:
 
 - `!` or `!=` or `<>`, different than
-- `=` or `:`, equal to
+- `=` or `==` or `:`, equal to
 - `>`, greater than
 - `<`, less than
 - `>=`, greater or equal to

@@ -12,13 +12,17 @@ import (
 	"strings"
 )
 
+type CSVCheckFieldFunc func(string) (string, int, bool)
+
+func (f CSVCheckFieldFunc) IsZero() bool { return true }
+
 type (
 	CSVConfig struct {
-		FieldsPerRecord  int                              `yaml:"fields_per_record,omitempty" json:"fields_per_record"`
-		Delimiter        string                           `yaml:"delimiter,omitempty" json:"delimiter"`
-		TrimLeadingSpace bool                             `yaml:"trim_leading_space,omitempty" json:"trim_leading_space"`
-		Format           string                           `yaml:"format,omitempty" json:"format"`
-		CheckField       func(string) (string, int, bool) `yaml:"-" json:"-"`
+		FieldsPerRecord  int               `yaml:"fields_per_record,omitempty" json:"fields_per_record"`
+		Delimiter        string            `yaml:"delimiter,omitempty" json:"delimiter"`
+		TrimLeadingSpace bool              `yaml:"trim_leading_space,omitempty" json:"trim_leading_space"`
+		Format           string            `yaml:"format,omitempty" json:"format"`
+		CheckField       CSVCheckFieldFunc `yaml:"-" json:"-"`
 	}
 
 	CSVParser struct {

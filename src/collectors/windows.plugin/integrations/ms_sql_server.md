@@ -325,6 +325,7 @@ These options allow the collector to connect to your MSSQL instance and collect 
 | pwd | Password for the specified user. | empty | yes |
 | additional instances | Number of additional SQL Server instances to monitor. | 0 | no |
 | windows authentication | Set to yes to use Windows credentials instead of SQL Server authentication. | no | no |
+| trust server certificate | Set to yes to trust the server's SSL certificate chain. | yes | no |
 | express | Set to yes when running SQL Express version. | no | no |
 | collect transactions | Run queries to collect information from the server's transactions. | yes | no |
 | collect waits | Run queries to collect information from the server's lock waits. | yes | no |

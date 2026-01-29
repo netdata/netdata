@@ -1299,8 +1299,8 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
-            - name: system.hw.sensor.resistence.input
-              description: Electrical resistence
+            - name: system.hw.sensor.resistance.input
+              description: Electrical resistance
               unit: "Ohms"
               chart_type: line
               dimensions:
@@ -2255,6 +2255,10 @@ modules:
               description: Set to yes to use Windows credentials instead of SQL Server authentication.
               default_value: no
               required: false
+            - name: trust server certificate
+              description: Set to yes to trust the server's SSL certificate chain.
+              default_value: yes
+              required: false
             - name: express
               description: Set to yes when running SQL Express version.
               default_value: no
@@ -3098,18 +3102,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: request
-            - name: ad.dra_replication_sync_objects_remaining
-              description: DRA replication full sync objects remaining
-              unit: objects
-              chart_type: line
-              dimensions:
-                - name: object
-            - name: ad.dra_replication_sync_objects_remaining
-              description: DRA replication full sync objects remaining
-              unit: objects
-              chart_type: line
-              dimensions:
-                - name: object
             - name: ad.name_cache_hits
               description: Name cache hits
               unit: hits/s

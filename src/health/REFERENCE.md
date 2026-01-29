@@ -315,7 +315,9 @@ Complete syntax reference for all alert configuration options. Use this section 
 
 **Precedence**
 
-Alerts have higher precedence and will override templates. If you have `alarm` and `template` entities with the same name attached to the same chart, Netdata will use `alarm`.
+Alarms are processed before templates. If you have `alarm` and `template` entities with the same name that both match the same chart, only the `alarm` will create an active alert for that chart.
+
+For complete details on configuration loading order and precedence rules, see [Alert Configuration Ordering](alert-configuration-ordering.md).
 
 :::
 
@@ -527,7 +529,7 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 
 | Parameter          | Purpose                     | Details                                                              |
 |--------------------|-----------------------------|----------------------------------------------------------------------|
-| `GROUPING OPTIONS` | Conditional processing      | `CONDITION VALUE` where condition is `!=`, `=`, `<=`, `<`, `>`, `>=` |
+| `GROUPING OPTIONS` | Conditional processing      | `CONDITION VALUE` where condition is `!=`, `=`, `==`, `<=`, `<`, `>`, `>=` |
 | `at BEFORE`        | End of lookup timeframe     | Default is 0 (now)                                                   |
 | `every DURATION`   | Update frequency            | Supports `s`, `m`, `h`, `d` units                                    |
 | `OPTIONS`          | Processing modifiers        | See options table below                                              |

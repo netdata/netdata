@@ -145,6 +145,7 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 	}
 
 	relDir := safePathClean(filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata"))
+	relDir = handleDirOnWin(env.cygwinBase, relDir, execDir)
 	if isDirExists(relDir) {
 		d.userConfigDirs = multipath.New(relDir)
 		return
@@ -177,6 +178,7 @@ func (d *directories) initStockRoot(env envData, execDir string) {
 	}
 
 	relDir := safePathClean(filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d"))
+	relDir = handleDirOnWin(env.cygwinBase, relDir, execDir)
 	if isDirExists(relDir) {
 		d.stockConfigDir = relDir
 		return
@@ -292,7 +294,7 @@ func handleDirOnWin(base, p string, execDir string) string {
 	if base == "" || !strings.HasPrefix(p, "/") {
 		return p
 	}
-	return filepath.Join(base, p)
+	return filepath.Join(base, strings.TrimPrefix(p, "/"))
 }
 
 func isDirExists(dir string) bool {

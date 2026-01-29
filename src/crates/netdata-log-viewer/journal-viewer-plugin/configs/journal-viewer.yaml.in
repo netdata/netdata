@@ -1,0 +1,45 @@
+# Log Viewer Plugin Configuration
+# This file configures the systemd journal log viewer plugin for Netdata
+
+journal:
+  # Paths to journal directories to watch and index. Multiple directories can
+  # be specified to monitor different journal sources. At least one path must
+  # be specified
+  paths:
+    - "/var/log/journal"
+    - "/run/log/journal"
+    - "@localstatedir_POST@/log/netdata/otel/v1"
+
+cache:
+  # Directory to store the hybrid cache (memory + disk backed by Foyer)
+  # Relative paths are resolved based on Netdata's cache directory
+  # Default: /var/cache/netdata/log-viewer
+  directory: "@cachedir_POST@/log-viewer"
+
+  # Memory cache capacity (number of indexed journal entries to keep in memory)
+  # Higher values improve query performance but use more RAM
+  # Default: 1000
+  memory_capacity: 1000
+
+  # Disk cache size (maximum size of the disk-backed cache)
+  # Accepts human-readable sizes: "32MB", "64MB", "1GB", etc.
+  # Higher values improve performance for large journal files
+  # Default: 32MB
+  disk_capacity: "32MB"
+
+  # Cache block size (size of individual cache blocks in Foyer)
+  # Accepts human-readable sizes: "4MB", "8MB", "16MB", etc.
+  # Trade-off between I/O efficiency and memory granularity
+  # Default: 4MB
+  block_size: "4MB"
+
+  # Number of background workers for indexing journal files
+  # Higher values speed up indexing but use more CPU
+  # Default: number of CPU cores (auto-detected)
+  # Uncomment to override:
+  # workers: 24
+
+  # Queue capacity for pending indexing requests
+  # Controls backpressure on the indexing system
+  # Default: 100
+  queue_capacity: 100

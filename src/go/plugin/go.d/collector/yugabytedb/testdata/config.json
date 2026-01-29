@@ -20,5 +20,18 @@
   "tls_cert": "ok",
   "tls_key": "ok",
   "tls_skip_verify": true,
-  "force_http2": true
+  "force_http2": true,
+  "functions": {
+    "dsn": "ok",
+    "top_queries": {
+      "disabled": true,
+      "timeout": 123.123,
+      "limit": 123
+    },
+    "running_queries": {
+      "disabled": true,
+      "timeout": 123.123,
+      "limit": 123
+    }
+  }
 }

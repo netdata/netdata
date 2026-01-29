@@ -14,13 +14,14 @@ import (
 )
 
 const (
-	keyName        = "name"
-	keyModule      = "module"
-	keyUpdateEvery = "update_every"
-	keyDetectRetry = "autodetection_retry"
-	keyPriority    = "priority"
-	keyLabels      = "labels"
-	keyVnode       = "vnode"
+	keyName         = "name"
+	keyModule       = "module"
+	keyUpdateEvery  = "update_every"
+	keyDetectRetry  = "autodetection_retry"
+	keyPriority     = "priority"
+	keyLabels       = "labels"
+	keyVnode        = "vnode"
+	keyFunctionOnly = "function_only"
 
 	ikeySource     = "__source__"
 	ikeySourceType = "__source_type__"
@@ -53,6 +54,7 @@ func (c Config) Priority() int           { v, _ := c.Get(keyPriority).(int); ret
 func (c Config) Labels() map[any]any     { v, _ := c.Get(keyLabels).(map[any]any); return v }
 func (c Config) Hash() uint64            { return calcHash(c) }
 func (c Config) Vnode() string           { v, _ := c.Get(keyVnode).(string); return v }
+func (c Config) FunctionOnly() bool      { v, _ := c.Get(keyFunctionOnly).(bool); return v }
 
 func (c Config) SetName(v string) Config   { return c.Set(keyName, v) }
 func (c Config) SetModule(v string) Config { return c.Set(keyModule, v) }

@@ -268,8 +268,8 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     }
 
     // Set timeout options
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
 
     // execute the request
     res = curl_easy_perform(curl);

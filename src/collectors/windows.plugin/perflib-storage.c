@@ -97,7 +97,13 @@ dict_logical_disk_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
 
 static void logical_disk_cleanup(struct logical_disk *d)
 {
+    string_freez(d->filesystem);
+    d->filesystem = NULL;
+
+    d->collected_metadata = false;
+
     rrdset_is_obsolete___safe_from_collector_thread(d->st_disk_space);
+    d->st_disk_space = NULL;
 }
 
 static void physical_disk_initialize(struct physical_disk *d)
@@ -128,12 +134,21 @@ static void physical_disk_initialize(struct physical_disk *d)
 static void physical_disk_cleanup(struct physical_disk *d)
 {
     string_freez(d->device);
+    d->device = NULL;
     string_freez(d->mount_point);
+    d->mount_point = NULL;
     string_freez(d->manufacturer);
+    d->manufacturer = NULL;
     string_freez(d->model);
+    d->model = NULL;
     string_freez(d->media_type);
+    d->media_type = NULL;
     string_freez(d->name);
+    d->name = NULL;
     string_freez(d->device_id);
+    d->device_id = NULL;
+
+    d->collected_metadata = false;
 
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_io.st_io);
     rrdset_is_obsolete___safe_from_collector_thread(d->disk_ops.st_ops);
@@ -153,6 +168,18 @@ void dict_physical_disk_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
     physical_disk_initialize(pd);
 }
 
+static void dict_logical_disk_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct logical_disk *d = value;
+    logical_disk_cleanup(d);
+}
+
+static void dict_physical_disk_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct physical_disk *d = value;
+    physical_disk_cleanup(d);
+}
+
 static DICTIONARY *logicalDisks = NULL, *physicalDisks = NULL;
 static void initialize(void)
 {
@@ -162,11 +189,13 @@ static void initialize(void)
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct logical_disk));
 
     dictionary_register_insert_callback(logicalDisks, dict_logical_disk_insert_cb, NULL);
+    dictionary_register_delete_callback(logicalDisks, dict_logical_disk_delete_cb, NULL);
 
     physicalDisks = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct physical_disk));
 
     dictionary_register_insert_callback(physicalDisks, dict_physical_disk_insert_cb, NULL);
+    dictionary_register_delete_callback(physicalDisks, dict_physical_disk_delete_cb, NULL);
 }
 
 static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
@@ -347,15 +376,13 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
         rrdset_done(d->st_disk_space);
     }
 
-    // cleanup
+    // cleanup - delete callback will handle resource cleanup
     {
         struct logical_disk *d;
         dfe_start_write(dict, d)
         {
-            if (d->last_collected < now_ut) {
-                logical_disk_cleanup(d);
+            if (d->last_collected < now_ut)
                 dictionary_del(dict, d_dfe.name);
-            }
         }
         dfe_done(d);
         dictionary_garbage_collect(dict);
@@ -661,15 +688,13 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
         }
     }
 
-    // cleanup
+    // cleanup - delete callback will handle resource cleanup
     {
         struct physical_disk *d;
         dfe_start_write(dict, d)
         {
-            if (d->last_collected < now_ut) {
-                physical_disk_cleanup(d);
+            if (d->last_collected < now_ut)
                 dictionary_del(dict, d_dfe.name);
-            }
         }
         dfe_done(d);
         dictionary_garbage_collect(dict);
