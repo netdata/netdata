@@ -336,8 +336,10 @@ For complete details on configuration loading order and precedence rules, see [A
 
 **Special Syntax Rules:**
 
-- A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with `!` for a negative match. Order is important! See our [simple patterns docs](/src/libnetdata/simple_pattern/README.md) for more examples
-- Lines terminated by a `\` are spliced together with the next line. The backslash is removed, and the following line is joined with the current one. No space is inserted, so you can split a line anywhere, even in the middle of a word. This is handy if your `info` line consists of several sentences
+- A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with `!` for a negative match. Order is important (first match wins, including negation). See our [simple patterns docs](/src/libnetdata/simple_pattern/README.md) for more examples
+- Lines terminated by a `\` continue on the next line. The backslash is replaced by a single space.
+- Quoted values are allowed for `class`, `type`, `component`, `units`, `to`, `exec`, `summary`, and `info` - quotes are stripped.
+- Legacy `charts:` and `families:` lines are accepted for backward compatibility but ignored by the parser.
 
 ### Complete Configuration Reference
 
@@ -348,16 +350,18 @@ For complete details on configuration loading order and precedence rules, see [A
 | [`class`](#alert-line-class)                        | no              | The general alert classification                                                     |
 | [`type`](#alert-line-type)                          | no              | What area of the system the alert monitors                                           |
 | [`component`](#alert-line-component)                | no              | Specific component of the type of the alert                                          |
-| [`lookup`](#alert-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on` |
-| [`calc`](#alert-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable           |
+| [`charts`](#alert-line-charts-and-families)         | no              | Legacy (ignored)                                                                      |
+| [`families`](#alert-line-charts-and-families)       | no              | Legacy (ignored)                                                                      |
+| [`lookup`](#alert-line-lookup)                      | no              | The database lookup to find and process metrics for the chart specified through `on` |
+| [`calc`](#alert-line-calc)                          | no              | A calculation to apply to the value found via `lookup` or another variable           |
 | [`every`](#alert-line-every)                        | no              | The frequency of the alert                                                           |
 | [`green`/`red`](#alert-lines-green-and-red)         | no              | Set the green and red thresholds of a chart                                          |
-| [`warn`/`crit`](#alert-lines-warn-and-crit)         | yes (see above) | Expressions evaluating to true or false, and when true, will trigger the alert       |
+| [`warn`/`crit`](#alert-lines-warn-and-crit)         | no              | Expressions evaluating to true or false, and when true, will trigger the alert       |
 | [`to`](#alert-line-to)                              | no              | A list of roles to send notifications to                                             |
 | [`exec`](#alert-line-exec)                          | no              | The script to execute when the alert changes status                                  |
 | [`delay`](#alert-line-delay)                        | no              | Optional hysteresis settings to prevent floods of notifications                      |
 | [`repeat`](#alert-line-repeat)                      | no              | The interval for sending notifications when an alert is in WARNING or CRITICAL mode  |
-| [`options`](#alert-line-options)                    | no              | Add an option to not clear alerts                                                    |
+| [`options`](#alert-line-options)                    | no              | Alert options (`no-clear-notification` / `no-clear`)                                 |
 | [`host labels`](#alert-line-host-labels)            | no              | Restrict an alert or template to a list of matching labels present on a host         |
 | [`chart labels`](#alert-line-chart-labels)          | no              | Restrict an alert or template to a list of matching labels present on a chart        |
 | [`summary`](#alert-line-summary)                    | no              | A brief description of the alert                                                     |
@@ -381,11 +385,11 @@ alarm: NAME
 template: NAME
 ```
 
-**Naming Rules:**
+**Naming Rules (code behavior):**
 
-- `NAME` can be any alphanumeric character
-- Only `.` (period) and `_` (underscore) symbols allowed
-- Can’t be `chart name`, `dimension name`, `family name`, or `chart variable names`
+- `NAME` is sanitized by Netdata; spaces and many symbols become `_`.
+- If sanitization changes the name, Netdata logs a rename and uses the sanitized name.
+- Avoid names that collide with chart/dimension/family/custom variable names (can shadow variables in expressions).
 
 #### Alert Line `on`
 
@@ -423,6 +427,11 @@ If you create a template using the `disk.io` context, it will apply an alert to 
 
 :::
 
+#### Alert Line `charts` and `families`
+
+These lines are accepted for backward compatibility but **ignored** by the parser.  
+Use `on:` (chart ID or context) and `chart labels:` instead.
+
 #### Alert Line `class`
 
 **Purpose:** This indicates the type of error (or general problem area) that the alert or template applies to.
@@ -433,7 +442,7 @@ If you create a template using the `disk.io` context, it will apply an alert to 
 class: Latency
 ```
 
-**Available Classes:**
+**Common Classes (not enforced):**
 
 | Class       | Use Case                       |
 |-------------|--------------------------------|
@@ -444,7 +453,7 @@ class: Latency
 
 :::note
 
-`class` will default to `Unknown` if the line is missing from the alert configuration.
+`class` is a free-form string. If the line is missing, it defaults to `Unknown`.
 
 :::
 
@@ -458,7 +467,7 @@ class: Latency
 type: Database
 ```
 
-**Available Types:**
+**Common Types (not enforced):**
 
 | Type            | Description                                                                                    |
 |-----------------|------------------------------------------------------------------------------------------------|
@@ -488,7 +497,7 @@ type: Database
 
 :::note
 
-If an alert configuration is missing the `type` line, its value will default to `Unknown`.
+`type` is a free-form string. If the line is missing, it defaults to `Unknown`.
 
 :::
 
@@ -504,7 +513,7 @@ component: MySQL
 
 :::note
 
-As with the `class` and `type` lines, if `component` is missing from the configuration, its value will default to `Unknown`.
+`component` is a free-form string. If the line is missing, it defaults to `Unknown`.
 
 :::
 
@@ -515,7 +524,7 @@ As with the `class` and `type` lines, if `component` is missing from the configu
 **Full Syntax:**
 
 ```text
-lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS]
+lookup: METHOD[(GROUPING OPTIONS)] AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS]
 ```
 
 **Required Parameters:**
@@ -525,11 +534,38 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 | `METHOD`  | [Grouping method](/src/web/api/queries/README.md#grouping-methods) | `average`, `min`, `max` |
 | `AFTER`   | How far back to look (negative number)                             | `-1m`, `-1h`, `-1d`     |
 
+**Grouping Options (inside parentheses):**
+
+- `countif(CONDITION VALUE)` where CONDITION is one of `=`, `==`, `:`, `!=`, `<>`, `>`, `>=`, `<`, `<=`, `!`  
+  - Examples: `countif(>5)`, `countif(<=0)`, `countif(!=0)`, `countif(:0)`
+  - If VALUE is omitted (e.g., `countif(>)`), it defaults to `0`
+- `percentile(N)` where N is 0–100 (default `95` if omitted or empty)
+- `trimmed-mean(N)` / `trimmed-median(N)` where N is trim % (default `5` if omitted or empty)
+
+**Methods (time aggregation) + aliases:**
+
+| Method | Aliases / Notes |
+|--------|----------------|
+| `average` | `avg`, `mean` |
+| `min` |  |
+| `max` |  |
+| `sum` |  |
+| `median` |  |
+| `stddev` |  |
+| `cv` | `rsd`, `coefficient-of-variation` |
+| `ses` | `ema`, `ewma` |
+| `des` |  |
+| `incremental_sum` | `incremental-sum` |
+| `trimmed-mean` | `trimmed-mean1/2/3/5/10/15/20/25` |
+| `trimmed-median` | `trimmed-median1/2/3/5/10/15/20/25` |
+| `percentile` | `percentile25/50/75/80/90/95/97/98/99` |
+| `countif` |  |
+| `extremes` |  |
+
 **Optional Parameters:**
 
 | Parameter          | Purpose                     | Details                                                              |
 |--------------------|-----------------------------|----------------------------------------------------------------------|
-| `GROUPING OPTIONS` | Conditional processing      | `CONDITION VALUE` where condition is `!=`, `=`, `==`, `<=`, `<`, `>`, `>=` |
 | `at BEFORE`        | End of lookup timeframe     | Default is 0 (now)                                                   |
 | `every DURATION`   | Update frequency            | Supports `s`, `m`, `h`, `d` units                                    |
 | `OPTIONS`          | Processing modifiers        | See options table below                                              |
@@ -539,16 +575,18 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 
 | Option        | Effect                                                  |
 |---------------|---------------------------------------------------------|
+| `absolute` / `abs` / `absolute_sum` | Use absolute values before aggregating |
 | `percentage`  | Calculate percentage of selected dimensions over total  |
-| `absolute`    | Turn all sample values positive                         |
 | `min`         | Return minimum of all dimensions after time-aggregation |
 | `max`         | Return maximum of all dimensions after time-aggregation |
 | `average`     | Return average of all dimensions after time-aggregation |
-| `sum`         | Return sum of all dimensions (default)                  |
 | `min2max`     | Return delta between min and max of dimensions          |
+| `sum`         | Return sum of all dimensions (default / no-op)          |
+| `null2zero`   | Convert null values to zero                             |
 | `unaligned`   | Prevent shifting query window to multiples of duration  |
-| `match-ids`   | Match dimensions by IDs (default)                       |
-| `match-names` | Match dimensions by names                               |
+| `match-ids` / `match_ids` | Match dimensions by IDs (default)            |
+| `match-names` / `match_names` | Match dimensions by names                   |
+| `anomaly-bit` | Use anomaly rate as data source                         |
 
 **Example:**
 
@@ -558,7 +596,11 @@ lookup: average -10m unaligned of user,system,softirq,irq,guest
 
 This looks back 10 minutes, calculates the average of the specified CPU dimensions, without aligning to time boundaries.
 
-The result of the lookup will be available as `$this` and `$NAME` in expressions. The timestamps of the timeframe evaluated by the database lookup are available as variables `$after` and `$before` (both are unix timestamps).
+**Notes:**
+- The result of the lookup is available as `$this`.
+- The timestamps of the evaluated timeframe are available as `$after` and `$before` (Unix timestamps).
+- If `every` is omitted, Netdata defaults it to `abs(AFTER)`.
+- `of all` (or omitting `of`) includes all dimensions.
 
 #### Alert Line `calc`
 
@@ -649,6 +691,7 @@ to: ROLE1 ROLE2 ROLE3 ...
 - First parameter passed to the `exec` script
 - Default script (`alarm-notify.sh`) treats this as a space-separated list of roles
 - Roles are consulted to find exact recipients per notification method
+- If omitted, the default recipient is `root` (from `[health]` in `netdata.conf`)
 
 #### Alert Line `exec`
 
@@ -660,7 +703,7 @@ exec: SCRIPT
 
 **Default Behavior:**
 
-- Default script is Netdata's `alarm-notify.sh`
+- Default script is `alarm-notify.sh` (from `[health]` -> `script to execute on alarm` in `netdata.conf`)
 - Supports all notification methods Netdata supports
 - Includes custom hooks
 
@@ -727,11 +770,12 @@ repeat: [off] [warning DURATION] [critical DURATION]
 
 ```text
 options: no-clear-notification
+options: no-clear
 ```
 
 **Available Options:**
 
-- `no-clear-notification` - Prevents clearing the alert notification
+- `no-clear-notification` / `no-clear` - Prevents clearing the alert notification
 
 **When to Use `no-clear-notification`:**
 
@@ -772,6 +816,11 @@ host labels: installed = 201*  # Matches all hosts installed in 2010s
 - Space-separated list
 - Accepts [simple patterns](/src/libnetdata/simple_pattern/README.md)
 - Alert only loads on matching hosts
+- You must start with `label_key=...` to set the label key
+- Values without `=` belong to the current key; values without a current key are ignored
+- Spaces around `=` are trimmed; commas are **not** supported
+- Multiple label keys in the same line use **AND** logic
+- Multiple values for the same key are evaluated left-to-right; the first match (including `!`) decides
 
 #### Alert Line `chart labels`
 
@@ -799,6 +848,10 @@ This requires BOTH conditions to be true (AND logic).
 - Space-separated list with [simple patterns](/src/libnetdata/simple_pattern/README.md) support
 - If a specified label doesn't exist on the chart, the chart won't match
 - Multiple labels use AND logic
+- You must start with `label_key=...` to set the label key
+- Multiple values for the same key are evaluated left-to-right; the first match (including `!`) decides
+- Values without `=` belong to the current key; values without a current key are ignored
+- Spaces around `=` are trimmed; commas are **not** supported
 
 #### Alert Line `summary`
 
@@ -882,7 +935,7 @@ How to write calculations and use variables in your alert definitions. Essential
 
 | Type       | Operators                              | Result                    |
 |------------|----------------------------------------|---------------------------|
-| Arithmetic | `+`, `-`, `*`, `/`                     | Numeric values            |
+| Arithmetic | `+`, `-`, `*`, `/`, `%`                | Numeric values            |
 | Comparison | `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=` | `1` (true) or `0` (false) |
 | Logical    | `&&`, `||`, `!`, `AND`, `OR`, `NOT`    | `1` (true) or `0` (false) |
 
@@ -895,8 +948,15 @@ How to write calculations and use variables in your alert definitions. Essential
 
 | Value | Purpose                               | Example Use    |
 |-------|---------------------------------------|----------------|
-| `nan` | Not a number (database lookup failed) | `$this != nan` |
-| `inf` | Infinite (division by zero)           | `$this != inf` |
+| `nan` | Not a number                          | `$this != nan` |
+| `inf` | Infinite                              | `$this != inf` |
+
+**Notes:**
+- Logical operators short-circuit (`&&`, `||`, `AND`, `OR`)
+- `nan` is false and `inf` is true in boolean checks
+- If the final expression result is `nan` or `inf`, evaluation fails and the alert becomes **UNDEFINED**
+- `nan == nan` is **true** and `nan != nan` is **false** (Netdata special handling)
+- `inf == inf` is **true** and `inf != inf` is **false**
 
 ### Conditional Operator for Hysteresis
 
@@ -960,9 +1020,10 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 | Variable               | Contains                                      |
 |------------------------|-----------------------------------------------|
 | `$last_collected_t`    | Unix timestamp of last data collection        |
-| `$collected_total_raw` | Sum of all dimensions (last collected values) |
 | `$update_every`        | Update frequency of the chart                 |
 | `$green`, `$red`       | Thresholds defined in alerts                  |
+
+Custom chart variables may also exist (collector-defined). Use the `alarm_variables` API to list them for a chart.
 
 **Dimension Value Types:**
 
@@ -984,6 +1045,11 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 - `$system.cpu.user` - User CPU from system.cpu chart
 - `$disk.sda.reads` - Read operations from sda disk chart
 
+#### Cross-Context Resolution (Label Scoring)
+
+When multiple chart instances match a cross-context reference (e.g., `$disk.iops.reads`), Netdata selects the instance with the **highest label overlap** with the current chart.  
+Ties depend on internal iteration order and are **not guaranteed stable**.
+
 #### Special Variables
 
 | Variable  | Contains               | Usage                                  |
@@ -997,11 +1063,22 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 | Constant         | Numeric Value | Usage                          |
 |------------------|---------------|--------------------------------|
 | `$REMOVED`       | -2            | Alert deleted (SIGUSR2 reload) |
-| `$UNINITIALIZED` | -1            | Alert not initialized          |
-| `$UNDEFINED`     | 0             | Calculation failed             |
+| `$UNDEFINED`     | -1            | Calculation failed             |
+| `$UNINITIALIZED` | 0             | Alert not initialized          |
 | `$CLEAR`         | 1             | Alert OK/not triggered         |
-| `$WARNING`       | 2             | Warning condition met          |
-| `$CRITICAL`      | 3             | Critical condition met         |
+| `$WARNING`       | 3             | Warning condition met          |
+| `$CRITICAL`      | 4             | Critical condition met         |
+
+**Note:** An internal `RAISED = 2` exists for evaluation, but it is **not** exposed as `$RAISED`.
+
+#### Alert-to-Alert References
+
+Alerts can reference other alerts by name (e.g., `$baseline_alert`).
+
+- References use the **most recent stored value** of the other alert
+- Netdata does **not** build a dependency graph; calculations run sequentially and order is not guaranteed
+- If Alert B references Alert A and A runs later, B uses A’s **previous** value
+- Circular references are **not resolved** and may yield `nan`/`UNDEFINED`
 
 **Status Comparison Examples:**
 
@@ -1021,13 +1098,13 @@ Status values increase with severity, so `$status > $CLEAR` will match both WARN
 
 ### Alert Status Lifecycle
 
-**Status Flow:** `UNINITIALIZED` → `UNDEFINED`/`CLEAR` → `WARNING` → `CRITICAL`
+**Status Flow:** `UNINITIALIZED` → `UNDEFINED`/`CLEAR` → `WARNING` → `CRITICAL` (and `REMOVED` can occur if the chart disappears)
 
 **When Status Changes:**
 
 - **`REMOVED`** - Alert deleted during configuration reload
 - **`UNINITIALIZED`** - Alert created but not yet calculated
-- **`UNDEFINED`** - Database lookup failed, division by zero, etc.
+- **`UNDEFINED`** - Expression evaluation failed (NaN/Inf or parse/eval errors)
 - **`CLEAR`** - Alert conditions aren’t met (normal state)
 - **`WARNING`** - Warning expression returned true/non-zero
 - **`CRITICAL`** - Critical expression returned true/non-zero

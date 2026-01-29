@@ -1,0 +1,32 @@
+# AI Skills Test Configuration
+
+models:
+  # Large model - reference for correctness
+  large:
+    name: minimax-m2.1
+    endpoint: http://10.20.4.21:8353/v1
+    model_id: minimax-m2.1
+    max_tokens: 8192
+    is_reasoning: true
+
+  # Small model - tests prompt clarity
+  small:
+    name: gpt-oss-20b
+    endpoint: http://10.20.4.205:8345/v1
+    model_id: gpt-oss-20b
+    max_tokens: 8192
+    is_reasoning: true
+
+# Test result interpretation
+results:
+  # Both pass = PASS (skill is good)
+  # Large pass, small fail = WARNING (skill works but could be clearer)
+  # Large fail = FAIL (skill needs fixing)
+
+test_settings:
+  # Retry failed tests this many times
+  retries: 1
+  # Timeout per API call in seconds
+  timeout: 120
+  # Save reasoning traces for debugging
+  save_reasoning: true

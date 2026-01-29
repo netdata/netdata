@@ -186,7 +186,7 @@ Your alerts exist in one of these states:
 | **CLEAR**         | Normal - conditions exist but not triggered | Warning and critical conditions evaluate to zero                         |
 | **WARNING**       | Warning threshold exceeded                        | Warning condition evaluates to non-zero                                  |
 | **CRITICAL**      | Critical threshold exceeded                       | Critical condition evaluates to non-zero                                 |
-| **UNDEFINED**     | Cannot evaluate                                   | No conditions defined, or value is NaN/Inf                               |
+| **UNDEFINED**     | Cannot evaluate                                   | Expression failed (NaN/Inf) or no warn/crit condition defined            |
 | **UNINITIALIZED** | Never evaluated                                   | Alert just created                                                      |
 | **REMOVED**       | Alert deleted                                     | Child disconnected, agent exit, or health reload                         |
 
@@ -259,8 +259,10 @@ crit: $this > 90 OR $failures > 5
 
 Each condition evaluates to:
 - NaN or Inf → UNDEFINED
-- Non-zero → RAISED
+- Non-zero → RAISED (internal)
 - Zero → CLEAR
+
+Note: `RAISED` is an internal evaluation state and is **not** available as `$RAISED` in expressions.
 
 Final status:
 - Critical RAISED → **CRITICAL** (priority)
@@ -348,13 +350,15 @@ Variables resolve in order (first match wins):
 | `$now`              | Current time              | Unix timestamp     |
 | `$last_collected_t` | Last collection time      | Unix timestamp     |
 | `$update_every`     | Collection frequency      | Seconds            |
-| `$status`           | Current status code       | -2 to 3            |
+| `$status`           | Current status code       | -2 to 4            |
 | `$REMOVED`          | Status constant           | -2                 |
-| `$UNINITIALIZED`    | Status constant           | -1                 |
-| `$UNDEFINED`        | Status constant           | 0                  |
+| `$UNDEFINED`        | Status constant           | -1                 |
+| `$UNINITIALIZED`    | Status constant           | 0                  |
 | `$CLEAR`            | Status constant           | 1                  |
-| `$WARNING`          | Status constant           | 2                  |
-| `$CRITICAL`         | Status constant           | 3                  |
+| `$WARNING`          | Status constant           | 3                  |
+| `$CRITICAL`         | Status constant           | 4                  |
+
+`$RAISED` is not available as a constant.
 
 #### 2. Dimension Values
 
@@ -393,6 +397,11 @@ template: cpu_check
     warn: $this > $cpu_baseline * 1.5
 ```
 
+Notes:
+- References use the **most recent stored value** of the other alert
+- Netdata does **not** build a dependency graph; evaluation order is not guaranteed
+- Circular references can result in `NaN`/`UNDEFINED`
+
 #### 6. Cross-Context References
 ```yaml
 template: disk_io_vs_iops
@@ -408,6 +417,8 @@ When alerts reference variables matching multiple instances, Netdata uses label 
 1. **Collect candidates** with matching names
 2. **Score by labels** - count common labels
 3. **Select best match** - highest label overlap
+
+Ties depend on internal iteration order and are **not guaranteed stable**.
 
 Example: Alert on `disk.io` (labels: `device=sda`, `mount=/data`) references `${disk.iops.reads}`:
 - `disk.iops` for sda (labels match) → Score: 2
