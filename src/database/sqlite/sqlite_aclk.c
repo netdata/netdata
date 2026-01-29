@@ -301,10 +301,9 @@ struct judy_list_t {
     Word_t count;
 };
 
-static void async_cb(uv_async_t *handle)
+static void async_cb(uv_async_t *handle __maybe_unused)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
+    ;
 }
 
 #define TIMER_PERIOD_MS (1000)
@@ -568,8 +567,6 @@ static void free_query_list(Pvoid_t JudyL)
 
 static void timer_cb(uv_timer_t *handle)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
     struct aclk_sync_config_s *config = handle->data;
 
     if (aclk_online_for_alerts()) {
