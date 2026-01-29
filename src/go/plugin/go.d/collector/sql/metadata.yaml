@@ -708,14 +708,11 @@ modules:
     functions:
       description: |
         This collector supports user-defined SQL functions that expose query results as
-        interactive table views in Netdata's **Top** tab.
+        interactive table views in Netdata's **Top** tab. Functions are configured per job
+        in the `functions` section of the job configuration. Since functions are entirely
+        user-defined, no predefined functions are listed here.
 
-        Unlike metrics which create time-series charts, functions provide on-demand,
-        tabular data views that users can filter, sort, and search.
-
-        **How Functions Appear in the UI**:
-
-        Functions are organized hierarchically in the **Top** tab:
+        In the Top tab, functions appear in a hierarchical menu:
 
         ```
         Databases
@@ -725,63 +722,7 @@ modules:
                 └── <function_name_2>
         ```
 
-        Each job creates its own group, and each function within that job appears as a
-        selectable item. The function's `name` field (or auto-derived name from `id`)
-        is displayed in the UI.
-
-        > **Note:** Function IDs cannot contain colons (`:`) as they are used internally
-        > as delimiters. Use hyphens (`-`) or underscores (`_`) instead.
-
-        **Use Cases**:
-
-        - **Slow query analysis**: Query `pg_stat_statements` or `performance_schema` to show queries by execution time.
-        - **Active connections**: List current sessions from `pg_stat_activity` or `information_schema.processlist`.
-        - **Lock monitoring**: Display blocking locks from `pg_locks` or `sys.dm_tran_locks`.
-        - **Table statistics**: Show per-table row counts, bloat, or index usage.
-
-        **Configuration**:
-
-        Functions are defined in the `functions` list in your job configuration:
-
-        ```yaml
-        functions:
-          - id: slow-queries          # Required: unique identifier
-            name: Slow Queries        # Optional: display name (derived from id if not set)
-            description: Top queries  # Optional: help text
-            query: |                  # Required: SQL to execute
-              SELECT query, calls, total_time
-              FROM pg_stat_statements
-              ORDER BY total_time DESC
-            timeout: 10               # Optional: query timeout (seconds)
-            limit: 100                # Optional: max rows (default: 100)
-            default_sort: total_time  # Optional: initial sort column
-            default_sort_desc: true   # Optional: descending sort (default: true)
-            columns:                  # Optional: column overrides
-              total_time:
-                type: duration
-                units: milliseconds
-        ```
-
-        **Column Types**:
-
-        Column types are auto-detected from database metadata but can be overridden:
-
-        | Type        | Description                              | Example columns            |
-        |-------------|------------------------------------------|----------------------------|
-        | `string`    | Text values                              | query, schema, username    |
-        | `integer`   | Whole numbers                            | calls, rows, connections   |
-        | `float`     | Decimal numbers                          | ratio, percentage          |
-        | `boolean`   | True/false values                        | is_active, enabled         |
-        | `duration`  | Time intervals (specify units)           | execution_time, wait_time  |
-        | `timestamp` | Date/time values                         | start_time, last_seen      |
-
-        **Function-Only Mode**:
-
-        Jobs can be configured to only provide functions by setting `function_only: true`.
-        In this mode:
-        - No charts are created (metrics configuration is not required)
-        - The job only provides interactive table views via the Top tab
-        - Useful for ad-hoc analysis without ongoing metric collection
+        Each job creates its own group containing all functions defined for that job.
       list: []
     metrics:
       folding:
