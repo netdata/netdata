@@ -100,7 +100,7 @@
     "eslint-plugin-unicorn": "^62.0.0",
     "knip": "^5.82.1",
     "markdown-it": "^14.1.0",
-    "mermaid": "^11.12.2",
+    "mermaid": "^10.9.5",
     "prettier": "^3.8.1",
     "turndown": "^7.2.2",
     "typescript": "^5.9.3",
