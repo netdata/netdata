@@ -75,7 +75,7 @@ func (r Registry) Register(name string, creator Creator) {
 		panic(fmt.Sprintf("%s has both Methods and JobMethods defined (mutually exclusive)", name))
 	}
 	if creator.FunctionOnly && creator.Methods == nil && creator.JobMethods == nil {
-		panic(fmt.Sprintf("%s is FunctionOnly but has no Methods defined", name))
+		panic(fmt.Sprintf("%s is FunctionOnly but has no Methods or JobMethods defined", name))
 	}
 	r[name] = creator
 }
