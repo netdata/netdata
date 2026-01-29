@@ -111,6 +111,28 @@ Metrics and charts are **defined by your SQL queries and metric blocks** at runt
 
 
 
+## Functions
+
+This collector supports user-defined SQL functions that expose query results as
+interactive table views in Netdata's **Top** tab. Functions are configured per job
+in the `functions` section of the job configuration. Since functions are entirely
+user-defined, no predefined functions are listed here.
+
+In the Top tab, functions appear in a hierarchical menu:
+
+```
+Databases
+└── SQL
+    └── <job_name>
+        ├── <function_name_1>
+        └── <function_name_2>
+```
+
+Each job creates its own group containing all functions defined for that job.
+
+
+
+
 ## Alerts
 
 There are no alerts configured by default for this integration.
