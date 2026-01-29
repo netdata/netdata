@@ -16,7 +16,8 @@ type ValueOptions struct {
 type Column struct {
 	// Index is the 0-based position in each row array and must match data order.
 	Index int
-	// Name is the header label shown in the UI.
+	// Name is the column tooltip shown in the UI.
+	// The column header is the map key used in the columns map, not this field.
 	Name string
 	// Type controls the base data type and default rendering.
 	Type FieldType

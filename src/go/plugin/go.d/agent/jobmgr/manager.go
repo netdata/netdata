@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
@@ -122,9 +123,13 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	for name, creator := range m.Modules {
 		m.dyncfgCollectorModuleCreate(name)
 
-		// Register module-level function if this module provides methods
-		if creator.Methods != nil {
+		// Register module if it provides static methods OR per-job methods
+		if creator.Methods != nil || creator.JobMethods != nil {
 			m.moduleFuncs.registerModule(name, creator)
+		}
+
+		// Register static module-level functions
+		if creator.Methods != nil {
 			methods := creator.Methods()
 			for _, method := range methods {
 				if method.ID == "" {
@@ -157,6 +162,7 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 				})
 			}
 		}
+		// Note: Per-job methods (JobMethods) are registered in startRunningJob
 	}
 
 	m.loadFileStatus()
@@ -343,6 +349,15 @@ func (m *Manager) startRunningJob(job *module.Job) {
 
 	// Track job for module function routing
 	m.moduleFuncs.addJob(job.ModuleName(), job.Name(), job)
+
+	// Register job-specific methods if module provides JobMethods callback
+	creator, ok := m.Modules.Lookup(job.ModuleName())
+	if ok && creator.JobMethods != nil {
+		methods := creator.JobMethods(job)
+		if len(methods) > 0 {
+			m.registerJobMethods(job, methods)
+		}
+	}
 }
 
 func (m *Manager) stopRunningJob(name string) {
@@ -354,6 +369,9 @@ func (m *Manager) stopRunningJob(name string) {
 	m.runningJobs.unlock()
 
 	if ok {
+		// Unregister job-specific methods
+		m.unregisterJobMethods(job)
+
 		// Remove job from module function registry
 		m.moduleFuncs.removeJob(job.ModuleName(), job.Name())
 		job.Stop()
@@ -385,6 +403,75 @@ func (m *Manager) cleanup() {
 	})
 }
 
+// registerJobMethods registers methods for a specific job with Netdata
+func (m *Manager) registerJobMethods(job *module.Job, methods []funcapi.MethodConfig) {
+	for _, method := range methods {
+		if method.ID == "" {
+			m.Warningf("skipping job method registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
+			continue
+		}
+
+		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
+
+		// Register Go handler for this function
+		m.FnReg.Register(funcName, m.makeJobMethodFuncHandler(job.ModuleName(), job.Name(), method.ID))
+
+		// Notify Netdata about this function
+		help := method.Help
+		if help == "" {
+			help = fmt.Sprintf("%s %s data function", job.ModuleName(), method.ID)
+		}
+
+		const cloudAccess = "0x0013" // SIGNED_ID | SAME_SPACE | SENSITIVE_DATA
+		access := "0x0000"
+		if method.RequireCloud {
+			access = cloudAccess
+		}
+
+		m.dyncfgApi.FunctionGlobal(netdataapi.FunctionGlobalOpts{
+			Name:     funcName,
+			Timeout:  60,
+			Help:     help,
+			Tags:     "top",
+			Access:   access,
+			Priority: 100,
+			Version:  3,
+		})
+
+		m.Debugf("registered job method: %s for job %s[%s]", funcName, job.ModuleName(), job.Name())
+	}
+
+	// Store methods in registry for later unregistration
+	m.moduleFuncs.registerJobMethods(job.ModuleName(), job.Name(), methods)
+}
+
+// unregisterJobMethods unregisters methods for a specific job
+func (m *Manager) unregisterJobMethods(job *module.Job) {
+	methods := m.moduleFuncs.getJobMethods(job.ModuleName(), job.Name())
+	if len(methods) == 0 {
+		return
+	}
+
+	for _, method := range methods {
+		if method.ID == "" {
+			continue
+		}
+
+		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
+
+		// Unregister Go handler
+		m.FnReg.Unregister(funcName)
+
+		// Notify Netdata to remove function (no-op until Netdata supports it)
+		m.dyncfgApi.FunctionRemove(funcName)
+
+		m.Debugf("unregistered job method: %s for job %s[%s]", funcName, job.ModuleName(), job.Name())
+	}
+
+	// Remove from registry
+	m.moduleFuncs.unregisterJobMethods(job.ModuleName(), job.Name())
+}
+
 func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) {
 	creator, ok := m.Modules[cfg.Module()]
 	if !ok {
@@ -396,7 +483,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) 
 
 	// Reject if config sets function_only but module has no methods
 	// Note: module-level FunctionOnly without Methods is caught at registration time
-	if cfg.FunctionOnly() && creator.Methods == nil {
+	if cfg.FunctionOnly() && creator.Methods == nil && creator.JobMethods == nil {
 		return nil, fmt.Errorf("function_only is set but %s module has no methods defined", cfg.Module())
 	}
 

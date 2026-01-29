@@ -43,6 +43,12 @@ type (
 		// When nil, methods are disabled for this module.
 		MethodHandler func(job *Job) funcapi.MethodHandler
 
+		// Optional: JobMethods returns methods to register when a job starts.
+		// Each method is registered as "moduleName:methodID" and unregistered when the job stops.
+		// This enables per-job function registration instead of static module-level functions.
+		// If nil, no per-job methods are registered.
+		JobMethods func(job *Job) []funcapi.MethodConfig
+
 		// FunctionOnly indicates this module provides only functions, no metrics.
 		// Jobs created from this module skip data collection and chart creation.
 		// The module must still implement Init() and Check() for connectivity validation.
@@ -65,8 +71,11 @@ func (r Registry) Register(name string, creator Creator) {
 	if _, ok := r[name]; ok {
 		panic(fmt.Sprintf("%s is already in registry", name))
 	}
-	if creator.FunctionOnly && creator.Methods == nil {
-		panic(fmt.Sprintf("%s is FunctionOnly but has no Methods defined", name))
+	if creator.Methods != nil && creator.JobMethods != nil {
+		panic(fmt.Sprintf("%s has both Methods and JobMethods defined (mutually exclusive)", name))
+	}
+	if creator.FunctionOnly && creator.Methods == nil && creator.JobMethods == nil {
+		panic(fmt.Sprintf("%s is FunctionOnly but has no Methods or JobMethods defined", name))
 	}
 	r[name] = creator
 }

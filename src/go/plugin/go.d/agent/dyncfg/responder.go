@@ -33,15 +33,24 @@ func (r *Responder) SendCodef(fn functions.Function, code int, message string, a
 		msg = fmt.Sprintf(message, args...)
 	}
 
-	response := struct {
-		Status  int    `json:"status"`
-		Message string `json:"message"`
-	}{
-		Status:  code,
-		Message: msg,
+	var payload []byte
+	if code >= 400 && code < 600 {
+		payload, _ = json.Marshal(struct {
+			Status       int    `json:"status"`
+			ErrorMessage string `json:"errorMessage"`
+		}{
+			Status:       code,
+			ErrorMessage: msg,
+		})
+	} else {
+		payload, _ = json.Marshal(struct {
+			Status  int    `json:"status"`
+			Message string `json:"message"`
+		}{
+			Status:  code,
+			Message: msg,
+		})
 	}
-
-	payload, _ := json.Marshal(response)
 
 	r.api.FUNCRESULT(netdataapi.FunctionResult{
 		UID:             fn.UID,
@@ -109,4 +118,9 @@ func (r *Responder) ConfigDelete(id string) {
 // FunctionGlobal registers a global function with Netdata
 func (r *Responder) FunctionGlobal(opts netdataapi.FunctionGlobalOpts) {
 	r.api.FUNCTIONGLOBAL(opts)
+}
+
+// FunctionRemove removes a function from Netdata (no-op until Netdata core supports it)
+func (r *Responder) FunctionRemove(name string) {
+	r.api.FUNCTIONREMOVE(name)
 }

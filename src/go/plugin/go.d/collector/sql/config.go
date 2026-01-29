@@ -12,8 +12,9 @@ import (
 )
 
 type Config struct {
-	UpdateEvery        int `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	Name               string `yaml:"name,omitempty" json:"name,omitempty"`
+	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 
 	Driver  string           `yaml:"driver" json:"driver"`
 	DSN     string           `yaml:"dsn" json:"dsn"`
@@ -22,6 +23,50 @@ type Config struct {
 	StaticLabels map[string]string   `yaml:"static_labels,omitempty" json:"static_labels"`
 	Queries      []ConfigQueryDef    `yaml:"queries,omitempty" json:"queries"`
 	Metrics      []ConfigMetricBlock `yaml:"metrics,omitempty" json:"metrics"`
+	Functions    []ConfigFunction    `yaml:"functions,omitempty" json:"functions,omitempty"`
+	FunctionOnly bool                `yaml:"function_only,omitempty" json:"function_only,omitempty"`
+}
+
+const (
+	defaultFunctionLimit = 100
+	maxFunctionLimit     = 10000
+)
+
+type ConfigFunction struct {
+	ID              string                      `yaml:"id" json:"id"`
+	Name            string                      `yaml:"name,omitempty" json:"name,omitempty"`
+	Description     string                      `yaml:"description,omitempty" json:"description,omitempty"`
+	Query           string                      `yaml:"query" json:"query"`
+	Timeout         confopt.Duration            `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+	Limit           int                         `yaml:"limit,omitempty" json:"limit,omitempty"`
+	DefaultSort     string                      `yaml:"default_sort,omitempty" json:"default_sort,omitempty"`
+	DefaultSortDesc *bool                       `yaml:"default_sort_desc,omitempty" json:"default_sort_desc,omitempty"`
+	Columns         map[string]ConfigFuncColumn `yaml:"columns,omitempty" json:"columns,omitempty"`
+}
+
+type ConfigFuncColumn struct {
+	Type     string `yaml:"type,omitempty" json:"type,omitempty"`
+	Units    string `yaml:"units,omitempty" json:"units,omitempty"`
+	Tooltip  string `yaml:"tooltip,omitempty" json:"tooltip,omitempty"`
+	Visible  *bool  `yaml:"visible,omitempty" json:"visible,omitempty"`
+	Sortable *bool  `yaml:"sortable,omitempty" json:"sortable,omitempty"`
+}
+
+func (f *ConfigFunction) derivedName() string {
+	if f.Name != "" {
+		return f.Name
+	}
+	return deriveNameFromID(f.ID)
+}
+
+func deriveNameFromID(id string) string {
+	words := strings.Split(strings.ReplaceAll(id, "_", "-"), "-")
+	for i, w := range words {
+		if len(w) > 0 {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
 }
 
 type (
@@ -86,8 +131,17 @@ func (c *Collector) validateConfig() error {
 		errs = append(errs, errors.New("dsn required"))
 	}
 
-	if len(c.Metrics) == 0 {
-		errs = append(errs, errors.New("missing metrics"))
+	if c.FunctionOnly {
+		if len(c.Metrics) > 0 {
+			errs = append(errs, errors.New("function_only is set but metrics are defined"))
+		}
+		if len(c.Functions) == 0 {
+			errs = append(errs, errors.New("function_only is set but no functions defined"))
+		}
+	} else {
+		if len(c.Metrics) == 0 {
+			errs = append(errs, errors.New("metrics required (or set function_only: true)"))
+		}
 	}
 
 	queryIdx := map[string]bool{}
@@ -99,7 +153,56 @@ func (c *Collector) validateConfig() error {
 		errs = append(errs, c.Metrics[i].validate(i, queryIdx)...)
 	}
 
+	funcIdx := map[string]bool{}
+	for i := range c.Functions {
+		errs = append(errs, c.Functions[i].validate(i, funcIdx)...)
+	}
+
 	return errors.Join(errs...)
+}
+
+func (f *ConfigFunction) validate(idx int, seen map[string]bool) []error {
+	var errs []error
+	fidx := idx + 1
+
+	if f.ID == "" {
+		errs = append(errs, fmt.Errorf("functions[%d] missing id", fidx))
+	}
+	if f.Query == "" {
+		errs = append(errs, fmt.Errorf("functions[%d] missing query", fidx))
+	}
+
+	if f.ID != "" {
+		if strings.Contains(f.ID, ":") {
+			errs = append(errs, fmt.Errorf("functions[%d] id %q cannot contain ':'", fidx, f.ID))
+		}
+		if _, dup := seen[f.ID]; dup {
+			errs = append(errs, fmt.Errorf("functions[%d] duplicate id %q", fidx, f.ID))
+		}
+		seen[f.ID] = true
+	}
+
+	if f.Limit < 0 {
+		errs = append(errs, fmt.Errorf("functions[%d] limit cannot be negative", fidx))
+	}
+	if f.Limit > maxFunctionLimit {
+		errs = append(errs, fmt.Errorf("functions[%d] limit exceeds maximum (%d)", fidx, maxFunctionLimit))
+	}
+	if f.Timeout.Duration() < 0 {
+		errs = append(errs, fmt.Errorf("functions[%d] timeout cannot be negative", fidx))
+	}
+
+	validTypes := map[string]bool{
+		"string": true, "integer": true, "float": true,
+		"boolean": true, "duration": true, "timestamp": true,
+	}
+	for colName, col := range f.Columns {
+		if col.Type != "" && !validTypes[col.Type] {
+			errs = append(errs, fmt.Errorf("functions[%d] column %q invalid type %q", fidx, colName, col.Type))
+		}
+	}
+
+	return errs
 }
 
 // ---- Per-struct validation helpers ----
