@@ -713,7 +713,10 @@ void ebpf_read_dcstat_thread(void *ptr)
             if (cgroups && shm_ebpf_cgroup.header)
                 ebpf_update_dc_cgroup();
 
-            sem_post(shm_mutex_ebpf_integration);
+            if (sem_post(shm_mutex_ebpf_integration))
+                netdata_log_error("DCSTAT: Failed to post semaphore.");
+        } else {
+            netdata_log_error("DCSTAT: Failed to wait on semaphore.");
         }
 
         counter = 0;
@@ -915,23 +918,18 @@ static void dcstat_send_global(netdata_publish_dcstat_t *publish)
         publish, dcstat_hash_values[NETDATA_KEY_DC_REFERENCE], dcstat_hash_values[NETDATA_KEY_DC_MISS]);
 
     netdata_publish_syscall_t *ptr = dcstat_counter_publish_aggregated;
-    netdata_idx_t value = dcstat_hash_values[NETDATA_KEY_DC_REFERENCE];
-    if (value != ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall) {
-        ptr[NETDATA_DCSTAT_IDX_REFERENCE].ncall = value - ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall;
-        ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall = value;
 
-        value = dcstat_hash_values[NETDATA_KEY_DC_SLOW];
-        ptr[NETDATA_DCSTAT_IDX_SLOW].ncall = value - ptr[NETDATA_DCSTAT_IDX_SLOW].pcall;
-        ptr[NETDATA_DCSTAT_IDX_SLOW].pcall = value;
+    netdata_idx_t ref_value = dcstat_hash_values[NETDATA_KEY_DC_REFERENCE];
+    ptr[NETDATA_DCSTAT_IDX_REFERENCE].ncall = ref_value - ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall;
+    ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall = ref_value;
 
-        value = dcstat_hash_values[NETDATA_KEY_DC_MISS];
-        ptr[NETDATA_DCSTAT_IDX_MISS].ncall = value - ptr[NETDATA_DCSTAT_IDX_MISS].pcall;
-        ptr[NETDATA_DCSTAT_IDX_MISS].pcall = value;
-    } else {
-        ptr[NETDATA_DCSTAT_IDX_REFERENCE].ncall = 0;
-        ptr[NETDATA_DCSTAT_IDX_SLOW].ncall = 0;
-        ptr[NETDATA_DCSTAT_IDX_MISS].ncall = 0;
-    }
+    netdata_idx_t slow_value = dcstat_hash_values[NETDATA_KEY_DC_SLOW];
+    ptr[NETDATA_DCSTAT_IDX_SLOW].ncall = slow_value - ptr[NETDATA_DCSTAT_IDX_SLOW].pcall;
+    ptr[NETDATA_DCSTAT_IDX_SLOW].pcall = slow_value;
+
+    netdata_idx_t miss_value = dcstat_hash_values[NETDATA_KEY_DC_MISS];
+    ptr[NETDATA_DCSTAT_IDX_MISS].ncall = miss_value - ptr[NETDATA_DCSTAT_IDX_MISS].pcall;
+    ptr[NETDATA_DCSTAT_IDX_MISS].pcall = miss_value;
 
     ebpf_one_dimension_write_charts(
         NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART, ptr[NETDATA_DCSTAT_IDX_RATIO].dimension, publish->ratio);
@@ -1092,7 +1090,7 @@ static void ebpf_obsolete_specific_dc_charts(char *type, int update_every)
  */
 void ebpf_dc_sum_cgroup_pids(netdata_publish_dcstat_t *publish, struct pid_on_target2 *root)
 {
-    memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
+    memset(&publish->curr, 0, sizeof(netdata_publish_dcstat_pid_t));
     while (root) {
         netdata_dcstat_pid_t *src = &root->dc;
 
