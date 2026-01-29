@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -43,7 +44,10 @@ type Collector struct {
 
 	charts *module.Charts
 
-	db *sql.DB
+	dbMu     sync.RWMutex
+	db       *sql.DB
+	dbCtx    context.Context
+	dbCancel context.CancelFunc
 
 	seenCharts map[string]bool
 
@@ -76,6 +80,8 @@ func (c *Collector) Check(ctx context.Context) error {
 		if err := c.openConnection(ctx); err != nil {
 			return err
 		}
+		// Create cancellable context for function queries
+		c.dbCtx, c.dbCancel = context.WithCancel(context.Background())
 	}
 
 	if c.Config.FunctionOnly {
@@ -109,6 +115,15 @@ func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 }
 
 func (c *Collector) Cleanup(context.Context) {
+	// Cancel context first to signal in-flight queries to abort
+	if c.dbCancel != nil {
+		c.dbCancel()
+	}
+
+	// Acquire write lock - should be quick since queries are aborting
+	c.dbMu.Lock()
+	defer c.dbMu.Unlock()
+
 	if c.db != nil {
 		_ = c.db.Close()
 		c.db = nil

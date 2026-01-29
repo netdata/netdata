@@ -73,6 +73,15 @@ func (f *funcTable) MethodParams(ctx context.Context, method string) ([]funcapi.
 }
 
 func (f *funcTable) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	// Check if collector is shutting down (fast path)
+	if f.collector.dbCtx != nil && f.collector.dbCtx.Err() != nil {
+		return funcapi.ErrorResponse(503, "collector is shutting down")
+	}
+
+	// Acquire read lock to prevent DB close during query
+	f.collector.dbMu.RLock()
+	defer f.collector.dbMu.RUnlock()
+
 	if f.collector.db == nil {
 		return funcapi.ErrorResponse(503, "database connection not initialized")
 	}
@@ -88,7 +97,18 @@ func (f *funcTable) Handle(ctx context.Context, method string, params funcapi.Re
 	if funcCfg == nil {
 		return funcapi.ErrorResponse(404, "unknown function: %s", functionID)
 	}
-	return f.executeFunction(ctx, funcCfg)
+
+	// Merge request context with collector's shutdown context
+	// Query cancels if either request times out OR collector shuts down
+	queryCtx, queryCancel := context.WithCancel(ctx)
+	defer queryCancel()
+
+	if f.collector.dbCtx != nil {
+		stop := context.AfterFunc(f.collector.dbCtx, queryCancel)
+		defer stop()
+	}
+
+	return f.executeFunction(queryCtx, funcCfg)
 }
 
 func (f *funcTable) findFunction(id string) *ConfigFunction {
