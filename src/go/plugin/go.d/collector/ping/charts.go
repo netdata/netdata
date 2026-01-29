@@ -27,26 +27,26 @@ var (
 	hostRTTChartTmpl = module.Chart{
 		ID:       "host_%s_rtt",
 		Title:    "Ping round-trip time",
-		Units:    "milliseconds",
+		Units:    "seconds",
 		Fam:      "latency",
 		Ctx:      "ping.host_rtt",
 		Priority: prioHostRTT,
 		Type:     module.Area,
 		Dims: module.Dims{
-			{ID: "host_%s_min_rtt", Name: "min", Div: 1e3},
-			{ID: "host_%s_max_rtt", Name: "max", Div: 1e3},
-			{ID: "host_%s_avg_rtt", Name: "avg", Div: 1e3},
+			{ID: "host_%s_min_rtt", Name: "min", DimOpts: module.DimOpts{Float: true}},
+			{ID: "host_%s_max_rtt", Name: "max", DimOpts: module.DimOpts{Float: true}},
+			{ID: "host_%s_avg_rtt", Name: "avg", DimOpts: module.DimOpts{Float: true}},
 		},
 	}
 	hostStdDevRTTChartTmpl = module.Chart{
 		ID:       "host_%s_std_dev_rtt",
 		Title:    "Ping round-trip time standard deviation",
-		Units:    "milliseconds",
+		Units:    "seconds",
 		Fam:      "latency",
 		Ctx:      "ping.host_std_dev_rtt",
 		Priority: prioHostStdDevRTT,
 		Dims: module.Dims{
-			{ID: "host_%s_std_dev_rtt", Name: "std_dev", Div: 1e3},
+			{ID: "host_%s_std_dev_rtt", Name: "std_dev", DimOpts: module.DimOpts{Float: true}},
 		},
 	}
 )
@@ -59,7 +59,7 @@ var hostPacketLossChartTmpl = module.Chart{
 	Ctx:      "ping.host_packet_loss",
 	Priority: prioHostPingPacketLoss,
 	Dims: module.Dims{
-		{ID: "host_%s_packet_loss", Name: "loss", Div: 1000},
+		{ID: "host_%s_packet_loss", Name: "loss", DimOpts: module.DimOpts{Float: true}},
 	},
 }
 
