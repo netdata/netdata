@@ -551,7 +551,7 @@ func TestManager_Run_Dyncfg_Get(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-get 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -658,7 +658,7 @@ FUNCTION_RESULT_END
 					wantRunning:    nil,
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-userconfig 404 application/json
-{"status":404,"message":"The specified module 'success!' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success!' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -818,7 +818,7 @@ func TestManager_Run_Dyncfg_Enable(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-enable 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1044,7 +1044,7 @@ func TestManager_Run_Dyncfg_Disable(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-disable 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1270,7 +1270,7 @@ func TestManager_Run_Dyncfg_Restart(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-restart 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1310,7 +1310,7 @@ FUNCTION_RESULT_END
 CONFIG test:collector:success:test create accepted job /collectors/test/Jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-restart 405 application/json
-{"status":405,"message":"Restarting data collection job is not allowed in 'accepted' state."}
+{"status":405,"errorMessage":"Restarting data collection job is not allowed in 'accepted' state."}
 FUNCTION_RESULT_END
 
 CONFIG test:collector:success:test status accepted
@@ -1414,7 +1414,7 @@ FUNCTION_RESULT_END
 CONFIG test:collector:success:test status disabled
 
 FUNCTION_RESULT_BEGIN 3-restart 405 application/json
-{"status":405,"message":"Restarting data collection job is not allowed in 'disabled' state."}
+{"status":405,"errorMessage":"Restarting data collection job is not allowed in 'disabled' state."}
 FUNCTION_RESULT_END
 
 CONFIG test:collector:success:test status disabled
@@ -1516,7 +1516,7 @@ func TestManager_Run_Dyncfg_Remove(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-remove 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1603,15 +1603,15 @@ FUNCTION_RESULT_END
 CONFIG test:collector:success:discovered status running
 
 FUNCTION_RESULT_BEGIN 1-remove 405 application/json
-{"status":405,"message":"Removing jobs of type 'stock' is not supported. Only 'dyncfg' jobs can be removed."}
+{"status":405,"errorMessage":"Removing jobs of type 'stock' is not supported. Only 'dyncfg' jobs can be removed."}
 FUNCTION_RESULT_END
 
 FUNCTION_RESULT_BEGIN 2-remove 405 application/json
-{"status":405,"message":"Removing jobs of type 'user' is not supported. Only 'dyncfg' jobs can be removed."}
+{"status":405,"errorMessage":"Removing jobs of type 'user' is not supported. Only 'dyncfg' jobs can be removed."}
 FUNCTION_RESULT_END
 
 FUNCTION_RESULT_BEGIN 3-remove 405 application/json
-{"status":405,"message":"Removing jobs of type 'discovered' is not supported. Only 'dyncfg' jobs can be removed."}
+{"status":405,"errorMessage":"Removing jobs of type 'discovered' is not supported. Only 'dyncfg' jobs can be removed."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1736,7 +1736,7 @@ func TestManager_Run_Dyncfg_Update(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-update 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1953,7 +1953,7 @@ func TestManager_Run_FunctionOnly(t *testing.T) {
 CONFIG test:collector:nofuncs:test create accepted job /collectors/test/Jobs user 'type=user,module=nofuncs,job=test' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 400 application/json
-{"status":400,"message":"Invalid configuration. Failed to apply configuration: function_only is set but nofuncs module has no methods defined."}
+{"status":400,"errorMessage":"Invalid configuration. Failed to apply configuration: function_only is set but nofuncs module has no methods defined."}
 FUNCTION_RESULT_END
 
 CONFIG test:collector:nofuncs:test status failed
