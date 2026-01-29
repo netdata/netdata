@@ -247,6 +247,11 @@
 - Feat(go.d.plugin): improve db function e2e tests and documentation ([#21654](https://github.com/netdata/netdata/issues/21654))
 - Refactor(go.d.plugin): use nested functions config for database collectors ([#21655](https://github.com/netdata/netdata/issues/21655))
 - Regenerate integrations docs ([#21653](https://github.com/netdata/netdata/issues/21653))
+- Fix(freebsd): CPU frequency detection returns unknown causing NaN display ([#21658](https://github.com/netdata/netdata/issues/21658))
+- Fix(notifications): update Matrix sender to comply with Matrix API ([#21659](https://github.com/netdata/netdata/issues/21659))
+- Feat(go.d.plugin/postgres): add running-queries and pg_stat_monitor support ([#21656](https://github.com/netdata/netdata/issues/21656))
+- Regenerate integrations docs ([#21663](https://github.com/netdata/netdata/issues/21663))
+- Remove unused/stale top-level files. ([#21660](https://github.com/netdata/netdata/issues/21660))
 
 ## [2.8.0] - 2025-11-19
 
