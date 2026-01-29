@@ -542,40 +542,40 @@ modules:
                 description: "Current operational state of the interface: up (operational and passing traffic), down (not operational), testing (in test mode), unknown (status cannot be determined), dormant (waiting for external actions), notPresent (interface removed but configuration remains), or lowerLayerDown (interface down due to lower-layer issues)"
               - name: Traffic In
                 type: float
-                unit: "Mbits"
-                description: Inbound network traffic rate in megabits per second. High values indicate heavy inbound data flow that may require capacity planning.
+                unit: "bit/s"
+                description: Inbound network traffic rate in bits per second. High values indicate heavy inbound data flow that may require capacity planning.
               - name: Traffic Out
                 type: float
-                unit: "Mbits"
-                description: Outbound network traffic rate in megabits per second. High values indicate heavy outbound data flow. Compare with Traffic In to identify asymmetric usage patterns.
+                unit: "bit/s"
+                description: Outbound network traffic rate in bits per second. High values indicate heavy outbound data flow. Compare with Traffic In to identify asymmetric usage patterns.
               - name: Unicast In
                 type: float
-                unit: "Kpps"
+                unit: "packets/s"
                 visibility: hidden
-                description: Rate of unicast packets (destined for a single recipient) received per second in thousands. Normal traffic pattern for point-to-point communications.
+                description: Rate of unicast packets (destined for a single recipient) received per second. Normal traffic pattern for point-to-point communications.
               - name: Unicast Out
                 type: float
-                unit: "Kpps"
+                unit: "packets/s"
                 visibility: hidden
-                description: Rate of unicast packets (addressed to a single destination) transmitted per second in thousands.
+                description: Rate of unicast packets (addressed to a single destination) transmitted per second.
               - name: Broadcast In
                 type: float
-                unit: "Kpps"
+                unit: "packets/s"
                 visibility: hidden
-                description: Rate of broadcast packets (sent to all nodes on network) received per second in thousands. High values may indicate network storms, ARP flooding, or misconfigured devices.
+                description: Rate of broadcast packets (sent to all nodes on network) received per second. High values may indicate network storms, ARP flooding, or misconfigured devices.
               - name: Broadcast Out
                 type: float
-                unit: "Kpps"
+                unit: "packets/s"
                 visibility: hidden
-                description: Rate of broadcast packets transmitted per second in thousands. Consistently high broadcast rates can degrade network performance.
+                description: Rate of broadcast packets transmitted per second. Consistently high broadcast rates can degrade network performance.
               - name: Packets In
                 type: float
-                unit: "Kpps"
-                description: Total inbound packet rate (sum of unicast, broadcast, and multicast) per second in thousands. Useful for overall interface load assessment.
+                unit: "packets/s"
+                description: Total inbound packet rate (sum of unicast, broadcast, and multicast) per second. Useful for overall interface load assessment.
               - name: Packets Out
                 type: float
-                unit: "Kpps"
-                description: Total outbound packet rate (sum of unicast, broadcast, and multicast) per second in thousands.
+                unit: "packets/s"
+                description: Total outbound packet rate (sum of unicast, broadcast, and multicast) per second.
               - name: Errors In
                 type: float
                 unit: "packets/s"
@@ -596,14 +596,14 @@ modules:
                 description: Rate of outbound packets deliberately discarded. Can indicate output queue overflows, ACL drops, or security policy rejections.
               - name: Multicast In
                 type: float
-                unit: "Kpps"
+                unit: "packets/s"
                 visibility: hidden
-                description: Rate of multicast packets (destined for a group) received per second in thousands. Common in video streaming, multicast applications, and routing protocols.
+                description: Rate of multicast packets (destined for a group) received per second. Common in video streaming, multicast applications, and routing protocols.
               - name: Multicast Out
                 type: float
-                unit: "Kpps"
+                unit: "packets/s"
                 visibility: hidden
-                description: Rate of multicast packets transmitted per second in thousands.
+                description: Rate of multicast packets transmitted per second.
           performance: |
             Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many interfaces may return many rows
           security: |
