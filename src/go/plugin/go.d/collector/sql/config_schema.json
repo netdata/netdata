@@ -290,6 +290,12 @@
           }
         }
       },
+      "function_only": {
+        "title": "Function Only",
+        "description": "Set to true if this job only provides functions (no metrics). When enabled, metrics configuration is ignored and no charts are created.",
+        "type": "boolean",
+        "default": false
+      },
       "functions": {
         "title": "Functions",
         "description": "SQL functions that expose query results as table views in the Netdata UI.",
@@ -384,12 +390,6 @@
           },
           "required": ["id", "query"]
         }
-      },
-      "function_only": {
-        "title": "Function Only",
-        "description": "Set to true if this job only provides functions (no metrics). When enabled, metrics configuration is ignored and no charts are created.",
-        "type": "boolean",
-        "default": false
       },
       "vnode": {
         "title": "Vnode",

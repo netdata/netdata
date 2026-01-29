@@ -23,8 +23,8 @@ type moduleFunc struct {
 	creator        module.Creator         // The module creator (has Methods())
 	methods        []funcapi.MethodConfig // Static methods from creator (ordered)
 	methodsByID    map[string]funcapi.MethodConfig
-	jobs           map[string]*jobEntry // jobName → job entry with generation
-	lastGeneration map[string]uint64    // jobName → last known generation (persists across removals)
+	jobs           map[string]*jobEntry              // jobName → job entry with generation
+	lastGeneration map[string]uint64                 // jobName → last known generation (persists across removals)
 	jobMethods     map[string][]funcapi.MethodConfig // jobName → methods registered for that job
 }
 

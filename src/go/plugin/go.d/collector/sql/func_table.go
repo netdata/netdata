@@ -344,6 +344,12 @@ func deriveFilterSummary(fieldType funcapi.FieldType) (funcapi.FieldFilter, func
 	}
 }
 
+// buildColumnMetadata constructs column definitions from SQL query results.
+//
+// This uses funcapi.Column directly instead of funcapi.ColumnMeta because:
+// - Columns are discovered dynamically at runtime from query results
+// - There are no static, pre-defined columns to embed ColumnMeta into
+// - ColumnMeta is designed for collectors with static columns and custom Value extractors
 func (f *funcTable) buildColumnMetadata(colTypes []*sql.ColumnType, overrides map[string]ConfigFuncColumn, defaultSort string, sortDesc bool) map[string]any {
 	columns := make(map[string]any, len(colTypes))
 
