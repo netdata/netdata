@@ -6,16 +6,34 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pathvalidate"
 )
 
 func (c *Collector) initNvidiaSmiExec() (nvidiaSmiBinary, error) {
 	binPath := c.BinaryPath
-	if _, err := os.Stat(binPath); os.IsNotExist(err) {
+	if binPath == "" || !fileExists(binPath) {
 		path, err := exec.LookPath(c.binName)
 		if err != nil {
-			return nil, fmt.Errorf("error on lookup '%s': %v", c.binName, err)
+			// Try Windows default paths
+			if runtime.GOOS == "windows" {
+				defaultPaths := []string{
+					filepath.Join(os.Getenv("ProgramFiles"), "NVIDIA Corporation", "NVSMI", "nvidia-smi.exe"),
+					filepath.Join(os.Getenv("SystemRoot"), "System32", "nvidia-smi.exe"),
+				}
+				for _, p := range defaultPaths {
+					if fileExists(p) {
+						path = p
+						err = nil
+						break
+					}
+				}
+			}
+			if err != nil {
+				return nil, fmt.Errorf("error on lookup '%s': %v", c.binName, err)
+			}
 		}
 		binPath = path
 	}
@@ -26,4 +44,9 @@ func (c *Collector) initNvidiaSmiExec() (nvidiaSmiBinary, error) {
 	}
 
 	return newNvidiaSmiBinary(validatedPath, c.Config, c.Logger)
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
