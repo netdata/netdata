@@ -180,9 +180,9 @@ func TestSqlJobMethods(t *testing.T) {
 		setupCollector func() *Collector
 		jobName        string
 		wantLen        int
-		wantMethodID   string
+		wantMethodIDs  []string
 	}{
-		"collector with functions": {
+		"collector with single function": {
 			setupCollector: func() *Collector {
 				c := New()
 				c.Config.Functions = []ConfigFunction{
@@ -190,9 +190,27 @@ func TestSqlJobMethods(t *testing.T) {
 				}
 				return c
 			},
-			jobName:      "postgres_test",
-			wantLen:      1,
-			wantMethodID: "postgres_test",
+			jobName:       "postgres_test",
+			wantLen:       1,
+			wantMethodIDs: []string{"postgres_test:test-query"},
+		},
+		"collector with multiple functions": {
+			setupCollector: func() *Collector {
+				c := New()
+				c.Config.Functions = []ConfigFunction{
+					{ID: "active-queries", Query: "SELECT 1"},
+					{ID: "databases", Query: "SELECT 2"},
+					{ID: "roles", Query: "SELECT 3"},
+				}
+				return c
+			},
+			jobName: "pg_main",
+			wantLen: 3,
+			wantMethodIDs: []string{
+				"pg_main:active-queries",
+				"pg_main:databases",
+				"pg_main:roles",
+			},
 		},
 		"collector without functions": {
 			setupCollector: func() *Collector {
@@ -216,93 +234,29 @@ func TestSqlJobMethods(t *testing.T) {
 			methods := sqlJobMethods(job)
 
 			assert.Len(t, methods, tc.wantLen)
-			if tc.wantLen > 0 {
-				assert.Equal(t, tc.wantMethodID, methods[0].ID)
-				assert.Equal(t, 10, methods[0].UpdateEvery)
+			for i, wantID := range tc.wantMethodIDs {
+				assert.Equal(t, wantID, methods[i].ID)
+				assert.Equal(t, 10, methods[i].UpdateEvery)
 			}
 		})
 	}
 }
 
 func TestFuncTable_MethodParams(t *testing.T) {
-	tests := map[string]struct {
-		setupCollector func() *Collector
-		wantErr        bool
-		errContains    string
-		wantParams     int
-	}{
-		"db not initialized": {
-			setupCollector: func() *Collector {
-				c := New()
-				c.Config.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
-				// db is nil
-				return c
-			},
-			wantErr:     true,
-			errContains: "initializing",
-		},
-		"no functions configured": {
-			setupCollector: func() *Collector {
-				c := New()
-				c.db, _, _ = sqlmock.New()
-				// no functions
-				return c
-			},
-			wantErr:     true,
-			errContains: "no functions configured",
-		},
-		"functions configured": {
-			setupCollector: func() *Collector {
-				c := New()
-				c.db, _, _ = sqlmock.New()
-				c.Config.Functions = []ConfigFunction{
-					{ID: "func1", Name: "Function One", Query: "SELECT 1"},
-					{ID: "func2", Query: "SELECT 2"},
-				}
-				return c
-			},
-			wantErr:    false,
-			wantParams: 1, // single __function param with 2 options
-		},
+	// MethodParams now always returns nil since each function is a separate endpoint
+	c := New()
+	c.db, _, _ = sqlmock.New()
+	c.Config.Functions = []ConfigFunction{
+		{ID: "func1", Query: "SELECT 1"},
+		{ID: "func2", Query: "SELECT 2"},
 	}
+	defer func() { _ = c.db.Close() }()
 
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			c := tc.setupCollector()
-			defer func() {
-				if c.db != nil {
-					_ = c.db.Close()
-				}
-			}()
+	ft := &funcTable{collector: c}
+	params, err := ft.MethodParams(context.Background(), "postgres_test:func1")
 
-			ft := &funcTable{collector: c}
-			params, err := ft.MethodParams(context.Background(), "table")
-
-			if tc.wantErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.errContains)
-			} else {
-				require.NoError(t, err)
-				require.Len(t, params, tc.wantParams)
-
-				// Verify __function param structure
-				funcParam := params[0]
-				assert.Equal(t, "__function", funcParam.ID)
-				assert.Equal(t, funcapi.ParamSelect, funcParam.Selection)
-				assert.Len(t, funcParam.Options, len(c.Config.Functions))
-
-				// First option should be default
-				assert.True(t, funcParam.Options[0].Default)
-				assert.Equal(t, "func1", funcParam.Options[0].ID)
-				assert.Equal(t, "Function One", funcParam.Options[0].Name)
-
-				// Second option uses derived name
-				assert.False(t, funcParam.Options[1].Default)
-				assert.Equal(t, "func2", funcParam.Options[1].ID)
-				assert.Equal(t, "Func2", funcParam.Options[1].Name)
-			}
-		})
-	}
+	require.NoError(t, err)
+	assert.Nil(t, params)
 }
 
 func TestFuncTable_Handle(t *testing.T) {
@@ -440,11 +394,10 @@ func TestFuncTable_Handle(t *testing.T) {
 			}
 
 			ft := &funcTable{collector: c}
-			params := funcapi.ResolvedParams{
-				"__function": {IDs: []string{tc.functionID}},
-			}
 
-			resp := ft.Handle(context.Background(), "table", params)
+			// Method format is "jobName:functionID" - function ID is extracted from method
+			method := "test_job:" + tc.functionID
+			resp := ft.Handle(context.Background(), method, nil)
 
 			tc.checkResp(t, resp)
 			if mock != nil {

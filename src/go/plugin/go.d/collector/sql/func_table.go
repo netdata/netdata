@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -24,29 +23,36 @@ func newFuncTable(c *Collector) *funcTable {
 
 var _ funcapi.MethodHandler = (*funcTable)(nil)
 
-// sqlJobMethods returns the method config for a specific SQL job.
-// The method ID is the job name, so each job registers as "sql:jobname".
+// sqlJobMethods returns method configs for a specific SQL job.
+// Each configured function becomes a separate method: "jobName:functionID"
+// This results in functions like "sql:postgres_test:active-queries"
 func sqlJobMethods(job *module.Job) []funcapi.MethodConfig {
 	c, ok := job.Module().(*Collector)
 	if !ok || len(c.Config.Functions) == 0 {
 		return nil
 	}
 
-	// Build method name from job name (e.g., "postgres_test" → "Postgres Test")
-	methodName := deriveNameFromID(job.Name())
+	methods := make([]funcapi.MethodConfig, 0, len(c.Config.Functions))
+	for _, fn := range c.Config.Functions {
+		// Method ID format: "jobName:functionID" (e.g., "postgres_test:active-queries")
+		// Full function name will be: "sql:postgres_test:active-queries"
+		methodID := job.Name() + ":" + fn.ID
 
-	// Build help text from first function's description or default
-	help := "Execute a configured SQL query and return results as a table"
-	if len(c.Config.Functions) > 0 && c.Config.Functions[0].Description != "" {
-		help = c.Config.Functions[0].Description
+		methodName := fn.derivedName()
+		help := fn.Description
+		if help == "" {
+			help = "Execute SQL query: " + fn.ID
+		}
+
+		methods = append(methods, funcapi.MethodConfig{
+			ID:          methodID,
+			Name:        methodName,
+			Help:        help,
+			UpdateEvery: 10,
+		})
 	}
 
-	return []funcapi.MethodConfig{{
-		ID:          job.Name(),
-		Name:        methodName,
-		Help:        help,
-		UpdateEvery: 10,
-	}}
+	return methods
 }
 
 func sqlMethodHandler(job *module.Job) funcapi.MethodHandler {
@@ -62,28 +68,8 @@ func (f *funcTable) Cleanup(context.Context) {
 }
 
 func (f *funcTable) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.collector.db == nil {
-		return nil, fmt.Errorf("collector is still initializing")
-	}
-	if len(f.collector.Config.Functions) == 0 {
-		return nil, fmt.Errorf("no functions configured")
-	}
-
-	options := make([]funcapi.ParamOption, len(f.collector.Config.Functions))
-	for i, fn := range f.collector.Config.Functions {
-		options[i] = funcapi.ParamOption{
-			ID:      fn.ID,
-			Name:    fn.derivedName(),
-			Default: i == 0,
-		}
-	}
-
-	return []funcapi.ParamConfig{{
-		ID:        "__function",
-		Name:      "Function",
-		Selection: funcapi.ParamSelect,
-		Options:   options,
-	}}, nil
+	// Each function is now a separate method endpoint, no __function selector needed
+	return nil, nil
 }
 
 func (f *funcTable) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
@@ -91,7 +77,13 @@ func (f *funcTable) Handle(ctx context.Context, method string, params funcapi.Re
 		return funcapi.ErrorResponse(503, "database connection not initialized")
 	}
 
-	functionID := params.GetOne("__function")
+	// Method format is "jobName:functionID" (e.g., "postgres_test:active-queries")
+	// Extract the functionID part after the last colon
+	functionID := method
+	if idx := strings.LastIndex(method, ":"); idx != -1 {
+		functionID = method[idx+1:]
+	}
+
 	funcCfg := f.findFunction(functionID)
 	if funcCfg == nil {
 		return funcapi.ErrorResponse(404, "unknown function: %s", functionID)
