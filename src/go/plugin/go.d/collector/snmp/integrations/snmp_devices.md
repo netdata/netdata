@@ -173,20 +173,20 @@ Network interface metrics from cached SNMP data, including traffic rates, packet
 | Type Group | string |  |  | Custom categorization mapping IANA interface types into practical groups: Ethernet (physical Ethernet interfaces), Aggregation (LAG/port-channels, bonds), Virtual (VLANs, loopbacks), or Other (all remaining types) |
 | Admin Status | string |  |  | Administrative state configured on the interface: up (enabled for use), down (administratively disabled), or testing (currently in test mode). Different from operational status. |
 | Oper Status | string |  |  | Current operational state of the interface: up (operational and passing traffic), down (not operational), testing (in test mode), unknown (status cannot be determined), dormant (waiting for external actions), notPresent (interface removed but configuration remains), or lowerLayerDown (interface down due to lower-layer issues) |
-| Traffic In | float | Mbits |  | Inbound network traffic rate in megabits per second. High values indicate heavy inbound data flow that may require capacity planning. |
-| Traffic Out | float | Mbits |  | Outbound network traffic rate in megabits per second. High values indicate heavy outbound data flow. Compare with Traffic In to identify asymmetric usage patterns. |
-| Unicast In | float | Kpps | hidden | Rate of unicast packets (destined for a single recipient) received per second in thousands. Normal traffic pattern for point-to-point communications. |
-| Unicast Out | float | Kpps | hidden | Rate of unicast packets (addressed to a single destination) transmitted per second in thousands. |
-| Broadcast In | float | Kpps | hidden | Rate of broadcast packets (sent to all nodes on network) received per second in thousands. High values may indicate network storms, ARP flooding, or misconfigured devices. |
-| Broadcast Out | float | Kpps | hidden | Rate of broadcast packets transmitted per second in thousands. Consistently high broadcast rates can degrade network performance. |
-| Packets In | float | Kpps |  | Total inbound packet rate (sum of unicast, broadcast, and multicast) per second in thousands. Useful for overall interface load assessment. |
-| Packets Out | float | Kpps |  | Total outbound packet rate (sum of unicast, broadcast, and multicast) per second in thousands. |
+| Traffic In | float | bit/s |  | Inbound network traffic rate in bits per second. High values indicate heavy inbound data flow that may require capacity planning. |
+| Traffic Out | float | bit/s |  | Outbound network traffic rate in bits per second. High values indicate heavy outbound data flow. Compare with Traffic In to identify asymmetric usage patterns. |
+| Unicast In | float | packets/s | hidden | Rate of unicast packets (destined for a single recipient) received per second. Normal traffic pattern for point-to-point communications. |
+| Unicast Out | float | packets/s | hidden | Rate of unicast packets (addressed to a single destination) transmitted per second. |
+| Broadcast In | float | packets/s | hidden | Rate of broadcast packets (sent to all nodes on network) received per second. High values may indicate network storms, ARP flooding, or misconfigured devices. |
+| Broadcast Out | float | packets/s | hidden | Rate of broadcast packets transmitted per second. Consistently high broadcast rates can degrade network performance. |
+| Packets In | float | packets/s |  | Total inbound packet rate (sum of unicast, broadcast, and multicast) per second. Useful for overall interface load assessment. |
+| Packets Out | float | packets/s |  | Total outbound packet rate (sum of unicast, broadcast, and multicast) per second. |
 | Errors In | float | packets/s | hidden | Rate of inbound packets with errors that prevented delivery. Non-zero values indicate physical layer issues (cable problems, signal integrity) or buffer overruns. |
 | Errors Out | float | packets/s | hidden | Rate of outbound packets with transmission errors. Non-zero values may indicate interface hardware issues, cabling problems, or duplex mismatches. |
 | Discards In | float | packets/s |  | Rate of inbound packets deliberately discarded by the device (often due to resource constraints, security policies, or unrecognized frames). Unlike errors, the interface may have been functioning correctly but chose to drop the packet. |
 | Discards Out | float | packets/s |  | Rate of outbound packets deliberately discarded. Can indicate output queue overflows, ACL drops, or security policy rejections. |
-| Multicast In | float | Kpps | hidden | Rate of multicast packets (destined for a group) received per second in thousands. Common in video streaming, multicast applications, and routing protocols. |
-| Multicast Out | float | Kpps | hidden | Rate of multicast packets transmitted per second in thousands. |
+| Multicast In | float | packets/s | hidden | Rate of multicast packets (destined for a group) received per second. Common in video streaming, multicast applications, and routing protocols. |
+| Multicast Out | float | packets/s | hidden | Rate of multicast packets transmitted per second. |
 
 
 
