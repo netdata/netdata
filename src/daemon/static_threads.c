@@ -10,7 +10,6 @@
 void aclk_main(void *ptr);
 void analytics_main(void *ptr);
 void cpuidlejitter_main(void *ptr);
-void health_main(void *ptr);
 void pluginsd_main(void *ptr);
 void service_main(void *ptr);
 void statsd_main(void *ptr);
@@ -27,15 +26,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = cpuidlejitter_main
     },
-    {
-        .name = "HEALTH",
-        .config_section = NULL,
-        .config_name = NULL,
-        .enabled = 1,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = health_main
-    },
+    // HEALTH is now managed via health_event_loop_init/shutdown (UV-based event loop)
     {
         .name = "ANALYTICS",
         .config_section = NULL,

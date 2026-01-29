@@ -2,6 +2,7 @@
 
 #include "health.h"
 #include "health-alert-entry.h"
+#include "health_event_loop_uv.h"
 
 // ----------------------------------------------------------------------------
 // ARAL memory management for ALARM_ENTRY structures
@@ -40,16 +41,17 @@ void health_alarm_entry_destroy(ALARM_ENTRY *ae) {
 }
 
 // ----------------------------------------------------------------------------
-extern __thread bool is_health_thread;
 
-inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async)
+inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, bool async, struct health_stmt_set *stmts)
 {
     if (async) {
-        bool queued = metadata_queue_ae_save(host, ae);
-        if (!queued && is_health_thread && service_running(SERVICE_HEALTH))
-            sql_health_alarm_log_save(host, ae);
+        bool queued = health_queue_alert_save(ae);
+        // Fallback to synchronous save if queue failed (full or shutting down).
+        // sql_health_alarm_log_save() handles stmts==NULL by preparing ad-hoc statements.
+        if (!queued && !health_should_stop())
+            sql_health_alarm_log_save(host, ae, stmts);
     } else
-        sql_health_alarm_log_save(host, ae);
+        sql_health_alarm_log_save(host, ae, stmts);
 }
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function) {
@@ -193,6 +195,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
     ALARM_ENTRY *ae = health_alarm_entry_create();
+    ae->host = host;
     ae->name = string_dup(name);
     ae->chart = string_dup(chart);
     ae->chart_context = string_dup(chart_context);
@@ -240,7 +243,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     return ae;
 }
 
-inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async)
+inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async, struct health_stmt_set *stmts)
 {
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
 
@@ -272,45 +275,66 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
             break;
         }
     }
-    rw_spinlock_read_unlock(&host->health_log.spinlock);
-    if (update_ae)
-        health_alarm_log_save(host, update_ae, async);
 
-    health_alarm_log_save(host, ae, async);
+    // Protect update_ae from being freed while we save it.
+    // Increment before releasing the lock to prevent cleanup from freeing it.
+    // Note: health_queue_alert_save() has its own increment that will be decremented
+    // by health_process_pending_alerts(). Our protection increment is only decremented
+    // if async queueing fails (fallback to sync) or if doing sync save directly.
+    if (update_ae)
+        __atomic_add_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELAXED);
+
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
+
+    if (update_ae) {
+        const bool queued_async = async && health_queue_alert_save(update_ae);
+        const bool do_sync_save = !queued_async && (!async || !health_should_stop());
+
+        if (do_sync_save)
+            sql_health_alarm_log_save(host, update_ae, stmts);
+
+        // Release our protection increment (async path has its own pending_save_count management).
+        __atomic_sub_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELEASE);
+    }
+
+    health_alarm_log_save(host, ae, async, stmts);
+}
+
+void health_alarm_entry_free_direct(ALARM_ENTRY *ae) {
+    string_freez(ae->name);
+    string_freez(ae->chart);
+    string_freez(ae->chart_name);
+    string_freez(ae->chart_context);
+    string_freez(ae->classification);
+    string_freez(ae->component);
+    string_freez(ae->type);
+    string_freez(ae->exec);
+    string_freez(ae->recipient);
+    string_freez(ae->source);
+    string_freez(ae->units);
+    string_freez(ae->info);
+    string_freez(ae->old_value_string);
+    string_freez(ae->new_value_string);
+    string_freez(ae->summary);
+
+    if (ae->popen_instance) {
+        spawn_popen_kill(ae->popen_instance, 0);
+        ae->popen_instance = NULL;
+    }
+
+    health_alarm_entry_destroy(ae);
 }
 
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
-    if(__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED))
-        metadata_queue_ae_deletion(ae);
+    // Use ACQUIRE to synchronize with RELEASE in health_process_pending_alerts()
+    // This ensures all save operations are complete before we decide to free
+    if (__atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE))
+        health_queue_alert_deletion(ae);
     else {
-        string_freez(ae->name);
-        string_freez(ae->chart);
-        string_freez(ae->chart_name);
-        string_freez(ae->chart_context);
-        string_freez(ae->classification);
-        string_freez(ae->component);
-        string_freez(ae->type);
-        string_freez(ae->exec);
-        string_freez(ae->recipient);
-        string_freez(ae->source);
-        string_freez(ae->units);
-        string_freez(ae->info);
-        string_freez(ae->old_value_string);
-        string_freez(ae->new_value_string);
-        string_freez(ae->summary);
-
-        if(ae->popen_instance) {
-            spawn_popen_kill(ae->popen_instance, 0);
-            ae->popen_instance = NULL;
-        }
-
-        if(ae->next || ae->prev)
+        if (ae->next || ae->prev)
             fatal("HEALTH: alarm entry to delete is still linked!");
 
-//        if(ae->prev_in_progress || ae->next_in_progress)
-//            fatal("HEALTH: alarm entry to be delete is linked in progress!");
-
-        health_alarm_entry_destroy(ae);
+        health_alarm_entry_free_direct(ae);
     }
 }
 
@@ -342,9 +366,10 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     ALARM_ENTRY *ae = host->health_log.alarms;
     while(ae) {
         // Check if entry is old enough to be deleted
-        if(ae->when < now - retention && 
+        // Use ACQUIRE for pending_save_count to synchronize with RELEASE in health_process_pending_alerts()
+        if(ae->when < now - retention &&
            (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) && // Only remove entries that have been processed/updated
-           __atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED) == 0) { // Only remove entries not pending save
+           __atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE) == 0) { // Only remove entries not pending save
             
             // Remove from linked list
             ALARM_ENTRY *next = ae->next;
