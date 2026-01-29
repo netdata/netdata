@@ -1222,6 +1222,10 @@ void ebpf_swap_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_swap_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endswap;
+    }
+
     em->maps = swap_maps;
 
     ebpf_update_pid_table(&swap_maps[NETDATA_PID_SWAP_TABLE], em);

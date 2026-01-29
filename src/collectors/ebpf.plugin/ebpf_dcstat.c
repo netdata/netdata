@@ -1499,6 +1499,10 @@ void ebpf_dcstat_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     CLEANUP_FUNCTION_REGISTER(ebpf_dcstat_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto enddcstat;
+    }
+
     em->maps = dcstat_maps;
 
     ebpf_update_pid_table(&dcstat_maps[NETDATA_DCSTAT_PID_STATS], em);

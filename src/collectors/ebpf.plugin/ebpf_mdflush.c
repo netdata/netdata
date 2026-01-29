@@ -415,6 +415,10 @@ void ebpf_mdflush_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     CLEANUP_FUNCTION_REGISTER(mdflush_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endmdflush;
+    }
+
     em->maps = mdflush_maps;
 
     char *md_flush_request = ebpf_find_symbol("md_flush_request");

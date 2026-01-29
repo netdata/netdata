@@ -1216,6 +1216,10 @@ void ebpf_filesystem_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_filesystem_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endfilesystem;
+    }
+
     ebpf_set_maps();
     ebpf_update_filesystem();
 

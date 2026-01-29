@@ -605,6 +605,10 @@ void ebpf_hardirq_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(hardirq_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endhardirq;
+    }
+
     em->maps = hardirq_maps;
 
     if (ebpf_enable_tracepoints(hardirq_tracepoints) == 0) {

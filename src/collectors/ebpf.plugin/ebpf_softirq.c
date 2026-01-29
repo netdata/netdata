@@ -258,6 +258,10 @@ void ebpf_softirq_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(softirq_cleanup) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endsoftirq;
+    }
+
     em->maps = softirq_maps;
 
     if (ebpf_enable_tracepoints(softirq_tracepoints) == 0) {

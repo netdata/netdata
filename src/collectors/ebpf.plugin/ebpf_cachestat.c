@@ -1713,6 +1713,10 @@ void ebpf_cachestat_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_cachestat_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endcachestat;
+    }
+
     em->maps = cachestat_maps;
 
     ebpf_update_pid_table(&cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em);

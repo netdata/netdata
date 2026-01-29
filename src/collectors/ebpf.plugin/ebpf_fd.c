@@ -1564,6 +1564,10 @@ void ebpf_fd_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_fd_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endfd;
+    }
+
     em->maps = fd_maps;
 
 #ifdef LIBBPF_MAJOR_VERSION

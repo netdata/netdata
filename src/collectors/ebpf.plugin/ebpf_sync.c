@@ -762,6 +762,10 @@ void ebpf_sync_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_sync_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endsync;
+    }
+
     ebpf_set_sync_maps();
     ebpf_sync_parse_syscalls();
 

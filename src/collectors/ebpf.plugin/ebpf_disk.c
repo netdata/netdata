@@ -941,6 +941,10 @@ void ebpf_disk_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_disk_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto enddisk;
+    }
+
     em->maps = disk_maps;
 
     if (ebpf_disk_enable_tracepoints()) {

@@ -562,6 +562,10 @@ void ebpf_oomkill_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(oomkill_cleanup) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endoomkill;
+    }
+
     em->maps = oomkill_maps;
 
 #define NETDATA_DEFAULT_OOM_DISABLED_MSG "Disabling OOMKILL thread, because"

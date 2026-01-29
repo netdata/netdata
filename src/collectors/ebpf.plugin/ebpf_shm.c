@@ -1361,6 +1361,10 @@ void ebpf_shm_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_shm_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endshm;
+    }
+
     em->maps = shm_maps;
 
     ebpf_update_pid_table(&shm_maps[NETDATA_PID_SHM_TABLE], em);

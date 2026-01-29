@@ -1738,6 +1738,14 @@ void ebpf_process_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_process_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        netdata_mutex_lock(&ebpf_exit_cleanup);
+        ebpf_update_disabled_plugin_stats(em);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
+        return;
+    }
+
     em->maps = process_maps;
 
     netdata_mutex_lock(&ebpf_exit_cleanup);

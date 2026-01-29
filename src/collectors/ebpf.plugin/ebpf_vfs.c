@@ -2920,6 +2920,10 @@ void ebpf_vfs_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_vfs_exit) cleanup_ptr = em;
 
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endvfs;
+    }
+
     em->maps = vfs_maps;
 
     ebpf_update_pid_table(&vfs_maps[NETDATA_VFS_PID], em);
