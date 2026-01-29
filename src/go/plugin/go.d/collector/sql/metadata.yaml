@@ -713,14 +713,33 @@ modules:
         Unlike metrics which create time-series charts, functions provide on-demand,
         tabular data views that users can filter, sort, and search.
 
-        ### Use Cases
+        **How Functions Appear in the UI**:
+
+        Functions are organized hierarchically in the **Top** tab:
+
+        ```
+        Databases
+        └── SQL
+            └── <job_name>
+                ├── <function_name_1>
+                └── <function_name_2>
+        ```
+
+        Each job creates its own group, and each function within that job appears as a
+        selectable item. The function's `name` field (or auto-derived name from `id`)
+        is displayed in the UI.
+
+        > **Note:** Function IDs cannot contain colons (`:`) as they are used internally
+        > as delimiters. Use hyphens (`-`) or underscores (`_`) instead.
+
+        **Use Cases**:
 
         - **Slow query analysis**: Query `pg_stat_statements` or `performance_schema` to show queries by execution time.
         - **Active connections**: List current sessions from `pg_stat_activity` or `information_schema.processlist`.
         - **Lock monitoring**: Display blocking locks from `pg_locks` or `sys.dm_tran_locks`.
         - **Table statistics**: Show per-table row counts, bloat, or index usage.
 
-        ### Configuration
+        **Configuration**:
 
         Functions are defined in the `functions` list in your job configuration:
 
@@ -743,7 +762,7 @@ modules:
                 units: milliseconds
         ```
 
-        ### Column Types
+        **Column Types**:
 
         Column types are auto-detected from database metadata but can be overridden:
 
@@ -756,7 +775,7 @@ modules:
         | `duration`  | Time intervals (specify units)           | execution_time, wait_time  |
         | `timestamp` | Date/time values                         | start_time, last_seen      |
 
-        ### Function-Only Mode
+        **Function-Only Mode**:
 
         Jobs can be configured to only provide functions by setting `function_only: true`.
         In this mode:
