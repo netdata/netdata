@@ -1,0 +1,1 @@
+# Deprecated: profiles are now defined in group_vars/all.yml via netdata_profiles_definitions.

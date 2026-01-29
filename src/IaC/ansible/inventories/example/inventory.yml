@@ -1,0 +1,14 @@
+all:
+  hosts:
+    standalone-01:
+      ansible_host: 203.0.113.10
+      netdata_profiles: [standalone]
+    child-01:
+      ansible_host: 203.0.113.11
+      netdata_profiles: [child]
+    child-min-01:
+      ansible_host: 203.0.113.12
+      netdata_profiles: [child_minimal]
+    parent-01:
+      ansible_host: 203.0.113.20
+      netdata_profiles: [parent]

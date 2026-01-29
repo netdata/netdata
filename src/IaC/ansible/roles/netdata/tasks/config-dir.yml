@@ -1,0 +1,34 @@
+---
+- name: Set config dir from user override
+  set_fact:
+    netdata_config_dir_effective: "{{ netdata_config_dir }}"
+  when: netdata_config_dir | length > 0
+
+- name: Detect config dir (if not set)
+  block:
+    - name: Check /etc/netdata/netdata.conf
+      stat:
+        path: /etc/netdata/netdata.conf
+      register: netdata_etc_conf
+
+    - name: Check /opt/netdata/etc/netdata/netdata.conf
+      stat:
+        path: /opt/netdata/etc/netdata/netdata.conf
+      register: netdata_opt_conf
+
+    - name: Set detected config dir
+      set_fact:
+        netdata_config_dir_effective: >-
+          {{
+            '/etc/netdata' if netdata_etc_conf.stat.exists else
+            ('/opt/netdata/etc/netdata' if netdata_opt_conf.stat.exists else '/etc/netdata')
+          }}
+  when: netdata_config_dir | length == 0
+
+- name: Ensure config dir exists
+  file:
+    path: "{{ netdata_config_dir_effective }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"

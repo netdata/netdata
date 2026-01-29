@@ -1,0 +1,25 @@
+---
+- name: Install Netdata
+  import_tasks: install.yml
+
+- name: Set Netdata config directory
+  import_tasks: config-dir.yml
+
+- name: Resolve Netdata profiles
+  import_tasks: profiles.yml
+
+- name: Deploy managed Netdata files
+  import_tasks: managed-files.yml
+  when: netdata_managed_files_effective | length > 0
+
+- name: Configure Netdata
+  import_tasks: configure.yml
+
+- name: Configure Netdata streaming
+  import_tasks: stream.yml
+
+- name: Ensure Netdata service is running
+  import_tasks: service.yml
+
+- name: Claim Netdata
+  import_tasks: claim.yml
