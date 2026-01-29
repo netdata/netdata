@@ -14,6 +14,6 @@ The Value formatter respects the following API `&options=`:
 
 The Value formatter is not exposed by the API by itself.
 Instead it is used by the [`ssv`](/src/web/api/formatters/ssv/README.md) formatter
-and [health monitoring queries](/src/health/README.md).
+and [health monitoring queries](/docs/alerts/understanding-alerts/README.md).
 
 

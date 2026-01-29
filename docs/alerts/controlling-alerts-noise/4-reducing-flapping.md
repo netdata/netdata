@@ -1,0 +1,145 @@
+# 4.4 Reducing Flapping and Noise
+
+Alert flapping—rapidly switching between CLEAR, WARNING, and CRITICAL states—creates noise and erodes trust in alerts. Users start to ignore flapping alerts, which defeats the purpose of alerting.
+
+## 4.4.1 Understanding Flapping
+
+**What causes flapping:**
+
+| Cause | Example |
+|-------|---------|
+| **Threshold too close to normal values** | Alert fires at >80%, system hovers at 79-81% |
+| **Short evaluation window** | 10-second window catches momentary spikes |
+| **Noisy metrics** | Metrics with high variance (e.g., network packets) |
+| **Race conditions** | Alert fires just before scheduled maintenance |
+
+**The cost of flapping:**
+- Notification fatigue → responders ignore alerts
+- False negatives → real alerts get lost in noise
+- Wasted time → investigating non-issues
+
+## 4.4.2 The `delay` Line
+
+The `delay` line controls how long conditions must **hold** before the alert changes status. This prevents brief excursions from triggering status changes.
+
+**Syntax:**
+
+```conf
+delay: [up|down] [duration] [multiplier X] [max [duration]]
+```
+
+**Parameters:**
+
+| Param | Description | Default |
+|-------|-------------|---------|
+| `up` | Delay before entering WARNING/CRITICAL | Required |
+| `down` | Delay before returning to CLEAR | Optional |
+| `duration` | Delay duration (e.g., `5m`, `1h`) | Required |
+| `multiplier X` | Multiply delay on each transition (e.g., `1.5`) | Optional |
+| `max duration` | Maximum total delay accumulated | Optional |
+
+**Common Pattern (from stock alerts):**
+
+```conf
+delay: up 5m down 1m multiplier 1.5 max 1h
+```
+
+**Example: Basic Delay**
+
+```conf
+template: 10min_cpu_usage
+    on: system.cpu
+    lookup: average -5m of user,system
+    every: 1m
+    warn: $this > 80
+    crit: $this > 95
+    delay: up 5m down 1m
+```
+
+This means:
+- **Up delay (5 minutes):** CPU must exceed threshold for **5 minutes** before WARNING/CRITICAL fires
+- **Down delay (1 minute):** CPU must stay below threshold for **1 minute** before returning to CLEAR
+
+## 4.4.3 The `repeat` Line
+
+The `repeat` line controls **how often notifications are sent** while the alert remains in a non-CLEAR state.
+
+**Syntax:**
+
+```conf
+repeat: [off] [warning DURATION] [critical DURATION]
+```
+
+**Parameters:**
+
+| Param | Description | Default |
+|-------|-------------|---------|
+| `off` | Turn off repeating notifications | Optional |
+| `warning DURATION` | Interval between WARNING notifications (e.g., `24h`) | Optional |
+| `critical DURATION` | Interval between CRITICAL notifications (e.g., `6h`) | Optional |
+
+**Example: Daily Repeat for Sustained Issues**
+
+```conf
+template: disk_space_usage
+   on: disk.space
+   lookup: average -1m percentage of avail
+   every: 1m
+   warn: $this < 20
+   crit: $this < 10
+   repeat: warning 24h critical 6h
+   info: Disk space is running low
+```
+
+This sends WARNING notifications once per day, and CRITICAL notifications every 6 hours while the alert is active.
+
+## 4.4.4 Combining Delay and Repeat
+
+```conf
+template: portcheck_connection_timeouts
+    on: portcheck.status
+    lookup: average -3m of timeout
+    every: 1m
+    warn: $this > 1000
+    delay: up 10m down 2m
+    repeat: 6h
+```
+
+**Behavior:**
+1. Service must be down for **10 minutes** before CRITICAL fires
+2. First notification sends immediately when CRITICAL fires
+3. If service stays down, next notification in **6 hours**
+4. Once service recovers, must stay up for **2 minutes** before CLEAR
+
+## 4.4.5 Status-Dependent Conditions
+
+For advanced hysteresis, use `if` conditions that depend on the **current status**:
+
+```conf
+template: 10min_cpu_usage
+    on: system.cpu
+    lookup: average -5m of user,system
+    every: 1m
+    warn: $this > ($status != CRITICAL ? 80 : 90)
+    crit: $this > ($status != CLEAR ? 95 : 98)
+```
+
+This means:
+- **Entering WARNING:** needs >80% CPU
+- **Staying in WARNING:** tolerates up to 90% before CRITICAL
+- **Entering CRITICAL:** needs >95%
+- **Staying in CRITICAL:** tolerates up to 98%
+
+See **[8.1 Hysteresis and Status-Based Conditions](/docs/alerts/essential-patterns/README.md)** for more examples of status-dependent thresholds.
+
+## 4.4.6 Related Sections
+
+- **[8.1 Hysteresis and Status-Based Conditions](/docs/alerts/essential-patterns/README.md)** - Status-aware logic
+- **[7.3 Alert Flapping](/docs/alerts/troubleshooting-alerts/README.md)** - Debugging and fixing flapping alerts
+- **[5.5 Testing and Troubleshooting](/docs/alerts/receiving-notifications/5-testing-troubleshooting.md)** - Verifying notification delivery
+
+## What's Next
+
+- **[5. Receiving Notifications](/docs/alerts/receiving-notifications/README.md)** - Configure notifications
+- **[8. Essential Alert Patterns](/docs/alerts/essential-patterns/README.md)** - Custom actions and performance
+- **[7. Troubleshooting Alerts](/docs/alerts/troubleshooting-alerts/README.md)** - Debugging alert issues

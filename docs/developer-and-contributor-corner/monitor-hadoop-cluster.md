@@ -178,4 +178,4 @@ sudo /etc/netdata/edit-config health.d/hdfs.conf
 sudo /etc/netdata/edit-config health.d/zookeeper.conf
 ```
 
-For more information about editing the defaults or writing new alert entities, see our [health monitoring documentation](/src/health/README.md).
+For more information about editing the defaults or writing new alert entities, see our [health monitoring documentation](/docs/alerts/understanding-alerts/README.md).
