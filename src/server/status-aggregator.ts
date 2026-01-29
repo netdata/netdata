@@ -300,10 +300,12 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
       const agentLine = `${shownName} — ${asClock(secs)}`;
       const title = typeof l.title === 'string' && l.title.length > 0 ? l.title : undefined;
       const latestStatus = typeof l.latestStatus === 'string' && l.latestStatus.length > 0 ? l.latestStatus : undefined;
+      const parsedStatus = parseStatusParts(latestStatus);
+      const nowText = parsedStatus.now;
 
-      // Build context elements: latestStatus on first line, agent/duration on second line
+      // Build context elements: nowText on first line, agent/duration on second line
       const contextElements: string[] = [];
-      if (latestStatus) contextElements.push(latestStatus);
+      if (nowText) contextElements.push(nowText);
       contextElements.push(agentLine);
       const contextText = contextElements.join('\n');
 
@@ -315,10 +317,10 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
           { type: 'context', elements: [{ type: 'mrkdwn', text: contextText }] }
         ];
       } else {
-        // No title, so if we have latestStatus show it with agent/duration as context
-        if (latestStatus) {
+        // No title, so if we have nowText show it with agent/duration as context
+        if (nowText) {
           return [
-            { type: 'section', text: { type: 'mrkdwn', text: latestStatus } },
+            { type: 'section', text: { type: 'mrkdwn', text: nowText } },
             { type: 'context', elements: [{ type: 'mrkdwn', text: agentLine }] }
           ];
         } else {
