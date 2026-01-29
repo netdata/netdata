@@ -12,8 +12,9 @@ import (
 )
 
 type Config struct {
-	UpdateEvery        int `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	Name               string `yaml:"name,omitempty" json:"name,omitempty"`
+	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 
 	Driver  string           `yaml:"driver" json:"driver"`
 	DSN     string           `yaml:"dsn" json:"dsn"`

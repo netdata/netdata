@@ -5,6 +5,7 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"io"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 func TestNormalizeValue(t *testing.T) {
@@ -173,12 +175,53 @@ func TestFuncTable_FindFunction(t *testing.T) {
 	assert.Nil(t, f)
 }
 
-func TestSqlMethods(t *testing.T) {
-	methods := sqlMethods()
-	assert.Len(t, methods, 1)
-	assert.Equal(t, "table", methods[0].ID)
-	assert.Equal(t, "SQL Table View", methods[0].Name)
-	assert.Equal(t, 10, methods[0].UpdateEvery)
+func TestSqlJobMethods(t *testing.T) {
+	tests := map[string]struct {
+		setupCollector func() *Collector
+		jobName        string
+		wantLen        int
+		wantMethodID   string
+	}{
+		"collector with functions": {
+			setupCollector: func() *Collector {
+				c := New()
+				c.Config.Functions = []ConfigFunction{
+					{ID: "test-query", Query: "SELECT 1", Description: "Test query"},
+				}
+				return c
+			},
+			jobName:      "postgres_test",
+			wantLen:      1,
+			wantMethodID: "postgres_test",
+		},
+		"collector without functions": {
+			setupCollector: func() *Collector {
+				return New()
+			},
+			jobName: "empty_job",
+			wantLen: 0,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := tc.setupCollector()
+			job := module.NewJob(module.JobConfig{
+				Name:       tc.jobName,
+				ModuleName: "sql",
+				FullName:   "sql_" + tc.jobName,
+				Module:     c,
+				Out:        io.Discard,
+			})
+			methods := sqlJobMethods(job)
+
+			assert.Len(t, methods, tc.wantLen)
+			if tc.wantLen > 0 {
+				assert.Equal(t, tc.wantMethodID, methods[0].ID)
+				assert.Equal(t, 10, methods[0].UpdateEvery)
+			}
+		})
+	}
 }
 
 func TestFuncTable_MethodParams(t *testing.T) {

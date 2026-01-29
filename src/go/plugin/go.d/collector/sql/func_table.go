@@ -24,11 +24,27 @@ func newFuncTable(c *Collector) *funcTable {
 
 var _ funcapi.MethodHandler = (*funcTable)(nil)
 
-func sqlMethods() []funcapi.MethodConfig {
+// sqlJobMethods returns the method config for a specific SQL job.
+// The method ID is the job name, so each job registers as "sql:jobname".
+func sqlJobMethods(job *module.Job) []funcapi.MethodConfig {
+	c, ok := job.Module().(*Collector)
+	if !ok || len(c.Config.Functions) == 0 {
+		return nil
+	}
+
+	// Build method name from job name (e.g., "postgres_test" → "Postgres Test")
+	methodName := deriveNameFromID(job.Name())
+
+	// Build help text from first function's description or default
+	help := "Execute a configured SQL query and return results as a table"
+	if len(c.Config.Functions) > 0 && c.Config.Functions[0].Description != "" {
+		help = c.Config.Functions[0].Description
+	}
+
 	return []funcapi.MethodConfig{{
-		ID:          "table",
-		Name:        "SQL Table View",
-		Help:        "Execute a configured SQL query and return results as a table",
+		ID:          job.Name(),
+		Name:        methodName,
+		Help:        help,
 		UpdateEvery: 10,
 	}}
 }

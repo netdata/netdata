@@ -458,3 +458,210 @@ func buildAcceptedParams(methodParams []funcapi.ParamConfig) []string {
 	}
 	return accepted
 }
+
+// makeJobMethodFuncHandler creates a function handler for a job-specific method.
+// Unlike makeMethodFuncHandler, this handler routes directly to a specific job
+// without needing the __job parameter (the job is known from the function name).
+func (m *Manager) makeJobMethodFuncHandler(moduleName, jobName, methodID string) func(functions.Function) {
+	return func(fn functions.Function) {
+		// Check for "info" request
+		if slices.Contains(fn.Args, "info") {
+			m.handleJobMethodFuncInfo(moduleName, jobName, methodID, fn)
+			return
+		}
+
+		methodCfg, ok := m.moduleFuncs.getJobMethod(moduleName, jobName, methodID)
+		if !ok {
+			m.respondError(fn, 404, "unknown method '%s' for job '%s:%s'", methodID, moduleName, jobName)
+			return
+		}
+
+		// Get job WITH generation for race condition detection
+		job, jobGen := m.moduleFuncs.getJobWithGeneration(moduleName, jobName)
+		if job == nil {
+			m.respondError(fn, 503, "job '%s:%s' is not running", moduleName, jobName)
+			return
+		}
+
+		// Create context with timeout from function request
+		ctx, cancel := context.WithTimeout(context.Background(), fn.Timeout)
+		defer cancel()
+
+		// Verify job is still running before calling handler
+		if !job.IsRunning() {
+			m.respondError(fn, 503, "job '%s:%s' is no longer running", moduleName, jobName)
+			return
+		}
+
+		// Get the creator for this module to call MethodHandler
+		creator, ok := m.moduleFuncs.getCreator(moduleName)
+		if !ok || creator.MethodHandler == nil {
+			m.respondError(fn, 500, "module '%s' does not implement MethodHandler", moduleName)
+			return
+		}
+
+		// Get the handler for this job
+		handler := creator.MethodHandler(job)
+		if handler == nil {
+			m.respondError(fn, 500, "module '%s' returned nil handler for job '%s'", moduleName, jobName)
+			return
+		}
+
+		payload := parsePayload(fn.Payload)
+		argValues := parseArgsParams(fn.Args)
+
+		// Resolve method-specific required params
+		methodParams, paramsFromJob, err := m.resolveJobMethodParams(ctx, methodCfg, handler, methodID)
+		if err != nil {
+			m.respondError(fn, 503, "job '%s:%s' cannot provide parameters: %v", moduleName, jobName, err)
+			return
+		}
+
+		// Validate provided param values
+		if paramsFromJob {
+			if err := validateParamValues(methodParams, argValues, payload, jobName); err != nil {
+				m.respondError(fn, 400, "%v", err)
+				return
+			}
+		}
+
+		methodParamValues := make(map[string][]string, len(methodParams))
+		for _, paramCfg := range methodParams {
+			methodParamValues[paramCfg.ID] = paramValues(argValues, payload, paramCfg.ID)
+		}
+		resolvedParams := funcapi.ResolveParams(methodParams, methodParamValues)
+
+		// Route to the module's handler
+		dataResp := handler.Handle(ctx, methodID, resolvedParams)
+
+		// Verify job was not replaced during handler execution
+		if !m.moduleFuncs.verifyJobGeneration(moduleName, jobName, jobGen) {
+			m.respondError(fn, 503, "job '%s:%s' was replaced during request, please retry", moduleName, jobName)
+			return
+		}
+
+		updateEvery := 1
+		if methodCfg.UpdateEvery > 1 {
+			updateEvery = methodCfg.UpdateEvery
+		}
+		m.respondJobMethodWithParams(fn, dataResp, methodParams, updateEvery)
+	}
+}
+
+// handleJobMethodFuncInfo handles "info" requests for a job-specific method
+func (m *Manager) handleJobMethodFuncInfo(moduleName, jobName, methodID string, fn functions.Function) {
+	methodCfg, ok := m.moduleFuncs.getJobMethod(moduleName, jobName, methodID)
+	if !ok {
+		m.respondError(fn, 404, "unknown method '%s' for job '%s:%s'", methodID, moduleName, jobName)
+		return
+	}
+
+	methodParams := methodCfg.RequiredParams
+	help := methodCfg.Help
+	if help == "" {
+		help = fmt.Sprintf("%s %s data function", moduleName, methodID)
+	}
+
+	updateEvery := 1
+	if methodCfg.UpdateEvery > 1 {
+		updateEvery = methodCfg.UpdateEvery
+	}
+
+	resp := map[string]any{
+		"v":               3,
+		"update_every":    updateEvery,
+		"status":          200,
+		"type":            "table",
+		"has_history":     false,
+		"help":            help,
+		"accepted_params": buildJobMethodAcceptedParams(methodParams),
+		"required_params": buildJobMethodRequiredParams(methodParams),
+	}
+
+	m.respondJSON(fn, resp)
+}
+
+// resolveJobMethodParams resolves method parameters for a job-specific method
+func (m *Manager) resolveJobMethodParams(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, bool, error) {
+	methodParams := methodCfg.RequiredParams
+
+	jobParams, err := handler.MethodParams(ctx, methodID)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(jobParams) == 0 {
+		return methodParams, true, nil
+	}
+
+	return funcapi.MergeParamConfigs(methodParams, jobParams), true, nil
+}
+
+// respondJobMethodWithParams wraps the module's data response for job-specific methods
+func (m *Manager) respondJobMethodWithParams(fn functions.Function, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
+	if dataResp == nil {
+		m.respondError(fn, 500, "internal error: module returned nil response")
+		return
+	}
+
+	if dataResp.Status >= 400 {
+		m.respondError(fn, dataResp.Status, "%s", dataResp.Message)
+		return
+	}
+
+	paramsForResponse := methodParams
+	if len(dataResp.RequiredParams) > 0 {
+		paramsForResponse = funcapi.MergeParamConfigs(paramsForResponse, dataResp.RequiredParams)
+	}
+
+	resp := map[string]any{
+		"v":               3,
+		"update_every":    updateEvery,
+		"status":          dataResp.Status,
+		"type":            "table",
+		"has_history":     false,
+		"help":            dataResp.Help,
+		"accepted_params": buildJobMethodAcceptedParams(paramsForResponse),
+		"required_params": buildJobMethodRequiredParams(paramsForResponse),
+	}
+
+	if dataResp.Columns != nil {
+		resp["columns"] = dataResp.Columns
+	}
+	if dataResp.Data != nil {
+		resp["data"] = dataResp.Data
+	}
+	if dataResp.DefaultSortColumn != "" {
+		resp["default_sort_column"] = dataResp.DefaultSortColumn
+	}
+	if len(dataResp.Charts) > 0 {
+		resp["charts"] = dataResp.Charts
+	}
+	if len(dataResp.DefaultCharts) > 0 {
+		resp["default_charts"] = dataResp.DefaultCharts.Build()
+	}
+	if len(dataResp.GroupBy) > 0 {
+		resp["group_by"] = dataResp.GroupBy
+	}
+
+	m.respondJSON(fn, resp)
+}
+
+// buildJobMethodAcceptedParams creates accepted_params for job-specific methods (no __job)
+func buildJobMethodAcceptedParams(methodParams []funcapi.ParamConfig) []string {
+	accepted := make([]string, 0, len(methodParams))
+	for _, p := range methodParams {
+		if !slices.Contains(accepted, p.ID) {
+			accepted = append(accepted, p.ID)
+		}
+	}
+	return accepted
+}
+
+// buildJobMethodRequiredParams creates required_params for job-specific methods (no __job)
+func buildJobMethodRequiredParams(methodParams []funcapi.ParamConfig) []map[string]any {
+	required := make([]map[string]any, 0, len(methodParams))
+	for _, cfg := range methodParams {
+		required = append(required, cfg.RequiredParam())
+	}
+	return required
+}

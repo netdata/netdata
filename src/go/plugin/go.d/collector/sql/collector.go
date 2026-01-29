@@ -21,7 +21,7 @@ func init() {
 		Create:          func() module.Module { return New() },
 		JobConfigSchema: configSchema,
 		Config:          func() any { return &Config{} },
-		Methods:         sqlMethods,
+		JobMethods:      sqlJobMethods,
 		MethodHandler:   sqlMethodHandler,
 	})
 }

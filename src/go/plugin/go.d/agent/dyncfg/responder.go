@@ -110,3 +110,8 @@ func (r *Responder) ConfigDelete(id string) {
 func (r *Responder) FunctionGlobal(opts netdataapi.FunctionGlobalOpts) {
 	r.api.FUNCTIONGLOBAL(opts)
 }
+
+// FunctionRemove removes a function from Netdata (no-op until Netdata core supports it)
+func (r *Responder) FunctionRemove(name string) {
+	r.api.FUNCTIONREMOVE(name)
+}
