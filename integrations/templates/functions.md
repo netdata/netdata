@@ -1,4 +1,4 @@
-[% if entry.functions and entry.functions.list %]
+[% if entry.functions %]
 ## Functions
 
 [[ entry.functions.description ]]
