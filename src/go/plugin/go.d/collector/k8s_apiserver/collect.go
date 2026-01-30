@@ -275,9 +275,11 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 
 // collectAdmission collects admission controller and webhook metrics
 func (c *Collector) collectAdmission(mfs prometheus.MetricFamilies, mx *metrics) {
-	// Admission step latency
+	// Admission step latency - aggregate buckets across all operation/rejected label combinations
 	if mf := mfs.Get("apiserver_admission_step_admission_duration_seconds"); mf != nil && mf.Type() == model.MetricTypeHistogram {
-		stepData := make(map[string]*histogramData)
+		// Use map[type][le] -> count for proper aggregation
+		stepBuckets := make(map[string]map[float64]float64)
+		stepTotals := make(map[string]float64)
 
 		for _, m := range mf.Metrics() {
 			if m.Histogram() == nil {
@@ -288,25 +290,29 @@ func (c *Collector) collectAdmission(mfs prometheus.MetricFamilies, mx *metrics)
 				continue
 			}
 
-			if stepData[stepType] == nil {
-				stepData[stepType] = &histogramData{}
+			if stepBuckets[stepType] == nil {
+				stepBuckets[stepType] = make(map[float64]float64)
 			}
 
 			for _, b := range m.Histogram().Buckets() {
 				if math.IsInf(b.UpperBound(), 0) {
-					stepData[stepType].total += b.CumulativeCount()
+					stepTotals[stepType] += b.CumulativeCount()
 					continue
 				}
-				stepData[stepType].buckets = append(stepData[stepType].buckets, histogramBucket{
-					le:    b.UpperBound(),
-					count: b.CumulativeCount(),
-				})
+				// Aggregate by summing counts for same le across all label combinations
+				stepBuckets[stepType][b.UpperBound()] += b.CumulativeCount()
 			}
 		}
 
-		for stepType, hd := range stepData {
+		// Convert aggregated buckets to histogramData for percentile calculation
+		for stepType, bucketMap := range stepBuckets {
+			hd := histogramData{total: stepTotals[stepType]}
+			for le, count := range bucketMap {
+				hd.buckets = append(hd.buckets, histogramBucket{le: le, count: count})
+			}
 			sortBuckets(hd.buckets)
-			if p50 := histogramPercentile(*hd, 0.5); !math.IsNaN(p50) {
+
+			if p50 := histogramPercentile(hd, 0.5); !math.IsNaN(p50) {
 				switch stepType {
 				case "validate":
 					mx.Admission.StepLatency.Validate.Set(p50 * latencyPrecision)
