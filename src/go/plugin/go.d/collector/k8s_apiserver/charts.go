@@ -395,6 +395,22 @@ func newWorkqueueAddsChart(name string) *Chart {
 	}
 }
 
+func newWorkqueueDurationChart(name string) *Chart {
+	return &Chart{
+		ID:    "workqueue_duration_" + name,
+		Title: "Work Queue Work Duration",
+		Units: "microseconds",
+		Fam:   "workqueue",
+		Ctx:   "k8s_apiserver.workqueue_duration",
+		Type:  module.Line,
+		Dims: Dims{
+			{ID: "workqueue_" + name + "_duration_p50", Name: "p50"},
+			{ID: "workqueue_" + name + "_duration_p90", Name: "p90"},
+			{ID: "workqueue_" + name + "_duration_p99", Name: "p99"},
+		},
+	}
+}
+
 func newAdmissionControllerLatencyChart(name string) *Chart {
 	// Heatmap chart with histogram bucket dimensions
 	// K8s admission controller histogram buckets: 5ms, 25ms, 100ms, 500ms, 1s, 2.5s, +Inf

@@ -141,3 +141,22 @@ subjects:
 ### Certificate errors
 - Provide the correct CA certificate path in `tls_ca`
 - Or set `tls_skip_verify: yes` (not recommended for production)
+
+## Cardinality Limits
+
+To prevent excessive memory usage in large clusters, the collector enforces cardinality limits
+on dynamic dimensions:
+
+| Dimension Type       | Maximum | Notes                                      |
+|---------------------|---------|---------------------------------------------|
+| Resources           | 500     | Kubernetes resource types (pods, services, etc.) |
+| Work Queues         | 100     | Controller work queues                      |
+| Admission Controllers | 100   | Admission controller names                  |
+| Admission Webhooks  | 50      | Admission webhook names                     |
+
+When these limits are reached, new dimensions are silently ignored. Existing dimensions that
+haven't been seen for approximately 5 minutes (300 collection cycles) are automatically cleaned
+up to make room for new ones.
+
+If you need to monitor more dimensions, you can modify the `defaultMax*` constants in the
+collector source code.

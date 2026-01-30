@@ -429,6 +429,21 @@ modules:
                 - name: p50
                 - name: p90
                 - name: p99
+            - name: k8s_apiserver.workqueue_adds
+              description: Work Queue Adds
+              unit: items/s
+              chart_type: line
+              dimensions:
+                - name: adds
+                - name: retries
+            - name: k8s_apiserver.workqueue_duration
+              description: Work Queue Work Duration
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: p50
+                - name: p90
+                - name: p99
         - name: admission controller
           description: These metrics refer to admission controllers.
           labels:

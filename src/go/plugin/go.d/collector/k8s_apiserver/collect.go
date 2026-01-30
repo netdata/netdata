@@ -3,6 +3,7 @@
 package k8s_apiserver
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -22,17 +23,27 @@ const (
 	latencyPrecision = 1000000
 
 	// Default cardinality limits to prevent unbounded memory growth
+	// Once these limits are reached, new dimensions are silently ignored
 	defaultMaxResources   = 500
 	defaultMaxWorkqueues  = 100
 	defaultMaxAdmCtrl     = 100
 	defaultMaxAdmWebhooks = 50
+
+	// Cleanup: dimensions not seen for this many cycles are removed
+	staleThresholdCycles = 300 // ~5 minutes at 1s update interval
 )
+
+// K8s admission histogram bucket bounds (seconds)
+// Ref: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/metrics/metrics.go
+var admissionBucketBounds = []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5}
 
 func (c *Collector) collect() (map[string]int64, error) {
 	mfs, err := c.prom.Scrape()
 	if err != nil {
 		return nil, err
 	}
+
+	c.collectCycle++
 
 	mx := newMetrics()
 
@@ -46,18 +57,24 @@ func (c *Collector) collect() (map[string]int64, error) {
 	c.collectAudit(mfs, mx)
 	c.collectAuth(mfs, mx)
 
+	// Periodically cleanup stale dimensions (every 100 cycles to avoid overhead)
+	if c.collectCycle%100 == 0 {
+		c.cleanupStaleDimensions()
+	}
+
 	return stm.ToMap(mx), nil
 }
 
 // collectRequests collects apiserver_request_total, apiserver_request_duration_seconds, etc.
 func (c *Collector) collectRequests(mfs prometheus.MetricFamilies, mx *metrics) {
 	// Total requests and by verb/code/resource
-	for _, mf := range mfs {
-		name := mf.Name()
-		if name != "apiserver_request_total" && name != "apiserver_request_count" {
-			continue
-		}
+	// Prefer apiserver_request_total (newer), fall back to apiserver_request_count (legacy)
+	mf := mfs.Get("apiserver_request_total")
+	if mf == nil {
+		mf = mfs.Get("apiserver_request_count")
+	}
 
+	if mf != nil {
 		for _, m := range mf.Metrics() {
 			value := metricValue(mf, m)
 			if math.IsNaN(value) {
@@ -84,15 +101,18 @@ func (c *Collector) collectRequests(mfs prometheus.MetricFamilies, mx *metrics) 
 
 			// By resource (with cardinality limit)
 			if resource != "" {
-				if c.collectedResources[resource] || len(c.collectedResources) < defaultMaxResources {
+				_, seen := c.collectedResources[resource]
+				if seen || len(c.collectedResources) < defaultMaxResources {
 					c.addResourceDimension(resource)
+					c.collectedResources[resource] = c.collectCycle
 					mx.Request.ByResource[resource] = mtx.Gauge(mx.Request.ByResource[resource].Value() + value)
 				}
 			}
 		}
 	}
 
-	// Dropped/rejected requests - support both legacy and APF metrics
+	// Dropped/rejected requests - sum both legacy and APF (flow control) metrics
+	// Both can be present and meaningful on different K8s versions
 	var dropped float64
 	if mf := mfs.Get("apiserver_dropped_requests_total"); mf != nil {
 		for _, m := range mf.Metrics() {
@@ -101,12 +121,10 @@ func (c *Collector) collectRequests(mfs prometheus.MetricFamilies, mx *metrics) 
 			}
 		}
 	}
-	if dropped == 0 {
-		if mf := mfs.Get("apiserver_flowcontrol_rejected_requests_total"); mf != nil {
-			for _, m := range mf.Metrics() {
-				if v := metricValue(mf, m); !math.IsNaN(v) {
-					dropped += v
-				}
+	if mf := mfs.Get("apiserver_flowcontrol_rejected_requests_total"); mf != nil {
+		for _, m := range mf.Metrics() {
+			if v := metricValue(mf, m); !math.IsNaN(v) {
+				dropped += v
 			}
 		}
 	}
@@ -175,14 +193,15 @@ func (c *Collector) collectInflight(mfs prometheus.MetricFamilies, mx *metrics) 
 		}
 	}
 
+	// Sum all long-running requests across all label combinations
 	if mf := mfs.Get("apiserver_longrunning_requests"); mf != nil {
-		var maxVal float64
+		var total float64
 		for _, m := range mf.Metrics() {
-			if v := metricValue(mf, m); !math.IsNaN(v) && v > maxVal {
-				maxVal = v
+			if v := metricValue(mf, m); !math.IsNaN(v) {
+				total += v
 			}
 		}
-		mx.Inflight.Longrunning.Set(maxVal)
+		mx.Inflight.Longrunning.Set(total)
 	}
 }
 
@@ -323,14 +342,25 @@ func (c *Collector) collectAdmissionControllerLatency(mfs prometheus.MetricFamil
 		}
 	}
 
-	for name, bucketMap := range controllerBucketMaps {
-		// Cardinality limit
-		if !c.collectedAdmissionCtrl[name] && len(c.collectedAdmissionCtrl) >= defaultMaxAdmCtrl {
+	// Collect names into slice first to avoid modifying maps during iteration
+	controllerNames := make([]string, 0, len(controllerBucketMaps))
+	for name := range controllerBucketMaps {
+		controllerNames = append(controllerNames, name)
+	}
+
+	for _, name := range controllerNames {
+		bucketMap := controllerBucketMaps[name]
+
+		// Cardinality limit: only accept new items if under limit
+		_, seen := c.collectedAdmissionCtrl[name]
+		if !seen && len(c.collectedAdmissionCtrl) >= defaultMaxAdmCtrl {
 			continue
 		}
 
-		if !c.collectedAdmissionCtrl[name] {
-			c.collectedAdmissionCtrl[name] = true
+		// Track last-seen cycle
+		c.collectedAdmissionCtrl[name] = c.collectCycle
+
+		if !seen {
 			if err := c.charts.Add(newAdmissionControllerLatencyChart(name)); err != nil {
 				c.Warningf("failed to add admission controller chart %s: %v", name, err)
 			}
@@ -340,23 +370,9 @@ func (c *Collector) collectAdmissionControllerLatency(mfs prometheus.MetricFamil
 			mx.Admission.Controllers[name] = &admissionControllerMetrics{}
 		}
 
-		// K8s admission controller histogram buckets: 0.005, 0.025, 0.1, 0.5, 1, 2.5, +Inf
-		// Convert cumulative counts to non-cumulative for heatmap
-		b5ms := bucketMap[0.005]
-		b25ms := bucketMap[0.025]
-		b100ms := bucketMap[0.1]
-		b500ms := bucketMap[0.5]
-		b1s := bucketMap[1.0]
-		b2500ms := bucketMap[2.5]
-		bInf := bucketMap[math.Inf(1)]
-
-		mx.Admission.Controllers[name].Bucket5ms.Set(b5ms)
-		mx.Admission.Controllers[name].Bucket25ms.Set(b25ms - b5ms)
-		mx.Admission.Controllers[name].Bucket100ms.Set(b100ms - b25ms)
-		mx.Admission.Controllers[name].Bucket500ms.Set(b500ms - b100ms)
-		mx.Admission.Controllers[name].Bucket1s.Set(b1s - b500ms)
-		mx.Admission.Controllers[name].Bucket2500ms.Set(b2500ms - b1s)
-		mx.Admission.Controllers[name].BucketInf.Set(bInf - b2500ms)
+		// Use cumulative bucket values directly - chart uses Incremental algorithm
+		// This avoids negative values when Prometheus counters reset
+		c.setAdmissionBucketMetrics(bucketMap, mx.Admission.Controllers[name])
 	}
 }
 
@@ -387,14 +403,25 @@ func (c *Collector) collectAdmissionWebhookLatency(mfs prometheus.MetricFamilies
 		}
 	}
 
-	for name, bucketMap := range webhookBucketMaps {
-		// Cardinality limit
-		if !c.collectedAdmissionWH[name] && len(c.collectedAdmissionWH) >= defaultMaxAdmWebhooks {
+	// Collect names into slice first to avoid modifying maps during iteration
+	webhookNames := make([]string, 0, len(webhookBucketMaps))
+	for name := range webhookBucketMaps {
+		webhookNames = append(webhookNames, name)
+	}
+
+	for _, name := range webhookNames {
+		bucketMap := webhookBucketMaps[name]
+
+		// Cardinality limit: only accept new items if under limit
+		_, seen := c.collectedAdmissionWH[name]
+		if !seen && len(c.collectedAdmissionWH) >= defaultMaxAdmWebhooks {
 			continue
 		}
 
-		if !c.collectedAdmissionWH[name] {
-			c.collectedAdmissionWH[name] = true
+		// Track last-seen cycle
+		c.collectedAdmissionWH[name] = c.collectCycle
+
+		if !seen {
 			if err := c.charts.Add(newAdmissionWebhookLatencyChart(name)); err != nil {
 				c.Warningf("failed to add admission webhook chart %s: %v", name, err)
 			}
@@ -404,23 +431,9 @@ func (c *Collector) collectAdmissionWebhookLatency(mfs prometheus.MetricFamilies
 			mx.Admission.Webhooks[name] = &admissionWebhookMetrics{}
 		}
 
-		// K8s admission webhook histogram buckets: 0.005, 0.025, 0.1, 0.5, 1, 2.5, +Inf
-		// Convert cumulative counts to non-cumulative for heatmap
-		b5ms := bucketMap[0.005]
-		b25ms := bucketMap[0.025]
-		b100ms := bucketMap[0.1]
-		b500ms := bucketMap[0.5]
-		b1s := bucketMap[1.0]
-		b2500ms := bucketMap[2.5]
-		bInf := bucketMap[math.Inf(1)]
-
-		mx.Admission.Webhooks[name].Bucket5ms.Set(b5ms)
-		mx.Admission.Webhooks[name].Bucket25ms.Set(b25ms - b5ms)
-		mx.Admission.Webhooks[name].Bucket100ms.Set(b100ms - b25ms)
-		mx.Admission.Webhooks[name].Bucket500ms.Set(b500ms - b100ms)
-		mx.Admission.Webhooks[name].Bucket1s.Set(b1s - b500ms)
-		mx.Admission.Webhooks[name].Bucket2500ms.Set(b2500ms - b1s)
-		mx.Admission.Webhooks[name].BucketInf.Set(bInf - b2500ms)
+		// Use cumulative bucket values directly - chart uses Incremental algorithm
+		// This avoids negative values when Prometheus counters reset
+		c.setAdmissionBucketMetrics(bucketMap, mx.Admission.Webhooks[name])
 	}
 }
 
@@ -506,14 +519,23 @@ func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics
 	queueLatencyMF := mfs.Get("workqueue_queue_duration_seconds")
 	workDurationMF := mfs.Get("workqueue_work_duration_seconds")
 
-	for queueName := range depthByName {
-		// Cardinality limit
-		if !c.collectedWorkqueues[queueName] && len(c.collectedWorkqueues) >= defaultMaxWorkqueues {
+	// Collect names into slice first to avoid modifying maps during iteration
+	queueNames := make([]string, 0, len(depthByName))
+	for name := range depthByName {
+		queueNames = append(queueNames, name)
+	}
+
+	for _, queueName := range queueNames {
+		// Cardinality limit: only accept new items if under limit
+		_, seen := c.collectedWorkqueues[queueName]
+		if !seen && len(c.collectedWorkqueues) >= defaultMaxWorkqueues {
 			continue
 		}
 
-		if !c.collectedWorkqueues[queueName] {
-			c.collectedWorkqueues[queueName] = true
+		// Track last-seen cycle
+		c.collectedWorkqueues[queueName] = c.collectCycle
+
+		if !seen {
 			if err := c.charts.Add(newWorkqueueDepthChart(queueName)); err != nil {
 				c.Warningf("failed to add workqueue depth chart %s: %v", queueName, err)
 			}
@@ -522,6 +544,9 @@ func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics
 			}
 			if err := c.charts.Add(newWorkqueueAddsChart(queueName)); err != nil {
 				c.Warningf("failed to add workqueue adds chart %s: %v", queueName, err)
+			}
+			if err := c.charts.Add(newWorkqueueDurationChart(queueName)); err != nil {
+				c.Warningf("failed to add workqueue duration chart %s: %v", queueName, err)
 			}
 		}
 
@@ -648,10 +673,12 @@ func (c *Collector) collectAuth(mfs prometheus.MetricFamilies, mx *metrics) {
 // Helper functions for dynamic dimension creation
 
 func (c *Collector) addVerbDimension(verb string) {
-	if c.collectedVerbs[verb] {
+	_, seen := c.collectedVerbs[verb]
+	c.collectedVerbs[verb] = c.collectCycle
+
+	if seen {
 		return
 	}
-	c.collectedVerbs[verb] = true
 
 	chart := c.charts.Get("requests_by_verb")
 	if chart == nil {
@@ -669,10 +696,12 @@ func (c *Collector) addVerbDimension(verb string) {
 }
 
 func (c *Collector) addCodeDimension(code string) {
-	if c.collectedCodes[code] {
+	_, seen := c.collectedCodes[code]
+	c.collectedCodes[code] = c.collectCycle
+
+	if seen {
 		return
 	}
-	c.collectedCodes[code] = true
 
 	chart := c.charts.Get("requests_by_code")
 	if chart == nil {
@@ -690,10 +719,11 @@ func (c *Collector) addCodeDimension(code string) {
 }
 
 func (c *Collector) addResourceDimension(resource string) {
-	if c.collectedResources[resource] {
+	_, seen := c.collectedResources[resource]
+	// Note: cycle tracking for resources is done in collectRequests due to cardinality limit check
+	if seen {
 		return
 	}
-	c.collectedResources[resource] = true
 
 	chart := c.charts.Get("requests_by_resource")
 	if chart == nil {
@@ -828,4 +858,152 @@ func histogramPercentile(hd histogramData, percentile float64) float64 {
 	}
 
 	return hd.buckets[len(hd.buckets)-1].le
+}
+
+// bucketSetter is implemented by admission controller and webhook metrics
+type bucketSetter interface {
+	setBuckets(b5ms, b25ms, b100ms, b500ms, b1s, b2500ms, bInf float64)
+}
+
+func (m *admissionControllerMetrics) setBuckets(b5ms, b25ms, b100ms, b500ms, b1s, b2500ms, bInf float64) {
+	m.Bucket5ms.Set(b5ms)
+	m.Bucket25ms.Set(b25ms)
+	m.Bucket100ms.Set(b100ms)
+	m.Bucket500ms.Set(b500ms)
+	m.Bucket1s.Set(b1s)
+	m.Bucket2500ms.Set(b2500ms)
+	m.BucketInf.Set(bInf)
+}
+
+func (m *admissionWebhookMetrics) setBuckets(b5ms, b25ms, b100ms, b500ms, b1s, b2500ms, bInf float64) {
+	m.Bucket5ms.Set(b5ms)
+	m.Bucket25ms.Set(b25ms)
+	m.Bucket100ms.Set(b100ms)
+	m.Bucket500ms.Set(b500ms)
+	m.Bucket1s.Set(b1s)
+	m.Bucket2500ms.Set(b2500ms)
+	m.BucketInf.Set(bInf)
+}
+
+// setAdmissionBucketMetrics extracts bucket values and sets them on the metrics
+// Converts Prometheus cumulative buckets to non-cumulative for heatmap display
+// Uses max(0, diff) to protect against negative values from counter resets
+func (c *Collector) setAdmissionBucketMetrics(bucketMap map[float64]float64, m bucketSetter) {
+	// Validate bucket presence and log warnings for missing buckets
+	var missingBuckets []string
+	for _, bound := range admissionBucketBounds {
+		if _, ok := bucketMap[bound]; !ok {
+			missingBuckets = append(missingBuckets, formatBucketBound(bound))
+		}
+	}
+	if _, ok := bucketMap[math.Inf(1)]; !ok {
+		missingBuckets = append(missingBuckets, "+Inf")
+	}
+	if len(missingBuckets) > 0 {
+		c.Debugf("missing histogram buckets: %v", missingBuckets)
+	}
+
+	// Extract cumulative bucket values (0 if missing)
+	b5ms := bucketMap[admissionBucketBounds[0]]
+	b25ms := bucketMap[admissionBucketBounds[1]]
+	b100ms := bucketMap[admissionBucketBounds[2]]
+	b500ms := bucketMap[admissionBucketBounds[3]]
+	b1s := bucketMap[admissionBucketBounds[4]]
+	b2500ms := bucketMap[admissionBucketBounds[5]]
+	bInf := bucketMap[math.Inf(1)]
+
+	// Convert cumulative to non-cumulative (differential) bucket counts
+	// Use max(0, diff) to handle Prometheus counter resets gracefully
+	// When a counter resets, the cumulative value decreases, causing negative diffs
+	m.setBuckets(
+		b5ms,
+		math.Max(0, b25ms-b5ms),
+		math.Max(0, b100ms-b25ms),
+		math.Max(0, b500ms-b100ms),
+		math.Max(0, b1s-b500ms),
+		math.Max(0, b2500ms-b1s),
+		math.Max(0, bInf-b2500ms),
+	)
+}
+
+// formatBucketBound formats a bucket bound for logging
+func formatBucketBound(bound float64) string {
+	if bound < 1 {
+		return fmt.Sprintf("%.0fms", bound*1000)
+	}
+	return fmt.Sprintf("%.1fs", bound)
+}
+
+// cleanupStaleDimensions removes dimensions that haven't been seen for staleThresholdCycles
+func (c *Collector) cleanupStaleDimensions() {
+	threshold := c.collectCycle - staleThresholdCycles
+
+	// Cleanup resources
+	for name, lastSeen := range c.collectedResources {
+		if lastSeen < threshold {
+			delete(c.collectedResources, name)
+			if chart := c.charts.Get("requests_by_resource"); chart != nil {
+				dimID := "request_by_resource_" + name
+				_ = chart.RemoveDim(dimID)
+				chart.MarkNotCreated()
+			}
+			c.Debugf("removed stale resource dimension: %s", name)
+		}
+	}
+
+	// Cleanup verbs
+	for name, lastSeen := range c.collectedVerbs {
+		if lastSeen < threshold {
+			delete(c.collectedVerbs, name)
+			if chart := c.charts.Get("requests_by_verb"); chart != nil {
+				dimID := "request_by_verb_" + name
+				_ = chart.RemoveDim(dimID)
+				chart.MarkNotCreated()
+			}
+			c.Debugf("removed stale verb dimension: %s", name)
+		}
+	}
+
+	// Cleanup codes
+	for name, lastSeen := range c.collectedCodes {
+		if lastSeen < threshold {
+			delete(c.collectedCodes, name)
+			if chart := c.charts.Get("requests_by_code"); chart != nil {
+				dimID := "request_by_code_" + name
+				_ = chart.RemoveDim(dimID)
+				chart.MarkNotCreated()
+			}
+			c.Debugf("removed stale code dimension: %s", name)
+		}
+	}
+
+	// Cleanup workqueues (remove charts)
+	for name, lastSeen := range c.collectedWorkqueues {
+		if lastSeen < threshold {
+			delete(c.collectedWorkqueues, name)
+			_ = c.charts.Remove("workqueue_depth_" + name)
+			_ = c.charts.Remove("workqueue_latency_" + name)
+			_ = c.charts.Remove("workqueue_adds_" + name)
+			_ = c.charts.Remove("workqueue_duration_" + name)
+			c.Debugf("removed stale workqueue charts: %s", name)
+		}
+	}
+
+	// Cleanup admission controllers (remove charts)
+	for name, lastSeen := range c.collectedAdmissionCtrl {
+		if lastSeen < threshold {
+			delete(c.collectedAdmissionCtrl, name)
+			_ = c.charts.Remove("admission_controller_latency_" + name)
+			c.Debugf("removed stale admission controller chart: %s", name)
+		}
+	}
+
+	// Cleanup admission webhooks (remove charts)
+	for name, lastSeen := range c.collectedAdmissionWH {
+		if lastSeen < threshold {
+			delete(c.collectedAdmissionWH, name)
+			_ = c.charts.Remove("admission_webhook_latency_" + name)
+			c.Debugf("removed stale admission webhook chart: %s", name)
+		}
+	}
 }

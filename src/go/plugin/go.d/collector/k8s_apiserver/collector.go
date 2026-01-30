@@ -48,12 +48,12 @@ func New() *Collector {
 			},
 		},
 		charts:                 baseCharts.Copy(),
-		collectedResources:     make(map[string]bool),
-		collectedVerbs:         make(map[string]bool),
-		collectedCodes:         make(map[string]bool),
-		collectedWorkqueues:    make(map[string]bool),
-		collectedAdmissionCtrl: make(map[string]bool),
-		collectedAdmissionWH:   make(map[string]bool),
+		collectedResources:     make(map[string]int64),
+		collectedVerbs:         make(map[string]int64),
+		collectedCodes:         make(map[string]int64),
+		collectedWorkqueues:    make(map[string]int64),
+		collectedAdmissionCtrl: make(map[string]int64),
+		collectedAdmissionWH:   make(map[string]int64),
 	}
 }
 
@@ -72,13 +72,17 @@ type Collector struct {
 
 	prom prometheus.Prometheus
 
-	// Track collected dynamic dimensions/charts
-	collectedResources     map[string]bool
-	collectedVerbs         map[string]bool
-	collectedCodes         map[string]bool
-	collectedWorkqueues    map[string]bool
-	collectedAdmissionCtrl map[string]bool
-	collectedAdmissionWH   map[string]bool
+	// Collection cycle counter for staleness tracking
+	collectCycle int64
+
+	// Track collected dynamic dimensions/charts with last-seen cycle
+	// Maps dimension name to the cycle number when it was last seen
+	collectedResources     map[string]int64
+	collectedVerbs         map[string]int64
+	collectedCodes         map[string]int64
+	collectedWorkqueues    map[string]int64
+	collectedAdmissionCtrl map[string]int64
+	collectedAdmissionWH   map[string]int64
 }
 
 func (c *Collector) Configuration() any {

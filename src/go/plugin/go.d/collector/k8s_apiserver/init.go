@@ -23,11 +23,16 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 		return nil, err
 	}
 
+	if srParseErr != nil {
+		c.Warningf("selector parse error (collecting all metrics): %v", srParseErr)
+	}
+
 	return prometheus.NewWithSelector(httpClient, c.RequestConfig, sr), nil
 }
 
 // Selector to filter only the metrics we need, reducing memory usage
-var sr, _ = selector.Expr{
+// Parse() is called at package init time; if it fails, sr will be nil and all metrics will be collected
+var sr, srParseErr = selector.Expr{
 	Allow: []string{
 		// Request metrics
 		"apiserver_request_total",
