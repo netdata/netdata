@@ -12,4 +12,7 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st);
 void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st);
 void rrdset_pluginsd_receive_slots_initialize(RRDSET *st);
 
+// Stress test for PRD_ARRAY reference counting - run with -W prd-array-stress
+int prd_array_stress_test(void);
+
 #endif //NETDATA_RRDSET_SLOTS_H

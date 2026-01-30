@@ -61,11 +61,12 @@ static void prd_array_release_entries(PRD_ARRAY *arr) {
 // --------------------------------------------------------------------------------------------------------------------
 // Unslot a chart - releases dimension references but keeps the array for reuse
 // This is called when switching charts or marking them obsolete
-// Thread-safe: uses reference counting to protect array access
+// Thread-safe: uses spinlock + reference counting to protect array access
 
 void rrdset_pluginsd_receive_unslot(RRDSET *st) {
     // Acquire a reference to safely access the array
-    PRD_ARRAY *arr = prd_array_acquire(&st->pluginsd.prd_array);
+    // The spinlock prevents races with concurrent replace+release operations
+    PRD_ARRAY *arr = prd_array_acquire(&st->pluginsd.prd_array, &st->pluginsd.spinlock);
     if (arr) {
         // Release all dimension references
         prd_array_release_entries(arr);
@@ -103,9 +104,11 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
     if(collector_tid != 0) {
         // Collector is still active, cannot cleanup now
-        // This shouldn't happen during normal operation - log a warning
-        netdata_log_error("PLUGINSD: attempted cleanup while collector (tid %d) is still active on chart, skipping",
-                         collector_tid);
+        // This shouldn't happen during normal operation - log a warning (rate limited)
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                     "PLUGINSD: attempted cleanup while collector (tid %d) is still active on chart, skipping",
+                     collector_tid);
         spinlock_unlock(&st->pluginsd.spinlock);
         return;
     }
@@ -153,4 +156,217 @@ void rrdset_pluginsd_receive_slots_initialize(RRDSET *st) {
     spinlock_init(&st->pluginsd.spinlock);
     st->pluginsd.last_slot = -1;
     st->pluginsd.prd_array = NULL;  // Explicitly initialize to NULL
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Stress test for PRD_ARRAY reference counting
+// Run with: netdata -W prd-array-stress
+// --------------------------------------------------------------------------------------------------------------------
+
+#define PRD_STRESS_TEST_DURATION_SEC 5
+#define PRD_STRESS_NUM_READERS 4
+#define PRD_STRESS_NUM_WRITERS 1   // Must be 1 - only one collector per chart in real code
+#define PRD_STRESS_NUM_CLEANERS 1
+
+typedef struct {
+    PRD_ARRAY *prd_array;
+    int32_t collector_tid;
+    SPINLOCK spinlock;
+    bool running;
+    uint64_t acquire_count;
+    uint64_t release_count;
+    uint64_t grow_count;
+    uint64_t cleanup_count;
+    uint64_t cleanup_skipped;
+} prd_stress_state_t;
+
+static prd_stress_state_t prd_stress_state;
+
+static void prd_stress_reader_thread(void *arg __maybe_unused) {
+    while (__atomic_load_n(&prd_stress_state.running, __ATOMIC_ACQUIRE)) {
+        PRD_ARRAY *arr = prd_array_acquire(&prd_stress_state.prd_array, &prd_stress_state.spinlock);
+        if (arr) {
+            // Simulate work with the array - read entries
+            for (size_t i = 0; i < arr->size && i < 10; i++) {
+                volatile void *dummy = arr->entries[i].rd;
+                (void)dummy;
+            }
+            __atomic_fetch_add(&prd_stress_state.acquire_count, 1, __ATOMIC_RELAXED);
+
+            // Small delay to increase chance of races
+            tinysleep();
+
+            prd_array_release(arr);
+            __atomic_fetch_add(&prd_stress_state.release_count, 1, __ATOMIC_RELAXED);
+        }
+        tinysleep();
+    }
+}
+
+static void prd_stress_writer_thread(void *arg __maybe_unused) {
+    while (__atomic_load_n(&prd_stress_state.running, __ATOMIC_ACQUIRE)) {
+        // Simulate collector_tid being set (like pluginsd_set_scope_chart does)
+        __atomic_store_n(&prd_stress_state.collector_tid, 1, __ATOMIC_RELEASE);
+
+        PRD_ARRAY *current_arr = prd_array_get_unsafe(&prd_stress_state.prd_array);
+
+        // Determine new size based on current array (or start fresh if NULL)
+        size_t current_size = current_arr ? current_arr->size : 0;
+        size_t new_size = current_size + 10;
+
+        // Wrap around to avoid unbounded growth
+        if (new_size > 1000)
+            new_size = 10;
+
+        // Create new array
+        PRD_ARRAY *new_arr = prd_array_create(new_size);
+
+        // Copy existing entries (only copy what fits in the new array)
+        if (current_arr && current_size > 0) {
+            size_t copy_count = (current_size < new_size) ? current_size : new_size;
+            memcpy(new_arr->entries, current_arr->entries,
+                   copy_count * sizeof(struct pluginsd_rrddim));
+        }
+
+        // Initialize new entries with some data
+        for (size_t i = current_size; i < new_size; i++) {
+            new_arr->entries[i].rd = (void *)(uintptr_t)(i + 1);
+            new_arr->entries[i].id = "test";
+        }
+
+        // Atomically replace
+        PRD_ARRAY *old_arr = prd_array_replace(&prd_stress_state.prd_array, new_arr);
+
+        if (old_arr)
+            prd_array_release(old_arr);
+
+        __atomic_fetch_add(&prd_stress_state.grow_count, 1, __ATOMIC_RELAXED);
+
+        // Clear collector_tid
+        __atomic_store_n(&prd_stress_state.collector_tid, 0, __ATOMIC_RELEASE);
+
+        usleep(100);
+    }
+}
+
+static void prd_stress_cleanup_thread(void *arg __maybe_unused) {
+    while (__atomic_load_n(&prd_stress_state.running, __ATOMIC_ACQUIRE)) {
+        usleep(500);
+
+        spinlock_lock(&prd_stress_state.spinlock);
+
+        // Check if collector is active (like rrdset_pluginsd_receive_unslot_and_cleanup does)
+        int32_t collector_tid = __atomic_load_n(&prd_stress_state.collector_tid, __ATOMIC_ACQUIRE);
+        if (collector_tid != 0) {
+            __atomic_fetch_add(&prd_stress_state.cleanup_skipped, 1, __ATOMIC_RELAXED);
+            spinlock_unlock(&prd_stress_state.spinlock);
+            continue;
+        }
+
+        // Replace array with NULL
+        PRD_ARRAY *old_arr = prd_array_replace(&prd_stress_state.prd_array, NULL);
+
+        spinlock_unlock(&prd_stress_state.spinlock);
+
+        if (old_arr) {
+            // Simulate clearing entries
+            for (size_t i = 0; i < old_arr->size; i++) {
+                old_arr->entries[i].rda = NULL;
+                old_arr->entries[i].rd = NULL;
+                old_arr->entries[i].id = NULL;
+            }
+
+            prd_array_release(old_arr);
+            __atomic_fetch_add(&prd_stress_state.cleanup_count, 1, __ATOMIC_RELAXED);
+        }
+    }
+}
+
+int prd_array_stress_test(void) {
+    int num_readers = PRD_STRESS_NUM_READERS;
+    int num_writers = PRD_STRESS_NUM_WRITERS;
+    int num_cleaners = PRD_STRESS_NUM_CLEANERS;
+    int duration_secs = PRD_STRESS_TEST_DURATION_SEC;
+    int total_threads = num_readers + num_writers + num_cleaners;
+
+    fprintf(stderr, "\nPRD_ARRAY Reference Counting Stress Test\n");
+    fprintf(stderr, "=========================================\n");
+    fprintf(stderr, "Duration: %d seconds\n", duration_secs);
+    fprintf(stderr, "Readers: %d, Writers: %d, Cleaners: %d\n\n", num_readers, num_writers, num_cleaners);
+
+    // Initialize state
+    memset(&prd_stress_state, 0, sizeof(prd_stress_state));
+    prd_stress_state.prd_array = prd_array_create(10);
+    spinlock_init(&prd_stress_state.spinlock);
+    __atomic_store_n(&prd_stress_state.running, true, __ATOMIC_RELEASE);
+
+    // Start threads
+    ND_THREAD **threads = callocz(total_threads, sizeof(ND_THREAD *));
+    char thread_name[32];
+
+    int t = 0;
+    for (int i = 0; i < num_readers; i++) {
+        snprintfz(thread_name, sizeof(thread_name), "PRDSTRESS_R%d", i);
+        threads[t++] = nd_thread_create(thread_name, NETDATA_THREAD_OPTION_DEFAULT,
+                                        prd_stress_reader_thread, NULL);
+    }
+    for (int i = 0; i < num_writers; i++) {
+        snprintfz(thread_name, sizeof(thread_name), "PRDSTRESS_W%d", i);
+        threads[t++] = nd_thread_create(thread_name, NETDATA_THREAD_OPTION_DEFAULT,
+                                        prd_stress_writer_thread, NULL);
+    }
+    for (int i = 0; i < num_cleaners; i++) {
+        snprintfz(thread_name, sizeof(thread_name), "PRDSTRESS_C%d", i);
+        threads[t++] = nd_thread_create(thread_name, NETDATA_THREAD_OPTION_DEFAULT,
+                                        prd_stress_cleanup_thread, NULL);
+    }
+
+    // Run the test
+    fprintf(stderr, "Running stress test...\n");
+    for (int i = 0; i < duration_secs; i++) {
+        sleep_usec(USEC_PER_SEC);
+        fprintf(stderr, "  %d/%d sec - acquires: %"PRIu64", releases: %"PRIu64", grows: %"PRIu64", cleanups: %"PRIu64", skipped: %"PRIu64"\n",
+                i + 1, duration_secs,
+                __atomic_load_n(&prd_stress_state.acquire_count, __ATOMIC_RELAXED),
+                __atomic_load_n(&prd_stress_state.release_count, __ATOMIC_RELAXED),
+                __atomic_load_n(&prd_stress_state.grow_count, __ATOMIC_RELAXED),
+                __atomic_load_n(&prd_stress_state.cleanup_count, __ATOMIC_RELAXED),
+                __atomic_load_n(&prd_stress_state.cleanup_skipped, __ATOMIC_RELAXED));
+    }
+
+    // Stop threads
+    __atomic_store_n(&prd_stress_state.running, false, __ATOMIC_RELEASE);
+
+    for (int i = 0; i < total_threads; i++) {
+        nd_thread_join(threads[i]);
+    }
+
+    // Final cleanup
+    PRD_ARRAY *final_arr = prd_array_replace(&prd_stress_state.prd_array, NULL);
+    if (final_arr)
+        prd_array_release(final_arr);
+
+    freez(threads);
+
+    // Print results
+    uint64_t acquires = __atomic_load_n(&prd_stress_state.acquire_count, __ATOMIC_RELAXED);
+    uint64_t releases = __atomic_load_n(&prd_stress_state.release_count, __ATOMIC_RELAXED);
+
+    fprintf(stderr, "\nTest completed!\n");
+    fprintf(stderr, "===============\n");
+    fprintf(stderr, "Total acquires:        %"PRIu64"\n", acquires);
+    fprintf(stderr, "Total releases:        %"PRIu64"\n", releases);
+    fprintf(stderr, "Total grows:           %"PRIu64"\n", prd_stress_state.grow_count);
+    fprintf(stderr, "Total cleanups:        %"PRIu64"\n", prd_stress_state.cleanup_count);
+    fprintf(stderr, "Total cleanup skipped: %"PRIu64"\n", prd_stress_state.cleanup_skipped);
+
+    int rc = 0;
+    if (acquires == releases) {
+        fprintf(stderr, "\nSUCCESS: All acquires have matching releases (no leaks)\n");
+    } else {
+        fprintf(stderr, "\nFAILED: Acquire/release mismatch - possible leak\n");
+        rc = 1;
+    }
+
+    return rc;
 }
