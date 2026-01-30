@@ -53,8 +53,6 @@ func dyncfgSDTemplateCmds() string {
 	return dyncfg.JoinCommands(
 		dyncfg.CommandAdd,
 		dyncfg.CommandSchema,
-		dyncfg.CommandEnable,
-		dyncfg.CommandDisable,
 		dyncfg.CommandUserconfig,
 	)
 }
@@ -109,7 +107,9 @@ func (d *ServiceDiscovery) dyncfgSDJobStatus(discovererType, name string, status
 	d.dyncfgApi.ConfigStatus(d.dyncfgJobID(discovererType, name), status)
 }
 
-// dyncfgConfig is the handler for dyncfg config commands
+// dyncfgConfig is the handler for dyncfg config commands.
+// Read-only commands (schema, get, userconfig) are executed directly.
+// State-changing commands are queued for serial execution.
 func (d *ServiceDiscovery) dyncfgConfig(fn functions.Function) {
 	if len(fn.Args) < 2 {
 		d.Warningf("dyncfg: missing required arguments, want at least 2 got %d", len(fn.Args))
@@ -119,11 +119,32 @@ func (d *ServiceDiscovery) dyncfgConfig(fn functions.Function) {
 
 	cmd := getDyncfgCommand(fn)
 
+	// Read-only commands can be executed directly
 	switch cmd {
 	case dyncfg.CommandSchema:
 		d.dyncfgCmdSchema(fn)
+		return
 	case dyncfg.CommandGet:
 		d.dyncfgCmdGet(fn)
+		return
+	case dyncfg.CommandUserconfig:
+		d.dyncfgCmdUserconfig(fn)
+		return
+	}
+
+	// State-changing commands are queued for serial execution
+	select {
+	case <-d.ctx.Done():
+		d.dyncfgApi.SendCodef(fn, 503, "Service discovery is shutting down.")
+	case d.dyncfgCh <- fn:
+	}
+}
+
+// dyncfgSeqExec executes state-changing dyncfg commands serially.
+func (d *ServiceDiscovery) dyncfgSeqExec(fn functions.Function) {
+	cmd := getDyncfgCommand(fn)
+
+	switch cmd {
 	case dyncfg.CommandAdd:
 		d.dyncfgCmdAdd(fn)
 	case dyncfg.CommandUpdate:
@@ -134,8 +155,6 @@ func (d *ServiceDiscovery) dyncfgConfig(fn functions.Function) {
 		d.dyncfgCmdDisable(fn)
 	case dyncfg.CommandRemove:
 		d.dyncfgCmdRemove(fn)
-	case dyncfg.CommandUserconfig:
-		d.dyncfgCmdUserconfig(fn)
 	default:
 		d.Warningf("dyncfg: command '%s' not implemented", cmd)
 		d.dyncfgApi.SendCodef(fn, 501, "Command '%s' is not implemented.", cmd)
@@ -176,18 +195,18 @@ func (d *ServiceDiscovery) dyncfgCmdGet(fn functions.Function) {
 		return
 	}
 
-	cfg, ok := d.exposedConfigs.lookup(dt, name)
-	if !ok {
+	content := d.exposedConfigs.getContent(dt, name)
+	if content == nil {
 		d.Warningf("dyncfg: get: config '%s:%s' not found", dt, name)
 		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
-	d.Infof("dyncfg: get: found config '%s:%s' content length=%d", dt, name, len(cfg.content))
+	d.Infof("dyncfg: get: found config '%s:%s' content length=%d", dt, name, len(content))
 
 	// Content is already stored as JSON (from transform or dyncfg payload)
 	d.Infof("dyncfg: get: sending config '%s:%s'", dt, name)
-	d.dyncfgApi.SendJSON(fn, string(cfg.content))
+	d.dyncfgApi.SendJSON(fn, string(content))
 }
 
 // dyncfgCmdAdd handles the add command for templates (creates a new job)
@@ -222,10 +241,19 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn functions.Function) {
 
 	d.Infof("dyncfg: add: %s:%s by user '%s'", dt, name, getFnSourceValue(fn, "user"))
 
+	// Check if config already exists (use getPipelineKey as existence check)
+	if d.exposedConfigs.getPipelineKey(dt, name) != "" {
+		sourceType := d.exposedConfigs.getSourceType(dt, name)
+		d.Warningf("dyncfg: add: config '%s:%s' already exists (source: %s)", dt, name, sourceType)
+		d.dyncfgApi.SendCodef(fn, 400, "Config '%s:%s' already exists.", dt, name)
+		return
+	}
+
 	// Store the config
 	cfg := &sdConfig{
 		discovererType: dt,
 		name:           name,
+		pipelineKey:    pipelineKey(dt, name),
 		source:         fn.Source,
 		sourceType:     "dyncfg",
 		status:         dyncfg.StatusAccepted,
@@ -250,17 +278,48 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn functions.Function) {
 		return
 	}
 
-	cfg, ok := d.exposedConfigs.lookup(dt, name)
-	if !ok {
+	pipelineKey := d.exposedConfigs.getPipelineKey(dt, name)
+	if pipelineKey == "" {
 		d.Warningf("dyncfg: update: config '%s:%s' not found", dt, name)
 		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
-	// Update command is not yet fully implemented - pipeline restart not supported
-	d.Warningf("dyncfg: update: command not yet implemented for '%s:%s'", dt, name)
-	d.dyncfgApi.SendCodef(fn, 501, "Update command is not yet implemented for service discovery configs.")
-	d.dyncfgSDJobStatus(dt, name, cfg.status)
+	if len(fn.Payload) == 0 {
+		d.Warningf("dyncfg: update: missing configuration payload for '%s:%s'", dt, name)
+		d.dyncfgApi.SendCodef(fn, 400, "Missing configuration payload.")
+		return
+	}
+
+	// Parse the new config
+	pipelineCfg, err := parseDyncfgPayload(fn.Payload, dt, d.configDefaults)
+	if err != nil {
+		d.Warningf("dyncfg: update: failed to parse config '%s:%s': %v", dt, name, err)
+		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
+		return
+	}
+
+	pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", fn.Source)
+
+	d.Infof("dyncfg: update: %s:%s by user '%s'", dt, name, getFnSourceValue(fn, "user"))
+
+	// Update stored config content
+	d.exposedConfigs.updateContent(dt, name, fn.Payload)
+
+	// If pipeline is running, restart it with grace period
+	if d.mgr.IsRunning(pipelineKey) {
+		if err := d.mgr.Restart(d.ctx, pipelineKey, pipelineCfg); err != nil {
+			d.Errorf("dyncfg: update: failed to restart pipeline '%s:%s': %v", dt, name, err)
+			d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusFailed)
+			d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
+			d.dyncfgApi.SendCodef(fn, 422, "Failed to restart pipeline: %v", err)
+			return
+		}
+		d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusRunning)
+	}
+
+	d.dyncfgSDJobStatus(dt, name, d.exposedConfigs.getStatus(dt, name))
+	d.dyncfgApi.SendCodef(fn, 200, "")
 }
 
 // dyncfgCmdEnable handles the enable command for jobs
@@ -274,17 +333,55 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn functions.Function) {
 		return
 	}
 
-	cfg, ok := d.exposedConfigs.lookup(dt, name)
-	if !ok {
+	// Get all needed values under lock via safe getters
+	pipelineKey := d.exposedConfigs.getPipelineKey(dt, name)
+	if pipelineKey == "" {
 		d.Warningf("dyncfg: enable: config '%s:%s' not found", dt, name)
 		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
-	// Enable command is not yet implemented - pipeline start not supported
-	d.Warningf("dyncfg: enable: command not yet implemented for '%s:%s'", dt, name)
-	d.dyncfgApi.SendCodef(fn, 501, "Enable command is not yet implemented for service discovery configs.")
-	d.dyncfgSDJobStatus(dt, name, cfg.status)
+	// If already running, return success (idempotent)
+	if d.mgr.IsRunning(pipelineKey) {
+		d.Infof("dyncfg: enable: pipeline '%s:%s' is already running", dt, name)
+		d.dyncfgApi.SendCodef(fn, 200, "")
+		return
+	}
+
+	content := d.exposedConfigs.getContent(dt, name)
+	source := d.exposedConfigs.getSource(dt, name)
+
+	// Parse the stored config
+	pipelineCfg, err := parseDyncfgPayload(content, dt, d.configDefaults)
+	if err != nil {
+		d.Warningf("dyncfg: enable: failed to parse config '%s:%s': %v", dt, name, err)
+		d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusFailed)
+		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
+		d.dyncfgApi.SendCodef(fn, 422, "Failed to parse config: %v", err)
+		return
+	}
+
+	sourceType := d.exposedConfigs.getSourceType(dt, name)
+	if sourceType == "file" {
+		pipelineCfg.Source = fmt.Sprintf("file=%s", source)
+	} else {
+		pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", source)
+	}
+
+	d.Infof("dyncfg: enable: starting pipeline '%s:%s'", dt, name)
+
+	// Start the pipeline
+	if err := d.mgr.Start(d.ctx, pipelineKey, pipelineCfg); err != nil {
+		d.Errorf("dyncfg: enable: failed to start pipeline '%s:%s': %v", dt, name, err)
+		d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusFailed)
+		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
+		d.dyncfgApi.SendCodef(fn, 422, "Failed to start pipeline: %v", err)
+		return
+	}
+
+	d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusRunning)
+	d.dyncfgSDJobStatus(dt, name, dyncfg.StatusRunning)
+	d.dyncfgApi.SendCodef(fn, 200, "")
 }
 
 // dyncfgCmdDisable handles the disable command for jobs
@@ -298,17 +395,31 @@ func (d *ServiceDiscovery) dyncfgCmdDisable(fn functions.Function) {
 		return
 	}
 
-	cfg, ok := d.exposedConfigs.lookup(dt, name)
-	if !ok {
+	// Get pipeline key via safe getter
+	pipelineKey := d.exposedConfigs.getPipelineKey(dt, name)
+	if pipelineKey == "" {
 		d.Warningf("dyncfg: disable: config '%s:%s' not found", dt, name)
 		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
-	// Disable command is not yet implemented - pipeline stop not supported
-	d.Warningf("dyncfg: disable: command not yet implemented for '%s:%s'", dt, name)
-	d.dyncfgApi.SendCodef(fn, 501, "Disable command is not yet implemented for service discovery configs.")
-	d.dyncfgSDJobStatus(dt, name, cfg.status)
+	// If not running, just update status (idempotent)
+	if !d.mgr.IsRunning(pipelineKey) {
+		d.Infof("dyncfg: disable: pipeline '%s:%s' is not running", dt, name)
+		d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusDisabled)
+		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusDisabled)
+		d.dyncfgApi.SendCodef(fn, 200, "")
+		return
+	}
+
+	d.Infof("dyncfg: disable: stopping pipeline '%s:%s'", dt, name)
+
+	// Stop the pipeline (this sends removal groups for discovered jobs)
+	d.mgr.Stop(pipelineKey)
+
+	d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusDisabled)
+	d.dyncfgSDJobStatus(dt, name, dyncfg.StatusDisabled)
+	d.dyncfgApi.SendCodef(fn, 200, "")
 }
 
 // dyncfgCmdRemove handles the remove command for dyncfg jobs
@@ -322,22 +433,35 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn functions.Function) {
 		return
 	}
 
-	cfg, ok := d.exposedConfigs.lookup(dt, name)
-	if !ok {
+	// Get values via safe getters
+	pipelineKey := d.exposedConfigs.getPipelineKey(dt, name)
+	if pipelineKey == "" {
 		d.Warningf("dyncfg: remove: config '%s:%s' not found", dt, name)
 		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
-	if !cfg.isDyncfg() {
-		d.Warningf("dyncfg: remove: cannot remove non-dyncfg config '%s:%s' (source: %s)", dt, name, cfg.sourceType)
-		d.dyncfgApi.SendCodef(fn, 405, "Cannot remove non-dyncfg configs. Source type: %s", cfg.sourceType)
+	sourceType := d.exposedConfigs.getSourceType(dt, name)
+	if sourceType != "dyncfg" {
+		d.Warningf("dyncfg: remove: cannot remove non-dyncfg config '%s:%s' (source: %s)", dt, name, sourceType)
+		d.dyncfgApi.SendCodef(fn, 405, "Cannot remove non-dyncfg configs. Source type: %s", sourceType)
 		return
 	}
 
-	// Remove command is not yet fully implemented - pipeline stop not supported
-	d.Warningf("dyncfg: remove: command not yet implemented for '%s:%s'", dt, name)
-	d.dyncfgApi.SendCodef(fn, 501, "Remove command is not yet implemented for service discovery configs.")
+	d.Infof("dyncfg: remove: removing config '%s:%s'", dt, name)
+
+	// Stop the pipeline if running (this sends removal groups for discovered jobs)
+	if d.mgr.IsRunning(pipelineKey) {
+		d.mgr.Stop(pipelineKey)
+	}
+
+	// Remove from exposed configs
+	d.exposedConfigs.remove(dt, name)
+
+	// Remove from dyncfg
+	d.dyncfgSDJobRemove(dt, name)
+
+	d.dyncfgApi.SendCodef(fn, 200, "")
 }
 
 // dyncfgCmdUserconfig handles the userconfig command for templates and jobs
@@ -351,14 +475,13 @@ func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn functions.Function) {
 	var jsonContent []byte
 
 	if isJob {
-		// For jobs, get content from stored config
-		cfg, ok := d.exposedConfigs.lookup(dt, name)
-		if !ok {
+		// For jobs, get content from stored config via safe getter
+		jsonContent = d.exposedConfigs.getContent(dt, name)
+		if jsonContent == nil {
 			d.Warningf("dyncfg: userconfig: config '%s:%s' not found", dt, name)
 			d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 			return
 		}
-		jsonContent = cfg.content
 	} else {
 		// For templates, use the payload from the request
 		if len(fn.Payload) == 0 {
@@ -500,9 +623,11 @@ func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile) 
 	d.Infof("exposeFileConfig: '%s' transformed content length=%d", conf.source, len(content))
 
 	// Store in exposed configs cache
+	// NOTE: pipelineKey for file configs is the file path (same as used by addPipeline)
 	sdCfg := &sdConfig{
 		discovererType: dt,
 		name:           name,
+		pipelineKey:    pipelineKeyFromSource(conf.source),
 		source:         conf.source,
 		sourceType:     "file",
 		status:         dyncfg.StatusRunning,

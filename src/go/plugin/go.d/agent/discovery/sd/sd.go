@@ -38,6 +38,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		fnReg:          cfg.FnReg,
 		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
 		exposedConfigs: newExposedSDConfigs(),
+		dyncfgCh:       make(chan functions.Function),
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
 			return pipeline.New(config)
 		},
@@ -56,8 +57,10 @@ type (
 		fnReg          functions.Registry
 		dyncfgApi      *dyncfg.Responder
 		exposedConfigs *exposedSDConfigs
+		dyncfgCh       chan functions.Function
 		newPipeline    func(config pipeline.Config) (sdPipeline, error)
 
+		ctx context.Context
 		mgr *PipelineManager
 	}
 	sdPipeline interface {
@@ -77,10 +80,11 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 	d.Info("instance is started")
 	defer func() { d.unregisterDyncfgTemplates(); d.Info("instance is stopped") }()
 
-	// Register dyncfg templates for discoverer types
-	d.registerDyncfgTemplates(ctx)
+	// Store context for dyncfg commands
+	d.ctx = ctx
 
 	// Create pipeline manager with send function that forwards to output channel
+	// NOTE: Must be created BEFORE registering dyncfg templates, as dyncfg commands use mgr
 	send := func(ctx context.Context, groups []*confgroup.Group) {
 		select {
 		case <-ctx.Done():
@@ -89,6 +93,10 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 	}
 
 	d.mgr = NewPipelineManager(d.Logger, d.newPipeline, send)
+
+	// Register dyncfg templates for discoverer types
+	// NOTE: Must be AFTER mgr creation, as dyncfg commands use mgr
+	d.registerDyncfgTemplates(ctx)
 
 	var wg sync.WaitGroup
 
@@ -105,8 +113,6 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 
 	// Cleanup all pipelines on shutdown
 	d.mgr.StopAll()
-
-	<-ctx.Done()
 }
 
 func (d *ServiceDiscovery) run(ctx context.Context) {
@@ -123,6 +129,8 @@ func (d *ServiceDiscovery) run(ctx context.Context) {
 			} else {
 				d.addPipeline(ctx, cfg)
 			}
+		case fn := <-d.dyncfgCh:
+			d.dyncfgSeqExec(fn)
 		}
 	}
 }

@@ -12,10 +12,11 @@ import (
 type sdConfig struct {
 	discovererType string // net_listeners, docker, k8s, snmp
 	name           string
-	source         string // file path or "dyncfg"
+	pipelineKey    string // key used by PipelineManager (file path or dyncfg:{type}:{name})
+	source         string // file path or fn.Source for dyncfg
 	sourceType     string // "file" or "dyncfg"
 	status         dyncfg.Status
-	content        []byte // raw YAML content
+	content        []byte // raw JSON content for dyncfg format
 }
 
 func (c *sdConfig) key() string {
@@ -55,6 +56,70 @@ func (c *exposedSDConfigs) lookup(discovererType, name string) (*sdConfig, bool)
 	defer c.mux.RUnlock()
 	cfg, ok := c.items[discovererType+":"+name]
 	return cfg, ok
+}
+
+func (c *exposedSDConfigs) updateStatus(discovererType, name string, status dyncfg.Status) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	if cfg, ok := c.items[discovererType+":"+name]; ok {
+		cfg.status = status
+	}
+}
+
+func (c *exposedSDConfigs) updateContent(discovererType, name string, content []byte) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	if cfg, ok := c.items[discovererType+":"+name]; ok {
+		cfg.content = content
+	}
+}
+
+func (c *exposedSDConfigs) getStatus(discovererType, name string) dyncfg.Status {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+	if cfg, ok := c.items[discovererType+":"+name]; ok {
+		return cfg.status
+	}
+	return dyncfg.StatusAccepted
+}
+
+func (c *exposedSDConfigs) getContent(discovererType, name string) []byte {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+	if cfg, ok := c.items[discovererType+":"+name]; ok {
+		// Return a copy to avoid race conditions
+		content := make([]byte, len(cfg.content))
+		copy(content, cfg.content)
+		return content
+	}
+	return nil
+}
+
+func (c *exposedSDConfigs) getPipelineKey(discovererType, name string) string {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+	if cfg, ok := c.items[discovererType+":"+name]; ok {
+		return cfg.pipelineKey
+	}
+	return ""
+}
+
+func (c *exposedSDConfigs) getSource(discovererType, name string) string {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+	if cfg, ok := c.items[discovererType+":"+name]; ok {
+		return cfg.source
+	}
+	return ""
+}
+
+func (c *exposedSDConfigs) getSourceType(discovererType, name string) string {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+	if cfg, ok := c.items[discovererType+":"+name]; ok {
+		return cfg.sourceType
+	}
+	return ""
 }
 
 func (c *exposedSDConfigs) lookupByKey(key string) (*sdConfig, bool) {
