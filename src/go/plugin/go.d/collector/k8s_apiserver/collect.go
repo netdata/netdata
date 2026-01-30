@@ -5,8 +5,9 @@ package k8s_apiserver
 import (
 	"math"
 	"sort"
-	"strconv"
 	"strings"
+
+	"github.com/prometheus/common/model"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
@@ -28,81 +29,104 @@ const (
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
-	raw, err := c.prom.ScrapeSeries()
+	mfs, err := c.prom.Scrape()
 	if err != nil {
 		return nil, err
 	}
 
 	mx := newMetrics()
 
-	c.collectRequests(raw, mx)
-	c.collectInflight(raw, mx)
-	c.collectRESTClient(raw, mx)
-	c.collectAdmission(raw, mx)
-	c.collectEtcd(raw, mx)
-	c.collectWorkqueues(raw, mx)
-	c.collectProcess(raw, mx)
-	c.collectAudit(raw, mx)
-	c.collectAuth(raw, mx)
+	c.collectRequests(mfs, mx)
+	c.collectInflight(mfs, mx)
+	c.collectRESTClient(mfs, mx)
+	c.collectAdmission(mfs, mx)
+	c.collectEtcd(mfs, mx)
+	c.collectWorkqueues(mfs, mx)
+	c.collectProcess(mfs, mx)
+	c.collectAudit(mfs, mx)
+	c.collectAuth(mfs, mx)
 
 	return stm.ToMap(mx), nil
 }
 
 // collectRequests collects apiserver_request_total, apiserver_request_duration_seconds, etc.
-func (c *Collector) collectRequests(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectRequests(mfs prometheus.MetricFamilies, mx *metrics) {
 	// Total requests and by verb/code/resource
-	for _, metric := range raw.FindByNames("apiserver_request_total", "apiserver_request_count") {
-		verb := metric.Labels.Get("verb")
-		code := metric.Labels.Get("code")
-		resource := metric.Labels.Get("resource")
-
-		mx.Request.Total.Add(metric.Value)
-
-		// By verb
-		if verb != "" {
-			c.addVerbDimension(verb)
-			mx.Request.ByVerb[verb] = mtx.Gauge(mx.Request.ByVerb[verb].Value() + metric.Value)
+	for _, mf := range mfs {
+		name := mf.Name()
+		if name != "apiserver_request_total" && name != "apiserver_request_count" {
+			continue
 		}
 
-		// By code
-		if code != "" {
-			c.addCodeDimension(code)
-			mx.Request.ByCode[code] = mtx.Gauge(mx.Request.ByCode[code].Value() + metric.Value)
-		}
+		for _, m := range mf.Metrics() {
+			value := metricValue(mf, m)
+			if math.IsNaN(value) {
+				continue
+			}
 
-		// By resource (with cardinality limit)
-		// Allow updates for already-tracked resources even after cap is reached
-		if resource != "" {
-			if c.collectedResources[resource] || len(c.collectedResources) < defaultMaxResources {
-				c.addResourceDimension(resource)
-				mx.Request.ByResource[resource] = mtx.Gauge(mx.Request.ByResource[resource].Value() + metric.Value)
+			verb := m.Labels().Get("verb")
+			code := m.Labels().Get("code")
+			resource := m.Labels().Get("resource")
+
+			mx.Request.Total.Add(value)
+
+			// By verb
+			if verb != "" {
+				c.addVerbDimension(verb)
+				mx.Request.ByVerb[verb] = mtx.Gauge(mx.Request.ByVerb[verb].Value() + value)
+			}
+
+			// By code
+			if code != "" {
+				c.addCodeDimension(code)
+				mx.Request.ByCode[code] = mtx.Gauge(mx.Request.ByCode[code].Value() + value)
+			}
+
+			// By resource (with cardinality limit)
+			if resource != "" {
+				if c.collectedResources[resource] || len(c.collectedResources) < defaultMaxResources {
+					c.addResourceDimension(resource)
+					mx.Request.ByResource[resource] = mtx.Gauge(mx.Request.ByResource[resource].Value() + value)
+				}
 			}
 		}
 	}
 
 	// Dropped/rejected requests - support both legacy and APF metrics
-	// Legacy: apiserver_dropped_requests_total (K8s < 1.20, APF disabled)
-	// Modern: apiserver_flowcontrol_rejected_requests_total (K8s >= 1.20, APF enabled)
-	dropped := raw.FindByName("apiserver_dropped_requests_total").Max()
+	var dropped float64
+	if mf := mfs.Get("apiserver_dropped_requests_total"); mf != nil {
+		for _, m := range mf.Metrics() {
+			if v := metricValue(mf, m); !math.IsNaN(v) {
+				dropped += v
+			}
+		}
+	}
 	if dropped == 0 {
-		// Sum across all flow schemas and priority levels
-		for _, metric := range raw.FindByName("apiserver_flowcontrol_rejected_requests_total") {
-			dropped += metric.Value
+		if mf := mfs.Get("apiserver_flowcontrol_rejected_requests_total"); mf != nil {
+			for _, m := range mf.Metrics() {
+				if v := metricValue(mf, m); !math.IsNaN(v) {
+					dropped += v
+				}
+			}
 		}
 	}
 	mx.Request.Dropped.Set(dropped)
 
 	// Request latency and response size (histograms)
-	c.collectRequestLatency(raw, mx)
-	c.collectResponseSize(raw, mx)
+	c.collectRequestLatency(mfs, mx)
+	c.collectResponseSize(mfs, mx)
 }
 
-func (c *Collector) collectRequestLatency(raw prometheus.Series, mx *metrics) {
-	// apiserver_request_duration_seconds is a histogram - compute percentiles from buckets
-	buckets := collectHistogramBuckets(raw, "apiserver_request_duration_seconds")
+func (c *Collector) collectRequestLatency(mfs prometheus.MetricFamilies, mx *metrics) {
+	mf := mfs.Get("apiserver_request_duration_seconds")
+	if mf == nil || mf.Type() != model.MetricTypeHistogram {
+		return
+	}
+
+	buckets := collectHistogramBucketsFromMF(mf, nil)
 	if len(buckets) > 0 {
 		if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
-			mx.Request.Latency.P50.Set(p50 * latencyPrecision) // seconds to microseconds, chart Div:1000 gives ms
+			mx.Request.Latency.P50.Set(p50 * latencyPrecision)
 		}
 		if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
 			mx.Request.Latency.P90.Set(p90 * latencyPrecision)
@@ -113,9 +137,13 @@ func (c *Collector) collectRequestLatency(raw prometheus.Series, mx *metrics) {
 	}
 }
 
-func (c *Collector) collectResponseSize(raw prometheus.Series, mx *metrics) {
-	// apiserver_response_sizes is a histogram - compute percentiles from buckets
-	buckets := collectHistogramBuckets(raw, "apiserver_response_sizes")
+func (c *Collector) collectResponseSize(mfs prometheus.MetricFamilies, mx *metrics) {
+	mf := mfs.Get("apiserver_response_sizes")
+	if mf == nil || mf.Type() != model.MetricTypeHistogram {
+		return
+	}
+
+	buckets := collectHistogramBucketsFromMF(mf, nil)
 	if len(buckets) > 0 {
 		if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
 			mx.Request.ResponseSize.P50.Set(p50)
@@ -130,130 +158,164 @@ func (c *Collector) collectResponseSize(raw prometheus.Series, mx *metrics) {
 }
 
 // collectInflight collects apiserver_current_inflight_requests and apiserver_longrunning_requests
-func (c *Collector) collectInflight(raw prometheus.Series, mx *metrics) {
-	for _, metric := range raw.FindByName("apiserver_current_inflight_requests") {
-		// FIXED: Label is "request_kind" not "requestKind"
-		kind := metric.Labels.Get("request_kind")
-		switch kind {
-		case "mutating":
-			mx.Inflight.Mutating.Set(metric.Value)
-		case "readOnly":
-			mx.Inflight.ReadOnly.Set(metric.Value)
+func (c *Collector) collectInflight(mfs prometheus.MetricFamilies, mx *metrics) {
+	if mf := mfs.Get("apiserver_current_inflight_requests"); mf != nil {
+		for _, m := range mf.Metrics() {
+			value := metricValue(mf, m)
+			if math.IsNaN(value) {
+				continue
+			}
+			kind := m.Labels().Get("request_kind")
+			switch kind {
+			case "mutating":
+				mx.Inflight.Mutating.Set(value)
+			case "readOnly":
+				mx.Inflight.ReadOnly.Set(value)
+			}
 		}
 	}
 
-	// Use apiserver_longrunning_requests (the actual metric name, not apiserver_longrunning_gauge)
-	value := raw.FindByName("apiserver_longrunning_requests").Max()
-	mx.Inflight.Longrunning.Set(value)
+	if mf := mfs.Get("apiserver_longrunning_requests"); mf != nil {
+		var maxVal float64
+		for _, m := range mf.Metrics() {
+			if v := metricValue(mf, m); !math.IsNaN(v) && v > maxVal {
+				maxVal = v
+			}
+		}
+		mx.Inflight.Longrunning.Set(maxVal)
+	}
 }
 
 // collectRESTClient collects rest_client_requests_total and rest_client_request_duration_seconds
-func (c *Collector) collectRESTClient(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics) {
 	codeChart := c.charts.Get("rest_client_requests_by_code")
 	methodChart := c.charts.Get("rest_client_requests_by_method")
 
-	// Single iteration for both code and method dimensions
-	for _, metric := range raw.FindByName("rest_client_requests_total") {
-		code := metric.Labels.Get("code")
-		method := metric.Labels.Get("method")
-
-		// By code
-		if code != "" {
-			dimID := "rest_client_by_code_" + code
-			if codeChart != nil && !codeChart.HasDim(dimID) {
-				if err := codeChart.AddDim(&Dim{ID: dimID, Name: code, Algo: module.Incremental}); err != nil {
-					c.Warningf("failed to add REST client code dimension %s: %v", code, err)
-				} else {
-					codeChart.MarkNotCreated()
-				}
+	if mf := mfs.Get("rest_client_requests_total"); mf != nil {
+		for _, m := range mf.Metrics() {
+			value := metricValue(mf, m)
+			if math.IsNaN(value) {
+				continue
 			}
-			mx.RESTClient.ByCode[code] = mtx.Gauge(mx.RESTClient.ByCode[code].Value() + metric.Value)
-		}
 
-		// By method
-		if method != "" {
-			dimID := "rest_client_by_method_" + method
-			if methodChart != nil && !methodChart.HasDim(dimID) {
-				if err := methodChart.AddDim(&Dim{ID: dimID, Name: method, Algo: module.Incremental}); err != nil {
-					c.Warningf("failed to add REST client method dimension %s: %v", method, err)
-				} else {
-					methodChart.MarkNotCreated()
+			code := m.Labels().Get("code")
+			method := m.Labels().Get("method")
+
+			// By code
+			if code != "" {
+				dimID := "rest_client_by_code_" + code
+				if codeChart != nil && !codeChart.HasDim(dimID) {
+					if err := codeChart.AddDim(&Dim{ID: dimID, Name: code, Algo: module.Incremental}); err != nil {
+						c.Warningf("failed to add REST client code dimension %s: %v", code, err)
+					} else {
+						codeChart.MarkNotCreated()
+					}
 				}
+				mx.RESTClient.ByCode[code] = mtx.Gauge(mx.RESTClient.ByCode[code].Value() + value)
 			}
-			mx.RESTClient.ByMethod[method] = mtx.Gauge(mx.RESTClient.ByMethod[method].Value() + metric.Value)
+
+			// By method
+			if method != "" {
+				dimID := "rest_client_by_method_" + method
+				if methodChart != nil && !methodChart.HasDim(dimID) {
+					if err := methodChart.AddDim(&Dim{ID: dimID, Name: method, Algo: module.Incremental}); err != nil {
+						c.Warningf("failed to add REST client method dimension %s: %v", method, err)
+					} else {
+						methodChart.MarkNotCreated()
+					}
+				}
+				mx.RESTClient.ByMethod[method] = mtx.Gauge(mx.RESTClient.ByMethod[method].Value() + value)
+			}
 		}
 	}
 
-	// REST client latency - metric is rest_client_request_duration_seconds (histogram)
-	buckets := collectHistogramBuckets(raw, "rest_client_request_duration_seconds")
-	if len(buckets) > 0 {
-		if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
-			mx.RESTClient.Latency.P50.Set(p50 * latencyPrecision)
-		}
-		if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
-			mx.RESTClient.Latency.P90.Set(p90 * latencyPrecision)
-		}
-		if p99 := histogramPercentile(buckets, 0.99); !math.IsNaN(p99) {
-			mx.RESTClient.Latency.P99.Set(p99 * latencyPrecision)
+	// REST client latency
+	if mf := mfs.Get("rest_client_request_duration_seconds"); mf != nil && mf.Type() == model.MetricTypeHistogram {
+		buckets := collectHistogramBucketsFromMF(mf, nil)
+		if len(buckets) > 0 {
+			if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
+				mx.RESTClient.Latency.P50.Set(p50 * latencyPrecision)
+			}
+			if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
+				mx.RESTClient.Latency.P90.Set(p90 * latencyPrecision)
+			}
+			if p99 := histogramPercentile(buckets, 0.99); !math.IsNaN(p99) {
+				mx.RESTClient.Latency.P99.Set(p99 * latencyPrecision)
+			}
 		}
 	}
 }
 
 // collectAdmission collects admission controller and webhook metrics
-func (c *Collector) collectAdmission(raw prometheus.Series, mx *metrics) {
-	// Admission step latency - try histogram first, then summary fallback
-	stepBuckets := make(map[string][]histogramBucket)
-	for _, metric := range raw.FindByName("apiserver_admission_step_admission_duration_seconds_bucket") {
-		if math.IsNaN(metric.Value) {
-			continue
-		}
-		stepType := metric.Labels.Get("type")
-		le := metric.Labels.Get("le")
-		if stepType == "" || le == "" {
-			continue
-		}
-		bound, err := strconv.ParseFloat(le, 64)
-		if err != nil {
-			continue
-		}
-		stepBuckets[stepType] = append(stepBuckets[stepType], histogramBucket{le: bound, count: metric.Value})
-	}
+func (c *Collector) collectAdmission(mfs prometheus.MetricFamilies, mx *metrics) {
+	// Admission step latency
+	if mf := mfs.Get("apiserver_admission_step_admission_duration_seconds"); mf != nil && mf.Type() == model.MetricTypeHistogram {
+		stepBuckets := make(map[string][]histogramBucket)
 
-	for stepType, buckets := range stepBuckets {
-		if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
-			switch stepType {
-			case "validate":
-				mx.Admission.StepLatency.Validate.Set(p50 * latencyPrecision)
-			case "admit":
-				mx.Admission.StepLatency.Admit.Set(p50 * latencyPrecision)
+		for _, m := range mf.Metrics() {
+			if m.Histogram() == nil {
+				continue
+			}
+			stepType := m.Labels().Get("type")
+			if stepType == "" {
+				continue
+			}
+
+			for _, b := range m.Histogram().Buckets() {
+				if math.IsInf(b.UpperBound(), 0) {
+					continue
+				}
+				stepBuckets[stepType] = append(stepBuckets[stepType], histogramBucket{
+					le:    b.UpperBound(),
+					count: float64(b.CumulativeCount()),
+				})
+			}
+		}
+
+		for stepType, buckets := range stepBuckets {
+			sortBuckets(buckets)
+			if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
+				switch stepType {
+				case "validate":
+					mx.Admission.StepLatency.Validate.Set(p50 * latencyPrecision)
+				case "admit":
+					mx.Admission.StepLatency.Admit.Set(p50 * latencyPrecision)
+				}
 			}
 		}
 	}
 
 	// Admission controller latency (dynamic charts)
-	c.collectAdmissionControllerLatency(raw, mx)
-	c.collectAdmissionWebhookLatency(raw, mx)
+	c.collectAdmissionControllerLatency(mfs, mx)
+	c.collectAdmissionWebhookLatency(mfs, mx)
 }
 
-func (c *Collector) collectAdmissionControllerLatency(raw prometheus.Series, mx *metrics) {
-	// Metric is apiserver_admission_controller_admission_duration_seconds (histogram)
-	// Collect as heatmap with non-cumulative bucket counts
-	// Must aggregate by controller name, then by le bucket (summing across operation/type/rejected labels)
-	controllerBucketMaps := make(map[string]map[string]float64) // name -> le_string -> cumulative_count
+func (c *Collector) collectAdmissionControllerLatency(mfs prometheus.MetricFamilies, mx *metrics) {
+	mf := mfs.Get("apiserver_admission_controller_admission_duration_seconds")
+	if mf == nil || mf.Type() != model.MetricTypeHistogram {
+		return
+	}
 
-	for _, metric := range raw.FindByName("apiserver_admission_controller_admission_duration_seconds_bucket") {
-		if math.IsNaN(metric.Value) {
+	// Collect as heatmap with non-cumulative bucket counts
+	// Must aggregate by controller name, then by le bucket
+	controllerBucketMaps := make(map[string]map[float64]float64) // name -> le -> cumulative_count
+
+	for _, m := range mf.Metrics() {
+		if m.Histogram() == nil {
 			continue
 		}
-		name := metric.Labels.Get("name")
-		le := metric.Labels.Get("le")
-		if name == "" || le == "" {
+		name := m.Labels().Get("name")
+		if name == "" {
 			continue
 		}
+
 		if controllerBucketMaps[name] == nil {
-			controllerBucketMaps[name] = make(map[string]float64)
+			controllerBucketMaps[name] = make(map[float64]float64)
 		}
-		controllerBucketMaps[name][le] += metric.Value
+
+		for _, b := range m.Histogram().Buckets() {
+			controllerBucketMaps[name][b.UpperBound()] += float64(b.CumulativeCount())
+		}
 	}
 
 	for name, bucketMap := range controllerBucketMaps {
@@ -275,18 +337,13 @@ func (c *Collector) collectAdmissionControllerLatency(raw prometheus.Series, mx 
 
 		// K8s admission controller histogram buckets: 0.005, 0.025, 0.1, 0.5, 1, 2.5, +Inf
 		// Convert cumulative counts to non-cumulative for heatmap
-		// Each bucket value = cumulative[bucket] - cumulative[previous_bucket]
-		// Note: le labels may be "1" or "1.0" depending on prometheus library parsing
-		b5ms := bucketMap["0.005"]
-		b25ms := bucketMap["0.025"]
-		b100ms := bucketMap["0.1"]
-		b500ms := bucketMap["0.5"]
-		b1s := bucketMap["1"]
-		if b1s == 0 {
-			b1s = bucketMap["1.0"]
-		}
-		b2500ms := bucketMap["2.5"]
-		bInf := bucketMap["+Inf"]
+		b5ms := bucketMap[0.005]
+		b25ms := bucketMap[0.025]
+		b100ms := bucketMap[0.1]
+		b500ms := bucketMap[0.5]
+		b1s := bucketMap[1.0]
+		b2500ms := bucketMap[2.5]
+		bInf := bucketMap[math.Inf(1)]
 
 		mx.Admission.Controllers[name].Bucket5ms.Set(b5ms)
 		mx.Admission.Controllers[name].Bucket25ms.Set(b25ms - b5ms)
@@ -298,25 +355,31 @@ func (c *Collector) collectAdmissionControllerLatency(raw prometheus.Series, mx 
 	}
 }
 
-func (c *Collector) collectAdmissionWebhookLatency(raw prometheus.Series, mx *metrics) {
-	// Metric is apiserver_admission_webhook_admission_duration_seconds (histogram)
-	// Collect as heatmap with non-cumulative bucket counts
-	// Must aggregate by webhook name, then by le bucket (summing across operation/type/rejected labels)
-	webhookBucketMaps := make(map[string]map[string]float64) // name -> le_string -> cumulative_count
+func (c *Collector) collectAdmissionWebhookLatency(mfs prometheus.MetricFamilies, mx *metrics) {
+	mf := mfs.Get("apiserver_admission_webhook_admission_duration_seconds")
+	if mf == nil || mf.Type() != model.MetricTypeHistogram {
+		return
+	}
 
-	for _, metric := range raw.FindByName("apiserver_admission_webhook_admission_duration_seconds_bucket") {
-		if math.IsNaN(metric.Value) {
+	// Collect as heatmap with non-cumulative bucket counts
+	webhookBucketMaps := make(map[string]map[float64]float64) // name -> le -> cumulative_count
+
+	for _, m := range mf.Metrics() {
+		if m.Histogram() == nil {
 			continue
 		}
-		name := metric.Labels.Get("name")
-		le := metric.Labels.Get("le")
-		if name == "" || le == "" {
+		name := m.Labels().Get("name")
+		if name == "" {
 			continue
 		}
+
 		if webhookBucketMaps[name] == nil {
-			webhookBucketMaps[name] = make(map[string]float64)
+			webhookBucketMaps[name] = make(map[float64]float64)
 		}
-		webhookBucketMaps[name][le] += metric.Value
+
+		for _, b := range m.Histogram().Buckets() {
+			webhookBucketMaps[name][b.UpperBound()] += float64(b.CumulativeCount())
+		}
 	}
 
 	for name, bucketMap := range webhookBucketMaps {
@@ -338,17 +401,13 @@ func (c *Collector) collectAdmissionWebhookLatency(raw prometheus.Series, mx *me
 
 		// K8s admission webhook histogram buckets: 0.005, 0.025, 0.1, 0.5, 1, 2.5, +Inf
 		// Convert cumulative counts to non-cumulative for heatmap
-		// Note: le labels may be "1" or "1.0" depending on prometheus library parsing
-		b5ms := bucketMap["0.005"]
-		b25ms := bucketMap["0.025"]
-		b100ms := bucketMap["0.1"]
-		b500ms := bucketMap["0.5"]
-		b1s := bucketMap["1"]
-		if b1s == 0 {
-			b1s = bucketMap["1.0"]
-		}
-		b2500ms := bucketMap["2.5"]
-		bInf := bucketMap["+Inf"]
+		b5ms := bucketMap[0.005]
+		b25ms := bucketMap[0.025]
+		b100ms := bucketMap[0.1]
+		b500ms := bucketMap[0.5]
+		b1s := bucketMap[1.0]
+		b2500ms := bucketMap[2.5]
+		bInf := bucketMap[math.Inf(1)]
 
 		mx.Admission.Webhooks[name].Bucket5ms.Set(b5ms)
 		mx.Admission.Webhooks[name].Bucket25ms.Set(b25ms - b5ms)
@@ -361,9 +420,7 @@ func (c *Collector) collectAdmissionWebhookLatency(raw prometheus.Series, mx *me
 }
 
 // collectEtcd collects etcd/storage object count metrics
-func (c *Collector) collectEtcd(raw prometheus.Series, mx *metrics) {
-	// Object counts per resource (dynamic chart)
-	// FIXED: Use apiserver_storage_objects (newer) or etcd_object_counts (older)
+func (c *Collector) collectEtcd(mfs prometheus.MetricFamilies, mx *metrics) {
 	chart := c.charts.Get("etcd_object_counts")
 	if chart == nil {
 		chart = newEtcdObjectCountsChart()
@@ -373,17 +430,25 @@ func (c *Collector) collectEtcd(raw prometheus.Series, mx *metrics) {
 	}
 
 	// Try apiserver_storage_objects first (newer k8s), then etcd_object_counts (older)
-	objectMetrics := raw.FindByName("apiserver_storage_objects")
-	if len(objectMetrics) == 0 {
-		objectMetrics = raw.FindByName("etcd_object_counts")
+	mf := mfs.Get("apiserver_storage_objects")
+	if mf == nil {
+		mf = mfs.Get("etcd_object_counts")
+	}
+	if mf == nil {
+		return
 	}
 
-	for _, metric := range objectMetrics {
-		resource := metric.Labels.Get("resource")
+	for _, m := range mf.Metrics() {
+		value := metricValue(mf, m)
+		if math.IsNaN(value) {
+			continue
+		}
+
+		resource := m.Labels().Get("resource")
 		if resource == "" {
 			continue
 		}
-		// Simplify resource name (remove api group suffix)
+
 		resourceName := simplifyResourceName(resource)
 		dimID := "etcd_objects_" + resourceName
 
@@ -394,32 +459,47 @@ func (c *Collector) collectEtcd(raw prometheus.Series, mx *metrics) {
 				chart.MarkNotCreated()
 			}
 		}
-		mx.Etcd.ObjectCounts[resourceName] = mtx.Gauge(metric.Value)
+		mx.Etcd.ObjectCounts[resourceName] = mtx.Gauge(value)
 	}
 }
 
 // collectWorkqueues collects controller work queue metrics
-func (c *Collector) collectWorkqueues(raw prometheus.Series, mx *metrics) {
-	// Pre-index metrics by queue name for O(1) lookup instead of O(n) per queue
+func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics) {
+	// Pre-index metrics by queue name
 	depthByName := make(map[string]float64)
 	addsByName := make(map[string]float64)
 	retriesByName := make(map[string]float64)
 
-	for _, metric := range raw.FindByName("workqueue_depth") {
-		if name := metric.Labels.Get("name"); name != "" {
-			depthByName[name] = metric.Value
+	if mf := mfs.Get("workqueue_depth"); mf != nil {
+		for _, m := range mf.Metrics() {
+			if name := m.Labels().Get("name"); name != "" {
+				if v := metricValue(mf, m); !math.IsNaN(v) {
+					depthByName[name] = v
+				}
+			}
 		}
 	}
-	for _, metric := range raw.FindByName("workqueue_adds_total") {
-		if name := metric.Labels.Get("name"); name != "" {
-			addsByName[name] = metric.Value
+	if mf := mfs.Get("workqueue_adds_total"); mf != nil {
+		for _, m := range mf.Metrics() {
+			if name := m.Labels().Get("name"); name != "" {
+				if v := metricValue(mf, m); !math.IsNaN(v) {
+					addsByName[name] = v
+				}
+			}
 		}
 	}
-	for _, metric := range raw.FindByName("workqueue_retries_total") {
-		if name := metric.Labels.Get("name"); name != "" {
-			retriesByName[name] = metric.Value
+	if mf := mfs.Get("workqueue_retries_total"); mf != nil {
+		for _, m := range mf.Metrics() {
+			if name := m.Labels().Get("name"); name != "" {
+				if v := metricValue(mf, m); !math.IsNaN(v) {
+					retriesByName[name] = v
+				}
+			}
 		}
 	}
+
+	queueLatencyMF := mfs.Get("workqueue_queue_duration_seconds")
+	workDurationMF := mfs.Get("workqueue_work_duration_seconds")
 
 	for queueName := range depthByName {
 		// Cardinality limit
@@ -445,96 +525,117 @@ func (c *Collector) collectWorkqueues(raw prometheus.Series, mx *metrics) {
 		}
 
 		wq := mx.Workqueue.Controllers[queueName]
-
-		// Use pre-indexed values
 		wq.Depth.Set(depthByName[queueName])
 		wq.Adds.Set(addsByName[queueName])
 		wq.Retries.Set(retriesByName[queueName])
 
 		// Queue latency (histogram)
-		buckets := collectHistogramBucketsWithLabel(raw, "workqueue_queue_duration_seconds_bucket", "name", queueName)
-		if len(buckets) > 0 {
-			if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
-				wq.LatencyP50.Set(p50 * 1000000) // seconds to microseconds
-			}
-			if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
-				wq.LatencyP90.Set(p90 * 1000000)
-			}
-			if p99 := histogramPercentile(buckets, 0.99); !math.IsNaN(p99) {
-				wq.LatencyP99.Set(p99 * 1000000)
+		if queueLatencyMF != nil && queueLatencyMF.Type() == model.MetricTypeHistogram {
+			buckets := collectHistogramBucketsFromMF(queueLatencyMF, func(m prometheus.Metric) bool {
+				return m.Labels().Get("name") == queueName
+			})
+			if len(buckets) > 0 {
+				if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
+					wq.LatencyP50.Set(p50 * 1000000)
+				}
+				if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
+					wq.LatencyP90.Set(p90 * 1000000)
+				}
+				if p99 := histogramPercentile(buckets, 0.99); !math.IsNaN(p99) {
+					wq.LatencyP99.Set(p99 * 1000000)
+				}
 			}
 		}
 
 		// Work duration (histogram)
-		buckets = collectHistogramBucketsWithLabel(raw, "workqueue_work_duration_seconds_bucket", "name", queueName)
-		if len(buckets) > 0 {
-			if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
-				wq.DurationP50.Set(p50 * 1000000) // seconds to microseconds
-			}
-			if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
-				wq.DurationP90.Set(p90 * 1000000)
-			}
-			if p99 := histogramPercentile(buckets, 0.99); !math.IsNaN(p99) {
-				wq.DurationP99.Set(p99 * 1000000)
+		if workDurationMF != nil && workDurationMF.Type() == model.MetricTypeHistogram {
+			buckets := collectHistogramBucketsFromMF(workDurationMF, func(m prometheus.Metric) bool {
+				return m.Labels().Get("name") == queueName
+			})
+			if len(buckets) > 0 {
+				if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
+					wq.DurationP50.Set(p50 * 1000000)
+				}
+				if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
+					wq.DurationP90.Set(p90 * 1000000)
+				}
+				if p99 := histogramPercentile(buckets, 0.99); !math.IsNaN(p99) {
+					wq.DurationP99.Set(p99 * 1000000)
+				}
 			}
 		}
 	}
 }
 
 // collectProcess collects Go runtime and process metrics
-func (c *Collector) collectProcess(raw prometheus.Series, mx *metrics) {
-	mx.Process.Goroutines.Set(raw.FindByName("go_goroutines").Max())
-	mx.Process.Threads.Set(raw.FindByName("go_threads").Max())
-	mx.Process.CPUSeconds.Set(raw.FindByName("process_cpu_seconds_total").Max() * precision)
-	mx.Process.ResidentMemory.Set(raw.FindByName("process_resident_memory_bytes").Max())
-	mx.Process.VirtualMemory.Set(raw.FindByName("process_virtual_memory_bytes").Max())
-	mx.Process.OpenFDs.Set(raw.FindByName("process_open_fds").Max())
-	mx.Process.MaxFDs.Set(raw.FindByName("process_max_fds").Max())
-	mx.Process.HeapAlloc.Set(raw.FindByName("go_memstats_heap_alloc_bytes").Max())
-	mx.Process.HeapInuse.Set(raw.FindByName("go_memstats_heap_inuse_bytes").Max())
-	mx.Process.StackInuse.Set(raw.FindByName("go_memstats_stack_inuse_bytes").Max())
+func (c *Collector) collectProcess(mfs prometheus.MetricFamilies, mx *metrics) {
+	mx.Process.Goroutines.Set(getMaxValue(mfs, "go_goroutines"))
+	mx.Process.Threads.Set(getMaxValue(mfs, "go_threads"))
+	mx.Process.CPUSeconds.Set(getMaxValue(mfs, "process_cpu_seconds_total") * precision)
+	mx.Process.ResidentMemory.Set(getMaxValue(mfs, "process_resident_memory_bytes"))
+	mx.Process.VirtualMemory.Set(getMaxValue(mfs, "process_virtual_memory_bytes"))
+	mx.Process.OpenFDs.Set(getMaxValue(mfs, "process_open_fds"))
+	mx.Process.MaxFDs.Set(getMaxValue(mfs, "process_max_fds"))
+	mx.Process.HeapAlloc.Set(getMaxValue(mfs, "go_memstats_heap_alloc_bytes"))
+	mx.Process.HeapInuse.Set(getMaxValue(mfs, "go_memstats_heap_inuse_bytes"))
+	mx.Process.StackInuse.Set(getMaxValue(mfs, "go_memstats_stack_inuse_bytes"))
 
 	// GC duration (summary with quantile labels)
-	// K8s exports quantiles: "0", "0.25", "0.5", "0.75", "1"
-	for _, metric := range raw.FindByName("go_gc_duration_seconds") {
-		if math.IsNaN(metric.Value) {
-			continue
-		}
-		quantile := metric.Labels.Get("quantile")
-		switch quantile {
-		case "0":
-			mx.Process.GCDurationMin.Set(metric.Value * 1000000) // seconds to microseconds
-		case "0.25":
-			mx.Process.GCDurationP25.Set(metric.Value * 1000000)
-		case "0.5":
-			mx.Process.GCDurationP50.Set(metric.Value * 1000000)
-		case "0.75":
-			mx.Process.GCDurationP75.Set(metric.Value * 1000000)
-		case "1":
-			mx.Process.GCDurationMax.Set(metric.Value * 1000000)
+	if mf := mfs.Get("go_gc_duration_seconds"); mf != nil && mf.Type() == model.MetricTypeSummary {
+		for _, m := range mf.Metrics() {
+			if m.Summary() == nil {
+				continue
+			}
+			for _, q := range m.Summary().Quantiles() {
+				if math.IsNaN(q.Value()) {
+					continue
+				}
+				switch q.Quantile() {
+				case 0:
+					mx.Process.GCDurationMin.Set(q.Value() * 1000000)
+				case 0.25:
+					mx.Process.GCDurationP25.Set(q.Value() * 1000000)
+				case 0.5:
+					mx.Process.GCDurationP50.Set(q.Value() * 1000000)
+				case 0.75:
+					mx.Process.GCDurationP75.Set(q.Value() * 1000000)
+				case 1:
+					mx.Process.GCDurationMax.Set(q.Value() * 1000000)
+				}
+			}
 		}
 	}
 }
 
 // collectAudit collects audit event metrics
-func (c *Collector) collectAudit(raw prometheus.Series, mx *metrics) {
-	mx.Audit.EventsTotal.Set(raw.FindByName("apiserver_audit_event_total").Max())
-	mx.Audit.RejectedTotal.Set(raw.FindByName("apiserver_audit_requests_rejected_total").Max())
+func (c *Collector) collectAudit(mfs prometheus.MetricFamilies, mx *metrics) {
+	mx.Audit.EventsTotal.Set(getMaxValue(mfs, "apiserver_audit_event_total"))
+	mx.Audit.RejectedTotal.Set(getMaxValue(mfs, "apiserver_audit_requests_rejected_total"))
 }
 
 // collectAuth collects authentication metrics
-func (c *Collector) collectAuth(raw prometheus.Series, mx *metrics) {
-	// FIXED: Sum across all usernames instead of taking max
-	for _, metric := range raw.FindByName("authenticated_user_requests") {
-		mx.Auth.AuthenticatedRequests.Add(metric.Value)
+func (c *Collector) collectAuth(mfs prometheus.MetricFamilies, mx *metrics) {
+	// Sum across all usernames
+	if mf := mfs.Get("authenticated_user_requests"); mf != nil {
+		for _, m := range mf.Metrics() {
+			if v := metricValue(mf, m); !math.IsNaN(v) {
+				mx.Auth.AuthenticatedRequests.Add(v)
+			}
+		}
 	}
 
 	// Client certificate expiration - histogram, track count of certs expiring within 24h
-	for _, metric := range raw.FindByName("apiserver_client_certificate_expiration_seconds_bucket") {
-		le := metric.Labels.Get("le")
-		if le == "86400" { // 1 day bucket
-			mx.Auth.CertExpirationSeconds.Set(metric.Value)
-			break
+	if mf := mfs.Get("apiserver_client_certificate_expiration_seconds"); mf != nil && mf.Type() == model.MetricTypeHistogram {
+		for _, m := range mf.Metrics() {
+			if m.Histogram() == nil {
+				continue
+			}
+			for _, b := range m.Histogram().Buckets() {
+				if b.UpperBound() == 86400 { // 1 day bucket
+					mx.Auth.CertExpirationSeconds.Set(float64(b.CumulativeCount()))
+					break
+				}
+			}
 		}
 	}
 }
@@ -605,10 +706,47 @@ func (c *Collector) addResourceDimension(resource string) {
 }
 
 // simplifyResourceName removes API group suffix from resource names
-// e.g., "deployments.apps" -> "deployments"
 func simplifyResourceName(resource string) string {
 	parts := strings.SplitN(resource, ".", 2)
 	return parts[0]
+}
+
+// metricValue extracts the value from a metric based on its type
+func metricValue(mf *prometheus.MetricFamily, m prometheus.Metric) float64 {
+	switch mf.Type() {
+	case model.MetricTypeGauge:
+		if m.Gauge() != nil {
+			return m.Gauge().Value()
+		}
+	case model.MetricTypeCounter:
+		if m.Counter() != nil {
+			return m.Counter().Value()
+		}
+	case model.MetricTypeUnknown:
+		if m.Gauge() != nil {
+			return m.Gauge().Value()
+		}
+		if m.Counter() != nil {
+			return m.Counter().Value()
+		}
+	}
+	return math.NaN()
+}
+
+// getMaxValue gets the maximum value across all metrics in a family
+func getMaxValue(mfs prometheus.MetricFamilies, name string) float64 {
+	mf := mfs.Get(name)
+	if mf == nil {
+		return 0
+	}
+
+	var maxVal float64
+	for _, m := range mf.Metrics() {
+		if v := metricValue(mf, m); !math.IsNaN(v) && v > maxVal {
+			maxVal = v
+		}
+	}
+	return maxVal
 }
 
 // Histogram percentile calculation utilities
@@ -618,23 +756,24 @@ type histogramBucket struct {
 	count float64
 }
 
-// collectHistogramBuckets aggregates histogram buckets across all label combinations
-func collectHistogramBuckets(raw prometheus.Series, metricName string) []histogramBucket {
+// collectHistogramBucketsFromMF collects histogram buckets from a metric family
+func collectHistogramBucketsFromMF(mf *prometheus.MetricFamily, filter func(prometheus.Metric) bool) []histogramBucket {
 	bucketMap := make(map[float64]float64)
 
-	for _, metric := range raw.FindByName(metricName + "_bucket") {
-		if math.IsNaN(metric.Value) {
+	for _, m := range mf.Metrics() {
+		if filter != nil && !filter(m) {
 			continue
 		}
-		le := metric.Labels.Get("le")
-		if le == "" || le == "+Inf" {
+		if m.Histogram() == nil {
 			continue
 		}
-		bound, err := strconv.ParseFloat(le, 64)
-		if err != nil {
-			continue
+
+		for _, b := range m.Histogram().Buckets() {
+			if math.IsInf(b.UpperBound(), 0) {
+				continue
+			}
+			bucketMap[b.UpperBound()] += float64(b.CumulativeCount())
 		}
-		bucketMap[bound] += metric.Value
 	}
 
 	buckets := make([]histogramBucket, 0, len(bucketMap))
@@ -642,55 +781,22 @@ func collectHistogramBuckets(raw prometheus.Series, metricName string) []histogr
 		buckets = append(buckets, histogramBucket{le: le, count: count})
 	}
 
-	sort.Slice(buckets, func(i, j int) bool {
-		return buckets[i].le < buckets[j].le
-	})
-
+	sortBuckets(buckets)
 	return buckets
 }
 
-// collectHistogramBucketsWithLabel collects buckets for a specific label value
-func collectHistogramBucketsWithLabel(raw prometheus.Series, metricName, labelName, labelValue string) []histogramBucket {
-	bucketMap := make(map[float64]float64)
-
-	for _, metric := range raw.FindByName(metricName) {
-		if math.IsNaN(metric.Value) {
-			continue
-		}
-		if metric.Labels.Get(labelName) != labelValue {
-			continue
-		}
-		le := metric.Labels.Get("le")
-		if le == "" || le == "+Inf" {
-			continue
-		}
-		bound, err := strconv.ParseFloat(le, 64)
-		if err != nil {
-			continue
-		}
-		bucketMap[bound] += metric.Value
-	}
-
-	buckets := make([]histogramBucket, 0, len(bucketMap))
-	for le, count := range bucketMap {
-		buckets = append(buckets, histogramBucket{le: le, count: count})
-	}
-
+func sortBuckets(buckets []histogramBucket) {
 	sort.Slice(buckets, func(i, j int) bool {
 		return buckets[i].le < buckets[j].le
 	})
-
-	return buckets
 }
 
 // histogramPercentile estimates the percentile value from histogram buckets
-// Uses linear interpolation within the bucket containing the percentile
 func histogramPercentile(buckets []histogramBucket, percentile float64) float64 {
 	if len(buckets) == 0 {
 		return math.NaN()
 	}
 
-	// Get total count from the last bucket
 	total := buckets[len(buckets)-1].count
 	if total == 0 {
 		return math.NaN()
@@ -698,11 +804,9 @@ func histogramPercentile(buckets []histogramBucket, percentile float64) float64 
 
 	target := percentile * total
 
-	// Find the bucket containing the target count
 	var prevBound, prevCount float64
 	for _, b := range buckets {
 		if b.count >= target {
-			// Linear interpolation within this bucket
 			bucketWidth := b.le - prevBound
 			bucketCount := b.count - prevCount
 			if bucketCount == 0 {
@@ -715,6 +819,5 @@ func histogramPercentile(buckets []histogramBucket, percentile float64) float64 
 		prevCount = b.count
 	}
 
-	// If we get here, return the last bucket bound
 	return buckets[len(buckets)-1].le
 }
