@@ -116,10 +116,15 @@ func TestCollector_Collect(t *testing.T) {
 		wantMetrics map[string]int64
 	}{
 		"success on valid response": {
-			prepare:     caseValidMetrics,
+			prepare: caseValidMetrics,
 			wantMetrics: map[string]int64{
-				// We expect some metrics to be collected
-				// Exact values depend on testdata/metrics.txt content
+				// Process metrics (from testdata/metrics.txt)
+				"process_goroutines":            1633,
+				"process_threads":               29,
+				"process_open_fds":              84,
+				"process_max_fds":               2147483584,
+				"process_resident_memory_bytes": 346054656,
+				"process_virtual_memory_bytes":  1091432448,
 			},
 		},
 	}
@@ -166,6 +171,15 @@ func TestCollector_Collect(t *testing.T) {
 			}
 			assert.Greater(t, verbCount, 0, "Expected some verb dimensions")
 			assert.Greater(t, codeCount, 0, "Expected some code dimensions")
+
+			// Verify expected metric values
+			for metric, expectedValue := range test.wantMetrics {
+				actualValue, ok := mx[metric]
+				assert.True(t, ok, "Expected metric %s not found", metric)
+				if ok {
+					assert.Equal(t, expectedValue, actualValue, "Metric %s has unexpected value", metric)
+				}
+			}
 
 			t.Logf("Collected %d metrics, %d verbs, %d codes", len(mx), verbCount, codeCount)
 		})
