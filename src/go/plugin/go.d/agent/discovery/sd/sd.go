@@ -73,7 +73,10 @@ func (d *ServiceDiscovery) String() string {
 
 func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	d.Info("instance is started")
-	defer func() { d.Info("instance is stopped") }()
+	defer func() { d.unregisterDyncfgTemplates(); d.Info("instance is stopped") }()
+
+	// Register dyncfg templates for discoverer types
+	d.registerDyncfgTemplates(ctx)
 
 	// Create pipeline manager with send function that forwards to output channel
 	send := func(ctx context.Context, groups []*confgroup.Group) {
