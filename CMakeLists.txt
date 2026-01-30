@@ -1743,6 +1743,7 @@ set(STREAMING_PLUGIN_FILES
         src/streaming/stream-parents.c
         src/streaming/stream-handshake.c
         src/streaming/protocol/command-function.c
+        src/streaming/protocol/command-function-del.c
         src/streaming/protocol/command-host-labels.c
         src/streaming/protocol/command-chart-definition.c
         src/streaming/protocol/command-begin-set-end-v2.c

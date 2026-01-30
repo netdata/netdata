@@ -22,6 +22,7 @@ static struct {
     {STREAM_CAP_CLABELS,      "CLABELS" },
     {STREAM_CAP_LZ4,          "LZ4" },
     {STREAM_CAP_FUNCTIONS,    "FUNCTIONS" },
+    {STREAM_CAP_FUNCTION_DEL, "FUNCDEL" },
     {STREAM_CAP_REPLICATION,  "REPLICATION" },
     {STREAM_CAP_BINARY,       "BINARY" },
     {STREAM_CAP_INTERPOLATED, "INTERPOLATED" },
@@ -128,6 +129,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_CLAIM |
             STREAM_CAP_CLABELS |
             STREAM_CAP_FUNCTIONS |
+            STREAM_CAP_FUNCTION_DEL |
             STREAM_CAP_REPLICATION |
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
