@@ -122,6 +122,10 @@ func TestCollector_Collect(t *testing.T) {
 				"host_192.0.2.1_packets_recv":   5,
 				"host_192.0.2.1_packets_sent":   5,
 				"host_192.0.2.1_std_dev_rtt":    5000,
+				"host_192.0.2.1_rtt_variance":   25000000,
+				"host_192.0.2.1_mean_jitter":    2500,
+				"host_192.0.2.1_ewma_jitter":    156,
+				"host_192.0.2.1_sma_jitter":     2500,
 				"host_192.0.2.2_avg_rtt":        15000,
 				"host_192.0.2.2_max_rtt":        20000,
 				"host_192.0.2.2_min_rtt":        10000,
@@ -129,6 +133,10 @@ func TestCollector_Collect(t *testing.T) {
 				"host_192.0.2.2_packets_recv":   5,
 				"host_192.0.2.2_packets_sent":   5,
 				"host_192.0.2.2_std_dev_rtt":    5000,
+				"host_192.0.2.2_rtt_variance":   25000000,
+				"host_192.0.2.2_mean_jitter":    2500,
+				"host_192.0.2.2_ewma_jitter":    156,
+				"host_192.0.2.2_sma_jitter":     2500,
 				"host_example.com_avg_rtt":      15000,
 				"host_example.com_max_rtt":      20000,
 				"host_example.com_min_rtt":      10000,
@@ -136,6 +144,10 @@ func TestCollector_Collect(t *testing.T) {
 				"host_example.com_packets_recv": 5,
 				"host_example.com_packets_sent": 5,
 				"host_example.com_std_dev_rtt":  5000,
+				"host_example.com_rtt_variance": 25000000,
+				"host_example.com_mean_jitter":  2500,
+				"host_example.com_ewma_jitter":  156,
+				"host_example.com_sma_jitter":   2500,
 			},
 			wantNumCharts: 3 * len(hostChartsTmpl),
 		},
@@ -183,6 +195,98 @@ func casePingError(t *testing.T) *Collector {
 	return collr
 }
 
+func TestCalcMeanJitter(t *testing.T) {
+	tests := map[string]struct {
+		rtts []time.Duration
+		want time.Duration
+	}{
+		"empty": {
+			rtts: nil,
+			want: 0,
+		},
+		"single": {
+			rtts: []time.Duration{time.Millisecond * 10},
+			want: 0,
+		},
+		"two samples": {
+			rtts: []time.Duration{time.Millisecond * 10, time.Millisecond * 15},
+			want: time.Millisecond * 5,
+		},
+		"five samples": {
+			// 10, 12, 15, 18, 20 -> diffs: 2, 3, 3, 2 -> mean = 10/4 = 2.5
+			rtts: []time.Duration{
+				time.Millisecond * 10,
+				time.Millisecond * 12,
+				time.Millisecond * 15,
+				time.Millisecond * 18,
+				time.Millisecond * 20,
+			},
+			want: time.Microsecond * 2500,
+		},
+		"negative differences": {
+			// 20, 15, 10 -> diffs: |-5|=5, |-5|=5 -> mean = 5
+			rtts: []time.Duration{
+				time.Millisecond * 20,
+				time.Millisecond * 15,
+				time.Millisecond * 10,
+			},
+			want: time.Millisecond * 5,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := calcMeanJitter(test.rtts)
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestCollector_UpdateEWMAJitter(t *testing.T) {
+	collr := New()
+	collr.JitterEWMASamples = 16
+	collr.jitterEWMA = make(map[string]float64)
+
+	// First call: prev=0, current=2500μs -> ewma = 1/16 * 2500000 + 15/16 * 0 = 156250ns
+	got := collr.updateEWMAJitter("host1", time.Microsecond*2500)
+	assert.Equal(t, time.Duration(156250), got)
+
+	// Second call: prev=156250, current=2500μs -> ewma = 1/16 * 2500000 + 15/16 * 156250 = 302734ns
+	got = collr.updateEWMAJitter("host1", time.Microsecond*2500)
+	assert.Equal(t, time.Duration(302734), got)
+
+	// Test that EWMA can decrease when current is lower
+	// Set EWMA to a high value
+	collr.jitterEWMA["host2"] = 1000000 // 1ms
+	// Current jitter is 0 -> EWMA should decrease
+	got = collr.updateEWMAJitter("host2", 0)
+	// ewma = 1/16 * 0 + 15/16 * 1000000 = 937500ns (decreased from 1000000)
+	assert.Equal(t, time.Duration(937500), got)
+	assert.True(t, got < time.Microsecond*1000, "EWMA should decrease when current is lower")
+}
+
+func TestCollector_UpdateSMAJitter(t *testing.T) {
+	collr := New()
+	collr.JitterSMAWindow = 3
+	collr.jitterSMA = make(map[string][]float64)
+
+	// First call: window=[1000] -> sma = 1000
+	got := collr.updateSMAJitter("host1", time.Microsecond*1000)
+	assert.Equal(t, time.Microsecond*1000, got)
+
+	// Second call: window=[1000, 2000] -> sma = 1500
+	got = collr.updateSMAJitter("host1", time.Microsecond*2000)
+	assert.Equal(t, time.Microsecond*1500, got)
+
+	// Third call: window=[1000, 2000, 3000] -> sma = 2000
+	got = collr.updateSMAJitter("host1", time.Microsecond*3000)
+	assert.Equal(t, time.Microsecond*2000, got)
+
+	// Fourth call: window slides [2000, 3000, 4000] -> sma = 3000
+	got = collr.updateSMAJitter("host1", time.Microsecond*4000)
+	assert.Equal(t, time.Microsecond*3000, got)
+}
+
 type mockProber struct {
 	errOnPing bool
 }
@@ -198,11 +302,17 @@ func (m *mockProber) Ping(host string) (*probing.Statistics, error) {
 		PacketsRecvDuplicates: 0,
 		PacketLoss:            0,
 		Addr:                  host,
-		Rtts:                  nil,
-		MinRtt:                time.Millisecond * 10,
-		MaxRtt:                time.Millisecond * 20,
-		AvgRtt:                time.Millisecond * 15,
-		StdDevRtt:             time.Millisecond * 5,
+		Rtts: []time.Duration{
+			time.Millisecond * 10,
+			time.Millisecond * 12,
+			time.Millisecond * 15,
+			time.Millisecond * 18,
+			time.Millisecond * 20,
+		},
+		MinRtt:    time.Millisecond * 10,
+		MaxRtt:    time.Millisecond * 20,
+		AvgRtt:    time.Millisecond * 15,
+		StdDevRtt: time.Millisecond * 5,
 	}
 
 	return &stats, nil
