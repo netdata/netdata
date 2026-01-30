@@ -10,8 +10,12 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 
 	"gopkg.in/yaml.v2"
 )
@@ -19,6 +23,7 @@ import (
 type Config struct {
 	ConfigDefaults confgroup.Registry
 	ConfDir        multipath.MultiPath
+	FnReg          functions.Registry
 }
 
 func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
@@ -30,6 +35,8 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		Logger:         log,
 		confProv:       newConfFileReader(log, cfg.ConfDir),
 		configDefaults: cfg.ConfigDefaults,
+		fnReg:          cfg.FnReg,
+		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
 			return pipeline.New(config)
 		},
@@ -45,6 +52,8 @@ type (
 		confProv confFileProvider
 
 		configDefaults confgroup.Registry
+		fnReg          functions.Registry
+		dyncfgApi      *dyncfg.Responder
 		newPipeline    func(config pipeline.Config) (sdPipeline, error)
 
 		mgr *PipelineManager
