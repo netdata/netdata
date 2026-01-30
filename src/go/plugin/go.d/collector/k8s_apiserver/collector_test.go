@@ -167,57 +167,72 @@ func TestCollector_Collect(t *testing.T) {
 
 func TestHistogramPercentile(t *testing.T) {
 	tests := map[string]struct {
-		buckets    []histogramBucket
+		hd         histogramData
 		percentile float64
 		want       float64
 		wantNaN    bool
 	}{
 		"empty buckets returns NaN": {
-			buckets:    []histogramBucket{},
+			hd:         histogramData{buckets: []histogramBucket{}, total: 0},
 			percentile: 0.5,
 			wantNaN:    true,
 		},
 		"zero count returns NaN": {
-			buckets: []histogramBucket{
-				{le: 0.1, count: 0},
-				{le: 0.5, count: 0},
+			hd: histogramData{
+				buckets: []histogramBucket{
+					{le: 0.1, count: 0},
+					{le: 0.5, count: 0},
+				},
+				total: 0,
 			},
 			percentile: 0.5,
 			wantNaN:    true,
 		},
 		"p50 single bucket": {
-			buckets: []histogramBucket{
-				{le: 0.1, count: 100},
+			hd: histogramData{
+				buckets: []histogramBucket{
+					{le: 0.1, count: 100},
+				},
+				total: 100,
 			},
 			percentile: 0.5,
 			want:       0.05, // Half of first bucket
 		},
 		"p50 two buckets equal distribution": {
-			buckets: []histogramBucket{
-				{le: 0.1, count: 50},
-				{le: 0.2, count: 100},
+			hd: histogramData{
+				buckets: []histogramBucket{
+					{le: 0.1, count: 50},
+					{le: 0.2, count: 100},
+				},
+				total: 100,
 			},
 			percentile: 0.5,
 			want:       0.1, // Should be at boundary
 		},
 		"p90 realistic distribution": {
-			buckets: []histogramBucket{
-				{le: 0.005, count: 80},
-				{le: 0.01, count: 90},
-				{le: 0.025, count: 95},
-				{le: 0.05, count: 98},
-				{le: 0.1, count: 100},
+			hd: histogramData{
+				buckets: []histogramBucket{
+					{le: 0.005, count: 80},
+					{le: 0.01, count: 90},
+					{le: 0.025, count: 95},
+					{le: 0.05, count: 98},
+					{le: 0.1, count: 100},
+				},
+				total: 100,
 			},
 			percentile: 0.9,
 			want:       0.01, // 90% of 100 = 90, in second bucket
 		},
 		"p99 realistic distribution": {
-			buckets: []histogramBucket{
-				{le: 0.005, count: 80},
-				{le: 0.01, count: 90},
-				{le: 0.025, count: 95},
-				{le: 0.05, count: 98},
-				{le: 0.1, count: 100},
+			hd: histogramData{
+				buckets: []histogramBucket{
+					{le: 0.005, count: 80},
+					{le: 0.01, count: 90},
+					{le: 0.025, count: 95},
+					{le: 0.05, count: 98},
+					{le: 0.1, count: 100},
+				},
+				total: 100,
 			},
 			percentile: 0.99,
 			want:       0.075, // 99% of 100 = 99, in last bucket
@@ -226,7 +241,7 @@ func TestHistogramPercentile(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := histogramPercentile(test.buckets, test.percentile)
+			result := histogramPercentile(test.hd, test.percentile)
 			if test.wantNaN {
 				assert.True(t, math.IsNaN(result), "Expected NaN but got %f", result)
 			} else {

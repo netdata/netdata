@@ -123,15 +123,15 @@ func (c *Collector) collectRequestLatency(mfs prometheus.MetricFamilies, mx *met
 		return
 	}
 
-	buckets := collectHistogramBucketsFromMF(mf, nil)
-	if len(buckets) > 0 {
-		if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
+	hd := collectHistogramBucketsFromMF(mf, nil)
+	if len(hd.buckets) > 0 {
+		if p50 := histogramPercentile(hd, 0.5); !math.IsNaN(p50) {
 			mx.Request.Latency.P50.Set(p50 * latencyPrecision)
 		}
-		if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
+		if p90 := histogramPercentile(hd, 0.9); !math.IsNaN(p90) {
 			mx.Request.Latency.P90.Set(p90 * latencyPrecision)
 		}
-		if p99 := histogramPercentile(buckets, 0.99); !math.IsNaN(p99) {
+		if p99 := histogramPercentile(hd, 0.99); !math.IsNaN(p99) {
 			mx.Request.Latency.P99.Set(p99 * latencyPrecision)
 		}
 	}
@@ -143,15 +143,15 @@ func (c *Collector) collectResponseSize(mfs prometheus.MetricFamilies, mx *metri
 		return
 	}
 
-	buckets := collectHistogramBucketsFromMF(mf, nil)
-	if len(buckets) > 0 {
-		if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
+	hd := collectHistogramBucketsFromMF(mf, nil)
+	if len(hd.buckets) > 0 {
+		if p50 := histogramPercentile(hd, 0.5); !math.IsNaN(p50) {
 			mx.Request.ResponseSize.P50.Set(p50)
 		}
-		if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
+		if p90 := histogramPercentile(hd, 0.9); !math.IsNaN(p90) {
 			mx.Request.ResponseSize.P90.Set(p90)
 		}
-		if p99 := histogramPercentile(buckets, 0.99); !math.IsNaN(p99) {
+		if p99 := histogramPercentile(hd, 0.99); !math.IsNaN(p99) {
 			mx.Request.ResponseSize.P99.Set(p99)
 		}
 	}
@@ -231,15 +231,15 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 
 	// REST client latency
 	if mf := mfs.Get("rest_client_request_duration_seconds"); mf != nil && mf.Type() == model.MetricTypeHistogram {
-		buckets := collectHistogramBucketsFromMF(mf, nil)
-		if len(buckets) > 0 {
-			if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
+		hd := collectHistogramBucketsFromMF(mf, nil)
+		if len(hd.buckets) > 0 {
+			if p50 := histogramPercentile(hd, 0.5); !math.IsNaN(p50) {
 				mx.RESTClient.Latency.P50.Set(p50 * latencyPrecision)
 			}
-			if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
+			if p90 := histogramPercentile(hd, 0.9); !math.IsNaN(p90) {
 				mx.RESTClient.Latency.P90.Set(p90 * latencyPrecision)
 			}
-			if p99 := histogramPercentile(buckets, 0.99); !math.IsNaN(p99) {
+			if p99 := histogramPercentile(hd, 0.99); !math.IsNaN(p99) {
 				mx.RESTClient.Latency.P99.Set(p99 * latencyPrecision)
 			}
 		}
@@ -250,7 +250,7 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 func (c *Collector) collectAdmission(mfs prometheus.MetricFamilies, mx *metrics) {
 	// Admission step latency
 	if mf := mfs.Get("apiserver_admission_step_admission_duration_seconds"); mf != nil && mf.Type() == model.MetricTypeHistogram {
-		stepBuckets := make(map[string][]histogramBucket)
+		stepData := make(map[string]*histogramData)
 
 		for _, m := range mf.Metrics() {
 			if m.Histogram() == nil {
@@ -261,20 +261,25 @@ func (c *Collector) collectAdmission(mfs prometheus.MetricFamilies, mx *metrics)
 				continue
 			}
 
+			if stepData[stepType] == nil {
+				stepData[stepType] = &histogramData{}
+			}
+
 			for _, b := range m.Histogram().Buckets() {
 				if math.IsInf(b.UpperBound(), 0) {
+					stepData[stepType].total += b.CumulativeCount()
 					continue
 				}
-				stepBuckets[stepType] = append(stepBuckets[stepType], histogramBucket{
+				stepData[stepType].buckets = append(stepData[stepType].buckets, histogramBucket{
 					le:    b.UpperBound(),
-					count: float64(b.CumulativeCount()),
+					count: b.CumulativeCount(),
 				})
 			}
 		}
 
-		for stepType, buckets := range stepBuckets {
-			sortBuckets(buckets)
-			if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
+		for stepType, hd := range stepData {
+			sortBuckets(hd.buckets)
+			if p50 := histogramPercentile(*hd, 0.5); !math.IsNaN(p50) {
 				switch stepType {
 				case "validate":
 					mx.Admission.StepLatency.Validate.Set(p50 * latencyPrecision)
@@ -531,17 +536,17 @@ func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics
 
 		// Queue latency (histogram)
 		if queueLatencyMF != nil && queueLatencyMF.Type() == model.MetricTypeHistogram {
-			buckets := collectHistogramBucketsFromMF(queueLatencyMF, func(m prometheus.Metric) bool {
+			hd := collectHistogramBucketsFromMF(queueLatencyMF, func(m prometheus.Metric) bool {
 				return m.Labels().Get("name") == queueName
 			})
-			if len(buckets) > 0 {
-				if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
+			if len(hd.buckets) > 0 {
+				if p50 := histogramPercentile(hd, 0.5); !math.IsNaN(p50) {
 					wq.LatencyP50.Set(p50 * 1000000)
 				}
-				if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
+				if p90 := histogramPercentile(hd, 0.9); !math.IsNaN(p90) {
 					wq.LatencyP90.Set(p90 * 1000000)
 				}
-				if p99 := histogramPercentile(buckets, 0.99); !math.IsNaN(p99) {
+				if p99 := histogramPercentile(hd, 0.99); !math.IsNaN(p99) {
 					wq.LatencyP99.Set(p99 * 1000000)
 				}
 			}
@@ -549,17 +554,17 @@ func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics
 
 		// Work duration (histogram)
 		if workDurationMF != nil && workDurationMF.Type() == model.MetricTypeHistogram {
-			buckets := collectHistogramBucketsFromMF(workDurationMF, func(m prometheus.Metric) bool {
+			hd := collectHistogramBucketsFromMF(workDurationMF, func(m prometheus.Metric) bool {
 				return m.Labels().Get("name") == queueName
 			})
-			if len(buckets) > 0 {
-				if p50 := histogramPercentile(buckets, 0.5); !math.IsNaN(p50) {
+			if len(hd.buckets) > 0 {
+				if p50 := histogramPercentile(hd, 0.5); !math.IsNaN(p50) {
 					wq.DurationP50.Set(p50 * 1000000)
 				}
-				if p90 := histogramPercentile(buckets, 0.9); !math.IsNaN(p90) {
+				if p90 := histogramPercentile(hd, 0.9); !math.IsNaN(p90) {
 					wq.DurationP90.Set(p90 * 1000000)
 				}
-				if p99 := histogramPercentile(buckets, 0.99); !math.IsNaN(p99) {
+				if p99 := histogramPercentile(hd, 0.99); !math.IsNaN(p99) {
 					wq.DurationP99.Set(p99 * 1000000)
 				}
 			}
@@ -756,9 +761,15 @@ type histogramBucket struct {
 	count float64
 }
 
+type histogramData struct {
+	buckets []histogramBucket
+	total   float64 // from +Inf bucket
+}
+
 // collectHistogramBucketsFromMF collects histogram buckets from a metric family
-func collectHistogramBucketsFromMF(mf *prometheus.MetricFamily, filter func(prometheus.Metric) bool) []histogramBucket {
+func collectHistogramBucketsFromMF(mf *prometheus.MetricFamily, filter func(prometheus.Metric) bool) histogramData {
 	bucketMap := make(map[float64]float64)
+	var total float64
 
 	for _, m := range mf.Metrics() {
 		if filter != nil && !filter(m) {
@@ -770,9 +781,10 @@ func collectHistogramBucketsFromMF(mf *prometheus.MetricFamily, filter func(prom
 
 		for _, b := range m.Histogram().Buckets() {
 			if math.IsInf(b.UpperBound(), 0) {
+				total += b.CumulativeCount()
 				continue
 			}
-			bucketMap[b.UpperBound()] += float64(b.CumulativeCount())
+			bucketMap[b.UpperBound()] += b.CumulativeCount()
 		}
 	}
 
@@ -782,7 +794,7 @@ func collectHistogramBucketsFromMF(mf *prometheus.MetricFamily, filter func(prom
 	}
 
 	sortBuckets(buckets)
-	return buckets
+	return histogramData{buckets: buckets, total: total}
 }
 
 func sortBuckets(buckets []histogramBucket) {
@@ -792,20 +804,16 @@ func sortBuckets(buckets []histogramBucket) {
 }
 
 // histogramPercentile estimates the percentile value from histogram buckets
-func histogramPercentile(buckets []histogramBucket, percentile float64) float64 {
-	if len(buckets) == 0 {
+// total should be from the +Inf bucket which contains the true total count
+func histogramPercentile(hd histogramData, percentile float64) float64 {
+	if len(hd.buckets) == 0 || hd.total == 0 {
 		return math.NaN()
 	}
 
-	total := buckets[len(buckets)-1].count
-	if total == 0 {
-		return math.NaN()
-	}
-
-	target := percentile * total
+	target := percentile * hd.total
 
 	var prevBound, prevCount float64
-	for _, b := range buckets {
+	for _, b := range hd.buckets {
 		if b.count >= target {
 			bucketWidth := b.le - prevBound
 			bucketCount := b.count - prevCount
@@ -819,5 +827,5 @@ func histogramPercentile(buckets []histogramBucket, percentile float64) float64 
 		prevCount = b.count
 	}
 
-	return buckets[len(buckets)-1].le
+	return hd.buckets[len(hd.buckets)-1].le
 }
