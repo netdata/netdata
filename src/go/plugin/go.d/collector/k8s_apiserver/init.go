@@ -4,16 +4,41 @@ package k8s_apiserver
 
 import (
 	"errors"
+	"os"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
+const (
+	defaultTLSCA           = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	defaultBearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+)
+
 func (c *Collector) validateConfig() error {
 	if c.URL == "" {
 		return errors.New("url not set")
 	}
+
+	// Check if using default in-cluster TLS CA that doesn't exist
+	if c.TLSConfig.TLSCA == defaultTLSCA {
+		if _, err := os.Stat(c.TLSConfig.TLSCA); os.IsNotExist(err) {
+			c.Warningf("default tls_ca '%s' not found (not running inside a Kubernetes pod?); "+
+				"set 'tls_ca' to your CA certificate path, or set it to '' if using 'tls_skip_verify: yes'",
+				defaultTLSCA)
+		}
+	}
+
+	// Check if using default bearer token file that doesn't exist
+	if c.BearerTokenFile == defaultBearerTokenFile {
+		if _, err := os.Stat(c.BearerTokenFile); os.IsNotExist(err) {
+			c.Warningf("default bearer_token_file '%s' not found (not running inside a Kubernetes pod?); "+
+				"set 'bearer_token_file' to your token path, or use other authentication methods",
+				defaultBearerTokenFile)
+		}
+	}
+
 	return nil
 }
 
