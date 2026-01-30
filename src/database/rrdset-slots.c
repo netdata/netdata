@@ -85,11 +85,8 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
         return;
     }
 
-    // Load and acquire array while holding spinlock (prevents TOCTOU with other cleanup)
-    PRD_ARRAY *arr = st->pluginsd.prd_array;
-    if (arr) {
-        __atomic_fetch_add(&arr->refcount, 1, __ATOMIC_ACQ_REL);
-    }
+    // Acquire array while holding spinlock (prevents TOCTOU with other cleanup)
+    PRD_ARRAY *arr = prd_array_acquire_locked(&st->pluginsd.prd_array);
 
     spinlock_unlock(&st->pluginsd.spinlock);
 
