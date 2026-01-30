@@ -54,6 +54,8 @@ func New() *Collector {
 		collectedWorkqueues:    make(map[string]int64),
 		collectedAdmissionCtrl: make(map[string]int64),
 		collectedAdmissionWH:   make(map[string]int64),
+		collectedRESTCodes:     make(map[string]int64),
+		collectedRESTMethods:   make(map[string]int64),
 	}
 }
 
@@ -83,6 +85,8 @@ type Collector struct {
 	collectedWorkqueues    map[string]int64
 	collectedAdmissionCtrl map[string]int64
 	collectedAdmissionWH   map[string]int64
+	collectedRESTCodes     map[string]int64
+	collectedRESTMethods   map[string]int64
 }
 
 func (c *Collector) Configuration() any {

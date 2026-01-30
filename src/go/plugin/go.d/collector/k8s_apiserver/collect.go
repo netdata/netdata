@@ -220,27 +220,35 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 			code := m.Labels().Get("code")
 			method := m.Labels().Get("method")
 
-			// By code
+			// By code (track for cleanup)
 			if code != "" {
-				dimID := "rest_client_by_code_" + code
-				if codeChart != nil && !codeChart.HasDim(dimID) {
-					if err := codeChart.AddDim(&Dim{ID: dimID, Name: code, Algo: module.Incremental}); err != nil {
-						c.Warningf("failed to add REST client code dimension %s: %v", code, err)
-					} else {
-						codeChart.MarkNotCreated()
+				_, seen := c.collectedRESTCodes[code]
+				c.collectedRESTCodes[code] = c.collectCycle
+				if !seen {
+					dimID := "rest_client_by_code_" + code
+					if codeChart != nil && !codeChart.HasDim(dimID) {
+						if err := codeChart.AddDim(&Dim{ID: dimID, Name: code, Algo: module.Incremental}); err != nil {
+							c.Warningf("failed to add REST client code dimension %s: %v", code, err)
+						} else {
+							codeChart.MarkNotCreated()
+						}
 					}
 				}
 				mx.RESTClient.ByCode[code] = mtx.Gauge(mx.RESTClient.ByCode[code].Value() + value)
 			}
 
-			// By method
+			// By method (track for cleanup)
 			if method != "" {
-				dimID := "rest_client_by_method_" + method
-				if methodChart != nil && !methodChart.HasDim(dimID) {
-					if err := methodChart.AddDim(&Dim{ID: dimID, Name: method, Algo: module.Incremental}); err != nil {
-						c.Warningf("failed to add REST client method dimension %s: %v", method, err)
-					} else {
-						methodChart.MarkNotCreated()
+				_, seen := c.collectedRESTMethods[method]
+				c.collectedRESTMethods[method] = c.collectCycle
+				if !seen {
+					dimID := "rest_client_by_method_" + method
+					if methodChart != nil && !methodChart.HasDim(dimID) {
+						if err := methodChart.AddDim(&Dim{ID: dimID, Name: method, Algo: module.Incremental}); err != nil {
+							c.Warningf("failed to add REST client method dimension %s: %v", method, err)
+						} else {
+							methodChart.MarkNotCreated()
+						}
 					}
 				}
 				mx.RESTClient.ByMethod[method] = mtx.Gauge(mx.RESTClient.ByMethod[method].Value() + value)
@@ -519,9 +527,22 @@ func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics
 	queueLatencyMF := mfs.Get("workqueue_queue_duration_seconds")
 	workDurationMF := mfs.Get("workqueue_work_duration_seconds")
 
-	// Collect names into slice first to avoid modifying maps during iteration
-	queueNames := make([]string, 0, len(depthByName))
+	// Merge all queue names from depth, adds, and retries to avoid missing workqueues
+	// that may not have depth metric but have other metrics
+	allQueueNames := make(map[string]struct{})
 	for name := range depthByName {
+		allQueueNames[name] = struct{}{}
+	}
+	for name := range addsByName {
+		allQueueNames[name] = struct{}{}
+	}
+	for name := range retriesByName {
+		allQueueNames[name] = struct{}{}
+	}
+
+	// Collect names into slice to avoid modifying maps during iteration
+	queueNames := make([]string, 0, len(allQueueNames))
+	for name := range allQueueNames {
 		queueNames = append(queueNames, name)
 	}
 
@@ -974,6 +995,32 @@ func (c *Collector) cleanupStaleDimensions() {
 				chart.MarkNotCreated()
 			}
 			c.Debugf("removed stale code dimension: %s", name)
+		}
+	}
+
+	// Cleanup REST client codes
+	for name, lastSeen := range c.collectedRESTCodes {
+		if lastSeen < threshold {
+			delete(c.collectedRESTCodes, name)
+			if chart := c.charts.Get("rest_client_requests_by_code"); chart != nil {
+				dimID := "rest_client_by_code_" + name
+				_ = chart.RemoveDim(dimID)
+				chart.MarkNotCreated()
+			}
+			c.Debugf("removed stale REST client code dimension: %s", name)
+		}
+	}
+
+	// Cleanup REST client methods
+	for name, lastSeen := range c.collectedRESTMethods {
+		if lastSeen < threshold {
+			delete(c.collectedRESTMethods, name)
+			if chart := c.charts.Get("rest_client_requests_by_method"); chart != nil {
+				dimID := "rest_client_by_method_" + name
+				_ = chart.RemoveDim(dimID)
+				chart.MarkNotCreated()
+			}
+			c.Debugf("removed stale REST client method dimension: %s", name)
 		}
 	}
 
