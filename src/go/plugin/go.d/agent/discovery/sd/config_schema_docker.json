@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Docker Service Discovery",
+  "description": "Discovers services running in Docker containers",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Pipeline name (must be unique)",
+      "minLength": 1
+    },
+    "address": {
+      "type": "string",
+      "description": "Docker daemon address (default: unix:///var/run/docker.sock)",
+      "examples": ["unix:///var/run/docker.sock", "tcp://localhost:2375"]
+    },
+    "timeout": {
+      "type": "string",
+      "description": "Timeout for Docker API calls (default: 2s)",
+      "pattern": "^[0-9]+(s|m)$",
+      "examples": ["2s", "5s"]
+    },
+    "tags": {
+      "type": "string",
+      "description": "Tags to apply to discovered targets (space-separated)"
+    },
+    "services": {
+      "type": "array",
+      "description": "Service matching rules",
+      "items": {
+        "$ref": "#/$defs/serviceRule"
+      }
+    }
+  },
+  "required": ["name"],
+  "$defs": {
+    "serviceRule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Rule identifier (for logging/diagnostics)"
+        },
+        "match": {
+          "type": "string",
+          "description": "Expression to match containers (e.g., '{{.Image}} == \"nginx\"')"
+        },
+        "config_template": {
+          "type": "string",
+          "description": "YAML template for collector config generation"
+        }
+      },
+      "required": ["id", "match"]
+    }
+  }
+}

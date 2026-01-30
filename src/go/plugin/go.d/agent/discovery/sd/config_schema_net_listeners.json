@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Net Listeners Service Discovery",
+  "description": "Discovers services by scanning local listening network ports",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Pipeline name (must be unique)",
+      "minLength": 1
+    },
+    "interval": {
+      "type": "string",
+      "description": "How often to scan for listeners (default: 2m)",
+      "pattern": "^[0-9]+(s|m|h)$",
+      "examples": ["30s", "2m", "5m"]
+    },
+    "timeout": {
+      "type": "string",
+      "description": "Timeout for local listener discovery (default: 5s)",
+      "pattern": "^[0-9]+(s|m)$",
+      "examples": ["5s", "10s"]
+    },
+    "tags": {
+      "type": "string",
+      "description": "Tags to apply to discovered targets (space-separated)"
+    },
+    "services": {
+      "type": "array",
+      "description": "Service matching rules",
+      "items": {
+        "$ref": "#/$defs/serviceRule"
+      }
+    }
+  },
+  "required": ["name"],
+  "$defs": {
+    "serviceRule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Rule identifier (for logging/diagnostics)"
+        },
+        "match": {
+          "type": "string",
+          "description": "Expression to match targets (e.g., '{{.Port}} == 80')"
+        },
+        "config_template": {
+          "type": "string",
+          "description": "YAML template for collector config generation"
+        }
+      },
+      "required": ["id", "match"]
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Kubernetes Service Discovery",
+  "description": "Discovers services running in Kubernetes cluster",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Pipeline name (must be unique)",
+      "minLength": 1
+    },
+    "role": {
+      "type": "string",
+      "description": "Kubernetes resource role to discover",
+      "enum": ["pod", "service"],
+      "default": "pod"
+    },
+    "namespaces": {
+      "type": "array",
+      "description": "Namespaces to watch (empty = all namespaces)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "selector": {
+      "type": "object",
+      "description": "Label and field selectors for filtering resources",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Label selector (e.g., 'app=nginx')"
+        },
+        "field": {
+          "type": "string",
+          "description": "Field selector (e.g., 'metadata.name=my-pod')"
+        }
+      }
+    },
+    "pod": {
+      "type": "object",
+      "description": "Pod-specific options",
+      "properties": {
+        "local_mode": {
+          "type": "boolean",
+          "description": "Only discover pods on the same node as the agent",
+          "default": false
+        }
+      }
+    },
+    "tags": {
+      "type": "string",
+      "description": "Tags to apply to discovered targets (space-separated)"
+    },
+    "services": {
+      "type": "array",
+      "description": "Service matching rules",
+      "items": {
+        "$ref": "#/$defs/serviceRule"
+      }
+    }
+  },
+  "required": ["name", "role", "tags"],
+  "$defs": {
+    "serviceRule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Rule identifier (for logging/diagnostics)"
+        },
+        "match": {
+          "type": "string",
+          "description": "Expression to match resources"
+        },
+        "config_template": {
+          "type": "string",
+          "description": "YAML template for collector config generation"
+        }
+      },
+      "required": ["id", "match"]
+    }
+  }
+}
