@@ -51,6 +51,7 @@
 // plugins.d accepts these for functions (from external plugins or streaming children)
 // related to STREAM_CAP_FUNCTIONS, STREAM_CAP_PROGRESS
 #define PLUGINSD_KEYWORD_FUNCTION               "FUNCTION"                  // define a function
+#define PLUGINSD_KEYWORD_FUNCTION_DEL           "FUNCTION_DEL"              // unregister a function
 #define PLUGINSD_KEYWORD_FUNCTION_PROGRESS      "FUNCTION_PROGRESS"         // send updates about function progress
 #define PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN  "FUNCTION_RESULT_BEGIN"     // the result of a function transaction
 #define PLUGINSD_KEYWORD_FUNCTION_RESULT_END    "FUNCTION_RESULT_END"       // the end of the result of a func. trans.
