@@ -18,13 +18,13 @@ func (m *Manager) dyncfgConfigHandler(fn functions.Function) {
 func (m *Manager) dyncfgConfig(fn dyncfg.Function) {
 	if err := fn.ValidateArgs(2); err != nil {
 		m.Warningf("dyncfg: %v", err)
-		m.dyncfgApi.SendCodef(fn.Fn(), 400, "%v", err)
+		m.dyncfgApi.SendCodef(fn, 400, "%v", err)
 		return
 	}
 
 	select {
 	case <-m.ctx.Done():
-		m.dyncfgApi.SendCodef(fn.Fn(), 503, "Job manager is shutting down.")
+		m.dyncfgApi.SendCodef(fn, 503, "Job manager is shutting down.")
 	default:
 	}
 
@@ -40,7 +40,7 @@ func (m *Manager) dyncfgQueuedExec(fn dyncfg.Function) {
 	case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):
 		m.dyncfgVnodeExec(fn)
 	default:
-		m.dyncfgApi.SendCodef(fn.Fn(), 503, "unknown function '%s' (%s).", fn.Fn().Name, id)
+		m.dyncfgApi.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Fn().Name, id)
 	}
 }
 
@@ -53,6 +53,6 @@ func (m *Manager) dyncfgSeqExec(fn dyncfg.Function) {
 	case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):
 		m.dyncfgVnodeSeqExec(fn)
 	default:
-		m.dyncfgApi.SendCodef(fn.Fn(), 503, "unknown function '%s' (%s).", fn.Fn().Name, id)
+		m.dyncfgApi.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Fn().Name, id)
 	}
 }

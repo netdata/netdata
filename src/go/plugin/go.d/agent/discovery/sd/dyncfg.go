@@ -119,7 +119,7 @@ func (d *ServiceDiscovery) dyncfgConfigHandler(fn functions.Function) {
 func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 	if err := fn.ValidateArgs(2); err != nil {
 		d.Warningf("dyncfg: %v", err)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "%v", err)
+		d.dyncfgApi.SendCodef(fn, 400, "%v", err)
 		return
 	}
 
@@ -139,7 +139,7 @@ func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 	// State-changing commands are queued for serial execution
 	select {
 	case <-d.ctx.Done():
-		d.dyncfgApi.SendCodef(fn.Fn(), 503, "Service discovery is shutting down.")
+		d.dyncfgApi.SendCodef(fn, 503, "Service discovery is shutting down.")
 	case d.dyncfgCh <- fn:
 	}
 }
@@ -159,7 +159,7 @@ func (d *ServiceDiscovery) dyncfgSeqExec(fn dyncfg.Function) {
 		d.dyncfgCmdRemove(fn)
 	default:
 		d.Warningf("dyncfg: command '%s' not implemented", fn.Command())
-		d.dyncfgApi.SendCodef(fn.Fn(), 501, "Command '%s' is not implemented.", fn.Command())
+		d.dyncfgApi.SendCodef(fn, 501, "Command '%s' is not implemented.", fn.Command())
 	}
 }
 
@@ -170,18 +170,18 @@ func (d *ServiceDiscovery) dyncfgCmdSchema(fn dyncfg.Function) {
 
 	if dt == "" {
 		d.Warningf("dyncfg: schema: invalid ID format '%s'", id)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "Invalid ID format: %s", id)
+		d.dyncfgApi.SendCodef(fn, 400, "Invalid ID format: %s", id)
 		return
 	}
 
 	if !isValidDiscovererType(dt) {
 		d.Warningf("dyncfg: schema: unknown discoverer type '%s'", dt)
-		d.dyncfgApi.SendCodef(fn.Fn(), 404, "Unknown discoverer type: %s", dt)
+		d.dyncfgApi.SendCodef(fn, 404, "Unknown discoverer type: %s", dt)
 		return
 	}
 
 	schema := getDiscovererSchema(dt, isJob)
-	d.dyncfgApi.SendJSON(fn.Fn(), schema)
+	d.dyncfgApi.SendJSON(fn, schema)
 }
 
 // dyncfgCmdGet handles the get command for jobs
@@ -193,14 +193,14 @@ func (d *ServiceDiscovery) dyncfgCmdGet(fn dyncfg.Function) {
 
 	if !isJob || name == "" {
 		d.Warningf("dyncfg: get: invalid job ID format '%s'", id)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "Invalid job ID format: %s", id)
+		d.dyncfgApi.SendCodef(fn, 400, "Invalid job ID format: %s", id)
 		return
 	}
 
 	content := d.exposedConfigs.getContent(dt, name)
 	if content == nil {
 		d.Warningf("dyncfg: get: config '%s:%s' not found", dt, name)
-		d.dyncfgApi.SendCodef(fn.Fn(), 404, "Config '%s:%s' not found.", dt, name)
+		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
@@ -208,14 +208,14 @@ func (d *ServiceDiscovery) dyncfgCmdGet(fn dyncfg.Function) {
 
 	// Content is already stored as JSON (from transform or dyncfg payload)
 	d.Infof("dyncfg: get: sending config '%s:%s'", dt, name)
-	d.dyncfgApi.SendJSON(fn.Fn(), string(content))
+	d.dyncfgApi.SendJSON(fn, string(content))
 }
 
 // dyncfgCmdAdd handles the add command for templates (creates a new job)
 func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 	if err := fn.ValidateArgs(3); err != nil {
 		d.Warningf("dyncfg: add: %v", err)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "%v", err)
+		d.dyncfgApi.SendCodef(fn, 400, "%v", err)
 		return
 	}
 
@@ -225,19 +225,19 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 	dt, _, _ := d.extractDiscovererAndName(id)
 	if dt == "" || !isValidDiscovererType(dt) {
 		d.Warningf("dyncfg: add: invalid discoverer type in ID '%s'", id)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "Invalid discoverer type in ID: %s", id)
+		d.dyncfgApi.SendCodef(fn, 400, "Invalid discoverer type in ID: %s", id)
 		return
 	}
 
 	if name == "" {
 		d.Warningf("dyncfg: add: missing job name")
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "Missing job name.")
+		d.dyncfgApi.SendCodef(fn, 400, "Missing job name.")
 		return
 	}
 
 	if err := fn.ValidateHasPayload(); err != nil {
 		d.Warningf("dyncfg: add: %v for '%s:%s'", err, dt, name)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "%v", err)
+		d.dyncfgApi.SendCodef(fn, 400, "%v", err)
 		return
 	}
 
@@ -247,7 +247,7 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 	if d.exposedConfigs.getPipelineKey(dt, name) != "" {
 		sourceType := d.exposedConfigs.getSourceType(dt, name)
 		d.Warningf("dyncfg: add: config '%s:%s' already exists (source: %s)", dt, name, sourceType)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "Config '%s:%s' already exists.", dt, name)
+		d.dyncfgApi.SendCodef(fn, 400, "Config '%s:%s' already exists.", dt, name)
 		return
 	}
 
@@ -266,7 +266,7 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 	// Create the dyncfg job
 	d.dyncfgSDJobCreate(dt, name, cfg.sourceType, cfg.source, cfg.status)
 
-	d.dyncfgApi.SendCodef(fn.Fn(), 202, "")
+	d.dyncfgApi.SendCodef(fn, 202, "")
 }
 
 // dyncfgCmdUpdate handles the update command for jobs
@@ -276,20 +276,20 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 
 	if !isJob || name == "" {
 		d.Warningf("dyncfg: update: invalid job ID format '%s'", id)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "Invalid job ID format: %s", id)
+		d.dyncfgApi.SendCodef(fn, 400, "Invalid job ID format: %s", id)
 		return
 	}
 
 	pipelineKey := d.exposedConfigs.getPipelineKey(dt, name)
 	if pipelineKey == "" {
 		d.Warningf("dyncfg: update: config '%s:%s' not found", dt, name)
-		d.dyncfgApi.SendCodef(fn.Fn(), 404, "Config '%s:%s' not found.", dt, name)
+		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
 	if err := fn.ValidateHasPayload(); err != nil {
 		d.Warningf("dyncfg: update: %v for '%s:%s'", err, dt, name)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "%v", err)
+		d.dyncfgApi.SendCodef(fn, 400, "%v", err)
 		return
 	}
 
@@ -297,7 +297,7 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 	pipelineCfg, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults)
 	if err != nil {
 		d.Warningf("dyncfg: update: failed to parse config '%s:%s': %v", dt, name, err)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "Failed to parse config: %v", err)
+		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
 		return
 	}
 
@@ -321,14 +321,14 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 			d.Errorf("dyncfg: update: failed to restart pipeline '%s:%s': %v", dt, name, err)
 			d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusFailed)
 			d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
-			d.dyncfgApi.SendCodef(fn.Fn(), 422, "Failed to restart pipeline: %v", err)
+			d.dyncfgApi.SendCodef(fn, 422, "Failed to restart pipeline: %v", err)
 			return
 		}
 		d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusRunning)
 	}
 
 	d.dyncfgSDJobStatus(dt, name, d.exposedConfigs.getStatus(dt, name))
-	d.dyncfgApi.SendCodef(fn.Fn(), 200, "")
+	d.dyncfgApi.SendCodef(fn, 200, "")
 }
 
 // dyncfgCmdEnable handles the enable command for jobs
@@ -338,7 +338,7 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn dyncfg.Function) {
 
 	if !isJob || name == "" {
 		d.Warningf("dyncfg: enable: invalid job ID format '%s'", id)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "Invalid job ID format: %s", id)
+		d.dyncfgApi.SendCodef(fn, 400, "Invalid job ID format: %s", id)
 		return
 	}
 
@@ -346,7 +346,7 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn dyncfg.Function) {
 	pipelineKey := d.exposedConfigs.getPipelineKey(dt, name)
 	if pipelineKey == "" {
 		d.Warningf("dyncfg: enable: config '%s:%s' not found", dt, name)
-		d.dyncfgApi.SendCodef(fn.Fn(), 404, "Config '%s:%s' not found.", dt, name)
+		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
@@ -355,7 +355,7 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn dyncfg.Function) {
 		d.Infof("dyncfg: enable: pipeline '%s:%s' is already running", dt, name)
 		d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusRunning)
 		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusRunning)
-		d.dyncfgApi.SendCodef(fn.Fn(), 200, "")
+		d.dyncfgApi.SendCodef(fn, 200, "")
 		return
 	}
 
@@ -368,7 +368,7 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn dyncfg.Function) {
 		d.Warningf("dyncfg: enable: failed to parse config '%s:%s': %v", dt, name, err)
 		d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusFailed)
 		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
-		d.dyncfgApi.SendCodef(fn.Fn(), 422, "Failed to parse config: %v", err)
+		d.dyncfgApi.SendCodef(fn, 422, "Failed to parse config: %v", err)
 		return
 	}
 
@@ -386,13 +386,13 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn dyncfg.Function) {
 		d.Errorf("dyncfg: enable: failed to start pipeline '%s:%s': %v", dt, name, err)
 		d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusFailed)
 		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
-		d.dyncfgApi.SendCodef(fn.Fn(), 422, "Failed to start pipeline: %v", err)
+		d.dyncfgApi.SendCodef(fn, 422, "Failed to start pipeline: %v", err)
 		return
 	}
 
 	d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusRunning)
 	d.dyncfgSDJobStatus(dt, name, dyncfg.StatusRunning)
-	d.dyncfgApi.SendCodef(fn.Fn(), 200, "")
+	d.dyncfgApi.SendCodef(fn, 200, "")
 }
 
 // dyncfgCmdDisable handles the disable command for jobs
@@ -402,7 +402,7 @@ func (d *ServiceDiscovery) dyncfgCmdDisable(fn dyncfg.Function) {
 
 	if !isJob || name == "" {
 		d.Warningf("dyncfg: disable: invalid job ID format '%s'", id)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "Invalid job ID format: %s", id)
+		d.dyncfgApi.SendCodef(fn, 400, "Invalid job ID format: %s", id)
 		return
 	}
 
@@ -410,7 +410,7 @@ func (d *ServiceDiscovery) dyncfgCmdDisable(fn dyncfg.Function) {
 	pipelineKey := d.exposedConfigs.getPipelineKey(dt, name)
 	if pipelineKey == "" {
 		d.Warningf("dyncfg: disable: config '%s:%s' not found", dt, name)
-		d.dyncfgApi.SendCodef(fn.Fn(), 404, "Config '%s:%s' not found.", dt, name)
+		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
@@ -419,7 +419,7 @@ func (d *ServiceDiscovery) dyncfgCmdDisable(fn dyncfg.Function) {
 		d.Infof("dyncfg: disable: pipeline '%s:%s' is not running", dt, name)
 		d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusDisabled)
 		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusDisabled)
-		d.dyncfgApi.SendCodef(fn.Fn(), 200, "")
+		d.dyncfgApi.SendCodef(fn, 200, "")
 		return
 	}
 
@@ -430,7 +430,7 @@ func (d *ServiceDiscovery) dyncfgCmdDisable(fn dyncfg.Function) {
 
 	d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusDisabled)
 	d.dyncfgSDJobStatus(dt, name, dyncfg.StatusDisabled)
-	d.dyncfgApi.SendCodef(fn.Fn(), 200, "")
+	d.dyncfgApi.SendCodef(fn, 200, "")
 }
 
 // dyncfgCmdRemove handles the remove command for dyncfg jobs
@@ -440,7 +440,7 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn dyncfg.Function) {
 
 	if !isJob || name == "" {
 		d.Warningf("dyncfg: remove: invalid job ID format '%s'", id)
-		d.dyncfgApi.SendCodef(fn.Fn(), 400, "Invalid job ID format: %s", id)
+		d.dyncfgApi.SendCodef(fn, 400, "Invalid job ID format: %s", id)
 		return
 	}
 
@@ -448,14 +448,14 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn dyncfg.Function) {
 	pipelineKey := d.exposedConfigs.getPipelineKey(dt, name)
 	if pipelineKey == "" {
 		d.Warningf("dyncfg: remove: config '%s:%s' not found", dt, name)
-		d.dyncfgApi.SendCodef(fn.Fn(), 404, "Config '%s:%s' not found.", dt, name)
+		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
 	sourceType := d.exposedConfigs.getSourceType(dt, name)
 	if sourceType != "dyncfg" {
 		d.Warningf("dyncfg: remove: cannot remove non-dyncfg config '%s:%s' (source: %s)", dt, name, sourceType)
-		d.dyncfgApi.SendCodef(fn.Fn(), 405, "Cannot remove non-dyncfg configs. Source type: %s", sourceType)
+		d.dyncfgApi.SendCodef(fn, 405, "Cannot remove non-dyncfg configs. Source type: %s", sourceType)
 		return
 	}
 
@@ -472,7 +472,7 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn dyncfg.Function) {
 	// Remove from dyncfg
 	d.dyncfgSDJobRemove(dt, name)
 
-	d.dyncfgApi.SendCodef(fn.Fn(), 200, "")
+	d.dyncfgApi.SendCodef(fn, 200, "")
 }
 
 // dyncfgCmdUserconfig handles the userconfig command for templates and jobs
@@ -490,14 +490,14 @@ func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn dyncfg.Function) {
 		jsonContent = d.exposedConfigs.getContent(dt, name)
 		if jsonContent == nil {
 			d.Warningf("dyncfg: userconfig: config '%s:%s' not found", dt, name)
-			d.dyncfgApi.SendCodef(fn.Fn(), 404, "Config '%s:%s' not found.", dt, name)
+			d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 			return
 		}
 	} else {
 		// For templates, use the payload from the request
 		if !fn.HasPayload() {
 			d.Warningf("dyncfg: userconfig: missing payload for template '%s'", dt)
-			d.dyncfgApi.SendCodef(fn.Fn(), 400, "Missing configuration payload.")
+			d.dyncfgApi.SendCodef(fn, 400, "Missing configuration payload.")
 			return
 		}
 		jsonContent = fn.Payload()
@@ -507,19 +507,19 @@ func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn dyncfg.Function) {
 	var content any
 	if err := json.Unmarshal(jsonContent, &content); err != nil {
 		d.Warningf("dyncfg: userconfig: failed to parse config: %v", err)
-		d.dyncfgApi.SendCodef(fn.Fn(), 500, "Failed to parse config: %v", err)
+		d.dyncfgApi.SendCodef(fn, 500, "Failed to parse config: %v", err)
 		return
 	}
 
 	yamlBytes, err := yaml.Marshal(content)
 	if err != nil {
 		d.Warningf("dyncfg: userconfig: failed to marshal config to YAML: %v", err)
-		d.dyncfgApi.SendCodef(fn.Fn(), 500, "Failed to marshal config to YAML: %v", err)
+		d.dyncfgApi.SendCodef(fn, 500, "Failed to marshal config to YAML: %v", err)
 		return
 	}
 
 	d.Infof("dyncfg: userconfig: sending yaml length=%d", len(yamlBytes))
-	d.dyncfgApi.SendYAML(fn.Fn(), string(yamlBytes))
+	d.dyncfgApi.SendYAML(fn, string(yamlBytes))
 }
 
 // extractDiscovererAndName parses a dyncfg ID into discoverer type and name.
