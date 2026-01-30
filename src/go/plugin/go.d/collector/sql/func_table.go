@@ -45,10 +45,11 @@ func sqlJobMethods(job *module.Job) []funcapi.MethodConfig {
 		}
 
 		methods = append(methods, funcapi.MethodConfig{
-			ID:          methodID,
-			Name:        methodName,
-			Help:        help,
-			UpdateEvery: 10,
+			ID:           methodID,
+			Name:         methodName,
+			Help:         help,
+			UpdateEvery:  10,
+			RequireCloud: true,
 		})
 	}
 
