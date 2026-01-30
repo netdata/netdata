@@ -252,6 +252,16 @@
 - Feat(go.d.plugin/postgres): add running-queries and pg_stat_monitor support ([#21656](https://github.com/netdata/netdata/issues/21656))
 - Regenerate integrations docs ([#21663](https://github.com/netdata/netdata/issues/21663))
 - Remove unused/stale top-level files. ([#21660](https://github.com/netdata/netdata/issues/21660))
+- Document function naming conventions ([#21661](https://github.com/netdata/netdata/issues/21661))
+- Fix(claim): use printf for portable newline handling in claim script ([#21665](https://github.com/netdata/netdata/issues/21665))
+- Add reporting documentation page ([#21520](https://github.com/netdata/netdata/issues/21520))
+- Feat(go.d.plugin/sql): add function support for interactive table views ([#21666](https://github.com/netdata/netdata/issues/21666))
+- Regenerate integrations docs ([#21670](https://github.com/netdata/netdata/issues/21670))
+- Docs(go.d/sql): fix functions section in metadata.yaml ([#21671](https://github.com/netdata/netdata/issues/21671))
+- Fix(integrations): show functions section even with empty list ([#21672](https://github.com/netdata/netdata/issues/21672))
+- Regenerate integrations docs ([#21673](https://github.com/netdata/netdata/issues/21673))
+- Chore(go.d/snmp): use base units for interfaces function columns ([#21674](https://github.com/netdata/netdata/issues/21674))
+- Regenerate integrations docs ([#21675](https://github.com/netdata/netdata/issues/21675))
 
 ## [2.8.0] - 2025-11-19
 
