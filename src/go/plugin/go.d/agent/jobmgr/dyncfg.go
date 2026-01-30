@@ -3,36 +3,36 @@
 package jobmgr
 
 import (
-	"encoding/json"
-	"fmt"
-	"reflect"
 	"strings"
 
-	"gopkg.in/yaml.v2"
-
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 )
 
-func (m *Manager) dyncfgConfig(fn functions.Function) {
-	if len(fn.Args) < 2 {
-		m.Warningf("dyncfg: %s: missing required arguments, want 3 got %d", fn.Name, len(fn.Args))
-		m.dyncfgApi.SendCodef(fn, 400, "Missing required arguments. Need at least 2, but got %d.", len(fn.Args))
+// dyncfgConfigHandler wraps dyncfgConfig to convert functions.Function to dyncfg.Function.
+// This is needed because functions.Registry expects func(functions.Function).
+func (m *Manager) dyncfgConfigHandler(fn functions.Function) {
+	m.dyncfgConfig(dyncfg.NewFunction(fn))
+}
+
+func (m *Manager) dyncfgConfig(fn dyncfg.Function) {
+	if err := fn.ValidateArgs(2); err != nil {
+		m.Warningf("dyncfg: %v", err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "%v", err)
 		return
 	}
 
 	select {
 	case <-m.ctx.Done():
-		m.dyncfgApi.SendCodef(fn, 503, "Job manager is shutting down.")
+		m.dyncfgApi.SendCodef(fn.Fn(), 503, "Job manager is shutting down.")
 	default:
 	}
-
-	//m.Infof("QQ FN: '%s'", fn)
 
 	m.dyncfgQueuedExec(fn)
 }
 
-func (m *Manager) dyncfgQueuedExec(fn functions.Function) {
-	id := fn.Args[0]
+func (m *Manager) dyncfgQueuedExec(fn dyncfg.Function) {
+	id := fn.ID()
 
 	switch {
 	case strings.HasPrefix(id, m.dyncfgCollectorPrefixValue()):
@@ -40,12 +40,12 @@ func (m *Manager) dyncfgQueuedExec(fn functions.Function) {
 	case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):
 		m.dyncfgVnodeExec(fn)
 	default:
-		m.dyncfgApi.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Name, id)
+		m.dyncfgApi.SendCodef(fn.Fn(), 503, "unknown function '%s' (%s).", fn.Fn().Name, id)
 	}
 }
 
-func (m *Manager) dyncfgSeqExec(fn functions.Function) {
-	id := fn.Args[0]
+func (m *Manager) dyncfgSeqExec(fn dyncfg.Function) {
+	id := fn.ID()
 
 	switch {
 	case strings.HasPrefix(id, m.dyncfgCollectorPrefixValue()):
@@ -53,16 +53,6 @@ func (m *Manager) dyncfgSeqExec(fn functions.Function) {
 	case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):
 		m.dyncfgVnodeSeqExec(fn)
 	default:
-		m.dyncfgApi.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Name, id)
+		m.dyncfgApi.SendCodef(fn.Fn(), 503, "unknown function '%s' (%s).", fn.Fn().Name, id)
 	}
-}
-
-func unmarshalPayload(dst any, fn functions.Function) error {
-	if v := reflect.ValueOf(dst); v.Kind() != reflect.Ptr || v.IsNil() {
-		return fmt.Errorf("invalid config: expected a pointer to a struct, got a %s", v.Type())
-	}
-	if fn.ContentType == "application/json" {
-		return json.Unmarshal(fn.Payload, dst)
-	}
-	return yaml.Unmarshal(fn.Payload, dst)
 }

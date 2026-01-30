@@ -3,7 +3,6 @@
 package jobmgr
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
@@ -75,27 +73,27 @@ func (m *Manager) dyncfgVnodeJobCreate(cfg *vnodes.VirtualNode, status dyncfg.St
 	})
 }
 
-func (m *Manager) dyncfgVnodeExec(fn functions.Function) {
-	cmd := dyncfg.Command(strings.ToLower(fn.Args[1]))
+func (m *Manager) dyncfgVnodeExec(fn dyncfg.Function) {
+	cmd := fn.Command()
 
 	switch cmd {
 	case dyncfg.CommandUserconfig:
 		m.dyncfgVnodeUserconfig(fn)
 		return
 	case dyncfg.CommandSchema:
-		m.dyncfgApi.SendJSON(fn, vnodes.ConfigSchema)
+		m.dyncfgApi.SendJSON(fn.Fn(), vnodes.ConfigSchema)
 		return
 	}
 
 	select {
 	case <-m.ctx.Done():
-		m.dyncfgApi.SendCodef(fn, 503, "Job manager is shutting down.")
+		m.dyncfgApi.SendCodef(fn.Fn(), 503, "Job manager is shutting down.")
 	case m.dyncfgCh <- fn:
 	}
 }
 
-func (m *Manager) dyncfgVnodeSeqExec(fn functions.Function) {
-	cmd := dyncfg.Command(strings.ToLower(fn.Args[1]))
+func (m *Manager) dyncfgVnodeSeqExec(fn dyncfg.Function) {
+	cmd := fn.Command()
 
 	switch cmd {
 	case dyncfg.CommandTest:
@@ -109,61 +107,61 @@ func (m *Manager) dyncfgVnodeSeqExec(fn functions.Function) {
 	case dyncfg.CommandRemove:
 		m.dyncfgVnodeRemove(fn)
 	default:
-		m.Warningf("dyncfg: function '%s' command '%s' not implemented", fn.Name, cmd)
-		m.dyncfgApi.SendCodef(fn, 501, "Function '%s' command '%s' is not implemented.", fn.Name, cmd)
+		m.Warningf("dyncfg: function '%s' command '%s' not implemented", fn.Fn().Name, cmd)
+		m.dyncfgApi.SendCodef(fn.Fn(), 501, "Function '%s' command '%s' is not implemented.", fn.Fn().Name, cmd)
 	}
 }
 
-func (m *Manager) dyncfgVnodeGet(fn functions.Function) {
+func (m *Manager) dyncfgVnodeGet(fn dyncfg.Function) {
 	cmd := dyncfg.CommandGet
 
-	id := fn.Args[0]
+	id := fn.ID()
 	name := strings.TrimPrefix(id, m.dyncfgVnodePrefixValue()+":")
 
 	cfg, ok := m.Vnodes[name]
 	if !ok {
 		m.Warningf("dyncfg: %s: vnode %s not found", cmd, name)
-		m.dyncfgApi.SendCodef(fn, 404, "The specified vnode '%s' is not registered.", name)
+		m.dyncfgApi.SendCodef(fn.Fn(), 404, "The specified vnode '%s' is not registered.", name)
 		return
 	}
 
 	bs, err := json.Marshal(cfg)
 	if err != nil {
 		m.Warningf("dyncfg: %s: vnode job %s failed to json marshal config: %v", cmd, name, err)
-		m.dyncfgApi.SendCodef(fn, 500, "Failed to convert configuration into JSON: %v.", err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 500, "Failed to convert configuration into JSON: %v.", err)
 		return
 	}
 
-	m.dyncfgApi.SendJSON(fn, string(bs))
+	m.dyncfgApi.SendJSON(fn.Fn(), string(bs))
 }
 
-func (m *Manager) dyncfgVnodeAdd(fn functions.Function) {
+func (m *Manager) dyncfgVnodeAdd(fn dyncfg.Function) {
 	cmd := dyncfg.CommandAdd
 
-	if len(fn.Args) < 3 {
-		m.Warningf("dyncfg: %s: missing required arguments, want 3 got %d", cmd, len(fn.Args))
-		m.dyncfgApi.SendCodef(fn, 400, "Missing required arguments. Need at least 3, but got %d.", len(fn.Args))
+	if err := fn.ValidateArgs(3); err != nil {
+		m.Warningf("dyncfg: %s: %v", cmd, err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "%v", err)
 		return
 	}
 
-	name := fn.Args[2]
+	name := fn.JobName()
 
-	if len(fn.Payload) == 0 {
+	if !fn.HasPayload() {
 		m.Warningf("dyncfg: %s: vnode job %s missing configuration payload.", cmd, name)
-		m.dyncfgApi.SendCodef(fn, 400, "Missing configuration payload.")
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "Missing configuration payload.")
 		return
 	}
 
 	cfg, err := vnodeConfigFromPayload(fn)
 	if err != nil {
 		m.Warningf("dyncfg: %s: vnode job %s: failed to create config from payload: %v", cmd, name, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Failed to create configuration from payload. Invalid configuration format: %v.", err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "Failed to create configuration from payload. Invalid configuration format: %v.", err)
 		return
 	}
 
 	if err := uuid.Validate(cfg.GUID); err != nil {
 		m.Warningf("dyncfg: %s: vnode job %s: invalid guid: %v", cmd, name, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Failed to create configuration from payload. Invalid guid format: %v.", err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "Failed to create configuration from payload. Invalid guid format: %v.", err)
 		return
 	}
 
@@ -171,12 +169,12 @@ func (m *Manager) dyncfgVnodeAdd(fn functions.Function) {
 
 	if err := m.verifyVnodeUnique(cfg); err != nil {
 		m.Warningf("dyncfg: %s: vnode job %s: %v", cmd, name, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Failed to create configuration from payload: %v.", err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "Failed to create configuration from payload: %v.", err)
 		return
 	}
 
 	if orig, ok := m.Vnodes[name]; ok && orig.Equal(cfg) {
-		m.dyncfgApi.SendCodef(fn, 202, "")
+		m.dyncfgApi.SendCodef(fn.Fn(), 202, "")
 		m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
 		return
 	}
@@ -189,61 +187,61 @@ func (m *Manager) dyncfgVnodeAdd(fn functions.Function) {
 		}
 	})
 
-	m.dyncfgApi.SendCodef(fn, 202, "")
+	m.dyncfgApi.SendCodef(fn.Fn(), 202, "")
 	m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
 }
 
-func (m *Manager) dyncfgVnodeRemove(fn functions.Function) {
+func (m *Manager) dyncfgVnodeRemove(fn dyncfg.Function) {
 	cmd := dyncfg.CommandRemove
 
-	id := fn.Args[0]
+	id := fn.ID()
 	name := strings.TrimPrefix(id, m.dyncfgVnodePrefixValue()+":")
 
 	vnode, ok := m.Vnodes[name]
 	if !ok {
 		m.Warningf("dyncfg: %s: vnode %s not found", cmd, name)
-		m.dyncfgApi.SendCodef(fn, 404, "The specified vnode '%s' is not registered.", name)
+		m.dyncfgApi.SendCodef(fn.Fn(), 404, "The specified vnode '%s' is not registered.", name)
 		return
 	}
 	if vnode.SourceType != confgroup.TypeDyncfg {
 		m.Warningf("dyncfg: %s: module vnode %s: can not remove vnode of type %s", cmd, vnode.Name, vnode.SourceType)
-		m.dyncfgApi.SendCodef(fn, 405, "Removing vnode of type '%s' is not supported. Only 'dyncfg' vnodes can be removed.", vnode.SourceType)
+		m.dyncfgApi.SendCodef(fn.Fn(), 405, "Removing vnode of type '%s' is not supported. Only 'dyncfg' vnodes can be removed.", vnode.SourceType)
 		return
 	}
 
 	if s := m.dyncfgVnodeAffectedJobs(vnode.Name); s != "" {
 		m.Warningf("dyncfg: %s: vnode %s has running jobs (%s)", cmd, name, s)
-		m.dyncfgApi.SendCodef(fn, 404, "The specified vnode '%s' has running jobs (%s).", name, s)
+		m.dyncfgApi.SendCodef(fn.Fn(), 404, "The specified vnode '%s' has running jobs (%s).", name, s)
 		return
 	}
 
 	delete(m.Vnodes, name)
 
 	m.dyncfgApi.ConfigDelete(id)
-	m.dyncfgApi.SendCodef(fn, 200, "")
+	m.dyncfgApi.SendCodef(fn.Fn(), 200, "")
 }
 
-func (m *Manager) dyncfgVnodeTest(fn functions.Function) {
+func (m *Manager) dyncfgVnodeTest(fn dyncfg.Function) {
 	cmd := dyncfg.CommandTest
 
-	if len(fn.Args) < 3 {
-		m.Warningf("dyncfg: %s: missing required arguments, want 3 got %d", cmd, len(fn.Args))
-		m.dyncfgApi.SendCodef(fn, 400, "Missing required arguments. Need at least 3, but got %d.", len(fn.Args))
+	if err := fn.ValidateArgs(3); err != nil {
+		m.Warningf("dyncfg: %s: %v", cmd, err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "%v", err)
 		return
 	}
 
-	name := fn.Args[2]
+	name := fn.JobName()
 
 	cfg, err := vnodeConfigFromPayload(fn)
 	if err != nil {
 		m.Warningf("dyncfg: %s: vnode: failed to create config from payload: %v", cmd, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
 		return
 	}
 
 	if err := uuid.Validate(cfg.GUID); err != nil {
 		m.Warningf("dyncfg: %s: vnode job %s: invalid guid: %v", cmd, name, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Failed to create configuration from payload. Invalid guid format: %v.", err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "Failed to create configuration from payload. Invalid guid format: %v.", err)
 		return
 	}
 
@@ -251,47 +249,47 @@ func (m *Manager) dyncfgVnodeTest(fn functions.Function) {
 
 	if err := m.verifyVnodeUnique(cfg); err != nil {
 		m.Warningf("dyncfg: %s: vnode job %s: %v", cmd, name, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Failed to create configuration from payload: %v.", err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "Failed to create configuration from payload: %v.", err)
 		return
 	}
 
 	if s := m.dyncfgVnodeAffectedJobs(cfg.Name); s != "" {
-		m.dyncfgApi.SendCodef(fn, 202, "Updated configuration will affect: %s.", s)
+		m.dyncfgApi.SendCodef(fn.Fn(), 202, "Updated configuration will affect: %s.", s)
 	} else {
-		m.dyncfgApi.SendCodef(fn, 202, "No jobs will be affected by this change.")
+		m.dyncfgApi.SendCodef(fn.Fn(), 202, "No jobs will be affected by this change.")
 	}
 }
 
-func (m *Manager) dyncfgVnodeUpdate(fn functions.Function) {
+func (m *Manager) dyncfgVnodeUpdate(fn dyncfg.Function) {
 	cmd := dyncfg.CommandUpdate
 
-	id := fn.Args[0]
+	id := fn.ID()
 	name := strings.TrimPrefix(id, m.dyncfgVnodePrefixValue()+":")
 
 	orig, ok := m.Vnodes[name]
 	if !ok {
 		m.Warningf("dyncfg: %s: vnode %s not found", cmd, name)
-		m.dyncfgApi.SendCodef(fn, 404, "The specified vnode '%s' is not registered.", name)
+		m.dyncfgApi.SendCodef(fn.Fn(), 404, "The specified vnode '%s' is not registered.", name)
 		return
 	}
 
 	cfg, err := vnodeConfigFromPayload(fn)
 	if err != nil {
 		m.Warningf("dyncfg: %s: vnode: failed to create config from payload: %v", cmd, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
 		return
 	}
 
 	if err := uuid.Validate(cfg.GUID); err != nil {
 		m.Warningf("dyncfg: %s: vnode job %s: invalid guid: %v", cmd, name, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Failed to create configuration from payload. Invalid guid format: %v.", err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "Failed to create configuration from payload. Invalid guid format: %v.", err)
 		return
 	}
 
 	dyncfgUpdateVnodeConfig(cfg, name, fn)
 
 	if orig.Equal(cfg) {
-		m.dyncfgApi.SendCodef(fn, 202, "")
+		m.dyncfgApi.SendCodef(fn.Fn(), 202, "")
 		return
 	}
 
@@ -303,21 +301,21 @@ func (m *Manager) dyncfgVnodeUpdate(fn functions.Function) {
 		}
 	})
 
-	m.dyncfgApi.SendCodef(fn, 202, "")
+	m.dyncfgApi.SendCodef(fn.Fn(), 202, "")
 	m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
 }
 
-func (m *Manager) dyncfgVnodeUserconfig(fn functions.Function) {
+func (m *Manager) dyncfgVnodeUserconfig(fn dyncfg.Function) {
 	cmd := dyncfg.CommandUserconfig
 
 	bs, err := vnodeUserconfigFromPayload(fn)
 	if err != nil {
 		m.Warningf("dyncfg: %s: vnode: failed to create config from payload: %v", cmd, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
+		m.dyncfgApi.SendCodef(fn.Fn(), 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
 		return
 	}
 
-	m.dyncfgApi.SendYAML(fn, string(bs))
+	m.dyncfgApi.SendYAML(fn.Fn(), string(bs))
 }
 
 func (m *Manager) dyncfgVnodeAffectedJobs(vnode string) string {
@@ -348,34 +346,34 @@ func (m *Manager) verifyVnodeUnique(newCfg *vnodes.VirtualNode) error {
 	return nil
 }
 
-func dyncfgUpdateVnodeConfig(cfg *vnodes.VirtualNode, name string, fn functions.Function) {
+func dyncfgUpdateVnodeConfig(cfg *vnodes.VirtualNode, name string, fn dyncfg.Function) {
 	cfg.SourceType = confgroup.TypeDyncfg
-	cfg.Source = fn.Source
+	cfg.Source = fn.Source()
 	cfg.Name = name
 	if cfg.Hostname == "" {
 		cfg.Hostname = name
 	}
 }
 
-func vnodeConfigFromPayload(fn functions.Function) (*vnodes.VirtualNode, error) {
+func vnodeConfigFromPayload(fn dyncfg.Function) (*vnodes.VirtualNode, error) {
 	var cfg vnodes.VirtualNode
 
-	if err := unmarshalPayload(&cfg, fn); err != nil {
+	if err := fn.UnmarshalPayload(&cfg); err != nil {
 		return nil, err
 	}
 
 	return &cfg, nil
 }
 
-func vnodeUserconfigFromPayload(fn functions.Function) ([]byte, error) {
+func vnodeUserconfigFromPayload(fn dyncfg.Function) ([]byte, error) {
 	cfg, err := vnodeConfigFromPayload(fn)
 	if err != nil {
 		return nil, err
 	}
 
 	name := "test"
-	if len(fn.Args) > 2 {
-		name = fn.Args[2]
+	if len(fn.Fn().Args) > 2 {
+		name = fn.Fn().Args[2]
 	}
 
 	dyncfgUpdateVnodeConfig(cfg, name, fn)
