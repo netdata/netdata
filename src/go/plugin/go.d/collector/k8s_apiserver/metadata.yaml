@@ -1,0 +1,464 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-k8s_apiserver
+      plugin_name: go.d.plugin
+      module_name: k8s_apiserver
+      monitored_instance:
+        name: Kubernetes API Server
+        link: https://kubernetes.io/docs/concepts/overview/components/#kube-apiserver
+        icon_filename: kubernetes.svg
+        categories:
+          - data-collection.kubernetes
+      keywords:
+        - kubernetes
+        - k8s
+        - apiserver
+        - kube-apiserver
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: go.d.plugin
+              module_name: k8s_kubelet
+            - plugin_name: go.d.plugin
+              module_name: k8s_kubeproxy
+            - plugin_name: go.d.plugin
+              module_name: k8s_state
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Kubernetes API Server health, performance, and request metrics.
+
+          It collects metrics from the kube-apiserver's `/metrics` endpoint, providing insights into:
+          - Request rates, latencies, and error rates
+          - Current inflight and long-running requests
+          - Admission controller and webhook performance
+          - etcd backend health and object counts
+          - Controller work queue depths and latencies
+          - Authentication and audit events
+          - Go runtime and process metrics
+        method_description: |
+          The collector scrapes Prometheus-format metrics from the Kubernetes API Server's metrics endpoint.
+          Authentication is typically done using a ServiceAccount bearer token.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          The ServiceAccount used must have permissions to access the `/metrics` endpoint.
+          In most clusters, this requires cluster-admin or a custom ClusterRole with metrics access.
+      default_behavior:
+        auto_detection:
+          description: |
+            When running inside a Kubernetes cluster, the collector attempts to connect to
+            `https://kubernetes.default.svc:443/metrics` using the pod's ServiceAccount token.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: ServiceAccount with metrics access
+            description: |
+              The Netdata pod must have a ServiceAccount with permissions to read metrics from the API server.
+              You can create a ClusterRole and ClusterRoleBinding for this purpose.
+      configuration:
+        file:
+          name: go.d/k8s_apiserver.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval (seconds).
+              default_value: 1
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval (seconds). Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+
+            - name: url
+              description: Target endpoint URL.
+              default_value: https://kubernetes.default.svc:443/metrics
+              required: true
+              group: Target
+            - name: timeout
+              description: HTTP request timeout (seconds).
+              default_value: 2
+              required: false
+              group: Target
+
+            - name: username
+              description: Username for Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: HTTP Auth
+            - name: password
+              description: Password for Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: HTTP Auth
+            - name: bearer_token_file
+              description: "Path to a file containing a bearer token (used for `Authorization: Bearer`)."
+              default_value: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+              required: false
+              group: HTTP Auth
+
+            - name: tls_skip_verify
+              description: Skip TLS certificate and hostname verification (insecure).
+              default_value: no
+              required: false
+              group: TLS
+            - name: tls_ca
+              description: Path to CA bundle used to validate the server certificate.
+              default_value: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+              required: false
+              group: TLS
+            - name: tls_cert
+              description: Path to client TLS certificate (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_key
+              description: Path to client TLS private key (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+
+            - name: proxy_url
+              description: HTTP proxy URL.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_username
+              description: Username for proxy Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_password
+              description: Password for proxy Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+
+            - name: method
+              description: HTTP method to use.
+              default_value: "GET"
+              required: false
+              group: Request
+            - name: body
+              description: Request body (e.g., for POST/PUT).
+              default_value: ""
+              required: false
+              group: Request
+            - name: headers
+              description: "Additional HTTP headers (one per line as key: value)."
+              default_value: ""
+              required: false
+              group: Request
+            - name: not_follow_redirects
+              description: Do not follow HTTP redirects.
+              default_value: no
+              required: false
+              group: Request
+            - name: force_http2
+              description: Force HTTP/2 (including h2c over TCP).
+              default_value: no
+              required: false
+              group: Request
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: In-cluster (default)
+              folding:
+                enabled: false
+              description: Default configuration when running inside a Kubernetes cluster.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://kubernetes.default.svc:443/metrics
+                    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+                    tls_ca: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            - name: External access with kubectl proxy
+              description: |
+                Access API server metrics via kubectl proxy running on localhost.
+              config: |
+                jobs:
+                  - name: via-proxy
+                    url: http://127.0.0.1:8001/metrics
+            - name: Direct access with token
+              description: |
+                Direct access to API server with a bearer token.
+              config: |
+                jobs:
+                  - name: direct
+                    url: https://api.example.com:6443/metrics
+                    bearer_token_file: /path/to/token
+                    tls_skip_verify: yes
+    troubleshooting:
+      problems:
+        list:
+          - name: Connection refused
+            description: |
+              The API server may not be accessible. Check that:
+              1. The URL is correct
+              2. Network policies allow access
+              3. The ServiceAccount has proper RBAC permissions
+          - name: 401 Unauthorized
+            description: |
+              Authentication failed. Verify:
+              1. The bearer token file exists and is readable
+              2. The token is valid and not expired
+              3. The ServiceAccount has metrics access permissions
+          - name: Certificate errors
+            description: |
+              TLS verification failed. Options:
+              1. Provide the correct CA certificate path in `tls_ca`
+              2. Set `tls_skip_verify: yes` (not recommended for production)
+    alerts:
+      - name: k8s_apiserver_request_errors
+        metric: k8s_apiserver.requests_by_code
+        info: "high rate of API server request errors (5xx responses)"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
+      - name: k8s_apiserver_latency
+        metric: k8s_apiserver.request_latency
+        info: "API server request latency is high"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored API server instance.
+          labels: []
+          metrics:
+            - name: k8s_apiserver.requests_total
+              description: API Server Request Rate
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: k8s_apiserver.requests_dropped
+              description: API Server Dropped Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: dropped
+            - name: k8s_apiserver.requests_by_verb
+              description: API Server Requests By Verb
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per HTTP verb
+            - name: k8s_apiserver.requests_by_code
+              description: API Server Requests By Status Code
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per HTTP status code
+            - name: k8s_apiserver.requests_by_resource
+              description: API Server Requests By Resource
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per Kubernetes resource
+            - name: k8s_apiserver.request_latency
+              description: API Server Request Latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: p50
+                - name: p90
+                - name: p99
+            - name: k8s_apiserver.response_size
+              description: API Server Response Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: p50
+                - name: p90
+                - name: p99
+            - name: k8s_apiserver.inflight_requests
+              description: API Server Inflight Requests
+              unit: requests
+              chart_type: stacked
+              dimensions:
+                - name: mutating
+                - name: read_only
+            - name: k8s_apiserver.longrunning_requests
+              description: API Server Long-Running Requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: longrunning
+            - name: k8s_apiserver.rest_client_requests_by_code
+              description: REST Client Requests By Status Code
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per HTTP status code
+            - name: k8s_apiserver.rest_client_requests_by_method
+              description: REST Client Requests By Method
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per HTTP method
+            - name: k8s_apiserver.rest_client_latency
+              description: REST Client Request Latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: p50
+                - name: p90
+                - name: p99
+            - name: k8s_apiserver.admission_step_latency
+              description: Admission Step Latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: validate
+                - name: admit
+            - name: k8s_apiserver.etcd_cache
+              description: Etcd Helper Cache
+              unit: operations/s
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: k8s_apiserver.etcd_object_counts
+              description: Objects Stored In Etcd
+              unit: objects
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per resource type
+            - name: k8s_apiserver.audit_events
+              description: API Server Audit Events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: events
+                - name: rejected
+            - name: k8s_apiserver.authentication_requests
+              description: API Server Authenticated Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: authenticated
+            - name: k8s_apiserver.goroutines
+              description: Goroutines
+              unit: goroutines
+              chart_type: line
+              dimensions:
+                - name: goroutines
+            - name: k8s_apiserver.threads
+              description: OS Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: k8s_apiserver.process_memory
+              description: Process Memory
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: resident
+                - name: virtual
+            - name: k8s_apiserver.heap_memory
+              description: Go Heap Memory
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: alloc
+                - name: inuse
+                - name: stack
+            - name: k8s_apiserver.gc_duration
+              description: GC Duration
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: p50
+                - name: p90
+                - name: p99
+            - name: k8s_apiserver.open_fds
+              description: Open File Descriptors
+              unit: file descriptors
+              chart_type: line
+              dimensions:
+                - name: open
+                - name: max
+            - name: k8s_apiserver.cpu_usage
+              description: CPU Usage
+              unit: seconds/s
+              chart_type: line
+              dimensions:
+                - name: cpu
+        - name: workqueue
+          description: These metrics refer to controller work queues.
+          labels:
+            - name: controller
+              description: Controller name
+          metrics:
+            - name: k8s_apiserver.workqueue_depth
+              description: Work Queue Depth
+              unit: items
+              chart_type: line
+              dimensions:
+                - name: depth
+            - name: k8s_apiserver.workqueue_latency
+              description: Work Queue Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: p50
+                - name: p90
+                - name: p99
+        - name: admission controller
+          description: These metrics refer to admission controllers.
+          labels:
+            - name: name
+              description: Admission controller name
+          metrics:
+            - name: k8s_apiserver.admission_controller_latency
+              description: Admission Controller Latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: p50
+                - name: p90
+                - name: p99
+        - name: admission webhook
+          description: These metrics refer to admission webhooks.
+          labels:
+            - name: name
+              description: Webhook name
+          metrics:
+            - name: k8s_apiserver.admission_webhook_latency
+              description: Admission Webhook Latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: p50
+                - name: p90
+                - name: p99
