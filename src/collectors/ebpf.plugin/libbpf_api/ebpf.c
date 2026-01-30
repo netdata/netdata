@@ -1611,7 +1611,7 @@ static inline int ebpf_open_tracepoint_path(char *filename, size_t length, char 
  *
  * @return  it returns 1 when it is enabled, 0 when it is disabled and -1 on error.
  */
-int ebpf_is_tracepoint_enabled(char *subsys, char *eventname)
+int ebpf_is_tracepoint_enabled(const char *subsys, const char *eventname)
 {
     char text[FILENAME_MAX + 1];
     int fd = ebpf_open_tracepoint_path(text, FILENAME_MAX, subsys, eventname, O_RDONLY);
@@ -1640,7 +1640,7 @@ int ebpf_is_tracepoint_enabled(char *subsys, char *eventname)
  *
  * @return It returns 0 on success and -1 otherwise
  */
-static int ebpf_change_tracing_values(char *subsys, char *eventname, char *value)
+static int ebpf_change_tracing_values(const char *subsys, const char *eventname, const char *value)
 {
     if (strcmp("0", value) && strcmp("1", value)) {
         netdata_log_error("Invalid value given to either enable or disable a tracepoint.");
@@ -1673,7 +1673,7 @@ static int ebpf_change_tracing_values(char *subsys, char *eventname, char *value
  *
  * @return It returns 0 on success and -1 otherwise
  */
-int ebpf_enable_tracing_values(char *subsys, char *eventname)
+int ebpf_enable_tracing_values(const char *subsys, const char *eventname)
 {
     return ebpf_change_tracing_values(subsys, eventname, "1");
 }
@@ -1688,7 +1688,7 @@ int ebpf_enable_tracing_values(char *subsys, char *eventname)
  *
  * @return It returns 0 on success and -1 otherwise
  */
-int ebpf_disable_tracing_values(char *subsys, char *eventname)
+int ebpf_disable_tracing_values(const char *subsys, const char *eventname)
 {
     return ebpf_change_tracing_values(subsys, eventname, "0");
 }

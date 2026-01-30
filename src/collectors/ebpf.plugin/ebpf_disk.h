@@ -90,11 +90,6 @@ typedef struct block_key {
     uint32_t dev;
 } block_key_t;
 
-typedef struct netdata_ebpf_publish_disk {
-    netdata_ebpf_disks_t *plot;
-    struct netdata_ebpf_publish_disk *next;
-} ebpf_publish_disk_t;
-
 #define NETDATA_EBPF_DISK_LATENCY_CONTEXT "disk.latency_io"
 
 extern struct config disk_config;

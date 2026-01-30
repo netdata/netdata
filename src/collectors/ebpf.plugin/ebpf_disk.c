@@ -40,9 +40,9 @@ static ebpf_local_maps_t disk_maps[] = {
 static avl_tree_lock disk_tree;
 netdata_ebpf_disks_t *disk_list = NULL;
 
-char *tracepoint_block_type = {"block"};
-char *tracepoint_block_issue = {"block_rq_issue"};
-char *tracepoint_block_rq_complete = {"block_rq_complete"};
+const char *tracepoint_block_type = "block";
+const char *tracepoint_block_issue = "block_rq_issue";
+const char *tracepoint_block_rq_complete = "block_rq_complete";
 
 static int was_block_issue_enabled = 0;
 static int was_block_rq_complete_enabled = 0;
@@ -53,7 +53,6 @@ static netdata_publish_syscall_t disk_publish_aggregated[NETDATA_EBPF_HIST_MAX_B
 
 static netdata_idx_t *disk_hash_values = NULL;
 
-ebpf_publish_disk_t *plot_disks = NULL;
 netdata_mutex_t plot_mutex;
 
 static netdata_mutex_t tracepoint_mutex;
@@ -116,11 +115,13 @@ static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *filename)
     }
 
     ssize_t file_length = read(fd, content, FILENAME_MAX);
-    if (file_length > 0) {
-        content[file_length] = '\0';
-        w->start = strtoul(content, NULL, 10);
-    }
     close(fd);
+    if (file_length <= 0) {
+        return -1;
+    }
+
+    content[file_length] = '\0';
+    w->start = strtoul(content, NULL, 10);
 
     return 0;
 }
@@ -144,17 +145,19 @@ static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *filename)
     }
 
     ssize_t file_length = read(fd, content, FILENAME_MAX);
-    if (file_length > 0) {
-        content[file_length] = '\0';
-
-        char *s = strstr(content, "PARTNAME=EFI");
-        if (s) {
-            w->main->boot_partition = w;
-            w->flags |= NETDATA_DISK_HAS_EFI;
-            w->boot_chart = strdupz("disk_bootsector");
-        }
-    }
     close(fd);
+    if (file_length <= 0) {
+        return -1;
+    }
+
+    content[file_length] = '\0';
+
+    char *s = strstr(content, "PARTNAME=EFI");
+    if (s) {
+        w->main->boot_partition = w;
+        w->flags |= NETDATA_DISK_HAS_EFI;
+        w->boot_chart = strdupz("disk_bootsector");
+    }
 
     return 0;
 }
@@ -176,11 +179,13 @@ static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *filename)
     }
 
     ssize_t file_length = read(fd, content, FILENAME_MAX);
-    if (file_length > 0) {
-        content[file_length] = '\0';
-        w->end = w->start + strtoul(content, NULL, 10) - 1;
-    }
     close(fd);
+    if (file_length <= 0) {
+        return -1;
+    }
+
+    content[file_length] = '\0';
+    w->end = w->start + strtoul(content, NULL, 10) - 1;
 
     return 0;
 }
@@ -298,23 +303,13 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
     uint32_t dev = netdata_new_encode_dev(major, minor);
     find.dev = dev;
     netdata_ebpf_disks_t *ret = (netdata_ebpf_disks_t *)avl_search_lock(&disk_tree, (avl_t *)&find);
-    if (ret) { // Disk is already present
+    if (ret) {
         ret->flags |= NETDATA_DISK_IS_HERE;
         ret->last_update = current_time;
         return;
     }
 
-    netdata_ebpf_disks_t *update_next = disk_list;
     if (likely(disk_list)) {
-        netdata_ebpf_disks_t *move = disk_list;
-        while (move) {
-            if (dev == move->dev)
-                return;
-
-            update_next = move;
-            move = move->next;
-        }
-
         w = callocz(1, sizeof(netdata_ebpf_disks_t));
         length = strlen(name);
         if (length >= NETDATA_DISK_NAME_LEN)
@@ -325,6 +320,10 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
         w->major = major;
         w->minor = minor;
         w->dev = netdata_new_encode_dev(major, minor);
+
+        netdata_ebpf_disks_t *update_next = disk_list;
+        while (update_next->next)
+            update_next = update_next->next;
         update_next->next = w;
     } else {
         disk_list = callocz(1, sizeof(netdata_ebpf_disks_t));
@@ -448,24 +447,6 @@ static void ebpf_disk_disable_tracepoints()
 }
 
 /**
- * Cleanup plot disks
- *
- * Clean disk list
- */
-static void ebpf_cleanup_plot_disks()
-{
-    ebpf_publish_disk_t *move = plot_disks, *next;
-    while (move) {
-        next = move->next;
-
-        freez(move);
-
-        move = next;
-    }
-    plot_disks = NULL;
-}
-
-/**
  * Cleanup Disk List
  */
 static void ebpf_cleanup_disk_list()
@@ -492,21 +473,20 @@ static void ebpf_cleanup_disk_list()
  */
 static void ebpf_obsolete_disk_global(ebpf_module_t *em)
 {
-    ebpf_publish_disk_t *move = plot_disks;
+    netdata_ebpf_disks_t *move = disk_list;
     while (move) {
-        netdata_ebpf_disks_t *ned = move->plot;
-        uint32_t flags = ned->flags;
+        uint32_t flags = move->flags;
         if (flags & NETDATA_DISK_CHART_CREATED) {
             ebpf_write_chart_obsolete(
-                ned->histogram.name,
-                ned->family,
+                move->histogram.name,
+                move->family,
                 "",
                 "Disk latency",
                 EBPF_COMMON_UNITS_CALLS_PER_SEC,
-                ned->family,
+                move->family,
                 NETDATA_EBPF_CHART_TYPE_STACKED,
                 NETDATA_EBPF_DISK_LATENCY_CONTEXT,
-                ned->histogram.order,
+                move->histogram.order,
                 em->update_every);
         }
 
@@ -555,9 +535,6 @@ static void ebpf_disk_exit(void *pptr)
     netdata_mutex_destroy(&plot_mutex);
     netdata_mutex_destroy(&tracepoint_mutex);
 
-    if (plot_disks)
-        ebpf_cleanup_plot_disks();
-
     if (disk_list)
         ebpf_cleanup_disk_list();
 
@@ -576,34 +553,15 @@ static void ebpf_disk_exit(void *pptr)
 /**
  * Fill Plot list
  *
+ * Mark disk as needing to be plotted
+ *
  * @param ptr a pointer for current disk
  */
 static void ebpf_fill_plot_disks(netdata_ebpf_disks_t *ptr)
 {
     netdata_mutex_lock(&plot_mutex);
-    ebpf_publish_disk_t *w;
-    if (likely(plot_disks)) {
-        ebpf_publish_disk_t *move = plot_disks, *store = plot_disks;
-        while (move) {
-            if (move->plot == ptr) {
-                netdata_mutex_unlock(&plot_mutex);
-                return;
-            }
-
-            store = move;
-            move = move->next;
-        }
-
-        w = callocz(1, sizeof(ebpf_publish_disk_t));
-        w->plot = ptr;
-        store->next = w;
-    } else {
-        plot_disks = callocz(1, sizeof(ebpf_publish_disk_t));
-        plot_disks->plot = ptr;
-    }
-    netdata_mutex_unlock(&plot_mutex);
-
     ptr->flags |= NETDATA_DISK_ADDED_TO_PLOT_LIST;
+    netdata_mutex_unlock(&plot_mutex);
 }
 
 /**
@@ -735,32 +693,36 @@ static void ebpf_create_hd_charts(netdata_ebpf_disks_t *w, int update_every)
 /**
  * Remove pointer from plot
  *
- * Remove pointer from plot list when the disk is not present.
+ * Remove disk from tracking when not present - now iterates disk_list directly
  */
 static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
 {
     time_t current_time = now_realtime_sec();
     time_t limit = 10 * em->update_every;
     netdata_mutex_lock(&plot_mutex);
-    ebpf_publish_disk_t *move = plot_disks, *prev = plot_disks;
+    netdata_ebpf_disks_t *move = disk_list, *prev = NULL;
     int update_every = em->update_every;
     while (move) {
-        netdata_ebpf_disks_t *ned = move->plot;
-        uint32_t flags = ned->flags;
+        uint32_t flags = move->flags;
 
-        if (!(flags & NETDATA_DISK_IS_HERE) && ((current_time - ned->last_update) > limit)) {
-            ebpf_obsolete_hd_charts(ned, update_every);
-            avl_t *ret = (avl_t *)avl_remove_lock(&disk_tree, (avl_t *)ned);
+        if (!(flags & NETDATA_DISK_IS_HERE) && ((current_time - move->last_update) > limit)) {
+            ebpf_obsolete_hd_charts(move, update_every);
+            avl_t *ret = (avl_t *)avl_remove_lock(&disk_tree, (avl_t *)move);
             UNUSED(ret);
-            if (move == plot_disks) {
-                freez(move);
-                plot_disks = NULL;
-                break;
-            } else {
+            if (prev) {
                 prev->next = move->next;
-                ebpf_publish_disk_t *clean = move;
+                netdata_ebpf_disks_t *clean = move;
                 move = move->next;
+                freez(clean->histogram.name);
+                freez(clean->boot_chart);
                 freez(clean);
+                continue;
+            } else {
+                disk_list = move->next;
+                freez(move->histogram.name);
+                freez(move->boot_chart);
+                freez(move);
+                move = disk_list;
                 continue;
             }
         }
@@ -781,25 +743,24 @@ static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
 static void ebpf_latency_send_hd_data(int update_every)
 {
     netdata_mutex_lock(&plot_mutex);
-    if (!plot_disks) {
+    if (!disk_list) {
         netdata_mutex_unlock(&plot_mutex);
         return;
     }
 
-    ebpf_publish_disk_t *move = plot_disks;
+    netdata_ebpf_disks_t *move = disk_list;
     while (move) {
-        netdata_ebpf_disks_t *ned = move->plot;
-        uint32_t flags = ned->flags;
+        uint32_t flags = move->flags;
         if (!(flags & NETDATA_DISK_CHART_CREATED)) {
-            ebpf_create_hd_charts(ned, update_every);
+            ebpf_create_hd_charts(move, update_every);
         }
 
         if ((flags & NETDATA_DISK_CHART_CREATED)) {
             write_histogram_chart(
-                ned->histogram.name, ned->family, ned->histogram.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+                move->histogram.name, move->family, move->histogram.histogram, dimensions, NETDATA_EBPF_HIST_MAX_BINS);
         }
 
-        ned->flags &= ~NETDATA_DISK_IS_HERE;
+        move->flags &= ~NETDATA_DISK_IS_HERE;
 
         move = move->next;
     }
