@@ -301,7 +301,14 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 		return
 	}
 
-	pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", fn.Source())
+	// Preserve original source type (file vs dyncfg)
+	sourceType := d.exposedConfigs.getSourceType(dt, name)
+	source := d.exposedConfigs.getSource(dt, name)
+	if sourceType == "file" {
+		pipelineCfg.Source = fmt.Sprintf("file=%s", source)
+	} else {
+		pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", fn.Source())
+	}
 
 	d.Infof("dyncfg: update: %s:%s by user '%s'", dt, name, fn.User())
 
@@ -343,9 +350,11 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn dyncfg.Function) {
 		return
 	}
 
-	// If already running, return success (idempotent)
+	// If already running, ensure status is correct and return success (idempotent)
 	if d.mgr.IsRunning(pipelineKey) {
 		d.Infof("dyncfg: enable: pipeline '%s:%s' is already running", dt, name)
+		d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusRunning)
+		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusRunning)
 		d.dyncfgApi.SendCodef(fn.Fn(), 200, "")
 		return
 	}
@@ -599,11 +608,15 @@ func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile) 
 		name = conf.source
 	}
 
-	// Transform pipeline config to dyncfg format
+	// Transform pipeline config to dyncfg format (JSON)
 	content, err := transformPipelineConfigToDyncfg(cfg, dt)
 	if err != nil {
-		d.Warningf("failed to transform config '%s' to dyncfg format: %v", conf.source, err)
-		content = conf.content // fallback to raw content
+		d.Warningf("failed to transform config '%s' to dyncfg format: %v, not exposing via dyncfg", conf.source, err)
+		return
+	}
+	if len(content) == 0 {
+		d.Warningf("failed to transform config '%s': empty result, not exposing via dyncfg", conf.source)
+		return
 	}
 
 	d.Infof("exposeFileConfig: '%s' transformed content length=%d", conf.source, len(content))

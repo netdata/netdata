@@ -43,15 +43,19 @@ func parseNetListenersConfig(payload []byte, configDefaults confgroup.Registry) 
 	}
 
 	if dc.Interval != "" {
-		if d, err := time.ParseDuration(dc.Interval); err == nil {
-			interval := confopt.Duration(d)
-			nlCfg.Interval = &interval
+		d, err := time.ParseDuration(dc.Interval)
+		if err != nil {
+			return pipeline.Config{}, fmt.Errorf("invalid interval '%s': %w", dc.Interval, err)
 		}
+		interval := confopt.Duration(d)
+		nlCfg.Interval = &interval
 	}
 	if dc.Timeout != "" {
-		if d, err := time.ParseDuration(dc.Timeout); err == nil {
-			nlCfg.Timeout = confopt.Duration(d)
+		d, err := time.ParseDuration(dc.Timeout)
+		if err != nil {
+			return pipeline.Config{}, fmt.Errorf("invalid timeout '%s': %w", dc.Timeout, err)
 		}
+		nlCfg.Timeout = confopt.Duration(d)
 	}
 
 	return pipeline.Config{
@@ -78,9 +82,11 @@ func parseDockerConfig(payload []byte, configDefaults confgroup.Registry) (pipel
 	}
 
 	if dc.Timeout != "" {
-		if d, err := time.ParseDuration(dc.Timeout); err == nil {
-			dCfg.Timeout = confopt.Duration(d)
+		d, err := time.ParseDuration(dc.Timeout)
+		if err != nil {
+			return pipeline.Config{}, fmt.Errorf("invalid timeout '%s': %w", dc.Timeout, err)
 		}
+		dCfg.Timeout = confopt.Duration(d)
 	}
 
 	return pipeline.Config{
@@ -139,21 +145,27 @@ func parseSNMPConfig(payload []byte, configDefaults confgroup.Registry) (pipelin
 	}
 
 	if dc.RescanInterval != "" {
-		if d, err := time.ParseDuration(dc.RescanInterval); err == nil {
-			interval := confopt.Duration(d)
-			snmpCfg.RescanInterval = &interval
+		d, err := time.ParseDuration(dc.RescanInterval)
+		if err != nil {
+			return pipeline.Config{}, fmt.Errorf("invalid rescan_interval '%s': %w", dc.RescanInterval, err)
 		}
+		interval := confopt.Duration(d)
+		snmpCfg.RescanInterval = &interval
 	}
 	if dc.Timeout != "" {
-		if d, err := time.ParseDuration(dc.Timeout); err == nil {
-			snmpCfg.Timeout = confopt.Duration(d)
+		d, err := time.ParseDuration(dc.Timeout)
+		if err != nil {
+			return pipeline.Config{}, fmt.Errorf("invalid timeout '%s': %w", dc.Timeout, err)
 		}
+		snmpCfg.Timeout = confopt.Duration(d)
 	}
 	if dc.DeviceCacheTTL != "" {
-		if d, err := time.ParseDuration(dc.DeviceCacheTTL); err == nil {
-			ttl := confopt.Duration(d)
-			snmpCfg.DeviceCacheTTL = &ttl
+		d, err := time.ParseDuration(dc.DeviceCacheTTL)
+		if err != nil {
+			return pipeline.Config{}, fmt.Errorf("invalid device_cache_ttl '%s': %w", dc.DeviceCacheTTL, err)
 		}
+		ttl := confopt.Duration(d)
+		snmpCfg.DeviceCacheTTL = &ttl
 	}
 
 	for _, c := range dc.Credentials {
