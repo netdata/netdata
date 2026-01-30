@@ -1,142 +1,234 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "title": "SNMP Device Discovery",
-  "description": "Discovers SNMP devices by scanning network subnets",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "Pipeline name (must be unique)",
-      "minLength": 1
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SNMP Device Discovery",
+    "description": "Discovers SNMP devices by scanning network subnets.",
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "description": "Pipeline name (must be unique).",
+        "type": "string",
+        "minLength": 1
+      },
+      "rescan_interval": {
+        "title": "Rescan interval",
+        "description": "How often to scan networks for devices.",
+        "type": "string",
+        "pattern": "^[0-9]+(s|m|h)$",
+        "default": "30m"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for SNMP device responses.",
+        "type": "string",
+        "pattern": "^[0-9]+(s|m)$",
+        "default": "1s"
+      },
+      "device_cache_ttl": {
+        "title": "Device cache TTL",
+        "description": "How long to cache discovery results.",
+        "type": "string",
+        "pattern": "^[0-9]+(s|m|h)$",
+        "default": "12h"
+      },
+      "parallel_scans_per_network": {
+        "title": "Parallel scans",
+        "description": "Concurrent IPs to scan per subnet.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 256,
+        "default": 32
+      },
+      "credentials": {
+        "title": "Credentials",
+        "description": "SNMP credentials for authentication.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "description": "Credential identifier (referenced by networks).",
+              "type": "string"
+            },
+            "version": {
+              "title": "SNMP version",
+              "description": "SNMP protocol version.",
+              "type": "string",
+              "enum": [
+                "1",
+                "2c",
+                "3"
+              ],
+              "default": "2c"
+            },
+            "community": {
+              "title": "Community",
+              "description": "Community string (for SNMP v1/v2c).",
+              "type": "string",
+              "default": "public"
+            },
+            "username": {
+              "title": "Username",
+              "description": "Username (for SNMPv3).",
+              "type": "string"
+            },
+            "security_level": {
+              "title": "Security level",
+              "description": "Security level (for SNMPv3).",
+              "type": "string",
+              "enum": [
+                "noAuthNoPriv",
+                "authNoPriv",
+                "authPriv"
+              ]
+            },
+            "auth_protocol": {
+              "title": "Auth protocol",
+              "description": "Authentication protocol (for SNMPv3).",
+              "type": "string",
+              "enum": [
+                "md5",
+                "sha",
+                "sha224",
+                "sha256",
+                "sha384",
+                "sha512"
+              ]
+            },
+            "auth_password": {
+              "title": "Auth password",
+              "description": "Authentication passphrase (for SNMPv3).",
+              "type": "string"
+            },
+            "priv_protocol": {
+              "title": "Privacy protocol",
+              "description": "Privacy protocol (for SNMPv3).",
+              "type": "string",
+              "enum": [
+                "des",
+                "aes",
+                "aes192",
+                "aes256",
+                "aes192C",
+                "aes256C"
+              ]
+            },
+            "priv_password": {
+              "title": "Privacy password",
+              "description": "Privacy passphrase (for SNMPv3).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "version"
+          ]
+        }
+      },
+      "networks": {
+        "title": "Networks",
+        "description": "Network subnets to scan.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "subnet": {
+              "title": "Subnet",
+              "description": "IP range to scan (e.g., '192.168.1.0/24', '10.0.0.1-10.0.0.50').",
+              "type": "string"
+            },
+            "credential": {
+              "title": "Credential",
+              "description": "Name of credential to use for this network.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "subnet",
+            "credential"
+          ]
+        }
+      },
+      "services": {
+        "title": "Service rules",
+        "description": "Service matching rules.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "title": "Rule ID",
+              "description": "Rule identifier (for logging/diagnostics).",
+              "type": "string"
+            },
+            "match": {
+              "title": "Match expression",
+              "description": "Expression to match devices.",
+              "type": "string"
+            },
+            "config_template": {
+              "title": "Config template",
+              "description": "YAML template for collector config generation.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "match"
+          ]
+        }
+      }
+    },
+    "required": [
+      "name",
+      "credentials",
+      "networks"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
     },
     "rescan_interval": {
-      "type": "string",
-      "description": "How often to scan networks for devices (default: 30m)",
-      "pattern": "^[0-9]+(s|m|h)$",
-      "examples": ["30m", "1h"]
+      "ui:placeholder": "30m",
+      "ui:help": "Examples: 30m, 1h"
     },
     "timeout": {
-      "type": "string",
-      "description": "Timeout for SNMP device responses (default: 1s)",
-      "pattern": "^[0-9]+(s|m)$",
-      "examples": ["1s", "5s"]
+      "ui:placeholder": "1s",
+      "ui:help": "Examples: 1s, 5s"
     },
     "device_cache_ttl": {
-      "type": "string",
-      "description": "How long to cache discovery results (default: 12h)",
-      "pattern": "^[0-9]+(s|m|h)$",
-      "examples": ["12h", "24h"]
-    },
-    "parallel_scans_per_network": {
-      "type": "integer",
-      "description": "Concurrent IPs to scan per subnet (default: 32)",
-      "minimum": 1,
-      "maximum": 256,
-      "default": 32
+      "ui:placeholder": "12h",
+      "ui:help": "Examples: 12h, 24h"
     },
     "credentials": {
-      "type": "array",
-      "description": "SNMP credentials for authentication",
       "items": {
-        "$ref": "#/$defs/credential"
+        "community": {
+          "ui:widget": "password"
+        },
+        "auth_password": {
+          "ui:widget": "password"
+        },
+        "priv_password": {
+          "ui:widget": "password"
+        }
       }
     },
     "networks": {
-      "type": "array",
-      "description": "Network subnets to scan",
       "items": {
-        "$ref": "#/$defs/network"
+        "subnet": {
+          "ui:placeholder": "192.168.1.0/24"
+        }
       }
     },
     "services": {
-      "type": "array",
-      "description": "Service matching rules",
       "items": {
-        "$ref": "#/$defs/serviceRule"
-      }
-    }
-  },
-  "required": ["name", "credentials", "networks"],
-  "$defs": {
-    "credential": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "Credential identifier (referenced by networks)"
-        },
-        "version": {
-          "type": "string",
-          "description": "SNMP version",
-          "enum": ["1", "2c", "3"],
-          "default": "2c"
-        },
-        "community": {
-          "type": "string",
-          "description": "Community string (for SNMP v1/v2c)",
-          "default": "public"
-        },
-        "username": {
-          "type": "string",
-          "description": "Username (for SNMPv3)"
-        },
-        "security_level": {
-          "type": "string",
-          "description": "Security level (for SNMPv3)",
-          "enum": ["noAuthNoPriv", "authNoPriv", "authPriv"]
-        },
-        "auth_protocol": {
-          "type": "string",
-          "description": "Authentication protocol (for SNMPv3)",
-          "enum": ["md5", "sha", "sha224", "sha256", "sha384", "sha512"]
-        },
-        "auth_password": {
-          "type": "string",
-          "description": "Authentication passphrase (for SNMPv3)"
-        },
-        "priv_protocol": {
-          "type": "string",
-          "description": "Privacy protocol (for SNMPv3)",
-          "enum": ["des", "aes", "aes192", "aes256", "aes192C", "aes256C"]
-        },
-        "priv_password": {
-          "type": "string",
-          "description": "Privacy passphrase (for SNMPv3)"
-        }
-      },
-      "required": ["name", "version"]
-    },
-    "network": {
-      "type": "object",
-      "properties": {
-        "subnet": {
-          "type": "string",
-          "description": "IP range to scan (e.g., '192.168.1.0/24', '10.0.0.1-10.0.0.50')"
-        },
-        "credential": {
-          "type": "string",
-          "description": "Name of credential to use for this network"
-        }
-      },
-      "required": ["subnet", "credential"]
-    },
-    "serviceRule": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Rule identifier (for logging/diagnostics)"
-        },
-        "match": {
-          "type": "string",
-          "description": "Expression to match devices"
-        },
         "config_template": {
-          "type": "string",
-          "description": "YAML template for collector config generation"
+          "ui:widget": "textarea"
         }
-      },
-      "required": ["id", "match"]
+      }
     }
   }
 }

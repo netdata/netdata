@@ -55,6 +55,7 @@ func dyncfgSDTemplateCmds() string {
 		dyncfg.CommandSchema,
 		dyncfg.CommandEnable,
 		dyncfg.CommandDisable,
+		dyncfg.CommandUserconfig,
 	)
 }
 
@@ -65,6 +66,7 @@ func dyncfgSDJobCmds(isDyncfgJob bool) string {
 		dyncfg.CommandEnable,
 		dyncfg.CommandDisable,
 		dyncfg.CommandUpdate,
+		dyncfg.CommandUserconfig,
 	}
 	if isDyncfgJob {
 		cmds = append(cmds, dyncfg.CommandRemove)
@@ -86,6 +88,8 @@ func (d *ServiceDiscovery) dyncfgSDTemplateCreate(discovererType string) {
 
 func (d *ServiceDiscovery) dyncfgSDJobCreate(discovererType, name, sourceType, source string, status dyncfg.Status) {
 	isDyncfg := sourceType == "dyncfg"
+	cmds := dyncfgSDJobCmds(isDyncfg)
+	d.Infof("dyncfg: creating job '%s:%s' sourceType=%s isDyncfg=%v cmds='%s'", discovererType, name, sourceType, isDyncfg, cmds)
 	d.dyncfgApi.ConfigCreate(netdataapi.ConfigOpts{
 		ID:                d.dyncfgJobID(discovererType, name),
 		Status:            status.String(),
@@ -93,7 +97,7 @@ func (d *ServiceDiscovery) dyncfgSDJobCreate(discovererType, name, sourceType, s
 		Path:              fmt.Sprintf(dyncfgSDPath, executable.Name),
 		SourceType:        sourceType,
 		Source:            source,
-		SupportedCommands: dyncfgSDJobCmds(isDyncfg),
+		SupportedCommands: cmds,
 	})
 }
 
@@ -130,6 +134,8 @@ func (d *ServiceDiscovery) dyncfgConfig(fn functions.Function) {
 		d.dyncfgCmdDisable(fn)
 	case dyncfg.CommandRemove:
 		d.dyncfgCmdRemove(fn)
+	case dyncfg.CommandUserconfig:
+		d.dyncfgCmdUserconfig(fn)
 	default:
 		d.Warningf("dyncfg: command '%s' not implemented", cmd)
 		d.dyncfgApi.SendCodef(fn, 501, "Command '%s' is not implemented.", cmd)
@@ -164,6 +170,8 @@ func (d *ServiceDiscovery) dyncfgCmdGet(fn functions.Function) {
 	id := fn.Args[0]
 	dt, name, isJob := d.extractDiscovererAndName(id)
 
+	d.Infof("dyncfg: get: id=%s dt=%s name=%s isJob=%v", id, dt, name, isJob)
+
 	if !isJob || name == "" {
 		d.Warningf("dyncfg: get: invalid job ID format '%s'", id)
 		d.dyncfgApi.SendCodef(fn, 400, "Invalid job ID format: %s", id)
@@ -177,22 +185,11 @@ func (d *ServiceDiscovery) dyncfgCmdGet(fn functions.Function) {
 		return
 	}
 
-	// Convert content to JSON for response
-	var content any
-	if err := yaml.Unmarshal(cfg.content, &content); err != nil {
-		d.Warningf("dyncfg: get: failed to parse config '%s:%s': %v", dt, name, err)
-		d.dyncfgApi.SendCodef(fn, 500, "Failed to parse config: %v", err)
-		return
-	}
+	d.Infof("dyncfg: get: found config '%s:%s' content length=%d", dt, name, len(cfg.content))
 
-	bs, err := json.Marshal(content)
-	if err != nil {
-		d.Warningf("dyncfg: get: failed to marshal config '%s:%s': %v", dt, name, err)
-		d.dyncfgApi.SendCodef(fn, 500, "Failed to marshal config: %v", err)
-		return
-	}
-
-	d.dyncfgApi.SendJSON(fn, string(bs))
+	// Content is already stored as JSON (from transform or dyncfg payload)
+	d.Infof("dyncfg: get: sending config '%s:%s'", dt, name)
+	d.dyncfgApi.SendJSON(fn, string(cfg.content))
 }
 
 // dyncfgCmdAdd handles the add command for templates (creates a new job)
@@ -381,6 +378,54 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn functions.Function) {
 	d.dyncfgSDJobRemove(dt, name)
 }
 
+// dyncfgCmdUserconfig handles the userconfig command for templates and jobs
+// Returns YAML representation of the config for user-friendly file format
+func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn functions.Function) {
+	id := fn.Args[0]
+	dt, name, isJob := d.extractDiscovererAndName(id)
+
+	d.Infof("dyncfg: userconfig: id=%s dt=%s name=%s isJob=%v", id, dt, name, isJob)
+
+	var jsonContent []byte
+
+	if isJob {
+		// For jobs, get content from stored config
+		cfg, ok := d.exposedConfigs.lookup(dt, name)
+		if !ok {
+			d.Warningf("dyncfg: userconfig: config '%s:%s' not found", dt, name)
+			d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
+			return
+		}
+		jsonContent = cfg.content
+	} else {
+		// For templates, use the payload from the request
+		if len(fn.Payload) == 0 {
+			d.Warningf("dyncfg: userconfig: missing payload for template '%s'", dt)
+			d.dyncfgApi.SendCodef(fn, 400, "Missing configuration payload.")
+			return
+		}
+		jsonContent = fn.Payload
+	}
+
+	// Content is JSON, convert to YAML
+	var content any
+	if err := json.Unmarshal(jsonContent, &content); err != nil {
+		d.Warningf("dyncfg: userconfig: failed to parse config: %v", err)
+		d.dyncfgApi.SendCodef(fn, 500, "Failed to parse config: %v", err)
+		return
+	}
+
+	yamlBytes, err := yaml.Marshal(content)
+	if err != nil {
+		d.Warningf("dyncfg: userconfig: failed to marshal config to YAML: %v", err)
+		d.dyncfgApi.SendCodef(fn, 500, "Failed to marshal config to YAML: %v", err)
+		return
+	}
+
+	d.Infof("dyncfg: userconfig: sending yaml length=%d", len(yamlBytes))
+	d.dyncfgApi.SendYAML(fn, string(yamlBytes))
+}
+
 // extractDiscovererAndName parses a dyncfg ID into discoverer type and name.
 // ID format: {prefix}{discovererType} (template) or {prefix}{discovererType}:{name} (job)
 // Returns discovererType, name, isJob
@@ -483,6 +528,15 @@ func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile) 
 		name = conf.source
 	}
 
+	// Transform pipeline config to dyncfg format
+	content, err := transformPipelineConfigToDyncfg(cfg, dt)
+	if err != nil {
+		d.Warningf("failed to transform config '%s' to dyncfg format: %v", conf.source, err)
+		content = conf.content // fallback to raw content
+	}
+
+	d.Infof("exposeFileConfig: '%s' transformed content length=%d", conf.source, len(content))
+
 	// Store in exposed configs cache
 	sdCfg := &sdConfig{
 		discovererType: dt,
@@ -490,7 +544,7 @@ func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile) 
 		source:         conf.source,
 		sourceType:     "file",
 		status:         dyncfg.StatusRunning,
-		content:        conf.content,
+		content:        content,
 	}
 	d.exposedConfigs.add(sdCfg)
 

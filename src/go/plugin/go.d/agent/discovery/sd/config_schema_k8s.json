@@ -1,83 +1,123 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "title": "Kubernetes Service Discovery",
-  "description": "Discovers services running in Kubernetes cluster",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "Pipeline name (must be unique)",
-      "minLength": 1
-    },
-    "role": {
-      "type": "string",
-      "description": "Kubernetes resource role to discover",
-      "enum": ["pod", "service"],
-      "default": "pod"
-    },
-    "namespaces": {
-      "type": "array",
-      "description": "Namespaces to watch (empty = all namespaces)",
-      "items": {
-        "type": "string"
-      }
-    },
-    "selector": {
-      "type": "object",
-      "description": "Label and field selectors for filtering resources",
-      "properties": {
-        "label": {
-          "type": "string",
-          "description": "Label selector (e.g., 'app=nginx')"
-        },
-        "field": {
-          "type": "string",
-          "description": "Field selector (e.g., 'metadata.name=my-pod')"
-        }
-      }
-    },
-    "pod": {
-      "type": "object",
-      "description": "Pod-specific options",
-      "properties": {
-        "local_mode": {
-          "type": "boolean",
-          "description": "Only discover pods on the same node as the agent",
-          "default": false
-        }
-      }
-    },
-    "tags": {
-      "type": "string",
-      "description": "Tags to apply to discovered targets (space-separated)"
-    },
-    "services": {
-      "type": "array",
-      "description": "Service matching rules",
-      "items": {
-        "$ref": "#/$defs/serviceRule"
-      }
-    }
-  },
-  "required": ["name", "role", "tags"],
-  "$defs": {
-    "serviceRule": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Rule identifier (for logging/diagnostics)"
-        },
-        "match": {
-          "type": "string",
-          "description": "Expression to match resources"
-        },
-        "config_template": {
-          "type": "string",
-          "description": "YAML template for collector config generation"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Kubernetes Service Discovery",
+    "description": "Discovers services running in Kubernetes cluster.",
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "description": "Pipeline name (must be unique).",
+        "type": "string",
+        "minLength": 1
+      },
+      "role": {
+        "title": "Role",
+        "description": "Kubernetes resource role to discover.",
+        "type": "string",
+        "enum": [
+          "pod",
+          "service"
+        ],
+        "default": "pod"
+      },
+      "namespaces": {
+        "title": "Namespaces",
+        "description": "Namespaces to watch (empty = all namespaces).",
+        "type": "array",
+        "items": {
+          "type": "string"
         }
       },
-      "required": ["id", "match"]
+      "selector": {
+        "title": "Selector",
+        "description": "Label and field selectors for filtering resources.",
+        "type": "object",
+        "properties": {
+          "label": {
+            "title": "Label selector",
+            "description": "Label selector (e.g., 'app=nginx').",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field selector",
+            "description": "Field selector (e.g., 'metadata.name=my-pod').",
+            "type": "string"
+          }
+        }
+      },
+      "pod": {
+        "title": "Pod options",
+        "description": "Pod-specific options.",
+        "type": "object",
+        "properties": {
+          "local_mode": {
+            "title": "Local mode",
+            "description": "Only discover pods on the same node as the agent.",
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "tags": {
+        "title": "Tags",
+        "description": "Tags to apply to discovered targets (space-separated).",
+        "type": "string"
+      },
+      "services": {
+        "title": "Service rules",
+        "description": "Service matching rules.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "title": "Rule ID",
+              "description": "Rule identifier (for logging/diagnostics).",
+              "type": "string"
+            },
+            "match": {
+              "title": "Match expression",
+              "description": "Expression to match resources.",
+              "type": "string"
+            },
+            "config_template": {
+              "title": "Config template",
+              "description": "YAML template for collector config generation.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "match"
+          ]
+        }
+      }
+    },
+    "required": [
+      "name",
+      "role",
+      "tags"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "selector": {
+      "label": {
+        "ui:placeholder": "app=nginx"
+      },
+      "field": {
+        "ui:placeholder": "metadata.name=my-pod"
+      }
+    },
+    "services": {
+      "items": {
+        "config_template": {
+          "ui:widget": "textarea"
+        }
+      }
     }
   }
 }
