@@ -182,12 +182,12 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
 
     buffer_sprintf(
         instance->buffer,
-        "put %s.%s.%s %llu " COLLECTED_NUMBER_FORMAT " host=%s%s\n",
+        "put %s.%s.%s %llu " NETDATA_DOUBLE_FORMAT " host=%s%s\n",
         instance->config.prefix,
         chart_name,
         dimension_name,
         (unsigned long long)rd->collector.last_collected_time.tv_sec,
-        rd->collector.last_collected_value,
+        rrddim_last_collected_as_double(rd),
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
 
@@ -316,7 +316,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         "{"
         "\"metric\":\"%s.%s.%s\","
         "\"timestamp\":%llu,"
-        "\"value\":"COLLECTED_NUMBER_FORMAT","
+        "\"value\":" NETDATA_DOUBLE_FORMAT ","
         "\"tags\":{"
         "\"host\":\"%s\"%s"
         "}"
@@ -325,7 +325,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         chart_name,
         dimension_name,
         (unsigned long long)rd->collector.last_collected_time.tv_sec,
-        rd->collector.last_collected_value,
+        rrddim_last_collected_as_double(rd),
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "");
 

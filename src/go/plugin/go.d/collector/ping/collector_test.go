@@ -109,33 +109,33 @@ func TestCollector_Check(t *testing.T) {
 func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepare       func(t *testing.T) *Collector
-		wantMetrics   map[string]int64
+		wantMetrics   map[string]float64
 		wantNumCharts int
 	}{
 		"success when Ping does not return an error": {
 			prepare: casePingSuccess,
-			wantMetrics: map[string]int64{
-				"host_192.0.2.1_avg_rtt":        15000,
-				"host_192.0.2.1_max_rtt":        20000,
-				"host_192.0.2.1_min_rtt":        10000,
-				"host_192.0.2.1_packet_loss":    0,
+			wantMetrics: map[string]float64{
+				"host_192.0.2.1_avg_rtt":        15,
+				"host_192.0.2.1_max_rtt":        20,
+				"host_192.0.2.1_min_rtt":        10,
+				"host_192.0.2.1_packet_loss":    80.5,
 				"host_192.0.2.1_packets_recv":   5,
-				"host_192.0.2.1_packets_sent":   5,
-				"host_192.0.2.1_std_dev_rtt":    5000,
-				"host_192.0.2.2_avg_rtt":        15000,
-				"host_192.0.2.2_max_rtt":        20000,
-				"host_192.0.2.2_min_rtt":        10000,
-				"host_192.0.2.2_packet_loss":    0,
+				"host_192.0.2.1_packets_sent":   4,
+				"host_192.0.2.1_std_dev_rtt":    5,
+				"host_192.0.2.2_avg_rtt":        15,
+				"host_192.0.2.2_max_rtt":        20,
+				"host_192.0.2.2_min_rtt":        10,
+				"host_192.0.2.2_packet_loss":    80.5,
 				"host_192.0.2.2_packets_recv":   5,
-				"host_192.0.2.2_packets_sent":   5,
-				"host_192.0.2.2_std_dev_rtt":    5000,
-				"host_example.com_avg_rtt":      15000,
-				"host_example.com_max_rtt":      20000,
-				"host_example.com_min_rtt":      10000,
-				"host_example.com_packet_loss":  0,
+				"host_192.0.2.2_packets_sent":   4,
+				"host_192.0.2.2_std_dev_rtt":    5,
+				"host_example.com_avg_rtt":      15,
+				"host_example.com_max_rtt":      20,
+				"host_example.com_min_rtt":      10,
+				"host_example.com_packet_loss":  80.5,
 				"host_example.com_packets_recv": 5,
-				"host_example.com_packets_sent": 5,
-				"host_example.com_std_dev_rtt":  5000,
+				"host_example.com_packets_sent": 4,
+				"host_example.com_std_dev_rtt":  5,
 			},
 			wantNumCharts: 3 * len(hostChartsTmpl),
 		},
@@ -150,7 +150,7 @@ func TestCollector_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare(t)
 
-			mx := collr.Collect(context.Background())
+			mx := collr.CollectMetrics(context.Background())
 
 			require.Equal(t, test.wantMetrics, mx)
 
@@ -194,15 +194,15 @@ func (m *mockProber) Ping(host string) (*probing.Statistics, error) {
 
 	stats := probing.Statistics{
 		PacketsRecv:           5,
-		PacketsSent:           5,
+		PacketsSent:           4,
 		PacketsRecvDuplicates: 0,
-		PacketLoss:            0,
+		PacketLoss:            80.5,
 		Addr:                  host,
 		Rtts:                  nil,
-		MinRtt:                time.Millisecond * 10,
-		MaxRtt:                time.Millisecond * 20,
-		AvgRtt:                time.Millisecond * 15,
-		StdDevRtt:             time.Millisecond * 5,
+		MinRtt:                time.Second * 10,
+		MaxRtt:                time.Second * 20,
+		AvgRtt:                time.Second * 15,
+		StdDevRtt:             time.Second * 5,
 	}
 
 	return &stats, nil

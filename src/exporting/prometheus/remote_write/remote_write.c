@@ -273,7 +273,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                         connector_specific_data->write_request,
                         name, chart, family, dimension,
                     (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-                        rd->collector.last_collected_value, timeval_msec(&rd->collector.last_collected_time));
+                        rrddim_last_collected_as_double(rd), timeval_msec(&rd->collector.last_collected_time));
             } else {
                 // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
                 // we create a metric per dimension
@@ -290,7 +290,7 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
                         connector_specific_data->write_request,
                         name, chart, family, NULL,
                     (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-                        rd->collector.last_collected_value, timeval_msec(&rd->collector.last_collected_time));
+                        rrddim_last_collected_as_double(rd), timeval_msec(&rd->collector.last_collected_time));
             }
         } else {
             // we need average or sum of the data
