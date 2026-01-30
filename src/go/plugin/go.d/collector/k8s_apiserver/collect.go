@@ -104,22 +104,25 @@ func (c *Collector) collectRequests(mfs prometheus.MetricFamilies, mx *metrics) 
 			// By verb
 			if verb != "" {
 				c.addVerbDimension(verb)
-				mx.Request.ByVerb[verb] = mtx.Gauge(mx.Request.ByVerb[verb].Value() + value)
+				verbID := cleanID(verb)
+				mx.Request.ByVerb[verbID] = mtx.Gauge(mx.Request.ByVerb[verbID].Value() + value)
 			}
 
 			// By code
 			if code != "" {
 				c.addCodeDimension(code)
-				mx.Request.ByCode[code] = mtx.Gauge(mx.Request.ByCode[code].Value() + value)
+				codeID := cleanID(code)
+				mx.Request.ByCode[codeID] = mtx.Gauge(mx.Request.ByCode[codeID].Value() + value)
 			}
 
 			// By resource (with cardinality limit)
 			if resource != "" {
-				_, seen := c.collectedResources[resource]
+				resourceID := cleanID(resource)
+				_, seen := c.collectedResources[resourceID]
 				if seen || len(c.collectedResources) < defaultMaxResources {
 					c.addResourceDimension(resource)
-					c.collectedResources[resource] = c.collectCycle
-					mx.Request.ByResource[resource] = mtx.Gauge(mx.Request.ByResource[resource].Value() + value)
+					c.collectedResources[resourceID] = c.collectCycle
+					mx.Request.ByResource[resourceID] = mtx.Gauge(mx.Request.ByResource[resourceID].Value() + value)
 				}
 			}
 		}
@@ -236,10 +239,11 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 
 			// By code (track for cleanup)
 			if code != "" {
-				_, seen := c.collectedRESTCodes[code]
-				c.collectedRESTCodes[code] = c.collectCycle
+				codeID := cleanID(code)
+				_, seen := c.collectedRESTCodes[codeID]
+				c.collectedRESTCodes[codeID] = c.collectCycle
 				if !seen {
-					dimID := "rest_client_by_code_" + cleanID(code)
+					dimID := "rest_client_by_code_" + codeID
 					if codeChart != nil && !codeChart.HasDim(dimID) {
 						if err := codeChart.AddDim(&Dim{ID: dimID, Name: code, Algo: module.Incremental}); err != nil {
 							c.Warningf("failed to add REST client code dimension %s: %v", code, err)
@@ -248,15 +252,16 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 						}
 					}
 				}
-				mx.RESTClient.ByCode[code] = mtx.Gauge(mx.RESTClient.ByCode[code].Value() + value)
+				mx.RESTClient.ByCode[codeID] = mtx.Gauge(mx.RESTClient.ByCode[codeID].Value() + value)
 			}
 
 			// By method (track for cleanup)
 			if method != "" {
-				_, seen := c.collectedRESTMethods[method]
-				c.collectedRESTMethods[method] = c.collectCycle
+				methodID := cleanID(method)
+				_, seen := c.collectedRESTMethods[methodID]
+				c.collectedRESTMethods[methodID] = c.collectCycle
 				if !seen {
-					dimID := "rest_client_by_method_" + cleanID(method)
+					dimID := "rest_client_by_method_" + methodID
 					if methodChart != nil && !methodChart.HasDim(dimID) {
 						if err := methodChart.AddDim(&Dim{ID: dimID, Name: method, Algo: module.Incremental}); err != nil {
 							c.Warningf("failed to add REST client method dimension %s: %v", method, err)
@@ -265,7 +270,7 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 						}
 					}
 				}
-				mx.RESTClient.ByMethod[method] = mtx.Gauge(mx.RESTClient.ByMethod[method].Value() + value)
+				mx.RESTClient.ByMethod[methodID] = mtx.Gauge(mx.RESTClient.ByMethod[methodID].Value() + value)
 			}
 		}
 	}
@@ -502,7 +507,8 @@ func (c *Collector) collectEtcd(mfs prometheus.MetricFamilies, mx *metrics) {
 		}
 
 		resourceName := simplifyResourceName(resource)
-		dimID := "etcd_objects_" + cleanID(resourceName)
+		resourceID := cleanID(resourceName)
+		dimID := "etcd_objects_" + resourceID
 
 		if chart != nil && !chart.HasDim(dimID) {
 			if err := chart.AddDim(&Dim{ID: dimID, Name: resourceName}); err != nil {
@@ -511,7 +517,7 @@ func (c *Collector) collectEtcd(mfs prometheus.MetricFamilies, mx *metrics) {
 				chart.MarkNotCreated()
 			}
 		}
-		mx.Etcd.ObjectCounts[resourceName] = mtx.Gauge(value)
+		mx.Etcd.ObjectCounts[resourceID] = mtx.Gauge(value)
 	}
 }
 

@@ -24,6 +24,7 @@ func TestCollector_E2E_KindCluster(t *testing.T) {
 
 	collr := New()
 	collr.URL = "http://127.0.0.1:8001/metrics"
+	collr.TLSConfig.TLSCA = "" // Disable TLS for kubectl proxy
 
 	require.NoError(t, collr.Init(context.TODO()))
 	require.NoError(t, collr.Check(context.TODO()))
