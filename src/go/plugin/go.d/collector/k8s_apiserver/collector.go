@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
@@ -40,6 +41,9 @@ func New() *Collector {
 				},
 				ClientConfig: web.ClientConfig{
 					Timeout: confopt.Duration(time.Second * 2),
+					TLSConfig: tlscfg.TLSConfig{
+						TLSCA: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+					},
 				},
 			},
 		},

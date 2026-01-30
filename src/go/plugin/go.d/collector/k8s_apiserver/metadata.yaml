@@ -340,13 +340,6 @@ modules:
               dimensions:
                 - name: validate
                 - name: admit
-            - name: k8s_apiserver.etcd_cache
-              description: Etcd Helper Cache
-              unit: operations/s
-              chart_type: stacked
-              dimensions:
-                - name: hits
-                - name: misses
             - name: k8s_apiserver.etcd_object_counts
               description: Objects Stored In Etcd
               unit: objects
@@ -398,9 +391,11 @@ modules:
               unit: seconds
               chart_type: line
               dimensions:
+                - name: min
+                - name: p25
                 - name: p50
-                - name: p90
-                - name: p99
+                - name: p75
+                - name: max
             - name: k8s_apiserver.open_fds
               description: Open File Descriptors
               unit: file descriptors
@@ -442,12 +437,16 @@ modules:
           metrics:
             - name: k8s_apiserver.admission_controller_latency
               description: Admission Controller Latency
-              unit: milliseconds
-              chart_type: line
+              unit: events/s
+              chart_type: heatmap
               dimensions:
-                - name: p50
-                - name: p90
-                - name: p99
+                - name: 5ms
+                - name: 25ms
+                - name: 100ms
+                - name: 500ms
+                - name: 1s
+                - name: 2.5s
+                - name: +Inf
         - name: admission webhook
           description: These metrics refer to admission webhooks.
           labels:
@@ -456,9 +455,13 @@ modules:
           metrics:
             - name: k8s_apiserver.admission_webhook_latency
               description: Admission Webhook Latency
-              unit: milliseconds
-              chart_type: line
+              unit: events/s
+              chart_type: heatmap
               dimensions:
-                - name: p50
-                - name: p90
-                - name: p99
+                - name: 5ms
+                - name: 25ms
+                - name: 100ms
+                - name: 500ms
+                - name: 1s
+                - name: 2.5s
+                - name: +Inf

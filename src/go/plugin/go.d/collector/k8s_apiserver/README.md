@@ -33,7 +33,6 @@ the Prometheus-format metrics from the kube-apiserver's `/metrics` endpoint.
 - `k8s_apiserver.admission_webhook_latency` - Per-webhook latency (dynamic)
 
 ### Etcd
-- `k8s_apiserver.etcd_cache` - Etcd helper cache hits/misses
 - `k8s_apiserver.etcd_object_counts` - Objects stored in etcd by resource type
 
 ### Workqueue

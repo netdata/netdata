@@ -42,13 +42,20 @@ func TestCollector_Init(t *testing.T) {
 	}{
 		"success with default config": {
 			wantFail: false,
-			config:   New().Config,
+			config: func() Config {
+				cfg := New().Config
+				cfg.BearerTokenFile = ""
+				cfg.TLSConfig.TLSCA = ""
+				return cfg
+			}(),
 		},
 		"fail when URL is empty": {
 			wantFail: true,
 			config: func() Config {
 				cfg := New().Config
 				cfg.URL = ""
+				cfg.BearerTokenFile = ""
+				cfg.TLSConfig.TLSCA = ""
 				return cfg
 			}(),
 		},
@@ -253,6 +260,8 @@ func TestHistogramPercentile(t *testing.T) {
 
 func TestCollector_Cleanup(t *testing.T) {
 	collr := New()
+	collr.BearerTokenFile = ""
+	collr.TLSConfig.TLSCA = ""
 	require.NoError(t, collr.Init(context.TODO()))
 	collr.Cleanup(context.TODO())
 }
@@ -268,6 +277,8 @@ func caseValidMetrics(t *testing.T) (*Collector, func()) {
 
 	collr := New()
 	collr.URL = srv.URL
+	collr.BearerTokenFile = ""
+	collr.TLSConfig.TLSCA = ""
 
 	return collr, srv.Close
 }
@@ -281,6 +292,8 @@ func caseInvalidMetrics(t *testing.T) (*Collector, func()) {
 
 	collr := New()
 	collr.URL = srv.URL
+	collr.BearerTokenFile = ""
+	collr.TLSConfig.TLSCA = ""
 
 	return collr, srv.Close
 }
@@ -289,6 +302,8 @@ func caseConnectionRefused(t *testing.T) (*Collector, func()) {
 	t.Helper()
 	collr := New()
 	collr.URL = "http://127.0.0.1:38001/metrics"
+	collr.BearerTokenFile = ""
+	collr.TLSConfig.TLSCA = ""
 
 	return collr, func() {}
 }
