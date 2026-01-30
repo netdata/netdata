@@ -16,8 +16,8 @@ ebpf_local_maps_t ext4_maps[] = {
 #endif
     },
     {.name = "tmp_ext4",
-     .internal_input = 4192,
-     .user_input = 4192,
+     .internal_input = NETDATA_FS_TEMP_MAP_SIZE,
+     .user_input = NETDATA_FS_TEMP_MAP_SIZE,
      .type = NETDATA_EBPF_MAP_CONTROLLER,
      .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
@@ -45,8 +45,8 @@ ebpf_local_maps_t xfs_maps[] = {
 #endif
     },
     {.name = "tmp_xfs",
-     .internal_input = 4192,
-     .user_input = 4192,
+     .internal_input = NETDATA_FS_TEMP_MAP_SIZE,
+     .user_input = NETDATA_FS_TEMP_MAP_SIZE,
      .type = NETDATA_EBPF_MAP_CONTROLLER,
      .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
@@ -74,8 +74,8 @@ ebpf_local_maps_t nfs_maps[] = {
 #endif
     },
     {.name = "tmp_nfs",
-     .internal_input = 4192,
-     .user_input = 4192,
+     .internal_input = NETDATA_FS_TEMP_MAP_SIZE,
+     .user_input = NETDATA_FS_TEMP_MAP_SIZE,
      .type = NETDATA_EBPF_MAP_CONTROLLER,
      .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
@@ -103,8 +103,8 @@ ebpf_local_maps_t zfs_maps[] = {
 #endif
     },
     {.name = "tmp_zfs",
-     .internal_input = 4192,
-     .user_input = 4192,
+     .internal_input = NETDATA_FS_TEMP_MAP_SIZE,
+     .user_input = NETDATA_FS_TEMP_MAP_SIZE,
      .type = NETDATA_EBPF_MAP_CONTROLLER,
      .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
@@ -141,8 +141,8 @@ ebpf_local_maps_t btrfs_maps[] = {
 #endif
     },
     {.name = "tmp_btrfs",
-     .internal_input = 4192,
-     .user_input = 4192,
+     .internal_input = NETDATA_FS_TEMP_MAP_SIZE,
+     .user_input = NETDATA_FS_TEMP_MAP_SIZE,
      .type = NETDATA_EBPF_MAP_CONTROLLER,
      .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
@@ -395,43 +395,22 @@ ebpf_fs_load_and_attach(ebpf_local_maps_t *map, struct filesystem_bpf *obj, cons
  *
  *****************************************************************/
 
-/**
- * Obsolete Cleanup Struct
- *
- * Clean allocatged data durinc obsolete steps
- *
- * @param efp
- */
-static void ebpf_obsolete_cleanup_struct(ebpf_filesystem_partitions_t *efp)
+static void ebpf_cleanup_fs_histogram(netdata_ebpf_histogram_t *hist)
 {
-    freez(efp->hread.name);
-    efp->hread.name = NULL;
-    freez(efp->hread.title);
-    efp->hread.title = NULL;
-    freez(efp->hread.ctx);
-    efp->hread.ctx = NULL;
+    freez(hist->name);
+    hist->name = NULL;
+    freez(hist->title);
+    hist->title = NULL;
+    freez(hist->ctx);
+    hist->ctx = NULL;
+}
 
-    freez(efp->hwrite.name);
-    efp->hwrite.name = NULL;
-    freez(efp->hwrite.title);
-    efp->hwrite.title = NULL;
-    freez(efp->hwrite.ctx);
-    efp->hwrite.ctx = NULL;
-
-    freez(efp->hopen.name);
-    efp->hopen.name = NULL;
-    freez(efp->hopen.title);
-    efp->hopen.title = NULL;
-    freez(efp->hopen.ctx);
-    efp->hopen.ctx = NULL;
-
-    freez(efp->hadditional.name);
-    efp->hadditional.name = NULL;
-    freez(efp->hadditional.title);
-    efp->hadditional.title = NULL;
-    freez(efp->hadditional.ctx);
-    efp->hadditional.ctx = NULL;
-
+static void ebpf_cleanup_fs_partition(ebpf_filesystem_partitions_t *efp)
+{
+    ebpf_cleanup_fs_histogram(&efp->hread);
+    ebpf_cleanup_fs_histogram(&efp->hwrite);
+    ebpf_cleanup_fs_histogram(&efp->hopen);
+    ebpf_cleanup_fs_histogram(&efp->hadditional);
     freez(efp->family_name);
     efp->family_name = NULL;
 }
@@ -501,7 +480,7 @@ static void ebpf_obsolete_fs_charts(int update_every)
                 efp->hadditional.order,
                 update_every);
 
-            ebpf_obsolete_cleanup_struct(efp);
+            ebpf_cleanup_fs_partition(efp);
         }
         efp->flags = flags;
     }
@@ -775,7 +754,7 @@ static int ebpf_update_partitions(ebpf_module_t *em)
     if (curr < update_every)
         return 0;
 
-    update_every = curr + 5 * em->update_every;
+    update_every = curr + (NETDATA_PARTITION_UPDATE_INTERVAL_MULTIPLIER * em->update_every);
     if (!ebpf_read_local_partitions()) {
         em->optional = -1;
         return -1;
@@ -802,50 +781,9 @@ void ebpf_filesystem_cleanup_ebpf_data()
     int i;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
-        if (efp->probe_links) {
-            freez(efp->family_name);
-            efp->family_name = NULL;
-
-            freez(efp->hread.name);
-            efp->hread.name = NULL;
-            freez(efp->hread.title);
-            efp->hread.title = NULL;
-
-            freez(efp->hwrite.name);
-            efp->hwrite.name = NULL;
-            freez(efp->hwrite.title);
-            efp->hwrite.title = NULL;
-
-            freez(efp->hopen.name);
-            efp->hopen.name = NULL;
-            freez(efp->hopen.title);
-            efp->hopen.title = NULL;
-
-            freez(efp->hadditional.name);
-            efp->hadditional.name = NULL;
-            freez(efp->hadditional.title);
-            efp->hadditional.title = NULL;
-            freez(efp->hadditional.ctx);
-            efp->hadditional.ctx = NULL;
-        }
+        if (efp->probe_links)
+            ebpf_cleanup_fs_partition(efp);
     }
-}
-
-/**
- * Cleanup FS Histograms
- *
- * @param ptr pointer to structure to be cleaned
- */
-static void ebpf_cleanup_fs_histograms(netdata_ebpf_histogram_t *ptr)
-{
-    freez(ptr->name);
-    ptr->name = NULL;
-
-    freez(ptr->title);
-    ptr->title = NULL;
-
-    freez(ptr->ctx);
-    ptr->ctx = NULL;
 }
 
 /**
@@ -874,7 +812,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
             "filesystem.read_latency",
             efp->hread.order,
             em->update_every);
-        ebpf_cleanup_fs_histograms(&efp->hread);
+        ebpf_cleanup_fs_histogram(&efp->hread);
 
         ebpf_write_chart_obsolete(
             NETDATA_FILESYSTEM_FAMILY,
@@ -887,7 +825,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
             "filesystem.write_latency",
             efp->hwrite.order,
             em->update_every);
-        ebpf_cleanup_fs_histograms(&efp->hwrite);
+        ebpf_cleanup_fs_histogram(&efp->hwrite);
 
         ebpf_write_chart_obsolete(
             NETDATA_FILESYSTEM_FAMILY,
@@ -900,7 +838,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
             "filesystem.open_latency",
             efp->hopen.order,
             em->update_every);
-        ebpf_cleanup_fs_histograms(&efp->hopen);
+        ebpf_cleanup_fs_histogram(&efp->hopen);
 
         ebpf_write_chart_obsolete(
             NETDATA_FILESYSTEM_FAMILY,
@@ -913,7 +851,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
             efp->hadditional.ctx,
             efp->hadditional.order,
             em->update_every);
-        ebpf_cleanup_fs_histograms(&efp->hadditional);
+        ebpf_cleanup_fs_histogram(&efp->hadditional);
 
         efp->flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION;
     }
@@ -973,32 +911,33 @@ static void ebpf_filesystem_exit(void *pptr)
  *****************************************************************/
 
 /**
- * Select hist
+ * Select histogram
  *
- * Select a histogram to store data.
+ * Select histogram based on operation type
  *
- * @param efp pointer for the structure with pointers.
+ * @param efp pointer to filesystem partition
  * @param id  histogram selector
  *
- * @return It returns a pointer for the histogram
+ * @return pointer to histogram and sets idx
  */
 static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t *efp, uint32_t *idx, uint32_t id)
 {
-    if (id < NETDATA_KEY_CALLS_READ) {
-        *idx = id;
-        return &efp->hread;
-    } else if (id < NETDATA_KEY_CALLS_WRITE) {
-        *idx = id - NETDATA_KEY_CALLS_READ;
-        return &efp->hwrite;
-    } else if (id < NETDATA_KEY_CALLS_OPEN) {
-        *idx = id - NETDATA_KEY_CALLS_WRITE;
-        return &efp->hopen;
-    } else if (id < NETDATA_KEY_CALLS_SYNC) {
-        *idx = id - NETDATA_KEY_CALLS_OPEN;
-        return &efp->hadditional;
-    }
+    uint32_t hist_idx = id / NETDATA_FS_HISTOGRAM_BINS;
+    if (hist_idx >= 4)
+        return NULL;
 
-    return NULL;
+    *idx = id % NETDATA_FS_HISTOGRAM_BINS;
+
+    switch (hist_idx) {
+        case 0:
+            return &efp->hread;
+        case 1:
+            return &efp->hwrite;
+        case 2:
+            return &efp->hopen;
+        default:
+            return &efp->hadditional;
+    }
 }
 
 /**

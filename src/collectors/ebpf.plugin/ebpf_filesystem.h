@@ -9,16 +9,17 @@
 
 #include "ebpf.h"
 
-// Maximum length for filesystem distribution name
+// Constants
 #define NETDATA_FS_MAX_DIST_NAME 64UL
+#define NETDATA_FS_TEMP_MAP_SIZE 4192
+#define NETDATA_FS_HISTOGRAM_BINS 24
+#define NETDATA_PARTITION_UPDATE_INTERVAL_MULTIPLIER 5
 
 // Configuration section and file names
 #define NETDATA_FILESYSTEM_CONFIG_NAME "filesystem"
 #define NETDATA_FILESYSTEM_CONFIG_FILE "filesystem.conf"
 
 enum filesystem_limit {
-    // Histogram bin offsets for different operation types
-    // Each operation type has 24 histogram bins (NETDATA_EBPF_HIST_MAX_BINS)
     NETDATA_KEY_CALLS_READ = 24,
     NETDATA_KEY_CALLS_WRITE = 48,
     NETDATA_KEY_CALLS_OPEN = 72,
