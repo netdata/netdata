@@ -353,7 +353,7 @@ var cpuUsageChart = Chart{
 func newWorkqueueDepthChart(name string) *Chart {
 	return &Chart{
 		ID:    "workqueue_depth_" + name,
-		Title: "Work Queue Depth: " + name,
+		Title: "Work Queue Depth",
 		Units: "items",
 		Fam:   "workqueue",
 		Ctx:   "k8s_apiserver.workqueue_depth",
@@ -367,7 +367,7 @@ func newWorkqueueDepthChart(name string) *Chart {
 func newWorkqueueLatencyChart(name string) *Chart {
 	return &Chart{
 		ID:    "workqueue_latency_" + name,
-		Title: "Work Queue Latency: " + name,
+		Title: "Work Queue Latency",
 		Units: "microseconds",
 		Fam:   "workqueue",
 		Ctx:   "k8s_apiserver.workqueue_latency",
@@ -383,7 +383,7 @@ func newWorkqueueLatencyChart(name string) *Chart {
 func newWorkqueueAddsChart(name string) *Chart {
 	return &Chart{
 		ID:    "workqueue_adds_" + name,
-		Title: "Work Queue Adds: " + name,
+		Title: "Work Queue Adds",
 		Units: "items/s",
 		Fam:   "workqueue",
 		Ctx:   "k8s_apiserver.workqueue_adds",
@@ -400,7 +400,7 @@ func newAdmissionControllerLatencyChart(name string) *Chart {
 	// K8s admission controller histogram buckets: 5ms, 25ms, 100ms, 500ms, 1s, 2.5s, +Inf
 	return &Chart{
 		ID:    "admission_controller_latency_" + name,
-		Title: "Admission Controller Latency: " + name,
+		Title: "Admission Controller Latency",
 		Units: "events/s",
 		Fam:   "admission",
 		Ctx:   "k8s_apiserver.admission_controller_latency",
@@ -422,7 +422,7 @@ func newAdmissionWebhookLatencyChart(name string) *Chart {
 	// K8s admission webhook histogram buckets: 5ms, 25ms, 100ms, 500ms, 1s, 2.5s, +Inf
 	return &Chart{
 		ID:    "admission_webhook_latency_" + name,
-		Title: "Admission Webhook Latency: " + name,
+		Title: "Admission Webhook Latency",
 		Units: "events/s",
 		Fam:   "admission",
 		Ctx:   "k8s_apiserver.admission_webhook_latency",
