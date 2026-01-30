@@ -94,6 +94,8 @@ Metrics:
 |:------|:----------|:----|
 | ping.host_rtt | min, max, avg | milliseconds |
 | ping.host_std_dev_rtt | std_dev | milliseconds |
+| ping.host_jitter | mean, ewma, sma | milliseconds |
+| ping.host_rtt_variance | variance | ms² |
 | ping.host_packet_loss | loss | percentage |
 | ping.host_packets | received, sent | packets |
 
@@ -106,7 +108,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ping_host_reachable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_packet_loss | network host ${lab1el:host} reachability status |
+| [ ping_host_reachable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_packet_loss | network host ${label:host} reachability status |
 | [ ping_packet_loss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_packet_loss | packet loss percentage to the network host ${label:host} over the last 10 minutes |
 | [ ping_host_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_rtt | average latency to the network host ${label:host} over the last 10 seconds |
 
@@ -153,6 +155,8 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | privileged | Ping packet type. `yes` = raw ICMP ping, `no` = unprivileged UDP ping. | yes | yes |
 |  | packets | Number of ping packets to send per iteration. | 5 | no |
 |  | interval | Interval between sending ping packets. | 100ms | no |
+| **Jitter Settings** | jitter_ewma_samples | EWMA smoothing factor for jitter calculation. Higher values = smoother, slower response. | 16 | no |
+|  | jitter_sma_window | Number of iterations for SMA jitter calculation. | 10 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
