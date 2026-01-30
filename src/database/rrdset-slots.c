@@ -94,6 +94,8 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     if(!st)
         return;
 
+    RRDHOST *host = st->rrdhost;
+
     spinlock_lock(&st->pluginsd.spinlock);
 
     // Check if collector is still active - if so, we cannot safely cleanup
@@ -102,10 +104,8 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     if(collector_tid != 0) {
         // Collector is still active, cannot cleanup now
         // This shouldn't happen during normal operation - log a warning
-        nd_log_limit_static_global_var(erl, 1, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "PLUGINSD: attempted cleanup while collector (tid %d) is still active on chart, skipping",
-                     collector_tid);
+        netdata_log_error("PLUGINSD: attempted cleanup while collector (tid %d) is still active on chart, skipping",
+                         collector_tid);
         spinlock_unlock(&st->pluginsd.spinlock);
         return;
     }
@@ -113,13 +113,23 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     // Replace the array with NULL - this prevents new references from being acquired
     PRD_ARRAY *old_arr = prd_array_replace(&st->pluginsd.prd_array, NULL);
 
-    // Reset other state while holding the lock
+    // Capture last_slot before resetting - we need it to clear the host mapping
+    int32_t last_slot = st->pluginsd.last_slot;
+
+    // Reset state while holding the lock
     __atomic_store_n(&st->pluginsd.pos, 0, __ATOMIC_RELAXED);
     st->pluginsd.set = false;
     st->pluginsd.last_slot = -1;
     st->pluginsd.dims_with_slots = false;
 
     spinlock_unlock(&st->pluginsd.spinlock);
+
+    // Clear the chart slot mapping using the captured last_slot value
+    if(last_slot >= 0 &&
+        (uint32_t)last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
+        host->stream.rcv.pluginsd_chart_slots.array[last_slot] == st) {
+        host->stream.rcv.pluginsd_chart_slots.array[last_slot] = NULL;
+    }
 
     // Now handle the old array outside the lock
     if (old_arr) {
@@ -128,14 +138,6 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
 
         // Release all dimension references
         prd_array_release_entries(old_arr);
-
-        // Clear the chart slot mapping
-        RRDHOST *host = st->rrdhost;
-        if(st->pluginsd.last_slot >= 0 &&
-            (uint32_t)st->pluginsd.last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
-            host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] == st) {
-            host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] = NULL;
-        }
 
         // Release our reference - array will be freed when refcount reaches 0
         // If another thread still has a reference (unlikely but possible during races),
