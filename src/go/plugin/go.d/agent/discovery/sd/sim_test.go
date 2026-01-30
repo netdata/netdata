@@ -34,7 +34,6 @@ func (sim *discoverySim) run(t *testing.T) {
 			confFiles: sim.configs,
 			ch:        make(chan confFile),
 		},
-		pipelines: make(map[string]func()),
 	}
 
 	in := make(chan<- []*confgroup.Group)
