@@ -15,6 +15,9 @@
 // 1. The array is not freed while any thread is still using it
 // 2. Concurrent readers can safely iterate without locks
 // 3. Writers can atomically replace the array without blocking readers
+//
+// IMPORTANT: prd_array_acquire() requires a spinlock to prevent a race condition where another thread
+// could replace and free the array between loading the pointer and incrementing the refcount.
 // --------------------------------------------------------------------------------------------------------------------
 
 typedef struct pluginsd_rrddim_array {
@@ -36,26 +39,23 @@ static inline PRD_ARRAY *prd_array_create(size_t size) {
 }
 
 // Acquire a reference to the array stored in the atomic pointer location
-// Returns NULL if no array exists or if the array is being freed (refcount <= 0)
+// Returns NULL if no array exists
 // The caller MUST call prd_array_release() when done
-static inline PRD_ARRAY *prd_array_acquire(PRD_ARRAY **array_ptr) {
-    PRD_ARRAY *arr;
-    int32_t refcount;
+//
+// IMPORTANT: This function requires a spinlock to prevent use-after-free:
+// Without the lock, between loading the array pointer and incrementing its refcount,
+// another thread could replace the pointer and free the old array.
+static inline PRD_ARRAY *prd_array_acquire(PRD_ARRAY **array_ptr, SPINLOCK *spinlock) {
+    spinlock_lock(spinlock);
 
-    do {
-        arr = __atomic_load_n(array_ptr, __ATOMIC_ACQUIRE);
-        if (!arr)
-            return NULL;
+    PRD_ARRAY *arr = *array_ptr;
+    if (arr) {
+        // Safe to access arr->refcount because we hold the spinlock
+        // and any replace+release operation also needs this lock
+        __atomic_fetch_add(&arr->refcount, 1, __ATOMIC_ACQ_REL);
+    }
 
-        refcount = __atomic_load_n(&arr->refcount, __ATOMIC_ACQUIRE);
-        if (refcount <= 0)
-            return NULL;  // Array is being freed
-
-        // Try to atomically increment the refcount
-        // If it changed between load and CAS, retry
-    } while (!__atomic_compare_exchange_n(&arr->refcount, &refcount, refcount + 1,
-                                          false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE));
-
+    spinlock_unlock(spinlock);
     return arr;
 }
 
@@ -79,13 +79,18 @@ static inline void prd_array_release(PRD_ARRAY *arr) {
 // Atomically replace the array pointer with a new array
 // Returns the old array (caller must release it) or NULL if there was no old array
 // The new_arr can be NULL to clear the array
+//
+// IMPORTANT: When the returned old array will be released (potentially freeing it),
+// the caller MUST hold the same spinlock used by prd_array_acquire() to prevent races.
 static inline PRD_ARRAY *prd_array_replace(PRD_ARRAY **array_ptr, PRD_ARRAY *new_arr) {
     return __atomic_exchange_n(array_ptr, new_arr, __ATOMIC_ACQ_REL);
 }
 
-// Get the current array without acquiring a reference (for quick NULL checks)
-// WARNING: The returned pointer may become invalid at any time
-// Only use this for NULL checks, not for accessing array contents
+// Get the current array without acquiring a reference (for quick NULL checks or
+// when external synchronization guarantees the array won't be freed)
+// WARNING: The returned pointer may become invalid at any time unless:
+// - The caller holds the spinlock, OR
+// - The caller is the collector thread with collector_tid set (preventing cleanup)
 static inline PRD_ARRAY *prd_array_get_unsafe(PRD_ARRAY **array_ptr) {
     return __atomic_load_n(array_ptr, __ATOMIC_ACQUIRE);
 }
