@@ -908,15 +908,6 @@ void ebpf_disk_thread(void *ptr)
 
     em->maps = disk_maps;
 
-    if (ebpf_disk_enable_tracepoints()) {
-        goto enddisk;
-    }
-
-    avl_init_lock(&disk_tree, ebpf_compare_disks);
-    if (read_local_disks()) {
-        goto enddisk;
-    }
-
     if (netdata_mutex_init(&plot_mutex)) {
         netdata_log_error("Cannot initialize local mutex");
         goto enddisk;
@@ -924,6 +915,15 @@ void ebpf_disk_thread(void *ptr)
 
     if (netdata_mutex_init(&tracepoint_mutex)) {
         netdata_log_error("Cannot initialize tracepoint mutex");
+        goto enddisk;
+    }
+
+    if (ebpf_disk_enable_tracepoints()) {
+        goto enddisk;
+    }
+
+    avl_init_lock(&disk_tree, ebpf_compare_disks);
+    if (read_local_disks()) {
         goto enddisk;
     }
 
