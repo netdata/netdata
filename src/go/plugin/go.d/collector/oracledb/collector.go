@@ -22,16 +22,23 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
-		Methods:         oracleMethods,
-		MethodParams:    oracleMethodParams,
-		HandleMethod:    oracleHandleMethod,
+		Methods:         oracledbMethods,
+		MethodHandler:   oracledbFunctionHandler,
 	})
 }
 
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			Timeout:         confopt.Duration(time.Second * 2),
+			Timeout: confopt.Duration(time.Second * 2),
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+				RunningQueries: RunningQueriesConfig{
+					Limit: 500,
+				},
+			},
 			charts:          globalCharts.Copy(),
 			seenTablespaces: make(map[string]bool),
 			seenWaitClasses: make(map[string]bool),
@@ -45,7 +52,7 @@ type Config struct {
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	DSN                string           `json:"dsn" yaml:"dsn"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	Functions          FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
 
 	charts *module.Charts
 
@@ -55,11 +62,58 @@ type Config struct {
 	seenWaitClasses map[string]bool
 }
 
+type FunctionsConfig struct {
+	TopQueries     TopQueriesConfig     `yaml:"top_queries,omitempty" json:"top_queries"`
+	RunningQueries RunningQueriesConfig `yaml:"running_queries,omitempty" json:"running_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+type RunningQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
+}
+
+func (c Config) runningQueriesTimeout() time.Duration {
+	if c.Functions.RunningQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.RunningQueries.Timeout.Duration()
+}
+
+func (c Config) runningQueriesLimit() int {
+	if c.Functions.RunningQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.RunningQueries.Limit
+}
+
 type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
 	db *sql.DB
+
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -73,6 +127,8 @@ func (c *Collector) Init(context.Context) error {
 	}
 
 	c.publicDSN = dsn
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -106,7 +162,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.db != nil {
 		if err := c.db.Close(); err != nil {
 			c.Errorf("cleanup: error on closing connection [%s]: %v", c.publicDSN, err)

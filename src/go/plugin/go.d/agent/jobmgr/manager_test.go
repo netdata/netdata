@@ -551,7 +551,7 @@ func TestManager_Run_Dyncfg_Get(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-get 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -658,7 +658,7 @@ FUNCTION_RESULT_END
 					wantRunning:    nil,
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-userconfig 404 application/json
-{"status":404,"message":"The specified module 'success!' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success!' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -818,7 +818,7 @@ func TestManager_Run_Dyncfg_Enable(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-enable 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1044,7 +1044,7 @@ func TestManager_Run_Dyncfg_Disable(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-disable 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1270,7 +1270,7 @@ func TestManager_Run_Dyncfg_Restart(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-restart 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1310,7 +1310,7 @@ FUNCTION_RESULT_END
 CONFIG test:collector:success:test create accepted job /collectors/test/Jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-restart 405 application/json
-{"status":405,"message":"Restarting data collection job is not allowed in 'accepted' state."}
+{"status":405,"errorMessage":"Restarting data collection job is not allowed in 'accepted' state."}
 FUNCTION_RESULT_END
 
 CONFIG test:collector:success:test status accepted
@@ -1414,7 +1414,7 @@ FUNCTION_RESULT_END
 CONFIG test:collector:success:test status disabled
 
 FUNCTION_RESULT_BEGIN 3-restart 405 application/json
-{"status":405,"message":"Restarting data collection job is not allowed in 'disabled' state."}
+{"status":405,"errorMessage":"Restarting data collection job is not allowed in 'disabled' state."}
 FUNCTION_RESULT_END
 
 CONFIG test:collector:success:test status disabled
@@ -1516,7 +1516,7 @@ func TestManager_Run_Dyncfg_Remove(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-remove 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1603,15 +1603,15 @@ FUNCTION_RESULT_END
 CONFIG test:collector:success:discovered status running
 
 FUNCTION_RESULT_BEGIN 1-remove 405 application/json
-{"status":405,"message":"Removing jobs of type 'stock' is not supported. Only 'dyncfg' jobs can be removed."}
+{"status":405,"errorMessage":"Removing jobs of type 'stock' is not supported. Only 'dyncfg' jobs can be removed."}
 FUNCTION_RESULT_END
 
 FUNCTION_RESULT_BEGIN 2-remove 405 application/json
-{"status":405,"message":"Removing jobs of type 'user' is not supported. Only 'dyncfg' jobs can be removed."}
+{"status":405,"errorMessage":"Removing jobs of type 'user' is not supported. Only 'dyncfg' jobs can be removed."}
 FUNCTION_RESULT_END
 
 FUNCTION_RESULT_BEGIN 3-remove 405 application/json
-{"status":405,"message":"Removing jobs of type 'discovered' is not supported. Only 'dyncfg' jobs can be removed."}
+{"status":405,"errorMessage":"Removing jobs of type 'discovered' is not supported. Only 'dyncfg' jobs can be removed."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1736,7 +1736,7 @@ func TestManager_Run_Dyncfg_Update(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-update 404 application/json
-{"status":404,"message":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1913,4 +1913,124 @@ func prepareDyncfgCfg(module, job string) confgroup.Config {
 		SetSource("type=dyncfg").
 		SetModule(module).
 		SetName(job)
+}
+
+func prepareFunctionOnlyCfg(module, job string) confgroup.Config {
+	return confgroup.Config{}.
+		SetSourceType(confgroup.TypeUser).
+		SetProvider("test").
+		SetSource(fmt.Sprintf("type=user,module=%s,job=%s", module, job)).
+		SetModule(module).
+		SetName(job).
+		Set("function_only", true)
+}
+
+func TestManager_Run_FunctionOnly(t *testing.T) {
+	tests := map[string]struct {
+		createSim func() *runSim
+	}{
+		"function_only config for module without methods => error": {
+			createSim: func() *runSim {
+				cfg := prepareFunctionOnlyCfg("nofuncs", "test")
+
+				return &runSim{
+					do: func(mgr *Manager, in chan []*confgroup.Group) {
+						sendConfGroup(in, cfg.Source(), cfg)
+						mgr.dyncfgConfig(functions.Function{
+							UID:  "1-enable",
+							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
+						})
+					},
+					wantDiscovered: []confgroup.Config{cfg},
+					wantSeen: []seenConfig{
+						{cfg: cfg, status: dyncfg.StatusFailed},
+					},
+					wantExposed: []seenConfig{
+						{cfg: cfg, status: dyncfg.StatusFailed},
+					},
+					wantRunning: nil,
+					wantDyncfg: `
+CONFIG test:collector:nofuncs:test create accepted job /collectors/test/Jobs user 'type=user,module=nofuncs,job=test' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
+
+FUNCTION_RESULT_BEGIN 1-enable 400 application/json
+{"status":400,"errorMessage":"Invalid configuration. Failed to apply configuration: function_only is set but nofuncs module has no methods defined."}
+FUNCTION_RESULT_END
+
+CONFIG test:collector:nofuncs:test status failed
+`,
+				}
+			},
+		},
+		"function_only config for module with methods => ok": {
+			createSim: func() *runSim {
+				cfg := prepareFunctionOnlyCfg("withfuncs", "test")
+
+				return &runSim{
+					do: func(mgr *Manager, in chan []*confgroup.Group) {
+						sendConfGroup(in, cfg.Source(), cfg)
+						mgr.dyncfgConfig(functions.Function{
+							UID:  "1-enable",
+							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
+						})
+					},
+					wantDiscovered: []confgroup.Config{cfg},
+					wantSeen: []seenConfig{
+						{cfg: cfg, status: dyncfg.StatusRunning},
+					},
+					wantExposed: []seenConfig{
+						{cfg: cfg, status: dyncfg.StatusRunning},
+					},
+					wantRunning: []string{cfg.FullName()},
+					wantDyncfg: `
+CONFIG test:collector:withfuncs:test create accepted job /collectors/test/Jobs user 'type=user,module=withfuncs,job=test' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
+
+FUNCTION_RESULT_BEGIN 1-enable 200 application/json
+{"status":200,"message":""}
+FUNCTION_RESULT_END
+
+CONFIG test:collector:withfuncs:test status running
+`,
+				}
+			},
+		},
+		"FunctionOnly module => ok": {
+			createSim: func() *runSim {
+				cfg := prepareUserCfg("funconly", "test")
+
+				return &runSim{
+					do: func(mgr *Manager, in chan []*confgroup.Group) {
+						sendConfGroup(in, cfg.Source(), cfg)
+						mgr.dyncfgConfig(functions.Function{
+							UID:  "1-enable",
+							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
+						})
+					},
+					wantDiscovered: []confgroup.Config{cfg},
+					wantSeen: []seenConfig{
+						{cfg: cfg, status: dyncfg.StatusRunning},
+					},
+					wantExposed: []seenConfig{
+						{cfg: cfg, status: dyncfg.StatusRunning},
+					},
+					wantRunning: []string{cfg.FullName()},
+					wantDyncfg: `
+CONFIG test:collector:funconly:test create accepted job /collectors/test/Jobs user 'type=user,module=funconly,job=test' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
+
+FUNCTION_RESULT_BEGIN 1-enable 200 application/json
+{"status":200,"message":""}
+FUNCTION_RESULT_END
+
+CONFIG test:collector:funconly:test status running
+`,
+				}
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			sim := test.createSim()
+			sim.run(t)
+		})
+	}
 }

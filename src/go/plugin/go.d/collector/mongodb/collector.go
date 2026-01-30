@@ -24,8 +24,7 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         mongoMethods,
-		MethodParams:    mongoMethodParams,
-		HandleMethod:    mongoHandleMethod,
+		MethodHandler:   mongoFunctionHandler,
 	})
 }
 
@@ -37,6 +36,11 @@ func New() *Collector {
 			Databases: matcher.SimpleExpr{
 				Includes: []string{},
 				Excludes: []string{},
+			},
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
 			},
 		},
 
@@ -53,23 +57,37 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode                     string             `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery               int                `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry        int                `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	URI                       string             `yaml:"uri" json:"uri"`
-	Timeout                   confopt.Duration   `yaml:"timeout,omitempty" json:"timeout"`
-	Databases                 matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
-	TopQueriesFunctionEnabled *bool              `yaml:"top_queries_function_enabled,omitempty" json:"top_queries_function_enabled,omitempty"`
-	TopQueriesLimit           int                `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	Vnode              string             `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int                `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int                `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	URI                string             `yaml:"uri" json:"uri"`
+	Timeout            confopt.Duration   `yaml:"timeout,omitempty" json:"timeout"`
+	Databases          matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
+	Functions          FunctionsConfig    `yaml:"functions,omitempty" json:"functions"`
 }
 
-// GetTopQueriesFunctionEnabled returns whether the top queries function is enabled.
-// Defaults to true if not explicitly configured.
-func (c *Config) GetTopQueriesFunctionEnabled() bool {
-	if c.TopQueriesFunctionEnabled == nil {
-		return true
+type FunctionsConfig struct {
+	TopQueries TopQueriesConfig `yaml:"top_queries,omitempty" json:"top_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
 	}
-	return *c.TopQueriesFunctionEnabled
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
 }
 
 type Collector struct {
@@ -90,6 +108,8 @@ type Collector struct {
 	// Top queries column cache with double-checked locking
 	topQueriesColsMu sync.RWMutex
 	topQueriesCols   map[string]bool
+
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -104,6 +124,8 @@ func (c *Collector) Init(context.Context) error {
 	if err := c.initDatabaseSelector(); err != nil {
 		return fmt.Errorf("init database selector: %v", err)
 	}
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -137,7 +159,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.conn == nil {
 		return
 	}

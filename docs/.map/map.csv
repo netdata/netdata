@@ -5,6 +5,7 @@ https://github.com/netdata/netdata/edit/master/docs/realtime-monitoring.md,Real-
 https://github.com/netdata/netdata/edit/master/docs/scalability.md,Scalability,Published,Welcome to Netdata,,
 https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md,Monitor Anything,Published,Welcome to Netdata,,Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box.
 https://github.com/netdata/netdata/edit/master/docs/fleet-configuration-management.md,Fleet Deployment and Configuration Management,Published,Welcome to Netdata,,
+https://github.com/netdata/netdata/edit/master/docs/reporting.md,Reporting,Published,Welcome to Netdata,"power bi, tableau, looker, qlik, reporting, business intelligence, bi, grafana, ai insights, mcp, executive reports, board reporting, data export","Extract infrastructure insights for stakeholders and BI tools using AI Insights, AI assistants (MCP), Grafana, or data export to Power BI, Tableau, and other analytics platforms."
 https://github.com/netdata/netdata/edit/master/docs/getting-started-netdata/guide.md,Getting Started,Published,root,,
 https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.md,Live Demo,Published,root,,
 ,,,,,
@@ -96,6 +97,7 @@ https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/view-plan-and-billing.md,Netdata Plans & Billing,Published,Netdata Cloud,,
 https://github.com/netdata/netdata/edit/master/src/aclk/README.md,Agent-Cloud Link (ACLK),Published,Netdata Cloud,,The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud.
 https://github.com/netdata/netdata/edit/master/docs/learn/remove-node.md,Remove Agent,Published,Netdata Cloud,,
+https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/node-states-and-transitions.md,Node States and Transitions,Published,Netdata Cloud,"node states,live,stale,offline,unseen,transitions",Understanding node connection states and state transitions in Netdata Cloud
 https://github.com/netdata/netdata/edit/master/docs/learn/unclaim-reclaim-node.md,Unclaim and Reclaim a Node,Published,Netdata Cloud,,
 https://github.com/netdata/netdata/edit/master/docs/delete/netdata/account.md,Account Deletion,Published,Netdata Cloud,,
 ,,,,,
@@ -155,6 +157,7 @@ https://github.com/netdata/netdata/edit/master/docs/logs/active_journal_centrali
 ,,,,,
 https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md,Top Consumers,Published,Top Consumers,,Present the Netdata Functions what these are and why they should be used.
 https://github.com/netdata/netdata/edit/master/docs/functions/processes.md,Processes,Published,Top Consumers,,
+https://github.com/netdata/netdata/edit/master/docs/functions/databases.md,Database Queries,Published,Top Consumers,,Top and running database queries with deadlock and error attribution for 13 databases.
 ,,,,,
 https://github.com/netdata/netdata/edit/master/src/health/README.md,Alerts & Notifications,Published,Alerts & Notifications,,
 https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md,Creating Alerts with the Alerts Configuration Manager,Published,Alerts & Notifications,,

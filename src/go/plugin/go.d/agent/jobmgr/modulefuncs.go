@@ -6,6 +6,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
@@ -19,11 +20,12 @@ type moduleFuncRegistry struct {
 }
 
 type moduleFunc struct {
-	creator        module.Creator        // The module creator (has Methods())
-	methods        []module.MethodConfig // Static methods from creator (ordered)
-	methodsByID    map[string]module.MethodConfig
-	jobs           map[string]*jobEntry // jobName → job entry with generation
-	lastGeneration map[string]uint64    // jobName → last known generation (persists across removals)
+	creator        module.Creator         // The module creator (has Methods())
+	methods        []funcapi.MethodConfig // Static methods from creator (ordered)
+	methodsByID    map[string]funcapi.MethodConfig
+	jobs           map[string]*jobEntry              // jobName → job entry with generation
+	lastGeneration map[string]uint64                 // jobName → last known generation (persists across removals)
+	jobMethods     map[string][]funcapi.MethodConfig // jobName → methods registered for that job
 }
 
 // jobEntry wraps a job with a generation number for race detection
@@ -43,7 +45,7 @@ func (r *moduleFuncRegistry) registerModule(name string, creator module.Creator)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	var methods []module.MethodConfig
+	var methods []funcapi.MethodConfig
 	if creator.Methods != nil {
 		methods = creator.Methods()
 	}
@@ -54,14 +56,15 @@ func (r *moduleFuncRegistry) registerModule(name string, creator module.Creator)
 		methodsByID:    indexMethods(methods),
 		jobs:           make(map[string]*jobEntry),
 		lastGeneration: make(map[string]uint64),
+		jobMethods:     make(map[string][]funcapi.MethodConfig),
 	}
 }
 
-func indexMethods(methods []module.MethodConfig) map[string]module.MethodConfig {
+func indexMethods(methods []funcapi.MethodConfig) map[string]funcapi.MethodConfig {
 	if len(methods) == 0 {
 		return nil
 	}
-	idx := make(map[string]module.MethodConfig, len(methods))
+	idx := make(map[string]funcapi.MethodConfig, len(methods))
 	for _, m := range methods {
 		if m.ID == "" {
 			continue
@@ -147,7 +150,7 @@ func (r *moduleFuncRegistry) verifyJobGeneration(moduleName, jobName string, exp
 }
 
 // getMethods returns the method configurations for a module
-func (r *moduleFuncRegistry) getMethods(moduleName string) []module.MethodConfig {
+func (r *moduleFuncRegistry) getMethods(moduleName string) []funcapi.MethodConfig {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -159,7 +162,7 @@ func (r *moduleFuncRegistry) getMethods(moduleName string) []module.MethodConfig
 }
 
 // getMethod returns a method config by ID for a module.
-func (r *moduleFuncRegistry) getMethod(moduleName, methodID string) (*module.MethodConfig, bool) {
+func (r *moduleFuncRegistry) getMethod(moduleName, methodID string) (*funcapi.MethodConfig, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -229,4 +232,61 @@ func (r *moduleFuncRegistry) isModuleRegistered(moduleName string) bool {
 
 	_, ok := r.modules[moduleName]
 	return ok
+}
+
+// registerJobMethods stores methods registered for a specific job
+func (r *moduleFuncRegistry) registerJobMethods(moduleName, jobName string, methods []funcapi.MethodConfig) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	mf, ok := r.modules[moduleName]
+	if !ok {
+		return
+	}
+	mf.jobMethods[jobName] = methods
+}
+
+// unregisterJobMethods removes methods registered for a specific job
+func (r *moduleFuncRegistry) unregisterJobMethods(moduleName, jobName string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	mf, ok := r.modules[moduleName]
+	if !ok {
+		return
+	}
+	delete(mf.jobMethods, jobName)
+}
+
+// getJobMethods returns methods registered for a specific job
+func (r *moduleFuncRegistry) getJobMethods(moduleName, jobName string) []funcapi.MethodConfig {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	mf, ok := r.modules[moduleName]
+	if !ok {
+		return nil
+	}
+	return mf.jobMethods[jobName]
+}
+
+// getJobMethod returns a specific method registered for a job by method ID
+func (r *moduleFuncRegistry) getJobMethod(moduleName, jobName, methodID string) (*funcapi.MethodConfig, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	mf, ok := r.modules[moduleName]
+	if !ok {
+		return nil, false
+	}
+	methods, ok := mf.jobMethods[jobName]
+	if !ok {
+		return nil, false
+	}
+	for i := range methods {
+		if methods[i].ID == methodID {
+			return &methods[i], true
+		}
+	}
+	return nil, false
 }

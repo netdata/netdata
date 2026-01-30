@@ -3,3 +3,12 @@ update_every: 123
 autodetection_retry: 123
 dsn: "ok"
 timeout: 123.123
+functions:
+  top_queries:
+    disabled: yes
+    timeout: 123.123
+    limit: 123
+  running_queries:
+    disabled: yes
+    timeout: 123.123
+    limit: 123

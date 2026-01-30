@@ -30,26 +30,102 @@
         "minimum": 0.5,
         "default": 5
       },
-      "query_store_function_enabled": {
-        "title": "Enable Query Store Function",
-        "description": "Enable the top-queries function using SQL Server Query Store. WARNING: Query Store may contain unmasked PII (customer names, emails, IDs) in query text. Only enable after ensuring proper access controls to the Netdata dashboard.",
-        "type": "boolean",
-        "default": true
-      },
-      "query_store_time_window_days": {
-        "title": "Query Store Time Window (Days)",
-        "description": "How many days of Query Store data to query for the top-queries function. Set to 0 to query all available data (not recommended for busy servers).",
-        "type": "integer",
-        "minimum": 0,
-        "default": 7
-      },
-      "top_queries_limit": {
-        "title": "Top Queries Limit",
-        "description": "Maximum number of queries to return in the top-queries function response.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 5000,
-        "default": 500
+      "functions": {
+        "title": "Functions",
+        "description": "Configuration for Netdata functions exposed by this collector.",
+        "type": "object",
+        "properties": {
+          "top_queries": {
+            "title": "Top Queries",
+            "description": "Configuration for the top-queries function using SQL Server Query Store.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the top-queries function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
+                "type": "number",
+                "minimum": 0
+              },
+              "limit": {
+                "title": "Limit",
+                "description": "Maximum number of queries to return. Set to 0 to use the default (500).",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000,
+                "default": 500
+              },
+              "time_window_days": {
+                "title": "Time Window (Days)",
+                "description": "How many days of Query Store data to query. Set to 0 to use the default (7). Set to -1 to query all available data (not recommended for busy servers).",
+                "type": "integer",
+                "minimum": -1,
+                "default": 7
+              }
+            }
+          },
+          "deadlock_info": {
+            "title": "Deadlock Info",
+            "description": "Configuration for the deadlock-info function.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the deadlock-info function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
+                "type": "number",
+                "minimum": 0
+              },
+              "use_ring_buffer": {
+                "title": "Use Ring Buffer",
+                "description": "Use ring_buffer target instead of event_file for system_health session. Enable for Azure SQL Database without blob storage.",
+                "type": "boolean",
+                "default": false
+              }
+            }
+          },
+          "error_info": {
+            "title": "Error Info",
+            "description": "Configuration for the error-info function.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the error-info function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
+                "type": "number",
+                "minimum": 0
+              },
+              "session_name": {
+                "title": "Session Name",
+                "description": "Name of the Extended Events session that captures error_reported events.",
+                "type": "string",
+                "default": "netdata_errors"
+              },
+              "use_ring_buffer": {
+                "title": "Use Ring Buffer",
+                "description": "Use ring_buffer target instead of event_file. Enable for Azure SQL Database without blob storage.",
+                "type": "boolean",
+                "default": false
+              }
+            }
+          }
+        }
       }
     },
     "required": [
@@ -73,11 +149,34 @@
     "timeout": {
       "ui:help": "Accepts decimals for sub-second granularity (e.g., 0.5 for 500ms)."
     },
-    "query_store_function_enabled": {
-      "ui:help": "When enabled, the 'top-queries' function becomes available in the Netdata dashboard. Review the PII warning before enabling."
-    },
-    "query_store_time_window_days": {
-      "ui:help": "Limits Query Store data to recent days. Lower values improve performance on busy servers."
+    "functions": {
+      "top_queries": {
+        "disabled": {
+          "ui:help": "WARNING: Query Store may contain unmasked PII (customer names, emails, IDs) in query text."
+        },
+        "time_window_days": {
+          "ui:help": "Limits Query Store data to recent days. Lower values improve performance on busy servers."
+        }
+      },
+      "deadlock_info": {
+        "disabled": {
+          "ui:help": "WARNING: Query text may contain unmasked sensitive literals. Requires VIEW SERVER STATE permission."
+        },
+        "use_ring_buffer": {
+          "ui:help": "Enable for Azure SQL Database or environments without event_file access. Ring buffer can be slower."
+        }
+      },
+      "error_info": {
+        "disabled": {
+          "ui:help": "WARNING: Error messages and query text may contain unmasked sensitive literals. Requires VIEW SERVER STATE permission."
+        },
+        "session_name": {
+          "ui:help": "The Extended Events session must be created by an administrator and include an event_file target capturing sqlserver.error_reported with sql_text action."
+        },
+        "use_ring_buffer": {
+          "ui:help": "Enable for Azure SQL Database or environments without event_file access. Ring buffer can be slower."
+        }
+      }
     },
     "ui:flavour": "tabs",
     "ui:options": {
@@ -92,10 +191,9 @@
           ]
         },
         {
-          "title": "Query Store",
+          "title": "Functions",
           "fields": [
-            "query_store_function_enabled",
-            "query_store_time_window_days"
+            "functions"
           ]
         }
       ]

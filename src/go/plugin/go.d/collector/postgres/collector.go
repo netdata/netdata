@@ -28,8 +28,7 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         pgMethods,
-		MethodParams:    pgMethodParams,
-		HandleMethod:    pgHandleMethod,
+		MethodHandler:   pgFunctionHandler,
 	})
 }
 
@@ -44,6 +43,11 @@ func New() *Collector {
 			// https://discord.com/channels/847502280503590932/1022693928874549368
 			MaxDBTables:  50,
 			MaxDBIndexes: 250,
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 		charts:  baseCharts.Copy(),
 		dbConns: make(map[string]*dbConn),
@@ -72,7 +76,31 @@ type Config struct {
 	QueryTimeHistogram []float64        `yaml:"query_time_histogram,omitempty" json:"query_time_histogram"`
 	MaxDBTables        int64            `yaml:"max_db_tables" json:"max_db_tables"`
 	MaxDBIndexes       int64            `yaml:"max_db_indexes" json:"max_db_indexes"`
-	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	Functions          FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	TopQueries TopQueriesConfig `yaml:"top_queries,omitempty" json:"top_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
 }
 
 type (
@@ -92,7 +120,10 @@ type (
 		pgVersion               int
 		pgStatStatementsAvail   bool            // cached positive result only
 		pgStatStatementsColumns map[string]bool // cached column names from pg_stat_statements
-		pgStatStatementsMu      sync.RWMutex    // protects pgStatStatements* fields for concurrent access
+		pgStatMonitorAvail      bool            // cached positive result only
+		pgStatMonitorColumns    map[string]bool // cached column names from pg_stat_monitor
+		queryStatsSource        string          // "pg_stat_monitor" or "pg_stat_statements" (auto-detected)
+		pgStatStatementsMu      sync.RWMutex    // protects pgStatStatements*/pgStatMonitor* fields for concurrent access
 		dbSr                    matcher.Matcher
 		recheckSettingsTime     time.Time
 		recheckSettingsEvery    time.Duration
@@ -100,6 +131,8 @@ type (
 		doSlowEvery             time.Duration
 
 		mx *pgMetrics
+
+		funcRouter *funcRouter
 	}
 	dbConn struct {
 		db         *sql.DB
@@ -126,6 +159,8 @@ func (c *Collector) Init(context.Context) error {
 
 	c.mx.xactTimeHist = metrix.NewHistogramWithRangeBuckets(c.XactTimeHistogram)
 	c.mx.queryTimeHist = metrix.NewHistogramWithRangeBuckets(c.QueryTimeHistogram)
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -157,7 +192,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.db == nil {
 		return
 	}

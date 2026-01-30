@@ -32,12 +32,8 @@ func TestRethinkDBMethods(t *testing.T) {
 func TestRethinkDBRunningColumns_HasRequiredColumns(t *testing.T) {
 	required := []string{"jobId", "query", "durationMs"}
 
-	uiKeys := make(map[string]bool)
-	for _, col := range rethinkRunningColumns {
-		uiKeys[col.id] = true
-	}
-
-	for _, key := range required {
-		assert.True(t, uiKeys[key], "column %s should be defined", key)
+	cs := rethinkColumnSet(rethinkRunningColumns)
+	for _, id := range required {
+		assert.True(t, cs.ContainsColumn(id), "column %s should be defined", id)
 	}
 }

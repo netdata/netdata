@@ -290,6 +290,107 @@
           }
         }
       },
+      "function_only": {
+        "title": "Function Only",
+        "description": "Set to true if this job only provides functions (no metrics). When enabled, metrics configuration is ignored and no charts are created.",
+        "type": "boolean",
+        "default": false
+      },
+      "functions": {
+        "title": "Functions",
+        "description": "SQL functions that expose query results as table views in the Netdata UI.",
+        "type": "array",
+        "items": {
+          "title": "Function",
+          "type": "object",
+          "properties": {
+            "id": {
+              "title": "ID",
+              "description": "Unique identifier for this function.",
+              "type": "string"
+            },
+            "name": {
+              "title": "Name",
+              "description": "Display name shown in the UI. Auto-derived from ID if empty.",
+              "type": "string"
+            },
+            "description": {
+              "title": "Description",
+              "description": "Help text shown in the UI.",
+              "type": "string"
+            },
+            "query": {
+              "title": "Query",
+              "description": "SQL query to execute when this function is called.",
+              "type": "string"
+            },
+            "timeout": {
+              "title": "Timeout",
+              "description": "Query timeout in seconds. Uses collector default if not set.",
+              "type": "number",
+              "minimum": 0
+            },
+            "limit": {
+              "title": "Row Limit",
+              "description": "Maximum rows to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 100
+            },
+            "default_sort": {
+              "title": "Default Sort Column",
+              "description": "Column name for initial sort order.",
+              "type": "string"
+            },
+            "default_sort_desc": {
+              "title": "Sort Descending",
+              "description": "Sort in descending order by default.",
+              "type": "boolean",
+              "default": true
+            },
+            "columns": {
+              "title": "Column Overrides",
+              "description": "Override auto-detected column metadata.",
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "title": "Type",
+                    "description": "Column data type.",
+                    "type": "string",
+                    "enum": ["string", "integer", "float", "boolean", "duration", "timestamp"]
+                  },
+                  "units": {
+                    "title": "Units",
+                    "description": "Unit label for the column (e.g., milliseconds, bytes).",
+                    "type": "string"
+                  },
+                  "tooltip": {
+                    "title": "Tooltip",
+                    "description": "Hover text shown in the UI.",
+                    "type": "string"
+                  },
+                  "visible": {
+                    "title": "Visible",
+                    "description": "Show column by default.",
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "sortable": {
+                    "title": "Sortable",
+                    "description": "Allow sorting by this column.",
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          },
+          "required": ["id", "query"]
+        }
+      },
       "vnode": {
         "title": "Vnode",
         "description": "Name of the Virtual Node this job should send its metrics to. Leave empty to use the local node.",
@@ -335,6 +436,13 @@
           "title": "Static Labels",
           "fields": [
             "static_labels"
+          ]
+        },
+        {
+          "title": "Functions",
+          "fields": [
+            "function_only",
+            "functions"
           ]
         }
       ]
@@ -394,6 +502,24 @@
               }
             }
           }
+        }
+      }
+    },
+    "functions": {
+      "items": {
+        "ui:order": [
+          "id",
+          "name",
+          "description",
+          "query",
+          "timeout",
+          "limit",
+          "default_sort",
+          "default_sort_desc",
+          "columns"
+        ],
+        "query": {
+          "ui:widget": "textarea"
         }
       }
     }

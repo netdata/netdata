@@ -99,13 +99,39 @@
           10
         ]
       },
-      "top_queries_limit": {
-        "title": "Top Queries Limit",
-        "description": "Maximum number of queries to return in the top-queries function response.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 5000,
-        "default": 500
+      "functions": {
+        "title": "Functions",
+        "description": "Configuration for Netdata functions exposed by this collector.",
+        "type": "object",
+        "properties": {
+          "top_queries": {
+            "title": "Top Queries",
+            "description": "Configuration for the top-queries function.",
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "title": "Disabled",
+                "description": "Disable the top-queries function.",
+                "type": "boolean",
+                "default": false
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
+                "type": "number",
+                "minimum": 0
+              },
+              "limit": {
+                "title": "Limit",
+                "description": "Maximum number of queries to return. Set to 0 to use the default (500).",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000,
+                "default": 500
+              }
+            }
+          }
+        }
       }
     },
     "required": [
@@ -143,6 +169,12 @@
             "transaction_time_histogram",
             "query_time_histogram"
           ]
+        },
+        {
+          "title": "Functions",
+          "fields": [
+            "functions"
+          ]
         }
       ]
     },
@@ -160,6 +192,13 @@
     },
     "query_time_histogram": {
       "ui:listFlavour": "list"
+    },
+    "functions": {
+      "top_queries": {
+        "disabled": {
+          "ui:help": "WARNING: Query text may contain unmasked sensitive literals (PII). Requires pg_stat_statements extension."
+        }
+      }
     }
   }
 }

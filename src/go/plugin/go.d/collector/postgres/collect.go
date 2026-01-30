@@ -19,6 +19,7 @@ const (
 	pgVersion10 = 10_00_00
 	pgVersion11 = 11_00_00
 	pgVersion13 = 13_00_00
+	pgVersion14 = 14_00_00
 	pgVersion17 = 17_00_00
 )
 

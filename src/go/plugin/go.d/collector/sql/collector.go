@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -21,6 +22,8 @@ func init() {
 		Create:          func() module.Module { return New() },
 		JobConfigSchema: configSchema,
 		Config:          func() any { return &Config{} },
+		JobMethods:      sqlJobMethods,
+		MethodHandler:   sqlMethodHandler,
 	})
 }
 
@@ -41,9 +44,14 @@ type Collector struct {
 
 	charts *module.Charts
 
-	db *sql.DB
+	dbMu     sync.RWMutex
+	db       *sql.DB
+	dbCtx    context.Context
+	dbCancel context.CancelFunc
 
 	seenCharts map[string]bool
+
+	funcTable *funcTable
 }
 
 func (c *Collector) Configuration() any {
@@ -51,14 +59,35 @@ func (c *Collector) Configuration() any {
 }
 
 func (c *Collector) Charts() *module.Charts {
+	if c.Config.FunctionOnly {
+		return nil
+	}
 	return c.charts
 }
 
 func (c *Collector) Init(context.Context) error {
-	return c.validateConfig()
+	if err := c.validateConfig(); err != nil {
+		return err
+	}
+
+	c.funcTable = newFuncTable(c)
+
+	return nil
 }
 
 func (c *Collector) Check(ctx context.Context) error {
+	if c.db == nil {
+		if err := c.openConnection(ctx); err != nil {
+			return err
+		}
+		// Create cancellable context for function queries
+		c.dbCtx, c.dbCancel = context.WithCancel(context.Background())
+	}
+
+	if c.Config.FunctionOnly {
+		return nil
+	}
+
 	mx, err := c.collect(ctx)
 	if err != nil {
 		return err
@@ -70,6 +99,10 @@ func (c *Collector) Check(ctx context.Context) error {
 }
 
 func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	if c.Config.FunctionOnly {
+		return nil
+	}
+
 	mx, err := c.collect(ctx)
 	if err != nil {
 		c.Error(err)
@@ -82,6 +115,15 @@ func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 }
 
 func (c *Collector) Cleanup(context.Context) {
+	// Cancel context first to signal in-flight queries to abort
+	if c.dbCancel != nil {
+		c.dbCancel()
+	}
+
+	// Acquire write lock - should be quick since queries are aborting
+	c.dbMu.Lock()
+	defer c.dbMu.Unlock()
+
 	if c.db != nil {
 		_ = c.db.Close()
 		c.db = nil

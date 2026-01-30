@@ -95,9 +95,9 @@ The configuration file name is [go.d/sd/snmp.conf](https://github.com/netdata/ne
 You can edit the configuration file using the edit-config script from the Netdata [config directory](https://learn.netdata.cloud/docs/netdata-agent/configuration#the-netdata-config-directory).
 
 ```bash
- cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
- sudo ./edit-config go.d/sd/snmp.conf
- ```
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/sd/snmp.conf
+```
 
 
 #### Limits
@@ -117,11 +117,76 @@ Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. Th
 
 :::tip
 
- To understand the structure of these profiles (metrics, tags, virtual metrics, etc.), see **[SNMP Profile Format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp/profile-format.md)**.
+To understand the structure of these profiles (metrics, tags, virtual metrics, etc.), see **[SNMP Profile Format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp/profile-format.md)**.
 
 :::
 
 If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or exclusively, when `ping_only: true`).
+
+
+
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Network Interfaces
+
+Provides detailed network interface traffic and status metrics from SNMP-enabled devices.
+
+This function queries cached SNMP interface data collected during regular polling cycles and presents it in a sortable, filterable table. Each row represents a network interface on the monitored SNMP device, with comprehensive metrics for traffic analysis, error monitoring, and operational status tracking.
+
+Use cases:
+- Identify top bandwidth-consuming interfaces on routers, switches, and access points
+- Monitor interface operational and administrative status for network health
+- Investigate packet errors, discards, and unusual traffic patterns
+
+Data is sourced from the IF-MIB (RFC 2863) interface counters and is cached from the last successful SNMP collection. No additional SNMP requests are triggered when calling this function.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Snmp:interfaces` |
+| Require Cloud | no |
+| Performance | Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many interfaces may return many rows |
+| Security | Exposes interface names, operational status, and traffic counters only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed |
+| Availability | Available when:<br/>• The collector has completed at least one data collection cycle<br/>• Interface data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Type Group | select | Filter interfaces by their type classification group. Custom mapping categorizes IANA interface types into practical groups for easier filtering. | yes | ethernet | Ethernet (default), Aggregation, Virtual, Other |
+
+#### Returns
+
+Network interface metrics from cached SNMP data, including traffic rates, packet statistics, operational status, and error counters. Each row represents one physical or virtual interface.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Interface | string |  |  | Network interface name or identifier (e.g., eth0, GigabitEthernet1/0/1, Vlan100) |
+| Type | string |  |  | IANA-assigned interface type from IF-MIB (e.g., ethernetCsmacd, ieee80211, softwareLoopback) |
+| Type Group | string |  |  | Custom categorization mapping IANA interface types into practical groups: Ethernet (physical Ethernet interfaces), Aggregation (LAG/port-channels, bonds), Virtual (VLANs, loopbacks), or Other (all remaining types) |
+| Admin Status | string |  |  | Administrative state configured on the interface: up (enabled for use), down (administratively disabled), or testing (currently in test mode). Different from operational status. |
+| Oper Status | string |  |  | Current operational state of the interface: up (operational and passing traffic), down (not operational), testing (in test mode), unknown (status cannot be determined), dormant (waiting for external actions), notPresent (interface removed but configuration remains), or lowerLayerDown (interface down due to lower-layer issues) |
+| Traffic In | float | bit/s |  | Inbound network traffic rate in bits per second. High values indicate heavy inbound data flow that may require capacity planning. |
+| Traffic Out | float | bit/s |  | Outbound network traffic rate in bits per second. High values indicate heavy outbound data flow. Compare with Traffic In to identify asymmetric usage patterns. |
+| Unicast In | float | packets/s | hidden | Rate of unicast packets (destined for a single recipient) received per second. Normal traffic pattern for point-to-point communications. |
+| Unicast Out | float | packets/s | hidden | Rate of unicast packets (addressed to a single destination) transmitted per second. |
+| Broadcast In | float | packets/s | hidden | Rate of broadcast packets (sent to all nodes on network) received per second. High values may indicate network storms, ARP flooding, or misconfigured devices. |
+| Broadcast Out | float | packets/s | hidden | Rate of broadcast packets transmitted per second. Consistently high broadcast rates can degrade network performance. |
+| Packets In | float | packets/s |  | Total inbound packet rate (sum of unicast, broadcast, and multicast) per second. Useful for overall interface load assessment. |
+| Packets Out | float | packets/s |  | Total outbound packet rate (sum of unicast, broadcast, and multicast) per second. |
+| Errors In | float | packets/s | hidden | Rate of inbound packets with errors that prevented delivery. Non-zero values indicate physical layer issues (cable problems, signal integrity) or buffer overruns. |
+| Errors Out | float | packets/s | hidden | Rate of outbound packets with transmission errors. Non-zero values may indicate interface hardware issues, cabling problems, or duplex mismatches. |
+| Discards In | float | packets/s |  | Rate of inbound packets deliberately discarded by the device (often due to resource constraints, security policies, or unrecognized frames). Unlike errors, the interface may have been functioning correctly but chose to drop the packet. |
+| Discards Out | float | packets/s |  | Rate of outbound packets deliberately discarded. Can indicate output queue overflows, ACL drops, or security policy rejections. |
+| Multicast In | float | packets/s | hidden | Rate of multicast packets (destined for a group) received per second. Common in video streaming, multicast applications, and routing protocols. |
+| Multicast Out | float | packets/s | hidden | Rate of multicast packets transmitted per second. |
 
 
 

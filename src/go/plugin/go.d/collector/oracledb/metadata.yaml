@@ -106,11 +106,37 @@ modules:
               default_value: 1
               required: false
               group: Target
-            - name: top_queries_limit
-              description: Maximum number of rows returned by the `top-queries` and `running-queries` functions.
+            - name: functions.top_queries.disabled
+              description: Disable the [top-queries](#top-queries) function.
+              default_value: false
+              required: false
+              group: Functions
+            - name: functions.top_queries.timeout
+              description: Query timeout (seconds). Uses collector timeout if not set.
+              default_value: ""
+              required: false
+              group: Functions
+            - name: functions.top_queries.limit
+              description: Maximum number of queries to return.
               default_value: 500
               required: false
-              group: Limits
+              group: Functions
+
+            - name: functions.running_queries.disabled
+              description: Disable the [running-queries](#running-queries) function.
+              default_value: false
+              required: false
+              group: Functions
+            - name: functions.running_queries.timeout
+              description: Query timeout (seconds). Uses collector timeout if not set.
+              default_value: ""
+              required: false
+              group: Functions
+            - name: functions.running_queries.limit
+              description: Maximum number of queries to return.
+              default_value: 500
+              required: false
+              group: Functions
 
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
@@ -150,6 +176,247 @@ modules:
       problems:
         list: []
     alerts: []
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          description: |
+            Retrieves aggregated SQL statement performance metrics from Oracle [V$SQLSTATS](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-SQLSTATS.html) view.
+
+            This function queries `V$SQLSTATS` which provides SQL execution statistics aggregated across all cursors for each SQL statement. Statistics include execution counts, timing metrics, I/O operations, and resource consumption.
+
+            Use cases:
+            - Identify slow queries consuming the most total execution time
+            - Find queries with high buffer gets or disk reads for I/O optimization
+            - Analyze CPU-intensive queries for resource tuning
+
+            Query text is truncated at 4096 characters for display purposes.
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column. Options include total time, CPU time, executions, buffer gets, disk reads, and more. Defaults to total time to focus on most resource-intensive queries.
+              type: select
+              required: true
+              default: totalTime
+              options: []
+          returns:
+            description: Aggregated SQL statistics from `V$SQLSTATS`. Each row represents a unique SQL statement with cumulative metrics across all executions.
+            columns:
+              - name: SQL ID
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Unique identifier for the SQL statement in the shared pool. Can be used to find execution plans in `V$SQL_PLAN`."
+              - name: Query
+                type: string
+                unit: ""
+                description: "SQL statement text. Truncated to 4096 characters for display purposes."
+              - name: Schema
+                type: string
+                unit: ""
+                description: "Schema under which the SQL was parsed. Useful for identifying which application or user generated the query."
+              - name: Executions
+                type: integer
+                unit: ""
+                description: "Total number of times this SQL statement has been executed. High values indicate frequently run queries."
+              - name: Total Time
+                type: duration
+                unit: "milliseconds"
+                description: "Cumulative elapsed time across all executions. High values indicate queries consuming significant database resources."
+              - name: Avg Time
+                type: duration
+                unit: "milliseconds"
+                description: "Average elapsed time per execution. Use this to compare typical performance across different SQL statements."
+              - name: CPU Time
+                type: duration
+                unit: "milliseconds"
+                description: "Cumulative CPU time consumed across all executions. Compare with total time to identify I/O-bound vs CPU-bound queries."
+              - name: Buffer Gets
+                type: integer
+                unit: ""
+                description: "Total number of logical reads from the buffer cache. High values relative to rows processed may indicate inefficient queries."
+              - name: Disk Reads
+                type: integer
+                unit: ""
+                description: "Total number of physical reads from disk. High values indicate queries that cannot be satisfied from the buffer cache."
+              - name: Rows Processed
+                type: integer
+                unit: ""
+                description: "Total number of rows processed across all executions. Compare with buffer gets to assess query efficiency."
+              - name: Parse Calls
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: "Number of times the SQL was parsed (hard + soft parses). High values may indicate lack of bind variables."
+              - name: Module
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Application module name set via `DBMS_APPLICATION_INFO`. Useful for identifying which application component generated the query."
+              - name: Action
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Application action name set via `DBMS_APPLICATION_INFO`. Provides finer-grained identification within a module."
+              - name: Last Active
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Timestamp when this SQL statement was last executed. Helps identify recently active vs historical queries."
+          performance: |
+            Queries `V$SQLSTATS` which is a lightweight view optimized for statistics retrieval:<br/>• On busy databases with many SQL statements, the query may take longer<br/>• Default limit of 500 rows balances usefulness with performance
+          security: |
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only
+          prerequisites:
+            list:
+              - title: Grant access to V$SQLSTATS
+                description: |
+                  The monitoring user must have SELECT privilege on `V$SQLSTATS` and related views.
+
+                  1. Grant the required privileges:
+
+                     ```sql
+                     -- Note: Use V_$ (with underscore) for GRANT - this is the base fixed view
+                     -- Queries use the V$ public synonym
+                     GRANT SELECT ON V_$SQLSTATS TO netdata;
+                     -- Or grant the broader role:
+                     GRANT SELECT_CATALOG_ROLE TO netdata;
+                     ```
+
+                  2. Verify access:
+
+                     ```sql
+                     SELECT COUNT(*) FROM V$SQLSTATS WHERE ROWNUM <= 1;
+                     ```
+
+                  :::info
+
+                  - `V$SQLSTATS` is available in Oracle 10g and later
+                  - The view aggregates statistics across all child cursors for each SQL statement
+                  - Some columns like `MODULE` and `ACTION` require applications to set them via `DBMS_APPLICATION_INFO`
+
+                  :::
+          availability: |
+            Available when:<br/>• The collector has successfully connected to Oracle DB<br/>• The user has SELECT privilege on `V$SQLSTATS`<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
+        - id: running-queries
+          name: Running Queries
+          description: |
+            Retrieves currently executing SQL statements from Oracle [V$SESSION](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-SESSION.html) view.
+
+            This function queries `V$SESSION` joined with `V$SQL` to provide a real-time snapshot of all active user sessions currently executing SQL statements. It shows session details, elapsed time, and the SQL being executed.
+
+            Use cases:
+            - Identify long-running queries that may be blocking other sessions
+            - Monitor active workload and session distribution
+            - Debug stuck or slow queries in real-time
+
+            Query text is truncated at 4096 characters for display purposes.
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column. Defaults to elapsed time to show longest-running queries first.
+              type: select
+              required: true
+              default: lastCallMs
+              options: []
+          returns:
+            description: Real-time snapshot of currently executing SQL statements. Each row represents an active user session with its current SQL.
+            columns:
+              - name: Session
+                type: string
+                unit: ""
+                description: "Session identifier in format `SID,SERIAL#`. Can be used with `ALTER SYSTEM KILL SESSION` if needed."
+              - name: User
+                type: string
+                unit: ""
+                description: "Oracle username of the session. Useful for identifying workload by user."
+              - name: Status
+                type: string
+                unit: ""
+                description: "Session status (ACTIVE for currently executing). Only active sessions with SQL are shown."
+              - name: Type
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Session type (USER or BACKGROUND). This function filters to USER sessions only."
+              - name: SQL ID
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Identifier of the currently executing SQL. Can be used to find the statement in `V$SQL`."
+              - name: Query
+                type: string
+                unit: ""
+                description: "SQL statement text currently being executed. Truncated to 4096 characters."
+              - name: Elapsed
+                type: duration
+                unit: "milliseconds"
+                description: "Time elapsed since the session's last call started. High values indicate long-running operations that may need investigation."
+              - name: SQL Exec Start
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Timestamp when the current SQL execution started."
+              - name: Module
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Application module name set via `DBMS_APPLICATION_INFO`. Identifies which application is running the query."
+              - name: Action
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Application action name set via `DBMS_APPLICATION_INFO`."
+              - name: Program
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Client program name that established the session (e.g., sqlplus, JDBC Thin Client)."
+              - name: Machine
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Client machine name or IP address. Useful for identifying query sources."
+          performance: |
+            Queries `V$SESSION` joined with `V$SQL` for currently active sessions:<br/>• Lightweight operation as it only returns currently active user sessions<br/>• Default limit of 500 rows (rarely reached for running queries)
+          security: |
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and credentials in query parameters<br/>• Access should be restricted to authorized personnel only
+          prerequisites:
+            list:
+              - title: Grant access to V$SESSION
+                description: |
+                  The monitoring user must have SELECT privilege on `V$SESSION` and `V$SQL`.
+
+                  1. Grant the required privileges:
+
+                     ```sql
+                     -- Note: Use V_$ (with underscore) for GRANT - this is the base fixed view
+                     -- Queries use the V$ public synonym
+                     GRANT SELECT ON V_$SESSION TO netdata;
+                     GRANT SELECT ON V_$SQL TO netdata;
+                     -- Or grant the broader role:
+                     GRANT SELECT_CATALOG_ROLE TO netdata;
+                     ```
+
+                  2. Verify access:
+
+                     ```sql
+                     SELECT COUNT(*) FROM V$SESSION WHERE ROWNUM <= 1;
+                     ```
+
+                  :::info
+
+                  - Only USER sessions with ACTIVE status and a current SQL ID are returned
+                  - The elapsed time is based on `LAST_CALL_ET` which resets when a new SQL starts
+                  - BACKGROUND sessions (Oracle internal processes) are filtered out
+
+                  :::
+          availability: |
+            Available when:<br/>• The collector has successfully connected to Oracle DB<br/>• The user has SELECT privilege on `V$SESSION` and `V$SQL`<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

@@ -146,13 +146,26 @@ func (m *Manager) handlePrefixRouting(f Function, fs *functionSet) {
 }
 
 func (m *Manager) respf(fn *Function, code int, msgf string, a ...any) {
-	bs, _ := json.Marshal(struct {
-		Status  int    `json:"status"`
-		Message string `json:"message"`
-	}{
-		Status:  code,
-		Message: fmt.Sprintf(msgf, a...),
-	})
+	msg := fmt.Sprintf(msgf, a...)
+
+	var bs []byte
+	if code >= 400 && code < 600 {
+		bs, _ = json.Marshal(struct {
+			Status       int    `json:"status"`
+			ErrorMessage string `json:"errorMessage"`
+		}{
+			Status:       code,
+			ErrorMessage: msg,
+		})
+	} else {
+		bs, _ = json.Marshal(struct {
+			Status  int    `json:"status"`
+			Message string `json:"message"`
+		}{
+			Status:  code,
+			Message: msg,
+		})
+	}
 
 	m.api.FUNCRESULT(netdataapi.FunctionResult{
 		UID:             fn.UID,

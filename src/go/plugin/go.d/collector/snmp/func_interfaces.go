@@ -4,170 +4,121 @@ package snmp
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
+
+// Compile-time interface check.
+var _ funcapi.MethodHandler = (*funcInterfaces)(nil)
 
 // funcInterfaces handles the "interfaces" function for SNMP devices.
 // It provides network interface traffic and status metrics from cached SNMP data.
 type funcInterfaces struct {
-	cache *ifaceCache
+	router *funcRouter
 }
 
-func newFuncInterfaces(cache *ifaceCache) *funcInterfaces {
-	return &funcInterfaces{cache: cache}
+func newFuncInterfaces(r *funcRouter) *funcInterfaces {
+	return &funcInterfaces{router: r}
 }
 
-// methods returns the method configurations for this function.
-func (f *funcInterfaces) methods() []module.MethodConfig {
-	return []module.MethodConfig{
-		{
-			UpdateEvery: 10,
-			ID:          "interfaces",
-			Name:        "Network Interfaces",
-			Help:        "Network interface traffic and status metrics",
-			RequiredParams: []funcapi.ParamConfig{{
-				ID:        funcIfacesParamTypeGroup,
-				Name:      "Type Group",
-				Help:      "Filter by interface type group",
-				Selection: funcapi.ParamSelect,
-				Options: []funcapi.ParamOption{
-					{ID: "ethernet", Name: "Ethernet", Default: true},
-					{ID: "aggregation", Name: "Aggregation"},
-					{ID: "virtual", Name: "Virtual"},
-					{ID: "other", Name: "Other"},
-				},
-			}},
+const (
+	ifacesMethodID         = "interfaces"
+	ifacesParamTypeGroup   = "if_type_group"
+	ifacesDefaultTypeGroup = "ethernet"
+)
+
+func ifacesMethodConfig() funcapi.MethodConfig {
+	return funcapi.MethodConfig{
+		ID:          ifacesMethodID,
+		Name:        "Network Interfaces",
+		UpdateEvery: 10,
+		Help:        "Network interface traffic and status metrics",
+		RequiredParams: []funcapi.ParamConfig{{
+			ID:        ifacesParamTypeGroup,
+			Name:      "Type Group",
+			Help:      "Filter by interface type group",
+			Selection: funcapi.ParamSelect,
+			Options: []funcapi.ParamOption{
+				{ID: "ethernet", Name: "Ethernet", Default: true},
+				{ID: "aggregation", Name: "Aggregation"},
+				{ID: "virtual", Name: "Virtual"},
+				{ID: "other", Name: "Other"},
+			},
+		}},
+	}
+}
+
+// MethodParams implements funcapi.MethodHandler.
+func (f *funcInterfaces) MethodParams(_ context.Context, method string) ([]funcapi.ParamConfig, error) {
+	if method != ifacesMethodID {
+		return nil, nil
+	}
+	return []funcapi.ParamConfig{{
+		ID:        ifacesParamTypeGroup,
+		Name:      "Type Group",
+		Help:      "Filter by interface type group",
+		Selection: funcapi.ParamSelect,
+		Options: []funcapi.ParamOption{
+			{ID: "ethernet", Name: "Ethernet", Default: true},
+			{ID: "aggregation", Name: "Aggregation"},
+			{ID: "virtual", Name: "Virtual"},
+			{ID: "other", Name: "Other"},
 		},
-	}
+	}}, nil
 }
 
-// methodParams returns params for the given method.
-func (f *funcInterfaces) methodParams(method string) ([]funcapi.ParamConfig, error) {
-	if method != "interfaces" {
-		return nil, fmt.Errorf("unknown method: %s", method)
+// Cleanup implements funcapi.MethodHandler.
+func (f *funcInterfaces) Cleanup(_ context.Context) {}
+
+// Handle implements funcapi.MethodHandler.
+func (f *funcInterfaces) Handle(_ context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+	if method != ifacesMethodID {
+		return funcapi.NotFoundResponse(method)
 	}
 
-	methods := f.methods()
-	if len(methods) > 0 {
-		return methods[0].RequiredParams, nil
-	}
-	return nil, nil
-}
-
-// handle processes a function request and returns the response.
-func (f *funcInterfaces) handle(method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	if method != "interfaces" {
-		return &module.FunctionResponse{Status: 404, Message: fmt.Sprintf("unknown method: %s", method)}
+	if f.router.ifaceCache == nil {
+		return funcapi.UnavailableResponse("interface data not available yet, please retry after data collection")
 	}
 
-	if f.cache == nil {
-		return &module.FunctionResponse{
-			Status:  503,
-			Message: "interface data not available yet, please retry after data collection",
-		}
-	}
+	f.router.ifaceCache.mu.RLock()
+	defer f.router.ifaceCache.mu.RUnlock()
 
-	f.cache.mu.RLock()
-	defer f.cache.mu.RUnlock()
-
-	typeGroupFilter := params.GetOne(funcIfacesParamTypeGroup)
+	typeGroupFilter := params.GetOne(ifacesParamTypeGroup)
 	if typeGroupFilter == "" {
-		typeGroupFilter = "ethernet"
+		typeGroupFilter = ifacesDefaultTypeGroup
 	}
 
 	// Build data rows from cache
-	data := make([][]any, 0, len(f.cache.interfaces))
-	for _, entry := range f.cache.interfaces {
+	data := make([][]any, 0, len(f.router.ifaceCache.interfaces))
+	for _, entry := range f.router.ifaceCache.interfaces {
 		if !matchesTypeGroup(entry.ifTypeGroup, typeGroupFilter) {
 			continue
 		}
-		row := f.buildRow(entry)
-		data = append(data, row)
+		data = append(data, f.buildRow(entry))
 	}
 
-	// Sort data based on params
 	f.sortData(data, f.defaultSortColumn())
 
-	return &module.FunctionResponse{
+	cs := snmpColumnSet(snmpAllColumns)
+
+	return &funcapi.FunctionResponse{
 		Status:            200,
 		Help:              "Network interface traffic and status metrics",
-		Columns:           f.buildColumns(),
+		Columns:           f.buildColumns(cs),
 		Data:              data,
 		DefaultSortColumn: f.defaultSortColumn(),
-
-		// Charts for aggregated visualization
-		Charts: map[string]module.ChartConfig{
-			"Traffic": {
-				Name:    "Traffic",
-				Type:    "stacked-bar",
-				Columns: []string{"Traffic In", "Traffic Out"},
-			},
-			"UnicastPackets": {
-				Name:    "Unicast Packets",
-				Type:    "stacked-bar",
-				Columns: []string{"Unicast In", "Unicast Out"},
-			},
-			"BroadcastPackets": {
-				Name:    "Broadcast Packets",
-				Type:    "stacked-bar",
-				Columns: []string{"Broadcast In", "Broadcast Out"},
-			},
-			"MulticastPackets": {
-				Name:    "Multicast Packets",
-				Type:    "stacked-bar",
-				Columns: []string{"Multicast In", "Multicast Out"},
-			},
-			"OperationalStatus": {
-				Name:    "Operational Status",
-				Type:    "stacked-bar",
-				Columns: []string{"Oper Status"},
-			},
-		},
-		DefaultCharts: [][]string{
-			{"Traffic", "Type"},
-			{"OperationalStatus", "Oper Status"},
-		},
-		GroupBy: map[string]module.GroupByConfig{
-			"Type": {
-				Name:    "Group by Type",
-				Columns: []string{"Type"},
-			},
-		},
+		ChartingConfig:    cs.BuildCharting(),
 	}
 }
 
 // buildColumns builds column definitions for the response.
-func (f *funcInterfaces) buildColumns() map[string]any {
-	columns := make(map[string]any)
+func (f *funcInterfaces) buildColumns(cs funcapi.ColumnSet[snmpColumn]) map[string]any {
+	columns := cs.BuildColumns()
 
-	for i, col := range funcIfacesColumns {
-		colDef := funcapi.Column{
-			Index:         i,
-			Name:          col.name,
-			Type:          col.dataType,
-			Units:         col.units,
-			Visualization: col.visual,
-			Sort:          col.sortDir,
-			Sortable:      true,
-			Sticky:        col.sticky,
-			Summary:       col.summary,
-			Filter:        col.filter,
-			Visible:       col.visible,
-			ValueOptions: funcapi.ValueOptions{
-				Transform:     col.transform,
-				DecimalPoints: col.decimals,
-				DefaultValue:  nil,
-			},
-		}
-		columns[col.key] = colDef.BuildColumn()
-	}
-
+	// Add rowOptions column (not part of the regular column set)
 	rowOptions := funcapi.Column{
-		Index:         len(funcIfacesColumns),
+		Index:         cs.Len(),
 		Name:          "rowOptions",
 		Type:          funcapi.FieldTypeNone,
 		Visualization: funcapi.FieldVisualRowOptions,
@@ -190,20 +141,19 @@ func (f *funcInterfaces) buildColumns() map[string]any {
 }
 
 // buildRow builds a data row from an interface entry.
-// Column order is determined by funcIfacesColumns - each column's value() extracts the data.
 func (f *funcInterfaces) buildRow(entry *ifaceEntry) []any {
-	row := make([]any, len(funcIfacesColumns)+1)
-	for i, col := range funcIfacesColumns {
-		row[i] = col.value(entry)
+	row := make([]any, len(snmpAllColumns)+1)
+	for i, col := range snmpAllColumns {
+		row[i] = col.Value(entry)
 	}
 	if isIfaceDown(entry) {
-		for i, col := range funcIfacesColumns {
-			if col.dataType == funcapi.FieldTypeFloat {
+		for i, col := range snmpAllColumns {
+			if col.Type == funcapi.FieldTypeFloat {
 				row[i] = nil
 			}
 		}
 	}
-	row[len(funcIfacesColumns)] = rowOptionsForIface(entry)
+	row[len(snmpAllColumns)] = rowOptionsForIface(entry)
 	return row
 }
 
@@ -213,14 +163,13 @@ func (f *funcInterfaces) sortData(data [][]any, sortColumn string) {
 		return
 	}
 
-	// Find column index and sort direction
 	colIdx := 0
 	sortDir := funcapi.FieldSortAscending
 
-	for i, col := range funcIfacesColumns {
-		if col.key == sortColumn {
+	for i, col := range snmpAllColumns {
+		if col.Name == sortColumn {
 			colIdx = i
-			sortDir = col.sortDir
+			sortDir = col.Sort
 			break
 		}
 	}
@@ -229,7 +178,6 @@ func (f *funcInterfaces) sortData(data [][]any, sortColumn string) {
 		vi := data[i][colIdx]
 		vj := data[j][colIdx]
 
-		// Handle nil values - put them at the end
 		if vi == nil && vj == nil {
 			return false
 		}
@@ -240,7 +188,6 @@ func (f *funcInterfaces) sortData(data [][]any, sortColumn string) {
 			return true
 		}
 
-		// Compare based on type
 		switch a := vi.(type) {
 		case string:
 			b := vj.(string)
@@ -262,9 +209,9 @@ func (f *funcInterfaces) sortData(data [][]any, sortColumn string) {
 
 // defaultSortColumn returns the default sort column key.
 func (f *funcInterfaces) defaultSortColumn() string {
-	for _, col := range funcIfacesColumns {
-		if col.defaultSort {
-			return col.key
+	for _, col := range snmpAllColumns {
+		if col.DefaultSort {
+			return col.Name
 		}
 	}
 	return "Interface"
@@ -296,19 +243,11 @@ func matchesTypeGroup(group, filter string) bool {
 	return group == filter
 }
 
-// ptrToAny converts a *float64 to any, returning nil if the pointer is nil.
 func ptrToAny(p *float64) any {
 	if p == nil {
 		return nil
 	}
 	return *p
-}
-
-func ptrToAnyScale(p *float64, scale float64) any {
-	if p == nil {
-		return nil
-	}
-	return *p / scale
 }
 
 func sumRates(vals ...*float64) *float64 {
@@ -327,300 +266,39 @@ func sumRates(vals ...*float64) *float64 {
 	return &sum
 }
 
-// Package-level registration functions that delegate to funcInterfaces.
-
-func snmpMethods() []module.MethodConfig {
-	return (&funcInterfaces{}).methods()
+// snmpColumn defines a column for SNMP interfaces function.
+type snmpColumn struct {
+	funcapi.ColumnMeta
+	Value       func(*ifaceEntry) any // Extracts value from entry
+	DefaultSort bool                  // Is default sort column
 }
 
-func snmpMethodParams(_ context.Context, job *module.Job, method string) ([]funcapi.ParamConfig, error) {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return nil, fmt.Errorf("invalid module type")
-	}
-	return c.funcIfaces.methodParams(method)
+func snmpColumnSet(cols []snmpColumn) funcapi.ColumnSet[snmpColumn] {
+	return funcapi.Columns(cols, func(c snmpColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 }
 
-func snmpHandleMethod(_ context.Context, job *module.Job, method string, params funcapi.ResolvedParams) *module.FunctionResponse {
-	c, ok := job.Module().(*Collector)
-	if !ok {
-		return &module.FunctionResponse{Status: 500, Message: "internal error: invalid module type"}
-	}
-	return c.funcIfaces.handle(method, params)
-}
-
-// funcIfacesParamTypeGroup is the parameter ID for type group filtering.
-const funcIfacesParamTypeGroup = "if_type_group"
-
-// funcIfacesColumn defines a column with its metadata and value extractor.
-// The value function extracts the column's data from an ifaceEntry.
-type funcIfacesColumn struct {
-	key         string                 // column header value (must be unique)
-	name        string                 // tooltip value
-	value       func(*ifaceEntry) any  // extracts value from entry
-	dataType    funcapi.FieldType      // string, float, etc.
-	units       string                 // display units (bytes/s, packets/s)
-	visual      funcapi.FieldVisual    // visualization type
-	visible     bool                   // shown by default
-	transform   funcapi.FieldTransform // number formatting
-	decimals    int                    // decimal points
-	sortDir     funcapi.FieldSort      // asc or desc
-	summary     funcapi.FieldSummary   // count, sum, etc.
-	filter      funcapi.FieldFilter    // multiselect, range, etc.
-	sortOption  string                 // if non-empty, appears in sort dropdown
-	defaultSort bool                   // is default sort column
-	sticky      bool                   // sticky column
-}
-
-// funcIfacesColumns defines all columns for the interfaces function.
-// Each column includes its value extractor - single source of truth.
-var funcIfacesColumns = []funcIfacesColumn{
-	{
-		key:         "Interface",
-		name:        "",
-		value:       func(e *ifaceEntry) any { return e.name },
-		dataType:    funcapi.FieldTypeString,
-		visible:     true,
-		sortDir:     funcapi.FieldSortAscending,
-		summary:     funcapi.FieldSummaryCount,
-		filter:      funcapi.FieldFilterMultiselect,
-		defaultSort: true,
-		sticky:      true,
-	},
-	{
-		key:      "Type",
-		name:     "IANA ifType (IF-MIB)",
-		value:    func(e *ifaceEntry) any { return e.ifType },
-		dataType: funcapi.FieldTypeString,
-		visible:  false,
-		sortDir:  funcapi.FieldSortAscending,
-		summary:  funcapi.FieldSummaryCount,
-		filter:   funcapi.FieldFilterMultiselect,
-	},
-	{
-		key:      "Type Group",
-		name:     "Custom mapping of IANA ifType into groups",
-		value:    func(e *ifaceEntry) any { return e.ifTypeGroup },
-		dataType: funcapi.FieldTypeString,
-		visible:  true,
-		sortDir:  funcapi.FieldSortAscending,
-		summary:  funcapi.FieldSummaryCount,
-		filter:   funcapi.FieldFilterMultiselect,
-	},
-	{
-		key:      "Admin Status",
-		name:     "Administrative status: up, down, testing",
-		value:    func(e *ifaceEntry) any { return e.adminStatus },
-		dataType: funcapi.FieldTypeString,
-		visible:  true,
-		sortDir:  funcapi.FieldSortAscending,
-		summary:  funcapi.FieldSummaryCount,
-		filter:   funcapi.FieldFilterMultiselect,
-	},
-	{
-		key:      "Oper Status",
-		name:     "Operational status: up, down, testing, unknown, dormant, notPresent, lowerLayerDown",
-		value:    func(e *ifaceEntry) any { return e.operStatus },
-		dataType: funcapi.FieldTypeString,
-		visible:  true,
-		sortDir:  funcapi.FieldSortAscending,
-		summary:  funcapi.FieldSummaryCount,
-		filter:   funcapi.FieldFilterMultiselect,
-	},
-	{
-		key:       "Traffic In",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.trafficIn, 1_000_000) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "Mbits",
-		visual:    funcapi.FieldVisualBar,
-		visible:   true,
-		transform: funcapi.FieldTransformNumber,
-		decimals:  2,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:       "Traffic Out",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.trafficOut, 1_000_000) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "Mbits",
-		visual:    funcapi.FieldVisualBar,
-		visible:   true,
-		transform: funcapi.FieldTransformNumber,
-		decimals:  2,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:       "Unicast In",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.ucastPktsIn, 1_000) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "Kpps",
-		visual:    funcapi.FieldVisualBar,
-		visible:   false,
-		transform: funcapi.FieldTransformNumber,
-		decimals:  2,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:       "Unicast Out",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.ucastPktsOut, 1_000) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "Kpps",
-		visual:    funcapi.FieldVisualBar,
-		visible:   false,
-		transform: funcapi.FieldTransformNumber,
-		decimals:  2,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:       "Broadcast In",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.bcastPktsIn, 1_000) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "Kpps",
-		visual:    funcapi.FieldVisualBar,
-		visible:   false,
-		transform: funcapi.FieldTransformNumber,
-		decimals:  2,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:       "Broadcast Out",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.bcastPktsOut, 1_000) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "Kpps",
-		visual:    funcapi.FieldVisualBar,
-		visible:   false,
-		transform: funcapi.FieldTransformNumber,
-		decimals:  2,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:  "Packets In",
-		name: "",
-		value: func(e *ifaceEntry) any {
-			return ptrToAnyScale(sumRates(e.rates.ucastPktsIn, e.rates.bcastPktsIn, e.rates.mcastPktsIn), 1_000)
-		},
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "Kpps",
-		visual:    funcapi.FieldVisualBar,
-		visible:   true,
-		transform: funcapi.FieldTransformNumber,
-		decimals:  2,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:  "Packets Out",
-		name: "",
-		value: func(e *ifaceEntry) any {
-			return ptrToAnyScale(sumRates(e.rates.ucastPktsOut, e.rates.bcastPktsOut, e.rates.mcastPktsOut), 1_000)
-		},
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "Kpps",
-		visual:    funcapi.FieldVisualBar,
-		visible:   true,
-		transform: funcapi.FieldTransformNumber,
-		decimals:  2,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:       "Errors In",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.errorsIn) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "packets/s",
-		visual:    funcapi.FieldVisualBar,
-		visible:   false,
-		transform: funcapi.FieldTransformNumber,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:       "Errors Out",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.errorsOut) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "packets/s",
-		visual:    funcapi.FieldVisualBar,
-		visible:   false,
-		transform: funcapi.FieldTransformNumber,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:       "Discards In",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.discardsIn) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "packets/s",
-		visual:    funcapi.FieldVisualBar,
-		visible:   true,
-		transform: funcapi.FieldTransformNumber,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:       "Discards Out",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAny(e.rates.discardsOut) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "packets/s",
-		visual:    funcapi.FieldVisualBar,
-		visible:   true,
-		transform: funcapi.FieldTransformNumber,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:       "Multicast In",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.mcastPktsIn, 1_000) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "Kpps",
-		visual:    funcapi.FieldVisualBar,
-		visible:   false,
-		transform: funcapi.FieldTransformNumber,
-		decimals:  2,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
-	{
-		key:       "Multicast Out",
-		name:      "",
-		value:     func(e *ifaceEntry) any { return ptrToAnyScale(e.rates.mcastPktsOut, 1_000) },
-		dataType:  funcapi.FieldTypeFloat,
-		units:     "Kpps",
-		visual:    funcapi.FieldVisualBar,
-		visible:   false,
-		transform: funcapi.FieldTransformNumber,
-		decimals:  2,
-		sortDir:   funcapi.FieldSortDescending,
-		summary:   funcapi.FieldSummarySum,
-		filter:    funcapi.FieldFilterRange,
-	},
+var snmpAllColumns = []snmpColumn{
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Interface", Tooltip: "Interface", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sticky: true, Sortable: true}, Value: func(e *ifaceEntry) any { return e.name }, DefaultSort: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Type", Tooltip: "IANA ifType (IF-MIB)", Type: funcapi.FieldTypeString, Visible: false, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true, GroupBy: &funcapi.GroupByOptions{IsDefault: true}}, Value: func(e *ifaceEntry) any { return e.ifType }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Type Group", Tooltip: "Custom mapping of IANA ifType into groups", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, Value: func(e *ifaceEntry) any { return e.ifTypeGroup }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Admin Status", Tooltip: "Administrative status: up, down, testing", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, Value: func(e *ifaceEntry) any { return e.adminStatus }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Oper Status", Tooltip: "Operational status: up, down, testing, unknown, dormant, notPresent, lowerLayerDown", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true, Chart: &funcapi.ChartOptions{Group: "OperationalStatus", Title: "Operational Status", IsDefault: true, DefaultGroupBy: "Oper Status"}, GroupBy: &funcapi.GroupByOptions{}}, Value: func(e *ifaceEntry) any { return e.operStatus }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Traffic In", Tooltip: "Traffic In", Type: funcapi.FieldTypeFloat, Units: "bit/s", Visualization: funcapi.FieldVisualBar, Visible: true, Transform: funcapi.FieldTransformNumber, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true, Chart: &funcapi.ChartOptions{Group: "Traffic", IsDefault: true, DefaultGroupBy: "Type"}}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.trafficIn) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Traffic Out", Tooltip: "Traffic Out", Type: funcapi.FieldTypeFloat, Units: "bit/s", Visualization: funcapi.FieldVisualBar, Visible: true, Transform: funcapi.FieldTransformNumber, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true, Chart: &funcapi.ChartOptions{Group: "Traffic"}}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.trafficOut) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Unicast In", Tooltip: "Unicast In", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: false, Transform: funcapi.FieldTransformNumber, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true, Chart: &funcapi.ChartOptions{Group: "UnicastPackets", Title: "Unicast Packets"}}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.ucastPktsIn) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Unicast Out", Tooltip: "Unicast Out", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: false, Transform: funcapi.FieldTransformNumber, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true, Chart: &funcapi.ChartOptions{Group: "UnicastPackets"}}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.ucastPktsOut) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Broadcast In", Tooltip: "Broadcast In", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: false, Transform: funcapi.FieldTransformNumber, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true, Chart: &funcapi.ChartOptions{Group: "BroadcastPackets", Title: "Broadcast Packets"}}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.bcastPktsIn) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Broadcast Out", Tooltip: "Broadcast Out", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: false, Transform: funcapi.FieldTransformNumber, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true, Chart: &funcapi.ChartOptions{Group: "BroadcastPackets"}}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.bcastPktsOut) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Packets In", Tooltip: "Packets In", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: true, Transform: funcapi.FieldTransformNumber, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, Value: func(e *ifaceEntry) any {
+		return ptrToAny(sumRates(e.rates.ucastPktsIn, e.rates.bcastPktsIn, e.rates.mcastPktsIn))
+	}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Packets Out", Tooltip: "Packets Out", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: true, Transform: funcapi.FieldTransformNumber, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, Value: func(e *ifaceEntry) any {
+		return ptrToAny(sumRates(e.rates.ucastPktsOut, e.rates.bcastPktsOut, e.rates.mcastPktsOut))
+	}},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Errors In", Tooltip: "Errors In", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.errorsIn) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Errors Out", Tooltip: "Errors Out", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: false, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.errorsOut) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Discards In", Tooltip: "Discards In", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.discardsIn) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Discards Out", Tooltip: "Discards Out", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: true, Transform: funcapi.FieldTransformNumber, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.discardsOut) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Multicast In", Tooltip: "Multicast In", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: false, Transform: funcapi.FieldTransformNumber, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true, Chart: &funcapi.ChartOptions{Group: "MulticastPackets", Title: "Multicast Packets"}}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.mcastPktsIn) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "Multicast Out", Tooltip: "Multicast Out", Type: funcapi.FieldTypeFloat, Units: "packets/s", Visualization: funcapi.FieldVisualBar, Visible: false, Transform: funcapi.FieldTransformNumber, DecimalPoints: 2, Sort: funcapi.FieldSortDescending, Summary: funcapi.FieldSummarySum, Filter: funcapi.FieldFilterRange, Sortable: true, Chart: &funcapi.ChartOptions{Group: "MulticastPackets"}}, Value: func(e *ifaceEntry) any { return ptrToAny(e.rates.mcastPktsOut) }},
 }

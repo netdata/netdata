@@ -198,3 +198,11 @@ func (a *API) FUNCTIONGLOBAL(opts FunctionGlobalOpts) {
 		strconv.Itoa(opts.Priority) + " " +
 		strconv.Itoa(opts.Version) + "\n\n"))
 }
+
+// FUNCTIONREMOVE removes a function from Netdata.
+// NOTE: This is a no-op placeholder - Netdata core does not yet support function removal.
+// When Netdata implements this, the protocol format will be added here.
+func (a *API) FUNCTIONREMOVE(name string) {
+	// TODO: Implement when Netdata core supports function removal
+	// For now, this is intentionally a no-op
+}

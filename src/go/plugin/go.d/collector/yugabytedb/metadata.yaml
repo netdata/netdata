@@ -35,7 +35,7 @@ modules:
           description: |
             By default, it detects YugabyteDB instances running on localhost.
             On startup, it tries to collect metrics from:
-            
+
             - http://127.0.0.1:7000/prometheus-metrics (Master)
             - http://127.0.0.1:9000/prometheus-metrics (Tablet Server)
             - http://127.0.0.1:12000/prometheus-metrics (YCQL)
@@ -87,21 +87,6 @@ modules:
               default_value: 1
               required: false
               group: Target
-            - name: dsn
-              description: SQL DSN used by `top-queries` and `running-queries` functions.
-              default_value: ""
-              required: false
-              group: Query Functions
-            - name: sql_timeout
-              description: SQL query timeout (seconds) for query functions.
-              default_value: 1
-              required: false
-              group: Query Functions
-            - name: top_queries_limit
-              description: Maximum number of rows returned by the `top-queries` and `running-queries` functions.
-              default_value: 500
-              required: false
-              group: Limits
 
             - name: username
               description: Username for Basic HTTP authentication.
@@ -182,6 +167,44 @@ modules:
               required: false
               group: Request
 
+            - name: functions.dsn
+              description: SQL DSN (required for query functions).
+              default_value: ""
+              required: false
+              group: Functions
+
+            - name: functions.top_queries.disabled
+              description: Disable the [top-queries](#top-queries) function.
+              default_value: false
+              required: false
+              group: Functions
+            - name: functions.top_queries.timeout
+              description: Query timeout (seconds). Uses collector timeout if not set.
+              default_value: ""
+              required: false
+              group: Functions
+            - name: functions.top_queries.limit
+              description: Maximum number of queries to return.
+              default_value: 500
+              required: false
+              group: Functions
+
+            - name: functions.running_queries.disabled
+              description: Disable the [running-queries](#running-queries) function.
+              default_value: false
+              required: false
+              group: Functions
+            - name: functions.running_queries.timeout
+              description: Query timeout (seconds). Uses collector timeout if not set.
+              default_value: ""
+              required: false
+              group: Functions
+            - name: functions.running_queries.limit
+              description: Maximum number of queries to return.
+              default_value: 500
+              required: false
+              group: Functions
+
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
@@ -209,7 +232,8 @@ modules:
                 jobs:
                   - name: local
                     url: http://127.0.0.1:7000/prometheus-metrics
-                    dsn: postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable
+                    functions:
+                      dsn: postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable
             - name: HTTP authentication
               description: Basic HTTP authentication.
               config: |
@@ -228,7 +252,7 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
@@ -241,6 +265,212 @@ modules:
       problems:
         list: []
     alerts: []
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+      list:
+        - id: top-queries
+          name: Top Queries
+          description: |
+            Retrieves aggregated query statistics from the PostgreSQL-compatible [pg_stat_statements](https://docs.yugabyte.com/preview/explore/query-1-performance/pg-stat-statements/) extension in YSQL.
+
+            This function queries the `pg_stat_statements` view which tracks execution statistics for all SQL statements executed on the YSQL layer. It provides timing metrics, execution counts, and row statistics for each unique query pattern.
+
+            Use cases:
+            - Identify slow queries consuming excessive total execution time
+            - Find high-frequency queries that may benefit from optimization
+            - Analyze query patterns by database and user
+
+            Query text is truncated at 4096 characters for display purposes.
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column. Options include total time, mean time, max time, calls, and rows. Defaults to total time to focus on most resource-intensive queries.
+              type: select
+              required: true
+              default: totalTime
+              options: []
+          returns:
+            description: Aggregated query statistics from `pg_stat_statements`. Each row represents a unique query pattern with cumulative metrics across all executions.
+            columns:
+              - name: Query ID
+                type: string
+                unit: ""
+                visibility: hidden
+                description: Internal hash identifier for the normalized query pattern.
+              - name: Query
+                type: string
+                unit: ""
+                description: Normalized SQL query text with literals replaced by parameter placeholders. Truncated to 4096 characters.
+              - name: Database
+                type: string
+                unit: ""
+                description: Database name where the query was executed. Useful for multi-database workload analysis.
+              - name: User
+                type: string
+                unit: ""
+                description: YSQL user who executed the query. Useful for identifying workload by user or application.
+              - name: Calls
+                type: integer
+                unit: ""
+                description: Total number of times this query pattern has been executed. High values indicate frequently run queries.
+              - name: Total Time
+                type: duration
+                unit: "milliseconds"
+                description: Cumulative execution time across all calls. Primary metric for identifying resource-intensive queries.
+              - name: Mean Time
+                type: duration
+                unit: "milliseconds"
+                description: Average execution time per call. Compare with total time to distinguish slow queries from frequently called ones.
+              - name: Min Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Minimum execution time observed for this query pattern.
+              - name: Max Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Maximum execution time observed. Large gaps between min and max may indicate parameter sensitivity or lock contention.
+              - name: Rows
+                type: integer
+                unit: ""
+                description: Total number of rows retrieved or affected by the query across all executions.
+              - name: Stddev Time
+                type: duration
+                unit: "milliseconds"
+                visibility: hidden
+                description: Standard deviation of execution times. High values indicate inconsistent query performance.
+          performance: |
+            Queries the `pg_stat_statements` view via YSQL connection:<br/>• Default limit of 500 rows balances completeness with performance<br/>• Use `sql_timeout` to prevent long-running queries
+          security: |
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data embedded in queries<br/>• Access should be restricted to authorized personnel only
+          prerequisites:
+            list:
+              - title: Enable pg_stat_statements extension
+                description: |
+                  The `pg_stat_statements` extension must be installed in the target YSQL database.
+
+                  1. Install the extension:
+
+                     ```sql
+                     CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+                     ```
+
+                  2. Verify access:
+
+                     ```sql
+                     SELECT * FROM pg_stat_statements LIMIT 1;
+                     ```
+
+                  :::info
+
+                  - The extension tracks statistics for all SQL statements executed
+                  - Statistics can be reset with `SELECT pg_stat_statements_reset()`
+                  - YugabyteDB uses PostgreSQL-compatible extensions
+
+                  :::
+          availability: |
+            Available when:<br/>• The collector has successfully connected to YSQL<br/>• The `pg_stat_statements` extension is installed<br/>• Returns HTTP 503 if the SQL connection cannot be established or extension is not installed<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
+        - id: running-queries
+          name: Running Queries
+          description: |
+            Retrieves currently executing statements from the PostgreSQL-compatible [pg_stat_activity](https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW) view in YSQL.
+
+            This function queries `pg_stat_activity` to show all non-idle backend processes with their current query, state, and timing information. It excludes idle connections to focus on active workload.
+
+            Use cases:
+            - Identify long-running queries that may need investigation
+            - Monitor active connections and their current state
+            - Investigate blocked or waiting queries
+
+            Query text is truncated at 4096 characters for display purposes.
+          parameters:
+            - id: __sort
+              name: Filter By
+              description: Select the primary sort column. Defaults to elapsed time to focus on longest-running queries.
+              type: select
+              required: true
+              default: elapsedMs
+              options: []
+          returns:
+            description: Currently running SQL statements from `pg_stat_activity`. Each row represents an active backend process with its current query and execution context.
+            columns:
+              - name: PID
+                type: string
+                unit: ""
+                visibility: hidden
+                description: Backend process ID. Can be used with pg_terminate_backend() to cancel a query.
+              - name: Query
+                type: string
+                unit: ""
+                description: The SQL statement currently being executed. Truncated to 4096 characters.
+              - name: Database
+                type: string
+                unit: ""
+                description: Database name the backend is connected to.
+              - name: User
+                type: string
+                unit: ""
+                description: YSQL user name of the backend process.
+              - name: State
+                type: string
+                unit: ""
+                description: Current state of the backend (active, idle in transaction, fastpath function call, etc.).
+              - name: Wait Event Type
+                type: string
+                unit: ""
+                visibility: hidden
+                description: Type of event the backend is waiting for (Lock, LWLock, IO, etc.). Null if not waiting.
+              - name: Wait Event
+                type: string
+                unit: ""
+                visibility: hidden
+                description: Specific wait event name. Useful for diagnosing lock contention or I/O bottlenecks.
+              - name: Application
+                type: string
+                unit: ""
+                visibility: hidden
+                description: Application name set by the client connection. Useful for identifying which application is running the query.
+              - name: Client Address
+                type: string
+                unit: ""
+                visibility: hidden
+                description: IP address of the client connection.
+              - name: Query Start
+                type: string
+                unit: ""
+                visibility: hidden
+                description: Timestamp when the current query began execution.
+              - name: Elapsed
+                type: duration
+                unit: "milliseconds"
+                description: Time elapsed since the query started. High values indicate long-running queries that may need investigation.
+          performance: |
+            Queries the `pg_stat_activity` view via YSQL connection:<br/>• Returns only non-idle connections to reduce result size<br/>• Default limit of 500 rows balances completeness with performance<br/>• Use `sql_timeout` to prevent long-running queries
+          security: |
+            Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data embedded in queries<br/>• Access should be restricted to authorized personnel only
+          prerequisites:
+            list:
+              - title: Grant access to all queries (optional)
+                description: |
+                  By default, users can only see their own queries in `pg_stat_activity`. To view all users' queries, grant the `pg_read_all_stats` role:
+
+                  ```sql
+                  GRANT pg_read_all_stats TO your_user;
+                  ```
+
+                  :::info
+
+                  - The `yugabyte` superuser can see all queries by default
+                  - Without elevated privileges, only the user's own queries are visible
+                  - Idle connections are filtered out from results
+
+                  :::
+          availability: |
+            Available when:<br/>• The collector has successfully connected to YSQL<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

@@ -25,16 +25,20 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         proxysqlMethods,
-		MethodParams:    proxysqlMethodParams,
-		HandleMethod:    proxysqlHandleMethod,
+		MethodHandler:   proxysqlFunctionHandler,
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			DSN:     "stats:stats@tcp(127.0.0.1:6032)/",
 			Timeout: confopt.Duration(time.Second),
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		charts: baseCharts.Copy(),
@@ -46,6 +50,10 @@ func New() *Collector {
 			hostgroups: make(map[string]*hostgroupCache),
 		},
 	}
+
+	c.funcRouter = newFuncRouter(c)
+
+	return c
 }
 
 type Config struct {
@@ -54,7 +62,31 @@ type Config struct {
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	DSN                string           `yaml:"dsn" json:"dsn"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	TopQueriesLimit    int              `yaml:"top_queries_limit,omitempty" json:"top_queries_limit,omitempty"`
+	Functions          FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	TopQueries TopQueriesConfig `yaml:"top_queries,omitempty" json:"top_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
 }
 
 type Collector struct {
@@ -67,6 +99,8 @@ type Collector struct {
 
 	once  *sync.Once
 	cache *cache
+
+	funcRouter *funcRouter // function router for method handlers
 
 	queryDigestCols   map[string]bool
 	queryDigestColsMu sync.RWMutex
@@ -113,7 +147,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.db == nil {
 		return
 	}

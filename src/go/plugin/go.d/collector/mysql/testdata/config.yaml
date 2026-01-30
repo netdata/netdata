@@ -4,3 +4,14 @@ autodetection_retry: 123
 dsn: "ok"
 my.cnf: "ok"
 timeout: 123.123
+functions:
+  top_queries:
+    disabled: yes
+    timeout: 123.123
+    limit: 123
+  deadlock_info:
+    disabled: yes
+    timeout: 123.123
+  error_info:
+    disabled: yes
+    timeout: 123.123

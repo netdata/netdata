@@ -7,6 +7,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,8 +38,8 @@ func TestModuleFuncRegistry_RegisterModule(t *testing.T) {
 
 			for _, m := range tc.modules {
 				r.registerModule(m, module.Creator{
-					Methods: func() []module.MethodConfig {
-						return []module.MethodConfig{{ID: "test"}}
+					Methods: func() []funcapi.MethodConfig {
+						return []funcapi.MethodConfig{{ID: "test"}}
 					},
 				})
 			}
@@ -124,12 +125,12 @@ func TestModuleFuncRegistry_GenerationVerification(t *testing.T) {
 func TestModuleFuncRegistry_GetMethods(t *testing.T) {
 	r := newModuleFuncRegistry()
 
-	expectedMethods := []module.MethodConfig{
+	expectedMethods := []funcapi.MethodConfig{
 		{ID: "top-queries", Name: "Top Queries"},
 	}
 
 	r.registerModule("postgres", module.Creator{
-		Methods: func() []module.MethodConfig {
+		Methods: func() []funcapi.MethodConfig {
 			return expectedMethods
 		},
 	})
@@ -207,8 +208,8 @@ func newTestModuleFuncsJob(name string) *module.Job {
 func TestModuleFuncRegistry_Concurrency(t *testing.T) {
 	r := newModuleFuncRegistry()
 	r.registerModule("postgres", module.Creator{
-		Methods: func() []module.MethodConfig {
-			return []module.MethodConfig{{ID: "test"}}
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{ID: "test"}}
 		},
 	})
 
