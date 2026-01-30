@@ -133,6 +133,9 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 		d.Infof("received empty config, stopping pipeline '%s'", key)
 		d.mgr.Stop(key)
 	}
+
+	// Remove from dyncfg if exposed
+	d.removeExposedFileConfig(conf.source)
 }
 
 func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile) {
@@ -164,7 +167,11 @@ func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile) {
 
 	if err != nil {
 		d.Errorf("pipeline '%s': %v", key, err)
+		return
 	}
+
+	// Expose file config as dyncfg job
+	d.exposeFileConfig(cfg, conf)
 }
 
 // pipelineKeyFromSource extracts a pipeline key from a file source path.

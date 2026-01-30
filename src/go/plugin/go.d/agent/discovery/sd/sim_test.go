@@ -34,6 +34,7 @@ func (sim *discoverySim) run(t *testing.T) {
 			confFiles: sim.configs,
 			ch:        make(chan confFile),
 		},
+		exposedConfigs: newExposedSDConfigs(),
 	}
 
 	in := make(chan<- []*confgroup.Group)

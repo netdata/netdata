@@ -10,6 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 
@@ -460,4 +461,58 @@ func (d *ServiceDiscovery) unregisterDyncfgTemplates() {
 	}
 
 	d.fnReg.UnregisterPrefix("config", d.dyncfgSDPrefixValue())
+}
+
+// exposeFileConfig exposes a file-based pipeline config as a dyncfg job.
+// It extracts the discoverer type from the config and creates a dyncfg job for it.
+func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile) {
+	if len(cfg.Discover) == 0 {
+		return
+	}
+
+	// Use the first discoverer type in the config
+	dt := cfg.Discover[0].Discoverer
+	if !isValidDiscovererType(dt) {
+		d.Warningf("unknown discoverer type '%s' in file config '%s'", dt, conf.source)
+		return
+	}
+
+	name := cfg.Name
+	if name == "" {
+		// Use file path as fallback name
+		name = conf.source
+	}
+
+	// Store in exposed configs cache
+	sdCfg := &sdConfig{
+		discovererType: dt,
+		name:           name,
+		source:         conf.source,
+		sourceType:     "file",
+		status:         dyncfg.StatusRunning,
+		content:        conf.content,
+	}
+	d.exposedConfigs.add(sdCfg)
+
+	// Create dyncfg job
+	d.dyncfgSDJobCreate(dt, name, sdCfg.sourceType, sdCfg.source, sdCfg.status)
+	d.Debugf("exposed file config '%s' as dyncfg job '%s:%s'", conf.source, dt, name)
+}
+
+// removeExposedFileConfig removes a file-based config from dyncfg.
+func (d *ServiceDiscovery) removeExposedFileConfig(source string) {
+	// Find and remove configs with this source
+	var toRemove []struct{ dt, name string }
+
+	d.exposedConfigs.forEach(func(cfg *sdConfig) {
+		if cfg.source == source && cfg.sourceType == "file" {
+			toRemove = append(toRemove, struct{ dt, name string }{cfg.discovererType, cfg.name})
+		}
+	})
+
+	for _, r := range toRemove {
+		d.exposedConfigs.remove(r.dt, r.name)
+		d.dyncfgSDJobRemove(r.dt, r.name)
+		d.Debugf("removed file config dyncfg job '%s:%s'", r.dt, r.name)
+	}
 }
