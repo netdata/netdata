@@ -55,6 +55,18 @@ static inline PRD_ARRAY *prd_array_create(size_t size) {
     return arr;
 }
 
+// Acquire a reference to the array when spinlock is ALREADY HELD
+// Returns NULL if no array exists
+// The caller MUST call prd_array_release() when done
+// Use this when you need to do additional checks (e.g., collector_tid) under the same spinlock
+static inline PRD_ARRAY *prd_array_acquire_locked(PRD_ARRAY **array_ptr) {
+    PRD_ARRAY *arr = *array_ptr;
+    if (arr) {
+        __atomic_fetch_add(&arr->refcount, 1, __ATOMIC_ACQ_REL);
+    }
+    return arr;
+}
+
 // Acquire a reference to the array stored in the atomic pointer location
 // Returns NULL if no array exists
 // The caller MUST call prd_array_release() when done
@@ -63,12 +75,7 @@ static inline PRD_ARRAY *prd_array_create(size_t size) {
 // Uses spinlock to coordinate with other cleanup operations.
 static inline PRD_ARRAY *prd_array_acquire(PRD_ARRAY **array_ptr, SPINLOCK *spinlock) {
     spinlock_lock(spinlock);
-
-    PRD_ARRAY *arr = *array_ptr;
-    if (arr) {
-        __atomic_fetch_add(&arr->refcount, 1, __ATOMIC_ACQ_REL);
-    }
-
+    PRD_ARRAY *arr = prd_array_acquire_locked(array_ptr);
     spinlock_unlock(spinlock);
     return arr;
 }
