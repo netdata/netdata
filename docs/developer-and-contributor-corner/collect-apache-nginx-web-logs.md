@@ -104,4 +104,4 @@ You can also edit this file directly with `edit-config`:
 ```
 
 For more information about editing the defaults or writing new alert entities, see our
-[health monitoring documentation](/src/health/README.md).
+[health monitoring documentation](/docs/alerts/understanding-alerts/README.md).

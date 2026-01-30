@@ -230,7 +230,7 @@ endmeta-->
 meta_yaml: "{meta_yaml}"
 sidebar_label: "{sidebar_label}"
 learn_status: "Published"
-learn_rel_path: "{learn_rel_path.replace("notifications", "Alerts & Notifications/Notifications")}"
+learn_rel_path: "{learn_rel_path.replace("notifications", "Alerts & Notifications/Receiving Notifications")}"
 """
             if keywords:
                 md += f"keywords: {keywords}\n"
@@ -257,7 +257,7 @@ endmeta-->
 meta_yaml: "{meta_yaml}"
 sidebar_label: "{sidebar_label}"
 learn_status: "Published"
-learn_rel_path: "{learn_rel_path.replace("notifications", "Alerts & Notifications/Notifications")}"
+learn_rel_path: "{learn_rel_path.replace("notifications", "Alerts & Notifications/Receiving Notifications")}"
 """
             if keywords:
                 md += f"keywords: {keywords}\n"
