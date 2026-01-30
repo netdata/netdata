@@ -247,16 +247,23 @@ function formatResponse(result) {
 
 ## Recommended Sizing (Per Parent)
 
+The following sizing recommendations are NOT resource consumption. They are recommended VM allocation per Parent (2x are needed for HA).
+
 | Resource | Specification |
 |----------|---------------|
 | **CPU** | ${cpu_cores} cores |
 | **RAM** | ${ram_gib} GiB |
 
-*After rounding, actual free resources: ${actual_cpu_free_pct}% CPU, ${actual_ram_free_pct}% RAM.*
+*Included free resources: ${actual_cpu_free_pct}% CPU, ${actual_ram_free_pct}% RAM.*
 
 ---
 
-**Note**: Present these parameters to users and recalculate if adjustments are needed.`;
+Rounding:
+- CPU cores are rounded up to the nearest even number (2, 4, 6, 8...).
+- RAM is rounded up to multiples of 4 GiB, minimum 4 GiB.
+
+Present these parameters to users and recalculate if adjustments are needed.
+`;
 }
 
 async function toolCalculateParentSizing(args) {
