@@ -62,10 +62,19 @@ func NewPipelineManager(
 // If a pipeline with the same key is already running, it will be stopped first.
 func (m *PipelineManager) Start(ctx context.Context, key string, cfg pipeline.Config) error {
 	m.mux.Lock()
-	defer m.mux.Unlock()
 
 	// Stop existing pipeline if any (no grace period - this is initial start or replace)
-	m.stopPipelineLocked(key, true)
+	rp := m.removePipelineLocked(key, true)
+
+	m.mux.Unlock()
+
+	// Wait for old pipeline outside the lock
+	if rp != nil {
+		m.waitForPipeline(key, rp)
+	}
+
+	m.mux.Lock()
+	defer m.mux.Unlock()
 
 	return m.startPipelineLocked(ctx, key, cfg)
 }
@@ -73,23 +82,26 @@ func (m *PipelineManager) Start(ctx context.Context, key string, cfg pipeline.Co
 // Stop stops a pipeline and sends removal groups for all its tracked sources.
 func (m *PipelineManager) Stop(key string) {
 	m.mux.Lock()
-	defer m.mux.Unlock()
+	rp := m.removePipelineLocked(key, true)
+	m.mux.Unlock()
 
-	m.stopPipelineLocked(key, true)
+	// Wait for pipeline outside the lock
+	if rp != nil {
+		m.waitForPipeline(key, rp)
+	}
 }
 
 // Restart stops a pipeline and starts it with new config, using grace period
 // to avoid removing discovered jobs that will be re-discovered.
 func (m *PipelineManager) Restart(ctx context.Context, key string, cfg pipeline.Config) error {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	// Validate new config first by creating the pipeline
+	// Validate new config first by creating the pipeline (outside lock)
 	pl, err := m.newPipeline(cfg)
 	if err != nil {
 		// New config is invalid, keep old pipeline running
 		return err
 	}
+
+	m.mux.Lock()
 
 	// Mark current sources as pending removal (grace period)
 	if sources, ok := m.pipelineSources[key]; ok && len(sources) > 0 {
@@ -101,7 +113,17 @@ func (m *PipelineManager) Restart(ctx context.Context, key string, cfg pipeline.
 	}
 
 	// Stop old pipeline without cleanup (sources are pending, not removed)
-	m.stopPipelineLocked(key, false)
+	rp := m.removePipelineLocked(key, false)
+
+	m.mux.Unlock()
+
+	// Wait for old pipeline outside the lock
+	if rp != nil {
+		m.waitForPipeline(key, rp)
+	}
+
+	m.mux.Lock()
+	defer m.mux.Unlock()
 
 	// Start the already-created new pipeline
 	return m.startPipelineWithInstanceLocked(ctx, key, cfg, pl)
@@ -109,11 +131,19 @@ func (m *PipelineManager) Restart(ctx context.Context, key string, cfg pipeline.
 
 // StopAll stops all running pipelines with cleanup.
 func (m *PipelineManager) StopAll() {
+	// Collect and remove all pipelines while holding the lock
 	m.mux.Lock()
-	defer m.mux.Unlock()
-
+	toStop := make(map[string]*runningPipeline, len(m.pipelines))
 	for key := range m.pipelines {
-		m.stopPipelineLocked(key, true)
+		if rp := m.removePipelineLocked(key, true); rp != nil {
+			toStop[key] = rp
+		}
+	}
+	m.mux.Unlock()
+
+	// Wait for all pipelines outside the lock
+	for key, rp := range toStop {
+		m.waitForPipeline(key, rp)
 	}
 }
 
@@ -236,23 +266,32 @@ func (m *PipelineManager) onGroupsReceived(ctx context.Context, key string, grou
 	m.send(ctx, groups)
 }
 
-func (m *PipelineManager) stopPipelineLocked(key string, cleanup bool) {
+// removePipelineLocked removes a pipeline from the map, cancels it, and optionally
+// schedules cleanup. Returns the runningPipeline so caller can wait outside the lock.
+// Must be called with m.mux held.
+func (m *PipelineManager) removePipelineLocked(key string, cleanup bool) *runningPipeline {
 	rp, ok := m.pipelines[key]
 	if !ok {
-		return
+		return nil
 	}
 
-	// Cancel and wait for pipeline to stop
+	// Cancel the pipeline (it will stop asynchronously)
 	rp.cancel()
-	<-rp.done
 
+	// Remove from map so it's not visible to other operations
 	delete(m.pipelines, key)
 
 	if cleanup {
 		m.cleanupSourcesLocked(key)
 	}
 
-	m.Infof("pipeline '%s' stopped (cleanup=%v)", key, cleanup)
+	return rp
+}
+
+// waitForPipeline waits for a pipeline to finish. Must be called without holding m.mux.
+func (m *PipelineManager) waitForPipeline(key string, rp *runningPipeline) {
+	<-rp.done
+	m.Infof("pipeline '%s' stopped", key)
 }
 
 func (m *PipelineManager) cleanupSourcesLocked(key string) {
@@ -261,10 +300,14 @@ func (m *PipelineManager) cleanupSourcesLocked(key string) {
 		return
 	}
 
+	// Use a timeout context to avoid blocking forever if consumer stopped reading
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	// Send empty groups to remove discovered jobs
 	for source := range sources {
 		m.Debugf("pipeline '%s': sending removal for source '%s'", key, source)
-		m.send(context.Background(), []*confgroup.Group{{Source: source}})
+		m.send(ctx, []*confgroup.Group{{Source: source}})
 	}
 
 	delete(m.pipelineSources, key)
@@ -272,9 +315,14 @@ func (m *PipelineManager) cleanupSourcesLocked(key string) {
 }
 
 func (m *PipelineManager) processGracePeriodRemovals(ctx context.Context) {
-	m.mux.Lock()
-	defer m.mux.Unlock()
+	// Collect expired removals while holding the lock
+	type removal struct {
+		key    string
+		source string
+	}
+	var toRemove []removal
 
+	m.mux.Lock()
 	now := time.Now()
 
 	for key, pending := range m.pendingRemovals {
@@ -282,18 +330,24 @@ func (m *PipelineManager) processGracePeriodRemovals(ctx context.Context) {
 			continue
 		}
 
-		// Grace period expired - remove sources that weren't re-discovered
+		// Grace period expired - collect sources that weren't re-discovered
 		for source := range pending.sources {
-			m.Infof("pipeline '%s': grace period expired, removing source '%s'", key, source)
-			m.send(ctx, []*confgroup.Group{{Source: source}})
+			toRemove = append(toRemove, removal{key: key, source: source})
 
-			// Also remove from tracked sources
+			// Remove from tracked sources
 			if sources, ok := m.pipelineSources[key]; ok {
 				delete(sources, source)
 			}
 		}
 
 		delete(m.pendingRemovals, key)
+	}
+	m.mux.Unlock()
+
+	// Send removals outside the lock to avoid blocking other operations
+	for _, r := range toRemove {
+		m.Infof("pipeline '%s': grace period expired, removing source '%s'", r.key, r.source)
+		m.send(ctx, []*confgroup.Group{{Source: r.source}})
 	}
 }
 

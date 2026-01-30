@@ -259,23 +259,9 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn functions.Function) {
 		return
 	}
 
-	if len(fn.Payload) == 0 {
-		d.Warningf("dyncfg: update: missing configuration payload for '%s:%s'", dt, name)
-		d.dyncfgApi.SendCodef(fn, 400, "Missing configuration payload.")
-		d.dyncfgSDJobStatus(dt, name, cfg.status)
-		return
-	}
-
-	d.Infof("dyncfg: update: %s:%s by user '%s'", dt, name, getFnSourceValue(fn, "user"))
-
-	// Update the config content
-	cfg.content = fn.Payload
-	cfg.source = fn.Source
-
-	// If running, restart the pipeline
-	// TODO: implement pipeline restart with new config
-
-	d.dyncfgApi.SendCodef(fn, 200, "")
+	// Update command is not yet fully implemented - pipeline restart not supported
+	d.Warningf("dyncfg: update: command not yet implemented for '%s:%s'", dt, name)
+	d.dyncfgApi.SendCodef(fn, 501, "Update command is not yet implemented for service discovery configs.")
 	d.dyncfgSDJobStatus(dt, name, cfg.status)
 }
 
@@ -297,18 +283,9 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn functions.Function) {
 		return
 	}
 
-	if cfg.status == dyncfg.StatusRunning {
-		d.dyncfgApi.SendCodef(fn, 200, "")
-		d.dyncfgSDJobStatus(dt, name, cfg.status)
-		return
-	}
-
-	d.Infof("dyncfg: enable: %s:%s by user '%s'", dt, name, getFnSourceValue(fn, "user"))
-
-	// TODO: start the pipeline with this config
-	cfg.status = dyncfg.StatusRunning
-
-	d.dyncfgApi.SendCodef(fn, 200, "")
+	// Enable command is not yet implemented - pipeline start not supported
+	d.Warningf("dyncfg: enable: command not yet implemented for '%s:%s'", dt, name)
+	d.dyncfgApi.SendCodef(fn, 501, "Enable command is not yet implemented for service discovery configs.")
 	d.dyncfgSDJobStatus(dt, name, cfg.status)
 }
 
@@ -330,18 +307,9 @@ func (d *ServiceDiscovery) dyncfgCmdDisable(fn functions.Function) {
 		return
 	}
 
-	if cfg.status == dyncfg.StatusDisabled {
-		d.dyncfgApi.SendCodef(fn, 200, "")
-		d.dyncfgSDJobStatus(dt, name, cfg.status)
-		return
-	}
-
-	d.Infof("dyncfg: disable: %s:%s by user '%s'", dt, name, getFnSourceValue(fn, "user"))
-
-	// TODO: stop the pipeline for this config
-	cfg.status = dyncfg.StatusDisabled
-
-	d.dyncfgApi.SendCodef(fn, 200, "")
+	// Disable command is not yet implemented - pipeline stop not supported
+	d.Warningf("dyncfg: disable: command not yet implemented for '%s:%s'", dt, name)
+	d.dyncfgApi.SendCodef(fn, 501, "Disable command is not yet implemented for service discovery configs.")
 	d.dyncfgSDJobStatus(dt, name, cfg.status)
 }
 
@@ -369,13 +337,9 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn functions.Function) {
 		return
 	}
 
-	d.Infof("dyncfg: remove: %s:%s by user '%s'", dt, name, getFnSourceValue(fn, "user"))
-
-	// TODO: stop the pipeline if running
-
-	d.exposedConfigs.remove(dt, name)
-	d.dyncfgApi.SendCodef(fn, 200, "")
-	d.dyncfgSDJobRemove(dt, name)
+	// Remove command is not yet fully implemented - pipeline stop not supported
+	d.Warningf("dyncfg: remove: command not yet implemented for '%s:%s'", dt, name)
+	d.dyncfgApi.SendCodef(fn, 501, "Remove command is not yet implemented for service discovery configs.")
 }
 
 // dyncfgCmdUserconfig handles the userconfig command for templates and jobs
