@@ -52,7 +52,7 @@ type (
 		AuthProtocol string `yaml:"auth_protocol"`
 		// AuthPassphrase is the authentication passphrase (for SNMPv3)
 		AuthPassphrase string `yaml:"auth_password"`
-		// PrivacyProtocol must be one of: "des", "aes", "aes192", "aes256", "aes192C", "aes256C" (for SNMPv3)
+		// PrivacyProtocol must be one of: "des", "aes", "aes192", "aes256", "aes192c", "aes256c" (for SNMPv3)
 		PrivacyProtocol string `yaml:"priv_protocol"`
 		// PrivacyPassphrase is the privacy passphrase (for SNMPv3)
 		PrivacyPassphrase string `yaml:"priv_password"`

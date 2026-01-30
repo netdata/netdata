@@ -64,13 +64,13 @@ func (m *PipelineManager) Start(ctx context.Context, key string, cfg pipeline.Co
 	m.mux.Lock()
 
 	// Stop existing pipeline if any (no grace period - this is initial start or replace)
-	rp := m.removePipelineLocked(key, true)
+	sp := m.removePipelineLocked(key, true)
 
 	m.mux.Unlock()
 
-	// Wait for old pipeline outside the lock
-	if rp != nil {
-		m.waitForPipeline(key, rp)
+	// Wait for old pipeline and cleanup outside the lock
+	if sp != nil {
+		m.waitAndCleanup(key, sp)
 	}
 
 	m.mux.Lock()
@@ -82,12 +82,12 @@ func (m *PipelineManager) Start(ctx context.Context, key string, cfg pipeline.Co
 // Stop stops a pipeline and sends removal groups for all its tracked sources.
 func (m *PipelineManager) Stop(key string) {
 	m.mux.Lock()
-	rp := m.removePipelineLocked(key, true)
+	sp := m.removePipelineLocked(key, true)
 	m.mux.Unlock()
 
-	// Wait for pipeline outside the lock
-	if rp != nil {
-		m.waitForPipeline(key, rp)
+	// Wait for pipeline and cleanup outside the lock
+	if sp != nil {
+		m.waitAndCleanup(key, sp)
 	}
 }
 
@@ -104,22 +104,32 @@ func (m *PipelineManager) Restart(ctx context.Context, key string, cfg pipeline.
 	m.mux.Lock()
 
 	// Mark current sources as pending removal (grace period)
+	// Merge with existing pending removals to avoid losing sources from previous restarts
 	if sources, ok := m.pipelineSources[key]; ok && len(sources) > 0 {
-		m.pendingRemovals[key] = &pendingRemoval{
-			sources:   copySourcesMap(sources),
-			timestamp: time.Now(),
+		if existing, ok := m.pendingRemovals[key]; ok {
+			// Merge: add current sources to existing pending removals
+			for src := range sources {
+				existing.sources[src] = struct{}{}
+			}
+			existing.timestamp = time.Now() // Reset grace period
+			m.Debugf("pipeline '%s': merged %d sources into pending removal (now %d total)", key, len(sources), len(existing.sources))
+		} else {
+			m.pendingRemovals[key] = &pendingRemoval{
+				sources:   copySourcesMap(sources),
+				timestamp: time.Now(),
+			}
+			m.Debugf("pipeline '%s': marked %d sources for pending removal (grace period)", key, len(sources))
 		}
-		m.Debugf("pipeline '%s': marked %d sources for pending removal (grace period)", key, len(sources))
 	}
 
 	// Stop old pipeline without cleanup (sources are pending, not removed)
-	rp := m.removePipelineLocked(key, false)
+	sp := m.removePipelineLocked(key, false)
 
 	m.mux.Unlock()
 
 	// Wait for old pipeline outside the lock
-	if rp != nil {
-		m.waitForPipeline(key, rp)
+	if sp != nil {
+		m.waitForPipeline(key, sp)
 	}
 
 	m.mux.Lock()
@@ -133,17 +143,17 @@ func (m *PipelineManager) Restart(ctx context.Context, key string, cfg pipeline.
 func (m *PipelineManager) StopAll() {
 	// Collect and remove all pipelines while holding the lock
 	m.mux.Lock()
-	toStop := make(map[string]*runningPipeline, len(m.pipelines))
+	toStop := make(map[string]*stoppedPipeline, len(m.pipelines))
 	for key := range m.pipelines {
-		if rp := m.removePipelineLocked(key, true); rp != nil {
-			toStop[key] = rp
+		if sp := m.removePipelineLocked(key, true); sp != nil {
+			toStop[key] = sp
 		}
 	}
 	m.mux.Unlock()
 
-	// Wait for all pipelines outside the lock
-	for key, rp := range toStop {
-		m.waitForPipeline(key, rp)
+	// Wait for all pipelines and cleanup outside the lock
+	for key, sp := range toStop {
+		m.waitAndCleanup(key, sp)
 	}
 }
 
@@ -266,10 +276,16 @@ func (m *PipelineManager) onGroupsReceived(ctx context.Context, key string, grou
 	m.send(ctx, groups)
 }
 
+// stoppedPipeline holds info needed to complete pipeline shutdown outside the lock.
+type stoppedPipeline struct {
+	rp              *runningPipeline
+	sourcesToRemove []string
+}
+
 // removePipelineLocked removes a pipeline from the map, cancels it, and optionally
-// schedules cleanup. Returns the runningPipeline so caller can wait outside the lock.
+// collects sources for cleanup. Returns info needed to complete shutdown outside the lock.
 // Must be called with m.mux held.
-func (m *PipelineManager) removePipelineLocked(key string, cleanup bool) *runningPipeline {
+func (m *PipelineManager) removePipelineLocked(key string, cleanup bool) *stoppedPipeline {
 	rp, ok := m.pipelines[key]
 	if !ok {
 		return nil
@@ -281,37 +297,70 @@ func (m *PipelineManager) removePipelineLocked(key string, cleanup bool) *runnin
 	// Remove from map so it's not visible to other operations
 	delete(m.pipelines, key)
 
+	result := &stoppedPipeline{rp: rp}
+
 	if cleanup {
-		m.cleanupSourcesLocked(key)
+		result.sourcesToRemove = m.collectSourcesForCleanupLocked(key)
 	}
 
-	return rp
+	return result
 }
 
-// waitForPipeline waits for a pipeline to finish. Must be called without holding m.mux.
-func (m *PipelineManager) waitForPipeline(key string, rp *runningPipeline) {
-	<-rp.done
+// waitForPipeline waits for a pipeline to finish without sending removal notifications.
+// Used when sources are in pending removal state (grace period) and shouldn't be cleaned up.
+// Must be called without holding m.mux.
+func (m *PipelineManager) waitForPipeline(key string, sp *stoppedPipeline) {
+	<-sp.rp.done
 	m.Infof("pipeline '%s' stopped", key)
 }
 
-func (m *PipelineManager) cleanupSourcesLocked(key string) {
-	sources, ok := m.pipelineSources[key]
-	if !ok || len(sources) == 0 {
-		return
+// waitAndCleanup waits for pipeline to finish and sends removal notifications.
+// Must be called without holding m.mux.
+func (m *PipelineManager) waitAndCleanup(key string, sp *stoppedPipeline) {
+	<-sp.rp.done
+	m.Infof("pipeline '%s' stopped", key)
+
+	// Send removals outside the lock
+	if len(sp.sourcesToRemove) > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		for _, source := range sp.sourcesToRemove {
+			m.Debugf("pipeline '%s': sending removal for source '%s'", key, source)
+			m.send(ctx, []*confgroup.Group{{Source: source}})
+		}
+	}
+}
+
+// collectSourcesForCleanupLocked collects all sources that need removal notifications,
+// including tracked sources and pending removals. Must be called with m.mux held.
+func (m *PipelineManager) collectSourcesForCleanupLocked(key string) []string {
+	sourceSet := make(map[string]struct{})
+
+	// Collect tracked sources
+	if sources, ok := m.pipelineSources[key]; ok {
+		for src := range sources {
+			sourceSet[src] = struct{}{}
+		}
 	}
 
-	// Use a timeout context to avoid blocking forever if consumer stopped reading
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Send empty groups to remove discovered jobs
-	for source := range sources {
-		m.Debugf("pipeline '%s': sending removal for source '%s'", key, source)
-		m.send(ctx, []*confgroup.Group{{Source: source}})
+	// Collect pending removal sources (these would otherwise be orphaned)
+	if pending, ok := m.pendingRemovals[key]; ok {
+		for src := range pending.sources {
+			sourceSet[src] = struct{}{}
+		}
 	}
 
+	// Clean up maps
 	delete(m.pipelineSources, key)
 	delete(m.pendingRemovals, key)
+
+	// Convert to slice
+	sources := make([]string, 0, len(sourceSet))
+	for src := range sourceSet {
+		sources = append(sources, src)
+	}
+	return sources
 }
 
 func (m *PipelineManager) processGracePeriodRemovals(ctx context.Context) {

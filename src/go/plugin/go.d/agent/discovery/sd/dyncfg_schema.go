@@ -38,14 +38,22 @@ func getDiscovererSchemaByType(discovererType string) string {
 }
 
 const schemaGeneric = `{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "title": "Service Discovery Pipeline Configuration",
-  "properties": {
-    "name": {
-      "type": "string",
-      "description": "Pipeline name (must be unique)"
-    }
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "Service Discovery Pipeline Configuration",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "description": "Pipeline name (must be unique)."
+      }
+    },
+    "required": ["name"]
   },
-  "required": ["name"]
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    }
+  }
 }`

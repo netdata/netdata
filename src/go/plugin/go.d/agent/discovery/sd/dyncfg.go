@@ -159,8 +159,6 @@ func (d *ServiceDiscovery) dyncfgCmdSchema(fn functions.Function) {
 		return
 	}
 
-	// For now, return a placeholder schema
-	// TODO: Task #7 will implement proper schemas for each discoverer type
 	schema := getDiscovererSchema(dt, isJob)
 	d.dyncfgApi.SendJSON(fn, schema)
 }

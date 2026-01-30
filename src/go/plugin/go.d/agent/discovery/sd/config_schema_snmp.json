@@ -111,8 +111,8 @@
                 "aes",
                 "aes192",
                 "aes256",
-                "aes192C",
-                "aes256C"
+                "aes192c",
+                "aes256c"
               ]
             },
             "priv_password": {
