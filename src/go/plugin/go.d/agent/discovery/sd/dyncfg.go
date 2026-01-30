@@ -434,19 +434,7 @@ func getFnSourceValue(fn functions.Function, key string) string {
 // getDiscovererSchema returns a JSON schema for the given discoverer type.
 // isJob indicates whether this is for a job or template.
 func getDiscovererSchema(discovererType string, isJob bool) string {
-	// TODO: Task #7 will implement proper schemas for each discoverer type
-	// For now, return a minimal placeholder schema
-	return fmt.Sprintf(`{
-		"$schema": "http://json-schema.org/draft-07/schema#",
-		"type": "object",
-		"title": "%s Service Discovery Configuration",
-		"properties": {
-			"name": {
-				"type": "string",
-				"description": "Pipeline name"
-			}
-		}
-	}`, discovererType)
+	return getDiscovererSchemaByType(discovererType)
 }
 
 // registerDyncfgTemplates registers dyncfg templates for each discoverer type
