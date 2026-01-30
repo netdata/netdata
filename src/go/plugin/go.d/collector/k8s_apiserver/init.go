@@ -23,8 +23,12 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 		return nil, err
 	}
 
-	if srParseErr != nil {
-		c.Warningf("selector parse error (collecting all metrics): %v", srParseErr)
+	// If selector parsing failed or selector is nil, log and collect all metrics
+	if srParseErr != nil || sr == nil {
+		if srParseErr != nil {
+			c.Warningf("selector parse error (collecting all metrics): %v", srParseErr)
+		}
+		return prometheus.New(httpClient, c.RequestConfig), nil
 	}
 
 	return prometheus.NewWithSelector(httpClient, c.RequestConfig, sr), nil
