@@ -37,6 +37,20 @@ const (
 // Ref: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/metrics/metrics.go
 var admissionBucketBounds = []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5}
 
+// idReplacer sanitizes label values for use in chart/dimension IDs
+// Replaces characters that could cause issues in Netdata with underscores
+var idReplacer = strings.NewReplacer(
+	".", "_",
+	" ", "_",
+	"/", "_",
+	":", "_",
+)
+
+// cleanID sanitizes a string for use in chart or dimension IDs
+func cleanID(s string) string {
+	return strings.ToLower(idReplacer.Replace(s))
+}
+
 func (c *Collector) collect() (map[string]int64, error) {
 	mfs, err := c.prom.Scrape()
 	if err != nil {
@@ -225,7 +239,7 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 				_, seen := c.collectedRESTCodes[code]
 				c.collectedRESTCodes[code] = c.collectCycle
 				if !seen {
-					dimID := "rest_client_by_code_" + code
+					dimID := "rest_client_by_code_" + cleanID(code)
 					if codeChart != nil && !codeChart.HasDim(dimID) {
 						if err := codeChart.AddDim(&Dim{ID: dimID, Name: code, Algo: module.Incremental}); err != nil {
 							c.Warningf("failed to add REST client code dimension %s: %v", code, err)
@@ -242,7 +256,7 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 				_, seen := c.collectedRESTMethods[method]
 				c.collectedRESTMethods[method] = c.collectCycle
 				if !seen {
-					dimID := "rest_client_by_method_" + method
+					dimID := "rest_client_by_method_" + cleanID(method)
 					if methodChart != nil && !methodChart.HasDim(dimID) {
 						if err := methodChart.AddDim(&Dim{ID: dimID, Name: method, Algo: module.Incremental}); err != nil {
 							c.Warningf("failed to add REST client method dimension %s: %v", method, err)
@@ -365,28 +379,31 @@ func (c *Collector) collectAdmissionControllerLatency(mfs prometheus.MetricFamil
 	for _, name := range controllerNames {
 		bucketMap := controllerBucketMaps[name]
 
+		// Sanitize name for use in chart/dimension IDs
+		cleanName := cleanID(name)
+
 		// Cardinality limit: only accept new items if under limit
-		_, seen := c.collectedAdmissionCtrl[name]
+		_, seen := c.collectedAdmissionCtrl[cleanName]
 		if !seen && len(c.collectedAdmissionCtrl) >= defaultMaxAdmCtrl {
 			continue
 		}
 
 		// Track last-seen cycle
-		c.collectedAdmissionCtrl[name] = c.collectCycle
+		c.collectedAdmissionCtrl[cleanName] = c.collectCycle
 
 		if !seen {
-			if err := c.charts.Add(newAdmissionControllerLatencyChart(name)); err != nil {
+			if err := c.charts.Add(newAdmissionControllerLatencyChart(cleanName)); err != nil {
 				c.Warningf("failed to add admission controller chart %s: %v", name, err)
 			}
 		}
 
-		if mx.Admission.Controllers[name] == nil {
-			mx.Admission.Controllers[name] = &admissionControllerMetrics{}
+		if mx.Admission.Controllers[cleanName] == nil {
+			mx.Admission.Controllers[cleanName] = &admissionControllerMetrics{}
 		}
 
 		// Use cumulative bucket values directly - chart uses Incremental algorithm
 		// This avoids negative values when Prometheus counters reset
-		c.setAdmissionBucketMetrics(bucketMap, mx.Admission.Controllers[name])
+		c.setAdmissionBucketMetrics(bucketMap, mx.Admission.Controllers[cleanName])
 	}
 }
 
@@ -426,28 +443,31 @@ func (c *Collector) collectAdmissionWebhookLatency(mfs prometheus.MetricFamilies
 	for _, name := range webhookNames {
 		bucketMap := webhookBucketMaps[name]
 
+		// Sanitize name for use in chart/dimension IDs
+		cleanName := cleanID(name)
+
 		// Cardinality limit: only accept new items if under limit
-		_, seen := c.collectedAdmissionWH[name]
+		_, seen := c.collectedAdmissionWH[cleanName]
 		if !seen && len(c.collectedAdmissionWH) >= defaultMaxAdmWebhooks {
 			continue
 		}
 
 		// Track last-seen cycle
-		c.collectedAdmissionWH[name] = c.collectCycle
+		c.collectedAdmissionWH[cleanName] = c.collectCycle
 
 		if !seen {
-			if err := c.charts.Add(newAdmissionWebhookLatencyChart(name)); err != nil {
+			if err := c.charts.Add(newAdmissionWebhookLatencyChart(cleanName)); err != nil {
 				c.Warningf("failed to add admission webhook chart %s: %v", name, err)
 			}
 		}
 
-		if mx.Admission.Webhooks[name] == nil {
-			mx.Admission.Webhooks[name] = &admissionWebhookMetrics{}
+		if mx.Admission.Webhooks[cleanName] == nil {
+			mx.Admission.Webhooks[cleanName] = &admissionWebhookMetrics{}
 		}
 
 		// Use cumulative bucket values directly - chart uses Incremental algorithm
 		// This avoids negative values when Prometheus counters reset
-		c.setAdmissionBucketMetrics(bucketMap, mx.Admission.Webhooks[name])
+		c.setAdmissionBucketMetrics(bucketMap, mx.Admission.Webhooks[cleanName])
 	}
 }
 
@@ -482,7 +502,7 @@ func (c *Collector) collectEtcd(mfs prometheus.MetricFamilies, mx *metrics) {
 		}
 
 		resourceName := simplifyResourceName(resource)
-		dimID := "etcd_objects_" + resourceName
+		dimID := "etcd_objects_" + cleanID(resourceName)
 
 		if chart != nil && !chart.HasDim(dimID) {
 			if err := chart.AddDim(&Dim{ID: dimID, Name: resourceName}); err != nil {
@@ -553,35 +573,38 @@ func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics
 	}
 
 	for _, queueName := range queueNames {
+		// Sanitize name for use in chart/dimension IDs
+		cleanName := cleanID(queueName)
+
 		// Cardinality limit: only accept new items if under limit
-		_, seen := c.collectedWorkqueues[queueName]
+		_, seen := c.collectedWorkqueues[cleanName]
 		if !seen && len(c.collectedWorkqueues) >= defaultMaxWorkqueues {
 			continue
 		}
 
 		// Track last-seen cycle
-		c.collectedWorkqueues[queueName] = c.collectCycle
+		c.collectedWorkqueues[cleanName] = c.collectCycle
 
 		if !seen {
-			if err := c.charts.Add(newWorkqueueDepthChart(queueName)); err != nil {
+			if err := c.charts.Add(newWorkqueueDepthChart(cleanName)); err != nil {
 				c.Warningf("failed to add workqueue depth chart %s: %v", queueName, err)
 			}
-			if err := c.charts.Add(newWorkqueueLatencyChart(queueName)); err != nil {
+			if err := c.charts.Add(newWorkqueueLatencyChart(cleanName)); err != nil {
 				c.Warningf("failed to add workqueue latency chart %s: %v", queueName, err)
 			}
-			if err := c.charts.Add(newWorkqueueAddsChart(queueName)); err != nil {
+			if err := c.charts.Add(newWorkqueueAddsChart(cleanName)); err != nil {
 				c.Warningf("failed to add workqueue adds chart %s: %v", queueName, err)
 			}
-			if err := c.charts.Add(newWorkqueueDurationChart(queueName)); err != nil {
+			if err := c.charts.Add(newWorkqueueDurationChart(cleanName)); err != nil {
 				c.Warningf("failed to add workqueue duration chart %s: %v", queueName, err)
 			}
 		}
 
-		if mx.Workqueue.Controllers[queueName] == nil {
-			mx.Workqueue.Controllers[queueName] = &workqueueMetrics{}
+		if mx.Workqueue.Controllers[cleanName] == nil {
+			mx.Workqueue.Controllers[cleanName] = &workqueueMetrics{}
 		}
 
-		wq := mx.Workqueue.Controllers[queueName]
+		wq := mx.Workqueue.Controllers[cleanName]
 		wq.Depth.Set(depthByName[queueName])
 		wq.Adds.Set(addsByName[queueName])
 		wq.Retries.Set(retriesByName[queueName])
@@ -712,7 +735,7 @@ func (c *Collector) addVerbDimension(verb string) {
 		c.Warningf("chart 'requests_by_verb' not found, cannot add dimension for verb: %s", verb)
 		return
 	}
-	dimID := "request_by_verb_" + verb
+	dimID := "request_by_verb_" + cleanID(verb)
 	if !chart.HasDim(dimID) {
 		if err := chart.AddDim(&Dim{ID: dimID, Name: verb, Algo: module.Incremental}); err != nil {
 			c.Warningf("failed to add verb dimension %s: %v", verb, err)
@@ -735,7 +758,7 @@ func (c *Collector) addCodeDimension(code string) {
 		c.Warningf("chart 'requests_by_code' not found, cannot add dimension for code: %s", code)
 		return
 	}
-	dimID := "request_by_code_" + code
+	dimID := "request_by_code_" + cleanID(code)
 	if !chart.HasDim(dimID) {
 		if err := chart.AddDim(&Dim{ID: dimID, Name: code, Algo: module.Incremental}); err != nil {
 			c.Warningf("failed to add code dimension %s: %v", code, err)
@@ -757,7 +780,7 @@ func (c *Collector) addResourceDimension(resource string) {
 		c.Warningf("chart 'requests_by_resource' not found, cannot add dimension for resource: %s", resource)
 		return
 	}
-	dimID := "request_by_resource_" + resource
+	dimID := "request_by_resource_" + cleanID(resource)
 	if !chart.HasDim(dimID) {
 		if err := chart.AddDim(&Dim{ID: dimID, Name: resource, Algo: module.Incremental}); err != nil {
 			c.Warningf("failed to add resource dimension %s: %v", resource, err)
@@ -970,7 +993,7 @@ func (c *Collector) cleanupStaleDimensions() {
 		if lastSeen < threshold {
 			delete(c.collectedResources, name)
 			if chart := c.charts.Get("requests_by_resource"); chart != nil {
-				dimID := "request_by_resource_" + name
+				dimID := "request_by_resource_" + cleanID(name)
 				_ = chart.RemoveDim(dimID)
 				chart.MarkNotCreated()
 			}
@@ -983,7 +1006,7 @@ func (c *Collector) cleanupStaleDimensions() {
 		if lastSeen < threshold {
 			delete(c.collectedVerbs, name)
 			if chart := c.charts.Get("requests_by_verb"); chart != nil {
-				dimID := "request_by_verb_" + name
+				dimID := "request_by_verb_" + cleanID(name)
 				_ = chart.RemoveDim(dimID)
 				chart.MarkNotCreated()
 			}
@@ -996,7 +1019,7 @@ func (c *Collector) cleanupStaleDimensions() {
 		if lastSeen < threshold {
 			delete(c.collectedCodes, name)
 			if chart := c.charts.Get("requests_by_code"); chart != nil {
-				dimID := "request_by_code_" + name
+				dimID := "request_by_code_" + cleanID(name)
 				_ = chart.RemoveDim(dimID)
 				chart.MarkNotCreated()
 			}
@@ -1009,7 +1032,7 @@ func (c *Collector) cleanupStaleDimensions() {
 		if lastSeen < threshold {
 			delete(c.collectedRESTCodes, name)
 			if chart := c.charts.Get("rest_client_requests_by_code"); chart != nil {
-				dimID := "rest_client_by_code_" + name
+				dimID := "rest_client_by_code_" + cleanID(name)
 				_ = chart.RemoveDim(dimID)
 				chart.MarkNotCreated()
 			}
@@ -1022,7 +1045,7 @@ func (c *Collector) cleanupStaleDimensions() {
 		if lastSeen < threshold {
 			delete(c.collectedRESTMethods, name)
 			if chart := c.charts.Get("rest_client_requests_by_method"); chart != nil {
-				dimID := "rest_client_by_method_" + name
+				dimID := "rest_client_by_method_" + cleanID(name)
 				_ = chart.RemoveDim(dimID)
 				chart.MarkNotCreated()
 			}
@@ -1034,10 +1057,10 @@ func (c *Collector) cleanupStaleDimensions() {
 	for name, lastSeen := range c.collectedWorkqueues {
 		if lastSeen < threshold {
 			delete(c.collectedWorkqueues, name)
-			_ = c.charts.Remove("workqueue_depth_" + name)
-			_ = c.charts.Remove("workqueue_latency_" + name)
-			_ = c.charts.Remove("workqueue_adds_" + name)
-			_ = c.charts.Remove("workqueue_duration_" + name)
+			_ = c.charts.Remove("workqueue_depth_" + cleanID(name))
+			_ = c.charts.Remove("workqueue_latency_" + cleanID(name))
+			_ = c.charts.Remove("workqueue_adds_" + cleanID(name))
+			_ = c.charts.Remove("workqueue_duration_" + cleanID(name))
 			c.Debugf("removed stale workqueue charts: %s", name)
 		}
 	}
@@ -1046,7 +1069,7 @@ func (c *Collector) cleanupStaleDimensions() {
 	for name, lastSeen := range c.collectedAdmissionCtrl {
 		if lastSeen < threshold {
 			delete(c.collectedAdmissionCtrl, name)
-			_ = c.charts.Remove("admission_controller_latency_" + name)
+			_ = c.charts.Remove("admission_controller_latency_" + cleanID(name))
 			c.Debugf("removed stale admission controller chart: %s", name)
 		}
 	}
@@ -1055,7 +1078,7 @@ func (c *Collector) cleanupStaleDimensions() {
 	for name, lastSeen := range c.collectedAdmissionWH {
 		if lastSeen < threshold {
 			delete(c.collectedAdmissionWH, name)
-			_ = c.charts.Remove("admission_webhook_latency_" + name)
+			_ = c.charts.Remove("admission_webhook_latency_" + cleanID(name))
 			c.Debugf("removed stale admission webhook chart: %s", name)
 		}
 	}

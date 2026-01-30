@@ -38,6 +38,8 @@ the Prometheus-format metrics from the kube-apiserver's `/metrics` endpoint.
 ### Workqueue
 - `k8s_apiserver.workqueue_depth` - Controller work queue depth (dynamic per controller)
 - `k8s_apiserver.workqueue_latency` - Queue latency percentiles (dynamic per controller)
+- `k8s_apiserver.workqueue_adds` - Work queue adds and retries (dynamic per controller)
+- `k8s_apiserver.workqueue_duration` - Work duration percentiles (dynamic per controller)
 
 ### Audit
 - `k8s_apiserver.audit_events` - Audit events generated
