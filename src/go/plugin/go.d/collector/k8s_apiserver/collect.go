@@ -616,13 +616,13 @@ func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics
 			})
 			if len(hd.buckets) > 0 {
 				if p50 := histogramPercentile(hd, 0.5); !math.IsNaN(p50) {
-					wq.LatencyP50.Set(p50 * 1000000)
+					wq.LatencyP50.Set(p50 * latencyPrecision)
 				}
 				if p90 := histogramPercentile(hd, 0.9); !math.IsNaN(p90) {
-					wq.LatencyP90.Set(p90 * 1000000)
+					wq.LatencyP90.Set(p90 * latencyPrecision)
 				}
 				if p99 := histogramPercentile(hd, 0.99); !math.IsNaN(p99) {
-					wq.LatencyP99.Set(p99 * 1000000)
+					wq.LatencyP99.Set(p99 * latencyPrecision)
 				}
 			}
 		}
@@ -634,13 +634,13 @@ func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics
 			})
 			if len(hd.buckets) > 0 {
 				if p50 := histogramPercentile(hd, 0.5); !math.IsNaN(p50) {
-					wq.DurationP50.Set(p50 * 1000000)
+					wq.DurationP50.Set(p50 * latencyPrecision)
 				}
 				if p90 := histogramPercentile(hd, 0.9); !math.IsNaN(p90) {
-					wq.DurationP90.Set(p90 * 1000000)
+					wq.DurationP90.Set(p90 * latencyPrecision)
 				}
 				if p99 := histogramPercentile(hd, 0.99); !math.IsNaN(p99) {
-					wq.DurationP99.Set(p99 * 1000000)
+					wq.DurationP99.Set(p99 * latencyPrecision)
 				}
 			}
 		}
@@ -672,15 +672,15 @@ func (c *Collector) collectProcess(mfs prometheus.MetricFamilies, mx *metrics) {
 				}
 				switch q.Quantile() {
 				case 0:
-					mx.Process.GCDurationMin.Set(q.Value() * 1000000)
+					mx.Process.GCDurationMin.Set(q.Value() * latencyPrecision)
 				case 0.25:
-					mx.Process.GCDurationP25.Set(q.Value() * 1000000)
+					mx.Process.GCDurationP25.Set(q.Value() * latencyPrecision)
 				case 0.5:
-					mx.Process.GCDurationP50.Set(q.Value() * 1000000)
+					mx.Process.GCDurationP50.Set(q.Value() * latencyPrecision)
 				case 0.75:
-					mx.Process.GCDurationP75.Set(q.Value() * 1000000)
+					mx.Process.GCDurationP75.Set(q.Value() * latencyPrecision)
 				case 1:
-					mx.Process.GCDurationMax.Set(q.Value() * 1000000)
+					mx.Process.GCDurationMax.Set(q.Value() * latencyPrecision)
 				}
 			}
 		}
