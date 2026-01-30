@@ -36,7 +36,7 @@
     icon: null,
     position: 'bottom-right',
     storageKey: 'ai-agent-chat',
-    maxInputBytes: 10240,    // 10KB max input size
+    maxInputBytes: 65536,    // 64KB max input size
     maxHistoryPairs: 5,      // Send last 5 user-assistant pairs
   };
 
@@ -129,18 +129,37 @@
     }
   }
 
+  // Clean up HTML before conversion (removes Google Sheets artifacts)
+  function cleanHtmlForConversion(html) {
+    // Remove HTML comments (Google Sheets adds CSS comments like <!--td {border:...}-->)
+    let cleaned = html.replace(/<!--[\s\S]*?-->/g, '');
+    // Remove style tags
+    cleaned = cleaned.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+    // Remove meta tags
+    cleaned = cleaned.replace(/<meta[^>]*>/gi, '');
+    return cleaned.trim();
+  }
+
   // Simple HTML to Markdown conversion (fallback if Turndown not available)
   function htmlToMarkdown(html) {
+    // Clean up HTML before conversion
+    const cleanedHtml = cleanHtmlForConversion(html);
+
     if (window.TurndownService) {
       const turndown = new window.TurndownService({
         headingStyle: 'atx',
         codeBlockStyle: 'fenced',
       });
-      return turndown.turndown(html);
+      // Add GFM plugin for tables support (Google Sheets paste)
+      // Uses @guyplusplus fork which handles tables without <thead>
+      if (window.TurndownPluginGfmService) {
+        turndown.use(window.TurndownPluginGfmService.gfm);
+      }
+      return turndown.turndown(cleanedHtml);
     }
     // Basic fallback - extract text only
     const temp = document.createElement('div');
-    temp.innerHTML = html;
+    temp.innerHTML = cleanedHtml;
     return temp.textContent || temp.innerText || '';
   }
 

@@ -103,6 +103,7 @@
     "mermaid": "^11.12.2",
     "prettier": "^3.8.1",
     "turndown": "^7.2.2",
+    "@guyplusplus/turndown-plugin-gfm": "^1.0.7",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },
