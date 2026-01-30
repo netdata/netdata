@@ -166,6 +166,7 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
         rrd_slot_memory_added(sizeof(PRD_ARRAY) + wanted_size * sizeof(struct pluginsd_rrddim));
 
         // Atomically replace the old array with the new one
+        // No spinlock needed: collector_tid is set, so cleanup code will skip this chart
         PRD_ARRAY *old_arr = prd_array_replace(&st->pluginsd.prd_array, new_arr);
 
         // Free the old array if there was one

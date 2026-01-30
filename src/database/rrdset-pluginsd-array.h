@@ -11,13 +11,30 @@
 // Reference-counted array for pluginsd dimension caching
 //
 // This structure provides thread-safe access to the dimension cache array used by the pluginsd protocol.
-// The reference counting ensures that:
-// 1. The array is not freed while any thread is still using it
-// 2. Concurrent readers can safely iterate without locks
-// 3. Writers can atomically replace the array without blocking readers
+// The reference counting ensures that the array is not freed while any thread is still using it.
 //
-// IMPORTANT: prd_array_acquire() requires a spinlock to prevent a race condition where another thread
-// could replace and free the array between loading the pointer and incrementing the refcount.
+// THREAD SAFETY - LIFECYCLE SEPARATION:
+// -------------------------------------
+// The design relies on collector and cleanup never running concurrently on the same chart:
+//
+// 1. collector_tid: Primary synchronization mechanism
+//    - Collector sets collector_tid BEFORE accessing the array
+//    - Collector clears collector_tid AFTER all operations are complete
+//    - Cleanup code checks collector_tid and SKIPS if non-zero
+//    - This allows the collector to use lock-free operations (get_unsafe, replace, release)
+//
+// 2. spinlock + refcount: Coordinates concurrent cleanup operations
+//    - prd_array_acquire(): Takes spinlock, loads pointer, increments refcount
+//    - Used by cleanup code when collector is NOT active
+//    - Prevents races between multiple cleanup threads
+//
+// 3. Lifecycle guarantee: In production, cleanup only runs when:
+//    - Stream receiver is stopped (collector thread terminated)
+//    - collector_tid is explicitly cleared before cleanup
+//    - Therefore, collector's replace+release never races with cleanup's acquire
+//
+// HOT PATH (collector active, collector_tid set): Lock-free
+// CLEANUP PATH (collector stopped, collector_tid == 0): Uses spinlock
 // --------------------------------------------------------------------------------------------------------------------
 
 typedef struct pluginsd_rrddim_array {
@@ -42,16 +59,13 @@ static inline PRD_ARRAY *prd_array_create(size_t size) {
 // Returns NULL if no array exists
 // The caller MUST call prd_array_release() when done
 //
-// IMPORTANT: This function requires a spinlock to prevent use-after-free:
-// Without the lock, between loading the array pointer and incrementing its refcount,
-// another thread could replace the pointer and free the old array.
+// IMPORTANT: Only call this when collector_tid == 0 (collector not active).
+// Uses spinlock to coordinate with other cleanup operations.
 static inline PRD_ARRAY *prd_array_acquire(PRD_ARRAY **array_ptr, SPINLOCK *spinlock) {
     spinlock_lock(spinlock);
 
     PRD_ARRAY *arr = *array_ptr;
     if (arr) {
-        // Safe to access arr->refcount because we hold the spinlock
-        // and any replace+release operation also needs this lock
         __atomic_fetch_add(&arr->refcount, 1, __ATOMIC_ACQ_REL);
     }
 
@@ -80,8 +94,9 @@ static inline void prd_array_release(PRD_ARRAY *arr) {
 // Returns the old array (caller must release it) or NULL if there was no old array
 // The new_arr can be NULL to clear the array
 //
-// IMPORTANT: When the returned old array will be released (potentially freeing it),
-// the caller MUST hold the same spinlock used by prd_array_acquire() to prevent races.
+// Thread safety depends on context:
+// - Collector (collector_tid set): No spinlock needed - cleanup will skip
+// - Cleanup (collector_tid == 0): Should hold spinlock to coordinate with other cleanup
 static inline PRD_ARRAY *prd_array_replace(PRD_ARRAY **array_ptr, PRD_ARRAY *new_arr) {
     return __atomic_exchange_n(array_ptr, new_arr, __ATOMIC_ACQ_REL);
 }
