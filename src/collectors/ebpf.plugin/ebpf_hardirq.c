@@ -326,9 +326,9 @@ static int hardirq_parse_interrupts(char *irq_name, int irq)
  */
 static int hardirq_read_latency_map(int mapfd)
 {
-    static hardirq_ebpf_static_val_t *hardirq_ebpf_vals = NULL;
-    if (!hardirq_ebpf_vals)
-        hardirq_ebpf_vals = callocz(ebpf_nprocs + 1, sizeof(hardirq_ebpf_static_val_t));
+    static hardirq_ebpf_static_val_t *hardirq_ebpf_dynamic_vals = NULL;
+    if (!hardirq_ebpf_dynamic_vals)
+        hardirq_ebpf_dynamic_vals = callocz(ebpf_nprocs, sizeof(hardirq_ebpf_static_val_t));
 
     hardirq_ebpf_key_t key = {};
     hardirq_ebpf_key_t next_key = {};
@@ -336,32 +336,16 @@ static int hardirq_read_latency_map(int mapfd)
     hardirq_val_t *v = NULL;
 
     while (bpf_map_get_next_key(mapfd, &key, &next_key) == 0) {
-        // get val for this key.
-        int test = bpf_map_lookup_elem(mapfd, &key, hardirq_ebpf_vals);
+        int test = bpf_map_lookup_elem(mapfd, &key, hardirq_ebpf_dynamic_vals);
         if (unlikely(test < 0)) {
             key = next_key;
             continue;
         }
 
-        // is this IRQ saved yet?
-        //
-        // if not, make a new one, mark it as unsaved for now, and continue; we
-        // will insert it at the end after all of its values are correctly set,
-        // so that we can safely publish it to the collector within a single,
-        // short locked operation.
-        //
-        // otherwise simply continue; we will only update the latency, which
-        // can be republished safely without a lock.
-        //
-        // NOTE: lock isn't strictly necessary for this initial search, as only
-        // this thread does writing, but the AVL is using a read-write lock so
-        // there is no congestion.
         bool v_is_new = false;
         search_v.irq = key.irq;
         v = (hardirq_val_t *)avl_search_lock(&hardirq_pub, (avl_t *)&search_v);
         if (unlikely(v == NULL)) {
-            // latency/name can only be added reliably at a later time.
-            // when they're added, only then will we AVL insert.
             v = ebpf_hardirq_get();
             v->irq = key.irq;
             v->dim_exists = false;
@@ -369,21 +353,14 @@ static int hardirq_read_latency_map(int mapfd)
             v_is_new = true;
         }
 
-        // note two things:
-        // 1. we must add up latency value for this IRQ across all CPUs.
-        // 2. the name is unfortunately *not* available on all CPU maps - only
-        //    a single map contains the name, so we must find it. we only need
-        //    to copy it though if the IRQ is new for us.
-        uint64_t total_latency = 0;
+        uint64_t latency = 0;
         int i;
         for (i = 0; i < ebpf_nprocs; i++) {
-            total_latency += hardirq_ebpf_vals[i].latency / 1000;
+            latency += hardirq_ebpf_dynamic_vals[i].latency / 1000;
         }
 
-        // can now safely publish latency for existing IRQs.
-        v->latency = total_latency;
+        v->latency = latency;
 
-        // can now safely publish new IRQ.
         if (v_is_new) {
             if (hardirq_parse_interrupts(v->name, v->irq)) {
                 ebpf_hardirq_release(v);
@@ -406,7 +383,7 @@ static void hardirq_read_latency_static_map(int mapfd)
 {
     static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
     if (!hardirq_ebpf_static_vals)
-        hardirq_ebpf_static_vals = callocz(ebpf_nprocs + 1, sizeof(hardirq_ebpf_static_val_t));
+        hardirq_ebpf_static_vals = callocz(ebpf_nprocs, sizeof(hardirq_ebpf_static_val_t));
 
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
@@ -416,14 +393,14 @@ static void hardirq_read_latency_static_map(int mapfd)
             continue;
         }
 
-        uint64_t total_latency = 0;
+        uint64_t latency = 0;
         int cpu_i;
         int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
         for (cpu_i = 0; cpu_i < end; cpu_i++) {
-            total_latency += hardirq_ebpf_static_vals[cpu_i].latency / 1000;
+            latency += hardirq_ebpf_static_vals[cpu_i].latency / 1000;
         }
 
-        hardirq_static_vals[i].latency = total_latency;
+        hardirq_static_vals[i].latency = latency;
     }
 }
 
