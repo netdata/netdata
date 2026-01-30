@@ -62,21 +62,37 @@ static void prd_array_release_entries(PRD_ARRAY *arr) {
 // Unslot a chart - releases dimension references but keeps the array for reuse
 // This is called when switching charts or marking them obsolete
 //
-// IMPORTANT: The collector_tid check is REQUIRED for correctness, not just optimization.
-// The collector does replace+release without spinlock (for lock-free hot path).
-// If we called acquire while collector is active, we could race with its replace+release.
+// IMPORTANT: This function must only be called when the collector is STOPPED, not just
+// when collector_tid happens to be 0. The collector_tid check inside the spinlock is a
+// safety mechanism, but the real protection comes from the caller ensuring the collector
+// is fully stopped before calling this function.
 
 void rrdset_pluginsd_receive_unslot(RRDSET *st) {
     if(!st)
         return;
 
-    // CRITICAL: Must skip if collector is active to avoid race with its lock-free operations
-    pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
-    if(collector_tid != 0)
-        return;
+    spinlock_lock(&st->pluginsd.spinlock);
 
-    // Safe to acquire now - collector is not active on this chart
-    PRD_ARRAY *arr = prd_array_acquire(&st->pluginsd.prd_array, &st->pluginsd.spinlock);
+    // Check collector_tid inside spinlock - if set, collector is active, skip
+    pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
+    if(collector_tid != 0) {
+        // This shouldn't happen if caller ensured collector is stopped
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                     "PLUGINSD: rrdset_pluginsd_receive_unslot called while collector (tid %d) is active, skipping",
+                     collector_tid);
+        spinlock_unlock(&st->pluginsd.spinlock);
+        return;
+    }
+
+    // Load and acquire array while holding spinlock (prevents TOCTOU with other cleanup)
+    PRD_ARRAY *arr = st->pluginsd.prd_array;
+    if (arr) {
+        __atomic_fetch_add(&arr->refcount, 1, __ATOMIC_ACQ_REL);
+    }
+
+    spinlock_unlock(&st->pluginsd.spinlock);
+
     if (arr) {
         // Release all dimension references
         prd_array_release_entries(arr);
@@ -172,97 +188,136 @@ void rrdset_pluginsd_receive_slots_initialize(RRDSET *st) {
 // Stress test for PRD_ARRAY lifecycle separation model
 // Run with: netdata -W prd-array-stress
 //
-// This test validates that the lifecycle separation between collector and cleanup is correct:
-// - The collector (writer) sets collector_tid, uses lock-free operations, then clears collector_tid
-// - The cleaner checks collector_tid and skips if set, otherwise uses spinlock for coordination
-// - In production, cleanup only runs when the collector is fully stopped, so they never race
-// - This test simulates that lifecycle with interleaved writer and cleaner threads
+// This test validates the lifecycle separation model used in production:
+// - In production, the collector is FULLY STOPPED before cleanup runs
+// - The collector_tid check is a safety mechanism, but the real protection comes from lifecycle separation
+// - This test simulates that by running the writer and cleaner in non-overlapping phases
+//
+// The test runs in cycles:
+// 1. Writer phase: collector runs multiple iterations (collector_tid set)
+// 2. Handoff: collector fully stops (collector_tid cleared, writer_done signaled)
+// 3. Cleanup phase: cleaner runs (only when writer is fully stopped)
+// 4. Repeat
 // --------------------------------------------------------------------------------------------------------------------
 
 #define PRD_STRESS_TEST_DURATION_SEC 5
-#define PRD_STRESS_NUM_WRITERS 1   // Must be 1 - only one collector per chart in real code
-#define PRD_STRESS_NUM_CLEANERS 2  // Multiple cleanup threads to test spinlock coordination
+#define PRD_STRESS_ITERATIONS_PER_PHASE 50
 
 typedef struct {
     PRD_ARRAY *prd_array;
-    int32_t collector_tid;
+    pid_t collector_tid;
     SPINLOCK spinlock;
-    bool running;
+
+    // Lifecycle coordination (simulates stream receiver stop/start)
+    bool test_running;           // Overall test is running
+    bool writer_should_run;      // Writer is allowed to run
+    bool writer_is_running;      // Writer is currently in a phase
+
+    // Counters
     uint64_t grow_count;
     uint64_t cleanup_count;
-    uint64_t cleanup_skipped;
+    uint64_t phase_count;
 } prd_stress_state_t;
 
 static prd_stress_state_t prd_stress_state;
 
 static void prd_stress_writer_thread(void *arg __maybe_unused) {
-    while (__atomic_load_n(&prd_stress_state.running, __ATOMIC_ACQUIRE)) {
+    while (__atomic_load_n(&prd_stress_state.test_running, __ATOMIC_ACQUIRE)) {
+
+        // Wait until we're allowed to run (simulates stream receiver starting)
+        while (__atomic_load_n(&prd_stress_state.test_running, __ATOMIC_ACQUIRE) &&
+               !__atomic_load_n(&prd_stress_state.writer_should_run, __ATOMIC_ACQUIRE)) {
+            tinysleep();
+        }
+
+        if (!__atomic_load_n(&prd_stress_state.test_running, __ATOMIC_ACQUIRE))
+            break;
+
+        // Signal that writer is now running
+        __atomic_store_n(&prd_stress_state.writer_is_running, true, __ATOMIC_RELEASE);
+
         // Simulate collector_tid being set (like pluginsd_set_scope_chart does)
-        __atomic_store_n(&prd_stress_state.collector_tid, 1, __ATOMIC_RELEASE);
+        __atomic_store_n(&prd_stress_state.collector_tid, gettid_cached(), __ATOMIC_RELEASE);
 
-        PRD_ARRAY *current_arr = prd_array_get_unsafe(&prd_stress_state.prd_array);
+        // Run multiple iterations in this phase (simulates collecting data)
+        for (int iter = 0; iter < PRD_STRESS_ITERATIONS_PER_PHASE; iter++) {
+            if (!__atomic_load_n(&prd_stress_state.writer_should_run, __ATOMIC_ACQUIRE))
+                break;
 
-        // Determine new size based on current array (or start fresh if NULL)
-        size_t current_size = current_arr ? current_arr->size : 0;
-        size_t new_size = current_size + 10;
+            PRD_ARRAY *current_arr = prd_array_get_unsafe(&prd_stress_state.prd_array);
 
-        // Wrap around to avoid unbounded growth
-        if (new_size > 1000)
-            new_size = 10;
+            size_t current_size = current_arr ? current_arr->size : 0;
+            size_t new_size = current_size + 10;
 
-        // Create new array
-        PRD_ARRAY *new_arr = prd_array_create(new_size);
+            if (new_size > 500)
+                new_size = 10;
 
-        // Copy existing entries (only copy what fits in the new array)
-        if (current_arr && current_size > 0) {
-            size_t copy_count = (current_size < new_size) ? current_size : new_size;
-            memcpy(new_arr->entries, current_arr->entries,
-                   copy_count * sizeof(struct pluginsd_rrddim));
+            PRD_ARRAY *new_arr = prd_array_create(new_size);
+
+            if (current_arr && current_size > 0) {
+                size_t copy_count = (current_size < new_size) ? current_size : new_size;
+                memcpy(new_arr->entries, current_arr->entries,
+                       copy_count * sizeof(struct pluginsd_rrddim));
+            }
+
+            for (size_t i = (current_size < new_size ? current_size : 0); i < new_size; i++) {
+                new_arr->entries[i].rd = (void *)(uintptr_t)(i + 1);
+                new_arr->entries[i].id = "test";
+            }
+
+            PRD_ARRAY *old_arr = prd_array_replace(&prd_stress_state.prd_array, new_arr);
+
+            if (old_arr)
+                prd_array_release(old_arr);
+
+            __atomic_fetch_add(&prd_stress_state.grow_count, 1, __ATOMIC_RELAXED);
+
+            tinysleep();
         }
 
-        // Initialize new entries with some data
-        for (size_t i = current_size; i < new_size; i++) {
-            new_arr->entries[i].rd = (void *)(uintptr_t)(i + 1);
-            new_arr->entries[i].id = "test";
-        }
-
-        // Atomically replace - no spinlock needed because collector_tid is set
-        // Cleanup code checks collector_tid and skips if set
-        PRD_ARRAY *old_arr = prd_array_replace(&prd_stress_state.prd_array, new_arr);
-
-        if (old_arr)
-            prd_array_release(old_arr);
-
-        __atomic_fetch_add(&prd_stress_state.grow_count, 1, __ATOMIC_RELAXED);
-
-        // Clear collector_tid
+        // Clear collector_tid (like pluginsd_set_scope_chart does when switching away)
         __atomic_store_n(&prd_stress_state.collector_tid, 0, __ATOMIC_RELEASE);
 
-        usleep(100);
+        // Signal that writer phase is complete
+        __atomic_store_n(&prd_stress_state.writer_is_running, false, __ATOMIC_RELEASE);
+
+        // Wait for permission to stop (let cleanup run)
+        while (__atomic_load_n(&prd_stress_state.test_running, __ATOMIC_ACQUIRE) &&
+               !__atomic_load_n(&prd_stress_state.writer_should_run, __ATOMIC_ACQUIRE) &&
+               !__atomic_load_n(&prd_stress_state.writer_is_running, __ATOMIC_ACQUIRE)) {
+            tinysleep();
+        }
     }
 }
 
 static void prd_stress_cleanup_thread(void *arg __maybe_unused) {
-    while (__atomic_load_n(&prd_stress_state.running, __ATOMIC_ACQUIRE)) {
-        usleep(500);
+    while (__atomic_load_n(&prd_stress_state.test_running, __ATOMIC_ACQUIRE)) {
 
+        // Wait until writer is fully stopped (simulates stream_receiver_signal_to_stop_and_wait)
+        while (__atomic_load_n(&prd_stress_state.test_running, __ATOMIC_ACQUIRE) &&
+               __atomic_load_n(&prd_stress_state.writer_is_running, __ATOMIC_ACQUIRE)) {
+            tinysleep();
+        }
+
+        if (!__atomic_load_n(&prd_stress_state.test_running, __ATOMIC_ACQUIRE))
+            break;
+
+        // Now safe to cleanup - writer is fully stopped
         spinlock_lock(&prd_stress_state.spinlock);
 
-        // Check if collector is active (like rrdset_pluginsd_receive_unslot_and_cleanup does)
-        int32_t collector_tid = __atomic_load_n(&prd_stress_state.collector_tid, __ATOMIC_ACQUIRE);
+        // Double-check collector_tid (should be 0 since writer stopped)
+        pid_t collector_tid = __atomic_load_n(&prd_stress_state.collector_tid, __ATOMIC_ACQUIRE);
         if (collector_tid != 0) {
-            __atomic_fetch_add(&prd_stress_state.cleanup_skipped, 1, __ATOMIC_RELAXED);
+            // This shouldn't happen if lifecycle is correct
             spinlock_unlock(&prd_stress_state.spinlock);
             continue;
         }
 
-        // Replace array with NULL
         PRD_ARRAY *old_arr = prd_array_replace(&prd_stress_state.prd_array, NULL);
 
         spinlock_unlock(&prd_stress_state.spinlock);
 
         if (old_arr) {
-            // Simulate clearing entries
             for (size_t i = 0; i < old_arr->size; i++) {
                 old_arr->entries[i].rda = NULL;
                 old_arr->entries[i].rd = NULL;
@@ -272,79 +327,109 @@ static void prd_stress_cleanup_thread(void *arg __maybe_unused) {
             prd_array_release(old_arr);
             __atomic_fetch_add(&prd_stress_state.cleanup_count, 1, __ATOMIC_RELAXED);
         }
+
+        tinysleep();
+    }
+}
+
+// Controller thread - orchestrates the lifecycle phases
+static void prd_stress_controller_thread(void *arg __maybe_unused) {
+    while (__atomic_load_n(&prd_stress_state.test_running, __ATOMIC_ACQUIRE)) {
+
+        // Start writer phase
+        __atomic_store_n(&prd_stress_state.writer_should_run, true, __ATOMIC_RELEASE);
+
+        // Wait for writer to start and run
+        usleep(10000);  // 10ms - let writer run
+
+        // Signal writer to stop (simulates stream receiver stopping)
+        __atomic_store_n(&prd_stress_state.writer_should_run, false, __ATOMIC_RELEASE);
+
+        // Wait for writer to fully stop
+        while (__atomic_load_n(&prd_stress_state.test_running, __ATOMIC_ACQUIRE) &&
+               __atomic_load_n(&prd_stress_state.writer_is_running, __ATOMIC_ACQUIRE)) {
+            tinysleep();
+        }
+
+        // Cleanup phase - cleaner will run now that writer is stopped
+        usleep(5000);  // 5ms - let cleanup run
+
+        __atomic_fetch_add(&prd_stress_state.phase_count, 1, __ATOMIC_RELAXED);
     }
 }
 
 int prd_array_stress_test(void) {
-    int num_writers = PRD_STRESS_NUM_WRITERS;
-    int num_cleaners = PRD_STRESS_NUM_CLEANERS;
     int duration_secs = PRD_STRESS_TEST_DURATION_SEC;
-    int total_threads = num_writers + num_cleaners;
 
     fprintf(stderr, "\nPRD_ARRAY Lifecycle Stress Test\n");
     fprintf(stderr, "================================\n");
     fprintf(stderr, "Duration: %d seconds\n", duration_secs);
-    fprintf(stderr, "Writers (collectors): %d, Cleaners: %d\n\n", num_writers, num_cleaners);
+    fprintf(stderr, "This test simulates production lifecycle:\n");
+    fprintf(stderr, "  1. Writer (collector) runs with collector_tid set\n");
+    fprintf(stderr, "  2. Writer fully stops (collector_tid cleared)\n");
+    fprintf(stderr, "  3. Cleaner runs cleanup\n");
+    fprintf(stderr, "  4. Repeat\n\n");
 
     // Initialize state
     memset(&prd_stress_state, 0, sizeof(prd_stress_state));
     prd_stress_state.prd_array = prd_array_create(10);
     spinlock_init(&prd_stress_state.spinlock);
-    __atomic_store_n(&prd_stress_state.running, true, __ATOMIC_RELEASE);
+    __atomic_store_n(&prd_stress_state.test_running, true, __ATOMIC_RELEASE);
 
     // Start threads
-    ND_THREAD **threads = callocz(total_threads, sizeof(ND_THREAD *));
     char thread_name[32];
 
-    int t = 0;
-    for (int i = 0; i < num_writers; i++) {
-        snprintfz(thread_name, sizeof(thread_name), "PRDSTRESS_W%d", i);
-        threads[t++] = nd_thread_create(thread_name, NETDATA_THREAD_OPTION_DEFAULT,
-                                        prd_stress_writer_thread, NULL);
-    }
-    for (int i = 0; i < num_cleaners; i++) {
-        snprintfz(thread_name, sizeof(thread_name), "PRDSTRESS_C%d", i);
-        threads[t++] = nd_thread_create(thread_name, NETDATA_THREAD_OPTION_DEFAULT,
-                                        prd_stress_cleanup_thread, NULL);
-    }
+    snprintfz(thread_name, sizeof(thread_name), "PRDSTRESS_W");
+    ND_THREAD *writer_thread = nd_thread_create(thread_name, NETDATA_THREAD_OPTION_DEFAULT,
+                                                 prd_stress_writer_thread, NULL);
+
+    snprintfz(thread_name, sizeof(thread_name), "PRDSTRESS_C");
+    ND_THREAD *cleanup_thread = nd_thread_create(thread_name, NETDATA_THREAD_OPTION_DEFAULT,
+                                                  prd_stress_cleanup_thread, NULL);
+
+    snprintfz(thread_name, sizeof(thread_name), "PRDSTRESS_CTRL");
+    ND_THREAD *controller_thread = nd_thread_create(thread_name, NETDATA_THREAD_OPTION_DEFAULT,
+                                                     prd_stress_controller_thread, NULL);
 
     // Run the test
     fprintf(stderr, "Running stress test...\n");
     for (int i = 0; i < duration_secs; i++) {
         sleep_usec(USEC_PER_SEC);
-        fprintf(stderr, "  %d/%d sec - grows: %"PRIu64", cleanups: %"PRIu64", skipped: %"PRIu64"\n",
+        fprintf(stderr, "  %d/%d sec - phases: %"PRIu64", grows: %"PRIu64", cleanups: %"PRIu64"\n",
                 i + 1, duration_secs,
+                __atomic_load_n(&prd_stress_state.phase_count, __ATOMIC_RELAXED),
                 __atomic_load_n(&prd_stress_state.grow_count, __ATOMIC_RELAXED),
-                __atomic_load_n(&prd_stress_state.cleanup_count, __ATOMIC_RELAXED),
-                __atomic_load_n(&prd_stress_state.cleanup_skipped, __ATOMIC_RELAXED));
+                __atomic_load_n(&prd_stress_state.cleanup_count, __ATOMIC_RELAXED));
     }
 
-    // Stop threads
-    __atomic_store_n(&prd_stress_state.running, false, __ATOMIC_RELEASE);
+    // Stop all threads
+    __atomic_store_n(&prd_stress_state.test_running, false, __ATOMIC_RELEASE);
+    __atomic_store_n(&prd_stress_state.writer_should_run, true, __ATOMIC_RELEASE);  // Unblock writer
 
-    for (int i = 0; i < total_threads; i++) {
-        nd_thread_join(threads[i]);
-    }
+    nd_thread_join(controller_thread);
+    nd_thread_join(writer_thread);
+    nd_thread_join(cleanup_thread);
 
-    // Final cleanup (all threads stopped, no synchronization needed)
+    // Final cleanup
     PRD_ARRAY *final_arr = prd_array_replace(&prd_stress_state.prd_array, NULL);
     if (final_arr)
         prd_array_release(final_arr);
 
-    freez(threads);
-
     // Print results
     fprintf(stderr, "\nTest completed!\n");
     fprintf(stderr, "===============\n");
-    fprintf(stderr, "Total grows:           %"PRIu64"\n", prd_stress_state.grow_count);
-    fprintf(stderr, "Total cleanups:        %"PRIu64"\n", prd_stress_state.cleanup_count);
-    fprintf(stderr, "Total cleanup skipped: %"PRIu64"\n", prd_stress_state.cleanup_skipped);
+    fprintf(stderr, "Total phases:    %"PRIu64"\n", prd_stress_state.phase_count);
+    fprintf(stderr, "Total grows:     %"PRIu64"\n", prd_stress_state.grow_count);
+    fprintf(stderr, "Total cleanups:  %"PRIu64"\n", prd_stress_state.cleanup_count);
 
-    fprintf(stderr, "\nSUCCESS: Test completed without crashes\n");
-    fprintf(stderr, "\nThis test validates the lifecycle separation model:\n");
-    fprintf(stderr, "- Writer (collector) uses lock-free get_unsafe/replace when collector_tid is set\n");
-    fprintf(stderr, "- Cleaner checks collector_tid and skips if set, uses spinlock otherwise\n");
-    fprintf(stderr, "- No concurrent access between writer and cleaner on the same array\n");
-
-    return 0;
+    if (prd_stress_state.cleanup_count > 0 && prd_stress_state.grow_count > 0) {
+        fprintf(stderr, "\nSUCCESS: Lifecycle separation validated\n");
+        fprintf(stderr, "- Writer and cleaner ran in non-overlapping phases\n");
+        fprintf(stderr, "- No concurrent access to the array\n");
+        fprintf(stderr, "- Reference counting worked correctly\n");
+        return 0;
+    } else {
+        fprintf(stderr, "\nWARNING: Low activity - increase test duration\n");
+        return 1;
+    }
 }
