@@ -337,7 +337,7 @@ static void prd_stress_controller_thread(void *arg __maybe_unused) {
         __atomic_store_n(&prd_stress_state.writer_should_run, true, __ATOMIC_RELEASE);
 
         // Wait for writer to start and run
-        usleep(10000);  // 10ms - let writer run
+        sleep_usec(10000);  // 10ms - let writer run
 
         // Signal writer to stop (simulates stream receiver stopping)
         __atomic_store_n(&prd_stress_state.writer_should_run, false, __ATOMIC_RELEASE);
@@ -349,7 +349,7 @@ static void prd_stress_controller_thread(void *arg __maybe_unused) {
         }
 
         // Cleanup phase - cleaner will run now that writer is stopped
-        usleep(5000);  // 5ms - let cleanup run
+        sleep_usec(5000);  // 5ms - let cleanup run
 
         __atomic_fetch_add(&prd_stress_state.phase_count, 1, __ATOMIC_RELAXED);
     }
