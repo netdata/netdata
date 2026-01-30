@@ -10,7 +10,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 )
 
@@ -66,21 +65,4 @@ func unmarshalPayload(dst any, fn functions.Function) error {
 		return json.Unmarshal(fn.Payload, dst)
 	}
 	return yaml.Unmarshal(fn.Payload, dst)
-}
-
-func getFnSourceValue(fn functions.Function, key string) string {
-	prefix := key + "="
-	for _, part := range strings.Split(fn.Source, ",") {
-		if v, ok := strings.CutPrefix(part, prefix); ok {
-			return strings.TrimSpace(v)
-		}
-	}
-	return ""
-}
-
-func getDyncfgCommand(fn functions.Function) dyncfg.Command {
-	if len(fn.Args) < 2 {
-		return ""
-	}
-	return dyncfg.Command(strings.ToLower(fn.Args[1]))
 }

@@ -117,7 +117,7 @@ func (d *ServiceDiscovery) dyncfgConfig(fn functions.Function) {
 		return
 	}
 
-	cmd := getDyncfgCommand(fn)
+	cmd := dyncfg.GetCommand(fn)
 
 	// Read-only commands can be executed directly
 	switch cmd {
@@ -142,7 +142,7 @@ func (d *ServiceDiscovery) dyncfgConfig(fn functions.Function) {
 
 // dyncfgSeqExec executes state-changing dyncfg commands serially.
 func (d *ServiceDiscovery) dyncfgSeqExec(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+	cmd := dyncfg.GetCommand(fn)
 
 	switch cmd {
 	case dyncfg.CommandAdd:
@@ -239,7 +239,7 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn functions.Function) {
 		return
 	}
 
-	d.Infof("dyncfg: add: %s:%s by user '%s'", dt, name, getFnSourceValue(fn, "user"))
+	d.Infof("dyncfg: add: %s:%s by user '%s'", dt, name, dyncfg.GetSourceValue(fn, "user"))
 
 	// Check if config already exists (use getPipelineKey as existence check)
 	if d.exposedConfigs.getPipelineKey(dt, name) != "" {
@@ -301,7 +301,7 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn functions.Function) {
 
 	pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", fn.Source)
 
-	d.Infof("dyncfg: update: %s:%s by user '%s'", dt, name, getFnSourceValue(fn, "user"))
+	d.Infof("dyncfg: update: %s:%s by user '%s'", dt, name, dyncfg.GetSourceValue(fn, "user"))
 
 	// Update stored config content
 	d.exposedConfigs.updateContent(dt, name, fn.Payload)
@@ -543,23 +543,6 @@ func isValidDiscovererType(dt string) bool {
 		}
 	}
 	return false
-}
-
-func getDyncfgCommand(fn functions.Function) dyncfg.Command {
-	if len(fn.Args) < 2 {
-		return ""
-	}
-	return dyncfg.Command(strings.ToLower(fn.Args[1]))
-}
-
-func getFnSourceValue(fn functions.Function, key string) string {
-	prefix := key + "="
-	for _, part := range strings.Split(fn.Source, ",") {
-		if v, ok := strings.CutPrefix(part, prefix); ok {
-			return strings.TrimSpace(v)
-		}
-	}
-	return ""
 }
 
 // getDiscovererSchema returns a JSON schema for the given discoverer type.

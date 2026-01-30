@@ -4,6 +4,8 @@ package dyncfg
 
 import (
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 )
 
 // Status represents the state of a dyncfg entity
@@ -53,4 +55,25 @@ func JoinCommands(commands ...Command) string {
 		strs[i] = string(cmd)
 	}
 	return strings.Join(strs, " ")
+}
+
+// GetCommand extracts the dyncfg command from a function's arguments.
+// Returns empty string if args has fewer than 2 elements.
+func GetCommand(fn functions.Function) Command {
+	if len(fn.Args) < 2 {
+		return ""
+	}
+	return Command(strings.ToLower(fn.Args[1]))
+}
+
+// GetSourceValue extracts a value from the function's Source field.
+// Source format is "key1=value1,key2=value2,...".
+func GetSourceValue(fn functions.Function, key string) string {
+	prefix := key + "="
+	for _, part := range strings.Split(fn.Source, ",") {
+		if v, ok := strings.CutPrefix(part, prefix); ok {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }
