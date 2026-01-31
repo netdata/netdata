@@ -204,27 +204,11 @@ func (m *PipelineManager) startPipelineLocked(ctx context.Context, key string, c
 }
 
 func (m *PipelineManager) startPipelineWithInstanceLocked(ctx context.Context, key string, cfg pipeline.Config, pl sdPipeline) error {
-	// Cancel any existing pipeline for this key (handles race in Restart)
-	if existing, ok := m.pipelines[key]; ok {
-		m.Warningf("pipeline '%s': cancelling unexpected existing pipeline before start", key)
-		existing.cancel()
-
-		// Preserve sources from the interloping pipeline for grace period cleanup
-		if sources, ok := m.pipelineSources[key]; ok && len(sources) > 0 {
-			if pending, ok := m.pendingRemovals[key]; ok {
-				for src := range sources {
-					pending.sources[src] = struct{}{}
-				}
-				pending.timestamp = time.Now()
-			} else {
-				m.pendingRemovals[key] = &pendingRemoval{
-					sources:   copySourcesMap(sources),
-					timestamp: time.Now(),
-				}
-			}
-		}
-		// Don't wait - just cancel and let it exit asynchronously
-	}
+	// No check for existing pipeline needed here:
+	// All operations for the same pipeline key are processed sequentially
+	// in ServiceDiscovery.run()'s select loop (both file config events and
+	// dyncfg commands), so concurrent Start/Restart calls for the same key
+	// cannot occur.
 
 	plCtx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
