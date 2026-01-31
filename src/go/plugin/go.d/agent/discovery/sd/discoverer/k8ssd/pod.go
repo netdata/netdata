@@ -418,4 +418,3 @@ func isVar(name string) bool {
 	// variables.
 	return strings.IndexByte(name, '$') != -1
 }
-

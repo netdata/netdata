@@ -295,4 +295,3 @@ func extractComm(cmdLine string) string {
 	_, comm := filepath.Split(cmdLine)
 	return strings.TrimSuffix(comm, ":")
 }
-

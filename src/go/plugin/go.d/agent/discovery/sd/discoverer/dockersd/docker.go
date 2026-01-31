@@ -213,4 +213,3 @@ func cntrSource(cntr typesContainer.Summary) string {
 	name := strings.TrimPrefix(cntr.Names[0], "/")
 	return fmt.Sprintf("discoverer=docker,container=%s,image=%s", name, cntr.Image)
 }
-
