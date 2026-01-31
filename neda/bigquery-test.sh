@@ -65,8 +65,9 @@ if [[ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]]; then
 fi
 
 # Default: last 7 complete days (ending yesterday) for stability, matching Grafana patterns.
-FROM_DATE="${FROM_DATE:-$(date -I -d '7 days ago')}"
-TO_DATE="${TO_DATE:-$(date -I -d '1 day ago')}"
+# Use UTC (-u) to match BigQuery's CURRENT_DATE() which is UTC-based.
+FROM_DATE="${FROM_DATE:-$(date -u -I -d '7 days ago')}"
+TO_DATE="${TO_DATE:-$(date -u -I -d '1 day ago')}"
 
 AI_AGENT_BIN="${AI_AGENT_BIN:-${SCRIPT_DIR}/../ai-agent}"
 SYSTEM_PROMPT="${SYSTEM_PROMPT:-${SCRIPT_DIR}/bigquery.ai}"
