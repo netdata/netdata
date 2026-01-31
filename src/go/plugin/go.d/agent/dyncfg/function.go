@@ -119,21 +119,21 @@ func (f Function) ValidateHasPayload() error {
 // Uses JSON for "application/json", YAML otherwise.
 func (f Function) UnmarshalPayload(dst any) error {
 	if f.fn.ContentType == "application/json" {
-		return f.UnmarshalJSON(dst)
+		return f.unmarshalJSON(dst)
 	}
-	return f.UnmarshalYAML(dst)
+	return f.unmarshalYAML(dst)
 }
 
-// UnmarshalJSON unmarshals the payload as JSON into dst.
-func (f Function) UnmarshalJSON(dst any) error {
+// unmarshalJSON unmarshals the payload as JSON into dst.
+func (f Function) unmarshalJSON(dst any) error {
 	if err := json.Unmarshal(f.fn.Payload, dst); err != nil {
 		return fmt.Errorf("failed to unmarshal JSON payload: %w", err)
 	}
 	return nil
 }
 
-// UnmarshalYAML unmarshals the payload as YAML into dst.
-func (f Function) UnmarshalYAML(dst any) error {
+// unmarshalYAML unmarshals the payload as YAML into dst.
+func (f Function) unmarshalYAML(dst any) error {
 	if err := yaml.Unmarshal(f.fn.Payload, dst); err != nil {
 		return fmt.Errorf("failed to unmarshal YAML payload: %w", err)
 	}
