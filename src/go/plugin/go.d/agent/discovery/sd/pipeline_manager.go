@@ -26,9 +26,9 @@ type PipelineManager struct {
 	send        func(ctx context.Context, groups []*confgroup.Group)
 
 	mux             sync.Mutex
-	pipelines       map[string]*runningPipeline       // [pipelineKey]
-	pipelineSources map[string]map[string]struct{}    // [pipelineKey][source]
-	pendingRemovals map[string]*pendingRemoval        // [pipelineKey]
+	pipelines       map[string]*runningPipeline    // [pipelineKey]
+	pipelineSources map[string]map[string]struct{} // [pipelineKey][source]
+	pendingRemovals map[string]*pendingRemoval     // [pipelineKey]
 }
 
 type runningPipeline struct {
