@@ -9,7 +9,6 @@ type DyncfgNetListenersConfig struct {
 	Name     string `json:"name" yaml:"name"`
 	Disabled bool   `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 
-	Tags     string `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Interval string `json:"interval,omitempty" yaml:"interval,omitempty"`
 	Timeout  string `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 
@@ -20,7 +19,6 @@ type DyncfgDockerConfig struct {
 	Name     string `json:"name" yaml:"name"`
 	Disabled bool   `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 
-	Tags    string `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Address string `json:"address,omitempty" yaml:"address,omitempty"`
 	Timeout string `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 
@@ -32,7 +30,6 @@ type DyncfgK8sConfig struct {
 	Disabled bool   `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 
 	Role       string               `json:"role,omitempty" yaml:"role,omitempty"`
-	Tags       string               `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Namespaces []string             `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
 	Selector   *DyncfgK8sSelector   `json:"selector,omitempty" yaml:"selector,omitempty"`
 	Pod        *DyncfgK8sPodOptions `json:"pod,omitempty" yaml:"pod,omitempty"`

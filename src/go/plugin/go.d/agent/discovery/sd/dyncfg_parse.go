@@ -38,9 +38,7 @@ func parseNetListenersConfig(payload []byte, configDefaults confgroup.Registry) 
 		return pipeline.Config{}, fmt.Errorf("unmarshal net_listeners config: %w", err)
 	}
 
-	nlCfg := netlistensd.Config{
-		Tags: dc.Tags,
-	}
+	nlCfg := netlistensd.Config{}
 
 	if dc.Interval != "" {
 		d, err := time.ParseDuration(dc.Interval)
@@ -77,7 +75,6 @@ func parseDockerConfig(payload []byte, configDefaults confgroup.Registry) (pipel
 	}
 
 	dCfg := dockersd.Config{
-		Tags:    dc.Tags,
 		Address: dc.Address,
 	}
 
@@ -109,7 +106,6 @@ func parseK8sConfig(payload []byte, configDefaults confgroup.Registry) (pipeline
 
 	k8sCfg := k8ssd.Config{
 		Role:       dc.Role,
-		Tags:       dc.Tags,
 		Namespaces: dc.Namespaces,
 	}
 

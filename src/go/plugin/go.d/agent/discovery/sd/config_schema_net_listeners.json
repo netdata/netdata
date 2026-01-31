@@ -20,36 +20,32 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Timeout for local listener discovery.",
-        "type": "string",
-        "pattern": "^[0-9]+(s|m)$",
-        "default": "5s"
-      },
-      "tags": {
-        "title": "Tags",
-        "description": "Tags to apply to discovered targets (space-separated).",
-        "type": "string"
+        "description": "Timeout for local listener discovery, in seconds.",
+        "type": "number",
+        "minimum": 0.1,
+        "default": 5
       },
       "services": {
         "title": "Service rules",
-        "description": "Service matching rules.",
+        "description": "- Match discovered network listeners and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a listener matches, a data collection job is created.",
         "type": "array",
+        "minItems": 1,
         "items": {
           "type": "object",
           "properties": {
             "id": {
               "title": "Rule ID",
-              "description": "Rule identifier (for logging/diagnostics).",
+              "description": "Unique identifier for this rule. Used in logs to identify which rule matched a service.",
               "type": "string"
             },
             "match": {
               "title": "Match expression",
-              "description": "Expression to match targets (e.g., '{{.Port}} == 80').",
+              "description": "Go template expression that must evaluate to 'true' for the rule to match the discovered service.",
               "type": "string"
             },
             "config_template": {
               "title": "Config template",
-              "description": "YAML template for collector config generation.",
+              "description": "**Uses the same fields as match expression**. Go template that generates the data collection job configuration in YAML format. **Must include 'module' and 'name' fields**, plus any module-specific settings.",
               "type": "string"
             }
           },
@@ -68,18 +64,48 @@
     "uiOptions": {
       "fullPage": true
     },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "name",
+            "interval",
+            "timeout"
+          ]
+        },
+        {
+          "title": "Services",
+          "fields": [
+            "services"
+          ]
+        }
+      ]
+    },
     "interval": {
       "ui:placeholder": "2m",
       "ui:help": "Examples: 30s, 2m, 5m"
     },
     "timeout": {
-      "ui:placeholder": "5s",
-      "ui:help": "Examples: 5s, 10s"
+      "ui:placeholder": "5",
+      "ui:help": "Value in seconds. Examples: 5, 10, 0.5"
     },
     "services": {
+      "ui:listFlavour": "list",
       "items": {
+        "id": {
+          "ui:placeholder": "nginx-http",
+          "ui:help": "Use descriptive names like 'nginx-http', 'mysql-default', 'redis-local'"
+        },
+        "match": {
+          "ui:widget": "textarea",
+          "ui:placeholder": "{{ eq .Comm \"nginx\" }}",
+          "ui:help": "| Field | Description |\n|-------|-------------|\n| `.Protocol` | TCP, TCP6, UDP, UDP6 |\n| `.IPAddress` | IP address |\n| `.Port` | Port number |\n| `.Address` | IP:Port combined |\n| `.Comm` | Process name |\n| `.Cmdline` | Full command line |\n\n**Functions:** eq, ne, glob, regexp, and, or, not"
+        },
         "config_template": {
-          "ui:widget": "textarea"
+          "ui:widget": "textarea",
+          "ui:placeholder": "module: nginx\nname: {{.Name}}-{{.Address}}\nurl: http://{{.Address}}/stub_status"
         }
       }
     }

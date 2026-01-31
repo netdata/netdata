@@ -59,31 +59,27 @@
           }
         }
       },
-      "tags": {
-        "title": "Tags",
-        "description": "Tags to apply to discovered targets (space-separated).",
-        "type": "string"
-      },
       "services": {
         "title": "Service rules",
-        "description": "Service matching rules.",
+        "description": "- Match discovered Kubernetes resources and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a pod or service matches, a data collection job is created.",
         "type": "array",
+        "minItems": 1,
         "items": {
           "type": "object",
           "properties": {
             "id": {
               "title": "Rule ID",
-              "description": "Rule identifier (for logging/diagnostics).",
+              "description": "Unique identifier for this rule. Used in logs to identify which rule matched a resource.",
               "type": "string"
             },
             "match": {
               "title": "Match expression",
-              "description": "Expression to match resources.",
+              "description": "Go template expression that must evaluate to 'true' for the rule to match the discovered pod or service.",
               "type": "string"
             },
             "config_template": {
               "title": "Config template",
-              "description": "YAML template for collector config generation.",
+              "description": "**Uses the same fields as match expression**. Go template that generates the data collection job configuration in YAML format. **Must include 'module' and 'name' fields**, plus any module-specific settings.",
               "type": "string"
             }
           },
@@ -96,13 +92,33 @@
     },
     "required": [
       "name",
-      "role",
-      "tags"
+      "role"
     ]
   },
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "name",
+            "role",
+            "namespaces",
+            "selector",
+            "pod"
+          ]
+        },
+        {
+          "title": "Services",
+          "fields": [
+            "services"
+          ]
+        }
+      ]
     },
     "selector": {
       "label": {
@@ -113,9 +129,20 @@
       }
     },
     "services": {
+      "ui:listFlavour": "list",
       "items": {
+        "id": {
+          "ui:placeholder": "nginx-pods",
+          "ui:help": "Use descriptive names like 'nginx-pods', 'mysql-service', 'prometheus-metrics'"
+        },
+        "match": {
+          "ui:widget": "textarea",
+          "ui:placeholder": "{{ eq .Namespace \"default\" }}",
+          "ui:help": "**Pod role fields:**\n| Field | Description |\n|-------|-------------|\n| `.Address` | Pod IP:Port |\n| `.Namespace` | Pod namespace |\n| `.Name` | Pod name |\n| `.Annotations` | Annotations (map) |\n| `.Labels` | Labels (map) |\n| `.NodeName` | Node name |\n| `.PodIP` | Pod IP |\n| `.ControllerName` | Controller name |\n| `.ControllerKind` | Controller kind |\n| `.ContName` | Container name |\n| `.Image` | Container image |\n| `.Env` | Env vars (map) |\n| `.Port` | Container port |\n| `.PortName` | Port name |\n| `.PortProtocol` | Port protocol |\n\n**Service role fields:**\n| Field | Description |\n|-------|-------------|\n| `.Address` | ClusterIP:Port |\n| `.Namespace` | Service namespace |\n| `.Name` | Service name |\n| `.Annotations` | Annotations (map) |\n| `.Labels` | Labels (map) |\n| `.Port` | Service port |\n| `.PortName` | Port name |\n| `.PortProtocol` | Port protocol |\n| `.ClusterIP` | Cluster IP |\n| `.ExternalName` | External name |\n\n**Functions:** eq, ne, glob, regexp, and, or, not\n\n**Map access:** {{ index .Labels \"key\" }}"
+        },
         "config_template": {
-          "ui:widget": "textarea"
+          "ui:widget": "textarea",
+          "ui:placeholder": "module: nginx\nname: {{.Namespace}}-{{.Name}}\nurl: http://{{.Address}}/stub_status"
         }
       }
     }

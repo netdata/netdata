@@ -37,7 +37,6 @@ func transformNetListeners(cfg pipeline.Config) DyncfgNetListenersConfig {
 	result := DyncfgNetListenersConfig{
 		Name:     cfg.Name,
 		Disabled: cfg.Disabled,
-		Tags:     nl.Tags,
 		Services: extractServices(cfg),
 	}
 
@@ -58,7 +57,6 @@ func transformDocker(cfg pipeline.Config) DyncfgDockerConfig {
 	result := DyncfgDockerConfig{
 		Name:     cfg.Name,
 		Disabled: cfg.Disabled,
-		Tags:     d.Tags,
 		Address:  d.Address,
 		Services: extractServices(cfg),
 	}
@@ -83,7 +81,6 @@ func transformK8s(cfg pipeline.Config) DyncfgK8sConfig {
 		k := disc.K8s[0]
 
 		result.Role = k.Role
-		result.Tags = k.Tags
 		result.Namespaces = k.Namespaces
 
 		if k.Selector.Label != "" || k.Selector.Field != "" {
