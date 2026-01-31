@@ -136,10 +136,6 @@ func (s *serviceDiscoverer) handleQueueItem(ctx context.Context, in chan<- []mod
 
 	tgg := s.buildTargetGroup(svc)
 
-	for _, tgt := range tgg.Targets() {
-		tgt.Tags().Merge(s.Tags())
-	}
-
 	send(ctx, in, tgg)
 }
 

@@ -3,7 +3,6 @@
 package k8ssd
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -12,7 +11,6 @@ type Config struct {
 
 	APIServer  string   `yaml:"api_server"` // TODO: not used
 	Role       string   `yaml:"role"`
-	Tags       string   `yaml:"tags"`
 	Namespaces []string `yaml:"namespaces"`
 	Selector   struct {
 		Label string `yaml:"label"`
@@ -28,9 +26,6 @@ func validateConfig(cfg Config) error {
 	case rolePod, roleService:
 	default:
 		return fmt.Errorf("unknown role: '%s'", cfg.Role)
-	}
-	if cfg.Tags == "" {
-		return errors.New("'tags' not set")
 	}
 	return nil
 }

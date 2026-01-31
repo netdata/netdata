@@ -30,18 +30,12 @@ var (
 
 type Config struct {
 	Source string `yaml:"-"`
-	Tags   string `yaml:"tags"`
 
 	Interval confopt.Duration `yaml:"interval"`
 	Timeout  confopt.Duration `yaml:"timeout"`
 }
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
-	tags, err := model.ParseTags(cfg.Tags)
-	if err != nil {
-		return nil, fmt.Errorf("parse tags: %v", err)
-	}
-
 	interval := time.Minute * 2
 	if cfg.Interval.Duration() != 0 {
 		interval = cfg.Interval.Duration()
@@ -64,8 +58,6 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		cache:      make(map[uint64]*cacheItem),
 		started:    make(chan struct{}),
 	}
-
-	d.Tags().Merge(tags)
 
 	return d, nil
 }
@@ -252,7 +244,6 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 		}
 
 		tgt.hash = hash
-		tgt.Tags().Merge(d.Tags())
 
 		targets = append(targets, tgt)
 	}

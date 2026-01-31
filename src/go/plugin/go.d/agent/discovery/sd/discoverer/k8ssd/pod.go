@@ -147,10 +147,6 @@ func (p *podDiscoverer) handleQueueItem(ctx context.Context, in chan<- []model.T
 
 	tgg := p.buildTargetGroup(pod)
 
-	for _, tgt := range tgg.Targets() {
-		tgt.Tags().Merge(p.Tags())
-	}
-
 	send(ctx, in, tgg)
 
 }

@@ -22,11 +22,6 @@ import (
 )
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
-	tags, err := model.ParseTags(cfg.Tags)
-	if err != nil {
-		return nil, fmt.Errorf("parse tags: %v", err)
-	}
-
 	d := &Discoverer{
 		Logger: logger.New().With(
 			slog.String("component", "service discovery"),
@@ -48,9 +43,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		d.addr = addr
 	}
 
-	d.Tags().Merge(tags)
-
-	if cfg.Timeout.Duration().Seconds() != 0 {
+	if cfg.Timeout.Duration() != 0 {
 		d.timeout = cfg.Timeout.Duration()
 	}
 	if cfg.Address != "" {
@@ -63,7 +56,6 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 type Config struct {
 	Source string
 
-	Tags    string           `yaml:"tags"`
 	Address string           `yaml:"address"`
 	Timeout confopt.Duration `yaml:"timeout"`
 }
@@ -204,7 +196,6 @@ func (d *Discoverer) buildTargetGroup(cntr typesContainer.Summary) model.TargetG
 			}
 
 			tgt.hash = hash
-			tgt.Tags().Merge(d.Tags())
 
 			tgg.targets = append(tgg.targets, tgt)
 		}

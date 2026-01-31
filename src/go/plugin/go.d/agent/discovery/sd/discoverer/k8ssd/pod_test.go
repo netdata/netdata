@@ -629,7 +629,6 @@ func preparePodTargetGroup(pod *corev1.Pod) *podTargetGroup {
 				PortProtocol:   string(port.Protocol),
 			}
 			tgt.hash = mustCalcHash(tgt)
-			tgt.Tags().Merge(discoveryTags)
 
 			tgg.targets = append(tgg.targets, tgt)
 		}

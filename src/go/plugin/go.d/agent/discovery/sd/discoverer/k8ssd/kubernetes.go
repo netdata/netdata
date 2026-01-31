@@ -46,11 +46,6 @@ func NewKubeDiscoverer(cfg Config) (*KubeDiscoverer, error) {
 		return nil, fmt.Errorf("config validation: %v", err)
 	}
 
-	tags, err := model.ParseTags(cfg.Tags)
-	if err != nil {
-		return nil, fmt.Errorf("parse tags: %v", err)
-	}
-
 	client, err := k8sclient.New("Netdata/service-td")
 	if err != nil {
 		return nil, fmt.Errorf("create clientset: %v", err)
@@ -74,7 +69,6 @@ func NewKubeDiscoverer(cfg Config) (*KubeDiscoverer, error) {
 		Logger:        log,
 		cfgSource:     cfg.Source,
 		client:        client,
-		tags:          tags,
 		role:          role(cfg.Role),
 		namespaces:    ns,
 		selectorLabel: cfg.Selector.Label,
@@ -93,7 +87,6 @@ type KubeDiscoverer struct {
 
 	client kubernetes.Interface
 
-	tags          model.Tags
 	role          role
 	namespaces    []string
 	selectorLabel string
@@ -216,7 +209,6 @@ func (d *KubeDiscoverer) setupPodDiscoverer(ctx context.Context, ns string) *pod
 		cache.NewSharedInformer(cmapLW, &corev1.ConfigMap{}, resyncPeriod),
 		cache.NewSharedInformer(secretLW, &corev1.Secret{}, resyncPeriod),
 	)
-	td.Tags().Merge(d.tags)
 
 	return td
 }
@@ -240,7 +232,6 @@ func (d *KubeDiscoverer) setupServiceDiscoverer(ctx context.Context, namespace s
 	inf := cache.NewSharedInformer(svcLW, &corev1.Service{}, resyncPeriod)
 
 	td := newServiceDiscoverer(inf)
-	td.Tags().Merge(d.tags)
 
 	return td
 }

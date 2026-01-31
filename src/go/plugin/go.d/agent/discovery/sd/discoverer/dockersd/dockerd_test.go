@@ -157,7 +157,5 @@ func prepareNginxContainer(name string) typesContainer.Summary {
 
 func withHash(tgt *target) *target {
 	tgt.hash, _ = calcHash(tgt)
-	tags, _ := model.ParseTags("docker")
-	tgt.Tags().Merge(tags)
 	return tgt
 }

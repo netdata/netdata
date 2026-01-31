@@ -450,7 +450,6 @@ func prepareSvcTargetGroup(svc *corev1.Service) *serviceTargetGroup {
 			Type:         string(svc.Spec.Type),
 		}
 		tgt.hash = mustCalcHash(tgt)
-		tgt.Tags().Merge(discoveryTags)
 		tgg.targets = append(tgg.targets, tgt)
 	}
 

@@ -18,8 +18,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-var discoveryTags, _ = model.ParseTags("k8s")
-
 func TestMain(m *testing.M) {
 	_ = os.Setenv(envNodeName, "m01")
 	_ = os.Setenv(k8sclient.EnvFakeClient, "true")
@@ -36,11 +34,11 @@ func TestNewKubeDiscoverer(t *testing.T) {
 	}{
 		"pod role config": {
 			wantErr: false,
-			cfg:     Config{Role: string(rolePod), Tags: "k8s"},
+			cfg:     Config{Role: string(rolePod)},
 		},
 		"service role config": {
 			wantErr: false,
-			cfg:     Config{Role: string(roleService), Tags: "k8s"},
+			cfg:     Config{Role: string(roleService)},
 		},
 		"empty config": {
 			wantErr: true,
@@ -135,10 +133,8 @@ func TestKubeDiscoverer_Discover(t *testing.T) {
 
 func prepareDiscoverer(role role, namespaces []string, objects ...runtime.Object) (*KubeDiscoverer, kubernetes.Interface) {
 	client := fake.NewClientset(objects...)
-	tags, _ := model.ParseTags("k8s")
 	disc := &KubeDiscoverer{
 		cfgSource:   "test=test",
-		tags:        tags,
 		role:        role,
 		namespaces:  namespaces,
 		client:      client,
