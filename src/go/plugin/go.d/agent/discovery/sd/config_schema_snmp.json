@@ -58,6 +58,7 @@
               "type": "string",
               "enum": [
                 "1",
+                "2",
                 "2c",
                 "3"
               ],
@@ -175,7 +176,7 @@
               "title": "Config template",
               "description": "**Uses the same fields as match expression**. Go template that generates the data collection job configuration in YAML format. **Must include 'module' and 'name' fields**, plus any module-specific settings.",
               "type": "string",
-              "default": "{{- if .SysInfo.Name }}\nname: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}\n{{- else }}\nname: ip-{{ .IPAddress }}\n{{- end }}\nhostname: {{ .IPAddress }}\noptions:\n  version: {{ .Credential.Version }}\n{{- if eq .Credential.Version \"1\" \"2\" }}\ncommunity: {{ .Credential.Community }}\n{{- else }}\nuser:\n  name: {{ .Credential.UserName }}\n  level: {{ .Credential.SecurityLevel }}\n  auth_proto: {{ .Credential.AuthProtocol }}\n  auth_key: {{ .Credential.AuthPassphrase }}\n  priv_proto: {{ .Credential.PrivacyProtocol }}\n  priv_key: {{ .Credential.PrivacyPassphrase }}\n{{- end }}"
+              "default": "{{- if .SysInfo.Name }}\nname: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}\n{{- else }}\nname: ip-{{ .IPAddress }}\n{{- end }}\nhostname: {{ .IPAddress }}\noptions:\n  version: {{ .Credential.Version }}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" }}\ncommunity: {{ .Credential.Community }}\n{{- else }}\nuser:\n  name: {{ .Credential.UserName }}\n  level: {{ .Credential.SecurityLevel }}\n  auth_proto: {{ .Credential.AuthProtocol }}\n  auth_key: {{ .Credential.AuthPassphrase }}\n  priv_proto: {{ .Credential.PrivacyProtocol }}\n  priv_key: {{ .Credential.PrivacyPassphrase }}\n{{- end }}"
             }
           },
           "required": [
@@ -276,7 +277,7 @@
         },
         "config_template": {
           "ui:widget": "textarea",
-          "ui:placeholder": "{{- if .SysInfo.Name }}\nname: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}\n{{- else }}\nname: ip-{{ .IPAddress }}\n{{- end }}\nhostname: {{ .IPAddress }}\noptions:\n  version: {{ .Credential.Version }}\n{{- if eq .Credential.Version \"1\" \"2\" }}\ncommunity: {{ .Credential.Community }}\n{{- else }}\nuser:\n  name: {{ .Credential.UserName }}\n  level: {{ .Credential.SecurityLevel }}\n  auth_proto: {{ .Credential.AuthProtocol }}\n  auth_key: {{ .Credential.AuthPassphrase }}\n  priv_proto: {{ .Credential.PrivacyProtocol }}\n  priv_key: {{ .Credential.PrivacyPassphrase }}\n{{- end }}"
+          "ui:placeholder": "{{- if .SysInfo.Name }}\nname: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}\n{{- else }}\nname: ip-{{ .IPAddress }}\n{{- end }}\nhostname: {{ .IPAddress }}\noptions:\n  version: {{ .Credential.Version }}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" }}\ncommunity: {{ .Credential.Community }}\n{{- else }}\nuser:\n  name: {{ .Credential.UserName }}\n  level: {{ .Credential.SecurityLevel }}\n  auth_proto: {{ .Credential.AuthProtocol }}\n  auth_key: {{ .Credential.AuthPassphrase }}\n  priv_proto: {{ .Credential.PrivacyProtocol }}\n  priv_key: {{ .Credential.PrivacyPassphrase }}\n{{- end }}"
         }
       }
     }
