@@ -4262,14 +4262,21 @@ compare_timeseries_fields() {
       elif ($rv == null or $av == null) then false
       else ((($av - $rv) | abs) <= $eps)
       end;
+    # Check if a row has all zero (or near-zero) values - used to tolerate gap-filling
+    def is_zero_row($row):
+      ($fields | all(. as $f |
+        ($row[$f] == null) or ((to_num($row[$f]) | abs) <= $eps)
+      ));
     (to_map($ref[0]) as $r
       | to_map((agent_obj).data) as $a
       | ($r | keys_unsorted) as $dates
       | ($a | keys_unsorted) as $adates
+      | (($adates - $dates) | map(select(. as $d | is_zero_row($a[$d]) | not))) as $nonzero_extras
       | {
           ok: (
             ($dates | length) > 0
-            and ($dates == $adates)
+            and (($dates - $adates) | length) == 0
+            and ($nonzero_extras | length) == 0
             and ($dates | all(. as $d |
               ($fields | all(. as $f |
                 values_match($r[$d][$f]; $a[$d][$f])
@@ -4277,7 +4284,8 @@ compare_timeseries_fields() {
             ))
           ),
           missing_in_agent: ($dates - $adates),
-          extra_in_agent: ($adates - $dates),
+          extra_in_agent: $nonzero_extras,
+          extra_in_agent_zeros: (($adates - $dates) | map(select(. as $d | is_zero_row($a[$d])))),
           diffs: ($dates | map(. as $d | {
             date: $d,
             fields: ($fields | map(. as $f | {
