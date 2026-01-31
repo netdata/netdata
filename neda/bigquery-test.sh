@@ -4118,7 +4118,7 @@ run_agent() {
   local merged_schema
   local merged_schema_file
   local question_payload
-  local no_stream_flag="--no-stream"
+  local no_stream_flag="--stream"
   if [[ -n "${MODEL_OVERRIDE}" ]]; then
     override_args=(--override "models=${MODEL_OVERRIDE}")
   fi
