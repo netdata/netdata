@@ -258,6 +258,13 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 		return
 	}
 
+	// Validate config by parsing it
+	if _, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults); err != nil {
+		d.Warningf("dyncfg: add: invalid config for '%s:%s': %v", dt, name, err)
+		d.dyncfgApi.SendCodef(fn, 400, "Invalid config: %v", err)
+		return
+	}
+
 	// Store the config
 	cfg := &sdConfig{
 		discovererType: dt,
@@ -641,6 +648,12 @@ func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile) 
 	name := cfg.Name
 	if name == "" {
 		// Use file path as fallback name
+		name = conf.source
+	}
+
+	// Check for name collision - if another config with same discovererType:name exists, use source path
+	if existing := d.exposedConfigs.getPipelineKey(dt, name); existing != "" {
+		d.Warningf("file config '%s': name '%s' collides with existing config, using source path as name", conf.source, name)
 		name = conf.source
 	}
 
