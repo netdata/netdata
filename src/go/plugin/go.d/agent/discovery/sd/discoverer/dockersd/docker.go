@@ -43,7 +43,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		d.addr = addr
 	}
 
-	if cfg.Timeout.Duration() != 0 {
+	if cfg.Timeout.Duration() > 0 {
 		d.timeout = cfg.Timeout.Duration()
 	}
 	if cfg.Address != "" {

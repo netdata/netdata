@@ -37,11 +37,11 @@ type Config struct {
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
 	interval := time.Minute * 2
-	if cfg.Interval.Duration() != 0 {
+	if cfg.Interval.Duration() > 0 {
 		interval = cfg.Interval.Duration()
 	}
 	timeout := time.Second * 5
-	if cfg.Timeout.Duration() != 0 {
+	if cfg.Timeout.Duration() > 0 {
 		timeout = cfg.Timeout.Duration()
 	}
 

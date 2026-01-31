@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -439,15 +440,23 @@ func TestPipelineManager_ConcurrentOperations(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Track created and stopped pipelines to detect leaks
+	var created, stopped atomic.Int64
+
+	mockFactory := func(cfg pipeline.Config) (sdPipeline, error) {
+		created.Add(1)
+		return &trackingMockPipeline{stopped: &stopped}, nil
+	}
+
 	m := NewPipelineManager(
 		logger.New(),
-		mockNewPipeline,
+		mockFactory,
 		func(_ context.Context, _ []*confgroup.Group) {},
 	)
 
 	var wg sync.WaitGroup
 
-	// Concurrent starts
+	// Concurrent starts for the same key
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(i int) {
@@ -480,6 +489,15 @@ func TestPipelineManager_ConcurrentOperations(t *testing.T) {
 	// Should have exactly one pipeline running
 	assert.True(t, m.IsRunning("pipeline"))
 	assert.Len(t, m.Keys(), 1)
+
+	// Stop all pipelines
+	m.StopAll()
+
+	// Wait for all pipelines to stop
+	assert.Eventually(t, func() bool {
+		return created.Load() == stopped.Load()
+	}, time.Second*5, time.Millisecond*100,
+		"leaked pipelines: created=%d, stopped=%d", created.Load(), stopped.Load())
 }
 
 // mockNewPipeline creates a mock pipeline that does nothing.
@@ -525,4 +543,14 @@ func (p *testMockPipeline) Run(ctx context.Context, out chan<- []*confgroup.Grou
 
 	// Wait for cancellation
 	<-ctx.Done()
+}
+
+// trackingMockPipeline tracks when it stops for leak detection
+type trackingMockPipeline struct {
+	stopped *atomic.Int64
+}
+
+func (p *trackingMockPipeline) Run(ctx context.Context, _ chan<- []*confgroup.Group) {
+	<-ctx.Done()
+	p.stopped.Add(1)
 }

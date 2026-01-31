@@ -178,6 +178,10 @@ func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile) {
 		return
 	}
 
+	// Remove any existing dyncfg job for this source before exposing
+	// (handles case where name or discoverer type changed in config)
+	d.removeExposedFileConfig(conf.source)
+
 	// Expose file config as dyncfg job
 	d.exposeFileConfig(cfg, conf)
 }

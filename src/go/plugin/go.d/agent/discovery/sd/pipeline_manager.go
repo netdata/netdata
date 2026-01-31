@@ -204,6 +204,13 @@ func (m *PipelineManager) startPipelineLocked(ctx context.Context, key string, c
 }
 
 func (m *PipelineManager) startPipelineWithInstanceLocked(ctx context.Context, key string, cfg pipeline.Config, pl sdPipeline) error {
+	// Cancel any existing pipeline for this key (handles race in Restart)
+	if existing, ok := m.pipelines[key]; ok {
+		m.Warningf("pipeline '%s': cancelling unexpected existing pipeline before start", key)
+		existing.cancel()
+		// Don't wait - just cancel and let it exit asynchronously
+	}
+
 	plCtx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 
