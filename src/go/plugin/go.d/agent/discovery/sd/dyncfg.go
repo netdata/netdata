@@ -348,19 +348,19 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 
 	d.Infof("dyncfg: update: %s:%s by user '%s'", dt, name, fn.User())
 
-	// Update stored config content
-	d.exposedConfigs.updateContent(dt, name, fn.Payload())
-
 	// If pipeline is running, restart it with grace period
+	// Only update stored config content after successful restart
 	if d.mgr.IsRunning(pipelineKey) {
 		if err := d.mgr.Restart(d.ctx, pipelineKey, pipelineCfg); err != nil {
 			d.Errorf("dyncfg: update: failed to restart pipeline '%s:%s': %v", dt, name, err)
-			d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusFailed)
-			d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
 			d.dyncfgApi.SendCodef(fn, 422, "Failed to restart pipeline: %v", err)
 			return
 		}
+		d.exposedConfigs.updateContent(dt, name, fn.Payload())
 		d.exposedConfigs.updateStatus(dt, name, dyncfg.StatusRunning)
+	} else {
+		// Pipeline not running, just update the stored config
+		d.exposedConfigs.updateContent(dt, name, fn.Payload())
 	}
 
 	d.dyncfgSDJobStatus(dt, name, d.exposedConfigs.getStatus(dt, name))

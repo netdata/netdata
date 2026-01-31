@@ -38,7 +38,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		fnReg:          cfg.FnReg,
 		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
 		exposedConfigs: newExposedSDConfigs(),
-		dyncfgCh:       make(chan dyncfg.Function),
+		dyncfgCh:       make(chan dyncfg.Function, 1),
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
 			return pipeline.New(config)
 		},

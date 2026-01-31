@@ -49,7 +49,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 		Logger:         logger.New(),
 		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
 		exposedConfigs: newExposedSDConfigs(),
-		dyncfgCh:       make(chan dyncfg.Function),
+		dyncfgCh:       make(chan dyncfg.Function, 1),
 		newPipeline: func(cfg pipeline.Config) (sdPipeline, error) {
 			return newTestPipeline(cfg.Name), nil
 		},

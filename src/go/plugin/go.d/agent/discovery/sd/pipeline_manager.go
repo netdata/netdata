@@ -254,6 +254,12 @@ func (m *PipelineManager) runPipeline(ctx context.Context, key string, pl sdPipe
 func (m *PipelineManager) onGroupsReceived(ctx context.Context, key string, groups []*confgroup.Group) {
 	m.mux.Lock()
 
+	// Ignore groups if pipeline is no longer tracked (was removed)
+	if _, exists := m.pipelines[key]; !exists {
+		m.mux.Unlock()
+		return
+	}
+
 	// Track sources
 	for _, grp := range groups {
 		if m.pipelineSources[key] == nil {
