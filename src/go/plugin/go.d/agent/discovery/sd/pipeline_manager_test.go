@@ -318,7 +318,7 @@ func TestPipelineManager_RunGracePeriodCleanup(t *testing.T) {
 		m.mux.Lock()
 		m.pendingRemovals["test-pipeline"] = &pendingRemoval{
 			sources:   map[string]struct{}{"expired-source": {}},
-			timestamp: time.Now().Add(-35 * time.Second), // older than grace period
+			timestamp: time.Now().Add(-65 * time.Second), // older than 1 minute grace period
 		}
 		m.pipelineSources["test-pipeline"] = map[string]struct{}{"expired-source": {}}
 		m.mux.Unlock()

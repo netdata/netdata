@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
@@ -523,7 +524,7 @@ func TestServiceDiscovery_DyncfgUpdate(t *testing.T) {
 				cfg := DyncfgNetListenersConfig{Name: "test-job"}
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := DyncfgNetListenersConfig{Name: "test-job", Interval: "10s"}
+				updatedCfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(10 * time.Second)}
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -708,7 +709,7 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 	}{
 		"userconfig for template": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: "5s"}
+				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(5 * time.Second)}
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -720,7 +721,7 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-userconfig 200 application/yaml")
 						assert.Contains(t, got, "name: test-job")
-						assert.Contains(t, got, "interval: 5s")
+						assert.Contains(t, got, "interval: 5")
 						assert.Contains(t, got, "FUNCTION_RESULT_END")
 					},
 				}
@@ -728,7 +729,7 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 		},
 		"userconfig for existing job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: "5s"}
+				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(5 * time.Second)}
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -747,7 +748,7 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-add 202 application/json")
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-userconfig 200 application/yaml")
 						assert.Contains(t, got, "name: test-job")
-						assert.Contains(t, got, "interval: 5s")
+						assert.Contains(t, got, "interval: 5")
 					},
 				}
 			},
@@ -821,7 +822,7 @@ func TestServiceDiscovery_DyncfgDockerConfig(t *testing.T) {
 				cfg := DyncfgDockerConfig{
 					Name:    "docker-test",
 					Address: "unix:///var/run/docker.sock",
-					Timeout: "5s",
+					Timeout: confopt.Duration(5 * time.Second),
 					Services: []DyncfgServiceRule{
 						{ID: "nginx", Match: `{{ glob .Image "*nginx*" }}`},
 					},
@@ -1048,9 +1049,9 @@ func TestServiceDiscovery_DyncfgSNMPConfig(t *testing.T) {
 			createSim: func() *dyncfgSim {
 				cfg := DyncfgSNMPConfig{
 					Name:           "snmp-test",
-					RescanInterval: "30m",
-					Timeout:        "1s",
-					DeviceCacheTTL: "12h",
+					RescanInterval: confopt.Duration(30 * time.Minute),
+					Timeout:        confopt.Duration(1 * time.Second),
+					DeviceCacheTTL: confopt.Duration(12 * time.Hour),
 					Credentials: []DyncfgSNMPCredential{
 						{Name: "public-v2", Version: "2c", Community: "public"},
 					},
@@ -1134,7 +1135,7 @@ FUNCTION_RESULT_END
 			createSim: func() *dyncfgSim {
 				cfg := DyncfgSNMPConfig{
 					Name:           "snmp-test",
-					RescanInterval: "1h",
+					RescanInterval: confopt.Duration(1 * time.Hour),
 					Credentials: []DyncfgSNMPCredential{
 						{Name: "v2-cred", Version: "2c", Community: "public"},
 					},
@@ -1159,7 +1160,7 @@ FUNCTION_RESULT_END
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-get 200 application/json")
 						assert.Contains(t, got, `"name":"snmp-test"`)
-						assert.Contains(t, got, `"rescan_interval":"1h"`)
+						assert.Contains(t, got, `"rescan_interval":3600`) // 1 hour in seconds
 						assert.Contains(t, got, `"subnet":"192.168.0.0/16"`)
 					},
 				}
@@ -1181,10 +1182,10 @@ func TestServiceDiscovery_DyncfgUpdateWhileRunning(t *testing.T) {
 	}{
 		"update running pipeline restarts it": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: "5s"}
+				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(5 * time.Second)}
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := DyncfgNetListenersConfig{Name: "test-job", Interval: "10s"}
+				updatedCfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(10 * time.Second)}
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -1300,7 +1301,7 @@ func TestServiceDiscovery_DyncfgTest(t *testing.T) {
 	}{
 		"test valid config succeeds": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: "5s"}
+				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(5 * time.Second)}
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{

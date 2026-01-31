@@ -2,6 +2,8 @@
 
 package sd
 
+import "github.com/netdata/netdata/go/plugins/pkg/confopt"
+
 // Dyncfg config structs for each discoverer type.
 // These are the flattened representations used by the UI, with proper json/yaml tags.
 
@@ -9,8 +11,8 @@ type DyncfgNetListenersConfig struct {
 	Name     string `json:"name" yaml:"name"`
 	Disabled bool   `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 
-	Interval string `json:"interval,omitempty" yaml:"interval,omitempty"`
-	Timeout  string `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Interval confopt.Duration `json:"interval,omitempty" yaml:"interval,omitempty"`
+	Timeout  confopt.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 
 	Services []DyncfgServiceRule `json:"services,omitempty" yaml:"services,omitempty"`
 }
@@ -19,8 +21,8 @@ type DyncfgDockerConfig struct {
 	Name     string `json:"name" yaml:"name"`
 	Disabled bool   `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 
-	Address string `json:"address,omitempty" yaml:"address,omitempty"`
-	Timeout string `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Address string           `json:"address,omitempty" yaml:"address,omitempty"`
+	Timeout confopt.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 
 	Services []DyncfgServiceRule `json:"services,omitempty" yaml:"services,omitempty"`
 }
@@ -50,10 +52,10 @@ type DyncfgSNMPConfig struct {
 	Name     string `json:"name" yaml:"name"`
 	Disabled bool   `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 
-	RescanInterval          string `json:"rescan_interval,omitempty" yaml:"rescan_interval,omitempty"`
-	Timeout                 string `json:"timeout,omitempty" yaml:"timeout,omitempty"`
-	DeviceCacheTTL          string `json:"device_cache_ttl,omitempty" yaml:"device_cache_ttl,omitempty"`
-	ParallelScansPerNetwork int    `json:"parallel_scans_per_network,omitempty" yaml:"parallel_scans_per_network,omitempty"`
+	RescanInterval          confopt.Duration `json:"rescan_interval,omitempty" yaml:"rescan_interval,omitempty"`
+	Timeout                 confopt.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	DeviceCacheTTL          confopt.Duration `json:"device_cache_ttl,omitempty" yaml:"device_cache_ttl,omitempty"`
+	ParallelScansPerNetwork int              `json:"parallel_scans_per_network,omitempty" yaml:"parallel_scans_per_network,omitempty"`
 
 	Credentials []DyncfgSNMPCredential `json:"credentials,omitempty" yaml:"credentials,omitempty"`
 	Networks    []DyncfgSNMPNetwork    `json:"networks,omitempty" yaml:"networks,omitempty"`

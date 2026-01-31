@@ -5,9 +5,7 @@ package sd
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/dockersd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/k8ssd"
@@ -38,22 +36,9 @@ func parseNetListenersConfig(payload []byte, configDefaults confgroup.Registry) 
 		return pipeline.Config{}, fmt.Errorf("unmarshal net_listeners config: %w", err)
 	}
 
-	nlCfg := netlistensd.Config{}
-
-	if dc.Interval != "" {
-		d, err := time.ParseDuration(dc.Interval)
-		if err != nil {
-			return pipeline.Config{}, fmt.Errorf("invalid interval '%s': %w", dc.Interval, err)
-		}
-		interval := confopt.Duration(d)
-		nlCfg.Interval = &interval
-	}
-	if dc.Timeout != "" {
-		d, err := time.ParseDuration(dc.Timeout)
-		if err != nil {
-			return pipeline.Config{}, fmt.Errorf("invalid timeout '%s': %w", dc.Timeout, err)
-		}
-		nlCfg.Timeout = confopt.Duration(d)
+	nlCfg := netlistensd.Config{
+		Interval: dc.Interval,
+		Timeout:  dc.Timeout,
 	}
 
 	return pipeline.Config{
@@ -76,14 +61,7 @@ func parseDockerConfig(payload []byte, configDefaults confgroup.Registry) (pipel
 
 	dCfg := dockersd.Config{
 		Address: dc.Address,
-	}
-
-	if dc.Timeout != "" {
-		d, err := time.ParseDuration(dc.Timeout)
-		if err != nil {
-			return pipeline.Config{}, fmt.Errorf("invalid timeout '%s': %w", dc.Timeout, err)
-		}
-		dCfg.Timeout = confopt.Duration(d)
+		Timeout: dc.Timeout,
 	}
 
 	return pipeline.Config{
@@ -137,31 +115,10 @@ func parseSNMPConfig(payload []byte, configDefaults confgroup.Registry) (pipelin
 	}
 
 	snmpCfg := snmpsd.Config{
+		RescanInterval:          dc.RescanInterval,
+		Timeout:                 dc.Timeout,
+		DeviceCacheTTL:          dc.DeviceCacheTTL,
 		ParallelScansPerNetwork: dc.ParallelScansPerNetwork,
-	}
-
-	if dc.RescanInterval != "" {
-		d, err := time.ParseDuration(dc.RescanInterval)
-		if err != nil {
-			return pipeline.Config{}, fmt.Errorf("invalid rescan_interval '%s': %w", dc.RescanInterval, err)
-		}
-		interval := confopt.Duration(d)
-		snmpCfg.RescanInterval = &interval
-	}
-	if dc.Timeout != "" {
-		d, err := time.ParseDuration(dc.Timeout)
-		if err != nil {
-			return pipeline.Config{}, fmt.Errorf("invalid timeout '%s': %w", dc.Timeout, err)
-		}
-		snmpCfg.Timeout = confopt.Duration(d)
-	}
-	if dc.DeviceCacheTTL != "" {
-		d, err := time.ParseDuration(dc.DeviceCacheTTL)
-		if err != nil {
-			return pipeline.Config{}, fmt.Errorf("invalid device_cache_ttl '%s': %w", dc.DeviceCacheTTL, err)
-		}
-		ttl := confopt.Duration(d)
-		snmpCfg.DeviceCacheTTL = &ttl
 	}
 
 	for _, c := range dc.Credentials {

@@ -32,8 +32,8 @@ type Config struct {
 	Source string `yaml:"-"`
 	Tags   string `yaml:"tags"`
 
-	Interval *confopt.Duration `yaml:"interval"`
-	Timeout  confopt.Duration  `yaml:"timeout"`
+	Interval confopt.Duration `yaml:"interval"`
+	Timeout  confopt.Duration `yaml:"timeout"`
 }
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
@@ -43,7 +43,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 	}
 
 	interval := time.Minute * 2
-	if cfg.Interval != nil {
+	if cfg.Interval.Duration() != 0 {
 		interval = cfg.Interval.Duration()
 	}
 	timeout := time.Second * 5

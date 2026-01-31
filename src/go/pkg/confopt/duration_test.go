@@ -156,34 +156,92 @@ func TestDuration_UnmarshalYAML(t *testing.T) {
 
 func TestDuration_UnmarshalJSON(t *testing.T) {
 	tests := map[string]struct {
-		input any
+		input    string
+		expected time.Duration
+		wantErr  bool
 	}{
-		"duration":     {input: "300ms"},
-		"string int":   {input: "1"},
-		"string float": {input: "1.1"},
-		"int":          {input: 2},
-		"float":        {input: 2.2},
+		// JSON numbers (interpreted as seconds)
+		"json number int": {
+			input:    `{"d": 30}`,
+			expected: 30 * time.Second,
+		},
+		"json number float": {
+			input:    `{"d": 1.5}`,
+			expected: 1500 * time.Millisecond,
+		},
+		"json number zero": {
+			input:    `{"d": 0}`,
+			expected: 0,
+		},
+
+		// JSON strings with duration format
+		"json string seconds": {
+			input:    `{"d": "30s"}`,
+			expected: 30 * time.Second,
+		},
+		"json string minutes": {
+			input:    `{"d": "5m"}`,
+			expected: 5 * time.Minute,
+		},
+		"json string hours": {
+			input:    `{"d": "2h"}`,
+			expected: 2 * time.Hour,
+		},
+		"json string milliseconds": {
+			input:    `{"d": "500ms"}`,
+			expected: 500 * time.Millisecond,
+		},
+		"json string combined": {
+			input:    `{"d": "1h30m"}`,
+			expected: 90 * time.Minute,
+		},
+		"json string days": {
+			input:    `{"d": "1d"}`,
+			expected: 24 * time.Hour,
+		},
+		"json string weeks": {
+			input:    `{"d": "1w"}`,
+			expected: 7 * 24 * time.Hour,
+		},
+
+		// JSON strings with numeric values (interpreted as seconds)
+		"json string numeric int": {
+			input:    `{"d": "30"}`,
+			expected: 30 * time.Second,
+		},
+		"json string numeric float": {
+			input:    `{"d": "1.5"}`,
+			expected: 1500 * time.Millisecond,
+		},
+
+		// JSON null (results in zero value, not an error)
+		"json null": {
+			input:    `{"d": null}`,
+			expected: 0,
+		},
+
+		// Errors
+		"json string invalid": {
+			input:   `{"d": "invalid"}`,
+			wantErr: true,
+		},
 	}
 
-	var zero Duration
-
-	type duration struct {
-		D Duration `json:"d"`
-	}
-	type input struct {
-		D any `json:"d"`
-	}
-
-	for name, test := range tests {
-		name = fmt.Sprintf("%s (%v)", name, test.input)
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			input := input{D: test.input}
-			data, err := yaml.Marshal(input)
-			require.NoError(t, err)
+			var result struct {
+				D Duration `json:"d"`
+			}
 
-			var d duration
-			require.NoError(t, yaml.Unmarshal(data, &d))
-			assert.NotEqual(t, zero.String(), d.D.String())
+			err := json.Unmarshal([]byte(tc.input), &result)
+
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, result.D.Duration())
 		})
 	}
 }

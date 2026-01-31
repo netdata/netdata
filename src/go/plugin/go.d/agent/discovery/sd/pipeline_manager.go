@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	restartGracePeriod = 30 * time.Second
+	restartGracePeriod = 1 * time.Minute
 )
 
 // PipelineManager manages the lifecycle of discovery pipelines.

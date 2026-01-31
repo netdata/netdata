@@ -34,38 +34,26 @@ func transformNetListeners(cfg pipeline.Config) DyncfgNetListenersConfig {
 	disc := cfg.Discover[0]
 	nl := disc.NetListeners
 
-	result := DyncfgNetListenersConfig{
+	return DyncfgNetListenersConfig{
 		Name:     cfg.Name,
 		Disabled: cfg.Disabled,
+		Interval: nl.Interval,
+		Timeout:  nl.Timeout,
 		Services: extractServices(cfg),
 	}
-
-	if nl.Interval != nil {
-		result.Interval = nl.Interval.String()
-	}
-	if nl.Timeout.Duration() != 0 {
-		result.Timeout = nl.Timeout.String()
-	}
-
-	return result
 }
 
 func transformDocker(cfg pipeline.Config) DyncfgDockerConfig {
 	disc := cfg.Discover[0]
 	d := disc.Docker
 
-	result := DyncfgDockerConfig{
+	return DyncfgDockerConfig{
 		Name:     cfg.Name,
 		Disabled: cfg.Disabled,
 		Address:  d.Address,
+		Timeout:  d.Timeout,
 		Services: extractServices(cfg),
 	}
-
-	if d.Timeout.Duration() != 0 {
-		result.Timeout = d.Timeout.String()
-	}
-
-	return result
 }
 
 func transformK8s(cfg pipeline.Config) DyncfgK8sConfig {
@@ -107,18 +95,11 @@ func transformSNMP(cfg pipeline.Config) DyncfgSNMPConfig {
 	result := DyncfgSNMPConfig{
 		Name:                    cfg.Name,
 		Disabled:                cfg.Disabled,
+		RescanInterval:          s.RescanInterval,
+		Timeout:                 s.Timeout,
+		DeviceCacheTTL:          s.DeviceCacheTTL,
 		ParallelScansPerNetwork: s.ParallelScansPerNetwork,
 		Services:                extractServices(cfg),
-	}
-
-	if s.RescanInterval != nil {
-		result.RescanInterval = s.RescanInterval.String()
-	}
-	if s.Timeout.Duration() != 0 {
-		result.Timeout = s.Timeout.String()
-	}
-	if s.DeviceCacheTTL != nil {
-		result.DeviceCacheTTL = s.DeviceCacheTTL.String()
 	}
 
 	// Credentials

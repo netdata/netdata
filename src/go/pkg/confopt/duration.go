@@ -108,22 +108,28 @@ func (d Duration) MarshalYAML() (any, error) {
 }
 
 func (d *Duration) UnmarshalJSON(b []byte) error {
-	s := string(b)
+	// Try as JSON string first (handles quoted values like "30m", "5s")
+	var s string
+	if err := json.Unmarshal(b, &s); err == nil {
+		if v, err := ParseDuration(s); err == nil {
+			*d = Duration(v)
+			return nil
+		}
+		// Try as numeric string (interpret as seconds)
+		if v, err := strconv.ParseFloat(s, 64); err == nil {
+			*d = Duration(v * float64(time.Second))
+			return nil
+		}
+	}
 
-	if v, err := time.ParseDuration(s); err == nil {
-		*d = Duration(v)
-		return nil
-	}
-	if v, err := strconv.ParseInt(s, 10, 64); err == nil {
-		*d = Duration(time.Duration(v) * time.Second)
-		return nil
-	}
-	if v, err := strconv.ParseFloat(s, 64); err == nil {
-		*d = Duration(v * float64(time.Second))
+	// Try as JSON number (handles unquoted values like 5, 1.5)
+	var f float64
+	if err := json.Unmarshal(b, &f); err == nil {
+		*d = Duration(f * float64(time.Second))
 		return nil
 	}
 
-	return fmt.Errorf("unparsable duration format '%s'", s)
+	return fmt.Errorf("unparsable duration format '%s'", string(b))
 }
 
 func (d Duration) MarshalJSON() ([]byte, error) {
