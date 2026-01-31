@@ -53,6 +53,7 @@ func dyncfgSDTemplateCmds() string {
 	return dyncfg.JoinCommands(
 		dyncfg.CommandAdd,
 		dyncfg.CommandSchema,
+		dyncfg.CommandTest,
 		dyncfg.CommandUserconfig,
 	)
 }
@@ -133,6 +134,12 @@ func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 		return
 	case dyncfg.CommandUserconfig:
 		d.dyncfgCmdUserconfig(fn)
+		return
+	}
+
+	// Test command validates config without creating a job
+	if fn.Command() == dyncfg.CommandTest {
+		d.dyncfgCmdTest(fn)
 		return
 	}
 
@@ -267,6 +274,35 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 	d.dyncfgSDJobCreate(dt, name, cfg.sourceType, cfg.source, cfg.status)
 
 	d.dyncfgApi.SendCodef(fn, 202, "")
+}
+
+// dyncfgCmdTest handles the test command for templates (validates config without creating a job)
+func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
+	id := fn.ID()
+
+	dt, _, _ := d.extractDiscovererAndName(id)
+	if dt == "" || !isValidDiscovererType(dt) {
+		d.Warningf("dyncfg: test: invalid discoverer type in ID '%s'", id)
+		d.dyncfgApi.SendCodef(fn, 400, "Invalid discoverer type in ID: %s", id)
+		return
+	}
+
+	if err := fn.ValidateHasPayload(); err != nil {
+		d.Warningf("dyncfg: test: %v for '%s'", err, dt)
+		d.dyncfgApi.SendCodef(fn, 400, "%v", err)
+		return
+	}
+
+	// Parse and validate the config without storing it
+	_, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults)
+	if err != nil {
+		d.Warningf("dyncfg: test: failed to parse config for '%s': %v", dt, err)
+		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
+		return
+	}
+
+	d.Infof("dyncfg: test: config for '%s' is valid", dt)
+	d.dyncfgApi.SendCodef(fn, 200, "")
 }
 
 // dyncfgCmdUpdate handles the update command for jobs

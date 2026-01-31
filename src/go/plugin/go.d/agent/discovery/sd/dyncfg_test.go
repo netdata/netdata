@@ -166,8 +166,8 @@ func sendDyncfgCmd(sd *ServiceDiscovery, uid string, args []string, payload []by
 	}
 
 	switch cmd {
-	case "schema", "get", "userconfig":
-		// These are handled directly in dyncfgConfig
+	case "schema", "get", "userconfig", "test":
+		// These are handled directly in dyncfgConfig (read-only/validation commands)
 		sd.dyncfgConfig(fn)
 	default:
 		// State-changing commands go through the channel
@@ -797,6 +797,618 @@ func TestServiceDiscovery_DyncfgFileConfig(t *testing.T) {
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-remove 405 application/json
 {"status":405,"errorMessage":"Cannot remove non-dyncfg configs. Source type: file"}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			sim := tc.createSim()
+			sim.run(t)
+		})
+	}
+}
+
+func TestServiceDiscovery_DyncfgDockerConfig(t *testing.T) {
+	tests := map[string]struct {
+		createSim func() *dyncfgSim
+	}{
+		"add docker job": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgDockerConfig{
+					Name:    "docker-test",
+					Address: "unix:///var/run/docker.sock",
+					Timeout: "5s",
+					Services: []DyncfgServiceRule{
+						{ID: "nginx", Match: `{{ glob .Image "*nginx*" }}`},
+					},
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererDocker), "add", "docker-test"},
+							payload, "type=dyncfg,user=test")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererDocker,
+							name:           "docker-test",
+							sourceType:     "dyncfg",
+							status:         dyncfg.StatusAccepted,
+						},
+					},
+					wantDyncfg: `
+CONFIG test:sd:docker:docker-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+
+FUNCTION_RESULT_BEGIN 1-add 202 application/json
+{"status":202,"message":""}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"add and enable docker job": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgDockerConfig{
+					Name:    "docker-test",
+					Address: "tcp://localhost:2375",
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Add
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererDocker), "add", "docker-test"},
+							payload, "type=dyncfg,user=test")
+
+						// Enable
+						sendDyncfgCmd(sd, "2-enable",
+							[]string{sd.dyncfgJobID(DiscovererDocker, "docker-test"), "enable"},
+							nil, "")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererDocker,
+							name:           "docker-test",
+							sourceType:     "dyncfg",
+							status:         dyncfg.StatusRunning,
+						},
+					},
+					wantRunning: []string{"dyncfg:docker:docker-test"},
+				}
+			},
+		},
+		"get docker job config": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgDockerConfig{
+					Name:    "docker-test",
+					Address: "unix:///var/run/docker.sock",
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Add
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererDocker), "add", "docker-test"},
+							payload, "type=dyncfg,user=test")
+
+						// Get
+						sendDyncfgCmd(sd, "2-get",
+							[]string{sd.dyncfgJobID(DiscovererDocker, "docker-test"), "get"},
+							nil, "")
+					},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-get 200 application/json")
+						assert.Contains(t, got, `"name":"docker-test"`)
+						assert.Contains(t, got, `"address":"unix:///var/run/docker.sock"`)
+					},
+				}
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			sim := tc.createSim()
+			sim.run(t)
+		})
+	}
+}
+
+func TestServiceDiscovery_DyncfgK8sConfig(t *testing.T) {
+	tests := map[string]struct {
+		createSim func() *dyncfgSim
+	}{
+		"add k8s job": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgK8sConfig{
+					Name:       "k8s-test",
+					Role:       "pod",
+					Namespaces: []string{"default", "kube-system"},
+					Selector: &DyncfgK8sSelector{
+						Label: "app=nginx",
+					},
+					Pod: &DyncfgK8sPodOptions{
+						LocalMode: true,
+					},
+					Services: []DyncfgServiceRule{
+						{ID: "nginx-pods", Match: `{{ eq .Namespace "default" }}`},
+					},
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererK8s), "add", "k8s-test"},
+							payload, "type=dyncfg,user=test")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererK8s,
+							name:           "k8s-test",
+							sourceType:     "dyncfg",
+							status:         dyncfg.StatusAccepted,
+						},
+					},
+					wantDyncfg: `
+CONFIG test:sd:k8s:k8s-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+
+FUNCTION_RESULT_BEGIN 1-add 202 application/json
+{"status":202,"message":""}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"add k8s service role job": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgK8sConfig{
+					Name: "k8s-svc-test",
+					Role: "service",
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Add
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererK8s), "add", "k8s-svc-test"},
+							payload, "type=dyncfg,user=test")
+
+						// Enable
+						sendDyncfgCmd(sd, "2-enable",
+							[]string{sd.dyncfgJobID(DiscovererK8s, "k8s-svc-test"), "enable"},
+							nil, "")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererK8s,
+							name:           "k8s-svc-test",
+							sourceType:     "dyncfg",
+							status:         dyncfg.StatusRunning,
+						},
+					},
+					wantRunning: []string{"dyncfg:k8s:k8s-svc-test"},
+				}
+			},
+		},
+		"get k8s job config": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgK8sConfig{
+					Name:       "k8s-test",
+					Role:       "pod",
+					Namespaces: []string{"default"},
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Add
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererK8s), "add", "k8s-test"},
+							payload, "type=dyncfg,user=test")
+
+						// Get
+						sendDyncfgCmd(sd, "2-get",
+							[]string{sd.dyncfgJobID(DiscovererK8s, "k8s-test"), "get"},
+							nil, "")
+					},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-get 200 application/json")
+						assert.Contains(t, got, `"name":"k8s-test"`)
+						assert.Contains(t, got, `"role":"pod"`)
+						assert.Contains(t, got, `"namespaces":["default"]`)
+					},
+				}
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			sim := tc.createSim()
+			sim.run(t)
+		})
+	}
+}
+
+func TestServiceDiscovery_DyncfgSNMPConfig(t *testing.T) {
+	tests := map[string]struct {
+		createSim func() *dyncfgSim
+	}{
+		"add snmp job": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgSNMPConfig{
+					Name:           "snmp-test",
+					RescanInterval: "30m",
+					Timeout:        "1s",
+					DeviceCacheTTL: "12h",
+					Credentials: []DyncfgSNMPCredential{
+						{Name: "public-v2", Version: "2c", Community: "public"},
+					},
+					Networks: []DyncfgSNMPNetwork{
+						{Subnet: "192.168.1.0/24", Credential: "public-v2"},
+					},
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererSNMP), "add", "snmp-test"},
+							payload, "type=dyncfg,user=test")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererSNMP,
+							name:           "snmp-test",
+							sourceType:     "dyncfg",
+							status:         dyncfg.StatusAccepted,
+						},
+					},
+					wantDyncfg: `
+CONFIG test:sd:snmp:snmp-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+
+FUNCTION_RESULT_BEGIN 1-add 202 application/json
+{"status":202,"message":""}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"add snmp v3 job": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgSNMPConfig{
+					Name: "snmp-v3-test",
+					Credentials: []DyncfgSNMPCredential{
+						{
+							Name:          "snmpv3-auth",
+							Version:       "3",
+							Username:      "admin",
+							SecurityLevel: "authPriv",
+							AuthProtocol:  "sha256",
+							AuthPassword:  "authpass",
+							PrivProtocol:  "aes",
+							PrivPassword:  "privpass",
+						},
+					},
+					Networks: []DyncfgSNMPNetwork{
+						{Subnet: "10.0.0.0/24", Credential: "snmpv3-auth"},
+					},
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Add
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererSNMP), "add", "snmp-v3-test"},
+							payload, "type=dyncfg,user=test")
+
+						// Enable
+						sendDyncfgCmd(sd, "2-enable",
+							[]string{sd.dyncfgJobID(DiscovererSNMP, "snmp-v3-test"), "enable"},
+							nil, "")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererSNMP,
+							name:           "snmp-v3-test",
+							sourceType:     "dyncfg",
+							status:         dyncfg.StatusRunning,
+						},
+					},
+					wantRunning: []string{"dyncfg:snmp:snmp-v3-test"},
+				}
+			},
+		},
+		"get snmp job config": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgSNMPConfig{
+					Name:           "snmp-test",
+					RescanInterval: "1h",
+					Credentials: []DyncfgSNMPCredential{
+						{Name: "v2-cred", Version: "2c", Community: "public"},
+					},
+					Networks: []DyncfgSNMPNetwork{
+						{Subnet: "192.168.0.0/16", Credential: "v2-cred"},
+					},
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Add
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererSNMP), "add", "snmp-test"},
+							payload, "type=dyncfg,user=test")
+
+						// Get
+						sendDyncfgCmd(sd, "2-get",
+							[]string{sd.dyncfgJobID(DiscovererSNMP, "snmp-test"), "get"},
+							nil, "")
+					},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-get 200 application/json")
+						assert.Contains(t, got, `"name":"snmp-test"`)
+						assert.Contains(t, got, `"rescan_interval":"1h"`)
+						assert.Contains(t, got, `"subnet":"192.168.0.0/16"`)
+					},
+				}
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			sim := tc.createSim()
+			sim.run(t)
+		})
+	}
+}
+
+func TestServiceDiscovery_DyncfgUpdateWhileRunning(t *testing.T) {
+	tests := map[string]struct {
+		createSim func() *dyncfgSim
+	}{
+		"update running pipeline restarts it": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: "5s"}
+				payload, _ := json.Marshal(cfg)
+
+				updatedCfg := DyncfgNetListenersConfig{Name: "test-job", Interval: "10s"}
+				updatedPayload, _ := json.Marshal(updatedCfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Add
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererNetListeners), "add", "test-job"},
+							payload, "type=dyncfg,user=test")
+
+						// Enable (starts pipeline)
+						sendDyncfgCmd(sd, "2-enable",
+							[]string{sd.dyncfgJobID(DiscovererNetListeners, "test-job"), "enable"},
+							nil, "")
+
+						// Update while running (should restart pipeline)
+						sendDyncfgCmd(sd, "3-update",
+							[]string{sd.dyncfgJobID(DiscovererNetListeners, "test-job"), "update"},
+							updatedPayload, "type=dyncfg,user=test")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererNetListeners,
+							name:           "test-job",
+							sourceType:     "dyncfg",
+							status:         dyncfg.StatusRunning,
+						},
+					},
+					wantRunning: []string{"dyncfg:net_listeners:test-job"},
+					wantDyncfg: `
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+
+FUNCTION_RESULT_BEGIN 1-add 202 application/json
+{"status":202,"message":""}
+FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status running
+
+FUNCTION_RESULT_BEGIN 2-enable 200 application/json
+{"status":200,"message":""}
+FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status running
+
+FUNCTION_RESULT_BEGIN 3-update 200 application/json
+{"status":200,"message":""}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"update running docker pipeline": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgDockerConfig{Name: "docker-job", Address: "unix:///var/run/docker.sock"}
+				payload, _ := json.Marshal(cfg)
+
+				updatedCfg := DyncfgDockerConfig{Name: "docker-job", Address: "tcp://localhost:2375"}
+				updatedPayload, _ := json.Marshal(updatedCfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Add
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererDocker), "add", "docker-job"},
+							payload, "type=dyncfg,user=test")
+
+						// Enable
+						sendDyncfgCmd(sd, "2-enable",
+							[]string{sd.dyncfgJobID(DiscovererDocker, "docker-job"), "enable"},
+							nil, "")
+
+						// Update while running
+						sendDyncfgCmd(sd, "3-update",
+							[]string{sd.dyncfgJobID(DiscovererDocker, "docker-job"), "update"},
+							updatedPayload, "type=dyncfg,user=test")
+
+						// Verify config was updated
+						sendDyncfgCmd(sd, "4-get",
+							[]string{sd.dyncfgJobID(DiscovererDocker, "docker-job"), "get"},
+							nil, "")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererDocker,
+							name:           "docker-job",
+							sourceType:     "dyncfg",
+							status:         dyncfg.StatusRunning,
+						},
+					},
+					wantRunning: []string{"dyncfg:docker:docker-job"},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						// Verify update response
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 3-update 200 application/json")
+						// Verify config was updated to new address
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 4-get 200 application/json")
+						assert.Contains(t, got, `"address":"tcp://localhost:2375"`)
+					},
+				}
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			sim := tc.createSim()
+			sim.run(t)
+		})
+	}
+}
+
+func TestServiceDiscovery_DyncfgTest(t *testing.T) {
+	tests := map[string]struct {
+		createSim func() *dyncfgSim
+	}{
+		"test valid config succeeds": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: "5s"}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-test",
+							[]string{sd.dyncfgTemplateID(DiscovererNetListeners), "test"},
+							payload, "")
+					},
+					wantExposed: []wantExposedConfig{},
+					wantRunning: []string{},
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-test 200 application/json
+{"status":200,"message":""}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"test without payload fails": {
+			createSim: func() *dyncfgSim {
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-test",
+							[]string{sd.dyncfgTemplateID(DiscovererNetListeners), "test"},
+							nil, "")
+					},
+					wantExposed: []wantExposedConfig{},
+					wantRunning: []string{},
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-test 400 application/json
+{"status":400,"errorMessage":"missing configuration payload"}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"test valid docker config": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgDockerConfig{
+					Name:    "docker-test",
+					Address: "unix:///var/run/docker.sock",
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-test",
+							[]string{sd.dyncfgTemplateID(DiscovererDocker), "test"},
+							payload, "")
+					},
+					wantExposed: []wantExposedConfig{},
+					wantRunning: []string{},
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-test 200 application/json
+{"status":200,"message":""}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"test valid k8s config": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgK8sConfig{
+					Name: "k8s-test",
+					Role: "pod",
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-test",
+							[]string{sd.dyncfgTemplateID(DiscovererK8s), "test"},
+							payload, "")
+					},
+					wantExposed: []wantExposedConfig{},
+					wantRunning: []string{},
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-test 200 application/json
+{"status":200,"message":""}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"test valid snmp config": {
+			createSim: func() *dyncfgSim {
+				cfg := DyncfgSNMPConfig{
+					Name: "snmp-test",
+					Credentials: []DyncfgSNMPCredential{
+						{Name: "v2-cred", Version: "2c"},
+					},
+					Networks: []DyncfgSNMPNetwork{
+						{Subnet: "192.168.1.0/24", Credential: "v2-cred"},
+					},
+				}
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-test",
+							[]string{sd.dyncfgTemplateID(DiscovererSNMP), "test"},
+							payload, "")
+					},
+					wantExposed: []wantExposedConfig{},
+					wantRunning: []string{},
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-test 200 application/json
+{"status":200,"message":""}
 FUNCTION_RESULT_END
 `,
 				}
