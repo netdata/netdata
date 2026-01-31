@@ -15,7 +15,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/k8sclient"
 
-	"github.com/gohugoio/hashstructure"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,7 +40,7 @@ var log = logger.New().With(
 	slog.String("discoverer", "kubernetes"),
 )
 
-func NewKubeDiscoverer(cfg Config) (*KubeDiscoverer, error) {
+func NewDiscoverer(cfg Config) (*KubeDiscoverer, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, fmt.Errorf("config validation: %v", err)
 	}
@@ -242,20 +241,6 @@ func enqueue(queue *workqueue.Typed[any], obj any) {
 		return
 	}
 	queue.Add(key)
-}
-
-func send(ctx context.Context, in chan<- []model.TargetGroup, tgg model.TargetGroup) {
-	if tgg == nil {
-		return
-	}
-	select {
-	case <-ctx.Done():
-	case in <- []model.TargetGroup{tgg}:
-	}
-}
-
-func calcHash(obj any) (uint64, error) {
-	return hashstructure.Hash(obj, nil)
 }
 
 func joinSelectors(srs ...string) string {

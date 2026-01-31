@@ -47,7 +47,7 @@ func TestNewKubeDiscoverer(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			disc, err := NewKubeDiscoverer(test.cfg)
+			disc, err := NewDiscoverer(test.cfg)
 
 			if test.wantErr {
 				assert.Error(t, err)
@@ -149,7 +149,7 @@ func newNamespace(name string) *corev1.Namespace {
 }
 
 func mustCalcHash(obj any) uint64 {
-	hash, err := calcHash(obj)
+	hash, err := model.CalcHash(obj)
 	if err != nil {
 		panic(fmt.Sprintf("hash calculation: %v", err))
 	}

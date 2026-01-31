@@ -16,8 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gohugoio/hashstructure"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
@@ -238,7 +236,7 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 
 		tgt.Address = net.JoinHostPort(tgt.IPAddress, tgt.Port)
 
-		hash, err := calcHash(tgt)
+		hash, err := model.CalcHash(tgt)
 		if err != nil {
 			continue
 		}
@@ -298,6 +296,3 @@ func extractComm(cmdLine string) string {
 	return strings.TrimSuffix(comm, ":")
 }
 
-func calcHash(obj any) (uint64, error) {
-	return hashstructure.Hash(obj, nil)
-}

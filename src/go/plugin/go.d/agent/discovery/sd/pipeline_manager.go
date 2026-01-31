@@ -208,6 +208,21 @@ func (m *PipelineManager) startPipelineWithInstanceLocked(ctx context.Context, k
 	if existing, ok := m.pipelines[key]; ok {
 		m.Warningf("pipeline '%s': cancelling unexpected existing pipeline before start", key)
 		existing.cancel()
+
+		// Preserve sources from the interloping pipeline for grace period cleanup
+		if sources, ok := m.pipelineSources[key]; ok && len(sources) > 0 {
+			if pending, ok := m.pendingRemovals[key]; ok {
+				for src := range sources {
+					pending.sources[src] = struct{}{}
+				}
+				pending.timestamp = time.Now()
+			} else {
+				m.pendingRemovals[key] = &pendingRemoval{
+					sources:   copySourcesMap(sources),
+					timestamp: time.Now(),
+				}
+			}
+		}
 		// Don't wait - just cancel and let it exit asynchronously
 	}
 

@@ -36,7 +36,7 @@ func TestDiscoverer_Discover(t *testing.T) {
 									Name:          nginx1.Names[0][1:],
 									Image:         nginx1.Image,
 									Command:       nginx1.Command,
-									Labels:        mapAny(nginx1.Labels),
+									Labels:        model.MapAny(nginx1.Labels),
 									PrivatePort:   "80",
 									PublicPort:    "8080",
 									PublicPortIP:  "0.0.0.0",
@@ -56,7 +56,7 @@ func TestDiscoverer_Discover(t *testing.T) {
 									Name:          nginx2.Names[0][1:],
 									Image:         nginx2.Image,
 									Command:       nginx2.Command,
-									Labels:        mapAny(nginx2.Labels),
+									Labels:        model.MapAny(nginx2.Labels),
 									PrivatePort:   "80",
 									PublicPort:    "8080",
 									PublicPortIP:  "0.0.0.0",
@@ -98,7 +98,7 @@ func TestDiscoverer_Discover(t *testing.T) {
 									Name:          nginx2.Names[0][1:],
 									Image:         nginx2.Image,
 									Command:       nginx2.Command,
-									Labels:        mapAny(nginx2.Labels),
+									Labels:        model.MapAny(nginx2.Labels),
 									PrivatePort:   "80",
 									PublicPort:    "8080",
 									PublicPortIP:  "0.0.0.0",
@@ -156,6 +156,6 @@ func prepareNginxContainer(name string) typesContainer.Summary {
 }
 
 func withHash(tgt *target) *target {
-	tgt.hash, _ = calcHash(tgt)
+	tgt.hash, _ = model.CalcHash(tgt)
 	return tgt
 }

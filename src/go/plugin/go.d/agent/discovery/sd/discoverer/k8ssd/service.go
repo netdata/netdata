@@ -125,7 +125,7 @@ func (s *serviceDiscoverer) handleQueueItem(ctx context.Context, in chan<- []mod
 
 	if !exists {
 		tgg := &serviceTargetGroup{source: serviceSourceFromNsName(namespace, name)}
-		send(ctx, in, tgg)
+		model.SendTargetGroup(ctx, in, tgg)
 		return
 	}
 
@@ -136,7 +136,7 @@ func (s *serviceDiscoverer) handleQueueItem(ctx context.Context, in chan<- []mod
 
 	tgg := s.buildTargetGroup(svc)
 
-	send(ctx, in, tgg)
+	model.SendTargetGroup(ctx, in, tgg)
 }
 
 func (s *serviceDiscoverer) buildTargetGroup(svc *corev1.Service) model.TargetGroup {
@@ -160,8 +160,8 @@ func (s *serviceDiscoverer) buildTargets(svc *corev1.Service) (targets []model.T
 			Address:      net.JoinHostPort(svc.Name+"."+svc.Namespace+".svc", portNum),
 			Namespace:    svc.Namespace,
 			Name:         svc.Name,
-			Annotations:  mapAny(svc.Annotations),
-			Labels:       mapAny(svc.Labels),
+			Annotations:  model.MapAny(svc.Annotations),
+			Labels:       model.MapAny(svc.Labels),
 			Port:         portNum,
 			PortName:     port.Name,
 			PortProtocol: string(port.Protocol),
@@ -169,7 +169,7 @@ func (s *serviceDiscoverer) buildTargets(svc *corev1.Service) (targets []model.T
 			ExternalName: svc.Spec.ExternalName,
 			Type:         string(svc.Spec.Type),
 		}
-		hash, err := calcHash(tgt)
+		hash, err := model.CalcHash(tgt)
 		if err != nil {
 			continue
 		}

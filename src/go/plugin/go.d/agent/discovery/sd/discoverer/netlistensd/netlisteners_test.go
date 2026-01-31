@@ -162,6 +162,6 @@ func TestDiscoverer_Discover(t *testing.T) {
 }
 
 func withHash(l *target) *target {
-	l.hash, _ = calcHash(l)
+	l.hash, _ = model.CalcHash(l)
 	return l
 }

@@ -115,7 +115,7 @@ func (p *Pipeline) registerDiscoverers(conf Config) error {
 		case "k8s":
 			for _, k8sCfg := range cfg.K8s {
 				k8sCfg.Source = conf.Source
-				td, err := k8ssd.NewKubeDiscoverer(k8sCfg)
+				td, err := k8ssd.NewDiscoverer(k8sCfg)
 				if err != nil {
 					return fmt.Errorf("failed to create '%s' discoverer: %v", cfg.Discoverer, err)
 				}

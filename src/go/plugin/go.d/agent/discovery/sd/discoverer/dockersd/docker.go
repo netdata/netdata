@@ -18,7 +18,6 @@ import (
 
 	typesContainer "github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
-	"github.com/gohugoio/hashstructure"
 )
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
@@ -179,7 +178,7 @@ func (d *Discoverer) buildTargetGroup(cntr typesContainer.Summary) model.TargetG
 				Name:          strings.TrimPrefix(cntr.Names[0], "/"),
 				Image:         cntr.Image,
 				Command:       cntr.Command,
-				Labels:        mapAny(cntr.Labels),
+				Labels:        model.MapAny(cntr.Labels),
 				PrivatePort:   strconv.Itoa(int(port.PrivatePort)),
 				PublicPort:    strconv.Itoa(int(port.PublicPort)),
 				PublicPortIP:  port.IP,
@@ -190,7 +189,7 @@ func (d *Discoverer) buildTargetGroup(cntr typesContainer.Summary) model.TargetG
 			}
 			tgt.Address = net.JoinHostPort(tgt.IPAddress, tgt.PrivatePort)
 
-			hash, err := calcHash(tgt)
+			hash, err := model.CalcHash(tgt)
 			if err != nil {
 				continue
 			}
@@ -215,17 +214,3 @@ func cntrSource(cntr typesContainer.Summary) string {
 	return fmt.Sprintf("discoverer=docker,container=%s,image=%s", name, cntr.Image)
 }
 
-func calcHash(obj any) (uint64, error) {
-	return hashstructure.Hash(obj, nil)
-}
-
-func mapAny(src map[string]string) map[string]any {
-	if src == nil {
-		return nil
-	}
-	m := make(map[string]any, len(src))
-	for k, v := range src {
-		m[k] = v
-	}
-	return m
-}
