@@ -1614,7 +1614,11 @@ static inline int ebpf_open_tracepoint_path(char *filename, size_t length, char 
 int ebpf_is_tracepoint_enabled(const char *subsys, const char *eventname)
 {
     char text[FILENAME_MAX + 1];
-    int fd = ebpf_open_tracepoint_path(text, FILENAME_MAX, subsys, eventname, O_RDONLY);
+    int fd = ebpf_open_tracepoint_path(text,
+            FILENAME_MAX,
+            (char *)subsys,
+            (char *)eventname,
+            O_RDONLY);
     if (fd < 0) {
         return -1;
     }
@@ -1648,7 +1652,11 @@ static int ebpf_change_tracing_values(const char *subsys, const char *eventname,
     }
 
     char filename[1024];
-    int fd = ebpf_open_tracepoint_path(filename, 1023, subsys, eventname, O_WRONLY);
+    int fd = ebpf_open_tracepoint_path(filename,
+            1023,
+            (char *)subsys,
+            (char *)eventname,
+            O_WRONLY);
     if (fd < 0) {
         return -1;
     }

@@ -771,7 +771,7 @@ void ebpf_library_run_unittests(void)
     fprintf(stderr, "\n");
     fprintf(stderr, "===========================================\n");
     if (tests_failed == 0) {
-        fprintf(stderr, "  All tests PASSED (%d tests)\n", tests_failed);
+        fprintf(stderr, "  All tests PASSED\n");
     } else {
         fprintf(stderr, "  %d tests FAILED\n", tests_failed);
     }

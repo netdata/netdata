@@ -435,12 +435,12 @@ static void ebpf_disk_disable_tracepoints()
     block_rq_complete_enabled = was_block_rq_complete_enabled;
     netdata_mutex_unlock(&tracepoint_mutex);
 
-    if (block_issue_enabled) {
+    if (!block_issue_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_block_type, tracepoint_block_issue))
             netdata_log_error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_issue);
     }
 
-    if (block_rq_complete_enabled) {
+    if (!block_rq_complete_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_block_type, tracepoint_block_rq_complete))
             netdata_log_error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_rq_complete);
     }

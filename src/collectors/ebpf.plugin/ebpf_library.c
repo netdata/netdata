@@ -654,37 +654,40 @@ static void ebpf_link_hostnames(const char *parse)
     if (unlikely(!parse))
         return;
 
+    char *move = strdupz(parse);
+    char *clean = move;
     while (likely(parse)) {
         // Find the first valid value
-        while (isspace(*parse))
-            parse++;
+        while (isspace(*move))
+            move++;
 
         // No valid value found
-        if (unlikely(!*parse))
+        if (unlikely(!*move))
             return;
 
         // Find space that ends the list
-        char *end = strchr(parse, ' ');
+        char *end = strchr(move, ' ');
         if (end) {
             *end++ = '\0';
         }
 
         int neg = 0;
-        if (*parse == '!') {
+        if (*move == '!') {
             neg++;
-            parse++;
+            move++;
         }
 
         ebpf_network_viewer_hostname_list_t *hostname = callocz(1, sizeof(ebpf_network_viewer_hostname_list_t));
-        hostname->value = strdupz(parse);
-        hostname->hash = simple_hash(parse);
-        hostname->value_pattern = simple_pattern_create(parse, NULL, SIMPLE_PATTERN_EXACT, true);
+        hostname->value = strdupz(move);
+        hostname->hash = simple_hash(move);
+        hostname->value_pattern = simple_pattern_create(move, NULL, SIMPLE_PATTERN_EXACT, true);
 
         ebpf_link_hostname(
             (!neg) ? &network_viewer_opt.included_hostnames : &network_viewer_opt.excluded_hostnames, hostname);
 
-        parse = end;
+        move = end;
     }
+    freez(clean);
 }
 
 void parse_network_viewer_section(struct config *cfg)
@@ -924,6 +927,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
     }
 
     char *end = strdupz(ip);
+    char *clean_end = end;
     // Move while I cannot find a separator
     while (*end && *end != '/' && *end != '-')
         end++;
@@ -1066,7 +1070,7 @@ storethisip:
 
 cleanipdup:
     freez(ipdup);
-    freez(end);
+    freez(clean_end);
 }
 
 /**
