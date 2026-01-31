@@ -262,6 +262,11 @@
 - Regenerate integrations docs ([#21673](https://github.com/netdata/netdata/issues/21673))
 - Chore(go.d/snmp): use base units for interfaces function columns ([#21674](https://github.com/netdata/netdata/issues/21674))
 - Regenerate integrations docs ([#21675](https://github.com/netdata/netdata/issues/21675))
+- Test(go.d/snmp): fix tests ([#21677](https://github.com/netdata/netdata/issues/21677))
+- Fix(go.d/sql): add requireCloud flag to func ([#21678](https://github.com/netdata/netdata/issues/21678))
+- Update external plugins section in map.csv ([#21679](https://github.com/netdata/netdata/issues/21679))
+- Feat(go.d/ping): add jitter and variance metrics ([#21683](https://github.com/netdata/netdata/issues/21683))
+- Regenerate integrations docs ([#21684](https://github.com/netdata/netdata/issues/21684))
 
 ## [2.8.0] - 2025-11-19
 
