@@ -656,7 +656,7 @@ static void ebpf_link_hostnames(const char *parse)
 
     char *move = strdupz(parse);
     char *clean = move;
-    while (likely(parse)) {
+    while (likely(move)) {
         // Find the first valid value
         while (isspace(*move))
             move++;
