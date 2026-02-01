@@ -27,6 +27,77 @@ type discoverySim struct {
 	wantPipelines []*mockPipeline
 }
 
+// discoverySimExt is an extended simulation that also checks exposed configs
+type discoverySimExt struct {
+	configs          []confFile
+	wantPipelines    []*mockPipeline
+	wantExposedCount int
+	wantExposed      []wantExposedCfg
+}
+
+type wantExposedCfg struct {
+	key        string // discovererType:name
+	sourceType string
+	status     dyncfg.Status
+}
+
+func (sim *discoverySimExt) run(t *testing.T) {
+	fact := &mockFactory{}
+	var buf bytes.Buffer
+	mgr := &ServiceDiscovery{
+		Logger: logger.New(),
+		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
+			return fact.create(config)
+		},
+		confProv: &mockConfigProvider{
+			confFiles: sim.configs,
+			ch:        make(chan confFile),
+		},
+		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		seenConfigs:    newSeenSDConfigs(),
+		exposedConfigs: newExposedSDConfigs(),
+		// dyncfgCh is intentionally nil to trigger auto-enable in tests
+	}
+
+	in := make(chan<- []*confgroup.Group)
+	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() { defer close(done); mgr.Run(ctx, in) }()
+
+	time.Sleep(time.Second * 3)
+
+	lock.Lock()
+	if sim.wantPipelines != nil {
+		assert.Equalf(t, sim.wantPipelines, fact.pipelines, "pipelines mismatch")
+	}
+
+	// Check exposed configs count
+	if sim.wantExposedCount > 0 {
+		assert.Equal(t, sim.wantExposedCount, mgr.exposedConfigs.count(), "exposed configs count")
+	}
+
+	// Check specific exposed configs
+	for _, want := range sim.wantExposed {
+		cfg, ok := mgr.exposedConfigs.lookup(want.key)
+		if !assert.Truef(t, ok, "exposed config '%s' not found", want.key) {
+			continue
+		}
+		assert.Equal(t, want.sourceType, cfg.SourceType(), "exposed config '%s' sourceType", want.key)
+		assert.Equal(t, want.status, cfg.Status(), "exposed config '%s' status", want.key)
+	}
+	lock.Unlock()
+
+	cancel()
+
+	timeout := time.Second * 5
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		t.Errorf("sd failed to exit in %s", timeout)
+	}
+}
+
 func (sim *discoverySim) run(t *testing.T) {
 	fact := &mockFactory{}
 	var buf bytes.Buffer

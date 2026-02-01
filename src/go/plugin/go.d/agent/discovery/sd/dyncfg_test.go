@@ -1526,6 +1526,148 @@ FUNCTION_RESULT_END
 	}
 }
 
+func TestServiceDiscovery_DyncfgPriority(t *testing.T) {
+	tests := map[string]struct {
+		createSim func() *dyncfgSim
+	}{
+		"dyncfg add replaces running file config": {
+			// File config is running, dyncfg add with same name should replace it
+			createSim: func() *dyncfgSim {
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Simulate a running file config
+						fileCfg := sdConfig{
+							"name":             "test-job",
+							ikeyDiscovererType: DiscovererNetListeners,
+							ikeyPipelineKey:    "/etc/netdata/sd.d/test.conf",
+							ikeySource:         "/etc/netdata/sd.d/test.conf",
+							ikeySourceType:     confgroup.TypeUser,
+							ikeyStatus:         dyncfg.StatusRunning,
+						}
+						sd.seenConfigs.add(fileCfg)
+						sd.exposedConfigs.add(fileCfg)
+
+						// Start the pipeline to simulate running state
+						pipelineCfg := pipeline.Config{Name: "test-job"}
+						_ = sd.mgr.Start(sd.ctx, fileCfg.PipelineKey(), pipelineCfg)
+
+						// Dyncfg add with same name - should replace file config
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererNetListeners), "add", "test-job"},
+							payload, "type=dyncfg,user=test")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererNetListeners,
+							name:           "test-job",
+							sourceType:     confgroup.TypeDyncfg, // dyncfg replaces file
+							status:         dyncfg.StatusAccepted,
+						},
+					},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						// Should see: delete old file config, create new dyncfg config
+						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job delete")
+						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job create accepted job")
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-add 202 application/json")
+					},
+				}
+			},
+		},
+		"dyncfg add replaces stock file config": {
+			// Stock file config exists, dyncfg add should replace it
+			createSim: func() *dyncfgSim {
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Simulate a stock file config (not running)
+						fileCfg := sdConfig{
+							"name":             "test-job",
+							ikeyDiscovererType: DiscovererNetListeners,
+							ikeyPipelineKey:    "/usr/lib/netdata/conf.d/sd/test.conf",
+							ikeySource:         "/usr/lib/netdata/conf.d/sd/test.conf",
+							ikeySourceType:     confgroup.TypeStock,
+							ikeyStatus:         dyncfg.StatusAccepted,
+						}
+						sd.seenConfigs.add(fileCfg)
+						sd.exposedConfigs.add(fileCfg)
+
+						// Dyncfg add with same name - should replace stock config
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererNetListeners), "add", "test-job"},
+							payload, "type=dyncfg,user=test")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererNetListeners,
+							name:           "test-job",
+							sourceType:     confgroup.TypeDyncfg,
+							status:         dyncfg.StatusAccepted,
+						},
+					},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job delete")
+						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job create accepted job")
+						assert.Contains(t, got, "dyncfg")
+					},
+				}
+			},
+		},
+		"dyncfg add fails if dyncfg config with same name exists": {
+			// Dyncfg config exists, another dyncfg add with same name should fail
+			createSim: func() *dyncfgSim {
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Simulate existing dyncfg config
+						dyncfgCfg := sdConfig{
+							"name":             "test-job",
+							ikeyDiscovererType: DiscovererNetListeners,
+							ikeyPipelineKey:    "dyncfg:net_listeners:test-job",
+							ikeySource:         "type=dyncfg,user=admin",
+							ikeySourceType:     confgroup.TypeDyncfg,
+							ikeyStatus:         dyncfg.StatusRunning,
+						}
+						sd.seenConfigs.add(dyncfgCfg)
+						sd.exposedConfigs.add(dyncfgCfg)
+
+						// Another dyncfg add with same name - should fail
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererNetListeners), "add", "test-job"},
+							payload, "type=dyncfg,user=test")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererNetListeners,
+							name:           "test-job",
+							sourceType:     confgroup.TypeDyncfg,
+							status:         dyncfg.StatusRunning, // original keeps running
+						},
+					},
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-add 400 application/json
+{"status":400,"errorMessage":"Config 'net_listeners:test-job' already exists."}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			sim := tc.createSim()
+			sim.run(t)
+		})
+	}
+}
+
 // testPipeline is a simple pipeline for testing that just waits for cancellation.
 type testPipeline struct {
 	name string

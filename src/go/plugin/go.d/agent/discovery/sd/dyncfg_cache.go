@@ -36,8 +36,15 @@ func (c sdConfig) PipelineKey() string    { v, _ := c[ikeyPipelineKey].(string);
 func (c sdConfig) Name() string           { v, _ := c["name"].(string); return v }
 
 func (c sdConfig) Status() dyncfg.Status {
-	v, _ := c[ikeyStatus].(dyncfg.Status)
-	return v
+	// Handle both dyncfg.Status (original) and string (after JSON clone)
+	switch v := c[ikeyStatus].(type) {
+	case dyncfg.Status:
+		return v
+	case string:
+		return dyncfg.Status(v)
+	default:
+		return ""
+	}
 }
 
 func (c sdConfig) SetSource(v string) sdConfig         { c[ikeySource] = v; return c }
@@ -71,11 +78,24 @@ func (c sdConfig) SourceTypePriority() int {
 	}
 }
 
-// Clone returns a deep copy of the config.
+// Clone returns a deep copy of the config using JSON marshal/unmarshal.
 func (c sdConfig) Clone() sdConfig {
-	clone := make(sdConfig, len(c))
-	for k, v := range c {
-		clone[k] = v
+	data, err := json.Marshal(c)
+	if err != nil {
+		// Fallback to shallow copy if marshal fails (shouldn't happen)
+		clone := make(sdConfig, len(c))
+		for k, v := range c {
+			clone[k] = v
+		}
+		return clone
+	}
+	var clone sdConfig
+	if err := json.Unmarshal(data, &clone); err != nil {
+		// Fallback to shallow copy
+		clone = make(sdConfig, len(c))
+		for k, v := range c {
+			clone[k] = v
+		}
 	}
 	return clone
 }
@@ -185,11 +205,9 @@ func newSDConfigFromJSON(data []byte, source, sourceType, discovererType, pipeli
 
 // sourceTypeFromPath determines the source type (stock/user) from a file path.
 func sourceTypeFromPath(path string) string {
-	// User configs are in paths containing "edit.d", "user", or similar patterns
-	if strings.Contains(path, ".d/") ||
-		strings.Contains(path, "/user/") ||
-		strings.Contains(path, "/custom/") ||
-		strings.Contains(path, "/edit.d/") {
+	// User configs are in /etc/ (e.g., /etc/netdata/sd.d/)
+	// Stock configs are in /usr/lib/ or similar system paths
+	if strings.Contains(path, "/etc/") {
 		return confgroup.TypeUser
 	}
 	return confgroup.TypeStock
@@ -220,20 +238,25 @@ func (c *seenSDConfigs) remove(uid string) {
 	delete(c.items, uid)
 }
 
+// lookup returns a deep copy of the config to avoid data races.
 func (c *seenSDConfigs) lookup(uid string) (sdConfig, bool) {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
 	cfg, ok := c.items[uid]
-	return cfg, ok
+	if !ok {
+		return nil, false
+	}
+	return cfg.Clone(), true
 }
 
+// lookupBySource returns deep copies of configs from the given source.
 func (c *seenSDConfigs) lookupBySource(source string) []sdConfig {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
 	var result []sdConfig
 	for _, cfg := range c.items {
 		if cfg.Source() == source {
-			result = append(result, cfg)
+			result = append(result, cfg.Clone())
 		}
 	}
 	return result
@@ -264,11 +287,16 @@ func (c *exposedSDConfigs) remove(key string) {
 	delete(c.items, key)
 }
 
+// lookup returns a deep copy of the config to avoid data races.
+// Callers can safely read from the returned config without synchronization.
 func (c *exposedSDConfigs) lookup(key string) (sdConfig, bool) {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
 	cfg, ok := c.items[key]
-	return cfg, ok
+	if !ok {
+		return nil, false
+	}
+	return cfg.Clone(), true
 }
 
 func (c *exposedSDConfigs) updateStatus(key string, status dyncfg.Status) {
