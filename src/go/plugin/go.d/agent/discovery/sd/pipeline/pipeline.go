@@ -20,7 +20,7 @@ import (
 )
 
 func New(cfg Config) (*Pipeline, error) {
-	if err := validateConfig(cfg); err != nil {
+	if err := ValidateConfig(cfg); err != nil {
 		return nil, err
 	}
 

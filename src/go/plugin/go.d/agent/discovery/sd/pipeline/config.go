@@ -214,7 +214,9 @@ type ComposeRuleConfig struct {
 	} `yaml:"config"` // mandatory, at least 1
 }
 
-func validateConfig(cfg Config) error {
+// ValidateConfig validates a pipeline configuration.
+// Exported for use by dyncfg validation.
+func ValidateConfig(cfg Config) error {
 	if cfg.Name == "" {
 		return errors.New("'name' not set")
 	}

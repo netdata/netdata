@@ -52,6 +52,7 @@
                 "title": "Credentials",
                 "description": "SNMP credentials for authentication.",
                 "type": "array",
+                "minItems": 1,
                 "items": {
                   "type": "object",
                   "properties": {
@@ -140,6 +141,7 @@
                 "title": "Networks",
                 "description": "Network subnets to scan.",
                 "type": "array",
+                "minItems": 1,
                 "items": {
                   "type": "object",
                   "properties": {
@@ -207,7 +209,8 @@
     },
     "required": [
       "name",
-      "discoverer"
+      "discoverer",
+      "services"
     ]
   },
   "uiSchema": {

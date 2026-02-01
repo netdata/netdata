@@ -22,8 +22,16 @@ func parseDyncfgPayload(payload []byte, discovererType string, configDefaults co
 	cfg.ConfigDefaults = configDefaults
 
 	// Validate that the config has the expected discoverer type
-	if got := cfg.Discoverer.Type(); got != "" && got != discovererType {
+	if got := cfg.Discoverer.Type(); got != discovererType {
+		if got == "" {
+			return pipeline.Config{}, fmt.Errorf("no discoverer configured, expected %q", discovererType)
+		}
 		return pipeline.Config{}, fmt.Errorf("config has discoverer type %q, expected %q", got, discovererType)
+	}
+
+	// Perform full semantic validation (name, discoverer, services rules)
+	if err := pipeline.ValidateConfig(cfg); err != nil {
+		return pipeline.Config{}, err
 	}
 
 	return cfg, nil

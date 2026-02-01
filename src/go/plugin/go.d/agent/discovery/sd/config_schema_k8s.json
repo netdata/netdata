@@ -114,7 +114,8 @@
     },
     "required": [
       "name",
-      "discoverer"
+      "discoverer",
+      "services"
     ]
   },
   "uiSchema": {
