@@ -27,7 +27,7 @@ function respondError(id, code, message, data) {
 }
 
 // -------------------------- Server Instructions --------------------------
-const SERVER_INSTRUCTIONS = `Netdata Parents Sizing Calculator - Calculate CPU and RAM requirements for Netdata Parent nodes.
+const SERVER_INSTRUCTIONS = `Netdata Parents Sizing Calculator - Calculate CPU, RAM, and Disk requirements for Netdata Parent nodes.
 
 INPUTS:
 - max_concurrently_connected_nodes (required): Number of concurrently monitored nodes at peak time
@@ -37,6 +37,9 @@ INPUTS:
 - ml_enabled: Machine Learning enabled (default: true)
 - mem_safety_margin: Memory headroom percentage (default: 0.30 = 30%)
 - cpu_safety_margin: CPU headroom for queries percentage (default: 0.40 = 40%)
+- days_retention_tier0: Per-second data retention in days (default: 14)
+- days_retention_tier1: Per-minute data retention in days (default: 90)
+- days_retention_tier2: Per-hour data retention in days (default: 365)
 
 GUIDELINES:
 - Simple nodes (bare metal, VMs): ~3000 metrics/s
@@ -45,10 +48,31 @@ GUIDELINES:
 - Daily autoscaling k8s: ephemerality = 10
 - Clustered parents stream to each other, requiring more resources
 
+EPHEMERALITY MODEL:
+- 1.0 = stable infrastructure, no metric rotation
+- 2.0 = all metrics rotate once over the maximum retention period
+- Higher values = faster rotation (e.g., 10 = metrics rotate 9x over retention)
+
 OUTPUT:
-Returns breakdown of metrics, raw resource needs, and final recommendations with safety margins applied.`;
+Returns breakdown of metrics, raw resource needs, disk requirements per tier, and final recommendations with safety margins applied.`;
 
 // -------------------------- Sizing Logic (from Netdata Parents Sizing Guide) --------------------------
+
+// -------------------------- Disk Sizing Constants --------------------------
+// Derived from production Netdata deployments (Kubernetes and stable infrastructure)
+const DISK_CONSTANTS = {
+    // Bytes per sample (after compression)
+    // Tier 0: Gorilla compression + ZSTD = excellent compression for time-series
+    // Tier 1 & 2: ZSTD only = good compression but includes aggregation overhead
+    BYTES_PER_SAMPLE_TIER0: 0.6,   // Gorilla + ZSTD (observed: 0.4-0.7)
+    BYTES_PER_SAMPLE_TIER1: 4,     // ZSTD only (observed: 3.9-5.4)
+    BYTES_PER_SAMPLE_TIER2: 22,    // ZSTD + fragmentation overhead (observed: 22-25)
+
+    // Samples per day at each granularity
+    SAMPLES_PER_DAY_TIER0: 86400,  // 1 sample per second
+    SAMPLES_PER_DAY_TIER1: 1440,   // 1 sample per minute
+    SAMPLES_PER_DAY_TIER2: 24      // 1 sample per hour
+};
 
 /**
  * Calculates Netdata Parent sizing based on infrastructure metrics.
@@ -63,7 +87,10 @@ function calculateSizing(inputs) {
         clustered_parent = true,
         ml_enabled = true,
         mem_safety_margin = 0.30,
-        cpu_safety_margin = 0.40
+        cpu_safety_margin = 0.40,
+        days_retention_tier0 = 14,
+        days_retention_tier1 = 90,
+        days_retention_tier2 = 365
     } = inputs;
 
     // Validate required parameter
@@ -83,6 +110,15 @@ function calculateSizing(inputs) {
     }
     if (typeof ml_enabled !== 'boolean') {
         throw new Error('ml_enabled must be a boolean');
+    }
+    if (typeof days_retention_tier0 !== 'number' || days_retention_tier0 < 1) {
+        throw new Error('days_retention_tier0 must be a number >= 1');
+    }
+    if (typeof days_retention_tier1 !== 'number' || days_retention_tier1 < 1) {
+        throw new Error('days_retention_tier1 must be a number >= 1');
+    }
+    if (typeof days_retention_tier2 !== 'number' || days_retention_tier2 < 1) {
+        throw new Error('days_retention_tier2 must be a number >= 1');
     }
 
     // Convert booleans to numeric for calculations
@@ -151,6 +187,35 @@ function calculateSizing(inputs) {
     // Round RAM to multiples of 4 GiB, minimum 4 GiB
     const roundRam = (n) => Math.max(4, Math.ceil(n / 4) * 4);
 
+    // --- Disk Sizing Calculations ---
+    // Ephemerality model: rotation_rate = (ephemerality - 1) / max_retention_days
+    // At ephemerality=1: no rotation. At ephemerality=2: all metrics rotate once over max retention.
+    const max_retention_days = Math.max(days_retention_tier0, days_retention_tier1, days_retention_tier2);
+    const rotation_rate = (ephemerality - 1) / max_retention_days;
+
+    // Base metrics (currently collected)
+    const base_metrics = metrics_curr_collected;
+
+    // Total unique metrics per tier (accounting for rotation over each tier's retention period)
+    const metrics_tier0 = base_metrics * (1 + rotation_rate * days_retention_tier0);
+    const metrics_tier1 = base_metrics * (1 + rotation_rate * days_retention_tier1);
+    const metrics_tier2 = base_metrics * (1 + rotation_rate * days_retention_tier2);
+
+    // Samples per tier
+    const samples_tier0 = metrics_tier0 * days_retention_tier0 * DISK_CONSTANTS.SAMPLES_PER_DAY_TIER0;
+    const samples_tier1 = metrics_tier1 * days_retention_tier1 * DISK_CONSTANTS.SAMPLES_PER_DAY_TIER1;
+    const samples_tier2 = metrics_tier2 * days_retention_tier2 * DISK_CONSTANTS.SAMPLES_PER_DAY_TIER2;
+
+    // Disk per tier (bytes -> GiB)
+    const GiB = 1024 ** 3;
+    const disk_tier0_gib = (samples_tier0 * DISK_CONSTANTS.BYTES_PER_SAMPLE_TIER0) / GiB;
+    const disk_tier1_gib = (samples_tier1 * DISK_CONSTANTS.BYTES_PER_SAMPLE_TIER1) / GiB;
+    const disk_tier2_gib = (samples_tier2 * DISK_CONSTANTS.BYTES_PER_SAMPLE_TIER2) / GiB;
+    const disk_total_gib = disk_tier0_gib + disk_tier1_gib + disk_tier2_gib;
+
+    // Round disk to multiples of 10 GiB for practical provisioning
+    const roundDisk = (n) => Math.max(10, Math.ceil(n / 10) * 10);
+
     return {
         inputs: {
             max_concurrently_connected_nodes,
@@ -159,7 +224,10 @@ function calculateSizing(inputs) {
             clustered_parent,
             ml_enabled,
             mem_safety_margin,
-            cpu_safety_margin
+            cpu_safety_margin,
+            days_retention_tier0,
+            days_retention_tier1,
+            days_retention_tier2
         },
         breakdown: {
             total_metrics_per_second: metrics_curr_collected,
@@ -171,12 +239,39 @@ function calculateSizing(inputs) {
             raw_memory_needed_mib: parseFloat(mem_usage_mib.toFixed(2)),
             raw_cpu_needed_cores: parseFloat(cpu_usage_cores.toFixed(4))
         },
+        disk: {
+            tier0: {
+                retention_days: days_retention_tier0,
+                granularity: '1s',
+                unique_metrics: Math.round(metrics_tier0),
+                samples: Math.round(samples_tier0),
+                disk_gib: parseFloat(disk_tier0_gib.toFixed(2))
+            },
+            tier1: {
+                retention_days: days_retention_tier1,
+                granularity: '1m',
+                unique_metrics: Math.round(metrics_tier1),
+                samples: Math.round(samples_tier1),
+                disk_gib: parseFloat(disk_tier1_gib.toFixed(2))
+            },
+            tier2: {
+                retention_days: days_retention_tier2,
+                granularity: '1h',
+                unique_metrics: Math.round(metrics_tier2),
+                samples: Math.round(samples_tier2),
+                disk_gib: parseFloat(disk_tier2_gib.toFixed(2))
+            },
+            total_gib: parseFloat(disk_total_gib.toFixed(2)),
+            total_gib_rounded: roundDisk(disk_total_gib)
+        },
         recommendation: {
             cpu_cores: roundCpu(final_cpu_cores),
             ram_gib: roundRam(final_mem_gib),
+            disk_gib: roundDisk(disk_total_gib),
             cpu_cores_exact: parseFloat(final_cpu_cores.toFixed(2)),
             ram_gib_exact: parseFloat(final_mem_gib.toFixed(2)),
-            details: `Recommended: ${roundCpu(final_cpu_cores)} CPU Cores and ${roundRam(final_mem_gib)} GiB RAM`
+            disk_gib_exact: parseFloat(disk_total_gib.toFixed(2)),
+            details: `Recommended: ${roundCpu(final_cpu_cores)} CPU Cores, ${roundRam(final_mem_gib)} GiB RAM, ${roundDisk(disk_total_gib)} GiB Disk`
         }
     };
 }
@@ -202,7 +297,10 @@ function formatResponse(result) {
         clustered_parent,
         ml_enabled,
         mem_safety_margin,
-        cpu_safety_margin
+        cpu_safety_margin,
+        days_retention_tier0,
+        days_retention_tier1,
+        days_retention_tier2
     } = result.inputs;
 
     const {
@@ -213,8 +311,11 @@ function formatResponse(result) {
         raw_cpu_needed_cores
     } = result.breakdown;
 
+    const { tier0, tier1, tier2, total_gib, total_gib_rounded } = result.disk;
+
     const cpu_cores = result.recommendation.cpu_cores;
     const ram_gib = result.recommendation.ram_gib;
+    const disk_gib = result.recommendation.disk_gib;
     const mem_margin_pct = Math.round(mem_safety_margin * 100);
     const cpu_margin_pct = Math.round(cpu_safety_margin * 100);
 
@@ -222,6 +323,13 @@ function formatResponse(result) {
     const raw_ram_gib = raw_memory_needed_mib / 1024;
     const actual_cpu_free_pct = Math.round((1 - raw_cpu_needed_cores / cpu_cores) * 100);
     const actual_ram_free_pct = Math.round((1 - raw_ram_gib / ram_gib) * 100);
+
+    // Format retention as human-readable
+    const formatRetention = (days) => {
+        if (days >= 365) return `${Math.round(days / 365 * 10) / 10}y`;
+        if (days >= 30) return `${Math.round(days / 30 * 10) / 10}mo`;
+        return `${days}d`;
+    };
 
     return `# Netdata Parent Sizing: ${max_concurrently_connected_nodes} Nodes
 
@@ -231,7 +339,7 @@ function formatResponse(result) {
 |-----------|-------|-------------|
 | **Concurrent Nodes** | ${max_concurrently_connected_nodes} | Distinct monitored hosts (physical servers, VMs, SNMP devices, vnodes). Containers are not counted as nodes. |
 | **Metrics per Node** | ${metrics_per_node} | Average metrics/second per node across all collection types. Reference values: bare-metal/VMs ~5k, Kubernetes nodes ~20k, SNMP devices ~300. |
-| **Ephemerality** | ${ephemerality}x | Ratio of historical to active nodes in retention. 1 = static infrastructure, 2 = full rotation within retention period, higher = dynamic environments. |
+| **Ephemerality** | ${ephemerality}x | Infrastructure rotation factor. 1 = static (no rotation), 2 = all metrics rotate once over retention period, 10 = 9x rotation. |
 | **Parent Clustering** | ${clustered_parent} | Enable when this parent streams to other parents. Disable for standalone deployments. |
 | **Machine Learning** | ${ml_enabled} | Enable for parent-side anomaly detection. Disable if child nodes perform ML locally (anomaly data propagates via streaming). |
 | **Memory Margin** | ${mem_margin_pct}% | Reserved for OS and other processes. Values below 10% risk OOM conditions. |
@@ -253,14 +361,52 @@ The following sizing recommendations are NOT resource consumption. They are reco
 |----------|---------------|
 | **CPU** | ${cpu_cores} cores |
 | **RAM** | ${ram_gib} GiB |
+| **Disk** | ${disk_gib} GiB |
 
 *Included free resources: ${actual_cpu_free_pct}% CPU, ${actual_ram_free_pct}% RAM.*
 
+## Disk Requirements by Tier
+
+| Tier | Granularity | Retention | Unique Metrics | Samples | Disk Size |
+|------|-------------|-----------|----------------|---------|-----------|
+| **0** | per-second | ${formatRetention(days_retention_tier0)} | ${formatNumber(tier0.unique_metrics)} | ${formatNumber(tier0.samples)} | ${tier0.disk_gib} GiB |
+| **1** | per-minute | ${formatRetention(days_retention_tier1)} | ${formatNumber(tier1.unique_metrics)} | ${formatNumber(tier1.samples)} | ${tier1.disk_gib} GiB |
+| **2** | per-hour | ${formatRetention(days_retention_tier2)} | ${formatNumber(tier2.unique_metrics)} | ${formatNumber(tier2.samples)} | ${tier2.disk_gib} GiB |
+
+**Total Disk: ${total_gib} GiB** (rounded to ${total_gib_rounded} GiB for provisioning)
+
+### Disk Calculation Assumptions
+
+**Compression (bytes per sample on disk):**
+
+| Tier | Compression | Bytes/Sample | Rationale |
+|------|-------------|--------------|-----------|
+| **0** | Gorilla + ZSTD | 0.6 | Time-series optimized compression, excellent for per-second data |
+| **1** | ZSTD | 4 | Standard compression for aggregated per-minute data |
+| **2** | ZSTD | 22 | Includes fragmentation overhead from sparse/ephemeral metrics |
+
+**Ephemerality Model:**
+
+This calculation assumes metrics rotate **uniformly** over the maximum retention period (${formatRetention(Math.max(days_retention_tier0, days_retention_tier1, days_retention_tier2))}).
+
+- **Ephemerality = ${ephemerality}** means all currently collected metrics will be replaced **${(ephemerality - 1).toFixed(1)} times** over ${formatRetention(Math.max(days_retention_tier0, days_retention_tier1, days_retention_tier2))}
+- **Daily rotation rate:** ${((ephemerality - 1) / Math.max(days_retention_tier0, days_retention_tier1, days_retention_tier2) * 100).toFixed(2)}% of metrics rotate per day
+- **Unique metrics per tier** = base metrics × (1 + rotation_rate × tier_retention_days)
+
+| Tier | Retention | Metric Growth | Unique Metrics |
+|------|-----------|---------------|----------------|
+| **0** | ${formatRetention(days_retention_tier0)} | +${((tier0.unique_metrics / total_metrics_per_second - 1) * 100).toFixed(1)}% | ${formatNumber(tier0.unique_metrics)} |
+| **1** | ${formatRetention(days_retention_tier1)} | +${((tier1.unique_metrics / total_metrics_per_second - 1) * 100).toFixed(1)}% | ${formatNumber(tier1.unique_metrics)} |
+| **2** | ${formatRetention(days_retention_tier2)} | +${((tier2.unique_metrics / total_metrics_per_second - 1) * 100).toFixed(1)}% | ${formatNumber(tier2.unique_metrics)} |
+
+*Note: Actual disk usage may vary based on metric value patterns, compression efficiency, and rotation timing.*
+
 ---
 
-Rounding:
-- CPU cores are rounded up to the nearest even number (2, 4, 6, 8...).
-- RAM is rounded up to multiples of 4 GiB, minimum 4 GiB.
+### Rounding Rules
+- CPU cores: rounded up to nearest even number (2, 4, 6, 8...)
+- RAM: rounded up to multiples of 4 GiB, minimum 4 GiB
+- Disk: rounded up to multiples of 10 GiB, minimum 10 GiB
 
 Present these parameters to users and recalculate if adjustments are needed.
 `;
@@ -274,7 +420,10 @@ async function toolCalculateParentSizing(args) {
         clustered_parent: args.clustered_parent !== undefined ? Boolean(args.clustered_parent) : undefined,
         ml_enabled: args.ml_enabled !== undefined ? Boolean(args.ml_enabled) : undefined,
         mem_safety_margin: args.mem_safety_margin !== undefined ? Number(args.mem_safety_margin) : undefined,
-        cpu_safety_margin: args.cpu_safety_margin !== undefined ? Number(args.cpu_safety_margin) : undefined
+        cpu_safety_margin: args.cpu_safety_margin !== undefined ? Number(args.cpu_safety_margin) : undefined,
+        days_retention_tier0: args.days_retention_tier0 !== undefined ? Number(args.days_retention_tier0) : undefined,
+        days_retention_tier1: args.days_retention_tier1 !== undefined ? Number(args.days_retention_tier1) : undefined,
+        days_retention_tier2: args.days_retention_tier2 !== undefined ? Number(args.days_retention_tier2) : undefined
     });
     return formatResponse(result);
 }
@@ -283,12 +432,13 @@ async function toolCalculateParentSizing(args) {
 const tools = [
     {
         name: 'calculate_parent_sizing',
-        description: `Calculates the required CPU and RAM for a Netdata Parent node based on infrastructure size and configuration.
+        description: `Calculates the required CPU, RAM, and Disk for a Netdata Parent node based on infrastructure size and configuration.
 
 <usage>
 - Only max_concurrently_connected_nodes is required
 - All other parameters have sensible defaults
 - Returns breakdown and final recommendations with safety margins
+- Includes detailed disk requirements per tier with assumptions
 </usage>
 
 <parameters>
@@ -302,6 +452,9 @@ Optional (with defaults):
 - ml_enabled: Machine Learning enabled (default: true)
 - mem_safety_margin: Memory headroom (default: 0.30 = 30%)
 - cpu_safety_margin: CPU headroom for queries (default: 0.40 = 40%)
+- days_retention_tier0: Per-second data retention in days (default: 14)
+- days_retention_tier1: Per-minute data retention in days (default: 90)
+- days_retention_tier2: Per-hour data retention in days (default: 365)
 </parameters>
 
 <examples>
@@ -310,6 +463,9 @@ Minimal (just node count, uses all defaults):
 
 Custom configuration:
 { "max_concurrently_connected_nodes": 500, "metrics_per_node": 10000, "ephemerality": 5 }
+
+With custom retention:
+{ "max_concurrently_connected_nodes": 100, "days_retention_tier0": 7, "days_retention_tier1": 30, "days_retention_tier2": 180 }
 </examples>`,
         inputSchema: {
             type: 'object',
@@ -341,6 +497,18 @@ Custom configuration:
                 cpu_safety_margin: {
                     type: 'number',
                     description: 'CPU utilization available for queries (percentage as decimal). Default: 0.4'
+                },
+                days_retention_tier0: {
+                    type: 'number',
+                    description: 'Per-second data retention in days. Default: 14'
+                },
+                days_retention_tier1: {
+                    type: 'number',
+                    description: 'Per-minute data retention in days. Default: 90'
+                },
+                days_retention_tier2: {
+                    type: 'number',
+                    description: 'Per-hour data retention in days. Default: 365'
                 }
             },
             required: ['max_concurrently_connected_nodes']
