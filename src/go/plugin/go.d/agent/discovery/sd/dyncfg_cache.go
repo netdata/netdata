@@ -181,8 +181,9 @@ func newSDConfigFromYAML(data []byte, source, sourceType, pipelineKey string) (s
 }
 
 // newSDConfigFromJSON creates an sdConfig from JSON payload.
-// Used when receiving dyncfg add/update commands. Cleans the name for dyncfg compatibility.
-func newSDConfigFromJSON(data []byte, source, sourceType, discovererType, pipelineKey string) (sdConfig, error) {
+// Used when receiving dyncfg add/update commands.
+// The name parameter is forced onto the config (from dyncfg job ID), matching jobmgr pattern.
+func newSDConfigFromJSON(data []byte, name, source, sourceType, discovererType, pipelineKey string) (sdConfig, error) {
 	var m sdConfig
 	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("unmarshal json: %w", err)
@@ -191,10 +192,9 @@ func newSDConfigFromJSON(data []byte, source, sourceType, discovererType, pipeli
 		return nil, fmt.Errorf("unmarshal json: got nil map")
 	}
 
-	// Clean the name for dyncfg compatibility
-	if name := m.Name(); name != "" {
-		m["name"] = cleanName(name)
-	}
+	// Force name from dyncfg job ID (matching jobmgr pattern: cfg.SetName(name))
+	// This ensures sdConfig.Key() matches the dyncfg job ID regardless of payload content
+	m["name"] = cleanName(name)
 
 	// Add metadata
 	m.SetSource(source)

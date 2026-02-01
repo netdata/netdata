@@ -254,7 +254,7 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 
 	// Create sdConfig from JSON payload
 	pkey := pipelineKey(dt, name)
-	scfg, err := newSDConfigFromJSON(fn.Payload(), fn.Source(), confgroup.TypeDyncfg, dt, pkey)
+	scfg, err := newSDConfigFromJSON(fn.Payload(), name, fn.Source(), confgroup.TypeDyncfg, dt, pkey)
 	if err != nil {
 		d.Warningf("dyncfg: add: failed to create config '%s:%s': %v", dt, name, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to create config: %v", err)
@@ -377,13 +377,27 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 	}
 
 	// Create updated sdConfig
-	newCfg, err := newSDConfigFromJSON(fn.Payload(), newSource, newSourceType, dt, newPipelineKey)
+	newCfg, err := newSDConfigFromJSON(fn.Payload(), name, newSource, newSourceType, dt, newPipelineKey)
 	if err != nil {
 		d.Warningf("dyncfg: update: failed to create config '%s': %v", key, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to create config: %v", err)
 		return
 	}
 	newCfg.SetStatus(ecfg.Status())
+
+	// Update caches first (before pipeline operations)
+	// When old was dyncfg: remove old from seenConfigs (cleanup stale entry)
+	// When old was file: keep in seenConfigs (for re-exposure if dyncfg removed later)
+	if !isConversion {
+		d.seenConfigs.remove(ecfg.UID())
+	}
+	d.seenConfigs.add(newCfg)
+	d.exposedConfigs.add(newCfg)
+
+	// For conversion: remove old dyncfg job now, create new one after pipeline operation
+	if isConversion {
+		d.dyncfgSDJobRemove(dt, name)
+	}
 
 	// Handle pipeline restart/start
 	if isConversion {
@@ -393,36 +407,33 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 		}
 		// Start new dyncfg pipeline
 		if err := d.mgr.Start(d.ctx, newPipelineKey, pipelineCfg); err != nil {
+			// Accept failure state, user can retry via enable (matching jobmgr pattern)
 			d.Errorf("dyncfg: update: failed to start pipeline '%s': %v", key, err)
-			d.dyncfgApi.SendCodef(fn, 422, "Failed to start pipeline: %v", err)
+			newCfg.SetStatus(dyncfg.StatusFailed)
+			d.exposedConfigs.updateStatus(key, dyncfg.StatusFailed)
+			d.dyncfgSDJobCreate(dt, name, newSourceType, newSource, dyncfg.StatusFailed)
+			d.dyncfgApi.SendCodef(fn, 200, "")
 			return
 		}
 		newCfg.SetStatus(dyncfg.StatusRunning)
+		d.exposedConfigs.updateStatus(key, dyncfg.StatusRunning)
+		d.dyncfgSDJobCreate(dt, name, newSourceType, newSource, dyncfg.StatusRunning)
 	} else if d.mgr.IsRunning(ecfg.PipelineKey()) {
 		// Restart existing dyncfg pipeline
 		if err := d.mgr.Restart(d.ctx, ecfg.PipelineKey(), pipelineCfg); err != nil {
+			// Accept failure state, user can retry via enable (matching jobmgr pattern)
 			d.Errorf("dyncfg: update: failed to restart pipeline '%s': %v", key, err)
-			d.dyncfgApi.SendCodef(fn, 422, "Failed to restart pipeline: %v", err)
+			newCfg.SetStatus(dyncfg.StatusFailed)
+			d.exposedConfigs.updateStatus(key, dyncfg.StatusFailed)
+			d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
+			d.dyncfgApi.SendCodef(fn, 200, "")
 			return
 		}
 		newCfg.SetStatus(dyncfg.StatusRunning)
-	}
-
-	// Update caches
-	// When old was dyncfg: remove old from seenConfigs (cleanup stale entry)
-	// When old was file: keep in seenConfigs (for re-exposure if dyncfg removed later)
-	if !isConversion {
-		d.seenConfigs.remove(ecfg.UID())
-	}
-	d.seenConfigs.add(newCfg)
-	d.exposedConfigs.add(newCfg)
-
-	// Update dyncfg UI
-	if isConversion {
-		// File -> dyncfg: remove old file job, create new dyncfg job (updates source type in UI)
-		d.dyncfgSDJobRemove(dt, name)
-		d.dyncfgSDJobCreate(dt, name, newSourceType, newSource, newCfg.Status())
+		d.exposedConfigs.updateStatus(key, dyncfg.StatusRunning)
+		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusRunning)
 	} else {
+		// Pipeline not running, just update status in dyncfg UI
 		d.dyncfgSDJobStatus(dt, name, newCfg.Status())
 	}
 
@@ -574,6 +585,11 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn dyncfg.Function) {
 
 	// Remove from dyncfg
 	d.dyncfgSDJobRemove(dt, name)
+
+	// TODO: After removing dyncfg config, check if a lower-priority config (user/stock file)
+	// exists in seenConfigs with the same Key(). If so, promote it to exposedConfigs and
+	// recreate the dyncfg job. This would allow file configs to "take over" when dyncfg
+	// override is removed.
 
 	d.dyncfgApi.SendCodef(fn, 200, "")
 }
