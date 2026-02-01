@@ -17,7 +17,7 @@ Netdata's alerting uses **templates** (match all instances of a context) and **a
 
 To override, create an alert with the **same name**. User definitions are processed before stock definitions, so yours wins.
 
-See [Alert Configuration Ordering](/docs/alerts-and-notifications/alert-configuration-ordering) for the full conceptual explanation.
+See [Alert Configuration Ordering](/src/health/alert-configuration-ordering.md) for the full conceptual explanation.
 
 ## Where to Put Your Overrides
 
@@ -345,5 +345,5 @@ To restore file-based control, remove the dynamic config through the UI (reset t
 
 ## Related Documentation
 
-- [Health Configuration Reference](/docs/alerts-and-notifications/alert-configuration-reference)
-- [Alert Configuration Ordering](/docs/alerts-and-notifications/alert-configuration-ordering)
+- [Health Configuration Reference](/src/health/REFERENCE.md)
+- [Alert Configuration Ordering](/src/health/alert-configuration-ordering.md)
