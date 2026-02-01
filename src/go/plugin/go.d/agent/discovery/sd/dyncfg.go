@@ -88,7 +88,6 @@ func (d *ServiceDiscovery) dyncfgSDTemplateCreate(discovererType string) {
 func (d *ServiceDiscovery) dyncfgSDJobCreate(discovererType, name, sourceType, source string, status dyncfg.Status) {
 	isDyncfg := sourceType == "dyncfg"
 	cmds := dyncfgSDJobCmds(isDyncfg)
-	d.Infof("dyncfg: creating job '%s:%s' sourceType=%s isDyncfg=%v cmds='%s'", discovererType, name, sourceType, isDyncfg, cmds)
 	d.dyncfgApi.ConfigCreate(netdataapi.ConfigOpts{
 		ID:                d.dyncfgJobID(discovererType, name),
 		Status:            status.String(),
@@ -393,6 +392,11 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn dyncfg.Function) {
 		return
 	}
 
+	// Clear wait flag if this is the config we're waiting for
+	if pipelineKey == d.waitCfgOnOff {
+		d.waitCfgOnOff = ""
+	}
+
 	// If already running, ensure status is correct and return success (idempotent)
 	if d.mgr.IsRunning(pipelineKey) {
 		d.Infof("dyncfg: enable: pipeline '%s:%s' is already running", dt, name)
@@ -455,6 +459,11 @@ func (d *ServiceDiscovery) dyncfgCmdDisable(fn dyncfg.Function) {
 		d.Warningf("dyncfg: disable: config '%s:%s' not found", dt, name)
 		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
+	}
+
+	// Clear wait flag if this is the config we're waiting for
+	if pipelineKey == d.waitCfgOnOff {
+		d.waitCfgOnOff = ""
 	}
 
 	// If not running, just update status (idempotent)
@@ -633,7 +642,7 @@ func (d *ServiceDiscovery) unregisterDyncfgTemplates() {
 
 // exposeFileConfig exposes a file-based pipeline config as a dyncfg job.
 // It extracts the discoverer type from the config and creates a dyncfg job for it.
-func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile) {
+func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile, status dyncfg.Status) {
 	if len(cfg.Discover) == 0 {
 		return
 	}
@@ -641,11 +650,11 @@ func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile) 
 	// Use the first discoverer type in the config
 	dt := cfg.Discover[0].Discoverer
 	if !isValidDiscovererType(dt) {
-		d.Warningf("unknown discoverer type '%s' in file config '%s'", dt, conf.source)
+		d.Warningf("exposeFileConfig: unknown discoverer type '%s' in file config '%s'", dt, conf.source)
 		return
 	}
 
-	name := cfg.Name
+	name := cfg.CleanName()
 	if name == "" {
 		// Use file path as fallback name
 		name = conf.source
@@ -660,15 +669,13 @@ func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile) 
 	// Transform pipeline config to dyncfg format (JSON)
 	content, err := transformPipelineConfigToDyncfg(cfg, dt)
 	if err != nil {
-		d.Warningf("failed to transform config '%s' to dyncfg format: %v, not exposing via dyncfg", conf.source, err)
+		d.Warningf("exposeFileConfig: failed to transform config '%s' to dyncfg format: %v", conf.source, err)
 		return
 	}
 	if len(content) == 0 {
-		d.Warningf("failed to transform config '%s': empty result, not exposing via dyncfg", conf.source)
+		d.Warningf("exposeFileConfig: failed to transform config '%s': empty result", conf.source)
 		return
 	}
-
-	d.Infof("exposeFileConfig: '%s' transformed content length=%d", conf.source, len(content))
 
 	// Store in exposed configs cache
 	// NOTE: pipelineKey for file configs is the file path (same as used by addPipeline)
@@ -678,14 +685,35 @@ func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile) 
 		pipelineKey:    pipelineKeyFromSource(conf.source),
 		source:         conf.source,
 		sourceType:     "file",
-		status:         dyncfg.StatusRunning,
+		status:         status,
 		content:        content,
 	}
 	d.exposedConfigs.add(sdCfg)
 
-	// Create dyncfg job
+	// Create dyncfg job - notifies netdata
 	d.dyncfgSDJobCreate(dt, name, sdCfg.sourceType, sdCfg.source, sdCfg.status)
-	d.Debugf("exposed file config '%s' as dyncfg job '%s:%s'", conf.source, dt, name)
+}
+
+// autoEnableFileConfig enables a file config without waiting for netdata's enable command.
+// Used in terminal mode where netdata is not available to send commands.
+// This mimics what jobmgr does: call the enable handler directly with a synthetic function.
+func (d *ServiceDiscovery) autoEnableFileConfig(cfg pipeline.Config) {
+	if len(cfg.Discover) == 0 {
+		return
+	}
+
+	dt := cfg.Discover[0].Discoverer
+	name := cfg.CleanName()
+	if name == "" {
+		return
+	}
+
+	// Create a synthetic enable function and call the handler directly
+	// This is the same pattern used in jobmgr
+	fn := dyncfg.NewFunction(functions.Function{
+		Args: []string{d.dyncfgJobID(dt, name), "enable"},
+	})
+	d.dyncfgCmdEnable(fn)
 }
 
 // removeExposedFileConfig removes a file-based config from dyncfg.

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -17,8 +18,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 
+	"github.com/mattn/go-isatty"
 	"gopkg.in/yaml.v2"
 )
+
+var isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdin.Fd())
 
 type Config struct {
 	ConfigDefaults confgroup.Registry
@@ -62,6 +66,11 @@ type (
 
 		ctx context.Context
 		mgr *PipelineManager
+
+		// waitCfgOnOff holds the pipeline key we're waiting for enable/disable on.
+		// When set, we only process dyncfg commands (not new file configs).
+		// This ensures netdata can send enable/disable before we process more configs.
+		waitCfgOnOff string
 	}
 	sdPipeline interface {
 		Run(ctx context.Context, in chan<- []*confgroup.Group)
@@ -117,20 +126,30 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 
 func (d *ServiceDiscovery) run(ctx context.Context) {
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		case cfg := <-d.confProv.configs():
-			if cfg.source == "" {
-				continue
+		if d.waitCfgOnOff != "" {
+			// Waiting for enable/disable command - only process dyncfg commands
+			select {
+			case <-ctx.Done():
+				return
+			case fn := <-d.dyncfgCh:
+				d.dyncfgSeqExec(fn)
 			}
-			if len(cfg.content) == 0 {
-				d.removePipeline(cfg)
-			} else {
-				d.addPipeline(ctx, cfg)
+		} else {
+			select {
+			case <-ctx.Done():
+				return
+			case cfg := <-d.confProv.configs():
+				if cfg.source == "" {
+					continue
+				}
+				if len(cfg.content) == 0 {
+					d.removePipeline(cfg)
+				} else {
+					d.addPipeline(ctx, cfg)
+				}
+			case fn := <-d.dyncfgCh:
+				d.dyncfgSeqExec(fn)
 			}
-		case fn := <-d.dyncfgCh:
-			d.dyncfgSeqExec(fn)
 		}
 	}
 }
@@ -164,26 +183,47 @@ func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile) {
 
 	key := pipelineKeyFromSource(conf.source)
 
-	var err error
+	// If pipeline already running (reload case), restart with grace period.
+	// Already running means netdata previously enabled it.
 	if d.mgr.IsRunning(key) {
 		d.Infof("restarting pipeline '%s' with updated config", key)
-		err = d.mgr.Restart(ctx, key, cfg)
-	} else {
-		d.Infof("starting pipeline '%s'", key)
-		err = d.mgr.Start(ctx, key, cfg)
-	}
-
-	if err != nil {
-		d.Errorf("pipeline '%s': %v", key, err)
+		if err := d.mgr.Restart(ctx, key, cfg); err != nil {
+			d.Errorf("pipeline '%s': %v", key, err)
+			return
+		}
+		// Update exposed config
+		d.removeExposedFileConfig(conf.source)
+		d.exposeFileConfig(cfg, conf, dyncfg.StatusRunning)
 		return
 	}
 
-	// Remove any existing dyncfg job for this source before exposing
-	// (handles case where name or discoverer type changed in config)
+	// For new pipelines, expose first with Accepted status and wait for enable.
+	// This matches jobmgr pattern - netdata will send enable based on stored state.
 	d.removeExposedFileConfig(conf.source)
 
-	// Expose file config as dyncfg job
-	d.exposeFileConfig(cfg, conf)
+	// Check if we can use the dyncfg enable path (requires discoverers for dyncfg ID)
+	canUseDyncfgEnable := len(cfg.Discover) > 0 && cfg.Name != ""
+
+	if !canUseDyncfgEnable {
+		// No discoverers or name - can't use dyncfg path, start directly (tests, simple configs)
+		if err := d.mgr.Start(d.ctx, key, cfg); err != nil {
+			d.Errorf("pipeline '%s': %v", key, err)
+			return
+		}
+		d.exposeFileConfig(cfg, conf, dyncfg.StatusRunning)
+		return
+	}
+
+	// Store config and create dyncfg job to notify netdata
+	d.exposeFileConfig(cfg, conf, dyncfg.StatusAccepted)
+
+	if isTerminal || d.dyncfgCh == nil {
+		// Auto-enable in terminal mode or tests (no netdata to send commands)
+		d.autoEnableFileConfig(cfg)
+	} else {
+		// Wait for netdata to send enable/disable command
+		d.waitCfgOnOff = key
+	}
 }
 
 // pipelineKeyFromSource extracts a pipeline key from a file source path.

@@ -68,11 +68,14 @@ func (f Function) ID() string {
 
 // JobName returns the job name from Args[2] (used in add command).
 // Returns empty string if args has fewer than 3 elements.
+// Sanitizes the name by replacing spaces and colons with underscores.
 func (f Function) JobName() string {
 	if len(f.fn.Args) < 3 {
 		return ""
 	}
-	return f.fn.Args[2]
+	name := strings.ReplaceAll(f.fn.Args[2], " ", "_")
+	name = strings.ReplaceAll(name, ":", "_")
+	return name
 }
 
 // User returns the user value from the Source field.

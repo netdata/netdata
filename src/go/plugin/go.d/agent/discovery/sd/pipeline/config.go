@@ -32,6 +32,14 @@ type Config struct {
 	Compose  []ComposeRuleConfig  `yaml:"compose"`
 }
 
+// CleanName returns the name sanitized for use in dyncfg IDs.
+// Replaces spaces and colons to avoid parsing issues.
+func (c Config) CleanName() string {
+	name := strings.ReplaceAll(c.Name, " ", "_")
+	name = strings.ReplaceAll(name, ":", "_")
+	return name
+}
+
 type DiscoveryConfig struct {
 	Discoverer   string             `yaml:"discoverer"`
 	NetListeners netlistensd.Config `yaml:"net_listeners"`
