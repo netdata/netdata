@@ -67,30 +67,12 @@ func (sim discoverySim) run(t *testing.T) {
 		return
 	}
 
-	// --- legacy path ---
-	clr, err := newTargetClassificator(cfg.LegacyClassify)
-	require.Nil(t, err, "newTargetClassificator")
-
-	cmr, err := newConfigComposer(cfg.LegacyCompose)
-	require.Nil(t, err, "newConfigComposer")
-
-	mockClr := &mockClassificator{clr: clr}
-	mockCmr := &mockComposer{cmr: cmr}
-
-	pl.clr = mockClr
-	pl.cmr = mockCmr
-
-	clr.Logger = pl.Logger
-	cmr.Logger = pl.Logger
-
 	groups := sim.collectGroups(t, pl)
 
 	sortConfigGroups(groups)
 	sortConfigGroups(sim.wantConfGroups)
 
 	assert.Equal(t, sim.wantConfGroups, groups)
-	assert.Equalf(t, sim.wantClassifyCalls, mockClr.calls, "classify calls")
-	assert.Equalf(t, sim.wantComposeCalls, mockCmr.calls, "compose calls")
 }
 
 func (sim discoverySim) collectGroups(t *testing.T, pl *Pipeline) []*confgroup.Group {
@@ -121,16 +103,6 @@ func (sim discoverySim) collectGroups(t *testing.T, pl *Pipeline) []*confgroup.G
 	}()
 
 	return groups
-}
-
-type mockClassificator struct {
-	calls int
-	clr   *targetClassificator
-}
-
-func (m *mockClassificator) classify(tgt model.Target) model.Tags {
-	m.calls++
-	return m.clr.classify(tgt)
 }
 
 type mockComposer struct {
