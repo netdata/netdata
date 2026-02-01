@@ -355,17 +355,29 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 		return
 	}
 
-	// Set source based on original source type
-	if ecfg.SourceType() == confgroup.TypeDyncfg {
-		pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", fn.Source())
+	// Updating a non-dyncfg config converts it to dyncfg (creates an override).
+	// This ensures changes persist and take priority over file configs.
+	isConversion := ecfg.SourceType() != confgroup.TypeDyncfg
+	var newSource, newSourceType, newPipelineKey string
+
+	if isConversion {
+		// Convert file config to dyncfg override
+		newSource = fn.Source()
+		newSourceType = confgroup.TypeDyncfg
+		newPipelineKey = pipelineKey(dt, name)
+		pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", newSource)
+		d.Infof("dyncfg: update: converting file config '%s' to dyncfg by user '%s'", key, fn.User())
 	} else {
-		pipelineCfg.Source = fmt.Sprintf("file=%s", ecfg.Source())
+		// Update existing dyncfg config
+		newSource = fn.Source()
+		newSourceType = confgroup.TypeDyncfg
+		newPipelineKey = ecfg.PipelineKey()
+		pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", newSource)
+		d.Infof("dyncfg: update: %s by user '%s'", key, fn.User())
 	}
 
-	d.Infof("dyncfg: update: %s by user '%s'", key, fn.User())
-
-	// Create updated sdConfig from new payload, preserving metadata
-	newCfg, err := newSDConfigFromJSON(fn.Payload(), ecfg.Source(), ecfg.SourceType(), dt, ecfg.PipelineKey())
+	// Create updated sdConfig
+	newCfg, err := newSDConfigFromJSON(fn.Payload(), newSource, newSourceType, dt, newPipelineKey)
 	if err != nil {
 		d.Warningf("dyncfg: update: failed to create config '%s': %v", key, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to create config: %v", err)
@@ -373,8 +385,21 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 	}
 	newCfg.SetStatus(ecfg.Status())
 
-	// If pipeline is running, restart it with grace period
-	if d.mgr.IsRunning(ecfg.PipelineKey()) {
+	// Handle pipeline restart/start
+	if isConversion {
+		// Stop old file pipeline if running (different pipeline key)
+		if d.mgr.IsRunning(ecfg.PipelineKey()) {
+			d.mgr.Stop(ecfg.PipelineKey())
+		}
+		// Start new dyncfg pipeline
+		if err := d.mgr.Start(d.ctx, newPipelineKey, pipelineCfg); err != nil {
+			d.Errorf("dyncfg: update: failed to start pipeline '%s': %v", key, err)
+			d.dyncfgApi.SendCodef(fn, 422, "Failed to start pipeline: %v", err)
+			return
+		}
+		newCfg.SetStatus(dyncfg.StatusRunning)
+	} else if d.mgr.IsRunning(ecfg.PipelineKey()) {
+		// Restart existing dyncfg pipeline
 		if err := d.mgr.Restart(d.ctx, ecfg.PipelineKey(), pipelineCfg); err != nil {
 			d.Errorf("dyncfg: update: failed to restart pipeline '%s': %v", key, err)
 			d.dyncfgApi.SendCodef(fn, 422, "Failed to restart pipeline: %v", err)
@@ -383,11 +408,24 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 		newCfg.SetStatus(dyncfg.StatusRunning)
 	}
 
-	// Update both caches
+	// Update caches
+	// When old was dyncfg: remove old from seenConfigs (cleanup stale entry)
+	// When old was file: keep in seenConfigs (for re-exposure if dyncfg removed later)
+	if !isConversion {
+		d.seenConfigs.remove(ecfg.UID())
+	}
 	d.seenConfigs.add(newCfg)
 	d.exposedConfigs.add(newCfg)
 
-	d.dyncfgSDJobStatus(dt, name, newCfg.Status())
+	// Update dyncfg UI
+	if isConversion {
+		// File -> dyncfg: remove old file job, create new dyncfg job (updates source type in UI)
+		d.dyncfgSDJobRemove(dt, name)
+		d.dyncfgSDJobCreate(dt, name, newSourceType, newSource, newCfg.Status())
+	} else {
+		d.dyncfgSDJobStatus(dt, name, newCfg.Status())
+	}
+
 	d.dyncfgApi.SendCodef(fn, 200, "")
 }
 
@@ -651,4 +689,3 @@ func (d *ServiceDiscovery) unregisterDyncfgTemplates() {
 
 	d.fnReg.UnregisterPrefix("config", d.dyncfgSDPrefixValue())
 }
-

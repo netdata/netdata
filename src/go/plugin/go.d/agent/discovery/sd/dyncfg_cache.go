@@ -187,6 +187,9 @@ func newSDConfigFromJSON(data []byte, source, sourceType, discovererType, pipeli
 	if err := json.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("unmarshal json: %w", err)
 	}
+	if m == nil {
+		return nil, fmt.Errorf("unmarshal json: got nil map")
+	}
 
 	// Clean the name for dyncfg compatibility
 	if name := m.Name(); name != "" {

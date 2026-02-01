@@ -190,8 +190,8 @@ type LegacyDiscoveryConfig struct {
 }
 
 type ServiceRuleConfig struct {
-	ID             string `yaml:"id" json:"id"`                                       // mandatory (for logging/diagnostics)
-	Match          string `yaml:"match" json:"match"`                                 // mandatory
+	ID             string `yaml:"id" json:"id"`                                               // mandatory (for logging/diagnostics)
+	Match          string `yaml:"match" json:"match"`                                         // mandatory
 	ConfigTemplate string `yaml:"config_template,omitempty" json:"config_template,omitempty"` // optional (drop if empty)
 }
 

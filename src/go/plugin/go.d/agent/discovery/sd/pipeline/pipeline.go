@@ -37,27 +37,12 @@ func New(cfg Config) (*Pipeline, error) {
 
 	p.accum.Logger = p.Logger
 
-	if len(cfg.Services) > 0 {
-		svr, err := newServiceEngine(cfg.Services)
-		if err != nil {
-			return nil, fmt.Errorf("services rules: %v", err)
-		}
-		p.svr = svr
-		svr.Logger = p.Logger
-	} else {
-		// Legacy path
-		clr, err := newTargetClassificator(cfg.LegacyClassify)
-		if err != nil {
-			return nil, fmt.Errorf("classify rules: %v", err)
-		}
-		cmr, err := newConfigComposer(cfg.LegacyCompose)
-		if err != nil {
-			return nil, fmt.Errorf("compose rules: %v", err)
-		}
-		p.clr, p.cmr = clr, cmr
-		clr.Logger = p.Logger
-		cmr.Logger = p.Logger
+	svr, err := newServiceEngine(cfg.Services)
+	if err != nil {
+		return nil, fmt.Errorf("services rules: %v", err)
 	}
+	p.svr = svr
+	svr.Logger = p.Logger
 
 	if err := p.registerDiscoverers(cfg); err != nil {
 		return nil, err
