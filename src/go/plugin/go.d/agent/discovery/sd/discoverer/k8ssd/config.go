@@ -7,18 +7,18 @@ import (
 )
 
 type Config struct {
-	Source string `yaml:"-"`
+	Source string `yaml:"-" json:"-"`
 
-	APIServer  string   `yaml:"api_server"` // TODO: not used
-	Role       string   `yaml:"role"`
-	Namespaces []string `yaml:"namespaces"`
+	APIServer  string   `yaml:"api_server,omitempty" json:"-"` // TODO: not used
+	Role       string   `yaml:"role,omitempty" json:"role,omitempty"`
+	Namespaces []string `yaml:"namespaces,omitempty" json:"namespaces,omitempty"`
 	Selector   struct {
-		Label string `yaml:"label"`
-		Field string `yaml:"field"`
-	} `yaml:"selector"`
+		Label string `yaml:"label,omitempty" json:"label,omitempty"`
+		Field string `yaml:"field,omitempty" json:"field,omitempty"`
+	} `yaml:"selector,omitempty" json:"selector,omitempty"`
 	Pod struct {
-		LocalMode bool `yaml:"local_mode"`
-	} `yaml:"pod"`
+		LocalMode bool `yaml:"local_mode,omitempty" json:"local_mode,omitempty"`
+	} `yaml:"pod,omitempty" json:"pod,omitempty"`
 }
 
 func validateConfig(cfg Config) error {

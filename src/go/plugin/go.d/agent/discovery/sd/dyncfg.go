@@ -666,7 +666,7 @@ func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile, 
 	}
 
 	// Transform pipeline config to dyncfg format (JSON)
-	content, err := transformPipelineConfigToDyncfg(cfg, dt)
+	content, err := json.Marshal(cfg)
 	if err != nil {
 		d.Warningf("exposeFileConfig: failed to transform config '%s' to dyncfg format: %v", conf.source, err)
 		return

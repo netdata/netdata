@@ -18,11 +18,11 @@ import (
 )
 
 type Config struct {
-	Source         string             `yaml:"-"`
-	ConfigDefaults confgroup.Registry `yaml:"-"`
+	Source         string             `yaml:"-" json:"-"`
+	ConfigDefaults confgroup.Registry `yaml:"-" json:"-"`
 
-	Disabled bool   `yaml:"disabled"`
-	Name     string `yaml:"name"`
+	Disabled bool   `yaml:"disabled,omitempty" json:"disabled,omitempty"`
+	Name     string `yaml:"name" json:"name"`
 
 	// New format: single discoverer struct
 	Discoverer DiscovererConfig `yaml:"discoverer,omitempty" json:"discoverer,omitempty"`
@@ -30,10 +30,10 @@ type Config struct {
 	// New single-step format for service rules:
 	Services []ServiceRuleConfig `yaml:"services,omitempty" json:"services,omitempty"`
 
-	// Legacy formats (converted during unmarshal):
-	LegacyDiscover []LegacyDiscoveryConfig `yaml:"discover,omitempty" json:"discover,omitempty"`
-	LegacyClassify []ClassifyRuleConfig    `yaml:"classify,omitempty" json:"classify,omitempty"`
-	LegacyCompose  []ComposeRuleConfig     `yaml:"compose,omitempty" json:"compose,omitempty"`
+	// Legacy formats (converted during unmarshal, excluded from JSON):
+	LegacyDiscover []LegacyDiscoveryConfig `yaml:"discover,omitempty" json:"-"`
+	LegacyClassify []ClassifyRuleConfig    `yaml:"classify,omitempty" json:"-"`
+	LegacyCompose  []ComposeRuleConfig     `yaml:"compose,omitempty" json:"-"`
 }
 
 // DiscovererConfig holds the configuration for a single discoverer type.

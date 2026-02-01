@@ -53,10 +53,10 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 }
 
 type Config struct {
-	Source string
+	Source string `yaml:"-" json:"-"`
 
-	Address string           `yaml:"address"`
-	Timeout confopt.Duration `yaml:"timeout"`
+	Address string           `yaml:"address,omitempty" json:"address,omitempty"`
+	Timeout confopt.Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 type (
