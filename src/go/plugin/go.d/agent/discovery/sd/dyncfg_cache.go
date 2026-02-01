@@ -36,15 +36,8 @@ func (c sdConfig) PipelineKey() string    { v, _ := c[ikeyPipelineKey].(string);
 func (c sdConfig) Name() string           { v, _ := c["name"].(string); return v }
 
 func (c sdConfig) Status() dyncfg.Status {
-	// Handle both dyncfg.Status (original) and string (after JSON clone)
-	switch v := c[ikeyStatus].(type) {
-	case dyncfg.Status:
-		return v
-	case string:
-		return dyncfg.Status(v)
-	default:
-		return ""
-	}
+	v, _ := c[ikeyStatus].(dyncfg.Status)
+	return v
 }
 
 func (c sdConfig) SetSource(v string) sdConfig         { c[ikeySource] = v; return c }
@@ -96,7 +89,14 @@ func (c sdConfig) Clone() sdConfig {
 		for k, v := range c {
 			clone[k] = v
 		}
+		return clone
 	}
+	// Restore metadata from original (JSON may lose type info for type aliases)
+	clone.SetSource(c.Source())
+	clone.SetSourceType(c.SourceType())
+	clone.SetDiscovererType(c.DiscovererType())
+	clone.SetPipelineKey(c.PipelineKey())
+	clone.SetStatus(c.Status())
 	return clone
 }
 
