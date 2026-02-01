@@ -278,30 +278,32 @@ static int ebpf_fd_set_target_values()
  *
  * @param obj is the main structure for bpf objects.
  */
-static void ebpf_fd_set_hash_tables(struct fd_bpf *obj)
+static int ebpf_fd_set_hash_tables(struct fd_bpf *obj)
 {
     int map_fd;
 
     map_fd = bpf_map__fd(obj->maps.tbl_fd_global);
     if (map_fd < 0) {
         netdata_log_error("Failed to get fd for tbl_fd_global map");
-        return;
+        return -1;
     }
     fd_maps[NETDATA_FD_GLOBAL_STATS].map_fd = map_fd;
 
     map_fd = bpf_map__fd(obj->maps.tbl_fd_pid);
     if (map_fd < 0) {
         netdata_log_error("Failed to get fd for tbl_fd_pid map");
-        return;
+        return -1;
     }
     fd_maps[NETDATA_FD_PID_STATS].map_fd = map_fd;
 
     map_fd = bpf_map__fd(obj->maps.fd_ctrl);
     if (map_fd < 0) {
         netdata_log_error("Failed to get fd for fd_ctrl map");
-        return;
+        return -1;
     }
     fd_maps[NETDATA_FD_CONTROLLER].map_fd = map_fd;
+
+    return 0;
 }
 
 /**
@@ -360,9 +362,11 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
 
     ret = (test == EBPF_LOAD_TRAMPOLINE) ? fd_bpf__attach(obj) : ebpf_fd_attach_probe(obj);
     if (!ret) {
-        ebpf_fd_set_hash_tables(obj);
+        ret = ebpf_fd_set_hash_tables(obj);
 
-        ebpf_update_controller(fd_maps[NETDATA_FD_CONTROLLER].map_fd, em);
+        if (!ret) {
+            ebpf_update_controller(fd_maps[NETDATA_FD_CONTROLLER].map_fd, em);
+        }
     }
 
     return ret;
