@@ -46,6 +46,7 @@ Chat mode is built for chat bots where users expect immediate, uninterrupted str
 
 Key behavior:
 
+- Final report content equals the **streamed output** (think/META filtered), aggregated across turns
 - Treats all model output as **final-report content** (no XML wrapper enforcement)
 - Stop condition: `stop=stop` **and** no tools (ok/failed/unknown) **and** non-empty output
 - If `stop=stop` arrives with empty output, the turn **retries**

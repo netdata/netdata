@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import type { AIAgentSessionConfig, Configuration, TurnResult } from '../../types.js';
 
-import { extractNonceFromMessages } from '../phase2-harness-scenarios/infrastructure/harness-helpers.js';
 import { runWithExecuteTurnOverride } from '../phase2-harness-scenarios/infrastructure/harness-runner.js';
 
 const BASE_CONFIG: Configuration = {
@@ -105,14 +104,16 @@ describe('output modes', () => {
   });
 
   it('chat final report equals streamed output across turns and excludes META/reasoning', async () => {
-    const outputEvents: Array<{ text: string; source?: string }> = [];
+    const outputEvents: { text: string; source?: string }[] = [];
     const thinkingEvents: string[] = [];
+    const systemNonce = 'unit-chat-nonce';
 
     const sessionConfig = buildSessionConfig({
       outputMode: 'chat',
       maxTurns: 2,
-      maxRetries: 0,
+      maxRetries: 1,
       stream: true,
+      systemNonce,
       callbacks: {
         onEvent: (event, meta) => {
           if (event.type === 'output') {
@@ -121,19 +122,17 @@ describe('output modes', () => {
           if (event.type === 'thinking') {
             thinkingEvents.push(event.text);
           }
+          // console.debug('event', event.type, meta.source);
         },
       },
     });
 
-    const scenarioId = 'unit-chat-final-report-stream';
     const turn1Chunk = 'Hello ';
     const turn2Chunk = 'world';
     const reasoningText = 'private reasoning';
 
-    const result = await runWithExecuteTurnOverride(sessionConfig, ({ request }) => {
-      const turn = request.turnMetadata?.turn ?? 1;
-
-      if (turn === 1) {
+    const result = await runWithExecuteTurnOverride(sessionConfig, ({ request, invocation }) => {
+      if (invocation === 1) {
         request.onChunk?.(turn1Chunk, 'content');
         return Promise.resolve({
           status: { type: 'success', hasToolCalls: true, finalAnswer: false },
@@ -155,7 +154,7 @@ describe('output modes', () => {
         });
       }
 
-      const nonce = extractNonceFromMessages(request.messages, scenarioId);
+      const nonce = systemNonce;
       const metaWrapper = `<ai-agent-${nonce}-META plugin="support-metadata">{"ticket":"T-1"}</ai-agent-${nonce}-META>`;
       const assistantContent = `<think>${reasoningText}</think>${turn2Chunk}${metaWrapper}`;
 

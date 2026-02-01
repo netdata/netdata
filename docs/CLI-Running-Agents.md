@@ -215,7 +215,7 @@ ai-agent --agent chat.ai --stream "Hello"
 | Flag     | `--chat` / `--no-chat` |
 | Default  | `--no-chat`            |
 
-**Description**: Controls output mode for the CLI session. Chat mode streams output as final-report content without XML wrapper enforcement. Agentic mode enforces final-report rules.
+**Description**: Controls output mode for the CLI session. Chat mode streams output as final-report content (streamed output is the final report, think/META filtered, aggregated across turns) without XML wrapper enforcement. Agentic mode enforces final-report rules.
 
 See [Operations-Output-Modes](Operations-Output-Modes) for details and trade-offs.
 

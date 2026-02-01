@@ -190,6 +190,7 @@ export class TurnRunner {
     private state: TurnRunnerState;
     private finalReportStreamed = false;
     private streamedOutputTail = '';
+    private chatOutputBuffer = '';
     private thinkingEmittedAttempts = new Set<string>();
 
     constructor(ctx: TurnRunnerContext, callbacks: TurnRunnerCallbacks) {
@@ -249,6 +250,27 @@ export class TurnRunner {
         if (streamed.length === 0)
             return false;
         return streamed.endsWith(candidate);
+    }
+    private appendChatOutputChunk(chunk: string, source: EventSource): void {
+        if (this.ctx.sessionConfig.outputMode !== 'chat')
+            return;
+        if (chunk.length === 0)
+            return;
+        if (source === 'finalize' && this.chatOutputBuffer.endsWith(chunk))
+            return;
+        this.chatOutputBuffer += chunk;
+    }
+    private emitOutputChunk(chunk: string, source: EventSource): void {
+        if (chunk.length === 0)
+            return;
+        this.callbacks.emitEvent({ type: 'output', text: chunk }, { source });
+        if (source === 'stream') {
+            this.appendStreamedOutputTail(chunk);
+            if (this.ctx.sessionConfig.outputMode === 'chat') {
+                this.finalReportStreamed = true;
+            }
+        }
+        this.appendChatOutputChunk(chunk, source);
     }
     private thinkingAttemptKey(turn: number, attempt: number): string {
         return `${String(turn)}:${String(attempt)}`;
@@ -1526,6 +1548,7 @@ export class TurnRunner {
                         const chatAccepted = this.tryAcceptChatOutput({
                             stopReason: turnResult.stopReason,
                             textContent,
+                            streamedContent: this.chatOutputBuffer,
                             sanitizedHasToolCalls,
                             toolFailureDetected,
                             executionStats,
@@ -2357,6 +2380,7 @@ export class TurnRunner {
     private tryAcceptChatOutput(params: {
         stopReason?: string;
         textContent?: string;
+        streamedContent?: string;
         sanitizedHasToolCalls: boolean;
         toolFailureDetected: boolean;
         executionStats: {
@@ -2367,7 +2391,9 @@ export class TurnRunner {
         };
     }): boolean {
         if (this.ctx.sessionConfig.outputMode !== 'chat') return false;
-        const chatContent = params.textContent;
+        const chatContent = (typeof params.streamedContent === 'string' && params.streamedContent.length > 0)
+            ? params.streamedContent
+            : params.textContent;
         const hasAnyToolActivity = params.sanitizedHasToolCalls
             || params.toolFailureDetected
             || params.executionStats.executedTools > 0
@@ -2908,8 +2934,7 @@ export class TurnRunner {
         if (finalOutput !== undefined && finalOutput.length > 0) {
             const alreadyStreamed = this.finalReportStreamed || this.hasStreamedFinalOutput(finalOutput);
             if (!alreadyStreamed) {
-                this.callbacks.emitEvent({ type: 'output', text: finalOutput }, { source: 'finalize' });
-                this.appendStreamedOutputTail(finalOutput);
+                this.emitOutputChunk(finalOutput, 'finalize');
                 this.finalReportStreamed = true;
             }
         }
@@ -3955,7 +3980,7 @@ export class TurnRunner {
             xmlFilter = new XmlFinalReportFilter(nonce, { suppressStreaming: finalReportLockedForAttempt });
         }
         // Reset streaming state only when the final report is not already locked.
-        if (!finalReportLockedForAttempt) {
+        if (!finalReportLockedForAttempt && this.ctx.sessionConfig.outputMode !== 'chat') {
             this.finalReportStreamed = false;
             this.resetStreamedOutputTail();
         }
@@ -4022,8 +4047,7 @@ export class TurnRunner {
                         const filtered = xmlFilter.process(split.content);
                         if (filtered.length > 0) {
                             const outputSource: EventSource = xmlFilter.hasStreamedContent ? 'finalize' : 'stream';
-                            this.callbacks.emitEvent({ type: 'output', text: filtered }, { source: outputSource });
-                            this.appendStreamedOutputTail(filtered);
+                            this.emitOutputChunk(filtered, outputSource);
                             // Only mark as streamed if we actually emitted content (and are inside the tag)
                             if (xmlFilter.hasStreamedContent) {
                                 this.finalReportStreamed = true;
@@ -4031,8 +4055,7 @@ export class TurnRunner {
                         }
                     }
                     else {
-                        this.callbacks.emitEvent({ type: 'output', text: split.content }, { source: 'stream' });
-                        this.appendStreamedOutputTail(split.content);
+                        this.emitOutputChunk(split.content, 'stream');
                     }
                     return;
                 }
@@ -4224,8 +4247,7 @@ export class TurnRunner {
                     const left = xmlFilter.flush();
                     if (left.length > 0) {
                         const outputSource: EventSource = xmlFilter.hasStreamedContent ? 'finalize' : 'stream';
-                        this.callbacks.emitEvent({ type: 'output', text: left }, { source: outputSource });
-                        this.appendStreamedOutputTail(left);
+                        this.emitOutputChunk(left, outputSource);
                         if (xmlFilter.hasStreamedContent) {
                             this.finalReportStreamed = true;
                         }
