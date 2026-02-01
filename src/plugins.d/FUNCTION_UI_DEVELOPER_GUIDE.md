@@ -951,4 +951,4 @@ if (tail_mode) {
 
 ---
 
-This guide covers everything you need to build both simple monitoring functions and advanced log explorers. For implementation details and edge cases, see [FUNCTIONS_REFERENCE.md](FUNCTIONS_REFERENCE.md).
+This guide covers everything you need to build both simple monitoring functions and advanced log explorers. For implementation details and edge cases, see [FUNCTIONS_REFERENCE.md](/src/plugins.d/FUNCTION_UI_REFERENCE.md).
