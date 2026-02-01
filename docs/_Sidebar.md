@@ -15,6 +15,7 @@
 - [Orchestration](Agent-Files-Orchestration)
 - [Behavior](Agent-Files-Behavior)
 - [Contracts](Agent-Files-Contracts)
+- [Safety & Security](Agent-Development-Safety)
 
 **System Prompts** ⭐
 - [Overview](System-Prompts)
@@ -50,6 +51,7 @@
 
 **Operations**
 - [Overview](Operations)
+- [Output Modes](Operations-Output-Modes)
 - [Logging](Operations-Logging)
 - [Debugging](Operations-Debugging)
 - [Snapshots](Operations-Snapshots)
