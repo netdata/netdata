@@ -317,7 +317,7 @@ Complete syntax reference for all alert configuration options. Use this section 
 
 Alarms are processed before templates. If you have `alarm` and `template` entities with the same name that both match the same chart, only the `alarm` will create an active alert for that chart.
 
-For complete details on configuration loading order and precedence rules, see [Alert Configuration Ordering](/docs/alerts-and-notifications/alert-configuration-ordering).
+For complete details on configuration loading order and precedence rules, see [Alert Configuration Ordering](/src/health/alert-configuration-ordering.md).
 
 :::
 
