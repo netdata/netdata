@@ -267,6 +267,9 @@
 - Update external plugins section in map.csv ([#21679](https://github.com/netdata/netdata/issues/21679))
 - Feat(go.d/ping): add jitter and variance metrics ([#21683](https://github.com/netdata/netdata/issues/21683))
 - Regenerate integrations docs ([#21684](https://github.com/netdata/netdata/issues/21684))
+- Always capture backtrace on panic. ([#21681](https://github.com/netdata/netdata/issues/21681))
+- Build(deps): bump github.com/coreos/go-systemd/v22 from 22.6.0 to 22.7.0 in /src/go ([#21687](https://github.com/netdata/netdata/issues/21687))
+- Build(deps): bump go.mongodb.org/mongo-driver from 1.17.7 to 1.17.8 in /src/go ([#21686](https://github.com/netdata/netdata/issues/21686))
 
 ## [2.8.0] - 2025-11-19
 
