@@ -20,6 +20,7 @@ export interface XmlNextNoticeContext {
   maxRetries: number;
   contextPercentUsed: number;
   expectedFinalFormat: OutputFormatId | 'text';
+  responseMode?: 'agentic' | 'chat';
   hasExternalTools: boolean;
   taskStatusToolEnabled: boolean;
   forcedFinalTurnReason?: FinalTurnReason;
@@ -68,6 +69,7 @@ export const buildXmlNextNotice = (context: XmlNextNoticeContext): string => {
     max_retries: context.maxRetries,
     context_percent_used: context.contextPercentUsed,
     expected_final_format: context.expectedFinalFormat,
+    response_mode: context.responseMode ?? 'agentic',
     format_prompt_value: resolveFormatPromptValue(context.expectedFinalFormat),
     datetime: runtimeVars.DATETIME,
     timestamp: runtimeVars.TIMESTAMP,

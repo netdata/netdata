@@ -44,6 +44,7 @@ const META_PLUGIN_NAME = 'meta-required';
 const META_PLUGIN_FILE = 'meta-required.js';
 const META_TICKET_ID = 'T-123';
 const SCENARIO_META_RETRY = 'suite-final-report-meta-missing-meta-only';
+const SCENARIO_META_RETRY_CHAT = 'suite-final-report-meta-missing-chat';
 const SCENARIO_META_BEFORE_FINAL = 'suite-final-report-meta-before-final';
 const SCENARIO_META_EXHAUSTION = 'suite-final-report-meta-missing-exhaustion';
 const SCENARIO_META_CACHE_HIT = 'suite-final-report-meta-cache-hit';
@@ -394,6 +395,74 @@ PLUGINS_TESTS.push({
     const turnFailedContent = turnFailed.content;
     invariant(turnFailedContent.includes(nonce), 'TURN-FAILED feedback should include the session nonce');
     invariant(!turnFailedContent.includes('NONCE'), 'TURN-FAILED feedback should not include the literal NONCE token');
+  },
+} satisfies HarnessTest);
+
+// Test: Chat mode missing META triggers retry; META-only follow-up succeeds without replacing output
+PLUGINS_TESTS.push({
+  id: SCENARIO_META_RETRY_CHAT,
+  description: 'Suite: Chat mode missing META triggers retry and accepts META-only completion',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.outputMode = 'chat';
+    sessionConfig.maxTurns = 3;
+    sessionConfig.maxRetries = 1;
+    const fixture = createMetaPluginFixture();
+    sessionConfig.finalReportPluginDescriptors = fixture.descriptors;
+    sessionConfig.agentPath = fixture.agentPath;
+    const reportContent = FIRST_REPORT_CONTENT;
+
+    try {
+      return await runWithExecuteTurnOverride(sessionConfig, ({ request, invocation }) => {
+        const nonce = extractNonceFromMessages(request.messages, SCENARIO_META_RETRY_CHAT);
+        if (invocation === 1) {
+          return Promise.resolve({
+            status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+            latencyMs: 5,
+            response: reportContent,
+            messages: [
+              {
+                role: 'assistant',
+                content: reportContent,
+              } as ConversationMessage,
+            ],
+            tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+            stopReason: 'stop',
+          });
+        }
+
+        const metaWrapper = buildMetaWrapper(nonce, fixture.pluginName, META_TICKET_ID);
+        return Promise.resolve({
+          status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+          latencyMs: 5,
+          response: metaWrapper,
+          messages: [
+            {
+              role: 'assistant',
+              content: metaWrapper,
+            } as ConversationMessage,
+          ],
+          tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+          stopReason: 'stop',
+        });
+      });
+    } finally {
+      fixture.cleanup();
+    }
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'Chat META-only retry should succeed');
+    invariant(result.finalReport !== undefined, FINAL_REPORT_PRESENT_MSG);
+    invariant(result.finalReport.content === FIRST_REPORT_CONTENT, 'Locked final report should be preserved');
+    invariant(countFinalReportToolCalls(result.conversation) === 0, FINAL_REPORT_TOOL_CALL_FORBIDDEN);
+    const slugs = parseTurnFailureSlugs(result, SCENARIO_META_RETRY_CHAT, ['final_meta_missing']);
+    invariant(!slugs.includes('content_without_tools_or_report'), 'META-only retry should not include content_without_tools_or_report');
+    const turnFailed = findTurnFailedMessage(result.conversation, TURN_FAILED_MARKER);
+    invariant(turnFailed !== undefined, 'TURN-FAILED feedback should be present');
+    invariant(typeof turnFailed.content === 'string', 'TURN-FAILED feedback should be text');
+    invariant(
+      !turnFailed.content.includes('Text output detected without any tool calls'),
+      'TURN-FAILED feedback should not include content_without_tools_or_report guidance in chat META retry'
+    );
   },
 } satisfies HarnessTest);
 

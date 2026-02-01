@@ -21,6 +21,7 @@ export interface XmlNextPayload {
   slotTemplates: XmlSlotTemplate[];
   taskStatusToolEnabled: boolean;
   expectedFinalFormat: OutputFormatId | 'text';
+  responseMode?: 'agentic' | 'chat';
   finalSchema?: Record<string, unknown>;
   finalReportPluginRequirements: ResolvedFinalReportPluginRequirement[];
   finalReportLocked: boolean;
@@ -157,6 +158,7 @@ export function renderXmlNext(payload: XmlNextPayload): string {
     maxRetries: payload.maxRetries,
     contextPercentUsed: payload.contextPercentUsed,
     expectedFinalFormat: payload.expectedFinalFormat,
+    responseMode: payload.responseMode,
     hasExternalTools: payload.hasExternalTools,
     taskStatusToolEnabled: payload.taskStatusToolEnabled,
     finalReportPluginRequirements: payload.finalReportPluginRequirements,

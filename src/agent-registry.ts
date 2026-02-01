@@ -30,6 +30,7 @@ export interface SpawnSessionArgs {
   history?: ConversationMessage[];
   callbacks?: AIAgentEventCallbacks;
   renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
+  outputMode?: 'agentic' | 'chat';
   abortSignal?: AbortSignal;
   stopRef?: { stopping: boolean };
   initialTitle?: string;
@@ -119,6 +120,7 @@ export class AgentRegistry {
       callbacks: args.callbacks,
       renderTarget: args.renderTarget,
       outputFormat: format,
+      outputMode: args.outputMode,
       abortSignal: args.abortSignal,
       stopRef: args.stopRef,
       initialTitle: args.initialTitle,

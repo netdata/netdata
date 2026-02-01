@@ -28,6 +28,7 @@ interface InternalToolProviderOptions {
   outputFormat: OutputFormatId;
   expectedOutputFormat?: OutputFormatId;
   expectedJsonSchema?: Record<string, unknown>;
+  responseMode?: 'agentic' | 'chat';
   maxToolCallsPerTurn: number;
   updateStatus: (text: string, taskStatus?: TaskStatusData) => void;
   setTitle: (title: string, emoji?: string) => void;
@@ -72,6 +73,7 @@ export class InternalToolProvider extends ToolProvider {
   private readonly formatId: OutputFormatId;
   private readonly formatDescription: string;
   private readonly maxToolCallsPerTurn: number;
+  private readonly responseMode: 'agentic' | 'chat';
   private instructions: string;
   private readonly slackSchema: Record<string, unknown>;
   private readonly taskStatusSchema: { description?: string; inputSchema: Record<string, unknown> };
@@ -96,6 +98,7 @@ export class InternalToolProvider extends ToolProvider {
     this.formatId = opts.outputFormat;
     this.formatDescription = describeFormatParameter(this.formatId);
     this.maxToolCallsPerTurn = opts.maxToolCallsPerTurn;
+    this.responseMode = opts.responseMode ?? 'agentic';
     const expected = opts.expectedOutputFormat;
     if (expected !== undefined && expected !== this.formatId) {
       throw new Error(`Output format mismatch: expectedOutput.format=${expected} but session outputFormat=${this.formatId}`);
@@ -189,6 +192,7 @@ export class InternalToolProvider extends ToolProvider {
       slack_mrkdwn_rules: SLACK_BLOCK_KIT_MRKDWN_RULES,
       plugin_requirements: this.finalReportPluginRequirements,
       nonce: this.xmlSessionNonce,
+      response_mode: this.responseMode,
       max_tool_calls_per_turn: this.maxToolCallsPerTurn,
       batch_enabled: this.opts.enableBatch,
       progress_tool_enabled: !this.disableProgressTool,

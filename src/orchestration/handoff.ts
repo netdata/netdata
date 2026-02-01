@@ -32,6 +32,7 @@ export interface ExecuteHandoffOptions {
     | "tools"
     | "isMaster"
     | "pendingHandoffCount"
+    | "outputMode"
     | "conversationHistory"
   > & {
     trace?: {
@@ -82,6 +83,7 @@ export async function executeHandoff(
     parentSession: opts.parentSession,
     isMaster: opts.isMaster,
     pendingHandoffCount: opts.pendingHandoffCount,
+    outputMode: opts.parentSession.outputMode,
     ancestors: opts.ancestors,
   });
 }

@@ -32,6 +32,8 @@ A **headend** is a network service that exposes your agents to external clients.
 | Public website chat widget                     | [Embed](Headends-Embed)                               |
 | Node.js application integration                | [Library](Headends-Library)                           |
 
+**Output modes**: Some headends default to **chat** mode (Embed, OpenAI-Compatible, Anthropic-Compatible). Others use **agentic** mode. See [Operations-Output-Modes](Operations-Output-Modes) for the comparison and defaults.
+
 ---
 
 ## Available Headends

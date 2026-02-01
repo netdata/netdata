@@ -661,6 +661,7 @@ export class EmbedHeadend implements Headend {
         telemetryLabels,
         wantsProgressUpdates: true,
         renderTarget: 'embed',
+        outputMode: 'chat',
         stream: true,
       });
 

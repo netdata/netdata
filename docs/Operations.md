@@ -18,6 +18,7 @@ Monitor, debug, and maintain AI Agent deployments in production environments.
 
 | Page                                           | Description                                                |
 | ---------------------------------------------- | ---------------------------------------------------------- |
+| [Output Modes](Operations-Output-Modes)        | Agentic vs chat mode behavior and trade-offs               |
 | [Logging](Operations-Logging)                  | Structured logging system, severity levels, output formats |
 | [Debugging Guide](Operations-Debugging)        | Step-by-step debugging workflow for common issues          |
 | [Session Snapshots](Operations-Snapshots)      | Session state capture and post-mortem analysis             |

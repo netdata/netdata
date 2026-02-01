@@ -10,8 +10,8 @@ Outputs nothing when no plugins are configured.
 {% if meta_required %}
 {% capture plugin_names %}{% for plugin in plugin_requirements %}{% if forloop.first == false %}, {% endif %}{{ plugin.name }}{% endfor %}{% endcapture %}
 {% if final_report_locked %}
-FINAL already accepted. Provide required META wrappers only. Plugins: {{ plugin_names }}. Use <ai-agent-{{ nonce }}-META plugin="name">{...}</ai-agent-{{ nonce }}-META>.
+Your final report/answer is already received and accepted for this session. Provide required META wrappers only. Plugins: {{ plugin_names }}. Use <ai-agent-{{ nonce }}-META plugin="name">{...}</ai-agent-{{ nonce }}-META>.
 {% else %}
-META REQUIRED WITH FINAL. Plugins: {{ plugin_names }}. Use <ai-agent-{{ nonce }}-META plugin="name">{...}</ai-agent-{{ nonce }}-META>.
+META REQUIRED AFTER YOUR FINAL REPORT/ANSWER. Plugins: {{ plugin_names }}. Use <ai-agent-{{ nonce }}-META plugin="name">{...}</ai-agent-{{ nonce }}-META>.
 {% endif %}
 {% endif %}

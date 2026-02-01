@@ -2,15 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AIAgentResult, Configuration, OrchestrationRuntimeAgent } from "../../../types.js";
 
-import { executeAdvisors } from "../../../orchestration/advisors.js";
-import { spawnOrchestrationChild } from "../../../orchestration/spawn-child.js";
+const { mockSpawn } = vi.hoisted(() => ({ mockSpawn: vi.fn() }));
 
 vi.mock("../../../orchestration/spawn-child.js", () => ({
-  spawnOrchestrationChild: vi.fn(),
+  spawnOrchestrationChild: mockSpawn,
 }));
 
 beforeEach(() => {
-  vi.resetAllMocks();
+  mockSpawn.mockReset();
+  vi.resetModules();
 });
 
 const baseConfig: Configuration = {
@@ -54,6 +54,7 @@ const buildAdvisor = (ref: string): OrchestrationRuntimeAgent => ({
 
 describe("executeAdvisors", () => {
   it("builds advisory block when advisor succeeds", async () => {
+    const { executeAdvisors } = await import("../../../orchestration/advisors.js");
     const mockResult: AIAgentResult = {
       success: true,
       conversation: [{ role: "assistant", content: ADVISOR_REPLY }],
@@ -66,7 +67,6 @@ describe("executeAdvisors", () => {
       },
       finalAgentId: "advisor",
     };
-    const mockSpawn = vi.mocked(spawnOrchestrationChild);
     mockSpawn.mockResolvedValueOnce(mockResult);
 
     const results = await executeAdvisors({
@@ -83,6 +83,7 @@ describe("executeAdvisors", () => {
   });
 
   it("returns failure block when advisor run is unsuccessful", async () => {
+    const { executeAdvisors } = await import("../../../orchestration/advisors.js");
     const mockResult: AIAgentResult = {
       success: false,
       error: "boom",
@@ -90,7 +91,6 @@ describe("executeAdvisors", () => {
       logs: [],
       accounting: [],
     };
-    const mockSpawn = vi.mocked(spawnOrchestrationChild);
     mockSpawn.mockResolvedValueOnce(mockResult);
 
     const results = await executeAdvisors({

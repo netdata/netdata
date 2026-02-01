@@ -35,11 +35,11 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.31",
-    "@ai-sdk/google": "^3.0.18",
-    "@ai-sdk/openai": "^3.0.23",
-    "@ai-sdk/openai-compatible": "^2.0.24",
-    "@ai-sdk/provider-utils": "^4.0.11",
+    "@ai-sdk/anthropic": "^3.0.35",
+    "@ai-sdk/google": "^3.0.20",
+    "@ai-sdk/openai": "^3.0.25",
+    "@ai-sdk/openai-compatible": "^2.0.26",
+    "@ai-sdk/provider-utils": "^4.0.13",
     "@anthropic-ai/tokenizer": "^0.0.4",
     "@dqbd/tiktoken": "^1.0.22",
     "@lenml/tokenizer-gemini": "^3.7.2",
@@ -57,10 +57,10 @@
     "@opentelemetry/sdk-trace-node": "^2.5.0",
     "@opentelemetry/semantic-conventions": "^1.39.0",
     "@slack/bolt": "^4.6.0",
-    "ai": "^6.0.62",
+    "ai": "^6.0.67",
     "ajv": "^8.17.1",
     "async-mutex": "^0.5.0",
-    "commander": "^14.0.2",
+    "commander": "^14.0.3",
     "express": "^5.2.1",
     "ignore": "^7.0.5",
     "js-yaml": "^4.1.1",
@@ -77,6 +77,7 @@
     "better-sqlite3": "^12.6.2"
   },
   "devDependencies": {
+    "@guyplusplus/turndown-plugin-gfm": "^1.0.7",
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.6",
     "@types/node": "^25.1.0",
@@ -103,7 +104,6 @@
     "mermaid": "^11.12.2",
     "prettier": "^3.8.1",
     "turndown": "^7.2.2",
-    "@guyplusplus/turndown-plugin-gfm": "^1.0.7",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },

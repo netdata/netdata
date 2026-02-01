@@ -14,6 +14,7 @@ import type { CommanderError } from 'commander';
 
 import { AgentRegistry } from './agent-registry.js';
 import { parseDurationMs } from './cache/ttl.js';
+import { resolveCliOutputMode } from './cli-output-mode.js';
 import { buildUnifiedConfiguration, discoverLayers, resolveDefaults } from './config-resolver.js';
 import { formatPromptValue, resolveFormatIdForCli } from './formats.js';
 import { parseFrontmatter, stripFrontmatter, parseList, parsePairs, buildFrontmatterTemplate } from './frontmatter.js';
@@ -949,6 +950,8 @@ const embedConcurrencyOption = new Option('--embed-concurrency <n>', 'Maximum co
   .argParser(parsePositive);
 
 const slackHeadendOption = new Option('--slack', 'Start Slack Socket Mode headend');
+const chatModeOption = new Option('--chat', 'Enable chat output mode (streamed output treated as final report)');
+const noChatModeOption = new Option('--no-chat', 'Disable chat output mode (default)');
 const listToolsOption = new Option('--list-tools <server>', 'List tools for the specified MCP server (use "all" to list every server)')
   .argParser((value: string, previous: string[]) => appendValue(value, previous))
   .default([], undefined);
@@ -966,6 +969,8 @@ program.addOption(openaiCompletionsConcurrencyOption);
 program.addOption(anthropicCompletionsConcurrencyOption);
 program.addOption(embedConcurrencyOption);
 program.addOption(slackHeadendOption);
+program.addOption(chatModeOption);
+program.addOption(noChatModeOption);
 program.addOption(listToolsOption);
 program.addOption(schemaValidateOption);
 
@@ -1961,12 +1966,15 @@ program
         return;
       }
 
+      const cliOutputMode = resolveCliOutputMode(options.chat);
+
       // Create and run session via unified loader
       const result = await loaded.run(resolvedSystem, resolvedUser, {
         history: conversationHistory,
         callbacks,
         renderTarget: 'cli',
         outputFormat: chosenFormatId,
+        outputMode: cliOutputMode,
         telemetryLabels: sessionTelemetryLabels,
         wantsProgressUpdates: true,
       });

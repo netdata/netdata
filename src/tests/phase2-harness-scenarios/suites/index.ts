@@ -10,6 +10,7 @@ import { COVERAGE_TESTS } from './coverage.test.js';
 import { ERROR_HANDLING_TESTS } from './error-handling.test.js';
 import { FINAL_REPORT_TESTS } from './final-report.test.js';
 import { FORMAT_SPECIFIC_TESTS } from './format-specific.test.js';
+import { OUTPUT_MODES_TESTS } from './output-modes.test.js';
 import { PLUGINS_TESTS } from './plugins.test.js';
 import { REASONING_TESTS } from './reasoning.test.js';
 import { ROUTER_HANDOFF_TESTS } from './router-handoff.test.js';
@@ -27,6 +28,7 @@ export const SUITE_TEST_SCENARIOS: HarnessTest[] = [
   ...ERROR_HANDLING_TESTS,
   ...FINAL_REPORT_TESTS,
   ...FORMAT_SPECIFIC_TESTS,
+  ...OUTPUT_MODES_TESTS,
   ...PLUGINS_TESTS,
   ...REASONING_TESTS,
   ...ROUTER_HANDOFF_TESTS,
@@ -41,6 +43,7 @@ export { COVERAGE_TESTS } from './coverage.test.js';
 export { ERROR_HANDLING_TESTS } from './error-handling.test.js';
 export { FINAL_REPORT_TESTS } from './final-report.test.js';
 export { FORMAT_SPECIFIC_TESTS } from './format-specific.test.js';
+export { OUTPUT_MODES_TESTS } from './output-modes.test.js';
 export { PLUGINS_TESTS } from './plugins.test.js';
 export { REASONING_TESTS } from './reasoning.test.js';
 export { ROUTER_HANDOFF_TESTS } from './router-handoff.test.js';

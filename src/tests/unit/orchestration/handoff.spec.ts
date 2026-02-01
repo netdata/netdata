@@ -1,12 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { SpawnChildAgentOptions } from "../../../orchestration/spawn-child.js";
 import type { AIAgentResult, Configuration, OrchestrationRuntimeAgent } from "../../../types.js";
 
-import { executeHandoff } from "../../../orchestration/handoff.js";
-import { spawnOrchestrationChild } from "../../../orchestration/spawn-child.js";
+const { mockSpawn } = vi.hoisted(() => ({ mockSpawn: vi.fn() }));
 
 vi.mock("../../../orchestration/spawn-child.js", () => ({
-  spawnOrchestrationChild: vi.fn(),
+  spawnOrchestrationChild: mockSpawn,
 }));
 
 const baseConfig: Configuration = {
@@ -47,8 +47,14 @@ const buildTarget = (ref: string): OrchestrationRuntimeAgent => ({
   run: () => Promise.reject(new Error("unused")),
 });
 
+beforeEach(() => {
+  mockSpawn.mockReset();
+  vi.resetModules();
+});
+
 describe("executeHandoff", () => {
   it("injects original user request and response blocks", async () => {
+    const { executeHandoff } = await import("../../../orchestration/handoff.js");
     const mockResult: AIAgentResult = {
       success: true,
       conversation: [],
@@ -60,7 +66,6 @@ describe("executeHandoff", () => {
         ts: Date.now(),
       },
     };
-    const mockSpawn = vi.mocked(spawnOrchestrationChild);
     mockSpawn.mockResolvedValueOnce(mockResult);
 
     const parentResult: AIAgentResult = {
@@ -84,7 +89,7 @@ describe("executeHandoff", () => {
     });
 
     expect(mockSpawn).toHaveBeenCalledTimes(1);
-    const call = mockSpawn.mock.calls[0];
+    const call = mockSpawn.mock.calls[0] as [SpawnChildAgentOptions];
     const userPrompt = call[0].userPrompt;
     expect(userPrompt).toContain("<original_user_request__");
     expect(userPrompt).toContain("original request");

@@ -610,6 +610,7 @@ export class TurnRunner {
                         maxRetries,
                         contextPercentUsed,
                         expectedFinalFormat: this.ctx.resolvedFormat ?? 'markdown',
+                        responseMode: this.ctx.sessionConfig.outputMode ?? 'agentic',
                         finalReportPluginRequirements: this.ctx.pluginRuntime.getResolvedRequirements(),
                         hasExternalTools: allTools.some((tool) => tool.name !== FINAL_REPORT_TOOL),
                         taskStatusToolEnabled: this.ctx.taskStatusToolEnabled,
@@ -630,6 +631,7 @@ export class TurnRunner {
                         finalReportToolName: FINAL_REPORT_TOOL,
                         resolvedFormat: this.ctx.resolvedFormat,
                         expectedJsonSchema: this.ctx.expectedJsonSchema,
+                        responseMode: this.ctx.sessionConfig.outputMode ?? 'agentic',
                         attempt: attempts + 1,  // attempts is 0-based, but we want 1-based for display
                         maxRetries,
                         contextPercentUsed,
@@ -1520,14 +1522,22 @@ export class TurnRunner {
                                 }
                             }
                         }
+                        const executionStats = turnResult.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
+                        const chatAccepted = this.tryAcceptChatOutput({
+                            stopReason: turnResult.stopReason,
+                            textContent,
+                            sanitizedHasToolCalls,
+                            toolFailureDetected,
+                            executionStats,
+                        });
                         // Synthetic error: success with content but no tools and no final_report
-                        if (this.finalReport === undefined) {
-                        if (!sanitizedHasToolCalls && sanitizedHasText) {
-                            lastError = 'invalid_response: content_without_tools_or_final';
-                            lastErrorType = 'invalid_response';
-                            this.addTurnFailure('content_without_tools_or_report');
-                            textWithoutToolsFailureAdded = true;
-                        }
+                        if (!chatAccepted && this.finalReport === undefined) {
+                            if (!sanitizedHasToolCalls && sanitizedHasText) {
+                                lastError = 'invalid_response: content_without_tools_or_final';
+                                lastErrorType = 'invalid_response';
+                                this.addTurnFailure('content_without_tools_or_report');
+                                textWithoutToolsFailureAdded = true;
+                            }
                         }
                         // CONTRACT: Empty response without tool calls must NOT be added to conversation
                         // Check BEFORE pushing to conversation
@@ -1657,7 +1667,6 @@ export class TurnRunner {
                                 collapseRemainingTurns('incomplete_final_report');
                             }
                         }
-        const executionStats = turnResult.executionStats ?? { executedTools: 0, executedNonProgressBatchTools: 0, executedProgressBatchTools: 0, unknownToolEncountered: false };
         const hasNonProgressTools = executionStats.executedNonProgressBatchTools > 0;
         const hasProgressOnly = executionStats.executedProgressBatchTools > 0 && executionStats.executedNonProgressBatchTools === 0;
         const nextProgressOnlyTurns = hasProgressOnly ? (this.state.consecutiveProgressOnlyTurns ?? 0) + 1 : 0;
@@ -1743,13 +1752,15 @@ export class TurnRunner {
                             continue;
                         }
                         // Non-final turns: no tools executed (progress-only already succeeded above)
-                        lastError = 'invalid_response: no_tools';
-                        if (!sanitizedHasText && isReasoningOnly) {
-                            this.addTurnFailure('reasoning_only');
-                        } else if (sanitizedHasText && !textWithoutToolsFailureAdded) {
-                            this.addTurnFailure('content_without_tools_or_report');
+                        if (!finalReportExists) {
+                            lastError = 'invalid_response: no_tools';
+                            if (!sanitizedHasText && isReasoningOnly) {
+                                this.addTurnFailure('reasoning_only');
+                            } else if (sanitizedHasText && !textWithoutToolsFailureAdded) {
+                                this.addTurnFailure('content_without_tools_or_report');
+                            }
+                            lastErrorType = 'invalid_response';
                         }
-                        lastErrorType = 'invalid_response';
                         appendTruncationFailure();
                         logAttemptFailure();
                         continue;
@@ -2343,6 +2354,34 @@ export class TurnRunner {
             : undefined;
         return { finalReportExists, finalizationReady, metaIssuesToApply, missingMetaReason };
     }
+    private tryAcceptChatOutput(params: {
+        stopReason?: string;
+        textContent?: string;
+        sanitizedHasToolCalls: boolean;
+        toolFailureDetected: boolean;
+        executionStats: {
+            executedTools: number;
+            executedNonProgressBatchTools: number;
+            executedProgressBatchTools: number;
+            unknownToolEncountered?: boolean;
+        };
+    }): boolean {
+        if (this.ctx.sessionConfig.outputMode !== 'chat') return false;
+        const chatContent = params.textContent;
+        const hasAnyToolActivity = params.sanitizedHasToolCalls
+            || params.toolFailureDetected
+            || params.executionStats.executedTools > 0
+            || params.executionStats.executedNonProgressBatchTools > 0
+            || params.executionStats.executedProgressBatchTools > 0
+            || params.executionStats.unknownToolEncountered === true;
+        const chatHasOutput = typeof chatContent === 'string' && chatContent.trim().length > 0;
+        if (params.stopReason !== 'stop' || hasAnyToolActivity || !chatHasOutput) return false;
+        if (this.finalReport === undefined && typeof chatContent === 'string') {
+            const format = this.ctx.sessionConfig.outputFormat;
+            this.commitFinalReport({ format, content: chatContent }, 'chat');
+        }
+        return true;
+    }
     private addTurnFailure(slug: TurnFailedSlug, reason?: string): void {
         const normalizedReason = typeof reason === 'string' ? reason.trim() : undefined;
         const existing = this.state.turnFailedEvents.find((entry) => entry.slug === slug);
@@ -2678,9 +2717,11 @@ export class TurnRunner {
             fatal: false,
             message: source === 'synthetic'
                 ? 'Synthetic final report generated.'
-                : source === FINAL_REPORT_SOURCE_TOOL_MESSAGE
-                    ? 'Final report accepted from tool message.'
-                    : 'Final report accepted from tool call.',
+                : source === 'chat'
+                    ? 'Final report accepted from chat output.'
+                    : source === FINAL_REPORT_SOURCE_TOOL_MESSAGE
+                        ? 'Final report accepted from tool message.'
+                        : 'Final report accepted from tool call.',
             details: { source }
         };
         this.log(entry);

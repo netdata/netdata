@@ -843,6 +843,7 @@ export class OpenAICompletionsHeadend implements Headend {
         headendId: this.id,
         telemetryLabels,
         wantsProgressUpdates: true,
+        outputMode: 'chat',
       });
       const result = await AIAgent.run(session);
       if (abortController.signal.aborted) {

@@ -837,6 +837,7 @@ export class AIAgentSession {
         outputFormat: this.sessionConfig.outputFormat,
         expectedOutputFormat: eo?.format === 'json' ? 'json' : undefined,
         expectedJsonSchema,
+        responseMode: this.sessionConfig.outputMode ?? 'agentic',
         disableProgressTool: !enableProgressTool,
         hasExternalTools: hasNonInternalDeclaredTools || hasSubAgentsConfigured,
         hasRouterHandoff,
@@ -2617,6 +2618,7 @@ export class AIAgent {
       const onChildOpTree = (tree: SessionNode) => { session.attachOrchestrationChildOp(opId, tree); };
       const callbacks = wrapOrchestrationCallbacks(parentSession.callbacks, opPath, onChildOpTree);
       const childParentSession = { ...parentSession, callbacks };
+      const outputMode = kind === 'handoff' ? parentSession.outputMode : undefined;
       try {
         const result = await spawnOrchestrationChild({
           agent,
@@ -2625,6 +2627,7 @@ export class AIAgent {
           parentSession: childParentSession,
           isMaster: options.isMaster,
           pendingHandoffCount: options.pendingHandoffCount,
+          outputMode,
           ancestors: options.ancestors,
         });
         if (result.opTree !== undefined) {

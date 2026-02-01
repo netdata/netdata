@@ -47,6 +47,33 @@ CORE_ORCHESTRATION_TESTS.push({
   },
 } satisfies HarnessTest);
 
+// Test: stopReason=stop still fails without tools/final report (agentic baseline)
+CORE_ORCHESTRATION_TESTS.push({
+  id: 'suite-core-stop-reason-stop-no-tools',
+  description: 'Suite: stopReason=stop without tools still fails in agentic mode',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 1;
+    sessionConfig.maxRetries = 1;
+    return await runWithExecuteTurnOverride(sessionConfig, () => Promise.resolve({
+      status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+      latencyMs: 5,
+      response: 'plain text with stop reason',
+      messages: [
+        {
+          role: 'assistant',
+          content: 'plain text with stop reason',
+        },
+      ],
+      tokens: { inputTokens: 4, outputTokens: 2, totalTokens: 6 },
+      stopReason: 'stop',
+    }));
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(!result.success, 'stopReason=stop without tools should still fail in agentic mode');
+    expectTurnFailureContains(result.logs, 'suite-core-stop-reason-stop-no-tools', ['no_tools', 'final_report_missing', 'retries_exhausted']);
+  },
+} satisfies HarnessTest);
+
 // Test: Max turn exhaustion fails session (suite version)
 CORE_ORCHESTRATION_TESTS.push({
   id: 'suite-core-max-turn-exhaustion-fails',

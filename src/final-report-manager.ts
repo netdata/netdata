@@ -25,7 +25,7 @@ const FORMAT_SLACK_BLOCK_KIT: OutputFormatId = 'slack-block-kit';
 // Reusable type definitions
 export type { FinalReportPayload };
 export type PendingFinalReportPayload = Omit<FinalReportPayload, 'ts'>;
-export type FinalReportSource = 'tool-call' | 'tool-message' | 'synthetic';
+export type FinalReportSource = 'tool-call' | 'tool-message' | 'synthetic' | 'chat';
 
 export const FINAL_REPORT_FORMAT_VALUES = ['json', 'markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'sub-agent', 'text'] as const satisfies readonly FinalReportPayload['format'][];
 

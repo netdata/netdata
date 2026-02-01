@@ -864,6 +864,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       cacheTtlMs,
       agentHash,
       outputFormat: o.outputFormat,
+      outputMode: o.outputMode,
       renderTarget: o.renderTarget,
       conversationHistory: o.history,
       expectedOutput: resolvedExpectedOutput,
@@ -1055,8 +1056,8 @@ export function loadAgentFromContent(
   }
 
   const layers: ResolvedConfigLayer[] = options?.configLayers ?? discoverLayers({ configPath: options?.configPath, promptPath: id });
-  const baseDir = options?.baseDir ?? process.cwd();
-  const flattened = flattenPromptContent(content, options?.baseDir);
+  const baseDir = path.resolve(options?.baseDir ?? process.cwd());
+  const flattened = flattenPromptContent(content, baseDir);
 
   return loadAgentCore({
     cache: reg,
@@ -1066,7 +1067,7 @@ export function loadAgentFromContent(
     promptContent: flattened.content,
     systemTemplate: flattened.systemTemplate,
     baseDir,
-    frontmatterBaseDir: options?.baseDir,
+    frontmatterBaseDir: baseDir,
     options,
     layers,
     ancestorChain,

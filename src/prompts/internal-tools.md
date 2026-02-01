@@ -7,6 +7,7 @@ Variables:
 - slack_mrkdwn_rules: Slack mrkdwn guidance (string)
 - plugin_requirements: array of plugin requirement objects
 - nonce: XML nonce
+- response_mode: 'agentic' | 'chat'
 - max_tool_calls_per_turn: max tools per turn
 - batch_enabled: boolean
 - progress_tool_enabled: boolean
@@ -17,6 +18,7 @@ Variables:
 {% render 'final-report.md',
   plugin_requirements: plugin_requirements,
   nonce: nonce,
+  response_mode: response_mode,
   format_id: format_id,
   format_description: format_description,
   expected_json_schema: expected_json_schema,
@@ -27,7 +29,7 @@ Variables:
 {{ final_report_block | strip }}
 
 {% capture mandatory_rules_block %}
-{% render 'mandatory-rules.md', plugin_requirements: plugin_requirements, nonce: nonce, final_report_locked: false %}
+{% render 'mandatory-rules.md', plugin_requirements: plugin_requirements, nonce: nonce, final_report_locked: false, response_mode: response_mode %}
 {% endcapture %}
 {{ mandatory_rules_block | strip }}
 

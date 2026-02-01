@@ -101,6 +101,7 @@ export interface SpawnChildAgentOptions {
   userPrompt: string;
   isMaster?: boolean;
   pendingHandoffCount?: number;
+  outputMode?: AIAgentSessionConfig['outputMode'];
   parentSession: Pick<
     AIAgentSessionConfig,
     | "config"
@@ -194,6 +195,7 @@ export async function spawnOrchestrationChild(
     turnPathPrefix: childTrace.turnPath,
     isMaster: inheritedIsMaster,
     pendingHandoffCount: inheritedPending,
+    outputMode: opts.outputMode,
     abortSignal: parentSession.abortSignal,
     stopRef: parentSession.stopRef,
     ancestors: opts.ancestors,

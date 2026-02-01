@@ -9,6 +9,7 @@ Variables:
 - context_percent_used: context percent used
 - expected_final_format: output format id
 - format_prompt_value: output format guidance string
+- response_mode: 'agentic' | 'chat'
 - datetime: RFC3339 timestamp
 - timestamp: unix timestamp seconds
 - day: weekday name
@@ -42,6 +43,7 @@ Variables:
 {% elsif consecutive_progress_only_turns > 0 %}
 {% assign has_warnings = true %}
 {% endif %}
+{% capture final_report_how_to_provide %}{% if response_mode == 'agentic' %}using the XML wrapper: {{ final_wrapper_example }}{% else %}at your output{% endif %}{% endcapture %}
 
 # System Notice
 
@@ -49,12 +51,16 @@ This is turn/step {{ turn }}{% if max_turns %} of {{ max_turns }}{% endif %}{% i
 Current date and time (RFC3339): {{ datetime }}
 Unix epoch timestamp: {{ timestamp }}
 Day: {{ day }}
-Timezone: {{ timezone }}{% if has_external_tools and max_tools %}
-You can execute up to {{ max_tools }} tools per turn.{% endif %}
-{% if has_warnings %}
+Timezone: {{ timezone }}
 
+{% if has_external_tools and max_tools %}
+You can execute up to {{ max_tools }} tools per turn.
+{% endif %}
+
+{% if has_warnings %}
 {% if final_report_locked %}
-FINAL report already accepted. Do NOT resend the FINAL wrapper. Provide the required META wrappers now.
+Your final report/answer is already received. Do NOT resend your final report/answer.
+Provide the required META wrappers now.
 {% if missing_meta_plugin_names.size > 0 %}
 Missing META plugins: {{ missing_meta_plugin_names | join: ', ' }}.
 {% else %}
@@ -95,14 +101,14 @@ Turn wasted: you called task-status without any other tools and without providin
 {% assign relevant_names = missing_meta_plugin_names %}
 {% endif %}
 {% if final_report_locked %}
-## META Requirements — FINAL Already Accepted
-The FINAL wrapper has already been accepted for this session. Do NOT resend it.
+## META Requirements — FINAL REPORT/ANSWER Already Accepted
+Your final report/answer has already been received and accepted for this session. Do NOT resend your final report/answer.
 Missing META plugins: {{ relevant_names | join: ', ' }}.
 
 Missing META wrappers (exact tags):
 {% else %}
 ## META Requirements
-META is mandatory with the FINAL wrapper in this session.
+META is mandatory AFTER your final report/answer.
 
 Required META wrappers (exact tags):
 {% endif %}
@@ -118,12 +124,12 @@ Plugin META instructions:
 {% endif %}
 {% if forced_final_turn_reason != '' %}
 {% if final_report_locked %}
-FINAL already accepted. Do NOT resend the FINAL wrapper.
+Your final report/answer has been already received and accepted for this session. Do NOT resend your final report/answer.
 Provide the missing META wrappers now. Do NOT call tools.
 {{ meta_reminder_short_locked }}
 {% else %}
 {% capture final_footer_message %}
-You must now provide your final report/answer in the expected format ({{ expected_final_format }}) using the XML wrapper: {{ final_wrapper_example }}
+You must now provide your final report/answer in the expected format ({{ expected_final_format }}) {{final_report_how_to_provide}}
 {% endcapture %}
 {% assign final_footer_message = final_footer_message | strip %}
 {% if allow_router_handoff %}
@@ -141,7 +147,7 @@ Allowed tools for this final turn: {{ final_turn_tools | join: ', ' }}
 {% endif %}
 {% else %}
 {% if final_report_locked %}
-FINAL already accepted. Do NOT resend the FINAL wrapper.
+Your final report/answer has been already received and accepted. Do NOT resend your final report/answer.
 Provide the missing META wrappers now. Do NOT call tools.
 {{ meta_reminder_short_locked }}
 {% else %}
@@ -153,13 +159,13 @@ EITHER
 - Together with these tool calls, also call `agent__task_status` to inform your user about what you are doing and why you are calling these tools.
 {% endif %}
 OR
-- Provide your final report/answer in the expected format ({{ expected_final_format }}) using the XML wrapper: {{ final_wrapper_example }}
+- Provide your final report/answer in the expected format ({{ expected_final_format }}) {{final_report_how_to_provide}}
 {% if meta_required %}
 {{ meta_xml_snippets }}
 {% endif %}
 {{ meta_reminder_short }}
 {% else %}
-You must now provide your final report/answer in the expected format ({{ expected_final_format }}) using the XML wrapper: {{ final_wrapper_example }}
+You must now provide your final report/answer in the expected format ({{ expected_final_format }}) {{final_report_how_to_provide}}
 {% if meta_required %}
 {{ meta_xml_snippets }}
 {% endif %}
@@ -169,6 +175,6 @@ You must now provide your final report/answer in the expected format ({{ expecte
 {% endif %}
 
 {% if show_last_retry_reminder %}
-Reminder: do not end with plain text. Use an available tool to make progress. When ready to conclude, provide your final report/answer in the required XML wrapper.
+Reminder: Use an available tool to make progress. When ready to conclude, provide your final report/answer {{final_report_how_to_provide}}
 {{ meta_reminder_short }}
 {% endif %}

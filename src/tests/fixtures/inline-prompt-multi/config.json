@@ -1,0 +1,13 @@
+{
+  "providers": {
+    "test": {
+      "type": "test-llm"
+    }
+  },
+  "mcpServers": {},
+  "queues": {
+    "default": {
+      "concurrent": 1
+    }
+  }
+}

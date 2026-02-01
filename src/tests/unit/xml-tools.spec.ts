@@ -151,9 +151,9 @@ describe('XML streaming parser', () => {
       hasExternalTools: true,
     });
 
-    expect(xml).toContain('FINAL already accepted. Do NOT resend the FINAL wrapper.');
+    expect(xml).toContain('Your final report/answer is already received. Do NOT resend your final report/answer.');
     expect(xml).toContain(`Missing META plugins: ${SAMPLE_PLUGIN_NAME}.`);
-    expect(xml).toContain('## META Requirements — FINAL Already Accepted');
+    expect(xml).toContain('## META Requirements — FINAL REPORT/ANSWER Already Accepted');
     expect(xml).toContain(SAMPLE_META_WRAPPER);
     expect(xml).not.toContain(META_REQUIRED_PHRASE);
     expect(xml).not.toContain(`<ai-agent-${NONCE}-FINAL`);

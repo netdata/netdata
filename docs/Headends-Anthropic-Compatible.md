@@ -37,6 +37,8 @@ The Anthropic-compatible headend provides a drop-in replacement for Anthropic's 
 - Token usage tracking
 - Concurrent request limiting
 
+**Output mode**: This headend runs in **chat** mode by default. See [Operations-Output-Modes](Operations-Output-Modes) for details and trade-offs.
+
 ---
 
 ## Quick Start

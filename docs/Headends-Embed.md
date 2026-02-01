@@ -41,6 +41,8 @@ The Embed headend provides a public HTTP API designed for website chat widgets. 
 - Rate limiting and authentication tiers
 - Prometheus metrics
 
+**Output mode**: This headend runs in **chat** mode by default. See [Operations-Output-Modes](Operations-Output-Modes) for details and trade-offs.
+
 ---
 
 ## Quick Start

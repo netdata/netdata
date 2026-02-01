@@ -695,6 +695,7 @@ export interface AgentRunOptions {
   trace?: AIAgentSessionConfig['trace'];
   renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
   outputFormat: OutputFormatId;
+  outputMode?: 'agentic' | 'chat';
   abortSignal?: AbortSignal;
   stopRef?: { stopping: boolean; reason?: 'stop' | 'abort' | 'shutdown' };
   initialTitle?: string;
@@ -759,6 +760,8 @@ export interface AIAgentSessionConfig {
   agentHash?: string;
   // Resolved output format for this session (must be provided by caller)
   outputFormat: OutputFormatId;
+  // Output mode: agentic (default) vs chat (headend-controlled)
+  outputMode?: 'agentic' | 'chat';
   // Optional rendering target for diagnostics
   renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'embed' | 'sub-agent';
   conversationHistory?: ConversationMessage[];

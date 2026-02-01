@@ -29,6 +29,8 @@ All CLI options follow these conventions:
 - **Repeatable flags** can be specified multiple times (e.g., `--agent a.ai --agent b.ai`)
 - **Duration values** accept milliseconds or human-readable formats (e.g., `5000`, `5s`, `2m`)
 
+**Output modes**: CLI can run in **agentic** or **chat** mode. Use `--chat` to enable chat mode, or `--no-chat` to force agentic mode. See [Operations-Output-Modes](Operations-Output-Modes) for details and trade-offs.
+
 ---
 
 ## Quick Reference

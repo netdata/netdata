@@ -60,6 +60,7 @@ export interface XmlBuildMessagesConfig {
   finalReportToolName: string;
   resolvedFormat: OutputFormatId | undefined;
   expectedJsonSchema: Record<string, unknown> | undefined;
+  responseMode?: 'agentic' | 'chat';
   // Retry info
   attempt: number;
   maxRetries: number;
@@ -221,6 +222,7 @@ export class XmlToolTransport {
       attempt: config.attempt,
       maxRetries: config.maxRetries,
       contextPercentUsed: config.contextPercentUsed,
+      responseMode: config.responseMode ?? 'agentic',
       hasExternalTools,
       forcedFinalTurnReason: config.forcedFinalTurnReason,
       finalTurnTools: config.finalTurnTools,
