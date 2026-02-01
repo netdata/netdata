@@ -184,5 +184,5 @@ This is different from alert-level overriding. With shadowing, you must include 
 
 ## Related Documentation
 
-- [Health Configuration Reference](REFERENCE.md)
-- [Overriding Stock Alerts](overriding-stock-alerts.md)
+- [Health Configuration Reference](/docs/alerts-and-notifications/alert-configuration-reference)
+- [Overriding Stock Alerts](/docs/alerts-and-notifications/overriding-stock-alerts)

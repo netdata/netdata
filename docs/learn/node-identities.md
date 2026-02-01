@@ -86,7 +86,7 @@ If two Agents have the same Machine GUID:
 - Cloud kicks the older connection offline when the second connects
 - This causes unstable "flapping" connections
 
-See [VM Templates](vm-templates.md) for how to avoid this when cloning VMs.
+See [VM Templates](/docs/netdata-agent/vm-templates) for how to avoid this when cloning VMs.
 
 :::
 
@@ -124,7 +124,7 @@ When a database contains metadata for multiple nodes (from Children or [Virtual 
 1. **Reports all nodes** - All known nodes are reported to Netdata Cloud
 2. **Retention persistence** - Node entries persist in Cloud until database retention expires (can be years with tiering)
 
-This is normal for Parent nodes receiving data from Children, and for Agents using Virtual Nodes. See [VM Templates](vm-templates.md) for implications when cloning VMs.
+This is normal for Parent nodes receiving data from Children, and for Agents using Virtual Nodes. See [VM Templates](/docs/netdata-agent/vm-templates) for implications when cloning VMs.
 
 ## Virtual Nodes (vnodes)
 
@@ -232,7 +232,7 @@ Read the file `/var/lib/netdata/registry/netdata.public.unique.id`.
 <details>
 <summary>Can I change my node's Machine GUID?</summary>
 
-Yes, but it will appear as a new node in Netdata Cloud and Netdata Parents. Delete the GUID file and status backups, then restart Netdata. See [VM Templates](vm-templates.md) for the complete procedure.
+Yes, but it will appear as a new node in Netdata Cloud and Netdata Parents. Delete the GUID file and status backups, then restart Netdata. See [VM Templates](/docs/netdata-agent/vm-templates) for the complete procedure.
 
 </details>
 

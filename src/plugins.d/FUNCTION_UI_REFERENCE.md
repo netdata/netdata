@@ -1,6 +1,6 @@
 # Netdata Functions v3 Protocol - Technical Reference
 
-> **Note**: This is the technical specification. For a practical guide to implementing functions, see [FUNCTIONS_DEVELOPER_GUIDE.md](FUNCTIONS_DEVELOPER_GUIDE.md).
+> **Note**: This is the technical specification. For a practical guide to implementing functions, see [Functions Developer Guide](/docs/developer-and-contributor-corner/external-plugins/functions-developer-guide).
 
 ## Overview
 

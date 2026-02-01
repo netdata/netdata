@@ -6,8 +6,8 @@
 
 The commands in this guide **permanently delete**:
 - All historical metrics
-- [Node identity](/docs/learn/node-identities.md#agent-self-identity)
-- [Cloud connection](/docs/learn/node-identities.md#agent-cloud-link-aclk-identity)
+- [Node identity](/docs/netdata-agent/node-identities#agent-self-identity)
+- [Cloud connection](/docs/netdata-agent/node-identities#agent-cloud-link-aclk-identity)
 - Alert history
 
 **This is irreversible. There is no undo.**
@@ -27,7 +27,7 @@ How to prepare a VM template so each clone gets a unique Netdata identity and au
 
 ## Prerequisites
 
-- **Read first**: [Node Identities](node-identities.md) - understand what you're deleting
+- **Read first**: [Node Identities](/docs/netdata-agent/node-identities) - understand what you're deleting
 - Netdata installed on a VM
 - Hypervisor that supports templates or golden images
 - (Optional) `/etc/netdata/claim.conf` configured for auto-claiming to Cloud
@@ -76,9 +76,9 @@ See [Node Ephemerality](/docs/nodes-ephemerality.md) for full documentation.
 
 | Category | Files | What's Lost |
 |----------|-------|-------------|
-| **[Agent Identity](node-identities.md#agent-self-identity)** | [GUID file](node-identities.md#agent-self-identity), [status backups](node-identities.md#status-file-backups) | Node identity |
-| **[ACLK Auth](node-identities.md#agent-cloud-link-aclk-identity)** | [`cloud.d/`](node-identities.md#agent-cloud-link-aclk-identity) directory | Cloud connection, must re-claim |
-| **[Node Metadata](node-identities.md#parent-children-identities)** | `netdata-meta.db*`, `context-meta.db*` | Node metadata, metric mappings |
+| **[Agent Identity](/docs/netdata-agent/node-identities#agent-self-identity)** | [GUID file](/docs/netdata-agent/node-identities#agent-self-identity), [status backups](/docs/netdata-agent/node-identities#status-file-backups) | Node identity |
+| **[ACLK Auth](/docs/netdata-agent/node-identities#agent-cloud-link-aclk-identity)** | [`cloud.d/`](/docs/netdata-agent/node-identities#agent-cloud-link-aclk-identity) directory | Cloud connection, must re-claim |
+| **[Node Metadata](/docs/netdata-agent/node-identities#parent-children-identities)** | `netdata-meta.db*`, `context-meta.db*` | Node metadata, metric mappings |
 | **Metrics** | `dbengine*` directories (all tiers) | All historical metrics |
 
 **Keep**: `/etc/netdata/claim.conf` - enables auto-claiming on clones
@@ -143,9 +143,9 @@ Should contain:
 
 ## When Clones Boot
 
-1. Netdata starts, no [GUID](node-identities.md#agent-self-identity) found, generates new unique identity
+1. Netdata starts, no [GUID](/docs/netdata-agent/node-identities#agent-self-identity) found, generates new unique identity
 2. If `claim.conf` exists, auto-claims to Cloud
-3. Cloud assigns [Node ID](node-identities.md#cloud-node-identity), new node appears in your Space
+3. Cloud assigns [Node ID](/docs/netdata-agent/node-identities#cloud-node-identity), new node appears in your Space
 
 Each clone is a unique, independent node.
 
@@ -202,13 +202,13 @@ Each instance installs fresh with unique identity.
 
 ### Clones share the same identity
 
-Cause: [GUID recovered from status backup](node-identities.md#status-file-backups). Netdata checks multiple backup locations before generating a new GUID.
+Cause: [GUID recovered from status backup](/docs/netdata-agent/node-identities#status-file-backups). Netdata checks multiple backup locations before generating a new GUID.
 
 Solution: Delete **all** status file locations, not just the primary GUID file. See the cleanup commands in [Step 2](#2-delete-all-identity-and-data-files).
 
 ### Clones don't connect to Parent
 
-Cause: Either clones share the same [Machine GUID](node-identities.md#agent-self-identity) (only one can connect at a time), or `stream.conf` wasn't configured in the template.
+Cause: Either clones share the same [Machine GUID](/docs/netdata-agent/node-identities#agent-self-identity) (only one can connect at a time), or `stream.conf` wasn't configured in the template.
 
 Solution:
 - Verify each clone has a unique GUID: `cat /var/lib/netdata/registry/netdata.public.unique.id`
@@ -217,7 +217,7 @@ Solution:
 
 ### Stale "template" node appears in Cloud
 
-Cause: [Database files kept](node-identities.md#multiple-node-identities-in-database) from the template. The template's node identity persists in the metadata.
+Cause: [Database files kept](/docs/netdata-agent/node-identities#multiple-node-identities-in-database) from the template. The template's node identity persists in the metadata.
 
 Solution: Delete databases on all clones. This loses historical metrics but removes the stale node reference.
 
@@ -229,7 +229,7 @@ Solution: Reset `stream.conf` on clones or delete the API key sections that enab
 
 ### Unstable Cloud connections (flapping)
 
-Cause: Two agents have the same [Machine GUID](node-identities.md#agent-self-identity). Cloud kicks the older connection offline when the second connects.
+Cause: Two agents have the same [Machine GUID](/docs/netdata-agent/node-identities#agent-self-identity). Cloud kicks the older connection offline when the second connects.
 
 Solution: Each agent needs a unique GUID. Run the cleanup procedure on affected clones.
 
@@ -279,14 +279,14 @@ This deletes all historical metrics on the clone. If you skip deleting `cloud.d/
 <details>
 <summary>What if I reboot a clone?</summary>
 
-Identity persists. Netdata only generates a new [GUID](node-identities.md#agent-self-identity) when the file AND all [backups](node-identities.md#status-file-backups) are missing.
+Identity persists. Netdata only generates a new [GUID](/docs/netdata-agent/node-identities#agent-self-identity) when the file AND all [backups](/docs/netdata-agent/node-identities#status-file-backups) are missing.
 
 </details>
 
 <details>
 <summary>Can multiple clones use the same claim token?</summary>
 
-Yes. Each clone gets a unique [Machine GUID](node-identities.md#agent-self-identity) and [Claimed ID](node-identities.md#claimed-id). They authenticate with the same token but appear as separate nodes.
+Yes. Each clone gets a unique [Machine GUID](/docs/netdata-agent/node-identities#agent-self-identity) and [Claimed ID](/docs/netdata-agent/node-identities#agent-cloud-link-aclk-identity). They authenticate with the same token but appear as separate nodes.
 
 </details>
 
