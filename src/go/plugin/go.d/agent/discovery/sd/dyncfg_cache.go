@@ -3,133 +3,283 @@
 package sd
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
+
+	"gopkg.in/yaml.v2"
 )
 
-// sdConfig represents a service discovery pipeline configuration for dyncfg
-type sdConfig struct {
-	discovererType string // net_listeners, docker, k8s, snmp
-	name           string
-	pipelineKey    string // key used by PipelineManager (file path or dyncfg:{type}:{name})
-	source         string // file path or fn.Source for dyncfg
-	sourceType     string // "file" or "dyncfg"
-	status         dyncfg.Status
-	content        []byte // raw JSON content for dyncfg format
+// Internal metadata keys (excluded from JSON output, same pattern as confgroup.Config)
+const (
+	ikeySource         = "__source__"
+	ikeySourceType     = "__source_type__"
+	ikeyDiscovererType = "__discoverer_type__"
+	ikeyPipelineKey    = "__pipeline_key__"
+	ikeyStatus         = "__status__"
+)
+
+// sdConfig represents a service discovery pipeline configuration.
+// Uses map[string]any with __ metadata fields, same pattern as confgroup.Config.
+// The actual config data is stored alongside metadata and parsed to pipeline.Config only when needed.
+type sdConfig map[string]any
+
+func (c sdConfig) Source() string         { v, _ := c[ikeySource].(string); return v }
+func (c sdConfig) SourceType() string     { v, _ := c[ikeySourceType].(string); return v }
+func (c sdConfig) DiscovererType() string { v, _ := c[ikeyDiscovererType].(string); return v }
+func (c sdConfig) PipelineKey() string    { v, _ := c[ikeyPipelineKey].(string); return v }
+func (c sdConfig) Name() string           { v, _ := c["name"].(string); return v }
+
+func (c sdConfig) Status() dyncfg.Status {
+	v, _ := c[ikeyStatus].(dyncfg.Status)
+	return v
 }
 
-func (c *sdConfig) key() string {
-	return c.discovererType + ":" + c.name
+func (c sdConfig) SetSource(v string) sdConfig         { c[ikeySource] = v; return c }
+func (c sdConfig) SetSourceType(v string) sdConfig     { c[ikeySourceType] = v; return c }
+func (c sdConfig) SetDiscovererType(v string) sdConfig { c[ikeyDiscovererType] = v; return c }
+func (c sdConfig) SetPipelineKey(v string) sdConfig    { c[ikeyPipelineKey] = v; return c }
+func (c sdConfig) SetStatus(v dyncfg.Status) sdConfig  { c[ikeyStatus] = v; return c }
+
+// Key returns the logical key for exposedConfigs: "discovererType:name"
+func (c sdConfig) Key() string {
+	return c.DiscovererType() + ":" + c.Name()
 }
 
-func (c *sdConfig) isDyncfg() bool {
-	return c.sourceType == "dyncfg"
+// UID returns the unique key for seenConfigs: "source:discovererType:name"
+func (c sdConfig) UID() string {
+	return c.Source() + ":" + c.Key()
 }
 
-// exposedSDConfigs tracks SD configs exposed via dyncfg UI
+// SourceTypePriority returns priority based on source type.
+// Higher value = higher priority. Matches confgroup.Config pattern.
+func (c sdConfig) SourceTypePriority() int {
+	switch c.SourceType() {
+	case confgroup.TypeDyncfg:
+		return 16
+	case confgroup.TypeUser:
+		return 8
+	case confgroup.TypeStock:
+		return 2
+	default:
+		return 0
+	}
+}
+
+// Clone returns a deep copy of the config.
+func (c sdConfig) Clone() sdConfig {
+	clone := make(sdConfig, len(c))
+	for k, v := range c {
+		clone[k] = v
+	}
+	return clone
+}
+
+// ToPipelineConfig converts sdConfig to pipeline.Config for actually running the pipeline.
+// This parses the config data (excluding __ fields) into the typed struct.
+func (c sdConfig) ToPipelineConfig(configDefaults confgroup.Registry) (pipeline.Config, error) {
+	// Marshal without __ fields, then unmarshal to pipeline.Config
+	data := c.DataJSON()
+
+	var cfg pipeline.Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return pipeline.Config{}, fmt.Errorf("unmarshal pipeline config: %w", err)
+	}
+
+	cfg.ConfigDefaults = configDefaults
+
+	// Set source based on source type
+	switch c.SourceType() {
+	case confgroup.TypeDyncfg:
+		cfg.Source = fmt.Sprintf("dyncfg=%s", c.Source())
+	default:
+		cfg.Source = fmt.Sprintf("file=%s", c.Source())
+	}
+
+	return cfg, nil
+}
+
+// DataJSON returns JSON representation of config data (excluding __ metadata fields).
+// Used for dyncfg get command and for converting to pipeline.Config.
+func (c sdConfig) DataJSON() []byte {
+	data := make(map[string]any, len(c))
+	for k, v := range c {
+		if !strings.HasPrefix(k, "__") {
+			data[k] = v
+		}
+	}
+	b, _ := json.Marshal(data)
+	return b
+}
+
+// cleanName sanitizes a name for use in dyncfg IDs.
+// Replaces spaces and colons with underscores to avoid parsing issues.
+func cleanName(name string) string {
+	name = strings.ReplaceAll(name, " ", "_")
+	name = strings.ReplaceAll(name, ":", "_")
+	return name
+}
+
+// newSDConfigFromYAML creates an sdConfig from YAML bytes.
+// Used when loading file configs. Cleans the name for dyncfg compatibility.
+func newSDConfigFromYAML(data []byte, source, sourceType, pipelineKey string) (sdConfig, error) {
+	// First unmarshal to pipeline.Config to get discoverer type and apply YAML processing
+	var cfg pipeline.Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("unmarshal yaml: %w", err)
+	}
+
+	// Now marshal to JSON and unmarshal to map for sdConfig
+	jsonData, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshal to json: %w", err)
+	}
+
+	var m sdConfig
+	if err := json.Unmarshal(jsonData, &m); err != nil {
+		return nil, fmt.Errorf("unmarshal to map: %w", err)
+	}
+
+	// Clean the name for dyncfg compatibility
+	if name := m.Name(); name != "" {
+		m["name"] = cleanName(name)
+	}
+
+	// Add metadata
+	m.SetSource(source)
+	m.SetSourceType(sourceType)
+	m.SetDiscovererType(cfg.Discoverer.Type())
+	m.SetPipelineKey(pipelineKey)
+	m.SetStatus(dyncfg.StatusAccepted)
+
+	return m, nil
+}
+
+// newSDConfigFromJSON creates an sdConfig from JSON payload.
+// Used when receiving dyncfg add/update commands. Cleans the name for dyncfg compatibility.
+func newSDConfigFromJSON(data []byte, source, sourceType, discovererType, pipelineKey string) (sdConfig, error) {
+	var m sdConfig
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, fmt.Errorf("unmarshal json: %w", err)
+	}
+
+	// Clean the name for dyncfg compatibility
+	if name := m.Name(); name != "" {
+		m["name"] = cleanName(name)
+	}
+
+	// Add metadata
+	m.SetSource(source)
+	m.SetSourceType(sourceType)
+	m.SetDiscovererType(discovererType)
+	m.SetPipelineKey(pipelineKey)
+	m.SetStatus(dyncfg.StatusAccepted)
+
+	return m, nil
+}
+
+// sourceTypeFromPath determines the source type (stock/user) from a file path.
+func sourceTypeFromPath(path string) string {
+	// User configs are in paths containing "edit.d", "user", or similar patterns
+	if strings.Contains(path, ".d/") ||
+		strings.Contains(path, "/user/") ||
+		strings.Contains(path, "/custom/") ||
+		strings.Contains(path, "/edit.d/") {
+		return confgroup.TypeUser
+	}
+	return confgroup.TypeStock
+}
+
+// seenSDConfigs tracks all discovered SD configs by unique ID (source + key).
+// Multiple sources can produce configs with the same logical name.
+type seenSDConfigs struct {
+	mux   sync.RWMutex
+	items map[string]sdConfig // [UID()]
+}
+
+func newSeenSDConfigs() *seenSDConfigs {
+	return &seenSDConfigs{
+		items: make(map[string]sdConfig),
+	}
+}
+
+func (c *seenSDConfigs) add(cfg sdConfig) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	c.items[cfg.UID()] = cfg
+}
+
+func (c *seenSDConfigs) remove(uid string) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	delete(c.items, uid)
+}
+
+func (c *seenSDConfigs) lookup(uid string) (sdConfig, bool) {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+	cfg, ok := c.items[uid]
+	return cfg, ok
+}
+
+func (c *seenSDConfigs) lookupBySource(source string) []sdConfig {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+	var result []sdConfig
+	for _, cfg := range c.items {
+		if cfg.Source() == source {
+			result = append(result, cfg)
+		}
+	}
+	return result
+}
+
+// exposedSDConfigs tracks SD configs exposed via dyncfg UI by logical key.
+// Only one config per logical key (discovererType:name) is exposed at a time.
 type exposedSDConfigs struct {
 	mux   sync.RWMutex
-	items map[string]*sdConfig // [discovererType:name]
+	items map[string]sdConfig // [Key()]
 }
 
 func newExposedSDConfigs() *exposedSDConfigs {
 	return &exposedSDConfigs{
-		items: make(map[string]*sdConfig),
+		items: make(map[string]sdConfig),
 	}
 }
 
-func (c *exposedSDConfigs) add(cfg *sdConfig) {
+func (c *exposedSDConfigs) add(cfg sdConfig) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
-	c.items[cfg.key()] = cfg
+	c.items[cfg.Key()] = cfg
 }
 
-func (c *exposedSDConfigs) remove(discovererType, name string) {
+func (c *exposedSDConfigs) remove(key string) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
-	delete(c.items, discovererType+":"+name)
+	delete(c.items, key)
 }
 
-func (c *exposedSDConfigs) lookup(discovererType, name string) (*sdConfig, bool) {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	cfg, ok := c.items[discovererType+":"+name]
-	return cfg, ok
-}
-
-func (c *exposedSDConfigs) updateStatus(discovererType, name string, status dyncfg.Status) {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-	if cfg, ok := c.items[discovererType+":"+name]; ok {
-		cfg.status = status
-	}
-}
-
-func (c *exposedSDConfigs) updateContent(discovererType, name string, content []byte) {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-	if cfg, ok := c.items[discovererType+":"+name]; ok {
-		cfg.content = content
-	}
-}
-
-func (c *exposedSDConfigs) getStatus(discovererType, name string) dyncfg.Status {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	if cfg, ok := c.items[discovererType+":"+name]; ok {
-		return cfg.status
-	}
-	return dyncfg.StatusAccepted
-}
-
-func (c *exposedSDConfigs) getContent(discovererType, name string) []byte {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	if cfg, ok := c.items[discovererType+":"+name]; ok {
-		// Return a copy to avoid race conditions
-		content := make([]byte, len(cfg.content))
-		copy(content, cfg.content)
-		return content
-	}
-	return nil
-}
-
-func (c *exposedSDConfigs) getPipelineKey(discovererType, name string) string {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	if cfg, ok := c.items[discovererType+":"+name]; ok {
-		return cfg.pipelineKey
-	}
-	return ""
-}
-
-func (c *exposedSDConfigs) getSource(discovererType, name string) string {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	if cfg, ok := c.items[discovererType+":"+name]; ok {
-		return cfg.source
-	}
-	return ""
-}
-
-func (c *exposedSDConfigs) getSourceType(discovererType, name string) string {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	if cfg, ok := c.items[discovererType+":"+name]; ok {
-		return cfg.sourceType
-	}
-	return ""
-}
-
-func (c *exposedSDConfigs) lookupByKey(key string) (*sdConfig, bool) {
+func (c *exposedSDConfigs) lookup(key string) (sdConfig, bool) {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
 	cfg, ok := c.items[key]
 	return cfg, ok
 }
 
-func (c *exposedSDConfigs) forEach(fn func(cfg *sdConfig)) {
+func (c *exposedSDConfigs) updateStatus(key string, status dyncfg.Status) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	if cfg, ok := c.items[key]; ok {
+		cfg.SetStatus(status)
+	}
+}
+
+func (c *exposedSDConfigs) forEach(fn func(cfg sdConfig)) {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
 	for _, cfg := range c.items {
@@ -137,11 +287,11 @@ func (c *exposedSDConfigs) forEach(fn func(cfg *sdConfig)) {
 	}
 }
 
-func (c *exposedSDConfigs) forEachByType(discovererType string, fn func(cfg *sdConfig)) {
+func (c *exposedSDConfigs) forEachBySource(source string, fn func(cfg sdConfig)) {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
 	for _, cfg := range c.items {
-		if cfg.discovererType == discovererType {
+		if cfg.Source() == source {
 			fn(cfg)
 		}
 	}
@@ -151,16 +301,4 @@ func (c *exposedSDConfigs) count() int {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
 	return len(c.items)
-}
-
-func (c *exposedSDConfigs) countByType(discovererType string) int {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	count := 0
-	for _, cfg := range c.items {
-		if cfg.discovererType == discovererType {
-			count++
-		}
-	}
-	return count
 }

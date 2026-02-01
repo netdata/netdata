@@ -100,6 +100,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 	sd := &ServiceDiscovery{
 		Logger:         logger.New(),
 		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		seenConfigs:    newSeenSDConfigs(),
 		exposedConfigs: newExposedSDConfigs(),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
 		newPipeline: func(cfg pipeline.Config) (sdPipeline, error) {
@@ -182,15 +183,15 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 	// Verify exposed configs
 	if s.wantExposed != nil {
-		wantLen, gotLen := len(s.wantExposed), len(sd.exposedConfigs.items)
+		wantLen, gotLen := len(s.wantExposed), sd.exposedConfigs.count()
 		require.Equalf(t, wantLen, gotLen, "exposedConfigs: different len (want %d got %d)", wantLen, gotLen)
 
 		for _, want := range s.wantExposed {
 			key := want.discovererType + ":" + want.name
-			cfg, ok := sd.exposedConfigs.items[key]
+			cfg, ok := sd.exposedConfigs.lookup(key)
 			require.Truef(t, ok, "exposedConfigs: config '%s' not found", key)
-			assert.Equal(t, want.sourceType, cfg.sourceType, "exposedConfigs: wrong sourceType for '%s'", key)
-			assert.Equal(t, want.status, cfg.status, "exposedConfigs: wrong status for '%s'", key)
+			assert.Equal(t, want.sourceType, cfg.SourceType(), "exposedConfigs: wrong sourceType for '%s'", key)
+			assert.Equal(t, want.status, cfg.Status(), "exposedConfigs: wrong status for '%s'", key)
 		}
 	}
 
@@ -400,17 +401,16 @@ func TestServiceDiscovery_DyncfgGet(t *testing.T) {
 							[]string{sd.dyncfgJobID(DiscovererNetListeners, "test-job"), "get"},
 							nil, "")
 					},
-					wantDyncfg: `
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
-
-FUNCTION_RESULT_BEGIN 1-add 202 application/json
-{"status":202,"message":""}
-FUNCTION_RESULT_END
-
-FUNCTION_RESULT_BEGIN 2-get 200 application/json
-{"name":"test-job","discoverer":{"net_listeners":{}}}
-FUNCTION_RESULT_END
-`,
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						// Check that CONFIG and FUNCTION_RESULT lines are present
+						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job create accepted job")
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-add 202 application/json")
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-get 200 application/json")
+						// JSON key order may vary, so check for presence of expected fields
+						assert.Contains(t, got, `"name":"test-job"`)
+						assert.Contains(t, got, `"discoverer":{`)
+						assert.Contains(t, got, `"net_listeners":{}`)
+					},
 				}
 			},
 		},
@@ -822,15 +822,15 @@ func TestServiceDiscovery_DyncfgFileConfig(t *testing.T) {
 				return &dyncfgSim{
 					do: func(sd *ServiceDiscovery) {
 						// Manually add a file-based config to exposedConfigs
-						sd.exposedConfigs.add(&sdConfig{
-							discovererType: DiscovererNetListeners,
-							name:           "file-config",
-							pipelineKey:    "/etc/netdata/sd/test.conf",
-							source:         "/etc/netdata/sd/test.conf",
-							sourceType:     "file",
-							status:         dyncfg.StatusRunning,
-							content:        []byte(`{"name":"file-config"}`),
-						})
+						cfg := sdConfig{
+							"name":             "file-config",
+							ikeyDiscovererType: DiscovererNetListeners,
+							ikeyPipelineKey:    "/etc/netdata/sd/test.conf",
+							ikeySource:         "/etc/netdata/sd/test.conf",
+							ikeySourceType:     "file",
+							ikeyStatus:         dyncfg.StatusRunning,
+						}
+						sd.exposedConfigs.add(cfg)
 
 						// Try to remove
 						sendDyncfgCmd(sd, "1-remove",

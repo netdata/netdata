@@ -3,6 +3,7 @@
 package sd
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync"
@@ -10,8 +11,11 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -25,6 +29,7 @@ type discoverySim struct {
 
 func (sim *discoverySim) run(t *testing.T) {
 	fact := &mockFactory{}
+	var buf bytes.Buffer
 	mgr := &ServiceDiscovery{
 		Logger: logger.New(),
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
@@ -34,7 +39,11 @@ func (sim *discoverySim) run(t *testing.T) {
 			confFiles: sim.configs,
 			ch:        make(chan confFile),
 		},
+		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		seenConfigs:    newSeenSDConfigs(),
 		exposedConfigs: newExposedSDConfigs(),
+		// dyncfgCh is intentionally nil to trigger auto-enable in tests
+		// (simulates terminal mode where netdata is not available)
 	}
 
 	in := make(chan<- []*confgroup.Group)

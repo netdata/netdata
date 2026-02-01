@@ -5,6 +5,7 @@ package sd
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/netlistensd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
 
 	"gopkg.in/yaml.v2"
@@ -36,14 +37,14 @@ func TestServiceDiscovery_Run(t *testing.T) {
 			},
 		},
 		"re-add pipeline multiple times": {
+			// With the new stability logic, re-adding the same config from the same source
+			// when it's already running is a no-op. Only 1 pipeline should be created.
 			configs: []confFile{
 				prepareConfigFile("source", "name"),
 				prepareConfigFile("source", "name"),
 				prepareConfigFile("source", "name"),
 			},
 			wantPipelines: []*mockPipeline{
-				{name: "name", started: true, stopped: true},
-				{name: "name", started: true, stopped: true},
 				{name: "name", started: true, stopped: false},
 			},
 		},
@@ -82,7 +83,13 @@ func TestServiceDiscovery_Run(t *testing.T) {
 }
 
 func prepareConfigFile(source, name string) confFile {
-	bs, _ := yaml.Marshal(pipeline.Config{Name: name})
+	cfg := pipeline.Config{
+		Name: name,
+		Discoverer: pipeline.DiscovererConfig{
+			NetListeners: &netlistensd.Config{},
+		},
+	}
+	bs, _ := yaml.Marshal(cfg)
 
 	return confFile{
 		source:  source,
@@ -97,7 +104,14 @@ func prepareEmptyConfigFile(source string) confFile {
 }
 
 func prepareDisabledConfigFile(source, name string) confFile {
-	bs, _ := yaml.Marshal(pipeline.Config{Name: name, Disabled: true})
+	cfg := pipeline.Config{
+		Name:     name,
+		Disabled: true,
+		Discoverer: pipeline.DiscovererConfig{
+			NetListeners: &netlistensd.Config{},
+		},
+	}
+	bs, _ := yaml.Marshal(cfg)
 
 	return confFile{
 		source:  source,

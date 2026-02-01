@@ -4,7 +4,6 @@ package sd
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"sync"
@@ -19,7 +18,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 
 	"github.com/mattn/go-isatty"
-	"gopkg.in/yaml.v2"
 )
 
 var isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdin.Fd())
@@ -41,6 +39,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		configDefaults: cfg.ConfigDefaults,
 		fnReg:          cfg.FnReg,
 		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
+		seenConfigs:    newSeenSDConfigs(),
 		exposedConfigs: newExposedSDConfigs(),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
@@ -60,7 +59,8 @@ type (
 		configDefaults confgroup.Registry
 		fnReg          functions.Registry
 		dyncfgApi      *dyncfg.Responder
-		exposedConfigs *exposedSDConfigs
+		seenConfigs    *seenSDConfigs    // All discovered configs by UID
+		exposedConfigs *exposedSDConfigs // Configs exposed to dyncfg by Key
 		dyncfgCh       chan dyncfg.Function
 		newPipeline    func(config pipeline.Config) (sdPipeline, error)
 
@@ -155,75 +155,157 @@ func (d *ServiceDiscovery) run(ctx context.Context) {
 }
 
 func (d *ServiceDiscovery) removePipeline(conf confFile) {
-	key := pipelineKeyFromSource(conf.source)
-	if d.mgr.IsRunning(key) {
-		d.Infof("received empty config, stopping pipeline '%s'", key)
-		d.mgr.Stop(key)
+	seenCfgs := d.seenConfigs.lookupBySource(conf.source)
+	if len(seenCfgs) == 0 {
+		return
 	}
 
-	// Remove from dyncfg if exposed
-	d.removeExposedFileConfig(conf.source)
+	d.Infof("removing %d config(s) from source '%s'", len(seenCfgs), conf.source)
+
+	for _, scfg := range seenCfgs {
+		// Remove from seen cache
+		d.seenConfigs.remove(scfg.UID())
+
+		// Check if this was the exposed config
+		ecfg, ok := d.exposedConfigs.lookup(scfg.Key())
+		if !ok || scfg.UID() != ecfg.UID() {
+			// Not exposed or different config is exposed - skip dyncfg remove
+			continue
+		}
+
+		// This was the exposed config - stop pipeline and remove from dyncfg
+		if d.mgr.IsRunning(scfg.PipelineKey()) {
+			d.mgr.Stop(scfg.PipelineKey())
+		}
+
+		d.exposedConfigs.remove(scfg.Key())
+		d.dyncfgSDJobRemove(scfg.DiscovererType(), scfg.Name())
+	}
 }
 
 func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile) {
-	var cfg pipeline.Config
+	// Create sdConfig directly from YAML (cleans name for dyncfg compatibility)
+	sourceType := sourceTypeFromPath(conf.source)
+	pipelineKey := pipelineKeyFromSource(conf.source)
 
-	if err := yaml.Unmarshal(conf.content, &cfg); err != nil {
+	scfg, err := newSDConfigFromYAML(conf.content, conf.source, sourceType, pipelineKey)
+	if err != nil {
 		d.Errorf("failed to unmarshal config from '%s': %v", conf.source, err)
 		return
 	}
 
-	if cfg.Disabled {
-		d.Infof("pipeline '%s' is disabled in config", cfg.Name)
+	// Check if disabled
+	if disabled, _ := scfg["disabled"].(bool); disabled {
+		d.Infof("pipeline '%s' is disabled in config", scfg.Name())
 		return
 	}
 
-	cfg.Source = fmt.Sprintf("file=%s", conf.source)
-	cfg.ConfigDefaults = d.configDefaults
+	if scfg.DiscovererType() == "" {
+		d.Errorf("config '%s' has no discoverer configured", conf.source)
+		return
+	}
 
-	key := pipelineKeyFromSource(conf.source)
+	if scfg.Name() == "" {
+		d.Errorf("config '%s' has no name configured", conf.source)
+		return
+	}
 
-	// If pipeline already running (reload case), restart with grace period.
-	// Already running means netdata previously enabled it.
-	if d.mgr.IsRunning(key) {
-		d.Infof("restarting pipeline '%s' with updated config", key)
-		if err := d.mgr.Restart(ctx, key, cfg); err != nil {
-			d.Errorf("pipeline '%s': %v", key, err)
-			return
+	d.addConfig(ctx, scfg)
+}
+
+// addConfig handles adding a config with priority handling.
+// This is the core logic matching jobmgr pattern.
+func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
+	// For file sources: One file = one config. If the file previously provided a different config,
+	// remove the old one first. This handles the case where a file config name changes.
+	if scfg.SourceType() != confgroup.TypeDyncfg {
+		d.removeOldConfigsFromSource(scfg.Source(), scfg.Key())
+	}
+
+	// Always add to seen cache
+	d.seenConfigs.add(scfg)
+
+	// Check if there's an existing exposed config with the same key
+	ecfg, exists := d.exposedConfigs.lookup(scfg.Key())
+
+	if !exists {
+		// No existing config - expose this one
+		scfg.SetStatus(dyncfg.StatusAccepted)
+		d.exposedConfigs.add(scfg)
+		d.dyncfgSDJobCreate(scfg.DiscovererType(), scfg.Name(), scfg.SourceType(), scfg.Source(), scfg.Status())
+
+		if isTerminal || d.dyncfgCh == nil {
+			// Auto-enable in terminal mode or tests
+			d.autoEnableConfig(scfg)
+		} else {
+			// Wait for netdata to send enable/disable
+			d.waitCfgOnOff = scfg.PipelineKey()
 		}
-		// Update exposed config
-		d.removeExposedFileConfig(conf.source)
-		d.exposeFileConfig(cfg, conf, dyncfg.StatusRunning)
 		return
 	}
 
-	// For new pipelines, expose first with Accepted status and wait for enable.
-	// This matches jobmgr pattern - netdata will send enable based on stored state.
-	d.removeExposedFileConfig(conf.source)
+	// Existing config found - apply priority rules
+	sp, ep := scfg.SourceTypePriority(), ecfg.SourceTypePriority()
 
-	// Check if we can use the dyncfg enable path (requires discoverer for dyncfg ID)
-	canUseDyncfgEnable := !cfg.Discoverer.Empty() && cfg.Name != ""
-
-	if !canUseDyncfgEnable {
-		// No discoverers or name - can't use dyncfg path, start directly (tests, simple configs)
-		if err := d.mgr.Start(d.ctx, key, cfg); err != nil {
-			d.Errorf("pipeline '%s': %v", key, err)
-			return
-		}
-		d.exposeFileConfig(cfg, conf, dyncfg.StatusRunning)
+	// Higher priority wins. If same priority and existing is running, keep existing (stability).
+	if ep > sp || (ep == sp && ecfg.Status() == dyncfg.StatusRunning) {
+		d.Debugf("config '%s': keeping existing (priority: existing=%d new=%d, status=%s)",
+			scfg.Key(), ep, sp, ecfg.Status())
 		return
 	}
 
-	// Store config and create dyncfg job to notify netdata
-	d.exposeFileConfig(cfg, conf, dyncfg.StatusAccepted)
+	// New config wins - stop existing if running
+	d.Infof("config '%s': replacing existing (priority: existing=%d new=%d)", scfg.Key(), ep, sp)
+
+	if ecfg.Status() == dyncfg.StatusRunning {
+		d.mgr.Stop(ecfg.PipelineKey())
+	}
+
+	// Replace in exposed cache
+	scfg.SetStatus(dyncfg.StatusAccepted)
+	d.exposedConfigs.add(scfg)
+
+	// Update dyncfg (remove old, create new with new source)
+	d.dyncfgSDJobRemove(ecfg.DiscovererType(), ecfg.Name())
+	d.dyncfgSDJobCreate(scfg.DiscovererType(), scfg.Name(), scfg.SourceType(), scfg.Source(), scfg.Status())
 
 	if isTerminal || d.dyncfgCh == nil {
-		// Auto-enable in terminal mode or tests (no netdata to send commands)
-		d.autoEnableFileConfig(cfg)
+		d.autoEnableConfig(scfg)
 	} else {
-		// Wait for netdata to send enable/disable command
-		d.waitCfgOnOff = key
+		d.waitCfgOnOff = scfg.PipelineKey()
 	}
+}
+
+// removeOldConfigsFromSource removes configs from the same source that have a different key.
+// This handles the case where a file's config name changes.
+// Note: We don't stop the pipeline here - the new config will stop it when it starts via
+// PipelineManager.Start (which stops any existing pipeline with the same key).
+// This ensures that if the new config fails to start, the old pipeline keeps running.
+func (d *ServiceDiscovery) removeOldConfigsFromSource(source, newKey string) {
+	oldCfgs := d.seenConfigs.lookupBySource(source)
+	for _, oldCfg := range oldCfgs {
+		if oldCfg.Key() == newKey {
+			continue // Same config, skip
+		}
+
+		// Different config from same source - remove from caches
+		d.seenConfigs.remove(oldCfg.UID())
+
+		// If it was exposed, remove from exposed cache and dyncfg
+		// But DON'T stop the pipeline - let the new config's enable handle that
+		if ecfg, ok := d.exposedConfigs.lookup(oldCfg.Key()); ok && ecfg.UID() == oldCfg.UID() {
+			d.exposedConfigs.remove(oldCfg.Key())
+			d.dyncfgSDJobRemove(oldCfg.DiscovererType(), oldCfg.Name())
+		}
+	}
+}
+
+// autoEnableConfig enables a config without waiting for netdata's enable command.
+func (d *ServiceDiscovery) autoEnableConfig(cfg sdConfig) {
+	fn := dyncfg.NewFunction(functions.Function{
+		Args: []string{d.dyncfgJobID(cfg.DiscovererType(), cfg.Name()), "enable"},
+	})
+	d.dyncfgCmdEnable(fn)
 }
 
 // pipelineKeyFromSource extracts a pipeline key from a file source path.
