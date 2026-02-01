@@ -11,53 +11,75 @@
         "type": "string",
         "minLength": 1
       },
-      "role": {
-        "title": "Role",
-        "description": "Kubernetes resource role to discover.",
-        "type": "string",
-        "enum": [
-          "pod",
-          "service"
-        ],
-        "default": "pod"
-      },
-      "namespaces": {
-        "title": "Namespaces",
-        "description": "Namespaces to watch (empty = all namespaces).",
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "selector": {
-        "title": "Selector",
-        "description": "Label and field selectors for filtering resources.",
+      "discoverer": {
+        "title": "Discoverer",
         "type": "object",
         "properties": {
-          "label": {
-            "title": "Label selector",
-            "description": "Label selector (e.g., 'app=nginx').",
-            "type": "string"
-          },
-          "field": {
-            "title": "Field selector",
-            "description": "Field selector (e.g., 'metadata.name=my-pod').",
-            "type": "string"
+          "k8s": {
+            "title": "Kubernetes",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "title": "Role",
+                  "description": "Kubernetes resource role to discover.",
+                  "type": "string",
+                  "enum": [
+                    "pod",
+                    "service"
+                  ],
+                  "default": "pod"
+                },
+                "namespaces": {
+                  "title": "Namespaces",
+                  "description": "Namespaces to watch (empty = all namespaces).",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "selector": {
+                  "title": "Selector",
+                  "description": "Label and field selectors for filtering resources.",
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "title": "Label selector",
+                      "description": "Label selector (e.g., 'app=nginx').",
+                      "type": "string"
+                    },
+                    "field": {
+                      "title": "Field selector",
+                      "description": "Field selector (e.g., 'metadata.name=my-pod').",
+                      "type": "string"
+                    }
+                  }
+                },
+                "pod": {
+                  "title": "Pod options",
+                  "description": "Pod-specific options.",
+                  "type": "object",
+                  "properties": {
+                    "local_mode": {
+                      "title": "Local mode",
+                      "description": "Only discover pods on the same node as the agent.",
+                      "type": "boolean",
+                      "default": false
+                    }
+                  }
+                }
+              },
+              "required": [
+                "role"
+              ]
+            }
           }
-        }
-      },
-      "pod": {
-        "title": "Pod options",
-        "description": "Pod-specific options.",
-        "type": "object",
-        "properties": {
-          "local_mode": {
-            "title": "Local mode",
-            "description": "Only discover pods on the same node as the agent.",
-            "type": "boolean",
-            "default": false
-          }
-        }
+        },
+        "required": [
+          "k8s"
+        ]
       },
       "services": {
         "title": "Service rules",
@@ -92,7 +114,7 @@
     },
     "required": [
       "name",
-      "role"
+      "discoverer"
     ]
   },
   "uiSchema": {
@@ -106,10 +128,7 @@
           "title": "Base",
           "fields": [
             "name",
-            "role",
-            "namespaces",
-            "selector",
-            "pod"
+            "discoverer"
           ]
         },
         {
@@ -120,12 +139,19 @@
         }
       ]
     },
-    "selector": {
-      "label": {
-        "ui:placeholder": "app=nginx"
-      },
-      "field": {
-        "ui:placeholder": "metadata.name=my-pod"
+    "discoverer": {
+      "k8s": {
+        "ui:listFlavour": "list",
+        "items": {
+          "selector": {
+            "label": {
+              "ui:placeholder": "app=nginx"
+            },
+            "field": {
+              "ui:placeholder": "metadata.name=my-pod"
+            }
+          }
+        }
       }
     },
     "services": {

@@ -643,12 +643,11 @@ func (d *ServiceDiscovery) unregisterDyncfgTemplates() {
 // exposeFileConfig exposes a file-based pipeline config as a dyncfg job.
 // It extracts the discoverer type from the config and creates a dyncfg job for it.
 func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile, status dyncfg.Status) {
-	if len(cfg.Discover) == 0 {
+	dt := cfg.Discoverer.Type()
+	if dt == "" {
 		return
 	}
 
-	// Use the first discoverer type in the config
-	dt := cfg.Discover[0].Discoverer
 	if !isValidDiscovererType(dt) {
 		d.Warningf("exposeFileConfig: unknown discoverer type '%s' in file config '%s'", dt, conf.source)
 		return
@@ -698,11 +697,11 @@ func (d *ServiceDiscovery) exposeFileConfig(cfg pipeline.Config, conf confFile, 
 // Used in terminal mode where netdata is not available to send commands.
 // This mimics what jobmgr does: call the enable handler directly with a synthetic function.
 func (d *ServiceDiscovery) autoEnableFileConfig(cfg pipeline.Config) {
-	if len(cfg.Discover) == 0 {
+	dt := cfg.Discoverer.Type()
+	if dt == "" {
 		return
 	}
 
-	dt := cfg.Discover[0].Discoverer
 	name := cfg.CleanName()
 	if name == "" {
 		return

@@ -11,18 +11,33 @@
         "type": "string",
         "minLength": 1
       },
-      "address": {
-        "title": "Docker address",
-        "description": "Docker daemon address.",
-        "type": "string",
-        "default": "unix:///var/run/docker.sock"
-      },
-      "timeout": {
-        "title": "Timeout",
-        "description": "Timeout for Docker API calls, in seconds.",
-        "type": "number",
-        "minimum": 0.1,
-        "default": 2
+      "discoverer": {
+        "title": "Discoverer",
+        "type": "object",
+        "properties": {
+          "docker": {
+            "title": "Docker",
+            "type": "object",
+            "properties": {
+              "address": {
+                "title": "Docker address",
+                "description": "Docker daemon address.",
+                "type": "string",
+                "default": "unix:///var/run/docker.sock"
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Timeout for Docker API calls, in seconds.",
+                "type": "number",
+                "minimum": 0.1,
+                "default": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "docker"
+        ]
       },
       "services": {
         "title": "Service rules",
@@ -56,7 +71,8 @@
       }
     },
     "required": [
-      "name"
+      "name",
+      "discoverer"
     ]
   },
   "uiSchema": {
@@ -70,8 +86,7 @@
           "title": "Base",
           "fields": [
             "name",
-            "address",
-            "timeout"
+            "discoverer"
           ]
         },
         {
@@ -82,13 +97,17 @@
         }
       ]
     },
-    "address": {
-      "ui:placeholder": "unix:///var/run/docker.sock",
-      "ui:help": "Examples: unix:///var/run/docker.sock, tcp://localhost:2375"
-    },
-    "timeout": {
-      "ui:placeholder": "2",
-      "ui:help": "Value in seconds. Examples: 2, 5, 0.5"
+    "discoverer": {
+      "docker": {
+        "address": {
+          "ui:placeholder": "unix:///var/run/docker.sock",
+          "ui:help": "Examples: unix:///var/run/docker.sock, tcp://localhost:2375"
+        },
+        "timeout": {
+          "ui:placeholder": "2",
+          "ui:help": "Value in seconds. Examples: 2, 5, 0.5"
+        }
+      }
     },
     "services": {
       "ui:listFlavour": "list",

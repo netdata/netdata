@@ -11,7 +11,7 @@ import (
 // transformPipelineConfigToDyncfg converts a pipeline.Config to a dyncfg-compatible JSON format.
 // This is used when exposing file-based configs through dyncfg so the UI can display them correctly.
 func transformPipelineConfigToDyncfg(cfg pipeline.Config, discovererType string) ([]byte, error) {
-	if len(cfg.Discover) == 0 {
+	if cfg.Discoverer.Empty() {
 		return nil, nil
 	}
 
@@ -31,127 +31,123 @@ func transformPipelineConfigToDyncfg(cfg pipeline.Config, discovererType string)
 }
 
 func transformNetListeners(cfg pipeline.Config) DyncfgNetListenersConfig {
-	disc := cfg.Discover[0]
-	nl := disc.NetListeners
-
-	return DyncfgNetListenersConfig{
+	result := DyncfgNetListenersConfig{
 		Name:     cfg.Name,
 		Disabled: cfg.Disabled,
-		Interval: nl.Interval,
-		Timeout:  nl.Timeout,
 		Services: extractServices(cfg),
 	}
+
+	if nl := cfg.Discoverer.NetListeners; nl != nil {
+		result.Discoverer.NetListeners = DyncfgNetListenersOptions{
+			Interval: nl.Interval,
+			Timeout:  nl.Timeout,
+		}
+	}
+
+	return result
 }
 
 func transformDocker(cfg pipeline.Config) DyncfgDockerConfig {
-	disc := cfg.Discover[0]
-	d := disc.Docker
-
-	return DyncfgDockerConfig{
+	result := DyncfgDockerConfig{
 		Name:     cfg.Name,
 		Disabled: cfg.Disabled,
-		Address:  d.Address,
-		Timeout:  d.Timeout,
 		Services: extractServices(cfg),
 	}
+
+	if d := cfg.Discoverer.Docker; d != nil {
+		result.Discoverer.Docker = DyncfgDockerOptions{
+			Address: d.Address,
+			Timeout: d.Timeout,
+		}
+	}
+
+	return result
 }
 
 func transformK8s(cfg pipeline.Config) DyncfgK8sConfig {
-	disc := cfg.Discover[0]
-
 	result := DyncfgK8sConfig{
 		Name:     cfg.Name,
 		Disabled: cfg.Disabled,
 		Services: extractServices(cfg),
 	}
 
-	if len(disc.K8s) > 0 {
-		k := disc.K8s[0]
-
-		result.Role = k.Role
-		result.Namespaces = k.Namespaces
+	for _, k := range cfg.Discoverer.K8s {
+		opts := DyncfgK8sOptions{
+			Role:       k.Role,
+			Namespaces: k.Namespaces,
+		}
 
 		if k.Selector.Label != "" || k.Selector.Field != "" {
-			result.Selector = &DyncfgK8sSelector{
+			opts.Selector = &DyncfgK8sSelector{
 				Label: k.Selector.Label,
 				Field: k.Selector.Field,
 			}
 		}
 
 		if k.Pod.LocalMode {
-			result.Pod = &DyncfgK8sPodOptions{
+			opts.Pod = &DyncfgK8sPodOptions{
 				LocalMode: true,
 			}
 		}
+
+		result.Discoverer.K8s = append(result.Discoverer.K8s, opts)
 	}
 
 	return result
 }
 
 func transformSNMP(cfg pipeline.Config) DyncfgSNMPConfig {
-	disc := cfg.Discover[0]
-	s := disc.SNMP
-
 	result := DyncfgSNMPConfig{
-		Name:                    cfg.Name,
-		Disabled:                cfg.Disabled,
-		RescanInterval:          s.RescanInterval,
-		Timeout:                 s.Timeout,
-		DeviceCacheTTL:          s.DeviceCacheTTL,
-		ParallelScansPerNetwork: s.ParallelScansPerNetwork,
-		Services:                extractServices(cfg),
+		Name:     cfg.Name,
+		Disabled: cfg.Disabled,
+		Services: extractServices(cfg),
 	}
 
-	// Credentials
-	for _, c := range s.Credentials {
-		result.Credentials = append(result.Credentials, DyncfgSNMPCredential{
-			Name:          c.Name,
-			Version:       c.Version,
-			Community:     c.Community,
-			Username:      c.UserName,
-			SecurityLevel: c.SecurityLevel,
-			AuthProtocol:  c.AuthProtocol,
-			AuthPassword:  c.AuthPassphrase,
-			PrivProtocol:  c.PrivacyProtocol,
-			PrivPassword:  c.PrivacyPassphrase,
-		})
-	}
+	if s := cfg.Discoverer.SNMP; s != nil {
+		result.Discoverer.SNMP = DyncfgSNMPOptions{
+			RescanInterval:          s.RescanInterval,
+			Timeout:                 s.Timeout,
+			DeviceCacheTTL:          s.DeviceCacheTTL,
+			ParallelScansPerNetwork: s.ParallelScansPerNetwork,
+		}
 
-	// Networks
-	for _, n := range s.Networks {
-		result.Networks = append(result.Networks, DyncfgSNMPNetwork{
-			Subnet:     n.Subnet,
-			Credential: n.Credential,
-		})
+		// Credentials
+		for _, c := range s.Credentials {
+			result.Discoverer.SNMP.Credentials = append(result.Discoverer.SNMP.Credentials, DyncfgSNMPCredential{
+				Name:          c.Name,
+				Version:       c.Version,
+				Community:     c.Community,
+				Username:      c.UserName,
+				SecurityLevel: c.SecurityLevel,
+				AuthProtocol:  c.AuthProtocol,
+				AuthPassword:  c.AuthPassphrase,
+				PrivProtocol:  c.PrivacyProtocol,
+				PrivPassword:  c.PrivacyPassphrase,
+			})
+		}
+
+		// Networks
+		for _, n := range s.Networks {
+			result.Discoverer.SNMP.Networks = append(result.Discoverer.SNMP.Networks, DyncfgSNMPNetwork{
+				Subnet:     n.Subnet,
+				Credential: n.Credential,
+			})
+		}
 	}
 
 	return result
 }
 
 // extractServices extracts service rules from the pipeline config.
-// It handles both the new "services" format and legacy "classify/compose" format.
 func extractServices(cfg pipeline.Config) []DyncfgServiceRule {
 	var services []DyncfgServiceRule
 
-	if len(cfg.Services) > 0 {
-		// New format
-		for _, s := range cfg.Services {
-			services = append(services, DyncfgServiceRule{
-				ID:             s.ID,
-				Match:          s.Match,
-				ConfigTemplate: s.ConfigTemplate,
-			})
-		}
-	} else if len(cfg.Classify) > 0 || len(cfg.Compose) > 0 {
-		// Legacy format - convert to services
-		converted, _ := pipeline.ConvertOldToServices(cfg.Classify, cfg.Compose)
-		for _, s := range converted {
-			services = append(services, DyncfgServiceRule{
-				ID:             s.ID,
-				Match:          s.Match,
-				ConfigTemplate: s.ConfigTemplate,
-			})
-		}
+	for _, s := range cfg.Services {
+		services = append(services, DyncfgServiceRule{
+			ID:             s.ID,
+			Match:          s.Match,
+			ConfigTemplate: s.ConfigTemplate,
+		})
 	}
 
 	return services

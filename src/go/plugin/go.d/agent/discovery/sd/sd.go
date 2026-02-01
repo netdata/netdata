@@ -201,8 +201,8 @@ func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile) {
 	// This matches jobmgr pattern - netdata will send enable based on stored state.
 	d.removeExposedFileConfig(conf.source)
 
-	// Check if we can use the dyncfg enable path (requires discoverers for dyncfg ID)
-	canUseDyncfgEnable := len(cfg.Discover) > 0 && cfg.Name != ""
+	// Check if we can use the dyncfg enable path (requires discoverer for dyncfg ID)
+	canUseDyncfgEnable := !cfg.Discoverer.Empty() && cfg.Name != ""
 
 	if !canUseDyncfgEnable {
 		// No discoverers or name - can't use dyncfg path, start directly (tests, simple configs)

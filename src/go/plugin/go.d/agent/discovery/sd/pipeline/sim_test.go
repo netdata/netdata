@@ -68,10 +68,10 @@ func (sim discoverySim) run(t *testing.T) {
 	}
 
 	// --- legacy path ---
-	clr, err := newTargetClassificator(cfg.Classify)
+	clr, err := newTargetClassificator(cfg.LegacyClassify)
 	require.Nil(t, err, "newTargetClassificator")
 
-	cmr, err := newConfigComposer(cfg.Compose)
+	cmr, err := newConfigComposer(cfg.LegacyCompose)
 	require.Nil(t, err, "newConfigComposer")
 
 	mockClr := &mockClassificator{clr: clr}

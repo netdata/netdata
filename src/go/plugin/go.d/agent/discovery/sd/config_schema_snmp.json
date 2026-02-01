@@ -11,146 +11,165 @@
         "type": "string",
         "minLength": 1
       },
-      "rescan_interval": {
-        "title": "Rescan interval",
-        "description": "How often to scan networks for devices.",
-        "type": "string",
-        "pattern": "^[0-9]+(s|m|h)$",
-        "default": "30m"
-      },
-      "timeout": {
-        "title": "Timeout",
-        "description": "Timeout for SNMP device responses, in seconds.",
-        "type": "number",
-        "minimum": 0.1,
-        "default": 1
-      },
-      "device_cache_ttl": {
-        "title": "Device cache TTL",
-        "description": "How long to cache discovery results.",
-        "type": "string",
-        "pattern": "^[0-9]+(s|m|h)$",
-        "default": "12h"
-      },
-      "parallel_scans_per_network": {
-        "title": "Parallel scans",
-        "description": "Concurrent IPs to scan per subnet.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 256,
-        "default": 32
-      },
-      "credentials": {
-        "title": "Credentials",
-        "description": "SNMP credentials for authentication.",
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "title": "Name",
-              "description": "Credential identifier (referenced by networks).",
-              "type": "string"
+      "discoverer": {
+        "title": "Discoverer",
+        "type": "object",
+        "properties": {
+          "snmp": {
+            "title": "SNMP",
+            "type": "object",
+            "properties": {
+              "rescan_interval": {
+                "title": "Rescan interval",
+                "description": "How often to scan networks for devices.",
+                "type": "string",
+                "pattern": "^[0-9]+(s|m|h)$",
+                "default": "30m"
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Timeout for SNMP device responses, in seconds.",
+                "type": "number",
+                "minimum": 0.1,
+                "default": 1
+              },
+              "device_cache_ttl": {
+                "title": "Device cache TTL",
+                "description": "How long to cache discovery results.",
+                "type": "string",
+                "pattern": "^[0-9]+(s|m|h)$",
+                "default": "12h"
+              },
+              "parallel_scans_per_network": {
+                "title": "Parallel scans",
+                "description": "Concurrent IPs to scan per subnet.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 256,
+                "default": 32
+              },
+              "credentials": {
+                "title": "Credentials",
+                "description": "SNMP credentials for authentication.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "title": "Name",
+                      "description": "Credential identifier (referenced by networks).",
+                      "type": "string"
+                    },
+                    "version": {
+                      "title": "SNMP version",
+                      "description": "SNMP protocol version.",
+                      "type": "string",
+                      "enum": [
+                        "1",
+                        "2",
+                        "2c",
+                        "3"
+                      ],
+                      "default": "2c"
+                    },
+                    "community": {
+                      "title": "Community",
+                      "description": "Community string (for SNMP v1/v2c).",
+                      "type": "string",
+                      "default": "public"
+                    },
+                    "username": {
+                      "title": "Username",
+                      "description": "Username (for SNMPv3).",
+                      "type": "string"
+                    },
+                    "security_level": {
+                      "title": "Security level",
+                      "description": "Security level (for SNMPv3).",
+                      "type": "string",
+                      "enum": [
+                        "noAuthNoPriv",
+                        "authNoPriv",
+                        "authPriv"
+                      ]
+                    },
+                    "auth_protocol": {
+                      "title": "Auth protocol",
+                      "description": "Authentication protocol (for SNMPv3).",
+                      "type": "string",
+                      "enum": [
+                        "md5",
+                        "sha",
+                        "sha224",
+                        "sha256",
+                        "sha384",
+                        "sha512"
+                      ]
+                    },
+                    "auth_password": {
+                      "title": "Auth password",
+                      "description": "Authentication passphrase (for SNMPv3).",
+                      "type": "string"
+                    },
+                    "priv_protocol": {
+                      "title": "Privacy protocol",
+                      "description": "Privacy protocol (for SNMPv3).",
+                      "type": "string",
+                      "enum": [
+                        "des",
+                        "aes",
+                        "aes192",
+                        "aes256",
+                        "aes192c",
+                        "aes256c"
+                      ]
+                    },
+                    "priv_password": {
+                      "title": "Privacy password",
+                      "description": "Privacy passphrase (for SNMPv3).",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "version"
+                  ]
+                }
+              },
+              "networks": {
+                "title": "Networks",
+                "description": "Network subnets to scan.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "subnet": {
+                      "title": "Subnet",
+                      "description": "IP range to scan (e.g., '192.168.1.0/24', '10.0.0.1-10.0.0.50').",
+                      "type": "string"
+                    },
+                    "credential": {
+                      "title": "Credential",
+                      "description": "Name of credential to use for this network.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "subnet",
+                    "credential"
+                  ]
+                }
+              }
             },
-            "version": {
-              "title": "SNMP version",
-              "description": "SNMP protocol version.",
-              "type": "string",
-              "enum": [
-                "1",
-                "2",
-                "2c",
-                "3"
-              ],
-              "default": "2c"
-            },
-            "community": {
-              "title": "Community",
-              "description": "Community string (for SNMP v1/v2c).",
-              "type": "string",
-              "default": "public"
-            },
-            "username": {
-              "title": "Username",
-              "description": "Username (for SNMPv3).",
-              "type": "string"
-            },
-            "security_level": {
-              "title": "Security level",
-              "description": "Security level (for SNMPv3).",
-              "type": "string",
-              "enum": [
-                "noAuthNoPriv",
-                "authNoPriv",
-                "authPriv"
-              ]
-            },
-            "auth_protocol": {
-              "title": "Auth protocol",
-              "description": "Authentication protocol (for SNMPv3).",
-              "type": "string",
-              "enum": [
-                "md5",
-                "sha",
-                "sha224",
-                "sha256",
-                "sha384",
-                "sha512"
-              ]
-            },
-            "auth_password": {
-              "title": "Auth password",
-              "description": "Authentication passphrase (for SNMPv3).",
-              "type": "string"
-            },
-            "priv_protocol": {
-              "title": "Privacy protocol",
-              "description": "Privacy protocol (for SNMPv3).",
-              "type": "string",
-              "enum": [
-                "des",
-                "aes",
-                "aes192",
-                "aes256",
-                "aes192c",
-                "aes256c"
-              ]
-            },
-            "priv_password": {
-              "title": "Privacy password",
-              "description": "Privacy passphrase (for SNMPv3).",
-              "type": "string"
-            }
-          },
-          "required": [
-            "name",
-            "version"
-          ]
-        }
-      },
-      "networks": {
-        "title": "Networks",
-        "description": "Network subnets to scan.",
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "subnet": {
-              "title": "Subnet",
-              "description": "IP range to scan (e.g., '192.168.1.0/24', '10.0.0.1-10.0.0.50').",
-              "type": "string"
-            },
-            "credential": {
-              "title": "Credential",
-              "description": "Name of credential to use for this network.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "subnet",
-            "credential"
-          ]
-        }
+            "required": [
+              "credentials",
+              "networks"
+            ]
+          }
+        },
+        "required": [
+          "snmp"
+        ]
       },
       "services": {
         "title": "Service rules",
@@ -188,8 +207,7 @@
     },
     "required": [
       "name",
-      "credentials",
-      "networks"
+      "discoverer"
     ]
   },
   "uiSchema": {
@@ -203,22 +221,7 @@
           "title": "Base",
           "fields": [
             "name",
-            "rescan_interval",
-            "timeout",
-            "device_cache_ttl",
-            "parallel_scans_per_network"
-          ]
-        },
-        {
-          "title": "Credentials",
-          "fields": [
-            "credentials"
-          ]
-        },
-        {
-          "title": "Networks",
-          "fields": [
-            "networks"
+            "discoverer"
           ]
         },
         {
@@ -229,37 +232,41 @@
         }
       ]
     },
-    "rescan_interval": {
-      "ui:placeholder": "30m",
-      "ui:help": "Examples: 30m, 1h"
-    },
-    "timeout": {
-      "ui:placeholder": "1",
-      "ui:help": "Value in seconds. Examples: 1, 5, 0.5"
-    },
-    "device_cache_ttl": {
-      "ui:placeholder": "12h",
-      "ui:help": "Examples: 12h, 24h"
-    },
-    "credentials": {
-      "ui:listFlavour": "list",
-      "items": {
-        "community": {
-          "ui:widget": "password"
+    "discoverer": {
+      "snmp": {
+        "rescan_interval": {
+          "ui:placeholder": "30m",
+          "ui:help": "Examples: 30m, 1h"
         },
-        "auth_password": {
-          "ui:widget": "password"
+        "timeout": {
+          "ui:placeholder": "1",
+          "ui:help": "Value in seconds. Examples: 1, 5, 0.5"
         },
-        "priv_password": {
-          "ui:widget": "password"
-        }
-      }
-    },
-    "networks": {
-      "ui:listFlavour": "list",
-      "items": {
-        "subnet": {
-          "ui:placeholder": "192.168.1.0/24"
+        "device_cache_ttl": {
+          "ui:placeholder": "12h",
+          "ui:help": "Examples: 12h, 24h"
+        },
+        "credentials": {
+          "ui:listFlavour": "list",
+          "items": {
+            "community": {
+              "ui:widget": "password"
+            },
+            "auth_password": {
+              "ui:widget": "password"
+            },
+            "priv_password": {
+              "ui:widget": "password"
+            }
+          }
+        },
+        "networks": {
+          "ui:listFlavour": "list",
+          "items": {
+            "subnet": {
+              "ui:placeholder": "192.168.1.0/24"
+            }
+          }
         }
       }
     },

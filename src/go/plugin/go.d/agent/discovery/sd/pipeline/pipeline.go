@@ -46,11 +46,11 @@ func New(cfg Config) (*Pipeline, error) {
 		svr.Logger = p.Logger
 	} else {
 		// Legacy path
-		clr, err := newTargetClassificator(cfg.Classify)
+		clr, err := newTargetClassificator(cfg.LegacyClassify)
 		if err != nil {
 			return nil, fmt.Errorf("classify rules: %v", err)
 		}
-		cmr, err := newConfigComposer(cfg.Compose)
+		cmr, err := newConfigComposer(cfg.LegacyCompose)
 		if err != nil {
 			return nil, fmt.Errorf("compose rules: %v", err)
 		}
@@ -92,45 +92,49 @@ type (
 )
 
 func (p *Pipeline) registerDiscoverers(conf Config) error {
-	for _, cfg := range conf.Discover {
-		switch cfg.Discoverer {
-		case "net_listeners":
-			cfg.NetListeners.Source = conf.Source
-			td, err := netlistensd.NewDiscoverer(cfg.NetListeners)
-			if err != nil {
-				return fmt.Errorf("failed to create '%s' discoverer: %v", cfg.Discoverer, err)
-			}
-			p.discoverers = append(p.discoverers, td)
-		case "docker":
-			if hostinfo.IsInsideK8sCluster() {
-				p.Infof("not registering '%s' discoverer: disabled in k8s environment", cfg.Discoverer)
-				continue
-			}
-			cfg.Docker.Source = conf.Source
-			td, err := dockersd.NewDiscoverer(cfg.Docker)
-			if err != nil {
-				return fmt.Errorf("failed to create '%s' discoverer: %v", cfg.Discoverer, err)
-			}
-			p.discoverers = append(p.discoverers, td)
-		case "k8s":
-			for _, k8sCfg := range cfg.K8s {
-				k8sCfg.Source = conf.Source
-				td, err := k8ssd.NewDiscoverer(k8sCfg)
-				if err != nil {
-					return fmt.Errorf("failed to create '%s' discoverer: %v", cfg.Discoverer, err)
-				}
-				p.discoverers = append(p.discoverers, td)
-			}
-		case "snmp":
-			cfg.SNMP.Source = conf.Source
-			td, err := snmpsd.NewDiscoverer(cfg.SNMP)
-			if err != nil {
-				return fmt.Errorf("failed to create '%s' discoverer: %v", cfg.Discoverer, err)
-			}
-			p.discoverers = append(p.discoverers, td)
-		default:
-			return fmt.Errorf("unknown discoverer: '%s'", cfg.Discoverer)
+	disc := conf.Discoverer
+
+	if disc.NetListeners != nil {
+		cfg := *disc.NetListeners
+		cfg.Source = conf.Source
+		td, err := netlistensd.NewDiscoverer(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to create 'net_listeners' discoverer: %v", err)
 		}
+		p.discoverers = append(p.discoverers, td)
+	}
+
+	if disc.Docker != nil {
+		if hostinfo.IsInsideK8sCluster() {
+			p.Info("not registering 'docker' discoverer: disabled in k8s environment")
+		} else {
+			cfg := *disc.Docker
+			cfg.Source = conf.Source
+			td, err := dockersd.NewDiscoverer(cfg)
+			if err != nil {
+				return fmt.Errorf("failed to create 'docker' discoverer: %v", err)
+			}
+			p.discoverers = append(p.discoverers, td)
+		}
+	}
+
+	for _, k8sCfg := range disc.K8s {
+		k8sCfg.Source = conf.Source
+		td, err := k8ssd.NewDiscoverer(k8sCfg)
+		if err != nil {
+			return fmt.Errorf("failed to create 'k8s' discoverer: %v", err)
+		}
+		p.discoverers = append(p.discoverers, td)
+	}
+
+	if disc.SNMP != nil {
+		cfg := *disc.SNMP
+		cfg.Source = conf.Source
+		td, err := snmpsd.NewDiscoverer(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to create 'snmp' discoverer: %v", err)
+		}
+		p.discoverers = append(p.discoverers, td)
 	}
 
 	if len(p.discoverers) == 0 {

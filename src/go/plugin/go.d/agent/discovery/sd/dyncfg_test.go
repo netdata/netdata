@@ -23,6 +23,54 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Helper functions to create test configs with the new discoverer wrapper format
+
+func newTestNetListenersConfig(name string, interval, timeout confopt.Duration, services []DyncfgServiceRule) DyncfgNetListenersConfig {
+	return DyncfgNetListenersConfig{
+		Name: name,
+		Discoverer: DyncfgNetListenersDiscoverer{
+			NetListeners: DyncfgNetListenersOptions{
+				Interval: interval,
+				Timeout:  timeout,
+			},
+		},
+		Services: services,
+	}
+}
+
+func newTestDockerConfig(name, address string, timeout confopt.Duration, services []DyncfgServiceRule) DyncfgDockerConfig {
+	return DyncfgDockerConfig{
+		Name: name,
+		Discoverer: DyncfgDockerDiscoverer{
+			Docker: DyncfgDockerOptions{
+				Address: address,
+				Timeout: timeout,
+			},
+		},
+		Services: services,
+	}
+}
+
+func newTestK8sConfig(name string, opts []DyncfgK8sOptions, services []DyncfgServiceRule) DyncfgK8sConfig {
+	return DyncfgK8sConfig{
+		Name: name,
+		Discoverer: DyncfgK8sDiscoverer{
+			K8s: opts,
+		},
+		Services: services,
+	}
+}
+
+func newTestSNMPConfig(name string, opts DyncfgSNMPOptions, services []DyncfgServiceRule) DyncfgSNMPConfig {
+	return DyncfgSNMPConfig{
+		Name: name,
+		Discoverer: DyncfgSNMPDiscoverer{
+			SNMP: opts,
+		},
+		Services: services,
+	}
+}
+
 type dyncfgSim struct {
 	do func(sd *ServiceDiscovery)
 
@@ -234,9 +282,7 @@ func TestServiceDiscovery_DyncfgAdd(t *testing.T) {
 	}{
 		"add net_listeners job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{
-					Name: "test-job",
-				}
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -282,7 +328,7 @@ FUNCTION_RESULT_END
 		},
 		"add duplicate job fails": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job"}
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -335,7 +381,7 @@ func TestServiceDiscovery_DyncfgGet(t *testing.T) {
 	}{
 		"get existing job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job"}
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -358,7 +404,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 FUNCTION_RESULT_END
 
 FUNCTION_RESULT_BEGIN 2-get 200 application/json
-{"name":"test-job"}
+{"name":"test-job","discoverer":{"net_listeners":{}}}
 FUNCTION_RESULT_END
 `,
 				}
@@ -396,7 +442,7 @@ func TestServiceDiscovery_DyncfgEnableDisable(t *testing.T) {
 	}{
 		"enable starts pipeline": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job"}
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -438,7 +484,7 @@ FUNCTION_RESULT_END
 		},
 		"disable stops pipeline": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job"}
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -521,10 +567,10 @@ func TestServiceDiscovery_DyncfgUpdate(t *testing.T) {
 	}{
 		"update existing job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job"}
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(10 * time.Second)}
+				updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, nil)
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -565,7 +611,7 @@ FUNCTION_RESULT_END
 		},
 		"update non-existent job fails": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job"}
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -598,7 +644,7 @@ func TestServiceDiscovery_DyncfgRemove(t *testing.T) {
 	}{
 		"remove dyncfg job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job"}
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -633,7 +679,7 @@ FUNCTION_RESULT_END
 		},
 		"remove running job stops it first": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job"}
+				cfg := newTestNetListenersConfig("test-job", 0, 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -709,7 +755,7 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 	}{
 		"userconfig for template": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(5 * time.Second)}
+				cfg := newTestNetListenersConfig("test-job", confopt.Duration(5*time.Second), 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -729,7 +775,7 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 		},
 		"userconfig for existing job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(5 * time.Second)}
+				cfg := newTestNetListenersConfig("test-job", confopt.Duration(5*time.Second), 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -819,14 +865,9 @@ func TestServiceDiscovery_DyncfgDockerConfig(t *testing.T) {
 	}{
 		"add docker job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgDockerConfig{
-					Name:    "docker-test",
-					Address: "unix:///var/run/docker.sock",
-					Timeout: confopt.Duration(5 * time.Second),
-					Services: []DyncfgServiceRule{
-						{ID: "nginx", Match: `{{ glob .Image "*nginx*" }}`},
-					},
-				}
+				cfg := newTestDockerConfig("docker-test", "unix:///var/run/docker.sock", confopt.Duration(5*time.Second), []DyncfgServiceRule{
+					{ID: "nginx", Match: `{{ glob .Image "*nginx*" }}`},
+				})
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -855,10 +896,7 @@ FUNCTION_RESULT_END
 		},
 		"add and enable docker job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgDockerConfig{
-					Name:    "docker-test",
-					Address: "tcp://localhost:2375",
-				}
+				cfg := newTestDockerConfig("docker-test", "tcp://localhost:2375", 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -887,10 +925,7 @@ FUNCTION_RESULT_END
 		},
 		"get docker job config": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgDockerConfig{
-					Name:    "docker-test",
-					Address: "unix:///var/run/docker.sock",
-				}
+				cfg := newTestDockerConfig("docker-test", "unix:///var/run/docker.sock", 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -929,20 +964,16 @@ func TestServiceDiscovery_DyncfgK8sConfig(t *testing.T) {
 	}{
 		"add k8s job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgK8sConfig{
-					Name:       "k8s-test",
-					Role:       "pod",
-					Namespaces: []string{"default", "kube-system"},
-					Selector: &DyncfgK8sSelector{
-						Label: "app=nginx",
+				cfg := newTestK8sConfig("k8s-test", []DyncfgK8sOptions{
+					{
+						Role:       "pod",
+						Namespaces: []string{"default", "kube-system"},
+						Selector:   &DyncfgK8sSelector{Label: "app=nginx"},
+						Pod:        &DyncfgK8sPodOptions{LocalMode: true},
 					},
-					Pod: &DyncfgK8sPodOptions{
-						LocalMode: true,
-					},
-					Services: []DyncfgServiceRule{
-						{ID: "nginx-pods", Match: `{{ eq .Namespace "default" }}`},
-					},
-				}
+				}, []DyncfgServiceRule{
+					{ID: "nginx-pods", Match: `{{ eq .Namespace "default" }}`},
+				})
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -971,10 +1002,7 @@ FUNCTION_RESULT_END
 		},
 		"add k8s service role job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgK8sConfig{
-					Name: "k8s-svc-test",
-					Role: "service",
-				}
+				cfg := newTestK8sConfig("k8s-svc-test", []DyncfgK8sOptions{{Role: "service"}}, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1003,11 +1031,7 @@ FUNCTION_RESULT_END
 		},
 		"get k8s job config": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgK8sConfig{
-					Name:       "k8s-test",
-					Role:       "pod",
-					Namespaces: []string{"default"},
-				}
+				cfg := newTestK8sConfig("k8s-test", []DyncfgK8sOptions{{Role: "pod", Namespaces: []string{"default"}}}, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1047,18 +1071,13 @@ func TestServiceDiscovery_DyncfgSNMPConfig(t *testing.T) {
 	}{
 		"add snmp job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgSNMPConfig{
-					Name:           "snmp-test",
+				cfg := newTestSNMPConfig("snmp-test", DyncfgSNMPOptions{
 					RescanInterval: confopt.Duration(30 * time.Minute),
 					Timeout:        confopt.Duration(1 * time.Second),
 					DeviceCacheTTL: confopt.Duration(12 * time.Hour),
-					Credentials: []DyncfgSNMPCredential{
-						{Name: "public-v2", Version: "2c", Community: "public"},
-					},
-					Networks: []DyncfgSNMPNetwork{
-						{Subnet: "192.168.1.0/24", Credential: "public-v2"},
-					},
-				}
+					Credentials:    []DyncfgSNMPCredential{{Name: "public-v2", Version: "2c", Community: "public"}},
+					Networks:       []DyncfgSNMPNetwork{{Subnet: "192.168.1.0/24", Credential: "public-v2"}},
+				}, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1087,24 +1106,19 @@ FUNCTION_RESULT_END
 		},
 		"add snmp v3 job": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgSNMPConfig{
-					Name: "snmp-v3-test",
-					Credentials: []DyncfgSNMPCredential{
-						{
-							Name:          "snmpv3-auth",
-							Version:       "3",
-							Username:      "admin",
-							SecurityLevel: "authPriv",
-							AuthProtocol:  "sha256",
-							AuthPassword:  "authpass",
-							PrivProtocol:  "aes",
-							PrivPassword:  "privpass",
-						},
-					},
-					Networks: []DyncfgSNMPNetwork{
-						{Subnet: "10.0.0.0/24", Credential: "snmpv3-auth"},
-					},
-				}
+				cfg := newTestSNMPConfig("snmp-v3-test", DyncfgSNMPOptions{
+					Credentials: []DyncfgSNMPCredential{{
+						Name:          "snmpv3-auth",
+						Version:       "3",
+						Username:      "admin",
+						SecurityLevel: "authPriv",
+						AuthProtocol:  "sha256",
+						AuthPassword:  "authpass",
+						PrivProtocol:  "aes",
+						PrivPassword:  "privpass",
+					}},
+					Networks: []DyncfgSNMPNetwork{{Subnet: "10.0.0.0/24", Credential: "snmpv3-auth"}},
+				}, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1133,16 +1147,11 @@ FUNCTION_RESULT_END
 		},
 		"get snmp job config": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgSNMPConfig{
-					Name:           "snmp-test",
+				cfg := newTestSNMPConfig("snmp-test", DyncfgSNMPOptions{
 					RescanInterval: confopt.Duration(1 * time.Hour),
-					Credentials: []DyncfgSNMPCredential{
-						{Name: "v2-cred", Version: "2c", Community: "public"},
-					},
-					Networks: []DyncfgSNMPNetwork{
-						{Subnet: "192.168.0.0/16", Credential: "v2-cred"},
-					},
-				}
+					Credentials:    []DyncfgSNMPCredential{{Name: "v2-cred", Version: "2c", Community: "public"}},
+					Networks:       []DyncfgSNMPNetwork{{Subnet: "192.168.0.0/16", Credential: "v2-cred"}},
+				}, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1182,10 +1191,10 @@ func TestServiceDiscovery_DyncfgUpdateWhileRunning(t *testing.T) {
 	}{
 		"update running pipeline restarts it": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(5 * time.Second)}
+				cfg := newTestNetListenersConfig("test-job", confopt.Duration(5*time.Second), 0, nil)
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(10 * time.Second)}
+				updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, nil)
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -1238,10 +1247,10 @@ FUNCTION_RESULT_END
 		},
 		"update running docker pipeline": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgDockerConfig{Name: "docker-job", Address: "unix:///var/run/docker.sock"}
+				cfg := newTestDockerConfig("docker-job", "unix:///var/run/docker.sock", 0, nil)
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := DyncfgDockerConfig{Name: "docker-job", Address: "tcp://localhost:2375"}
+				updatedCfg := newTestDockerConfig("docker-job", "tcp://localhost:2375", 0, nil)
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -1301,7 +1310,7 @@ func TestServiceDiscovery_DyncfgTest(t *testing.T) {
 	}{
 		"test valid config succeeds": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgNetListenersConfig{Name: "test-job", Interval: confopt.Duration(5 * time.Second)}
+				cfg := newTestNetListenersConfig("test-job", confopt.Duration(5*time.Second), 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1340,10 +1349,7 @@ FUNCTION_RESULT_END
 		},
 		"test valid docker config": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgDockerConfig{
-					Name:    "docker-test",
-					Address: "unix:///var/run/docker.sock",
-				}
+				cfg := newTestDockerConfig("docker-test", "unix:///var/run/docker.sock", 0, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1364,10 +1370,7 @@ FUNCTION_RESULT_END
 		},
 		"test valid k8s config": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgK8sConfig{
-					Name: "k8s-test",
-					Role: "pod",
-				}
+				cfg := newTestK8sConfig("k8s-test", []DyncfgK8sOptions{{Role: "pod"}}, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1388,15 +1391,10 @@ FUNCTION_RESULT_END
 		},
 		"test valid snmp config": {
 			createSim: func() *dyncfgSim {
-				cfg := DyncfgSNMPConfig{
-					Name: "snmp-test",
-					Credentials: []DyncfgSNMPCredential{
-						{Name: "v2-cred", Version: "2c"},
-					},
-					Networks: []DyncfgSNMPNetwork{
-						{Subnet: "192.168.1.0/24", Credential: "v2-cred"},
-					},
-				}
+				cfg := newTestSNMPConfig("snmp-test", DyncfgSNMPOptions{
+					Credentials: []DyncfgSNMPCredential{{Name: "v2-cred", Version: "2c"}},
+					Networks:    []DyncfgSNMPNetwork{{Subnet: "192.168.1.0/24", Credential: "v2-cred"}},
+				}, nil)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1431,8 +1429,8 @@ func TestServiceDiscovery_DyncfgMultipleJobs(t *testing.T) {
 	}{
 		"multiple jobs lifecycle": {
 			createSim: func() *dyncfgSim {
-				cfg1 := DyncfgNetListenersConfig{Name: "job1"}
-				cfg2 := DyncfgNetListenersConfig{Name: "job2"}
+				cfg1 := newTestNetListenersConfig("job1", 0, 0, nil)
+				cfg2 := newTestNetListenersConfig("job2", 0, 0, nil)
 				payload1, _ := json.Marshal(cfg1)
 				payload2, _ := json.Marshal(cfg2)
 

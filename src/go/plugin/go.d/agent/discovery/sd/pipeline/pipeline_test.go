@@ -118,6 +118,8 @@ services:
 			wantComposeCalls:  0,
 			wantConfGroups:    nil,
 		},
+		// Note: Legacy classify/compose config is auto-converted to services format during unmarshal.
+		// The service rule IDs become the compose selectors (bar1, bar2), so module is set to those.
 		"new group with targets": {
 			config: config,
 			discoverers: []model.Discoverer{
@@ -125,10 +127,10 @@ services:
 					newMockTargetGroup("test", "mock1", "mock2"),
 				),
 			},
-			wantClassifyCalls: 2,
+			wantClassifyCalls: 0, // services mode - no classify
 			wantComposeCalls:  2,
 			wantConfGroups: []*confgroup.Group{
-				prepareDiscoveredGroup("mock1-foobar1", "mock2-foobar2"),
+				prepareDiscoveredGroupWithModule("mock1-foobar1", "bar1", "mock2-foobar2", "bar2"),
 			},
 		},
 		"existing group with same targets": {
@@ -141,10 +143,10 @@ services:
 					newMockTargetGroup("test", "mock1", "mock2"),
 				),
 			},
-			wantClassifyCalls: 2,
+			wantClassifyCalls: 0, // services mode - no classify
 			wantComposeCalls:  2,
 			wantConfGroups: []*confgroup.Group{
-				prepareDiscoveredGroup("mock1-foobar1", "mock2-foobar2"),
+				prepareDiscoveredGroupWithModule("mock1-foobar1", "bar1", "mock2-foobar2", "bar2"),
 			},
 		},
 		"existing group that previously had targets with no targets": {
@@ -157,10 +159,10 @@ services:
 					newMockTargetGroup("test"),
 				),
 			},
-			wantClassifyCalls: 2,
+			wantClassifyCalls: 0, // services mode - no classify
 			wantComposeCalls:  2,
 			wantConfGroups: []*confgroup.Group{
-				prepareDiscoveredGroup("mock1-foobar1", "mock2-foobar2"),
+				prepareDiscoveredGroupWithModule("mock1-foobar1", "bar1", "mock2-foobar2", "bar2"),
 				prepareDiscoveredGroup(),
 			},
 		},
@@ -174,11 +176,11 @@ services:
 					newMockTargetGroup("test", "mock1", "mock2", "mock11", "mock22"),
 				),
 			},
-			wantClassifyCalls: 4,
+			wantClassifyCalls: 0, // services mode - no classify
 			wantComposeCalls:  4,
 			wantConfGroups: []*confgroup.Group{
-				prepareDiscoveredGroup("mock1-foobar1", "mock2-foobar2"),
-				prepareDiscoveredGroup("mock1-foobar1", "mock2-foobar2", "mock11-foobar1", "mock22-foobar2"),
+				prepareDiscoveredGroupWithModule("mock1-foobar1", "bar1", "mock2-foobar2", "bar2"),
+				prepareDiscoveredGroupWithModule("mock1-foobar1", "bar1", "mock11-foobar1", "bar1", "mock2-foobar2", "bar2", "mock22-foobar2", "bar2"),
 			},
 		},
 		"existing group with new targets only": {
@@ -191,11 +193,11 @@ services:
 					newMockTargetGroup("test", "mock11", "mock22"),
 				),
 			},
-			wantClassifyCalls: 4,
+			wantClassifyCalls: 0, // services mode - no classify
 			wantComposeCalls:  4,
 			wantConfGroups: []*confgroup.Group{
-				prepareDiscoveredGroup("mock1-foobar1", "mock2-foobar2"),
-				prepareDiscoveredGroup("mock11-foobar1", "mock22-foobar2"),
+				prepareDiscoveredGroupWithModule("mock1-foobar1", "bar1", "mock2-foobar2", "bar2"),
+				prepareDiscoveredGroupWithModule("mock11-foobar1", "bar1", "mock22-foobar2", "bar2"),
 			},
 		},
 		"services-only: new group with targets": {

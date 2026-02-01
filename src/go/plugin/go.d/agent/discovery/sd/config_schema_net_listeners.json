@@ -11,19 +11,34 @@
         "type": "string",
         "minLength": 1
       },
-      "interval": {
-        "title": "Scan interval",
-        "description": "How often to scan for listeners.",
-        "type": "string",
-        "pattern": "^[0-9]+(s|m|h)$",
-        "default": "2m"
-      },
-      "timeout": {
-        "title": "Timeout",
-        "description": "Timeout for local listener discovery, in seconds.",
-        "type": "number",
-        "minimum": 0.1,
-        "default": 5
+      "discoverer": {
+        "title": "Discoverer",
+        "type": "object",
+        "properties": {
+          "net_listeners": {
+            "title": "Net Listeners",
+            "type": "object",
+            "properties": {
+              "interval": {
+                "title": "Scan interval",
+                "description": "How often to scan for listeners.",
+                "type": "string",
+                "pattern": "^[0-9]+(s|m|h)$",
+                "default": "2m"
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Timeout for local listener discovery, in seconds.",
+                "type": "number",
+                "minimum": 0.1,
+                "default": 5
+              }
+            }
+          }
+        },
+        "required": [
+          "net_listeners"
+        ]
       },
       "services": {
         "title": "Service rules",
@@ -57,7 +72,8 @@
       }
     },
     "required": [
-      "name"
+      "name",
+      "discoverer"
     ]
   },
   "uiSchema": {
@@ -71,8 +87,7 @@
           "title": "Base",
           "fields": [
             "name",
-            "interval",
-            "timeout"
+            "discoverer"
           ]
         },
         {
@@ -83,13 +98,17 @@
         }
       ]
     },
-    "interval": {
-      "ui:placeholder": "2m",
-      "ui:help": "Examples: 30s, 2m, 5m"
-    },
-    "timeout": {
-      "ui:placeholder": "5",
-      "ui:help": "Value in seconds. Examples: 5, 10, 0.5"
+    "discoverer": {
+      "net_listeners": {
+        "interval": {
+          "ui:placeholder": "2m",
+          "ui:help": "Examples: 30s, 2m, 5m"
+        },
+        "timeout": {
+          "ui:placeholder": "5",
+          "ui:help": "Value in seconds. Examples: 5, 10, 0.5"
+        }
+      }
     },
     "services": {
       "ui:listFlavour": "list",
