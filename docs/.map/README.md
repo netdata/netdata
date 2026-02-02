@@ -31,19 +31,15 @@ Each node is either:
 
 #### `meta` fields
 
-| Field           | Purpose                                                                       | Notes                                                                                                                                                                                      |
-|-----------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **label**       | The label shown in the sidebar.                                               | For category overview pages, this should match the sidebar position. Categories are defined by having `items`.                                                                             |
-| **path**        | Single path segment override (optional).                                      | Used when the document's Learn path segment differs from the tree structure. Example: `OpenTelemetry` (not a full path). If omitted, the path is derived from the tree hierarchy.          |
-| **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`). Can be omitted only for nodes with `integration_placeholder` children (the integrations themselves will have edit URLs). |
-| **keywords**    | List of keywords for search.                                                  | Example: `["install", "linux"]`                                                                                                                                                            |
-| **description** | Legacy metadata description.                                                  | Rarely used today.                                                                                                                                                                         |
-
-#### Path Reconstruction
-
-The full Learn path for each document is automatically reconstructed by walking the tree hierarchy and concatenating parent labels. The `path` field in `meta` is only needed when a document's path segment differs from its tree position.
-
-For example, a document appearing under "Collecting Metrics" in the sidebar with `path: OpenTelemetry` will have Learn path `OpenTelemetry` instead of `Collecting Metrics/OpenTelemetry Metrics`.
+| Field           | Purpose                                                                       | Notes                                                                                                                                        |
+|-----------------|-------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| **id**          | Stable identifier for the node.                                               | Derived from `custom_edit_url` filename or a slugified label.                                                                                |
+| **label**       | The label shown in the sidebar.                                               | To make a category: the **overview** page’s label **must match** the last segment of `path`. <br>👉 Every folder must have an overview page. |
+| **status**      | `Published` or `Unpublished`.                                                 | If `Unpublished`, see [Unpublishing Files](#unpublishing-files).                                                                             |
+| **path**        | The location path on Learn.                                                   | Use **uppercase letters** and **spaces**. Example: `Netdata Agent/Installation/Linux`. <br>👉 Every level requires an overview page.         |
+| **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`).                                                                            |
+| **keywords**    | List of keywords for search.                                                  | Example: `["install", "linux"]`                                                                                                              |
+| **description** | Legacy metadata description.                                                  | Rarely used today.                                                                                                                           |
 
 #### Integration placeholder node
 
@@ -58,8 +54,11 @@ Placeholders are positional: the ingest pipeline replaces them in-place with gen
 
 ```yaml
 - meta:
+    id: "linux"
     label: "Linux"
+    path: "Netdata Agent/Installation/Linux"
     edit_url: "https://github.com/netdata/netdata/edit/master/docs/installation/linux.md"
+    status: "Published"
     description: "How to install Netdata Agent on Linux"
     keywords:
       - "install"
