@@ -43,9 +43,10 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
             if(utf8_character_bytes == 1)
                 valid_sequence = false;
             else {
-                // make sure all the characters are valid
+                // make sure all the continuation bytes are valid
+                // also check for premature string termination (truncated UTF-8)
                 for(size_t i = 1; i < utf8_character_bytes; i++) {
-                    if(!IS_UTF8_BYTE(src[i]) || IS_UTF8_STARTBYTE(src[i])) {
+                    if(src[i] == '\0' || !IS_UTF8_BYTE(src[i]) || IS_UTF8_STARTBYTE(src[i])) {
                         valid_sequence = false;
                         break;
                     }
@@ -59,14 +60,20 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
                         *d++ = *src++;
                 }
                 else {
-                    *d++ = hex_digits_lower[(*src & 0xF0) >> 4];
-                    if(d <= end) *d++ = hex_digits_lower[(*src & 0x0F)];
-
+                    // invalid or truncated UTF-8 sequence - hex encode it
+                    // each byte becomes 2 hex chars, so check we have room for at least 2
+                    if(d + 1 < end) {
+                        *d++ = hex_digits_lower[(*src & 0xF0) >> 4];
+                        *d++ = hex_digits_lower[(*src & 0x0F)];
+                    }
                     src++;
 
-                    while(IS_UTF8_BYTE(*src) && !IS_UTF8_STARTBYTE(*src) && d <= end) {
-                        *d++ = hex_digits_lower[(*src & 0xF0) >> 4];
-                        if(d <= end) *d++ = hex_digits_lower[(*src & 0x0F)];
+                    // hex encode any continuation bytes
+                    while(IS_UTF8_BYTE(*src) && !IS_UTF8_STARTBYTE(*src)) {
+                        if(d + 1 < end) {
+                            *d++ = hex_digits_lower[(*src & 0xF0) >> 4];
+                            *d++ = hex_digits_lower[(*src & 0x0F)];
+                        }
                         src++;
                     }
                 }

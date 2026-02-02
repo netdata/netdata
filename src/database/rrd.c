@@ -27,11 +27,14 @@ int gap_when_lost_iterations_above = 1;
 STRING *rrd_string_strdupz(const char *s) {
     if(unlikely(!s || !*s)) return string_strdupz(s);
 
-    char *tmp = strdupz(s);
-    json_fix_string(tmp);
-    STRING *ret = string_strdupz(tmp);
-    freez(tmp);
-    return ret;
+    size_t len = strlen(s);
+    char buf[len + 1];
+
+    // Sanitize the string, preserving valid UTF-8
+    text_sanitize((unsigned char *)buf, (const unsigned char *)s, sizeof(buf),
+                  rrd_string_allowed_chars, true, "", NULL);
+
+    return string_strdupz(buf);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

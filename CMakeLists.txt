@@ -1029,6 +1029,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/sanitizers/chart_id_and_name.h
         src/libnetdata/sanitizers/utf8-sanitizer.c
         src/libnetdata/sanitizers/utf8-sanitizer.h
+        src/libnetdata/sanitizers/utf8-sanitizer-unittest.c
         src/libnetdata/sanitizers/sanitizers.h
         src/libnetdata/sanitizers/sanitizers-labels.c
         src/libnetdata/sanitizers/sanitizers-labels.h
