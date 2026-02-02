@@ -270,6 +270,9 @@
 - Always capture backtrace on panic. ([#21681](https://github.com/netdata/netdata/issues/21681))
 - Build(deps): bump github.com/coreos/go-systemd/v22 from 22.6.0 to 22.7.0 in /src/go ([#21687](https://github.com/netdata/netdata/issues/21687))
 - Build(deps): bump go.mongodb.org/mongo-driver from 1.17.7 to 1.17.8 in /src/go ([#21686](https://github.com/netdata/netdata/issues/21686))
+- Fix relative markdown links for learn site ingestion ([#21688](https://github.com/netdata/netdata/issues/21688))
+- Fix relative link in Functions developer guide ([#21689](https://github.com/netdata/netdata/issues/21689))
+- Fix documentation links to work on both GitHub and learn site ([#21690](https://github.com/netdata/netdata/issues/21690))
 
 ## [2.8.0] - 2025-11-19
 
