@@ -28,13 +28,15 @@ STRING *rrd_string_strdupz(const char *s) {
     if(unlikely(!s || !*s)) return string_strdupz(s);
 
     size_t len = strlen(s);
-    char buf[len + 1];
+    char *buf = mallocz(len + 1);
 
     // Sanitize the string, preserving valid UTF-8
-    text_sanitize((unsigned char *)buf, (const unsigned char *)s, sizeof(buf),
+    text_sanitize((unsigned char *)buf, (const unsigned char *)s, len + 1,
                   rrd_string_allowed_chars, true, "", NULL);
 
-    return string_strdupz(buf);
+    STRING *result = string_strdupz(buf);
+    freez(buf);
+    return result;
 }
 
 // --------------------------------------------------------------------------------------------------------------------

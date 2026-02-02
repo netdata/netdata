@@ -490,6 +490,10 @@ int netdata_main(int argc, char **argv) {
                             return perflibnamestest_main();
                         }
 #endif
+                        else if(strcmp(optarg, "utf8sanitizertest") == 0) {
+                            unittest_running = true;
+                            return utf8_sanitizer_unittest();
+                        }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             unittest_running = true;
@@ -530,10 +534,6 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "durationtest") == 0) {
                             unittest_running = true;
                             return duration_unittest();
-                        }
-                        else if(strcmp(optarg, "utf8sanitizertest") == 0) {
-                            unittest_running = true;
-                            return utf8_sanitizer_unittest();
                         }
                         else if(strcmp(optarg, "healthconfigtest") == 0) {
                             unittest_running = true;
