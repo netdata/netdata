@@ -1,11 +1,11 @@
 # 1. Understanding Alerts in Netdata
 
-In Netdata, an **alert** (also called a "health check") is a rule that continuously monitors one or more metrics and assigns a **status** based on whether conditions are met.
+In Netdata, an **alert** is a rule that continuously monitors one or more metrics and assigns a **status** based on whether conditions are met.
 
 | Core Concept | Description |
 |--------------|-------------|
 | **Where alerts are evaluated** | Locally on each Netdata Agent, using locally stored metrics data |
-| **How alerts work** | Each alert inspects recent metrics data (for example, "average CPU over the last 5 minutes") and decides whether the system is in a healthy state (`CLEAR`), needs attention (`WARNING`), or has a problem (`CRITICAL`) |
+| **How alerts work** | Each alert inspects recent metrics data (for example, "average CPU over the last 5 minutes") and assigns one of five statuses: `CLEAR` (healthy), `WARNING` (needs attention), `CRITICAL` (problem detected), `RAISED` (transitioning to non-clear), or `UNDEFINED` (evaluation failed) |
 | **What happens on status change** | When an alert's status changes, that transition becomes an **alert event** visible in Netdata Cloud's Events Feed, and may trigger notifications depending on your configuration |
 
 ## Where Alerts Run

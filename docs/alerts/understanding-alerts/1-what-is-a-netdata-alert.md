@@ -21,13 +21,14 @@ Alert events are:
 
 ## Alert Statuses
 
-Every alert has one of six possible statuses at any given time:
+Every alert has one of seven possible statuses at any given time:
 
 | Status | Meaning |
 |--------|---------|
 | **UNINITIALIZED** | The alert has just been created but has not yet collected enough data to evaluate |
 | **UNDEFINED** | The alert could not be evaluated (missing data, division by zero, NaN/Inf result) |
 | **CLEAR** | The alert can be evaluated and neither warning nor critical thresholds are triggered; the metric is in a normal, healthy state |
+| **RAISED** | The alert has transitioned from CLEAR to WARNING or CRITICAL (internal transition state) |
 | **WARNING** | The warning expression evaluated to true; something may require attention |
 | **CRITICAL** | The critical expression evaluated to true; if both warning and critical conditions are met, CRITICAL takes precedence |
 | **REMOVED** | The alert has been deleted (configuration reload, child node disconnected, obsolete chart instance, or the device/service is no longer there) |
@@ -98,7 +99,7 @@ For a given alert definition applied to a given chart instance, there is one **a
 ## Key Takeaways
 
 - A Netdata alert is a **rule that monitors metrics from charts** and assigns a status
-- Alerts have **six possible statuses**: `UNINITIALIZED`, `UNDEFINED`, `CLEAR`, `WARNING`, `CRITICAL`, `REMOVED`
+- Alerts have **seven possible statuses**: `UNINITIALIZED`, `UNDEFINED`, `CLEAR`, `RAISED`, `WARNING`, `CRITICAL`, `REMOVED`
 - Status transitions become **alert events** visible locally and in Netdata Cloud
 - Alerts can be **chart-specific (alarms)** or **context-based (templates)**
 - Alert evaluation happens **on the Agent**, not in Cloud
