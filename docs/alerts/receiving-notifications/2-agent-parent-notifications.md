@@ -88,7 +88,7 @@ chart labels: unit_name=!*
        to: incident-response
 ```
 
-See **8.4 Custom Actions with `exec`** for full details on available environment variables and script integration patterns.
+See **8.4 Custom Actions with `exec`** for full details on available positional arguments and script integration patterns.
 
 ## 5.2.7 Related Sections
 
