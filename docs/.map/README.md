@@ -33,7 +33,6 @@ Each node is either:
 
 | Field           | Purpose                                                                       | Notes                                                                                                                                        |
 |-----------------|-------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| **id**          | Stable identifier for the node.                                               | Derived from `custom_edit_url` filename or a slugified label.                                                                                |
 | **label**       | The label shown in the sidebar.                                               | To make a category: the **overview** page’s label **must match** the last segment of `path`. <br>👉 Every folder must have an overview page. |
 | **status**      | `Published` or `Unpublished`.                                                 | If `Unpublished`, see [Unpublishing Files](#unpublishing-files).                                                                             |
 | **path**        | The location path on Learn.                                                   | Use **uppercase letters** and **spaces**. Example: `Netdata Agent/Installation/Linux`. <br>👉 Every level requires an overview page.         |
@@ -54,7 +53,6 @@ Placeholders are positional: the ingest pipeline replaces them in-place with gen
 
 ```yaml
 - meta:
-    id: "linux"
     label: "Linux"
     path: "Netdata Agent/Installation/Linux"
     edit_url: "https://github.com/netdata/netdata/edit/master/docs/installation/linux.md"
