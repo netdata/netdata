@@ -5,7 +5,7 @@ enabling users to ingest, store and visualize OpenTelemetry metrics in charts.
 
 ## Configuration
 
-Edit the [otel.yaml](https://github.com/netdata/netdata/blob/master/src/crates/jf/otel-plugin/configs/otel.yaml)
+Edit the [otel.yaml](https://github.com/netdata/netdata/blob/master/src/crates/netdata-otel/otel-plugin/configs/otel.yaml)
 configuration file using `edit-config` from the Netdata
 [config directory](/docs/netdata-agent/configuration/README.md#locate-your-config-directory),
 which is typically located under `/etc/netdata`.
@@ -65,7 +65,7 @@ the attributes that the `otel.plugin` will use when creating new chart
 instances and dimension names.
 
 For example, the following bit from the
-[otel.d/v1/metrics/hostmetrics.yaml](https://github.com/netdata/netdata/blob/master/src/crates/jf/otel-plugin/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml)
+[otel.d/v1/metrics/hostmetrics.yaml](https://github.com/netdata/netdata/blob/master/src/crates/netdata-otel/otel-plugin/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml)
  configuration file for the [hostmetrics](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/hostmetricsreceiver/internal/scraper/networkscraper/documentation.md) receiver:
 ```yaml
 select:
