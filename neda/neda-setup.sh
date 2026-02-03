@@ -84,7 +84,7 @@ install_pkg() {
             run dnf install -y "$pkg_redhat" || run yum install -y "$pkg_redhat"
             ;;
         arch)
-            run pacman -Sy --noconfirm "$pkg_arch"
+            run pacman -S --needed --noconfirm "$pkg_arch"
             ;;
         *)
             log_error "Unsupported OS. Please install $pkg_debian manually."
@@ -96,6 +96,104 @@ install_pkg() {
 # Detect OS early
 detect_os
 log_info "Detected OS family: $OS_FAMILY"
+
+# ============================================================================
+# PREREQUISITES - Batch install all required packages
+# ============================================================================
+
+log_info "Checking prerequisites..."
+
+# Arrays to collect missing packages (distro-specific names)
+MISSING_PKGS=()
+
+# Check curl
+if ! command -v curl &>/dev/null; then
+    log_info "  - curl: missing"
+    MISSING_PKGS+=(curl)
+else
+    log_info "  - curl: found"
+fi
+
+# Check git
+if ! command -v git &>/dev/null; then
+    log_info "  - git: missing"
+    MISSING_PKGS+=(git)
+else
+    log_info "  - git: found"
+fi
+
+# Check python3
+if ! command -v python3 &>/dev/null; then
+    log_info "  - python3: missing"
+    case "$OS_FAMILY" in
+        debian) MISSING_PKGS+=(python3) ;;
+        redhat) MISSING_PKGS+=(python3) ;;
+        arch)   MISSING_PKGS+=(python) ;;
+    esac
+else
+    log_info "  - python3: found"
+fi
+
+# Check python3-venv (Debian-specific, included in python3 on others)
+if [ "$OS_FAMILY" = "debian" ]; then
+    if command -v python3 &>/dev/null; then
+        if ! python3 -m venv --help &>/dev/null 2>&1; then
+            log_info "  - python3-venv: missing"
+            MISSING_PKGS+=(python3-venv)
+        else
+            log_info "  - python3-venv: found"
+        fi
+    else
+        # python3 not installed yet, venv will be missing
+        log_info "  - python3-venv: missing (python3 not installed)"
+        MISSING_PKGS+=(python3-venv)
+    fi
+fi
+
+# Check ripgrep
+if ! command -v rg &>/dev/null; then
+    log_info "  - ripgrep: missing"
+    MISSING_PKGS+=(ripgrep)
+else
+    log_info "  - ripgrep: found"
+fi
+
+# Check pipx
+if ! command -v pipx &>/dev/null; then
+    log_info "  - pipx: missing"
+    case "$OS_FAMILY" in
+        debian) MISSING_PKGS+=(pipx) ;;
+        redhat) MISSING_PKGS+=(pipx) ;;
+        arch)   MISSING_PKGS+=(python-pipx) ;;
+    esac
+else
+    log_info "  - pipx: found"
+fi
+
+# Install all missing prerequisites in one command
+if [ ${#MISSING_PKGS[@]} -gt 0 ]; then
+    log_info "Installing missing prerequisites: ${MISSING_PKGS[*]}"
+    case "$OS_FAMILY" in
+        debian)
+            run apt-get update
+            run apt-get install -y "${MISSING_PKGS[@]}"
+            ;;
+        redhat)
+            run dnf install -y "${MISSING_PKGS[@]}" || run yum install -y "${MISSING_PKGS[@]}"
+            ;;
+        arch)
+            run pacman -S --needed --noconfirm "${MISSING_PKGS[@]}"
+            ;;
+        *)
+            log_error "Unsupported OS family: $OS_FAMILY"
+            log_error "Please install manually: ${MISSING_PKGS[*]}"
+            exit 1
+            ;;
+    esac
+    log_info "Prerequisites installed successfully"
+else
+    log_info "All prerequisites already installed"
+fi
 
 # Resolve script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -204,7 +302,7 @@ install_nodejs() {
             ;;
         arch)
             # Arch repos have recent Node.js versions
-            run pacman -Sy --noconfirm nodejs npm
+            run pacman -S --needed --noconfirm nodejs npm
             ;;
         *)
             log_error "Unsupported OS. Please install Node.js $version manually."
@@ -232,19 +330,6 @@ fi
 if ! command -v npx &> /dev/null; then
     log_error "Failed to install npx"
     exit 1
-fi
-
-# ============================================================================
-# RIPGREP (required by ai-agent for file search)
-# ============================================================================
-
-log_info "Checking ripgrep..."
-
-if ! command -v rg &> /dev/null; then
-    log_info "Installing ripgrep..."
-    install_pkg ripgrep ripgrep ripgrep
-else
-    log_info "ripgrep already available ($(rg --version | head -1))"
 fi
 
 # ============================================================================
@@ -470,14 +555,7 @@ log_info "━━━━━━━━━━━━━━━━━━━━━━━�
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 log_info "Setting up Python tools for MCP servers..."
 
-# Install pipx system-wide (available to all users including neda)
-if ! command -v pipx &> /dev/null; then
-    log_info "Installing pipx system-wide..."
-    install_pkg pipx pipx python-pipx
-else
-    log_info "pipx already available ($(pipx --version))"
-fi
-
+# pipx is installed in prerequisites section
 # Ensure neda user's pipx is configured properly
 run sudo -u "$NEDA_USER" env HOME="$NEDA_HOME" pipx ensurepath
 
@@ -519,17 +597,68 @@ run sudo -u "$NEDA_USER" env HOME="$NEDA_HOME" PLAYWRIGHT_BROWSERS_PATH="$NEDA_H
 
 # Install system dependencies required by Playwright browsers
 log_info "Installing Playwright system dependencies..."
-run npx --prefix "$NEDA_HOME" playwright install-deps
 
-# NOTE: For Arch/Manjaro users, the above command will fail because playwright install-deps
-# only supports Debian/Ubuntu. On Arch/Manjaro, manually run this command instead:
-#
-# yay -S --needed nss nspr at-spi2-core libcups libdrm dbus libxcb libxkbcommon \
-#     libx11 libxcomposite libxdamage libxext libxfixes libxrandr mesa pango cairo \
-#     alsa-lib xorg-server-xvfb libxml2-legacy icu66-bin libffi7 libwebp0.5
-#
-# This installs both official repo packages and AUR packages (icu66-bin, libffi7, libwebp0.5)
-# required for Playwright's bundled browsers.
+case "$OS_FAMILY" in
+    debian)
+        # Debian/Ubuntu: playwright install-deps works natively
+        run npx --prefix "$NEDA_HOME" playwright install-deps
+        ;;
+    redhat)
+        # Fedora/RHEL: install known Playwright dependencies
+        PLAYWRIGHT_DEPS_REDHAT=(
+            nss nspr at-spi2-atk at-spi2-core cups-libs libdrm dbus-libs
+            libxcb libxkbcommon libX11 libXcomposite libXdamage libXext
+            libXfixes libXrandr mesa-libgbm pango cairo alsa-lib
+            libxshmfence gtk3 libgbm
+        )
+        log_info "Installing Playwright deps for Fedora/RHEL: ${PLAYWRIGHT_DEPS_REDHAT[*]}"
+        run dnf install -y "${PLAYWRIGHT_DEPS_REDHAT[@]}" || run yum install -y "${PLAYWRIGHT_DEPS_REDHAT[@]}"
+        ;;
+    arch)
+        # Arch/Manjaro: install official repo packages
+        PLAYWRIGHT_DEPS_ARCH=(
+            nss nspr at-spi2-core libcups libdrm dbus libxcb libxkbcommon
+            libx11 libxcomposite libxdamage libxext libxfixes libxrandr
+            mesa pango cairo alsa-lib gtk3 xorg-server-xvfb
+        )
+        log_info "Installing Playwright deps for Arch/Manjaro: ${PLAYWRIGHT_DEPS_ARCH[*]}"
+        if ! pacman -S --needed --noconfirm "${PLAYWRIGHT_DEPS_ARCH[@]}"; then
+            log_warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log_warn "Some Playwright dependencies failed to install."
+            log_warn "This usually happens when your system needs updating. Try:"
+            log_warn "  sudo pacman -Syu"
+            log_warn "Then re-run this setup script."
+            log_warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        fi
+
+        # AUR packages that may be needed for Playwright browsers
+        # Must run as non-root user (yay/paru refuse to run as root)
+        PLAYWRIGHT_AUR_PKGS=(icu66-bin libffi7 libwebp0.5)
+
+        # Determine which user to run AUR helper as
+        AUR_USER="${SUDO_USER:-$NEDA_USER}"
+
+        if command -v yay &>/dev/null; then
+            log_info "Installing AUR packages via yay (as $AUR_USER): ${PLAYWRIGHT_AUR_PKGS[*]}"
+            sudo -u "$AUR_USER" yay -S --needed --noconfirm "${PLAYWRIGHT_AUR_PKGS[@]}" || \
+                log_warn "Some AUR packages failed to install. Playwright browsers may not work correctly."
+        elif command -v paru &>/dev/null; then
+            log_info "Installing AUR packages via paru (as $AUR_USER): ${PLAYWRIGHT_AUR_PKGS[*]}"
+            sudo -u "$AUR_USER" paru -S --needed --noconfirm "${PLAYWRIGHT_AUR_PKGS[@]}" || \
+                log_warn "Some AUR packages failed to install. Playwright browsers may not work correctly."
+        else
+            log_warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            log_warn "Arch/Manjaro: yay/paru not found. Some Playwright browsers may require AUR packages."
+            log_warn "If browsers fail to launch, install yay/paru and run:"
+            log_warn "  yay -S --needed ${PLAYWRIGHT_AUR_PKGS[*]}"
+            log_warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        fi
+        ;;
+    *)
+        log_warn "Unknown OS family. Skipping Playwright system dependencies."
+        log_warn "You may need to install browser dependencies manually."
+        ;;
+esac
 
 # Create compatibility copies for common version mismatches
 # This handles version differences between fetcher-mcp and installed Playwright
