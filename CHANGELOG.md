@@ -273,6 +273,11 @@
 - Fix relative markdown links for learn site ingestion ([#21688](https://github.com/netdata/netdata/issues/21688))
 - Fix relative link in Functions developer guide ([#21689](https://github.com/netdata/netdata/issues/21689))
 - Fix documentation links to work on both GitHub and learn site ([#21690](https://github.com/netdata/netdata/issues/21690))
+- Feat(go.d.plugin): add k8s_apiserver collector with heatmap support ([#21682](https://github.com/netdata/netdata/issues/21682))
+- Keep window manager state consistent on `mmap` failures. ([#21693](https://github.com/netdata/netdata/issues/21693))
+- Handle transient systemd state flag changes. ([#21695](https://github.com/netdata/netdata/issues/21695))
+- Adjust curl options when submitting events ([#21696](https://github.com/netdata/netdata/issues/21696))
+- Add object size and bounds validation when reading journal files. ([#21697](https://github.com/netdata/netdata/issues/21697))
 
 ## [2.8.0] - 2025-11-19
 
