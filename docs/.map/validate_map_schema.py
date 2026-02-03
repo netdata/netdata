@@ -160,6 +160,10 @@ def validate_custom_rules(data: dict) -> Tuple[bool, List[ValidationError]]:
     errors: List[ValidationError] = []
     edit_urls: Dict[str, str] = {}
     
+    # Guard against non-dict YAML root
+    if not isinstance(data, dict):
+        return False, [ValidationError('root', f'YAML root must be a dictionary, got {type(data).__name__}')]
+    
     sidebar = data.get('sidebar', [])
     if not isinstance(sidebar, list):
         return False, [ValidationError('root', 'sidebar must be a list')]
@@ -198,6 +202,12 @@ def main():
         schema = load_schema(str(schema_path))
     except Exception as e:
         print(f"ERROR loading files: {e}")
+        sys.exit(1)
+    
+    # Guard against non-dict YAML root
+    if not isinstance(data, dict):
+        print(f"❌ Validation FAILED:\n")
+        print(f"  • YAML root must be a dictionary, got {type(data).__name__}")
         sys.exit(1)
     
     all_errors = []
