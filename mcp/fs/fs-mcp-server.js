@@ -81,9 +81,49 @@ try {
 const ALLOW_RGREP_ROOT = allowRGrepRoot;
 const ALLOW_TREE_ROOT = allowTreeRoot;
 
+// Security constants
+const MAX_PATH_LENGTH = 4096;
+
+/**
+ * Validate path does not contain null bytes.
+ * Null bytes can cause undefined behavior in shell commands and filesystem operations.
+ */
+function assertNoNullBytes(raw) {
+  if (raw.includes("\x00")) {
+    throw new Error("null bytes are not allowed in paths");
+  }
+}
+
+/**
+ * Validate path length is reasonable.
+ * Prevents DoS via extremely long paths.
+ */
+function assertPathLength(raw) {
+  if (raw.length > MAX_PATH_LENGTH) {
+    throw new Error(`path exceeds maximum length of ${MAX_PATH_LENGTH}`);
+  }
+}
+
+/**
+ * Validate path does not contain control characters that could cause issues.
+ * Allows tabs and spaces but rejects other control characters.
+ */
+function assertNoControlChars(raw) {
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(raw)) {
+    throw new Error("control characters are not allowed in paths");
+  }
+}
+
 function assertNoDotDot(raw) {
   if (typeof raw !== "string") throw new Error("path must be a string");
   if (raw === "") return;
+
+  // Security checks
+  assertNoNullBytes(raw);
+  assertPathLength(raw);
+  assertNoControlChars(raw);
+
   if (
     raw.startsWith("/") ||
     raw.startsWith("\\") ||
@@ -126,25 +166,42 @@ function validateFile(file) {
 function validateRegex(pattern) {
   if (typeof pattern !== "string") throw new Error("regex must be a string");
   if (pattern.length > 10000) throw new Error("Regex pattern too long");
+  // Security: check for null bytes and control characters
+  assertNoNullBytes(pattern);
+  assertNoControlChars(pattern);
 }
 
 function validateGlob(glob) {
   if (typeof glob !== "string") throw new Error("glob must be a string");
+  if (glob.length > MAX_PATH_LENGTH) {
+    throw new Error(`glob exceeds maximum length of ${MAX_PATH_LENGTH}`);
+  }
+  // Security: check for null bytes and control characters
+  assertNoNullBytes(glob);
+  assertNoControlChars(glob);
 }
 
 /**
- * Sanitize a string by removing any occurrences of ROOT path.
- * This prevents leaking absolute filesystem paths to the model.
+ * Sanitize a string by removing occurrences of ROOT path.
+ * This prevents leaking the absolute ROOT directory path to the model.
+ *
+ * CRITICAL: The model must NEVER see the actual ROOT directory path.
+ *
+ * NOTE: We only replace ROOT, not generic paths like /home/... or /etc/...
+ * because file contents may legitimately contain such paths and should not
+ * be corrupted. The security model is about hiding ROOT's location, not
+ * about hiding all absolute paths.
  */
 function sanitizePath(str) {
   if (typeof str !== "string") return str;
+
   // Replace ROOT path with <ROOT> placeholder
   // Use global replace in case ROOT appears multiple times
   return str.split(ROOT).join("<ROOT>");
 }
 
 async function execCommand(cmd, args, options = {}) {
-  const { allowedExitCodes = [0] } = options;
+  const { allowedExitCodes = [0], sanitizeOutput = true } = options;
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
       stdio: ["pipe", "pipe", "pipe"],
@@ -180,7 +237,10 @@ async function execCommand(cmd, args, options = {}) {
         error.code = code;
         reject(error);
       } else {
-        resolve(stdout);
+        // Optionally sanitize stdout to prevent ROOT path leakage
+        // For Grep/RGrep: file content should NOT be sanitized (per requirement 3)
+        // For ListDir/Tree/Find: sanitization acts as safety net
+        resolve(sanitizeOutput ? sanitizePath(stdout) : stdout);
       }
     });
   });
@@ -388,7 +448,17 @@ async function toolRead(args) {
   }
   if (!stat.isFile()) throw new Error(`${file}: not a regular file`);
 
-  const buf = await fsp.readFile(abs);
+  // Wrap readFile in try/catch to prevent ROOT leak via error messages
+  // Node.js errors include absolute paths which would expose ROOT
+  let buf;
+  try {
+    buf = await fsp.readFile(abs);
+  } catch (e) {
+    // Log full error to stderr (allowed per security model)
+    console.error(`Read error: ${e.message}`);
+    // Return sanitized error to model using relative path
+    throw new Error(`${file}: cannot read file`);
+  }
   const text = decodeUtf8WithHexEscapes(buf);
   const arr = splitLinesPreserve(text);
   const totalLines = arr.length;
@@ -456,7 +526,8 @@ async function toolGrep(args) {
     file,
   ];
 
-  const output = await execCommand(cmd, cmdArgs, { allowedExitCodes: [0, 1] });
+  // sanitizeOutput: false - file content should NOT be sanitized per requirement 3
+  const output = await execCommand(cmd, cmdArgs, { allowedExitCodes: [0, 1], sanitizeOutput: false });
   return parseRgTextToGrepFormat(output);
 }
 
@@ -525,7 +596,8 @@ async function toolRGrep(args) {
   // Security validation already done via assertWithinRoot(abs)
   const cmdArgs = ["--json", ...(cs ? [] : ["-i"]), "--", regex, dir];
 
-  const output = await execCommand(cmd, cmdArgs, { allowedExitCodes: [0, 1] });
+  // sanitizeOutput: false - file content should NOT be sanitized per requirement 3
+  const output = await execCommand(cmd, cmdArgs, { allowedExitCodes: [0, 1], sanitizeOutput: false });
   return parseRgJsonToRGrepFormat(output);
 }
 
