@@ -294,7 +294,7 @@ export const extractNonceFromMessages = (messages: readonly ConversationMessage[
     if (matchLine !== null && typeof matchLine[1] === 'string' && matchLine[1].length > 0) {
       return matchLine[1];
     }
-    const matchSlotNotice = /<ai-agent-([a-z0-9]+)-(FINAL|PROGRESS|0001)/i.exec(noticeContent);
+    const matchSlotNotice = /<ai-agent-([a-z0-9]+)-(FINAL|PROGRESS|META|0001)/i.exec(noticeContent);
     if (matchSlotNotice !== null && typeof matchSlotNotice[1] === 'string' && matchSlotNotice[1].length > 0) {
       return matchSlotNotice[1];
     }
@@ -304,7 +304,7 @@ export const extractNonceFromMessages = (messages: readonly ConversationMessage[
   const tagNonce = messages
     .map(asString)
     .filter((c): c is string => c !== undefined)
-    .map((content) => /<ai-agent-([a-z0-9]+)-(FINAL|PROGRESS|0001)/i.exec(content))
+    .map((content) => /<ai-agent-([a-z0-9]+)-(FINAL|PROGRESS|META|0001)/i.exec(content))
     .find((m) => m !== null && typeof m[1] === 'string' && m[1].length > 0);
   if (tagNonce !== undefined && tagNonce !== null) {
     return tagNonce[1];

@@ -436,11 +436,11 @@ const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
-// Prompt + instructions currently estimate to ~728 tokens (ctx + new, schema excluded from projection).
-// Reduced from ~766 after template whitespace normalization and META removal when no plugins configured.
-const THRESHOLD_CONTEXT_WINDOW_BELOW = 788; // limit = 788 - 8 - 32 = 748 (> projected ~728)
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 768; // limit = 768 - 8 - 32 = 728 (matches projected)
-const THRESHOLD_CONTEXT_WINDOW_ABOVE = 768; // limit = 768 - 8 - 32 = 728 (< projected ~729)
+// Prompt + instructions currently estimate to ~686 tokens (ctx + new, schema excluded from projection).
+// Reduced from ~728 after further template/prompt optimizations.
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 746; // limit = 746 - 8 - 32 = 706 (> projected ~686)
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 726; // limit = 726 - 8 - 32 = 686 (matches projected)
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 726; // limit = 726 - 8 - 32 = 686 (< projected ~687)
 const PREFLIGHT_CONTEXT_WINDOW = 80;
 const PREFLIGHT_BUFFER_TOKENS = 8;
 const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;
@@ -593,7 +593,7 @@ const extractNonceFromMessages = (messages: readonly ConversationMessage[], scen
     if (matchLine !== null && typeof matchLine[1] === 'string' && matchLine[1].length > 0) {
       return matchLine[1];
     }
-    const matchSlotNotice = /<ai-agent-([a-z0-9]+)-(FINAL|PROGRESS|0001)/i.exec(noticeContent);
+    const matchSlotNotice = /<ai-agent-([a-z0-9]+)-(FINAL|PROGRESS|META|0001)/i.exec(noticeContent);
     if (matchSlotNotice !== null && typeof matchSlotNotice[1] === 'string' && matchSlotNotice[1].length > 0) {
       return matchSlotNotice[1];
     }
@@ -603,14 +603,13 @@ const extractNonceFromMessages = (messages: readonly ConversationMessage[], scen
   const tagNonce = messages
     .map(asString)
     .filter((c): c is string => c !== undefined)
-    .map((content) => /<ai-agent-([a-z0-9]+)-(FINAL|PROGRESS|0001)/i.exec(content))
+    .map((content) => /<ai-agent-([a-z0-9]+)-(FINAL|PROGRESS|META|0001)/i.exec(content))
     .find((m) => m !== null && typeof m[1] === 'string' && m[1].length > 0);
   if (tagNonce !== undefined && tagNonce !== null) {
     return tagNonce[1];
   }
 
   invariant(false, `Nonce parse failed for ${scenarioId}.`);
-  return '';
 };
 
 function buildInMemoryConfigLayers(configuration: Configuration): ResolvedConfigLayer[] {
