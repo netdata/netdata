@@ -54,7 +54,7 @@ There are two ways alerts can be attached to charts:
 
 :::note
 
-The distinction between `alarm` and `template` is a legacy feature. Netdata is moving toward a unified alert definition format (YAML-based) where both will be consolidated into a single alert type. The `alarm` syntax is essentially a subset of `template` functionality. For new alert definitions, **use `template` exclusively**.
+The distinction between `alarm` and `template` is a legacy feature. Both will eventually be consolidated into a single unified alert type. The `alarm` syntax is essentially a subset of `template` functionality. For new alert definitions, **use `template` exclusively**.
 
 :::
 

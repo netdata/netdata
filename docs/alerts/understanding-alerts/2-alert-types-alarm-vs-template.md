@@ -2,7 +2,7 @@
 
 :::note
 
-The distinction between `alarm` and `template` is a legacy feature. Netdata is moving toward a unified alert definition format (YAML-based) where both will be consolidated into a single alert type. The `alarm` syntax is essentially a subset of `template` functionality. For new alert definitions, **use `template` exclusively**.
+The distinction between `alarm` and `template` is a legacy feature. Netdata is moving toward a unified alert definition format where both will be consolidated into a single alert type. The `alarm` syntax is essentially a subset of `template` functionality. For new alert definitions, **use `template` exclusively**.
 
 :::
 
@@ -14,7 +14,7 @@ In Netdata, alerts are rules that monitor metrics from charts and assign a statu
 |--------|-------------|
 | **Unified evaluation** | Both use the same health engine and evaluation logic |
 | **Scope** | The rule can target one specific chart or all charts of a context |
-| **Future direction** | Both will be unified into a single YAML-based alert definition format |
+| **Future direction** | Both will be unified into a single alert definition format |
 
 ## `template`: The Preferred Alert Type
 
@@ -34,7 +34,7 @@ An **alarm** is a legacy syntax for defining chart-specific alerts. It is tied t
 :::note 
 
 Deprecation Notice
-The `alarm` syntax is maintained for backward compatibility. New alert definitions should use `template` exclusively. In future versions, both will be consolidated into a unified YAML format.
+The `alarm` syntax is maintained for backward compatibility. New alert definitions should use `template` exclusively. In future versions, both will be consolidated into a unified format.
 
 :::
 

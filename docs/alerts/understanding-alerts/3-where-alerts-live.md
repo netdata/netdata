@@ -134,18 +134,20 @@ Choose alert names that:
 
 ## Configuration Precedence
 
-When multiple alert sources exist, Netdata applies them in this order:
+When multiple alert sources exist, Netdata evaluates them in this priority order:
 
-1. **Stock alerts** are loaded first from `/usr/lib/netdata/conf.d/health.d/`
-2. **Custom alerts** are loaded next from `/etc/netdata/health.d/`
-   - If a custom alert has the **same name** as a stock alert, the custom version **overrides** it
-3. **Cloud-pushed alerts** are loaded at runtime and **override** file-based alerts with the same name
+1. **Custom alerts** are loaded first from `/etc/netdata/health.d/`
+   - Your definitions take precedence and are never overwritten by upgrades
+2. **Stock alerts** are loaded second from `/usr/lib/netdata/conf.d/health.d/`
+   - Only files that **do not exist** in your custom directory are loaded
+   - If a file with the same name exists in both directories, the custom file entirely replaces the stock file (entire file is skipped, not just conflicting alert names)
+3. **Cloud-pushed alerts** are applied at runtime and **override** file-based alerts with the same name
    - Alert names are provided by you when creating them in Cloud
    - Same-name alerts will conflict regardless of source
 
 This layering means:
 - You can **extend** stock alerts by creating new custom files with unique names
-- You can **override** stock alerts by creating files with matching names
+- You can **override** stock alerts by creating files with matching names (entire file replacement, not per-alert)
 - Cloud-pushed alerts **override** any file-based alert with the same name
 - Centralized management via Cloud doesn't require touching local files
 
