@@ -67,16 +67,16 @@ You'll see a form with fields like:
 | **Description** | Human-readable explanation of what this alert monitors | `CPU usage exceeds 80% for 5 minutes` |
 | **Metric / Chart** | The metric/chart to monitor on this node | Select `system.cpu` |
 | **Dimension** | Specific dimension within the chart (optional) | `user` (user CPU time) |
-| **Detection Mode** | How the alert evaluates data (see 2.3.3) | `Static Threshold` |
+| **Evaluation Parameters** | How data is evaluated (see 2.3.3) | `data_source`, `time_group`, etc. |
 | **Aggregation / Function** | How data is aggregated over the time window | `average` |
 | **Time Window** | How far back to look when evaluating | `5 minutes` |
 | **Warning Threshold** | Condition that triggers WARNING status | `> 80` |
 | **Critical Threshold** | Condition that triggers CRITICAL status | `> 95` |
 | **Notification Recipients / Routing** | Who gets notified when this alert fires | Select integration or role |
 
-### Step 3: Choose Detection Mode
+### Step 3: Configure Evaluation Strategy
 
-Select the **Detection Mode** (for example, Static Threshold, Dynamic Baseline, or Rate of Change). See **2.3.3 Detection Modes** for details.
+Set the evaluation parameters according to your monitoring needs. See **2.3.3 Evaluation Strategy** for details.
 
 ### Step 4: Set Scope (Optional)
 
@@ -100,85 +100,19 @@ Click **Save**. Netdata Cloud will:
 2. Push it to the selected node (and any additional nodes in scope)
 3. The node will load it into memory and begin evaluating it immediately
 
-## 2.3.3 Detection Modes
+## 2.3.3 Evaluation Strategy
 
-The **Detection Mode** field determines how the alert evaluates metric data.
+The alert evaluation is controlled by several parameters combined together:
 
-<details>
-<summary><strong>Static Threshold</strong></summary>
+| Parameter | Purpose | Options |
+|-----------|---------|--------|
+| **Data Source** | What values to compare | Samples (raw values), Percentages (vs total), Anomalies (ML-detected deviations) |
+| **Time Group** | How to aggregate over time window | Average, Median, Min, Max, Sum, etc. |
+| **Dimensions Group** | How to combine multiple dimensions | Sum, Average, Min, Max, Min to Max |
 
-**What it does:**  
-Compares aggregated metric values against fixed thresholds you define.
+For standard threshold-based alerting, use `data_source: samples` with your chosen thresholds.
 
-**When to use:**  
-- You know the exact acceptable range for a metric (for example, "CPU should stay below 80%")
-- You want predictable, consistent alerting behavior
-
-**Example:**
-
-| Setting | Value |
-|---------|-------|
-| Metric | `system.cpu` |
-| Aggregation | `average` |
-| Time Window | `5 minutes` |
-| Warning | `> 80` |
-| Critical | `> 95` |
-
-This fires WARNING if average CPU over the last 5 minutes exceeds 80%.
-
-</details>
-
-<details>
-<summary><strong>Dynamic Baseline (ML-Based)</strong></summary>
-
-**What it does:**  
-Uses Netdata's machine learning models to detect anomalies based on learned patterns, rather than fixed thresholds.
-
-**When to use:**  
-- Metrics have variable "normal" ranges (for example, traffic patterns that differ by time of day)
-- You want to detect unusual behavior without manually tuning thresholds
-
-**How it works:**  
-Netdata's ML engine trains on historical data and flags values that deviate significantly from expected patterns.
-
-**Example:**
-- Metric: `net.net` (network traffic)
-- Detection Mode: `Dynamic Baseline`
-- Sensitivity: `Medium`
-
-This fires when network traffic is anomalously high or low compared to learned patterns, even if absolute values vary throughout the day.
-
-:::note
-
-Dynamic Baseline requires Netdata's ML features to be enabled and trained. See [Netdata ML documentation](https://learn.netdata.cloud/docs/machine-learning-and-anomaly-detection) for details.
-
-:::
-
-</details>
-
-<details>
-<summary><strong>Rate of Change</strong></summary><br/>
-
-**What it does:**  
-Alerts when a metric changes too rapidly (spikes or drops) rather than crossing an absolute threshold.
-
-**When to use:**  
-- You care about sudden changes more than absolute values
-- Detecting capacity exhaustion (for example, disk filling up fast)
-- Catching traffic spikes or drops
-
-**Example:**
-
-| Setting | Value |
-|---------|-------|
-| Metric | `disk.space` |
-| Detection Mode | `Rate of Change` |
-| Time Window | `10 minutes` |
-| Warning | `> 5% decrease per minute` |
-
-This fires if available disk space is dropping faster than 5% per minute, signaling rapid consumption.
-
-</details>
+For anomaly-based detection, set `data_source: anomalies` to trigger on ML-flagged deviations. This requires Netdata's ML features to be enabled and trained. See [Netdata ML documentation](https://learn.netdata.cloud/docs/machine-learning-and-anomaly-detection) for details.
 
 ## 2.3.4 Managing Cloud-Defined Alerts
 
