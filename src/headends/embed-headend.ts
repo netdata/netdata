@@ -489,7 +489,8 @@ export class EmbedHeadend implements Headend {
       res.writeHead(200, {
         [CONTENT_TYPE_HEADER]: EVENT_STREAM_CONTENT_TYPE,
         'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
       });
       sseHeadersSent = true;
       const flushHeaders = (res as http.ServerResponse & { flushHeaders?: () => void }).flushHeaders;

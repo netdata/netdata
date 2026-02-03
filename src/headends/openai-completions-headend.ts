@@ -827,7 +827,8 @@ export class OpenAICompletionsHeadend implements Headend {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
       });
       const flushHeaders = (res as http.ServerResponse & { flushHeaders?: () => void }).flushHeaders;
       if (typeof flushHeaders === 'function') flushHeaders.call(res);
