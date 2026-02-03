@@ -21,7 +21,7 @@ Metrics flow from collectors through the Netdata database and into the health en
 
 The database maintains per-second resolution for recent time windows and aggregated data for longer periods. Alert lookups query this database to retrieve historical values for comparison against thresholds.
 
-The health engine runs on a configurable interval, typically every second. Each iteration evaluates all enabled alerts against recent metric values.
+The health engine runs on a configurable global interval (default ~10 seconds). Individual alerts use their own `every` line to control evaluation frequency, ranging from every 1 second for rapidly changing metrics to several minutes for slow-changing metrics.
 
 ## 12.1.2 The Alert State Machine
 
