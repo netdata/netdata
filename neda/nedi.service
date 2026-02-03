@@ -1,0 +1,41 @@
+[Unit]
+Description=Nedi AI Support Engineer
+After=network.target
+
+[Service]
+Type=simple
+User=neda
+Group=neda
+WorkingDirectory=/opt/neda
+
+# Environment
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/neda/google-cloud-sdk/bin:/opt/neda/bin:/opt/neda/.local/bin:/opt/netdata/usr/bin"
+Environment="HOME=/opt/neda"
+Environment="NODE_ENV=production"
+
+# Execute
+ExecStart=/opt/neda/bin/neda \
+  --agent ./support-public.ai \
+  --embed support:8707 \
+  --telemetry-enabled \
+  --telemetry-prometheus-enabled \
+  --telemetry-prometheus-port 8706 \
+  --verbose
+
+# Restart policy
+TimeoutStopSec=5
+Restart=always
+RestartSec=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=neda
+LogNamespace=neda
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -57,6 +57,46 @@ run() {
     fi
 }
 
+# Detect OS and package manager
+detect_os() {
+    if [ -f /etc/debian_version ]; then
+        OS_FAMILY="debian"
+    elif [ -f /etc/redhat-release ]; then
+        OS_FAMILY="redhat"
+    elif [ -f /etc/arch-release ]; then
+        OS_FAMILY="arch"
+    else
+        OS_FAMILY="unknown"
+    fi
+}
+
+# Generic package installer
+install_pkg() {
+    local pkg_debian="$1"
+    local pkg_redhat="${2:-$1}"
+    local pkg_arch="${3:-$1}"
+
+    case "$OS_FAMILY" in
+        debian)
+            run apt-get install -y "$pkg_debian"
+            ;;
+        redhat)
+            run dnf install -y "$pkg_redhat" || run yum install -y "$pkg_redhat"
+            ;;
+        arch)
+            run pacman -Sy --noconfirm "$pkg_arch"
+            ;;
+        *)
+            log_error "Unsupported OS. Please install $pkg_debian manually."
+            exit 1
+            ;;
+    esac
+}
+
+# Detect OS early
+detect_os
+log_info "Detected OS family: $OS_FAMILY"
+
 # Resolve script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.."
@@ -144,21 +184,54 @@ fi
 
 log_info "Checking Node.js tools..."
 
-if ! command -v npx &> /dev/null; then
-    log_info "Installing Node.js and npm tools..."
-    
-    if ! command -v node &> /dev/null; then
-        log_info "Installing Node.js via NodeSource repository..."
-        run curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
-        run apt-get install -y nodejs
-    fi
-    
-    if ! command -v npx &> /dev/null; then
-        log_error "Failed to install npx"
-        exit 1
+# Function to get major node version
+get_node_major_version() {
+    node --version 2>/dev/null | sed 's/v\([0-9]*\).*/\1/'
+}
+
+# Function to install/upgrade Node.js based on OS
+install_nodejs() {
+    local version=$1
+
+    case "$OS_FAMILY" in
+        debian)
+            run curl -fsSL https://deb.nodesource.com/setup_${version}.x | bash -
+            run apt-get install -y nodejs
+            ;;
+        redhat)
+            run curl -fsSL https://rpm.nodesource.com/setup_${version}.x | bash -
+            run dnf install -y nodejs || run yum install -y nodejs
+            ;;
+        arch)
+            # Arch repos have recent Node.js versions
+            run pacman -Sy --noconfirm nodejs npm
+            ;;
+        *)
+            log_error "Unsupported OS. Please install Node.js $version manually."
+            exit 1
+            ;;
+    esac
+}
+
+REQUIRED_NODE_VERSION=22
+
+if command -v node &> /dev/null; then
+    CURRENT_NODE_VERSION=$(get_node_major_version)
+    if [ "$CURRENT_NODE_VERSION" -lt "$REQUIRED_NODE_VERSION" ]; then
+        log_info "Node.js $CURRENT_NODE_VERSION found, upgrading to Node.js $REQUIRED_NODE_VERSION..."
+        install_nodejs $REQUIRED_NODE_VERSION
+        log_info "Node.js upgraded to $(node --version)"
+    else
+        log_info "Node.js $(node --version) already meets requirement (>= $REQUIRED_NODE_VERSION)"
     fi
 else
-    log_info "Node.js tools already available ($(node --version))"
+    log_info "Installing Node.js $REQUIRED_NODE_VERSION..."
+    install_nodejs $REQUIRED_NODE_VERSION
+fi
+
+if ! command -v npx &> /dev/null; then
+    log_error "Failed to install npx"
+    exit 1
 fi
 
 # ============================================================================
@@ -169,7 +242,7 @@ log_info "Checking ripgrep..."
 
 if ! command -v rg &> /dev/null; then
     log_info "Installing ripgrep..."
-    run apt-get install -y ripgrep
+    install_pkg ripgrep ripgrep ripgrep
 else
     log_info "ripgrep already available ($(rg --version | head -1))"
 fi
@@ -326,7 +399,7 @@ cat > "$NEDA_HOME/bin/neda" <<EOF
 #!/usr/bin/env bash
 # Neda launcher script
 
-export PATH="\$PATH:$GCLOUD_HOME/bin:$NEDA_HOME/bin"
+export PATH="\$PATH:$GCLOUD_HOME/bin:$NEDA_HOME/bin:$NEDA_HOME/.local/bin"
 export HOME="$NEDA_HOME"
 
 # Change to neda directory for relative paths
@@ -393,32 +466,37 @@ log_info "Use services-install.sh to install them to systemd"
 
 log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Check Python tools (pipx, uvx) for MCP servers
+# Install Python tools (pipx, uv/uvx) for MCP servers
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-log_info "Checking Python tools for MCP servers..."
+log_info "Setting up Python tools for MCP servers..."
 
-# Check if pipx is installed
+# Install pipx system-wide (available to all users including neda)
 if ! command -v pipx &> /dev/null; then
-    log_error "pipx is not installed but required for analytics-mcp"
-    log_info "Please install pipx manually:"
-    log_info "  - On Ubuntu/Debian: sudo apt install pipx"
-    log_info "  - On Arch/Manjaro: sudo pacman -S python-pipx"
-    log_info "  - Via pip: python3 -m pip install --user pipx"
-    log_info "Then re-run this setup script."
-    exit 1
-fi
-
-# Check if uvx is available (it's part of uv)
-if ! command -v uvx &> /dev/null; then
-    log_error "uvx is not installed but required for freshdesk-mcp"
-    log_info "Please install uv manually:"
-    log_info "  curl -LsSf https://astral.sh/uv/install.sh | sh"
-    log_info "Then re-run this setup script."
-    exit 1
+    log_info "Installing pipx system-wide..."
+    install_pkg pipx pipx python-pipx
+else
+    log_info "pipx already available ($(pipx --version))"
 fi
 
 # Ensure neda user's pipx is configured properly
 run sudo -u "$NEDA_USER" env HOME="$NEDA_HOME" pipx ensurepath
+
+# Install uv for the neda user (uvx is part of uv)
+# uv installs to ~/.local/bin by default
+UV_BIN="$NEDA_HOME/.local/bin/uv"
+if [ ! -f "$UV_BIN" ]; then
+    log_info "Installing uv/uvx for neda user..."
+    run sudo -u "$NEDA_USER" env HOME="$NEDA_HOME" bash -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
+
+    if [ -f "$UV_BIN" ]; then
+        log_info "uv installed successfully at $UV_BIN"
+    else
+        log_error "Failed to install uv for neda user"
+        exit 1
+    fi
+else
+    log_info "uv already installed at $UV_BIN"
+fi
 
 # Note: analytics-mcp and freshdesk-mcp are run via 'pipx run' and 'uvx' respectively
 # They don't need pre-installation as they're fetched and cached on first use
