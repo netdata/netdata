@@ -281,12 +281,21 @@ alarm: mysql_10s_slow_queries
 
 Setting `to: silent` prevents notifications without stopping evaluation.
 
-**Method 2: Disable evaluation entirely**
-```conf
-# Completely disable alert evaluation
-alarm: disk_space_usage
-enabled: no
+**Method 2: Exclude via pattern matching**
+To disable a specific alert without commenting it out, use pattern exclusion in `netdata.conf`:
+
+```ini
+[health]
+    enabled alarms = !my_alert_name *
 ```
+
+Or disable all alerts matching a pattern:
+```ini
+[health]
+    enabled alarms = !*_disk_* *
+```
+
+Then reload health or restart the Agent.
 
 **Method 3: Disable via Cloud silencing rules**
 - Use **silencing rules** in Netdata Cloud to suppress notifications space-wide (see **4. Controlling Alerts and Noise**)
