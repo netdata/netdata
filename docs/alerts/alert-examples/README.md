@@ -261,33 +261,8 @@ lookup: min -10m at -50m unaligned of avail
 2. `out_of_disk_space_time` divides available bytes by fill rate to get hours remaining
 3. If fill rate is ≤ 0 (disk growing or stable), returns `inf` (never fills)
 
-### 6.5.2 Memory Leak Detection
 
-```conf
-template: ram_in_use
-    on: system.ram
-lookup: average -1h of used
-     every: 1m
-   calc: $this - $this(-1h)
-       units: MB
-       warn: $this > 500
-       crit: $this > 1000
-         to: sysadmin
-```
 
-### 6.5.3 Network Traffic Rate of Change
-
-```conf
-template: interface_inbound_errors
-    on: net.errors
-lookup: average -1m of inbound
-     every: 1m
-   calc: abs($this - $this(-5m))
-       units: errors
-       warn: $this > 10
-       crit: $this > 100
-         to: ops-team
-```
 
 ## Related Sections
 
