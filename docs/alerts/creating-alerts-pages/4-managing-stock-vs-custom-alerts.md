@@ -17,9 +17,11 @@ Your Netdata deployment can have alerts from three sources:
 :::note
 
 All three sources **coexist** on your nodes:
-- Stock alerts load first
-- Custom file-based alerts load next and can override stock alerts **with the same alert name** (regardless of filename). Additionally, if a user file has the same filename as a stock file, the stock file is skipped entirely.
-- Cloud-defined alerts load at runtime and override file-based alerts when they reuse the same `alarm`/`template` name (otherwise they coexist).
+- **Custom file-based alerts load first** from `/etc/netdata/health.d/` and take precedence
+- **Stock alerts load second** from `/usr/lib/netdata/conf.d/health.d/` — only applies where user hasn't overridden with same name
+- **Cloud-defined alerts load last** at runtime and override file-based alerts when they reuse the same `alarm`/`template` name
+
+**File shadowing:** If a user file has the same filename as a stock file, only the user file is loaded.
 
 :::
 
