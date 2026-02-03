@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""
-Validate map.yaml against JSON Schema with additional custom rules.
+"""\nValidate map.yaml against JSON Schema with additional custom rules.
 
 This validator uses JSON Schema for structure validation and adds custom
 checks for rules that can't be expressed in JSON Schema, such as:
-- Nodes with integration_placeholder children can omit edit_url and status
+- Nodes with integration_placeholder children can omit edit_url (but not status)
 - No duplicate edit_urls
 
 Exit codes:
@@ -31,7 +30,7 @@ except ImportError:
     sys.exit(1)
 
 
-class ValidationError:
+class MapValidationError:
     def __init__(self, path: str, message: str):
         self.path = path
         self.message = message
@@ -69,7 +68,7 @@ def check_has_integration_placeholder(items: List[Any]) -> bool:
     )
 
 
-def check_duplicate_edit_urls(node: Any, path: str, edit_urls: Dict[str, str], errors: List[ValidationError]) -> None:
+def check_duplicate_edit_urls(node: Any, path: str, edit_urls: Dict[str, str], errors: List[MapValidationError]) -> None:
     """Recursively check for duplicate edit_urls."""
     if not isinstance(node, dict):
         return
@@ -87,7 +86,7 @@ def check_duplicate_edit_urls(node: Any, path: str, edit_urls: Dict[str, str], e
         
         if edit_url and isinstance(edit_url, str):
             if edit_url in edit_urls:
-                errors.append(ValidationError(
+                errors.append(MapValidationError(
                     node_path,
                     f"Duplicate edit_url: '{edit_url}' (first seen at {edit_urls[edit_url]})"
                 ))
@@ -101,12 +100,12 @@ def check_duplicate_edit_urls(node: Any, path: str, edit_urls: Dict[str, str], e
                 check_duplicate_edit_urls(item, node_path, edit_urls, errors)
 
 
-def check_integration_placeholder_rule(node: Any, path: str, errors: List[ValidationError]) -> None:
+def check_integration_placeholder_rule(node: Any, path: str, errors: List[MapValidationError]) -> None:
     """
-    Check that nodes without edit_url/status have integration_placeholder children.
+    Check that nodes without edit_url have integration_placeholder children.
     
-    Custom rule: A node can only have null/missing edit_url and status if it has
-    at least one integration_placeholder child.
+    Custom rule: A node can only omit edit_url if it has at least one
+    integration_placeholder child. The status field is always required.
     """
     if not isinstance(node, dict):
         return
@@ -122,22 +121,15 @@ def check_integration_placeholder_rule(node: Any, path: str, errors: List[Valida
     label = meta.get('label', '???')
     node_path = f"{path}/{label}" if path else label
     edit_url = meta.get('edit_url')
-    status = meta.get('status')
     items = node.get('items', [])
     
-    # If edit_url or status is missing/null, check if there's an integration placeholder
-    if (edit_url is None or status is None):
+    # If edit_url is missing, check if there's an integration placeholder
+    if edit_url is None:
         if not check_has_integration_placeholder(items):
-            if edit_url is None:
-                errors.append(ValidationError(
-                    node_path,
-                    "Missing 'edit_url' field (only allowed for nodes with integration_placeholder children)"
-                ))
-            if status is None:
-                errors.append(ValidationError(
-                    node_path,
-                    "Missing 'status' field (only allowed for nodes with integration_placeholder children)"
-                ))
+            errors.append(MapValidationError(
+                node_path,
+                "Missing 'edit_url' field (only allowed for nodes with integration_placeholder children)"
+            ))
     
     # Recurse into children
     if isinstance(items, list):
@@ -156,18 +148,18 @@ def validate_with_schema(data: dict, schema: dict) -> Tuple[bool, List[str]]:
     return len(errors) == 0, errors
 
 
-def validate_custom_rules(data: dict) -> Tuple[bool, List[ValidationError]]:
+def validate_custom_rules(data: dict) -> Tuple[bool, List[MapValidationError]]:
     """Apply custom validation rules not expressible in JSON Schema."""
-    errors: List[ValidationError] = []
+    errors: List[MapValidationError] = []
     edit_urls: Dict[str, str] = {}
     
     # Guard against non-dict YAML root
     if not isinstance(data, dict):
-        return False, [ValidationError('root', f'YAML root must be a dictionary, got {type(data).__name__}')]
+        return False, [MapValidationError('root', f'YAML root must be a dictionary, got {type(data).__name__}')]
     
     sidebar = data.get('sidebar', [])
     if not isinstance(sidebar, list):
-        return False, [ValidationError('root', 'sidebar must be a list')]
+        return False, [MapValidationError('root', 'sidebar must be a list')]
     
     # Check for duplicate edit_urls
     for node in sidebar:
