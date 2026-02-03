@@ -74,10 +74,9 @@ Use **template** when:
 ## How to Target a Specific Chart with `template`
 
 If you need to target a specific chart instance (the use case for legacy `alarm`), use `template` with scoped context matching:
-- Use `chart labels:` to filter by chart labels
-- Use `host labels:` to filter by host labels  
+- Use `chart labels:` to filter by chart labels (e.g., `chart labels: id=eth0`)
+- Use `host labels:` to filter by host labels (e.g., `host labels: hostname=webserver-01`)
 - Use `os:` to filter by operating system
-- This approach migrates cleanly to the future YAML format
 
 Example (legacy `alarm` vs equivalent `template`):
 ```conf
@@ -100,19 +99,19 @@ template: 1m_received_traffic_overflow
 
 :::note
 
-**Important:** The template above applies to **all** network interfaces. To restrict it to a specific chart like `eth0`, use additional scoping:
+**Important:** The template above applies to **all** network interfaces. To restrict it to a specific chart like `eth0`, use `chart labels:`:
 
 ```conf
 template: eth0_inbound_utilization
     on: net.net
-    families: eth0  # Restrict to eth0 interface only
+    chart labels: id=eth0
     lookup: average -1m unaligned absolute of received
     units: Mbits
     warn: $this > 80
     crit: $this > 90
 ```
 
-Or use `host:` labels to target a specific host's network interfaces.
+Or use `host labels:` to target a specific host's network interfaces.
 
 :::
 
