@@ -1052,7 +1052,7 @@ sidebar:
                 path: Dashboards and Charts/Tabs
                 edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/dashboards-tab.md
                 status: Published
-                description: Design new dashboards that target your infrastructure's unique needs and share them with your team fortargeted visual anomaly detection or incident response.
+                description: Design new dashboards that target your infrastructure's unique needs and share them with your team for targeted visual anomaly detection or incident response.
           - meta:
                 label: Events
                 path: Dashboards and Charts/Tabs
