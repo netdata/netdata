@@ -16,7 +16,7 @@ These variables are always available in alert expressions after `lookup` or `cal
 
 **Contains:** The primary value being evaluated by this alert. If `calc` is defined, this is the result of the `calc` expression. If no `calc`, this is the result of the `lookup` aggregation.
 
-**Scope:** Available in all `calc`, `warn`, `crit`, and `ok` expressions.
+**Scope:** Available in all `calc`, `warn`, and `crit` expressions.
 
 **Example:**
 ```conf
