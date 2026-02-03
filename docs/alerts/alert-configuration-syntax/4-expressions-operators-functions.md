@@ -1,6 +1,6 @@
 # 3.4 Expressions, Operators, and Functions
 
-Alert conditions in Netdata are expressed as numeric boolean expressions on top of the value of `$this` (and other variables). These expressions appear in lines like `warn:`, `crit:`, and `ok:` (when used). Expressions compare and combine numbers and status constants; there are no string comparisons or regular expressions in the health expression language.
+Alert conditions in Netdata are expressed as numeric boolean expressions on top of the value of `$this` (and other variables). These expressions appear in lines like `warn:` and `crit:`. Expressions compare and combine numbers and status constants; there are no string comparisons or regular expressions in the health expression language.
 
 :::tip
 
@@ -14,7 +14,6 @@ Expressions primarily appear in these lines:
 
 - `warn:` (condition for entering or staying in WARNING)
 - `crit:` (condition for entering or staying in CRITICAL)
-- `ok:` (optional, explicit condition for returning to CLEAR)
 
 Example:
 
@@ -25,15 +24,7 @@ crit: $this > 95
 
 Here, the expression on `warn:` evaluates to true when `$this` is above `80`, and the expression on `crit:` evaluates to true when `$this` is above `95`.
 
-Using an explicit `ok:` to control when the alert clears:
-
-```conf
-warn: $this > 80
-crit: $this > 95
-  ok: $this < 70
-```
-
-In many stock alerts, `ok:` is omitted and Netdata uses default clear behavior based on `warn:`/`crit:` transitions. Use `ok:` only when you need more explicit or asymmetric clear conditions.
+Netdata uses default clear behavior based on `warn:`/`crit:` transitions—when neither condition is true, the alert clears.
 
 :::tip
 
@@ -51,7 +42,7 @@ An expression must evaluate to true or false. Internally, Netdata evaluates them
 | 2 | Evaluate the `crit:` and `warn:` expressions | Check both conditions |
 | 3 | If `crit:` is true | Alert enters or stays in CRITICAL |
 | 4 | If `crit:` is false but `warn:` is true | Alert enters or stays in WARNING |
-| 5 | If both are false and an `ok:` expression exists | Netdata evaluates `ok:` to decide whether to return to CLEAR |
+| 5 | If both are false | Alert returns to CLEAR |
 | 6 | Apply previous status and `delay`/hysteresis | Final status depends on these settings (see 3.1 and 8.1) |
 
 A simple example:
