@@ -57,6 +57,33 @@ def format_schema_error(error: jsonschema.ValidationError) -> str:
     path = (
         ".".join(str(p) for p in error.absolute_path) if error.absolute_path else "root"
     )
+    # For oneOf/anyOf, jsonschema often reports a generic message like
+    # "is not valid under any of the given schemas" and puts the real
+    # problems into error.context. Surface the most relevant sub-error(s)
+    # so users see actionable messages without needing debug output.
+    validator = getattr(error, "validator", None)
+    if validator in ("oneOf", "anyOf") and getattr(error, "context", None):
+        suberrors = list(error.context)
+
+        def _path_depth(e: jsonschema.ValidationError) -> int:
+            try:
+                return len(list(e.absolute_path))
+            except Exception:
+                return 0
+
+        # Prefer the deepest (most specific) sub-error.
+        suberrors.sort(key=_path_depth, reverse=True)
+        primary = suberrors[0]
+        sub_path = (
+            ".".join(str(p) for p in primary.absolute_path) if primary.absolute_path else path
+        )
+        # Collect up to a couple of distinct messages for context.
+        messages = [primary.message]
+        for sub in suberrors[1:3]:
+            if sub.message not in messages:
+                messages.append(sub.message)
+        details = "; ".join(messages)
+        return f"[{sub_path}] {details} (while validating {validator} at {path})"
     return f"[{path}] {error.message}"
 
 
