@@ -84,12 +84,12 @@ Just ensure the file is under `/etc/netdata/health.d/` and has a `.conf` extensi
 
 ## 2.2.3 Adding or Modifying Alert Definitions
 
-Alert definitions use the `template` keyword, which is the recommended and future-proof way to define alerts for any scope:
+Alert definitions use the `template` keyword, which is the recommended way to define alerts for any scope:
 
 | Scope | How to Target |
 |-------|---------------|
 | **All charts of a context** | Use `on: <context>` (for example, `on: disk.space`) |
-| **Specific chart instance** | Use `families: <chart-name>` to filter (for example, `families: _` for root filesystem only) |
+| **Specific chart instance** | Use `chart labels:` to filter (for example, `chart labels: id=_` for root filesystem only) |
 
 For the conceptual difference between context-based and chart-specific targeting, see **1.2 Alert Types: `alarm` vs `template`**.
 
@@ -122,12 +122,12 @@ template: disk_space_usage
 - `lookup:` aggregates data over the last minute
 - `warn:` and `crit:` define warning and critical thresholds
 
-**To target a specific chart only** (for example, only root filesystem), use `families:`:
+**To target a specific chart only** (for example, only root filesystem), use `chart labels:`:
 
 ```conf
 template: root_disk_space
     on: disk.space
- families: _  # Restrict to root filesystem only
+chart labels: id=_  # Restrict to root filesystem only
    lookup: average -1m percentage of avail
     units: %
     every: 1m
@@ -147,9 +147,9 @@ Both use **dots** in their naming convention.
 - Example: `on: disk.space` monitors all filesystems
 - Example: `on: net.net` monitors all network interfaces
 
-**Chart IDs** (`families:`): Reference **specific chart instances**
-- Example: `families: _` targets root filesystem only
-- Example: `families: eth0` targets specific network interface
+**Chart IDs** (`id` label): Reference **specific chart instances** (accessed via `chart labels:id=<name>`)
+- Example: `chart labels: id=_` targets root filesystem only
+- Example: `chart labels: id=eth0` targets specific network interface
 
 **How to find them:**
 - Dashboard: Hover over chart → check tooltip
@@ -353,9 +353,9 @@ To modify a **stock alert** without losing your changes on upgrade:
 5. **Reload** health configuration
 
 **How precedence works:**
-- Stock alerts load first from `/usr/lib/netdata/conf.d/health.d/`
-- Custom alerts load next from `/etc/netdata/health.d/`
-- If a custom alert has the **same name** as a stock alert, the custom version **overrides** it
+- Custom alerts load first from `/etc/netdata/health.d/`
+- Stock alerts load second from `/usr/lib/netdata/conf.d/health.d/`
+- If a file with the **same name** exists in both directories, the custom file **entirely replaces** the stock file (stock file is skipped, not just per-alert)
 
 :::tip
 
