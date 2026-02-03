@@ -923,6 +923,8 @@ static int store_label_batch(
     }
 
 bind_fail:
+    if (param)
+        errors = 1;
     REPORT_BIND_FAIL(stmt, param);
     SQLITE_FINALIZE(stmt);
 
