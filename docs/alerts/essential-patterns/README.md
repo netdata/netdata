@@ -33,14 +33,13 @@ lookup: average -10m unaligned of user,system
      units: %
      every: 1m
       warn: ($status == $CLEAR && $this > 80) || ($status >= $WARNING && $this > 70)
-      crit: ($status < $CRITICAL && $this > 95) || ($status == $CRITICAL && $this > 90)
-        ok: $this < 70
+       crit: ($status < $CRITICAL && $this > 95) || ($status == $CRITICAL && $this > 90)
 ```
 
 This implements asymmetric hysteresis:
 - Enter WARNING at 80%, but stay WARNING until > 85%
 - Enter CRITICAL at 95%, but stay CRITICAL until > 98%
-- Clear only when below 70%
+- Alarms automatically clear when criteria are no longer met
 
 The `$status` variable enables different thresholds based on current state.
 
@@ -179,7 +178,7 @@ The exec script receives 33 positional arguments (not environment variables):
 if [ "${10}" = "CRITICAL" ]; then
     curl -X POST https://events.pagerduty.com/v2/enqueue \
         -H 'Content-Type: application/json' \
-        -d "{\"routing_key\": \"YOUR_KEY\", \"event_action\": \"trigger\", \"dedup_key\": \"${3}\"}"
+        -d '{"routing_key": "YOUR_KEY", "event_action": "trigger", "dedup_key": "'"$3"'"}'
 fi
 ```
 
