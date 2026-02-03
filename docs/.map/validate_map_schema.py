@@ -15,12 +15,12 @@ Exit codes:
 import sys
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Set, Tuple
+from typing import List, Dict, Any, Tuple
 
 try:
-    import yaml
+    from ruamel.yaml import YAML
 except ImportError:
-    print("ERROR: PyYAML is required. Install with: pip install pyyaml")
+    print("ERROR: ruamel.yaml is required. Install with: pip install ruamel.yaml")
     sys.exit(1)
 
 try:
@@ -48,8 +48,9 @@ def load_schema(schema_path: str) -> dict:
 
 def load_yaml(yaml_path: str) -> dict:
     """Load YAML file."""
+    yaml = YAML(typ='safe')
     with open(yaml_path, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f)
+        return yaml.load(f)
 
 
 def format_schema_error(error: jsonschema.ValidationError) -> str:
