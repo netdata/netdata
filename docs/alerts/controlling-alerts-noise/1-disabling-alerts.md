@@ -30,11 +30,14 @@ Add the alert you want to disable:
 
 ```conf
 # Disable stock alert that doesn't apply to our environment
-alarm: mysql_10s_slow_queries
+# Use pattern matching in netdata.conf: enabled alarms = !mysql_*
 
-# Disable by setting enabled to no
+# Or create an override that provides no evaluation logic:
 template: mysql_10s_slow_queries
-   enabled: no
+   on: mysql.queries
+  lookup: average -10s of slow_queries
+     calc: $this
+# Intentionally leave out warn:/crit: so it never triggers
 ```
 
 Reload configuration:
