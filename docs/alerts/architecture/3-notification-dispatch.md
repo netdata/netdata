@@ -44,7 +44,7 @@ Critical notification delivery should use redundant paths. Configure multiple no
 
 Notification routing determines which recipients receive which alerts. Routing rules can filter by alert name, chart, host, or severity.
 
-Escalation policies route unacknowledged alerts to secondary recipients after timeout periods.
+Native Netdata routing uses roles and filters but does not implement escalation timelines. External escalation services like PagerDuty or OpsGenie provide secondary recipient routing after acknowledged timeouts.
 
 | Routing Factor | Description |
 |----------------|-------------|
