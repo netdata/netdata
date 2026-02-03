@@ -50,9 +50,9 @@ Match notification method to alert severity and urgency. Critical alerts warrant
 
 | Severity | Notification Method | Expected Response |
 |----------|---------------------|-------------------|
-| CRIT | Paging, SMS | Immediate (< 15 min) |
-| WARN | Email, Slack | Same business day |
-| INFO | Dashboard | Review during normal work |
+| CRITICAL | Paging, SMS | Immediate (< 15 min) |
+| WARNING | Email, Slack | Same business day |
+| CLEAR | Dashboard | Acknowledge resolution |
 
 Consider the time-sensitivity of each alert type. An alert requiring response within minutes should use different notification methods than an alert requiring response within days.
 
