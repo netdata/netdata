@@ -741,10 +741,12 @@ where
         let shutdown_token = self.shutdown_token.clone();
 
         tokio::spawn(async move {
-        tokio::spawn(async move {
             match wait_for_shutdown_signal().await {
                 Ok(()) => info!("received shutdown signal, initiating graceful shutdown"),
-                Err(e) => error!("failed to wait for shutdown signal: {}, initiating shutdown", e),
+                Err(e) => error!(
+                    "failed to wait for shutdown signal: {}, initiating shutdown",
+                    e
+                ),
             }
             shutdown_token.cancel();
         });
