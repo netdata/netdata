@@ -15,7 +15,7 @@ sudo bash /usr/lib/netdata/health/alarm-test.sh slack
 **Check notification logs:**
 
 ```bash
-sudo grep -i notification /var/log/netdata/error.log | tail -n 100
+sudo grep -i notification /var/log/netdata/health.log | tail -n 100
 ```
 
 ## 5.5.2 Testing Cloud Notifications
