@@ -36,7 +36,7 @@ endpoint:
   tls_ca_cert_path: null
 ```
 
-### Metrics
+## Metrics
 
 The `metrics` section allows users to specify the directory containing
 configuration files for mapping OpenTelemetry metrics to Netdata chart
@@ -53,7 +53,7 @@ metrics:
   buffer_samples: 10
 ```
 
-## Mapping OpenTelemetry metrics to Netdata chart instances
+### Mapping OpenTelemetry metrics to Netdata chart instances
 
 Without an explicit mapping, the `otel.plugin` defaults to creating distinct
 chart instances based on the attributes of each data point in a metric. Users
@@ -80,3 +80,32 @@ corresponding regular expressions specified in the values of the
 `instrumentation_scope_name` and `metric_name` keys. Similarly, the values of
 the `protocol` and `state` attributes of each data point in the matched metric
 will be used to create a new chart instance with the proper dimension names.
+
+## Logs
+
+The `logs` section configures how `otel.plugin` receives, stores, and manages
+OpenTelemetry logs. Logs are stored in `systemd`-compatible journal files that
+support rotation and retention policies for efficient storage management.
+
+### Rotation
+
+Rotation controls when a new journal file is created. A new file is created
+when **any** of the following limits is exceeded:
+
+| Option                       | Default   | Description                                  |
+|------------------------------|-----------|----------------------------------------------|
+| `size_of_journal_file`       | `100MB`   | Maximum file size before rotating            |
+| `entries_of_journal_file`    | `50000`   | Maximum log entries per file                 |
+| `duration_of_journal_file`   | `2 hours` | Maximum time span within a single file       |
+
+### Retention
+
+Retention controls when old journal files are deleted, allowing you to limit
+the overall size of the logs directory. Files are removed (starting with the
+oldest) to satisfy **all** of the following limits:
+
+| Option                       | Default  | Description                       |
+|------------------------------|----------|-----------------------------------|
+| `number_of_journal_files`    | `10`     | Maximum number of files to keep   |
+| `size_of_journal_files`      | `1GB`    | Maximum total size of all files   |
+| `duration_of_journal_files`  | `7 days` | Maximum age of files              |
