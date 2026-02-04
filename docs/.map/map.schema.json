@@ -52,7 +52,8 @@
             "description": "Metadata for a sidebar node",
             "required": [
                 "label",
-                "path"
+                "path",
+                "status"
             ],
             "additionalProperties": false,
             "properties": {
