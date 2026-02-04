@@ -78,6 +78,12 @@ repeat: [off] [warning DURATION] [critical DURATION]
 | `warning DURATION` | Interval between WARNING notifications (e.g., `24h`) | Optional |
 | `critical DURATION` | Interval between CRITICAL notifications (e.g., `6h`) | Optional |
 
+:::note
+
+Each duration requires its keyword prefix (`warning:` or `critical:`). A lone duration like `repeat: 6h` is not valid—specify `repeat: warning 6h` and/or `repeat: critical 6h` explicitly.
+
+:::
+
 **Example: Daily Repeat for Sustained Issues**
 
 ```conf
@@ -102,7 +108,7 @@ template: portcheck_connection_timeouts
     every: 1m
     warn: $this > 1000
     delay: up 10m down 2m
-    repeat: 6h
+    repeat: critical 6h
 ```
 
 **Behavior:**
