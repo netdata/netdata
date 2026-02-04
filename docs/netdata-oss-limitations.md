@@ -35,7 +35,7 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 | Anomaly detection (ML) | ✓ | ✓ | ✓ |
 | Alert notifications | ✓ | ✓ | ✓ |
 | Multi-node views | 5 nodes | 5 nodes | Unlimited |
-| Custom dashboards | 1 per agent | 1 per agent | Unlimited |
+| Custom dashboards | 1 per agent | 1 per room | Unlimited |
 
 ### Functions (Top Tab)
 
@@ -132,7 +132,7 @@ The 5-node limit on multi-node dashboards applies to Community plans:
 | **AI Features** | Blocked | Full access | Full access |
 | **Dynamic Configuration** | Blocked | Blocked | Full access |
 | **Multi-node Limit** | 5 nodes | 5 nodes | Unlimited |
-| **Custom Dashboards** | 1 per agent | 1 per agent | Unlimited |
+| **Custom Dashboards** | 1 per agent | 1 per room | Unlimited |
 | **RBAC & SSO** | N/A | Not available | Full access |
 
 Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to Business for full configuration control and unlimited scale.
