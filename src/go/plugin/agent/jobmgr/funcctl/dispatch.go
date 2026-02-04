@@ -166,7 +166,7 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) func(fun
 				resolvedParams[paramJob] = resolvedJob
 			},
 			respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
-				c.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery)
+				c.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery, methodCfg.ResponseType)
 			},
 		})
 	}
@@ -194,7 +194,7 @@ func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functi
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          200,
-		"type":            "table",
+		"type":            resolveResponseType("", methodCfg.ResponseType),
 		"has_history":     false,
 		"help":            help,
 		"accepted_params": buildAcceptedParams(methodParams),
@@ -437,7 +437,7 @@ func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID stri
 				return c.resolveJobMethodParams(ctx, methodCfg, handler, methodID)
 			},
 			respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
-				c.respondJobMethodWithParams(fn, dataResp, methodParams, updateEvery)
+				c.respondJobMethodWithParams(fn, dataResp, methodParams, updateEvery, methodCfg.ResponseType)
 			},
 		})
 	}
@@ -465,7 +465,7 @@ func (c *Controller) handleJobMethodFuncInfo(moduleName, jobName, methodID strin
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          200,
-		"type":            "table",
+		"type":            resolveResponseType("", methodCfg.ResponseType),
 		"has_history":     false,
 		"help":            help,
 		"accepted_params": buildJobMethodAcceptedParams(methodParams),
@@ -486,7 +486,6 @@ func (c *Controller) resolveJobMethodParams(ctx context.Context, methodCfg *func
 
 	return funcapi.MergeParamConfigs(methodParams, jobParams), true, nil
 }
-
 func buildJobMethodAcceptedParams(methodParams []funcapi.ParamConfig) []string {
 	accepted := make([]string, 0, len(methodParams))
 	for _, param := range methodParams {
