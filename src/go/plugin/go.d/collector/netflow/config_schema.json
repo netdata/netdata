@@ -1,8 +1,8 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "NetFlow/IPFIX collector configuration.",
-    "description": "Collector for NetFlow v5/v9 and IPFIX flow summaries.",
+    "title": "NetFlow/IPFIX/sFlow collector configuration.",
+    "description": "Collector for NetFlow v5/v9, IPFIX, and sFlow flow summaries.",
     "type": "object",
     "properties": {
       "update_every": {
@@ -34,6 +34,11 @@
           },
           "ipfix": {
             "title": "IPFIX",
+            "type": "boolean",
+            "default": true
+          },
+          "sflow": {
+            "title": "sFlow",
             "type": "boolean",
             "default": true
           }
