@@ -41,14 +41,14 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 	coll.updateTopologyCacheEntry(ddsnmp.Metric{
 		Name: metricLldpRemEntry,
 		Tags: map[string]string{
-			tagLldpLocPortNum:       "1",
-			tagLldpRemIndex:         "1",
-			tagLldpRemChassisID:     "aa:bb:cc:dd:ee:ff",
+			tagLldpLocPortNum:          "1",
+			tagLldpRemIndex:            "1",
+			tagLldpRemChassisID:        "aa:bb:cc:dd:ee:ff",
 			tagLldpRemChassisIDSubtype: "4",
-			tagLldpRemPortID:        "Gi0/2",
-			tagLldpRemPortIDSubtype: "5",
-			tagLldpRemPortDesc:      "downlink",
-			tagLldpRemSysName:       "sw2",
+			tagLldpRemPortID:           "Gi0/2",
+			tagLldpRemPortIDSubtype:    "5",
+			tagLldpRemPortDesc:         "downlink",
+			tagLldpRemSysName:          "sw2",
 		},
 	})
 
@@ -98,4 +98,92 @@ func TestTopologyCache_CdpSnapshot(t *testing.T) {
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
 	assert.Equal(t, "Gi0/2", data.Links[0].Src.IfName)
 	assert.Equal(t, "Gi0/3", data.Links[0].Dst.PortID)
+}
+
+func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
+	coll := &Collector{
+		Config:        Config{Hostname: "10.0.0.1"},
+		topologyCache: newTopologyCache(),
+		sysInfo:       &snmputils.SysInfo{SysObjectID: "1.3.6.1.4.1.9.1.1", Name: "sw1", Descr: "Switch 1"},
+	}
+
+	coll.resetTopologyCache()
+	coll.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
+		Tags: map[string]string{
+			tagLldpLocChassisID:        "00:11:22:33:44:55",
+			tagLldpLocChassisIDSubtype: "4",
+			tagLldpLocSysCapEnabled:    "80",
+			tagLldpLocSysCapSupported:  "80",
+		},
+	}})
+
+	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+		Name: metricLldpLocManAddrEntry,
+		Tags: map[string]string{
+			tagLldpLocMgmtAddrSubtype: "2",
+			tagLldpLocMgmtAddr:        "0a000001",
+			tagLldpLocMgmtAddrIfID:    "1",
+		},
+	})
+	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+		Name: metricLldpRemManAddrEntry,
+		Tags: map[string]string{
+			tagLldpLocPortNum:         "1",
+			tagLldpRemIndex:           "1",
+			tagLldpRemMgmtAddrSubtype: "2",
+			tagLldpRemMgmtAddr:        "0a000002",
+		},
+	})
+	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+		Name: metricLldpRemEntry,
+		Tags: map[string]string{
+			tagLldpLocPortNum:          "1",
+			tagLldpRemIndex:            "1",
+			tagLldpRemChassisID:        "aa:bb:cc:dd:ee:ff",
+			tagLldpRemChassisIDSubtype: "4",
+			tagLldpRemSysName:          "sw2",
+			tagLldpRemSysCapEnabled:    "80",
+		},
+	})
+
+	coll.finalizeTopologyCache()
+
+	coll.topologyCache.mu.RLock()
+	data, ok := coll.topologyCache.snapshot()
+	coll.topologyCache.mu.RUnlock()
+
+	require.True(t, ok)
+	require.Greater(t, len(data.Devices), 1)
+	require.NotEmpty(t, data.Devices[0].ManagementAddresses)
+	require.NotEmpty(t, data.Devices[0].CapabilitiesEnabled)
+	require.True(t, containsMgmtAddr(data, map[string]struct{}{"10.0.0.2": {}}))
+}
+
+func TestTopologyCache_CDPManagementAddresses(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		ManagementIP:  "10.0.0.1",
+	}
+
+	cache.updateCdpRemote(map[string]string{
+		tagCdpIfIndex:               "2",
+		tagCdpDeviceIndex:           "1",
+		tagCdpDeviceID:              "sw3",
+		tagCdpPrimaryMgmtAddrType:   "1",
+		tagCdpPrimaryMgmtAddr:       "0a000003",
+		tagCdpSecondaryMgmtAddrType: "1",
+		tagCdpSecondaryMgmtAddr:     "0a000004",
+	})
+
+	cache.mu.RLock()
+	data, ok := cache.snapshot()
+	cache.mu.RUnlock()
+
+	require.True(t, ok)
+	require.True(t, containsMgmtAddr(data, map[string]struct{}{"10.0.0.3": {}, "10.0.0.4": {}}))
 }
