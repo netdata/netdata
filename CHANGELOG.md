@@ -278,6 +278,9 @@
 - Handle transient systemd state flag changes. ([#21695](https://github.com/netdata/netdata/issues/21695))
 - Adjust curl options when submitting events ([#21696](https://github.com/netdata/netdata/issues/21696))
 - Add object size and bounds validation when reading journal files. ([#21697](https://github.com/netdata/netdata/issues/21697))
+- Update README links to correct otel-plugin paths ([#21699](https://github.com/netdata/netdata/issues/21699))
+- Fix text sanitizer buffer overflow ([#21698](https://github.com/netdata/netdata/issues/21698))
+- Fix ML db model load function ([#21700](https://github.com/netdata/netdata/issues/21700))
 
 ## [2.8.0] - 2025-11-19
 
