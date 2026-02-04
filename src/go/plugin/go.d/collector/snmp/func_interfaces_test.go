@@ -13,17 +13,20 @@ import (
 
 // newTestFuncInterfaces creates a funcInterfaces for testing with the given cache.
 func newTestFuncInterfaces(cache *ifaceCache) *funcInterfaces {
-	r := &funcRouter{ifaceCache: cache}
+	r := &funcRouter{ifaceCache: cache, topologyCache: nil}
 	return newFuncInterfaces(r)
 }
 
 func TestSnmpMethods(t *testing.T) {
 	methods := snmpMethods()
 
-	require.Len(t, methods, 1)
+	require.Len(t, methods, 2)
 	assert.Equal(t, "interfaces", methods[0].ID)
 	assert.Equal(t, "Network Interfaces", methods[0].Name)
 	require.NotEmpty(t, methods[0].RequiredParams)
+
+	assert.Equal(t, "topology", methods[1].ID)
+	assert.Equal(t, "Topology", methods[1].Name)
 
 	// Verify type group param exists
 	var typeGroupParam *funcapi.ParamConfig

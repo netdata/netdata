@@ -264,6 +264,11 @@ func TestCollector_Collect(t *testing.T) {
 				"snmp_device_prof_test_stats_timings_table":            0,
 				"snmp_device_prof_test_stats_timings_virtual":          0,
 				"snmp_device_prof_uptime":                              123,
+				"snmp_topology_devices_discovered":                     0,
+				"snmp_topology_devices_total":                          1,
+				"snmp_topology_links_cdp":                              0,
+				"snmp_topology_links_lldp":                             0,
+				"snmp_topology_links_total":                            0,
 			},
 		},
 		"collects table multivalue metric": {
@@ -323,6 +328,11 @@ func TestCollector_Collect(t *testing.T) {
 				"snmp_device_prof_test_stats_timings_virtual":          0,
 				"snmp_device_prof_if_octets_eth0_in":                   1,
 				"snmp_device_prof_if_octets_eth0_out":                  2,
+				"snmp_topology_devices_discovered":                     0,
+				"snmp_topology_devices_total":                          1,
+				"snmp_topology_links_cdp":                              0,
+				"snmp_topology_links_lldp":                             0,
+				"snmp_topology_links_total":                            0,
 			},
 		},
 	}

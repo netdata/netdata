@@ -189,6 +189,49 @@ Network interface metrics from cached SNMP data, including traffic rates, packet
 | Multicast Out | float | packets/s | hidden | Rate of multicast packets transmitted per second. |
 
 
+### Network Topology
+
+Provides LLDP/CDP neighbor discovery data for the monitored SNMP device.
+
+This function reads cached LLDP/CDP data collected during regular SNMP polling and returns a topology schema (devices, links, and stats). No additional SNMP requests are triggered when calling this function.
+
+Use cases:
+- Discover Layer 2 neighbors and link mapping
+- Validate cabling and port connections
+- Identify adjacent devices that are discovered but not monitored
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Snmp:topology` |
+| Require Cloud | yes |
+| Performance | Uses cached SNMP data only. If `topology.autoprobe` is enabled, LLDP/CDP tables are collected during normal polling. |
+| Security | Exposes device identifiers, port identifiers, and management addresses only. No credentials or payload data are exposed. |
+| Availability | Available after at least one successful collection cycle with LLDP/CDP data. Returns HTTP 503 if topology cache is not ready. |
+
+#### Prerequisites
+
+- Devices must expose LLDP-MIB and/or CISCO-CDP-MIB data.
+- By default, vendor profiles that include LLDP/CDP will provide topology data.
+- To enable LLDP/CDP collection for devices without vendor profiles, set `topology.autoprobe: yes`.
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Topology data for the monitored device in a JSON schema suitable for cross-agent aggregation.
+
+| Field | Type | Description |
+|:------|:-----|:------------|
+| schema_version | integer | Topology schema version. |
+| agent_id | string | Netdata Agent or vnode identifier that collected the data. |
+| collected_at | string | Collection timestamp in RFC 3339 format. |
+| devices | array | List of devices (local and discovered). |
+| links | array | List of discovered links (LLDP/CDP). |
+| stats | object | Summary stats (device/link counts). |
+
+
 
 ## Alerts
 
@@ -258,6 +301,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
 |  | ping.interval | Interval between sending ping packets. | 100ms | no |
 | **Profiles** | manual_profiles | A list of profiles to force-apply when auto-detection cannot be used. | [] | no |
+| **Topology** | topology.autoprobe | When enabled, the collector auto-appends LLDP/CDP profiles in-memory for topology discovery, even if the matched vendor profile does not include them. | yes | no |
 | **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
 |  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
 |  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
@@ -517,6 +561,4 @@ Table metrics are usually the slowest and often determine the total collection t
 1. Do logs show “skipping data collection”?  
 2. Does *Internal → Stats* show collection time > `update_every`?  
 3. Increase `update_every` until skips disappear.
-
-
 

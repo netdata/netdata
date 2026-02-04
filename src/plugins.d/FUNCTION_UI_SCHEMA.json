@@ -11,6 +11,8 @@
   "oneOf": [
     { "$ref": "#/definitions/info_response" },
     { "$ref": "#/definitions/data_response" },
+    { "$ref": "#/definitions/topology_response" },
+    { "$ref": "#/definitions/flows_response" },
     { "$ref": "#/definitions/error_response" },
     { "$ref": "#/definitions/not_modified_response" }
   ],
@@ -226,6 +228,177 @@
         "histogram": { "type": "object" },
         "items": { "type": "object" },
         "pagination": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "topology_device": {
+      "type": "object",
+      "required": ["chassis_id", "chassis_id_type"],
+      "properties": {
+        "chassis_id": { "type": "string" },
+        "chassis_id_type": { "type": "string" },
+        "sys_object_id": { "type": "string" },
+        "sys_name": { "type": "string" },
+        "sys_descr": { "type": "string" },
+        "sys_location": { "type": "string" },
+        "management_ip": { "type": "string" },
+        "agent_id": { "type": "string" },
+        "agent_job_id": { "type": "string" },
+        "vendor": { "type": "string" },
+        "model": { "type": "string" },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "labels": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "topology_endpoint": {
+      "type": "object",
+      "required": ["chassis_id", "chassis_id_type"],
+      "properties": {
+        "chassis_id": { "type": "string" },
+        "chassis_id_type": { "type": "string" },
+        "if_index": { "type": "integer" },
+        "if_name": { "type": "string" },
+        "port_id": { "type": "string" },
+        "port_id_type": { "type": "string" },
+        "port_descr": { "type": "string" },
+        "sys_name": { "type": "string" },
+        "management_ip": { "type": "string" },
+        "agent_id": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "topology_link": {
+      "type": "object",
+      "required": ["protocol", "src", "dst"],
+      "properties": {
+        "protocol": { "type": "string" },
+        "src": { "$ref": "#/definitions/topology_endpoint" },
+        "dst": { "$ref": "#/definitions/topology_endpoint" },
+        "discovered_at": { "type": "string", "format": "date-time" },
+        "last_seen": { "type": "string", "format": "date-time" },
+        "bidirectional": { "type": "boolean" },
+        "validated": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "topology_response": {
+      "type": "object",
+      "required": ["status", "type", "data"],
+      "properties": {
+        "status": { "type": "integer" },
+        "type": { "const": "topology" },
+        "data": {
+          "type": "object",
+          "required": ["schema_version", "agent_id", "collected_at", "devices", "links"],
+          "properties": {
+            "schema_version": { "type": "string" },
+            "agent_id": { "type": "string" },
+            "collected_at": { "type": "string", "format": "date-time" },
+            "devices": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/topology_device" }
+            },
+            "links": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/topology_link" }
+            },
+            "stats": { "type": "object" },
+            "metrics": { "type": "object" }
+          },
+          "additionalProperties": true
+        },
+        "has_history": { "type": "boolean" },
+        "accepted_params": { "$ref": "#/definitions/accepted_params" },
+        "required_params": { "$ref": "#/definitions/required_params" },
+        "help": { "type": "string" },
+        "update_every": { "type": "integer" },
+        "expires": { "type": "integer" }
+      },
+      "additionalProperties": true
+    },
+    "flow_exporter": {
+      "type": "object",
+      "required": ["exporter_ip"],
+      "properties": {
+        "exporter_ip": { "type": "string" },
+        "exporter_name": { "type": "string" },
+        "sampling_rate": { "type": "integer" },
+        "flow_version": { "type": "string" },
+        "interfaces": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "flow_key": {
+      "type": "object",
+      "properties": {
+        "src_prefix": { "type": "string" },
+        "dst_prefix": { "type": "string" },
+        "src_port": { "type": "integer" },
+        "dst_port": { "type": "integer" },
+        "protocol": { "type": "integer" },
+        "src_as": { "type": "integer" },
+        "dst_as": { "type": "integer" },
+        "in_if": { "type": "integer" },
+        "out_if": { "type": "integer" }
+      },
+      "additionalProperties": true
+    },
+    "flow_bucket": {
+      "type": "object",
+      "required": ["timestamp", "bytes", "packets"],
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "duration_sec": { "type": "integer" },
+        "key": { "$ref": "#/definitions/flow_key" },
+        "bytes": { "type": "integer" },
+        "packets": { "type": "integer" },
+        "flows": { "type": "integer" },
+        "raw_bytes": { "type": "integer" },
+        "raw_packets": { "type": "integer" },
+        "sampling_rate": { "type": "integer" },
+        "direction": { "type": "string" },
+        "exporter_ip": { "type": "string" },
+        "agent_id": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "flows_response": {
+      "type": "object",
+      "required": ["status", "type", "data"],
+      "properties": {
+        "status": { "type": "integer" },
+        "type": { "const": "flows" },
+        "data": {
+          "type": "object",
+          "required": ["schema_version", "agent_id", "period_start", "period_end"],
+          "properties": {
+            "schema_version": { "type": "string" },
+            "agent_id": { "type": "string" },
+            "period_start": { "type": "string", "format": "date-time" },
+            "period_end": { "type": "string", "format": "date-time" },
+            "exporters": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/flow_exporter" }
+            },
+            "buckets": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/flow_bucket" }
+            },
+            "summaries": { "type": "object" },
+            "metrics": { "type": "object" }
+          },
+          "additionalProperties": true
+        },
+        "has_history": { "type": "boolean" },
+        "accepted_params": { "$ref": "#/definitions/accepted_params" },
+        "required_params": { "$ref": "#/definitions/required_params" },
+        "help": { "type": "string" },
+        "update_every": { "type": "integer" },
+        "expires": { "type": "integer" }
       },
       "additionalProperties": true
     },

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package snmp
+package netflow
 
 import (
 	"context"
@@ -10,22 +10,17 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-// funcRouter routes method calls to appropriate function handlers.
 type funcRouter struct {
-	ifaceCache    *ifaceCache
-	topologyCache *topologyCache
-
-	handlers map[string]funcapi.MethodHandler
+	collector *Collector
+	handlers  map[string]funcapi.MethodHandler
 }
 
-func newFuncRouter(cache *ifaceCache, topoCache *topologyCache) *funcRouter {
+func newFuncRouter(c *Collector) *funcRouter {
 	r := &funcRouter{
-		ifaceCache:    cache,
-		topologyCache: topoCache,
-		handlers:      make(map[string]funcapi.MethodHandler),
+		collector: c,
+		handlers:  make(map[string]funcapi.MethodHandler),
 	}
-	r.handlers[ifacesMethodID] = newFuncInterfaces(r)
-	r.handlers[topologyMethodID] = newFuncTopology(r)
+	r.handlers[flowsMethodID] = newFuncFlows(r)
 	return r
 }
 
@@ -52,14 +47,13 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 	}
 }
 
-func snmpMethods() []funcapi.MethodConfig {
+func netflowMethods() []funcapi.MethodConfig {
 	return []funcapi.MethodConfig{
-		ifacesMethodConfig(),
-		topologyMethodConfig(),
+		flowsMethodConfig(),
 	}
 }
 
-func snmpFunctionHandler(job *module.Job) funcapi.MethodHandler {
+func netflowFunctionHandler(job *module.Job) funcapi.MethodHandler {
 	c, ok := job.Module().(*Collector)
 	if !ok {
 		return nil

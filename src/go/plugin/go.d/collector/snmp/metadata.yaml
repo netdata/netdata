@@ -414,6 +414,12 @@ modules:
               default_value: "[]"
               required: false
 
+            - name: topology.autoprobe
+              group: Topology
+              description: When enabled, auto-append LLDP/CDP profiles in-memory for topology discovery even if the matched vendor profile does not include them.
+              default_value: "true"
+              required: false
+
             - name: create_vnode
               group: Virtual node
               description: If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata.
@@ -604,6 +610,46 @@ modules:
                 unit: "packets/s"
                 visibility: hidden
                 description: Rate of multicast packets transmitted per second.
+
+        - id: topology
+          name: Network Topology
+          description: |
+            Provides LLDP/CDP neighbor discovery data for the monitored SNMP device.
+
+            This function reads cached LLDP/CDP data collected during regular SNMP polling and returns a topology schema (devices, links, and stats). No additional SNMP requests are triggered when calling this function.
+
+            Use cases:
+            - Discover Layer 2 neighbors and link mapping
+            - Validate cabling and port connections
+            - Identify adjacent devices that are discovered but not monitored
+          parameters: []
+          returns:
+            description: Topology data for the monitored device in a JSON schema suitable for cross-agent aggregation.
+            columns:
+              - name: schema_version
+                type: integer
+                unit: ""
+                description: Topology schema version.
+              - name: agent_id
+                type: string
+                unit: ""
+                description: Netdata Agent or vnode identifier that collected the data.
+              - name: collected_at
+                type: string
+                unit: ""
+                description: Collection timestamp in RFC 3339 format.
+              - name: devices
+                type: array
+                unit: ""
+                description: List of devices (local and discovered).
+              - name: links
+                type: array
+                unit: ""
+                description: List of discovered links (LLDP/CDP).
+              - name: stats
+                type: object
+                unit: ""
+                description: Summary stats (device/link counts).
           performance: |
             Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many interfaces may return many rows
           security: |

@@ -4,9 +4,11 @@ package jobmgr
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/stretchr/testify/assert"
 )
@@ -172,4 +174,69 @@ func TestBuildRequiredParams_TypeSelect(t *testing.T) {
 	// Verify specific param IDs
 	assert.Equal(t, "__job", params[0]["id"])
 	assert.Equal(t, "__sort", params[1]["id"])
+}
+
+func newTestManagerWithCapture(t *testing.T) (*Manager, *map[string]any) {
+	t.Helper()
+
+	var resp map[string]any
+	mgr := &Manager{
+		moduleFuncs: newModuleFuncRegistry(),
+		FunctionJSONWriter: func(payload []byte, code int) {
+			if err := json.Unmarshal(payload, &resp); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
+		},
+	}
+	return mgr, &resp
+}
+
+func TestRespondWithParams_ResponseType(t *testing.T) {
+	mgr, resp := newTestManagerWithCapture(t)
+
+	dataResp := &funcapi.FunctionResponse{
+		Status:       200,
+		ResponseType: "topology",
+	}
+	mgr.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "")
+
+	assert.Equal(t, "topology", (*resp)["type"])
+}
+
+func TestRespondWithParams_MethodTypeFallback(t *testing.T) {
+	mgr, resp := newTestManagerWithCapture(t)
+
+	dataResp := &funcapi.FunctionResponse{
+		Status: 200,
+	}
+	mgr.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "flows")
+
+	assert.Equal(t, "flows", (*resp)["type"])
+}
+
+func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
+	mgr, resp := newTestManagerWithCapture(t)
+
+	mgr.moduleFuncs.registerModule("snmp", module.Creator{
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{ID: "topology", ResponseType: "topology"}}
+		},
+	})
+
+	mgr.handleMethodFuncInfo("snmp", "topology", functions.Function{})
+
+	assert.Equal(t, "topology", (*resp)["type"])
+}
+
+func TestHandleJobMethodFuncInfo_UsesResponseType(t *testing.T) {
+	mgr, resp := newTestManagerWithCapture(t)
+
+	mgr.moduleFuncs.registerModule("netflow", module.Creator{})
+	mgr.moduleFuncs.registerJobMethods("netflow", "job1", []funcapi.MethodConfig{
+		{ID: "flows", ResponseType: "flows"},
+	})
+
+	mgr.handleJobMethodFuncInfo("netflow", "job1", "flows", functions.Function{})
+
+	assert.Equal(t, "flows", (*resp)["type"])
 }

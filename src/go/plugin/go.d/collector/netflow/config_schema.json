@@ -1,0 +1,178 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "NetFlow/IPFIX collector configuration.",
+    "description": "Collector for NetFlow v5/v9 and IPFIX flow summaries.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "address": {
+        "title": "Listen address",
+        "description": "UDP address to listen on for flow exports.",
+        "type": "string",
+        "default": ":2055"
+      },
+      "protocols": {
+        "title": "Protocols",
+        "type": "object",
+        "properties": {
+          "netflow_v5": {
+            "title": "NetFlow v5",
+            "type": "boolean",
+            "default": true
+          },
+          "netflow_v9": {
+            "title": "NetFlow v9",
+            "type": "boolean",
+            "default": true
+          },
+          "ipfix": {
+            "title": "IPFIX",
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "aggregation": {
+        "title": "Aggregation",
+        "type": "object",
+        "properties": {
+          "bucket_seconds": {
+            "title": "Bucket seconds",
+            "description": "Aggregation bucket duration in seconds. Set 0 to use update_every.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "max_buckets": {
+            "title": "Max buckets",
+            "description": "Maximum number of buckets retained in memory.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 60
+          },
+          "max_keys": {
+            "title": "Max keys",
+            "description": "Maximum unique flow keys per bucket. Set 0 for unlimited.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 10000
+          },
+          "max_packet_size": {
+            "title": "Max packet size",
+            "description": "Maximum UDP payload size (bytes) to read per packet.",
+            "type": "integer",
+            "minimum": 512,
+            "default": 65535
+          },
+          "receive_buffer": {
+            "title": "Receive buffer",
+            "description": "UDP socket receive buffer size (bytes). Set 0 to use OS default.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 4194304
+          }
+        }
+      },
+      "sampling": {
+        "title": "Sampling",
+        "type": "object",
+        "properties": {
+          "default_rate": {
+            "title": "Default sampling rate",
+            "description": "Sampling rate applied when no per-record or per-exporter rate is available.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          }
+        }
+      },
+      "exporters": {
+        "title": "Exporter overrides",
+        "description": "Optional overrides for exporter name and sampling rate.",
+        "type": ["array", "null"],
+        "items": {
+          "type": "object",
+          "properties": {
+            "ip": {
+              "title": "Exporter IP",
+              "type": "string"
+            },
+            "name": {
+              "title": "Exporter name",
+              "type": "string"
+            },
+            "sampling_rate": {
+              "title": "Sampling rate",
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": ["ip"]
+        }
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "address"
+    ]
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "address",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Protocols",
+          "fields": [
+            "protocols"
+          ]
+        },
+        {
+          "title": "Aggregation",
+          "fields": [
+            "aggregation"
+          ]
+        },
+        {
+          "title": "Sampling",
+          "fields": [
+            "sampling"
+          ]
+        },
+        {
+          "title": "Exporters",
+          "fields": [
+            "exporters"
+          ]
+        }
+      ]
+    },
+    "uiOptions": {
+      "fullPage": true
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
+    "exporters": {
+      "ui:listFlavour": "list"
+    }
+  }
+}
