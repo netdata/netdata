@@ -39,17 +39,29 @@ metric_tags:
 
 metrics:
   - MIB: LLDP-MIB
-    symbols:
-      - OID: 1.0.8802.1.1.2.1.2.1.0
-        name: lldpStatsRemTablesLastChangeTime
-      - OID: 1.0.8802.1.1.2.1.2.2.0
-        name: lldpStatsRemTablesInserts
-      - OID: 1.0.8802.1.1.2.1.2.3.0
-        name: lldpStatsRemTablesDeletes
-      - OID: 1.0.8802.1.1.2.1.2.4.0
-        name: lldpStatsRemTablesDrops
-      - OID: 1.0.8802.1.1.2.1.2.5.0
-        name: lldpStatsRemTablesAgeouts
+    symbol:
+      OID: 1.0.8802.1.1.2.1.2.1.0
+      name: lldpStatsRemTablesLastChangeTime
+
+  - MIB: LLDP-MIB
+    symbol:
+      OID: 1.0.8802.1.1.2.1.2.2.0
+      name: lldpStatsRemTablesInserts
+
+  - MIB: LLDP-MIB
+    symbol:
+      OID: 1.0.8802.1.1.2.1.2.3.0
+      name: lldpStatsRemTablesDeletes
+
+  - MIB: LLDP-MIB
+    symbol:
+      OID: 1.0.8802.1.1.2.1.2.4.0
+      name: lldpStatsRemTablesDrops
+
+  - MIB: LLDP-MIB
+    symbol:
+      OID: 1.0.8802.1.1.2.1.2.5.0
+      name: lldpStatsRemTablesAgeouts
 
   - MIB: LLDP-MIB
     table:
@@ -157,7 +169,8 @@ metrics:
       OID: 1.0.8802.1.1.2.1.4.1
       name: lldpRemTable
     symbols:
-      - OID: 1.0.8802.1.1.2.1.4.1.1.1
+      # Use a required numeric column to ensure rows are emitted by ddsnmp.
+      - OID: 1.0.8802.1.1.2.1.4.1.1.6
         name: lldpRemEntry
     metric_tags:
       - tag: lldp_loc_port_num
