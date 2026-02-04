@@ -163,14 +163,16 @@ warn: ($this > 75) && !($status == $CRITICAL)
 
 ### Parentheses and Precedence
 
-Netdata follows normal operator precedence rules:
+Netdata follows these operator precedence rules (evaluated in order, 1 first):
 
 1. Parentheses `(...)`
-2. Arithmetic operators (`*`, `/`, `%`, then `+`, `-`)
-3. Comparison operators (`>`, `<`, `>=`, `<=`, `==`, `!=`)
-4. Logical NOT `!`
-5. Logical AND `&&`
-6. Logical OR `||`
+2. Ternary conditional `? :` (lowest precedence)
+3. Logical OR `||`
+4. Logical AND `&&`
+5. Logical NOT `!`
+6. Comparison operators (`>`, `<`, `>=`, `<=`, `==`, `!=`, `<>`)
+7. Arithmetic operators (`*`, `/`, `%`, then `+`, `-`)
+8. Unary operators (negation, `abs()`)
 
 :::tip
 
