@@ -223,7 +223,11 @@ impl Log {
     /// If `source_realtime_usec` is provided, a `_SOURCE_REALTIME_TIMESTAMP` field will be added
     /// to record the original timestamp from the source (in microseconds since Unix epoch).
     /// This is useful when ingesting logs from external sources that have their own timestamps.
-    pub fn write_entry(&mut self, items: &[&[u8]], source_realtime_usec: Option<u64>) -> Result<()> {
+    pub fn write_entry(
+        &mut self,
+        items: &[&[u8]],
+        source_realtime_usec: Option<u64>,
+    ) -> Result<()> {
         if items.is_empty() {
             return Ok(());
         }
@@ -523,5 +527,22 @@ impl Log {
         let field_refs: Vec<&[u8]> = fields.iter().map(|f| f.as_slice()).collect();
 
         self.write_entry(&field_refs, None)
+    }
+}
+
+impl Drop for Log {
+    fn drop(&mut self) {
+        use journal_core::file::JournalState;
+
+        if let Some(ref mut active_file) = self.active_file {
+            // A single file is opened for writing exactly once. Once closed, we
+            // treat them as immutable. We need a custom impl for `Drop` to keep
+            // this invariant true whenever the plugin receives a `SIGTERM` or
+            // a `SIGINT`.
+            active_file.journal_file.journal_header_mut().state = JournalState::Archived as u8;
+
+            // Best/Last-effort sync just to be on the cautious side.
+            let _ = active_file.journal_file.sync();
+        }
     }
 }
