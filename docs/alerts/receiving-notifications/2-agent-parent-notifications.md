@@ -27,18 +27,18 @@ Netdata supports multiple notification destinations:
 ## 5.2.3 Configuring Email Notifications
 
 ```conf
-# Enable email notifications
-SEND_EMAIL="YES"
+# Enable email notifications: YES, NO, or AUTO (auto-detect based on sendmail availability)
+SEND_EMAIL="AUTO"
 
-# SMTP configuration (for systems without local MTA)
-SMTP_SERVER="smtp.example.com:587"
-SMTP_USER="alerts@example.com"
-SMTP_PASSWORD="your-password"
-FROM_ADDRESS="netdata@example.com"
+# Sender address for email notifications
+EMAIL_SENDER="netdata@hostname"
 
 # Default recipients (can be overridden per alert)
 DEFAULT_RECIPIENT_EMAIL="admin@example.com"
 ```
+
+By default, Netdata uses the system's `sendmail` command. If not found, email notifications are silently disabled. For systems without a local MTA, configure sendmail to relay to your mail server.
+
 
 ## 5.2.4 Configuring Slack Notifications
 
@@ -61,8 +61,8 @@ DEFAULT_RECIPIENT_SLACK="#alerts"
 
 ```conf
 SEND_PD="YES"
-PD_SERVICE_KEY="your-service-key"
-DEFAULT_RECIPIENT_PD="pagerduty-group"
+# Set the PagerDuty service key as the recipient value
+DEFAULT_RECIPIENT_PD="your-pagerduty-service-key"
 ```
 
 ## 5.2.6 Using Custom Scripts with `exec`
