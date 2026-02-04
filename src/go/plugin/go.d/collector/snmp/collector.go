@@ -96,10 +96,10 @@ type (
 
 		vnode *vnodes.VirtualNode
 
-		charts            *module.Charts
-		seenScalarMetrics map[string]bool
-		seenTableMetrics  map[string]bool
-		seenProfiles      map[string]bool
+		charts              *module.Charts
+		seenScalarMetrics   map[string]bool
+		seenTableMetrics    map[string]bool
+		seenProfiles        map[string]bool
 		topologyChartsAdded bool
 
 		ifaceCache    *ifaceCache    // interface metrics cache for functions

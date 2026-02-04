@@ -22,8 +22,8 @@ func TestMergeTopology(t *testing.T) {
 		Links: []topologyLink{
 			{
 				Protocol: "lldp",
-				Src: topologyEndpoint{ChassisID: "aa", ChassisIDType: "mac", PortID: "1"},
-				Dst: topologyEndpoint{ChassisID: "bb", ChassisIDType: "mac", PortID: "1"},
+				Src:      topologyEndpoint{ChassisID: "aa", ChassisIDType: "mac", PortID: "1"},
+				Dst:      topologyEndpoint{ChassisID: "bb", ChassisIDType: "mac", PortID: "1"},
 			},
 		},
 	}
@@ -38,8 +38,8 @@ func TestMergeTopology(t *testing.T) {
 		Links: []topologyLink{
 			{
 				Protocol: "lldp",
-				Src: topologyEndpoint{ChassisID: "bb", ChassisIDType: "mac", PortID: "1"},
-				Dst: topologyEndpoint{ChassisID: "aa", ChassisIDType: "mac", PortID: "1"},
+				Src:      topologyEndpoint{ChassisID: "bb", ChassisIDType: "mac", PortID: "1"},
+				Dst:      topologyEndpoint{ChassisID: "aa", ChassisIDType: "mac", PortID: "1"},
 			},
 		},
 	}
