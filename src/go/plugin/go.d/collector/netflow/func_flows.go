@@ -27,7 +27,7 @@ func flowsMethodConfig() funcapi.MethodConfig {
 		ID:           flowsMethodID,
 		Name:         "Flows",
 		UpdateEvery:  10,
-		Help:         "NetFlow/IPFIX flow summary data",
+		Help:         "NetFlow/IPFIX/sFlow flow summary data",
 		RequireCloud: true,
 		ResponseType: "flows",
 	}
@@ -60,7 +60,7 @@ func (f *funcFlows) Handle(_ context.Context, method string, _ funcapi.ResolvedP
 
 	return &funcapi.FunctionResponse{
 		Status:       200,
-		Help:         "NetFlow/IPFIX flow summary data",
+		Help:         "NetFlow/IPFIX/sFlow flow summary data",
 		ResponseType: "flows",
 		Data:         data,
 	}

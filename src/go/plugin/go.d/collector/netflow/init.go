@@ -11,7 +11,7 @@ func (c *Collector) validateConfig() error {
 	if c.Address == "" {
 		c.Address = defaultAddress
 	}
-	if !c.Protocols.NetFlowV5 && !c.Protocols.NetFlowV9 && !c.Protocols.IPFIX {
+	if !c.Protocols.NetFlowV5 && !c.Protocols.NetFlowV9 && !c.Protocols.IPFIX && !c.Protocols.SFlow {
 		return errors.New("at least one protocol must be enabled")
 	}
 	if c.Aggregation.MaxPacketSize <= 0 {

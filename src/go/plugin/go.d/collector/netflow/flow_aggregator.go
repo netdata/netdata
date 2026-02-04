@@ -68,11 +68,11 @@ type exporterOverride struct {
 }
 
 type exporterState struct {
-	ip          string
-	name        string
+	ip           string
+	name         string
 	samplingRate int
-	flowVersion string
-	lastSeen    time.Time
+	flowVersion  string
+	lastSeen     time.Time
 }
 
 type flowCollectorStats struct {
@@ -83,24 +83,24 @@ type flowCollectorStats struct {
 }
 
 type flowTotals struct {
-	Bytes   uint64
-	Packets uint64
-	Flows   uint64
-	Dropped uint64
-	Duration time.Duration
+	Bytes     uint64
+	Packets   uint64
+	Flows     uint64
+	Dropped   uint64
+	Duration  time.Duration
 	Timestamp time.Time
 }
 
 func newFlowAggregator(cfg flowAggregatorConfig) *flowAggregator {
 	a := &flowAggregator{
-		bucketDuration: cfg.bucketDuration,
-		maxBuckets:     cfg.maxBuckets,
-		maxKeys:        cfg.maxKeys,
-		defaultRate:    cfg.defaultRate,
-		buckets:        make(map[time.Time]*flowBucketState),
+		bucketDuration:    cfg.bucketDuration,
+		maxBuckets:        cfg.maxBuckets,
+		maxKeys:           cfg.maxKeys,
+		defaultRate:       cfg.defaultRate,
+		buckets:           make(map[time.Time]*flowBucketState),
 		exporterOverrides: make(map[string]exporterOverride),
-		exporters:      make(map[string]*exporterState),
-		now:            time.Now,
+		exporters:         make(map[string]*exporterState),
+		now:               time.Now,
 	}
 
 	if a.bucketDuration <= 0 {
@@ -278,11 +278,11 @@ func (a *flowAggregator) Snapshot(agentID string) flowData {
 
 	buckets := make([]flowBucket, 0, len(starts))
 	summaries := map[string]any{
-		"total_bytes":   uint64(0),
-		"total_packets": uint64(0),
-		"total_flows":   uint64(0),
-		"raw_bytes":     uint64(0),
-		"raw_packets":   uint64(0),
+		"total_bytes":     uint64(0),
+		"total_packets":   uint64(0),
+		"total_flows":     uint64(0),
+		"raw_bytes":       uint64(0),
+		"raw_packets":     uint64(0),
 		"dropped_records": a.stats.recordsDropped,
 	}
 
@@ -341,7 +341,7 @@ func (a *flowAggregator) Snapshot(agentID string) flowData {
 		"records_dropped": a.stats.recordsDropped,
 		"records_too_old": a.stats.recordsTooOld,
 		"decode_errors":   a.stats.decodeErrors,
-		"exporters":        len(a.exporters),
+		"exporters":       len(a.exporters),
 	}
 
 	return flowData{
