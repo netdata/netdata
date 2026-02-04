@@ -18,13 +18,13 @@ import (
 var configSchema string
 
 const (
-	defaultUpdateEvery    = 10
-	defaultAddress        = ":2055"
-	defaultMaxPacketSize  = 65535
-	defaultReceiveBuffer  = 4 * 1024 * 1024
-	defaultMaxBuckets     = 60
-	defaultMaxKeys        = 10000
-	defaultSamplingRate   = 1
+	defaultUpdateEvery   = 10
+	defaultAddress       = ":2055"
+	defaultMaxPacketSize = 65535
+	defaultReceiveBuffer = 4 * 1024 * 1024
+	defaultMaxBuckets    = 60
+	defaultMaxKeys       = 10000
+	defaultSamplingRate  = 1
 )
 
 func init() {
@@ -48,6 +48,7 @@ func New() *Collector {
 				NetFlowV5: true,
 				NetFlowV9: true,
 				IPFIX:     true,
+				SFlow:     true,
 			},
 			Aggregation: AggregationConfig{
 				MaxPacketSize: defaultMaxPacketSize,
@@ -107,9 +108,10 @@ func (c *Collector) Init(context.Context) error {
 	})
 
 	c.decoder = newFlowDecoder(flowDecoderConfig{
-		enableV5:  c.Protocols.NetFlowV5,
-		enableV9:  c.Protocols.NetFlowV9,
+		enableV5:    c.Protocols.NetFlowV5,
+		enableV9:    c.Protocols.NetFlowV9,
 		enableIPFIX: c.Protocols.IPFIX,
+		enableSFlow: c.Protocols.SFlow,
 	})
 
 	c.ctx, c.cancel = context.WithCancel(context.Background())
