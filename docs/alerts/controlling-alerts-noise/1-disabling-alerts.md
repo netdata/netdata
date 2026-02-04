@@ -78,14 +78,22 @@ This keeps the alert loaded but ensures it never triggers notifications.
 You can also disable alerts programmatically:
 
 ```bash
-# Disable a specific alert
-curl -s -H "X-Auth-Token: YOUR_TOKEN" \
-  "http://localhost:19999/api/v1/manage/health?cmd=disable&alarm=my_alert"
+# Disable a specific alert (use SELECTORS like alarm=, chart=, context=, host=)
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  "http://localhost:19999/api/v1/manage/health?cmd=DISABLE&alarm=my_alert"
 
 # Disable all alerts
-curl -s -H "X-Auth-Token: YOUR_TOKEN" \
-  "http://localhost:19999/api/v1/manage/health?cmd=disable_all"
+curl -s -H "Authorization: Bearer YOUR_API_KEY" \
+  "http://localhost:19999/api/v1/manage/health?cmd=DISABLE+ALL"
 ```
+
+:::note
+
+**Authentication:** The Management API uses the management API key, not the `X-Auth-Token` header used elsewhere. Retrieve the key from `/var/lib/netdata/netdata.api.key` on the agent, or use the same key that authorizes `/api/v1/manage/health` endpoints.
+
+**Command Format:** Commands must be UPPERCASE (`DISABLE`, `DISABLE ALL`, `SILENCE`, `SILENCE ALL`). Selectors use keyword syntax: `alarm=PATTERN`, `chart=PATTERN`, `context=PATTERN`, or `host=PATTERN`.
+
+:::
 
 See **9.4 Health Management API** for full documentation.
 
