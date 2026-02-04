@@ -1,0 +1,117 @@
+# LLDP-MIB profile for topology discovery.
+# MIB: LLDP-MIB (IEEE 802.1AB)
+
+metric_tags:
+  - tag: lldp_loc_chassis_id
+    symbol:
+      OID: 1.0.8802.1.1.2.1.3.2.0
+      name: lldpLocChassisId
+  - tag: lldp_loc_chassis_id_subtype
+    symbol:
+      OID: 1.0.8802.1.1.2.1.3.1.0
+      name: lldpLocChassisIdSubtype
+    mapping:
+      1: chassisComponent
+      2: interfaceAlias
+      3: portComponent
+      4: macAddress
+      5: networkAddress
+      6: interfaceName
+      7: local
+  - tag: lldp_loc_sys_name
+    symbol:
+      OID: 1.0.8802.1.1.2.1.3.3.0
+      name: lldpLocSysName
+  - tag: lldp_loc_sys_desc
+    symbol:
+      OID: 1.0.8802.1.1.2.1.3.4.0
+      name: lldpLocSysDesc
+
+metrics:
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.3.7
+      name: lldpLocPortTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.3.7.1.2
+        name: lldpLocPortEntry
+    metric_tags:
+      - tag: lldp_loc_port_num
+        index: 1
+      - tag: lldp_loc_port_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.7.1.3
+          name: lldpLocPortId
+      - tag: lldp_loc_port_id_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.7.1.2
+          name: lldpLocPortIdSubtype
+        mapping:
+          1: interfaceAlias
+          2: portComponent
+          3: macAddress
+          4: networkAddress
+          5: interfaceName
+          6: agentCircuitId
+          7: local
+      - tag: lldp_loc_port_desc
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.7.1.4
+          name: lldpLocPortDesc
+
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.4.1
+      name: lldpRemTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.4.1.1.1
+        name: lldpRemEntry
+    metric_tags:
+      - tag: lldp_loc_port_num
+        index: 2
+      - tag: lldp_rem_index
+        index: 3
+      - tag: lldp_rem_chassis_id_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.4
+          name: lldpRemChassisIdSubtype
+        mapping:
+          1: chassisComponent
+          2: interfaceAlias
+          3: portComponent
+          4: macAddress
+          5: networkAddress
+          6: interfaceName
+          7: local
+      - tag: lldp_rem_chassis_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.5
+          name: lldpRemChassisId
+      - tag: lldp_rem_port_id_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.6
+          name: lldpRemPortIdSubtype
+        mapping:
+          1: interfaceAlias
+          2: portComponent
+          3: macAddress
+          4: networkAddress
+          5: interfaceName
+          6: agentCircuitId
+          7: local
+      - tag: lldp_rem_port_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.7
+          name: lldpRemPortId
+      - tag: lldp_rem_port_desc
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.8
+          name: lldpRemPortDesc
+      - tag: lldp_rem_sys_name
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.9
+          name: lldpRemSysName
+      - tag: lldp_rem_sys_desc
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.10
+          name: lldpRemSysDesc

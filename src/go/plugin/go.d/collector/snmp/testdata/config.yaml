@@ -5,6 +5,9 @@ vnode_device_down_threshold: 123
 manual_profiles:
   - "ok"
 
+topology:
+  autoprobe: yes
+
 vnode:
   name: "ok"
   guid: "ok"

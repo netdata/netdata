@@ -1,0 +1,188 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-netflow
+      plugin_name: go.d.plugin
+      module_name: netflow
+      monitored_instance:
+        name: NetFlow/IPFIX
+        link: ""
+        icon_filename: globe.svg
+        categories:
+          - data-collection.generic-data-collection
+      keywords:
+        - netflow
+        - ipfix
+        - flow
+        - traffic
+        - network
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Collects NetFlow v5/v9 and IPFIX flow summaries over UDP.
+
+          The collector aggregates flow records into time buckets and exposes a flows Function response for Netdata Cloud aggregation.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Configure exporters
+            description: |
+              Configure your routers/switches/firewalls to export NetFlow/IPFIX to this Netdata node.
+              Ensure UDP traffic can reach the listener port (default `2055`).
+      configuration:
+        file:
+          name: go.d/netflow.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency (seconds).
+              default_value: 10
+              required: false
+              group: Collection
+
+            - name: address
+              description: UDP address to listen on for flow exports.
+              default_value: ":2055"
+              required: true
+              group: Listener
+
+            - name: protocols.netflow_v5
+              description: Enable NetFlow v5 decoding.
+              default_value: yes
+              required: false
+              group: Protocols
+            - name: protocols.netflow_v9
+              description: Enable NetFlow v9 decoding.
+              default_value: yes
+              required: false
+              group: Protocols
+            - name: protocols.ipfix
+              description: Enable IPFIX decoding.
+              default_value: yes
+              required: false
+              group: Protocols
+
+            - name: aggregation.bucket_seconds
+              description: Aggregation bucket duration in seconds. Set 0 to use update_every.
+              default_value: 0
+              required: false
+              group: Aggregation
+            - name: aggregation.max_buckets
+              description: Maximum number of buckets retained in memory.
+              default_value: 60
+              required: false
+              group: Aggregation
+            - name: aggregation.max_keys
+              description: Maximum unique flow keys per bucket. Set 0 for unlimited.
+              default_value: 10000
+              required: false
+              group: Aggregation
+            - name: aggregation.max_packet_size
+              description: Maximum UDP payload size (bytes) to read per packet.
+              default_value: 65535
+              required: false
+              group: Aggregation
+            - name: aggregation.receive_buffer
+              description: UDP socket receive buffer size (bytes). Set 0 to use OS default.
+              default_value: 4194304
+              required: false
+              group: Aggregation
+
+            - name: sampling.default_rate
+              description: Sampling rate applied when no per-record or per-exporter rate is available.
+              default_value: 1
+              required: false
+              group: Sampling
+
+            - name: exporters
+              description: Optional overrides for exporter name and sampling rate.
+              default_value: "[]"
+              required: false
+              group: Exporters
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Default listener
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: ":2055"
+            - name: With exporter overrides
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: ":2055"
+                    exporters:
+                      - ip: 192.0.2.10
+                        name: core-router
+                        sampling_rate: 100
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: NetFlow/IPFIX collector
+          description: These metrics refer to the local flow collector.
+          labels: []
+          metrics:
+            - name: netflow.traffic
+              description: Flow traffic rate.
+              unit: bytes/s
+              dimensions:
+                - name: bytes
+            - name: netflow.packets
+              description: Flow packet rate.
+              unit: packets/s
+              dimensions:
+                - name: packets
+            - name: netflow.flows
+              description: Flow record rate.
+              unit: flows/s
+              dimensions:
+                - name: flows
+            - name: netflow.dropped
+              description: Dropped flow records rate.
+              unit: records/s
+              dimensions:
+                - name: dropped
