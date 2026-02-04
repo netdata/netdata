@@ -1,1617 +1,1612 @@
 sidebar:
+- meta:
+    label: Welcome to Netdata
+    path: Welcome to Netdata
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/welcome-to-netdata.md
+    status: Published
+  items:
+  - meta:
+      label: Enterprise Evaluation Guide
+      path: Welcome to Netdata
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation-corrected.md
+      status: Published
+      keywords:
+      - real-time observability
+      - infrastructure monitoring
+  - meta:
+      label: Real-time Monitoring
+      path: Welcome to Netdata
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/realtime-monitoring.md
+      status: Published
+  - meta:
+      label: Scalability
+      path: Welcome to Netdata
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/scalability.md
+      status: Published
+  - meta:
+      label: Monitor Anything
+      path: Welcome to Netdata
+      edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md
+      status: Published
+      description: Netdata gathers real-time metrics from hundreds of data sources
+        using collectors. Most require zero configuration and are pre-configured out
+        of the box.
+  - meta:
+      label: Fleet Deployment and Configuration Management
+      path: Welcome to Netdata
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-configuration-management.md
+      status: Published
+  - meta:
+      label: Reporting
+      path: Welcome to Netdata
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/reporting.md
+      status: Published
+      description: Extract infrastructure insights for stakeholders and BI tools using
+        AI Insights, AI assistants (MCP), Grafana, or data export to Power BI, Tableau,
+        and other analytics platforms.
+      keywords:
+      - power bi
+      - tableau
+      - looker
+      - qlik
+      - reporting
+      - business intelligence
+      - bi
+      - grafana
+      - ai insights
+      - mcp
+      - executive reports
+      - board reporting
+      - data export
+- meta:
+    label: Getting Started
+    path: root
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/getting-started-netdata/guide.md
+    status: Published
+- meta:
+    label: Live Demo
+    path: root
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.md
+    status: Published
+- meta:
+    label: Netdata Agent
+    path: Netdata Agent
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/standalone-deployment.md
+    status: Published
+  items:
+  - meta:
+      label: Versions & Platforms
+      path: Netdata Agent
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/versions-and-platforms.md
+      status: Published
+      description: Present all the supported platform in the Netdata solution
+  - meta:
+      label: Quickstart Deployment
+      path: Netdata Agent
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/README.md
+      status: Published
+  - meta:
+      label: Installation
+      path: Netdata Agent/Installation
+      edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/README.md
+      status: Published
+    items:
     - meta:
-          label: Welcome to Netdata
-          path: Welcome to Netdata
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/welcome-to-netdata.md
-          status: Published
-    - meta:
-          label: Enterprise Evaluation Guide
-          path: Welcome to Netdata
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation-corrected.md
-          status: Published
-          keywords:
-              - real-time observability
-              - infrastructure monitoring
-    - meta:
-          label: Real-time Monitoring
-          path: Welcome to Netdata
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/realtime-monitoring.md
-          status: Published
-    - meta:
-          label: Scalability
-          path: Welcome to Netdata
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/scalability.md
-          status: Published
-    - meta:
-          label: Monitor Anything
-          path: Welcome to Netdata
-          edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md
-          status: Published
-          description: Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box.
-    - meta:
-          label: Fleet Deployment and Configuration Management
-          path: Welcome to Netdata
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-configuration-management.md
-          status: Published
-    - meta:
-          label: Reporting
-          path: Welcome to Netdata
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/reporting.md
-          status: Published
-          description: Extract infrastructure insights for stakeholders and BI tools using AI Insights, AI assistants (MCP), Grafana, or data export to Power BI, Tableau, and other analytics platforms.
-          keywords:
-              - power bi
-              - tableau
-              - looker
-              - qlik
-              - reporting
-              - business intelligence
-              - bi
-              - grafana
-              - ai insights
-              - mcp
-              - executive reports
-              - board reporting
-              - data export
-    - meta:
-          label: Getting Started
-          path: root
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/getting-started-netdata/guide.md
-          status: Published
-    - meta:
-          label: Live Demo
-          path: root
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.md
-          status: Published
-    - meta:
-          label: Netdata Agent
-          path: Netdata Agent
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/standalone-deployment.md
-          status: Published
-    - meta:
-          label: Versions & Platforms
-          path: Netdata Agent
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/versions-and-platforms.md
-          status: Published
-          description: Present all the supported platform in the Netdata solution
-    - meta:
-          label: Quickstart Deployment
-          path: Netdata Agent
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/README.md
-          status: Published
+        label: Linux
+        path: Netdata Agent/Installation/Linux
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kickstart.md
+        status: Published
+        description: The kickstart.sh script installs Netdata from source, including
+          all dependencies required to connect to Netdata Cloud, with a single command.
       items:
-          - meta:
-                label: Installation
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/README.md
-                status: Published
-            items:
-                - meta:
-                      label: Linux
-                      path: Netdata Agent/Installation/Linux
-                      edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kickstart.md
-                      status: Published
-                      description: The kickstart.sh script installs Netdata from source, including all dependencies required to connect to Netdata Cloud, with a single command.
-                - meta:
-                      label: Native Linux Distribution packages
-                      path: Netdata Agent/Installation/Linux
-                      edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/packages.md
-                      status: Published
-                      description: Instructions for how to install Netdata using native DEB or RPM packages.
-                - meta:
-                      label: Static binary Linux Packages
-                      path: Netdata Agent/Installation/Linux
-                      edit_url: https://github.com/netdata/netdata/edit/master/packaging/makeself/README.md
-                      status: Published
-                      description: Users can build the static 64-bit binary package that we ship with every release of the open-source Netdata Agent for debugging or specialize purposes.
-                - meta:
-                      label: Switch Install Types and Release Channels
-                      path: Netdata Agent/Installation/Linux
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/switching-install-types.md
-                      status: Published
-                - meta:
-                      label: Offline systems
-                      path: Netdata Agent/Installation/Linux
-                      edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/offline.md
-                      status: Published
-                      description: Install the Netdata Agent on offline/air gapped systems to benefit from real-time, per-second monitoring without connecting to the internet.
-                - meta:
-                      label: Windows
-                      path: Netdata Agent/Installation/Windows
-                      edit_url: https://github.com/netdata/netdata/edit/master/packaging/windows/WINDOWS_INSTALLER.md
-                      status: Published
-                - meta:
-                      label: Switching Install Types and Release Channels
-                      path: Netdata Agent/Installation/Windows
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/install/windows-release-channels.md
-                      status: Published
-                      description: Guide to choosing and switching between different Netdata Windows installation methods and release channels
-          - meta:
-                label: Docker
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/docker/README.md
-                status: Published
-          - meta:
-                label: Kubernetes
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kubernetes.md
-                status: Published
-                description: Deploy Netdata to monitor a Kubernetes cluster to monitor the health, performance, resource utilization, and application metrics of a Kubernetes cluster in real time.
-          - meta:
-                label: Kubernetes Helm chart reference
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/helmchart/edit/master/charts/netdata/README.md
-                status: Published
-          - meta:
-                label: macOS
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/macos.md
-                status: Published
-          - meta:
-                label: FreeBSD
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md
-                status: Published
-                description: Install Netdata on FreeBSD to monitor the health and performance of bare metal or VMs with thousands of real-time, per-second metrics.
-          - meta:
-                label: pfSense
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/pfsense.md
-                status: Published
-                description: Install Netdata on pfSense to monitor the health and performance of firewalls with thousands of real-time, per-second metrics.
-          - meta:
-                label: Synology
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/synology.md
-                status: Published
-                description: The Netdata Agent can be installed on AMD64-compatible NAS systems using the 64-bit pre-compiled static binary.
-          - meta:
-                label: Ansible
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/ansible.md
-                status: Published
-                description: Deploy an infrastructure monitoring solution in minutes with the Netdata Agent and Ansible. Use and customize a simple playbook for monitoring as code.
-          - meta:
-                label: AWS
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/aws.md
-                status: Published
-                description: The Netdata Agent runs on all popular cloud providers, but often requires additional steps and configuration for full functionality.
-          - meta:
-                label: Azure
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/azure.md
-                status: Published
-                description: The Netdata Agent runs on all popular cloud providers, but often requires additional steps and configuration for full functionality.
-          - meta:
-                label: GCP
-                path: Netdata Agent/Installation
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/gcp.md
-                status: Published
-                description: The Netdata Agent runs on all popular cloud providers, but often requires additional steps and configuration for full functionality.
-          - meta:
-                label: Maintenance
-                path: Netdata Agent/Maintenance
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/maintenance-operations-on-netdata-agents.md
-                status: Published
-          - meta:
-                label: Service Control
-                path: Netdata Agent/Maintenance
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/start-stop-restart.md
-                status: Published
-                description: Manage the Netdata Agent daemon, load configuration changes, and troubleshoot stuck processes on systemd and non-systemd nodes.
-          - meta:
-                label: Update
-                path: Netdata Agent/Maintenance
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UPDATE.md
-                status: Published
-                description: If you opted out of automatic updates, you need to update your Netdata Agent to the latest nightly or stable version.
-          - meta:
-                label: Reinstall
-                path: Netdata Agent/Maintenance
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/REINSTALL.md
-                status: Published
-                description: Troubleshooting installation issues or force an update of the Netdata Agent by reinstalling it using the same method you used during installation.
-          - meta:
-                label: Uninstall
-                path: Netdata Agent/Maintenance
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UNINSTALL.md
-                status: Published
-                description: If you are no longer interested in using the Netdata Agent, use the self-contained uninstaller to remove all traces of binaries and configuration files.
-          - meta:
-                label: Backup and restore an Agent
-                path: Netdata Agent/Maintenance
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/backup-and-restore-an-agent.md
-                status: Published
-                description: What actions you need to do to backup and Agent and restore it.
-          - meta:
-                label: Resource Utilization
-                path: Netdata Agent/Resource Utilization
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/README.md
-                status: Published
-          - meta:
-                label: CPU
-                path: Netdata Agent/Resource Utilization
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md
-                status: Published
-          - meta:
-                label: RAM
-                path: Netdata Agent/Resource Utilization
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md
-                status: Published
-          - meta:
-                label: Bandwidth
-                path: Netdata Agent/Resource Utilization
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/bandwidth-requirements.md
-                status: Published
-          - meta:
-                label: Disk & Retention
-                path: Netdata Agent/Resource Utilization
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md
-                status: Published
-          - meta:
-                label: Configuration
-                path: Netdata Agent/Configuration
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/README.md
-                status: Published
-                description: Netdata is zero-configuration for most users, but complex infrastructures may require you to tweak some of the Agent's granular settings.
-          - meta:
-                label: Dynamic Configuration Manager
-                path: Netdata Agent/Configuration
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/dynamic-configuration.md
-                status: Published
-          - meta:
-                label: Daemon
-                path: Netdata Agent/Configuration
-                edit_url: https://github.com/netdata/netdata/edit/master/src/daemon/config/README.md
-                status: Published
-                description: The Netdata Agent's daemon is installed preconfigured to collect thousands of metrics every second, but is highly configurable for real-world workloads.
-          - meta:
-                label: Database
-                path: Netdata Agent/Configuration
-                edit_url: https://github.com/netdata/netdata/edit/master/src/database/CONFIGURATION.md
-                status: Published
-                description: With a single configuration change, the Netdata Agent can store days, weeks, or months of metrics at its famous per-second granularity.
-          - meta:
-                label: Registry
-                path: Netdata Agent/Configuration
-                edit_url: https://github.com/netdata/netdata/edit/master/src/registry/CONFIGURATION.md
-                status: Published
-                description: Netdata utilizes a central registry of machines/person GUIDs, URLs, and opt-in account information to provide unified cross-server dashboards.
-            items:
-                - meta:
-                      label: Securing Agents
-                      path: Netdata Agent/Configuration/Securing Agents
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/securing-netdata-agents.md
-                      status: Published
-                      description: Your data and systems are safe with Netdata, but we recommend a few easy ways to improve the security of your infrastructure.
-                - meta:
-                      label: Web Server Reference
-                      path: Netdata Agent/Configuration/Securing Agents
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/server/README.md
-                      status: Published
-                      description: The Netdata Agent's local static-threaded web server serves dashboards and real-time visualizations with security and DDoS protection.
-                  items:
-                      - meta:
-                            label: Running the Agent behind a reverse proxy
-                            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy
-                            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/README.md
-                            status: Published
-                      - meta:
-                            label: Nginx
-                            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy
-                            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md
-                            status: Published
-                      - meta:
-                            label: HAProxy
-                            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy
-                            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md
-                            status: Published
-                      - meta:
-                            label: Apache
-                            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy
-                            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-apache.md
-                            status: Published
-                      - meta:
-                            label: Lighttpd v1.4.x
-                            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy
-                            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-lighttpd.md
-                            status: Published
-                      - meta:
-                            label: Caddy
-                            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy
-                            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-caddy.md
-                            status: Published
-                      - meta:
-                            label: H2O
-                            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy
-                            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md
-                            status: Published
-          - meta:
-                label: Performance Optimization
-                path: Netdata Agent/Configuration
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md
-                status: Published
-                description: While the Netdata Agent is designed to monitor a system with only 1% CPU, you can optimize its performance for low-resource systems.
-          - meta:
-                label: Organize systems, metrics, and alerts
-                path: Netdata Agent/Configuration
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md
-                status: Published
-          - meta:
-                label: Using custom CA certificates with Netdata
-                path: Netdata Agent/Configuration
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/using-custom-ca-certificates-with-netdata.md
-                status: Published
-    - meta:
-          label: Daemon
-          path: Netdata Agent
-          edit_url: https://github.com/netdata/netdata/edit/master/src/daemon/README.md
+      - meta:
+          label: Native Linux Distribution packages
+          path: Netdata Agent/Installation/Linux
+          edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/packages.md
           status: Published
-    - meta:
-          label: Database
-          path: Netdata Agent
-          edit_url: https://github.com/netdata/netdata/edit/master/src/database/README.md
+          description: Instructions for how to install Netdata using native DEB or
+            RPM packages.
+      - meta:
+          label: Static binary Linux Packages
+          path: Netdata Agent/Installation/Linux
+          edit_url: https://github.com/netdata/netdata/edit/master/packaging/makeself/README.md
           status: Published
-    - meta:
-          label: Logging
-          path: Netdata Agent
-          edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/log/README.md
+          description: Users can build the static 64-bit binary package that we ship
+            with every release of the open-source Netdata Agent for debugging or specialize
+            purposes.
+      - meta:
+          label: Switch Install Types and Release Channels
+          path: Netdata Agent/Installation/Linux
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/switching-install-types.md
           status: Published
-    - meta:
-          label: Registry
-          path: Netdata Agent
-          edit_url: https://github.com/netdata/netdata/edit/master/src/registry/README.md
+      - meta:
+          label: Offline systems
+          path: Netdata Agent/Installation/Linux
+          edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/offline.md
           status: Published
-          description: Netdata utilizes a central registry of machines/person GUIDs, URLs, and opt-in account information to provide unified cross-server dashboards.
+          description: Install the Netdata Agent on offline/air gapped systems to
+            benefit from real-time, per-second monitoring without connecting to the
+            internet.
     - meta:
-          label: Agent CLI
-          path: Netdata Agent
-          edit_url: https://github.com/netdata/netdata/edit/master/src/cli/README.md
-          status: Published
-          description: The Netdata Agent includes a command-line experience for reloading health configuration, reopening log files, halting the daemon, and more.
-    - meta:
-          label: Node Identities
-          path: Netdata Agent
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/node-identities.md
-          status: Published
-          description: Understanding how Netdata identifies nodes across Agents Parents and Cloud
-          keywords:
-              - guid
-              - machine guid
-              - node id
-              - claimed id
-              - identity
-    - meta:
-          label: VM Templates
-          path: Netdata Agent
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/vm-templates.md
-          status: Published
-          description: Prepare VM templates so each clone gets a unique Netdata identity
-          keywords:
-              - vm
-              - template
-              - clone
-              - kvm
-              - proxmox
-              - vagrant
-              - terraform
-    - meta:
-          label: Anonymous telemetry events
-          path: Netdata Agent
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/anonymous-telemetry-events.md
-          status: Published
-    - meta:
-          label: Netdata Parents
-          path: Netdata Parents
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/deployment-with-centralization-points.md
-          status: Published
-    - meta:
-          label: Parent Configuration Best Practices
-          path: Netdata Parents
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/best-practices.md
-          status: Published
-    - meta:
-          label: Parent-Child Configuration Reference
-          path: Netdata Parents
-          edit_url: https://github.com/netdata/netdata/edit/master/src/streaming/README.md
-          status: Published
-    - meta:
-          label: Configuration Examples
-          path: Netdata Parents
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/deployment-strategies.md
-          status: Published
-    - meta:
-          label: Streaming Routing Reference
-          path: Netdata Parents
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/streaming-routing.md
-          status: Published
-    - meta:
-          label: Node Types and Lifecycle Reference
-          path: Netdata Parents
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/nodes-ephemerality.md
-          status: Published
+        label: Windows
+        path: Netdata Agent/Installation/Windows
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/windows/WINDOWS_INSTALLER.md
+        status: Published
       items:
-          - meta:
-                label: Metrics Centralization Points
-                path: Netdata Parents/Metrics Centralization Points
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/README.md
-                status: Published
-          - meta:
-                label: Configuring Metrics Centralization Points
-                path: Netdata Parents/Metrics Centralization Points
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/configuration.md
-                status: Published
-          - meta:
-                label: Sizing Netdata Parents
-                path: Netdata Parents/Metrics Centralization Points
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/sizing-netdata-parents.md
-                status: Published
-          - meta:
-                label: Clustering and High Availability of Netdata Parents
-                path: Netdata Parents/Metrics Centralization Points
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md
-                status: Published
-          - meta:
-                label: Replication of Past Samples
-                path: Netdata Parents/Metrics Centralization Points
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md
-                status: Published
-          - meta:
-                label: FAQ on Metrics Centralization Points
-                path: Netdata Parents/Metrics Centralization Points
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/faq.md
-                status: Published
-    - meta:
-          label: Netdata Cloud
-          path: Netdata Cloud
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/README.md
+      - meta:
+          label: Switching Install Types and Release Channels
+          path: Netdata Agent/Installation/Windows
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/install/windows-release-channels.md
           status: Published
+          description: Guide to choosing and switching between different Netdata Windows
+            installation methods and release channels
     - meta:
-          label: Connect Agent
-          path: Netdata Cloud
-          edit_url: https://github.com/netdata/netdata/edit/master/src/claim/README.md
-          status: Published
+        label: Docker
+        path: Netdata Agent/Installation
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/docker/README.md
+        status: Published
+    - meta:
+        label: Kubernetes
+        path: Netdata Agent/Installation
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kubernetes.md
+        status: Published
+        description: Deploy Netdata to monitor a Kubernetes cluster to monitor the
+          health, performance, resource utilization, and application metrics of a
+          Kubernetes cluster in real time.
+    - meta:
+        label: Kubernetes Helm chart reference
+        path: Netdata Agent/Installation
+        edit_url: https://github.com/netdata/helmchart/edit/master/charts/netdata/README.md
+        status: Published
+    - meta:
+        label: macOS
+        path: Netdata Agent/Installation
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/macos.md
+        status: Published
+    - meta:
+        label: FreeBSD
+        path: Netdata Agent/Installation
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md
+        status: Published
+        description: Install Netdata on FreeBSD to monitor the health and performance
+          of bare metal or VMs with thousands of real-time, per-second metrics.
+    - meta:
+        label: pfSense
+        path: Netdata Agent/Installation
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/pfsense.md
+        status: Published
+        description: Install Netdata on pfSense to monitor the health and performance
+          of firewalls with thousands of real-time, per-second metrics.
+    - meta:
+        label: Synology
+        path: Netdata Agent/Installation
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/synology.md
+        status: Published
+        description: The Netdata Agent can be installed on AMD64-compatible NAS systems
+          using the 64-bit pre-compiled static binary.
+    - meta:
+        label: Ansible
+        path: Netdata Agent/Installation
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/ansible.md
+        status: Published
+        description: Deploy an infrastructure monitoring solution in minutes with
+          the Netdata Agent and Ansible. Use and customize a simple playbook for monitoring
+          as code.
+    - meta:
+        label: AWS
+        path: Netdata Agent/Installation
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/aws.md
+        status: Published
+        description: The Netdata Agent runs on all popular cloud providers, but often
+          requires additional steps and configuration for full functionality.
+    - meta:
+        label: Azure
+        path: Netdata Agent/Installation
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/azure.md
+        status: Published
+        description: The Netdata Agent runs on all popular cloud providers, but often
+          requires additional steps and configuration for full functionality.
+    - meta:
+        label: GCP
+        path: Netdata Agent/Installation
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/gcp.md
+        status: Published
+        description: The Netdata Agent runs on all popular cloud providers, but often
+          requires additional steps and configuration for full functionality.
+  - meta:
+      label: Maintenance
+      path: Netdata Agent/Maintenance
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/maintenance-operations-on-netdata-agents.md
+      status: Published
+    items:
+    - meta:
+        label: Service Control
+        path: Netdata Agent/Maintenance
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/start-stop-restart.md
+        status: Published
+        description: Manage the Netdata Agent daemon, load configuration changes,
+          and troubleshoot stuck processes on systemd and non-systemd nodes.
+    - meta:
+        label: Update
+        path: Netdata Agent/Maintenance
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UPDATE.md
+        status: Published
+        description: If you opted out of automatic updates, you need to update your
+          Netdata Agent to the latest nightly or stable version.
+    - meta:
+        label: Reinstall
+        path: Netdata Agent/Maintenance
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/REINSTALL.md
+        status: Published
+        description: Troubleshooting installation issues or force an update of the
+          Netdata Agent by reinstalling it using the same method you used during installation.
+    - meta:
+        label: Uninstall
+        path: Netdata Agent/Maintenance
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UNINSTALL.md
+        status: Published
+        description: If you are no longer interested in using the Netdata Agent, use
+          the self-contained uninstaller to remove all traces of binaries and configuration
+          files.
+    - meta:
+        label: Backup and restore an Agent
+        path: Netdata Agent/Maintenance
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/backup-and-restore-an-agent.md
+        status: Published
+        description: What actions you need to do to backup and Agent and restore it.
+  - meta:
+      label: Resource Utilization
+      path: Netdata Agent/Resource Utilization
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/README.md
+      status: Published
+    items:
+    - meta:
+        label: CPU
+        path: Netdata Agent/Resource Utilization
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md
+        status: Published
+    - meta:
+        label: RAM
+        path: Netdata Agent/Resource Utilization
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md
+        status: Published
+    - meta:
+        label: Bandwidth
+        path: Netdata Agent/Resource Utilization
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/bandwidth-requirements.md
+        status: Published
+    - meta:
+        label: Disk & Retention
+        path: Netdata Agent/Resource Utilization
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md
+        status: Published
+  - meta:
+      label: Configuration
+      path: Netdata Agent/Configuration
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/README.md
+      status: Published
+      description: Netdata is zero-configuration for most users, but complex infrastructures
+        may require you to tweak some of the Agent's granular settings.
+    items:
+    - meta:
+        label: Dynamic Configuration Manager
+        path: Netdata Agent/Configuration
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/dynamic-configuration.md
+        status: Published
+    - meta:
+        label: Daemon
+        path: Netdata Agent/Configuration
+        edit_url: https://github.com/netdata/netdata/edit/master/src/daemon/config/README.md
+        status: Published
+        description: The Netdata Agent's daemon is installed preconfigured to collect
+          thousands of metrics every second, but is highly configurable for real-world
+          workloads.
+    - meta:
+        label: Database
+        path: Netdata Agent/Configuration
+        edit_url: https://github.com/netdata/netdata/edit/master/src/database/CONFIGURATION.md
+        status: Published
+        description: With a single configuration change, the Netdata Agent can store
+          days, weeks, or months of metrics at its famous per-second granularity.
+    - meta:
+        label: Registry
+        path: Netdata Agent/Configuration
+        edit_url: https://github.com/netdata/netdata/edit/master/src/registry/CONFIGURATION.md
+        status: Published
+        description: Netdata utilizes a central registry of machines/person GUIDs,
+          URLs, and opt-in account information to provide unified cross-server dashboards.
+    - meta:
+        label: Securing Agents
+        path: Netdata Agent/Configuration/Securing Agents
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/securing-netdata-agents.md
+        status: Published
+        description: Your data and systems are safe with Netdata, but we recommend
+          a few easy ways to improve the security of your infrastructure.
       items:
-          - meta:
-                label: Spaces and Rooms
-                path: Netdata Cloud/Spaces and Rooms
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md
-                status: Published
-          - meta:
-                label: Node Rule-Based Room Assignment
-                path: Netdata Cloud/Spaces and Rooms
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/node-rule-based-room-assignment.md
-                status: Published
-          - meta:
-                label: Versions
-                path: Netdata Cloud/Versions
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/versions.md
-                status: Unpublished
-          - meta:
-                label: Authentication & Authorization
-                path: Netdata Cloud/Authentication & Authorization
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/README.md
-                status: Published
-          - meta:
-                label: Enterprise SSO Authentication
-                path: Netdata Cloud/Authentication & Authorization
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md
-                status: Published
-            items:
-                - type: integration_placeholder
-                  integration_kind: authentication
-          - meta:
-                label: Role-based access model
-                path: Netdata Cloud/Authentication & Authorization
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md
-                status: Published
-                description: Explanation of Netdata roles and permissions linked to them
-          - meta:
-                label: API Tokens
-                path: Netdata Cloud/Authentication & Authorization
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/api-tokens.md
-                status: Published
-    - meta:
-          label: Netdata Plans & Billing
-          path: Netdata Cloud
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/view-plan-and-billing.md
+      - meta:
+          label: Web Server Reference
+          path: Netdata Agent/Configuration/Securing Agents
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/server/README.md
           status: Published
-    - meta:
-          label: Agent-Cloud Link (ACLK)
-          path: Netdata Cloud
-          edit_url: https://github.com/netdata/netdata/edit/master/src/aclk/README.md
+          description: The Netdata Agent's local static-threaded web server serves
+            dashboards and real-time visualizations with security and DDoS protection.
+      - meta:
+          label: Running the Agent behind a reverse proxy
+          path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind
+            a reverse proxy
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/README.md
           status: Published
-          description: The Agent-Cloud link (ACLK) is the mechanism responsible for connecting a Netdata agent to Netdata Cloud.
+        items:
+        - meta:
+            label: Nginx
+            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind
+              a reverse proxy
+            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md
+            status: Published
+        - meta:
+            label: HAProxy
+            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind
+              a reverse proxy
+            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md
+            status: Published
+        - meta:
+            label: Apache
+            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind
+              a reverse proxy
+            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-apache.md
+            status: Published
+        - meta:
+            label: Lighttpd v1.4.x
+            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind
+              a reverse proxy
+            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-lighttpd.md
+            status: Published
+        - meta:
+            label: Caddy
+            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind
+              a reverse proxy
+            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-caddy.md
+            status: Published
+        - meta:
+            label: H2O
+            path: Netdata Agent/Configuration/Securing Agents/Running the Agent behind
+              a reverse proxy
+            edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md
+            status: Published
     - meta:
-          label: Remove Agent
-          path: Netdata Cloud
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/remove-node.md
-          status: Published
+        label: Performance Optimization
+        path: Netdata Agent/Configuration
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md
+        status: Published
+        description: While the Netdata Agent is designed to monitor a system with
+          only 1% CPU, you can optimize its performance for low-resource systems.
     - meta:
-          label: Node States and Transitions
-          path: Netdata Cloud
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/node-states-and-transitions.md
-          status: Published
-          description: Understanding node connection states and state transitions in Netdata Cloud
-          keywords:
-              - node states
-              - live
-              - stale
-              - offline
-              - unseen
-              - transitions
+        label: Organize systems, metrics, and alerts
+        path: Netdata Agent/Configuration
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md
+        status: Published
     - meta:
-          label: Unclaim and Reclaim a Node
-          path: Netdata Cloud
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/unclaim-reclaim-node.md
-          status: Published
+        label: Using custom CA certificates with Netdata
+        path: Netdata Agent/Configuration
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/using-custom-ca-certificates-with-netdata.md
+        status: Published
+  - meta:
+      label: Daemon
+      path: Netdata Agent
+      edit_url: https://github.com/netdata/netdata/edit/master/src/daemon/README.md
+      status: Published
+  - meta:
+      label: Database
+      path: Netdata Agent
+      edit_url: https://github.com/netdata/netdata/edit/master/src/database/README.md
+      status: Published
+  - meta:
+      label: Logging
+      path: Netdata Agent
+      edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/log/README.md
+      status: Published
+  - meta:
+      label: Registry
+      path: Netdata Agent
+      edit_url: https://github.com/netdata/netdata/edit/master/src/registry/README.md
+      status: Published
+      description: Netdata utilizes a central registry of machines/person GUIDs, URLs,
+        and opt-in account information to provide unified cross-server dashboards.
+  - meta:
+      label: Agent CLI
+      path: Netdata Agent
+      edit_url: https://github.com/netdata/netdata/edit/master/src/cli/README.md
+      status: Published
+      description: The Netdata Agent includes a command-line experience for reloading
+        health configuration, reopening log files, halting the daemon, and more.
+  - meta:
+      label: Node Identities
+      path: Netdata Agent
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/node-identities.md
+      status: Published
+      description: Understanding how Netdata identifies nodes across Agents Parents
+        and Cloud
+      keywords:
+      - guid
+      - machine guid
+      - node id
+      - claimed id
+      - identity
+  - meta:
+      label: VM Templates
+      path: Netdata Agent
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/vm-templates.md
+      status: Published
+      description: Prepare VM templates so each clone gets a unique Netdata identity
+      keywords:
+      - vm
+      - template
+      - clone
+      - kvm
+      - proxmox
+      - vagrant
+      - terraform
+  - meta:
+      label: Anonymous telemetry events
+      path: Netdata Agent
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/anonymous-telemetry-events.md
+      status: Published
+- meta:
+    label: Netdata Parents
+    path: Netdata Parents
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/deployment-with-centralization-points.md
+    status: Published
+  items:
+  - meta:
+      label: Parent Configuration Best Practices
+      path: Netdata Parents
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/best-practices.md
+      status: Published
+  - meta:
+      label: Parent-Child Configuration Reference
+      path: Netdata Parents
+      edit_url: https://github.com/netdata/netdata/edit/master/src/streaming/README.md
+      status: Published
+  - meta:
+      label: Configuration Examples
+      path: Netdata Parents
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/deployment-strategies.md
+      status: Published
+  - meta:
+      label: Streaming Routing Reference
+      path: Netdata Parents
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/streaming-routing.md
+      status: Published
+  - meta:
+      label: Node Types and Lifecycle Reference
+      path: Netdata Parents
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/nodes-ephemerality.md
+      status: Published
+  - meta:
+      label: Metrics Centralization Points
+      path: Netdata Parents/Metrics Centralization Points
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/README.md
+      status: Published
+    items:
     - meta:
-          label: Account Deletion
-          path: Netdata Cloud
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/delete/netdata/account.md
-          status: Published
+        label: Configuring Metrics Centralization Points
+        path: Netdata Parents/Metrics Centralization Points
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/configuration.md
+        status: Published
     - meta:
-          label: Netdata Cloud On-Prem
-          path: Netdata Cloud On-Prem
-          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/README.md
-          status: Published
+        label: Sizing Netdata Parents
+        path: Netdata Parents/Metrics Centralization Points
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/sizing-netdata-parents.md
+        status: Published
     - meta:
-          label: Installation
-          path: Netdata Cloud On-Prem
-          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/installation.md
-          status: Published
+        label: Clustering and High Availability of Netdata Parents
+        path: Netdata Parents/Metrics Centralization Points
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md
+        status: Published
     - meta:
-          label: Software Bill of Materials
-          path: Netdata Cloud On-Prem
-          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/sbom.md
-          status: Published
+        label: Replication of Past Samples
+        path: Netdata Parents/Metrics Centralization Points
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md
+        status: Published
     - meta:
-          label: Container Image Signature Verification
-          path: Netdata Cloud On-Prem
-          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/image-signature-verification.md
-          status: Published
+        label: FAQ on Metrics Centralization Points
+        path: Netdata Parents/Metrics Centralization Points
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/faq.md
+        status: Published
+- meta:
+    label: Netdata Cloud
+    path: Netdata Cloud
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/README.md
+    status: Published
+  items:
+  - meta:
+      label: Connect Agent
+      path: Netdata Cloud
+      edit_url: https://github.com/netdata/netdata/edit/master/src/claim/README.md
+      status: Published
+  - meta:
+      label: Spaces and Rooms
+      path: Netdata Cloud/Spaces and Rooms
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md
+      status: Published
+    items:
     - meta:
-          label: Security Hardening Guide
-          path: Netdata Cloud On-Prem
-          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/hardening-guide.md
-          status: Published
+        label: Node Rule-Based Room Assignment
+        path: Netdata Cloud/Spaces and Rooms
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/node-rule-based-room-assignment.md
+        status: Published
+  - meta:
+      label: Authentication & Authorization
+      path: Netdata Cloud/Authentication & Authorization
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/README.md
+      status: Published
+    items:
     - meta:
-          label: Kubernetes Network Policy Configuration
-          path: Netdata Cloud On-Prem
-          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/netpol.md
-          status: Published
+        label: Enterprise SSO Authentication
+        path: Netdata Cloud/Authentication & Authorization
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md
+        status: Published
     - meta:
-          label: PoC without K8s
-          path: Netdata Cloud On-Prem
-          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/poc-without-k8s.md
-          status: Published
+        label: Role-based access model
+        path: Netdata Cloud/Authentication & Authorization
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md
+        status: Published
+        description: Explanation of Netdata roles and permissions linked to them
     - meta:
-          label: Mirroring image registry
-          path: Netdata Cloud On-Prem
-          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/ecr-mirror.md
-          status: Published
+        label: API Tokens
+        path: Netdata Cloud/Authentication & Authorization
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/api-tokens.md
+        status: Published
+    - type: integration_placeholder
+      integration_kind: authentication
+  - meta:
+      label: Netdata Plans & Billing
+      path: Netdata Cloud
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/view-plan-and-billing.md
+      status: Published
+  - meta:
+      label: Agent-Cloud Link (ACLK)
+      path: Netdata Cloud
+      edit_url: https://github.com/netdata/netdata/edit/master/src/aclk/README.md
+      status: Published
+      description: The Agent-Cloud link (ACLK) is the mechanism responsible for connecting
+        a Netdata agent to Netdata Cloud.
+  - meta:
+      label: Remove Agent
+      path: Netdata Cloud
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/remove-node.md
+      status: Published
+  - meta:
+      label: Node States and Transitions
+      path: Netdata Cloud
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/node-states-and-transitions.md
+      status: Published
+      description: Understanding node connection states and state transitions in Netdata
+        Cloud
+      keywords:
+      - node states
+      - live
+      - stale
+      - offline
+      - unseen
+      - transitions
+  - meta:
+      label: Unclaim and Reclaim a Node
+      path: Netdata Cloud
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/learn/unclaim-reclaim-node.md
+      status: Published
+  - meta:
+      label: Account Deletion
+      path: Netdata Cloud
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/delete/netdata/account.md
+      status: Published
+- meta:
+    label: Netdata Cloud On-Prem
+    path: Netdata Cloud On-Prem
+    edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/README.md
+    status: Published
+  items:
+  - meta:
+      label: Installation
+      path: Netdata Cloud On-Prem
+      edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/installation.md
+      status: Published
+  - meta:
+      label: Software Bill of Materials
+      path: Netdata Cloud On-Prem
+      edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/sbom.md
+      status: Published
+  - meta:
+      label: Container Image Signature Verification
+      path: Netdata Cloud On-Prem
+      edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/image-signature-verification.md
+      status: Published
+  - meta:
+      label: Security Hardening Guide
+      path: Netdata Cloud On-Prem
+      edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/hardening-guide.md
+      status: Published
+  - meta:
+      label: Kubernetes Network Policy Configuration
+      path: Netdata Cloud On-Prem
+      edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/netpol.md
+      status: Published
+  - meta:
+      label: PoC without K8s
+      path: Netdata Cloud On-Prem
+      edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/poc-without-k8s.md
+      status: Published
+  - meta:
+      label: Mirroring image registry
+      path: Netdata Cloud On-Prem
+      edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/ecr-mirror.md
+      status: Published
+  - meta:
+      label: Troubleshooting
+      path: Netdata Cloud On-Prem
+      edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/troubleshooting.md
+      status: Published
+  - meta:
+      label: Release Notes
+      path: Netdata Cloud On-Prem
+      edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/netdata-cloud-onprem/RELEASE-NOTES.md
+      status: Published
+- meta:
+    label: Collecting Metrics
+    path: Collecting Metrics
+    edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/README.md
+    status: Published
+  items:
+  - meta:
+      label: Collectors configuration
+      path: Collecting Metrics
+      edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/REFERENCE.md
+      status: Published
+  - meta:
+      label: Service discovery
+      path: Collecting Metrics
+      edit_url: https://github.com/netdata/agent-service-discovery/edit/master/README.md
+      status: Published
+  - meta:
+      label: StatsD
+      path: Collecting Metrics
+      edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/statsd.plugin/README.md
+      status: Published
+  - meta:
+      label: OpenTelemetry Metrics
+      path: Collecting Metrics/OpenTelemetry
+      edit_url: https://github.com/netdata/netdata/edit/master/src/crates/netdata-otel/otel-plugin/README.md
+      status: Published
+      description: Ingesting storing and visualizing 
+  - meta:
+      label: SNMP Profile Format
+      path: Collecting Metrics
+      edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/snmp/profile-format.md
+      status: Published
+      description: Learn how Netdata’s SNMP collector uses profiles.
+  - type: integration_placeholder
+    integration_kind: collectors
+- meta:
+    label: Exporting Metrics
+    path: Exporting Metrics
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/exporting-metrics/README.md
+    status: Published
+    description: Use the exporting engine to send Netdata metrics to popular external
+      time series databases for long-term storage or further analysis.
+  items:
+  - meta:
+      label: Exporting reference
+      path: Exporting Metrics
+      edit_url: https://github.com/netdata/netdata/edit/master/src/exporting/README.md
+      status: Published
+      description: With the exporting engine, you can archive your Netdata metrics
+        to multiple external databases for long-term storage or further analysis.
+  - meta:
+      label: Enable an exporting connector
+      path: Exporting Metrics
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/exporting-metrics/enable-an-exporting-connector.md
+      status: Published
+      description: Learn how to enable and configure any connector using examples
+        to start exporting metrics to external time-series databases in minutes.
+  - meta:
+      label: Prometheus
+      path: Exporting Metrics
+      edit_url: https://github.com/netdata/netdata/edit/master/src/exporting/prometheus/README.md
+      status: Published
+      description: Export Netdata metrics to Prometheus for archiving and further
+        analysis.
+  - meta:
+      label: Shell Scripts
+      path: Exporting Metrics
+      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/exporters/shell/README.md
+      status: Published
+  - type: integration_placeholder
+    integration_kind: exporters
+- meta:
+    label: Logs
+    path: Logs
+  items:
+  - meta:
+      label: Journal Viewer Plugin
+      path: Logs/Systemd Journal Logs
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/README.md
+      status: Published
+      description: View and analyze logs available in systemd journal
+    items:
     - meta:
-          label: Troubleshooting
-          path: Netdata Cloud On-Prem
-          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/troubleshooting.md
-          status: Published
+        label: Forward Secure Sealing (FSS) in Systemd-Journal
+        path: Logs/Systemd Journal Logs
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/forward_secure_sealing.md
+        status: Published
+  - meta:
+      label: Windows Events Plugin Reference
+      path: Logs/Windows Event Logs
+      edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/windows-events.plugin/README.md
+      status: Published
+  - meta:
+      label: log2journal
+      path: Logs/log2journal
+      edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/log2journal/README.md
+      status: Published
+  - meta:
+      label: systemd-cat-native
+      path: Logs/systemd-cat-native
+      edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/log/systemd-cat-native.md
+      status: Published
+  - meta:
+      label: Logs Centralization Points with systemd-journald
+      path: Logs/Logs Centralization Points with systemd-journald
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md
+      status: Published
+    items:
     - meta:
-          label: Release Notes
-          path: Netdata Cloud On-Prem
-          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/netdata-cloud-onprem/RELEASE-NOTES.md
-          status: Published
+        label: Passive journal centralization with encryption using self-signed certificates
+        path: Logs/Logs Centralization Points with systemd-journald
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates.md
+        status: Published
     - meta:
-          label: Collecting Metrics
-          path: Collecting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/README.md
-          status: Published
+        label: Passive journal centralization without encryption
+        path: Logs/Logs Centralization Points with systemd-journald
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md
+        status: Published
     - meta:
-          label: Collectors configuration
-          path: Collecting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/REFERENCE.md
-          status: Published
+        label: Active journal source without encryption
+        path: Logs/Logs Centralization Points with systemd-journald
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/active_journal_centralization_guide_no_encryption.md
+        status: Published
+  - type: integration_placeholder
+    integration_kind: logs
+- meta:
+    label: Top Consumers
+    path: Top Consumers
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md
+    status: Published
+    description: Present the Netdata Functions what these are and why they should
+      be used.
+  items:
+  - meta:
+      label: Processes
+      path: Top Consumers
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/functions/processes.md
+      status: Published
+  - meta:
+      label: Database Queries
+      path: Top Consumers
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/functions/databases.md
+      status: Published
+      description: Top and running database queries with deadlock and error attribution
+        for 13 databases.
+- meta:
+    label: Alerts & Notifications
+    path: Alerts & Notifications
+    edit_url: https://github.com/netdata/netdata/edit/master/src/health/README.md
+    status: Published
+  items:
+  - meta:
+      label: Creating Alerts with the Alerts Configuration Manager
+      path: Alerts & Notifications
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md
+      status: Published
+  - meta:
+      label: Notifications
+      path: Alerts & Notifications/Notifications
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/README.md
+      status: Published
+      description: Send Netdata alerts from a centralized place with Netdata Cloud,
+        or configure nodes individually, to enable incident response and faster resolution.
+    items:
     - meta:
-          label: Service discovery
-          path: Collecting Metrics
-          edit_url: https://github.com/netdata/agent-service-discovery/edit/master/README.md
-          status: Published
-    - meta:
-          label: StatsD
-          path: Collecting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/statsd.plugin/README.md
-          status: Published
+        label: Agent Notifications Reference
+        path: Alerts & Notifications/Notifications/Agent Dispatched Notifications
+        edit_url: https://github.com/netdata/netdata/edit/master/src/health/notifications/README.md
+        status: Published
       items:
-          - meta:
-                label: OpenTelemetry Metrics
-                path: Collecting Metrics/OpenTelemetry
-                edit_url: https://github.com/netdata/netdata/edit/master/src/crates/netdata-otel/otel-plugin/README.md
-                status: Published
-                description: Ingesting storing and visualizing OpenTelemetry metrics
+      - type: integration_placeholder
+        integration_kind: agent_notifications
     - meta:
-          label: System metrics
-          path: Collecting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/system-metrics.md
-          status: Unpublished
-          description: Netdata collects thousands of metrics from physical and virtual systems, IoT/edge devices, and containers with zero configuration.
-    - meta:
-          label: Application metrics
-          path: Collecting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/application-metrics.md
-          status: Unpublished
-          description: Monitor and troubleshoot every application on your infrastructure with per-second metrics, zero configuration, and meaningful charts.
-    - meta:
-          label: Container metrics
-          path: Collecting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/container-metrics.md
-          status: Unpublished
-          description: Use Netdata to collect per-second utilization and application-level metrics from Linux/Docker containers and Kubernetes clusters.
-    - meta:
-          label: SNMP Profile Format
-          path: Collecting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/snmp/profile-format.md
-          status: Published
-          description: Learn how Netdata’s SNMP collector uses profiles.
+        label: Centralized Cloud Notifications Reference
+        path: Alerts & Notifications/Notifications/Centralized Cloud Notifications
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md
+        status: Published
+        description: Configure Netdata Cloud to send notifications to your team whenever
+          any node on your infrastructure triggers an alert threshold.
       items:
-          - type: integration_placeholder
-            integration_kind: collectors
-    - meta:
-          label: Exporting Metrics
-          path: Exporting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/exporting-metrics/README.md
+      - meta:
+          label: Manage notification methods
+          path: Alerts & Notifications/Notifications/Centralized Cloud Notifications
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md
           status: Published
-          description: Use the exporting engine to send Netdata metrics to popular external time series databases for long-term storage or further analysis.
-    - meta:
-          label: Exporting reference
-          path: Exporting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/src/exporting/README.md
+          description: Instructions on how to manage notification methods
+      - meta:
+          label: Manage alert notification silencing rules
+          path: Alerts & Notifications/Notifications/Centralized Cloud Notifications
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md
           status: Published
-          description: With the exporting engine, you can archive your Netdata metrics to multiple external databases for long-term storage or further analysis.
+          description: Master Netdata alert management via notification silencing
+            rules for efficient and focused monitoring.
+      - type: integration_placeholder
+        integration_kind: cloud_notifications
+  - meta:
+      label: Alert Configuration Reference
+      path: Alerts & Notifications
+      edit_url: https://github.com/netdata/netdata/edit/master/src/health/REFERENCE.md
+      status: Published
+  - meta:
+      label: Alert Configuration Ordering
+      path: Alerts & Notifications
+      edit_url: https://github.com/netdata/netdata/edit/master/src/health/alert-configuration-ordering.md
+      status: Published
+      keywords:
+      - alerts
+      - health
+      - ordering
+      - precedence
+      - templates
+      - alarms
+  - meta:
+      label: Overriding Stock Alerts
+      path: Alerts & Notifications
+      edit_url: https://github.com/netdata/netdata/edit/master/src/health/overriding-stock-alerts.md
+      status: Published
+      keywords:
+      - alerts
+      - health
+      - override
+      - stock
+      - templates
+      - alarms
+  - meta:
+      label: Health API Calls
+      path: Alerts & Notifications
+      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/health/README.md
+      status: Published
+- meta:
+    label: Netdata AI
+    path: Netdata AI
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md
+    status: Published
+  items:
+  - meta:
+      label: Conversations
+      path: Netdata AI
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/conversations.md
+      status: Published
+      keywords:
+      - conversations
+      - chat
+      - real-time
+      - live exhibits
+  - meta:
+      label: Insights
+      path: Netdata AI/Insights
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-insights.md
+      status: Published
+    items:
     - meta:
-          label: Enable an exporting connector
-          path: Exporting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/exporting-metrics/enable-an-exporting-connector.md
-          status: Published
-          description: Learn how to enable and configure any connector using examples to start exporting metrics to external time-series databases in minutes.
+        label: Infrastructure Summary
+        path: Netdata AI/Insights
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/infrastructure-summary.md
+        status: Published
+    - meta:
+        label: Performance Optimization
+        path: Netdata AI/Insights
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/performance-optimization.md
+        status: Published
+    - meta:
+        label: Capacity Planning
+        path: Netdata AI/Insights
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/capacity-planning.md
+        status: Published
+    - meta:
+        label: Anomaly Analysis
+        path: Netdata AI/Insights
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/anomaly-analysis.md
+        status: Published
+    - meta:
+        label: Scheduled Reports
+        path: Netdata AI/Insights
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/scheduled-reports.md
+        status: Published
+  - meta:
+      label: Investigations
+      path: Netdata AI/Investigations
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/investigations/index.md
+      status: Published
+    items:
+    - meta:
+        label: Custom Investigations
+        path: Netdata AI/Investigations
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/investigations/custom-investigations.md
+        status: Published
+    - meta:
+        label: Scheduled Investigations
+        path: Netdata AI/Investigations
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/investigations/scheduled-investigations.md
+        status: Published
+  - meta:
+      label: Troubleshooting
+      path: Netdata AI/Troubleshooting
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/troubleshooting/index.md
+      status: Published
+    items:
+    - meta:
+        label: Alert Troubleshooting
+        path: Netdata AI/Troubleshooting
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/troubleshooting/troubleshoot.md
+        status: Published
+    - meta:
+        label: Anomaly Advisor
+        path: Netdata AI/Troubleshooting
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/ml-ai/anomaly-advisor.md
+        status: Published
+    - meta:
+        label: Metric Correlations
+        path: Netdata AI/Troubleshooting
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/metric-correlations.md
+        status: Published
+        description: Quickly find metrics and charts closely related to a particular
+          timeframe of interest anywhere in your infrastructure to discover the root
+          cause faster.
+  - meta:
+      label: Alerts Automation
+      path: Netdata AI
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/alerts-automation/alerts-automation.md
+      status: Published
+      description: AI-powered alert creation and suggestions
+      keywords:
+      - alerts
+      - automation
+      - ai alerts
+  - meta:
+      label: Anomaly Detection
+      path: Netdata AI/Anomaly Detection
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md
+      status: Published
+    items:
+    - meta:
+        label: ML Configuration
+        path: Netdata AI/Anomaly Detection
+        edit_url: https://github.com/netdata/netdata/edit/master/src/ml/ml-configuration.md
+        status: Published
+    - meta:
+        label: ML Accuracy
+        path: Netdata AI/Anomaly Detection
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/ml-ai/ml-anomaly-detection/ml-accuracy.md
+        status: Published
+        description: Analysis of Netdata's ML anomaly detection accuracy, false positive
+          rates, and comparison with other approaches
+  - meta:
+      label: MCP
+      path: Netdata AI/MCP
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/README.md
+      status: Published
+    items:
+    - meta:
+        label: Chat with Netdata
+        path: Netdata AI/MCP
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/ai-chat-netdata.md
+        status: Published
+    - meta:
+        label: MCP Clients
+        path: Netdata AI/MCP/MCP Clients
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md
+        status: Published
       items:
-          - type: integration_placeholder
-            integration_kind: exporters
-    - meta:
-          label: Prometheus
-          path: Exporting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/src/exporting/prometheus/README.md
+      - meta:
+          label: Claude Desktop
+          path: Netdata AI/MCP/MCP Clients
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/claude-desktop.md
           status: Published
-          description: Export Netdata metrics to Prometheus for archiving and further analysis.
-    - meta:
-          label: Shell Scripts
-          path: Exporting Metrics
-          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/exporters/shell/README.md
+      - meta:
+          label: Cursor
+          path: Netdata AI/MCP/MCP Clients
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/cursor.md
           status: Published
-    - meta:
-          label: Logs
-          path: Logs
+      - meta:
+          label: Visual Studio Code
+          path: Netdata AI/MCP/MCP Clients
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/vs-code.md
           status: Published
+      - meta:
+          label: JetBrains IDEs
+          path: Netdata AI/MCP/MCP Clients
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/jetbrains-ides.md
+          status: Published
+      - meta:
+          label: Netdata Web Client
+          path: Netdata AI/MCP/MCP Clients
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/netdata-web-client.md
+          status: Published
+      - meta:
+          label: Claude Code
+          path: Netdata AI/MCP/MCP Clients
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/claude-code.md
+          status: Published
+      - meta:
+          label: Gemini CLI
+          path: Netdata AI/MCP/MCP Clients
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/gemini-cli.md
+          status: Published
+      - meta:
+          label: OpenAI Codex CLI
+          path: Netdata AI/MCP/MCP Clients
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/codex-cli.md
+          status: Published
+      - meta:
+          label: Crush
+          path: Netdata AI/MCP/MCP Clients
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/crush.md
+          status: Published
+      - meta:
+          label: OpenCode
+          path: Netdata AI/MCP/MCP Clients
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/opencode.md
+          status: Published
+- meta:
+    label: Dashboards and Charts
+    path: Dashboards and Charts
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/README.md
+    status: Published
+  items:
+  - meta:
+      label: Tabs
+      path: Dashboards and Charts/Tabs
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/home-tab.md
+      status: Published
+      description: With Netdata Cloud's War Rooms, you can see real-time metrics,
+        from any number of nodes in your infrastructure, in composite charts.
+    items:
+    - meta:
+        label: Alerts
+        path: Dashboards and Charts/Tabs
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/alerts-tab.md
+        status: Published
+    - meta:
+        label: Anomalies
+        path: Dashboards and Charts/Tabs
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/anomaly-advisor-tab.md
+        status: Published
+        description: Quickly find anomalous metrics anywhere in your infrastructure.
+    - meta:
+        label: Dashboards
+        path: Dashboards and Charts/Tabs
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/dashboards-tab.md
+        status: Published
+        description: Design new dashboards that target your infrastructure's unique
+          needs and share them with your team fortargeted visual anomaly detection
+          or incident response.
+    - meta:
+        label: Events
+        path: Dashboards and Charts/Tabs
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/events-feed.md
+        status: Published
+        description: Present the Netdata Events feed.
+    - meta:
+        label: Kubernetes
+        path: Dashboards and Charts/Tabs
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/kubernetes-tab.md
+        status: Published
+        description: Netdata Cloud features rich, zero-configuration Kubernetes monitoring
+          for the resource utilization and application metrics of Kubernetes (k8s)
+          clusters.
+    - meta:
+        label: Logs
+        path: Dashboards and Charts/Tabs
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/logs-tab.md
+        status: Published
+    - meta:
+        label: Metrics
+        path: Dashboards and Charts/Tabs
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md
+        status: Published
+    - meta:
+        label: Nodes
+        path: Dashboards and Charts/Tabs
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/nodes-tab.md
+        status: Published
+        description: See charts from all your nodes in one pane of glass, then dive
+          in to embedded dashboards for granular troubleshooting of ongoing issues.
+    - meta:
+        label: Top
+        path: Dashboards and Charts/Tabs
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/top-tab.md
+        status: Published
+        description: Instructions on how to use Functions
+  - meta:
+      label: Theme
+      path: Dashboards and Charts
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/themes.md
+      status: Published
+  - meta:
+      label: Grafana Plugin
+      path: Dashboards and Charts
+      edit_url: https://github.com/netdata/netdata-grafana-datasource-plugin/edit/master/README.md
+      status: Published
+  - meta:
+      label: Charts
+      path: Dashboards and Charts
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/netdata-charts.md
+      status: Published
+  - meta:
+      label: Expanded Chart Analysis
+      path: Dashboards and Charts
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/expanded-chart-analysis.md
+      status: Published
+  - meta:
+      label: NIDL Framework
+      path: Dashboards and Charts
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/NIDL-Framework.md
+      status: Published
+  - meta:
+      label: Node Filter
+      path: Dashboards and Charts
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/node-filter.md
+      status: Published
+  - meta:
+      label: Time Controls
+      path: Dashboards and Charts
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/visualization-date-and-time-controls.md
+      status: Published
+- meta:
+    label: Security and Privacy Design
+    path: Security and Privacy Design
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/README.md
+    status: Published
+  items:
+  - meta:
+      label: Netdata Agent
+      path: Security and Privacy Design
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-agent-security.md
+      status: Published
+  - meta:
+      label: Netdata Cloud
+      path: Security and Privacy Design
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-cloud-security.md
+      status: Published
+- meta:
+    label: Developer and Contributor Corner
+    path: Developer and Contributor Corner
+    edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/README.md
+    status: Published
+  items:
+  - meta:
+        label: REST API
+        path: Developer and Contributor Corner/REST API
+        edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/README.md
+        status: Published
+    items:
+    - meta:
+        label: Queries
+        path: Developer and Contributor Corner/REST API/Queries
+        edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/README.md
+        status: Published
       items:
-          - type: integration_placeholder
-            integration_kind: logs
-          - meta:
-                label: Journal Viewer Plugin
-                path: Logs/Systemd Journal Logs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/README.md
-                status: Published
-                description: View and analyze logs available in systemd journal
-          - meta:
-                label: Forward Secure Sealing (FSS) in Systemd-Journal
-                path: Logs/Systemd Journal Logs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/forward_secure_sealing.md
-                status: Published
-          - meta:
-                label: Windows Events Plugin Reference
-                path: Logs/Windows Event Logs
-                edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/windows-events.plugin/README.md
-                status: Published
-          - meta:
-                label: log2journal
-                path: Logs/log2journal
-                edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/log2journal/README.md
-                status: Published
-          - meta:
-                label: systemd-cat-native
-                path: Logs/systemd-cat-native
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/log/systemd-cat-native.md
-                status: Published
-          - meta:
-                label: Logs Centralization Points with systemd-journald
-                path: Logs/Logs Centralization Points with systemd-journald
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md
-                status: Published
-          - meta:
-                label: Passive journal centralization with encryption using self-signed certificates
-                path: Logs/Logs Centralization Points with systemd-journald
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-with-encryption-using-self-signed-certificates.md
-                status: Published
-          - meta:
-                label: Passive journal centralization without encryption
-                path: Logs/Logs Centralization Points with systemd-journald
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md
-                status: Published
-          - meta:
-                label: Active journal source without encryption
-                path: Logs/Logs Centralization Points with systemd-journald
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/active_journal_centralization_guide_no_encryption.md
-                status: Published
-    - meta:
-          label: Top Consumers
-          path: Top Consumers
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md
+      - meta:
+          label: Average or Mean
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/average/README.md
           status: Published
-          description: Present the Netdata Functions what these are and why they should be used.
-    - meta:
-          label: Processes
-          path: Top Consumers
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/functions/processes.md
+      - meta:
+          label: CountIf
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/countif/README.md
           status: Published
-    - meta:
-          label: Database Queries
-          path: Top Consumers
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/functions/databases.md
+      - meta:
+          label: Double exponential smoothing
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/des/README.md
           status: Published
-          description: Top and running database queries with deadlock and error attribution for 13 databases.
-    - meta:
-          label: Alerts & Notifications
-          path: Alerts & Notifications
-          edit_url: https://github.com/netdata/netdata/edit/master/src/health/README.md
+      - meta:
+          label: Incremental Sum (`incremental_sum`)
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/incremental_sum/README.md
           status: Published
-    - meta:
-          label: Creating Alerts with the Alerts Configuration Manager
-          path: Alerts & Notifications
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md
+      - meta:
+          label: Max
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/max/README.md
           status: Published
+      - meta:
+          label: Median
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/median/README.md
+          status: Published
+          description: Use median in API queries and health entities to find the 'middle'
+            value from a sample, eliminating any unwanted spikes in the returned metrics.
+      - meta:
+          label: Min
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/min/README.md
+          status: Published
+      - meta:
+          label: Percentile
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/percentile/README.md
+          status: Published
+          description: Use percentile in API queries and health entities to find the
+            'percentile' value from a sample, eliminating any unwanted spikes in the
+            returned metrics.
+      - meta:
+          label: Single (or Simple) Exponential Smoothing (`ses`)
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/ses/README.md
+          status: Published
+      - meta:
+          label: Standard deviation (`stddev`)
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/stddev/README.md
+          status: Published
+      - meta:
+          label: Sum
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/sum/README.md
+          status: Published
+      - meta:
+          label: Trimmed Mean
+          path: Developer and Contributor Corner/REST API/Queries
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/trimmed_mean/README.md
+          status: Published
+          description: Use trimmed-mean in API queries and health entities to find
+            the average value from a sample, eliminating any unwanted spikes in the
+            returned metrics.
+    - meta:
+        label: Formatters
+        path: Developer and Contributor Corner/REST API/Formatters
+        edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/README.md
+        status: Published
       items:
-          - meta:
-                label: Notifications
-                path: Alerts & Notifications/Notifications
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/README.md
-                status: Published
-                description: Send Netdata alerts from a centralized place with Netdata Cloud, or configure nodes individually, to enable incident response and faster resolution.
-            items:
-                - meta:
-                      label: Agent Notifications Reference
-                      path: Alerts & Notifications/Notifications/Agent Dispatched Notifications
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/health/notifications/README.md
-                      status: Published
-                  items:
-                      - type: integration_placeholder
-                        integration_kind: agent_notifications
-                - meta:
-                      label: Centralized Cloud Notifications Reference
-                      path: Alerts & Notifications/Notifications/Centralized Cloud Notifications
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md
-                      status: Published
-                      description: Configure Netdata Cloud to send notifications to your team whenever any node on your infrastructure triggers an alert threshold.
-                - meta:
-                      label: Manage notification methods
-                      path: Alerts & Notifications/Notifications/Centralized Cloud Notifications
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md
-                      status: Published
-                      description: Instructions on how to manage notification methods
-                - meta:
-                      label: Manage alert notification silencing rules
-                      path: Alerts & Notifications/Notifications/Centralized Cloud Notifications
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md
-                      status: Published
-                      description: Master Netdata alert management via notification silencing rules for efficient and focused monitoring.
-                  items:
-                      - type: integration_placeholder
-                        integration_kind: cloud_notifications
-    - meta:
-          label: Alert Configuration Reference
-          path: Alerts & Notifications
-          edit_url: https://github.com/netdata/netdata/edit/master/src/health/REFERENCE.md
+      - meta:
+          label: CSV formatter
+          path: Developer and Contributor Corner/REST API/Formatters
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/csv/README.md
+          status: Published
+      - meta:
+          label: JSON formatter
+          path: Developer and Contributor Corner/REST API/Formatters
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/json/README.md
+          status: Published
+      - meta:
+          label: SSV formatter
+          path: Developer and Contributor Corner/REST API/Formatters
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/ssv/README.md
+          status: Published
+      - meta:
+          label: Value formatter
+          path: Developer and Contributor Corner/REST API/Formatters
+          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/value/README.md
           status: Published
     - meta:
-          label: Alert Configuration Ordering
-          path: Alerts & Notifications
-          edit_url: https://github.com/netdata/netdata/edit/master/src/health/alert-configuration-ordering.md
-          status: Published
-          keywords:
-              - alerts
-              - health
-              - ordering
-              - precedence
-              - templates
-              - alarms
+        label: Netdata badges
+        path: Developer and Contributor Corner/REST API
+        edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/badges/README.md
+        status: Published
+  - meta:
+      label: Dynamic Configuration
+      path: Developer and Contributor Corner/Dynamic Configuration
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/dyncfg.md
+      status: Published
+  - meta:
+      label: Database Engine
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/src/database/engine/README.md
+      status: Published
+  - meta:
+      label: Contributing
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/.github/edit/main/CONTRIBUTING.md
+      status: Published
+  - meta:
+      label: Community code of conduct
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/.github/edit/main/CODE_OF_CONDUCT.md
+      status: Published
+  - meta:
+      label: Security Policy
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/.github/edit/main/SECURITY.md
+      status: Published
+      description: The Netdata team maintains and adheres to a formal process any
+        time a member of the community reports a security vulnerability.
+  - meta:
+      label: External plugins
+      path: Developer and Contributor Corner/External Plugins
+      edit_url: https://github.com/netdata/netdata/edit/master/src/plugins.d/README.md
+      status: Published
+    items:
     - meta:
-          label: Overriding Stock Alerts
-          path: Alerts & Notifications
-          edit_url: https://github.com/netdata/netdata/edit/master/src/health/overriding-stock-alerts.md
-          status: Published
-          keywords:
-              - alerts
-              - health
-              - override
-              - stock
-              - templates
-              - alarms
-    - meta:
-          label: Health API Calls
-          path: Alerts & Notifications
-          edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/health/README.md
-          status: Published
-    - meta:
-          label: Netdata AI
-          path: Netdata AI
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md
-          status: Published
-    - meta:
-          label: Conversations
-          path: Netdata AI
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/conversations.md
-          status: Published
-          keywords:
-              - conversations
-              - chat
-              - real-time
-              - live exhibits
+        label: go.d.plugin
+        path: Developer and Contributor Corner/External Plugins/go.d.plugin
+        edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/README.md
+        status: Published
+        description: go.d.plugin is an external plugin for Netdata, responsible for
+          running individual data collectors written in Go.
       items:
-          - meta:
-                label: Insights
-                path: Netdata AI/Insights
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-insights.md
-                status: Published
-          - meta:
-                label: Infrastructure Summary
-                path: Netdata AI/Insights
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/infrastructure-summary.md
-                status: Published
-          - meta:
-                label: Performance Optimization
-                path: Netdata AI/Insights
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/performance-optimization.md
-                status: Published
-          - meta:
-                label: Capacity Planning
-                path: Netdata AI/Insights
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/capacity-planning.md
-                status: Published
-          - meta:
-                label: Anomaly Analysis
-                path: Netdata AI/Insights
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/anomaly-analysis.md
-                status: Published
-          - meta:
-                label: Scheduled Reports
-                path: Netdata AI/Insights
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/insights/scheduled-reports.md
-                status: Published
-          - meta:
-                label: Investigations
-                path: Netdata AI/Investigations
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/investigations/index.md
-                status: Published
-          - meta:
-                label: Custom Investigations
-                path: Netdata AI/Investigations
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/investigations/custom-investigations.md
-                status: Published
-          - meta:
-                label: Scheduled Investigations
-                path: Netdata AI/Investigations
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/investigations/scheduled-investigations.md
-                status: Published
-          - meta:
-                label: Troubleshooting
-                path: Netdata AI/Troubleshooting
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/troubleshooting/index.md
-                status: Published
-          - meta:
-                label: Alert Troubleshooting
-                path: Netdata AI/Troubleshooting
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/troubleshooting/troubleshoot.md
-                status: Published
-          - meta:
-                label: Anomaly Advisor
-                path: Netdata AI/Troubleshooting
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/ml-ai/anomaly-advisor.md
-                status: Published
-          - meta:
-                label: Metric Correlations
-                path: Netdata AI/Troubleshooting
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/metric-correlations.md
-                status: Published
-                description: Quickly find metrics and charts closely related to a particular timeframe of interest anywhere in your infrastructure to discover the root cause faster.
-    - meta:
-          label: Alerts Automation
-          path: Netdata AI
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/alerts-automation/alerts-automation.md
+      - meta:
+          label: How to write a Netdata collector in Go
+          path: Developer and Contributor Corner/External Plugins/go.d.plugin
+          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/docs/how-to-write-a-module.md
           status: Published
-          description: AI-powered alert creation and suggestions
-          keywords:
-              - alerts
-              - automation
-              - ai alerts
-      items:
-          - meta:
-                label: Anomaly Detection
-                path: Netdata AI/Anomaly Detection
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md
-                status: Published
-          - meta:
-                label: ML Configuration
-                path: Netdata AI/Anomaly Detection
-                edit_url: https://github.com/netdata/netdata/edit/master/src/ml/ml-configuration.md
-                status: Published
-          - meta:
-                label: ML Accuracy
-                path: Netdata AI/Anomaly Detection
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/ml-ai/ml-anomaly-detection/ml-accuracy.md
-                status: Published
-                description: Analysis of Netdata's ML anomaly detection accuracy, false positive rates, and comparison with other approaches
-          - meta:
-                label: MCP
-                path: Netdata AI/MCP
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/README.md
-                status: Published
-          - meta:
-                label: Chat with Netdata
-                path: Netdata AI/MCP
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/ai-chat-netdata.md
-                status: Published
-            items:
-                - meta:
-                      label: MCP Clients
-                      path: Netdata AI/MCP/MCP Clients
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md
-                      status: Published
-                - meta:
-                      label: Claude Desktop
-                      path: Netdata AI/MCP/MCP Clients
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/claude-desktop.md
-                      status: Published
-                - meta:
-                      label: Cursor
-                      path: Netdata AI/MCP/MCP Clients
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/cursor.md
-                      status: Published
-                - meta:
-                      label: Visual Studio Code
-                      path: Netdata AI/MCP/MCP Clients
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/vs-code.md
-                      status: Published
-                - meta:
-                      label: JetBrains IDEs
-                      path: Netdata AI/MCP/MCP Clients
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/jetbrains-ides.md
-                      status: Published
-                - meta:
-                      label: Netdata Web Client
-                      path: Netdata AI/MCP/MCP Clients
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/netdata-web-client.md
-                      status: Published
-                - meta:
-                      label: Claude Code
-                      path: Netdata AI/MCP/MCP Clients
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/claude-code.md
-                      status: Published
-                - meta:
-                      label: Gemini CLI
-                      path: Netdata AI/MCP/MCP Clients
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/gemini-cli.md
-                      status: Published
-                - meta:
-                      label: OpenAI Codex CLI
-                      path: Netdata AI/MCP/MCP Clients
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/codex-cli.md
-                      status: Published
-                - meta:
-                      label: Crush
-                      path: Netdata AI/MCP/MCP Clients
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/crush.md
-                      status: Published
-                - meta:
-                      label: OpenCode
-                      path: Netdata AI/MCP/MCP Clients
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/opencode.md
-                      status: Published
+          description: This guide will walk you through the technical implementation
+            of writing a new Netdata collector in Golang, with tips on interfaces,
+            structure, configuration files, and more.
     - meta:
-          label: AI powered troubleshooting assistant
-          path: AI and Machine Learning
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-assistant.md
-          status: Unpublished
+        label: python.d.plugin
+        path: Developer and Contributor Corner/External Plugins/python.d.plugin
+        edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/python.d.plugin/README.md
+        status: Published
     - meta:
-          label: ML models and anomaly detection
-          path: AI and Machine Learning
-          edit_url: https://github.com/netdata/netdata/edit/master/src/ml/README.md
-          status: Unpublished
-          description: This is an in-depth look at how Netdata uses ML to detect anomalies.
+        label: charts.d.plugin
+        path: Developer and Contributor Corner/External Plugins
+        edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/charts.d.plugin/README.md
+        status: Published
     - meta:
-          label: Dashboards and Charts
-          path: Dashboards and Charts
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/README.md
-          status: Published
-      items:
-          - meta:
-                label: Tabs
-                path: Dashboards and Charts/Tabs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/home-tab.md
-                status: Published
-                description: With Netdata Cloud's War Rooms, you can see real-time metrics, from any number of nodes in your infrastructure, in composite charts.
-          - meta:
-                label: Alerts
-                path: Dashboards and Charts/Tabs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/alerts-tab.md
-                status: Published
-          - meta:
-                label: Anomalies
-                path: Dashboards and Charts/Tabs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/anomaly-advisor-tab.md
-                status: Published
-                description: Quickly find anomalous metrics anywhere in your infrastructure.
-          - meta:
-                label: Dashboards
-                path: Dashboards and Charts/Tabs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/dashboards-tab.md
-                status: Published
-                description: Design new dashboards that target your infrastructure's unique needs and share them with your team for targeted visual anomaly detection or incident response.
-          - meta:
-                label: Events
-                path: Dashboards and Charts/Tabs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/events-feed.md
-                status: Published
-                description: Present the Netdata Events feed.
-          - meta:
-                label: Kubernetes
-                path: Dashboards and Charts/Tabs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/kubernetes-tab.md
-                status: Published
-                description: Netdata Cloud features rich, zero-configuration Kubernetes monitoring for the resource utilization and application metrics of Kubernetes (k8s) clusters.
-          - meta:
-                label: Logs
-                path: Dashboards and Charts/Tabs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/logs-tab.md
-                status: Published
-          - meta:
-                label: Metrics
-                path: Dashboards and Charts/Tabs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md
-                status: Published
-          - meta:
-                label: Nodes
-                path: Dashboards and Charts/Tabs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/nodes-tab.md
-                status: Published
-                description: See charts from all your nodes in one pane of glass, then dive in to embedded dashboards for granular troubleshooting of ongoing issues.
-          - meta:
-                label: Top
-                path: Dashboards and Charts/Tabs
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/top-tab.md
-                status: Published
-                description: Instructions on how to use Functions
+        label: profile.plugin
+        path: Developer and Contributor Corner/External Plugins
+        edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/profile.plugin/README.md
+        status: Published
     - meta:
-          label: Theme
-          path: Dashboards and Charts
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/themes.md
-          status: Published
+        label: Functions v3 Protocol reference
+        path: Developer and Contributor Corner/External Plugins
+        edit_url: https://github.com/netdata/netdata/edit/master/src/plugins.d/FUNCTION_UI_REFERENCE.md
+        status: Published
     - meta:
-          label: Grafana Plugin
-          path: Dashboards and Charts
-          edit_url: https://github.com/netdata/netdata-grafana-datasource-plugin/edit/master/README.md
-          status: Published
+        label: Functions developer guide
+        path: Developer and Contributor Corner/External Plugins
+        edit_url: https://github.com/netdata/netdata/edit/master/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md
+        status: Published
+  - meta:
+      label: Contribute to the documentation
+      path: Developer and Contributor Corner/Contribute to the documentation
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/guidelines.md
+      status: Published
+    items:
     - meta:
-          label: Charts
-          path: Dashboards and Charts
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/netdata-charts.md
-          status: Published
+        label: Netdata style guide
+        path: Developer and Contributor Corner/Contribute to the documentation
+        edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/style-guide.md
+        status: Published
+        description: The Netdata style guide establishes editorial guidelines for
+          all of Netdata's writing, including documentation, blog posts, in-product
+          UX copy, and more.
+  - meta:
+      label: Glossary
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/glossary.md
+      status: Published
+  - meta:
+      label: libnetdata
+      path: Developer and Contributor Corner/libnetdata
+      edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/README.md
+      status: Published
+    items:
     - meta:
-          label: Expanded Chart Analysis
-          path: Dashboards and Charts
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/expanded-chart-analysis.md
-          status: Published
+        label: Adaptive re-sortable list (ARL)
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/adaptive_resortable_list/README.md
+        status: Published
     - meta:
-          label: NIDL Framework
-          path: Dashboards and Charts
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/NIDL-Framework.md
-          status: Published
+        label: Array allocator
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/aral/README.md
+        status: Published
     - meta:
-          label: Node Filter
-          path: Dashboards and Charts
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/node-filter.md
-          status: Published
+        label: AVL
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/avl/README.md
+        status: Published
     - meta:
-          label: Time Controls
-          path: Dashboards and Charts
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/visualization-date-and-time-controls.md
-          status: Published
+        label: BUFFER library
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/buffer/README.md
+        status: Published
     - meta:
-          label: Atlassian Confluence dashboards
-          path: Dashboards and Charts
-          edit_url: https://github.com/netdata/netdata/edit/master/src/web/gui/confluence/README.md
-          status: Unpublished
+        label: Circular Buffer
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/circular_buffer/README.md
+        status: Published
     - meta:
-          label: Legacy Agent Dashboard
-          path: Dashboards and Charts
-          edit_url: https://github.com/netdata/netdata/edit/master/src/web/gui/README.md
-          status: Unpublished
-          description: The local Netdata Agent dashboard is the heart of health monitoring and performance troubleshooting, with hundreds of real-time charts.
+        label: Clocks
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/clocks/README.md
+        status: Published
     - meta:
-          label: Monitor your Infrastructure
-          path: Dashboards and Charts
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/monitor-your-infrastructure.md
-          status: Unpublished
+        label: Netdata ini config files
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/config/README.md
+        status: Published
     - meta:
-          label: Security and Privacy Design
-          path: Security and Privacy Design
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/README.md
-          status: Published
+        label: JSON
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/json/README.md
+        status: Published
     - meta:
-          label: Netdata Agent
-          path: Security and Privacy Design
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-agent-security.md
-          status: Published
+        label: Locks
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/locks/README.md
+        status: Published
     - meta:
-          label: Netdata Cloud
-          path: Security and Privacy Design
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-cloud-security.md
-          status: Published
+        label: One way allocator
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/onewayalloc/README.md
+        status: Published
     - meta:
-          label: Developer and Contributor Corner
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/README.md
-          status: Published
-      items:
-          - meta:
-                label: REST API
-                path: Developer and Contributor Corner/REST API
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/netdata-apis.md
-                status: Unpublished
-          - meta:
-                label: REST API
-                path: Developer and Contributor Corner/REST API
-                edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/README.md
-                status: Published
-            items:
-                - meta:
-                      label: Queries
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/README.md
-                      status: Published
-                - meta:
-                      label: Average or Mean
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/average/README.md
-                      status: Published
-                - meta:
-                      label: CountIf
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/countif/README.md
-                      status: Published
-                - meta:
-                      label: Double exponential smoothing
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/des/README.md
-                      status: Published
-                - meta:
-                      label: Incremental Sum (`incremental_sum`)
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/incremental_sum/README.md
-                      status: Published
-                - meta:
-                      label: Max
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/max/README.md
-                      status: Published
-                - meta:
-                      label: Median
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/median/README.md
-                      status: Published
-                      description: Use median in API queries and health entities to find the 'middle' value from a sample, eliminating any unwanted spikes in the returned metrics.
-                - meta:
-                      label: Min
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/min/README.md
-                      status: Published
-                - meta:
-                      label: Percentile
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/percentile/README.md
-                      status: Published
-                      description: Use percentile in API queries and health entities to find the 'percentile' value from a sample, eliminating any unwanted spikes in the returned metrics.
-                - meta:
-                      label: Single (or Simple) Exponential Smoothing (`ses`)
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/ses/README.md
-                      status: Published
-                - meta:
-                      label: Standard deviation (`stddev`)
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/stddev/README.md
-                      status: Published
-                - meta:
-                      label: Sum
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/sum/README.md
-                      status: Published
-                - meta:
-                      label: Trimmed Mean
-                      path: Developer and Contributor Corner/REST API/Queries
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/queries/trimmed_mean/README.md
-                      status: Published
-                      description: Use trimmed-mean in API queries and health entities to find the average value from a sample, eliminating any unwanted spikes in the returned metrics.
-                - meta:
-                      label: Formatters
-                      path: Developer and Contributor Corner/REST API/Formatters
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/README.md
-                      status: Published
-                - meta:
-                      label: CSV formatter
-                      path: Developer and Contributor Corner/REST API/Formatters
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/csv/README.md
-                      status: Published
-                - meta:
-                      label: JSON formatter
-                      path: Developer and Contributor Corner/REST API/Formatters
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/json/README.md
-                      status: Published
-                - meta:
-                      label: SSV formatter
-                      path: Developer and Contributor Corner/REST API/Formatters
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/ssv/README.md
-                      status: Published
-                - meta:
-                      label: Value formatter
-                      path: Developer and Contributor Corner/REST API/Formatters
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/value/README.md
-                      status: Published
-          - meta:
-                label: Netdata badges
-                path: Developer and Contributor Corner/REST API
-                edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/badges/README.md
-                status: Published
-          - meta:
-                label: Dynamic Configuration
-                path: Developer and Contributor Corner/Dynamic Configuration
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/dyncfg.md
-                status: Published
+        label: popen
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/popen/README.md
+        status: Published
     - meta:
-          label: Database Engine
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/src/database/engine/README.md
-          status: Published
+        label: parser
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/parser/README.md
+        status: Published
     - meta:
-          label: Contributing
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/.github/edit/main/CONTRIBUTING.md
-          status: Published
+        label: procfile
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/procfile/README.md
+        status: Published
     - meta:
-          label: Community code of conduct
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/.github/edit/main/CODE_OF_CONDUCT.md
-          status: Published
+        label: Simple patterns
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/simple_pattern/README.md
+        status: Published
+        description: Netdata supports simple patterns, which are less cryptic versions
+          of regular expressions. Use familiar notation for powerful results.
     - meta:
-          label: Security Policy
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/.github/edit/main/SECURITY.md
-          status: Published
-          description: The Netdata team maintains and adheres to a formal process any time a member of the community reports a security vulnerability.
-      items:
-          - meta:
-                label: External plugins
-                path: Developer and Contributor Corner/External Plugins
-                edit_url: https://github.com/netdata/netdata/edit/master/src/plugins.d/README.md
-                status: Published
-            items:
-                - meta:
-                      label: go.d.plugin
-                      path: Developer and Contributor Corner/External Plugins/go.d.plugin
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/README.md
-                      status: Published
-                      description: go.d.plugin is an external plugin for Netdata, responsible for running individual data collectors written in Go.
-                - meta:
-                      label: How to write a Netdata collector in Go
-                      path: Developer and Contributor Corner/External Plugins/go.d.plugin
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/docs/how-to-write-a-module.md
-                      status: Published
-                      description: This guide will walk you through the technical implementation of writing a new Netdata collector in Golang, with tips on interfaces, structure, configuration files, and more.
-                - meta:
-                      label: python.d.plugin
-                      path: Developer and Contributor Corner/External Plugins/python.d.plugin
-                      edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/python.d.plugin/README.md
-                      status: Published
-                - meta:
-                      label: Develop a custom data collector in Python
-                      path: Developer and Contributor Corner/External Plugins/python.d.plugin
-                      edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/python-collector.md
-                      status: Unpublished
-                      description: Learn how write a custom data collector in Python, which you'll use to collect metrics from and monitor any application that isn't supported out of the box.
-          - meta:
-                label: charts.d.plugin
-                path: Developer and Contributor Corner/External Plugins
-                edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/charts.d.plugin/README.md
-                status: Published
-          - meta:
-                label: profile.plugin
-                path: Developer and Contributor Corner/External Plugins
-                edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/profile.plugin/README.md
-                status: Published
-          - meta:
-                label: Functions v3 Protocol reference
-                path: Developer and Contributor Corner/External Plugins
-                edit_url: https://github.com/netdata/netdata/edit/master/src/plugins.d/FUNCTION_UI_REFERENCE.md
-                status: Published
-          - meta:
-                label: Functions developer guide
-                path: Developer and Contributor Corner/External Plugins
-                edit_url: https://github.com/netdata/netdata/edit/master/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md
-                status: Published
-          - meta:
-                label: Contribute to the documentation
-                path: Developer and Contributor Corner/Contribute to the documentation
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/guidelines.md
-                status: Published
-          - meta:
-                label: Netdata style guide
-                path: Developer and Contributor Corner/Contribute to the documentation
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/style-guide.md
-                status: Published
-                description: The Netdata style guide establishes editorial guidelines for all of Netdata's writing, including documentation, blog posts, in-product UX copy, and more.
+        label: Statistical functions
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/statistical/README.md
+        status: Published
     - meta:
-          label: Web
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/src/web/README.md
-          status: Unpublished
-          description: Every Netdata Agent comes bundled with hundreds of interactive, customizable charts designed by monitoring and troubleshooting experts.
+        label: Storage number
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/storage_number/README.md
+        status: Published
     - meta:
-          label: Glossary
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/glossary.md
-          status: Published
-      items:
-          - meta:
-                label: libnetdata
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/README.md
-                status: Published
-          - meta:
-                label: Adaptive re-sortable list (ARL)
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/adaptive_resortable_list/README.md
-                status: Published
-          - meta:
-                label: Array allocator
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/aral/README.md
-                status: Published
-          - meta:
-                label: AVL
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/avl/README.md
-                status: Published
-          - meta:
-                label: BUFFER library
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/buffer/README.md
-                status: Published
-          - meta:
-                label: Circular Buffer
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/circular_buffer/README.md
-                status: Published
-          - meta:
-                label: Clocks
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/clocks/README.md
-                status: Published
-          - meta:
-                label: Netdata ini config files
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/config/README.md
-                status: Published
-          - meta:
-                label: JSON
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/json/README.md
-                status: Published
-          - meta:
-                label: Locks
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/locks/README.md
-                status: Published
-          - meta:
-                label: One way allocator
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/onewayalloc/README.md
-                status: Published
-          - meta:
-                label: popen
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/popen/README.md
-                status: Published
-          - meta:
-                label: parser
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/parser/README.md
-                status: Published
-          - meta:
-                label: procfile
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/procfile/README.md
-                status: Published
-          - meta:
-                label: Simple patterns
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/simple_pattern/README.md
-                status: Published
-                description: Netdata supports simple patterns, which are less cryptic versions of regular expressions. Use familiar notation for powerful results.
-          - meta:
-                label: Statistical functions
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/statistical/README.md
-                status: Published
-          - meta:
-                label: Storage number
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/storage_number/README.md
-                status: Published
-          - meta:
-                label: String
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/string/README.md
-                status: Published
-          - meta:
-                label: Threads
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/threads/README.md
-                status: Published
-          - meta:
-                label: URL
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/url/README.md
-                status: Published
-          - meta:
-                label: Worker Utilization
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/worker_utilization/README.md
-                status: Published
-          - meta:
-                label: Dictionaries
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/dictionary/README.md
-                status: Published
-          - meta:
-                label: July interface
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/july/README.md
-                status: Published
-          - meta:
-                label: Socket
-                path: Developer and Contributor Corner/libnetdata
-                edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/socket/README.md
-                status: Published
+        label: String
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/string/README.md
+        status: Published
     - meta:
-          label: Running a Local Dashboard through Cloudflare Tunnels
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/running-through-cf-tunnels.md
-          status: Published
+        label: Threads
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/threads/README.md
+        status: Published
     - meta:
-          label: Redistributed Software
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/REDISTRIBUTED.md
-          status: Published
+        label: URL
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/url/README.md
+        status: Published
     - meta:
-          label: Health command API tester
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/tests/health_mgmtapi/README.md
-          status: Published
+        label: Worker Utilization
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/worker_utilization/README.md
+        status: Published
     - meta:
-          label: Import, export, and print a snapshot
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/import-export-print-snapshot.md
-          status: Published
-          description: Snapshots can be incredibly useful for diagnosing anomalies after they've already happened, and are interoperable with any other node running Netdata.
+        label: Dictionaries
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/dictionary/README.md
+        status: Published
     - meta:
-          label: Build a custom Dashboard HTML page
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/src/web/gui/custom/README.md
-          status: Published
-          description: Build custom dashboards with key metrics from one or more nodes running the Netdata Agent and host them anywhere.
+        label: July interface
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/july/README.md
+        status: Published
     - meta:
-          label: Netdata for IoT
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-for-IoT.md
-          status: Unpublished
+        label: Socket
+        path: Developer and Contributor Corner/libnetdata
+        edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/socket/README.md
+        status: Published
+  - meta:
+      label: Running a Local Dashboard through Cloudflare Tunnels
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/running-through-cf-tunnels.md
+      status: Published
+  - meta:
+      label: Redistributed Software
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/REDISTRIBUTED.md
+      status: Published
+  - meta:
+      label: Health command API tester
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/tests/health_mgmtapi/README.md
+      status: Published
+  - meta:
+      label: Import, export, and print a snapshot
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/import-export-print-snapshot.md
+      status: Published
+      description: Snapshots can be incredibly useful for diagnosing anomalies after
+        they've already happened, and are interoperable with any other node running
+        Netdata.
+  - meta:
+      label: Build a custom Dashboard HTML page
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/src/web/gui/custom/README.md
+      status: Published
+      description: Build custom dashboards with key metrics from one or more nodes
+        running the Netdata Agent and host them anywhere.
+  - meta:
+      label: Monitor Nginx or Apache web server log files with Netdata
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/collect-apache-nginx-web-logs.md
+      status: Published
+  - meta:
+      label: Monitor Unbound DNS servers with Netdata
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/collect-unbound-metrics.md
+      status: Published
+  - meta:
+      label: Monitor a Hadoop cluster with Netdata
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/monitor-hadoop-cluster.md
+      status: Published
+  - meta:
+      label: Monitor, troubleshoot, and debug applications with eBPF metrics
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/monitor-debug-applications-ebpf.md
+      status: Published
+      description: Use Netdata's built-in eBPF metrics collector to monitor, troubleshoot,
+        and debug your custom application using low-level kernel feedback.
+  - meta:
+      label: Build the Netdata Agent Yourself
+      path: Developer and Contributor Corner/Build the Netdata Agent Yourself
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/build-the-netdata-agent-yourself.md
+      status: Published
+    items:
     - meta:
-          label: Monitor Nginx or Apache web server log files with Netdata
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/collect-apache-nginx-web-logs.md
-          status: Published
+        label: Package Maintainers
+        path: Developer and Contributor Corner/Build the Netdata Agent Yourself
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/maintainers/README.md
+        status: Published
     - meta:
-          label: Monitor Unbound DNS servers with Netdata
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/collect-unbound-metrics.md
-          status: Published
+        label: Compile from source code
+        path: Developer and Contributor Corner/Build the Netdata Agent Yourself
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md
+        status: Published
+        description: Package maintainers and power users may be interested in manually
+          building Netdata from source without using any of our installation scripts.
     - meta:
-          label: Monitor CockroachDB metrics with Netdata
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/monitor-cockroachdb.md
-          status: Unpublished
+        label: External build-system
+        path: Developer and Contributor Corner/Build the Netdata Agent Yourself
+        edit_url: https://github.com/netdata/netdata/edit/master/build_external/README.md
+        status: Published
     - meta:
-          label: Monitor a Hadoop cluster with Netdata
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/monitor-hadoop-cluster.md
-          status: Published
+        label: How to build native (DEB/RPM) packages locally for testing
+        path: Developer and Contributor Corner/Build the Netdata Agent Yourself
+        edit_url: https://github.com/netdata/netdata/edit/master/packaging/building-native-packages-locally.md
+        status: Published
+        description: Instructions for developers who need to build native packages
+          locally for testing.
     - meta:
-          label: "Kubernetes monitoring with Netdata: Overview and visualizations"
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/kubernetes-k8s-netdata.md
-          status: Unpublished
-          description: Learn how to navigate Netdata's Kubernetes monitoring features for visualizing the health and performance of a Kubernetes cluster with per-second granularity.
-    - meta:
-          label: LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/lamp-stack.md
-          status: Unpublished
-          description: Set up robust LAMP stack monitoring (Linux, Apache, MySQL, PHP) in just a few minutes using a free, open-source monitoring tool that collects metrics every second.
-    - meta:
-          label: Monitor Pi-hole (and a Raspberry Pi) with Netdata
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/pi-hole-raspberry-pi.md
-          status: Unpublished
-          description: Monitor Pi-hole metrics, plus Raspberry Pi system metrics, in minutes and completely for free with Netdata's open-source monitoring agent.
-    - meta:
-          label: Unsupervised anomaly detection for Raspberry Pi monitoring
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/raspberry-pi-anomaly-detection.md
-          status: Unpublished
-          description: Use a low-overhead machine learning algorithm and an open-source monitoring tool to detect anomalous metrics on a Raspberry Pi.
-    - meta:
-          label: Monitor, troubleshoot, and debug applications with eBPF metrics
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/monitor-debug-applications-ebpf.md
-          status: Published
-          description: Use Netdata's built-in eBPF metrics collector to monitor, troubleshoot, and debug your custom application using low-level kernel feedback.
-    - meta:
-          label: Monitor any process in real-time with Netdata
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/process.md
-          status: Unpublished
-          description: Tap into Netdata's powerful collectors, with per-second utilization metrics for every process, to troubleshoot faster and make data-informed decisions.
-      items:
-          - meta:
-                label: Build the Netdata Agent Yourself
-                path: Developer and Contributor Corner/Build the Netdata Agent Yourself
-                edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/build-the-netdata-agent-yourself.md
-                status: Published
-          - meta:
-                label: Package Maintainers
-                path: Developer and Contributor Corner/Build the Netdata Agent Yourself
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/maintainers/README.md
-                status: Published
-          - meta:
-                label: Compile from source code
-                path: Developer and Contributor Corner/Build the Netdata Agent Yourself
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md
-                status: Published
-                description: Package maintainers and power users may be interested in manually building Netdata from source without using any of our installation scripts.
-          - meta:
-                label: External build-system
-                path: Developer and Contributor Corner/Build the Netdata Agent Yourself
-                edit_url: https://github.com/netdata/netdata/edit/master/build_external/README.md
-                status: Published
-          - meta:
-                label: How to build native (DEB/RPM) packages locally for testing
-                path: Developer and Contributor Corner/Build the Netdata Agent Yourself
-                edit_url: https://github.com/netdata/netdata/edit/master/packaging/building-native-packages-locally.md
-                status: Published
-                description: Instructions for developers who need to build native packages locally for testing.
-          - meta:
-                label: Netdata contrib
-                path: Developer and Contributor Corner/Build the Netdata Agent Yourself
-                edit_url: https://github.com/netdata/netdata/edit/master/contrib/README.md
-                status: Published
-    - meta:
-          label: Install the Netdata Agent from a Git checkout
-          path: Developer and Contributor Corner
-          edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md
-          status: Published
-          description: Use the Netdata Agent source code from GitHub, plus helper scripts to set up your system, to install Netdata without packages or binaries.
+        label: Netdata contrib
+        path: Developer and Contributor Corner/Build the Netdata Agent Yourself
+        edit_url: https://github.com/netdata/netdata/edit/master/contrib/README.md
+        status: Published
+  - meta:
+      label: Install the Netdata Agent from a Git checkout
+      path: Developer and Contributor Corner
+      edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md
+      status: Published
+      description: Use the Netdata Agent source code from GitHub, plus helper scripts
+        to set up your system, to install Netdata without packages or binaries.
