@@ -10,7 +10,7 @@ Since Netdata is installed on all system, there are some important benefits:
 
 2. Netdata supports "vnodes" for monitoring networked systems that Netdata Agents cannot be installed on them. This allows Netdata to provide "virtual nodes" for cloud provider managed DBs, load balancers, SNMP devices, firewalls, even remote operating systems like IBM i (as/400). Using vnodes, Netdata dashboards can represent as "nodes" all the available networked devices, independently of whether a Netdata Agent can be installed on them or not.
 
-### Permanent vs Ephemeral/Dynamic Infrastrucute
+### Permanent vs Ephemeral/Dynamic Infrastructure
 
 The Netdata ecosystem fully supports both permanent and ephemeral/dynamic infrastructure. Nodes (and vnodes) are permanent by default (since this is the most common scenario), but Netdata Agents can be configured to mark their nodes as ephemeral too. When marked as ephemeral, Netdata does not send node-unreachability events for them when they disconnect.
 

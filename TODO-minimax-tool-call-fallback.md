@@ -3,10 +3,23 @@
 - Decide if we should add fallback support for tool-name-as-tag + XML parameters.
 
 # Analysis
-- Fallback parser only recognizes generic wrapper tags and expects JSON inside them, not tool-name tags:
-  - `src/tool-call-fallback.ts:102-108` defines `TAG_PATTERNS` as `<tool_calls>`, `<tool_call>`, `<tools>`, `<function_call>`, `<function>`.
-- Extraction only scans `TAG_PATTERNS` and parses JSON blocks:
-  - `src/tool-call-fallback.ts:235-267` loops over `TAG_PATTERNS` and calls `parseToolCalls` per extracted block.
+- Fallback parser has two paths:
+  - Wrapper tags (`<tool_calls>`, `<tool_call>`, `<tools>`, `<function_call>`, `<function>`) that expect JSON inside them (`src/tool-call-fallback.ts:104-110`, `src/tool-call-fallback.ts:347-361`).
+  - Tool-name tags (`<agent__task_status>...</agent__task_status>`) for tools allowed in the current turn (`src/tool-call-fallback.ts:178-206`, `src/tool-call-fallback.ts:365-379`).
+- User observed Minimax wrapper in assistant **content** (not native tool calls): `<minimax:tool_call><invoke name="agent__task_status">...</invoke></minimax:tool_call>`. This does not match current fallback patterns, so it is ignored when leaked in text.
+- Snapshot evidence (assistant content, not native tool calls):
+  - `0e8d79e3-b146-4d46-99ca-1b1d2c3bdd00.json.gz`:
+    - `opTree.turns[1].attributes.assistant.content` contains `<minimax:tool_call><invoke name="filesystem_repos__RGrep">...`
+    - `opTree.turns[1].ops[2].response.payload.textPreview` repeats the same block.
+    - Same turn shows system failure text in conversation: `TURN-FAILED: Text output detected without any tool calls or final report/answer...` (evidence of leaked tool call not executing).
+  - `24e707db-750e-4cac-ad01-6ae53280521b.json.gz`:
+    - `opTree.turns[2].ops[0].response.payload.textPreview` contains final report XML followed by `<minimax:tool_call><invoke name="agent__task_status">...`.
+  - `031ec822-2ce7-4f5c-b227-f04701c430be.json.gz` (nested session):
+    - `opTree.turns[2].ops[2].childSession` is `freshdesk` (`callPath: neda:freshdesk`).
+    - Inside `childSession.turns[8].ops[2].childSession` (agentId `tool_output.read_grep`) the LLM response textPreview/logs include `<minimax:tool_call><invoke name="tool_output_fs__Read">...` and `<invoke name="tool_output_fs__Grep">...` in `logs[].details.raw_response` and `response.payload.textPreview`.
+- Minimax sometimes emits namespaced wrapper tags and `<invoke name="...">` (example: `<minimax:tool_call><invoke name="agent__task_status">...</invoke></minimax:tool_call>`), which are not matched by `TAG_PATTERNS` and are not parsed by the tool-name tag extractor (which expects `<agent__task_status>...</agent__task_status>`):
+  - `src/tool-call-fallback.ts:104-110` only matches exact `<tool_call>` variants.
+  - `src/tool-call-fallback.ts:178-206` only extracts `<toolName>...</toolName>` blocks for allowed tool names.
 - JSON-only parsing:
   - `src/tool-call-fallback.ts:133-182` uses `parseJsonValueDetailed` and normalizes JSON objects/arrays into tool calls.
 - User-provided minimax-m2.1 examples use tool-name-as-tag + XML parameter elements:
@@ -35,6 +48,8 @@
    - Chosen: **A) Tolerate a trailing quote and treat as the known field name.**
 8. Work alongside other in-progress changes:
    - Chosen: **A) Proceed with this feature only; ignore and do not delete/commit unrelated changes.**
+9. Minimax wrapper support:
+   - Chosen: **A) Option 1 — parse `<minimax:tool_call><invoke name="...">...</invoke></minimax:tool_call>` in leaked text.**
 
 # Plan
 - If A: extend fallback parser to detect `<tool_name>...</tool_name>` tags where tool name matches known tools, and parse `<parameter>` into a JSON object.

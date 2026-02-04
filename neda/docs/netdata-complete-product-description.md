@@ -1401,6 +1401,7 @@ Whether you're monitoring a single server or a global infrastructure, Netdata's 
 - **Support**: https://netdata.cloud/support/
 - **Partnerships**: https://www.netdata.cloud/partnerships/
 - **Referral Program**: https://www.netdata.cloud/referral/
+- **SOC2 Type II Trust Center**: https://trust.netdata.cloud/
 
 **Start Your Free Trial**: https://app.netdata.cloud
 

@@ -282,6 +282,18 @@ Intro text
     });
   });
 
+  describe('minimax wrapper format', () => {
+    it('extracts invoke tool call with parameters', () => {
+      const input = 'Before\n<minimax:tool_call>\n<invoke name="agent__task_status">\n<parameter name="status">in-progress</parameter>\n<parameter name="done">Working</parameter>\n</invoke>\n</minimax:tool_call>\nAfter';
+      const result = tryExtractLeakedToolCalls(input, { allowedToolNames: TASK_STATUS_ALLOWED });
+      expect(result.content).toBe('Before\n\nAfter');
+      expect(result.toolCalls).toHaveLength(1);
+      expect(result.toolCalls[0].name).toBe('agent__task_status');
+      expect(result.toolCalls[0].parameters).toEqual({ status: 'in-progress', done: 'Working' });
+      expect(result.patternsMatched).toContain('minimax:tool_call');
+    });
+  });
+
   describe('case insensitivity', () => {
     it('handles uppercase tags', () => {
       const input = '<TOOLS>{"name": "test", "arguments": {}}</TOOLS>';

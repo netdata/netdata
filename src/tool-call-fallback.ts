@@ -118,6 +118,8 @@ const TASK_STATUS_FIELDS = new Set([
   'need_to_run_more_tools',
 ]);
 
+const MINIMAX_TOOL_CALL_TAG = 'minimax:tool_call';
+
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const normalizeXmlValue = (raw: string): string | boolean | undefined => {
@@ -215,6 +217,54 @@ const parseToolNameTagToolCall = (toolName: string, content: string): ToolCall |
     name: sanitizeToolName(toolName),
     parameters,
   };
+};
+
+const extractMinimaxToolCalls = (
+  content: string,
+  allowedToolNames?: Set<string>
+): { toolCalls: ToolCall[]; remaining: string; matched: boolean } => {
+  const toolCalls: ToolCall[] = [];
+  let remaining = content;
+  let matched = false;
+  const open = /<minimax:tool_call(?:\s[^>]*)?>/gi;
+  const closeTag = '</minimax:tool_call>';
+  const invokePattern = /<invoke\s+name\s*=\s*(["'])([^"']+)\1\s*>([\s\S]*?)<\/invoke\s*>/gi;
+
+  open.lastIndex = 0;
+  // eslint-disable-next-line functional/no-loop-statements, @typescript-eslint/no-unnecessary-condition -- intentional loop with break
+  while (true) {
+    const openMatch = open.exec(remaining);
+    if (openMatch === null) break;
+    matched = true;
+    const openEnd = openMatch.index + openMatch[0].length;
+    const closeIndex = remaining.toLowerCase().indexOf(closeTag, openEnd);
+    if (closeIndex === -1) break;
+
+    const innerContent = remaining.slice(openEnd, closeIndex).trim();
+    if (innerContent.length > 0) {
+      invokePattern.lastIndex = 0;
+      // eslint-disable-next-line functional/no-loop-statements -- parsing invoke blocks
+      for (const match of innerContent.matchAll(invokePattern)) {
+        const rawName = match[2].trim();
+        if (rawName.length === 0) continue;
+        const normalizedName = sanitizeToolName(rawName);
+        if (normalizedName.length === 0) continue;
+        if (allowedToolNames !== undefined && !allowedToolNames.has(normalizedName)) {
+          continue;
+        }
+        const invokeContent = match[3];
+        const toolCall = parseToolNameTagToolCall(normalizedName, invokeContent);
+        if (toolCall !== undefined) {
+          toolCalls.push(toolCall);
+        }
+      }
+    }
+
+    remaining = remaining.slice(0, openMatch.index) + remaining.slice(closeIndex + closeTag.length);
+    open.lastIndex = 0;
+  }
+
+  return { toolCalls, remaining, matched };
 };
 
 /**
@@ -378,6 +428,13 @@ export const tryExtractLeakedToolCalls = (
         }
       }
     }
+  }
+
+  const minimaxExtraction = extractMinimaxToolCalls(workingContent, allowedToolNames);
+  if (minimaxExtraction.matched) {
+    patternsMatched.push(MINIMAX_TOOL_CALL_TAG);
+    workingContent = minimaxExtraction.remaining;
+    allToolCalls.push(...minimaxExtraction.toolCalls);
   }
 
   // If no patterns were found, return input unchanged
