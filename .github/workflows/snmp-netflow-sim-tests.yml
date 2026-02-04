@@ -1,0 +1,78 @@
+---
+name: SNMP/NetFlow Simulator Tests
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/snmp-netflow-sim-tests.yml'
+      - 'src/go/plugin/go.d/collector/snmp/**'
+      - 'src/go/plugin/go.d/collector/netflow/**'
+      - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
+      - 'src/go/plugin/go.d/config/go.d/netflow.conf'
+  pull_request:
+    paths:
+      - '.github/workflows/snmp-netflow-sim-tests.yml'
+      - 'src/go/plugin/go.d/collector/snmp/**'
+      - 'src/go/plugin/go.d/collector/netflow/**'
+      - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
+      - 'src/go/plugin/go.d/config/go.d/netflow.conf'
+
+jobs:
+  simulator-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: src/go/go.mod
+
+      - name: Prepare snmpsim data
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/snmpsim-data
+          LLDP_FILES=$( (grep -l "1\.0\.8802\.1\.1\.2\.1\.4\.1\.1\.9" src/go/plugin/go.d/collector/snmp/testdata/snmprec/*.snmprec | head -n 2) || true )
+          CDP_FILE=$( (grep -l "1\.3\.6\.1\.4\.1\.9\.9\.23\.1\.2\.1\.1\.6" src/go/plugin/go.d/collector/snmp/testdata/snmprec/*.snmprec | head -n 1) || true )
+          if [ -z "${LLDP_FILES}" ] || [ -z "${CDP_FILE}" ]; then
+            echo "Missing LLDP/CDP snmprec fixtures with neighbor data" >&2
+            exit 1
+          fi
+          i=1
+          for f in ${LLDP_FILES}; do
+            cp "$f" "/tmp/snmpsim-data/lldp${i}.snmprec"
+            i=$((i+1))
+          done
+          cp "$CDP_FILE" /tmp/snmpsim-data/cdp1.snmprec
+
+      - name: Start snmpsim
+        run: |
+          docker run -d --name snmpsim -p 1161:161/udp -v /tmp/snmpsim-data:/usr/share/snmpsim/data tandoor/snmpsim:latest
+          sleep 3
+
+      - name: Download NetFlow stress pcaps
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/netflow-stress
+          curl -L -o /tmp/netflow-stress/smallFlows.pcap https://s3.amazonaws.com/tcpreplay-pcap-files/smallFlows.pcap
+          curl -L -o /tmp/netflow-stress/bigFlows.pcap https://s3.amazonaws.com/tcpreplay-pcap-files/bigFlows.pcap
+
+      - name: Run integration tests
+        env:
+          NETDATA_SNMPSIM_ENDPOINT: 127.0.0.1:1161
+          NETDATA_SNMPSIM_COMMUNITIES: lldp1,lldp2,cdp1
+          NETDATA_NETFLOW_STRESS_PCAPS: /tmp/netflow-stress
+        run: |
+          cd src/go
+          go test -tags=integration ./plugin/go.d/collector/snmp ./plugin/go.d/collector/netflow
+
+      - name: Stop snmpsim
+        if: always()
+        run: |
+          docker rm -f snmpsim || true
