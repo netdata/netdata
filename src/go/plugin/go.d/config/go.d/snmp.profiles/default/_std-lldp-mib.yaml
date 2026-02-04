@@ -26,8 +26,67 @@ metric_tags:
     symbol:
       OID: 1.0.8802.1.1.2.1.3.4.0
       name: lldpLocSysDesc
+  - tag: lldp_loc_sys_cap_supported
+    symbol:
+      OID: 1.0.8802.1.1.2.1.3.5.0
+      name: lldpLocSysCapSupported
+      format: hex
+  - tag: lldp_loc_sys_cap_enabled
+    symbol:
+      OID: 1.0.8802.1.1.2.1.3.6.0
+      name: lldpLocSysCapEnabled
+      format: hex
 
 metrics:
+  - MIB: LLDP-MIB
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.2.1.0
+        name: lldpStatsRemTablesLastChangeTime
+      - OID: 1.0.8802.1.1.2.1.2.2.0
+        name: lldpStatsRemTablesInserts
+      - OID: 1.0.8802.1.1.2.1.2.3.0
+        name: lldpStatsRemTablesDeletes
+      - OID: 1.0.8802.1.1.2.1.2.4.0
+        name: lldpStatsRemTablesDrops
+      - OID: 1.0.8802.1.1.2.1.2.5.0
+        name: lldpStatsRemTablesAgeouts
+
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.2.6
+      name: lldpStatsTxPortTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.2.6.1.2
+        name: lldpStatsTxPortFramesTotal
+    metric_tags:
+      - tag: lldp_loc_port_num
+        symbol:
+          OID: 1.0.8802.1.1.2.1.2.6.1.1
+          name: lldpStatsTxPortNum
+
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.2.7
+      name: lldpStatsRxPortTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.2.7.1.2
+        name: lldpStatsRxPortFramesDiscardedTotal
+      - OID: 1.0.8802.1.1.2.1.2.7.1.3
+        name: lldpStatsRxPortFramesErrors
+      - OID: 1.0.8802.1.1.2.1.2.7.1.4
+        name: lldpStatsRxPortFramesTotal
+      - OID: 1.0.8802.1.1.2.1.2.7.1.5
+        name: lldpStatsRxPortTLVsDiscardedTotal
+      - OID: 1.0.8802.1.1.2.1.2.7.1.6
+        name: lldpStatsRxPortTLVsUnrecognizedTotal
+      - OID: 1.0.8802.1.1.2.1.2.7.1.7
+        name: lldpStatsRxPortAgeoutsTotal
+    metric_tags:
+      - tag: lldp_loc_port_num
+        symbol:
+          OID: 1.0.8802.1.1.2.1.2.7.1.1
+          name: lldpStatsRxPortNum
+
   - MIB: LLDP-MIB
     table:
       OID: 1.0.8802.1.1.2.1.3.7
@@ -58,6 +117,40 @@ metrics:
         symbol:
           OID: 1.0.8802.1.1.2.1.3.7.1.4
           name: lldpLocPortDesc
+
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.3.8
+      name: lldpLocManAddrTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.3.8.1.1
+        name: lldpLocManAddrEntry
+    metric_tags:
+      - tag: lldp_loc_mgmt_addr_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.8.1.1
+          name: lldpLocManAddrSubtype
+      - tag: lldp_loc_mgmt_addr
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.8.1.2
+          name: lldpLocManAddr
+          format: hex
+      - tag: lldp_loc_mgmt_addr_len
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.8.1.3
+          name: lldpLocManAddrLen
+      - tag: lldp_loc_mgmt_addr_if_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.8.1.4
+          name: lldpLocManAddrIfSubtype
+      - tag: lldp_loc_mgmt_addr_if_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.8.1.5
+          name: lldpLocManAddrIfId
+      - tag: lldp_loc_mgmt_addr_oid
+        symbol:
+          OID: 1.0.8802.1.1.2.1.3.8.1.6
+          name: lldpLocManAddrOID
 
   - MIB: LLDP-MIB
     table:
@@ -115,3 +208,47 @@ metrics:
         symbol:
           OID: 1.0.8802.1.1.2.1.4.1.1.10
           name: lldpRemSysDesc
+      - tag: lldp_rem_sys_cap_supported
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.11
+          name: lldpRemSysCapSupported
+          format: hex
+      - tag: lldp_rem_sys_cap_enabled
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.1.1.12
+          name: lldpRemSysCapEnabled
+          format: hex
+
+  - MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.4.2
+      name: lldpRemManAddrTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.4.2.1.1
+        name: lldpRemManAddrEntry
+    metric_tags:
+      - tag: lldp_loc_port_num
+        index: 2
+      - tag: lldp_rem_index
+        index: 3
+      - tag: lldp_rem_mgmt_addr_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.1
+          name: lldpRemManAddrSubtype
+      - tag: lldp_rem_mgmt_addr
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.2
+          name: lldpRemManAddr
+          format: hex
+      - tag: lldp_rem_mgmt_addr_if_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.3
+          name: lldpRemManAddrIfSubtype
+      - tag: lldp_rem_mgmt_addr_if_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.4
+          name: lldpRemManAddrIfId
+      - tag: lldp_rem_mgmt_addr_oid
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.5
+          name: lldpRemManAddrOID
