@@ -3,7 +3,11 @@
 package snmp
 
 import (
+	"encoding/hex"
+	"fmt"
+	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,9 +15,11 @@ import (
 )
 
 const (
-	metricLldpLocPortEntry = "lldpLocPortEntry"
-	metricLldpRemEntry     = "lldpRemEntry"
-	metricCdpCacheEntry    = "cdpCacheEntry"
+	metricLldpLocPortEntry    = "lldpLocPortEntry"
+	metricLldpLocManAddrEntry = "lldpLocManAddrEntry"
+	metricLldpRemEntry        = "lldpRemEntry"
+	metricLldpRemManAddrEntry = "lldpRemManAddrEntry"
+	metricCdpCacheEntry       = "cdpCacheEntry"
 )
 
 const (
@@ -21,6 +27,15 @@ const (
 	tagLldpLocChassisIDSubtype = "lldp_loc_chassis_id_subtype"
 	tagLldpLocSysName          = "lldp_loc_sys_name"
 	tagLldpLocSysDesc          = "lldp_loc_sys_desc"
+	tagLldpLocSysCapSupported  = "lldp_loc_sys_cap_supported"
+	tagLldpLocSysCapEnabled    = "lldp_loc_sys_cap_enabled"
+
+	tagLldpLocMgmtAddrSubtype   = "lldp_loc_mgmt_addr_subtype"
+	tagLldpLocMgmtAddr          = "lldp_loc_mgmt_addr"
+	tagLldpLocMgmtAddrLen       = "lldp_loc_mgmt_addr_len"
+	tagLldpLocMgmtAddrIfSubtype = "lldp_loc_mgmt_addr_if_subtype"
+	tagLldpLocMgmtAddrIfID      = "lldp_loc_mgmt_addr_if_id"
+	tagLldpLocMgmtAddrOID       = "lldp_loc_mgmt_addr_oid"
 
 	tagLldpLocPortNum       = "lldp_loc_port_num"
 	tagLldpLocPortID        = "lldp_loc_port_id"
@@ -36,15 +51,37 @@ const (
 	tagLldpRemSysName          = "lldp_rem_sys_name"
 	tagLldpRemSysDesc          = "lldp_rem_sys_desc"
 	tagLldpRemMgmtAddr         = "lldp_rem_mgmt_addr"
+	tagLldpRemSysCapSupported  = "lldp_rem_sys_cap_supported"
+	tagLldpRemSysCapEnabled    = "lldp_rem_sys_cap_enabled"
 
-	tagCdpIfIndex     = "cdp_if_index"
-	tagCdpIfName      = "cdp_if_name"
-	tagCdpDeviceIndex = "cdp_device_index"
-	tagCdpDeviceID    = "cdp_device_id"
-	tagCdpDevicePort  = "cdp_device_port"
-	tagCdpPlatform    = "cdp_platform"
-	tagCdpCaps        = "cdp_capabilities"
-	tagCdpAddress     = "cdp_address"
+	tagLldpRemMgmtAddrSubtype   = "lldp_rem_mgmt_addr_subtype"
+	tagLldpRemMgmtAddrIfSubtype = "lldp_rem_mgmt_addr_if_subtype"
+	tagLldpRemMgmtAddrIfID      = "lldp_rem_mgmt_addr_if_id"
+	tagLldpRemMgmtAddrOID       = "lldp_rem_mgmt_addr_oid"
+
+	tagCdpIfIndex               = "cdp_if_index"
+	tagCdpIfName                = "cdp_if_name"
+	tagCdpDeviceIndex           = "cdp_device_index"
+	tagCdpDeviceID              = "cdp_device_id"
+	tagCdpAddressType           = "cdp_address_type"
+	tagCdpDevicePort            = "cdp_device_port"
+	tagCdpVersion               = "cdp_version"
+	tagCdpPlatform              = "cdp_platform"
+	tagCdpCaps                  = "cdp_capabilities"
+	tagCdpAddress               = "cdp_address"
+	tagCdpVTPDomain             = "cdp_vtp_mgmt_domain"
+	tagCdpNativeVLAN            = "cdp_native_vlan"
+	tagCdpDuplex                = "cdp_duplex"
+	tagCdpPower                 = "cdp_power_consumption"
+	tagCdpMTU                   = "cdp_mtu"
+	tagCdpSysName               = "cdp_sys_name"
+	tagCdpSysObjectID           = "cdp_sys_object_id"
+	tagCdpPrimaryMgmtAddrType   = "cdp_primary_mgmt_addr_type"
+	tagCdpPrimaryMgmtAddr       = "cdp_primary_mgmt_addr"
+	tagCdpSecondaryMgmtAddrType = "cdp_secondary_mgmt_addr_type"
+	tagCdpSecondaryMgmtAddr     = "cdp_secondary_mgmt_addr"
+	tagCdpPhysicalLocation      = "cdp_physical_location"
+	tagCdpLastChange            = "cdp_last_change"
 )
 
 var lldpChassisIDSubtypeMap = map[string]string{
@@ -97,19 +134,38 @@ type lldpRemote struct {
 	portDesc           string
 	sysName            string
 	sysDesc            string
+	sysCapSupported    string
+	sysCapEnabled      string
 	managementAddr     string
 	managementAddrType string
+	managementAddrs    []topologyManagementAddress
 }
 
 type cdpRemote struct {
-	ifIndex     string
-	ifName      string
-	deviceIndex string
-	deviceID    string
-	devicePort  string
-	platform    string
-	capabilities string
-	address     string
+	ifIndex               string
+	ifName                string
+	deviceIndex           string
+	deviceID              string
+	devicePort            string
+	platform              string
+	capabilities          string
+	addressType           string
+	address               string
+	version               string
+	vtpMgmtDomain         string
+	nativeVLAN            string
+	duplex                string
+	powerConsumption      string
+	mtu                   string
+	sysName               string
+	sysObjectID           string
+	primaryMgmtAddrType   string
+	primaryMgmtAddr       string
+	secondaryMgmtAddrType string
+	secondaryMgmtAddr     string
+	physicalLocation      string
+	lastChange            string
+	managementAddrs       []topologyManagementAddress
 }
 
 func newTopologyCache() *topologyCache {
@@ -163,6 +219,25 @@ func (c *Collector) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
 		if v := pm.Tags[tagLldpLocSysDesc]; v != "" {
 			c.topologyCache.localDevice.SysDescr = v
 		}
+		if v := pm.Tags[tagLldpLocSysCapSupported]; v != "" {
+			c.topologyCache.localDevice.Labels = ensureLabels(c.topologyCache.localDevice.Labels)
+			c.topologyCache.localDevice.Labels[tagLldpLocSysCapSupported] = v
+			caps := decodeLLDPCapabilities(v)
+			if len(caps) > 0 {
+				c.topologyCache.localDevice.CapabilitiesSupported = caps
+			}
+		}
+		if v := pm.Tags[tagLldpLocSysCapEnabled]; v != "" {
+			c.topologyCache.localDevice.Labels = ensureLabels(c.topologyCache.localDevice.Labels)
+			c.topologyCache.localDevice.Labels[tagLldpLocSysCapEnabled] = v
+			caps := decodeLLDPCapabilities(v)
+			if len(caps) > 0 {
+				c.topologyCache.localDevice.CapabilitiesEnabled = caps
+				if len(c.topologyCache.localDevice.Capabilities) == 0 {
+					c.topologyCache.localDevice.Capabilities = caps
+				}
+			}
+		}
 	}
 }
 
@@ -177,8 +252,12 @@ func (c *Collector) updateTopologyCacheEntry(m ddsnmp.Metric) {
 	switch m.Name {
 	case metricLldpLocPortEntry:
 		c.topologyCache.updateLldpLocPort(m.Tags)
+	case metricLldpLocManAddrEntry:
+		c.topologyCache.updateLldpLocManAddr(m.Tags)
 	case metricLldpRemEntry:
 		c.topologyCache.updateLldpRemote(m.Tags)
+	case metricLldpRemManAddrEntry:
+		c.topologyCache.updateLldpRemManAddr(m.Tags)
 	case metricCdpCacheEntry:
 		c.topologyCache.updateCdpRemote(m.Tags)
 	}
@@ -197,7 +276,7 @@ func (c *Collector) finalizeTopologyCache() {
 
 func isTopologyMetric(name string) bool {
 	switch name {
-	case metricLldpLocPortEntry, metricLldpRemEntry, metricCdpCacheEntry:
+	case metricLldpLocPortEntry, metricLldpLocManAddrEntry, metricLldpRemEntry, metricLldpRemManAddrEntry, metricCdpCacheEntry:
 		return true
 	default:
 		return false
@@ -265,6 +344,29 @@ func (c *topologyCache) updateLldpLocPort(tags map[string]string) {
 	}
 }
 
+func (c *topologyCache) updateLldpLocManAddr(tags map[string]string) {
+	addrHex := tags[tagLldpLocMgmtAddr]
+	if addrHex == "" {
+		return
+	}
+
+	addr, addrType := normalizeManagementAddress(addrHex, tags[tagLldpLocMgmtAddrSubtype])
+	if addr == "" {
+		return
+	}
+
+	mgmt := topologyManagementAddress{
+		Address:     addr,
+		AddressType: addrType,
+		IfSubtype:   tags[tagLldpLocMgmtAddrIfSubtype],
+		IfID:        tags[tagLldpLocMgmtAddrIfID],
+		OID:         tags[tagLldpLocMgmtAddrOID],
+		Source:      "lldp_local",
+	}
+
+	c.localDevice.ManagementAddresses = appendManagementAddress(c.localDevice.ManagementAddresses, mgmt)
+}
+
 func (c *topologyCache) updateLldpRemote(tags map[string]string) {
 	localPort := tags[tagLldpLocPortNum]
 	if localPort == "" {
@@ -304,9 +406,61 @@ func (c *topologyCache) updateLldpRemote(tags map[string]string) {
 	if v := tags[tagLldpRemSysDesc]; v != "" {
 		entry.sysDesc = v
 	}
+	if v := tags[tagLldpRemSysCapSupported]; v != "" {
+		entry.sysCapSupported = v
+	}
+	if v := tags[tagLldpRemSysCapEnabled]; v != "" {
+		entry.sysCapEnabled = v
+	}
 	if v := tags[tagLldpRemMgmtAddr]; v != "" {
 		entry.managementAddr = v
+		addr, addrType := normalizeManagementAddress(v, tags[tagLldpRemMgmtAddrSubtype])
+		if addr != "" {
+			entry.managementAddrs = appendManagementAddress(entry.managementAddrs, topologyManagementAddress{
+				Address:     addr,
+				AddressType: addrType,
+				Source:      "lldp_remote",
+			})
+		}
 	}
+}
+
+func (c *topologyCache) updateLldpRemManAddr(tags map[string]string) {
+	localPort := tags[tagLldpLocPortNum]
+	if localPort == "" {
+		return
+	}
+
+	remIndex := tags[tagLldpRemIndex]
+	if remIndex == "" {
+		return
+	}
+
+	key := localPort + ":" + remIndex
+	entry := c.lldpRemotes[key]
+	if entry == nil {
+		entry = &lldpRemote{
+			localPortNum: localPort,
+			remIndex:     remIndex,
+		}
+		c.lldpRemotes[key] = entry
+	}
+
+	addrHex := tags[tagLldpRemMgmtAddr]
+	addr, addrType := normalizeManagementAddress(addrHex, tags[tagLldpRemMgmtAddrSubtype])
+	if addr == "" {
+		return
+	}
+
+	mgmt := topologyManagementAddress{
+		Address:     addr,
+		AddressType: addrType,
+		IfSubtype:   tags[tagLldpRemMgmtAddrIfSubtype],
+		IfID:        tags[tagLldpRemMgmtAddrIfID],
+		OID:         tags[tagLldpRemMgmtAddrOID],
+		Source:      "lldp_remote",
+	}
+	entry.managementAddrs = appendManagementAddress(entry.managementAddrs, mgmt)
 }
 
 func (c *topologyCache) updateCdpRemote(tags map[string]string) {
@@ -333,8 +487,14 @@ func (c *topologyCache) updateCdpRemote(tags map[string]string) {
 	if v := tags[tagCdpDeviceID]; v != "" {
 		entry.deviceID = v
 	}
+	if v := tags[tagCdpAddressType]; v != "" {
+		entry.addressType = v
+	}
 	if v := tags[tagCdpDevicePort]; v != "" {
 		entry.devicePort = v
+	}
+	if v := tags[tagCdpVersion]; v != "" {
+		entry.version = v
 	}
 	if v := tags[tagCdpPlatform]; v != "" {
 		entry.platform = v
@@ -345,6 +505,47 @@ func (c *topologyCache) updateCdpRemote(tags map[string]string) {
 	if v := tags[tagCdpAddress]; v != "" {
 		entry.address = v
 	}
+	if v := tags[tagCdpVTPDomain]; v != "" {
+		entry.vtpMgmtDomain = v
+	}
+	if v := tags[tagCdpNativeVLAN]; v != "" {
+		entry.nativeVLAN = v
+	}
+	if v := tags[tagCdpDuplex]; v != "" {
+		entry.duplex = v
+	}
+	if v := tags[tagCdpPower]; v != "" {
+		entry.powerConsumption = v
+	}
+	if v := tags[tagCdpMTU]; v != "" {
+		entry.mtu = v
+	}
+	if v := tags[tagCdpSysName]; v != "" {
+		entry.sysName = v
+	}
+	if v := tags[tagCdpSysObjectID]; v != "" {
+		entry.sysObjectID = v
+	}
+	if v := tags[tagCdpPrimaryMgmtAddrType]; v != "" {
+		entry.primaryMgmtAddrType = v
+	}
+	if v := tags[tagCdpPrimaryMgmtAddr]; v != "" {
+		entry.primaryMgmtAddr = v
+	}
+	if v := tags[tagCdpSecondaryMgmtAddrType]; v != "" {
+		entry.secondaryMgmtAddrType = v
+	}
+	if v := tags[tagCdpSecondaryMgmtAddr]; v != "" {
+		entry.secondaryMgmtAddr = v
+	}
+	if v := tags[tagCdpPhysicalLocation]; v != "" {
+		entry.physicalLocation = v
+	}
+	if v := tags[tagCdpLastChange]; v != "" {
+		entry.lastChange = v
+	}
+
+	entry.managementAddrs = appendCdpManagementAddresses(entry, entry.managementAddrs)
 }
 
 func (c *topologyCache) snapshot() (topologyData, bool) {
@@ -379,12 +580,24 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 
 	for _, rem := range c.lldpRemotes {
 		remoteDev := topologyDevice{
-			ChassisID:     rem.chassisID,
-			ChassisIDType: rem.chassisIDSubtype,
-			SysName:       rem.sysName,
-			SysDescr:      rem.sysDesc,
-			ManagementIP:  rem.managementAddr,
-			Discovered:    true,
+			ChassisID:             rem.chassisID,
+			ChassisIDType:         rem.chassisIDSubtype,
+			SysName:               rem.sysName,
+			SysDescr:              rem.sysDesc,
+			ManagementIP:          rem.managementAddr,
+			ManagementAddresses:   rem.managementAddrs,
+			CapabilitiesSupported: decodeLLDPCapabilities(rem.sysCapSupported),
+			CapabilitiesEnabled:   decodeLLDPCapabilities(rem.sysCapEnabled),
+			Discovered:            true,
+		}
+		if rem.sysCapSupported != "" || rem.sysCapEnabled != "" {
+			remoteDev.Labels = ensureLabels(remoteDev.Labels)
+			if rem.sysCapSupported != "" {
+				remoteDev.Labels[tagLldpRemSysCapSupported] = rem.sysCapSupported
+			}
+			if rem.sysCapEnabled != "" {
+				remoteDev.Labels[tagLldpRemSysCapEnabled] = rem.sysCapEnabled
+			}
 		}
 		remoteDev = normalizeTopologyDevice(remoteDev)
 		if topologyDeviceKey(remoteDev) == "" {
@@ -408,13 +621,14 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 		}
 
 		dst := topologyEndpoint{
-			ChassisID:     remoteDev.ChassisID,
-			ChassisIDType: remoteDev.ChassisIDType,
-			PortID:        rem.portID,
-			PortIDType:    rem.portIDSubtype,
-			PortDescr:     rem.portDesc,
-			SysName:       rem.sysName,
-			ManagementIP:  rem.managementAddr,
+			ChassisID:           remoteDev.ChassisID,
+			ChassisIDType:       remoteDev.ChassisIDType,
+			PortID:              rem.portID,
+			PortIDType:          rem.portIDSubtype,
+			PortDescr:           rem.portDesc,
+			SysName:             rem.sysName,
+			ManagementIP:        rem.managementAddr,
+			ManagementAddresses: rem.managementAddrs,
 		}
 
 		links = append(links, topologyLink{
@@ -428,14 +642,49 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 	}
 
 	for _, rem := range c.cdpRemotes {
+		sysName := rem.deviceID
+		if rem.sysName != "" {
+			sysName = rem.sysName
+		}
+
 		remoteDev := topologyDevice{
-			ChassisID:     rem.deviceID,
-			ChassisIDType: "cdp_device_id",
-			SysName:       rem.deviceID,
-			ManagementIP:  rem.address,
-			Vendor:        "",
-			Model:         rem.platform,
-			Discovered:    true,
+			ChassisID:           rem.deviceID,
+			ChassisIDType:       "cdp_device_id",
+			SysObjectID:         rem.sysObjectID,
+			SysName:             sysName,
+			ManagementIP:        rem.address,
+			ManagementAddresses: rem.managementAddrs,
+			Vendor:              "",
+			Model:               rem.platform,
+			Discovered:          true,
+		}
+		remoteDev.Labels = ensureLabels(remoteDev.Labels)
+		if rem.version != "" {
+			remoteDev.Labels[tagCdpVersion] = rem.version
+		}
+		if rem.vtpMgmtDomain != "" {
+			remoteDev.Labels[tagCdpVTPDomain] = rem.vtpMgmtDomain
+		}
+		if rem.physicalLocation != "" {
+			remoteDev.Labels[tagCdpPhysicalLocation] = rem.physicalLocation
+		}
+		if rem.lastChange != "" {
+			remoteDev.Labels[tagCdpLastChange] = rem.lastChange
+		}
+		if rem.addressType != "" {
+			remoteDev.Labels[tagCdpAddressType] = rem.addressType
+		}
+		if rem.capabilities != "" {
+			remoteDev.Labels[tagCdpCaps] = rem.capabilities
+		}
+		if rem.platform != "" {
+			remoteDev.Labels[tagCdpPlatform] = rem.platform
+		}
+		if rem.sysName != "" {
+			remoteDev.Labels[tagCdpSysName] = rem.sysName
+		}
+		if rem.sysObjectID != "" {
+			remoteDev.Labels[tagCdpSysObjectID] = rem.sysObjectID
 		}
 		if remoteDev.ChassisID == "" && rem.address != "" {
 			remoteDev.ChassisID = rem.address
@@ -461,8 +710,24 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 			ChassisID:     remoteDev.ChassisID,
 			ChassisIDType: remoteDev.ChassisIDType,
 			PortID:        rem.devicePort,
-			SysName:       rem.deviceID,
+			SysName:       sysName,
 			ManagementIP:  rem.address,
+		}
+		dst.ManagementAddresses = rem.managementAddrs
+		if rem.nativeVLAN != "" || rem.duplex != "" || rem.mtu != "" || rem.powerConsumption != "" {
+			dst.Labels = ensureLabels(dst.Labels)
+			if rem.nativeVLAN != "" {
+				dst.Labels[tagCdpNativeVLAN] = rem.nativeVLAN
+			}
+			if rem.duplex != "" {
+				dst.Labels[tagCdpDuplex] = rem.duplex
+			}
+			if rem.mtu != "" {
+				dst.Labels[tagCdpMTU] = rem.mtu
+			}
+			if rem.powerConsumption != "" {
+				dst.Labels[tagCdpPower] = rem.powerConsumption
+			}
 		}
 
 		links = append(links, topologyLink{
@@ -494,6 +759,18 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 }
 
 func normalizeTopologyDevice(dev topologyDevice) topologyDevice {
+	if dev.ManagementIP == "" && len(dev.ManagementAddresses) > 0 {
+		if ip := pickManagementIP(dev.ManagementAddresses); ip != "" {
+			dev.ManagementIP = ip
+		}
+	}
+	if len(dev.Capabilities) == 0 {
+		if len(dev.CapabilitiesEnabled) > 0 {
+			dev.Capabilities = dev.CapabilitiesEnabled
+		} else if len(dev.CapabilitiesSupported) > 0 {
+			dev.Capabilities = dev.CapabilitiesSupported
+		}
+	}
 	if dev.ChassisID == "" && dev.ManagementIP != "" {
 		dev.ChassisID = dev.ManagementIP
 		dev.ChassisIDType = "management_ip"
@@ -516,6 +793,163 @@ func normalizeLLDPSubtype(value string, mapping map[string]string) string {
 		return v
 	}
 	return value
+}
+
+func ensureLabels(labels map[string]string) map[string]string {
+	if labels == nil {
+		return make(map[string]string)
+	}
+	return labels
+}
+
+func appendManagementAddress(addrs []topologyManagementAddress, addr topologyManagementAddress) []topologyManagementAddress {
+	if addr.Address == "" {
+		return addrs
+	}
+	for _, existing := range addrs {
+		if existing.Address == addr.Address && existing.AddressType == addr.AddressType && existing.Source == addr.Source {
+			return addrs
+		}
+	}
+	return append(addrs, addr)
+}
+
+func appendCdpManagementAddresses(entry *cdpRemote, current []topologyManagementAddress) []topologyManagementAddress {
+	addrs := current
+	if entry.primaryMgmtAddr != "" {
+		addr, addrType := normalizeManagementAddress(entry.primaryMgmtAddr, entry.primaryMgmtAddrType)
+		if addr != "" {
+			addrs = appendManagementAddress(addrs, topologyManagementAddress{
+				Address:     addr,
+				AddressType: addrType,
+				Source:      "cdp_primary_mgmt",
+			})
+		}
+	}
+	if entry.secondaryMgmtAddr != "" {
+		addr, addrType := normalizeManagementAddress(entry.secondaryMgmtAddr, entry.secondaryMgmtAddrType)
+		if addr != "" {
+			addrs = appendManagementAddress(addrs, topologyManagementAddress{
+				Address:     addr,
+				AddressType: addrType,
+				Source:      "cdp_secondary_mgmt",
+			})
+		}
+	}
+	if entry.address != "" {
+		addr, addrType := normalizeManagementAddress(entry.address, entry.addressType)
+		if addr != "" {
+			addrs = appendManagementAddress(addrs, topologyManagementAddress{
+				Address:     addr,
+				AddressType: addrType,
+				Source:      "cdp_cache_address",
+			})
+		}
+	}
+	return addrs
+}
+
+func pickManagementIP(addrs []topologyManagementAddress) string {
+	for _, addr := range addrs {
+		if ip := net.ParseIP(addr.Address); ip != nil {
+			return ip.String()
+		}
+	}
+	for _, addr := range addrs {
+		if addr.Address != "" {
+			return addr.Address
+		}
+	}
+	return ""
+}
+
+func normalizeManagementAddress(rawAddr, rawType string) (string, string) {
+	rawAddr = strings.TrimSpace(rawAddr)
+	if rawAddr == "" {
+		return "", normalizeAddressType(rawType, "")
+	}
+
+	if ip := net.ParseIP(rawAddr); ip != nil {
+		return ip.String(), normalizeAddressType(rawType, ip.String())
+	}
+
+	if bs, err := decodeHexString(rawAddr); err == nil {
+		if len(bs) == net.IPv4len || len(bs) == net.IPv6len {
+			ip := net.IP(bs)
+			return ip.String(), normalizeAddressType(rawType, ip.String())
+		}
+	}
+
+	return rawAddr, normalizeAddressType(rawType, rawAddr)
+}
+
+func normalizeAddressType(rawType, addr string) string {
+	switch rawType {
+	case "2":
+		return "ipv4"
+	case "3":
+		return "ipv6"
+	case "1":
+		if ip := net.ParseIP(addr); ip != nil && ip.To4() != nil {
+			return "ipv4"
+		}
+	}
+	if ip := net.ParseIP(addr); ip != nil {
+		if ip.To4() != nil {
+			return "ipv4"
+		}
+		return "ipv6"
+	}
+	return rawType
+}
+
+func decodeHexString(value string) ([]byte, error) {
+	clean := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(value)), "0x")
+	if clean == "" {
+		return nil, fmt.Errorf("empty hex string")
+	}
+	if len(clean)%2 == 1 {
+		clean = "0" + clean
+	}
+	return hex.DecodeString(clean)
+}
+
+func decodeLLDPCapabilities(value string) []string {
+	bs, err := decodeHexString(value)
+	if err != nil {
+		return nil
+	}
+
+	names := []string{
+		"other",
+		"repeater",
+		"bridge",
+		"wlanAccessPoint",
+		"router",
+		"telephone",
+		"docsisCableDevice",
+		"stationOnly",
+		"cVlanComponent",
+		"sVlanComponent",
+		"twoPortMacRelay",
+	}
+
+	caps := make([]string, 0, len(names))
+	for bit, name := range names {
+		if bitSet(bs, bit) {
+			caps = append(caps, name)
+		}
+	}
+	return caps
+}
+
+func bitSet(bs []byte, bit int) bool {
+	idx := bit / 8
+	if idx < 0 || idx >= len(bs) {
+		return false
+	}
+	mask := byte(1 << uint(7-(bit%8)))
+	return bs[idx]&mask != 0
 }
 
 func parseIndex(value string) int {
