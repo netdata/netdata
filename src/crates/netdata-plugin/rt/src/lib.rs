@@ -699,11 +699,11 @@ where
     ///
     /// # Note
     ///
-    /// This method runs indefinitely until shutdown is requested (via Ctrl-C or stdin closing).
+    /// This method runs indefinitely until shutdown is requested (via signals or stdin closing).
     pub async fn run(mut self) -> Result<()> {
         info!("starting plugin runtime: {}", self.plugin_name);
 
-        self.handle_ctr_c();
+        self.handle_shutdown_signals();
 
         // Start chart registry if charts were registered
         if let Some(registry) = self.chart_registry.take() {
@@ -736,23 +736,39 @@ where
         Ok(())
     }
 
-    /// Setup Ctrl-C signal handler for graceful shutdown.
-    fn handle_ctr_c(&self) {
+    /// Setup signal handlers for graceful shutdown
+    fn handle_shutdown_signals(&self) {
         let shutdown_token = self.shutdown_token.clone();
 
         tokio::spawn(async move {
-            match tokio::signal::ctrl_c().await {
-                Ok(()) => {
-                    info!("received ctrl-c signal, initiating graceful shutdown");
-                    shutdown_token.cancel();
-                }
-                Err(e) => {
-                    error!("failed to listen for Ctrl-C signal: {}", e);
-                }
-            }
+            let _ = wait_for_shutdown_signal().await;
+            info!("received shutdown signal, initiating graceful shutdown");
+            shutdown_token.cancel();
         });
     }
+}
 
+/// Waits for a shutdown signal (SIGINT or SIGTERM on Unix, SIGINT on other platforms).
+async fn wait_for_shutdown_signal() -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+
+        let mut sigterm = signal(SignalKind::terminate())?;
+
+        tokio::select! {
+            result = tokio::signal::ctrl_c() => result,
+            _ = sigterm.recv() => Ok(()),
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        tokio::signal::ctrl_c().await
+    }
+}
+
+impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R, W> {
     /// Declare all registered functions to Netdata.
     ///
     /// Sends a [`FunctionDeclaration`] message for each registered handler,
