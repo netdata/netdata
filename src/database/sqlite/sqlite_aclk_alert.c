@@ -775,7 +775,7 @@ void aclk_send_alert_configuration(char *config_hash)
     if (unlikely(!aclk_host_config))
         return;
 
-    nd_log(NDLS_ACCESS, NDLP_INFO,
+    nd_log(NDLS_ACCESS, NDLP_DEBUG,
         "ACLK REQ [%s (%s)]: Request to send alert config %s.",
         aclk_host_config->node_id,
         aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A",
