@@ -508,6 +508,11 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
     while (sqlite3_step_monitored(*res) == SQLITE_ROW) {
         health_alarm_log_populate(&alarm_log, *res, host, &status);
         aclk_send_alarm_log_entry(&alarm_log);
+
+        nd_uuid_t hash_id;
+        if (alarm_log.config_hash && !uuid_parse(alarm_log.config_hash, hash_id))
+            alert_hash_mark_sent(&hash_id);
+
         aclk_host_config->alert_count++;
 
         last_id = alarm_log.sequence_id;
@@ -716,6 +721,50 @@ void aclk_push_alert_events_for_all_hosts(void)
     SQLITE_FINALIZE(res_version);
 }
 
+#define SQL_SELECT_ALERT_HASH_CLOUD "SELECT 1 FROM alert_hash_cloud WHERE hash_id = @hash_id"
+#define SQL_INSERT_ALERT_HASH_CLOUD "INSERT OR IGNORE INTO alert_hash_cloud (hash_id) VALUES (@hash_id)"
+
+void alert_hash_mark_sent(nd_uuid_t *hash_id)
+{
+    static __thread sqlite3_stmt *res = NULL;
+
+    if (!res) {
+        if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_HASH_CLOUD, &res))
+            return;
+    }
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, hash_id, sizeof(*hash_id), SQLITE_STATIC));
+
+    param = 0;
+    (void)sqlite3_step_monitored(res);
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_RESET(res);
+}
+
+bool alert_hash_has_transitioned(nd_uuid_t *hash_id)
+{
+    static __thread sqlite3_stmt *res = NULL;
+
+    if (!res) {
+        if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_ALERT_HASH_CLOUD, &res))
+            return false;
+    }
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, hash_id, sizeof(*hash_id), SQLITE_STATIC));
+
+    param = 0;
+    bool found = (sqlite3_step_monitored(res) == SQLITE_ROW);
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_RESET(res);
+    return found;
+}
+
 void aclk_send_alert_configuration(char *config_hash)
 {
     if (unlikely(!config_hash))
@@ -726,7 +775,7 @@ void aclk_send_alert_configuration(char *config_hash)
     if (unlikely(!aclk_host_config))
         return;
 
-    nd_log(NDLS_ACCESS, NDLP_DEBUG,
+    nd_log(NDLS_ACCESS, NDLP_INFO,
         "ACLK REQ [%s (%s)]: Request to send alert config %s.",
         aclk_host_config->node_id,
         aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A",
@@ -841,6 +890,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
             aclk_host_config->node_id,
             aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A", config_hash);
         aclk_send_provide_alarm_cfg(&p_alarm_config);
+        alert_hash_mark_sent(&hash_uuid);
         freez(p_alarm_config.cfg_hash);
         destroy_aclk_alarm_configuration(&alarm_config);
     }

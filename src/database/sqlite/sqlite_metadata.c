@@ -104,6 +104,8 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, "
     "unique_id INT, date_created INT,  UNIQUE(host_id, health_log_id))",
 
+    "CREATE TABLE IF NOT EXISTS alert_hash_cloud (hash_id BLOB PRIMARY KEY)",
+
     "CREATE TABLE IF NOT EXISTS ctx_metadata_cleanup (id INTEGER PRIMARY KEY, host_id BLOB, context TEXT NOT NULL, date_created INT NOT NULL, "
     "UNIQUE (host_id, context))",
 
