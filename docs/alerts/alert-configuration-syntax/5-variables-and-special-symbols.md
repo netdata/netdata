@@ -258,17 +258,18 @@ calc: $now - $last_collected_t
 warn: $this > (5 * $update_every)
 ```
 
-### `$collected_total_raw` (Sum of All Dimensions)
+### Dimension Aggregation
 
-**Contains:** Sum of all dimensions' last collected values (raw).
+There is no built-in variable that sums all dimension values. To calculate totals:
 
-When to use: Total capacity calculations.
+1. Reference individual dimensions directly (e.g., `$used`, `$avail`)
+2. Use explicit addition in `calc`:
 
-**Example:**
 ```conf
 # Total disk capacity = used + available
-calc: $used * 100 / $collected_total_raw
-warn: $this > 80
+on: disk.space
+calc: ($used + $avail)
+warn: $this > 1000000000  # 1GB
 ```
 
 ### `$green` and `$red` (Threshold Values)
