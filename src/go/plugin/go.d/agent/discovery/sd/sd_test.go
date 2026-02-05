@@ -72,7 +72,7 @@ func TestServiceDiscovery_Run(t *testing.T) {
 				prepareConfigFile("source", "invalid"),
 			},
 			wantPipelines: []*mockPipeline{
-				{name: "name", started: true, stopped: false},
+				{name: "name", started: true, stopped: true},
 			},
 		},
 	}

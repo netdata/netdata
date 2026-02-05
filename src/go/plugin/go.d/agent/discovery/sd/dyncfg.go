@@ -458,6 +458,21 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn dyncfg.Function) {
 		d.waitCfgOnOff = ""
 	}
 
+	switch cfg.Status() {
+	case dyncfg.StatusAccepted, dyncfg.StatusDisabled, dyncfg.StatusFailed:
+		// proceed with enable
+	case dyncfg.StatusRunning:
+		// already running, return success (idempotent)
+		d.dyncfgApi.SendCodef(fn, 200, "")
+		d.dyncfgSDJobStatus(dt, name, cfg.Status())
+		return
+	default:
+		d.Warningf("dyncfg: enable: config '%s:%s': enabling not allowed in %s state", dt, name, cfg.Status())
+		d.dyncfgApi.SendCodef(fn, 405, "Enabling is not allowed in '%s' state.", cfg.Status())
+		d.dyncfgSDJobStatus(dt, name, cfg.Status())
+		return
+	}
+
 	// Convert sdConfig to pipeline.Config
 	pipelineCfg, err := cfg.ToPipelineConfig(d.configDefaults)
 	if err != nil {
@@ -468,30 +483,21 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn dyncfg.Function) {
 		return
 	}
 
-	d.Infof("dyncfg: enable: starting pipeline '%s:%s'", dt, name)
+	if cfg.Status() == dyncfg.StatusDisabled {
+		d.Infof("dyncfg: enable: %s:%s by user '%s'", dt, name, fn.User())
+	}
 
-	// If pipeline is running, use Restart (validates first, preserves old if new fails).
-	// Otherwise, use Start for initial startup.
-	if d.mgr.IsRunning(pkey) {
-		if err := d.mgr.Restart(d.ctx, pkey, pipelineCfg); err != nil {
-			d.Errorf("dyncfg: enable: failed to restart pipeline '%s:%s': %v", dt, name, err)
-			// On restart failure, keep old status (pipeline is still running with old config)
-			d.dyncfgApi.SendCodef(fn, 422, "Failed to restart pipeline: %v", err)
-			return
-		}
-	} else {
-		if err := d.mgr.Start(d.ctx, pkey, pipelineCfg); err != nil {
-			d.Errorf("dyncfg: enable: failed to start pipeline '%s:%s': %v", dt, name, err)
-			d.exposedConfigs.updateStatus(cfg, dyncfg.StatusFailed)
-			d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
-			d.dyncfgApi.SendCodef(fn, 422, "Failed to start pipeline: %v", err)
-			return
-		}
+	if err := d.mgr.Start(d.ctx, pkey, pipelineCfg); err != nil {
+		d.Errorf("dyncfg: enable: failed to start pipeline '%s:%s': %v", dt, name, err)
+		d.exposedConfigs.updateStatus(cfg, dyncfg.StatusFailed)
+		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
+		d.dyncfgApi.SendCodef(fn, 422, "Failed to start pipeline: %v", err)
+		return
 	}
 
 	d.exposedConfigs.updateStatus(cfg, dyncfg.StatusRunning)
-	d.dyncfgSDJobStatus(dt, name, dyncfg.StatusRunning)
 	d.dyncfgApi.SendCodef(fn, 200, "")
+	d.dyncfgSDJobStatus(dt, name, dyncfg.StatusRunning)
 }
 
 // dyncfgCmdDisable handles the disable command for jobs
