@@ -538,11 +538,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job status running
 
-CONFIG test:sd:net_listeners:test-job status disabled
-
 FUNCTION_RESULT_BEGIN 3-disable 200 application/json
 {"status":200,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status disabled
 `,
 				}
 			},
@@ -1509,11 +1509,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:job2 status running
 
-CONFIG test:sd:net_listeners:job1 status disabled
-
 FUNCTION_RESULT_BEGIN 5-disable 200 application/json
 {"status":200,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:job1 status disabled
 
 CONFIG test:sd:net_listeners:job2 delete
 

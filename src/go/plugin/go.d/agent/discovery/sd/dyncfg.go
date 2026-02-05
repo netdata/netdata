@@ -525,23 +525,23 @@ func (d *ServiceDiscovery) dyncfgCmdDisable(fn dyncfg.Function) {
 		d.waitCfgOnOff = ""
 	}
 
-	// If not running, just update status (idempotent)
-	if !d.mgr.IsRunning(pkey) {
-		d.Infof("dyncfg: disable: pipeline '%s:%s' is not running", dt, name)
-		d.exposedConfigs.updateStatus(cfg, dyncfg.StatusDisabled)
-		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusDisabled)
+	switch cfg.Status() {
+	case dyncfg.StatusDisabled:
+		// already disabled, return success (idempotent)
 		d.dyncfgApi.SendCodef(fn, 200, "")
+		d.dyncfgSDJobStatus(dt, name, cfg.Status())
 		return
+	case dyncfg.StatusRunning:
+		d.mgr.Stop(pkey)
+	default:
+		// Accepted, Failed - just proceed to set Disabled
 	}
 
-	d.Infof("dyncfg: disable: stopping pipeline '%s:%s'", dt, name)
-
-	// Stop the pipeline (this sends removal groups for discovered jobs)
-	d.mgr.Stop(pkey)
+	d.Infof("dyncfg: disable: %s:%s by user '%s'", dt, name, fn.User())
 
 	d.exposedConfigs.updateStatus(cfg, dyncfg.StatusDisabled)
-	d.dyncfgSDJobStatus(dt, name, dyncfg.StatusDisabled)
 	d.dyncfgApi.SendCodef(fn, 200, "")
+	d.dyncfgSDJobStatus(dt, name, dyncfg.StatusDisabled)
 }
 
 // dyncfgCmdRemove handles the remove command for dyncfg jobs
