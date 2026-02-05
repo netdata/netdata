@@ -65,8 +65,8 @@ sudo systemctl restart netdata
 | `refresh`            | Auto-refresh interval in seconds             | `0` (no refresh)                  | `auto`, `5`                    |
 | `label_color`        | Left side background color                   | `grey`                            | `blue`, `red`, `#007ec6`       |
 | `value_color`        | Right side background color                  | Based on value                    | `green`, `yellow`, `#4c1`      |
-| `text_color_lbl`     | Left text color                              | `white`                           | `black`, `#fff`                |
-| `text_color_val`     | Right text color                             | `white`                           | `black`, `#fff`                |
+| `text_color_lbl`     | Left text color                              | `grey` (fallback)                 | `black`, `#fff`                |
+| `text_color_val`     | Right text color                             | `grey` (fallback)                 | `black`, `#fff`                |
 | `fixed_width_lbl`    | Fixed width for label (pixels)               | Auto                              | `100`                          |
 | `fixed_width_val`    | Fixed width for value (pixels)               | Auto                              | `80`                           |
 
@@ -131,6 +131,22 @@ Conditional colors based on value:
 | `blue`                    | `#007ec6` |
 | `grey` / `gray`           | `#555`    |
 | `lightgrey` / `lightgray` | `#9f9f9f` |
+
+### Special Units Formats
+
+When using the `units` parameter, these special formats are recognized:
+
+| Units Value                            | Display Format            |
+| -------------------------------------- | ------------------------- |
+| `seconds` / `seconds ago`              | Formatted time (HH:MM:SS) |
+| `minutes` / `minutes ago`              | Formatted time (Xd HH:MM) |
+| `hours` / `hours ago`                  | Formatted time (Xd XXh)   |
+| `on/off` / `on-off` / `onoff`          | "on" or "off"             |
+| `up/down` / `up-down` / `updown`       | "up" or "down"            |
+| `ok/error` / `ok-error` / `okerror`    | "ok" or "error"           |
+| `ok/failed` / `ok-failed` / `okfailed` | "ok" or "failed"          |
+| `percentage` / `percent` / `pcent`     | Adds `%` suffix           |
+| `empty` / `null`                       | Hides units entirely      |
 
 ### Custom Colors
 
@@ -267,8 +283,8 @@ http://netdata.local:19999/api/v1/badge.svg?chart=system.cpu&dimension=user&valu
 ### Badge shows empty value
 
 - Check that the `dimension` parameter matches an actual dimension name
-- Verify the time range (`after`/`before`) contains data
-- Some charts may have no data for the requested time period
+- Verify the time range (`after`/`before`) contains recent data
+- Badge shows "-" when data is too old (staleness check) or unavailable
 
 ### Access denied / Cannot view badge
 
