@@ -8,6 +8,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
+
+	"gopkg.in/yaml.v2"
 )
 
 // parseDyncfgPayload parses a dyncfg JSON payload into a pipeline.Config.
@@ -41,4 +43,31 @@ func parseDyncfgPayload(payload []byte, discovererType string, configDefaults co
 // Format: "dyncfg:{discovererType}:{name}"
 func pipelineKey(discovererType, name string) string {
 	return fmt.Sprintf("dyncfg:%s:%s", discovererType, name)
+}
+
+// userConfigFromPayload converts a JSON payload to YAML format for user editing.
+// It unmarshals JSON into pipeline.Config, then marshals to YAML.
+// If jobName is provided (non-empty), it overrides the name from payload.
+// This ensures consistent field ordering and validates the structure.
+func userConfigFromPayload(payload []byte, discovererType, jobName string) ([]byte, error) {
+	var cfg pipeline.Config
+	if err := json.Unmarshal(payload, &cfg); err != nil {
+		return nil, fmt.Errorf("unmarshal json: %w", err)
+	}
+
+	// Use jobName if provided, otherwise keep name from payload
+	if jobName != "" {
+		cfg.Name = jobName
+	}
+	// If still no name, use default
+	if cfg.Name == "" {
+		cfg.Name = "test"
+	}
+
+	bs, err := yaml.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshal yaml: %w", err)
+	}
+
+	return bs, nil
 }

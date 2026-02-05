@@ -796,10 +796,10 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 							[]string{sd.dyncfgTemplateID(DiscovererNetListeners), "add", "test-job"},
 							payload, "type=dyncfg,user=test")
 
-						// Userconfig
+						// Userconfig - must provide payload (matching jobmgr pattern)
 						sendDyncfgCmd(sd, "2-userconfig",
 							[]string{sd.dyncfgJobID(DiscovererNetListeners, "test-job"), "userconfig"},
-							nil, "")
+							payload, "")
 					},
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-add 202 application/json")

@@ -4,7 +4,6 @@ package sd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -13,8 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
-
-	"gopkg.in/yaml.v2"
 )
 
 // Discoverer types supported by SD dyncfg
@@ -598,28 +595,28 @@ func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn dyncfg.Function) {
 	id := fn.ID()
 	dt, _, _ := d.extractDiscovererAndName(id)
 
+	if !isValidDiscovererType(dt) {
+		d.Warningf("dyncfg: userconfig: invalid discoverer type in ID '%s'", id)
+		d.dyncfgApi.SendCodef(fn, 400, "Invalid discoverer type in ID: %s", id)
+		return
+	}
+
 	if !fn.HasPayload() {
-		d.Warningf("dyncfg: userconfig: missing payload for template '%s'", dt)
+		d.Warningf("dyncfg: userconfig: missing payload for '%s'", id)
 		d.dyncfgApi.SendCodef(fn, 400, "Missing configuration payload.")
 		return
 	}
 
-	// Content is JSON, convert to YAML
-	var content any
-	if err := json.Unmarshal(fn.Payload(), &content); err != nil {
-		d.Warningf("dyncfg: userconfig: failed to parse config: %v", err)
-		d.dyncfgApi.SendCodef(fn, 500, "Failed to parse config: %v", err)
-		return
-	}
+	jobName := fn.JobName() // May be empty - userConfigFromPayload will use name from payload or default
 
-	yamlBytes, err := yaml.Marshal(content)
+	bs, err := userConfigFromPayload(fn.Payload(), dt, jobName)
 	if err != nil {
-		d.Warningf("dyncfg: userconfig: failed to marshal config to YAML: %v", err)
-		d.dyncfgApi.SendCodef(fn, 500, "Failed to marshal config to YAML: %v", err)
+		d.Warningf("dyncfg: userconfig: failed to create config for '%s': %v", id, err)
+		d.dyncfgApi.SendCodef(fn, 400, "Failed to create config: %v", err)
 		return
 	}
 
-	d.dyncfgApi.SendYAML(fn, string(yamlBytes))
+	d.dyncfgApi.SendYAML(fn, string(bs))
 }
 
 // extractDiscovererAndName parses a dyncfg ID into discoverer type and name.
