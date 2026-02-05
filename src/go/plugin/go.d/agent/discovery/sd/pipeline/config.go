@@ -3,7 +3,6 @@
 package pipeline
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -161,14 +160,6 @@ func (c Config) MarshalYAML() (any, error) {
 		Discoverer: c.Discoverer,
 		Services:   c.Services,
 	}, nil
-}
-
-// UnmarshalJSON implements json.Unmarshaler for dyncfg payloads.
-// Legacy fields (discover, classify, compose) have json:"-" tags and are
-// intentionally not supported in JSON - they're only for YAML file configs.
-func (c *Config) UnmarshalJSON(data []byte) error {
-	type plain Config // avoid recursion
-	return json.Unmarshal(data, (*plain)(c))
 }
 
 // LegacyDiscoveryConfig is the old discover[] array item format.
