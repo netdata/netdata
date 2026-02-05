@@ -31,13 +31,19 @@ Each node is either:
 
 #### `meta` fields
 
-| Field           | Purpose                                                                       | Notes                                                                                                                                                                                                                       |
-|-----------------|-------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **label**       | The label shown in the sidebar.                                               | For category overview pages, this should usually match the last segment of `path`, but some top-level or legacy categories are exceptions (for example, `Quickstart Deployment`). Categories are defined by having `items`. |
-| **path**        | The location path on Learn.                                                   | Prefer **Title Case** segments with **spaces** (example: `Netdata Agent/Installation/Linux`). Some special nodes (such as the top-level `root`) or legacy entries may not follow this; follow existing patterns nearby.     |
-| **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`). Can be omitted only for nodes with `integration_placeholder` children (the integrations themselves will have edit URLs).                                  |
-| **keywords**    | List of keywords for search.                                                  | Example: `["install", "linux"]`                                                                                                                                                                                             |
-| **description** | Legacy metadata description.                                                  | Rarely used today.                                                                                                                                                                                                          |
+| Field           | Purpose                                                                       | Notes                                                                                                                                                                                      |
+|-----------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **label**       | The label shown in the sidebar.                                               | For category overview pages, this should match the sidebar position. Categories are defined by having `items`.                                                                             |
+| **path**        | Single path segment override (optional).                                      | Used when the document's Learn path segment differs from the tree structure. Example: `OpenTelemetry` (not a full path). If omitted, the path is derived from the tree hierarchy.          |
+| **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`). Can be omitted only for nodes with `integration_placeholder` children (the integrations themselves will have edit URLs). |
+| **keywords**    | List of keywords for search.                                                  | Example: `["install", "linux"]`                                                                                                                                                            |
+| **description** | Legacy metadata description.                                                  | Rarely used today.                                                                                                                                                                         |
+
+#### Path Reconstruction
+
+The full Learn path for each document is automatically reconstructed by walking the tree hierarchy and concatenating parent labels. The `path` field in `meta` is only needed when a document's path segment differs from its tree position.
+
+For example, a document appearing under "Collecting Metrics" in the sidebar with `path: OpenTelemetry` will have Learn path `OpenTelemetry` instead of `Collecting Metrics/OpenTelemetry Metrics`.
 
 #### Integration placeholder node
 
