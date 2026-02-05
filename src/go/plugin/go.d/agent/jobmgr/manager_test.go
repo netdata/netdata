@@ -23,10 +23,10 @@ func TestManager_Run(t *testing.T) {
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, cfg.Source())
 					},
@@ -55,10 +55,10 @@ CONFIG test:collector:success:name delete
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 					},
 					wantDiscovered: []confgroup.Config{cfg},
 					wantSeen: []seenConfig{
@@ -85,10 +85,10 @@ CONFIG test:collector:fail:name delete
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, cfg.Source())
 					},
@@ -115,10 +115,10 @@ CONFIG test:collector:fail:name delete
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, cfg.Source())
 					},
@@ -147,10 +147,10 @@ CONFIG test:collector:success:name delete
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, cfg.Source())
 					},
@@ -179,10 +179,10 @@ CONFIG test:collector:fail:name delete
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, cfg.Source())
 					},
@@ -211,10 +211,10 @@ CONFIG test:collector:success:name delete
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, cfg.Source())
 					},
@@ -245,22 +245,22 @@ CONFIG test:collector:fail:name delete
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, stockCfg.Source(), stockCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(stockCfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(discCfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, userCfg.Source(), userCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
-						})
+						}))
 					},
 					wantDiscovered: []confgroup.Config{
 						stockCfg,
@@ -314,22 +314,22 @@ CONFIG test:collector:fail:user status failed
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, stockCfg.Source(), stockCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(stockCfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(discCfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, userCfg.Source(), userCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
-						})
+						}))
 					},
 					wantDiscovered: []confgroup.Config{
 						stockCfg,
@@ -382,22 +382,22 @@ CONFIG test:collector:fail:name status failed
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, stockCfg.Source(), stockCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(stockCfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(discCfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, userCfg.Source(), userCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, stockCfg.Source())
 						sendConfGroup(in, discCfg.Source())
@@ -446,10 +446,10 @@ CONFIG test:collector:fail:name delete
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, userCfg.Source(), userCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
 						sendConfGroup(in, stockCfg.Source(), stockCfg)
@@ -489,10 +489,10 @@ CONFIG test:collector:fail:name status failed
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, userCfg.Source(), userCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
 						sendConfGroup(in, stockCfg.Source(), stockCfg)
@@ -539,10 +539,10 @@ func TestManager_Run_Dyncfg_Get(t *testing.T) {
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-get",
 							Args: []string{mgr.dyncfgJobID(cfg), "get"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen:       nil,
@@ -566,16 +566,16 @@ FUNCTION_RESULT_END
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: bs,
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-get",
 							Args: []string{mgr.dyncfgJobID(cfg), "get"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -620,10 +620,10 @@ func TestManager_Run_Dyncfg_Userconfig(t *testing.T) {
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-userconfig",
 							Args: []string{mgr.dyncfgJobID(cfg), "userconfig"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen:       nil,
@@ -647,10 +647,10 @@ FUNCTION_RESULT_END
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-userconfig",
 							Args: []string{mgr.dyncfgJobID(cfg), "userconfig"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen:       nil,
@@ -684,12 +684,12 @@ func TestManager_Run_Dyncfg_Add(t *testing.T) {
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -716,12 +716,12 @@ CONFIG test:collector:success:test create accepted job /collectors/test/Jobs dyn
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -748,18 +748,18 @@ CONFIG test:collector:fail:test create accepted job /collectors/test/Jobs dyncfg
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "2-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -806,10 +806,10 @@ func TestManager_Run_Dyncfg_Enable(t *testing.T) {
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen:       nil,
@@ -830,16 +830,16 @@ FUNCTION_RESULT_END
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -872,20 +872,20 @@ CONFIG test:collector:success:test status running
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -924,16 +924,16 @@ CONFIG test:collector:success:test status running
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -966,20 +966,20 @@ CONFIG test:collector:fail:test status failed
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -1032,10 +1032,10 @@ func TestManager_Run_Dyncfg_Disable(t *testing.T) {
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-disable",
 							Args: []string{mgr.dyncfgJobID(cfg), "disable"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen:       nil,
@@ -1056,16 +1056,16 @@ FUNCTION_RESULT_END
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-disable",
 							Args: []string{mgr.dyncfgJobID(cfg), "disable"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -1098,20 +1098,20 @@ CONFIG test:collector:success:test status disabled
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-disable",
 							Args: []string{mgr.dyncfgJobID(cfg), "disable"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-disable",
 							Args: []string{mgr.dyncfgJobID(cfg), "disable"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -1150,16 +1150,16 @@ CONFIG test:collector:success:test status disabled
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-disable",
 							Args: []string{mgr.dyncfgJobID(cfg), "disable"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -1192,20 +1192,20 @@ CONFIG test:collector:fail:test status disabled
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-disable",
 							Args: []string{mgr.dyncfgJobID(cfg), "disable"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-disable",
 							Args: []string{mgr.dyncfgJobID(cfg), "disable"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -1258,10 +1258,10 @@ func TestManager_Run_Dyncfg_Restart(t *testing.T) {
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-restart",
 							Args: []string{mgr.dyncfgJobID(cfg), "restart"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen:       nil,
@@ -1282,16 +1282,16 @@ FUNCTION_RESULT_END
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-restart",
 							Args: []string{mgr.dyncfgJobID(cfg), "restart"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -1324,20 +1324,20 @@ CONFIG test:collector:success:test status accepted
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-restart",
 							Args: []string{mgr.dyncfgJobID(cfg), "restart"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -1376,20 +1376,20 @@ CONFIG test:collector:success:test status running
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-disable",
 							Args: []string{mgr.dyncfgJobID(cfg), "disable"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-restart",
 							Args: []string{mgr.dyncfgJobID(cfg), "restart"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -1428,24 +1428,24 @@ CONFIG test:collector:success:test status disabled
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-restart",
 							Args: []string{mgr.dyncfgJobID(cfg), "restart"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "4-restart",
 							Args: []string{mgr.dyncfgJobID(cfg), "restart"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -1504,10 +1504,10 @@ func TestManager_Run_Dyncfg_Remove(t *testing.T) {
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-remove",
 							Args: []string{mgr.dyncfgJobID(cfg), "remove"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen:       nil,
@@ -1531,35 +1531,35 @@ FUNCTION_RESULT_END
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, stockCfg.Source(), stockCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(stockCfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, userCfg.Source(), userCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(userCfg), "enable"},
-						})
+						}))
 
 						sendConfGroup(in, discCfg.Source(), discCfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-enable",
 							Args: []string{mgr.dyncfgJobID(discCfg), "enable"},
-						})
+						}))
 
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-remove",
 							Args: []string{mgr.dyncfgJobID(stockCfg), "remove"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-remove",
 							Args: []string{mgr.dyncfgJobID(userCfg), "remove"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-remove",
 							Args: []string{mgr.dyncfgJobID(discCfg), "remove"},
-						})
+						}))
 					},
 					wantDiscovered: []confgroup.Config{
 						stockCfg,
@@ -1623,16 +1623,16 @@ FUNCTION_RESULT_END
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-remove",
 							Args: []string{mgr.dyncfgJobID(cfg), "remove"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen:       nil,
@@ -1661,20 +1661,20 @@ CONFIG test:collector:success:test delete
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(cfg.Module()), "add", cfg.Name()},
 							Payload: []byte("{}"),
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "3-remove",
 							Args: []string{mgr.dyncfgJobID(cfg), "remove"},
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen:       nil,
@@ -1723,11 +1723,11 @@ func TestManager_Run_Dyncfg_Update(t *testing.T) {
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-update",
 							Args:    []string{mgr.dyncfgJobID(cfg), "update"},
 							Payload: []byte("{}"),
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen:       nil,
@@ -1753,22 +1753,22 @@ FUNCTION_RESULT_END
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(origCfg.Module()), "add", origCfg.Name()},
 							Payload: origBs,
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-enable",
 							Args: []string{mgr.dyncfgJobID(origCfg), "enable"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "3-update",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgJobID(origCfg), "update"},
 							Payload: updBs,
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -1812,22 +1812,22 @@ CONFIG test:collector:success:test status running
 
 				return &runSim{
 					do: func(mgr *Manager, _ chan []*confgroup.Group) {
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "1-add",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgModID(origCfg.Module()), "add", origCfg.Name()},
 							Payload: origBs,
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "2-disable",
 							Args: []string{mgr.dyncfgJobID(origCfg), "disable"},
-						})
-						mgr.dyncfgConfig(functions.Function{
+						}))
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:     "3-update",
 							Source:  "type=dyncfg",
 							Args:    []string{mgr.dyncfgJobID(origCfg), "update"},
 							Payload: updBs,
-						})
+						}))
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
@@ -1936,10 +1936,10 @@ func TestManager_Run_FunctionOnly(t *testing.T) {
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 					},
 					wantDiscovered: []confgroup.Config{cfg},
 					wantSeen: []seenConfig{
@@ -1968,10 +1968,10 @@ CONFIG test:collector:nofuncs:test status failed
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 					},
 					wantDiscovered: []confgroup.Config{cfg},
 					wantSeen: []seenConfig{
@@ -2000,10 +2000,10 @@ CONFIG test:collector:withfuncs:test status running
 				return &runSim{
 					do: func(mgr *Manager, in chan []*confgroup.Group) {
 						sendConfGroup(in, cfg.Source(), cfg)
-						mgr.dyncfgConfig(functions.Function{
+						mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
 							UID:  "1-enable",
 							Args: []string{mgr.dyncfgJobID(cfg), "enable"},
-						})
+						}))
 					},
 					wantDiscovered: []confgroup.Config{cfg},
 					wantSeen: []seenConfig{

@@ -31,7 +31,6 @@ type discoverySim struct {
 func (sim *discoverySim) run(t *testing.T) {
 	d, err := NewDiscoverer(Config{
 		Source: "",
-		Tags:   "netlisteners",
 	})
 	require.NoError(t, err)
 

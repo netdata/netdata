@@ -14,48 +14,50 @@ import (
 
 type (
 	Config struct {
-		Source string `yaml:"-"`
+		Source string `yaml:"-" json:"-"`
 
 		// RescanInterval defines how often to scan the networks for devices (default: 30m)
-		RescanInterval *confopt.Duration `yaml:"rescan_interval"`
+		// Zero means use default. Negative means disable rescanning (run once).
+		RescanInterval confopt.LongDuration `yaml:"rescan_interval,omitempty" json:"rescan_interval,omitempty"`
 		// Timeout defines the maximum time to wait for SNMP device responses (default: 1s)
-		Timeout confopt.Duration `yaml:"timeout"`
+		Timeout confopt.Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 		// DeviceCacheTTL defines how long to trust cached discovery results before requiring a new probe (default: 12h)
-		DeviceCacheTTL *confopt.Duration `yaml:"device_cache_ttl"`
+		// Zero means use default. Negative means cache never expires.
+		DeviceCacheTTL confopt.LongDuration `yaml:"device_cache_ttl,omitempty" json:"device_cache_ttl,omitempty"`
 		// ParallelScansPerNetwork defines how many IPs to scan concurrently within each subnet (default: 32)
-		ParallelScansPerNetwork int `yaml:"parallel_scans_per_network"`
+		ParallelScansPerNetwork int `yaml:"parallel_scans_per_network,omitempty" json:"parallel_scans_per_network,omitempty"`
 		// Credentials define the SNMP credentials used for authentication
-		Credentials []CredentialConfig `yaml:"credentials"`
+		Credentials []CredentialConfig `yaml:"credentials,omitempty" json:"credentials,omitempty"`
 		// Networks defines the subnets to scan and which credentials to use
-		Networks []NetworkConfig `yaml:"networks"`
+		Networks []NetworkConfig `yaml:"networks,omitempty" json:"networks,omitempty"`
 	}
 
 	NetworkConfig struct {
 		// Subnet is the IP range to scan, supporting various formats
 		// https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/iprange#supported-formats
-		Subnet string `yaml:"subnet"`
+		Subnet string `yaml:"subnet" json:"subnet"`
 		// Credential is the name of a credential from the Credentials list
-		Credential string `yaml:"credential"`
+		Credential string `yaml:"credential" json:"credential"`
 	}
 	CredentialConfig struct {
 		// Name is the identifier for this credential set, used in Network.Credential
-		Name string `yaml:"name"`
+		Name string `yaml:"name" json:"name"`
 		// Version must be one of: "1", "2c", or "3"
-		Version string `yaml:"version"`
+		Version string `yaml:"version" json:"version"`
 		// Community is the SNMP community string (used in v1 and v2c)
-		Community string `yaml:"community"`
+		Community string `yaml:"community,omitempty" json:"community,omitempty"`
 		// UserName is the SNMPv3 username
-		UserName string `yaml:"username"`
+		UserName string `yaml:"username,omitempty" json:"username,omitempty"`
 		// SecurityLevel must be one of: "noAuthNoPriv", "authNoPriv", or "authPriv" (for SNMPv3)
-		SecurityLevel string `yaml:"security_level"`
+		SecurityLevel string `yaml:"security_level,omitempty" json:"security_level,omitempty"`
 		// AuthProtocol must be one of: "md5", "sha", "sha224", "sha256", "sha384", "sha512" (for SNMPv3)
-		AuthProtocol string `yaml:"auth_protocol"`
+		AuthProtocol string `yaml:"auth_protocol,omitempty" json:"auth_protocol,omitempty"`
 		// AuthPassphrase is the authentication passphrase (for SNMPv3)
-		AuthPassphrase string `yaml:"auth_password"`
-		// PrivacyProtocol must be one of: "des", "aes", "aes192", "aes256", "aes192C", "aes256C" (for SNMPv3)
-		PrivacyProtocol string `yaml:"priv_protocol"`
+		AuthPassphrase string `yaml:"auth_password,omitempty" json:"auth_password,omitempty"`
+		// PrivacyProtocol must be one of: "des", "aes", "aes192", "aes256", "aes192c", "aes256c" (for SNMPv3)
+		PrivacyProtocol string `yaml:"priv_protocol,omitempty" json:"priv_protocol,omitempty"`
 		// PrivacyPassphrase is the privacy passphrase (for SNMPv3)
-		PrivacyPassphrase string `yaml:"priv_password"`
+		PrivacyPassphrase string `yaml:"priv_password,omitempty" json:"priv_password,omitempty"`
 	}
 )
 

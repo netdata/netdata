@@ -168,7 +168,9 @@ const char *db_models_add_model =
     "    @c10, @c11, @c12, @c13, @c14, @c15);";
 
 const char *db_models_load =
-    "SELECT * FROM models "
+    "SELECT after, before, min_dist, max_dist, "
+    "c00, c01, c02, c03, c04, c05, "
+    "c10, c11, c12, c13, c14, c15 FROM models "
     "WHERE dim_id = @dim_id AND after >= @after ORDER BY before ASC;";
 
 const char *db_models_delete =
@@ -407,29 +409,29 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
         ml_kmeans_t km;
 
-        km.after = sqlite3_column_int(res, 2);
-        km.before = sqlite3_column_int(res, 3);
+        km.after = sqlite3_column_int(res, 0);
+        km.before = sqlite3_column_int(res, 1);
 
-        km.min_dist = sqlite3_column_int(res, 4);
-        km.max_dist = sqlite3_column_int(res, 5);
+        km.min_dist = sqlite3_column_double(res, 2);
+        km.max_dist = sqlite3_column_double(res, 3);
 
         km.cluster_centers.resize(2);
 
         km.cluster_centers[0].set_size(Cfg.lag_n + 1);
-        km.cluster_centers[0](0) = sqlite3_column_double(res, 6);
-        km.cluster_centers[0](1) = sqlite3_column_double(res, 7);
-        km.cluster_centers[0](2) = sqlite3_column_double(res, 8);
-        km.cluster_centers[0](3) = sqlite3_column_double(res, 9);
-        km.cluster_centers[0](4) = sqlite3_column_double(res, 10);
-        km.cluster_centers[0](5) = sqlite3_column_double(res, 11);
+        km.cluster_centers[0](0) = sqlite3_column_double(res, 4);
+        km.cluster_centers[0](1) = sqlite3_column_double(res, 5);
+        km.cluster_centers[0](2) = sqlite3_column_double(res, 6);
+        km.cluster_centers[0](3) = sqlite3_column_double(res, 7);
+        km.cluster_centers[0](4) = sqlite3_column_double(res, 8);
+        km.cluster_centers[0](5) = sqlite3_column_double(res, 9);
 
         km.cluster_centers[1].set_size(Cfg.lag_n + 1);
-        km.cluster_centers[1](0) = sqlite3_column_double(res, 12);
-        km.cluster_centers[1](1) = sqlite3_column_double(res, 13);
-        km.cluster_centers[1](2) = sqlite3_column_double(res, 14);
-        km.cluster_centers[1](3) = sqlite3_column_double(res, 15);
-        km.cluster_centers[1](4) = sqlite3_column_double(res, 16);
-        km.cluster_centers[1](5) = sqlite3_column_double(res, 17);
+        km.cluster_centers[1](0) = sqlite3_column_double(res, 10);
+        km.cluster_centers[1](1) = sqlite3_column_double(res, 11);
+        km.cluster_centers[1](2) = sqlite3_column_double(res, 12);
+        km.cluster_centers[1](3) = sqlite3_column_double(res, 13);
+        km.cluster_centers[1](4) = sqlite3_column_double(res, 14);
+        km.cluster_centers[1](5) = sqlite3_column_double(res, 15);
 
         dim->km_contexts.emplace_back(km);
     }

@@ -99,4 +99,11 @@ pub fn init_tracing() {
         log_method_description(&log_method),
         filter_str,
     );
+
+    // Install panic hook that always captures backtraces.
+    // We want backtraces on panic regardless of RUST_BACKTRACE setting.
+    std::panic::set_hook(Box::new(|panic_info| {
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        tracing::error!("{panic_info}\n{backtrace}");
+    }));
 }

@@ -410,8 +410,12 @@ fn get_entry_timestamp(
 ) -> Result<u64> {
     // Try to read the source timestamp field if specified
     if let Some(field_name) = source_timestamp_field {
-        if let Ok(timestamp) = get_timestamp_field(journal_file, field_name, entry_offset) {
-            return Ok(timestamp);
+        match get_timestamp_field(journal_file, field_name, entry_offset) {
+            Ok(timestamp) => return Ok(timestamp),
+            Err(IndexError::MissingFieldName) => {
+                // Field not found, fall back to realtime timestamp
+            }
+            Err(e) => return Err(e),
         }
     }
 

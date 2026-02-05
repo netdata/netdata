@@ -615,8 +615,8 @@ func preparePodTargetGroup(pod *corev1.Pod) *podTargetGroup {
 				Address:        net.JoinHostPort(pod.Status.PodIP, portNum),
 				Namespace:      pod.Namespace,
 				Name:           pod.Name,
-				Annotations:    mapAny(pod.Annotations),
-				Labels:         mapAny(pod.Labels),
+				Annotations:    model.MapAny(pod.Annotations),
+				Labels:         model.MapAny(pod.Labels),
 				NodeName:       pod.Spec.NodeName,
 				PodIP:          pod.Status.PodIP,
 				ControllerName: "netdata-test",
@@ -629,7 +629,6 @@ func preparePodTargetGroup(pod *corev1.Pod) *podTargetGroup {
 				PortProtocol:   string(port.Protocol),
 			}
 			tgt.hash = mustCalcHash(tgt)
-			tgt.Tags().Merge(discoveryTags)
 
 			tgg.targets = append(tgg.targets, tgt)
 		}
@@ -642,7 +641,7 @@ func preparePodTargetGroupWithEnv(pod *corev1.Pod, env map[string]string) *podTa
 	tgg := preparePodTargetGroup(pod)
 
 	for _, tgt := range tgg.Targets() {
-		tgt.(*PodTarget).Env = mapAny(env)
+		tgt.(*PodTarget).Env = model.MapAny(env)
 		tgt.(*PodTarget).hash = mustCalcHash(tgt)
 	}
 

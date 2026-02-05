@@ -16,8 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gohugoio/hashstructure"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
@@ -29,25 +27,19 @@ var (
 )
 
 type Config struct {
-	Source string `yaml:"-"`
-	Tags   string `yaml:"tags"`
+	Source string `yaml:"-" json:"-"`
 
-	Interval *confopt.Duration `yaml:"interval"`
-	Timeout  confopt.Duration  `yaml:"timeout"`
+	Interval confopt.LongDuration `yaml:"interval,omitempty" json:"interval,omitempty"`
+	Timeout  confopt.Duration     `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
-	tags, err := model.ParseTags(cfg.Tags)
-	if err != nil {
-		return nil, fmt.Errorf("parse tags: %v", err)
-	}
-
 	interval := time.Minute * 2
-	if cfg.Interval != nil {
+	if cfg.Interval.Duration() > 0 {
 		interval = cfg.Interval.Duration()
 	}
 	timeout := time.Second * 5
-	if cfg.Timeout.Duration() != 0 {
+	if cfg.Timeout.Duration() > 0 {
 		timeout = cfg.Timeout.Duration()
 	}
 
@@ -64,8 +56,6 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		cache:      make(map[uint64]*cacheItem),
 		started:    make(chan struct{}),
 	}
-
-	d.Tags().Merge(tags)
 
 	return d, nil
 }
@@ -246,13 +236,12 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 
 		tgt.Address = net.JoinHostPort(tgt.IPAddress, tgt.Port)
 
-		hash, err := calcHash(tgt)
+		hash, err := model.CalcHash(tgt)
 		if err != nil {
 			continue
 		}
 
 		tgt.hash = hash
-		tgt.Tags().Merge(d.Tags())
 
 		targets = append(targets, tgt)
 	}
@@ -305,8 +294,4 @@ func extractComm(cmdLine string) string {
 	}
 	_, comm := filepath.Split(cmdLine)
 	return strings.TrimSuffix(comm, ":")
-}
-
-func calcHash(obj any) (uint64, error) {
-	return hashstructure.Hash(obj, nil)
 }

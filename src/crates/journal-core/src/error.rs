@@ -12,6 +12,12 @@ pub enum JournalError {
     #[error("invalid object type")]
     InvalidObjectType,
 
+    #[error("invalid object size: {0}")]
+    InvalidObjectSize(u64),
+
+    #[error("object exceeds file bounds")]
+    ObjectExceedsFileBounds,
+
     #[error("invalid object location")]
     InvalidObjectLocation,
 

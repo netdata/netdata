@@ -1,6 +1,6 @@
 # Netdata Functions: Developer Guide
 
-> **Note**: This is the practical developer guide. For the complete technical specification, see [FUNCTIONS_REFERENCE.md](FUNCTIONS_REFERENCE.md).
+> **Note**: This is the practical developer guide. For the complete technical specification, see [Functions v3 Protocol Reference](/src/plugins.d/FUNCTION_UI_REFERENCE.md).
 
 ## Overview
 
@@ -951,4 +951,4 @@ if (tail_mode) {
 
 ---
 
-This guide covers everything you need to build both simple monitoring functions and advanced log explorers. For implementation details and edge cases, see [FUNCTIONS_REFERENCE.md](FUNCTIONS_REFERENCE.md).
+This guide covers everything you need to build both simple monitoring functions and advanced log explorers. For implementation details and edge cases, see [FUNCTIONS_REFERENCE.md](/src/plugins.d/FUNCTION_UI_REFERENCE.md).

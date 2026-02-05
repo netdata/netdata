@@ -49,6 +49,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/intelgpu"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ipfs"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/isc_dhcpd"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/k8s_apiserver"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/k8s_kubelet"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/k8s_kubeproxy"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/k8s_state"

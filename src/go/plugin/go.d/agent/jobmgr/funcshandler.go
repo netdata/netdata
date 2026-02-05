@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
@@ -317,7 +318,7 @@ func (m *Manager) respondJSON(fn functions.Function, resp map[string]any) {
 		return
 	}
 
-	m.dyncfgApi.SendJSONWithCode(fn, string(data), code)
+	m.dyncfgApi.SendJSONWithCode(dyncfg.NewFunction(fn), string(data), code)
 }
 
 func parsePayload(raw []byte) map[string]any {

@@ -3,6 +3,7 @@
 package sd
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync"
@@ -10,8 +11,11 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -23,8 +27,24 @@ type discoverySim struct {
 	wantPipelines []*mockPipeline
 }
 
-func (sim *discoverySim) run(t *testing.T) {
+// discoverySimExt is an extended simulation that also checks exposed configs
+type discoverySimExt struct {
+	configs          []confFile
+	wantPipelines    []*mockPipeline
+	wantExposedCount int
+	wantExposed      []wantExposedCfg
+}
+
+type wantExposedCfg struct {
+	discovererType string
+	name           string
+	sourceType     string
+	status         dyncfg.Status
+}
+
+func (sim *discoverySimExt) run(t *testing.T) {
 	fact := &mockFactory{}
+	var buf bytes.Buffer
 	mgr := &ServiceDiscovery{
 		Logger: logger.New(),
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
@@ -34,7 +54,68 @@ func (sim *discoverySim) run(t *testing.T) {
 			confFiles: sim.configs,
 			ch:        make(chan confFile),
 		},
-		pipelines: make(map[string]func()),
+		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		seenConfigs:    newSeenSDConfigs(),
+		exposedConfigs: newExposedSDConfigs(),
+		// dyncfgCh is intentionally nil to trigger auto-enable in tests
+	}
+
+	in := make(chan<- []*confgroup.Group)
+	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() { defer close(done); mgr.Run(ctx, in) }()
+
+	time.Sleep(time.Second * 3)
+
+	lock.Lock()
+	if sim.wantPipelines != nil {
+		assert.Equalf(t, sim.wantPipelines, fact.pipelines, "pipelines mismatch")
+	}
+
+	// Check exposed configs count
+	if sim.wantExposedCount > 0 {
+		assert.Equal(t, sim.wantExposedCount, mgr.exposedConfigs.count(), "exposed configs count")
+	}
+
+	// Check specific exposed configs
+	for _, want := range sim.wantExposed {
+		cfg, ok := mgr.exposedConfigs.lookup(newLookupConfig(want.discovererType, want.name))
+		if !assert.Truef(t, ok, "exposed config '%s:%s' not found", want.discovererType, want.name) {
+			continue
+		}
+		assert.Equal(t, want.sourceType, cfg.SourceType(), "exposed config '%s:%s' sourceType", want.discovererType, want.name)
+		assert.Equal(t, want.status, cfg.Status(), "exposed config '%s:%s' status", want.discovererType, want.name)
+	}
+	lock.Unlock()
+
+	cancel()
+
+	timeout := time.Second * 5
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		t.Errorf("sd failed to exit in %s", timeout)
+	}
+}
+
+func (sim *discoverySim) run(t *testing.T) {
+	fact := &mockFactory{}
+	var buf bytes.Buffer
+	mgr := &ServiceDiscovery{
+		Logger: logger.New(),
+		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
+			return fact.create(config)
+		},
+		confProv: &mockConfigProvider{
+			confFiles: sim.configs,
+			ch:        make(chan confFile),
+		},
+		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		seenConfigs:    newSeenSDConfigs(),
+		exposedConfigs: newExposedSDConfigs(),
+		// dyncfgCh is intentionally nil to trigger auto-enable in tests
+		// (simulates terminal mode where netdata is not available)
 	}
 
 	in := make(chan<- []*confgroup.Group)

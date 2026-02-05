@@ -51,7 +51,7 @@ func New() *Manager {
 		started:   make(chan struct{}),
 		addCh:     make(chan confgroup.Config),
 		rmCh:      make(chan confgroup.Config),
-		dyncfgCh:  make(chan functions.Function),
+		dyncfgCh:  make(chan dyncfg.Function),
 		dyncfgApi: dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
 	}
 
@@ -96,7 +96,7 @@ type Manager struct {
 	//api      dyncfgAPI
 	addCh    chan confgroup.Config
 	rmCh     chan confgroup.Config
-	dyncfgCh chan functions.Function
+	dyncfgCh chan dyncfg.Function
 
 	waitCfgOnOff string // block processing of discovered configs until "enable"/"disable" is received from Netdata
 
@@ -111,8 +111,8 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	defer func() { m.cleanup(); m.Info("instance is stopped") }()
 	m.ctx = ctx
 
-	m.FnReg.RegisterPrefix("config", m.dyncfgCollectorPrefixValue(), m.dyncfgConfig)
-	m.FnReg.RegisterPrefix("config", m.dyncfgVnodePrefixValue(), m.dyncfgConfig)
+	m.FnReg.RegisterPrefix("config", m.dyncfgCollectorPrefixValue(), m.dyncfgConfigHandler)
+	m.FnReg.RegisterPrefix("config", m.dyncfgVnodePrefixValue(), m.dyncfgConfigHandler)
 
 	m.dyncfgVnodeModuleCreate()
 
@@ -293,7 +293,7 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 	m.dyncfgCollectorJobCreate(ecfg.cfg, ecfg.status)
 
 	if isTerminal || m.PluginName == "nodyncfg" { // FIXME: quick fix of TestAgent_Run (agent_test.go)
-		m.dyncfgConfigEnable(functions.Function{Args: []string{m.dyncfgJobID(ecfg.cfg), "enable"}})
+		m.dyncfgConfigEnable(dyncfg.NewFunction(functions.Function{Args: []string{m.dyncfgJobID(ecfg.cfg), "enable"}}))
 	} else {
 		m.waitCfgOnOff = ecfg.cfg.FullName()
 	}

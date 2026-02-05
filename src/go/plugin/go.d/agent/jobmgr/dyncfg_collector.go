@@ -19,7 +19,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
@@ -98,8 +97,8 @@ func (m *Manager) dyncfgJobStatus(cfg confgroup.Config, status dyncfg.Status) {
 	m.dyncfgApi.ConfigStatus(m.dyncfgJobID(cfg), status)
 }
 
-func (m *Manager) dyncfgCollectorExec(fn functions.Function) {
-	switch getDyncfgCommand(fn) {
+func (m *Manager) dyncfgCollectorExec(fn dyncfg.Function) {
+	switch fn.Command() {
 	case dyncfg.CommandUserconfig:
 		m.dyncfgConfigUserconfig(fn)
 		return
@@ -118,8 +117,8 @@ func (m *Manager) dyncfgCollectorExec(fn functions.Function) {
 	}
 }
 
-func (m *Manager) dyncfgCollectorSeqExec(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+func (m *Manager) dyncfgCollectorSeqExec(fn dyncfg.Function) {
+	cmd := fn.Command()
 
 	switch cmd {
 	case dyncfg.CommandTest:
@@ -141,18 +140,18 @@ func (m *Manager) dyncfgCollectorSeqExec(fn functions.Function) {
 	case dyncfg.CommandUpdate:
 		m.dyncfgConfigUpdate(fn)
 	default:
-		m.Warningf("dyncfg: function '%s' command '%s' not implemented", fn.Name, cmd)
-		m.dyncfgApi.SendCodef(fn, 501, "Function '%s' command '%s' is not implemented.", fn.Name, cmd)
+		m.Warningf("dyncfg: function '%s' command '%s' not implemented", fn.Fn().Name, cmd)
+		m.dyncfgApi.SendCodef(fn, 501, "Function '%s' command '%s' is not implemented.", fn.Fn().Name, cmd)
 	}
 }
 
-func (m *Manager) dyncfgConfigUserconfig(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+func (m *Manager) dyncfgConfigUserconfig(fn dyncfg.Function) {
+	cmd := fn.Command()
 
-	id := fn.Args[0]
-	jn := "test"
-	if len(fn.Args) > 2 {
-		jn = fn.Args[2]
+	id := fn.ID()
+	jn := fn.JobName()
+	if jn == "" {
+		jn = "test"
 	}
 
 	mn, ok := m.extractModuleName(id)
@@ -184,10 +183,10 @@ func (m *Manager) dyncfgConfigUserconfig(fn functions.Function) {
 	m.dyncfgApi.SendYAML(fn, string(bs))
 }
 
-func (m *Manager) dyncfgConfigTest(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+func (m *Manager) dyncfgConfigTest(fn dyncfg.Function) {
+	cmd := fn.Command()
 
-	id := fn.Args[0]
+	id := fn.ID()
 	mn, ok := m.extractModuleName(id)
 	if !ok {
 		m.Warningf("dyncfg: %s: could not extract module and job from id (%s)", cmd, id)
@@ -195,12 +194,12 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 		return
 	}
 
-	jn := "test"
-	if len(fn.Args) > 2 {
-		jn = fn.Args[2]
+	jn := fn.JobName()
+	if jn == "" {
+		jn = "test"
 	}
 
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, getFnSourceValue(fn, "user"))
+	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
 	if err := validateJobName(jn); err != nil {
 		m.Warningf("dyncfg: %s: module %s: unacceptable job name '%s': %v", cmd, mn, jn, err)
@@ -260,10 +259,10 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 	m.dyncfgApi.SendCodef(fn, 200, "")
 }
 
-func (m *Manager) dyncfgConfigSchema(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+func (m *Manager) dyncfgConfigSchema(fn dyncfg.Function) {
+	cmd := fn.Command()
 
-	id := fn.Args[0]
+	id := fn.ID()
 	mn, ok := m.extractModuleName(id)
 	if !ok {
 		m.Warningf("dyncfg: %s: could not extract module from id (%s)", cmd, id)
@@ -278,7 +277,7 @@ func (m *Manager) dyncfgConfigSchema(fn functions.Function) {
 		return
 	}
 
-	m.Infof("dyncfg: %s: %s module by user '%s'", cmd, mn, getFnSourceValue(fn, "user"))
+	m.Infof("dyncfg: %s: %s module by user '%s'", cmd, mn, fn.User())
 
 	if mod.JobConfigSchema == "" {
 		m.Warningf("dyncfg: schema: module %s: schema not found", mn)
@@ -289,10 +288,10 @@ func (m *Manager) dyncfgConfigSchema(fn functions.Function) {
 	m.dyncfgApi.SendJSON(fn, mod.JobConfigSchema)
 }
 
-func (m *Manager) dyncfgConfigGet(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+func (m *Manager) dyncfgConfigGet(fn dyncfg.Function) {
+	cmd := fn.Command()
 
-	id := fn.Args[0]
+	id := fn.ID()
 	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: %s: could not extract module and job from id (%s)", cmd, id)
@@ -307,7 +306,7 @@ func (m *Manager) dyncfgConfigGet(fn functions.Function) {
 		return
 	}
 
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, getFnSourceValue(fn, "user"))
+	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
 	ecfg, ok := m.exposedConfigs.lookupByName(mn, jn)
 	if !ok {
@@ -341,10 +340,10 @@ func (m *Manager) dyncfgConfigGet(fn functions.Function) {
 	m.dyncfgApi.SendJSON(fn, string(bs))
 }
 
-func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+func (m *Manager) dyncfgConfigRestart(fn dyncfg.Function) {
+	cmd := fn.Command()
 
-	id := fn.Args[0]
+	id := fn.ID()
 	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: %s: could not extract module from id (%s)", cmd, id)
@@ -381,7 +380,7 @@ func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 
 	m.retryingTasks.remove(ecfg.cfg)
 
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, getFnSourceValue(fn, "user"))
+	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
@@ -403,10 +402,10 @@ func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 	m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
 }
 
-func (m *Manager) dyncfgConfigEnable(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+func (m *Manager) dyncfgConfigEnable(fn dyncfg.Function) {
+	cmd := fn.Command()
 
-	id := fn.Args[0]
+	id := fn.ID()
 	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: %s: could not extract module and job from id (%s)", cmd, id)
@@ -449,7 +448,7 @@ func (m *Manager) dyncfgConfigEnable(fn functions.Function) {
 	}
 
 	if ecfg.status == dyncfg.StatusDisabled {
-		m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, getFnSourceValue(fn, "user"))
+		m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 	}
 
 	m.retryingTasks.remove(ecfg.cfg)
@@ -482,10 +481,10 @@ func (m *Manager) dyncfgConfigEnable(fn functions.Function) {
 	m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
 }
 
-func (m *Manager) dyncfgConfigDisable(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+func (m *Manager) dyncfgConfigDisable(fn dyncfg.Function) {
+	cmd := fn.Command()
 
-	id := fn.Args[0]
+	id := fn.ID()
 	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: %s: could not extract module from id (%s)", cmd, id)
@@ -519,24 +518,24 @@ func (m *Manager) dyncfgConfigDisable(fn functions.Function) {
 
 	m.retryingTasks.remove(ecfg.cfg)
 
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, getFnSourceValue(fn, "user"))
+	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
 	ecfg.status = dyncfg.StatusDisabled
 	m.dyncfgApi.SendCodef(fn, 200, "")
 	m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
 }
 
-func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+func (m *Manager) dyncfgConfigAdd(fn dyncfg.Function) {
+	cmd := fn.Command()
 
-	if len(fn.Args) < 3 {
-		m.Warningf("dyncfg: %s: missing required arguments, want 3 got %d", cmd, len(fn.Args))
-		m.dyncfgApi.SendCodef(fn, 400, "Missing required arguments. Need at least 3, but got %d.", len(fn.Args))
+	if err := fn.ValidateArgs(3); err != nil {
+		m.Warningf("dyncfg: %s: %v", cmd, err)
+		m.dyncfgApi.SendCodef(fn, 400, "%v", err)
 		return
 	}
 
-	id := fn.Args[0]
-	jn := fn.Args[2]
+	id := fn.ID()
+	jn := fn.JobName()
 	mn, ok := m.extractModuleName(id)
 	if !ok {
 		m.Warningf("dyncfg: %s: could not extract module from id (%s)", cmd, id)
@@ -544,7 +543,7 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 		return
 	}
 
-	if len(fn.Payload) == 0 {
+	if !fn.HasPayload() {
 		m.Warningf("dyncfg: %s: module %s job %s missing configuration payload.", cmd, mn, jn)
 		m.dyncfgApi.SendCodef(fn, 400, "Missing configuration payload.")
 		return
@@ -571,7 +570,7 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 		return
 	}
 
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, getFnSourceValue(fn, "user"))
+	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
 	if ecfg, ok := m.exposedConfigs.lookup(cfg); ok {
 		if scfg, ok := m.seenConfigs.lookup(ecfg.cfg); ok && isDyncfg(scfg.cfg) {
@@ -591,10 +590,10 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 	m.dyncfgCollectorJobCreate(ecfg.cfg, ecfg.status)
 }
 
-func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+func (m *Manager) dyncfgConfigRemove(fn dyncfg.Function) {
+	cmd := fn.Command()
 
-	id := fn.Args[0]
+	id := fn.ID()
 	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: %s: could not extract module and job from id (%s)", cmd, id)
@@ -615,7 +614,7 @@ func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
 		return
 	}
 
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, getFnSourceValue(fn, "user"))
+	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
 	m.retryingTasks.remove(ecfg.cfg)
 	m.seenConfigs.remove(ecfg.cfg)
@@ -627,10 +626,10 @@ func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
 	m.dyncfgJobRemove(ecfg.cfg)
 }
 
-func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
-	cmd := getDyncfgCommand(fn)
+func (m *Manager) dyncfgConfigUpdate(fn dyncfg.Function) {
+	cmd := fn.Command()
 
-	id := fn.Args[0]
+	id := fn.ID()
 	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: %s: could not extract module from id (%s)", cmd, id)
@@ -676,7 +675,7 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 		return
 	}
 
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, getFnSourceValue(fn, "user"))
+	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
 	m.exposedConfigs.remove(ecfg.cfg)
 	m.stopRunningJob(ecfg.cfg.FullName())
@@ -719,9 +718,9 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 	m.dyncfgJobStatus(scfg.cfg, scfg.status)
 }
 
-func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string, fn functions.Function) {
+func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string, fn dyncfg.Function) {
 	cfg.SetProvider("dyncfg")
-	cfg.SetSource(fn.Source)
+	cfg.SetSource(fn.Source())
 	cfg.SetSourceType("dyncfg")
 	cfg.SetModule(module)
 	cfg.SetName(name)
@@ -743,8 +742,8 @@ func (m *Manager) runRetryTask(ecfg *seenConfig, job *module.Job) {
 	go runRetryTask(ctx, m.addCh, ecfg.cfg)
 }
 
-func userConfigFromPayload(cfg any, jobName string, fn functions.Function) ([]byte, error) {
-	if err := unmarshalPayload(cfg, fn); err != nil {
+func userConfigFromPayload(cfg any, jobName string, fn dyncfg.Function) ([]byte, error) {
+	if err := fn.UnmarshalPayload(cfg); err != nil {
 		return nil, err
 	}
 
@@ -769,18 +768,18 @@ func userConfigFromPayload(cfg any, jobName string, fn functions.Function) ([]by
 	return yaml.Marshal(v)
 }
 
-func configFromPayload(fn functions.Function) (confgroup.Config, error) {
+func configFromPayload(fn dyncfg.Function) (confgroup.Config, error) {
 	var cfg confgroup.Config
 
-	if fn.ContentType == "application/json" {
-		if err := json.Unmarshal(fn.Payload, &cfg); err != nil {
+	if fn.IsContentTypeJSON() {
+		if err := json.Unmarshal(fn.Payload(), &cfg); err != nil {
 			return nil, err
 		}
 
 		return cfg.Clone()
 	}
 
-	if err := yaml.Unmarshal(fn.Payload, &cfg); err != nil {
+	if err := yaml.Unmarshal(fn.Payload(), &cfg); err != nil {
 		return nil, err
 	}
 
