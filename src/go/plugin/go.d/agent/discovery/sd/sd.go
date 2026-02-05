@@ -22,6 +22,12 @@ import (
 
 var isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdin.Fd())
 
+// disableDyncfg controls whether SD dyncfg integration is active.
+// When true (default): templates are not registered, file configs auto-start without dyncfg.
+// When false: full dyncfg integration (used in tests).
+// TODO: Remove this flag after SD dyncfg feature is validated in production.
+var disableDyncfg = true
+
 type Config struct {
 	ConfigDefaults confgroup.Registry
 	ConfDir        multipath.MultiPath
@@ -179,7 +185,9 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 		}
 
 		d.exposedConfigs.remove(scfg)
-		d.dyncfgSDJobRemove(scfg.DiscovererType(), scfg.Name())
+		if !disableDyncfg {
+			d.dyncfgSDJobRemove(scfg.DiscovererType(), scfg.Name())
+		}
 	}
 }
 
@@ -232,14 +240,19 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 		// No existing config - expose this one
 		scfg.SetStatus(dyncfg.StatusAccepted)
 		d.exposedConfigs.add(scfg)
-		d.dyncfgSDJobCreate(scfg.DiscovererType(), scfg.Name(), scfg.SourceType(), scfg.Source(), scfg.Status())
 
-		if isTerminal || d.dyncfgCh == nil {
-			// Auto-enable in terminal mode or tests
-			d.autoEnableConfig(scfg)
+		if disableDyncfg {
+			// Dyncfg disabled - start pipeline directly
+			d.startPipelineDirectly(ctx, scfg)
 		} else {
-			// Wait for netdata to send enable/disable
-			d.waitCfgOnOff = scfg.PipelineKey()
+			d.dyncfgSDJobCreate(scfg.DiscovererType(), scfg.Name(), scfg.SourceType(), scfg.Source(), scfg.Status())
+			if isTerminal || d.dyncfgCh == nil {
+				// Auto-enable in terminal mode or tests
+				d.autoEnableConfig(scfg)
+			} else {
+				// Wait for netdata to send enable/disable
+				d.waitCfgOnOff = scfg.PipelineKey()
+			}
 		}
 		return
 	}
@@ -265,14 +278,19 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	scfg.SetStatus(dyncfg.StatusAccepted)
 	d.exposedConfigs.add(scfg)
 
-	// Update dyncfg (remove old, create new with new source)
-	d.dyncfgSDJobRemove(ecfg.DiscovererType(), ecfg.Name())
-	d.dyncfgSDJobCreate(scfg.DiscovererType(), scfg.Name(), scfg.SourceType(), scfg.Source(), scfg.Status())
-
-	if isTerminal || d.dyncfgCh == nil {
-		d.autoEnableConfig(scfg)
+	if disableDyncfg {
+		// Dyncfg disabled - start pipeline directly
+		d.startPipelineDirectly(ctx, scfg)
 	} else {
-		d.waitCfgOnOff = scfg.PipelineKey()
+		// Update dyncfg (remove old, create new with new source)
+		d.dyncfgSDJobRemove(ecfg.DiscovererType(), ecfg.Name())
+		d.dyncfgSDJobCreate(scfg.DiscovererType(), scfg.Name(), scfg.SourceType(), scfg.Source(), scfg.Status())
+
+		if isTerminal || d.dyncfgCh == nil {
+			d.autoEnableConfig(scfg)
+		} else {
+			d.waitCfgOnOff = scfg.PipelineKey()
+		}
 	}
 }
 
@@ -295,7 +313,9 @@ func (d *ServiceDiscovery) removeOldConfigsFromSource(source, newKey string) {
 		// But DON'T stop the pipeline - let the new config's enable handle that
 		if ecfg, ok := d.exposedConfigs.lookup(oldCfg); ok && ecfg.UID() == oldCfg.UID() {
 			d.exposedConfigs.remove(oldCfg)
-			d.dyncfgSDJobRemove(oldCfg.DiscovererType(), oldCfg.Name())
+			if !disableDyncfg {
+				d.dyncfgSDJobRemove(oldCfg.DiscovererType(), oldCfg.Name())
+			}
 		}
 	}
 }
@@ -306,6 +326,23 @@ func (d *ServiceDiscovery) autoEnableConfig(cfg sdConfig) {
 		Args: []string{d.dyncfgJobID(cfg.DiscovererType(), cfg.Name()), "enable"},
 	})
 	d.dyncfgCmdEnable(fn)
+}
+
+// startPipelineDirectly starts a pipeline without dyncfg integration.
+// Used when disableDyncfg is true.
+func (d *ServiceDiscovery) startPipelineDirectly(ctx context.Context, cfg sdConfig) {
+	pipelineCfg, err := cfg.ToPipelineConfig(d.configDefaults)
+	if err != nil {
+		d.Errorf("failed to parse config '%s': %v", cfg.Name(), err)
+		return
+	}
+
+	if err := d.mgr.Start(ctx, cfg.PipelineKey(), pipelineCfg); err != nil {
+		d.Errorf("failed to start pipeline '%s': %v", cfg.Name(), err)
+		return
+	}
+
+	d.exposedConfigs.updateStatus(cfg, dyncfg.StatusRunning)
 }
 
 // pipelineKeyFromSource extracts a pipeline key from a file source path.

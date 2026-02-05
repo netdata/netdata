@@ -673,7 +673,7 @@ func isValidDiscovererType(dt string) bool {
 
 // registerDyncfgTemplates registers dyncfg templates for each discoverer type
 func (d *ServiceDiscovery) registerDyncfgTemplates(ctx context.Context) {
-	if d.fnReg == nil {
+	if d.fnReg == nil || disableDyncfg {
 		return
 	}
 
@@ -690,7 +690,7 @@ func (d *ServiceDiscovery) registerDyncfgTemplates(ctx context.Context) {
 
 // unregisterDyncfgTemplates unregisters dyncfg templates
 func (d *ServiceDiscovery) unregisterDyncfgTemplates() {
-	if d.fnReg == nil {
+	if d.fnReg == nil || disableDyncfg {
 		return
 	}
 
