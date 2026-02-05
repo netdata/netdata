@@ -134,10 +134,8 @@ func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 	case dyncfg.CommandUserconfig:
 		d.dyncfgCmdUserconfig(fn)
 		return
-	}
-
-	// Test command validates config without creating a job
-	if fn.Command() == dyncfg.CommandTest {
+	case dyncfg.CommandTest:
+		// Test command validates config without creating a job
 		d.dyncfgCmdTest(fn)
 		return
 	}
@@ -172,7 +170,7 @@ func (d *ServiceDiscovery) dyncfgSeqExec(fn dyncfg.Function) {
 // dyncfgCmdSchema handles the schema command for templates and jobs
 func (d *ServiceDiscovery) dyncfgCmdSchema(fn dyncfg.Function) {
 	id := fn.ID()
-	dt, _, isJob := d.extractDiscovererAndName(id)
+	dt, _, _ := d.extractDiscovererAndName(id)
 
 	if dt == "" {
 		d.Warningf("dyncfg: schema: invalid ID format '%s'", id)
@@ -186,7 +184,7 @@ func (d *ServiceDiscovery) dyncfgCmdSchema(fn dyncfg.Function) {
 		return
 	}
 
-	schema := getDiscovererSchema(dt, isJob)
+	schema := getDiscovererSchemaByType(dt)
 	d.dyncfgApi.SendJSON(fn, schema)
 }
 
@@ -598,33 +596,17 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn dyncfg.Function) {
 // Returns YAML representation of the config for user-friendly file format
 func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn dyncfg.Function) {
 	id := fn.ID()
-	dt, name, isJob := d.extractDiscovererAndName(id)
+	dt, _, _ := d.extractDiscovererAndName(id)
 
-	var jsonContent []byte
-
-	if isJob {
-		// For jobs, get content from stored config
-		key := dt + ":" + name
-		cfg, ok := d.exposedConfigs.lookup(key)
-		if !ok {
-			d.Warningf("dyncfg: userconfig: config '%s' not found", key)
-			d.dyncfgApi.SendCodef(fn, 404, "Config '%s' not found.", key)
-			return
-		}
-		jsonContent = cfg.DataJSON()
-	} else {
-		// For templates, use the payload from the request
-		if !fn.HasPayload() {
-			d.Warningf("dyncfg: userconfig: missing payload for template '%s'", dt)
-			d.dyncfgApi.SendCodef(fn, 400, "Missing configuration payload.")
-			return
-		}
-		jsonContent = fn.Payload()
+	if !fn.HasPayload() {
+		d.Warningf("dyncfg: userconfig: missing payload for template '%s'", dt)
+		d.dyncfgApi.SendCodef(fn, 400, "Missing configuration payload.")
+		return
 	}
 
 	// Content is JSON, convert to YAML
 	var content any
-	if err := json.Unmarshal(jsonContent, &content); err != nil {
+	if err := json.Unmarshal(fn.Payload(), &content); err != nil {
 		d.Warningf("dyncfg: userconfig: failed to parse config: %v", err)
 		d.dyncfgApi.SendCodef(fn, 500, "Failed to parse config: %v", err)
 		return
@@ -672,12 +654,6 @@ func isValidDiscovererType(dt string) bool {
 		}
 	}
 	return false
-}
-
-// getDiscovererSchema returns a JSON schema for the given discoverer type.
-// isJob indicates whether this is for a job or template.
-func getDiscovererSchema(discovererType string, isJob bool) string {
-	return getDiscovererSchemaByType(discovererType)
 }
 
 // registerDyncfgTemplates registers dyncfg templates for each discoverer type
