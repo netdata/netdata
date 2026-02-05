@@ -270,6 +270,22 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
     // if there is any error, our dictionary callbacks will call the caller callback to notify
     // the caller about the error - no need for error handling here.
     struct inflight_function *t = dictionary_set(parser->inflight.functions, transaction_str, &tmp, sizeof(struct inflight_function));
+    if(!t) {
+        // dictionary_set() returns NULL when the dictionary is destroyed
+        // (e.g., the plugin has exited). Clean up and notify the caller.
+        dictionary_write_unlock(parser->inflight.functions);
+
+        int code = HTTP_RESP_SERVICE_UNAVAILABLE;
+        rrd_call_function_error(rfe->result.wb, "The plugin is not available.", code);
+        rfe->result.cb(rfe->result.wb, code, rfe->result.data);
+
+        string_freez(tmp.function);
+        buffer_free(tmp.payload);
+        freez((void *)tmp.source);
+
+        return code;
+    }
+
     if(!t->sent_successfully) {
         int code = t->code;
         dictionary_write_unlock(parser->inflight.functions);
