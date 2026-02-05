@@ -25,7 +25,7 @@ After restart, users accessing `http://NODE:19999` will be redirected to Netdata
 
 **Requirements:**
 
-- Agent must be [claimed to Netdata Cloud](/docs/netdata-cloud/connect-agent-to-cloud.md)
+- Agent must be [claimed to Netdata Cloud](/src/claim/README.md)
 - Works with both Community (free) and Business plans
 
 For detailed configuration options, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).

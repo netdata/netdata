@@ -9,7 +9,7 @@ Bearer token protection is available to all Netdata Cloud users:
 - **Community plan** (free)
 - **Business plan** (paid)
 
-Your agent must be [claimed to Netdata Cloud](/docs/netdata-cloud/connect-agent-to-cloud.md) to use this feature.
+Your agent must be [claimed to Netdata Cloud](/src/claim/README.md) to use this feature.
 
 ## How It Works
 
