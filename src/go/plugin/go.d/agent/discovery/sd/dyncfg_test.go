@@ -37,7 +37,7 @@ func defaultTestServices() []pipeline.ServiceRuleConfig {
 	}
 }
 
-func newTestNetListenersConfig(name string, interval, timeout confopt.Duration, services []pipeline.ServiceRuleConfig) pipeline.Config {
+func newTestNetListenersConfig(name string, interval confopt.LongDuration, timeout confopt.Duration, services []pipeline.ServiceRuleConfig) pipeline.Config {
 	return pipeline.Config{
 		Name: name,
 		Discoverer: pipeline.DiscovererConfig{
@@ -583,7 +583,7 @@ func TestServiceDiscovery_DyncfgUpdate(t *testing.T) {
 				cfg := newTestNetListenersConfig("test-job", 0, 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -648,7 +648,7 @@ CONFIG test:sd:net_listeners:test-job status disabled
 				cfg := newTestNetListenersConfig("test-job", 0, 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -833,7 +833,7 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 	}{
 		"userconfig for template": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.Duration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -853,7 +853,7 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 		},
 		"userconfig for existing job": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.Duration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1149,9 +1149,9 @@ func TestServiceDiscovery_DyncfgSNMPConfig(t *testing.T) {
 		"add snmp job": {
 			createSim: func() *dyncfgSim {
 				cfg := newTestSNMPConfig("snmp-test", snmpsd.Config{
-					RescanInterval: confopt.Duration(30 * time.Minute),
+					RescanInterval: confopt.LongDuration(30 * time.Minute),
 					Timeout:        confopt.Duration(1 * time.Second),
-					DeviceCacheTTL: confopt.Duration(12 * time.Hour),
+					DeviceCacheTTL: confopt.LongDuration(12 * time.Hour),
 					Credentials:    []snmpsd.CredentialConfig{{Name: "public-v2", Version: "2c", Community: "public"}},
 					Networks:       []snmpsd.NetworkConfig{{Subnet: "192.168.1.0/24", Credential: "public-v2"}},
 				}, defaultTestServices())
@@ -1225,7 +1225,7 @@ CONFIG test:sd:snmp:snmp-test create accepted job /collectors/test/ServiceDiscov
 		"get snmp job config": {
 			createSim: func() *dyncfgSim {
 				cfg := newTestSNMPConfig("snmp-test", snmpsd.Config{
-					RescanInterval: confopt.Duration(1 * time.Hour),
+					RescanInterval: confopt.LongDuration(1 * time.Hour),
 					Credentials:    []snmpsd.CredentialConfig{{Name: "v2-cred", Version: "2c", Community: "public"}},
 					Networks:       []snmpsd.NetworkConfig{{Subnet: "192.168.0.0/16", Credential: "v2-cred"}},
 				}, defaultTestServices())
@@ -1246,7 +1246,7 @@ CONFIG test:sd:snmp:snmp-test create accepted job /collectors/test/ServiceDiscov
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-get 200 application/json")
 						assert.Contains(t, got, `"name":"snmp-test"`)
-						assert.Contains(t, got, `"rescan_interval":3600`) // 1 hour in seconds
+						assert.Contains(t, got, `"rescan_interval":"1h"`)
 						assert.Contains(t, got, `"subnet":"192.168.0.0/16"`)
 					},
 				}
@@ -1268,10 +1268,10 @@ func TestServiceDiscovery_DyncfgUpdateWhileRunning(t *testing.T) {
 	}{
 		"update running pipeline restarts it": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.Duration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -1387,7 +1387,7 @@ func TestServiceDiscovery_DyncfgTest(t *testing.T) {
 	}{
 		"test valid config succeeds": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.Duration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1492,10 +1492,10 @@ FUNCTION_RESULT_END
 		},
 		"test existing job config succeeds": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.Duration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -1821,7 +1821,7 @@ func TestServiceDiscovery_DyncfgUpdateSameConfig(t *testing.T) {
 	}{
 		"update running pipeline with same config skips restart": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.Duration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1888,7 +1888,7 @@ func TestServiceDiscovery_DyncfgUpdateFailedState(t *testing.T) {
 	}{
 		"update config in failed state restarts pipeline": {
 			createSim: func() *dyncfgSim {
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -1999,7 +1999,7 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 	}{
 		"update file config converts to dyncfg": {
 			createSim: func() *dyncfgSim {
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -2052,7 +2052,7 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 		},
 		"update disabled file config converts to dyncfg without starting": {
 			createSim: func() *dyncfgSim {
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -2140,7 +2140,7 @@ func TestServiceDiscovery_DyncfgRestartErrorHandling(t *testing.T) {
 							nil, "")
 
 						// Update - pipeline creation will fail
-						updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, defaultTestServices())
+						updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
 						updatedPayload, _ := json.Marshal(updatedCfg)
 
 						sendDyncfgCmd(sd, "3-update",

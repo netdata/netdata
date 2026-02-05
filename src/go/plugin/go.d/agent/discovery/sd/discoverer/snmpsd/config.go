@@ -18,12 +18,12 @@ type (
 
 		// RescanInterval defines how often to scan the networks for devices (default: 30m)
 		// Zero means use default. Negative means disable rescanning (run once).
-		RescanInterval confopt.Duration `yaml:"rescan_interval,omitempty" json:"rescan_interval,omitempty"`
+		RescanInterval confopt.LongDuration `yaml:"rescan_interval,omitempty" json:"rescan_interval,omitempty"`
 		// Timeout defines the maximum time to wait for SNMP device responses (default: 1s)
 		Timeout confopt.Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 		// DeviceCacheTTL defines how long to trust cached discovery results before requiring a new probe (default: 12h)
 		// Zero means use default. Negative means cache never expires.
-		DeviceCacheTTL confopt.Duration `yaml:"device_cache_ttl,omitempty" json:"device_cache_ttl,omitempty"`
+		DeviceCacheTTL confopt.LongDuration `yaml:"device_cache_ttl,omitempty" json:"device_cache_ttl,omitempty"`
 		// ParallelScansPerNetwork defines how many IPs to scan concurrently within each subnet (default: 32)
 		ParallelScansPerNetwork int `yaml:"parallel_scans_per_network,omitempty" json:"parallel_scans_per_network,omitempty"`
 		// Credentials define the SNMP credentials used for authentication

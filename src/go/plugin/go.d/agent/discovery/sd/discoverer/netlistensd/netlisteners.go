@@ -29,8 +29,8 @@ var (
 type Config struct {
 	Source string `yaml:"-" json:"-"`
 
-	Interval confopt.Duration `yaml:"interval,omitempty" json:"interval,omitempty"`
-	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+	Interval confopt.LongDuration `yaml:"interval,omitempty" json:"interval,omitempty"`
+	Timeout  confopt.Duration     `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
