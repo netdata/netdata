@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
@@ -32,6 +33,10 @@ import (
 var isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdin.Fd())
 
 func New() *Manager {
+	seen := dyncfg.NewSeenCache[confgroup.Config]()
+	exposed := dyncfg.NewExposedCache[confgroup.Config]()
+	api := dyncfg.NewResponder(netdataapi.New(safewriter.Stdout))
+
 	mgr := &Manager{
 		Logger: logger.New().With(
 			slog.String("component", "job manager"),
@@ -43,8 +48,8 @@ func New() *Manager {
 
 		moduleFuncs:       newModuleFuncRegistry(),
 		discoveredConfigs: newDiscoveredConfigsCache(),
-		seenConfigs:       newSeenConfigCache(),
-		exposedConfigs:    newExposedConfigCache(),
+		seen:              seen,
+		exposed:           exposed,
 		runningJobs:       newRunningJobsCache(),
 		retryingTasks:     newRetryingTasksCache(),
 
@@ -52,8 +57,23 @@ func New() *Manager {
 		addCh:     make(chan confgroup.Config),
 		rmCh:      make(chan confgroup.Config),
 		dyncfgCh:  make(chan dyncfg.Function),
-		dyncfgApi: dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
+		dyncfgApi: api,
 	}
+
+	mgr.collectorCb = &collectorCallbacks{mgr: mgr}
+	mgr.handler = dyncfg.NewHandler[confgroup.Config](
+		mgr.Logger,
+		api,
+		seen,
+		exposed,
+		mgr.collectorCb,
+		dyncfg.HandlerConfig{
+			Path:                    fmt.Sprintf(dyncfgCollectorPath, executable.Name),
+			EnableFailCode:          200,
+			RemoveStockOnEnableFail: true,
+			SupportRestart:         true,
+		},
+	)
 
 	return mgr
 }
@@ -62,6 +82,15 @@ func New() *Manager {
 func (m *Manager) SetDyncfgResponder(responder *dyncfg.Responder) {
 	if responder != nil {
 		m.dyncfgApi = responder
+		// Rebuild handler with the new responder.
+		m.handler = dyncfg.NewHandler[confgroup.Config](
+			m.Logger,
+			responder,
+			m.seen,
+			m.exposed,
+			m.collectorCb,
+			m.handler.Cfg(),
+		)
 	}
 }
 
@@ -86,10 +115,13 @@ type Manager struct {
 	moduleFuncs *moduleFuncRegistry
 
 	discoveredConfigs *discoveredConfigs
-	seenConfigs       *seenConfigs
-	exposedConfigs    *exposedConfigs
+	seen              *dyncfg.SeenCache[confgroup.Config]
+	exposed           *dyncfg.ExposedCache[confgroup.Config]
 	retryingTasks     *retryingTasks
 	runningJobs       *runningJobs
+
+	handler     *dyncfg.Handler[confgroup.Config]
+	collectorCb *collectorCallbacks
 
 	ctx     context.Context
 	started chan struct{}
@@ -265,60 +297,55 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 
 	m.retryingTasks.remove(cfg)
 
-	scfg, ok := m.seenConfigs.lookup(cfg)
-	if !ok {
-		scfg = &seenConfig{cfg: cfg}
-		m.seenConfigs.add(scfg)
+	if _, ok := m.seen.Lookup(cfg); !ok {
+		m.seen.Add(cfg)
 	}
 
-	ecfg, ok := m.exposedConfigs.lookup(cfg)
+	entry, ok := m.exposed.LookupByKey(cfg.Key())
 	if !ok {
-		scfg.status = dyncfg.StatusAccepted
-		ecfg = scfg
-		m.exposedConfigs.add(ecfg)
+		entry = &dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusAccepted}
+		m.exposed.Add(entry)
 	} else {
-		sp, ep := scfg.cfg.SourceTypePriority(), ecfg.cfg.SourceTypePriority()
-		if ep > sp || (ep == sp && ecfg.status == dyncfg.StatusRunning) {
+		sp, ep := cfg.SourceTypePriority(), entry.Cfg.SourceTypePriority()
+		if ep > sp || (ep == sp && entry.Status == dyncfg.StatusRunning) {
 			return
 		}
-		if ecfg.status == dyncfg.StatusRunning {
-			m.stopRunningJob(ecfg.cfg.FullName())
-			m.fileStatus.remove(ecfg.cfg)
+		if entry.Status == dyncfg.StatusRunning {
+			m.stopRunningJob(entry.Cfg.FullName())
+			m.fileStatus.remove(entry.Cfg)
 		}
-		scfg.status = dyncfg.StatusAccepted
-		m.exposedConfigs.add(scfg) // replace existing exposed
-		ecfg = scfg
+		entry = &dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusAccepted}
+		m.exposed.Add(entry) // replace existing exposed
 	}
 
-	m.dyncfgCollectorJobCreate(ecfg.cfg, ecfg.status)
+	m.handler.NotifyJobCreate(entry.Cfg, entry.Status)
 
 	if isTerminal || m.PluginName == "nodyncfg" { // FIXME: quick fix of TestAgent_Run (agent_test.go)
-		m.dyncfgConfigEnable(dyncfg.NewFunction(functions.Function{Args: []string{m.dyncfgJobID(ecfg.cfg), "enable"}}))
+		m.handler.CmdEnable(dyncfg.NewFunction(functions.Function{Args: []string{m.dyncfgJobID(entry.Cfg), "enable"}}))
 	} else {
-		m.waitCfgOnOff = ecfg.cfg.FullName()
+		m.waitCfgOnOff = entry.Cfg.FullName()
 	}
 }
 
 func (m *Manager) removeConfig(cfg confgroup.Config) {
 	m.retryingTasks.remove(cfg)
 
-	scfg, ok := m.seenConfigs.lookup(cfg)
-	if !ok {
+	if _, ok := m.seen.Lookup(cfg); !ok {
 		return
 	}
-	m.seenConfigs.remove(cfg)
+	m.seen.Remove(cfg)
 
-	ecfg, ok := m.exposedConfigs.lookup(cfg)
-	if !ok || scfg.cfg.UID() != ecfg.cfg.UID() {
+	entry, ok := m.exposed.LookupByKey(cfg.Key())
+	if !ok || cfg.UID() != entry.Cfg.UID() {
 		return
 	}
 
-	m.exposedConfigs.remove(cfg)
+	m.exposed.Remove(cfg)
 	m.stopRunningJob(cfg.FullName())
 	m.fileStatus.remove(cfg)
 
-	if !isStock(cfg) || ecfg.status == dyncfg.StatusRunning {
-		m.dyncfgJobRemove(cfg)
+	if !isStock(cfg) || entry.Status == dyncfg.StatusRunning {
+		m.handler.NotifyJobRemove(cfg)
 	}
 }
 

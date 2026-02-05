@@ -54,6 +54,12 @@ func (c *SeenCache[C]) LookupByUID(uid string) (C, bool) {
 	return v, ok
 }
 
+func (c *SeenCache[C]) Count() int {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+	return len(c.items)
+}
+
 // ExposedCache stores active config+status per logical name, keyed by Key().
 // LookupByKey returns a pointer to the stored Entry — mutations to Status
 // are visible through the pointer. Thread-safe for concurrent readers.

@@ -320,14 +320,15 @@ func (m *Manager) dyncfgVnodeUserconfig(fn dyncfg.Function) {
 
 func (m *Manager) dyncfgVnodeAffectedJobs(vnode string) string {
 	var s strings.Builder
-	for _, ecfg := range m.exposedConfigs.items {
-		if ecfg.cfg.Vnode() == vnode {
+	m.exposed.ForEach(func(_ string, entry *dyncfg.Entry[confgroup.Config]) bool {
+		if entry.Cfg.Vnode() == vnode {
 			if s.Len() > 0 {
 				s.WriteString(", ")
 			}
-			s.WriteString(fmt.Sprintf("%s:%s", ecfg.cfg.Module(), ecfg.cfg.Name()))
+			s.WriteString(fmt.Sprintf("%s:%s", entry.Cfg.Module(), entry.Cfg.Name()))
 		}
-	}
+		return true
+	})
 	return s.String()
 }
 

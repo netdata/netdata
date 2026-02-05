@@ -85,6 +85,7 @@ func NewHandler[C Config](
 
 func (h *Handler[C]) Seen() *SeenCache[C]       { return h.seen }
 func (h *Handler[C]) Exposed() *ExposedCache[C] { return h.exposed }
+func (h *Handler[C]) Cfg() HandlerConfig         { return h.cfg }
 
 // NotifyJobCreate registers/updates a config in the dyncfg API (upsert).
 func (h *Handler[C]) NotifyJobCreate(cfg C, status Status) {
@@ -117,12 +118,11 @@ func (h *Handler[C]) jobSupportedCommands(isDyncfg bool) string {
 		CommandEnable,
 		CommandDisable,
 		CommandUpdate,
-		CommandTest,
-		CommandUserconfig,
 	}
 	if h.cfg.SupportRestart {
 		cmds = append(cmds, CommandRestart)
 	}
+	cmds = append(cmds, CommandTest, CommandUserconfig)
 	if isDyncfg {
 		cmds = append(cmds, CommandRemove)
 	}
@@ -280,7 +280,7 @@ func (h *Handler[C]) CmdRemove(fn Function) {
 	}
 
 	if entry.Cfg.SourceType() != "dyncfg" {
-		h.api.SendCodef(fn, 405, "Removing non-dyncfg jobs is not allowed.")
+		h.api.SendCodef(fn, 405, "Removing jobs of type '%s' is not supported. Only 'dyncfg' jobs can be removed.", entry.Cfg.SourceType())
 		return
 	}
 

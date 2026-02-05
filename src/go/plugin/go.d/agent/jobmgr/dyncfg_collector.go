@@ -5,12 +5,10 @@ package jobmgr
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
-	"unicode"
 
 	"gopkg.in/yaml.v2"
 
@@ -48,22 +46,6 @@ func dyncfgCollectorModCmds() string {
 		dyncfg.CommandTest,
 		dyncfg.CommandUserconfig)
 }
-func dyncfgCollectorJobCmds(isDyncfgJob bool) string {
-	cmds := []dyncfg.Command{
-		dyncfg.CommandSchema,
-		dyncfg.CommandGet,
-		dyncfg.CommandEnable,
-		dyncfg.CommandDisable,
-		dyncfg.CommandUpdate,
-		dyncfg.CommandRestart,
-		dyncfg.CommandTest,
-		dyncfg.CommandUserconfig,
-	}
-	if isDyncfgJob {
-		cmds = append(cmds, dyncfg.CommandRemove)
-	}
-	return dyncfg.JoinCommands(cmds...)
-}
 
 func (m *Manager) dyncfgCollectorModuleCreate(name string) {
 	m.dyncfgApi.ConfigCreate(netdataapi.ConfigOpts{
@@ -77,24 +59,13 @@ func (m *Manager) dyncfgCollectorModuleCreate(name string) {
 	})
 }
 
-func (m *Manager) dyncfgCollectorJobCreate(cfg confgroup.Config, status dyncfg.Status) {
-	m.dyncfgApi.ConfigCreate(netdataapi.ConfigOpts{
-		ID:                m.dyncfgJobID(cfg),
-		Status:            status.String(),
-		ConfigType:        dyncfg.ConfigTypeJob.String(),
-		Path:              fmt.Sprintf(dyncfgCollectorPath, executable.Name),
-		SourceType:        cfg.SourceType(),
-		Source:            cfg.Source(),
-		SupportedCommands: dyncfgCollectorJobCmds(isDyncfg(cfg)),
-	})
-}
-
-func (m *Manager) dyncfgJobRemove(cfg confgroup.Config) {
-	m.dyncfgApi.ConfigDelete(m.dyncfgJobID(cfg))
-}
-
-func (m *Manager) dyncfgJobStatus(cfg confgroup.Config, status dyncfg.Status) {
-	m.dyncfgApi.ConfigStatus(m.dyncfgJobID(cfg), status)
+// exposedLookupByName looks up an exposed config by module + job name.
+func (m *Manager) exposedLookupByName(module, job string) (*dyncfg.Entry[confgroup.Config], bool) {
+	key := module + "_" + job
+	if module == job {
+		key = job
+	}
+	return m.exposed.LookupByKey(key)
 }
 
 func (m *Manager) dyncfgCollectorExec(fn dyncfg.Function) {
@@ -120,25 +91,37 @@ func (m *Manager) dyncfgCollectorExec(fn dyncfg.Function) {
 func (m *Manager) dyncfgCollectorSeqExec(fn dyncfg.Function) {
 	cmd := fn.Command()
 
+	// Clear waitCfgOnOff before enable/disable (component concern, not handler's).
+	if cmd == dyncfg.CommandEnable || cmd == dyncfg.CommandDisable {
+		key, _, ok := m.collectorCb.ExtractKey(fn)
+		if ok {
+			if entry, ok := m.exposed.LookupByKey(key); ok {
+				if entry.Cfg.FullName() == m.waitCfgOnOff {
+					m.waitCfgOnOff = ""
+				}
+			}
+		}
+	}
+
 	switch cmd {
+	case dyncfg.CommandAdd:
+		m.handler.CmdAdd(fn)
+	case dyncfg.CommandUpdate:
+		m.handler.CmdUpdate(fn)
+	case dyncfg.CommandEnable:
+		m.handler.CmdEnable(fn)
+	case dyncfg.CommandDisable:
+		m.handler.CmdDisable(fn)
+	case dyncfg.CommandRemove:
+		m.handler.CmdRemove(fn)
+	case dyncfg.CommandRestart:
+		m.dyncfgConfigRestart(fn)
 	case dyncfg.CommandTest:
 		m.dyncfgConfigTest(fn)
 	case dyncfg.CommandSchema:
 		m.dyncfgConfigSchema(fn)
 	case dyncfg.CommandGet:
 		m.dyncfgConfigGet(fn)
-	case dyncfg.CommandRestart:
-		m.dyncfgConfigRestart(fn)
-	case dyncfg.CommandEnable:
-		m.dyncfgConfigEnable(fn)
-	case dyncfg.CommandDisable:
-		m.dyncfgConfigDisable(fn)
-	case dyncfg.CommandAdd:
-		m.dyncfgConfigAdd(fn)
-	case dyncfg.CommandRemove:
-		m.dyncfgConfigRemove(fn)
-	case dyncfg.CommandUpdate:
-		m.dyncfgConfigUpdate(fn)
 	default:
 		m.Warningf("dyncfg: function '%s' command '%s' not implemented", fn.Fn().Name, cmd)
 		m.dyncfgApi.SendCodef(fn, 501, "Function '%s' command '%s' is not implemented.", fn.Fn().Name, cmd)
@@ -201,7 +184,7 @@ func (m *Manager) dyncfgConfigTest(fn dyncfg.Function) {
 
 	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
-	if err := validateJobName(jn); err != nil {
+	if err := dyncfg.ValidateJobName(jn); err != nil {
 		m.Warningf("dyncfg: %s: module %s: unacceptable job name '%s': %v", cmd, mn, jn, err)
 		m.dyncfgApi.SendCodef(fn, 400, "Unacceptable job name '%s': %v.", jn, err)
 		return
@@ -308,7 +291,7 @@ func (m *Manager) dyncfgConfigGet(fn dyncfg.Function) {
 
 	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
-	ecfg, ok := m.exposedConfigs.lookupByName(mn, jn)
+	entry, ok := m.exposedLookupByName(mn, jn)
 	if !ok {
 		m.Warningf("dyncfg: %s: module %s job %s not found", cmd, mn, jn)
 		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' job '%s' is not registered.", mn, jn)
@@ -317,7 +300,7 @@ func (m *Manager) dyncfgConfigGet(fn dyncfg.Function) {
 
 	mod := creator.Create()
 
-	if err := applyConfig(ecfg.cfg, mod); err != nil {
+	if err := applyConfig(entry.Cfg, mod); err != nil {
 		m.Warningf("dyncfg: %s: module %s job %s failed to apply config: %v", cmd, mn, jn, err)
 		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
 		return
@@ -351,371 +334,55 @@ func (m *Manager) dyncfgConfigRestart(fn dyncfg.Function) {
 		return
 	}
 
-	ecfg, ok := m.exposedConfigs.lookupByName(mn, jn)
+	entry, ok := m.exposedLookupByName(mn, jn)
 	if !ok {
 		m.Warningf("dyncfg: %s: module %s job %s not found", cmd, mn, jn)
 		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' job '%s' is not registered.", mn, jn)
 		return
 	}
 
-	job, err := m.createCollectorJob(ecfg.cfg)
+	job, err := m.createCollectorJob(entry.Cfg)
 	if err != nil {
 		m.Warningf("dyncfg: %s: module %s job %s: failed to apply config: %v", cmd, mn, jn, err)
 		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
+		m.handler.NotifyJobStatus(entry.Cfg, entry.Status)
 		return
 	}
 
-	switch ecfg.status {
+	switch entry.Status {
 	case dyncfg.StatusAccepted, dyncfg.StatusDisabled:
-		m.Warningf("dyncfg: %s: module %s job %s: restarting not allowed in '%s' state", cmd, mn, jn, ecfg.status)
-		m.dyncfgApi.SendCodef(fn, 405, "Restarting data collection job is not allowed in '%s' state.", ecfg.status)
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
+		m.Warningf("dyncfg: %s: module %s job %s: restarting not allowed in '%s' state", cmd, mn, jn, entry.Status)
+		m.dyncfgApi.SendCodef(fn, 405, "Restarting data collection job is not allowed in '%s' state.", entry.Status)
+		m.handler.NotifyJobStatus(entry.Cfg, entry.Status)
 		return
 	case dyncfg.StatusRunning:
-		m.fileStatus.remove(ecfg.cfg)
-		m.stopRunningJob(ecfg.cfg.FullName())
+		m.fileStatus.remove(entry.Cfg)
+		m.stopRunningJob(entry.Cfg.FullName())
 	default:
 	}
 
-	m.retryingTasks.remove(ecfg.cfg)
+	m.retryingTasks.remove(entry.Cfg)
 
 	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
 
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
-		ecfg.status = dyncfg.StatusFailed
+		entry.Status = dyncfg.StatusFailed
 		m.dyncfgApi.SendCodef(fn, 422, "Job restart failed: %v", err)
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		m.runRetryTask(ecfg, job)
+		m.handler.NotifyJobStatus(entry.Cfg, entry.Status)
+		m.scheduleRetryTask(entry.Cfg, job)
 		return
 	}
 
-	ecfg.status = dyncfg.StatusRunning
+	entry.Status = dyncfg.StatusRunning
 
-	if isDyncfg(ecfg.cfg) {
-		m.fileStatus.add(ecfg.cfg, ecfg.status.String())
+	if isDyncfg(entry.Cfg) {
+		m.fileStatus.add(entry.Cfg, entry.Status.String())
 	}
 	m.startRunningJob(job)
 
 	m.dyncfgApi.SendCodef(fn, 200, "")
-	m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-}
-
-func (m *Manager) dyncfgConfigEnable(fn dyncfg.Function) {
-	cmd := fn.Command()
-
-	id := fn.ID()
-	mn, jn, ok := m.extractModuleJobName(id)
-	if !ok {
-		m.Warningf("dyncfg: %s: could not extract module and job from id (%s)", cmd, id)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid ID format. Could not extract module and job name from ID. Provided ID: %s.", id)
-		return
-	}
-
-	ecfg, ok := m.exposedConfigs.lookupByName(mn, jn)
-	if !ok {
-		m.Warningf("dyncfg: %s: module %s job %s not found", cmd, mn, jn)
-		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' job '%s' is not registered.", mn, jn)
-		return
-	}
-
-	if ecfg.cfg.FullName() == m.waitCfgOnOff {
-		m.waitCfgOnOff = ""
-	}
-
-	switch ecfg.status {
-	case dyncfg.StatusAccepted, dyncfg.StatusDisabled, dyncfg.StatusFailed:
-	case dyncfg.StatusRunning:
-		// non-dyncfg update triggers enable/disable
-		m.dyncfgApi.SendCodef(fn, 200, "")
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		return
-	default:
-		m.Warningf("dyncfg: %s: module %s job %s: enabling not allowed in %s state", cmd, mn, jn, ecfg.status)
-		m.dyncfgApi.SendCodef(fn, 405, "Enabling data collection job is not allowed in '%s' state.", ecfg.status)
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		return
-	}
-
-	job, err := m.createCollectorJob(ecfg.cfg)
-	if err != nil {
-		ecfg.status = dyncfg.StatusFailed
-		m.Warningf("dyncfg: %s: module %s job %s: failed to apply config: %v", cmd, mn, jn, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		return
-	}
-
-	if ecfg.status == dyncfg.StatusDisabled {
-		m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
-	}
-
-	m.retryingTasks.remove(ecfg.cfg)
-
-	if err := job.AutoDetection(); err != nil {
-		job.Cleanup()
-		ecfg.status = dyncfg.StatusFailed
-		m.dyncfgApi.SendCodef(fn, 200, "Job enable failed: %v.", err)
-
-		if isStock(ecfg.cfg) {
-			m.exposedConfigs.remove(ecfg.cfg)
-			m.dyncfgJobRemove(ecfg.cfg)
-		} else {
-			m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		}
-
-		m.runRetryTask(ecfg, job)
-		return
-	}
-
-	ecfg.status = dyncfg.StatusRunning
-
-	if isDyncfg(ecfg.cfg) {
-		m.fileStatus.add(ecfg.cfg, ecfg.status.String())
-	}
-
-	m.startRunningJob(job)
-
-	m.dyncfgApi.SendCodef(fn, 200, "")
-	m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-}
-
-func (m *Manager) dyncfgConfigDisable(fn dyncfg.Function) {
-	cmd := fn.Command()
-
-	id := fn.ID()
-	mn, jn, ok := m.extractModuleJobName(id)
-	if !ok {
-		m.Warningf("dyncfg: %s: could not extract module from id (%s)", cmd, id)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid ID format. Could not extract module name from ID. Provided ID: %s.", id)
-		return
-	}
-
-	ecfg, ok := m.exposedConfigs.lookupByName(mn, jn)
-	if !ok {
-		m.Warningf("dyncfg: %s: module %s job %s not found", cmd, mn, jn)
-		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' job '%s' is not registered.", mn, jn)
-		return
-	}
-
-	if ecfg.cfg.FullName() == m.waitCfgOnOff {
-		m.waitCfgOnOff = ""
-	}
-
-	switch ecfg.status {
-	case dyncfg.StatusDisabled:
-		m.dyncfgApi.SendCodef(fn, 200, "")
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		return
-	case dyncfg.StatusRunning:
-		m.stopRunningJob(ecfg.cfg.FullName())
-		if isDyncfg(ecfg.cfg) {
-			m.fileStatus.remove(ecfg.cfg)
-		}
-	default:
-	}
-
-	m.retryingTasks.remove(ecfg.cfg)
-
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
-
-	ecfg.status = dyncfg.StatusDisabled
-	m.dyncfgApi.SendCodef(fn, 200, "")
-	m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-}
-
-func (m *Manager) dyncfgConfigAdd(fn dyncfg.Function) {
-	cmd := fn.Command()
-
-	if err := fn.ValidateArgs(3); err != nil {
-		m.Warningf("dyncfg: %s: %v", cmd, err)
-		m.dyncfgApi.SendCodef(fn, 400, "%v", err)
-		return
-	}
-
-	id := fn.ID()
-	jn := fn.JobName()
-	mn, ok := m.extractModuleName(id)
-	if !ok {
-		m.Warningf("dyncfg: %s: could not extract module from id (%s)", cmd, id)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid ID format. Could not extract module name from ID. Provided ID: %s.", id)
-		return
-	}
-
-	if !fn.HasPayload() {
-		m.Warningf("dyncfg: %s: module %s job %s missing configuration payload.", cmd, mn, jn)
-		m.dyncfgApi.SendCodef(fn, 400, "Missing configuration payload.")
-		return
-	}
-
-	if err := validateJobName(jn); err != nil {
-		m.Warningf("dyncfg: %s: module %s: unacceptable job name '%s': %v", cmd, mn, jn, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Unacceptable job name '%s': %v.", jn, err)
-		return
-	}
-
-	cfg, err := configFromPayload(fn)
-	if err != nil {
-		m.Warningf("dyncfg: %s: module %s job %s: failed to create config from payload: %v", cmd, mn, jn, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
-		return
-	}
-
-	m.dyncfgSetConfigMeta(cfg, mn, jn, fn)
-
-	if _, err := m.createCollectorJob(cfg); err != nil {
-		m.Warningf("dyncfg: %s: module %s job %s: failed to apply config: %v", cmd, mn, jn, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
-		return
-	}
-
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
-
-	if ecfg, ok := m.exposedConfigs.lookup(cfg); ok {
-		if scfg, ok := m.seenConfigs.lookup(ecfg.cfg); ok && isDyncfg(scfg.cfg) {
-			m.seenConfigs.remove(ecfg.cfg)
-		}
-		m.exposedConfigs.remove(ecfg.cfg)
-		m.retryingTasks.remove(ecfg.cfg)
-		m.stopRunningJob(ecfg.cfg.FullName())
-	}
-
-	scfg := &seenConfig{cfg: cfg, status: dyncfg.StatusAccepted}
-	ecfg := scfg
-	m.seenConfigs.add(scfg)
-	m.exposedConfigs.add(ecfg)
-
-	m.dyncfgApi.SendCodef(fn, 202, "")
-	m.dyncfgCollectorJobCreate(ecfg.cfg, ecfg.status)
-}
-
-func (m *Manager) dyncfgConfigRemove(fn dyncfg.Function) {
-	cmd := fn.Command()
-
-	id := fn.ID()
-	mn, jn, ok := m.extractModuleJobName(id)
-	if !ok {
-		m.Warningf("dyncfg: %s: could not extract module and job from id (%s)", cmd, id)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid ID format. Could not extract module and job name from ID. Provided ID: %s.", id)
-		return
-	}
-
-	ecfg, ok := m.exposedConfigs.lookupByName(mn, jn)
-	if !ok {
-		m.Warningf("dyncfg: %s: module %s job %s not found", cmd, mn, jn)
-		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' job '%s' is not registered.", mn, jn)
-		return
-	}
-
-	if !isDyncfg(ecfg.cfg) {
-		m.Warningf("dyncfg: %s: module %s job %s: can not remove jobs of type %s", cmd, mn, jn, ecfg.cfg.SourceType())
-		m.dyncfgApi.SendCodef(fn, 405, "Removing jobs of type '%s' is not supported. Only 'dyncfg' jobs can be removed.", ecfg.cfg.SourceType())
-		return
-	}
-
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
-
-	m.retryingTasks.remove(ecfg.cfg)
-	m.seenConfigs.remove(ecfg.cfg)
-	m.exposedConfigs.remove(ecfg.cfg)
-	m.stopRunningJob(ecfg.cfg.FullName())
-	m.fileStatus.remove(ecfg.cfg)
-
-	m.dyncfgApi.SendCodef(fn, 200, "")
-	m.dyncfgJobRemove(ecfg.cfg)
-}
-
-func (m *Manager) dyncfgConfigUpdate(fn dyncfg.Function) {
-	cmd := fn.Command()
-
-	id := fn.ID()
-	mn, jn, ok := m.extractModuleJobName(id)
-	if !ok {
-		m.Warningf("dyncfg: %s: could not extract module from id (%s)", cmd, id)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid ID format. Could not extract module name from ID. Provided ID: %s.", id)
-		return
-	}
-
-	ecfg, ok := m.exposedConfigs.lookupByName(mn, jn)
-	if !ok {
-		m.Warningf("dyncfg: %s: module %s job %s not found", cmd, mn, jn)
-		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' job '%s' is not registered.", mn, jn)
-		return
-	}
-
-	cfg, err := configFromPayload(fn)
-	if err != nil {
-		m.Warningf("dyncfg: %s: module %s: failed to create config from payload: %v", cmd, mn, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		return
-	}
-
-	m.dyncfgSetConfigMeta(cfg, mn, jn, fn)
-
-	if ecfg.status == dyncfg.StatusRunning && ecfg.cfg.UID() == cfg.UID() {
-		m.dyncfgApi.SendCodef(fn, 200, "")
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		return
-	}
-
-	job, err := m.createCollectorJob(cfg)
-	if err != nil {
-		m.Warningf("dyncfg: %s: module %s job %s: failed to apply config: %v", cmd, mn, jn, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		return
-	}
-
-	if ecfg.status == dyncfg.StatusAccepted {
-		m.Warningf("dyncfg: %s: module %s job %s: updating not allowed in %s", cmd, mn, jn, ecfg.status)
-		m.dyncfgApi.SendCodef(fn, 403, "Updating data collection job is not allowed in '%s' state.", ecfg.status)
-		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
-		return
-	}
-
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
-
-	m.exposedConfigs.remove(ecfg.cfg)
-	m.stopRunningJob(ecfg.cfg.FullName())
-
-	scfg := &seenConfig{cfg: cfg, status: dyncfg.StatusAccepted}
-	m.seenConfigs.add(scfg)
-	m.exposedConfigs.add(scfg)
-
-	if isDyncfg(ecfg.cfg) {
-		m.seenConfigs.remove(ecfg.cfg)
-	} else {
-		// Needed to update meta. There is no other way, unfortunately, but to send "create".
-		defer m.dyncfgCollectorJobCreate(scfg.cfg, scfg.status)
-	}
-
-	if ecfg.status == dyncfg.StatusDisabled {
-		scfg.status = dyncfg.StatusDisabled
-
-		m.dyncfgApi.SendCodef(fn, 200, "")
-		m.dyncfgJobStatus(cfg, scfg.status)
-		return
-	}
-
-	m.retryingTasks.remove(ecfg.cfg)
-
-	if err := job.AutoDetection(); err != nil {
-		job.Cleanup()
-		scfg.status = dyncfg.StatusFailed
-
-		m.dyncfgApi.SendCodef(fn, 200, "Job update failed: %v", err)
-		m.dyncfgJobStatus(scfg.cfg, scfg.status)
-		m.runRetryTask(scfg, job)
-		return
-	}
-
-	scfg.status = dyncfg.StatusRunning
-	m.startRunningJob(job)
-
-	m.dyncfgApi.SendCodef(fn, 200, "")
-	m.dyncfgJobStatus(scfg.cfg, scfg.status)
+	m.handler.NotifyJobStatus(entry.Cfg, entry.Status)
 }
 
 func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string, fn dyncfg.Function) {
@@ -729,17 +396,18 @@ func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string,
 	}
 }
 
-func (m *Manager) runRetryTask(ecfg *seenConfig, job *module.Job) {
+// scheduleRetryTask schedules a retry if the job supports auto-detection retry.
+func (m *Manager) scheduleRetryTask(cfg confgroup.Config, job *module.Job) {
 	if !job.RetryAutoDetection() {
 		return
 	}
 	m.Infof("%s[%s] job detection failed, will retry in %d seconds",
-		ecfg.cfg.Module(), ecfg.cfg.Name(), job.AutoDetectionEvery())
+		cfg.Module(), cfg.Name(), job.AutoDetectionEvery())
 
 	ctx, cancel := context.WithCancel(m.ctx)
-	m.retryingTasks.add(ecfg.cfg, &retryTask{cancel: cancel})
+	m.retryingTasks.add(cfg, &retryTask{cancel: cancel})
 
-	go runRetryTask(ctx, m.addCh, ecfg.cfg)
+	go runRetryTask(ctx, m.addCh, cfg)
 }
 
 func userConfigFromPayload(cfg any, jobName string, fn dyncfg.Function) ([]byte, error) {
@@ -813,15 +481,119 @@ func extractJobName(id string) (string, bool) {
 	return id[i+1:], true
 }
 
-func validateJobName(jobName string) error {
-	for _, r := range jobName {
-		if unicode.IsSpace(r) {
-			return errors.New("contains spaces")
+// --- collectorCallbacks implements dyncfg.Callbacks[confgroup.Config] ---
+
+type collectorCallbacks struct {
+	mgr *Manager
+}
+
+func (cb *collectorCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, ok bool) {
+	var mn, jn string
+
+	if fn.Command() == dyncfg.CommandAdd {
+		// For add: ID is module template, job name is in Args[2].
+		mn, ok = cb.mgr.extractModuleName(fn.ID())
+		if !ok {
+			return "", "", false
 		}
-		switch r {
-		case '.', ':':
-			return fmt.Errorf("contains '%c'", r)
+		jn = fn.JobName()
+		if jn == "" {
+			return "", "", false
+		}
+	} else {
+		// For other commands: ID contains module:job.
+		mn, jn, ok = cb.mgr.extractModuleJobName(fn.ID())
+		if !ok {
+			return "", "", false
 		}
 	}
+
+	key = mn + "_" + jn
+	if mn == jn {
+		key = jn
+	}
+	return key, jn, true
+}
+
+func (cb *collectorCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (confgroup.Config, error) {
+	mn, ok := cb.mgr.extractModuleName(fn.ID())
+	if !ok {
+		return nil, fmt.Errorf("could not extract module name from ID: %s", fn.ID())
+	}
+
+	cfg, err := configFromPayload(fn)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid configuration format. Failed to create configuration from payload: %v.", err)
+	}
+
+	cb.mgr.dyncfgSetConfigMeta(cfg, mn, name, fn)
+
+	if _, err := cb.mgr.createCollectorJob(cfg); err != nil {
+		return nil, fmt.Errorf("Invalid configuration. Failed to apply configuration: %v.", err)
+	}
+
+	return cfg, nil
+}
+
+func (cb *collectorCallbacks) Start(cfg confgroup.Config) error {
+	cb.mgr.retryingTasks.remove(cfg)
+
+	job, err := cb.mgr.createCollectorJob(cfg)
+	if err != nil {
+		return &codedError{err: fmt.Errorf("Invalid configuration. Failed to apply configuration: %v.", err), code: 400}
+	}
+
+	if err := job.AutoDetection(); err != nil {
+		job.Cleanup()
+		cb.mgr.scheduleRetryTask(cfg, job)
+		return fmt.Errorf("Job enable failed: %v.", err)
+	}
+
+	cb.mgr.startRunningJob(job)
 	return nil
 }
+
+func (cb *collectorCallbacks) Update(oldCfg, newCfg confgroup.Config) error {
+	cb.mgr.retryingTasks.remove(oldCfg)
+	cb.mgr.stopRunningJob(oldCfg.FullName())
+	cb.mgr.fileStatus.remove(oldCfg)
+
+	job, err := cb.mgr.createCollectorJob(newCfg)
+	if err != nil {
+		return fmt.Errorf("Job update failed: %v", err)
+	}
+
+	if err := job.AutoDetection(); err != nil {
+		job.Cleanup()
+		cb.mgr.scheduleRetryTask(newCfg, job)
+		return fmt.Errorf("Job update failed: %v", err)
+	}
+
+	cb.mgr.startRunningJob(job)
+	return nil
+}
+
+func (cb *collectorCallbacks) Stop(cfg confgroup.Config) {
+	cb.mgr.retryingTasks.remove(cfg)
+	cb.mgr.stopRunningJob(cfg.FullName())
+	cb.mgr.fileStatus.remove(cfg)
+}
+
+func (cb *collectorCallbacks) OnStatusChange(entry *dyncfg.Entry[confgroup.Config], _ dyncfg.Status, _ dyncfg.Function) {
+	if entry.Status == dyncfg.StatusRunning && isDyncfg(entry.Cfg) {
+		cb.mgr.fileStatus.add(entry.Cfg, entry.Status.String())
+	}
+}
+
+func (cb *collectorCallbacks) ConfigID(cfg confgroup.Config) string {
+	return cb.mgr.dyncfgJobID(cfg)
+}
+
+// codedError wraps an error with an HTTP status code for the handler.
+type codedError struct {
+	err  error
+	code int
+}
+
+func (e *codedError) Error() string { return e.err.Error() }
+func (e *codedError) Code() int     { return e.code }
