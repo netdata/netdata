@@ -51,9 +51,7 @@
             "type": "object",
             "description": "Metadata for a sidebar node",
             "required": [
-                "label",
-                "path",
-                "status"
+                "label"
             ],
             "additionalProperties": false,
             "properties": {
@@ -65,20 +63,12 @@
                 "path": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "Hierarchical path for organizing content (e.g., 'Netdata Agent/Installation')"
+                    "description": "Path segment for this node (only if the page should not be a category overview page in this section). Single segment like 'Installation', not full path."
                 },
                 "edit_url": {
                     "type": "string",
                     "pattern": "^https://github\\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+/edit/[a-zA-Z0-9_.-]+/.+\\.(md|mdx)$",
                     "description": "GitHub edit URL pointing to the source markdown file"
-                },
-                "status": {
-                    "type": "string",
-                    "enum": [
-                        "Published",
-                        "Unpublished"
-                    ],
-                    "description": "Publication status of the document"
                 },
                 "description": {
                     "type": "string",

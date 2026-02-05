@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""\nValidate map.yaml against JSON Schema with additional custom rules.
+"""Validate map.yaml against JSON Schema with additional custom rules.
 
 This validator uses JSON Schema for structure validation and adds custom
 checks for rules that can't be expressed in JSON Schema, such as:
 - Nodes with integration_placeholder children can omit edit_url (but not status)
 - No duplicate edit_urls
+
+Path reconstruction rule (for ingest):
+- Nodes WITH items array → label is the path segment (they define hierarchy)
+- Nodes WITHOUT items → leaves that belong to their parent's path
 
 Exit codes:
   0 - Validation passed
@@ -75,7 +79,9 @@ def format_schema_error(error: jsonschema.ValidationError) -> str:
         suberrors.sort(key=_path_depth, reverse=True)
         primary = suberrors[0]
         sub_path = (
-            ".".join(str(p) for p in primary.absolute_path) if primary.absolute_path else path
+            ".".join(str(p) for p in primary.absolute_path)
+            if primary.absolute_path
+            else path
         )
         # Collect up to a couple of distinct messages for context.
         messages = [primary.message]
