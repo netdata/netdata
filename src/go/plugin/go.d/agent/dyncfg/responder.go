@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 )
 
 // Responder handles standardized responses for dyncfg operations
@@ -23,8 +22,8 @@ func NewResponder(api *netdataapi.API) *Responder {
 }
 
 // SendCodef sends a response with a specific code and message
-func (r *Responder) SendCodef(fn functions.Function, code int, message string, args ...any) {
-	if fn.UID == "" {
+func (r *Responder) SendCodef(fn Function, code int, message string, args ...any) {
+	if fn.UID() == "" {
 		return
 	}
 
@@ -53,7 +52,7 @@ func (r *Responder) SendCodef(fn functions.Function, code int, message string, a
 	}
 
 	r.api.FUNCRESULT(netdataapi.FunctionResult{
-		UID:             fn.UID,
+		UID:             fn.UID(),
 		ContentType:     "application/json",
 		Payload:         string(payload),
 		Code:            strconv.Itoa(code),
@@ -62,18 +61,18 @@ func (r *Responder) SendCodef(fn functions.Function, code int, message string, a
 }
 
 // SendJSON sends a JSON payload response with HTTP 200 status
-func (r *Responder) SendJSON(fn functions.Function, payload string) {
+func (r *Responder) SendJSON(fn Function, payload string) {
 	r.sendPayload(fn, payload, "application/json")
 }
 
 // SendJSONWithCode sends a JSON payload response with a specific HTTP status code
-func (r *Responder) SendJSONWithCode(fn functions.Function, payload string, code int) {
-	if fn.UID == "" {
+func (r *Responder) SendJSONWithCode(fn Function, payload string, code int) {
+	if fn.UID() == "" {
 		return
 	}
 
 	r.api.FUNCRESULT(netdataapi.FunctionResult{
-		UID:             fn.UID,
+		UID:             fn.UID(),
 		ContentType:     "application/json",
 		Payload:         payload,
 		Code:            strconv.Itoa(code),
@@ -82,18 +81,18 @@ func (r *Responder) SendJSONWithCode(fn functions.Function, payload string, code
 }
 
 // SendYAML sends a YAML payload response
-func (r *Responder) SendYAML(fn functions.Function, payload string) {
+func (r *Responder) SendYAML(fn Function, payload string) {
 	r.sendPayload(fn, payload, "application/yaml")
 }
 
 // sendPayload sends a response with a specific payload and content type
-func (r *Responder) sendPayload(fn functions.Function, payload, contentType string) {
-	if fn.UID == "" {
+func (r *Responder) sendPayload(fn Function, payload, contentType string) {
+	if fn.UID() == "" {
 		return
 	}
 
 	r.api.FUNCRESULT(netdataapi.FunctionResult{
-		UID:             fn.UID,
+		UID:             fn.UID(),
 		ContentType:     contentType,
 		Payload:         payload,
 		Code:            "200",

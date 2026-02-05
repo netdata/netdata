@@ -235,7 +235,9 @@ func (a *Agent) run(ctx context.Context) {
 		return
 	}
 
-	discCfg := a.buildDiscoveryConf(enabledModules)
+	fnMgr := functions.NewManager()
+
+	discCfg := a.buildDiscoveryConf(enabledModules, fnMgr)
 
 	discMgr, err := discovery.NewManager(discCfg)
 	if err != nil {
@@ -245,8 +247,6 @@ func (a *Agent) run(ctx context.Context) {
 		}
 		return
 	}
-
-	fnMgr := functions.NewManager()
 
 	jobMgr := jobmgr.New()
 	jobMgr.PluginName = a.Name

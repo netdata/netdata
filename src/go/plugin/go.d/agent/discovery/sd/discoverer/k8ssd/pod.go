@@ -136,7 +136,7 @@ func (p *podDiscoverer) handleQueueItem(ctx context.Context, in chan<- []model.T
 
 	if !ok {
 		tgg := &podTargetGroup{source: podSourceFromNsName(namespace, name)}
-		send(ctx, in, tgg)
+		model.SendTargetGroup(ctx, in, tgg)
 		return
 	}
 
@@ -147,11 +147,7 @@ func (p *podDiscoverer) handleQueueItem(ctx context.Context, in chan<- []model.T
 
 	tgg := p.buildTargetGroup(pod)
 
-	for _, tgt := range tgg.Targets() {
-		tgt.Tags().Merge(p.Tags())
-	}
-
-	send(ctx, in, tgg)
+	model.SendTargetGroup(ctx, in, tgg)
 
 }
 
@@ -186,17 +182,17 @@ func (p *podDiscoverer) buildTargets(pod *corev1.Pod) (targets []model.Target) {
 				Address:        pod.Status.PodIP,
 				Namespace:      pod.Namespace,
 				Name:           pod.Name,
-				Annotations:    mapAny(pod.Annotations),
-				Labels:         mapAny(pod.Labels),
+				Annotations:    model.MapAny(pod.Annotations),
+				Labels:         model.MapAny(pod.Labels),
 				NodeName:       pod.Spec.NodeName,
 				PodIP:          pod.Status.PodIP,
 				ControllerName: name,
 				ControllerKind: kind,
 				ContName:       container.Name,
 				Image:          container.Image,
-				Env:            mapAny(env),
+				Env:            model.MapAny(env),
 			}
-			hash, err := calcHash(tgt)
+			hash, err := model.CalcHash(tgt)
 			if err != nil {
 				continue
 			}
@@ -211,20 +207,20 @@ func (p *podDiscoverer) buildTargets(pod *corev1.Pod) (targets []model.Target) {
 					Address:        net.JoinHostPort(pod.Status.PodIP, portNum),
 					Namespace:      pod.Namespace,
 					Name:           pod.Name,
-					Annotations:    mapAny(pod.Annotations),
-					Labels:         mapAny(pod.Labels),
+					Annotations:    model.MapAny(pod.Annotations),
+					Labels:         model.MapAny(pod.Labels),
 					NodeName:       pod.Spec.NodeName,
 					PodIP:          pod.Status.PodIP,
 					ControllerName: name,
 					ControllerKind: kind,
 					ContName:       container.Name,
 					Image:          container.Image,
-					Env:            mapAny(env),
+					Env:            model.MapAny(env),
 					Port:           portNum,
 					PortName:       port.Name,
 					PortProtocol:   string(port.Protocol),
 				}
-				hash, err := calcHash(tgt)
+				hash, err := model.CalcHash(tgt)
 				if err != nil {
 					continue
 				}
@@ -421,15 +417,4 @@ func isVar(name string) bool {
 	// environment variables in the container and any service environment
 	// variables.
 	return strings.IndexByte(name, '$') != -1
-}
-
-func mapAny(src map[string]string) map[string]any {
-	if src == nil {
-		return nil
-	}
-	m := make(map[string]any, len(src))
-	for k, v := range src {
-		m[k] = v
-	}
-	return m
 }

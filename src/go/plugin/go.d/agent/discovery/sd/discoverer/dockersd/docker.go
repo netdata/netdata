@@ -18,15 +18,9 @@ import (
 
 	typesContainer "github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
-	"github.com/gohugoio/hashstructure"
 )
 
 func NewDiscoverer(cfg Config) (*Discoverer, error) {
-	tags, err := model.ParseTags(cfg.Tags)
-	if err != nil {
-		return nil, fmt.Errorf("parse tags: %v", err)
-	}
-
 	d := &Discoverer{
 		Logger: logger.New().With(
 			slog.String("component", "service discovery"),
@@ -48,9 +42,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		d.addr = addr
 	}
 
-	d.Tags().Merge(tags)
-
-	if cfg.Timeout.Duration().Seconds() != 0 {
+	if cfg.Timeout.Duration() > 0 {
 		d.timeout = cfg.Timeout.Duration()
 	}
 	if cfg.Address != "" {
@@ -61,11 +53,10 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 }
 
 type Config struct {
-	Source string
+	Source string `yaml:"-" json:"-"`
 
-	Tags    string           `yaml:"tags"`
-	Address string           `yaml:"address"`
-	Timeout confopt.Duration `yaml:"timeout"`
+	Address string           `yaml:"address,omitempty" json:"address,omitempty"`
+	Timeout confopt.Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 type (
@@ -187,7 +178,7 @@ func (d *Discoverer) buildTargetGroup(cntr typesContainer.Summary) model.TargetG
 				Name:          strings.TrimPrefix(cntr.Names[0], "/"),
 				Image:         cntr.Image,
 				Command:       cntr.Command,
-				Labels:        mapAny(cntr.Labels),
+				Labels:        model.MapAny(cntr.Labels),
 				PrivatePort:   strconv.Itoa(int(port.PrivatePort)),
 				PublicPort:    strconv.Itoa(int(port.PublicPort)),
 				PublicPortIP:  port.IP,
@@ -198,13 +189,12 @@ func (d *Discoverer) buildTargetGroup(cntr typesContainer.Summary) model.TargetG
 			}
 			tgt.Address = net.JoinHostPort(tgt.IPAddress, tgt.PrivatePort)
 
-			hash, err := calcHash(tgt)
+			hash, err := model.CalcHash(tgt)
 			if err != nil {
 				continue
 			}
 
 			tgt.hash = hash
-			tgt.Tags().Merge(d.Tags())
 
 			tgg.targets = append(tgg.targets, tgt)
 		}
@@ -222,19 +212,4 @@ func (d *Discoverer) cleanup() {
 func cntrSource(cntr typesContainer.Summary) string {
 	name := strings.TrimPrefix(cntr.Names[0], "/")
 	return fmt.Sprintf("discoverer=docker,container=%s,image=%s", name, cntr.Image)
-}
-
-func calcHash(obj any) (uint64, error) {
-	return hashstructure.Hash(obj, nil)
-}
-
-func mapAny(src map[string]string) map[string]any {
-	if src == nil {
-		return nil
-	}
-	m := make(map[string]any, len(src))
-	for k, v := range src {
-		m[k] = v
-	}
-	return m
 }

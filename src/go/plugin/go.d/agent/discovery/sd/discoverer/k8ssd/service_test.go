@@ -440,8 +440,8 @@ func prepareSvcTargetGroup(svc *corev1.Service) *serviceTargetGroup {
 			Address:      net.JoinHostPort(svc.Name+"."+svc.Namespace+".svc", portNum),
 			Namespace:    svc.Namespace,
 			Name:         svc.Name,
-			Annotations:  mapAny(svc.Annotations),
-			Labels:       mapAny(svc.Labels),
+			Annotations:  model.MapAny(svc.Annotations),
+			Labels:       model.MapAny(svc.Labels),
 			Port:         portNum,
 			PortName:     port.Name,
 			PortProtocol: string(port.Protocol),
@@ -450,7 +450,6 @@ func prepareSvcTargetGroup(svc *corev1.Service) *serviceTargetGroup {
 			Type:         string(svc.Spec.Type),
 		}
 		tgt.hash = mustCalcHash(tgt)
-		tgt.Tags().Merge(discoveryTags)
 		tgg.targets = append(tgg.targets, tgt)
 	}
 
