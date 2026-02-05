@@ -82,8 +82,9 @@ To see exactly what and how is collected, you can review the script template `da
 All opt-out methods prevent:
 
 - The daemon from executing the anonymous statistics script
-- The anonymous statistics script from exiting immediately
 - The PostHog JavaScript snippet (which remains on the dashboard) from firing and sending any data to Netdata PostHog
+
+When opt-out is enabled, the anonymous statistics script exits immediately without sending any data.
 
 :::
 
@@ -137,7 +138,7 @@ Restart-Service -Name Netdata
 
 :::note
 
-After setting the environment variable, restart the Netdata service for changes to take effect.
+After setting the environment variable, restart the Netdata service for the changes to take effect.
 
 :::
 
@@ -161,7 +162,7 @@ environment:
   - DISABLE_TELEMETRY=1
 ```
 
-See [Docker installation guide](/packaging/docker/README.md#create-a-new-netdata-agent-container) for complete configuration.
+See the [Docker installation guide](/packaging/docker/README.md#create-a-new-netdata-agent-container) for complete configuration.
 
 </details>
 
@@ -183,7 +184,7 @@ export DISABLE_TELEMETRY=1
 ./kickstart.sh
 ```
 
-See [installation documentation](/packaging/installer/README.md) for available installer scripts.
+See the [installation documentation](/packaging/installer/README.md) for available installer scripts.
 
 </details>
 
@@ -199,10 +200,10 @@ See [installation documentation](/packaging/installer/README.md) for available i
 
 ## Verification
 
-To confirm telemetry is disabled:
+To confirm that telemetry is disabled:
 
 1. Check that the `.opt-out-from-anonymous-statistics` file exists in your config directory, **OR**
-2. Verify the `DISABLE_TELEMETRY` environment variable is set
+2. Verify that the `DISABLE_TELEMETRY` environment variable is set
 
 The Agent dashboard will no longer send PostHog events, and the backend statistics script will not execute.
 
