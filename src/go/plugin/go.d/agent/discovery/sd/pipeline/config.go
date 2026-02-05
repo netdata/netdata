@@ -3,6 +3,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,8 +14,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/netlistensd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/snmpsd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
-
-	"gopkg.in/yaml.v2"
 )
 
 type Config struct {
@@ -64,6 +63,24 @@ func (d DiscovererConfig) Type() string {
 // Empty returns true if no discoverer is configured.
 func (d DiscovererConfig) Empty() bool {
 	return d.Type() == ""
+}
+
+// count returns the number of discoverer types configured.
+func (d DiscovererConfig) count() int {
+	n := 0
+	if d.NetListeners != nil {
+		n++
+	}
+	if d.Docker != nil {
+		n++
+	}
+	if len(d.K8s) > 0 {
+		n++
+	}
+	if d.SNMP != nil {
+		n++
+	}
+	return n
 }
 
 // CleanName returns the name sanitized for use in dyncfg IDs.
@@ -147,36 +164,11 @@ func (c Config) MarshalYAML() (any, error) {
 }
 
 // UnmarshalJSON implements json.Unmarshaler for dyncfg payloads.
-// Note: Dyncfg JSON uses a flattened format per discoverer type,
-// so this is only used for generic JSON that matches the YAML structure.
+// Legacy fields (discover, classify, compose) have json:"-" tags and are
+// intentionally not supported in JSON - they're only for YAML file configs.
 func (c *Config) UnmarshalJSON(data []byte) error {
 	type plain Config // avoid recursion
-
-	// Use yaml.Unmarshal since it handles JSON too and our tags are compatible
-	if err := yaml.Unmarshal(data, (*plain)(c)); err != nil {
-		return err
-	}
-
-	// Convert legacy discover[] to new discoverer{} format
-	if len(c.LegacyDiscover) > 0 && c.Discoverer.Empty() {
-		c.convertLegacyDiscover()
-	}
-
-	// Convert legacy classify/compose to canonical services format
-	if len(c.Services) == 0 && (len(c.LegacyClassify) > 0 || len(c.LegacyCompose) > 0) {
-		services, err := ConvertOldToServices(c.LegacyClassify, c.LegacyCompose)
-		if err != nil {
-			return fmt.Errorf("failed to convert legacy config: %w", err)
-		}
-		c.Services = services
-	}
-
-	// Clear legacy fields
-	c.LegacyDiscover = nil
-	c.LegacyClassify = nil
-	c.LegacyCompose = nil
-
-	return nil
+	return json.Unmarshal(data, (*plain)(c))
 }
 
 // LegacyDiscoveryConfig is the old discover[] array item format.
@@ -222,6 +214,9 @@ func ValidateConfig(cfg Config) error {
 	}
 	if cfg.Discoverer.Empty() {
 		return errors.New("no discoverer configured")
+	}
+	if cfg.Discoverer.count() > 1 {
+		return errors.New("multiple discoverers configured, only one is allowed")
 	}
 	if err := validateServicesConfig(cfg.Services); err != nil {
 		return fmt.Errorf("services rules: %v", err)

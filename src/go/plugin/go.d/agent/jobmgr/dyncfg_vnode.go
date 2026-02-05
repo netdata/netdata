@@ -371,9 +371,9 @@ func vnodeUserconfigFromPayload(fn dyncfg.Function) ([]byte, error) {
 		return nil, err
 	}
 
-	name := "test"
-	if len(fn.Fn().Args) > 2 {
-		name = fn.Fn().Args[2]
+	name := fn.JobName()
+	if name == "" {
+		name = "test"
 	}
 
 	dyncfgUpdateVnodeConfig(cfg, name, fn)
