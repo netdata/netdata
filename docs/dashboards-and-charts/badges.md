@@ -200,17 +200,18 @@ When aggregating multiple data points, the `group` parameter determines how valu
 | `countif`         | Count values matching condition           |
 | `extremes`        | Min/max for mixed sign values             |
 
-Common methods: `average`, `sum`, `min`, `max`, `median`. See [Query Reference](/docs/developer-and-contributor-corner/rest-api/Queries/README.md) for all options.
+Common methods: `average`, `sum`, `min`, `max`, `median`. See [Query Reference](/src/web/api/queries/README.md) for all options.
 
 ## Alert Badges
 
 When using the `alarm` parameter, badges display alert states:
 
 - **CLEAR** - Green badge, alert is not triggered
-- **WARNING** - Yellow badge, warning threshold exceeded
+- **WARNING** - Orange badge, warning threshold exceeded
 - **CRITICAL** - Red badge, critical threshold exceeded
 - **UNDEFINED** - Grey badge, alert cannot be evaluated
 - **UNINITIALIZED** - Black badge, alert has not been initialized
+- **REMOVED** - Grey badge, alert has been removed (shutdown, disconnect)
 
 Example:
 
@@ -343,6 +344,6 @@ value_color=brightgreen<50:green<70:yellowgreen<80:yellow<90:orange<95:red
 ## Related Documentation
 
 - [Web Dashboard](/docs/dashboards-and-charts/README.md)
-- [Alert Configuration](/docs/alerts-and-notifications/README.md)
-- [API Reference](/docs/developer-and-contributor-corner/rest-api/README.md)
+- [Alert Configuration](/src/health/README.md)
+- [API Reference](/src/web/api/README.md)
 - [Access Control](/docs/netdata-agent/securing-netdata-agents.md)
