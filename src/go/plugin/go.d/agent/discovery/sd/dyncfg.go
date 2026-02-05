@@ -417,15 +417,18 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 		return
 	}
 
-	// Stop old pipeline if running
+	// Restart/start pipeline with new config
 	if isConversion {
+		// Conversion: pipeline keys differ, need Stop + Start
 		d.mgr.Stop(ecfg.PipelineKey())
+		err = d.mgr.Start(d.ctx, newPipelineKey, pipelineCfg)
 	} else {
-		d.mgr.Stop(newPipelineKey)
+		// Non-conversion: same pipeline key, use Restart for graceful transition
+		// Restart validates new config before stopping old, uses grace period
+		err = d.mgr.Restart(d.ctx, newPipelineKey, pipelineCfg)
 	}
 
-	// Start pipeline with new config
-	if err := d.mgr.Start(d.ctx, newPipelineKey, pipelineCfg); err != nil {
+	if err != nil {
 		d.Errorf("dyncfg: update: failed to start pipeline '%s:%s': %v", dt, name, err)
 		newCfg.SetStatus(dyncfg.StatusFailed)
 		d.exposedConfigs.updateStatus(newCfg, dyncfg.StatusFailed)
