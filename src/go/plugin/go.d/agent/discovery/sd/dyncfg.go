@@ -381,6 +381,14 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 		return
 	}
 
+	// Update not allowed in Accepted state (matching jobmgr pattern)
+	if ecfg.Status() == dyncfg.StatusAccepted {
+		d.Warningf("dyncfg: update: config '%s:%s': updating not allowed in %s state", dt, name, ecfg.Status())
+		d.dyncfgApi.SendCodef(fn, 403, "Updating is not allowed in '%s' state.", ecfg.Status())
+		d.dyncfgSDJobStatus(dt, name, ecfg.Status())
+		return
+	}
+
 	d.Infof("dyncfg: update: %s:%s by user '%s'", dt, name, fn.User())
 
 	// Update caches
@@ -581,15 +589,14 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn dyncfg.Function) {
 	d.seenConfigs.remove(cfg)
 	d.exposedConfigs.remove(cfg)
 
-	// Remove from dyncfg
-	d.dyncfgSDJobRemove(dt, name)
-
 	// TODO: After removing dyncfg config, check if a lower-priority config (user/stock file)
 	// exists in seenConfigs with the same Key(). If so, promote it to exposedConfigs and
 	// recreate the dyncfg job. This would allow file configs to "take over" when dyncfg
 	// override is removed.
 
+	// Response before delete (matching jobmgr pattern)
 	d.dyncfgApi.SendCodef(fn, 200, "")
+	d.dyncfgSDJobRemove(dt, name)
 }
 
 // dyncfgCmdUserconfig handles the userconfig command for templates and jobs

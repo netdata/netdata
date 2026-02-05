@@ -577,7 +577,7 @@ func TestServiceDiscovery_DyncfgUpdate(t *testing.T) {
 	tests := map[string]struct {
 		createSim func() *dyncfgSim
 	}{
-		"update existing job": {
+		"update disabled job": {
 			createSim: func() *dyncfgSim {
 				cfg := newTestNetListenersConfig("test-job", 0, 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
@@ -592,7 +592,72 @@ func TestServiceDiscovery_DyncfgUpdate(t *testing.T) {
 							[]string{sd.dyncfgTemplateID(DiscovererNetListeners), "add", "test-job"},
 							payload, "type=dyncfg,user=test")
 
-						// Update
+						// Enable then disable to get to Disabled state
+						sendDyncfgCmd(sd, "2-enable",
+							[]string{sd.dyncfgJobID(DiscovererNetListeners, "test-job"), "enable"},
+							nil, "")
+
+						sendDyncfgCmd(sd, "3-disable",
+							[]string{sd.dyncfgJobID(DiscovererNetListeners, "test-job"), "disable"},
+							nil, "")
+
+						// Update (should work in Disabled state)
+						sendDyncfgCmd(sd, "4-update",
+							[]string{sd.dyncfgJobID(DiscovererNetListeners, "test-job"), "update"},
+							updatedPayload, "type=dyncfg,user=test")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererNetListeners,
+							name:           "test-job",
+							sourceType:     "dyncfg",
+							status:         dyncfg.StatusDisabled,
+						},
+					},
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-add 202 application/json
+{"status":202,"message":""}
+FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+
+FUNCTION_RESULT_BEGIN 2-enable 200 application/json
+{"status":200,"message":""}
+FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status running
+
+FUNCTION_RESULT_BEGIN 3-disable 200 application/json
+{"status":200,"message":""}
+FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status disabled
+
+FUNCTION_RESULT_BEGIN 4-update 200 application/json
+{"status":200,"message":""}
+FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status disabled
+`,
+				}
+			},
+		},
+		"update in accepted state fails": {
+			createSim: func() *dyncfgSim {
+				cfg := newTestNetListenersConfig("test-job", 0, 0, defaultTestServices())
+				payload, _ := json.Marshal(cfg)
+
+				updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, defaultTestServices())
+				updatedPayload, _ := json.Marshal(updatedCfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// Add (creates in Accepted state)
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererNetListeners), "add", "test-job"},
+							payload, "type=dyncfg,user=test")
+
+						// Update in Accepted state should fail with 403
 						sendDyncfgCmd(sd, "2-update",
 							[]string{sd.dyncfgJobID(DiscovererNetListeners, "test-job"), "update"},
 							updatedPayload, "type=dyncfg,user=test")
@@ -612,8 +677,8 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
 
-FUNCTION_RESULT_BEGIN 2-update 200 application/json
-{"status":200,"message":""}
+FUNCTION_RESULT_BEGIN 2-update 403 application/json
+{"status":403,"errorMessage":"Updating is not allowed in 'accepted' state."}
 FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job status accepted
@@ -680,11 +745,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
 
-CONFIG test:sd:net_listeners:test-job delete
-
 FUNCTION_RESULT_BEGIN 2-remove 200 application/json
 {"status":200,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job delete
 `,
 				}
 			},
@@ -726,11 +791,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job status running
 
-CONFIG test:sd:net_listeners:test-job delete
-
 FUNCTION_RESULT_BEGIN 3-remove 200 application/json
 {"status":200,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job delete
 `,
 				}
 			},
@@ -1515,11 +1580,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:job1 status disabled
 
-CONFIG test:sd:net_listeners:job2 delete
-
 FUNCTION_RESULT_BEGIN 6-remove 200 application/json
 {"status":200,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:job2 delete
 `,
 				}
 			},
