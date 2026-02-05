@@ -88,7 +88,6 @@ https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/README.md,Netd
 https://github.com/netdata/netdata/edit/master/src/claim/README.md,Connect Agent,Published,Netdata Cloud,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md,Spaces and Rooms,Published,Netdata Cloud/Spaces and Rooms,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/node-rule-based-room-assignment.md,Node Rule-Based Room Assignment,Published,Netdata Cloud/Spaces and Rooms,,
-https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/versions.md,Versions,Unpublished,Netdata Cloud/Versions,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/README.md,Authentication & Authorization,Published,Netdata Cloud/Authentication & Authorization,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md,Enterprise SSO Authentication,Published,Netdata Cloud/Authentication & Authorization,,
 authentication_integrations,,,,,
@@ -122,13 +121,9 @@ https://github.com/netdata/netdata/edit/master/src/crates/netdata-otel/otel-plug
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/README.md,Metrics Centralization Points,Published,Netdata Parents/Metrics Centralization Points,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/configuration.md,Configuring Metrics Centralization Points,Published,Netdata Parents/Metrics Centralization Points,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/sizing-netdata-parents.md,Sizing Netdata Parents,Published,Netdata Parents/Metrics Centralization Points,,
-,Optimizing Netdata Children,Unpublished,Netdata Parents/Metrics Centralization Points,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md,Clustering and High Availability of Netdata Parents,Published,Netdata Parents/Metrics Centralization Points,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md,Replication of Past Samples,Published,Netdata Parents/Metrics Centralization Points,,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/faq.md,FAQ on Metrics Centralization Points,Published,Netdata Parents/Metrics Centralization Points,,
-https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/system-metrics.md,System metrics,Unpublished,Collecting Metrics,,"Netdata collects thousands of metrics from physical and virtual systems, IoT/edge devices, and containers with zero configuration."
-https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/application-metrics.md,Application metrics,Unpublished,Collecting Metrics,,"Monitor and troubleshoot every application on your infrastructure with per-second metrics, zero configuration, and meaningful charts."
-https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/container-metrics.md,Container metrics,Unpublished,Collecting Metrics,,Use Netdata to collect per-second utilization and application-level metrics from Linux/Docker containers and Kubernetes clusters.
 https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/snmp/profile-format.md,SNMP Profile Format,Published,Collecting Metrics,,Learn how Netdata’s SNMP collector uses profiles.
 collectors_integrations,,,,,
 ,,,,,
@@ -205,8 +200,6 @@ https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/g
 https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/codex-cli.md,OpenAI Codex CLI,Published,Netdata AI/MCP/MCP Clients,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/crush.md,Crush,Published,Netdata AI/MCP/MCP Clients,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/opencode.md,OpenCode,Published,Netdata AI/MCP/MCP Clients,,
-https://github.com/netdata/netdata/edit/master/docs/netdata-assistant.md,AI powered troubleshooting assistant,Unpublished,AI and Machine Learning,,
-https://github.com/netdata/netdata/edit/master/src/ml/README.md,ML models and anomaly detection,Unpublished,AI and Machine Learning,,This is an in-depth look at how Netdata uses ML to detect anomalies.
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/README.md,Dashboards and Charts,Published,Dashboards and Charts,,
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/home-tab.md,Tabs,Published,Dashboards and Charts/Tabs,,"With Netdata Cloud's War Rooms, you can see real-time metrics, from any number of nodes in your infrastructure, in composite charts."
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/alerts-tab.md,Alerts,Published,Dashboards and Charts/Tabs,,
@@ -225,9 +218,6 @@ https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/expand
 https://github.com/netdata/netdata/edit/master/docs/NIDL-Framework.md,NIDL Framework,Published,Dashboards and Charts,,
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/node-filter.md,Node Filter,Published,Dashboards and Charts,,
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/visualization-date-and-time-controls.md,Time Controls,Published,Dashboards and Charts,,
-https://github.com/netdata/netdata/edit/master/src/web/gui/confluence/README.md,Atlassian Confluence dashboards,Unpublished,Dashboards and Charts,,
-https://github.com/netdata/netdata/edit/master/src/web/gui/README.md,Legacy Agent Dashboard,Unpublished,Dashboards and Charts,,"The local Netdata Agent dashboard is the heart of health monitoring and performance troubleshooting, with hundreds of real-time charts."
-https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/monitor-your-infrastructure.md,Monitor your Infrastructure,Unpublished,Dashboards and Charts,,
 ,,,,,
 ,,,,,
 https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/README.md,Security and Privacy Design,Published,Security and Privacy Design,,
@@ -243,7 +233,6 @@ https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/
 ,,,,,
 ,,,,,
 https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/README.md,Developer and Contributor Corner,Published,Developer and Contributor Corner,,
-https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/netdata-apis.md,REST API,Unpublished,Developer and Contributor Corner/REST API,,
 https://github.com/netdata/netdata/edit/master/src/web/api/README.md,REST API,Published,Developer and Contributor Corner/REST API,,
 https://github.com/netdata/netdata/edit/master/src/web/api/queries/README.md,Queries,Published,Developer and Contributor Corner/REST API/Queries,,
 https://github.com/netdata/netdata/edit/master/src/web/api/queries/average/README.md,Average or Mean,Published,Developer and Contributor Corner/REST API/Queries,,
@@ -271,18 +260,16 @@ https://github.com/netdata/netdata/edit/master/src/database/engine/README.md,Dat
 https://github.com/netdata/.github/edit/main/CONTRIBUTING.md,Contributing,Published,Developer and Contributor Corner,,
 https://github.com/netdata/.github/edit/main/CODE_OF_CONDUCT.md,Community code of conduct,Published,Developer and Contributor Corner,,
 https://github.com/netdata/.github/edit/main/SECURITY.md,Security Policy,Published,Developer and Contributor Corner,,The Netdata team maintains and adheres to a formal process any time a member of the community reports a security vulnerability.
-https://github.com/netdata/netdata/edit/master/src/plugins.d/README.md,External plugins,Published,Developer and Contributor Corner/External Plugins,,
+https://github.com/netdata/netdata/edit/master/src/plugins.d/README.md,External Plugins,Published,Developer and Contributor Corner/External Plugins,,
 https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/README.md,go.d.plugin,Published,Developer and Contributor Corner/External Plugins/go.d.plugin,,"go.d.plugin is an external plugin for Netdata, responsible for running individual data collectors written in Go."
 https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/docs/how-to-write-a-module.md,How to write a Netdata collector in Go,Published,Developer and Contributor Corner/External Plugins/go.d.plugin,,"This guide will walk you through the technical implementation of writing a new Netdata collector in Golang, with tips on interfaces, structure, configuration files, and more."
 https://github.com/netdata/netdata/edit/master/src/collectors/python.d.plugin/README.md,python.d.plugin,Published,Developer and Contributor Corner/External Plugins/python.d.plugin,,
-https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/python-collector.md,Develop a custom data collector in Python,Unpublished,Developer and Contributor Corner/External Plugins/python.d.plugin,,"Learn how write a custom data collector in Python, which you'll use to collect metrics from and monitor any application that isn't supported out of the box."
 https://github.com/netdata/netdata/edit/master/src/collectors/charts.d.plugin/README.md,charts.d.plugin,Published,Developer and Contributor Corner/External Plugins,,
 https://github.com/netdata/netdata/edit/master/src/collectors/profile.plugin/README.md,profile.plugin,Published,Developer and Contributor Corner/External Plugins,,
 https://github.com/netdata/netdata/edit/master/src/plugins.d/FUNCTION_UI_REFERENCE.md,Functions v3 Protocol reference,Published,Developer and Contributor Corner/External Plugins,,
 https://github.com/netdata/netdata/edit/master/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md,Functions developer guide,Published,Developer and Contributor Corner/External Plugins,,
 https://github.com/netdata/netdata/edit/master/docs/guidelines.md,Contribute to the documentation,Published,Developer and Contributor Corner/Contribute to the documentation,,
 https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/style-guide.md,Netdata style guide,Published,Developer and Contributor Corner/Contribute to the documentation,,"The Netdata style guide establishes editorial guidelines for all of Netdata's writing, including documentation, blog posts, in-product UX copy, and more."
-https://github.com/netdata/netdata/edit/master/src/web/README.md,Web,Unpublished,Developer and Contributor Corner,,"Every Netdata Agent comes bundled with hundreds of interactive, customizable charts designed by monitoring and troubleshooting experts."
 https://github.com/netdata/netdata/edit/master/docs/glossary.md,Glossary,Published,Developer and Contributor Corner,,
 https://github.com/netdata/netdata/edit/master/src/libnetdata/README.md,libnetdata,Published,Developer and Contributor Corner/libnetdata,,
 https://github.com/netdata/netdata/edit/master/src/libnetdata/adaptive_resortable_list/README.md,Adaptive re-sortable list (ARL),Published,Developer and Contributor Corner/libnetdata,,
@@ -315,17 +302,10 @@ https://github.com/netdata/netdata/edit/master/REDISTRIBUTED.md,Redistributed So
 https://github.com/netdata/netdata/edit/master/tests/health_mgmtapi/README.md,Health command API tester,Published,Developer and Contributor Corner,,
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/import-export-print-snapshot.md,"Import, export, and print a snapshot",Published,Developer and Contributor Corner,,"Snapshots can be incredibly useful for diagnosing anomalies after they've already happened, and are interoperable with any other node running Netdata."
 https://github.com/netdata/netdata/edit/master/src/web/gui/custom/README.md,Build a custom Dashboard HTML page,Published,Developer and Contributor Corner,,Build custom dashboards with key metrics from one or more nodes running the Netdata Agent and host them anywhere.
-https://github.com/netdata/netdata/edit/master/docs/netdata-for-IoT.md,Netdata for IoT,Unpublished,Developer and Contributor Corner,,
 https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/collect-apache-nginx-web-logs.md,Monitor Nginx or Apache web server log files with Netdata,Published,Developer and Contributor Corner,,
 https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/collect-unbound-metrics.md,Monitor Unbound DNS servers with Netdata,Published,Developer and Contributor Corner,,
-https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/monitor-cockroachdb.md,Monitor CockroachDB metrics with Netdata,Unpublished,Developer and Contributor Corner,,
 https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/monitor-hadoop-cluster.md,Monitor a Hadoop cluster with Netdata,Published,Developer and Contributor Corner,,
-https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/kubernetes-k8s-netdata.md,Kubernetes monitoring with Netdata: Overview and visualizations,Unpublished,Developer and Contributor Corner,,Learn how to navigate Netdata's Kubernetes monitoring features for visualizing the health and performance of a Kubernetes cluster with per-second granularity.
-https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/lamp-stack.md,"LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata",Unpublished,Developer and Contributor Corner,,"Set up robust LAMP stack monitoring (Linux, Apache, MySQL, PHP) in just a few minutes using a free, open-source monitoring tool that collects metrics every second."
-https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/pi-hole-raspberry-pi.md,Monitor Pi-hole (and a Raspberry Pi) with Netdata,Unpublished,Developer and Contributor Corner,,"Monitor Pi-hole metrics, plus Raspberry Pi system metrics, in minutes and completely for free with Netdata's open-source monitoring agent."
-https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/raspberry-pi-anomaly-detection.md,Unsupervised anomaly detection for Raspberry Pi monitoring,Unpublished,Developer and Contributor Corner,,Use a low-overhead machine learning algorithm and an open-source monitoring tool to detect anomalous metrics on a Raspberry Pi.
 https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/monitor-debug-applications-ebpf.md,"Monitor, troubleshoot, and debug applications with eBPF metrics",Published,Developer and Contributor Corner,,"Use Netdata's built-in eBPF metrics collector to monitor, troubleshoot, and debug your custom application using low-level kernel feedback."
-https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/process.md,Monitor any process in real-time with Netdata,Unpublished,Developer and Contributor Corner,,"Tap into Netdata's powerful collectors, with per-second utilization metrics for every process, to troubleshoot faster and make data-informed decisions."
 https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/build-the-netdata-agent-yourself.md,Build the Netdata Agent Yourself,Published,Developer and Contributor Corner/Build the Netdata Agent Yourself,,
 https://github.com/netdata/netdata/edit/master/packaging/maintainers/README.md,Package Maintainers,Published,Developer and Contributor Corner/Build the Netdata Agent Yourself,,
 https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md,Compile from source code,Published,Developer and Contributor Corner/Build the Netdata Agent Yourself,,Package maintainers and power users may be interested in manually building Netdata from source without using any of our installation scripts.
