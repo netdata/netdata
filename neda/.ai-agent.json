@@ -3,7 +3,7 @@
     "nova": {
       "type": "openai-compatible",
       "apiKey": "${NOVA_API_KEY}",
-      "baseUrl": "http://10.20.4.21:8090/v1",
+      "baseUrl": "${NOVA_BASE_URL}",
       "openaiMode": "chat",
       "contextWindow": 131072,
       "stringSchemaFormatsAllowed": [
@@ -196,7 +196,7 @@
     "llama.cpp": {
       "type": "openai-compatible",
       "apiKey": "localkey",
-      "baseUrl": "http://nova:8234/v1",
+      "baseUrl": "http://10.20.4.21:8234/v1",
       "openaiMode": "chat",
       "stringSchemaFormatsAllowed": [
         "*"
