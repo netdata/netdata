@@ -1,16 +1,27 @@
 # Anonymous telemetry events
 
-Netdata collects anonymous usage information by default to improve the monitoring Agent. This telemetry helps identify issues and understand how users interact with Netdata.
+By default, Netdata collects anonymous usage information from the open-source monitoring Agent. For events like start, stop, crash, etc., we use our own cloud function in GCP. For frontend telemetry (page views, etc.) on the dashboard itself, we use the open-source product analytics platform [PostHog](https://github.com/PostHog/posthog).
 
-We are committed to your [data privacy](https://netdata.cloud/privacy/). You can opt out at any time using several methods described below.
+We are strongly committed to your [data privacy](https://netdata.cloud/privacy/).
+
+We use the statistics gathered from this information for two purposes:
+
+1. **Quality assurance**, to help us understand if Netdata behaves as expected, and to help us classify repeated issues with certain distributions or environments.
+
+2. **Usage statistics**, to help us interpret how people use the Netdata Agent in real-world environments, and to help us identify how our development/design decisions influence the community.
+
+Netdata collects usage information via two different channels:
+
+- **Agent dashboard**: We use the [PostHog JavaScript integration](https://posthog.com/docs/integrations/js-integration) (with sensitive event attributes overwritten to be anonymized) to send product usage events when you access an [Agent's dashboard](/docs/dashboards-and-charts/README.md).
+- **Agent backend**: The `netdata` daemon executes the [`anonymous-statistics.sh`](https://github.com/netdata/netdata/blob/6469cf92724644f5facf343e4bdd76ac0551a418/daemon/anonymous-statistics.sh.in) script when Netdata starts, stops cleanly, or fails.
 
 ## What data is collected
 
-Netdata gathers anonymous statistics via two channels:
+### Agent Dashboard - PostHog JavaScript
 
-### Agent Dashboard
+When you access an Agent dashboard session by visiting `http://NODE:19999`, Netdata initializes a PostHog session and masks various event attributes.
 
-The dashboard uses [PostHog JavaScript](https://posthog.com/docs/integrations/js-integration) to track page views and interactions. Sensitive attributes (IP, hostname, URL) are masked to anonymize the data:
+_Note_: You can see the relevant code in the [dashboard repository](https://github.com/netdata/dashboard/blob/master/src/domains/global/sagas.ts#L107) where the `window.posthog.register()` call is made.
 
 ```JavaScript
 window.posthog.register({
@@ -22,25 +33,36 @@ window.posthog.register({
 })
 ```
 
-### Agent Backend
+In the above snippet, a Netdata PostHog session is initialized and the `ip`, `current_url`, `pathname`, and `host` attributes are set to constant values for all events that may be sent during the session. This way, information like the IP or hostname of the Agent will not be sent as part of the product usage event data.
 
-The `netdata` daemon sends anonymous statistics when it starts, stops, or crashes via the `anonymous-statistics.sh` script.
+We have configured the dashboard to trigger the PostHog JavaScript code only when the variable `anonymous_statistics` is true. The value of this variable is controlled via the [opt-out mechanism](#opt-out).
 
-**Information collected:**
+### Agent Backend - Anonymous Statistics Script
 
-- Netdata version
-- OS name, version, and ID
+Every time the daemon is started or stopped, and every time a fatal condition is encountered, Netdata uses the anonymous statistics script to collect system information and send it to the Netdata telemetry cloud function via an HTTP call.
+
+**Information collected for all events:**
+
+- Netdata version, build information, release channel, install type
+- OS name, version, ID, and detection method
 - Kernel name, version, and architecture
 - Virtualization and containerization technology
+- System CPU information (model, vendor, frequency, core count)
+- System disk and RAM information (total sizes)
+- Netdata configuration (streaming, memory mode, web enabled, HTTPS, etc.)
+- Alert counts (normal, warning, critical)
+- Chart and metric counts
+- Collector information
+- Cloud connection status and availability
+- Streaming/mirroring configuration
 
 **For FATAL events only:**
 
-- Process and thread name
-- Source code function, filename, and line number
+The FATAL event sends the Netdata process and thread name, along with the source code function, source code filename, and source code line number of the fatal error.
 
 :::note
 
-To see exactly how data is collected, review the script template at [`daemon/anonymous-statistics.sh.in`](https://github.com/netdata/netdata/blob/6469cf92724644f5facf343e4bdd76ac0551a418/daemon/anonymous-statistics.sh.in).
+To see exactly what and how is collected, you can review the script template `daemon/anonymous-statistics.sh.in`. The template is converted to a bash script called `anonymous-statistics.sh`, installed under the Netdata `plugins directory`, which is usually `/usr/libexec/netdata/plugins.d`.
 
 :::
 
@@ -59,8 +81,9 @@ To see exactly how data is collected, review the script template at [`daemon/ano
 
 All opt-out methods prevent:
 
-- The anonymous statistics script from running
-- The PostHog JavaScript snippet from firing
+- The daemon from executing the anonymous statistics script
+- The anonymous statistics script from exiting immediately
+- The PostHog JavaScript snippet (which remains on the dashboard) from firing and sending any data to Netdata PostHog
 
 :::
 
@@ -171,7 +194,8 @@ See [installation documentation](/packaging/installer/README.md) for available i
 | Linux (standard)  | `/etc/netdata`                         |
 | Windows           | `C:\Program Files\Netdata\etc\netdata` |
 | Docker            | N/A (use environment variable)         |
-| macOS             | `/usr/local/etc/netdata`               |
+| macOS (Homebrew)  | `/usr/local/etc/netdata`               |
+| macOS (other)     | `/etc/netdata`                         |
 
 ## Verification
 
