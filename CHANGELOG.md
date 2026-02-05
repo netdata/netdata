@@ -281,6 +281,9 @@
 - Update README links to correct otel-plugin paths ([#21699](https://github.com/netdata/netdata/issues/21699))
 - Fix text sanitizer buffer overflow ([#21698](https://github.com/netdata/netdata/issues/21698))
 - Fix ML db model load function ([#21700](https://github.com/netdata/netdata/issues/21700))
+- Document logs functionality of otel plugin ([#21705](https://github.com/netdata/netdata/issues/21705))
+- Make new journal viewer plugin a mandatory dependency for native packages to ensure clean upgrades. ([#21701](https://github.com/netdata/netdata/issues/21701))
+- Set status flag of active journal file to archived on shutdown. ([#21707](https://github.com/netdata/netdata/issues/21707))
 
 ## [2.8.0] - 2025-11-19
 
