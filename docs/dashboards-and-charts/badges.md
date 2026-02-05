@@ -65,8 +65,8 @@ sudo systemctl restart netdata
 | `refresh`            | Auto-refresh interval in seconds             | `0` (no refresh)                  | `auto`, `5`                    |
 | `label_color`        | Left side background color                   | `grey`                            | `blue`, `red`, `#007ec6`       |
 | `value_color`        | Right side background color                  | Based on value                    | `green`, `yellow`, `#4c1`      |
-| `text_color_lbl`     | Left text color                              | `grey` (fallback)                 | `black`, `#fff`                |
-| `text_color_val`     | Right text color                             | `grey` (fallback)                 | `black`, `#fff`                |
+| `text_color_lbl`     | Left text color                              | `fff` (white)                     | `black`, `#fff`                |
+| `text_color_val`     | Right text color                             | `fff` (white)                     | `black`, `#fff`                |
 | `fixed_width_lbl`    | Fixed width for label (pixels)               | Auto                              | `100`                          |
 | `fixed_width_val`    | Fixed width for value (pixels)               | Auto                              | `80`                           |
 
