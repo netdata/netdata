@@ -46,27 +46,29 @@ sudo systemctl restart netdata
 
 ### Optional Parameters
 
-| Parameter            | Description                                  | Default              | Example                        |
-| -------------------- | -------------------------------------------- | -------------------- | ------------------------------ |
-| `alarm`              | Display alert status instead of metric value | -                    | `system.cpu.10min_cpu_usage`   |
-| `dimension` or `dim` | Specific dimension(s) to display             | All dimensions       | `user`, `system`               |
-| `after`              | Time range start (negative seconds)          | `-3600` (1 hour ago) | `-600` (10 min ago)            |
-| `before`             | Time range end (negative seconds)            | `0` (now)            | `0`                            |
-| `points`             | Number of data points to aggregate           | `1`                  | `60`                           |
-| `group`              | Aggregation method                           | `average`            | `average`, `sum`, `max`, `min` |
-| `label`              | Left-side label text                         | Chart name           | `CPU Usage`                    |
-| `units`              | Unit suffix to display                       | Auto-detected        | `%`, `MB`, `requests/s`        |
-| `multiply`           | Multiply value by this factor                | `1`                  | `100` (for percentages)        |
-| `divide`             | Divide value by this factor                  | `1`                  | `1024` (bytes to KB)           |
-| `precision`          | Decimal places                               | Auto                 | `2`                            |
-| `scale`              | Badge scale percentage                       | `100`                | `150`                          |
-| `refresh`            | Auto-refresh interval in seconds             | `0` (no refresh)     | `auto`, `5`                    |
-| `label_color`        | Left side background color                   | `grey`               | `blue`, `red`, `#007ec6`       |
-| `value_color`        | Right side background color                  | Based on value       | `green`, `yellow`, `#4c1`      |
-| `text_color_lbl`     | Left text color                              | `white`              | `black`, `#fff`                |
-| `text_color_val`     | Right text color                             | `white`              | `black`, `#fff`                |
-| `fixed_width_lbl`    | Fixed width for label (pixels)               | Auto                 | `100`                          |
-| `fixed_width_val`    | Fixed width for value (pixels)               | Auto                 | `80`                           |
+| Parameter            | Description                                  | Default                           | Example                        |
+| -------------------- | -------------------------------------------- | --------------------------------- | ------------------------------ |
+| `alarm`              | Display alert status instead of metric value | -                                 | `system.cpu.10min_cpu_usage`   |
+| `dimension` or `dim` | Specific dimension(s) to display             | All dimensions                    | `user`, `system`               |
+| `after`              | Time range start (negative seconds)          | `-UPDATE_EVERY` (chart-dependent) | `-600` (10 min ago)            |
+| `before`             | Time range end (negative seconds)            | `0` (now)                         | `0`                            |
+| `points`             | Number of data points to aggregate           | `1`                               | `60`                           |
+| `group`              | Aggregation method                           | `average`                         | `average`, `sum`, `max`, `min` |
+| `group_options`      | Additional grouping options                  | -                                 | `percentage`                   |
+| `options`            | Query options (percentage, abs, etc.)        | -                                 | `percentage`                   |
+| `label`              | Left-side label text                         | Chart name                        | `CPU Usage`                    |
+| `units`              | Unit suffix to display                       | Auto-detected                     | `%`, `MB`, `requests/s`        |
+| `multiply`           | Multiply value by this factor                | `1`                               | `100` (for percentages)        |
+| `divide`             | Divide value by this factor                  | `1`                               | `1024` (bytes to KB)           |
+| `precision`          | Decimal places (-1 for auto)                 | `-1` (auto)                       | `2`                            |
+| `scale`              | Badge scale percentage                       | `100`                             | `150`                          |
+| `refresh`            | Auto-refresh interval in seconds             | `0` (no refresh)                  | `auto`, `5`                    |
+| `label_color`        | Left side background color                   | `grey`                            | `blue`, `red`, `#007ec6`       |
+| `value_color`        | Right side background color                  | Based on value                    | `green`, `yellow`, `#4c1`      |
+| `text_color_lbl`     | Left text color                              | `white`                           | `black`, `#fff`                |
+| `text_color_val`     | Right text color                             | `white`                           | `black`, `#fff`                |
+| `fixed_width_lbl`    | Fixed width for label (pixels)               | Auto                              | `100`                          |
+| `fixed_width_val`    | Fixed width for value (pixels)               | Auto                              | `80`                           |
 
 ## Usage Examples
 
@@ -111,7 +113,7 @@ Static colors:
 Conditional colors based on value:
 
 ```markdown
-![Disk](http://localhost:19999/api/v1/badge.svg?chart=disk_space._&label=Root&units=%&value_color=green>80:yellow>90:red)
+![Disk](http://localhost:19999/api/v1/badge.svg?chart=disk_space._&label=Root&units=%&value_color=green<80:yellow<90:red)
 ```
 
 ## Color Options
@@ -143,22 +145,23 @@ value_color=FF5733
 Set colors based on value thresholds:
 
 ```
-value_color=green>80:yellow>90:red
+value_color=green<80:yellow<90:red
 ```
 
 This means:
 
-- Green if value ≤ 80
-- Yellow if value > 80 and ≤ 90
-- Red if value > 90
+- Green if value < 80
+- Yellow if value ≥ 80 and < 90
+- Red if value ≥ 90
 
 Supported operators:
 
-- `>` greater than
+- `:` or `=` equality (first match wins)
+- `!` inequality
 - `<` less than
-- `=` equal to
-- `>=` greater than or equal
+- `>` greater than
 - `<=` less than or equal
+- `>=` greater than or equal
 
 ## Grouping Methods
 
