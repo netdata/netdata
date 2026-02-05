@@ -217,7 +217,7 @@ https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/netdat
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/expanded-chart-analysis.md,Expanded Chart Analysis,Published,Dashboards and Charts,,
 https://github.com/netdata/netdata/edit/master/docs/NIDL-Framework.md,NIDL Framework,Published,Dashboards and Charts,,
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/node-filter.md,Node Filter,Published,Dashboards and Charts,,
-https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/badges.md,Badges,Published,Dashboards and Charts,badges,svg,embed,images,shields,Generate dynamic SVG badges for metrics and alerts to embed in dashboards, GitHub READMEs, or external sites.,
+https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/badges.md,Badges,Published,Dashboards and Charts,"badges,svg,embed,images,shields","Generate dynamic SVG badges for metrics and alerts to embed in dashboards, GitHub READMEs, or external sites."
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/visualization-date-and-time-controls.md,Time Controls,Published,Dashboards and Charts,,
 ,,,,,
 ,,,,,
