@@ -64,6 +64,46 @@ impl Default for CacheConfig {
     }
 }
 
+/// Default value for max_unique_values_per_field
+fn default_max_unique_values_per_field() -> usize {
+    500
+}
+
+/// Default value for max_field_payload_size
+fn default_max_field_payload_size() -> usize {
+    100
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IndexingConfig {
+    /// Maximum number of unique values to index per field.
+    ///
+    /// Fields with more unique values than this limit will have their indexing
+    /// truncated to prevent unbounded memory growth. This protects against
+    /// high-cardinality fields (e.g., MESSAGE with millions of unique values)
+    /// causing memory exhaustion during indexing.
+    #[serde(default = "default_max_unique_values_per_field")]
+    pub max_unique_values_per_field: usize,
+
+    /// Maximum payload size (in bytes) for field values to index.
+    ///
+    /// Field values with payloads larger than this limit (or compressed values)
+    /// will be skipped. This prevents large binary data or encoded content
+    /// from consuming excessive memory.
+    #[serde(default = "default_max_field_payload_size")]
+    pub max_field_payload_size: usize,
+}
+
+impl Default for IndexingConfig {
+    fn default() -> Self {
+        Self {
+            max_unique_values_per_field: default_max_unique_values_per_field(),
+            max_field_payload_size: default_max_field_payload_size(),
+        }
+    }
+}
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
@@ -74,6 +114,10 @@ pub struct Config {
     /// Cache configuration
     #[serde(rename = "cache")]
     pub cache: CacheConfig,
+
+    /// Indexing configuration
+    #[serde(rename = "indexing", default)]
+    pub indexing: IndexingConfig,
 }
 
 pub struct PluginConfig {
@@ -185,6 +229,15 @@ impl PluginConfig {
 
         if config.cache.queue_capacity == 0 {
             anyhow::bail!("cache.queue_capacity must be greater than 0");
+        }
+
+        // Validate indexing configuration
+        if config.indexing.max_unique_values_per_field == 0 {
+            anyhow::bail!("indexing.max_unique_values_per_field must be greater than 0");
+        }
+
+        if config.indexing.max_field_payload_size == 0 {
+            anyhow::bail!("indexing.max_field_payload_size must be greater than 0");
         }
 
         Ok(())
