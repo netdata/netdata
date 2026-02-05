@@ -231,6 +231,7 @@ https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/moni
 ,,,,,
 ,,,,,
 https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/README.md,Security and Privacy Design,Published,Security and Privacy Design,,
+https://github.com/netdata/netdata/edit/master/docs/netdata-oss-limitations.md,Access Control and Feature Availability,Published,Security and Privacy Design,,Feature availability across Anonymous access Netdata Cloud Community and Business tiers
 https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-agent-security.md,Netdata Agent,Published,Security and Privacy Design,,
 https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-cloud-security.md,Netdata Cloud,Published,Security and Privacy Design,,
 ,,,,,
