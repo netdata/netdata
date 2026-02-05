@@ -47,7 +47,7 @@ sudo systemctl restart netdata
 ### Optional Parameters
 
 | Parameter            | Description                                  | Default                           | Example                        |
-| -------------------- | -------------------------------------------- | --------------------------------- | ------------------------------ | --------- |
+| -------------------- | -------------------------------------------- | --------------------------------- | ------------------------------ |
 | `alarm`              | Display alert status instead of metric value | -                                 | `system.cpu.10min_cpu_usage`   |
 | `dimension` or `dim` | Specific dimension(s) to display             | All dimensions                    | `user`, `system`               |
 | `after`              | Time range start (negative seconds)          | `-UPDATE_EVERY` (chart-dependent) | `-600` (10 min ago)            |
@@ -55,7 +55,7 @@ sudo systemctl restart netdata
 | `points`             | Number of data points to aggregate           | `1`                               | `60`                           |
 | `group`              | Aggregation method                           | `average`                         | `average`, `sum`, `max`, `min` |
 | `group_options`      | Additional grouping options                  | -                                 | `percentage`                   |
-| `options`            | Query options (percentage, abs, etc.)        | -                                 | `percentage                    | absolute` |
+| `options`            | Query options (percentage, abs, etc.)        | -                                 | `percentage \| absolute`       |
 | `label`              | Left-side label text                         | Chart name                        | `CPU Usage`                    |
 | `units`              | Unit suffix to display                       | Auto-detected                     | `%`, `MB`, `requests/s`        |
 | `multiply`           | Multiply value by this factor                | `1`                               | `100` (for percentages)        |
