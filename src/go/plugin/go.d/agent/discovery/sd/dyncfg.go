@@ -354,19 +354,15 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 	var newSource, newSourceType, newPipelineKey string
 
 	if isConversion {
-		// Convert file config to dyncfg override
 		newSource = fn.Source()
 		newSourceType = confgroup.TypeDyncfg
 		newPipelineKey = pipelineKey(dt, name)
 		pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", newSource)
-		d.Infof("dyncfg: update: converting file config '%s:%s' to dyncfg by user '%s'", dt, name, fn.User())
 	} else {
-		// Update existing dyncfg config
 		newSource = fn.Source()
 		newSourceType = confgroup.TypeDyncfg
 		newPipelineKey = ecfg.PipelineKey()
 		pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", newSource)
-		d.Infof("dyncfg: update: %s:%s by user '%s'", dt, name, fn.User())
 	}
 
 	// Create updated sdConfig
@@ -376,9 +372,18 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to create config: %v", err)
 		return
 	}
-	newCfg.SetStatus(ecfg.Status())
 
-	// Update caches first (before pipeline operations)
+	// If running, not a conversion, and config unchanged, return early (optimization)
+	// Skip this optimization for conversions (file->dyncfg) since we need to change source type
+	if !isConversion && ecfg.Status() == dyncfg.StatusRunning && ecfg.Hash() == newCfg.Hash() {
+		d.dyncfgApi.SendCodef(fn, 200, "")
+		d.dyncfgSDJobStatus(dt, name, ecfg.Status())
+		return
+	}
+
+	d.Infof("dyncfg: update: %s:%s by user '%s'", dt, name, fn.User())
+
+	// Update caches
 	// When old was dyncfg: remove old from seenConfigs (cleanup stale entry)
 	// When old was file: keep in seenConfigs (for re-exposure if dyncfg removed later)
 	if !isConversion {
@@ -387,50 +392,50 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 	d.seenConfigs.add(newCfg)
 	d.exposedConfigs.add(newCfg)
 
-	// For conversion: remove old dyncfg job now, create new one after pipeline operation
+	// For conversion: remove old dyncfg job, will create new one below
 	if isConversion {
 		d.dyncfgSDJobRemove(dt, name)
 	}
 
-	// Handle pipeline restart/start
-	if isConversion {
-		// Stop old file pipeline if running (different pipeline key)
-		if d.mgr.IsRunning(ecfg.PipelineKey()) {
-			d.mgr.Stop(ecfg.PipelineKey())
+	// If old status was Accepted or Disabled, preserve it (don't auto-start)
+	if ecfg.Status() == dyncfg.StatusAccepted || ecfg.Status() == dyncfg.StatusDisabled {
+		newCfg.SetStatus(ecfg.Status())
+		d.exposedConfigs.updateStatus(newCfg, ecfg.Status())
+		if isConversion {
+			d.dyncfgSDJobCreate(dt, name, newSourceType, newSource, ecfg.Status())
 		}
-		// Start new dyncfg pipeline
-		if err := d.mgr.Start(d.ctx, newPipelineKey, pipelineCfg); err != nil {
-			// Accept failure state, user can retry via enable (matching jobmgr pattern)
-			d.Errorf("dyncfg: update: failed to start pipeline '%s:%s': %v", dt, name, err)
-			newCfg.SetStatus(dyncfg.StatusFailed)
-			d.exposedConfigs.updateStatus(newCfg, dyncfg.StatusFailed)
-			d.dyncfgSDJobCreate(dt, name, newSourceType, newSource, dyncfg.StatusFailed)
-			d.dyncfgApi.SendCodef(fn, 200, "")
-			return
-		}
-		newCfg.SetStatus(dyncfg.StatusRunning)
-		d.exposedConfigs.updateStatus(newCfg, dyncfg.StatusRunning)
-		d.dyncfgSDJobCreate(dt, name, newSourceType, newSource, dyncfg.StatusRunning)
-	} else if d.mgr.IsRunning(ecfg.PipelineKey()) {
-		// Restart existing dyncfg pipeline
-		if err := d.mgr.Restart(d.ctx, ecfg.PipelineKey(), pipelineCfg); err != nil {
-			// Accept failure state, user can retry via enable (matching jobmgr pattern)
-			d.Errorf("dyncfg: update: failed to restart pipeline '%s:%s': %v", dt, name, err)
-			newCfg.SetStatus(dyncfg.StatusFailed)
-			d.exposedConfigs.updateStatus(newCfg, dyncfg.StatusFailed)
-			d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
-			d.dyncfgApi.SendCodef(fn, 200, "")
-			return
-		}
-		newCfg.SetStatus(dyncfg.StatusRunning)
-		d.exposedConfigs.updateStatus(newCfg, dyncfg.StatusRunning)
-		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusRunning)
-	} else {
-		// Pipeline not running, just update status in dyncfg UI
-		d.dyncfgSDJobStatus(dt, name, newCfg.Status())
+		d.dyncfgApi.SendCodef(fn, 200, "")
+		d.dyncfgSDJobStatus(dt, name, ecfg.Status())
+		return
 	}
 
+	// Stop old pipeline if running
+	if isConversion {
+		d.mgr.Stop(ecfg.PipelineKey())
+	} else {
+		d.mgr.Stop(newPipelineKey)
+	}
+
+	// Start pipeline with new config
+	if err := d.mgr.Start(d.ctx, newPipelineKey, pipelineCfg); err != nil {
+		d.Errorf("dyncfg: update: failed to start pipeline '%s:%s': %v", dt, name, err)
+		newCfg.SetStatus(dyncfg.StatusFailed)
+		d.exposedConfigs.updateStatus(newCfg, dyncfg.StatusFailed)
+		if isConversion {
+			d.dyncfgSDJobCreate(dt, name, newSourceType, newSource, dyncfg.StatusFailed)
+		}
+		d.dyncfgApi.SendCodef(fn, 200, "")
+		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
+		return
+	}
+
+	newCfg.SetStatus(dyncfg.StatusRunning)
+	d.exposedConfigs.updateStatus(newCfg, dyncfg.StatusRunning)
+	if isConversion {
+		d.dyncfgSDJobCreate(dt, name, newSourceType, newSource, dyncfg.StatusRunning)
+	}
 	d.dyncfgApi.SendCodef(fn, 200, "")
+	d.dyncfgSDJobStatus(dt, name, dyncfg.StatusRunning)
 }
 
 // dyncfgCmdEnable handles the enable command for jobs

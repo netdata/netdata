@@ -612,11 +612,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
 
-CONFIG test:sd:net_listeners:test-job status accepted
-
 FUNCTION_RESULT_BEGIN 2-update 200 application/json
 {"status":200,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status accepted
 `,
 				}
 			},
@@ -1247,11 +1247,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job status running
 
-CONFIG test:sd:net_listeners:test-job status running
-
 FUNCTION_RESULT_BEGIN 3-update 200 application/json
 {"status":200,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status running
 `,
 				}
 			},

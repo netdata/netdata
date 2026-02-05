@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 
+	"github.com/gohugoio/hashstructure"
 	"gopkg.in/yaml.v2"
 )
 
@@ -38,6 +39,20 @@ func (c sdConfig) Name() string           { v, _ := c["name"].(string); return v
 func (c sdConfig) Status() dyncfg.Status {
 	v, _ := c[ikeyStatus].(dyncfg.Status)
 	return v
+}
+
+// HashIncludeMap implements hashstructure.HashIncludeMap to exclude __ metadata keys from hashing.
+// Same pattern as confgroup.Config.
+func (c sdConfig) HashIncludeMap(_ string, k, _ any) (bool, error) {
+	s := k.(string)
+	return !strings.HasPrefix(s, "__") && !strings.HasSuffix(s, "__"), nil
+}
+
+// Hash returns a hash of the config data (excluding __ metadata keys).
+// Used for comparing configs to detect changes.
+func (c sdConfig) Hash() uint64 {
+	hash, _ := hashstructure.Hash(c, nil)
+	return hash
 }
 
 func (c sdConfig) SetSource(v string) sdConfig         { c[ikeySource] = v; return c }
