@@ -564,10 +564,7 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn dyncfg.Function) {
 
 	d.Infof("dyncfg: remove: removing config '%s:%s'", dt, name)
 
-	// Stop the pipeline if running
-	if d.mgr.IsRunning(cfg.PipelineKey()) {
-		d.mgr.Stop(cfg.PipelineKey())
-	}
+	d.mgr.Stop(cfg.PipelineKey())
 
 	// Remove from both caches
 	d.seenConfigs.remove(cfg)
