@@ -289,36 +289,44 @@ http://netdata.local:19999/api/v1/badge.svg?chart=system.cpu&dimension=user&valu
 
 ## Troubleshooting
 
-### Badge shows "chart not found"
+<details>
+<summary>Badge shows "chart not found"</summary>
 
-- Verify the chart ID exists: Check the Netdata dashboard URL for the correct chart ID
-- Chart IDs are case-sensitive
-- Use `system.cpu` format, not `system.cpu.user`
+Verify the chart ID exists: Check the Netdata dashboard URL for the correct chart ID. Chart IDs are case-sensitive. Use `system.cpu` format, not `system.cpu.user`.
 
-### Badge shows empty value
+</details>
 
-- Check that the `dimension` parameter matches an actual dimension name
-- Verify the time range (`after`/`before`) contains recent data
-- Badge shows "-" when data is too old (staleness check) or unavailable
+<details>
+<summary>Badge shows empty value ("-")</summary>
 
-### Access denied / Cannot view badge
+Check that the `dimension` parameter matches an actual dimension name. Verify the time range (`after`/`before`) contains recent data. The badge shows "-" when data is too old (staleness check) or unavailable.
 
-- Check `allow badges from` in `netdata.conf`
-- Ensure the requesting IP is allowed
-- Check firewall rules on the Netdata host
+</details>
 
-### Colors not working
+<details>
+<summary>Access denied / Cannot view badge</summary>
 
-- Use predefined color names or 6-character hex codes (without `#`)
-- For conditional colors, ensure the format is correct: `color<threshold`
+Check `allow badges from` in `netdata.conf`. Ensure the requesting IP is allowed. Check firewall rules on the Netdata host.
 
-### Badge not updating
+</details>
 
-- Add `refresh=auto` or a specific interval
-- Some platforms cache images; try adding a cache-busting parameter:
-  ```
-  http://netdata.local:19999/api/v1/badge.svg?chart=system.cpu&refresh=5&t=123456
-  ```
+<details>
+<summary>Colors not working</summary>
+
+Use predefined color names or 6-character hex codes (without `#`). For conditional colors, ensure the format is correct: `color<threshold`.
+
+</details>
+
+<details>
+<summary>Badge not updating</summary>
+
+Add `refresh=auto` or a specific interval. Some platforms cache images; try adding a cache-busting parameter:
+
+```
+http://netdata.local:19999/api/v1/badge.svg?chart=system.cpu&refresh=5&t=123456
+```
+
+</details>
 
 ## Advanced Configuration
 
