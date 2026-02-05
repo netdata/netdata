@@ -952,7 +952,7 @@
       "command": "node",
       "args": [
         "/opt/ai-agent/mcp/fs/fs-mcp-server.js",
-        "/opt/neda/netdata-repos",
+        "${NETDATA_REPOS_ROOT}",
         "--no-rgrep-root",
         "--no-tree-root"
       ],
@@ -967,7 +967,7 @@
       "command": "node",
       "args": [
         "/opt/ai-agent/mcp/fs/fs-mcp-server.js",
-        "/opt/neda/netdata-repos-public"
+        "${NETDATA_REPOS_PUBLIC_ROOT}"
       ],
       "enabled": true,
       "toolsAllowed": [

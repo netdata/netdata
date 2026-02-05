@@ -3,8 +3,8 @@
 description: "Request Interpreter: Analyzes user requests and expands them into search interests and terms."
 usage: "Pass a user request to get a structured interpretation with interests and search terms."
 models:
-  - minimax/MiniMax-M2.1
   - nova/minimax-m2.1
+  - minimax/MiniMax-M2.1
   - zen/minimax-m2.1-free
   - zai/glm-4.7
   - zai/glm-4.6
