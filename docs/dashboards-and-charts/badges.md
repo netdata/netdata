@@ -165,17 +165,26 @@ Supported operators:
 
 ## Grouping Methods
 
-When aggregating multiple data points:
+When aggregating multiple data points, the `group` parameter determines how values are combined:
 
-| Method            | Description                    |
-| ----------------- | ------------------------------ |
-| `average`         | Arithmetic mean of values      |
-| `sum`             | Sum of all values              |
-| `max`             | Maximum value                  |
-| `min`             | Minimum value                  |
-| `median`          | Median value                   |
-| `stddev`          | Standard deviation             |
-| `incremental-sum` | Incremental sum (for counters) |
+| Method            | Description                               |
+| ----------------- | ----------------------------------------- |
+| `average`         | Arithmetic mean of values                 |
+| `sum`             | Sum of all values                         |
+| `max`             | Maximum value                             |
+| `min`             | Minimum value                             |
+| `median`          | Median value                              |
+| `stddev`          | Standard deviation                        |
+| `incremental-sum` | Incremental sum (for counters)            |
+| `trimmed-mean`    | Trimmed mean (excludes outliers)          |
+| `percentile`      | Percentile (specify with `group_options`) |
+| `ses`             | Single exponential smoothing              |
+| `des`             | Double exponential smoothing              |
+| `cv`              | Coefficient of variation                  |
+| `countif`         | Count values matching condition           |
+| `extremes`        | Min/max for mixed sign values             |
+
+Common methods: `average`, `sum`, `min`, `max`, `median`. See [Query Reference](/docs/developer-and-contributor-corner/rest-api/Queries/README.md) for all options.
 
 ## Alert Badges
 
@@ -185,6 +194,7 @@ When using the `alarm` parameter, badges display alert states:
 - **WARNING** - Yellow badge, warning threshold exceeded
 - **CRITICAL** - Red badge, critical threshold exceeded
 - **UNDEFINED** - Grey badge, alert cannot be evaluated
+- **UNINITIALIZED** - Black badge, alert has not been initialized
 
 Example:
 
@@ -269,7 +279,7 @@ http://netdata.local:19999/api/v1/badge.svg?chart=system.cpu&dimension=user&valu
 ### Colors not working
 
 - Use predefined color names or 6-character hex codes (without `#`)
-- For conditional colors, ensure the format is correct: `color>threshold`
+- For conditional colors, ensure the format is correct: `color<threshold`
 
 ### Badge not updating
 
