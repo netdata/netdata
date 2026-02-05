@@ -120,17 +120,17 @@ Conditional colors based on value:
 
 ### Predefined Colors
 
-| Color                     | Hex Code  | Visual                                                                                         |
-| ------------------------- | --------- | ---------------------------------------------------------------------------------------------- |
-| `brightgreen`             | `#4c1`    | <span style="background:#4c1;color:white;padding:2px 6px;border-radius:3px;">#4c1</span>       |
-| `green`                   | `#97CA00` | <span style="background:#97CA00;color:black;padding:2px 6px;border-radius:3px;">#97CA00</span> |
-| `yellowgreen`             | `#a4a61d` | <span style="background:#a4a61d;color:white;padding:2px 6px;border-radius:3px;">#a4a61d</span> |
-| `yellow`                  | `#dfb317` | <span style="background:#dfb317;color:black;padding:2px 6px;border-radius:3px;">#dfb317</span> |
-| `orange`                  | `#fe7d37` | <span style="background:#fe7d37;color:white;padding:2px 6px;border-radius:3px;">#fe7d37</span> |
-| `red`                     | `#e05d44` | <span style="background:#e05d44;color:white;padding:2px 6px;border-radius:3px;">#e05d44</span> |
-| `blue`                    | `#007ec6` | <span style="background:#007ec6;color:white;padding:2px 6px;border-radius:3px;">#007ec6</span> |
-| `grey` / `gray`           | `#555`    | <span style="background:#555;color:white;padding:2px 6px;border-radius:3px;">#555</span>       |
-| `lightgrey` / `lightgray` | `#9f9f9f` | <span style="background:#9f9f9f;color:black;padding:2px 6px;border-radius:3px;">#9f9f9f</span> |
+| Color                     | Hex Code  |
+| ------------------------- | --------- |
+| `brightgreen`             | `#4c1`    |
+| `green`                   | `#97CA00` |
+| `yellowgreen`             | `#a4a61d` |
+| `yellow`                  | `#dfb317` |
+| `orange`                  | `#fe7d37` |
+| `red`                     | `#e05d44` |
+| `blue`                    | `#007ec6` |
+| `grey` / `gray`           | `#555`    |
+| `lightgrey` / `lightgray` | `#9f9f9f` |
 
 ### Special Units Formats
 
