@@ -12,7 +12,7 @@ You can protect your Agents by implementing any of these security measures:
 
 *Best for:* Users who want direct access to agents secured by Netdata Cloud authentication
 
-You can secure direct access to your Netdata agents and parents with a single configuration setting. Bearer token protection integrates with Netdata Cloud SSO, so users authenticate through Cloud and inherit their Cloud roles and permissions.
+You can secure direct access to your Netdata Agents and Parents with a single configuration setting. Bearer token protection integrates with Netdata Cloud SSO, so users authenticate through Cloud and inherit their Cloud roles and permissions.
 
 Edit the `[web]` section in `netdata.conf` using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script:
 
