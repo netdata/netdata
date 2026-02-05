@@ -21,10 +21,10 @@
             "properties": {
               "interval": {
                 "title": "Scan interval",
-                "description": "How often to scan for listeners.",
-                "type": "string",
-                "pattern": "^[0-9]+(s|m|h)$",
-                "default": "2m"
+                "description": "How often to scan for listeners, in seconds.",
+                "type": "number",
+                "minimum": 1,
+                "default": 120
               },
               "timeout": {
                 "title": "Timeout",
@@ -102,8 +102,8 @@
     "discoverer": {
       "net_listeners": {
         "interval": {
-          "ui:placeholder": "2m",
-          "ui:help": "Examples: 30s, 2m, 5m"
+          "ui:placeholder": "120",
+          "ui:help": "Value in seconds. Examples: 30, 120, 300"
         },
         "timeout": {
           "ui:placeholder": "5",

@@ -21,10 +21,10 @@
             "properties": {
               "rescan_interval": {
                 "title": "Rescan interval",
-                "description": "How often to scan networks for devices.",
-                "type": "string",
-                "pattern": "^[0-9]+(s|m|h)$",
-                "default": "30m"
+                "description": "How often to scan networks for devices, in seconds.",
+                "type": "number",
+                "minimum": 60,
+                "default": 1800
               },
               "timeout": {
                 "title": "Timeout",
@@ -35,10 +35,10 @@
               },
               "device_cache_ttl": {
                 "title": "Device cache TTL",
-                "description": "How long to cache discovery results.",
-                "type": "string",
-                "pattern": "^[0-9]+(s|m|h)$",
-                "default": "12h"
+                "description": "How long to cache discovery results, in seconds.",
+                "type": "number",
+                "minimum": 60,
+                "default": 43200
               },
               "parallel_scans_per_network": {
                 "title": "Parallel scans",
@@ -238,16 +238,16 @@
     "discoverer": {
       "snmp": {
         "rescan_interval": {
-          "ui:placeholder": "30m",
-          "ui:help": "Examples: 30m, 1h"
+          "ui:placeholder": "1800",
+          "ui:help": "Value in seconds. Examples: 1800 (30m), 3600 (1h)"
         },
         "timeout": {
           "ui:placeholder": "1",
           "ui:help": "Value in seconds. Examples: 1, 5, 0.5"
         },
         "device_cache_ttl": {
-          "ui:placeholder": "12h",
-          "ui:help": "Examples: 12h, 24h"
+          "ui:placeholder": "43200",
+          "ui:help": "Value in seconds. Examples: 43200 (12h), 86400 (24h)"
         },
         "credentials": {
           "ui:listFlavour": "list",

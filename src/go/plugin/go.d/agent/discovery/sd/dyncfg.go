@@ -59,6 +59,7 @@ func dyncfgSDJobCmds(isDyncfgJob bool) string {
 	cmds := []dyncfg.Command{
 		dyncfg.CommandSchema,
 		dyncfg.CommandGet,
+		dyncfg.CommandTest,
 		dyncfg.CommandEnable,
 		dyncfg.CommandDisable,
 		dyncfg.CommandUpdate,
@@ -287,11 +288,11 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 	d.dyncfgSDJobCreate(dt, name, cfg.SourceType(), cfg.Source(), cfg.Status())
 }
 
-// dyncfgCmdTest handles the test command for templates (validates config without creating a job)
+// dyncfgCmdTest handles the test command for templates and jobs (validates config without applying it)
 func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 	id := fn.ID()
 
-	dt, _, _ := d.extractDiscovererAndName(id)
+	dt, name, isJob := d.extractDiscovererAndName(id)
 	if dt == "" || !isValidDiscovererType(dt) {
 		d.Warningf("dyncfg: test: invalid discoverer type in ID '%s'", id)
 		d.dyncfgApi.SendCodef(fn, 400, "Invalid discoverer type in ID: %s", id)
@@ -312,7 +313,11 @@ func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 		return
 	}
 
-	d.Infof("dyncfg: test: config for '%s' is valid", dt)
+	if isJob {
+		d.Infof("dyncfg: test: config for '%s:%s' is valid", dt, name)
+	} else {
+		d.Infof("dyncfg: test: config for '%s' is valid", dt)
+	}
 	d.dyncfgApi.SendCodef(fn, 200, "")
 }
 

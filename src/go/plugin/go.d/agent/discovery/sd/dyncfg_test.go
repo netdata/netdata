@@ -316,7 +316,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -368,13 +368,13 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -484,7 +484,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -531,7 +531,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -620,7 +620,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -676,7 +676,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-update 403 application/json
 {"status":403,"errorMessage":"Updating is not allowed in 'accepted' state."}
@@ -744,7 +744,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-remove 200 application/json
 {"status":200,"message":""}
@@ -784,7 +784,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -967,7 +967,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:docker:docker-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:docker:docker-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -1072,7 +1072,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:k8s:k8s-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:k8s:k8s-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -1176,7 +1176,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:snmp:snmp-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:snmp:snmp-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -1305,7 +1305,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1490,6 +1490,74 @@ FUNCTION_RESULT_END
 				}
 			},
 		},
+		"test existing job config succeeds": {
+			createSim: func() *dyncfgSim {
+				cfg := newTestNetListenersConfig("test-job", confopt.Duration(5*time.Second), 0, defaultTestServices())
+				payload, _ := json.Marshal(cfg)
+
+				updatedCfg := newTestNetListenersConfig("test-job", confopt.Duration(10*time.Second), 0, defaultTestServices())
+				updatedPayload, _ := json.Marshal(updatedCfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// First add the job
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererNetListeners), "add", "test-job"},
+							payload, "type=dyncfg,user=test")
+
+						// Test with new config (validates without applying)
+						sendDyncfgCmd(sd, "2-test",
+							[]string{sd.dyncfgJobID(DiscovererNetListeners, "test-job"), "test"},
+							updatedPayload, "")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererNetListeners,
+							name:           "test-job",
+							sourceType:     "dyncfg",
+							status:         dyncfg.StatusAccepted, // Still accepted, not changed by test
+						},
+					},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-add 202 application/json")
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-test 200 application/json")
+					},
+				}
+			},
+		},
+		"test job with invalid config fails": {
+			createSim: func() *dyncfgSim {
+				cfg := newTestNetListenersConfig("test-job", 0, 0, defaultTestServices())
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						// First add the job
+						sendDyncfgCmd(sd, "1-add",
+							[]string{sd.dyncfgTemplateID(DiscovererNetListeners), "add", "test-job"},
+							payload, "type=dyncfg,user=test")
+
+						// Test with invalid JSON
+						sendDyncfgCmd(sd, "2-test",
+							[]string{sd.dyncfgJobID(DiscovererNetListeners, "test-job"), "test"},
+							[]byte("{invalid json}"), "")
+					},
+					wantExposed: []wantExposedConfig{
+						{
+							discovererType: DiscovererNetListeners,
+							name:           "test-job",
+							sourceType:     "dyncfg",
+							status:         dyncfg.StatusAccepted,
+						},
+					},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-add 202 application/json")
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 2-test 400 application/json")
+						assert.Contains(t, got, "Failed to parse config")
+					},
+				}
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -1555,13 +1623,13 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:job1 create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:job1 create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:job2 create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:job2 create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 3-enable 200 application/json
 {"status":200,"message":""}
@@ -1787,7 +1855,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
