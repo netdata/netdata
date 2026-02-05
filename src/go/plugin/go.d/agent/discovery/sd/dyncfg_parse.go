@@ -45,6 +45,22 @@ func pipelineKey(discovererType, name string) string {
 	return fmt.Sprintf("dyncfg:%s:%s", discovererType, name)
 }
 
+// configToJSON converts stored config JSON to JSON via typed struct.
+// This ensures consistent field ordering matching the struct definition.
+func configToJSON(data []byte) ([]byte, error) {
+	var cfg pipeline.Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("unmarshal json: %w", err)
+	}
+
+	bs, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshal json: %w", err)
+	}
+
+	return bs, nil
+}
+
 // userConfigFromPayload converts a JSON payload to YAML format for user editing.
 // It unmarshals JSON into pipeline.Config, then marshals to YAML.
 // If jobName is provided (non-empty), it overrides the name from payload.

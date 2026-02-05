@@ -204,8 +204,15 @@ func (d *ServiceDiscovery) dyncfgCmdGet(fn dyncfg.Function) {
 		return
 	}
 
-	// Return config data as JSON (excluding __ metadata fields)
-	d.dyncfgApi.SendJSON(fn, string(cfg.DataJSON()))
+	// Convert stored config to JSON via typed struct for consistent field ordering
+	bs, err := configToJSON(cfg.DataJSON())
+	if err != nil {
+		d.Warningf("dyncfg: get: failed to convert config '%s' to JSON: %v", key, err)
+		d.dyncfgApi.SendCodef(fn, 500, "Failed to convert config to JSON: %v", err)
+		return
+	}
+
+	d.dyncfgApi.SendJSON(fn, string(bs))
 }
 
 // dyncfgCmdAdd handles the add command for templates (creates a new job)
