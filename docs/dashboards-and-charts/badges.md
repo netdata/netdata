@@ -123,7 +123,7 @@ Conditional colors based on value:
 | Color                     | Hex Code  | Sample |
 | ------------------------- | --------- | ------ |
 | `brightgreen`             | `#4c1`    | 🟢     |
-| `green`                   | `#97CA00` | 🟢     |
+| `green`                   | `#97CA00` | 🟢\*   |
 | `yellowgreen`             | `#a4a61d` | 🟡     |
 | `yellow`                  | `#dfb317` | 🟡     |
 | `orange`                  | `#fe7d37` | 🟠     |
@@ -132,7 +132,7 @@ Conditional colors based on value:
 | `grey` / `gray`           | `#555`    | ⬜     |
 | `lightgrey` / `lightgray` | `#9f9f9f` | ⬜     |
 
-**Color guide:** 🟢 green tones | 🟡 yellow/olive | 🟠 orange | 🔴 red | 🔵 blue | ⬜ greys
+**Color guide:** 🟢 rich green | 🟢\* lighter/yellowish green | 🟡 yellow/olive | 🟠 orange | 🔴 red | 🔵 blue | ⬜ greys
 
 ### Special Units Formats
 
