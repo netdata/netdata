@@ -8,6 +8,30 @@ You can protect your Agents by implementing any of these security measures:
 
 ### Recommended Methods
 
+**Enable Bearer Token Protection (Netdata Cloud SSO)**
+
+*Best for:* Users who want direct access to agents secured by Netdata Cloud authentication
+
+You can secure direct access to your Netdata agents and parents with a single configuration setting. Bearer token protection integrates with Netdata Cloud SSO, so users authenticate through Cloud and inherit their Cloud roles and permissions.
+
+Edit the `[web]` section in `netdata.conf` using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script:
+
+```text
+[web]
+    bearer token protection = yes
+```
+
+After restart, users accessing `http://NODE:19999` will be redirected to Netdata Cloud for authentication. Their Cloud role (Admin, Manager, Troubleshooter, etc.) determines what they can access.
+
+**Requirements:**
+
+- Agent must be [claimed to Netdata Cloud](/docs/netdata-cloud/connect-agent-to-cloud.md)
+- Works with both Community (free) and Business plans
+
+For detailed configuration options, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
+
+---
+
 **Disable the Local Dashboard**
 
 *Best for:* Users who monitor their systems through Netdata Cloud dashboards
