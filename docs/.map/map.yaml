@@ -1,4 +1,5 @@
 sidebar:
+  # Welcome to Netdata
   - meta:
       label: Welcome to Netdata
       edit_url: https://github.com/netdata/netdata/edit/master/docs/welcome-to-netdata.md
@@ -40,12 +41,15 @@ sidebar:
             - executive reports
             - board reporting
             - data export
+  # Getting Started
   - meta:
       label: Getting Started
       edit_url: https://github.com/netdata/netdata/edit/master/docs/getting-started-netdata/guide.md
+  # Live Demo
   - meta:
       label: Live Demo
       edit_url: https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.md
+  # Netdata Agent
   - meta:
       label: Netdata Agent
       edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/standalone-deployment.md
@@ -273,6 +277,7 @@ sidebar:
       - meta:
           label: Anonymous telemetry events
           edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/anonymous-telemetry-events.md
+  # Netdata Parents
   - meta:
       label: Netdata Parents
       edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/deployment-with-centralization-points.md
@@ -311,6 +316,7 @@ sidebar:
           - meta:
               label: FAQ on Metrics Centralization Points
               edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/faq.md
+  # Netdata Cloud
   - meta:
       label: Netdata Cloud
       edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/README.md
@@ -368,6 +374,7 @@ sidebar:
       - meta:
           label: Account Deletion
           edit_url: https://github.com/netdata/netdata/edit/master/docs/delete/netdata/account.md
+  # Netdata Cloud On-Prem
   - meta:
       label: Netdata Cloud On-Prem
       edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/README.md
@@ -399,6 +406,7 @@ sidebar:
       - meta:
           label: Release Notes
           edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/netdata-cloud-onprem/RELEASE-NOTES.md
+  # Collecting Metrics
   - meta:
       label: Collecting Metrics
       edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/README.md
@@ -423,6 +431,7 @@ sidebar:
           description: Learn how Netdata’s SNMP collector uses profiles.
       - type: integration_placeholder
         integration_kind: collectors
+  # Exporting Metrics
   - meta:
       label: Exporting Metrics
       edit_url: https://github.com/netdata/netdata/edit/master/docs/exporting-metrics/README.md
@@ -445,6 +454,7 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/exporters/shell/README.md
       - type: integration_placeholder
         integration_kind: exporters
+  # Logs
   - meta:
       label: Logs
     items:
@@ -483,6 +493,7 @@ sidebar:
               edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/active_journal_centralization_guide_no_encryption.md
       - type: integration_placeholder
         integration_kind: logs
+  # Top Consumers
   - meta:
       label: Top Consumers
       edit_url: https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md
@@ -495,6 +506,7 @@ sidebar:
           label: Database Queries
           edit_url: https://github.com/netdata/netdata/edit/master/docs/functions/databases.md
           description: Top and running database queries with deadlock and error attribution for 13 databases.
+  # Alerts & Notifications
   - meta:
       label: Alerts & Notifications
       edit_url: https://github.com/netdata/netdata/edit/master/src/health/README.md
@@ -556,6 +568,7 @@ sidebar:
       - meta:
           label: Health API Calls
           edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/health/README.md
+  # Netdata AI
   - meta:
       label: Netdata AI
       edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md
@@ -671,6 +684,7 @@ sidebar:
               - meta:
                   label: OpenCode
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/opencode.md
+  # Dashboards and Charts
   - meta:
       label: Dashboards and Charts
       edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/README.md
@@ -734,6 +748,7 @@ sidebar:
       - meta:
           label: Time Controls
           edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/visualization-date-and-time-controls.md
+  # Security and Privacy Design
   - meta:
       label: Security and Privacy Design
       edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/README.md
@@ -744,6 +759,7 @@ sidebar:
       - meta:
           label: Netdata Cloud
           edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-cloud-security.md
+  # Developer and Contributor Corner
   - meta:
       label: Developer and Contributor Corner
       edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/README.md
