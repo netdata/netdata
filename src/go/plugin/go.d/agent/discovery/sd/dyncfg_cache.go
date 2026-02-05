@@ -335,24 +335,6 @@ func (c *exposedSDConfigs) updateStatus(cfg sdConfig, status dyncfg.Status) {
 	}
 }
 
-func (c *exposedSDConfigs) forEach(fn func(cfg sdConfig)) {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	for _, cfg := range c.items {
-		fn(cfg)
-	}
-}
-
-func (c *exposedSDConfigs) forEachBySource(source string, fn func(cfg sdConfig)) {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	for _, cfg := range c.items {
-		if cfg.Source() == source {
-			fn(cfg)
-		}
-	}
-}
-
 func (c *exposedSDConfigs) count() int {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
