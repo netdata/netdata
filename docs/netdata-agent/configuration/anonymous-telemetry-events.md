@@ -75,6 +75,7 @@ To see exactly what and how is collected, you can review the script template `da
 🖥️  Windows             → Use Method 2 (Windows-specific)
 🐳 Docker              → Use Method 3 (Environment variable)
 📦 Manual/Offline      → Use Method 1 (File-based)
+🔷 FreeBSD             → Use Method 1 (File-based)
 ```
 
 :::note
@@ -91,22 +92,26 @@ When opt-out is enabled, the anonymous statistics script exits immediately witho
 ## Opt-out Methods
 
 <details>
-<summary><strong>Method 1: Create opt-out file (Linux/macOS)</strong></summary><br/>
+<summary><strong>Method 1: Create opt-out file (Linux/macOS/FreeBSD)</strong></summary><br/>
 
-**When to use**: Standard Linux installations, manual installations, macOS, or offline setups.
+**When to use**: Standard Linux installations, FreeBSD, manual installations, macOS, or offline setups.
 
 **Steps**:
 
-1. Navigate to your Netdata configuration directory (usually `/etc/netdata`)
+1. Navigate to your Netdata configuration directory
 2. Create an empty file called `.opt-out-from-anonymous-statistics`
 
 ```bash
+# Linux
 touch /etc/netdata/.opt-out-from-anonymous-statistics
+
+# FreeBSD
+touch /usr/local/etc/netdata/.opt-out-from-anonymous-statistics
 ```
 
 :::tip
 
-This method works for all installation types including manual, offline, and macOS installations. The file simply needs to exist—the content doesn't matter.
+This method works for all installation types including FreeBSD, manual, offline, and macOS installations. The file simply needs to exist—the content doesn't matter.
 
 :::
 
@@ -197,6 +202,7 @@ See the [installation documentation](/packaging/installer/README.md) for availab
 | Docker            | N/A (use environment variable)         |
 | macOS (Homebrew)  | `/usr/local/etc/netdata`               |
 | macOS (other)     | `/etc/netdata`                         |
+| FreeBSD           | `/usr/local/etc/netdata`               |
 
 ## Verification
 
