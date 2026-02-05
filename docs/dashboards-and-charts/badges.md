@@ -120,17 +120,19 @@ Conditional colors based on value:
 
 ### Predefined Colors
 
-| Color                     | Hex Code  |
-| ------------------------- | --------- |
-| `brightgreen`             | `#4c1`    |
-| `green`                   | `#97CA00` |
-| `yellowgreen`             | `#a4a61d` |
-| `yellow`                  | `#dfb317` |
-| `orange`                  | `#fe7d37` |
-| `red`                     | `#e05d44` |
-| `blue`                    | `#007ec6` |
-| `grey` / `gray`           | `#555`    |
-| `lightgrey` / `lightgray` | `#9f9f9f` |
+Use these color names in `label_color`, `value_color`, `text_color_lbl`, or `text_color_val`:
+
+[![brightgreen](https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&label=test&value_color=brightgreen&units=)]
+[![green](https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&label=test&value_color=green&units=)]
+[![yellowgreen](https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&label=test&value_color=yellowgreen&units=)]
+[![yellow](https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&label=test&value_color=yellow&units=)]
+[![orange](https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&label=test&value_color=orange&units=)]
+[![red](https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&label=test&value_color=red&units=)]
+[![blue](https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&label=test&value_color=blue&units=)]
+[![grey](https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&label=test&value_color=grey&units=)]
+[![lightgrey](https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&label=test&value_color=lightgrey&units=)]
+
+Hex codes: `brightgreen:#4c1` · `green:#97CA00` · `yellowgreen:#a4a61d` · `yellow:#dfb317` · `orange:#fe7d37` · `red:#e05d44` · `blue:#007ec6` · `grey:#555` · `lightgrey:#9f9f9f`
 
 ### Special Units Formats
 
