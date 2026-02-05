@@ -120,17 +120,17 @@ Conditional colors based on value:
 
 ### Predefined Colors
 
-| Color                     | Hex Code  |
-| ------------------------- | --------- |
-| `brightgreen`             | `#4c1`    |
-| `green`                   | `#97CA00` |
-| `yellowgreen`             | `#a4a61d` |
-| `yellow`                  | `#dfb317` |
-| `orange`                  | `#fe7d37` |
-| `red`                     | `#e05d44` |
-| `blue`                    | `#007ec6` |
-| `grey` / `gray`           | `#555`    |
-| `lightgrey` / `lightgray` | `#9f9f9f` |
+| Color                                                                                                                             | Hex Code  |
+| --------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#4c1;"></span> `brightgreen`                | `#4c1`    |
+| <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#97CA00;"></span> `green`                   | `#97CA00` |
+| <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#a4a61d;"></span> `yellowgreen`             | `#a4a61d` |
+| <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#dfb317;"></span> `yellow`                  | `#dfb317` |
+| <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#fe7d37;"></span> `orange`                  | `#fe7d37` |
+| <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#e05d44;"></span> `red`                     | `#e05d44` |
+| <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#007ec6;"></span> `blue`                    | `#007ec6` |
+| <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#555;"></span> `grey` / `gray`              | `#555`    |
+| <span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#9f9f9f;"></span> `lightgrey` / `lightgray` | `#9f9f9f` |
 
 ### Special Units Formats
 
