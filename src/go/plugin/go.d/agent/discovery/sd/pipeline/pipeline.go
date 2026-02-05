@@ -63,10 +63,6 @@ type (
 
 		// new
 		svr composer
-
-		// legacy
-		clr classificator
-		cmr composer
 	}
 	classificator interface {
 		classify(model.Target) model.Tags
@@ -222,26 +218,6 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 			}
 			continue
 		}
-
-		// Legacy:
-		if tags := p.clr.classify(tgt); len(tags) > 0 {
-			tgt.Tags().Merge(tags)
-
-			if cfgs := p.cmr.compose(tgt); len(cfgs) > 0 {
-				targetsCache[hash] = cfgs
-				changed = true
-
-				for _, cfg := range cfgs {
-					cfg.SetProvider(tgg.Provider())
-					cfg.SetSource(tgg.Source())
-					cfg.SetSourceType(confgroup.TypeDiscovered)
-					if def, ok := p.configDefaults.Lookup(cfg.Module()); ok {
-						cfg.ApplyDefaults(def)
-					}
-				}
-			}
-		}
-
 	}
 
 	for hash := range targetsCache {
