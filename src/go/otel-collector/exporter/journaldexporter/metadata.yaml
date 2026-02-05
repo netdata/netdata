@@ -1,7 +1,0 @@
-type: journaldexporter
-github_project: github.com/netdata/netdata/otel-collector/exporter/journaldexporter
-
-status:
-  class: exporter
-  stability:
-    development: [logs]
