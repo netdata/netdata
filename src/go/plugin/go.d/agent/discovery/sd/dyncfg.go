@@ -245,7 +245,11 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 		return
 	}
 
-	d.Infof("dyncfg: add: %s:%s by user '%s'", dt, name, fn.User())
+	if err := validateJobName(name); err != nil {
+		d.Warningf("dyncfg: add: unacceptable job name '%s': %v", name, err)
+		d.dyncfgApi.SendCodef(fn, 400, "Unacceptable job name '%s': %v.", name, err)
+		return
+	}
 
 	// Validate config by parsing it
 	if _, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults); err != nil {
@@ -263,36 +267,28 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 		return
 	}
 
-	// Check if config with same key already exists
+	d.Infof("dyncfg: add: %s:%s by user '%s'", dt, name, fn.User())
+
+	// If config with same key already exists, replace it (matching jobmgr pattern)
 	key := dt + ":" + name
-	ecfg, exists := d.exposedConfigs.lookup(key)
-
-	if exists {
-		// Dyncfg always has highest priority - replace existing
-		sp, ep := scfg.SourceTypePriority(), ecfg.SourceTypePriority()
-		if ep >= sp {
-			// Existing is dyncfg too - reject duplicate
-			d.Warningf("dyncfg: add: config '%s' already exists (source: %s)", key, ecfg.SourceType())
-			d.dyncfgApi.SendCodef(fn, 400, "Config '%s' already exists.", key)
-			return
+	if ecfg, ok := d.exposedConfigs.lookup(key); ok {
+		// Only remove from seenConfigs if it's a dyncfg config
+		// (file-based configs are removed via other codepath when file is deleted)
+		if scfg, ok := d.seenConfigs.lookup(ecfg.UID()); ok && scfg.SourceType() == confgroup.TypeDyncfg {
+			d.seenConfigs.remove(ecfg.UID())
 		}
-
-		// New dyncfg config replaces file config
-		d.Infof("dyncfg: add: replacing file config '%s' with dyncfg", key)
-		if ecfg.Status() == dyncfg.StatusRunning {
+		d.exposedConfigs.remove(key)
+		if d.mgr.IsRunning(ecfg.PipelineKey()) {
 			d.mgr.Stop(ecfg.PipelineKey())
 		}
-		d.dyncfgSDJobRemove(ecfg.DiscovererType(), ecfg.Name())
 	}
 
 	// Add to both caches
 	d.seenConfigs.add(scfg)
 	d.exposedConfigs.add(scfg)
 
-	// Create dyncfg job
-	d.dyncfgSDJobCreate(dt, name, scfg.SourceType(), scfg.Source(), scfg.Status())
-
 	d.dyncfgApi.SendCodef(fn, 202, "")
+	d.dyncfgSDJobCreate(dt, name, scfg.SourceType(), scfg.Source(), scfg.Status())
 }
 
 // dyncfgCmdTest handles the test command for templates (validates config without creating a job)
