@@ -85,6 +85,28 @@ command: `export DISABLE_TELEMETRY=1`. When creating a container using Netdata's
 image](/packaging/docker/README.md#create-a-new-netdata-agent-container) for the first time, this variable will disable
 the anonymous statistics script inside the container.
 
+### Windows
+
+On Windows, the Netdata configuration directory is located at `C:\Program Files\Netdata\etc\netdata`. You can opt out from sending anonymous statistics using the same mechanisms as on other platforms:
+
+**Create a file called `.opt-out-from-anonymous-statistics`.** Create an empty file in the Netdata configuration directory to immediately stop the statistics script from running. Run the following PowerShell command as Administrator:
+
+```powershell
+New-Item -Path "C:\Program Files\Netdata\etc\netdata\.opt-out-from-anonymous-statistics" -ItemType File -Force
+```
+
+**Set the `DISABLE_TELEMETRY` environment variable.** You can disable telemetry by setting the environment variable before starting the Netdata service. Run the following PowerShell command as Administrator:
+
+```powershell
+[Environment]::SetEnvironmentVariable("DISABLE_TELEMETRY", "1", "Machine")
+```
+
+Note: After setting the environment variable, you need to restart the Netdata service for the change to take effect:
+
+```powershell
+Restart-Service -Name Netdata
+```
+
 Each of these opt-out processes does the following:
 
 - Prevents the daemon from executing the anonymous statistics script.
