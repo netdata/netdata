@@ -532,9 +532,9 @@ impl FunctionHandler for CatalogFunction {
             })?;
         let find_files_duration = op_start.elapsed();
         debug!("[{}] found {} files in time range", txn.id(), files.len(),);
-        if tracing::enabled!(tracing::Level::DEBUG) {
+        if tracing::enabled!(tracing::Level::TRACE) {
             for (idx, file_info) in files.iter().enumerate() {
-                debug!(
+                tracing::trace!(
                     "[{}] file[{}/{}]: {}",
                     txn.id(),
                     idx + 1,
@@ -556,17 +556,6 @@ impl FunctionHandler for CatalogFunction {
             facets.len(),
             facets.precomputed_hash()
         );
-        if tracing::enabled!(tracing::Level::DEBUG) {
-            for (idx, facet) in facets.iter().enumerate() {
-                debug!(
-                    "[{}] facet[{}/{}]: {}",
-                    txn.id(),
-                    idx + 1,
-                    facets.len(),
-                    facet.as_str(),
-                );
-            }
-        }
 
         // Build file index keys
         let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
@@ -597,9 +586,9 @@ impl FunctionHandler for CatalogFunction {
             indexed_files.len(),
             files.len(),
         );
-        if tracing::enabled!(tracing::Level::DEBUG) {
+        if tracing::enabled!(tracing::Level::TRACE) {
             for (idx, (key, file_index)) in indexed_files.iter().enumerate() {
-                debug!(
+                tracing::trace!(
                     "[{}] file index[{}/{}]: {}, indexed at: {}, online: {}, bucket duration: {}",
                     txn.id(),
                     idx + 1,
