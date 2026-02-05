@@ -47,7 +47,7 @@ sudo systemctl restart netdata
 ### Optional Parameters
 
 | Parameter            | Description                                  | Default                           | Example                        |
-| -------------------- | -------------------------------------------- | --------------------------------- | ------------------------------ |
+| -------------------- | -------------------------------------------- | --------------------------------- | ------------------------------ | --------- |
 | `alarm`              | Display alert status instead of metric value | -                                 | `system.cpu.10min_cpu_usage`   |
 | `dimension` or `dim` | Specific dimension(s) to display             | All dimensions                    | `user`, `system`               |
 | `after`              | Time range start (negative seconds)          | `-UPDATE_EVERY` (chart-dependent) | `-600` (10 min ago)            |
@@ -55,7 +55,7 @@ sudo systemctl restart netdata
 | `points`             | Number of data points to aggregate           | `1`                               | `60`                           |
 | `group`              | Aggregation method                           | `average`                         | `average`, `sum`, `max`, `min` |
 | `group_options`      | Additional grouping options                  | -                                 | `percentage`                   |
-| `options`            | Query options (percentage, abs, etc.)        | -                                 | `percentage`                   |
+| `options`            | Query options (percentage, abs, etc.)        | -                                 | `percentage                    | absolute` |
 | `label`              | Left-side label text                         | Chart name                        | `CPU Usage`                    |
 | `units`              | Unit suffix to display                       | Auto-detected                     | `%`, `MB`, `requests/s`        |
 | `multiply`           | Multiply value by this factor                | `1`                               | `100` (for percentages)        |
@@ -148,6 +148,8 @@ When using the `units` parameter, these special formats are recognized:
 | `percentage` / `percent` / `pcent`     | Adds `%` suffix           |
 | `empty` / `null`                       | Hides units entirely      |
 
+To display a literal `/` in units, escape it with `\` (e.g., `units=requests\/s`).
+
 ### Custom Colors
 
 Use any hex color code (without the `#`):
@@ -201,6 +203,18 @@ When aggregating multiple data points, the `group` parameter determines how valu
 | `extremes`        | Min/max for mixed sign values             |
 
 Common methods: `average`, `sum`, `min`, `max`, `median`. See [Query Reference](/src/web/api/queries/README.md) for all options.
+
+### Query Options
+
+The `options` parameter accepts pipe-delimited values:
+
+| Option             | Description                                                |
+| ------------------ | ---------------------------------------------------------- |
+| `percentage`       | Calculate value as percentage of dimension total           |
+| `absolute` / `abs` | Convert all values to positive before summing              |
+| `display_absolute` | Use signed value for color, display absolute               |
+| `min2max`          | For multiple dimensions, return `max - min` instead of sum |
+| `unaligned`        | Skip time alignment for aggregated data                    |
 
 ## Alert Badges
 
@@ -340,6 +354,75 @@ value_color=brightgreen<50:green<70:yellowgreen<80:yellow<90:orange<95:red
    - Using a reverse proxy with authentication
    - Limiting available charts via ACLs
    - Monitoring badge access logs
+
+## URL Escaping
+
+When embedding badges in HTML, certain characters must be escaped:
+
+| Character | Description                  | Escape Sequence |
+| --------- | ---------------------------- | --------------- |
+| Space     | Spaces in labels/units       | `%20`           |
+| `#`       | Hash for colors              | `%23`           |
+| `%`       | Percent in units             | `%25`           |
+| `<`       | Less than                    | `%3C`           |
+| `>`       | Greater than                 | `%3E`           |
+| `\`       | Backslash (for `/` in units) | `%5C`           |
+| `\|`      | Pipe (delimit parameters)    | `%7C`           |
+
+Example with escaped spaces:
+
+```markdown
+![CPU](http://localhost:19999/api/v1/badge.svg?chart=system.cpu&label=CPU%20Usage)
+```
+
+## Performance
+
+Netdata can generate approximately **2,000 badges per second per CPU core**, with each badge taking about 0.5ms to generate on modern hardware.
+
+For badges calculating aggregates over long durations (days or more), response times will increase. Check `access.log` for timing information. Consider caching such badges or using a cron job to periodically save them.
+
+## Auto-Refresh with JavaScript
+
+For pages without HTTP refresh header support, use JavaScript to auto-refresh badges:
+
+```html
+<img
+  class="netdata-badge"
+  src="http://netdata.local:19999/api/v1/badge.svg?chart=system.cpu&label=CPU"
+/>
+<script>
+  var NETDATA_BADGES_AUTOREFRESH_SECONDS = 5;
+  function refreshNetdataBadges() {
+    var now = new Date().getTime().toString();
+    document.querySelectorAll(".netdata-badge").forEach(function (img) {
+      img.src = img.src.replace(/&_=\d*/, "") + "&_=" + now;
+    });
+    setTimeout(refreshNetdataBadges, NETDATA_BADGES_AUTOREFRESH_SECONDS * 1000);
+  }
+  setTimeout(refreshNetdataBadges, NETDATA_BADGES_AUTOREFRESH_SECONDS * 1000);
+</script>
+```
+
+Alternatively, include the Netdata refresh script:
+
+```html
+<script src="http://YOUR_NETDATA:19999/refresh-badges.js"></script>
+```
+
+## GitHub Limitations
+
+GitHub fetches images through a proxy and rewrites URLs, preventing auto-refresh. Badges in GitHub READMEs are static. To refresh manually, run this in the browser console:
+
+```javascript
+document.querySelectorAll("img").forEach(function (img) {
+  if (img.src.includes("badge.svg")) {
+    img.src =
+      img.src.replace(/\?cacheBuster=\d*/, "") +
+      "?cacheBuster=" +
+      new Date().getTime();
+  }
+});
+```
 
 ## Related Documentation
 
