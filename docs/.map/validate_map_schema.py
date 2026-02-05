@@ -3,7 +3,7 @@
 
 This validator uses JSON Schema for structure validation and adds custom
 checks for rules that can't be expressed in JSON Schema, such as:
-- Nodes with integration_placeholder children can omit edit_url (but not status)
+- Nodes with integration_placeholder children can omit edit_url
 - No duplicate edit_urls
 
 Path reconstruction rule (for ingest):
@@ -146,7 +146,7 @@ def check_integration_placeholder_rule(
     Check that nodes without edit_url have integration_placeholder children.
 
     Custom rule: A node can only omit edit_url if it has at least one
-    integration_placeholder child. The status field is always required.
+    integration_placeholder child.
     """
     if not isinstance(node, dict):
         return
