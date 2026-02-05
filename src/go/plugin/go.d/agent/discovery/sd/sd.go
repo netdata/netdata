@@ -164,10 +164,10 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 
 	for _, scfg := range seenCfgs {
 		// Remove from seen cache
-		d.seenConfigs.remove(scfg.UID())
+		d.seenConfigs.remove(scfg)
 
 		// Check if this was the exposed config
-		ecfg, ok := d.exposedConfigs.lookup(scfg.Key())
+		ecfg, ok := d.exposedConfigs.lookup(scfg)
 		if !ok || scfg.UID() != ecfg.UID() {
 			// Not exposed or different config is exposed - skip dyncfg remove
 			continue
@@ -178,7 +178,7 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 			d.mgr.Stop(scfg.PipelineKey())
 		}
 
-		d.exposedConfigs.remove(scfg.Key())
+		d.exposedConfigs.remove(scfg)
 		d.dyncfgSDJobRemove(scfg.DiscovererType(), scfg.Name())
 	}
 }
@@ -226,7 +226,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	d.seenConfigs.add(scfg)
 
 	// Check if there's an existing exposed config with the same key
-	ecfg, exists := d.exposedConfigs.lookup(scfg.Key())
+	ecfg, exists := d.exposedConfigs.lookup(scfg)
 
 	if !exists {
 		// No existing config - expose this one
@@ -289,12 +289,12 @@ func (d *ServiceDiscovery) removeOldConfigsFromSource(source, newKey string) {
 		}
 
 		// Different config from same source - remove from caches
-		d.seenConfigs.remove(oldCfg.UID())
+		d.seenConfigs.remove(oldCfg)
 
 		// If it was exposed, remove from exposed cache and dyncfg
 		// But DON'T stop the pipeline - let the new config's enable handle that
-		if ecfg, ok := d.exposedConfigs.lookup(oldCfg.Key()); ok && ecfg.UID() == oldCfg.UID() {
-			d.exposedConfigs.remove(oldCfg.Key())
+		if ecfg, ok := d.exposedConfigs.lookup(oldCfg); ok && ecfg.UID() == oldCfg.UID() {
+			d.exposedConfigs.remove(oldCfg)
 			d.dyncfgSDJobRemove(oldCfg.DiscovererType(), oldCfg.Name())
 		}
 	}

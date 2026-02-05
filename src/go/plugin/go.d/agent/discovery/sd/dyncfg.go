@@ -196,18 +196,17 @@ func (d *ServiceDiscovery) dyncfgCmdGet(fn dyncfg.Function) {
 		return
 	}
 
-	key := dt + ":" + name
-	cfg, ok := d.exposedConfigs.lookup(key)
+	cfg, ok := d.exposedConfigs.lookup(newLookupConfig(dt, name))
 	if !ok {
-		d.Warningf("dyncfg: get: config '%s' not found", key)
-		d.dyncfgApi.SendCodef(fn, 404, "Config '%s' not found.", key)
+		d.Warningf("dyncfg: get: config '%s:%s' not found", dt, name)
+		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
 	// Convert stored config to JSON via typed struct for consistent field ordering
 	bs, err := configToJSON(cfg.DataJSON())
 	if err != nil {
-		d.Warningf("dyncfg: get: failed to convert config '%s' to JSON: %v", key, err)
+		d.Warningf("dyncfg: get: failed to convert config '%s:%s' to JSON: %v", dt, name, err)
 		d.dyncfgApi.SendCodef(fn, 500, "Failed to convert config to JSON: %v", err)
 		return
 	}
@@ -260,7 +259,7 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 
 	// Create sdConfig from JSON payload
 	pkey := pipelineKey(dt, name)
-	scfg, err := newSDConfigFromJSON(fn.Payload(), name, fn.Source(), confgroup.TypeDyncfg, dt, pkey)
+	cfg, err := newSDConfigFromJSON(fn.Payload(), name, fn.Source(), confgroup.TypeDyncfg, dt, pkey)
 	if err != nil {
 		d.Warningf("dyncfg: add: failed to create config '%s:%s': %v", dt, name, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to create config: %v", err)
@@ -270,25 +269,22 @@ func (d *ServiceDiscovery) dyncfgCmdAdd(fn dyncfg.Function) {
 	d.Infof("dyncfg: add: %s:%s by user '%s'", dt, name, fn.User())
 
 	// If config with same key already exists, replace it (matching jobmgr pattern)
-	key := dt + ":" + name
-	if ecfg, ok := d.exposedConfigs.lookup(key); ok {
+	if ecfg, ok := d.exposedConfigs.lookup(cfg); ok {
 		// Only remove from seenConfigs if it's a dyncfg config
 		// (file-based configs are removed via other codepath when file is deleted)
-		if scfg, ok := d.seenConfigs.lookup(ecfg.UID()); ok && scfg.SourceType() == confgroup.TypeDyncfg {
-			d.seenConfigs.remove(ecfg.UID())
+		if scfg, ok := d.seenConfigs.lookup(ecfg); ok && scfg.SourceType() == confgroup.TypeDyncfg {
+			d.seenConfigs.remove(ecfg)
 		}
-		d.exposedConfigs.remove(key)
-		if d.mgr.IsRunning(ecfg.PipelineKey()) {
-			d.mgr.Stop(ecfg.PipelineKey())
-		}
+		d.exposedConfigs.remove(ecfg)
+		d.mgr.Stop(ecfg.PipelineKey())
 	}
 
 	// Add to both caches
-	d.seenConfigs.add(scfg)
-	d.exposedConfigs.add(scfg)
+	d.seenConfigs.add(cfg)
+	d.exposedConfigs.add(cfg)
 
 	d.dyncfgApi.SendCodef(fn, 202, "")
-	d.dyncfgSDJobCreate(dt, name, scfg.SourceType(), scfg.Source(), scfg.Status())
+	d.dyncfgSDJobCreate(dt, name, cfg.SourceType(), cfg.Source(), cfg.Status())
 }
 
 // dyncfgCmdTest handles the test command for templates (validates config without creating a job)
@@ -331,16 +327,15 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 		return
 	}
 
-	key := dt + ":" + name
-	ecfg, ok := d.exposedConfigs.lookup(key)
+	ecfg, ok := d.exposedConfigs.lookup(newLookupConfig(dt, name))
 	if !ok {
-		d.Warningf("dyncfg: update: config '%s' not found", key)
-		d.dyncfgApi.SendCodef(fn, 404, "Config '%s' not found.", key)
+		d.Warningf("dyncfg: update: config '%s:%s' not found", dt, name)
+		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
 	if err := fn.ValidateHasPayload(); err != nil {
-		d.Warningf("dyncfg: update: %v for '%s'", err, key)
+		d.Warningf("dyncfg: update: %v for '%s:%s'", err, dt, name)
 		d.dyncfgApi.SendCodef(fn, 400, "%v", err)
 		return
 	}
@@ -348,7 +343,7 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 	// Parse the new config to validate it
 	pipelineCfg, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults)
 	if err != nil {
-		d.Warningf("dyncfg: update: failed to parse config '%s': %v", key, err)
+		d.Warningf("dyncfg: update: failed to parse config '%s:%s': %v", dt, name, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
 		return
 	}
@@ -364,20 +359,20 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 		newSourceType = confgroup.TypeDyncfg
 		newPipelineKey = pipelineKey(dt, name)
 		pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", newSource)
-		d.Infof("dyncfg: update: converting file config '%s' to dyncfg by user '%s'", key, fn.User())
+		d.Infof("dyncfg: update: converting file config '%s:%s' to dyncfg by user '%s'", dt, name, fn.User())
 	} else {
 		// Update existing dyncfg config
 		newSource = fn.Source()
 		newSourceType = confgroup.TypeDyncfg
 		newPipelineKey = ecfg.PipelineKey()
 		pipelineCfg.Source = fmt.Sprintf("dyncfg=%s", newSource)
-		d.Infof("dyncfg: update: %s by user '%s'", key, fn.User())
+		d.Infof("dyncfg: update: %s:%s by user '%s'", dt, name, fn.User())
 	}
 
 	// Create updated sdConfig
 	newCfg, err := newSDConfigFromJSON(fn.Payload(), name, newSource, newSourceType, dt, newPipelineKey)
 	if err != nil {
-		d.Warningf("dyncfg: update: failed to create config '%s': %v", key, err)
+		d.Warningf("dyncfg: update: failed to create config '%s:%s': %v", dt, name, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to create config: %v", err)
 		return
 	}
@@ -387,7 +382,7 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 	// When old was dyncfg: remove old from seenConfigs (cleanup stale entry)
 	// When old was file: keep in seenConfigs (for re-exposure if dyncfg removed later)
 	if !isConversion {
-		d.seenConfigs.remove(ecfg.UID())
+		d.seenConfigs.remove(ecfg)
 	}
 	d.seenConfigs.add(newCfg)
 	d.exposedConfigs.add(newCfg)
@@ -406,29 +401,29 @@ func (d *ServiceDiscovery) dyncfgCmdUpdate(fn dyncfg.Function) {
 		// Start new dyncfg pipeline
 		if err := d.mgr.Start(d.ctx, newPipelineKey, pipelineCfg); err != nil {
 			// Accept failure state, user can retry via enable (matching jobmgr pattern)
-			d.Errorf("dyncfg: update: failed to start pipeline '%s': %v", key, err)
+			d.Errorf("dyncfg: update: failed to start pipeline '%s:%s': %v", dt, name, err)
 			newCfg.SetStatus(dyncfg.StatusFailed)
-			d.exposedConfigs.updateStatus(key, dyncfg.StatusFailed)
+			d.exposedConfigs.updateStatus(newCfg, dyncfg.StatusFailed)
 			d.dyncfgSDJobCreate(dt, name, newSourceType, newSource, dyncfg.StatusFailed)
 			d.dyncfgApi.SendCodef(fn, 200, "")
 			return
 		}
 		newCfg.SetStatus(dyncfg.StatusRunning)
-		d.exposedConfigs.updateStatus(key, dyncfg.StatusRunning)
+		d.exposedConfigs.updateStatus(newCfg, dyncfg.StatusRunning)
 		d.dyncfgSDJobCreate(dt, name, newSourceType, newSource, dyncfg.StatusRunning)
 	} else if d.mgr.IsRunning(ecfg.PipelineKey()) {
 		// Restart existing dyncfg pipeline
 		if err := d.mgr.Restart(d.ctx, ecfg.PipelineKey(), pipelineCfg); err != nil {
 			// Accept failure state, user can retry via enable (matching jobmgr pattern)
-			d.Errorf("dyncfg: update: failed to restart pipeline '%s': %v", key, err)
+			d.Errorf("dyncfg: update: failed to restart pipeline '%s:%s': %v", dt, name, err)
 			newCfg.SetStatus(dyncfg.StatusFailed)
-			d.exposedConfigs.updateStatus(key, dyncfg.StatusFailed)
+			d.exposedConfigs.updateStatus(newCfg, dyncfg.StatusFailed)
 			d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
 			d.dyncfgApi.SendCodef(fn, 200, "")
 			return
 		}
 		newCfg.SetStatus(dyncfg.StatusRunning)
-		d.exposedConfigs.updateStatus(key, dyncfg.StatusRunning)
+		d.exposedConfigs.updateStatus(newCfg, dyncfg.StatusRunning)
 		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusRunning)
 	} else {
 		// Pipeline not running, just update status in dyncfg UI
@@ -449,11 +444,10 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn dyncfg.Function) {
 		return
 	}
 
-	key := dt + ":" + name
-	cfg, ok := d.exposedConfigs.lookup(key)
+	cfg, ok := d.exposedConfigs.lookup(newLookupConfig(dt, name))
 	if !ok {
-		d.Warningf("dyncfg: enable: config '%s' not found", key)
-		d.dyncfgApi.SendCodef(fn, 404, "Config '%s' not found.", key)
+		d.Warningf("dyncfg: enable: config '%s:%s' not found", dt, name)
+		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
@@ -467,35 +461,35 @@ func (d *ServiceDiscovery) dyncfgCmdEnable(fn dyncfg.Function) {
 	// Convert sdConfig to pipeline.Config
 	pipelineCfg, err := cfg.ToPipelineConfig(d.configDefaults)
 	if err != nil {
-		d.Warningf("dyncfg: enable: failed to parse config '%s': %v", key, err)
-		d.exposedConfigs.updateStatus(key, dyncfg.StatusFailed)
+		d.Warningf("dyncfg: enable: failed to parse config '%s:%s': %v", dt, name, err)
+		d.exposedConfigs.updateStatus(cfg, dyncfg.StatusFailed)
 		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
 		d.dyncfgApi.SendCodef(fn, 422, "Failed to parse config: %v", err)
 		return
 	}
 
-	d.Infof("dyncfg: enable: starting pipeline '%s'", key)
+	d.Infof("dyncfg: enable: starting pipeline '%s:%s'", dt, name)
 
 	// If pipeline is running, use Restart (validates first, preserves old if new fails).
 	// Otherwise, use Start for initial startup.
 	if d.mgr.IsRunning(pkey) {
 		if err := d.mgr.Restart(d.ctx, pkey, pipelineCfg); err != nil {
-			d.Errorf("dyncfg: enable: failed to restart pipeline '%s': %v", key, err)
+			d.Errorf("dyncfg: enable: failed to restart pipeline '%s:%s': %v", dt, name, err)
 			// On restart failure, keep old status (pipeline is still running with old config)
 			d.dyncfgApi.SendCodef(fn, 422, "Failed to restart pipeline: %v", err)
 			return
 		}
 	} else {
 		if err := d.mgr.Start(d.ctx, pkey, pipelineCfg); err != nil {
-			d.Errorf("dyncfg: enable: failed to start pipeline '%s': %v", key, err)
-			d.exposedConfigs.updateStatus(key, dyncfg.StatusFailed)
+			d.Errorf("dyncfg: enable: failed to start pipeline '%s:%s': %v", dt, name, err)
+			d.exposedConfigs.updateStatus(cfg, dyncfg.StatusFailed)
 			d.dyncfgSDJobStatus(dt, name, dyncfg.StatusFailed)
 			d.dyncfgApi.SendCodef(fn, 422, "Failed to start pipeline: %v", err)
 			return
 		}
 	}
 
-	d.exposedConfigs.updateStatus(key, dyncfg.StatusRunning)
+	d.exposedConfigs.updateStatus(cfg, dyncfg.StatusRunning)
 	d.dyncfgSDJobStatus(dt, name, dyncfg.StatusRunning)
 	d.dyncfgApi.SendCodef(fn, 200, "")
 }
@@ -511,11 +505,10 @@ func (d *ServiceDiscovery) dyncfgCmdDisable(fn dyncfg.Function) {
 		return
 	}
 
-	key := dt + ":" + name
-	cfg, ok := d.exposedConfigs.lookup(key)
+	cfg, ok := d.exposedConfigs.lookup(newLookupConfig(dt, name))
 	if !ok {
-		d.Warningf("dyncfg: disable: config '%s' not found", key)
-		d.dyncfgApi.SendCodef(fn, 404, "Config '%s' not found.", key)
+		d.Warningf("dyncfg: disable: config '%s:%s' not found", dt, name)
+		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
@@ -528,19 +521,19 @@ func (d *ServiceDiscovery) dyncfgCmdDisable(fn dyncfg.Function) {
 
 	// If not running, just update status (idempotent)
 	if !d.mgr.IsRunning(pkey) {
-		d.Infof("dyncfg: disable: pipeline '%s' is not running", key)
-		d.exposedConfigs.updateStatus(key, dyncfg.StatusDisabled)
+		d.Infof("dyncfg: disable: pipeline '%s:%s' is not running", dt, name)
+		d.exposedConfigs.updateStatus(cfg, dyncfg.StatusDisabled)
 		d.dyncfgSDJobStatus(dt, name, dyncfg.StatusDisabled)
 		d.dyncfgApi.SendCodef(fn, 200, "")
 		return
 	}
 
-	d.Infof("dyncfg: disable: stopping pipeline '%s'", key)
+	d.Infof("dyncfg: disable: stopping pipeline '%s:%s'", dt, name)
 
 	// Stop the pipeline (this sends removal groups for discovered jobs)
 	d.mgr.Stop(pkey)
 
-	d.exposedConfigs.updateStatus(key, dyncfg.StatusDisabled)
+	d.exposedConfigs.updateStatus(cfg, dyncfg.StatusDisabled)
 	d.dyncfgSDJobStatus(dt, name, dyncfg.StatusDisabled)
 	d.dyncfgApi.SendCodef(fn, 200, "")
 }
@@ -556,21 +549,20 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn dyncfg.Function) {
 		return
 	}
 
-	key := dt + ":" + name
-	cfg, ok := d.exposedConfigs.lookup(key)
+	cfg, ok := d.exposedConfigs.lookup(newLookupConfig(dt, name))
 	if !ok {
-		d.Warningf("dyncfg: remove: config '%s' not found", key)
-		d.dyncfgApi.SendCodef(fn, 404, "Config '%s' not found.", key)
+		d.Warningf("dyncfg: remove: config '%s:%s' not found", dt, name)
+		d.dyncfgApi.SendCodef(fn, 404, "Config '%s:%s' not found.", dt, name)
 		return
 	}
 
 	if cfg.SourceType() != confgroup.TypeDyncfg {
-		d.Warningf("dyncfg: remove: cannot remove non-dyncfg config '%s' (source: %s)", key, cfg.SourceType())
+		d.Warningf("dyncfg: remove: cannot remove non-dyncfg config '%s:%s' (source: %s)", dt, name, cfg.SourceType())
 		d.dyncfgApi.SendCodef(fn, 405, "Cannot remove non-dyncfg configs. Source type: %s", cfg.SourceType())
 		return
 	}
 
-	d.Infof("dyncfg: remove: removing config '%s'", key)
+	d.Infof("dyncfg: remove: removing config '%s:%s'", dt, name)
 
 	// Stop the pipeline if running
 	if d.mgr.IsRunning(cfg.PipelineKey()) {
@@ -578,8 +570,8 @@ func (d *ServiceDiscovery) dyncfgCmdRemove(fn dyncfg.Function) {
 	}
 
 	// Remove from both caches
-	d.seenConfigs.remove(cfg.UID())
-	d.exposedConfigs.remove(key)
+	d.seenConfigs.remove(cfg)
+	d.exposedConfigs.remove(cfg)
 
 	// Remove from dyncfg
 	d.dyncfgSDJobRemove(dt, name)

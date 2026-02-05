@@ -147,7 +147,7 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			},
 			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
-				{key: "net_listeners:myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
+				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
 		},
 		"user then stock with same name - user keeps": {
@@ -162,7 +162,7 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			},
 			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
-				{key: "net_listeners:myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
+				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
 		},
 		"stock then stock with same name - existing keeps if running": {
@@ -177,7 +177,7 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			},
 			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
-				{key: "net_listeners:myconfig", sourceType: confgroup.TypeStock, status: dyncfg.StatusRunning},
+				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeStock, status: dyncfg.StatusRunning},
 			},
 		},
 		"user then user with same name - existing keeps if running": {
@@ -192,7 +192,7 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			},
 			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
-				{key: "net_listeners:myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
+				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
 		},
 		"remove non-exposed config - no dyncfg change": {
@@ -208,7 +208,7 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			},
 			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
-				{key: "net_listeners:myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
+				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
 		},
 		"multiple configs different names": {
@@ -223,8 +223,8 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			},
 			wantExposedCount: 2,
 			wantExposed: []wantExposedCfg{
-				{key: "net_listeners:stock-config", sourceType: confgroup.TypeStock, status: dyncfg.StatusRunning},
-				{key: "net_listeners:user-config", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
+				{discovererType: "net_listeners", name: "stock-config", sourceType: confgroup.TypeStock, status: dyncfg.StatusRunning},
+				{discovererType: "net_listeners", name: "user-config", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
 		},
 	}

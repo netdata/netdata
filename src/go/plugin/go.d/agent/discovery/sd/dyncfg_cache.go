@@ -216,6 +216,15 @@ func sourceTypeFromPath(path string) string {
 	return confgroup.TypeStock
 }
 
+// newLookupConfig creates a minimal sdConfig for cache lookups.
+// Only sets fields needed for Key() derivation: discovererType and name.
+func newLookupConfig(discovererType, name string) sdConfig {
+	return sdConfig{
+		ikeyDiscovererType: discovererType,
+		"name":             name,
+	}
+}
+
 // seenSDConfigs tracks all discovered SD configs by unique ID (source + key).
 // Multiple sources can produce configs with the same logical name.
 type seenSDConfigs struct {
@@ -235,21 +244,22 @@ func (c *seenSDConfigs) add(cfg sdConfig) {
 	c.items[cfg.UID()] = cfg
 }
 
-func (c *seenSDConfigs) remove(uid string) {
+func (c *seenSDConfigs) remove(cfg sdConfig) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
-	delete(c.items, uid)
+	delete(c.items, cfg.UID())
 }
 
 // lookup returns a deep copy of the config to avoid data races.
-func (c *seenSDConfigs) lookup(uid string) (sdConfig, bool) {
+// Key is derived from cfg.UID() internally.
+func (c *seenSDConfigs) lookup(cfg sdConfig) (sdConfig, bool) {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
-	cfg, ok := c.items[uid]
+	v, ok := c.items[cfg.UID()]
 	if !ok {
 		return nil, false
 	}
-	return cfg.Clone(), true
+	return v.Clone(), true
 }
 
 // lookupBySource returns deep copies of configs from the given source.
@@ -284,29 +294,29 @@ func (c *exposedSDConfigs) add(cfg sdConfig) {
 	c.items[cfg.Key()] = cfg
 }
 
-func (c *exposedSDConfigs) remove(key string) {
+func (c *exposedSDConfigs) remove(cfg sdConfig) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
-	delete(c.items, key)
+	delete(c.items, cfg.Key())
 }
 
 // lookup returns a deep copy of the config to avoid data races.
-// Callers can safely read from the returned config without synchronization.
-func (c *exposedSDConfigs) lookup(key string) (sdConfig, bool) {
+// Key is derived from cfg.Key() internally.
+func (c *exposedSDConfigs) lookup(cfg sdConfig) (sdConfig, bool) {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
-	cfg, ok := c.items[key]
+	v, ok := c.items[cfg.Key()]
 	if !ok {
 		return nil, false
 	}
-	return cfg.Clone(), true
+	return v.Clone(), true
 }
 
-func (c *exposedSDConfigs) updateStatus(key string, status dyncfg.Status) {
+func (c *exposedSDConfigs) updateStatus(cfg sdConfig, status dyncfg.Status) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
-	if cfg, ok := c.items[key]; ok {
-		cfg.SetStatus(status)
+	if v, ok := c.items[cfg.Key()]; ok {
+		v.SetStatus(status)
 	}
 }
 

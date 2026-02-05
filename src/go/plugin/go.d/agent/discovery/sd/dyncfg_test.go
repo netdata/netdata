@@ -194,11 +194,10 @@ func (s *dyncfgSim) run(t *testing.T) {
 		require.Equalf(t, wantLen, gotLen, "exposedConfigs: different len (want %d got %d)", wantLen, gotLen)
 
 		for _, want := range s.wantExposed {
-			key := want.discovererType + ":" + want.name
-			cfg, ok := sd.exposedConfigs.lookup(key)
-			require.Truef(t, ok, "exposedConfigs: config '%s' not found", key)
-			assert.Equal(t, want.sourceType, cfg.SourceType(), "exposedConfigs: wrong sourceType for '%s'", key)
-			assert.Equal(t, want.status, cfg.Status(), "exposedConfigs: wrong status for '%s'", key)
+			cfg, ok := sd.exposedConfigs.lookup(newLookupConfig(want.discovererType, want.name))
+			require.Truef(t, ok, "exposedConfigs: config '%s:%s' not found", want.discovererType, want.name)
+			assert.Equal(t, want.sourceType, cfg.SourceType(), "exposedConfigs: wrong sourceType for '%s:%s'", want.discovererType, want.name)
+			assert.Equal(t, want.status, cfg.Status(), "exposedConfigs: wrong status for '%s:%s'", want.discovererType, want.name)
 		}
 	}
 

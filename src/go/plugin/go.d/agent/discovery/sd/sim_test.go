@@ -36,9 +36,10 @@ type discoverySimExt struct {
 }
 
 type wantExposedCfg struct {
-	key        string // discovererType:name
-	sourceType string
-	status     dyncfg.Status
+	discovererType string
+	name           string
+	sourceType     string
+	status         dyncfg.Status
 }
 
 func (sim *discoverySimExt) run(t *testing.T) {
@@ -79,12 +80,12 @@ func (sim *discoverySimExt) run(t *testing.T) {
 
 	// Check specific exposed configs
 	for _, want := range sim.wantExposed {
-		cfg, ok := mgr.exposedConfigs.lookup(want.key)
-		if !assert.Truef(t, ok, "exposed config '%s' not found", want.key) {
+		cfg, ok := mgr.exposedConfigs.lookup(newLookupConfig(want.discovererType, want.name))
+		if !assert.Truef(t, ok, "exposed config '%s:%s' not found", want.discovererType, want.name) {
 			continue
 		}
-		assert.Equal(t, want.sourceType, cfg.SourceType(), "exposed config '%s' sourceType", want.key)
-		assert.Equal(t, want.status, cfg.Status(), "exposed config '%s' status", want.key)
+		assert.Equal(t, want.sourceType, cfg.SourceType(), "exposed config '%s:%s' sourceType", want.discovererType, want.name)
+		assert.Equal(t, want.status, cfg.Status(), "exposed config '%s:%s' status", want.discovererType, want.name)
 	}
 	lock.Unlock()
 
