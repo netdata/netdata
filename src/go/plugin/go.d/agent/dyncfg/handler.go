@@ -388,6 +388,59 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	h.cb.OnStatusChange(newEntry, oldStatus, fn)
 }
 
+// CmdRestart handles the "restart" command.
+// Stops the existing work and starts the same config again.
+// Only allowed for Running/Failed configs (rejects Accepted/Disabled).
+func (h *Handler[C]) CmdRestart(fn Function) {
+	key, _, ok := h.cb.ExtractKey(fn)
+	if !ok {
+		h.api.SendCodef(fn, 400, "Invalid job ID format.")
+		return
+	}
+
+	entry, ok := h.exposed.LookupByKey(key)
+	if !ok {
+		h.api.SendCodef(fn, 404, "Job not found.")
+		return
+	}
+
+	switch entry.Status {
+	case StatusAccepted, StatusDisabled:
+		h.api.SendCodef(fn, 405, "Restarting is not allowed in '%s' state.", entry.Status)
+		h.NotifyJobStatus(entry.Cfg, entry.Status)
+		return
+	case StatusRunning, StatusFailed:
+		// proceed
+	default:
+		h.api.SendCodef(fn, 405, "Restarting is not allowed in '%s' state.", entry.Status)
+		h.NotifyJobStatus(entry.Cfg, entry.Status)
+		return
+	}
+
+	oldStatus := entry.Status
+
+	h.cb.Stop(entry.Cfg)
+
+	err := h.cb.Start(entry.Cfg)
+
+	if err != nil {
+		entry.Status = StatusFailed
+		code := 422
+		if ce, ok := err.(CodedError); ok {
+			code = ce.Code()
+		}
+		h.api.SendCodef(fn, code, "Job restart failed: %v", err)
+		h.NotifyJobStatus(entry.Cfg, StatusFailed)
+		h.cb.OnStatusChange(entry, oldStatus, fn)
+		return
+	}
+
+	entry.Status = StatusRunning
+	h.api.SendCodef(fn, 200, "")
+	h.NotifyJobStatus(entry.Cfg, StatusRunning)
+	h.cb.OnStatusChange(entry, oldStatus, fn)
+}
+
 func isCodedError(err error) bool {
 	_, ok := err.(CodedError)
 	return ok

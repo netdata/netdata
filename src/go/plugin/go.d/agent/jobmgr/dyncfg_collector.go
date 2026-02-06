@@ -115,7 +115,7 @@ func (m *Manager) dyncfgCollectorSeqExec(fn dyncfg.Function) {
 	case dyncfg.CommandRemove:
 		m.handler.CmdRemove(fn)
 	case dyncfg.CommandRestart:
-		m.dyncfgConfigRestart(fn)
+		m.handler.CmdRestart(fn)
 	case dyncfg.CommandTest:
 		m.dyncfgConfigTest(fn)
 	case dyncfg.CommandSchema:
@@ -323,67 +323,6 @@ func (m *Manager) dyncfgConfigGet(fn dyncfg.Function) {
 	m.dyncfgApi.SendJSON(fn, string(bs))
 }
 
-func (m *Manager) dyncfgConfigRestart(fn dyncfg.Function) {
-	cmd := fn.Command()
-
-	id := fn.ID()
-	mn, jn, ok := m.extractModuleJobName(id)
-	if !ok {
-		m.Warningf("dyncfg: %s: could not extract module from id (%s)", cmd, id)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid ID format. Could not extract module name from ID. Provided ID: %s.", id)
-		return
-	}
-
-	entry, ok := m.exposedLookupByName(mn, jn)
-	if !ok {
-		m.Warningf("dyncfg: %s: module %s job %s not found", cmd, mn, jn)
-		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' job '%s' is not registered.", mn, jn)
-		return
-	}
-
-	job, err := m.createCollectorJob(entry.Cfg)
-	if err != nil {
-		m.Warningf("dyncfg: %s: module %s job %s: failed to apply config: %v", cmd, mn, jn, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
-		m.handler.NotifyJobStatus(entry.Cfg, entry.Status)
-		return
-	}
-
-	switch entry.Status {
-	case dyncfg.StatusAccepted, dyncfg.StatusDisabled:
-		m.Warningf("dyncfg: %s: module %s job %s: restarting not allowed in '%s' state", cmd, mn, jn, entry.Status)
-		m.dyncfgApi.SendCodef(fn, 405, "Restarting data collection job is not allowed in '%s' state.", entry.Status)
-		m.handler.NotifyJobStatus(entry.Cfg, entry.Status)
-		return
-	case dyncfg.StatusRunning:
-		m.fileStatus.remove(entry.Cfg)
-		m.stopRunningJob(entry.Cfg.FullName())
-	default:
-	}
-
-	m.retryingTasks.remove(entry.Cfg)
-
-	m.Infof("dyncfg: %s: %s/%s job by user '%s'", cmd, mn, jn, fn.User())
-
-	if err := job.AutoDetection(); err != nil {
-		job.Cleanup()
-		entry.Status = dyncfg.StatusFailed
-		m.dyncfgApi.SendCodef(fn, 422, "Job restart failed: %v", err)
-		m.handler.NotifyJobStatus(entry.Cfg, entry.Status)
-		m.scheduleRetryTask(entry.Cfg, job)
-		return
-	}
-
-	entry.Status = dyncfg.StatusRunning
-
-	if isDyncfg(entry.Cfg) {
-		m.fileStatus.add(entry.Cfg, entry.Status.String())
-	}
-	m.startRunningJob(job)
-
-	m.dyncfgApi.SendCodef(fn, 200, "")
-	m.handler.NotifyJobStatus(entry.Cfg, entry.Status)
-}
 
 func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string, fn dyncfg.Function) {
 	cfg.SetProvider("dyncfg")

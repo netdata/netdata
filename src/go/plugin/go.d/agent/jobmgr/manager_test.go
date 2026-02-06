@@ -1270,7 +1270,7 @@ func TestManager_Run_Dyncfg_Restart(t *testing.T) {
 					wantDyncfg: `
 
 FUNCTION_RESULT_BEGIN 1-restart 404 application/json
-{"status":404,"errorMessage":"The specified module 'success' job 'test' is not registered."}
+{"status":404,"errorMessage":"Job not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -1310,7 +1310,7 @@ FUNCTION_RESULT_END
 CONFIG test:collector:success:test create accepted job /collectors/test/Jobs dyncfg 'type=dyncfg' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-restart 405 application/json
-{"status":405,"errorMessage":"Restarting data collection job is not allowed in 'accepted' state."}
+{"status":405,"errorMessage":"Restarting is not allowed in 'accepted' state."}
 FUNCTION_RESULT_END
 
 CONFIG test:collector:success:test status accepted
@@ -1414,7 +1414,7 @@ FUNCTION_RESULT_END
 CONFIG test:collector:success:test status disabled
 
 FUNCTION_RESULT_BEGIN 3-restart 405 application/json
-{"status":405,"errorMessage":"Restarting data collection job is not allowed in 'disabled' state."}
+{"status":405,"errorMessage":"Restarting is not allowed in 'disabled' state."}
 FUNCTION_RESULT_END
 
 CONFIG test:collector:success:test status disabled

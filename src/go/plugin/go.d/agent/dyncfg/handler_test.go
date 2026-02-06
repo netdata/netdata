@@ -636,6 +636,128 @@ func TestCmdUpdate_Conversion_Disabled(t *testing.T) {
 	assert.Equal(t, StatusDisabled, entry.Status)
 }
 
+// --- CmdRestart Tests ---
+
+func TestCmdRestart_FromRunning(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+	fn := newTestFn("test:job1", "restart", "", nil)
+	h.CmdRestart(fn)
+
+	assert.Len(t, cb.stopCalls, 1)
+	assert.Len(t, cb.startCalls, 1)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusRunning, entry.Status)
+	require.Len(t, cb.statusCalls, 1)
+	assert.Equal(t, StatusRunning, cb.statusCalls[0].oldStatus)
+}
+
+func TestCmdRestart_FromFailed(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusFailed})
+
+	fn := newTestFn("test:job1", "restart", "", nil)
+	h.CmdRestart(fn)
+
+	assert.Len(t, cb.stopCalls, 1)
+	assert.Len(t, cb.startCalls, 1)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusRunning, entry.Status)
+	require.Len(t, cb.statusCalls, 1)
+	assert.Equal(t, StatusFailed, cb.statusCalls[0].oldStatus)
+}
+
+func TestCmdRestart_Accepted_Rejected(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+
+	fn := newTestFn("test:job1", "restart", "", nil)
+	h.CmdRestart(fn)
+
+	assert.Len(t, cb.stopCalls, 0)
+	assert.Len(t, cb.startCalls, 0)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusAccepted, entry.Status)
+}
+
+func TestCmdRestart_Disabled_Rejected(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusDisabled})
+
+	fn := newTestFn("test:job1", "restart", "", nil)
+	h.CmdRestart(fn)
+
+	assert.Len(t, cb.stopCalls, 0)
+	assert.Len(t, cb.startCalls, 0)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusDisabled, entry.Status)
+}
+
+func TestCmdRestart_NotFound(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	fn := newTestFn("test:job1", "restart", "", nil)
+	h.CmdRestart(fn)
+
+	assert.Len(t, cb.stopCalls, 0)
+	assert.Len(t, cb.startCalls, 0)
+}
+
+func TestCmdRestart_StartFails(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.startFn = func(_ testConfig) error { return errors.New("restart failed") }
+	h := newTestHandler(cb)
+
+	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+	fn := newTestFn("test:job1", "restart", "", nil)
+	h.CmdRestart(fn)
+
+	assert.Len(t, cb.stopCalls, 1)
+	assert.Len(t, cb.startCalls, 1)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusFailed, entry.Status)
+	require.Len(t, cb.statusCalls, 1)
+	assert.Equal(t, StatusRunning, cb.statusCalls[0].oldStatus)
+}
+
+func TestCmdRestart_StartFails_CodedError(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.startFn = func(_ testConfig) error {
+		return &codedErr{err: errors.New("bad config"), code: 400}
+	}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+	fn := newTestFn("test:job1", "restart", "", nil)
+	h.CmdRestart(fn)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusFailed, entry.Status)
+}
+
 // --- Notify Tests ---
 
 func TestNotifyJobCreate_SupportedCommands(t *testing.T) {
