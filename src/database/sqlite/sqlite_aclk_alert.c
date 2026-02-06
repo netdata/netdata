@@ -726,10 +726,20 @@ void aclk_push_alert_events_for_all_hosts(void)
 
 void alert_hash_mark_sent(nd_uuid_t *hash_id)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    if (!hash_id)
+        return;
 
-    if (!res) {
-        if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_HASH_CLOUD, &res))
+    static __thread sqlite3_stmt *compiled_res = NULL;
+    sqlite3_stmt *res = NULL;
+
+    if (is_health_thread) {
+        if (!compiled_res) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_HASH_CLOUD, &compiled_res))
+                return;
+        }
+        res = compiled_res;
+    } else {
+        if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_ALERT_HASH_CLOUD, &res))
             return;
     }
 
@@ -741,15 +751,28 @@ void alert_hash_mark_sent(nd_uuid_t *hash_id)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    if (is_health_thread)
+        SQLITE_RESET(res);
+    else
+        SQLITE_FINALIZE(res);
 }
 
 bool alert_hash_has_transitioned(nd_uuid_t *hash_id)
 {
-    static __thread sqlite3_stmt *res = NULL;
+    if (!hash_id)
+        return false;
 
-    if (!res) {
-        if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_ALERT_HASH_CLOUD, &res))
+    static __thread sqlite3_stmt *compiled_res = NULL;
+    sqlite3_stmt *res = NULL;
+
+    if (is_health_thread) {
+        if (!compiled_res) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_ALERT_HASH_CLOUD, &compiled_res))
+                return false;
+        }
+        res = compiled_res;
+    } else {
+        if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_HASH_CLOUD, &res))
             return false;
     }
 
@@ -761,7 +784,10 @@ bool alert_hash_has_transitioned(nd_uuid_t *hash_id)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    SQLITE_RESET(res);
+    if (is_health_thread)
+        SQLITE_RESET(res);
+    else
+        SQLITE_FINALIZE(res);
     return found;
 }
 
