@@ -284,6 +284,12 @@
 - Document logs functionality of otel plugin ([#21705](https://github.com/netdata/netdata/issues/21705))
 - Make new journal viewer plugin a mandatory dependency for native packages to ensure clean upgrades. ([#21701](https://github.com/netdata/netdata/issues/21701))
 - Set status flag of active journal file to archived on shutdown. ([#21707](https://github.com/netdata/netdata/issues/21707))
+- Add documentation for access control and feature availability ([#21703](https://github.com/netdata/netdata/issues/21703))
+- [Docs] port the map from csv to yaml ([#21692](https://github.com/netdata/netdata/issues/21692))
+- Docs: Add Windows telemetry opt-out instructions ([#21710](https://github.com/netdata/netdata/issues/21710))
+- Feat(go.d/sd): add dyncfg support for service discovery ([#21680](https://github.com/netdata/netdata/issues/21680))
+- Remove otel coll dist ([#21714](https://github.com/netdata/netdata/issues/21714))
+- Handle fields with high-cardinality and big payloads. ([#21716](https://github.com/netdata/netdata/issues/21716))
 
 ## [2.8.0] - 2025-11-19
 
