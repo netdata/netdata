@@ -81,21 +81,6 @@ func (sim *discoverySimExt) run(t *testing.T) {
 	if sim.wantPipelines != nil {
 		assert.Equalf(t, sim.wantPipelines, fact.pipelines, "pipelines mismatch")
 	}
-
-	// Check exposed configs count
-	if sim.wantExposedCount > 0 {
-		assert.Equal(t, sim.wantExposedCount, mgr.exposed.Count(), "exposed configs count")
-	}
-
-	// Check specific exposed configs
-	for _, want := range sim.wantExposed {
-		entry, ok := mgr.exposed.LookupByKey(want.discovererType + ":" + want.name)
-		if !assert.Truef(t, ok, "exposed config '%s:%s' not found", want.discovererType, want.name) {
-			continue
-		}
-		assert.Equal(t, want.sourceType, entry.Cfg.SourceType(), "exposed config '%s:%s' sourceType", want.discovererType, want.name)
-		assert.Equal(t, want.status, entry.Status, "exposed config '%s:%s' status", want.discovererType, want.name)
-	}
 	lock.Unlock()
 
 	cancel()
@@ -105,6 +90,20 @@ func (sim *discoverySimExt) run(t *testing.T) {
 	case <-done:
 	case <-time.After(timeout):
 		t.Errorf("sd failed to exit in %s", timeout)
+	}
+
+	// Check exposed configs after SD goroutine has stopped (no race on entry.Status).
+	// Caches survive shutdown — StopAll only stops pipelines, doesn't clear caches.
+	if sim.wantExposedCount > 0 {
+		assert.Equal(t, sim.wantExposedCount, mgr.exposed.Count(), "exposed configs count")
+	}
+	for _, want := range sim.wantExposed {
+		entry, ok := mgr.exposed.LookupByKey(want.discovererType + ":" + want.name)
+		if !assert.Truef(t, ok, "exposed config '%s:%s' not found", want.discovererType, want.name) {
+			continue
+		}
+		assert.Equal(t, want.sourceType, entry.Cfg.SourceType(), "exposed config '%s:%s' sourceType", want.discovererType, want.name)
+		assert.Equal(t, want.status, entry.Status, "exposed config '%s:%s' status", want.discovererType, want.name)
 	}
 }
 
