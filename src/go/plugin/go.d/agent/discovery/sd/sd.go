@@ -100,8 +100,10 @@ type (
 
 // SetDyncfgResponder allows overriding the default responder (e.g., to silence output in tests).
 func (d *ServiceDiscovery) SetDyncfgResponder(api *dyncfg.Responder) {
-	d.dyncfgApi = api
-	d.handler = dyncfg.NewHandler(d.Logger, api, d.seen, d.exposed, d.sdCb, d.handler.Cfg())
+	if api != nil {
+		d.dyncfgApi = api
+		d.handler = dyncfg.NewHandler(d.Logger, api, d.seen, d.exposed, d.sdCb, d.handler.Cfg())
+	}
 }
 
 func (d *ServiceDiscovery) String() string {

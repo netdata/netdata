@@ -73,7 +73,11 @@ func (c *SeenCache[C]) ForEach(fn func(uid string, cfg C) bool) {
 
 // ExposedCache stores active config+status per logical name, keyed by Key().
 // LookupByKey returns a pointer to the stored Entry — mutations to Status
-// are visible through the pointer. Thread-safe for concurrent readers.
+// are visible through the pointer. The mutex protects map access only.
+// Entry.Status is written exclusively by the serialized command goroutine
+// (via Handler.Cmd*) and is not read by any concurrent code path in production.
+// Concurrent read-only commands (schema/get/test/userconfig) access only
+// Entry.Cfg, which is immutable after creation.
 type ExposedCache[C Config] struct {
 	mux   sync.RWMutex
 	items map[string]*Entry[C]
