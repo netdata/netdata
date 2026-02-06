@@ -57,11 +57,11 @@ sudo systemctl restart netdata
 | `points`             | Number of data points to aggregate           | `1`                               | `60`                           |
 | `group`              | Aggregation method                           | `average`                         | `average`, `sum`, `max`, `min` |
 | `group_options`      | Additional grouping options                  | -                                 | `percentage`                   |
-| `options`            | Query options (percentage, abs, etc.)        | -                                 | `percentage \| absolute`       |
+| `options`            | Query options (percentage, abs, etc.)        | -                                 | `percentage%7Cabsolute`        |
 | `label`              | Left-side label text                         | Chart name                        | `CPU Usage`                    |
 | `units`              | Unit suffix to display                       | Auto-detected                     | `%`, `MB`, `requests/s`        |
 | `multiply`           | Multiply value by this factor                | `1`                               | `100` (for percentages)        |
-| `divide`             | Divide value by this factor                  | `1`                               | `1024` (bytes to KB)           |
+| `divide`             | Divide value by this factor                  | `1`                               | `1024` (MiB to MB)             |
 | `precision`          | Decimal places (-1 for auto)                 | `-1` (auto)                       | `2`                            |
 | `scale`              | Badge scale percentage                       | `100`                             | `150`                          |
 | `refresh`            | Auto-refresh interval in seconds             | `0` (no refresh)                  | `auto`, `5`                    |
@@ -205,7 +205,7 @@ This means:
 Supported operators:
 
 - `:` or `=` equality (first match wins)
-- `!` inequality
+- `!` or `<>` inequality
 - `<` less than
 - `>` greater than
 - `<=` less than or equal
@@ -283,7 +283,7 @@ Add to your repository README:
 ## Server Status
 
 ![CPU](https://your-netdata.com/api/v1/badge.svg?chart=system.cpu&dimension=user&label=CPU)
-![RAM](https://your-netdata.com/api/v1/badge.svg?chart=mem.available&units=GB&divide=1073741824&precision=1&label=RAM)
+![RAM](https://your-netdata.com/api/v1/badge.svg?chart=mem.available&units=GB&divide=1024&precision=1&label=RAM)
 ![Disk](https://your-netdata.com/api/v1/badge.svg?chart=disk_space._&units=%&label=Disk)
 ```
 
@@ -322,7 +322,14 @@ http://netdata.local:19999/api/v1/badge.svg?chart=system.cpu&dimension=user&valu
 <details>
 <summary>Badge shows "chart not found"</summary>
 
-Verify the chart ID exists: Check the Netdata dashboard URL for the correct chart ID. Chart IDs are case-sensitive. Use `system.cpu` format, not `system.cpu.user`.
+When requesting a non-existent chart, the API returns a placeholder badge displaying "chart not found" on the left side and "-" for the value. This is expected behavior—not an HTTP error.
+
+To resolve:
+
+1. Verify the chart ID exists in your Netdata dashboard
+2. Chart IDs are case-sensitive—use `system.cpu`, not `system.cpu.user`
+3. Check the dashboard URL for the correct chart ID format
+4. List available charts: `http://YOUR_HOST:19999/api/v1/charts`
 
 </details>
 
@@ -465,9 +472,11 @@ document.querySelectorAll("img").forEach(function (img) {
 ## Notes on Chart and Alert Behavior
 
 - **Chart availability varies**: Not all charts are available on all Netdata installations. Use the dashboard to verify chart IDs before using them in badges.
+- **Missing chart parameter**: Omitting the `chart` parameter returns HTTP 400 (Bad Request)—badges require a valid chart ID.
+- **Invalid chart ID**: Requesting a non-existent chart returns a placeholder badge with "chart not found" label and "-" value—this graceful degradation keeps badges visible.
 - **Dimension behavior**: When no dimension is specified, charts may show aggregated values (sum, average, or total) depending on the chart type. Specify individual dimensions for more granular control.
 - **Alarm names are configuration-dependent**: The exact alarm names depend on your Netdata health configuration files in `/etc/netdata/health.d/`. Check your configuration to find the correct alarm name.
-- **Memory charts**: The `mem.available` chart shows total available memory without dimensions. Check if your configuration provides `free` or `used` dimensions for specific memory components.
+- **Memory charts**: The `mem.available` chart shows total available memory without dimensions. The `system.ram` chart provides `free` and `used` dimensions for specific memory components.
 - **System load**: The `system.load` chart has multiple dimensions (load1, load5, load15). Without specifying a dimension, badges show the sum of all load averages. Use specific dimensions for individual load metrics.
 
 ## Related Documentation
