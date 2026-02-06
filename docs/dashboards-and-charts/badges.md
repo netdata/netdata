@@ -99,7 +99,7 @@ Display alert state:
 Show average network traffic over 5 minutes:
 
 ```markdown
-![Network](http://localhost:19999/api/v1/badge.svg?chart=system.net&dimension=received&after=-300&group=average&label=Net+In)
+![Network](http://localhost:19999/api/v1/badge.svg?chart=system.net&dimension=received&after=-300&group=average&label=Net%20In)
 ```
 
 ### Color-Coded Badges
