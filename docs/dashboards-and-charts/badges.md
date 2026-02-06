@@ -302,7 +302,7 @@ Create a simple status dashboard:
     alt="RAM"
   />
   <img
-    src="http://netdata.local:19999/api/v1/badge.svg?chart=system.load&label=Load"
+    src="http://netdata.local:19999/api/v1/badge.svg?chart=system.load&dimension=load1&label=Load"
     alt="Load"
   />
 </div>
