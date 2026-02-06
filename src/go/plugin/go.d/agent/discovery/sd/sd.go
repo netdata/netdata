@@ -200,7 +200,7 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 		d.seen.Remove(scfg)
 
 		// Check if this was the exposed config
-		entry, ok := d.exposed.LookupByKey(scfg.Key())
+		entry, ok := d.exposed.LookupByKey(scfg.ExposedKey())
 		if !ok || entry.Cfg.UID() != scfg.UID() {
 			// Not exposed or different config is exposed - skip dyncfg remove
 			continue
@@ -254,14 +254,14 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	// For file sources: One file = one config. If the file previously provided a different config,
 	// remove the old one first. This handles the case where a file config name changes.
 	if scfg.SourceType() != confgroup.TypeDyncfg {
-		d.removeOldConfigsFromSource(scfg.Source(), scfg.Key())
+		d.removeOldConfigsFromSource(scfg.Source(), scfg.ExposedKey())
 	}
 
 	// Always add to seen cache
 	d.seen.Add(scfg)
 
 	// Check if there's an existing exposed config with the same key
-	entry, exists := d.exposed.LookupByKey(scfg.Key())
+	entry, exists := d.exposed.LookupByKey(scfg.ExposedKey())
 
 	if !exists {
 		// No existing config - expose this one
@@ -289,12 +289,12 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	// Higher priority wins. If same priority and existing is running, keep existing (stability).
 	if ep > sp || (ep == sp && entry.Status == dyncfg.StatusRunning) {
 		d.Debugf("config '%s': keeping existing (priority: existing=%d new=%d, status=%s)",
-			scfg.Key(), ep, sp, entry.Status)
+			scfg.ExposedKey(), ep, sp, entry.Status)
 		return
 	}
 
 	// New config wins - stop existing if running
-	d.Infof("config '%s': replacing existing (priority: existing=%d new=%d)", scfg.Key(), ep, sp)
+	d.Infof("config '%s': replacing existing (priority: existing=%d new=%d)", scfg.ExposedKey(), ep, sp)
 
 	if entry.Status == dyncfg.StatusRunning {
 		d.mgr.Stop(entry.Cfg.PipelineKey())
@@ -335,7 +335,7 @@ func (d *ServiceDiscovery) removeOldConfigsFromSource(source, newKey string) {
 	})
 
 	for _, oldCfg := range oldCfgs {
-		if oldCfg.Key() == newKey {
+		if oldCfg.ExposedKey() == newKey {
 			continue // Same config, skip
 		}
 
@@ -344,7 +344,7 @@ func (d *ServiceDiscovery) removeOldConfigsFromSource(source, newKey string) {
 
 		// If it was exposed, remove from exposed cache and dyncfg
 		// But DON'T stop the pipeline - let the new config's enable handle that
-		if entry, ok := d.exposed.LookupByKey(oldCfg.Key()); ok && entry.Cfg.UID() == oldCfg.UID() {
+		if entry, ok := d.exposed.LookupByKey(oldCfg.ExposedKey()); ok && entry.Cfg.UID() == oldCfg.UID() {
 			d.exposed.Remove(oldCfg)
 			if !disableDyncfg {
 				d.handler.NotifyJobRemove(oldCfg)
@@ -367,7 +367,7 @@ func (d *ServiceDiscovery) startPipelineDirectly(ctx context.Context, cfg sdConf
 		return
 	}
 
-	if entry, ok := d.exposed.LookupByKey(cfg.Key()); ok {
+	if entry, ok := d.exposed.LookupByKey(cfg.ExposedKey()); ok {
 		entry.Status = dyncfg.StatusRunning
 	}
 }

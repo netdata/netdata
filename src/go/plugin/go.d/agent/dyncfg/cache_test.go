@@ -19,7 +19,7 @@ type testConfig struct {
 }
 
 func (c testConfig) UID() string             { return c.uid }
-func (c testConfig) Key() string             { return c.key }
+func (c testConfig) ExposedKey() string      { return c.key }
 func (c testConfig) SourceType() string      { return c.sourceType }
 func (c testConfig) SourceTypePriority() int { return c.priority }
 func (c testConfig) Source() string          { return c.source }

@@ -301,7 +301,7 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 		m.seen.Add(cfg)
 	}
 
-	entry, ok := m.exposed.LookupByKey(cfg.Key())
+	entry, ok := m.exposed.LookupByKey(cfg.ExposedKey())
 	if !ok {
 		entry = &dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusAccepted}
 		m.exposed.Add(entry)
@@ -335,7 +335,7 @@ func (m *Manager) removeConfig(cfg confgroup.Config) {
 	}
 	m.seen.Remove(cfg)
 
-	entry, ok := m.exposed.LookupByKey(cfg.Key())
+	entry, ok := m.exposed.LookupByKey(cfg.ExposedKey())
 	if !ok || cfg.UID() != entry.Cfg.UID() {
 		return
 	}

@@ -52,14 +52,14 @@ func (c sdConfig) SetSourceType(v string) sdConfig     { c[ikeySourceType] = v; 
 func (c sdConfig) SetDiscovererType(v string) sdConfig { c[ikeyDiscovererType] = v; return c }
 func (c sdConfig) SetPipelineKey(v string) sdConfig    { c[ikeyPipelineKey] = v; return c }
 
-// Key returns the logical key for ExposedCache: "discovererType:name"
-func (c sdConfig) Key() string {
+// ExposedKey returns the logical key for ExposedCache: "discovererType:name"
+func (c sdConfig) ExposedKey() string {
 	return c.DiscovererType() + ":" + c.Name()
 }
 
 // UID returns the unique key for seenConfigs: "source:discovererType:name"
 func (c sdConfig) UID() string {
-	return c.Source() + ":" + c.Key()
+	return c.Source() + ":" + c.ExposedKey()
 }
 
 // SourceTypePriority returns priority based on source type.
@@ -169,7 +169,7 @@ func newSDConfigFromJSON(data []byte, name, source, sourceType, discovererType, 
 	}
 
 	// Force name from dyncfg job ID (matching jobmgr pattern: cfg.SetName(name))
-	// This ensures sdConfig.Key() matches the dyncfg job ID regardless of payload content
+	// This ensures sdConfig.ExposedKey() matches the dyncfg job ID regardless of payload content
 	m["name"] = cleanName(name)
 
 	// Add metadata

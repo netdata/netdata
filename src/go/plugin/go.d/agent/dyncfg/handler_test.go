@@ -105,7 +105,7 @@ func (m *mockCallbacks) ConfigID(cfg testConfig) string {
 	if m.configIDFn != nil {
 		return m.configIDFn(cfg)
 	}
-	return "test:" + cfg.Key()
+	return "test:" + cfg.ExposedKey()
 }
 
 func newTestHandler(cb *mockCallbacks) *Handler[testConfig] {
@@ -282,7 +282,7 @@ func TestCmdAdd_ReplacesExisting(t *testing.T) {
 
 	// Old should be stopped, new should be in cache.
 	require.Len(t, cb.stopCalls, 1)
-	assert.Equal(t, "job1", cb.stopCalls[0].Key())
+	assert.Equal(t, "job1", cb.stopCalls[0].ExposedKey())
 
 	entry, ok := h.exposed.LookupByKey("job1")
 	require.True(t, ok)

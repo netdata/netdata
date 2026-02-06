@@ -116,7 +116,7 @@ func (s *runSim) run(t *testing.T) {
 	require.Equalf(t, wantLen, gotLen, "exposed: different len (want %d got %d)", wantLen, gotLen)
 
 	for _, we := range s.wantExposed {
-		entry, ok := mgr.exposed.LookupByKey(we.cfg.Key())
+		entry, ok := mgr.exposed.LookupByKey(we.cfg.ExposedKey())
 		require.Truef(t, ok && we.cfg.UID() == entry.Cfg.UID(), "exposed: config '%s' is not found", we.cfg.UID())
 		require.Truef(t, we.status == entry.Status, "exposed: wrong status for '%s', want %s got %s", we.cfg.UID(), we.status, entry.Status)
 	}

@@ -7,7 +7,7 @@ import "sync"
 // Config is the constraint interface for configs stored in handler caches.
 type Config interface {
 	UID() string             // SeenCache key (globally unique per source)
-	Key() string             // ExposedCache key (one per logical name)
+	ExposedKey() string      // ExposedCache key (one per logical name)
 	SourceType() string      // "dyncfg", "user", "stock"
 	SourceTypePriority() int // dyncfg=16, user=8, stock=2
 	Source() string          // source identifier
@@ -71,7 +71,7 @@ func (c *SeenCache[C]) ForEach(fn func(uid string, cfg C) bool) {
 	}
 }
 
-// ExposedCache stores active config+status per logical name, keyed by Key().
+// ExposedCache stores active config+status per logical name, keyed by ExposedKey().
 // LookupByKey returns a pointer to the stored Entry — mutations to Status
 // are visible through the pointer. The mutex protects map access only.
 // Entry.Status is written exclusively by the serialized command goroutine
@@ -87,17 +87,17 @@ func NewExposedCache[C Config]() *ExposedCache[C] {
 	return &ExposedCache[C]{items: make(map[string]*Entry[C])}
 }
 
-// Add inserts or overwrites an entry by cfg.Key().
+// Add inserts or overwrites an entry by cfg.ExposedKey().
 func (c *ExposedCache[C]) Add(entry *Entry[C]) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
-	c.items[entry.Cfg.Key()] = entry
+	c.items[entry.Cfg.ExposedKey()] = entry
 }
 
 func (c *ExposedCache[C]) Remove(cfg C) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
-	delete(c.items, cfg.Key())
+	delete(c.items, cfg.ExposedKey())
 }
 
 // LookupByKey returns a pointer to the stored entry.
