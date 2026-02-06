@@ -3,6 +3,8 @@
 package dyncfg
 
 import (
+	"errors"
+
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 )
@@ -138,7 +140,7 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 
 	key, name, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "Invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid job ID format.")
 		return
 	}
 
@@ -148,7 +150,7 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 	}
 
 	if err := ValidateJobName(name); err != nil {
-		h.api.SendCodef(fn, 400, "Invalid job name '%s': %v.", name, err)
+		h.api.SendCodef(fn, 400, "invalid job name '%s': %v.", name, err)
 		return
 	}
 
@@ -179,13 +181,13 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 func (h *Handler[C]) CmdEnable(fn Function) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "Invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid job ID format.")
 		return
 	}
 
 	entry, ok := h.exposed.LookupByKey(key)
 	if !ok {
-		h.api.SendCodef(fn, 404, "Job not found.")
+		h.api.SendCodef(fn, 404, "job not found.")
 		return
 	}
 
@@ -199,7 +201,7 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 	case StatusAccepted, StatusDisabled, StatusFailed:
 		// proceed to start
 	default:
-		h.api.SendCodef(fn, 405, "Enabling is not allowed in '%s' state.", entry.Status)
+		h.api.SendCodef(fn, 405, "enabling is not allowed in '%s' state.", entry.Status)
 		h.NotifyJobStatus(entry.Cfg, entry.Status)
 		return
 	}
@@ -210,7 +212,8 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 		entry.Status = StatusFailed
 
 		code := h.cfg.EnableFailCode
-		if ce, ok := err.(CodedError); ok {
+		var ce CodedError
+		if errors.As(err, &ce) {
 			code = ce.Code()
 		}
 		h.api.SendCodef(fn, code, "%v", err)
@@ -238,13 +241,13 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 func (h *Handler[C]) CmdDisable(fn Function) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "Invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid job ID format.")
 		return
 	}
 
 	entry, ok := h.exposed.LookupByKey(key)
 	if !ok {
-		h.api.SendCodef(fn, 404, "Job not found.")
+		h.api.SendCodef(fn, 404, "job not found.")
 		return
 	}
 
@@ -269,18 +272,18 @@ func (h *Handler[C]) CmdDisable(fn Function) {
 func (h *Handler[C]) CmdRemove(fn Function) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "Invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid job ID format.")
 		return
 	}
 
 	entry, ok := h.exposed.LookupByKey(key)
 	if !ok {
-		h.api.SendCodef(fn, 404, "Job not found.")
+		h.api.SendCodef(fn, 404, "job not found.")
 		return
 	}
 
 	if entry.Cfg.SourceType() != "dyncfg" {
-		h.api.SendCodef(fn, 405, "Removing jobs of type '%s' is not supported. Only 'dyncfg' jobs can be removed.", entry.Cfg.SourceType())
+		h.api.SendCodef(fn, 405, "removing jobs of type '%s' is not supported, only 'dyncfg' jobs can be removed.", entry.Cfg.SourceType())
 		return
 	}
 
@@ -296,13 +299,13 @@ func (h *Handler[C]) CmdRemove(fn Function) {
 func (h *Handler[C]) CmdUpdate(fn Function) {
 	key, name, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "Invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid job ID format.")
 		return
 	}
 
 	entry, ok := h.exposed.LookupByKey(key)
 	if !ok {
-		h.api.SendCodef(fn, 404, "Job not found.")
+		h.api.SendCodef(fn, 404, "job not found.")
 		return
 	}
 
@@ -328,7 +331,7 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	}
 
 	if entry.Status == StatusAccepted {
-		h.api.SendCodef(fn, 403, "Updating is not allowed in '%s' state.", entry.Status)
+		h.api.SendCodef(fn, 403, "updating is not allowed in '%s' state.", entry.Status)
 		h.NotifyJobStatus(entry.Cfg, StatusAccepted)
 		return
 	}
@@ -394,25 +397,25 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 func (h *Handler[C]) CmdRestart(fn Function) {
 	key, _, ok := h.cb.ExtractKey(fn)
 	if !ok {
-		h.api.SendCodef(fn, 400, "Invalid job ID format.")
+		h.api.SendCodef(fn, 400, "invalid job ID format.")
 		return
 	}
 
 	entry, ok := h.exposed.LookupByKey(key)
 	if !ok {
-		h.api.SendCodef(fn, 404, "Job not found.")
+		h.api.SendCodef(fn, 404, "job not found.")
 		return
 	}
 
 	switch entry.Status {
 	case StatusAccepted, StatusDisabled:
-		h.api.SendCodef(fn, 405, "Restarting is not allowed in '%s' state.", entry.Status)
+		h.api.SendCodef(fn, 405, "restarting is not allowed in '%s' state.", entry.Status)
 		h.NotifyJobStatus(entry.Cfg, entry.Status)
 		return
 	case StatusRunning, StatusFailed:
 		// proceed
 	default:
-		h.api.SendCodef(fn, 405, "Restarting is not allowed in '%s' state.", entry.Status)
+		h.api.SendCodef(fn, 405, "restarting is not allowed in '%s' state.", entry.Status)
 		h.NotifyJobStatus(entry.Cfg, entry.Status)
 		return
 	}
@@ -426,10 +429,11 @@ func (h *Handler[C]) CmdRestart(fn Function) {
 	if err != nil {
 		entry.Status = StatusFailed
 		code := 422
-		if ce, ok := err.(CodedError); ok {
+		var ce CodedError
+		if errors.As(err, &ce) {
 			code = ce.Code()
 		}
-		h.api.SendCodef(fn, code, "Job restart failed: %v", err)
+		h.api.SendCodef(fn, code, "job restart failed: %v", err)
 		h.NotifyJobStatus(entry.Cfg, StatusFailed)
 		h.cb.OnStatusChange(entry, oldStatus, fn)
 		return
@@ -442,6 +446,6 @@ func (h *Handler[C]) CmdRestart(fn Function) {
 }
 
 func isCodedError(err error) bool {
-	_, ok := err.(CodedError)
-	return ok
+	var ce CodedError
+	return errors.As(err, &ce)
 }

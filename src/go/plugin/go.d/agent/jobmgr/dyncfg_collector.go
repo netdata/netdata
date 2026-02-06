@@ -462,13 +462,13 @@ func (cb *collectorCallbacks) ParseAndValidate(fn dyncfg.Function, name string) 
 
 	cfg, err := configFromPayload(fn)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid configuration format. Failed to create configuration from payload: %v.", err)
+		return nil, fmt.Errorf("invalid configuration format: failed to create configuration from payload: %v", err)
 	}
 
 	cb.mgr.dyncfgSetConfigMeta(cfg, mn, name, fn)
 
 	if _, err := cb.mgr.createCollectorJob(cfg); err != nil {
-		return nil, fmt.Errorf("Invalid configuration. Failed to apply configuration: %v.", err)
+		return nil, fmt.Errorf("invalid configuration: failed to apply configuration: %v", err)
 	}
 
 	return cfg, nil
@@ -479,13 +479,13 @@ func (cb *collectorCallbacks) Start(cfg confgroup.Config) error {
 
 	job, err := cb.mgr.createCollectorJob(cfg)
 	if err != nil {
-		return &codedError{err: fmt.Errorf("Invalid configuration. Failed to apply configuration: %v.", err), code: 400}
+		return &codedError{err: fmt.Errorf("invalid configuration: failed to apply configuration: %v", err), code: 400}
 	}
 
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
 		cb.mgr.scheduleRetryTask(cfg, job)
-		return fmt.Errorf("Job enable failed: %v.", err)
+		return fmt.Errorf("job enable failed: %v", err)
 	}
 
 	cb.mgr.startRunningJob(job)
@@ -499,13 +499,13 @@ func (cb *collectorCallbacks) Update(oldCfg, newCfg confgroup.Config) error {
 
 	job, err := cb.mgr.createCollectorJob(newCfg)
 	if err != nil {
-		return fmt.Errorf("Job update failed: %v", err)
+		return fmt.Errorf("job update failed: %v", err)
 	}
 
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
 		cb.mgr.scheduleRetryTask(newCfg, job)
-		return fmt.Errorf("Job update failed: %v", err)
+		return fmt.Errorf("job update failed: %v", err)
 	}
 
 	cb.mgr.startRunningJob(job)

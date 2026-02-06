@@ -567,7 +567,7 @@ CONFIG test:sd:net_listeners:test-job status disabled
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-enable 404 application/json
-{"status":404,"errorMessage":"Job not found."}
+{"status":404,"errorMessage":"job not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -688,7 +688,7 @@ FUNCTION_RESULT_END
 CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-update 403 application/json
-{"status":403,"errorMessage":"Updating is not allowed in 'accepted' state."}
+{"status":403,"errorMessage":"updating is not allowed in 'accepted' state."}
 FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job status accepted
@@ -709,7 +709,7 @@ CONFIG test:sd:net_listeners:test-job status accepted
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-update 404 application/json
-{"status":404,"errorMessage":"Job not found."}
+{"status":404,"errorMessage":"job not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -820,7 +820,7 @@ CONFIG test:sd:net_listeners:test-job delete
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-remove 404 application/json
-{"status":404,"errorMessage":"Job not found."}
+{"status":404,"errorMessage":"job not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -929,7 +929,7 @@ func TestServiceDiscovery_DyncfgFileConfig(t *testing.T) {
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-remove 405 application/json
-{"status":405,"errorMessage":"Removing jobs of type 'file' is not supported. Only 'dyncfg' jobs can be removed."}
+{"status":405,"errorMessage":"removing jobs of type 'file' is not supported, only 'dyncfg' jobs can be removed."}
 FUNCTION_RESULT_END
 `,
 				}

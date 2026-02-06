@@ -4,9 +4,7 @@ package sd
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"unicode"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
@@ -90,17 +88,3 @@ func userConfigFromPayload(payload []byte, discovererType, jobName string) ([]by
 	return bs, nil
 }
 
-// validateJobName validates a job name for dyncfg.
-// Job names cannot contain spaces, '.', or ':' characters.
-func validateJobName(jobName string) error {
-	for _, r := range jobName {
-		if unicode.IsSpace(r) {
-			return errors.New("contains spaces")
-		}
-		switch r {
-		case '.', ':':
-			return fmt.Errorf("contains '%c'", r)
-		}
-	}
-	return nil
-}

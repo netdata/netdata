@@ -138,6 +138,70 @@ func newTestFn(id, cmd, name string, payload []byte) Function {
 	})
 }
 
+// --- ExtractKey Failure Tests ---
+
+func TestCmdAdd_ExtractKeyFailure(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	// ID without ":" causes default ExtractKey to return false.
+	fn := newTestFn("badid", "add", "job1", []byte(`{}`))
+	h.CmdAdd(fn)
+
+	assert.Equal(t, 0, h.exposed.Count())
+}
+
+func TestCmdEnable_ExtractKeyFailure(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	fn := newTestFn("badid", "enable", "", nil)
+	h.CmdEnable(fn)
+
+	assert.Len(t, cb.startCalls, 0)
+}
+
+func TestCmdDisable_ExtractKeyFailure(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	fn := newTestFn("badid", "disable", "", nil)
+	h.CmdDisable(fn)
+
+	assert.Len(t, cb.stopCalls, 0)
+}
+
+func TestCmdRemove_ExtractKeyFailure(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	fn := newTestFn("badid", "remove", "", nil)
+	h.CmdRemove(fn)
+
+	assert.Len(t, cb.stopCalls, 0)
+}
+
+func TestCmdUpdate_ExtractKeyFailure(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	fn := newTestFn("badid", "update", "", []byte(`{}`))
+	h.CmdUpdate(fn)
+
+	assert.Len(t, cb.updateCalls, 0)
+}
+
+func TestCmdRestart_ExtractKeyFailure(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	fn := newTestFn("badid", "restart", "", nil)
+	h.CmdRestart(fn)
+
+	assert.Len(t, cb.stopCalls, 0)
+	assert.Len(t, cb.startCalls, 0)
+}
+
 // --- CmdAdd Tests ---
 
 func TestCmdAdd_Success(t *testing.T) {
@@ -612,6 +676,48 @@ func TestCmdUpdate_NonConversion_StartFails(t *testing.T) {
 
 	entry, _ := h.exposed.LookupByKey("job1")
 	assert.Equal(t, StatusFailed, entry.Status)
+}
+
+func TestCmdUpdate_Conversion_StartFails(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.startFn = func(_ testConfig) error { return errors.New("start failed") }
+	h := newTestHandler(cb)
+
+	oldCfg := testConfig{uid: "stock:job1", key: "job1", sourceType: "stock", hash: 100}
+	h.seen.Add(oldCfg)
+	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+
+	cb.parseAndValidateFn = func(_ Function, name string) (testConfig, error) {
+		return testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg", hash: 200, source: "test"}, nil
+	}
+
+	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
+	h.CmdUpdate(fn)
+
+	// Conversion uses Stop + Start; Start fails → Failed status.
+	assert.Len(t, cb.stopCalls, 1)
+	assert.Len(t, cb.startCalls, 1)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusFailed, entry.Status)
+	assert.Equal(t, "dyncfg", entry.Cfg.SourceType())
+}
+
+func TestCmdUpdate_NoPayload(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{uid: "dyncfg:job1", key: "job1", sourceType: "dyncfg"}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusRunning})
+
+	// No payload (nil).
+	fn := newTestFn("test:job1", "update", "job1", nil)
+	h.CmdUpdate(fn)
+
+	// Should fail with missing payload, not modify cache.
+	assert.Len(t, cb.updateCalls, 0)
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusRunning, entry.Status)
 }
 
 func TestCmdUpdate_Conversion_Disabled(t *testing.T) {
