@@ -76,24 +76,42 @@ sudo systemctl restart netdata
 
 ### Basic Metric Badge
 
-Display current CPU usage from the `user` dimension:
+Display CPU usage from the `user` dimension:
 
 ```markdown
 ![CPU Usage](http://localhost:19999/api/v1/badge.svg?chart=system.cpu&dimension=user)
 ```
 
+To display aggregated CPU (all dimensions combined):
+
+```markdown
+![CPU Usage](http://localhost:19999/api/v1/badge.svg?chart=system.cpu)
+```
+
 ### Alert Status Badge
 
-Display alert state (replace with actual alarm name from your configuration):
+The badge displays the alert status text (like "OK", "WARNING", "CRITICAL") with the configured color. The alarm name must match your Netdata health configuration.
+
+Example:
 
 ```markdown
 ![CPU Alert](http://localhost:19999/api/v1/badge.svg?chart=system.cpu&alarm=system.cpu_usage&label=CPU+Alert)
 ```
 
+**Note:** Alarm names vary by Netdata configuration. Check your health configuration (`/etc/netdata/health.d/*.conf`) for the exact alarm name to use.
+
 ### Custom Label and Units
+
+Display available memory in GB with one decimal place:
 
 ```markdown
 ![Memory](http://localhost:19999/api/v1/badge.svg?chart=mem.available&label=RAM&precision=1)
+```
+
+**Note:** The `mem.available` chart shows total available memory when no dimension is specified. To display specific memory components, check if your Netdata configuration provides dimensions like `free` or `used`:
+
+```markdown
+![Memory Free](http://localhost:19999/api/v1/badge.svg?chart=mem.available&dimension=free&label=RAM+Free&precision=1)
 ```
 
 ### Aggregated Values
@@ -108,8 +126,16 @@ Show average network traffic over 5 minutes:
 
 Static colors:
 
+Display system load average (all 3 dimensions):
+
 ```markdown
-![Status](http://localhost:19999/api/v1/badge.svg?chart=system.cpu&label=Load&value_color=blue)
+![Status](http://localhost:19999/api/v1/badge.svg?chart=system.load&label=Load)
+```
+
+**Note:** This example shows all dimensions combined. To display specific load dimensions, use the `dimension` parameter:
+
+```markdown
+![Status](http://localhost:19999/api/v1/badge.svg?chart=system.load&dimension=load1&label=Load+1)
 ```
 
 Conditional colors based on value:
@@ -435,6 +461,14 @@ document.querySelectorAll("img").forEach(function (img) {
   }
 });
 ```
+
+## Notes on Chart and Alert Behavior
+
+- **Chart availability varies**: Not all charts are available on all Netdata installations. Use the dashboard to verify chart IDs before using them in badges.
+- **Dimension behavior**: When no dimension is specified, charts may show aggregated values (sum, average, or total) depending on the chart type. Specify individual dimensions for more granular control.
+- **Alarm names are configuration-dependent**: The exact alarm names depend on your Netdata health configuration files in `/etc/netdata/health.d/`. Check your configuration to find the correct alarm name.
+- **Memory charts**: The `mem.available` chart shows total available memory without dimensions. Check if your configuration provides `free` or `used` dimensions for specific memory components.
+- **System load**: The `system.load` chart has multiple dimensions (load1, load5, load15). Without specifying a dimension, badges show the sum of all load averages. Use specific dimensions for individual load metrics.
 
 ## Related Documentation
 
