@@ -126,6 +126,7 @@ const char *database_cleanup[] = {
     "DROP INDEX IF EXISTS health_log_d_ind_4",
     "DROP INDEX IF EXISTS health_log_d_ind_1",
     "DROP INDEX IF EXISTS health_log_d_ind_5",
+    "DELETE FROM alert_hash_cloud WHERE hash_id NOT IN (SELECT hash_id FROM alert_hash)",
     NULL
 };
 
