@@ -229,10 +229,6 @@ fn flatten_number_data_point(ndp: &NumberDataPoint) -> JsonMap<String, JsonValue
 fn flatten_histogram_data_point(hdp: &HistogramDataPoint) -> Vec<JsonMap<String, JsonValue>> {
     let mut results = Vec::new();
 
-    if hdp.bucket_counts.is_empty() || hdp.explicit_bounds.is_empty() {
-        return results;
-    }
-
     // Create base map with common fields
     let mut base_map = JsonMap::new();
     base_map.insert(
@@ -250,34 +246,77 @@ fn flatten_histogram_data_point(hdp: &HistogramDataPoint) -> Vec<JsonMap<String,
     }
 
     // Handle regular buckets
-    for (&bound, &count) in hdp.explicit_bounds.iter().zip(hdp.bucket_counts.iter()) {
-        let mut bucket_map = base_map.clone();
+    if !hdp.bucket_counts.is_empty() && !hdp.explicit_bounds.is_empty() {
+        for (&bound, &count) in hdp.explicit_bounds.iter().zip(hdp.bucket_counts.iter()) {
+            let mut bucket_map = base_map.clone();
+            bucket_map.insert(
+                "metric.attributes._nd_dimension".to_string(),
+                JsonValue::String("bucket".to_string()),
+            );
+            bucket_map.insert("bucket".to_string(), JsonValue::String(format!("{}", bound)));
+            bucket_map.insert("metric.value".to_string(), JsonValue::from(count));
+            results.push(bucket_map);
+        }
 
-        // Set dimension name to bucket identifier
-        let bucket_name = format!("{}", bound);
-        bucket_map.insert(
-            "metric.attributes._nd_dimension".to_string(),
-            JsonValue::String("bucket".to_string()),
-        );
-        bucket_map.insert("bucket".to_string(), JsonValue::String(bucket_name.clone()));
-        bucket_map.insert("metric.value".to_string(), JsonValue::from(count));
-
-        results.push(bucket_map);
+        // Handle +Inf bucket
+        if hdp.bucket_counts.len() > hdp.explicit_bounds.len() {
+            let mut inf_map = base_map.clone();
+            let inf_count = hdp.bucket_counts[hdp.bucket_counts.len() - 1];
+            inf_map.insert(
+                "metric.attributes._nd_dimension".to_string(),
+                JsonValue::String("bucket".to_string()),
+            );
+            inf_map.insert("bucket".to_string(), JsonValue::String("+Inf".to_string()));
+            inf_map.insert("metric.value".to_string(), JsonValue::from(inf_count));
+            results.push(inf_map);
+        }
     }
 
-    // Handle +Inf bucket if it exists
-    if hdp.bucket_counts.len() > hdp.explicit_bounds.len() {
-        let mut inf_map = base_map.clone();
-        let inf_count = hdp.bucket_counts[hdp.bucket_counts.len() - 1];
+    // Add "count" to the same context as buckets (it has the same unit: counts)
+    let mut count_map = base_map.clone();
+    count_map.insert(
+        "metric.attributes._nd_dimension".to_string(),
+        JsonValue::String("count".to_string()),
+    );
+    count_map.insert("count".to_string(), JsonValue::String("count".to_string()));
+    count_map.insert("metric.value".to_string(), JsonValue::from(hdp.count));
+    results.push(count_map);
 
-        inf_map.insert(
+    // Add "sum" as a separate context (suffix .sum) because it has the measurement unit
+    let mut sum_map = base_map.clone();
+    sum_map.insert("_nd_name_suffix".to_string(), JsonValue::String(".sum".to_string()));
+    sum_map.insert(
+        "metric.attributes._nd_dimension".to_string(),
+        JsonValue::String("sum".to_string()),
+    );
+    sum_map.insert("sum".to_string(), JsonValue::String("sum".to_string()));
+    sum_map.insert("metric.value".to_string(), JsonValue::from(hdp.sum));
+    results.push(sum_map);
+
+    // Add min (if present)
+    if let Some(min) = hdp.min {
+        let mut min_map = base_map.clone();
+        min_map.insert("_nd_name_suffix".to_string(), JsonValue::String(".min".to_string()));
+        min_map.insert(
             "metric.attributes._nd_dimension".to_string(),
-            JsonValue::String("bucket".to_string()),
+            JsonValue::String("min".to_string()),
         );
-        inf_map.insert("bucket".to_string(), JsonValue::String("+Inf".to_string()));
-        inf_map.insert("metric.value".to_string(), JsonValue::from(inf_count));
+        min_map.insert("min".to_string(), JsonValue::String("min".to_string()));
+        min_map.insert("metric.value".to_string(), JsonValue::from(min));
+        results.push(min_map);
+    }
 
-        results.push(inf_map);
+    // Add max (if present)
+    if let Some(max) = hdp.max {
+        let mut max_map = base_map.clone();
+        max_map.insert("_nd_name_suffix".to_string(), JsonValue::String(".max".to_string()));
+        max_map.insert(
+            "metric.attributes._nd_dimension".to_string(),
+            JsonValue::String("max".to_string()),
+        );
+        max_map.insert("max".to_string(), JsonValue::String("max".to_string()));
+        max_map.insert("metric.value".to_string(), JsonValue::from(max));
+        results.push(max_map);
     }
 
     results
