@@ -279,7 +279,10 @@ impl Registry {
                 }
             }
             EventKind::Modify(ModifyKind::Name(rename_mode)) => {
-                error!("unhandled rename mode: {:?}", rename_mode);
+                info!(
+                    "unhandled modify event: '{:?}', expecting rename event for newly archived file",
+                    rename_mode
+                );
             }
             event_kind => {
                 // Ignore other events (content modifications, access, etc.)
