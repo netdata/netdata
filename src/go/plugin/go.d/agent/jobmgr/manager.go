@@ -61,19 +61,27 @@ func New() *Manager {
 	}
 
 	mgr.collectorCb = &collectorCallbacks{mgr: mgr}
-	mgr.handler = dyncfg.NewHandler[confgroup.Config](
-		mgr.Logger,
-		api,
-		seen,
-		exposed,
-		mgr.collectorCb,
-		dyncfg.HandlerConfig{
-			Path:                    fmt.Sprintf(dyncfgCollectorPath, executable.Name),
-			EnableFailCode:          200,
-			RemoveStockOnEnableFail: true,
-			SupportRestart:          true,
+	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[confgroup.Config]{
+		Logger:    mgr.Logger,
+		API:       api,
+		Seen:      seen,
+		Exposed:   exposed,
+		Callbacks: mgr.collectorCb,
+
+		Path:                    fmt.Sprintf(dyncfgCollectorPath, executable.Name),
+		EnableFailCode:          200,
+		RemoveStockOnEnableFail: true,
+		JobCommands: []dyncfg.Command{
+			dyncfg.CommandSchema,
+			dyncfg.CommandGet,
+			dyncfg.CommandEnable,
+			dyncfg.CommandDisable,
+			dyncfg.CommandUpdate,
+			dyncfg.CommandRestart,
+			dyncfg.CommandTest,
+			dyncfg.CommandUserconfig,
 		},
-	)
+	})
 
 	return mgr
 }
@@ -82,15 +90,7 @@ func New() *Manager {
 func (m *Manager) SetDyncfgResponder(responder *dyncfg.Responder) {
 	if responder != nil {
 		m.dyncfgApi = responder
-		// Rebuild handler with the new responder.
-		m.handler = dyncfg.NewHandler[confgroup.Config](
-			m.Logger,
-			responder,
-			m.seen,
-			m.exposed,
-			m.collectorCb,
-			m.handler.Cfg(),
-		)
+		m.handler.SetAPI(responder)
 	}
 }
 

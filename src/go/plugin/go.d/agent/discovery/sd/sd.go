@@ -55,11 +55,24 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		},
 	}
 	d.sdCb = &sdCallbacks{sd: d}
-	d.handler = dyncfg.NewHandler(d.Logger, d.dyncfgApi, d.seen, d.exposed, d.sdCb, dyncfg.HandlerConfig{
-		Path:                    fmt.Sprintf(dyncfgSDPath, executable.Name),
-		EnableFailCode:          422,
-		RemoveStockOnEnableFail: false,
-		SupportRestart:          false,
+	d.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
+		Logger:    d.Logger,
+		API:       d.dyncfgApi,
+		Seen:      d.seen,
+		Exposed:   d.exposed,
+		Callbacks: d.sdCb,
+
+		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		EnableFailCode: 422,
+		JobCommands: []dyncfg.Command{
+			dyncfg.CommandSchema,
+			dyncfg.CommandGet,
+			dyncfg.CommandEnable,
+			dyncfg.CommandDisable,
+			dyncfg.CommandUpdate,
+			dyncfg.CommandTest,
+			dyncfg.CommandUserconfig,
+		},
 	})
 
 	return d, nil
@@ -102,7 +115,7 @@ type (
 func (d *ServiceDiscovery) SetDyncfgResponder(api *dyncfg.Responder) {
 	if api != nil {
 		d.dyncfgApi = api
-		d.handler = dyncfg.NewHandler(d.Logger, api, d.seen, d.exposed, d.sdCb, d.handler.Cfg())
+		d.handler.SetAPI(api)
 	}
 }
 

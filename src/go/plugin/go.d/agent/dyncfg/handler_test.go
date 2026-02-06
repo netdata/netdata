@@ -111,19 +111,27 @@ func (m *mockCallbacks) ConfigID(cfg testConfig) string {
 func newTestHandler(cb *mockCallbacks) *Handler[testConfig] {
 	var buf bytes.Buffer
 	api := NewResponder(netdataapi.New(safewriter.New(&buf)))
-	return NewHandler[testConfig](
-		logger.New(),
-		api,
-		NewSeenCache[testConfig](),
-		NewExposedCache[testConfig](),
-		cb,
-		HandlerConfig{
-			Path:                    "/test/path",
-			EnableFailCode:          200,
-			RemoveStockOnEnableFail: true,
-			SupportRestart:          true,
+	return NewHandler(HandlerOpts[testConfig]{
+		Logger:    logger.New(),
+		API:       api,
+		Seen:      NewSeenCache[testConfig](),
+		Exposed:   NewExposedCache[testConfig](),
+		Callbacks: cb,
+
+		Path:                    "/test/path",
+		EnableFailCode:          200,
+		RemoveStockOnEnableFail: true,
+		JobCommands: []Command{
+			CommandSchema,
+			CommandGet,
+			CommandEnable,
+			CommandDisable,
+			CommandUpdate,
+			CommandRestart,
+			CommandTest,
+			CommandUserconfig,
 		},
-	)
+	})
 }
 
 func newTestFn(id, cmd, name string, payload []byte) Function {
@@ -868,30 +876,28 @@ func TestCmdRestart_StartFails_CodedError(t *testing.T) {
 
 func TestNotifyJobCreate_SupportedCommands(t *testing.T) {
 	tests := []struct {
-		name           string
-		supportRestart bool
-		sourceType     string
-		wantRestart    bool
-		wantRemove     bool
+		name       string
+		commands   []Command
+		sourceType string
+		wantRemove bool
 	}{
-		{"dyncfg with restart", true, "dyncfg", true, true},
-		{"dyncfg no restart", false, "dyncfg", false, true},
-		{"stock with restart", true, "stock", true, false},
-		{"stock no restart", false, "stock", false, false},
+		{"dyncfg with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "dyncfg", true},
+		{"dyncfg no restart", []Command{CommandSchema, CommandGet}, "dyncfg", true},
+		{"stock with restart", []Command{CommandSchema, CommandGet, CommandRestart}, "stock", false},
+		{"stock no restart", []Command{CommandSchema, CommandGet}, "stock", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cb := &mockCallbacks{}
 			h := newTestHandler(cb)
-			h.cfg.SupportRestart = tt.supportRestart
+			h.jobCommands = tt.commands
 
 			cmds := h.jobSupportedCommands(tt.sourceType == "dyncfg")
 
-			if tt.wantRestart {
-				assert.Contains(t, cmds, "restart")
-			} else {
-				assert.NotContains(t, cmds, "restart")
+			// Base commands should always be present.
+			for _, cmd := range tt.commands {
+				assert.Contains(t, cmds, string(cmd))
 			}
 			if tt.wantRemove {
 				assert.Contains(t, cmds, "remove")

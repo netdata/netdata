@@ -20,7 +20,7 @@ type Callbacks[C Config] interface {
 
 	// Start creates a work unit and starts it. Owns the full start lifecycle
 	// including pre-start cleanup and post-fail retry scheduling.
-	// Return CodedError to override HandlerConfig.EnableFailCode.
+	// Return CodedError to override EnableFailCode.
 	// Used by CmdEnable and CmdUpdate (conversion only).
 	Start(cfg C) error
 
@@ -47,12 +47,18 @@ type CodedError interface {
 	Code() int
 }
 
-// HandlerConfig configures handler behavior differences between components.
-type HandlerConfig struct {
-	Path                    string // dyncfg path (e.g. "/collectors/go.d/Jobs")
-	EnableFailCode          int    // response code for enable failure (jobmgr: 200, SD: 422)
-	RemoveStockOnEnableFail bool   // remove stock config from exposed on enable failure
-	SupportRestart          bool   // include "restart" in SupportedCommands
+// HandlerOpts configures the handler with component-specific settings.
+type HandlerOpts[C Config] struct {
+	Logger    *logger.Logger
+	API       *Responder
+	Seen      *SeenCache[C]
+	Exposed   *ExposedCache[C]
+	Callbacks Callbacks[C]
+
+	Path                    string    // dyncfg path (e.g. "/collectors/go.d/Jobs")
+	EnableFailCode          int       // response code for enable failure (jobmgr: 200, SD: 422)
+	RemoveStockOnEnableFail bool      // remove stock config from exposed on enable failure
+	JobCommands             []Command // base commands for jobs; CommandRemove is added implicitly for dyncfg configs
 }
 
 // Handler implements the shared dyncfg command state machine.
@@ -60,34 +66,35 @@ type HandlerConfig struct {
 // and delegates domain-specific work to Callbacks.
 type Handler[C Config] struct {
 	*logger.Logger
-	api     *Responder
-	seen    *SeenCache[C]
-	exposed *ExposedCache[C]
-	cb      Callbacks[C]
-	cfg     HandlerConfig
+	api                     *Responder
+	seen                    *SeenCache[C]
+	exposed                 *ExposedCache[C]
+	cb                      Callbacks[C]
+	path                    string
+	enableFailCode          int
+	removeStockOnEnableFail bool
+	jobCommands             []Command
 }
 
-func NewHandler[C Config](
-	log *logger.Logger,
-	api *Responder,
-	seen *SeenCache[C],
-	exposed *ExposedCache[C],
-	cb Callbacks[C],
-	cfg HandlerConfig,
-) *Handler[C] {
+func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
 	return &Handler[C]{
-		Logger:  log,
-		api:     api,
-		seen:    seen,
-		exposed: exposed,
-		cb:      cb,
-		cfg:     cfg,
+		Logger:                  opts.Logger,
+		api:                     opts.API,
+		seen:                    opts.Seen,
+		exposed:                 opts.Exposed,
+		cb:                      opts.Callbacks,
+		path:                    opts.Path,
+		enableFailCode:          opts.EnableFailCode,
+		removeStockOnEnableFail: opts.RemoveStockOnEnableFail,
+		jobCommands:             opts.JobCommands,
 	}
 }
 
 func (h *Handler[C]) Seen() *SeenCache[C]       { return h.seen }
 func (h *Handler[C]) Exposed() *ExposedCache[C] { return h.exposed }
-func (h *Handler[C]) Cfg() HandlerConfig        { return h.cfg }
+
+// SetAPI replaces the responder (e.g. to silence output in CLI mode).
+func (h *Handler[C]) SetAPI(api *Responder) { h.api = api }
 
 // NotifyJobCreate registers/updates a config in the dyncfg API (upsert).
 func (h *Handler[C]) NotifyJobCreate(cfg C, status Status) {
@@ -96,7 +103,7 @@ func (h *Handler[C]) NotifyJobCreate(cfg C, status Status) {
 		ID:                h.cb.ConfigID(cfg),
 		Status:            status.String(),
 		ConfigType:        ConfigTypeJob.String(),
-		Path:              h.cfg.Path,
+		Path:              h.path,
 		SourceType:        cfg.SourceType(),
 		Source:            cfg.Source(),
 		SupportedCommands: h.jobSupportedCommands(isDyncfg),
@@ -114,17 +121,8 @@ func (h *Handler[C]) NotifyJobRemove(cfg C) {
 }
 
 func (h *Handler[C]) jobSupportedCommands(isDyncfg bool) string {
-	cmds := []Command{
-		CommandSchema,
-		CommandGet,
-		CommandEnable,
-		CommandDisable,
-		CommandUpdate,
-	}
-	if h.cfg.SupportRestart {
-		cmds = append(cmds, CommandRestart)
-	}
-	cmds = append(cmds, CommandTest, CommandUserconfig)
+	cmds := make([]Command, len(h.jobCommands))
+	copy(cmds, h.jobCommands)
 	if isDyncfg {
 		cmds = append(cmds, CommandRemove)
 	}
@@ -211,7 +209,7 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 	if err != nil {
 		entry.Status = StatusFailed
 
-		code := h.cfg.EnableFailCode
+		code := h.enableFailCode
 		var ce CodedError
 		if errors.As(err, &ce) {
 			code = ce.Code()
@@ -220,7 +218,7 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 
 		// Stock removal only for non-CodedError failures (runtime detection failures).
 		// CodedError = validation error (e.g. createCollectorJob → 400, no stock removal).
-		if h.cfg.RemoveStockOnEnableFail && !isCodedError(err) && entry.Cfg.SourceType() == "stock" {
+		if h.removeStockOnEnableFail && !isCodedError(err) && entry.Cfg.SourceType() == "stock" {
 			h.exposed.Remove(entry.Cfg)
 			h.NotifyJobRemove(entry.Cfg)
 		} else {

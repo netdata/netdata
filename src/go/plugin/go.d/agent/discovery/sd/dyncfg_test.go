@@ -118,11 +118,24 @@ func (s *dyncfgSim) run(t *testing.T) {
 		},
 	}
 	sd.sdCb = &sdCallbacks{sd: sd}
-	sd.handler = dyncfg.NewHandler(sd.Logger, sd.dyncfgApi, sd.seen, sd.exposed, sd.sdCb, dyncfg.HandlerConfig{
-		Path:                    fmt.Sprintf(dyncfgSDPath, executable.Name),
-		EnableFailCode:          422,
-		RemoveStockOnEnableFail: false,
-		SupportRestart:          false,
+	sd.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
+		Logger:    sd.Logger,
+		API:       sd.dyncfgApi,
+		Seen:      sd.seen,
+		Exposed:   sd.exposed,
+		Callbacks: sd.sdCb,
+
+		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		EnableFailCode: 422,
+		JobCommands: []dyncfg.Command{
+			dyncfg.CommandSchema,
+			dyncfg.CommandGet,
+			dyncfg.CommandEnable,
+			dyncfg.CommandDisable,
+			dyncfg.CommandUpdate,
+			dyncfg.CommandTest,
+			dyncfg.CommandUserconfig,
+		},
 	})
 
 	done := make(chan struct{})

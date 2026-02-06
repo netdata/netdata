@@ -62,11 +62,24 @@ func (sim *discoverySimExt) run(t *testing.T) {
 		// dyncfgCh is intentionally nil to trigger auto-enable in tests
 	}
 	mgr.sdCb = &sdCallbacks{sd: mgr}
-	mgr.handler = dyncfg.NewHandler(mgr.Logger, mgr.dyncfgApi, mgr.seen, mgr.exposed, mgr.sdCb, dyncfg.HandlerConfig{
-		Path:                    fmt.Sprintf(dyncfgSDPath, executable.Name),
-		EnableFailCode:          422,
-		RemoveStockOnEnableFail: false,
-		SupportRestart:          false,
+	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
+		Logger:    mgr.Logger,
+		API:       mgr.dyncfgApi,
+		Seen:      mgr.seen,
+		Exposed:   mgr.exposed,
+		Callbacks: mgr.sdCb,
+
+		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		EnableFailCode: 422,
+		JobCommands: []dyncfg.Command{
+			dyncfg.CommandSchema,
+			dyncfg.CommandGet,
+			dyncfg.CommandEnable,
+			dyncfg.CommandDisable,
+			dyncfg.CommandUpdate,
+			dyncfg.CommandTest,
+			dyncfg.CommandUserconfig,
+		},
 	})
 
 	in := make(chan<- []*confgroup.Group)
@@ -126,11 +139,24 @@ func (sim *discoverySim) run(t *testing.T) {
 		// (simulates terminal mode where netdata is not available)
 	}
 	mgr.sdCb = &sdCallbacks{sd: mgr}
-	mgr.handler = dyncfg.NewHandler(mgr.Logger, mgr.dyncfgApi, mgr.seen, mgr.exposed, mgr.sdCb, dyncfg.HandlerConfig{
-		Path:                    fmt.Sprintf(dyncfgSDPath, executable.Name),
-		EnableFailCode:          422,
-		RemoveStockOnEnableFail: false,
-		SupportRestart:          false,
+	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
+		Logger:    mgr.Logger,
+		API:       mgr.dyncfgApi,
+		Seen:      mgr.seen,
+		Exposed:   mgr.exposed,
+		Callbacks: mgr.sdCb,
+
+		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		EnableFailCode: 422,
+		JobCommands: []dyncfg.Command{
+			dyncfg.CommandSchema,
+			dyncfg.CommandGet,
+			dyncfg.CommandEnable,
+			dyncfg.CommandDisable,
+			dyncfg.CommandUpdate,
+			dyncfg.CommandTest,
+			dyncfg.CommandUserconfig,
+		},
 	})
 
 	in := make(chan<- []*confgroup.Group)
