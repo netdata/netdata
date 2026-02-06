@@ -87,7 +87,7 @@ func NewHandler[C Config](
 
 func (h *Handler[C]) Seen() *SeenCache[C]       { return h.seen }
 func (h *Handler[C]) Exposed() *ExposedCache[C] { return h.exposed }
-func (h *Handler[C]) Cfg() HandlerConfig         { return h.cfg }
+func (h *Handler[C]) Cfg() HandlerConfig        { return h.cfg }
 
 // NotifyJobCreate registers/updates a config in the dyncfg API (upsert).
 func (h *Handler[C]) NotifyJobCreate(cfg C, status Status) {

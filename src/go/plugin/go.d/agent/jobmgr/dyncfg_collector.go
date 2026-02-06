@@ -323,7 +323,6 @@ func (m *Manager) dyncfgConfigGet(fn dyncfg.Function) {
 	m.dyncfgApi.SendJSON(fn, string(bs))
 }
 
-
 func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string, fn dyncfg.Function) {
 	cfg.SetProvider("dyncfg")
 	cfg.SetSource(fn.Source())

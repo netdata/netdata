@@ -71,7 +71,7 @@ func New() *Manager {
 			Path:                    fmt.Sprintf(dyncfgCollectorPath, executable.Name),
 			EnableFailCode:          200,
 			RemoveStockOnEnableFail: true,
-			SupportRestart:         true,
+			SupportRestart:          true,
 		},
 	)
 

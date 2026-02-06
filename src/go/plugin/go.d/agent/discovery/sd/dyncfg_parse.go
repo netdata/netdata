@@ -87,4 +87,3 @@ func userConfigFromPayload(payload []byte, discovererType, jobName string) ([]by
 
 	return bs, nil
 }
-
