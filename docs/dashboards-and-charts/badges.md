@@ -76,7 +76,7 @@ sudo systemctl restart netdata
 
 ### Basic Metric Badge
 
-Display current CPU usage:
+Display current CPU usage from the `user` dimension:
 
 ```markdown
 ![CPU Usage](http://localhost:19999/api/v1/badge.svg?chart=system.cpu&dimension=user)
@@ -84,16 +84,16 @@ Display current CPU usage:
 
 ### Alert Status Badge
 
-Display alert state:
+Display alert state (replace with actual alarm name from your configuration):
 
 ```markdown
-![CPU Alert](http://localhost:19999/api/v1/badge.svg?chart=system.cpu&alarm=system.cpu.10min_cpu_usage)
+![CPU Alert](http://localhost:19999/api/v1/badge.svg?chart=system.cpu&alarm=system.cpu_usage&label=CPU+Alert)
 ```
 
 ### Custom Label and Units
 
 ```markdown
-![Memory](http://localhost:19999/api/v1/badge.svg?chart=mem.available&label=RAM&units=GB&divide=1073741824&precision=2)
+![Memory](http://localhost:19999/api/v1/badge.svg?chart=mem.available&label=RAM&precision=1)
 ```
 
 ### Aggregated Values
@@ -101,7 +101,7 @@ Display alert state:
 Show average network traffic over 5 minutes:
 
 ```markdown
-![Network](http://localhost:19999/api/v1/badge.svg?chart=system.net&dimension=received&after=-300&group=average&label=Net%20In)
+![Network](http://localhost:19999/api/v1/badge.svg?chart=system.net&dimension=received&after=-300&group=average&label=NetTraffic)
 ```
 
 ### Color-Coded Badges
@@ -109,7 +109,7 @@ Show average network traffic over 5 minutes:
 Static colors:
 
 ```markdown
-![Status](http://localhost:19999/api/v1/badge.svg?chart=system.load&label=Load&value_color=blue)
+![Status](http://localhost:19999/api/v1/badge.svg?chart=system.cpu&label=Load&value_color=blue)
 ```
 
 Conditional colors based on value:
