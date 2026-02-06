@@ -6,11 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 
 	"github.com/gohugoio/hashstructure"
 	"gopkg.in/yaml.v2"
@@ -22,7 +20,6 @@ const (
 	ikeySourceType     = "__source_type__"
 	ikeyDiscovererType = "__discoverer_type__"
 	ikeyPipelineKey    = "__pipeline_key__"
-	ikeyStatus         = "__status__"
 )
 
 // sdConfig represents a service discovery pipeline configuration.
@@ -35,11 +32,6 @@ func (c sdConfig) SourceType() string     { v, _ := c[ikeySourceType].(string); 
 func (c sdConfig) DiscovererType() string { v, _ := c[ikeyDiscovererType].(string); return v }
 func (c sdConfig) PipelineKey() string    { v, _ := c[ikeyPipelineKey].(string); return v }
 func (c sdConfig) Name() string           { v, _ := c["name"].(string); return v }
-
-func (c sdConfig) Status() dyncfg.Status {
-	v, _ := c[ikeyStatus].(dyncfg.Status)
-	return v
-}
 
 // HashIncludeMap implements hashstructure.HashIncludeMap to exclude __ metadata keys from hashing.
 // Same pattern as confgroup.Config.
@@ -59,16 +51,15 @@ func (c sdConfig) SetSource(v string) sdConfig         { c[ikeySource] = v; retu
 func (c sdConfig) SetSourceType(v string) sdConfig     { c[ikeySourceType] = v; return c }
 func (c sdConfig) SetDiscovererType(v string) sdConfig { c[ikeyDiscovererType] = v; return c }
 func (c sdConfig) SetPipelineKey(v string) sdConfig    { c[ikeyPipelineKey] = v; return c }
-func (c sdConfig) SetStatus(v dyncfg.Status) sdConfig  { c[ikeyStatus] = v; return c }
 
-// Key returns the logical key for exposedConfigs: "discovererType:name"
-func (c sdConfig) Key() string {
+// ExposedKey returns the logical key for ExposedCache: "discovererType:name"
+func (c sdConfig) ExposedKey() string {
 	return c.DiscovererType() + ":" + c.Name()
 }
 
 // UID returns the unique key for seenConfigs: "source:discovererType:name"
 func (c sdConfig) UID() string {
-	return c.Source() + ":" + c.Key()
+	return c.Source() + ":" + c.ExposedKey()
 }
 
 // SourceTypePriority returns priority based on source type.
@@ -84,35 +75,6 @@ func (c sdConfig) SourceTypePriority() int {
 	default:
 		return 0
 	}
-}
-
-// Clone returns a deep copy of the config using JSON marshal/unmarshal.
-func (c sdConfig) Clone() sdConfig {
-	data, err := json.Marshal(c)
-	if err != nil {
-		// Fallback to shallow copy if marshal fails (shouldn't happen)
-		clone := make(sdConfig, len(c))
-		for k, v := range c {
-			clone[k] = v
-		}
-		return clone
-	}
-	var clone sdConfig
-	if err := json.Unmarshal(data, &clone); err != nil {
-		// Fallback to shallow copy
-		clone = make(sdConfig, len(c))
-		for k, v := range c {
-			clone[k] = v
-		}
-		return clone
-	}
-	// Restore metadata from original (JSON may lose type info for type aliases)
-	clone.SetSource(c.Source())
-	clone.SetSourceType(c.SourceType())
-	clone.SetDiscovererType(c.DiscovererType())
-	clone.SetPipelineKey(c.PipelineKey())
-	clone.SetStatus(c.Status())
-	return clone
 }
 
 // ToPipelineConfig converts sdConfig to pipeline.Config for actually running the pipeline.
@@ -190,7 +152,6 @@ func newSDConfigFromYAML(data []byte, source, sourceType, pipelineKey string) (s
 	m.SetSourceType(sourceType)
 	m.SetDiscovererType(cfg.Discoverer.Type())
 	m.SetPipelineKey(pipelineKey)
-	m.SetStatus(dyncfg.StatusAccepted)
 
 	return m, nil
 }
@@ -208,7 +169,7 @@ func newSDConfigFromJSON(data []byte, name, source, sourceType, discovererType, 
 	}
 
 	// Force name from dyncfg job ID (matching jobmgr pattern: cfg.SetName(name))
-	// This ensures sdConfig.Key() matches the dyncfg job ID regardless of payload content
+	// This ensures sdConfig.ExposedKey() matches the dyncfg job ID regardless of payload content
 	m["name"] = cleanName(name)
 
 	// Add metadata
@@ -216,7 +177,6 @@ func newSDConfigFromJSON(data []byte, name, source, sourceType, discovererType, 
 	m.SetSourceType(sourceType)
 	m.SetDiscovererType(discovererType)
 	m.SetPipelineKey(pipelineKey)
-	m.SetStatus(dyncfg.StatusAccepted)
 
 	return m, nil
 }
@@ -229,114 +189,4 @@ func sourceTypeFromPath(path string) string {
 		return confgroup.TypeUser
 	}
 	return confgroup.TypeStock
-}
-
-// newLookupConfig creates a minimal sdConfig for cache lookups.
-// Only sets fields needed for Key() derivation: discovererType and name.
-func newLookupConfig(discovererType, name string) sdConfig {
-	return sdConfig{
-		ikeyDiscovererType: discovererType,
-		"name":             name,
-	}
-}
-
-// seenSDConfigs tracks all discovered SD configs by unique ID (source + key).
-// Multiple sources can produce configs with the same logical name.
-type seenSDConfigs struct {
-	mux   sync.RWMutex
-	items map[string]sdConfig // [UID()]
-}
-
-func newSeenSDConfigs() *seenSDConfigs {
-	return &seenSDConfigs{
-		items: make(map[string]sdConfig),
-	}
-}
-
-func (c *seenSDConfigs) add(cfg sdConfig) {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-	c.items[cfg.UID()] = cfg
-}
-
-func (c *seenSDConfigs) remove(cfg sdConfig) {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-	delete(c.items, cfg.UID())
-}
-
-// lookup returns a deep copy of the config to avoid data races.
-// Key is derived from cfg.UID() internally.
-func (c *seenSDConfigs) lookup(cfg sdConfig) (sdConfig, bool) {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	v, ok := c.items[cfg.UID()]
-	if !ok {
-		return nil, false
-	}
-	return v.Clone(), true
-}
-
-// lookupBySource returns deep copies of configs from the given source.
-func (c *seenSDConfigs) lookupBySource(source string) []sdConfig {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	var result []sdConfig
-	for _, cfg := range c.items {
-		if cfg.Source() == source {
-			result = append(result, cfg.Clone())
-		}
-	}
-	return result
-}
-
-// exposedSDConfigs tracks SD configs exposed via dyncfg UI by logical key.
-// Only one config per logical key (discovererType:name) is exposed at a time.
-type exposedSDConfigs struct {
-	mux   sync.RWMutex
-	items map[string]sdConfig // [Key()]
-}
-
-func newExposedSDConfigs() *exposedSDConfigs {
-	return &exposedSDConfigs{
-		items: make(map[string]sdConfig),
-	}
-}
-
-func (c *exposedSDConfigs) add(cfg sdConfig) {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-	c.items[cfg.Key()] = cfg
-}
-
-func (c *exposedSDConfigs) remove(cfg sdConfig) {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-	delete(c.items, cfg.Key())
-}
-
-// lookup returns a deep copy of the config to avoid data races.
-// Key is derived from cfg.Key() internally.
-func (c *exposedSDConfigs) lookup(cfg sdConfig) (sdConfig, bool) {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	v, ok := c.items[cfg.Key()]
-	if !ok {
-		return nil, false
-	}
-	return v.Clone(), true
-}
-
-func (c *exposedSDConfigs) updateStatus(cfg sdConfig, status dyncfg.Status) {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-	if v, ok := c.items[cfg.Key()]; ok {
-		v.SetStatus(status)
-	}
-}
-
-func (c *exposedSDConfigs) count() int {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	return len(c.items)
 }

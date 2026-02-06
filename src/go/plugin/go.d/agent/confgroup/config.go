@@ -48,6 +48,7 @@ func (c Config) Get(key string) any               { return c[key] }
 func (c Config) Name() string            { v, _ := c.Get(keyName).(string); return v }
 func (c Config) Module() string          { v, _ := c.Get(keyModule).(string); return v }
 func (c Config) FullName() string        { return fullName(c.Name(), c.Module()) }
+func (c Config) ExposedKey() string      { return c.FullName() }
 func (c Config) UpdateEvery() int        { v, _ := c.Get(keyUpdateEvery).(int); return v }
 func (c Config) AutoDetectionRetry() int { v, _ := c.Get(keyDetectRetry).(int); return v }
 func (c Config) Priority() int           { v, _ := c.Get(keyPriority).(int); return v }

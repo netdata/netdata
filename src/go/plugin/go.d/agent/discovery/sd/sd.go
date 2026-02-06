@@ -4,11 +4,13 @@ package sd
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
@@ -45,13 +47,33 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		configDefaults: cfg.ConfigDefaults,
 		fnReg:          cfg.FnReg,
 		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
-		seenConfigs:    newSeenSDConfigs(),
-		exposedConfigs: newExposedSDConfigs(),
+		seen:           dyncfg.NewSeenCache[sdConfig](),
+		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
 			return pipeline.New(config)
 		},
 	}
+	d.sdCb = &sdCallbacks{sd: d}
+	d.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
+		Logger:    d.Logger,
+		API:       d.dyncfgApi,
+		Seen:      d.seen,
+		Exposed:   d.exposed,
+		Callbacks: d.sdCb,
+
+		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		EnableFailCode: 422,
+		JobCommands: []dyncfg.Command{
+			dyncfg.CommandSchema,
+			dyncfg.CommandGet,
+			dyncfg.CommandEnable,
+			dyncfg.CommandDisable,
+			dyncfg.CommandUpdate,
+			dyncfg.CommandTest,
+			dyncfg.CommandUserconfig,
+		},
+	})
 
 	return d, nil
 }
@@ -65,8 +87,10 @@ type (
 		configDefaults confgroup.Registry
 		fnReg          functions.Registry
 		dyncfgApi      *dyncfg.Responder
-		seenConfigs    *seenSDConfigs    // All discovered configs by UID
-		exposedConfigs *exposedSDConfigs // Configs exposed to dyncfg by Key
+		seen           *dyncfg.SeenCache[sdConfig]
+		exposed        *dyncfg.ExposedCache[sdConfig]
+		handler        *dyncfg.Handler[sdConfig]
+		sdCb           *sdCallbacks
 		dyncfgCh       chan dyncfg.Function
 		newPipeline    func(config pipeline.Config) (sdPipeline, error)
 
@@ -86,6 +110,14 @@ type (
 		configs() chan confFile
 	}
 )
+
+// SetDyncfgResponder allows overriding the default responder (e.g., to silence output in tests).
+func (d *ServiceDiscovery) SetDyncfgResponder(api *dyncfg.Responder) {
+	if api != nil {
+		d.dyncfgApi = api
+		d.handler.SetAPI(api)
+	}
+}
 
 func (d *ServiceDiscovery) String() string {
 	return "service discovery"
@@ -161,7 +193,15 @@ func (d *ServiceDiscovery) run(ctx context.Context) {
 }
 
 func (d *ServiceDiscovery) removePipeline(conf confFile) {
-	seenCfgs := d.seenConfigs.lookupBySource(conf.source)
+	// Collect configs from this source (can't call Remove inside ForEach)
+	var seenCfgs []sdConfig
+	d.seen.ForEach(func(_ string, cfg sdConfig) bool {
+		if cfg.Source() == conf.source {
+			seenCfgs = append(seenCfgs, cfg)
+		}
+		return true
+	})
+
 	if len(seenCfgs) == 0 {
 		return
 	}
@@ -170,11 +210,11 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 
 	for _, scfg := range seenCfgs {
 		// Remove from seen cache
-		d.seenConfigs.remove(scfg)
+		d.seen.Remove(scfg)
 
 		// Check if this was the exposed config
-		ecfg, ok := d.exposedConfigs.lookup(scfg)
-		if !ok || scfg.UID() != ecfg.UID() {
+		entry, ok := d.exposed.LookupByKey(scfg.ExposedKey())
+		if !ok || entry.Cfg.UID() != scfg.UID() {
 			// Not exposed or different config is exposed - skip dyncfg remove
 			continue
 		}
@@ -184,9 +224,9 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 			d.mgr.Stop(scfg.PipelineKey())
 		}
 
-		d.exposedConfigs.remove(scfg)
+		d.exposed.Remove(scfg)
 		if !disableDyncfg {
-			d.dyncfgSDJobRemove(scfg.DiscovererType(), scfg.Name())
+			d.handler.NotifyJobRemove(scfg)
 		}
 	}
 }
@@ -227,25 +267,24 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	// For file sources: One file = one config. If the file previously provided a different config,
 	// remove the old one first. This handles the case where a file config name changes.
 	if scfg.SourceType() != confgroup.TypeDyncfg {
-		d.removeOldConfigsFromSource(scfg.Source(), scfg.Key())
+		d.removeOldConfigsFromSource(scfg.Source(), scfg.ExposedKey())
 	}
 
 	// Always add to seen cache
-	d.seenConfigs.add(scfg)
+	d.seen.Add(scfg)
 
 	// Check if there's an existing exposed config with the same key
-	ecfg, exists := d.exposedConfigs.lookup(scfg)
+	entry, exists := d.exposed.LookupByKey(scfg.ExposedKey())
 
 	if !exists {
 		// No existing config - expose this one
-		scfg.SetStatus(dyncfg.StatusAccepted)
-		d.exposedConfigs.add(scfg)
+		d.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: scfg, Status: dyncfg.StatusAccepted})
 
 		if disableDyncfg {
 			// Dyncfg disabled - start pipeline directly
 			d.startPipelineDirectly(ctx, scfg)
 		} else {
-			d.dyncfgSDJobCreate(scfg.DiscovererType(), scfg.Name(), scfg.SourceType(), scfg.Source(), scfg.Status())
+			d.handler.NotifyJobCreate(scfg, dyncfg.StatusAccepted)
 			if isTerminal || d.dyncfgCh == nil {
 				// Auto-enable in terminal mode or tests
 				d.autoEnableConfig(scfg)
@@ -258,33 +297,32 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	}
 
 	// Existing config found - apply priority rules
-	sp, ep := scfg.SourceTypePriority(), ecfg.SourceTypePriority()
+	sp, ep := scfg.SourceTypePriority(), entry.Cfg.SourceTypePriority()
 
 	// Higher priority wins. If same priority and existing is running, keep existing (stability).
-	if ep > sp || (ep == sp && ecfg.Status() == dyncfg.StatusRunning) {
+	if ep > sp || (ep == sp && entry.Status == dyncfg.StatusRunning) {
 		d.Debugf("config '%s': keeping existing (priority: existing=%d new=%d, status=%s)",
-			scfg.Key(), ep, sp, ecfg.Status())
+			scfg.ExposedKey(), ep, sp, entry.Status)
 		return
 	}
 
 	// New config wins - stop existing if running
-	d.Infof("config '%s': replacing existing (priority: existing=%d new=%d)", scfg.Key(), ep, sp)
+	d.Infof("config '%s': replacing existing (priority: existing=%d new=%d)", scfg.ExposedKey(), ep, sp)
 
-	if ecfg.Status() == dyncfg.StatusRunning {
-		d.mgr.Stop(ecfg.PipelineKey())
+	if entry.Status == dyncfg.StatusRunning {
+		d.mgr.Stop(entry.Cfg.PipelineKey())
 	}
 
 	// Replace in exposed cache
-	scfg.SetStatus(dyncfg.StatusAccepted)
-	d.exposedConfigs.add(scfg)
+	d.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: scfg, Status: dyncfg.StatusAccepted})
 
 	if disableDyncfg {
 		// Dyncfg disabled - start pipeline directly
 		d.startPipelineDirectly(ctx, scfg)
 	} else {
 		// Update dyncfg (remove old, create new with new source)
-		d.dyncfgSDJobRemove(ecfg.DiscovererType(), ecfg.Name())
-		d.dyncfgSDJobCreate(scfg.DiscovererType(), scfg.Name(), scfg.SourceType(), scfg.Source(), scfg.Status())
+		d.handler.NotifyJobRemove(entry.Cfg)
+		d.handler.NotifyJobCreate(scfg, dyncfg.StatusAccepted)
 
 		if isTerminal || d.dyncfgCh == nil {
 			d.autoEnableConfig(scfg)
@@ -300,32 +338,32 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 // PipelineManager.Start (which stops any existing pipeline with the same key).
 // This ensures that if the new config fails to start, the old pipeline keeps running.
 func (d *ServiceDiscovery) removeOldConfigsFromSource(source, newKey string) {
-	oldCfgs := d.seenConfigs.lookupBySource(source)
+	// Collect configs from this source (can't call Remove inside ForEach)
+	var oldCfgs []sdConfig
+	d.seen.ForEach(func(_ string, cfg sdConfig) bool {
+		if cfg.Source() == source {
+			oldCfgs = append(oldCfgs, cfg)
+		}
+		return true
+	})
+
 	for _, oldCfg := range oldCfgs {
-		if oldCfg.Key() == newKey {
+		if oldCfg.ExposedKey() == newKey {
 			continue // Same config, skip
 		}
 
 		// Different config from same source - remove from caches
-		d.seenConfigs.remove(oldCfg)
+		d.seen.Remove(oldCfg)
 
 		// If it was exposed, remove from exposed cache and dyncfg
 		// But DON'T stop the pipeline - let the new config's enable handle that
-		if ecfg, ok := d.exposedConfigs.lookup(oldCfg); ok && ecfg.UID() == oldCfg.UID() {
-			d.exposedConfigs.remove(oldCfg)
+		if entry, ok := d.exposed.LookupByKey(oldCfg.ExposedKey()); ok && entry.Cfg.UID() == oldCfg.UID() {
+			d.exposed.Remove(oldCfg)
 			if !disableDyncfg {
-				d.dyncfgSDJobRemove(oldCfg.DiscovererType(), oldCfg.Name())
+				d.handler.NotifyJobRemove(oldCfg)
 			}
 		}
 	}
-}
-
-// autoEnableConfig enables a config without waiting for netdata's enable command.
-func (d *ServiceDiscovery) autoEnableConfig(cfg sdConfig) {
-	fn := dyncfg.NewFunction(functions.Function{
-		Args: []string{d.dyncfgJobID(cfg.DiscovererType(), cfg.Name()), "enable"},
-	})
-	d.dyncfgCmdEnable(fn)
 }
 
 // startPipelineDirectly starts a pipeline without dyncfg integration.
@@ -342,7 +380,9 @@ func (d *ServiceDiscovery) startPipelineDirectly(ctx context.Context, cfg sdConf
 		return
 	}
 
-	d.exposedConfigs.updateStatus(cfg, dyncfg.StatusRunning)
+	if entry, ok := d.exposed.LookupByKey(cfg.ExposedKey()); ok {
+		entry.Status = dyncfg.StatusRunning
+	}
 }
 
 // pipelineKeyFromSource extracts a pipeline key from a file source path.

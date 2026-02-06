@@ -6,11 +6,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
@@ -54,11 +56,31 @@ func (sim *discoverySimExt) run(t *testing.T) {
 			confFiles: sim.configs,
 			ch:        make(chan confFile),
 		},
-		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
-		seenConfigs:    newSeenSDConfigs(),
-		exposedConfigs: newExposedSDConfigs(),
+		dyncfgApi: dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		seen:      dyncfg.NewSeenCache[sdConfig](),
+		exposed:   dyncfg.NewExposedCache[sdConfig](),
 		// dyncfgCh is intentionally nil to trigger auto-enable in tests
 	}
+	mgr.sdCb = &sdCallbacks{sd: mgr}
+	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
+		Logger:    mgr.Logger,
+		API:       mgr.dyncfgApi,
+		Seen:      mgr.seen,
+		Exposed:   mgr.exposed,
+		Callbacks: mgr.sdCb,
+
+		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		EnableFailCode: 422,
+		JobCommands: []dyncfg.Command{
+			dyncfg.CommandSchema,
+			dyncfg.CommandGet,
+			dyncfg.CommandEnable,
+			dyncfg.CommandDisable,
+			dyncfg.CommandUpdate,
+			dyncfg.CommandTest,
+			dyncfg.CommandUserconfig,
+		},
+	})
 
 	in := make(chan<- []*confgroup.Group)
 	done := make(chan struct{})
@@ -72,21 +94,6 @@ func (sim *discoverySimExt) run(t *testing.T) {
 	if sim.wantPipelines != nil {
 		assert.Equalf(t, sim.wantPipelines, fact.pipelines, "pipelines mismatch")
 	}
-
-	// Check exposed configs count
-	if sim.wantExposedCount > 0 {
-		assert.Equal(t, sim.wantExposedCount, mgr.exposedConfigs.count(), "exposed configs count")
-	}
-
-	// Check specific exposed configs
-	for _, want := range sim.wantExposed {
-		cfg, ok := mgr.exposedConfigs.lookup(newLookupConfig(want.discovererType, want.name))
-		if !assert.Truef(t, ok, "exposed config '%s:%s' not found", want.discovererType, want.name) {
-			continue
-		}
-		assert.Equal(t, want.sourceType, cfg.SourceType(), "exposed config '%s:%s' sourceType", want.discovererType, want.name)
-		assert.Equal(t, want.status, cfg.Status(), "exposed config '%s:%s' status", want.discovererType, want.name)
-	}
 	lock.Unlock()
 
 	cancel()
@@ -96,6 +103,20 @@ func (sim *discoverySimExt) run(t *testing.T) {
 	case <-done:
 	case <-time.After(timeout):
 		t.Errorf("sd failed to exit in %s", timeout)
+	}
+
+	// Check exposed configs after SD goroutine has stopped (no race on entry.Status).
+	// Caches survive shutdown — StopAll only stops pipelines, doesn't clear caches.
+	if sim.wantExposedCount > 0 {
+		assert.Equal(t, sim.wantExposedCount, mgr.exposed.Count(), "exposed configs count")
+	}
+	for _, want := range sim.wantExposed {
+		entry, ok := mgr.exposed.LookupByKey(want.discovererType + ":" + want.name)
+		if !assert.Truef(t, ok, "exposed config '%s:%s' not found", want.discovererType, want.name) {
+			continue
+		}
+		assert.Equal(t, want.sourceType, entry.Cfg.SourceType(), "exposed config '%s:%s' sourceType", want.discovererType, want.name)
+		assert.Equal(t, want.status, entry.Status, "exposed config '%s:%s' status", want.discovererType, want.name)
 	}
 }
 
@@ -111,12 +132,32 @@ func (sim *discoverySim) run(t *testing.T) {
 			confFiles: sim.configs,
 			ch:        make(chan confFile),
 		},
-		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
-		seenConfigs:    newSeenSDConfigs(),
-		exposedConfigs: newExposedSDConfigs(),
+		dyncfgApi: dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		seen:      dyncfg.NewSeenCache[sdConfig](),
+		exposed:   dyncfg.NewExposedCache[sdConfig](),
 		// dyncfgCh is intentionally nil to trigger auto-enable in tests
 		// (simulates terminal mode where netdata is not available)
 	}
+	mgr.sdCb = &sdCallbacks{sd: mgr}
+	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
+		Logger:    mgr.Logger,
+		API:       mgr.dyncfgApi,
+		Seen:      mgr.seen,
+		Exposed:   mgr.exposed,
+		Callbacks: mgr.sdCb,
+
+		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		EnableFailCode: 422,
+		JobCommands: []dyncfg.Command{
+			dyncfg.CommandSchema,
+			dyncfg.CommandGet,
+			dyncfg.CommandEnable,
+			dyncfg.CommandDisable,
+			dyncfg.CommandUpdate,
+			dyncfg.CommandTest,
+			dyncfg.CommandUserconfig,
+		},
+	})
 
 	in := make(chan<- []*confgroup.Group)
 	done := make(chan struct{})
