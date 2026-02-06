@@ -203,7 +203,7 @@ static inline int parser_action(PARSER *parser, char *input) {
                            (size_t)PLUGINSD_MAX_DEFERRED_SIZE,
                            parser->defer.end_keyword ? parser->defer.end_keyword : "unknown",
                            parser->user.cd ? string2str(parser->user.cd->filename) : "unknown",
-                           parser->defer.action_data ? (const char *)parser->defer.action_data : "none");
+                           parser->defer.action_data ? string2str((STRING *)parser->defer.action_data) : "none");
                     return 1;
                 }
             }
