@@ -60,6 +60,17 @@ func (c *SeenCache[C]) Count() int {
 	return len(c.items)
 }
 
+// ForEach iterates over all entries. Return false to stop iteration.
+func (c *SeenCache[C]) ForEach(fn func(uid string, cfg C) bool) {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+	for uid, cfg := range c.items {
+		if !fn(uid, cfg) {
+			return
+		}
+	}
+}
+
 // ExposedCache stores active config+status per logical name, keyed by Key().
 // LookupByKey returns a pointer to the stored Entry — mutations to Status
 // are visible through the pointer. Thread-safe for concurrent readers.

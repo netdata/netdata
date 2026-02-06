@@ -7,12 +7,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
@@ -106,15 +108,22 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 	var buf bytes.Buffer
 	sd := &ServiceDiscovery{
-		Logger:         logger.New(),
-		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
-		seenConfigs:    newSeenSDConfigs(),
-		exposedConfigs: newExposedSDConfigs(),
-		dyncfgCh:       make(chan dyncfg.Function, 1),
+		Logger:    logger.New(),
+		dyncfgApi: dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		seen:      dyncfg.NewSeenCache[sdConfig](),
+		exposed:   dyncfg.NewExposedCache[sdConfig](),
+		dyncfgCh:  make(chan dyncfg.Function, 1),
 		newPipeline: func(cfg pipeline.Config) (sdPipeline, error) {
 			return newTestPipeline(cfg.Name), nil
 		},
 	}
+	sd.sdCb = &sdCallbacks{sd: sd}
+	sd.handler = dyncfg.NewHandler(sd.Logger, sd.dyncfgApi, sd.seen, sd.exposed, sd.sdCb, dyncfg.HandlerConfig{
+		Path:                    fmt.Sprintf(dyncfgSDPath, executable.Name),
+		EnableFailCode:          422,
+		RemoveStockOnEnableFail: false,
+		SupportRestart:          false,
+	})
 
 	done := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -191,14 +200,14 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 	// Verify exposed configs
 	if s.wantExposed != nil {
-		wantLen, gotLen := len(s.wantExposed), sd.exposedConfigs.count()
+		wantLen, gotLen := len(s.wantExposed), sd.exposed.Count()
 		require.Equalf(t, wantLen, gotLen, "exposedConfigs: different len (want %d got %d)", wantLen, gotLen)
 
 		for _, want := range s.wantExposed {
-			cfg, ok := sd.exposedConfigs.lookup(newLookupConfig(want.discovererType, want.name))
+			entry, ok := sd.exposed.LookupByKey(want.discovererType + ":" + want.name)
 			require.Truef(t, ok, "exposedConfigs: config '%s:%s' not found", want.discovererType, want.name)
-			assert.Equal(t, want.sourceType, cfg.SourceType(), "exposedConfigs: wrong sourceType for '%s:%s'", want.discovererType, want.name)
-			assert.Equal(t, want.status, cfg.Status(), "exposedConfigs: wrong status for '%s:%s'", want.discovererType, want.name)
+			assert.Equal(t, want.sourceType, entry.Cfg.SourceType(), "exposedConfigs: wrong sourceType for '%s:%s'", want.discovererType, want.name)
+			assert.Equal(t, want.status, entry.Status, "exposedConfigs: wrong status for '%s:%s'", want.discovererType, want.name)
 		}
 	}
 
@@ -316,7 +325,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -368,13 +377,13 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -484,7 +493,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -531,7 +540,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -558,7 +567,7 @@ CONFIG test:sd:net_listeners:test-job status disabled
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-enable 404 application/json
-{"status":404,"errorMessage":"Config 'net_listeners:non-existent' not found."}
+{"status":404,"errorMessage":"Job not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -620,7 +629,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -676,7 +685,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-update 403 application/json
 {"status":403,"errorMessage":"Updating is not allowed in 'accepted' state."}
@@ -700,7 +709,7 @@ CONFIG test:sd:net_listeners:test-job status accepted
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-update 404 application/json
-{"status":404,"errorMessage":"Config 'net_listeners:non-existent' not found."}
+{"status":404,"errorMessage":"Job not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -744,7 +753,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-remove 200 application/json
 {"status":200,"message":""}
@@ -784,7 +793,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -811,7 +820,7 @@ CONFIG test:sd:net_listeners:test-job delete
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-remove 404 application/json
-{"status":404,"errorMessage":"Config 'net_listeners:non-existent' not found."}
+{"status":404,"errorMessage":"Job not found."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -895,16 +904,15 @@ func TestServiceDiscovery_DyncfgFileConfig(t *testing.T) {
 			createSim: func() *dyncfgSim {
 				return &dyncfgSim{
 					do: func(sd *ServiceDiscovery) {
-						// Manually add a file-based config to exposedConfigs
+						// Manually add a file-based config to exposed cache
 						cfg := sdConfig{
 							"name":             "file-config",
 							ikeyDiscovererType: DiscovererNetListeners,
 							ikeyPipelineKey:    "/etc/netdata/sd/test.conf",
 							ikeySource:         "/etc/netdata/sd/test.conf",
 							ikeySourceType:     "file",
-							ikeyStatus:         dyncfg.StatusRunning,
 						}
-						sd.exposedConfigs.add(cfg)
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: cfg, Status: dyncfg.StatusRunning})
 
 						// Try to remove
 						sendDyncfgCmd(sd, "1-remove",
@@ -921,7 +929,7 @@ func TestServiceDiscovery_DyncfgFileConfig(t *testing.T) {
 					},
 					wantDyncfg: `
 FUNCTION_RESULT_BEGIN 1-remove 405 application/json
-{"status":405,"errorMessage":"Cannot remove non-dyncfg configs. Source type: file"}
+{"status":405,"errorMessage":"Removing jobs of type 'file' is not supported. Only 'dyncfg' jobs can be removed."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -967,7 +975,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:docker:docker-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:docker:docker-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -1072,7 +1080,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:k8s:k8s-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:k8s:k8s-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -1176,7 +1184,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:snmp:snmp-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:snmp:snmp-test create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -1305,7 +1313,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1623,13 +1631,13 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:job1 create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:job1 create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:job2 create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:job2 create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 3-enable 200 application/json
 {"status":200,"message":""}
@@ -1687,10 +1695,9 @@ func TestServiceDiscovery_DyncfgPriority(t *testing.T) {
 							ikeyPipelineKey:    "/etc/netdata/sd.d/test.conf",
 							ikeySource:         "/etc/netdata/sd.d/test.conf",
 							ikeySourceType:     confgroup.TypeUser,
-							ikeyStatus:         dyncfg.StatusRunning,
 						}
-						sd.seenConfigs.add(fileCfg)
-						sd.exposedConfigs.add(fileCfg)
+						sd.seen.Add(fileCfg)
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: fileCfg, Status: dyncfg.StatusRunning})
 
 						// Start the pipeline to simulate running state
 						pipelineCfg := pipeline.Config{Name: "test-job"}
@@ -1733,10 +1740,9 @@ func TestServiceDiscovery_DyncfgPriority(t *testing.T) {
 							ikeyPipelineKey:    "/usr/lib/netdata/conf.d/sd/test.conf",
 							ikeySource:         "/usr/lib/netdata/conf.d/sd/test.conf",
 							ikeySourceType:     confgroup.TypeStock,
-							ikeyStatus:         dyncfg.StatusAccepted,
 						}
-						sd.seenConfigs.add(fileCfg)
-						sd.exposedConfigs.add(fileCfg)
+						sd.seen.Add(fileCfg)
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: fileCfg, Status: dyncfg.StatusAccepted})
 
 						// Dyncfg add with same name - should replace stock config
 						sendDyncfgCmd(sd, "1-add",
@@ -1775,10 +1781,9 @@ func TestServiceDiscovery_DyncfgPriority(t *testing.T) {
 							ikeyPipelineKey:    "dyncfg:net_listeners:test-job",
 							ikeySource:         "type=dyncfg,user=admin",
 							ikeySourceType:     confgroup.TypeDyncfg,
-							ikeyStatus:         dyncfg.StatusRunning,
 						}
-						sd.seenConfigs.add(dyncfgCfg)
-						sd.exposedConfigs.add(dyncfgCfg)
+						sd.seen.Add(dyncfgCfg)
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: dyncfgCfg, Status: dyncfg.StatusRunning})
 
 						// Start the pipeline to simulate running state
 						pipelineCfg := pipeline.Config{Name: "test-job"}
@@ -1855,7 +1860,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get test enable disable update userconfig remove' 0x0000 0x0000
+CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1900,10 +1905,9 @@ func TestServiceDiscovery_DyncfgUpdateFailedState(t *testing.T) {
 							ikeyPipelineKey:    "dyncfg:net_listeners:test-job",
 							ikeySource:         "type=dyncfg,user=test",
 							ikeySourceType:     confgroup.TypeDyncfg,
-							ikeyStatus:         dyncfg.StatusFailed,
 						}
-						sd.seenConfigs.add(failedCfg)
-						sd.exposedConfigs.add(failedCfg)
+						sd.seen.Add(failedCfg)
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: failedCfg, Status: dyncfg.StatusFailed})
 
 						// Update should restart the pipeline
 						sendDyncfgCmd(sd, "1-update",
@@ -1951,7 +1955,6 @@ func TestServiceDiscovery_DyncfgEnableFromFailed(t *testing.T) {
 							ikeyPipelineKey:    "dyncfg:net_listeners:test-job",
 							ikeySource:         "type=dyncfg,user=test",
 							ikeySourceType:     confgroup.TypeDyncfg,
-							ikeyStatus:         dyncfg.StatusFailed,
 							"discoverer": map[string]any{
 								"net_listeners": map[string]any{},
 							},
@@ -1959,8 +1962,8 @@ func TestServiceDiscovery_DyncfgEnableFromFailed(t *testing.T) {
 								map[string]any{"id": "test-rule", "match": "true"},
 							},
 						}
-						sd.seenConfigs.add(failedCfg)
-						sd.exposedConfigs.add(failedCfg)
+						sd.seen.Add(failedCfg)
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: failedCfg, Status: dyncfg.StatusFailed})
 
 						// Enable should start the pipeline
 						sendDyncfgCmd(sd, "1-enable",
@@ -2011,7 +2014,6 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 							ikeyPipelineKey:    "/etc/netdata/sd.d/test.conf",
 							ikeySource:         "/etc/netdata/sd.d/test.conf",
 							ikeySourceType:     confgroup.TypeUser,
-							ikeyStatus:         dyncfg.StatusRunning,
 							"discoverer": map[string]any{
 								"net_listeners": map[string]any{},
 							},
@@ -2019,8 +2021,8 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 								map[string]any{"id": "test-rule", "match": "true"},
 							},
 						}
-						sd.seenConfigs.add(fileCfg)
-						sd.exposedConfigs.add(fileCfg)
+						sd.seen.Add(fileCfg)
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: fileCfg, Status: dyncfg.StatusRunning})
 
 						// Start the file pipeline
 						pipelineCfg := pipeline.Config{Name: "test-job"}
@@ -2041,8 +2043,7 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 					},
 					wantRunning: []string{"dyncfg:net_listeners:test-job"}, // New pipeline key
 					wantDyncfgFunc: func(t *testing.T, got string) {
-						// Should see: delete old job, create new dyncfg job
-						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job delete")
+						// ConfigCreate acts as upsert (no delete needed)
 						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job create running job")
 						assert.Contains(t, got, "dyncfg") // New source type
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-update 200 application/json")
@@ -2064,7 +2065,6 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 							ikeyPipelineKey:    "/etc/netdata/sd.d/test.conf",
 							ikeySource:         "/etc/netdata/sd.d/test.conf",
 							ikeySourceType:     confgroup.TypeUser,
-							ikeyStatus:         dyncfg.StatusDisabled,
 							"discoverer": map[string]any{
 								"net_listeners": map[string]any{},
 							},
@@ -2072,8 +2072,8 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 								map[string]any{"id": "test-rule", "match": "true"},
 							},
 						}
-						sd.seenConfigs.add(fileCfg)
-						sd.exposedConfigs.add(fileCfg)
+						sd.seen.Add(fileCfg)
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: fileCfg, Status: dyncfg.StatusDisabled})
 
 						// Update via dyncfg - should convert but stay disabled
 						sendDyncfgCmd(sd, "1-update",
@@ -2090,7 +2090,7 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 					},
 					wantRunning: []string{}, // Not running
 					wantDyncfgFunc: func(t *testing.T, got string) {
-						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job delete")
+						// ConfigCreate acts as upsert (no delete needed)
 						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job create disabled job")
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-update 200 application/json")
 					},
@@ -2184,16 +2184,15 @@ func TestServiceDiscovery_DyncfgFileRemovalWithDyncfgOverride(t *testing.T) {
 			createSim: func() *dyncfgSim {
 				return &dyncfgSim{
 					do: func(sd *ServiceDiscovery) {
-						// Add file config to seenConfigs (simulating it was seen from file)
+						// Add file config to seen cache (simulating it was seen from file)
 						fileCfg := sdConfig{
 							"name":             "test-job",
 							ikeyDiscovererType: DiscovererNetListeners,
 							ikeyPipelineKey:    "/etc/netdata/sd.d/test.conf",
 							ikeySource:         "/etc/netdata/sd.d/test.conf",
 							ikeySourceType:     confgroup.TypeUser,
-							ikeyStatus:         dyncfg.StatusAccepted,
 						}
-						sd.seenConfigs.add(fileCfg)
+						sd.seen.Add(fileCfg)
 
 						// Add dyncfg override (higher priority) to both caches
 						dyncfgCfg := sdConfig{
@@ -2202,10 +2201,9 @@ func TestServiceDiscovery_DyncfgFileRemovalWithDyncfgOverride(t *testing.T) {
 							ikeyPipelineKey:    "dyncfg:net_listeners:test-job",
 							ikeySource:         "type=dyncfg,user=test",
 							ikeySourceType:     confgroup.TypeDyncfg,
-							ikeyStatus:         dyncfg.StatusRunning,
 						}
-						sd.seenConfigs.add(dyncfgCfg)
-						sd.exposedConfigs.add(dyncfgCfg)
+						sd.seen.Add(dyncfgCfg)
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: dyncfgCfg, Status: dyncfg.StatusRunning})
 
 						// Start the dyncfg pipeline
 						pipelineCfg := pipeline.Config{Name: "test-job"}
