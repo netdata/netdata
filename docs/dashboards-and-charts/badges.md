@@ -30,6 +30,8 @@ By default, badges can be accessed from any source. To restrict access:
     allow badges from = 10.* 192.168.* YOUR_IP
 ```
 
+The `allow badges from` parameter goes under the `[web]` section in `netdata.conf`.
+
 2. Restart Netdata:
 
 ```bash
@@ -270,7 +272,7 @@ Create a simple status dashboard:
     alt="CPU"
   />
   <img
-    src="http://netdata.local:19999/api/v1/badge.svg?chart=system.ram&label=RAM"
+    src="http://netdata.local:19999/api/v1/badge.svg?chart=mem.available&label=RAM"
     alt="RAM"
   />
   <img
