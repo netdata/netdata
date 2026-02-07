@@ -22,6 +22,10 @@ typedef struct health {
     bool use_summary_for_notifications;             // whether to use the summary field as a subject for notifications
     int32_t pending_transitions;                    // pending alert transitions to store
     uint64_t evloop_iteration;                      // the last health iteration that evaluated this host
+
+    // Per-host scheduling for parallel health processing
+    time_t next_run;                                // when this host should next be processed
+    bool processing;                                // true while health work is queued/running for this host
 } HEALTH;
 
 #endif //NETDATA_HEALTH_ALERT_LOG_H
