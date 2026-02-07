@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_oomkill.h"
+#include "ebpf_library.h"
 
 struct config oomkill_config = APPCONFIG_INITIALIZER;
 
@@ -560,6 +561,10 @@ void ebpf_oomkill_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(oomkill_cleanup) cleanup_ptr = em;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endoomkill;
+    }
 
     em->maps = oomkill_maps;
 

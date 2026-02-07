@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_mdflush.h"
+#include "ebpf_library.h"
 
 struct config mdflush_config = APPCONFIG_INITIALIZER;
 
@@ -413,6 +414,10 @@ void ebpf_mdflush_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     CLEANUP_FUNCTION_REGISTER(mdflush_exit) cleanup_ptr = em;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endmdflush;
+    }
 
     em->maps = mdflush_maps;
 

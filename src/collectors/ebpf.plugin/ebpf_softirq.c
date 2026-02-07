@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_softirq.h"
+#include "ebpf_library.h"
 
 struct config softirq_config = APPCONFIG_INITIALIZER;
 
@@ -256,6 +257,10 @@ void ebpf_softirq_thread(void *ptr)
     ebpf_module_t *em = ptr;
 
     CLEANUP_FUNCTION_REGISTER(softirq_cleanup) cleanup_ptr = em;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endsoftirq;
+    }
 
     em->maps = softirq_maps;
 

@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_vfs.h"
+#include "ebpf_library.h"
 
 static char *vfs_dimension_names[NETDATA_KEY_PUBLISH_VFS_END] = {"delete", "read", "write", "fsync", "open", "create"};
 static char *vfs_id_names[NETDATA_KEY_PUBLISH_VFS_END] =
@@ -2918,6 +2919,10 @@ void ebpf_vfs_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_vfs_exit) cleanup_ptr = em;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endvfs;
+    }
 
     em->maps = vfs_maps;
 

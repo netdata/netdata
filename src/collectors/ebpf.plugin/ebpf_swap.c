@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_swap.h"
+#include "ebpf_library.h"
 
 static char *swap_dimension_name[NETDATA_SWAP_END] = {"read", "write"};
 static netdata_syscall_stat_t swap_aggregated_data[NETDATA_SWAP_END];
@@ -453,9 +454,9 @@ static void ebpf_swap_exit(void *ptr)
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
 
 #ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj) {
-        swap_bpf__destroy(bpf_obj);
-        bpf_obj = NULL;
+    if (swap_bpf_obj) {
+        swap_bpf__destroy(swap_bpf_obj);
+        swap_bpf_obj = NULL;
     }
 #endif
     if (em->objects) {
@@ -1159,11 +1160,11 @@ static int ebpf_swap_load_bpf(ebpf_module_t *em)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else {
-        bpf_obj = swap_bpf__open();
-        if (!bpf_obj)
+        swap_bpf_obj = swap_bpf__open();
+        if (!swap_bpf_obj)
             ret = -1;
         else
-            ret = ebpf_swap_load_and_attach(bpf_obj, em);
+            ret = ebpf_swap_load_and_attach(swap_bpf_obj, em);
     }
 #endif
 
@@ -1188,16 +1189,18 @@ static int ebpf_swap_set_internal_value()
         address.function = swap_functions[i];
         ebpf_load_addresses(&address, -1);
         if (address.addr) {
-            int key =  (i < 2) ? NETDATA_KEY_SWAP_READPAGE_CALL: NETDATA_KEY_SWAP_WRITEPAGE_CALL;
+            int key = (i < 2) ? NETDATA_KEY_SWAP_READPAGE_CALL : NETDATA_KEY_SWAP_WRITEPAGE_CALL;
             swap_targets[key].name = address.function;
             address.addr = 0;
         }
     }
 
     if (!swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name || !swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name) {
-        netdata_log_error("%s (%s, %s) swap.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND,
-                          swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
-                          swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name);
+        netdata_log_error(
+            "%s (%s, %s) swap.",
+            NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND,
+            swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
+            swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name);
         return -1;
     }
 
@@ -1218,6 +1221,10 @@ void ebpf_swap_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_swap_exit) cleanup_ptr = em;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endswap;
+    }
 
     em->maps = swap_maps;
 

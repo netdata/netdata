@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_mount.h"
+#include "ebpf_library.h"
 
 static ebpf_local_maps_t mount_maps[] = {
     {.name = "tbl_mount",
@@ -501,6 +502,10 @@ void ebpf_mount_thread(void *ptr)
 {
     ebpf_module_t *em = ptr;
     CLEANUP_FUNCTION_REGISTER(ebpf_mount_exit) cleanup_ptr = em;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endmount;
+    }
 
     em->maps = mount_maps;
 

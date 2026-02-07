@@ -82,23 +82,23 @@
  *
  */
 enum netdata_ebpf_kernel_versions {
-    NETDATA_EBPF_KERNEL_4_06   = 263680,  //  264960 = 4 * 65536 +  6 * 256
-    NETDATA_EBPF_KERNEL_4_11   = 264960,  //  264960 = 4 * 65536 + 15 * 256
-    NETDATA_EBPF_KERNEL_4_14   = 265728,  //  264960 = 4 * 65536 + 14 * 256
-    NETDATA_EBPF_KERNEL_4_15   = 265984,  //  265984 = 4 * 65536 + 15 * 256
-    NETDATA_EBPF_KERNEL_4_17   = 266496,  //  266496 = 4 * 65536 + 17 * 256
-    NETDATA_EBPF_KERNEL_5_0    = 327680,  //  327680 = 5 * 65536 +  0 * 256
-    NETDATA_EBPF_KERNEL_5_3    = 328448,  //  327680 = 5 * 65536 +  3 * 256
-    NETDATA_EBPF_KERNEL_5_4    = 328704,  //  327680 = 5 * 65536 +  4 * 256
-    NETDATA_EBPF_KERNEL_5_5    = 328960,  //  327680 = 5 * 65536 +  5 * 256
-    NETDATA_EBPF_KERNEL_5_9_16 = 330000,  //  330240 = 5 * 65536 + 9 * 256 + 16
-    NETDATA_EBPF_KERNEL_5_10   = 330240,  //  330240 = 5 * 65536 + 10 * 256
-    NETDATA_EBPF_KERNEL_5_11   = 330496,  //  330240 = 5 * 65536 + 11 * 256
-    NETDATA_EBPF_KERNEL_5_14   = 331264,  //  331264 = 5 * 65536 + 14 * 256
-    NETDATA_EBPF_KERNEL_5_15   = 331520,  //  331520 = 5 * 65536 + 15 * 256
-    NETDATA_EBPF_KERNEL_5_16   = 331776,  //  331776 = 5 * 65536 + 16 * 256
-    NETDATA_EBPF_KERNEL_6_8    = 395264,  //  395264 = 6 * 65536 +  8 * 256
-    NETDATA_EBPF_KERNEL_6_16   = 397312   //  397312 = 6 * 65536 +  16 * 256
+    NETDATA_EBPF_KERNEL_4_06 = 263680,   //  264960 = 4 * 65536 +  6 * 256
+    NETDATA_EBPF_KERNEL_4_11 = 264960,   //  264960 = 4 * 65536 + 15 * 256
+    NETDATA_EBPF_KERNEL_4_14 = 265728,   //  264960 = 4 * 65536 + 14 * 256
+    NETDATA_EBPF_KERNEL_4_15 = 265984,   //  265984 = 4 * 65536 + 15 * 256
+    NETDATA_EBPF_KERNEL_4_17 = 266496,   //  266496 = 4 * 65536 + 17 * 256
+    NETDATA_EBPF_KERNEL_5_0 = 327680,    //  327680 = 5 * 65536 +  0 * 256
+    NETDATA_EBPF_KERNEL_5_3 = 328448,    //  327680 = 5 * 65536 +  3 * 256
+    NETDATA_EBPF_KERNEL_5_4 = 328704,    //  327680 = 5 * 65536 +  4 * 256
+    NETDATA_EBPF_KERNEL_5_5 = 328960,    //  327680 = 5 * 65536 +  5 * 256
+    NETDATA_EBPF_KERNEL_5_9_16 = 330000, //  330240 = 5 * 65536 + 9 * 256 + 16
+    NETDATA_EBPF_KERNEL_5_10 = 330240,   //  330240 = 5 * 65536 + 10 * 256
+    NETDATA_EBPF_KERNEL_5_11 = 330496,   //  330240 = 5 * 65536 + 11 * 256
+    NETDATA_EBPF_KERNEL_5_14 = 331264,   //  331264 = 5 * 65536 + 14 * 256
+    NETDATA_EBPF_KERNEL_5_15 = 331520,   //  331520 = 5 * 65536 + 15 * 256
+    NETDATA_EBPF_KERNEL_5_16 = 331776,   //  331776 = 5 * 65536 + 16 * 256
+    NETDATA_EBPF_KERNEL_6_8 = 395264,    //  395264 = 6 * 65536 +  8 * 256
+    NETDATA_EBPF_KERNEL_6_16 = 397312    //  397312 = 6 * 65536 +  16 * 256
 };
 
 enum netdata_kernel_flag {
@@ -106,13 +106,13 @@ enum netdata_kernel_flag {
     NETDATA_V4_14 = 1 << 1,
     NETDATA_V4_16 = 1 << 2,
     NETDATA_V4_18 = 1 << 3,
-    NETDATA_V5_4  = 1 << 4,
+    NETDATA_V5_4 = 1 << 4,
     NETDATA_V5_10 = 1 << 5,
     NETDATA_V5_11 = 1 << 6,
     NETDATA_V5_14 = 1 << 7,
     NETDATA_V5_15 = 1 << 8,
     NETDATA_V5_16 = 1 << 9,
-    NETDATA_V6_8  = 1 << 10
+    NETDATA_V6_8 = 1 << 10
 };
 
 enum netdata_kernel_idx {
@@ -120,7 +120,7 @@ enum netdata_kernel_idx {
     NETDATA_IDX_V4_14,
     NETDATA_IDX_V4_16,
     NETDATA_IDX_V4_18,
-    NETDATA_IDX_V5_4 ,
+    NETDATA_IDX_V5_4,
     NETDATA_IDX_V5_10,
     NETDATA_IDX_V5_11,
     NETDATA_IDX_V5_14,
@@ -133,13 +133,13 @@ enum netdata_kernel_idx {
 #define NETDATA_IDX_STR_V4_14 "4.14"
 #define NETDATA_IDX_STR_V4_16 "4.16"
 #define NETDATA_IDX_STR_V4_18 "4.18"
-#define NETDATA_IDX_STR_V5_4  "5.4"
+#define NETDATA_IDX_STR_V5_4 "5.4"
 #define NETDATA_IDX_STR_V5_10 "5.10"
 #define NETDATA_IDX_STR_V5_11 "5.11"
 #define NETDATA_IDX_STR_V5_14 "5.14"
 #define NETDATA_IDX_STR_V5_15 "5.15"
 #define NETDATA_IDX_STR_V5_16 "5.16"
-#define NETDATA_IDX_STR_V6_8  "6.8"
+#define NETDATA_IDX_STR_V6_8 "6.8"
 
 /**
  * Minimum value has relationship with libbpf support.
@@ -234,20 +234,20 @@ typedef struct ebpf_specify_name {
 } ebpf_specify_name_t;
 
 typedef enum netdata_ebpf_load_mode {
-    EBPF_LOAD_LEGACY = 1<<0,        // Select legacy mode, this means we will load binaries
-    EBPF_LOAD_CORE = 1<<1,          // When CO-RE is used, it is necessary to use the source code
-    EBPF_LOAD_PLAY_DICE = 1<<2,      // Take a look on environment and choose the best option
-    EBPF_LOADED_FROM_STOCK = 1<<3,  // Configuration loaded from Stock file
-    EBPF_LOADED_FROM_USER = 1<<4    // Configuration loaded from user
+    EBPF_LOAD_LEGACY = 1 << 0,       // Select legacy mode, this means we will load binaries
+    EBPF_LOAD_CORE = 1 << 1,         // When CO-RE is used, it is necessary to use the source code
+    EBPF_LOAD_PLAY_DICE = 1 << 2,    // Take a look on environment and choose the best option
+    EBPF_LOADED_FROM_STOCK = 1 << 3, // Configuration loaded from Stock file
+    EBPF_LOADED_FROM_USER = 1 << 4   // Configuration loaded from user
 } netdata_ebpf_load_mode_t;
-#define NETDATA_EBPF_LOAD_METHODS (EBPF_LOAD_LEGACY|EBPF_LOAD_CORE|EBPF_LOAD_PLAY_DICE)
-#define NETDATA_EBPF_LOAD_SOURCE (EBPF_LOADED_FROM_STOCK|EBPF_LOADED_FROM_USER)
+#define NETDATA_EBPF_LOAD_METHODS (EBPF_LOAD_LEGACY | EBPF_LOAD_CORE | EBPF_LOAD_PLAY_DICE)
+#define NETDATA_EBPF_LOAD_SOURCE (EBPF_LOADED_FROM_STOCK | EBPF_LOADED_FROM_USER)
 
 typedef enum netdata_ebpf_program_loaded {
-    EBPF_LOAD_PROBE,         // Attach probes on targets
-    EBPF_LOAD_RETPROBE,      // Attach retprobes on targets
-    EBPF_LOAD_TRACEPOINT,    // This stores log given description about the errors raised
-    EBPF_LOAD_TRAMPOLINE,    // This attaches kprobe when the function is called
+    EBPF_LOAD_PROBE,      // Attach probes on targets
+    EBPF_LOAD_RETPROBE,   // Attach retprobes on targets
+    EBPF_LOAD_TRACEPOINT, // This stores log given description about the errors raised
+    EBPF_LOAD_TRAMPOLINE, // This attaches kprobe when the function is called
 } netdata_ebpf_program_loaded_t;
 
 typedef struct netdata_ebpf_targets {
@@ -257,11 +257,11 @@ typedef struct netdata_ebpf_targets {
 
 typedef struct ebpf_plugin_stats {
     // Load options
-    uint32_t legacy;      // Legacy codes
-    uint32_t core;        // CO-RE codes, this means we are using source code compiled.
+    uint32_t legacy; // Legacy codes
+    uint32_t core;   // CO-RE codes, this means we are using source code compiled.
 
-    uint32_t threads;     // Total number of threads
-    uint32_t running;     // total number of threads running
+    uint32_t threads; // Total number of threads
+    uint32_t running; // total number of threads running
 
     uint32_t probes;      // Number of kprobes loaded
     uint32_t retprobes;   // Number of kretprobes loaded
@@ -270,7 +270,7 @@ typedef struct ebpf_plugin_stats {
 
     uint64_t memlock_kern; // The same information reported by bpftool, but it is not accurated
                            // https://lore.kernel.org/linux-mm/20230112155326.26902-5-laoar.shao@gmail.com/T/
-    uint32_t hash_tables; // Number of hash tables used on the system.
+    uint32_t hash_tables;  // Number of hash tables used on the system.
 
     uint32_t hash_percpu; // Number of threads running per cpu maps
     uint32_t hash_unique; // Number of threads running an unique map for all cores.
@@ -292,18 +292,18 @@ typedef enum netdata_apps_integration_flags {
 #define NETDATA_EBPF_STAT_DIMENSION_ARAL "aral"
 
 enum ebpf_threads_status {
-    NETDATA_THREAD_EBPF_RUNNING,            // started by plugin
-    NETDATA_THREAD_EBPF_FUNCTION_RUNNING,   // started by function
-    NETDATA_THREAD_EBPF_STOPPING,           // stopping thread
-    NETDATA_THREAD_EBPF_STOPPED,            // thread stopped
-    NETDATA_THREAD_EBPF_NOT_RUNNING         // thread was never started
+    NETDATA_THREAD_EBPF_RUNNING,          // started by plugin
+    NETDATA_THREAD_EBPF_FUNCTION_RUNNING, // started by function
+    NETDATA_THREAD_EBPF_STOPPING,         // stopping thread
+    NETDATA_THREAD_EBPF_STOPPED,          // thread stopped
+    NETDATA_THREAD_EBPF_NOT_RUNNING       // thread was never started
 };
 
 enum ebpf_global_table_values {
-    NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD, // Count elements added inside PID table
-    NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL, // Count elements removed from PID table
+    NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD,  // Count elements added inside PID table
+    NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL,  // Count elements removed from PID table
     NETDATA_EBPF_GLOBAL_TABLE_TEMP_TABLE_ADD, // Count elements added inside TEMP table
-    NETDATA_EBPF_GLOBAL_TABLE_TEMP_TABLE_DEL,  // Count elements removed from TEMP table
+    NETDATA_EBPF_GLOBAL_TABLE_TEMP_TABLE_DEL, // Count elements removed from TEMP table
 
     NETDATA_EBPF_GLOBAL_TABLE_STATUS_END
 };
@@ -320,11 +320,11 @@ typedef struct ebpf_module {
 
     // Helpers used with plugin
     struct {
-        void (*start_routine)(void *);                              // the thread function
-        void (*apps_routine)(struct ebpf_module *em, void *ptr);    // the apps charts
-        void (*fnct_routine)(BUFFER *bf, struct ebpf_module *em);   // the function used for exteernal requests
-        const char *fcnt_name;                                      // name given to cloud
-        const char *fcnt_desc;                                      // description given about function
+        void (*start_routine)(void *);                            // the thread function
+        void (*apps_routine)(struct ebpf_module *em, void *ptr);  // the apps charts
+        void (*fnct_routine)(BUFFER *bf, struct ebpf_module *em); // the function used for exteernal requests
+        const char *fcnt_name;                                    // name given to cloud
+        const char *fcnt_desc;                                    // description given about function
         const char *fcnt_thread_chart_name;
         int order_thread_chart;
         const char *fcnt_thread_lifetime_name;
@@ -371,8 +371,8 @@ typedef struct ebpf_module {
 int ebpf_get_kernel_version();
 int get_redhat_release();
 char *ebpf_kernel_suffix(int version, int isrh);
-struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf,
-                                           struct bpf_object **obj);
+struct bpf_link **
+ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf, struct bpf_object **obj);
 
 void ebpf_mount_config_name(char *filename, size_t length, char *path, const char *config);
 int ebpf_load_config(struct config *config, char *filename);
@@ -461,9 +461,9 @@ void ebpf_histogram_dimension_cleanup(char **ptr, size_t length);
 
 // Tracepoint helpers
 // For more information related to tracepoints read https://www.kernel.org/doc/html/latest/trace/tracepoints.html
-int ebpf_is_tracepoint_enabled(char *subsys, char *eventname);
-int ebpf_enable_tracing_values(char *subsys, char *eventname);
-int ebpf_disable_tracing_values(char *subsys, char *eventname);
+int ebpf_is_tracepoint_enabled(const char *subsys, const char *eventname);
+int ebpf_enable_tracing_values(const char *subsys, const char *eventname);
+int ebpf_disable_tracing_values(const char *subsys, const char *eventname);
 
 // BTF Section
 #define EBPF_DEFAULT_BTF_FILE "vmlinux"
@@ -485,8 +485,10 @@ void ebpf_update_map_type(struct bpf_map *map, ebpf_local_maps_t *w);
 void ebpf_define_map_type(ebpf_local_maps_t *maps, int maps_per_core, int kver);
 #endif
 
-void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report, ebpf_local_maps_t *maps,
-                                           ebpf_stats_action_t action);
+void ebpf_update_kernel_memory_with_vector(
+    ebpf_plugin_stats_t *report,
+    ebpf_local_maps_t *maps,
+    ebpf_stats_action_t action);
 void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *map, ebpf_stats_action_t action);
 int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em);
 void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio);
@@ -496,11 +498,12 @@ int ebpf_can_plugin_load_code(int kver, char *plugin_name);
 int ebpf_adjust_memory_limit();
 
 #ifdef LIBBPF_MAJOR_VERSION
-static inline int netdata_silent_libbpf_vfprintf(enum libbpf_print_level level __maybe_unused,
-                                                 const char *format __maybe_unused,
-                                                 va_list args __maybe_unused)
+static inline int netdata_silent_libbpf_vfprintf(
+    enum libbpf_print_level level __maybe_unused,
+    const char *format __maybe_unused,
+    va_list args __maybe_unused)
 {
-     return 0;
+    return 0;
 }
 #endif
 
