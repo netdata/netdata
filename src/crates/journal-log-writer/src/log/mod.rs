@@ -5,7 +5,7 @@ mod config;
 pub use config::{Config, RetentionPolicy, RotationPolicy};
 
 use crate::{Result, WriterError};
-use journal_common::{RealtimeClock, load_boot_id, load_machine_id, monotonic_now};
+use journal_common::{Microseconds, RealtimeClock, load_boot_id, load_machine_id, monotonic_now};
 use journal_core::field_map::{
     FieldMap, REMAPPING_MARKER, extract_field_name, is_systemd_compatible,
 };
@@ -175,6 +175,34 @@ pub struct Log {
     current_seqnum: u64,
     remapping_registry: FieldMap,
     clock: RealtimeClock,
+    last_monotonic_usec: u64,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EntryTimestamps {
+    /// Optional source timestamp for `_SOURCE_REALTIME_TIMESTAMP` field injection.
+    pub source_realtime_usec: Option<u64>,
+    /// Optional journal entry realtime timestamp override.
+    pub entry_realtime_usec: Option<u64>,
+    /// Optional journal entry monotonic timestamp override.
+    pub entry_monotonic_usec: Option<u64>,
+}
+
+impl EntryTimestamps {
+    pub fn with_source_realtime_usec(mut self, ts: u64) -> Self {
+        self.source_realtime_usec = Some(ts);
+        self
+    }
+
+    pub fn with_entry_realtime_usec(mut self, ts: u64) -> Self {
+        self.entry_realtime_usec = Some(ts);
+        self
+    }
+
+    pub fn with_entry_monotonic_usec(mut self, ts: u64) -> Self {
+        self.entry_monotonic_usec = Some(ts);
+        self
+    }
 }
 
 impl Log {
@@ -183,9 +211,27 @@ impl Log {
     /// Returns (realtime_usec, monotonic_usec) where:
     /// - realtime: microseconds since Unix epoch (CLOCK_REALTIME), monotonically increasing
     /// - monotonic: microseconds since boot (CLOCK_MONOTONIC)
-    fn capture_dual_timestamp(&self) -> Result<(u64, u64)> {
-        let realtime = self.clock.now().get();
-        let monotonic = monotonic_now().map_err(|e| WriterError::Io(e))?.get();
+    fn capture_dual_timestamp(
+        &mut self,
+        timestamp_override: Option<&EntryTimestamps>,
+    ) -> Result<(u64, u64)> {
+        let realtime = match timestamp_override.and_then(|ts| ts.entry_realtime_usec) {
+            Some(ts) => self.clock.observe(Microseconds::new(ts)).get(),
+            None => self.clock.now().get(),
+        };
+
+        let desired_monotonic = match timestamp_override.and_then(|ts| ts.entry_monotonic_usec) {
+            Some(ts) => ts,
+            None => monotonic_now().map_err(WriterError::Io)?.get(),
+        };
+
+        let monotonic = if desired_monotonic > self.last_monotonic_usec {
+            desired_monotonic
+        } else {
+            self.last_monotonic_usec.saturating_add(1)
+        };
+        self.last_monotonic_usec = monotonic;
+
         Ok((realtime, monotonic))
     }
 
@@ -197,6 +243,7 @@ impl Log {
         let boot_id = load_boot_id()?;
         let seqnum_id = uuid::Uuid::new_v4();
         let rotation_state = RotationState::new(&config.rotation_policy);
+        let last_monotonic_usec = chain.tail_monotonic_for_boot(boot_id)?.unwrap_or(0);
 
         // Initialize clock with last entry timestamp if available
         let clock = if let Some(tail_realtime) = chain.tail_realtime()? {
@@ -215,6 +262,7 @@ impl Log {
             current_seqnum,
             remapping_registry: FieldMap::new(),
             clock,
+            last_monotonic_usec,
         })
     }
 
@@ -227,6 +275,25 @@ impl Log {
         &mut self,
         items: &[&[u8]],
         source_realtime_usec: Option<u64>,
+    ) -> Result<()> {
+        self.write_entry_with_timestamps(
+            items,
+            EntryTimestamps {
+                source_realtime_usec,
+                ..EntryTimestamps::default()
+            },
+        )
+    }
+
+    /// Writes a journal entry with optional source and entry timestamp overrides.
+    ///
+    /// Overrides are safe by construction:
+    /// - entry realtime is clamped to strict monotonic progression (`last + 1us` floor)
+    /// - entry monotonic is also clamped to strict monotonic progression (`last + 1us` floor)
+    pub fn write_entry_with_timestamps(
+        &mut self,
+        items: &[&[u8]],
+        timestamps: EntryTimestamps,
     ) -> Result<()> {
         if items.is_empty() {
             return Ok(());
@@ -280,7 +347,7 @@ impl Log {
         transformed_items.push(boot_id_field.into_bytes());
 
         // Add _SOURCE_REALTIME_TIMESTAMP if provided
-        if let Some(timestamp_usec) = source_realtime_usec {
+        if let Some(timestamp_usec) = timestamps.source_realtime_usec {
             let source_timestamp_field = format!("_SOURCE_REALTIME_TIMESTAMP={}", timestamp_usec);
             transformed_items.push(source_timestamp_field.into_bytes());
         }
@@ -310,7 +377,7 @@ impl Log {
             items_refs.push(item.as_slice());
         }
 
-        let (realtime, monotonic) = self.capture_dual_timestamp()?;
+        let (realtime, monotonic) = self.capture_dual_timestamp(Some(&timestamps))?;
 
         let active_file = self.active_file.as_mut().unwrap();
         active_file.write_entry(&items_refs, realtime, monotonic)?;
@@ -351,7 +418,7 @@ impl Log {
         // Build references
         let items_refs: Vec<&[u8]> = remapping_items.iter().map(|v| v.as_slice()).collect();
 
-        let (realtime, monotonic) = self.capture_dual_timestamp()?;
+        let (realtime, monotonic) = self.capture_dual_timestamp(None)?;
 
         let active_file = self.active_file.as_mut().unwrap();
         active_file.write_entry(&items_refs, realtime, monotonic)?;
