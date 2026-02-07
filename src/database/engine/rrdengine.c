@@ -333,6 +333,7 @@ struct page_descr_with_data *page_descriptor_get(void) {
 }
 
 static inline void page_descriptor_release(struct page_descr_with_data *descr) {
+    uuidmap_free(descr->uuid_id);
     aral_freez(rrdeng_main.descriptors.ar, descr);
 }
 
@@ -950,7 +951,7 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
         header->descr[i].type = descr->type;
-        uuid_copy(*(nd_uuid_t *)header->descr[i].uuid, *descr->id);
+        uuid_copy(*(nd_uuid_t *)header->descr[i].uuid, *uuidmap_uuid_ptr(descr->uuid_id));
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time_ut = descr->start_time_ut;
 
