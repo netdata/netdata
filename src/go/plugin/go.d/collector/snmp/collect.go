@@ -196,6 +196,7 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsn
 
 func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
 	snmpProfiles := ddsnmp.FindProfiles(si.SysObjectID, si.Descr, c.ManualProfiles)
+	snmpProfiles = c.appendTopologyProfiles(snmpProfiles)
 	var profInfo []string
 
 	for _, prof := range snmpProfiles {

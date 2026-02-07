@@ -22,12 +22,16 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	}
 
 	c.resetIfaceCache()
+	c.resetTopologyCache()
+	c.updateTopologyProfileTags(pms)
 
 	c.collectProfileScalarMetrics(mx, pms)
 	c.collectProfileTableMetrics(mx, pms)
 	c.collectProfileStats(mx, pms)
 
 	c.finalizeIfaceCache()
+	c.finalizeTopologyCache()
+	c.collectTopologyMetrics(mx)
 
 	return nil
 }
@@ -63,6 +67,11 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnm
 	for _, pm := range pms {
 		for _, m := range pm.Metrics {
 			if !m.IsTable || m.Name == "" || len(m.Tags) == 0 {
+				continue
+			}
+
+			if isTopologyMetric(m.Name) {
+				c.updateTopologyCacheEntry(m)
 				continue
 			}
 
