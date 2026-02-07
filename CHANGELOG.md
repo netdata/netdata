@@ -290,6 +290,11 @@
 - Feat(go.d/sd): add dyncfg support for service discovery ([#21680](https://github.com/netdata/netdata/issues/21680))
 - Remove otel coll dist ([#21714](https://github.com/netdata/netdata/issues/21714))
 - Handle fields with high-cardinality and big payloads. ([#21716](https://github.com/netdata/netdata/issues/21716))
+- Refactor(go.d): extract shared dyncfg handler from jobmgr and sd ([#21718](https://github.com/netdata/netdata/issues/21718))
+- Update libbpf ([#21717](https://github.com/netdata/netdata/issues/21717))
+- Docs: Add bearer token protection as recommended security method ([#21712](https://github.com/netdata/netdata/issues/21712))
+- Use info-level log for undhandled modification events. ([#21719](https://github.com/netdata/netdata/issues/21719))
+- Improve log message when deferred response is too big. ([#21720](https://github.com/netdata/netdata/issues/21720))
 
 ## [2.8.0] - 2025-11-19
 
