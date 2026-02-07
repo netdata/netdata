@@ -364,18 +364,6 @@ endif()
 
 set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
 
-if(ENABLE_PLUGIN_EBPF)
-        include(NetdataLibBPF)
-        include(NetdataEBPFCORE)
-
-        if(NOT OS_LINUX)
-            message(FATAL_ERROR "The eBPF plugin is not supported on non-Linux systems")
-        endif()
-
-        netdata_bundle_libbpf()
-        netdata_fetch_ebpf_co_re()
-endif()
-
 pkg_check_modules(CURL libcurl>=7.21 REQUIRED IMPORTED_TARGET)
 set(HAVE_LIBCURL TRUE)
 
@@ -404,10 +392,13 @@ endif()
 # Custom Modules
 #
 
+include(NetdataRequiredDeps)
+include(NetdataTLS)
 include(NetdataJSONC)
 include(NetdataYAML)
 include(NetdataBacktrace)
 include(NetdataDlib)
+include(NetdataCompression)
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
         include(NetdataEBPFLegacy)
@@ -421,11 +412,34 @@ endif()
 # Checks from custom modules
 #
 
+# Required dependencies
+netdata_detect_zlib()
+netdata_detect_libuuid()
+netdata_detect_libuv()
+netdata_detect_tls_and_crypto()
 netdata_detect_jsonc()
 netdata_detect_libyaml()
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
         netdata_fetch_legacy_ebpf_code()
+endif()
+
+# Optional dependencies
+netdata_detect_lz4()
+netdata_detect_zstd()
+netdata_detect_brotli()
+
+# Optional component dependencies
+if(ENABLE_PLUGIN_EBPF)
+        include(NetdataLibBPF)
+        include(NetdataEBPFCORE)
+
+        if(NOT OS_LINUX)
+            message(FATAL_ERROR "The eBPF plugin is not supported on non-Linux systems")
+        endif()
+
+        netdata_bundle_libbpf()
+        netdata_fetch_ebpf_co_re()
 endif()
 
 if(ENABLE_SENTRY)
@@ -2316,12 +2330,24 @@ if(OS_WINDOWS)
         endif()
 endif()
 
+# ebpf
+if(ENABLE_PLUGIN_EBPF)
+    netdata_add_libbpf_to_target(libnetdata PUBLIC)
+endif()
+
 # judy
 target_link_libraries(libnetdata PUBLIC judy)
 
-netdata_add_jsonc_to_target(libnetdata)
-
-netdata_add_libyaml_to_target(libnetdata)
+netdata_add_jsonc_to_target(libnetdata PUBLIC)
+netdata_add_libyaml_to_target(libnetdata PUBLIC)
+netdata_add_zlib_to_target(libnetdata PUBLIC)
+netdata_add_libuuid_to_target(libnetdata PUBLIC)
+netdata_add_libuv_to_target(libnetdata PUBLIC)
+netdata_add_crypto_to_target(libnetdata PUBLIC)
+netdata_add_tls_to_target(libnetdata PUBLIC)
+netdata_add_lz4_to_target(libnetdata PUBLIC)
+netdata_add_zstd_to_target(libnetdata PUBLIC)
+netdata_add_brotli_to_target(libnetdata PUBLIC)
 
 # jemalloc
 if(ENABLE_JEMALLOC)
@@ -2362,73 +2388,6 @@ if(ENABLE_LIBUNWIND)
     message(FATAL "Could not find libunwind for logging of stack traces")
   endif()
 endif()
-
-# zlib
-if(OS_MACOS)
-        find_package(ZLIB REQUIRED)
-        target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
-        target_link_libraries(libnetdata PUBLIC ZLIB::ZLIB)
-else()
-        pkg_check_modules(ZLIB REQUIRED zlib)
-        target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
-endif()
-
-# lz4 - try to find a version that is compatible with streaming compression
-# otherwise pick whichever one we can find to support dbengine but don't set
-# ENABLE_LZ4.
-pkg_check_modules(LIBLZ4 liblz4>=1.9.0)
-if(LIBLZ4_FOUND)
-        set(ENABLE_LZ4 On)
-else()
-        pkg_check_modules(LIBLZ4 REQUIRED liblz4)
-endif()
-
-target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
-target_compile_options(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
-
-# zstd
-pkg_check_modules(LIBZSTD libzstd)
-if(LIBZSTD_FOUND)
-        set(ENABLE_ZSTD On)
-        target_include_directories(libnetdata BEFORE PUBLIC ${LIBZSTD_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${LIBZSTD_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${LIBZSTD_LDFLAGS})
-endif()
-
-# brotli
-pkg_check_modules(LIBBROTLI libbrotlidec libbrotlienc libbrotlicommon)
-if(LIBBROTLI_FOUND)
-        set(ENABLE_BROTLI On)
-        target_include_directories(libnetdata PUBLIC ${LIBBROTLI_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${LIBBROTLI_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${LIBBROTLI_LDFLAGS})
-endif()
-
-# uuid
-if(OS_MACOS OR OS_WINDOWS)
-        # UUID functionality is part of the system libraries here, so no extra
-        # stuff needed.
-else()
-        pkg_check_modules(UUID REQUIRED uuid)
-        target_include_directories(libnetdata BEFORE PUBLIC ${UUID_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${UUID_LDFLAGS})
-endif()
-
-# uv
-pkg_check_modules(LIBUV REQUIRED libuv)
-target_include_directories(libnetdata BEFORE PUBLIC ${LIBUV_INCLUDE_DIRS})
-target_compile_options(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
-
-# crypto
-target_link_libraries(libnetdata PUBLIC PkgConfig::CRYPTO)
-
-# openssl
-target_link_libraries(libnetdata PUBLIC PkgConfig::TLS)
 
 # mnl
 if(NOT OS_MACOS)
@@ -2850,7 +2809,7 @@ if(ENABLE_PLUGIN_EBPF)
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES} ${INTERCOMMUNICATION_COLLECTORS_FILES})
     target_link_libraries(ebpf.plugin libnetdata)
 
-    netdata_add_libbpf_to_target(ebpf.plugin)
+    netdata_add_libbpf_to_target(ebpf.plugin PUBLIC)
     netdata_add_ebpf_co_re_to_target(ebpf.plugin)
 
     install(TARGETS ebpf.plugin
@@ -3077,7 +3036,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${OS_WINDOWS}>:odbc32;setupapi>"
 )
 
-netdata_add_protobuf(netdata)
+netdata_add_protobuf_to_target(netdata PRIVATE)
 
 #
 # build systemd-cat-native
@@ -3127,7 +3086,7 @@ if(PCRE2_FOUND)
 
         target_link_libraries(log2journal PUBLIC libnetdata)
         target_link_libraries(log2journal PUBLIC "${PCRE2_LDFLAGS}")
-        netdata_add_libyaml_to_target(log2journal)
+        netdata_add_libyaml_to_target(log2journal PUBLIC)
 
         install(TARGETS log2journal
                 COMPONENT netdata

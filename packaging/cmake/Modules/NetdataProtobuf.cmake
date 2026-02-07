@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Macros and functions for handling of Protobuf
 
+include(NetdataUtil)
+
 # Prepare a vendored copy of Protobuf for use with Netdata.
 function(netdata_bundle_protobuf)
         include(FetchContent)
@@ -225,13 +227,6 @@ function(netdata_protoc_generate_cpp PROTO_ROOT_DIR OUTPUT_ROOT_DIR GENERATED_SO
 endfunction()
 
 # Add protobuf to a specified target.
-function(netdata_add_protobuf _target)
-        if(ENABLE_BUNDLED_PROTOBUF)
-            target_include_directories(${_target} BEFORE PRIVATE ${PROTOBUF_INCLUDE_DIRS})
-        else()
-            target_include_directories(${_target} PRIVATE ${PROTOBUF_INCLUDE_DIRS})
-        endif()
-
-        target_compile_options(${_target} PRIVATE ${PROTOBUF_CFLAGS_OTHER})
-        target_link_libraries(${_target} PRIVATE ${PROTOBUF_LIBRARIES})
+function(netdata_add_protobuf_to_target _target _scope)
+        netdata_add_lib_to_target(${_target} ${_scope} PROTOBUF)
 endfunction()
