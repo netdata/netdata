@@ -339,6 +339,45 @@ DCGM_FI_DEV_CLOCKS_EVENT_REASON_SW_POWER_CAP_NS{gpu="0",UUID="GPU-aaa"} 1000000
 	assert.False(t, seenCtx["dcgm.gpu.other.counter"])
 }
 
+func TestCollector_Collect_SkipsUnsupportedSummaryHistogramFamilies(t *testing.T) {
+	metrics := []byte(`
+# HELP DCGM_FI_DEV_GPU_UTIL GPU utilization (in %).
+# TYPE DCGM_FI_DEV_GPU_UTIL gauge
+DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-aaa"} 77
+# HELP DCGM_FI_DEV_FAKE_SUMMARY synthetic summary for test.
+# TYPE DCGM_FI_DEV_FAKE_SUMMARY summary
+DCGM_FI_DEV_FAKE_SUMMARY{gpu="0",UUID="GPU-aaa",quantile="0.5"} 1
+DCGM_FI_DEV_FAKE_SUMMARY_sum{gpu="0",UUID="GPU-aaa"} 2
+DCGM_FI_DEV_FAKE_SUMMARY_count{gpu="0",UUID="GPU-aaa"} 3
+# HELP DCGM_FI_DEV_FAKE_HIST synthetic histogram for test.
+# TYPE DCGM_FI_DEV_FAKE_HIST histogram
+DCGM_FI_DEV_FAKE_HIST_bucket{gpu="0",UUID="GPU-aaa",le="1"} 4
+DCGM_FI_DEV_FAKE_HIST_sum{gpu="0",UUID="GPU-aaa"} 5
+DCGM_FI_DEV_FAKE_HIST_count{gpu="0",UUID="GPU-aaa"} 6
+`)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(metrics)
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init(context.Background()))
+
+	mx := collr.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	gpuKey := "gpu=0|uuid=GPU-aaa"
+	utilDimID := makeID(makeID("dcgm.gpu.compute.utilization", gpuKey), "gpu")
+	assert.Equal(t, int64(77000), mx[utilDimID], utilDimID)
+	assert.Len(t, mx, 1)
+
+	for _, ch := range *collr.Charts() {
+		assert.NotContains(t, ch.Ctx, "fake_summary")
+		assert.NotContains(t, ch.Ctx, "fake_hist")
+	}
+}
+
 func TestClassifier_StrictNIDLSplitsForRareFamilies(t *testing.T) {
 	tests := []struct {
 		name  string

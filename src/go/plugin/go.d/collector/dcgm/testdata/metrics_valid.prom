@@ -38,8 +38,7 @@ DCGM_FI_PROF_PCIE_TX_BYTES{gpu="0",UUID="GPU-aaa"} 123456
 # TYPE DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_TOTAL counter
 DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_TOTAL{gpu="0",gpu_uuid="GPU-aaa",nvlink="1"} 4
 
-# HELP DCGM_FI_DEV_GPU_UTIL GPU utilization (in %), MIG.
-# TYPE DCGM_FI_DEV_GPU_UTIL gauge
+# MIG sample for the same DCGM_FI_DEV_GPU_UTIL metric family.
 DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-aaa",GPU_I_ID="2",GPU_I_PROFILE="1g.10gb"} 60
 
 # HELP go_gc_duration_seconds A Go runtime metric that should be ignored by the collector.

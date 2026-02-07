@@ -60,6 +60,10 @@ func (c *Collector) collect() (map[string]int64, error) {
 		}
 
 		typ := metricFamilyKind(mf)
+		if typ == sampleUnsupported {
+			c.Debugf("metric '%s' has unsupported Prometheus type '%s', skipping it", mf.Name(), mf.Type())
+			continue
+		}
 		for _, metric := range mf.Metrics() {
 			value, ok := metricValue(metric, typ)
 			if !ok || isInvalidMetricValue(value) {
@@ -156,8 +160,10 @@ func metricFamilyKind(mf *prometheus.MetricFamily) sampleKind {
 	switch mf.Type() {
 	case model.MetricTypeCounter:
 		return sampleCounter
-	case model.MetricTypeGauge, model.MetricTypeHistogram, model.MetricTypeSummary:
+	case model.MetricTypeGauge:
 		return sampleGauge
+	case model.MetricTypeHistogram, model.MetricTypeSummary:
+		return sampleUnsupported
 	default:
 		if strings.HasSuffix(strings.ToLower(mf.Name()), "_total") {
 			return sampleCounter

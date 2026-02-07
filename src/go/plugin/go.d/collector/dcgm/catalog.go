@@ -26,6 +26,7 @@ type sampleKind uint8
 const (
 	sampleGauge sampleKind = iota
 	sampleCounter
+	sampleUnsupported
 )
 
 type contextSpec struct {
