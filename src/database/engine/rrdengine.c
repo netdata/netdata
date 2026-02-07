@@ -1827,9 +1827,6 @@ uint64_t last_async_callback;
 
 void async_cb(uv_async_t *handle)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
-
     last_async_callback = uv_hrtime();
 
     netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
@@ -1845,10 +1842,8 @@ static void async_closed_cb(uv_handle_t *handle)
     __atomic_store_n(&main->async_ready, true, __ATOMIC_RELEASE);
 }
 #else
-void async_cb(uv_async_t *handle)
+void async_cb(uv_async_t *handle __maybe_unused)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
     netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 #endif
