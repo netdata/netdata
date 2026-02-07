@@ -359,6 +359,42 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     return PARSER_RC_OK;
 }
 
+PARSER_RC pluginsd_function_del(char **words, size_t num_words, PARSER *parser) {
+    bool global = false;
+    size_t i = 1;
+    if(num_words >= 2 && strcmp(get_word(words, num_words, 1), "GLOBAL") == 0) {
+        i++;
+        global = true;
+    }
+
+    char *name = get_word(words, num_words, i++);
+
+    RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_FUNCTION_DEL);
+    if(!host) return PARSER_RC_ERROR;
+
+    RRDSET *st = (global) ? NULL : pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_FUNCTION_DEL, PLUGINSD_KEYWORD_CHART);
+    if(!st) global = true;
+
+    if (unlikely(!name || !*name)) {
+        netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a FUNCTION_DEL without a name. Ignoring it.",
+                          rrdhost_hostname(host),
+                          st ? rrdset_id(st) : "(unset)");
+        return PARSER_RC_ERROR;
+    }
+
+    bool from_streaming = (parser->repertoire & PARSER_INIT_STREAMING) != 0;
+
+    if(!rrd_function_del(host, st, name, from_streaming, false)) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "PLUGINSD: 'host:%s' FUNCTION_DEL '%s' - function not found or ownership mismatch",
+               rrdhost_hostname(host), name);
+    }
+
+    parser->user.data_collections_count++;
+
+    return PARSER_RC_OK;
+}
+
 static void pluginsd_function_result_end(struct parser *parser, void *action_data) {
     STRING *key = action_data;
     if(key)
