@@ -24,6 +24,7 @@ struct health_plugin_globals health_globals = {
     },
     .prototypes = {
         .dict = NULL,
+        .registering = false,
     }
 };
 
