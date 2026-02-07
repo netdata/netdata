@@ -114,6 +114,28 @@ impl OwnedChain {
         }
     }
 
+    pub(super) fn tail_monotonic_for_boot(&self, boot_id: Uuid) -> Result<Option<u64>> {
+        let Some(file) = self.inner.back() else {
+            return Ok(None);
+        };
+
+        let window_size = 4096;
+        let jf = JournalFile::<Mmap>::open(file, window_size)?;
+        let header = jf.journal_header_ref();
+
+        let tail_boot_id = Uuid::from_bytes(header.tail_entry_boot_id);
+        if tail_boot_id != boot_id {
+            return Ok(None);
+        }
+
+        let monotonic = header.tail_entry_monotonic;
+        if monotonic == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(monotonic))
+        }
+    }
+
     /// Registers a new journal file with the directory.
     pub(super) fn create_file(
         &mut self,
