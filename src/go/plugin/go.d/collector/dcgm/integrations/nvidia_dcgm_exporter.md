@@ -40,6 +40,12 @@ jobs:
 ## Field Profiles
 
 `dcgm-exporter` ships with a small default field set. For production, use an explicit field CSV profile.
+Netdata provides a recommended exporter profile file:
+[`dcgm-exporter-netdata.csv`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv)
+(raw: `https://raw.githubusercontent.com/netdata/netdata/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv`).
+
+Example:
+`dcgm-exporter -f /path/to/dcgm-exporter-netdata.csv`
 
 Suggested baseline profile (comprehensive coverage with actionable throttling fields):
 

@@ -48,9 +48,18 @@ modules:
           - title: Run dcgm-exporter
             description: Install DCGM and run `dcgm-exporter` so that a Prometheus endpoint is available (default `:9400/metrics`).
           - title: Configure exporter field list
-            description: The default exporter profile exposes a small subset of fields. Configure the exporter CSV to include the fields you need.
+            description: |
+              The default exporter profile exposes a small subset of fields.
+              Use the Netdata recommended profile:
+              [`dcgm-exporter-netdata.csv`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv)
+              (raw download: `https://raw.githubusercontent.com/netdata/netdata/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv`).
+
+              Example:
+              `dcgm-exporter -f /path/to/dcgm-exporter-netdata.csv`
           - title: Keep collection intervals aligned
-            description: Set Netdata `update_every` to the same value as dcgm-exporter collection interval (default 30 seconds).
+            description: |
+              Set Netdata `update_every` to the same value as dcgm-exporter collection interval (default 30 seconds).
+              Example exporter interval: `dcgm-exporter -c 30000` and Netdata `update_every: 30`.
           - title: Enable profiling capabilities (optional)
             description: Profiling fields may require additional privileges/capabilities in your runtime environment.
       configuration:
