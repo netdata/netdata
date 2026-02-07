@@ -1,0 +1,54 @@
+# Netdata claim (optional)
+netdata_claim_enabled: true
+netdata_claim_token: "CHANGE_ME"
+netdata_claim_rooms: "CHANGE_ME"
+netdata_claim_url: "https://app.netdata.cloud"
+
+# Optional claim proxy settings
+# netdata_claim_proxy: "env"
+# netdata_claim_insecure: false
+
+# Release channel
+netdata_release_channel: "stable"
+
+# Optional overrides
+# netdata_hostname: "my-hostname"
+# netdata_config_dir: "/etc/netdata"
+# netdata_lib_dir: "/var/lib/netdata"
+# netdata_install_only_if_missing: true
+# netdata_kickstart_extra_args: []
+
+# Global managed files (applied to all hosts)
+netdata_managed_files:
+  - src: files/global/health.d/custom.conf
+    dest: health.d/custom.conf
+    type: health
+
+# Profile definitions (file-level isolation)
+netdata_profiles_definitions:
+  standalone:
+    managed_files: []
+
+  child:
+    managed_files:
+      - src: files/profiles/child/stream.conf
+        dest: stream.conf
+        type: stream_conf
+
+  child_minimal:
+    managed_files:
+      - src: files/profiles/child_minimal/netdata.conf
+        dest: netdata.conf
+        type: netdata_conf
+      - src: files/profiles/child_minimal/stream.conf
+        dest: stream.conf
+        type: stream_conf
+
+  parent:
+    managed_files:
+      - src: files/profiles/parent/netdata.conf
+        dest: netdata.conf
+        type: netdata_conf
+      - src: files/profiles/parent/stream.conf
+        dest: stream.conf
+        type: stream_conf

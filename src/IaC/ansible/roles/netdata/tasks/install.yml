@@ -1,0 +1,61 @@
+---
+- name: Gather service facts
+  service_facts:
+
+- name: Check if Netdata service exists
+  set_fact:
+    netdata_installed: "{{ 'netdata.service' in ansible_facts.services }}"
+
+- name: Decide if install is needed
+  set_fact:
+    netdata_install_needed: "{{ (not netdata_installed) or (not netdata_install_only_if_missing | bool) }}"
+
+- name: Ensure HTTP client is installed
+  package:
+    name: "{{ netdata_http_client_packages }}"
+    state: present
+  when: netdata_install_needed
+
+- name: Clean apt cache (optional)
+  command: apt-get clean
+  changed_when: false
+  when:
+    - netdata_install_needed
+    - netdata_apt_clean_before_install | bool
+    - ansible_facts.os_family == "Debian"
+
+- name: Download kickstart script
+  get_url:
+    url: "{{ netdata_kickstart_url }}"
+    dest: /tmp/netdata-kickstart.sh
+    mode: "0755"
+  when: netdata_install_needed
+
+- name: Build kickstart arguments (base)
+  set_fact:
+    netdata_kickstart_argv:
+      - /tmp/netdata-kickstart.sh
+      - --non-interactive
+      - --dont-wait
+      - --release-channel
+      - "{{ netdata_release_channel }}"
+  when: netdata_install_needed
+
+
+- name: Add extra kickstart arguments
+  set_fact:
+    netdata_kickstart_argv: "{{ netdata_kickstart_argv + netdata_kickstart_extra_args }}"
+  when:
+    - netdata_install_needed
+    - netdata_kickstart_extra_args | length > 0
+
+- name: Install Netdata
+  command:
+    argv: "{{ netdata_kickstart_argv }}"
+  when: netdata_install_needed
+  register: netdata_install_result
+  changed_when: netdata_install_needed
+
+- name: Record install run
+  set_fact:
+    netdata_install_ran: "{{ netdata_install_needed }}"

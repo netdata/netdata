@@ -1,0 +1,6 @@
+---
+- name: Ensure Netdata service is enabled and running
+  service:
+    name: netdata
+    state: started
+    enabled: true

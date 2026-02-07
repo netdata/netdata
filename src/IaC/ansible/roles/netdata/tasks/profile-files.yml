@@ -1,0 +1,16 @@
+---
+- name: Ensure profile exists
+  assert:
+    that:
+      - netdata_profiles_definitions[profile_name] is defined
+    fail_msg: "Profile '{{ profile_name }}' not found in netdata_profiles_definitions"
+
+- name: Append managed files for profile
+  set_fact:
+    netdata_profile_managed_files: >-
+      {{
+        netdata_profile_managed_files
+        + (netdata_profiles_definitions[profile_name].managed_files | default([])
+          | map('combine', {'__profile': profile_name})
+          | list)
+      }}

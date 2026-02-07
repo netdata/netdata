@@ -1,0 +1,88 @@
+---
+- name: Set stream enabled (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/stream.conf"
+    section: stream
+    option: enabled
+    value: "{{ 'yes' if (netdata_stream_enabled | bool) else 'no' }}"
+    create: true
+  when: netdata_stream_enabled | string | length > 0
+  notify: Restart Netdata
+
+- name: Set stream destinations (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/stream.conf"
+    section: stream
+    option: destination
+    value: "{{ netdata_stream_destinations | join(' ') }}"
+    create: true
+  when: netdata_stream_destinations | length > 0
+  notify: Restart Netdata
+
+- name: Set stream api key (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/stream.conf"
+    section: stream
+    option: api key
+    value: "{{ netdata_stream_api_key }}"
+    create: true
+  when: netdata_stream_api_key | length > 0
+  notify: Restart Netdata
+
+- name: Set stream section options (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/stream.conf"
+    section: stream
+    option: "{{ item.key }}"
+    value: "{{ item.value }}"
+    create: true
+  loop: "{{ netdata_stream_section_options | dict2items }}"
+  when: netdata_stream_section_options | length > 0
+  notify: Restart Netdata
+
+- name: Enable parent keys
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/stream.conf"
+    section: "{{ item.key }}"
+    option: enabled
+    value: "yes"
+    create: true
+  loop: "{{ netdata_stream_parent_keys }}"
+  when: netdata_stream_parent_keys | length > 0
+  notify: Restart Netdata
+
+- name: Set parent allow from (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/stream.conf"
+    section: "{{ item.key }}"
+    option: allow from
+    value: "{{ item.allow_from }}"
+    create: true
+  loop: "{{ netdata_stream_parent_keys }}"
+  when:
+    - netdata_stream_parent_keys | length > 0
+    - item.allow_from is defined
+    - item.allow_from | length > 0
+  notify: Restart Netdata
+
+- name: Set parent key options (optional)
+  include_tasks: stream-parent-options.yml
+  loop: "{{ netdata_stream_parent_keys }}"
+  loop_control:
+    loop_var: parent_key
+  when:
+    - netdata_stream_parent_keys | length > 0
+    - parent_key.options is defined
+    - parent_key.options | length > 0
+
+- name: Set stream.conf entries (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/stream.conf"
+    section: "{{ item.section }}"
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    create: true
+  loop: "{{ netdata_stream_entries }}"
+  when: netdata_stream_entries | length > 0
+  notify: Restart Netdata
+

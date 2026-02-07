@@ -1,0 +1,90 @@
+---
+- name: Validate claim settings
+  assert:
+    that:
+      - not netdata_claim_enabled or (netdata_claim_token | length > 0)
+    fail_msg: "netdata_claim_token is required when netdata_claim_enabled=true"
+
+- name: Check claimed marker
+  stat:
+    path: "{{ netdata_lib_dir }}/cloud.d/claimed_id"
+  register: netdata_claimed_id
+
+- name: Find netdatacli in PATH
+  command: command -v netdatacli
+  register: netdata_netdatacli_cmd
+  changed_when: false
+  failed_when: false
+  when: netdata_claim_enabled | bool
+
+- name: Check common netdatacli locations
+  stat:
+    path: "{{ item }}"
+  register: netdata_netdatacli_paths
+  loop:
+    - /usr/sbin/netdatacli
+    - /opt/netdata/bin/netdatacli
+  when: netdata_claim_enabled | bool
+
+- name: Select netdatacli path
+  set_fact:
+    netdatacli_path: >-
+      {{
+        netdata_netdatacli_cmd.stdout if netdata_netdatacli_cmd.stdout | length > 0 else
+        (netdata_netdatacli_paths.results | selectattr('stat.exists') | map(attribute='stat.path') | list | first | default(''))
+      }}
+  when: netdata_claim_enabled | bool
+
+- name: Fail if netdatacli is missing
+  fail:
+    msg: "netdatacli not found on the target host"
+  when:
+    - netdata_claim_enabled | bool
+    - netdatacli_path | length == 0
+
+- name: Remove claimed_id for reclaim
+  file:
+    path: "{{ netdata_lib_dir }}/cloud.d/claimed_id"
+    state: absent
+  when: netdata_reclaim | bool
+
+- name: Ensure claim.conf is absent when claim is disabled
+  file:
+    path: "{{ netdata_config_dir_effective }}/claim.conf"
+    state: absent
+  when: not netdata_claim_enabled | bool
+
+- name: Write claim.conf
+  template:
+    src: claim.conf.j2
+    dest: "{{ netdata_config_dir_effective }}/claim.conf"
+    owner: root
+    group: "{{ netdata_group }}"
+    mode: "0640"
+  register: netdata_claim_conf_write
+  when: netdata_claim_enabled | bool
+
+- name: Wait for netdata control socket
+  wait_for:
+    path: /run/netdata/netdata.pipe
+    timeout: 30
+  when: netdata_claim_enabled | bool
+
+- name: Reload claiming state
+  command:
+    argv:
+      - "{{ netdatacli_path }}"
+      - reload-claiming-state
+  when: netdata_claim_enabled | bool
+  changed_when: >-
+    (netdata_claim_conf_write.changed | default(false))
+    or (netdata_reclaim | bool)
+    or (not netdata_claimed_id.stat.exists)
+
+- name: Wait for claimed_id marker
+  wait_for:
+    path: "{{ netdata_lib_dir }}/cloud.d/claimed_id"
+    timeout: 120
+  when:
+    - netdata_claim_enabled | bool
+    - netdata_reclaim | bool or not netdata_claimed_id.stat.exists

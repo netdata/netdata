@@ -1,0 +1,51 @@
+---
+netdata_kickstart_url: "https://get.netdata.cloud/kickstart.sh"
+netdata_release_channel: "stable"
+
+netdata_claim_enabled: true
+netdata_claim_token: ""
+netdata_claim_rooms: ""
+netdata_claim_url: "https://app.netdata.cloud"
+netdata_claim_proxy: ""
+netdata_claim_insecure: false
+netdata_reclaim: false
+
+netdata_dbengine_multihost_disk_space: ""
+netdata_web_mode: ""
+netdata_hostname: ""
+
+netdata_config_dir: ""
+netdata_lib_dir: "/var/lib/netdata"
+netdata_group: "netdata"
+
+netdata_install_only_if_missing: true
+netdata_kickstart_extra_args: []
+
+netdata_http_client_packages:
+  - curl
+  - wget
+netdata_apt_clean_before_install: true
+
+netdata_db_mode: ""
+netdata_db_retention: ""
+netdata_db_update_every: ""
+netdata_ml_enabled: ""
+netdata_health_enabled: ""
+netdata_web_bind_to: ""
+netdata_stream_enabled: ""
+netdata_stream_destinations: []
+netdata_stream_api_key: ""
+netdata_stream_section_options: {}
+netdata_stream_parent_keys: []
+
+# Profile-based configuration
+netdata_profiles: []
+netdata_profiles_definitions: {}
+
+# Managed files (host-level)
+netdata_managed_files: []
+
+# Optional per-host tweaks for full config files
+netdata_conf_entries: []
+netdata_stream_entries: []
+

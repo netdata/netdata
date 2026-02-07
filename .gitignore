@@ -1,5 +1,10 @@
 # Secrets
 gcs-credentials.json
+src/IaC/.netdata-iac-claim.env
+
+# IaC e2e artifacts
+src/IaC/ansible/e2e/work/
+src/IaC/ansible/inventories/e2e/
 
 .deps
 .libs
@@ -209,3 +214,8 @@ compile.sh
 run-ibm.sh
 
 tmp/
+
+integrations/integrations.js
+integrations/integrations.json
+
+.claude/

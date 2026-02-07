@@ -1,0 +1,83 @@
+---
+- name: Validate managed file entries
+  assert:
+    that:
+      - item.src is defined
+      - item.dest is defined
+    fail_msg: "Each managed file must include 'src' and 'dest'"
+  loop: "{{ netdata_managed_files_effective }}"
+
+- name: Build managed files list with resolved paths
+  set_fact:
+    netdata_managed_files_resolved: "{{ (netdata_managed_files_resolved | default([])) + [ item | combine({'dest_resolved': dest_resolved, 'src_resolved': src_resolved}) ] }}"
+  vars:
+    dest_resolved: >-
+      {{
+        item.dest if (item.dest | regex_search('^/'))
+        else (netdata_config_dir_effective ~ '/' ~ item.dest)
+      }}
+    src_resolved: >-
+      {{
+        item.src if (item.src | regex_search('^/'))
+        else ((inventory_dir | default(playbook_dir)) ~ '/' ~ item.src)
+      }}
+  loop: "{{ netdata_managed_files_effective }}"
+
+- name: Build destination-to-profiles map
+  set_fact:
+    netdata_managed_files_dest_profiles: >-
+      {{
+        netdata_managed_files_dest_profiles | default({})
+        | combine({
+            item.dest_resolved: (netdata_managed_files_dest_profiles[item.dest_resolved] | default([])) + [ item.__profile | default('host') ]
+          }, recursive=True)
+      }}
+  loop: "{{ netdata_managed_files_resolved }}"
+
+- name: Initialize managed file collisions list
+  set_fact:
+    netdata_managed_files_collisions: []
+
+- name: Detect managed file destination collisions
+  set_fact:
+    netdata_managed_files_collisions: "{{ netdata_managed_files_collisions + [item] }}"
+  loop: "{{ netdata_managed_files_dest_profiles | dict2items }}"
+  when: item.value | length > 1
+
+- name: Fail on managed file destination collisions
+  fail:
+    msg: >-
+      Managed file destination collisions detected for {{ item.key }} (profiles: {{ item.value | unique | join(', ') }})
+  loop: "{{ netdata_managed_files_collisions }}"
+  when: netdata_managed_files_collisions | length > 0
+
+- name: Ensure managed file directories exist
+  file:
+    path: "{{ item.dest_resolved | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ netdata_managed_files_resolved }}"
+
+- name: Deploy managed files (copy)
+  copy:
+    src: "{{ item.src_resolved }}"
+    dest: "{{ item.dest_resolved }}"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0644') }}"
+  loop: "{{ netdata_managed_files_resolved }}"
+  when: not (item.template | default(false) | bool)
+  notify: Restart Netdata
+
+- name: Deploy managed files (template)
+  template:
+    src: "{{ item.src_resolved }}"
+    dest: "{{ item.dest_resolved }}"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0644') }}"
+  loop: "{{ netdata_managed_files_resolved }}"
+  when: item.template | default(false) | bool
+  notify: Restart Netdata
