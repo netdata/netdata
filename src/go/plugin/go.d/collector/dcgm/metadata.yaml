@@ -1,0 +1,365 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-dcgm
+      plugin_name: go.d.plugin
+      module_name: dcgm
+      monitored_instance:
+        name: NVIDIA DCGM Exporter
+        link: https://github.com/NVIDIA/dcgm-exporter
+        icon_filename: nvidia.svg
+        categories:
+          - data-collection.hardware-devices-and-sensors
+      keywords:
+        - nvidia
+        - gpu
+        - dcgm
+        - dcgm-exporter
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector gathers NVIDIA GPU telemetry from a `dcgm-exporter` endpoint.
+          It supports all numeric fields exposed by the exporter and maps them into Netdata-native contexts.
+        method_description: |
+          It collects metrics by periodically scraping the exporter Prometheus endpoint over HTTP.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: This integration does not support auto-detection in v1.
+        limits:
+          description: |
+            The collector applies global and per-metric time series limits to prevent excessive cardinality.
+        performance_impact:
+          description: The impact depends on dcgm-exporter field selection and resulting series cardinality.
+    setup:
+      prerequisites:
+        list:
+          - title: Run dcgm-exporter
+            description: Install DCGM and run `dcgm-exporter` so that a Prometheus endpoint is available (default `:9400/metrics`).
+          - title: Configure exporter field list
+            description: The default exporter profile exposes a small subset of fields. Configure the exporter CSV to include the fields you need.
+          - title: Keep collection intervals aligned
+            description: Set Netdata `update_every` to the same value as dcgm-exporter collection interval (default 30 seconds).
+          - title: Enable profiling capabilities (optional)
+            description: Profiling fields may require additional privileges/capabilities in your runtime environment.
+      configuration:
+        file:
+          name: go.d/dcgm.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval (seconds). Keep this aligned with dcgm-exporter collection interval.
+              default_value: 30
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval (seconds). Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+            - name: url
+              description: DCGM exporter metrics endpoint URL.
+              default_value: http://127.0.0.1:9400/metrics
+              required: true
+              group: Target
+            - name: timeout
+              description: HTTP request timeout (seconds).
+              default_value: 10
+              required: false
+              group: Target
+            - name: max_time_series
+              description: Global time series limit. If exceeded, collection is skipped for this cycle.
+              default_value: 2000
+              required: false
+              group: Limits
+            - name: max_time_series_per_metric
+              description: Per-metric time series limit. Metrics above this limit are skipped.
+              default_value: 200
+              required: false
+              group: Limits
+            - name: username
+              description: Username for Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: HTTP Auth
+            - name: password
+              description: Password for Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: HTTP Auth
+            - name: bearer_token_file
+              description: Path to a file containing a bearer token.
+              default_value: ""
+              required: false
+              group: HTTP Auth
+            - name: tls_skip_verify
+              description: Skip TLS certificate and hostname verification (insecure).
+              default_value: no
+              required: false
+              group: TLS
+            - name: tls_ca
+              description: Path to CA bundle used to validate the server certificate.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_cert
+              description: Path to client TLS certificate (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_key
+              description: Path to client TLS private key (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+            - name: proxy_url
+              description: HTTP proxy URL.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_username
+              description: Username for proxy authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_password
+              description: Password for proxy authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: headers
+              description: Additional HTTP headers to include in the request.
+              default_value: ""
+              required: false
+              group: Request
+            - name: method
+              description: HTTP method.
+              default_value: GET
+              required: false
+              group: Request
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+              group: Request
+            - name: not_follow_redirects
+              description: Do not follow HTTP redirects.
+              default_value: no
+              required: false
+              group: Request
+            - name: force_http2
+              description: Force HTTP/2 (including h2c over TCP).
+              default_value: no
+              required: false
+              group: Request
+            - name: vnode
+              description: Associate this job with a Virtual Node.
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Local exporter
+              description: Collect metrics from a local dcgm-exporter endpoint.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9400/metrics
+                    update_every: 30
+            - name: TLS endpoint
+              description: Collect metrics over HTTPS with custom CA certificate.
+              config: |
+                jobs:
+                  - name: secure
+                    url: https://dcgm-exporter.example.com:9400/metrics
+                    update_every: 30
+                    tls_ca: /etc/netdata/certs/dcgm-ca.crt
+            - name: Increased cardinality limits
+              description: Increase limits when collecting large field sets and multiple entities.
+              config: |
+                jobs:
+                  - name: dcgm_large
+                    url: http://127.0.0.1:9400/metrics
+                    update_every: 30
+                    max_time_series: 10000
+                    max_time_series_per_metric: 2000
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: dcgm_gpu_xid_errors
+        metric: dcgm.gpu.reliability.xid
+        info: NVIDIA driver reported GPU XID error on GPU ${label:gpu}
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf
+      - name: dcgm_gpu_row_remap_failure
+        metric: dcgm.gpu.reliability.row_remap_status
+        info: GPU row remapping failed on GPU ${label:gpu}
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf
+      - name: dcgm_gpu_uncorrectable_remapped_rows
+        metric: dcgm.gpu.reliability.row_remap_events
+        info: Uncorrectable remapped rows increased on GPU ${label:gpu}
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf
+      - name: dcgm_gpu_power_violation
+        metric: dcgm.gpu.throttle.violations
+        info: Power throttling detected on GPU ${label:gpu}
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf
+      - name: dcgm_gpu_thermal_violation
+        metric: dcgm.gpu.throttle.violations
+        info: Thermal throttling detected on GPU ${label:gpu}
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dcgm.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Metrics are grouped into static Netdata contexts. Contexts are created only when matching DCGM fields are present in the exporter output.
+      availability: []
+      scopes:
+        - name: gpu
+          description: These metrics refer to a GPU device instance.
+          labels:
+            - name: gpu
+              description: GPU index from exporter labels.
+            - name: uuid
+              description: GPU UUID, if available.
+          metrics:
+            - name: dcgm.gpu.compute.utilization
+              description: Device and engine utilization metrics.
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: gpu
+                - name: memory_copy
+                - name: encoder
+                - name: decoder
+            - name: dcgm.gpu.compute.activity
+              description: Profiling activity ratios (SM, tensor, FP pipelines, DRAM, etc.).
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: sm_active
+                - name: sm_occupancy
+                - name: tensor
+                - name: fp16
+                - name: fp32
+                - name: fp64
+            - name: dcgm.gpu.memory.usage
+              description: GPU memory usage.
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+                - name: reserved
+            - name: dcgm.gpu.clock.frequency
+              description: GPU and memory clock metrics.
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: sm
+                - name: memory
+            - name: dcgm.gpu.thermal.temperature
+              description: GPU and memory temperatures.
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: gpu
+                - name: memory
+            - name: dcgm.gpu.power.usage
+              description: Instantaneous power metrics.
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: draw
+            - name: dcgm.gpu.power.energy
+              description: Energy consumption rate metrics.
+              unit: mJ/s
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: dcgm.gpu.throttle.violations
+              description: Power and thermal violation duration counters.
+              unit: milliseconds/s
+              chart_type: line
+              dimensions:
+                - name: power_violation
+                - name: thermal_violation
+            - name: dcgm.gpu.interconnect.throughput
+              description: PCIe and NVLink throughput metrics.
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: pcie_tx
+                - name: pcie_rx
+            - name: dcgm.gpu.reliability.xid
+              description: Last XID error code.
+              unit: code
+              chart_type: line
+              dimensions:
+                - name: xid
+            - name: dcgm.gpu.reliability.row_remap_status
+              description: Row remap status indicators.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: row_remap_failure
+            - name: dcgm.gpu.reliability.row_remap_events
+              description: Row remap event counters.
+              unit: rows/s
+              chart_type: line
+              dimensions:
+                - name: correctable_remapped_rows
+                - name: uncorrectable_remapped_rows
+        - name: mig
+          description: These metrics refer to a MIG instance.
+          labels:
+            - name: gpu
+              description: Parent GPU index.
+            - name: gpu_i_id
+              description: MIG instance identifier.
+          metrics:
+            - name: dcgm.mig.compute.utilization
+              description: MIG utilization metrics.
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: gpu
+        - name: link
+          description: These metrics refer to NVLink link instances.
+          labels:
+            - name: nvlink
+              description: NVLink index.
+            - name: gpu
+              description: GPU index related to this link.
+          metrics:
+            - name: dcgm.link.interconnect.throughput
+              description: NVLink per-link throughput metrics.
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: nvlink_bandwidth
+            - name: dcgm.link.interconnect.error_rate
+              description: NVLink error counters as rates.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: nvlink_replay_error
