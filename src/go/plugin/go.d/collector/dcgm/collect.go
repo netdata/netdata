@@ -310,7 +310,7 @@ func detectEntity(idx map[string]string) metricEntity {
 	case hasLabel(idx, "nvlink"):
 		return entityNVLink
 	case hasLabel(idx, "nvswitch"):
-		return entitySwitch
+		return entityNVSwitch
 	case hasLabel(idx, "cpucore"):
 		return entityCPUCore
 	case hasLabel(idx, "cpu"):
@@ -336,7 +336,7 @@ func identityKeysForEntity(entity metricEntity) []string {
 		return append([]string{"gpu", "uuid", "gpu_uuid", "gpu_i_id", "gpu_instance_id", "gpu_i_profile", "gpu_instance_profile"}, workload...)
 	case entityNVLink:
 		return append([]string{"nvswitch", "gpu", "gpu_uuid", "nvlink"}, workload...)
-	case entitySwitch:
+	case entityNVSwitch:
 		return append([]string{"nvswitch"}, workload...)
 	case entityCPU:
 		return append([]string{"cpu"}, workload...)

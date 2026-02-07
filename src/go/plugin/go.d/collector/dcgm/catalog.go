@@ -15,7 +15,7 @@ const (
 	entityGPU      metricEntity = "gpu"
 	entityMIG      metricEntity = "mig"
 	entityNVLink   metricEntity = "nvlink"
-	entitySwitch   metricEntity = "switch"
+	entityNVSwitch metricEntity = "nvswitch"
 	entityCPU      metricEntity = "cpu"
 	entityCPUCore  metricEntity = "cpu_core"
 	entityExporter metricEntity = "exporter"
@@ -133,7 +133,7 @@ var groupCatalog = []groupSpec{
 var contextCatalog = buildContextCatalog()
 
 func buildContextCatalog() map[string]contextSpec {
-	entities := []metricEntity{entityGPU, entityMIG, entityNVLink, entitySwitch, entityCPU, entityCPUCore, entityExporter}
+	entities := []metricEntity{entityGPU, entityMIG, entityNVLink, entityNVSwitch, entityCPU, entityCPUCore, entityExporter}
 	catalog := make(map[string]contextSpec, len(entities)*len(groupCatalog))
 
 	prio := module.Priority
@@ -163,7 +163,7 @@ func entityDisplayName(entity metricEntity) string {
 		return "MIG"
 	case entityNVLink:
 		return "NVLink"
-	case entitySwitch:
+	case entityNVSwitch:
 		return "NVSwitch"
 	case entityCPU:
 		return "CPU"

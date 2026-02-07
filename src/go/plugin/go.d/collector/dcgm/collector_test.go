@@ -339,6 +339,33 @@ DCGM_FI_DEV_CLOCKS_EVENT_REASON_SW_POWER_CAP_NS{gpu="0",UUID="GPU-aaa"} 1000000
 	assert.False(t, seenCtx["dcgm.gpu.other.counter"])
 }
 
+func TestCollector_Collect_UsesNVSwitchEntityContextToken(t *testing.T) {
+	metrics := []byte(`
+# HELP DCGM_FI_DEV_NVSWITCH_THROUGHPUT_RX NVSwitch RX throughput.
+# TYPE DCGM_FI_DEV_NVSWITCH_THROUGHPUT_RX counter
+DCGM_FI_DEV_NVSWITCH_THROUGHPUT_RX{nvswitch="0"} 42
+`)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(metrics)
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init(context.Background()))
+
+	mx := collr.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	seenCtx := make(map[string]bool)
+	for _, ch := range *collr.Charts() {
+		seenCtx[ch.Ctx] = true
+	}
+
+	assert.True(t, seenCtx["dcgm.nvswitch.interconnect.nvswitch.throughput"])
+	assert.False(t, seenCtx["dcgm.switch.interconnect.nvswitch.throughput"])
+}
+
 func TestCollector_Collect_SkipsUnsupportedSummaryHistogramFamilies(t *testing.T) {
 	metrics := []byte(`
 # HELP DCGM_FI_DEV_GPU_UTIL GPU utilization (in %).
