@@ -343,7 +343,7 @@ modules:
               chart_type: line
               dimensions:
                 - name: gpu
-        - name: link
+        - name: nvlink
           description: These metrics refer to NVLink link instances.
           labels:
             - name: nvlink
@@ -351,13 +351,13 @@ modules:
             - name: gpu
               description: GPU index related to this link.
           metrics:
-            - name: dcgm.link.interconnect.throughput
+            - name: dcgm.nvlink.interconnect.throughput
               description: NVLink per-link throughput metrics.
               unit: B/s
               chart_type: area
               dimensions:
                 - name: nvlink_bandwidth
-            - name: dcgm.link.interconnect.error_rate
+            - name: dcgm.nvlink.interconnect.error_rate
               description: NVLink error counters as rates.
               unit: errors/s
               chart_type: line

@@ -164,7 +164,7 @@ func TestCollector_Collect(t *testing.T) {
 		makeID(makeID("dcgm.gpu.throttle.violations", gpuKey), "power_violation"):                      2000,
 		makeID(makeID("dcgm.gpu.throttle.violations", gpuKey), "thermal_violation"):                    5000,
 		makeID(makeID("dcgm.gpu.interconnect.throughput", gpuKey), "pcie_tx"):                          123456000,
-		makeID(makeID("dcgm.link.interconnect.error_rate", linkKey), "nvlink_replay_error"):            4000,
+		makeID(makeID("dcgm.nvlink.interconnect.error_rate", linkKey), "nvlink_replay_error"):          4000,
 	}
 
 	assert.Len(t, mx, len(expect))
@@ -192,7 +192,7 @@ func TestCollector_Collect(t *testing.T) {
 	assert.True(t, seenCtx["dcgm.gpu.reliability.row_remap_events"])
 	assert.True(t, seenCtx["dcgm.gpu.throttle.violations"])
 	assert.True(t, seenCtx["dcgm.gpu.interconnect.throughput"])
-	assert.True(t, seenCtx["dcgm.link.interconnect.error_rate"])
+	assert.True(t, seenCtx["dcgm.nvlink.interconnect.error_rate"])
 	assert.False(t, seenCtx["dcgm.gpu.thermal.temperature"])
 }
 
