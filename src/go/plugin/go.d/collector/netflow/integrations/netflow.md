@@ -24,7 +24,7 @@ Module: netflow
 
 Collects NetFlow v5/v9, IPFIX, and sFlow flow summaries over UDP.
 
-The collector aggregates flow records into time buckets and exposes a flows Function response for Netdata Cloud aggregation.
+The collector aggregates flow records into time buckets and exposes a flows Function response for Netdata Cloud analysis.
 
 This collector is supported on all platforms.
 
@@ -125,6 +125,11 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Aggregation** | aggregation.receive_buffer | UDP socket receive buffer size (bytes). Set 0 to use OS default. | 4194304 | no |
 | **Sampling** | sampling.default_rate | Sampling rate applied when no per-record or per-exporter rate is available. | 1 | no |
 | **Exporters** | exporters | Optional overrides for exporter name and sampling rate. | [] | no |
+| **Flows** | flows.public_allowlist | Public IPs, CIDRs, or ranges to keep as individual actors. | [] | no |
+| **Flows** | flows.summary_aggregation | Grouping key for aggregated flow links (ip, ip_protocol, five_tuple). | ip_protocol | no |
+| **Flows** | flows.live_top_n.enabled | Enable detailed Top-N flows in the flows view. | yes | no |
+| **Flows** | flows.live_top_n.limit | Maximum number of detailed flows to return. | 100 | no |
+| **Flows** | flows.live_top_n.sort_by | Sort detailed flows by bytes or packets. | bytes | no |
 | **Virtual Node** | vnode | Associates this data collection job with a Virtual Node. |  | no |
 
 

@@ -20,7 +20,12 @@ func (c *Collector) collectTopologyMetrics(mx map[string]int64) {
 		c.topologyChartsAdded = true
 	}
 
-	totalDevices := len(data.Devices)
+	totalDevices := 0
+	for _, actor := range data.Actors {
+		if actor.ActorType == "device" {
+			totalDevices++
+		}
+	}
 	totalLinks := len(data.Links)
 
 	var lldpLinks, cdpLinks int64

@@ -25,8 +25,8 @@ func TestSnmpMethods(t *testing.T) {
 	assert.Equal(t, "Network Interfaces", methods[0].Name)
 	require.NotEmpty(t, methods[0].RequiredParams)
 
-	assert.Equal(t, "topology", methods[1].ID)
-	assert.Equal(t, "Topology", methods[1].Name)
+	assert.Equal(t, "topology:snmp", methods[1].ID)
+	assert.Equal(t, "Topology (SNMP)", methods[1].Name)
 
 	// Verify type group param exists
 	var typeGroupParam *funcapi.ParamConfig

@@ -27,6 +27,9 @@ members = [
     # Netdata OTEL workspace members
     "netdata-otel/otel-plugin",
     "netdata-otel/flatten_otel",
+
+    # Netdata NetFlow workspace members
+    "netdata-netflow/netflow-plugin",
 ]
 
 [workspace.package]
@@ -77,6 +80,7 @@ async-trait = "0.1.89"
 serde_yaml = "0.9.34"
 serde_regex = "1.1.0"
 tokio = { version = "1.45", features = ["full"] }
+ipnet = "2.11.0"
 
 # Tracing
 tracing = { version = "0.1" }

@@ -74,11 +74,11 @@ func TestTopologyCache_RealSnmprecFixtures(t *testing.T) {
 			coll.topologyCache.mu.RUnlock()
 
 			require.True(t, ok)
-			require.GreaterOrEqual(t, len(snapshot.Devices), 1)
+			require.GreaterOrEqual(t, len(snapshot.Actors), 1)
 			if hasLinkableLLDP(data) || hasLinkableCDP(data) {
 				require.Greater(t, len(snapshot.Links), 0)
 			}
-			require.NotEmpty(t, snapshot.Devices[0].ChassisID)
+			require.NotEmpty(t, snapshot.Actors[0].Match.ChassisIDs)
 
 			if len(data.lldpRemotes) > 0 || len(data.lldpRemManAddrs) > 0 {
 				if hasLinkableLLDP(data) {
@@ -642,18 +642,19 @@ func hasProtocolLink(snapshot topologyData, protocol string) bool {
 
 func containsSysName(snapshot topologyData, names map[string]struct{}) bool {
 	for _, link := range snapshot.Links {
-		if link.Dst.SysName == "" {
+		sysName, _ := link.Dst.Attributes["sys_name"].(string)
+		if sysName == "" {
 			continue
 		}
-		if _, ok := names[link.Dst.SysName]; ok {
+		if _, ok := names[sysName]; ok {
 			return true
 		}
 	}
-	for _, dev := range snapshot.Devices {
-		if dev.SysName == "" {
+	for _, actor := range snapshot.Actors {
+		if actor.Match.SysName == "" {
 			continue
 		}
-		if _, ok := names[dev.SysName]; ok {
+		if _, ok := names[actor.Match.SysName]; ok {
 			return true
 		}
 	}
@@ -661,32 +662,16 @@ func containsSysName(snapshot topologyData, names map[string]struct{}) bool {
 }
 
 func containsMgmtAddr(snapshot topologyData, addrs map[string]struct{}) bool {
-	for _, dev := range snapshot.Devices {
-		if dev.ManagementIP != "" {
-			if _, ok := addrs[dev.ManagementIP]; ok {
-				return true
-			}
-		}
-		for _, addr := range dev.ManagementAddresses {
-			if addr.Address == "" {
-				continue
-			}
-			if _, ok := addrs[addr.Address]; ok {
+	for _, actor := range snapshot.Actors {
+		for _, ip := range actor.Match.IPAddresses {
+			if _, ok := addrs[ip]; ok {
 				return true
 			}
 		}
 	}
 	for _, link := range snapshot.Links {
-		if link.Dst.ManagementIP != "" {
-			if _, ok := addrs[link.Dst.ManagementIP]; ok {
-				return true
-			}
-		}
-		for _, addr := range link.Dst.ManagementAddresses {
-			if addr.Address == "" {
-				continue
-			}
-			if _, ok := addrs[addr.Address]; ok {
+		for _, ip := range link.Dst.Match.IPAddresses {
+			if _, ok := addrs[ip]; ok {
 				return true
 			}
 		}
@@ -719,35 +704,35 @@ func hasLinkableCDP(data snmprecTopology) bool {
 
 func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
 	for _, link := range snapshot.Links {
-		if link.Dst.SysName != "" {
-			if _, ok := ids[link.Dst.SysName]; ok {
+		if sysName, _ := link.Dst.Attributes["sys_name"].(string); sysName != "" {
+			if _, ok := ids[sysName]; ok {
 				return true
 			}
 		}
-		if link.Dst.ChassisID != "" {
-			if _, ok := ids[link.Dst.ChassisID]; ok {
+		for _, id := range link.Dst.Match.ChassisIDs {
+			if _, ok := ids[id]; ok {
 				return true
 			}
 		}
-		if link.Dst.ManagementIP != "" {
-			if _, ok := ids[link.Dst.ManagementIP]; ok {
+		for _, ip := range link.Dst.Match.IPAddresses {
+			if _, ok := ids[ip]; ok {
 				return true
 			}
 		}
 	}
-	for _, dev := range snapshot.Devices {
-		if dev.SysName != "" {
-			if _, ok := ids[dev.SysName]; ok {
+	for _, actor := range snapshot.Actors {
+		if actor.Match.SysName != "" {
+			if _, ok := ids[actor.Match.SysName]; ok {
 				return true
 			}
 		}
-		if dev.ChassisID != "" {
-			if _, ok := ids[dev.ChassisID]; ok {
+		for _, id := range actor.Match.ChassisIDs {
+			if _, ok := ids[id]; ok {
 				return true
 			}
 		}
-		if dev.ManagementIP != "" {
-			if _, ok := ids[dev.ManagementIP]; ok {
+		for _, ip := range actor.Match.IPAddresses {
+			if _, ok := ids[ip]; ok {
 				return true
 			}
 		}

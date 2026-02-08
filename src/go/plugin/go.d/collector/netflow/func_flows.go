@@ -20,14 +20,14 @@ func newFuncFlows(r *funcRouter) *funcFlows {
 	return &funcFlows{router: r}
 }
 
-const flowsMethodID = "flows"
+const flowsMethodID = "flows:netflow"
 
 func flowsMethodConfig() funcapi.MethodConfig {
 	return funcapi.MethodConfig{
 		ID:           flowsMethodID,
-		Name:         "Flows",
+		Name:         "Flows (NetFlow)",
 		UpdateEvery:  10,
-		Help:         "NetFlow/IPFIX/sFlow flow summary data",
+		Help:         "NetFlow/IPFIX/sFlow flow analysis data",
 		RequireCloud: true,
 		ResponseType: "flows",
 	}
@@ -37,12 +37,23 @@ func (f *funcFlows) MethodParams(_ context.Context, method string) ([]funcapi.Pa
 	if method != flowsMethodID {
 		return nil, nil
 	}
-	return nil, nil
+	return []funcapi.ParamConfig{
+		{
+			ID:        "view",
+			Name:      "View",
+			Help:      "Select aggregated or detailed flow view.",
+			Selection: funcapi.ParamSelect,
+			Options: []funcapi.ParamOption{
+				{ID: viewSummary, Name: "Aggregated", Default: true},
+				{ID: viewLive, Name: "Detailed"},
+			},
+		},
+	}, nil
 }
 
 func (f *funcFlows) Cleanup(_ context.Context) {}
 
-func (f *funcFlows) Handle(_ context.Context, method string, _ funcapi.ResolvedParams) *funcapi.FunctionResponse {
+func (f *funcFlows) Handle(_ context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if method != flowsMethodID {
 		return funcapi.NotFoundResponse(method)
 	}
@@ -58,11 +69,25 @@ func (f *funcFlows) Handle(_ context.Context, method string, _ funcapi.ResolvedP
 		return funcapi.UnavailableResponse("flow data not available yet, please retry after data collection")
 	}
 
+	view := viewSummary
+	if values := params.Get("view"); len(values) > 0 {
+		switch values[0] {
+		case "summary":
+			view = viewSummary
+		case "live":
+			view = viewLive
+		default:
+			view = values[0]
+		}
+	}
+
+	flowsData := collector.buildFlowsResponse(data, view)
+
 	return &funcapi.FunctionResponse{
 		Status:       200,
-		Help:         "NetFlow/IPFIX/sFlow flow summary data",
+		Help:         "NetFlow/IPFIX/sFlow flow analysis data",
 		ResponseType: "flows",
-		Data:         data,
+		Data:         flowsData,
 	}
 }
 

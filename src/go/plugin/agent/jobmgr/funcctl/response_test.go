@@ -47,9 +47,9 @@ func TestRespondWithParams_MethodTypeFallback(t *testing.T) {
 		Status: 200,
 	}
 
-	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "flows")
+	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology")
 
-	assert.Equal(t, "flows", (*resp)["type"])
+	assert.Equal(t, "topology", (*resp)["type"])
 }
 
 func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
@@ -57,11 +57,11 @@ func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
 
 	controller.registry.registerModule("snmp", collectorapi.Creator{
 		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{ID: "topology", ResponseType: "topology"}}
+			return []funcapi.MethodConfig{{ID: "topology:snmp", ResponseType: "topology"}}
 		},
 	})
 
-	controller.handleMethodFuncInfo("snmp", "topology", functions.Function{})
+	controller.handleMethodFuncInfo("snmp", "topology:snmp", functions.Function{})
 
 	assert.Equal(t, "topology", (*resp)["type"])
 }
@@ -71,10 +71,10 @@ func TestHandleJobMethodFuncInfo_UsesResponseType(t *testing.T) {
 
 	controller.registry.registerModule("netflow", collectorapi.Creator{})
 	controller.registry.registerJobMethods("netflow", "job1", []funcapi.MethodConfig{
-		{ID: "flows", ResponseType: "flows"},
+		{ID: "flows:netflow", ResponseType: "flows"},
 	})
 
-	controller.handleJobMethodFuncInfo("netflow", "job1", "flows", functions.Function{})
+	controller.handleJobMethodFuncInfo("netflow", "job1", "flows:netflow", functions.Function{})
 
 	assert.Equal(t, "flows", (*resp)["type"])
 }
