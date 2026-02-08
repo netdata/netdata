@@ -162,7 +162,7 @@ DCGM_FI_DEV_DEC_UTIL, gauge, Dec util
 # context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_nvbandwidth_result
 # DCGM_FI_DEV_DIAG_NVBANDWIDTH_RESULT, gauge, Diag nvbandwidth result
 # context=dcgm.gpu.interconnect.pcie.state family=gpu interconnect/pcie dimension=diag_pcie_result
-DCGM_FI_DEV_DIAG_PCIE_RESULT, gauge, Diag pcie result
+# DCGM_FI_DEV_DIAG_PCIE_RESULT, gauge, Diag pcie result
 # context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_pulse_test_result
 # DCGM_FI_DEV_DIAG_PULSE_TEST_RESULT, gauge, Diag pulse test result
 # context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_software_result
@@ -976,7 +976,7 @@ DCGM_FI_DEV_PSTATE, gauge, Pstate
 # context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_profile_ramp_up_rate
 # DCGM_FI_DEV_PWR_SMOOTHING_PROFILE_RAMP_UP_RATE, gauge, Pwr smoothing profile ramp up rate
 # context=dcgm.gpu.throttle.violations family=gpu throttle dimension=reliability_violation
-DCGM_FI_DEV_RELIABILITY_VIOLATION, counter, Reliability violation
+# DCGM_FI_DEV_RELIABILITY_VIOLATION, counter, Reliability violation
 # context=dcgm.gpu.power.profiles family=gpu power dimension=requested_power_profile_mask
 # DCGM_FI_DEV_REQUESTED_POWER_PROFILE_MASK, counter, Requested power profile mask
 # context=dcgm.gpu.memory.page_retirements family=gpu memory dimension=retired_dbe
@@ -1012,9 +1012,9 @@ DCGM_FI_DEV_THERMAL_VIOLATION, counter, Thermal violation
 # context=dcgm.gpu.reliability.memory_health family=gpu reliability dimension=threshold_srm
 DCGM_FI_DEV_THRESHOLD_SRM, gauge, Threshold srm
 # context=dcgm.gpu.throttle.violations family=gpu throttle dimension=total_app_clocks_violation
-DCGM_FI_DEV_TOTAL_APP_CLOCKS_VIOLATION, counter, Total app clocks violation
+# DCGM_FI_DEV_TOTAL_APP_CLOCKS_VIOLATION, counter, Total app clocks violation
 # context=dcgm.gpu.throttle.violations family=gpu throttle dimension=total_base_clocks_violation
-DCGM_FI_DEV_TOTAL_BASE_CLOCKS_VIOLATION, counter, Total base clocks violation
+# DCGM_FI_DEV_TOTAL_BASE_CLOCKS_VIOLATION, counter, Total base clocks violation
 # context=dcgm.gpu.power.energy family=gpu power dimension=total
 DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION, counter, Total energy consumption
 # context=dcgm.gpu.reliability.row_remap_events family=gpu reliability dimension=uncorrectable_remapped_rows
@@ -1116,9 +1116,9 @@ DCGM_FI_PROF_DRAM_ACTIVE, gauge, Dram active
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=graphics_engine_active
 DCGM_FI_PROF_GR_ENGINE_ACTIVE, gauge, Gr engine active
 # context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=hostmem_cache_hit
-# DCGM_FI_PROF_HOSTMEM_CACHE_HIT, gauge, Hostmem cache hit
+DCGM_FI_PROF_HOSTMEM_CACHE_HIT, gauge, Hostmem cache hit
 # context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=hostmem_cache_miss
-# DCGM_FI_PROF_HOSTMEM_CACHE_MISS, gauge, Hostmem cache miss
+DCGM_FI_PROF_HOSTMEM_CACHE_MISS, gauge, Hostmem cache miss
 # context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec0_active
 # DCGM_FI_PROF_NVDEC0_ACTIVE, gauge, Nvdec0 active
 # context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec1_active
@@ -1236,9 +1236,9 @@ DCGM_FI_PROF_PCIE_RX_BYTES, gauge, Pcie rx bytes
 # context=dcgm.gpu.interconnect.pcie.throughput family=gpu interconnect/pcie dimension=pcie_tx
 DCGM_FI_PROF_PCIE_TX_BYTES, gauge, Pcie tx bytes
 # context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=peermem_cache_hit
-# DCGM_FI_PROF_PEERMEM_CACHE_HIT, gauge, Peermem cache hit
+DCGM_FI_PROF_PEERMEM_CACHE_HIT, gauge, Peermem cache hit
 # context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=peermem_cache_miss
-# DCGM_FI_PROF_PEERMEM_CACHE_MISS, gauge, Peermem cache miss
+DCGM_FI_PROF_PEERMEM_CACHE_MISS, gauge, Peermem cache miss
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=fp16
 DCGM_FI_PROF_PIPE_FP16_ACTIVE, gauge, Pipe fp16 active
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=fp32
