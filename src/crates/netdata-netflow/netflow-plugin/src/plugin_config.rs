@@ -78,6 +78,14 @@ fn default_remote_network_source_transform() -> String {
     ".".to_string()
 }
 
+fn default_query_max_groups() -> usize {
+    50_000
+}
+
+fn default_query_facet_max_values_per_field() -> usize {
+    5_000
+}
+
 fn default_network_source_tls_verify() -> bool {
     true
 }
@@ -238,6 +246,20 @@ pub(crate) struct JournalConfig {
     )]
     #[serde(with = "humantime_serde")]
     pub(crate) query_5m_max_window: Duration,
+
+    #[arg(long = "netflow-query-max-groups", default_value_t = 50_000)]
+    #[serde(default = "default_query_max_groups", alias = "query-max-groups")]
+    pub(crate) query_max_groups: usize,
+
+    #[arg(
+        long = "netflow-query-facet-max-values-per-field",
+        default_value_t = 5_000
+    )]
+    #[serde(
+        default = "default_query_facet_max_values_per_field",
+        alias = "query-facet-max-values-per-field"
+    )]
+    pub(crate) query_facet_max_values_per_field: usize,
 }
 
 impl Default for JournalConfig {
@@ -251,6 +273,8 @@ impl Default for JournalConfig {
             duration_of_journal_files: Duration::from_secs(7 * 24 * 60 * 60),
             query_1m_max_window: Duration::from_secs(6 * 60 * 60),
             query_5m_max_window: Duration::from_secs(24 * 60 * 60),
+            query_max_groups: default_query_max_groups(),
+            query_facet_max_values_per_field: default_query_facet_max_values_per_field(),
         }
     }
 }
@@ -881,6 +905,12 @@ impl PluginConfig {
         if self.journal.query_5m_max_window < self.journal.query_1m_max_window {
             anyhow::bail!("journal.query_5m_max_window must be >= journal.query_1m_max_window");
         }
+        if self.journal.query_max_groups == 0 {
+            anyhow::bail!("journal.query_max_groups must be greater than 0");
+        }
+        if self.journal.query_facet_max_values_per_field == 0 {
+            anyhow::bail!("journal.query_facet_max_values_per_field must be greater than 0");
+        }
         if self.enrichment.routing_dynamic.bmp.enabled {
             self.enrichment
                 .routing_dynamic
@@ -1125,5 +1155,29 @@ mod tests {
         );
 
         cfg.validate().expect("configuration should be valid");
+    }
+
+    #[test]
+    fn validate_rejects_zero_query_max_groups() {
+        let mut cfg = PluginConfig::default();
+        cfg.journal.query_max_groups = 0;
+
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(
+            err.to_string()
+                .contains("journal.query_max_groups must be greater than 0")
+        );
+    }
+
+    #[test]
+    fn validate_rejects_zero_query_facet_max_values_per_field() {
+        let mut cfg = PluginConfig::default();
+        cfg.journal.query_facet_max_values_per_field = 0;
+
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(
+            err.to_string()
+                .contains("journal.query_facet_max_values_per_field must be greater than 0")
+        );
     }
 }
