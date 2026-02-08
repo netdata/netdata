@@ -340,7 +340,7 @@ modules:
                 - name: nvofa1_active
             - name: dcgm.gpu.compute.cache.activity
               description: GPU Memory Cache Hit/Miss metrics.
-              unit: '%'
+              unit: 'events/s'
               chart_type: line
               dimensions:
                 - name: hostmem_cache_hit
@@ -1033,7 +1033,7 @@ modules:
                 - name: nvofa1_active
             - name: dcgm.mig.compute.cache.activity
               description: MIG Memory Cache Hit/Miss metrics.
-              unit: '%'
+              unit: 'events/s'
               chart_type: line
               dimensions:
                 - name: hostmem_cache_hit

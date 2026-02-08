@@ -57,7 +57,7 @@ var groupCatalog = []groupSpec{
 	{Suffix: "compute.activity", Title: "Compute Pipeline Activity", Units: "percentage", Family: "compute", Type: module.Line},
 	{Suffix: "compute.tensor.activity", Title: "Tensor Core Activity by Precision", Units: "percentage", Family: "compute", Type: module.Line},
 	{Suffix: "compute.media.activity", Title: "Media Engine Activity", Units: "percentage", Family: "compute", Type: module.Line},
-	{Suffix: "compute.cache.activity", Title: "Memory Cache Hit/Miss", Units: "percentage", Family: "compute", Type: module.Line},
+	{Suffix: "compute.cache.activity", Title: "Memory Cache Hit/Miss", Units: "events/s", Family: "compute", Type: module.Line},
 	{Suffix: "memory.utilization", Title: "Memory Utilization", Units: "percentage", Family: "memory", Type: module.Line},
 	{Suffix: "memory.usage", Title: "Memory Usage", Units: "bytes", Family: "memory", Type: module.Stacked},
 	{Suffix: "memory.capacity", Title: "Memory Capacity", Units: "bytes", Family: "memory", Type: module.Line},
@@ -533,8 +533,7 @@ func metricScale(metricName, help string, spec contextSpec) float64 {
 
 	if strings.HasSuffix(spec.ID, ".compute.activity") ||
 		strings.HasSuffix(spec.ID, ".compute.tensor.activity") ||
-		strings.HasSuffix(spec.ID, ".compute.media.activity") ||
-		strings.HasSuffix(spec.ID, ".compute.cache.activity") {
+		strings.HasSuffix(spec.ID, ".compute.media.activity") {
 		return 100
 	}
 
