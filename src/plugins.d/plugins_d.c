@@ -284,6 +284,7 @@ void *pluginsd_main(void *ptr) {
 
     // disable some plugins by default
     inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
+    inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, "netflow", CONFIG_BOOLEAN_NO);
     // it crashes (both threads) on Alpine after we made it multi-threaded
     // works with "--device /dev/ipmi0", but this is not default
     // see https://github.com/netdata/netdata/pull/15564 for details

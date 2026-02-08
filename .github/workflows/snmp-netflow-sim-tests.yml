@@ -1,5 +1,5 @@
 ---
-name: SNMP/NetFlow Simulator Tests
+name: SNMP Simulator Tests
 on:
   push:
     branches:
@@ -7,16 +7,12 @@ on:
     paths:
       - '.github/workflows/snmp-netflow-sim-tests.yml'
       - 'src/go/plugin/go.d/collector/snmp/**'
-      - 'src/go/plugin/go.d/collector/netflow/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
-      - 'src/go/plugin/go.d/config/go.d/netflow.conf'
   pull_request:
     paths:
       - '.github/workflows/snmp-netflow-sim-tests.yml'
       - 'src/go/plugin/go.d/collector/snmp/**'
-      - 'src/go/plugin/go.d/collector/netflow/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/**'
-      - 'src/go/plugin/go.d/config/go.d/netflow.conf'
 
 jobs:
   simulator-tests:
@@ -55,22 +51,13 @@ jobs:
           docker run -d --name snmpsim -p 1161:161/udp -v /tmp/snmpsim-data:/usr/share/snmpsim/data tandoor/snmpsim:latest
           sleep 3
 
-      - name: Download NetFlow stress pcaps
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/netflow-stress
-          curl -L -o /tmp/netflow-stress/smallFlows.pcap https://s3.amazonaws.com/tcpreplay-pcap-files/smallFlows.pcap
-          curl -L -o /tmp/netflow-stress/bigFlows.pcap https://s3.amazonaws.com/tcpreplay-pcap-files/bigFlows.pcap
-
       - name: Run integration tests
         env:
           NETDATA_SNMPSIM_ENDPOINT: 127.0.0.1:1161
           NETDATA_SNMPSIM_COMMUNITIES: lldp1,lldp2,cdp1
-          NETDATA_NETFLOW_STRESS_PCAPS: /tmp/netflow-stress
         run: |
           cd src/go
-          go test -tags=integration ./plugin/go.d/collector/snmp ./plugin/go.d/collector/netflow
+          go test -tags=integration ./plugin/go.d/collector/snmp
 
       - name: Stop snmpsim
         if: always()

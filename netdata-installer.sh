@@ -220,6 +220,8 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-otel Explicitly disable the Netdata OpenTelemetry plugin.
   --enable-plugin-otel-signal-viewer Enable the OTel signal viewer plugin. Default: disabled
   --disable-plugin-otel-signal-viewer Explicitly disable the OTel signal viewer plugin.
+  --enable-plugin-netflow    Enable the NetFlow/IPFIX/sFlow flow analysis plugin. Default: disabled.
+  --disable-plugin-netflow   Explicitly disable the NetFlow/IPFIX/sFlow flow analysis plugin.
   --enable-plugin-ibm        Enable the IBM ecosystem monitoring plugin. Default: disabled
   --disable-plugin-ibm       Explicitly disable the IBM ecosystem monitoring plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
@@ -263,6 +265,7 @@ ENABLE_DBENGINE=1
 ENABLE_GO=1
 ENABLE_PYTHON=1
 ENABLE_CHARTS=1
+ENABLE_NETFLOW=0
 ENABLE_OTEL=0
 ENABLE_OTEL_SIGNAL_VIEWER=0
 ENABLE_IBM=0
@@ -303,6 +306,8 @@ while [ -n "${1}" ]; do
     "--disable-plugin-nfacct") ENABLE_NFACCT=0 ;;
     "--enable-plugin-xenstat") ENABLE_XENSTAT=1 ;;
     "--disable-plugin-xenstat") ENABLE_XENSTAT=0 ;;
+    "--enable-plugin-netflow") ENABLE_NETFLOW=1 ;;
+    "--disable-plugin-netflow") ENABLE_NETFLOW=0 ;;
     "--enable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=1 ;;
     "--disable-plugin-systemd-journal") ENABLE_SYSTEMD_JOURNAL=0 ;;
     "--internal-systemd-journal") USE_RUST_JOURNAL_FILE=1 ;;
