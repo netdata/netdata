@@ -59,14 +59,14 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 	coll.topologyCache.mu.RUnlock()
 
 	require.True(t, ok)
-	require.Len(t, data.Devices, 2)
+	require.Len(t, data.Actors, 2)
 	require.Len(t, data.Links, 1)
 
 	link := data.Links[0]
 	assert.Equal(t, "lldp", link.Protocol)
-	assert.Equal(t, "Gi0/1", link.Src.PortID)
-	assert.Equal(t, "Gi0/2", link.Dst.PortID)
-	assert.Equal(t, "sw2", link.Dst.SysName)
+	assert.Equal(t, "Gi0/1", link.Src.Attributes["port_id"])
+	assert.Equal(t, "Gi0/2", link.Dst.Attributes["port_id"])
+	assert.Equal(t, "sw2", link.Dst.Attributes["sys_name"])
 }
 
 func TestTopologyCache_CdpSnapshot(t *testing.T) {
@@ -93,11 +93,11 @@ func TestTopologyCache_CdpSnapshot(t *testing.T) {
 	cache.mu.RUnlock()
 
 	require.True(t, ok)
-	require.Len(t, data.Devices, 2)
+	require.Len(t, data.Actors, 2)
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
-	assert.Equal(t, "Gi0/2", data.Links[0].Src.IfName)
-	assert.Equal(t, "Gi0/3", data.Links[0].Dst.PortID)
+	assert.Equal(t, "Gi0/2", data.Links[0].Src.Attributes["if_name"])
+	assert.Equal(t, "Gi0/3", data.Links[0].Dst.Attributes["port_id"])
 }
 
 func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
@@ -153,9 +153,9 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 	coll.topologyCache.mu.RUnlock()
 
 	require.True(t, ok)
-	require.Greater(t, len(data.Devices), 1)
-	require.NotEmpty(t, data.Devices[0].ManagementAddresses)
-	require.NotEmpty(t, data.Devices[0].CapabilitiesEnabled)
+	require.Greater(t, len(data.Actors), 1)
+	require.True(t, actorHasAttributeList(data, "management_addresses"))
+	require.True(t, actorHasAttributeList(data, "capabilities_enabled"))
 	require.True(t, containsMgmtAddr(data, map[string]struct{}{"10.0.0.2": {}}))
 }
 
@@ -186,4 +186,33 @@ func TestTopologyCache_CDPManagementAddresses(t *testing.T) {
 
 	require.True(t, ok)
 	require.True(t, containsMgmtAddr(data, map[string]struct{}{"10.0.0.3": {}, "10.0.0.4": {}}))
+}
+
+func actorHasAttributeList(snapshot topologyData, key string) bool {
+	for _, actor := range snapshot.Actors {
+		if actor.Attributes == nil {
+			continue
+		}
+		value, ok := actor.Attributes[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch v := value.(type) {
+		case []string:
+			if len(v) > 0 {
+				return true
+			}
+		case []topologyManagementAddress:
+			if len(v) > 0 {
+				return true
+			}
+		case []any:
+			if len(v) > 0 {
+				return true
+			}
+		default:
+			return true
+		}
+	}
+	return false
 }

@@ -28,7 +28,7 @@ modules:
         metrics_description: |
           Collects NetFlow v5/v9, IPFIX, and sFlow flow summaries over UDP.
 
-          The collector aggregates flow records into time buckets and exposes a flows Function response for Netdata Cloud aggregation.
+          The collector aggregates flow records into time buckets and exposes a flows Function response for Netdata Cloud analysis.
         method_description: ""
       supported_platforms:
         include: []
@@ -130,6 +130,32 @@ modules:
               default_value: "[]"
               required: false
               group: Exporters
+
+            - name: flows.public_allowlist
+              description: Public IPs, CIDRs, or ranges to keep as individual actors.
+              default_value: "[]"
+              required: false
+              group: Flows
+            - name: flows.summary_aggregation
+              description: Grouping key for aggregated flow links (ip, ip_protocol, five_tuple).
+              default_value: ip_protocol
+              required: false
+              group: Flows
+            - name: flows.live_top_n.enabled
+              description: Enable detailed Top-N flows in the flows view.
+              default_value: yes
+              required: false
+              group: Flows
+            - name: flows.live_top_n.limit
+              description: Maximum number of detailed flows to return.
+              default_value: 100
+              required: false
+              group: Flows
+            - name: flows.live_top_n.sort_by
+              description: Sort detailed flows by bytes or packets.
+              default_value: bytes
+              required: false
+              group: Flows
 
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).

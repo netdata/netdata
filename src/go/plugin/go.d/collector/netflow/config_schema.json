@@ -122,6 +122,51 @@
           "required": ["ip"]
         }
       },
+      "flows": {
+        "title": "Flows View",
+        "type": "object",
+        "properties": {
+          "public_allowlist": {
+            "title": "Public allowlist",
+            "description": "Public IPs, CIDRs, or ranges to keep as individual actors.",
+            "type": ["array", "null"],
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "summary_aggregation": {
+            "title": "Summary aggregation",
+            "description": "Grouping key for aggregated flow links.",
+            "type": "string",
+            "enum": ["ip", "ip_protocol", "five_tuple"],
+            "default": "ip_protocol"
+          },
+          "live_top_n": {
+            "title": "Detailed Top-N",
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "title": "Enabled",
+                "type": "boolean",
+                "default": true
+              },
+              "limit": {
+                "title": "Limit",
+                "type": "integer",
+                "minimum": 1,
+                "default": 100
+              },
+              "sort_by": {
+                "title": "Sort by",
+                "type": "string",
+                "enum": ["bytes", "packets"],
+                "default": "bytes"
+              }
+            }
+          }
+        }
+      },
       "vnode": {
         "title": "Vnode",
         "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
@@ -166,6 +211,12 @@
           "title": "Exporters",
           "fields": [
             "exporters"
+          ]
+        },
+        {
+          "title": "Flows",
+          "fields": [
+            "flows"
           ]
         }
       ]

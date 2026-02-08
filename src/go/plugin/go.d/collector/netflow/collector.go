@@ -8,10 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
 )
 
 //go:embed "config_schema.json"
@@ -25,6 +27,9 @@ const (
 	defaultMaxBuckets    = 60
 	defaultMaxKeys       = 10000
 	defaultSamplingRate  = 1
+	defaultLiveTopNLimit = 100
+	defaultLiveTopNSort  = "bytes"
+	defaultSummaryAgg    = "ip_protocol"
 )
 
 func init() {
@@ -59,6 +64,14 @@ func New() *Collector {
 			Sampling: SamplingConfig{
 				DefaultRate: defaultSamplingRate,
 			},
+			Flows: FlowsConfig{
+				SummaryAggregation: defaultSummaryAgg,
+				LiveTopN: LiveTopNConfig{
+					Enabled: true,
+					Limit:   defaultLiveTopNLimit,
+					SortBy:  defaultLiveTopNSort,
+				},
+			},
 		},
 		charts: &module.Charts{},
 	}
@@ -83,6 +96,7 @@ type Collector struct {
 	aggregator *flowAggregator
 
 	funcRouter *funcRouter
+	allowlist  []iprange.Range
 }
 
 func (c *Collector) Configuration() any {
@@ -92,6 +106,13 @@ func (c *Collector) Configuration() any {
 func (c *Collector) Init(context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation failed: %v", err)
+	}
+	if len(c.Flows.PublicAllowlist) > 0 {
+		ranges, err := iprange.ParseRanges(strings.Join(c.Flows.PublicAllowlist, " "))
+		if err != nil {
+			return fmt.Errorf("invalid flows.public_allowlist: %v", err)
+		}
+		c.allowlist = ranges
 	}
 
 	bucketSeconds := c.Aggregation.BucketSeconds

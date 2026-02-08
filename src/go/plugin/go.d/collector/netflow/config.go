@@ -11,6 +11,7 @@ type (
 		Aggregation AggregationConfig `yaml:"aggregation,omitempty" json:"aggregation"`
 		Sampling    SamplingConfig    `yaml:"sampling,omitempty" json:"sampling"`
 		Exporters   []ExporterConfig  `yaml:"exporters,omitempty" json:"exporters"`
+		Flows       FlowsConfig       `yaml:"flows,omitempty" json:"flows"`
 	}
 
 	ProtocolsConfig struct {
@@ -36,5 +37,17 @@ type (
 		IP           string `yaml:"ip" json:"ip"`
 		Name         string `yaml:"name,omitempty" json:"name"`
 		SamplingRate int    `yaml:"sampling_rate,omitempty" json:"sampling_rate"`
+	}
+
+	FlowsConfig struct {
+		PublicAllowlist    []string       `yaml:"public_allowlist,omitempty" json:"public_allowlist"`
+		SummaryAggregation string         `yaml:"summary_aggregation,omitempty" json:"summary_aggregation"`
+		LiveTopN           LiveTopNConfig `yaml:"live_top_n,omitempty" json:"live_top_n"`
+	}
+
+	LiveTopNConfig struct {
+		Enabled bool   `yaml:"enabled,omitempty" json:"enabled"`
+		Limit   int    `yaml:"limit,omitempty" json:"limit"`
+		SortBy  string `yaml:"sort_by,omitempty" json:"sort_by"`
 	}
 )

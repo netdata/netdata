@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, span, warn};
 
-fn create_chain(path: &Path) -> Result<OwnedChain> {
+fn create_chain(path: &Path, machine_id_suffix: bool) -> Result<OwnedChain> {
     let machine_id = load_machine_id()
         .map_err(|e| WriterError::MachineId(format!("failed to load machine ID: {}", e)))?;
 
@@ -31,10 +31,14 @@ fn create_chain(path: &Path) -> Result<OwnedChain> {
         ));
     }
 
-    let path = PathBuf::from(path).join(machine_id.as_simple().to_string());
+    let path = if machine_id_suffix {
+        PathBuf::from(path).join(machine_id.as_simple().to_string())
+    } else {
+        PathBuf::from(path)
+    };
     if path.to_str().is_none() {
         return Err(WriterError::InvalidPath(
-            "path with machine ID contains invalid UTF-8".to_string(),
+            "resolved path contains invalid UTF-8".to_string(),
         ));
     }
 
@@ -48,7 +52,7 @@ fn create_chain(path: &Path) -> Result<OwnedChain> {
         ));
     }
 
-    OwnedChain::new(path, machine_id)
+    OwnedChain::new(path, machine_id, machine_id_suffix)
 }
 
 /// Tracks rotation state for size and count limits
@@ -237,7 +241,7 @@ impl Log {
 
     /// Creates a new journal log.
     pub fn new(path: &Path, config: Config) -> Result<Self> {
-        let chain = create_chain(path)?;
+        let chain = create_chain(path, config.machine_id_suffix)?;
 
         let current_seqnum = chain.tail_seqnum()?;
         let boot_id = load_boot_id()?;

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
@@ -574,7 +575,7 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 
 	addDevice(local)
 
-	links := make([]topologyLink, 0, len(c.lldpRemotes)+len(c.cdpRemotes))
+	links := make([]topology.Link, 0, len(c.lldpRemotes)+len(c.cdpRemotes))
 	linksLLDP := 0
 	linksCDP := 0
 
@@ -631,12 +632,14 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 			ManagementAddresses: rem.managementAddrs,
 		}
 
-		links = append(links, topologyLink{
+		links = append(links, topology.Link{
+			Layer:        "2",
 			Protocol:     "lldp",
-			Src:          src,
-			Dst:          dst,
-			DiscoveredAt: c.lastUpdate,
-			LastSeen:     c.lastUpdate,
+			Direction:    "unidirectional",
+			Src:          endpointToLink(src),
+			Dst:          endpointToLink(dst),
+			DiscoveredAt: timePtr(c.lastUpdate),
+			LastSeen:     timePtr(c.lastUpdate),
 		})
 		linksLLDP++
 	}
@@ -730,12 +733,14 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 			}
 		}
 
-		links = append(links, topologyLink{
+		links = append(links, topology.Link{
+			Layer:        "2",
 			Protocol:     "cdp",
-			Src:          src,
-			Dst:          dst,
-			DiscoveredAt: c.lastUpdate,
-			LastSeen:     c.lastUpdate,
+			Direction:    "unidirectional",
+			Src:          endpointToLink(src),
+			Dst:          endpointToLink(dst),
+			DiscoveredAt: timePtr(c.lastUpdate),
+			LastSeen:     timePtr(c.lastUpdate),
 		})
 		linksCDP++
 	}
@@ -748,14 +753,185 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 		"links_cdp":          linksCDP,
 	}
 
+	actors := make([]topology.Actor, 0, len(devices))
+	actorIndex := make(map[string]struct{})
+	for _, dev := range devices {
+		act := deviceToActor(dev, c.agentID)
+		key := actorKey(act.Match)
+		if key == "" {
+			continue
+		}
+		if _, ok := actorIndex[key]; ok {
+			continue
+		}
+		actorIndex[key] = struct{}{}
+		actors = append(actors, act)
+	}
+
 	return topologyData{
 		SchemaVersion: topologySchemaVersion,
+		Source:        "snmp",
+		Layer:         "2",
 		AgentID:       c.agentID,
 		CollectedAt:   c.lastUpdate,
-		Devices:       devices,
+		View:          "summary",
+		Actors:        actors,
 		Links:         links,
 		Stats:         stats,
 	}, true
+}
+
+func deviceToActor(dev topologyDevice, agentID string) topology.Actor {
+	match := topology.Match{
+		SysObjectID: dev.SysObjectID,
+		SysName:     dev.SysName,
+	}
+	if dev.ChassisID != "" {
+		match.ChassisIDs = []string{dev.ChassisID}
+		if strings.EqualFold(dev.ChassisIDType, "macAddress") {
+			match.MacAddresses = append(match.MacAddresses, dev.ChassisID)
+		}
+	}
+
+	if dev.ManagementIP != "" {
+		match.IPAddresses = append(match.IPAddresses, dev.ManagementIP)
+	}
+	for _, addr := range dev.ManagementAddresses {
+		if ip := net.ParseIP(addr.Address); ip != nil {
+			match.IPAddresses = append(match.IPAddresses, ip.String())
+		}
+	}
+	match.IPAddresses = uniqueStrings(match.IPAddresses)
+
+	attrs := map[string]any{
+		"chassis_id_type":        dev.ChassisIDType,
+		"sys_descr":              dev.SysDescr,
+		"sys_location":           dev.SysLocation,
+		"management_ip":          dev.ManagementIP,
+		"management_addresses":   dev.ManagementAddresses,
+		"agent_id":               agentID,
+		"agent_job_id":           dev.AgentJobID,
+		"vendor":                 dev.Vendor,
+		"model":                  dev.Model,
+		"capabilities":           dev.Capabilities,
+		"capabilities_supported": dev.CapabilitiesSupported,
+		"capabilities_enabled":   dev.CapabilitiesEnabled,
+		"discovered":             dev.Discovered,
+	}
+
+	return topology.Actor{
+		ActorType:  "device",
+		Layer:      "2",
+		Source:     "snmp",
+		Match:      match,
+		Attributes: pruneNilAttributes(attrs),
+		Labels:     dev.Labels,
+	}
+}
+
+func endpointToLink(ep topologyEndpoint) topology.LinkEndpoint {
+	match := topology.Match{}
+	if ep.ChassisID != "" {
+		match.ChassisIDs = []string{ep.ChassisID}
+		if strings.EqualFold(ep.ChassisIDType, "macAddress") {
+			match.MacAddresses = append(match.MacAddresses, ep.ChassisID)
+		}
+	}
+	if ep.ManagementIP != "" {
+		match.IPAddresses = append(match.IPAddresses, ep.ManagementIP)
+	}
+	for _, addr := range ep.ManagementAddresses {
+		if ip := net.ParseIP(addr.Address); ip != nil {
+			match.IPAddresses = append(match.IPAddresses, ip.String())
+		}
+	}
+	match.IPAddresses = uniqueStrings(match.IPAddresses)
+
+	attrs := map[string]any{
+		"chassis_id_type":      ep.ChassisIDType,
+		"if_index":             ep.IfIndex,
+		"if_name":              ep.IfName,
+		"port_id":              ep.PortID,
+		"port_id_type":         ep.PortIDType,
+		"port_descr":           ep.PortDescr,
+		"sys_name":             ep.SysName,
+		"management_ip":        ep.ManagementIP,
+		"management_addresses": ep.ManagementAddresses,
+		"agent_id":             ep.AgentID,
+		"labels":               ep.Labels,
+	}
+
+	return topology.LinkEndpoint{
+		Match:      match,
+		Attributes: pruneNilAttributes(attrs),
+	}
+}
+
+func actorKey(match topology.Match) string {
+	if len(match.ChassisIDs) > 0 {
+		return "chassis:" + strings.Join(match.ChassisIDs, ",")
+	}
+	if len(match.MacAddresses) > 0 {
+		return "mac:" + strings.Join(match.MacAddresses, ",")
+	}
+	if len(match.IPAddresses) > 0 {
+		return "ip:" + strings.Join(match.IPAddresses, ",")
+	}
+	if match.SysName != "" {
+		return "sysname:" + match.SysName
+	}
+	return ""
+}
+
+func uniqueStrings(values []string) []string {
+	if len(values) == 0 {
+		return values
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+func pruneNilAttributes(attrs map[string]any) map[string]any {
+	for k, v := range attrs {
+		switch vv := v.(type) {
+		case string:
+			if vv == "" {
+				delete(attrs, k)
+			}
+		case []string:
+			if len(vv) == 0 {
+				delete(attrs, k)
+			}
+		case []topologyManagementAddress:
+			if len(vv) == 0 {
+				delete(attrs, k)
+			}
+		case nil:
+			delete(attrs, k)
+		}
+	}
+	if len(attrs) == 0 {
+		return nil
+	}
+	return attrs
+}
+
+func timePtr(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
 }
 
 func normalizeTopologyDevice(dev topologyDevice) topologyDevice {

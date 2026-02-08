@@ -19,12 +19,12 @@ func newFuncTopology(r *funcRouter) *funcTopology {
 	return &funcTopology{router: r}
 }
 
-const topologyMethodID = "topology"
+const topologyMethodID = "topology:snmp"
 
 func topologyMethodConfig() funcapi.MethodConfig {
 	return funcapi.MethodConfig{
 		ID:           topologyMethodID,
-		Name:         "Topology",
+		Name:         "Topology (SNMP)",
 		UpdateEvery:  10,
 		Help:         "SNMP topology and neighbor discovery data",
 		RequireCloud: true,
