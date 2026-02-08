@@ -76,7 +76,7 @@ DCGM_FI_DEV_CLOCKS_EVENT_REASON_SW_THERM_SLOWDOWN_NS, counter, Clocks event reas
 # context=dcgm.gpu.throttle.violations family=gpu throttle dimension=sync_boost
 DCGM_FI_DEV_CLOCKS_EVENT_REASON_SYNC_BOOST_NS, counter, Clocks event reason sync boost ns
 # context=dcgm.gpu.state.configuration family=gpu state dimension=compute_mode
-# DCGM_FI_DEV_COMPUTE_MODE, gauge, Compute mode
+DCGM_FI_DEV_COMPUTE_MODE, gauge, Compute mode
 # context=dcgm.gpu.interconnect.connectx.link family=gpu interconnect/pcie dimension=connectx_active_pcie_link_speed
 # DCGM_FI_DEV_CONNECTX_ACTIVE_PCIE_LINK_SPEED, gauge, Connectx active pcie link speed
 # context=dcgm.gpu.interconnect.pcie.link.width family=gpu interconnect/pcie dimension=connectx_active_pcie_link_width
@@ -1102,7 +1102,7 @@ DCGM_FI_DRIVER_VERSION, label, Driver version
 # context=dcgm.exporter.inventory.software family=exporter inventory dimension=nvml_version
 # DCGM_FI_NVML_VERSION, label, Nvml version
 # context=dcgm.gpu.inventory.software family=gpu inventory dimension=process_name
-DCGM_FI_PROCESS_NAME, label, Process name
+# DCGM_FI_PROCESS_NAME, label, Process name
 # context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_rx_all_bytes
 # DCGM_FI_PROF_C2C_RX_ALL_BYTES, gauge, C2c rx all bytes
 # context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_rx_data_bytes

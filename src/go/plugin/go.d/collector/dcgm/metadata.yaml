@@ -944,7 +944,7 @@ modules:
                 - name: fbc_sessions_info
                 - name: fbc_stats
         - name: mig
-          description: These metrics refer to MIG instance instances.
+          description: These metrics refer to MIG instances.
           labels:
             - name: gpu
               description: gpu label from exporter metrics.
@@ -1940,7 +1940,7 @@ modules:
               description: nvswitch label from exporter metrics.
           metrics:
             - name: dcgm.nvswitch.interconnect.nvswitch.current
-              description: NVSwitch NVSwitch Current metrics.
+              description: NVSwitch Current metrics.
               unit: value
               chart_type: line
               dimensions:

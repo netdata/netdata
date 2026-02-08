@@ -274,6 +274,41 @@ DCGM_FI_DEV_XID_ERRORS{gpu="0",UUID="GPU-aaa",err_code="31",err_msg="MMU fault",
 	}
 }
 
+func TestCollector_Collect_ExposesDatasetLabelsExceptHostname(t *testing.T) {
+	metrics := []byte(`
+# HELP DCGM_FI_DEV_GPU_UTIL GPU utilization (in %).
+# TYPE DCGM_FI_DEV_GPU_UTIL gauge
+DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-aaa",Hostname="host1",DCGM_FI_PROCESS_NAME="/usr/bin/nv-hostengine",DCGM_FI_DRIVER_VERSION="590.48.01"} 80
+`)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(metrics)
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init(context.Background()))
+
+	mx := collr.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	charts := *collr.Charts()
+	require.NotEmpty(t, charts)
+
+	var labels []module.Label
+	for _, ch := range charts {
+		if ch.Ctx == "dcgm.gpu.compute.utilization" {
+			labels = ch.Labels
+			break
+		}
+	}
+	require.NotNil(t, labels)
+
+	assertChartHasLabel(t, labels, "dcgm_fi_process_name")
+	assertChartHasLabel(t, labels, "dcgm_fi_driver_version")
+	assertChartHasNoLabel(t, labels, "hostname")
+}
+
 func TestCollector_Collect_RatioAndBar1Classification(t *testing.T) {
 	metrics := []byte(`
 # HELP DCGM_FI_PROF_SM_ACTIVE Ratio of cycles an SM has at least 1 warp assigned.
@@ -691,4 +726,24 @@ func TestCollector_Cleanup(t *testing.T) {
 	collr.URL = "http://127.0.0.1:9400/metrics"
 	require.NoError(t, collr.Init(context.Background()))
 	assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
+}
+
+func assertChartHasLabel(t *testing.T, labels []module.Label, key string) {
+	t.Helper()
+	for _, lbl := range labels {
+		if lbl.Key == key {
+			return
+		}
+	}
+	assert.Failf(t, "missing label", "expected chart label %q", key)
+}
+
+func assertChartHasNoLabel(t *testing.T, labels []module.Label, key string) {
+	t.Helper()
+	for _, lbl := range labels {
+		if lbl.Key == key {
+			assert.Failf(t, "unexpected label", "did not expect chart label %q", key)
+			return
+		}
+	}
 }

@@ -370,36 +370,7 @@ func resolveEntityInstance(lbls promlabels.Labels) entityInstance {
 		parts = append(parts, "global")
 	}
 
-	stableLabelKeys := []string{
-		"gpu",
-		"uuid",
-		"gpu_uuid",
-		"gpu_i_id",
-		"gpu_instance_id",
-		"gpu_i_profile",
-		"gpu_instance_profile",
-		"device",
-		"modelname",
-		"model_name",
-		"pci_bus_id",
-		"nvswitch",
-		"nvlink",
-		"cpu",
-		"cpucore",
-		"namespace",
-		"pod",
-		"container",
-		"job",
-		"hpc_job",
-		"hpc_job_id",
-	}
-
-	chartLabels := make([]module.Label, 0, len(stableLabelKeys))
-	for _, key := range stableLabelKeys {
-		if v, ok := idx[key]; ok && v != "" {
-			chartLabels = append(chartLabels, module.Label{Key: normalizeLabelKey(key), Value: v})
-		}
-	}
+	chartLabels := buildChartLabels(idx)
 
 	return entityInstance{
 		entity:      entity,
@@ -483,6 +454,31 @@ func semanticDimSuffix(lbls promlabels.Labels) string {
 func normalizeLabelKey(s string) string {
 	s = strings.ToLower(s)
 	return sanitizeID(s)
+}
+
+func buildChartLabels(idx map[string]string) []module.Label {
+	ignore := map[string]bool{
+		"hostname": true, // host identity is already part of Netdata host model
+		"err_code": true, // used for dynamic XID dimension split, not chart label
+		"le":       true, // histogram bucket label
+		"quantile": true, // summary label
+		"__name__": true, // metric family name label, if present
+	}
+
+	keys := make([]string, 0, len(idx))
+	for key, value := range idx {
+		if value == "" || ignore[key] {
+			continue
+		}
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+	labels := make([]module.Label, 0, len(keys))
+	for _, key := range keys {
+		labels = append(labels, module.Label{Key: normalizeLabelKey(key), Value: idx[key]})
+	}
+	return labels
 }
 
 func shouldHideDimensionByDefault(contextID, dimName string) bool {
