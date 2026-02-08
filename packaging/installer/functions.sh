@@ -377,6 +377,7 @@ prepare_cmake_options() {
   enable_feature DBENGINE "${ENABLE_DBENGINE:-1}"
   enable_feature ML "${NETDATA_ENABLE_ML:-1}"
   enable_feature PLUGIN_APPS "${ENABLE_APPS:-1}"
+  enable_feature PLUGIN_NETFLOW "${ENABLE_NETFLOW:-0}"
   enable_feature PLUGIN_OTEL "${ENABLE_OTEL:-0}"
   enable_feature PLUGIN_OTEL_SIGNAL_VIEWER "${ENABLE_OTEL_SIGNAL_VIEWER:-0}"
   enable_feature PLUGIN_IBM "${ENABLE_IBM:-0}"
