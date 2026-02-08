@@ -546,9 +546,14 @@ void poll_events(LISTEN_SOCKETS *sockets
                 next = pi->next;
 
                 if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
-                    if (unlikely(pi->send_count == 0 && p.complete_request_timeout > 0 && (now - pi->connected_t) >= p.complete_request_timeout)) {
+                    if (unlikely(
+                        !(pi->flags & POLLINFO_FLAG_FIRST_REQUEST_RECEIVED) &&
+                        pi->send_count == 0 &&
+                        p.complete_request_timeout > 0 &&
+                        (now - pi->connected_t) >= p.complete_request_timeout
+                    )) {
                         nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                               "POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s has not sent a complete request in %zu seconds - closing it. "
+                               "POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s has not completed its first request in %zu seconds - closing it. "
                                , i
                                , pi->fd
                                , pi->client_ip ? pi->client_ip : "<undefined-ip>"

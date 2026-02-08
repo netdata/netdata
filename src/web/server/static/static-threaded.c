@@ -196,6 +196,15 @@ static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
         web_client_process_request_from_web_server(w);
         current_thread_pollinfo = NULL;
 
+        // Request processing may block for long-running functions.
+        // Refresh receive timestamp so idle timeout uses the actual return time.
+        pi->last_received_t = now_boottime_sec();
+
+        // The first-request timeout protects request ingress only.
+        // Once we no longer wait to receive request bytes, the first request is complete.
+        if(unlikely(!(pi->flags & POLLINFO_FLAG_FIRST_REQUEST_RECEIVED) && !web_client_has_wait_receive(w)))
+            pi->flags |= POLLINFO_FLAG_FIRST_REQUEST_RECEIVED;
+
         if (unlikely(w->mode == HTTP_REQUEST_MODE_STREAM)) {
             ssize_t rc = web_client_send(w);
             if(rc > 0)
