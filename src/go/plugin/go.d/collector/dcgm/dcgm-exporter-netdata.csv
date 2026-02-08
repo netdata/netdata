@@ -43,7 +43,7 @@ DCGM_FI_DEV_BAR1_TOTAL, gauge, Bar1 total
 # context=dcgm.gpu.memory.bar1_usage family=gpu memory dimension=used
 DCGM_FI_DEV_BAR1_USED, gauge, Bar1 used
 # context=dcgm.gpu.throttle.violations family=gpu throttle dimension=board_limit_violation
-DCGM_FI_DEV_BOARD_LIMIT_VIOLATION, counter, Board limit violation
+# DCGM_FI_DEV_BOARD_LIMIT_VIOLATION, counter, Board limit violation
 # context=dcgm.gpu.inventory.identity family=gpu inventory dimension=brand
 DCGM_FI_DEV_BRAND, label, Brand
 # context=dcgm.gpu.interconnect.state family=gpu interconnect/overview dimension=c2c_link
@@ -74,7 +74,7 @@ DCGM_FI_DEV_CLOCKS_EVENT_REASON_SW_POWER_CAP_NS, counter, Clocks event reason sw
 # context=dcgm.gpu.throttle.violations family=gpu throttle dimension=sw_therm_slowdown
 DCGM_FI_DEV_CLOCKS_EVENT_REASON_SW_THERM_SLOWDOWN_NS, counter, Clocks event reason sw therm slowdown ns
 # context=dcgm.gpu.throttle.violations family=gpu throttle dimension=sync_boost
-DCGM_FI_DEV_CLOCKS_EVENT_REASON_SYNC_BOOST_NS, counter, Clocks event reason sync boost ns
+# DCGM_FI_DEV_CLOCKS_EVENT_REASON_SYNC_BOOST_NS, counter, Clocks event reason sync boost ns
 # context=dcgm.gpu.state.configuration family=gpu state dimension=compute_mode
 DCGM_FI_DEV_COMPUTE_MODE, gauge, Compute mode
 # context=dcgm.gpu.interconnect.connectx.link family=gpu interconnect/pcie dimension=connectx_active_pcie_link_speed
@@ -310,7 +310,7 @@ DCGM_FI_DEV_GPU_UTIL, gauge, Gpu util
 # context=dcgm.gpu.internal.boundary family=gpu internal dimension=last_connectx_field_id
 # DCGM_FI_DEV_LAST_CONNECTX_FIELD_ID, gauge, Last connectx field id
 # context=dcgm.gpu.throttle.violations family=gpu throttle dimension=low_utilization_violation
-DCGM_FI_DEV_LOW_UTIL_VIOLATION, gauge, Low util violation
+# DCGM_FI_DEV_LOW_UTIL_VIOLATION, gauge, Low util violation
 # context=dcgm.gpu.clock.frequency family=gpu clock dimension=max_mem_clock
 DCGM_FI_DEV_MAX_MEM_CLOCK, gauge, Max mem clock
 # context=dcgm.gpu.clock.frequency family=gpu clock dimension=max_sm_clock
@@ -1004,7 +1004,7 @@ DCGM_FI_DEV_SM_CLOCK, gauge, Sm clock
 # context=dcgm.gpu.virtualization.vgpu.type family=gpu virtualization dimension=supported_vgpu_type_ids
 # DCGM_FI_DEV_SUPPORTED_VGPU_TYPE_IDS, gauge, Supported vgpu type ids
 # context=dcgm.gpu.state.configuration family=gpu state dimension=sync_boost_violation
-DCGM_FI_DEV_SYNC_BOOST_VIOLATION, counter, Sync boost violation
+# DCGM_FI_DEV_SYNC_BOOST_VIOLATION, counter, Sync boost violation
 # context=dcgm.gpu.cpu.power family=gpu cpu dimension=sysio_power_util_current
 # DCGM_FI_DEV_SYSIO_POWER_UTIL_CURRENT, gauge, Sysio power util current
 # context=dcgm.gpu.throttle.violations family=gpu throttle dimension=thermal_violation
@@ -1245,16 +1245,16 @@ DCGM_FI_PROF_PIPE_FP16_ACTIVE, gauge, Pipe fp16 active
 DCGM_FI_PROF_PIPE_FP32_ACTIVE, gauge, Pipe fp32 active
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=fp64
 DCGM_FI_PROF_PIPE_FP64_ACTIVE, gauge, Pipe fp64 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=pipe_int_active
-# DCGM_FI_PROF_PIPE_INT_ACTIVE, gauge, Pipe int active
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=integer
+DCGM_FI_PROF_PIPE_INT_ACTIVE, gauge, Pipe int active
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=tensor
 DCGM_FI_PROF_PIPE_TENSOR_ACTIVE, gauge, Pipe tensor active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=pipe_tensor_dfma_active
-# DCGM_FI_PROF_PIPE_TENSOR_DFMA_ACTIVE, gauge, Pipe tensor dfma active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=pipe_tensor_hmma_active
-# DCGM_FI_PROF_PIPE_TENSOR_HMMA_ACTIVE, gauge, Pipe tensor hmma active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=pipe_tensor_imma_active
-# DCGM_FI_PROF_PIPE_TENSOR_IMMA_ACTIVE, gauge, Pipe tensor imma active
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=tensor_dfma
+DCGM_FI_PROF_PIPE_TENSOR_DFMA_ACTIVE, gauge, Pipe tensor dfma active
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=tensor_hmma
+DCGM_FI_PROF_PIPE_TENSOR_HMMA_ACTIVE, gauge, Pipe tensor hmma active
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=tensor_imma
+DCGM_FI_PROF_PIPE_TENSOR_IMMA_ACTIVE, gauge, Pipe tensor imma active
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=sm_active
 DCGM_FI_PROF_SM_ACTIVE, gauge, Sm active
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=sm_occupancy

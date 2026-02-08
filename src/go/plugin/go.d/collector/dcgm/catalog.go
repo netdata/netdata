@@ -648,4 +648,8 @@ var metricDimensionAliases = map[string]string{
 	"DCGM_FI_PROF_PIPE_FP16_ACTIVE":                              "fp16",
 	"DCGM_FI_PROF_PCIE_TX_BYTES":                                 "pcie_tx",
 	"DCGM_FI_PROF_PCIE_RX_BYTES":                                 "pcie_rx",
+	"DCGM_FI_PROF_PIPE_INT_ACTIVE":                               "integer",
+	"DCGM_FI_PROF_PIPE_TENSOR_DFMA_ACTIVE":                       "tensor_dfma",
+	"DCGM_FI_PROF_PIPE_TENSOR_HMMA_ACTIVE":                       "tensor_hmma",
+	"DCGM_FI_PROF_PIPE_TENSOR_IMMA_ACTIVE":                       "tensor_imma",
 }
