@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/gohugoio/hashstructure"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
@@ -45,7 +43,7 @@ func newTarget(ip string, cred CredentialConfig, si snmputils.SysInfo) *target {
 		SysInfo:    si,
 	}
 
-	tg.hash, _ = hashstructure.Hash(tg, nil)
+	tg.hash, _ = model.CalcHash(tg)
 
 	return tg
 }

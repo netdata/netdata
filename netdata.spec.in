@@ -270,8 +270,8 @@ Suggests: %{name}-plugin-freeipmi = %{version}
 %if %{_have_cups}
 Suggests: %{name}-plugin-cups = %{version}
 %endif
-Recommends: %{name}-plugin-journal-viewer = %{version}
-Recommends: %{name}-plugin-systmed-units = %{version}
+Requires: %{name}-plugin-journal-viewer = %{version}
+Recommends: %{name}-plugin-systemd-units = %{version}
 Recommends: %{name}-plugin-network-viewer = %{version}
 %else
 Requires: %{name}-plugin-journal-viewer = %{version}

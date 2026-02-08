@@ -29,7 +29,15 @@ then you can get away with just
 proxy.server  = ( "" => ( ( "host" => "127.0.0.1", "port" => 19999 )))
 ```
 
-Though if it's public facing, you might then want to put some authentication on it. `htdigest` support looks like:
+Though if it's public facing, you might then want to put some authentication on it.
+
+:::tip Simpler Alternative
+
+If you use Netdata Cloud, [Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md) provides authentication with a single setting - no htdigest files or lighttpd auth configuration needed.
+
+:::
+
+`htdigest` support looks like:
 
 ```text
 auth.backend = "htdigest"

@@ -162,8 +162,6 @@ func TestDiscoverer_Discover(t *testing.T) {
 }
 
 func withHash(l *target) *target {
-	l.hash, _ = calcHash(l)
-	tags, _ := model.ParseTags("netlisteners")
-	l.Tags().Merge(tags)
+	l.hash, _ = model.CalcHash(l)
 	return l
 }

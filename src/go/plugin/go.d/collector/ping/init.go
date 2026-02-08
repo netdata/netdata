@@ -14,6 +14,12 @@ func (c *Collector) validateConfig() error {
 	if c.Packets <= 0 {
 		return errors.New("'send_packets' can't be <= 0")
 	}
+	if c.JitterEWMASamples <= 0 {
+		c.JitterEWMASamples = 16
+	}
+	if c.JitterSMAWindow <= 0 {
+		c.JitterSMAWindow = 10
+	}
 	return nil
 }
 

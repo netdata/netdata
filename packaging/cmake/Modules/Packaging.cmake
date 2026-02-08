@@ -97,7 +97,7 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_PREDEPENDS "netdata-user, libcap2-bin")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
 		"netdata-plugin-cups, netdata-plugin-freeipmi, netdata-plugin-ibm")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
-		"netdata-plugin-journal-viewer, netdata-plugin-systemd-units, \
+		"netdata-plugin-systemd-units, \
 netdata-plugin-network-viewer")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
@@ -108,6 +108,10 @@ endif()
 
 if(ENABLE_PLUGIN_OTEL)
   list(APPEND _main_deps "netdata-plugin-otel")
+endif()
+
+if(ENABLE_NETDATA_JOURNAL_FILE_READER)
+  list(APPEND _main_deps "netdata-plugin-journal-viewer")
 endif()
 
 if(ENABLE_PLUGIN_CHARTS)

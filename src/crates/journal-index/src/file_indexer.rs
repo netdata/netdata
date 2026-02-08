@@ -17,6 +17,42 @@ use journal_registry::File;
 use std::num::NonZeroU64;
 use tracing::{error, warn};
 
+/// Default maximum number of unique values to index per field.
+pub const DEFAULT_MAX_UNIQUE_VALUES_PER_FIELD: usize = 500;
+
+/// Default maximum payload size (in bytes) for field values to index.
+pub const DEFAULT_MAX_FIELD_PAYLOAD_SIZE: usize = 100;
+
+/// Configuration limits for the indexing process.
+///
+/// These limits protect against unbounded memory growth when indexing
+/// journal files with high-cardinality fields or large payloads.
+#[derive(Debug, Clone, Copy)]
+pub struct IndexingLimits {
+    /// Maximum number of unique values to index per field.
+    ///
+    /// Fields with more unique values than this limit will have their indexing
+    /// truncated. This protects against high-cardinality fields (e.g., MESSAGE
+    /// with millions of unique values) causing memory exhaustion.
+    pub max_unique_values_per_field: usize,
+
+    /// Maximum payload size (in bytes) for field values to index.
+    ///
+    /// Field values with payloads larger than this limit (or compressed values)
+    /// will be skipped. This prevents large binary data or encoded content
+    /// from consuming excessive memory.
+    pub max_field_payload_size: usize,
+}
+
+impl Default for IndexingLimits {
+    fn default() -> Self {
+        Self {
+            max_unique_values_per_field: DEFAULT_MAX_UNIQUE_VALUES_PER_FIELD,
+            max_field_payload_size: DEFAULT_MAX_FIELD_PAYLOAD_SIZE,
+        }
+    }
+}
+
 /// Reusable indexer for creating searchable indexes from journal files.
 ///
 /// # Indexing Process
@@ -39,9 +75,12 @@ use tracing::{error, warn};
 /// The indexer captures the journal file's `tail_object_offset` at the start of indexing
 /// to create a consistent snapshot. Any entries written to the file after indexing begins
 /// are ignored, preventing race conditions with concurrent writers.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct FileIndexer {
+    /// Configuration limits for the indexing process.
+    limits: IndexingLimits,
+
     // Associates a source timestamp value with its inlined cursor
     source_timestamp_cursor_pairs: Vec<(Microseconds, InlinedCursor)>,
 
@@ -64,8 +103,35 @@ pub struct FileIndexer {
     entry_offset_index: HashMap<NonZeroU64, u64>,
 }
 
+impl Default for FileIndexer {
+    fn default() -> Self {
+        Self::new(IndexingLimits::default())
+    }
+}
+
+impl FileIndexer {
+    /// Create a new indexer with the specified configuration limits.
+    pub fn new(limits: IndexingLimits) -> Self {
+        Self {
+            limits,
+            source_timestamp_cursor_pairs: Vec::new(),
+            entry_offsets: Vec::new(),
+            source_timestamp_entry_offset_pairs: Vec::new(),
+            realtime_entry_offset_pairs: Vec::new(),
+            entry_indices: Vec::new(),
+            entry_offset_index: HashMap::default(),
+        }
+    }
+}
+
 impl FileIndexer {
     /// Create a searchable index from a journal file.
+    ///
+    /// # Arguments
+    /// * `file` - The journal file to index
+    /// * `source_timestamp_field` - Optional field to use for timestamps
+    /// * `field_names` - Fields to create bitmap indexes for
+    /// * `bucket_duration` - Duration of histogram buckets
     pub fn index(
         &mut self,
         file: &File,
@@ -98,8 +164,25 @@ impl FileIndexer {
         // Capture indexing timestamp
         let indexed_at = Seconds::now();
 
-        // Capture whether the file was online when indexed
-        let was_online = journal_file.journal_header_ref().state == 1;
+        // Capture whether the file was online when indexed.
+        //
+        // A file is considered online if:
+        // 1. The journal header state is 1 (STATE_ONLINE), OR
+        // 2. The file is an "Active" file by filename (e.g., system.journal
+        //    without the @seqnum_id-head_seqnum-head_realtime suffix)
+        //
+        // We check both conditions because systemd-journal may temporarily set
+        // `state != 1` on active journal files (e.g., during flush operations).
+        // If we only checked the header state, we might incorrectly mark an
+        // active file as offline/archived, causing its cache entry to be
+        // considered "always fresh" and never re-indexed. This would result
+        // in the file being excluded from queries for current time ranges
+        // because its bounded time range (from when it was indexed) doesn't
+        // overlap with the query range.
+        //
+        // The otel-plugin does not suffer from this issue because it always
+        // uses "archived", instead of "active", filenames.
+        let was_online = journal_file.journal_header_ref().state == 1 || file.is_active();
 
         let field_map = journal_file.load_fields()?;
 
@@ -151,6 +234,9 @@ impl FileIndexer {
     ///
     /// Only entries with offsets <= `tail_object_offset` are included in the
     /// bitmaps, ensuring a consistent snapshot.
+    ///
+    /// Fields with more than `self.limits.max_unique_values_per_field` unique values
+    /// will have their indexing truncated to prevent unbounded memory growth.
     fn build_entries_index(
         &mut self,
         journal_file: &JournalFile<Mmap>,
@@ -159,6 +245,8 @@ impl FileIndexer {
         tail_object_offset: NonZeroU64,
     ) -> Result<HashMap<FieldValuePair, Bitmap>> {
         let mut entries_index = HashMap::default();
+        let mut truncated_fields: Vec<&FieldName> = Vec::new();
+        let mut fields_with_large_payloads: Vec<&FieldName> = Vec::new();
 
         for field_name in field_names {
             let Some(systemd_field) = field_map.get(field_name.as_str()) else {
@@ -180,12 +268,31 @@ impl FileIndexer {
                     }
                 };
 
+            // Track the number of unique values indexed for this field
+            let mut unique_values_count: usize = 0;
+            let mut ignored_large_payloads: usize = 0;
+            let mut was_truncated = false;
+
             for data_object in field_data_iterator {
+                // Check cardinality limit before processing this value
+                if unique_values_count >= self.limits.max_unique_values_per_field {
+                    was_truncated = true;
+                    break;
+                }
+
                 // Get the payload and the inlined cursor for this data object
                 let (data_payload, inlined_cursor) = {
                     let Ok(data_object) = data_object else {
                         continue;
                     };
+
+                    // Do not create indexes with fields that contain large payloads.
+                    if data_object.raw_payload().len() >= self.limits.max_field_payload_size
+                        || data_object.is_compressed()
+                    {
+                        ignored_large_payloads += 1;
+                        continue;
+                    }
 
                     // Skip the remapping value
                     if data_object.raw_payload().ends_with(field_name.as_bytes()) {
@@ -245,7 +352,41 @@ impl FileIndexer {
                 let field_name = FieldName::new_unchecked(field_name);
                 let k = FieldValuePair::new_unchecked(field_name, String::from(pair.value()));
                 entries_index.insert(k, bitmap);
+
+                unique_values_count += 1;
             }
+
+            // Track fields that were truncated or had large payloads skipped
+            if was_truncated {
+                truncated_fields.push(field_name);
+            }
+            if ignored_large_payloads > 0 {
+                fields_with_large_payloads.push(field_name);
+            }
+        }
+
+        // Log summary of indexing issues
+        if !truncated_fields.is_empty() {
+            let field_names: Vec<&str> = truncated_fields.iter().map(|f| f.as_str()).collect();
+            warn!(
+                "File '{}': {} field(s) truncated due to cardinality limit ({}): {:?}",
+                journal_file.file().path(),
+                truncated_fields.len(),
+                self.limits.max_unique_values_per_field,
+                field_names
+            );
+        }
+        if !fields_with_large_payloads.is_empty() {
+            let field_names: Vec<&str> = fields_with_large_payloads
+                .iter()
+                .map(|f| f.as_str())
+                .collect();
+            tracing::info!(
+                "File '{}': {} field(s) had values skipped due to large payloads: {:?}",
+                journal_file.file().path(),
+                fields_with_large_payloads.len(),
+                field_names
+            );
         }
 
         Ok(entries_index)

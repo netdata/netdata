@@ -10,7 +10,7 @@ use crate::{
     query_time_range::QueryTimeRange,
 };
 use foundation::Timeout;
-use journal_index::{FileIndex, FileIndexer};
+use journal_index::{FileIndex, FileIndexer, IndexingLimits};
 use journal_registry::Registry;
 use tracing::{error, trace};
 
@@ -136,8 +136,9 @@ impl Default for FileIndexCacheBuilder {
 /// * `cache` - The file index cache
 /// * `registry` - Registry to update with file metadata
 /// * `keys` - Vector of (file, facets, source_timestamp_field) to fetch/compute indexes for
-/// * `bucket_duration` - Duration of histogram buckets in seconds
+/// * `time_range` - Query time range for bucket duration calculation
 /// * `timeout` - Timeout for the entire operation (can be extended dynamically)
+/// * `indexing_limits` - Configuration limits for indexing (cardinality, payload size)
 ///
 /// # Returns
 /// Vector of responses for each key. Successful responses contain the file index.
@@ -148,6 +149,7 @@ pub async fn batch_compute_file_indexes(
     keys: Vec<FileIndexKey>,
     time_range: &QueryTimeRange,
     timeout: Timeout,
+    indexing_limits: IndexingLimits,
 ) -> Result<Vec<(FileIndexKey, FileIndex)>> {
     let bucket_duration = time_range.bucket_duration_seconds();
     // Phase 1: Batch check cache for all keys upfront
@@ -240,7 +242,7 @@ pub async fn batch_compute_file_indexes(
                     return (key, Err(EngineError::TimeBudgetExceeded));
                 }
 
-                let mut file_indexer = FileIndexer::default();
+                let mut file_indexer = FileIndexer::new(indexing_limits);
                 let result = file_indexer
                     .index(
                         &key.file,

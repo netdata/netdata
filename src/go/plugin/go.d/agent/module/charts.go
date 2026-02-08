@@ -24,6 +24,8 @@ const (
 	Area ChartType = "area"
 	// Stacked chart type.
 	Stacked ChartType = "stacked"
+	// Heatmap chart type for Prometheus histogram visualization.
+	Heatmap ChartType = "heatmap"
 
 	// Absolute dimension algorithm.
 	// The value is to drawn as-is (interpolated to second boundary).
@@ -59,7 +61,7 @@ func (d DimAlgo) String() string {
 
 func (c ChartType) String() string {
 	switch c {
-	case Line, Area, Stacked:
+	case Line, Area, Stacked, Heatmap:
 		return string(c)
 	}
 	return string(Line)

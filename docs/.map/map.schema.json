@@ -1,0 +1,116 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://netdata.cloud/schemas/map.schema.json",
+    "title": "Netdata Documentation Map",
+    "description": "Schema for validating Netdata documentation map.yaml structure",
+    "type": "object",
+    "required": [
+        "sidebar"
+    ],
+    "properties": {
+        "sidebar": {
+            "type": "array",
+            "description": "Top-level sidebar navigation structure",
+            "items": {
+                "$ref": "#/definitions/node"
+            }
+        }
+    },
+    "definitions": {
+        "node": {
+            "oneOf": [
+                {
+                    "$ref": "#/definitions/sidebarNode"
+                },
+                {
+                    "$ref": "#/definitions/integrationPlaceholder"
+                }
+            ]
+        },
+        "sidebarNode": {
+            "type": "object",
+            "description": "A sidebar node representing a document or category",
+            "required": [
+                "meta"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "meta": {
+                    "$ref": "#/definitions/nodeMeta"
+                },
+                "items": {
+                    "type": "array",
+                    "description": "Child nodes (documents, categories, or integration placeholders)",
+                    "items": {
+                        "$ref": "#/definitions/node"
+                    }
+                }
+            }
+        },
+        "nodeMeta": {
+            "type": "object",
+            "description": "Metadata for a sidebar node",
+            "required": [
+                "label"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Display label for the sidebar item"
+                },
+                "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Path segment for this node (only if the page should not be a category overview page in this section). Single segment like 'Installation', not full path."
+                },
+                "edit_url": {
+                    "type": "string",
+                    "pattern": "^https://github\\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+/edit/[a-zA-Z0-9_.-]+/.+\\.(md|mdx)$",
+                    "description": "GitHub edit URL pointing to the source markdown file"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional description/summary of the document"
+                },
+                "keywords": {
+                    "type": "array",
+                    "description": "Optional SEO keywords",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "integrationPlaceholder": {
+            "type": "object",
+            "description": "Placeholder for dynamically generated integration pages",
+            "required": [
+                "type",
+                "integration_kind"
+            ],
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "integration_placeholder",
+                    "description": "Identifies this as an integration placeholder"
+                },
+                "integration_kind": {
+                    "type": "string",
+                    "enum": [
+                        "collectors",
+                        "exporters",
+                        "notifications",
+                        "authentication",
+                        "logs",
+                        "agent_notifications",
+                        "cloud_notifications"
+                    ],
+                    "description": "Type of integrations to be inserted at this location"
+                }
+            }
+        }
+    }
+}

@@ -16,7 +16,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
-	github.com/coreos/go-systemd/v22 v22.6.0
+	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/facebook/time v0.0.0-20250211113239-e3e1421a0980
 	github.com/fsnotify/fsnotify v1.9.0
@@ -50,7 +50,7 @@ require (
 	github.com/tidwall/gjson v1.18.0
 	github.com/valyala/fastjson v1.6.7
 	github.com/vmware/govmomi v0.52.0
-	go.mongodb.org/mongo-driver v1.17.7
+	go.mongodb.org/mongo-driver v1.17.8
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/net v0.49.0
 	golang.org/x/sync v0.19.0

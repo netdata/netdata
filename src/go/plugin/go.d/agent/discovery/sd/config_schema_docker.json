@@ -1,0 +1,132 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Docker Service Discovery",
+    "description": "Discovers services running in Docker containers.",
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "description": "Pipeline name (must be unique).",
+        "type": "string",
+        "minLength": 1
+      },
+      "discoverer": {
+        "title": "Discoverer",
+        "type": "object",
+        "properties": {
+          "docker": {
+            "title": "Docker",
+            "type": "object",
+            "properties": {
+              "address": {
+                "title": "Docker address",
+                "description": "Docker daemon address.",
+                "type": "string",
+                "default": "unix:///var/run/docker.sock"
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Timeout for Docker API calls, in seconds.",
+                "type": "number",
+                "minimum": 0.1,
+                "default": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "docker"
+        ]
+      },
+      "services": {
+        "title": "Service rules",
+        "description": "- Match discovered Docker containers and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a container matches, a data collection job is created.",
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "title": "Rule ID",
+              "description": "Unique identifier for this rule. Used in logs to identify which rule matched a container.",
+              "type": "string"
+            },
+            "match": {
+              "title": "Match expression",
+              "description": "Go template expression that must evaluate to 'true' for the rule to match the discovered container.",
+              "type": "string"
+            },
+            "config_template": {
+              "title": "Config template",
+              "description": "**Uses the same fields as match expression**. Go template that generates the data collection job configuration in YAML format. **Must include 'module' and 'name' fields**, plus any module-specific settings.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "match"
+          ]
+        }
+      }
+    },
+    "required": [
+      "name",
+      "discoverer",
+      "services"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "name",
+            "discoverer"
+          ]
+        },
+        {
+          "title": "Services",
+          "fields": [
+            "services"
+          ]
+        }
+      ]
+    },
+    "discoverer": {
+      "docker": {
+        "address": {
+          "ui:placeholder": "unix:///var/run/docker.sock",
+          "ui:help": "Examples: unix:///var/run/docker.sock, tcp://localhost:2375"
+        },
+        "timeout": {
+          "ui:placeholder": "2",
+          "ui:help": "Value in seconds. Examples: 2, 5, 0.5"
+        }
+      }
+    },
+    "services": {
+      "ui:listFlavour": "list",
+      "items": {
+        "id": {
+          "ui:placeholder": "nginx-container",
+          "ui:help": "Use descriptive names like 'nginx-container', 'mysql-db', 'redis-cache'"
+        },
+        "match": {
+          "ui:widget": "textarea",
+          "ui:placeholder": "{{ glob .Image \"*nginx*\" }}",
+          "ui:help": "| Field | Description |\n|-------|-------------|\n| `.ID` | Container ID |\n| `.Name` | Container name |\n| `.Image` | Image name |\n| `.Command` | Container command |\n| `.Labels` | Labels (map) |\n| `.PrivatePort` | Container port |\n| `.PublicPort` | Host port |\n| `.PublicPortIP` | Host IP |\n| `.PortProtocol` | Port protocol |\n| `.NetworkMode` | Network mode |\n| `.NetworkDriver` | Network driver |\n| `.IPAddress` | Container IP |\n| `.Address` | IP:Port combined |\n\n**Functions:** eq, ne, glob, regexp, and, or, not\n\n**Labels access:** {{ index .Labels \"key\" }}"
+        },
+        "config_template": {
+          "ui:widget": "textarea",
+          "ui:placeholder": "module: nginx\nname: {{.Name}}\nurl: http://{{.Address}}/stub_status"
+        }
+      }
+    }
+  }
+}

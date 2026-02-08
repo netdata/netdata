@@ -47,7 +47,7 @@ func (p *pingProber) Ping(host string) (*probing.Statistics, error) {
 		return nil, fmt.Errorf("DNS lookup '%s' : %v", host, err)
 	}
 
-	pr.RecordRtts = false
+	pr.RecordRtts = true
 	pr.RecordTTLs = false
 	pr.Interval = p.conf.Interval.Duration()
 	pr.Count = p.conf.Packets
