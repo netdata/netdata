@@ -200,4 +200,10 @@ journal:
   duration_of_journal_files: 7d
   query_1m_max_window: 6h
   query_5m_max_window: 24h
+  query_max_groups: 50000
+  query_facet_max_values_per_field: 5000
 ```
+
+`query_max_groups` and `query_facet_max_values_per_field` are guardrails for
+query-time accumulator cardinality. When limits are hit, overflow is reported
+via response stats/facet metadata instead of growing unbounded memory.

@@ -1,5 +1,4 @@
 use crate::plugin_config::PluginConfig;
-use crate::rollup;
 use crate::tiering::{OpenTierState, TierKind, dimensions_for_rollup};
 use anyhow::{Context, Result};
 use chrono::{TimeZone, Utc};
@@ -14,19 +13,64 @@ use journal_registry::{Monitor, Registry};
 use notify::Event;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
-use std::collections::{BTreeMap, HashMap};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 const DEFAULT_QUERY_WINDOW_SECONDS: u32 = 15 * 60;
-const DEFAULT_QUERY_LIMIT: usize = 100;
-const MAX_QUERY_LIMIT: usize = 2000;
+const DEFAULT_QUERY_LIMIT: usize = 1000;
+const MAX_QUERY_LIMIT: usize = 1000;
 const QUERY_TIMEOUT_SECONDS: u64 = 10;
 const CACHE_MEMORY_CAPACITY: usize = 128;
 const CACHE_DISK_CAPACITY: usize = 256 * 1024 * 1024;
 const CACHE_BLOCK_SIZE: usize = 4 * 1024 * 1024;
+const QUERY_PAGE_LIMIT: usize = 4096;
+const DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS: usize = 50_000;
+const FACET_VALUE_LIMIT: usize = 100;
+const DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD: usize = 5_000;
+const HISTOGRAM_TARGET_BUCKETS: u32 = 60;
+const OTHER_BUCKET_LABEL: &str = "__other__";
+const OVERFLOW_BUCKET_LABEL: &str = "__overflow__";
+
+const GROUP_BY_DEFAULT_AGGREGATED: &[&str] = &[
+    "DIRECTION",
+    "EXPORTER_IP",
+    "EXPORTER_NAME",
+    "PROTOCOL",
+    "SRC_AS",
+    "DST_AS",
+    "SRC_NET_NAME",
+    "DST_NET_NAME",
+    "SRC_NET_ROLE",
+    "DST_NET_ROLE",
+    "SRC_NET_SITE",
+    "DST_NET_SITE",
+    "SRC_NET_REGION",
+    "DST_NET_REGION",
+    "SRC_NET_TENANT",
+    "DST_NET_TENANT",
+    "IN_IF",
+    "OUT_IF",
+];
+
+const RAW_ONLY_FIELDS: &[&str] = &["SRC_ADDR", "DST_ADDR", "SRC_PORT", "DST_PORT"];
+
+const FACET_EXCLUDED_FIELDS: &[&str] = &[
+    "_BOOT_ID",
+    "_SOURCE_REALTIME_TIMESTAMP",
+    "SRC_ADDR",
+    "DST_ADDR",
+    "SRC_PORT",
+    "DST_PORT",
+    "BYTES",
+    "PACKETS",
+    "FLOWS",
+    "RAW_BYTES",
+    "RAW_PACKETS",
+];
 
 const INDEXED_FIELDS: &[&str] = &[
     "FLOW_VERSION",
@@ -77,6 +121,10 @@ pub(crate) struct FlowsRequest {
     pub(crate) query: String,
     #[serde(default)]
     pub(crate) selections: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub(crate) group_by: Vec<String>,
+    #[serde(default)]
+    pub(crate) sort_by: String,
 }
 
 impl FlowsRequest {
@@ -86,6 +134,33 @@ impl FlowsRequest {
             _ => "aggregated",
         }
     }
+
+    pub(crate) fn normalized_sort_by(&self) -> SortBy {
+        match self.sort_by.as_str() {
+            "packets" => SortBy::Packets,
+            "flows" => SortBy::Flows,
+            _ => SortBy::Bytes,
+        }
+    }
+
+    pub(crate) fn normalized_group_by(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut seen = HashSet::new();
+
+        for raw in &self.group_by {
+            for part in raw.split(',') {
+                let field = part.trim();
+                if field.is_empty() {
+                    continue;
+                }
+                let normalized = field.to_ascii_uppercase();
+                if seen.insert(normalized.clone()) {
+                    out.push(normalized);
+                }
+            }
+        }
+        out
+    }
 }
 
 pub(crate) struct FlowQueryOutput {
@@ -93,9 +168,36 @@ pub(crate) struct FlowQueryOutput {
     pub(crate) flows: Vec<Value>,
     pub(crate) stats: HashMap<String, u64>,
     pub(crate) metrics: HashMap<String, u64>,
+    pub(crate) warnings: Option<Value>,
     pub(crate) facets: Option<Value>,
     pub(crate) histogram: Option<Value>,
+    pub(crate) visualizations: Option<Value>,
     pub(crate) pagination: Option<Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SortBy {
+    Bytes,
+    Packets,
+    Flows,
+}
+
+impl SortBy {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Bytes => "bytes",
+            Self::Packets => "packets",
+            Self::Flows => "flows",
+        }
+    }
+
+    fn metric(self, flow: FlowMetrics) -> u64 {
+        match self {
+            Self::Bytes => flow.bytes,
+            Self::Packets => flow.packets,
+            Self::Flows => flow.flows,
+        }
+    }
 }
 
 pub(crate) struct FlowQueryService {
@@ -106,6 +208,8 @@ pub(crate) struct FlowQueryService {
     open_tiers: Arc<RwLock<OpenTierState>>,
     tier_1m_threshold_secs: u32,
     tier_5m_threshold_secs: u32,
+    max_groups: usize,
+    facet_max_values_per_field: usize,
 }
 
 impl FlowQueryService {
@@ -150,6 +254,8 @@ impl FlowQueryService {
             .context("failed to load machine id")?;
         let tier_1m_threshold_secs = cfg.journal.query_1m_max_window.as_secs() as u32;
         let tier_5m_threshold_secs = cfg.journal.query_5m_max_window.as_secs() as u32;
+        let max_groups = cfg.journal.query_max_groups;
+        let facet_max_values_per_field = cfg.journal.query_facet_max_values_per_field;
 
         Ok((
             Self {
@@ -160,6 +266,8 @@ impl FlowQueryService {
                 open_tiers,
                 tier_1m_threshold_secs,
                 tier_5m_threshold_secs,
+                max_groups,
+                facet_max_values_per_field,
             },
             notify_rx,
         ))
@@ -191,8 +299,8 @@ impl FlowQueryService {
             .collect()
     }
 
-    fn select_query_tier(&self, view: &str, after: u32, before: u32) -> TierKind {
-        if view == "detailed" {
+    fn select_query_tier(&self, view: &str, after: u32, before: u32, force_raw: bool) -> TierKind {
+        if view == "detailed" || force_raw {
             return TierKind::Raw;
         }
 
@@ -208,8 +316,12 @@ impl FlowQueryService {
 
     pub(crate) async fn query_flows(&self, request: &FlowsRequest) -> Result<FlowQueryOutput> {
         let view = request.normalized_view();
+        let sort_by = request.normalized_sort_by();
         let (after, before) = resolve_time_bounds(request);
-        let selected_tier = self.select_query_tier(view, after, before);
+        let effective_group_by = resolve_effective_group_by(request);
+        let force_raw_tier =
+            requires_raw_tier_for_fields(&effective_group_by, &request.selections, &request.query);
+        let selected_tier = self.select_query_tier(view, after, before, force_raw_tier);
         let selected_tier_dir = self
             .tier_dirs
             .get(&selected_tier)
@@ -242,6 +354,30 @@ impl FlowQueryService {
         stats.insert("query_before".to_string(), before as u64);
         stats.insert("query_limit".to_string(), limit as u64);
         stats.insert("query_files".to_string(), files.len() as u64);
+        stats.insert(
+            "query_forced_raw_tier".to_string(),
+            u64::from(force_raw_tier),
+        );
+        stats.insert(
+            "query_group_by_fields".to_string(),
+            effective_group_by.len() as u64,
+        );
+        stats.insert(
+            "query_sort_metric".to_string(),
+            match sort_by {
+                SortBy::Bytes => 1,
+                SortBy::Packets => 2,
+                SortBy::Flows => 3,
+            },
+        );
+        stats.insert(
+            "query_group_accumulator_limit".to_string(),
+            self.max_groups as u64,
+        );
+        stats.insert(
+            "query_facet_accumulator_value_limit".to_string(),
+            self.facet_max_values_per_field as u64,
+        );
 
         if files.is_empty() {
             return Ok(FlowQueryOutput {
@@ -249,8 +385,10 @@ impl FlowQueryService {
                 flows: Vec::new(),
                 stats,
                 metrics: HashMap::new(),
+                warnings: None,
                 facets: None,
                 histogram: None,
+                visualizations: Some(default_flows_visualizations()),
                 pagination: Some(json!({
                     "limit": limit,
                     "returned": 0,
@@ -260,8 +398,14 @@ impl FlowQueryService {
             });
         }
 
-        let facets = build_index_facets(&request.selections);
+        let facets = build_index_facets(&request.selections, &effective_group_by);
         stats.insert("query_indexed_facets".to_string(), facets.len() as u64);
+        let projected_fields =
+            build_output_projection_fields(&effective_group_by, &request.selections);
+        stats.insert(
+            "query_projected_fields".to_string(),
+            projected_fields.len() as u64,
+        );
 
         let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
         let keys: Vec<FileIndexKey> = files
@@ -288,8 +432,10 @@ impl FlowQueryService {
                 flows: Vec::new(),
                 stats,
                 metrics: HashMap::new(),
+                warnings: None,
                 facets: None,
                 histogram: None,
+                visualizations: Some(default_flows_visualizations()),
                 pagination: Some(json!({
                     "limit": limit,
                     "returned": 0,
@@ -303,36 +449,63 @@ impl FlowQueryService {
         let before_usec = (before as u64).saturating_mul(1_000_000);
         let anchor_usec = before_usec.saturating_sub(1);
 
-        let mut query = LogQuery::new(
-            &file_indexes,
-            Anchor::Timestamp(Microseconds(anchor_usec)),
-            Direction::Backward,
-        )
-        .with_limit(limit.saturating_add(1))
-        .with_after_usec(after_usec)
-        .with_before_usec(before_usec);
-
         let filter = build_filter_from_selections(&request.selections);
-        if !filter.is_none() {
-            query = query.with_filter(filter);
-        }
-        if !request.query.is_empty() {
-            query = query.with_regex(request.query.clone());
-        }
+        let regex = (!request.query.is_empty()).then(|| request.query.clone());
 
-        let mut entries = query
-            .execute()
-            .context("failed to execute netflow journal query")?;
-        let matched_entries = entries.len();
-        let truncated = matched_entries > limit;
-        if truncated {
-            entries.truncate(limit);
-        }
+        let mut grouped_aggregates: HashMap<GroupKey, AggregatedFlow> = HashMap::new();
+        let mut group_overflow = GroupOverflow::default();
+        let mut facet_values: BTreeMap<String, FacetFieldAccumulator> = BTreeMap::new();
+        let (histogram_bucket_seconds, mut histogram_buckets) =
+            init_histogram_buckets(after, before);
+        let mut matched_entries = 0usize;
+        let mut page_state = None;
+        let mut query_pages = 0u64;
+        loop {
+            let mut query = LogQuery::new(
+                &file_indexes,
+                Anchor::Timestamp(Microseconds(anchor_usec)),
+                Direction::Backward,
+            )
+            .with_limit(QUERY_PAGE_LIMIT)
+            .with_after_usec(after_usec)
+            .with_before_usec(before_usec)
+            .with_output_fields(projected_fields.iter().cloned());
 
-        let mut records: Vec<FlowRecord> = entries
-            .into_iter()
-            .map(|entry| record_from_entry(entry))
-            .collect();
+            if !filter.is_none() {
+                query = query.with_filter(filter.clone());
+            }
+            if let Some(pattern) = regex.as_deref() {
+                query = query.with_regex(pattern);
+            }
+
+            let (entries, next_state) = query
+                .execute_page(page_state.as_ref())
+                .context("failed to execute netflow journal query page")?;
+            if entries.is_empty() {
+                break;
+            }
+
+            query_pages = query_pages.saturating_add(1);
+            for entry in entries {
+                let record = record_from_entry(entry);
+                accumulate_record(
+                    &record,
+                    &effective_group_by,
+                    &mut grouped_aggregates,
+                    &mut group_overflow,
+                    &mut facet_values,
+                    self.max_groups,
+                    self.facet_max_values_per_field,
+                    after,
+                    before,
+                    histogram_bucket_seconds,
+                    &mut histogram_buckets,
+                );
+                matched_entries = matched_entries.saturating_add(1);
+            }
+            page_state = Some(next_state);
+        }
+        stats.insert("query_pages".to_string(), query_pages);
 
         if selected_tier != TierKind::Raw {
             let open_rows = self.open_rows_for_tier(selected_tier, after, before);
@@ -340,39 +513,114 @@ impl FlowQueryService {
                 "query_open_bucket_records".to_string(),
                 open_rows.len() as u64,
             );
-            records.extend(open_rows.into_iter().map(|row| FlowRecord {
-                timestamp_usec: row.timestamp_usec,
-                fields: row.fields,
-            }));
+            for row in open_rows {
+                let record = FlowRecord {
+                    timestamp_usec: row.timestamp_usec,
+                    fields: row.fields,
+                };
+                accumulate_record(
+                    &record,
+                    &effective_group_by,
+                    &mut grouped_aggregates,
+                    &mut group_overflow,
+                    &mut facet_values,
+                    self.max_groups,
+                    self.facet_max_values_per_field,
+                    after,
+                    before,
+                    histogram_bucket_seconds,
+                    &mut histogram_buckets,
+                );
+                matched_entries = matched_entries.saturating_add(1);
+            }
         } else {
             stats.insert("query_open_bucket_records".to_string(), 0);
         }
 
-        let build_result = if view == "detailed" {
-            build_detailed_flows(&records)
-        } else {
-            build_aggregated_flows(&records)
-        };
+        let facet_overflow_records: u64 = facet_values
+            .values()
+            .map(|field| field.overflow_records)
+            .sum();
+        let facet_overflow_fields: u64 = facet_values
+            .values()
+            .filter(|field| field.overflow_records > 0)
+            .count() as u64;
+        let facet_payload = build_facets_from_accumulator(
+            facet_values,
+            sort_by,
+            &effective_group_by,
+            &request.selections,
+            self.facet_max_values_per_field,
+        );
+        let histogram_payload = histogram_value_from_buckets(
+            histogram_bucket_seconds,
+            histogram_buckets,
+            after,
+            before,
+        );
+        let build_result = build_grouped_flows_from_aggregates(
+            grouped_aggregates,
+            group_overflow.aggregate,
+            sort_by,
+            limit,
+        );
 
         stats.insert("query_matched_entries".to_string(), matched_entries as u64);
+        stats.insert(
+            "query_grouped_rows".to_string(),
+            build_result.grouped_total as u64,
+        );
         stats.insert(
             "query_returned_flows".to_string(),
             build_result.flows.len() as u64,
         );
-        stats.insert("query_truncated".to_string(), u64::from(truncated));
+        stats.insert(
+            "query_truncated".to_string(),
+            u64::from(build_result.truncated),
+        );
+        stats.insert(
+            "query_other_aggregated".to_string(),
+            u64::from(build_result.other_count > 0),
+        );
+        stats.insert(
+            "query_other_grouped_rows".to_string(),
+            build_result.other_count as u64,
+        );
+        stats.insert(
+            "query_group_overflow_records".to_string(),
+            group_overflow.dropped_records,
+        );
+        stats.insert(
+            "query_facet_overflow_records".to_string(),
+            facet_overflow_records,
+        );
+        stats.insert(
+            "query_facet_overflow_fields".to_string(),
+            facet_overflow_fields,
+        );
+
+        let warnings = build_query_warnings(
+            group_overflow.dropped_records,
+            facet_overflow_fields,
+            facet_overflow_records,
+        );
 
         Ok(FlowQueryOutput {
             agent_id: self.agent_id.clone(),
             flows: build_result.flows,
             stats,
             metrics: build_result.metrics.to_map(),
-            facets: None,
-            histogram: None,
+            warnings,
+            facets: Some(facet_payload),
+            histogram: Some(histogram_payload),
+            visualizations: Some(default_flows_visualizations()),
             pagination: Some(json!({
                 "limit": limit,
                 "returned": build_result.returned,
                 "matched_entries": matched_entries,
-                "truncated": truncated,
+                "truncated": build_result.truncated,
+                "grouped_rows": build_result.grouped_total,
+                "other_grouped_rows": build_result.other_count,
             })),
         })
     }
@@ -427,6 +675,9 @@ struct BuildResult {
     flows: Vec<Value>,
     metrics: FlowMetrics,
     returned: usize,
+    grouped_total: usize,
+    truncated: bool,
+    other_count: usize,
 }
 
 #[derive(Debug, Default)]
@@ -446,163 +697,259 @@ struct AggregatedFlow {
     exporter_mixed: bool,
 }
 
-fn build_detailed_flows(records: &[FlowRecord]) -> BuildResult {
-    let mut totals = FlowMetrics::default();
-    let mut flows = Vec::with_capacity(records.len());
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct GroupKey(Vec<(String, String)>);
 
-    for record in records {
-        let metrics = metrics_from_fields(&record.fields);
-        totals.add(metrics);
+#[derive(Debug, Default)]
+struct GroupOverflow {
+    aggregate: Option<AggregatedFlow>,
+    dropped_records: u64,
+}
 
-        let src_ip = record.fields.get("SRC_ADDR").map(String::as_str);
-        let dst_ip = record.fields.get("DST_ADDR").map(String::as_str);
-
-        let mut flow_obj = Map::new();
-        flow_obj.insert(
-            "timestamp".to_string(),
-            Value::String(format_timestamp_usec(record.timestamp_usec)),
-        );
-        if let Some(duration) = duration_from_fields(&record.fields) {
-            flow_obj.insert("duration_sec".to_string(), json!(duration));
-        }
-        if let Some(exporter) = exporter_value(&record.fields) {
-            flow_obj.insert("exporter".to_string(), exporter);
-        }
-        flow_obj.insert(
-            "src".to_string(),
-            endpoint_value(
-                src_ip,
-                record.fields.get("SRC_PORT").map(String::as_str),
-                false,
-            ),
-        );
-        flow_obj.insert(
-            "dst".to_string(),
-            endpoint_value(
-                dst_ip,
-                record.fields.get("DST_PORT").map(String::as_str),
-                false,
-            ),
-        );
-        flow_obj.insert(
-            "key".to_string(),
-            json!(dimensions_from_fields(&record.fields)),
-        );
-        flow_obj.insert("metrics".to_string(), metrics.to_value());
-        flows.push(Value::Object(flow_obj));
-    }
-
-    BuildResult {
-        returned: flows.len(),
-        flows,
-        metrics: totals,
-    }
+#[derive(Debug, Default)]
+struct FacetFieldAccumulator {
+    values: BTreeMap<String, FlowMetrics>,
+    overflow_metrics: FlowMetrics,
+    overflow_records: u64,
 }
 
 fn build_aggregated_flows(records: &[FlowRecord]) -> BuildResult {
-    let mut aggregates: HashMap<rollup::RollupKey, AggregatedFlow> = HashMap::new();
+    let default_group_by = GROUP_BY_DEFAULT_AGGREGATED
+        .iter()
+        .map(|field| (*field).to_string())
+        .collect::<Vec<_>>();
+    build_grouped_flows(
+        records,
+        &default_group_by,
+        SortBy::Bytes,
+        DEFAULT_QUERY_LIMIT,
+    )
+}
 
+fn build_grouped_flows(
+    records: &[FlowRecord],
+    group_by: &[String],
+    sort_by: SortBy,
+    limit: usize,
+) -> BuildResult {
+    let mut aggregates: HashMap<GroupKey, AggregatedFlow> = HashMap::new();
+    let mut overflow = GroupOverflow::default();
     for record in records {
-        let dimensions = dimensions_from_fields(&record.fields);
-        let rollup_key = rollup::build_rollup_key(&dimensions);
-        let rollup_labels: BTreeMap<String, String> = rollup_key.0.iter().cloned().collect();
         let metrics = metrics_from_fields(&record.fields);
-
-        let entry = aggregates
-            .entry(rollup_key)
-            .or_insert_with(|| AggregatedFlow {
-                labels: rollup_labels,
-                first_ts: record.timestamp_usec,
-                last_ts: record.timestamp_usec,
-                ..AggregatedFlow::default()
-            });
-
-        if record.timestamp_usec < entry.first_ts {
-            entry.first_ts = record.timestamp_usec;
-        }
-        if record.timestamp_usec > entry.last_ts {
-            entry.last_ts = record.timestamp_usec;
-        }
-        entry.metrics.add(metrics);
-
-        merge_single_value(
-            &mut entry.src_ip,
-            &mut entry.src_mixed,
-            record.fields.get("SRC_ADDR").map(String::as_str),
-        );
-        merge_single_value(
-            &mut entry.dst_ip,
-            &mut entry.dst_mixed,
-            record.fields.get("DST_ADDR").map(String::as_str),
-        );
-        merge_single_value(
-            &mut entry.exporter_ip,
-            &mut entry.exporter_mixed,
-            record.fields.get("EXPORTER_IP").map(String::as_str),
-        );
-        merge_single_value(
-            &mut entry.exporter_name,
-            &mut entry.exporter_mixed,
-            record.fields.get("EXPORTER_NAME").map(String::as_str),
-        );
-        merge_single_value(
-            &mut entry.flow_version,
-            &mut entry.exporter_mixed,
-            record.fields.get("FLOW_VERSION").map(String::as_str),
-        );
-        merge_single_value(
-            &mut entry.sampling_rate,
-            &mut entry.exporter_mixed,
-            record.fields.get("SAMPLING_RATE").map(String::as_str),
+        accumulate_grouped_record(
+            record,
+            metrics,
+            group_by,
+            &mut aggregates,
+            &mut overflow,
+            DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS,
         );
     }
+    build_grouped_flows_from_aggregates(aggregates, overflow.aggregate, sort_by, limit)
+}
 
+fn build_grouped_flows_from_aggregates(
+    aggregates: HashMap<GroupKey, AggregatedFlow>,
+    overflow: Option<AggregatedFlow>,
+    sort_by: SortBy,
+    limit: usize,
+) -> BuildResult {
+    let grouped_total = aggregates.len();
     let mut grouped: Vec<AggregatedFlow> = aggregates.into_values().collect();
-    grouped.sort_by(|a, b| {
-        b.metrics
-            .bytes
-            .cmp(&a.metrics.bytes)
-            .then_with(|| b.metrics.packets.cmp(&a.metrics.packets))
-    });
+    if let Some(overflow_row) = overflow {
+        grouped.push(overflow_row);
+    }
+    grouped.sort_by(|a, b| compare_aggregated(a, b, sort_by));
+
+    let limit = sanitize_limit(Some(limit));
+    let truncated = grouped.len() > limit;
+    let mut other_count = 0usize;
+    let mut rows = grouped;
+    let mut other = None;
+    if truncated {
+        let rest = rows.split_off(limit);
+        other_count = rest.len();
+        other = Some(merge_other_bucket(rest));
+    }
 
     let mut totals = FlowMetrics::default();
-    let mut flows = Vec::with_capacity(grouped.len());
+    let mut flows = Vec::with_capacity(rows.len() + usize::from(other.is_some()));
 
-    for agg in grouped {
+    for agg in rows {
         totals.add(agg.metrics);
+        flows.push(flow_value_from_aggregate(agg));
+    }
 
-        let mut flow_obj = Map::new();
-        flow_obj.insert(
-            "timestamp".to_string(),
-            Value::String(format_timestamp_usec(agg.last_ts)),
-        );
-        if agg.last_ts >= agg.first_ts {
-            flow_obj.insert(
-                "duration_sec".to_string(),
-                json!((agg.last_ts - agg.first_ts) / 1_000_000),
-            );
-        }
-        if let Some(exporter) = exporter_value_from_aggregate(&agg) {
-            flow_obj.insert("exporter".to_string(), exporter);
-        }
-        flow_obj.insert(
-            "src".to_string(),
-            aggregated_endpoint_value(agg.src_ip.as_deref(), agg.src_mixed),
-        );
-        flow_obj.insert(
-            "dst".to_string(),
-            aggregated_endpoint_value(agg.dst_ip.as_deref(), agg.dst_mixed),
-        );
-        flow_obj.insert("key".to_string(), json!(agg.labels));
-        flow_obj.insert("metrics".to_string(), agg.metrics.to_value());
-        flows.push(Value::Object(flow_obj));
+    if let Some(other_agg) = other {
+        totals.add(other_agg.metrics);
+        flows.push(flow_value_from_aggregate(other_agg));
     }
 
     BuildResult {
         returned: flows.len(),
         flows,
         metrics: totals,
+        grouped_total,
+        truncated,
+        other_count,
     }
+}
+
+fn accumulate_grouped_record(
+    record: &FlowRecord,
+    metrics: FlowMetrics,
+    group_by: &[String],
+    aggregates: &mut HashMap<GroupKey, AggregatedFlow>,
+    overflow: &mut GroupOverflow,
+    max_groups: usize,
+) {
+    let labels = labels_for_group(record, group_by);
+    let key = GroupKey(
+        labels
+            .iter()
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect(),
+    );
+    if let Some(entry) = aggregates.get_mut(&key) {
+        update_aggregate_entry(entry, record, metrics);
+        return;
+    }
+
+    if aggregates.len() >= max_groups {
+        let entry = overflow
+            .aggregate
+            .get_or_insert_with(new_overflow_aggregate);
+        overflow.dropped_records = overflow.dropped_records.saturating_add(1);
+        update_aggregate_entry(entry, record, metrics);
+        return;
+    }
+
+    let mut entry = AggregatedFlow {
+        labels,
+        first_ts: record.timestamp_usec,
+        last_ts: record.timestamp_usec,
+        ..AggregatedFlow::default()
+    };
+    update_aggregate_entry(&mut entry, record, metrics);
+    aggregates.insert(key, entry);
+}
+
+fn new_overflow_aggregate() -> AggregatedFlow {
+    AggregatedFlow {
+        labels: BTreeMap::from([(String::from("_bucket"), String::from(OVERFLOW_BUCKET_LABEL))]),
+        src_mixed: true,
+        dst_mixed: true,
+        exporter_mixed: true,
+        ..AggregatedFlow::default()
+    }
+}
+
+fn update_aggregate_entry(entry: &mut AggregatedFlow, record: &FlowRecord, metrics: FlowMetrics) {
+    if entry.first_ts == 0 || record.timestamp_usec < entry.first_ts {
+        entry.first_ts = record.timestamp_usec;
+    }
+    if record.timestamp_usec > entry.last_ts {
+        entry.last_ts = record.timestamp_usec;
+    }
+    entry.metrics.add(metrics);
+
+    merge_single_value(
+        &mut entry.src_ip,
+        &mut entry.src_mixed,
+        record.fields.get("SRC_ADDR").map(String::as_str),
+    );
+    merge_single_value(
+        &mut entry.dst_ip,
+        &mut entry.dst_mixed,
+        record.fields.get("DST_ADDR").map(String::as_str),
+    );
+    merge_single_value(
+        &mut entry.exporter_ip,
+        &mut entry.exporter_mixed,
+        record.fields.get("EXPORTER_IP").map(String::as_str),
+    );
+    merge_single_value(
+        &mut entry.exporter_name,
+        &mut entry.exporter_mixed,
+        record.fields.get("EXPORTER_NAME").map(String::as_str),
+    );
+    merge_single_value(
+        &mut entry.flow_version,
+        &mut entry.exporter_mixed,
+        record.fields.get("FLOW_VERSION").map(String::as_str),
+    );
+    merge_single_value(
+        &mut entry.sampling_rate,
+        &mut entry.exporter_mixed,
+        record.fields.get("SAMPLING_RATE").map(String::as_str),
+    );
+}
+
+fn labels_for_group(record: &FlowRecord, group_by: &[String]) -> BTreeMap<String, String> {
+    let mut labels = BTreeMap::new();
+    for field in group_by {
+        let value = record.fields.get(field).cloned().unwrap_or_default();
+        labels.insert(field.clone(), value);
+    }
+    labels
+}
+
+fn compare_aggregated(a: &AggregatedFlow, b: &AggregatedFlow, sort_by: SortBy) -> Ordering {
+    sort_by
+        .metric(b.metrics)
+        .cmp(&sort_by.metric(a.metrics))
+        .then_with(|| b.metrics.bytes.cmp(&a.metrics.bytes))
+        .then_with(|| b.metrics.packets.cmp(&a.metrics.packets))
+        .then_with(|| b.metrics.flows.cmp(&a.metrics.flows))
+}
+
+fn merge_other_bucket(rows: Vec<AggregatedFlow>) -> AggregatedFlow {
+    let mut other = AggregatedFlow {
+        labels: BTreeMap::from([(String::from("_bucket"), String::from(OTHER_BUCKET_LABEL))]),
+        src_mixed: true,
+        dst_mixed: true,
+        exporter_mixed: true,
+        ..AggregatedFlow::default()
+    };
+
+    for row in rows {
+        if other.first_ts == 0 || row.first_ts < other.first_ts {
+            other.first_ts = row.first_ts;
+        }
+        if row.last_ts > other.last_ts {
+            other.last_ts = row.last_ts;
+        }
+        other.metrics.add(row.metrics);
+    }
+    other
+}
+
+fn flow_value_from_aggregate(agg: AggregatedFlow) -> Value {
+    let mut flow_obj = Map::new();
+    flow_obj.insert(
+        "timestamp".to_string(),
+        Value::String(format_timestamp_usec(agg.last_ts)),
+    );
+    if agg.last_ts >= agg.first_ts {
+        flow_obj.insert(
+            "duration_sec".to_string(),
+            json!((agg.last_ts.saturating_sub(agg.first_ts)) / 1_000_000),
+        );
+    }
+    if let Some(exporter) = exporter_value_from_aggregate(&agg) {
+        flow_obj.insert("exporter".to_string(), exporter);
+    }
+    flow_obj.insert(
+        "src".to_string(),
+        aggregated_endpoint_value(agg.src_ip.as_deref(), agg.src_mixed),
+    );
+    flow_obj.insert(
+        "dst".to_string(),
+        aggregated_endpoint_value(agg.dst_ip.as_deref(), agg.dst_mixed),
+    );
+    flow_obj.insert("key".to_string(), json!(agg.labels));
+    flow_obj.insert("metrics".to_string(), agg.metrics.to_value());
+    Value::Object(flow_obj)
 }
 
 fn resolve_time_bounds(request: &FlowsRequest) -> (u32, u32) {
@@ -629,10 +976,95 @@ fn sanitize_limit(last: Option<usize>) -> usize {
     }
 }
 
-fn build_index_facets(selections: &HashMap<String, Vec<String>>) -> Facets {
+fn resolve_effective_group_by(request: &FlowsRequest) -> Vec<String> {
+    let group_by = request.normalized_group_by();
+    if !group_by.is_empty() {
+        return group_by;
+    }
+
+    GROUP_BY_DEFAULT_AGGREGATED
+        .iter()
+        .map(|field| (*field).to_string())
+        .collect()
+}
+
+fn field_is_raw_only(field: &str) -> bool {
+    RAW_ONLY_FIELDS
+        .iter()
+        .any(|raw_only| field.eq_ignore_ascii_case(raw_only))
+        || field.to_ascii_uppercase().starts_with("V9_")
+        || field.to_ascii_uppercase().starts_with("IPFIX_")
+}
+
+fn requires_raw_tier_for_fields(
+    group_by: &[String],
+    selections: &HashMap<String, Vec<String>>,
+    query: &str,
+) -> bool {
+    if !query.is_empty() {
+        return true;
+    }
+
+    if group_by
+        .iter()
+        .any(|field| field_is_raw_only(field.as_str()))
+    {
+        return true;
+    }
+    selections
+        .keys()
+        .any(|field| field_is_raw_only(field.as_str()))
+}
+
+fn build_output_projection_fields(
+    group_by: &[String],
+    selections: &HashMap<String, Vec<String>>,
+) -> Vec<String> {
+    let mut projected = HashSet::new();
+    projected.insert("_SOURCE_REALTIME_TIMESTAMP".to_string());
+
+    for metric in ["BYTES", "PACKETS", "FLOWS", "RAW_BYTES", "RAW_PACKETS"] {
+        projected.insert(metric.to_string());
+    }
+
+    // Fields required for endpoint/exporter framing in response rows.
+    for field in [
+        "SRC_ADDR",
+        "DST_ADDR",
+        "EXPORTER_IP",
+        "EXPORTER_NAME",
+        "FLOW_VERSION",
+        "SAMPLING_RATE",
+    ] {
+        projected.insert(field.to_string());
+    }
+
+    // Include all facet-eligible indexed fields so facet values remain useful.
+    for field in INDEXED_FIELDS {
+        if facet_field_allowed(field) {
+            projected.insert((*field).to_string());
+        }
+    }
+
+    for field in group_by {
+        projected.insert(field.to_ascii_uppercase());
+    }
+    for field in selections.keys() {
+        projected.insert(field.to_ascii_uppercase());
+    }
+
+    let mut out: Vec<String> = projected.into_iter().collect();
+    out.sort();
+    out
+}
+
+fn build_index_facets(selections: &HashMap<String, Vec<String>>, group_by: &[String]) -> Facets {
     let mut names: Vec<String> = INDEXED_FIELDS.iter().map(|v| (*v).to_string()).collect();
     for key in selections.keys() {
-        names.push(key.clone());
+        names.push(key.to_ascii_uppercase());
+    }
+    for key in group_by {
+        names.push(key.to_ascii_uppercase());
     }
     names.sort();
     names.dedup();
@@ -650,11 +1082,12 @@ fn build_filter_from_selections(selections: &HashMap<String, Vec<String>>) -> Fi
         if values.is_empty() {
             continue;
         }
+        let field_name = field.to_ascii_uppercase();
 
         let value_filters: Vec<_> = values
             .iter()
             .filter_map(|value| {
-                let pair_str = format!("{}={}", field, value);
+                let pair_str = format!("{}={}", field_name, value);
                 FieldValuePair::parse(&pair_str).map(Filter::match_field_value_pair)
             })
             .collect();
@@ -671,6 +1104,278 @@ fn build_filter_from_selections(selections: &HashMap<String, Vec<String>>) -> Fi
     } else {
         Filter::and(field_filters)
     }
+}
+
+fn build_facets(
+    records: &[FlowRecord],
+    sort_by: SortBy,
+    group_by: &[String],
+    request: &FlowsRequest,
+) -> Value {
+    let mut by_field: BTreeMap<String, FacetFieldAccumulator> = BTreeMap::new();
+    for record in records {
+        let metrics = metrics_from_fields(&record.fields);
+        accumulate_facet_record(
+            record,
+            metrics,
+            &mut by_field,
+            DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD,
+        );
+    }
+    build_facets_from_accumulator(
+        by_field,
+        sort_by,
+        group_by,
+        &request.selections,
+        DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD,
+    )
+}
+
+fn facet_field_allowed(field: &str) -> bool {
+    !FACET_EXCLUDED_FIELDS.contains(&field)
+        && !field.starts_with("V9_")
+        && !field.starts_with("IPFIX_")
+        && !field.starts_with('_')
+}
+
+fn accumulate_record(
+    record: &FlowRecord,
+    group_by: &[String],
+    grouped_aggregates: &mut HashMap<GroupKey, AggregatedFlow>,
+    group_overflow: &mut GroupOverflow,
+    facet_values: &mut BTreeMap<String, FacetFieldAccumulator>,
+    max_groups: usize,
+    facet_max_values_per_field: usize,
+    after: u32,
+    before: u32,
+    histogram_bucket_seconds: u32,
+    histogram_buckets: &mut [FlowMetrics],
+) {
+    let metrics = metrics_from_fields(&record.fields);
+    accumulate_grouped_record(
+        record,
+        metrics,
+        group_by,
+        grouped_aggregates,
+        group_overflow,
+        max_groups,
+    );
+    accumulate_facet_record(record, metrics, facet_values, facet_max_values_per_field);
+    accumulate_histogram_record(
+        record.timestamp_usec,
+        metrics,
+        after,
+        before,
+        histogram_bucket_seconds,
+        histogram_buckets,
+    );
+}
+
+fn accumulate_facet_record(
+    record: &FlowRecord,
+    metrics: FlowMetrics,
+    by_field: &mut BTreeMap<String, FacetFieldAccumulator>,
+    facet_max_values_per_field: usize,
+) {
+    for (field, value) in &record.fields {
+        if !facet_field_allowed(field) || value.is_empty() {
+            continue;
+        }
+        let field_acc = by_field.entry(field.clone()).or_default();
+        if let Some(existing) = field_acc.values.get_mut(value) {
+            existing.add(metrics);
+            continue;
+        }
+
+        if field_acc.values.len() < facet_max_values_per_field {
+            field_acc.values.insert(value.clone(), metrics);
+            continue;
+        }
+
+        field_acc.overflow_metrics.add(metrics);
+        field_acc.overflow_records = field_acc.overflow_records.saturating_add(1);
+    }
+}
+
+fn build_facets_from_accumulator(
+    by_field: BTreeMap<String, FacetFieldAccumulator>,
+    sort_by: SortBy,
+    group_by: &[String],
+    selections: &HashMap<String, Vec<String>>,
+    facet_max_values_per_field: usize,
+) -> Value {
+    let mut fields = Vec::with_capacity(by_field.len());
+    let mut overflowed_fields = 0u64;
+    let mut overflowed_records = 0u64;
+
+    for (field, field_acc) in by_field {
+        let mut rows: Vec<(String, FlowMetrics)> = field_acc.values.into_iter().collect();
+        rows.sort_by(|a, b| {
+            sort_by
+                .metric(b.1)
+                .cmp(&sort_by.metric(a.1))
+                .then_with(|| b.1.bytes.cmp(&a.1.bytes))
+                .then_with(|| b.1.packets.cmp(&a.1.packets))
+        });
+
+        let total_values = rows.len();
+        let truncated = total_values > FACET_VALUE_LIMIT;
+        if truncated {
+            rows.truncate(FACET_VALUE_LIMIT);
+        }
+
+        let values = rows
+            .into_iter()
+            .map(|(value, metrics)| {
+                json!({
+                    "value": value,
+                    "metrics": metrics.to_value(),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        fields.push(json!({
+            "field": field,
+            "total_values": total_values,
+            "truncated": truncated,
+            "overflowed": field_acc.overflow_records > 0,
+            "overflow_records": field_acc.overflow_records,
+            "values": values,
+        }));
+
+        if field_acc.overflow_records > 0 {
+            overflowed_fields = overflowed_fields.saturating_add(1);
+            overflowed_records = overflowed_records.saturating_add(field_acc.overflow_records);
+        }
+    }
+
+    json!({
+        "value_limit": FACET_VALUE_LIMIT,
+        "accumulator_value_limit": facet_max_values_per_field,
+        "excluded_fields": RAW_ONLY_FIELDS,
+        "overflowed_fields": overflowed_fields,
+        "overflowed_records": overflowed_records,
+        "fields": fields,
+        "auto": {
+            "group_by": group_by,
+            "selections": selections,
+            "sort_by": sort_by.as_str(),
+        }
+    })
+}
+
+fn init_histogram_buckets(after: u32, before: u32) -> (u32, Vec<FlowMetrics>) {
+    if before <= after {
+        return (0, Vec::new());
+    }
+    let window = before - after;
+    let bucket_seconds =
+        ((window + HISTOGRAM_TARGET_BUCKETS - 1) / HISTOGRAM_TARGET_BUCKETS).max(1);
+    let bucket_count = ((window + bucket_seconds - 1) / bucket_seconds).max(1) as usize;
+    (bucket_seconds, vec![FlowMetrics::default(); bucket_count])
+}
+
+fn accumulate_histogram_record(
+    timestamp_usec: u64,
+    metrics: FlowMetrics,
+    after: u32,
+    before: u32,
+    bucket_seconds: u32,
+    buckets: &mut [FlowMetrics],
+) {
+    if before <= after || bucket_seconds == 0 || buckets.is_empty() {
+        return;
+    }
+
+    let ts_seconds = (timestamp_usec / 1_000_000) as u32;
+    if ts_seconds < after || ts_seconds >= before {
+        return;
+    }
+    let index = ((ts_seconds - after) / bucket_seconds) as usize;
+    if let Some(bucket) = buckets.get_mut(index) {
+        bucket.add(metrics);
+    }
+}
+
+fn histogram_value_from_buckets(
+    bucket_seconds: u32,
+    buckets: Vec<FlowMetrics>,
+    after: u32,
+    before: u32,
+) -> Value {
+    if before <= after || bucket_seconds == 0 {
+        return json!({
+            "bucket_seconds": 0,
+            "rows": [],
+        });
+    }
+    let rows = buckets
+        .into_iter()
+        .enumerate()
+        .map(|(index, metrics)| {
+            let start = after.saturating_add((index as u32).saturating_mul(bucket_seconds));
+            let end = start.saturating_add(bucket_seconds).min(before);
+            json!({
+                "start": format_timestamp_usec((start as u64) * 1_000_000),
+                "end": format_timestamp_usec((end as u64) * 1_000_000),
+                "metrics": metrics.to_value(),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    json!({
+        "bucket_seconds": bucket_seconds,
+        "rows": rows,
+    })
+}
+
+fn build_query_warnings(
+    group_overflow_records: u64,
+    facet_overflow_fields: u64,
+    facet_overflow_records: u64,
+) -> Option<Value> {
+    let mut warnings = Vec::new();
+    if group_overflow_records > 0 {
+        warnings.push(json!({
+            "code": "group_overflow",
+            "message": "Group accumulator limit reached; additional groups were folded into __overflow__.",
+            "overflow_records": group_overflow_records,
+        }));
+    }
+    if facet_overflow_records > 0 {
+        warnings.push(json!({
+            "code": "facet_overflow",
+            "message": "Facet accumulator limit reached; additional values were folded into overflow counters.",
+            "overflow_fields": facet_overflow_fields,
+            "overflow_records": facet_overflow_records,
+        }));
+    }
+    if warnings.is_empty() {
+        None
+    } else {
+        Some(Value::Array(warnings))
+    }
+}
+
+fn default_flows_visualizations() -> Value {
+    json!({
+        "default": ["directional_graph", "timeline"],
+        "items": {
+            "directional_graph": {
+                "name": "Directional Graph",
+                "type": "graph",
+                "source_field": "src",
+                "target_field": "dst",
+                "metric": "bytes"
+            },
+            "timeline": {
+                "name": "Traffic Timeline",
+                "type": "timeseries",
+                "source": "histogram",
+                "metrics": ["bytes", "packets", "flows"]
+            }
+        }
+    })
 }
 
 fn record_from_entry(entry: journal_engine::LogEntryData) -> FlowRecord {
@@ -710,27 +1415,6 @@ fn dimensions_from_fields(fields: &BTreeMap<String, String>) -> BTreeMap<String,
     dimensions_for_rollup(fields)
 }
 
-fn exporter_value(fields: &BTreeMap<String, String>) -> Option<Value> {
-    let ip = fields.get("EXPORTER_IP")?.to_string();
-    let mut obj = Map::new();
-    obj.insert("ip".to_string(), Value::String(ip));
-
-    if let Some(name) = fields.get("EXPORTER_NAME") {
-        obj.insert("name".to_string(), Value::String(name.clone()));
-    }
-    if let Some(version) = fields.get("FLOW_VERSION") {
-        obj.insert("flow_version".to_string(), Value::String(version.clone()));
-    }
-    if let Some(rate) = fields
-        .get("SAMPLING_RATE")
-        .and_then(|v| v.parse::<u64>().ok())
-    {
-        obj.insert("sampling_rate".to_string(), json!(rate));
-    }
-
-    Some(Value::Object(obj))
-}
-
 fn exporter_value_from_aggregate(agg: &AggregatedFlow) -> Option<Value> {
     if agg.exporter_mixed {
         return None;
@@ -755,31 +1439,6 @@ fn exporter_value_from_aggregate(agg: &AggregatedFlow) -> Option<Value> {
     }
 
     Some(Value::Object(obj))
-}
-
-fn endpoint_value(ip: Option<&str>, port: Option<&str>, aggregated: bool) -> Value {
-    let mut endpoint = Map::new();
-    let mut match_obj = Map::new();
-
-    if let Some(ipv) = ip {
-        match_obj.insert("ip_addresses".to_string(), json!([ipv]));
-    }
-    endpoint.insert("match".to_string(), Value::Object(match_obj));
-
-    let mut attributes = Map::new();
-    if let Some(port_value) = port.and_then(|v| v.parse::<u64>().ok()) {
-        if port_value > 0 {
-            attributes.insert("port".to_string(), json!(port_value));
-        }
-    }
-    if aggregated {
-        attributes.insert("aggregated".to_string(), Value::Bool(true));
-    }
-    if !attributes.is_empty() {
-        endpoint.insert("attributes".to_string(), Value::Object(attributes));
-    }
-
-    Value::Object(endpoint)
 }
 
 fn aggregated_endpoint_value(ip: Option<&str>, mixed: bool) -> Value {
@@ -823,49 +1482,6 @@ fn merge_single_value(current: &mut Option<String>, mixed: &mut bool, next: Opti
     }
 }
 
-fn duration_from_fields(fields: &BTreeMap<String, String>) -> Option<u64> {
-    if let Some(v) = fields
-        .get("DURATION_SEC")
-        .and_then(|s| s.parse::<u64>().ok())
-    {
-        return Some(v);
-    }
-
-    let start_millis = fields
-        .get("FLOW_START_MILLIS")
-        .and_then(|v| v.parse::<u64>().ok())
-        .or_else(|| {
-            fields
-                .get("OBSERVATION_TIME_MILLIS")
-                .and_then(|v| v.parse::<u64>().ok())
-        });
-    let end_millis = fields
-        .get("FLOW_END_MILLIS")
-        .and_then(|v| v.parse::<u64>().ok())
-        .or_else(|| {
-            fields
-                .get("OBSERVATION_TIME_MILLIS")
-                .and_then(|v| v.parse::<u64>().ok())
-        });
-
-    if let (Some(start), Some(end)) = (start_millis, end_millis) {
-        return Some(end.saturating_sub(start) / 1000);
-    }
-
-    let start_seconds = fields
-        .get("FLOW_START_SECONDS")
-        .and_then(|v| v.parse::<u64>().ok());
-    let end_seconds = fields
-        .get("FLOW_END_SECONDS")
-        .and_then(|v| v.parse::<u64>().ok());
-
-    if let (Some(start), Some(end)) = (start_seconds, end_seconds) {
-        return Some(end.saturating_sub(start));
-    }
-
-    None
-}
-
 fn parse_u64(value: Option<&String>) -> u64 {
     value.and_then(|v| v.parse::<u64>().ok()).unwrap_or(0)
 }
@@ -882,9 +1498,13 @@ fn format_timestamp_usec(timestamp_usec: u64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_aggregated_flows, dimensions_from_fields, metrics_from_fields};
+    use super::{
+        FlowsRequest, SortBy, build_aggregated_flows, build_facets, build_grouped_flows,
+        dimensions_from_fields, metrics_from_fields, requires_raw_tier_for_fields,
+        resolve_effective_group_by,
+    };
     use crate::rollup::build_rollup_key;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashMap};
 
     #[test]
     fn rollup_dimensions_exclude_only_metrics_and_internal() {
@@ -953,5 +1573,167 @@ mod tests {
         assert_eq!(flow["metrics"]["bytes"], 150);
         assert_eq!(flow["src"]["attributes"]["cardinality"], "multiple");
         assert_eq!(flow["dst"]["attributes"]["cardinality"], "multiple");
+    }
+
+    #[test]
+    fn raw_tier_is_required_for_ip_or_port_fields() {
+        let group_by = vec!["SRC_ADDR".to_string(), "PROTOCOL".to_string()];
+        let selections = HashMap::from([("DST_PORT".to_string(), vec!["443".to_string()])]);
+        assert!(requires_raw_tier_for_fields(&group_by, &selections, ""));
+    }
+
+    #[test]
+    fn grouped_flows_add_other_bucket_when_truncated() {
+        let mut records = Vec::new();
+        for idx in 0..3 {
+            records.push(super::FlowRecord {
+                timestamp_usec: 100 + idx,
+                fields: BTreeMap::from([
+                    ("PROTOCOL".to_string(), "6".to_string()),
+                    ("EXPORTER_IP".to_string(), "192.0.2.1".to_string()),
+                    ("BYTES".to_string(), format!("{}", 100 - (idx * 10))),
+                    ("PACKETS".to_string(), format!("{}", 10 + idx)),
+                    ("FLOWS".to_string(), "1".to_string()),
+                ]),
+            });
+        }
+
+        let result = build_grouped_flows(&records, &["BYTES".to_string()], SortBy::Packets, 2);
+        assert!(result.truncated);
+        assert_eq!(result.other_count, 1);
+        assert_eq!(result.flows.len(), 3);
+        assert_eq!(result.flows[2]["key"]["_bucket"], "__other__");
+    }
+
+    #[test]
+    fn facets_exclude_ip_and_port_fields() {
+        let records = vec![super::FlowRecord {
+            timestamp_usec: 100,
+            fields: BTreeMap::from([
+                ("SRC_ADDR".to_string(), "10.0.0.1".to_string()),
+                ("DST_PORT".to_string(), "443".to_string()),
+                ("PROTOCOL".to_string(), "6".to_string()),
+                ("BYTES".to_string(), "10".to_string()),
+                ("PACKETS".to_string(), "1".to_string()),
+                ("FLOWS".to_string(), "1".to_string()),
+            ]),
+        }];
+
+        let facets = build_facets(
+            &records,
+            SortBy::Bytes,
+            &["PROTOCOL".to_string()],
+            &FlowsRequest::default(),
+        );
+
+        let fields = facets["fields"].as_array().expect("fields array");
+        assert!(fields.iter().any(|entry| entry["field"] == "PROTOCOL"));
+        assert!(!fields.iter().any(|entry| entry["field"] == "SRC_ADDR"));
+        assert!(!fields.iter().any(|entry| entry["field"] == "DST_PORT"));
+    }
+
+    #[test]
+    fn default_group_by_uses_aggregated_view_set() {
+        let request = FlowsRequest::default();
+        let group_by = resolve_effective_group_by(&request);
+        assert!(group_by.iter().any(|field| field == "PROTOCOL"));
+        assert!(group_by.iter().any(|field| field == "EXPORTER_IP"));
+        assert!(!group_by.iter().any(|field| field == "SRC_ADDR"));
+    }
+
+    #[test]
+    fn grouped_accumulator_routes_new_groups_to_overflow_after_cap() {
+        let mut aggregates: HashMap<super::GroupKey, super::AggregatedFlow> = HashMap::new();
+        for idx in 0..super::DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS {
+            aggregates.insert(
+                super::GroupKey(vec![("PROTOCOL".to_string(), idx.to_string())]),
+                super::AggregatedFlow::default(),
+            );
+        }
+
+        let record = super::FlowRecord {
+            timestamp_usec: 100,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "overflow-key".to_string()),
+                ("BYTES".to_string(), "123".to_string()),
+                ("PACKETS".to_string(), "1".to_string()),
+                ("FLOWS".to_string(), "1".to_string()),
+            ]),
+        };
+        let metrics = metrics_from_fields(&record.fields);
+        let mut overflow = super::GroupOverflow::default();
+        super::accumulate_grouped_record(
+            &record,
+            metrics,
+            &["PROTOCOL".to_string()],
+            &mut aggregates,
+            &mut overflow,
+            super::DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS,
+        );
+
+        assert_eq!(
+            aggregates.len(),
+            super::DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS
+        );
+        assert_eq!(overflow.dropped_records, 1);
+        let overflow_row = overflow.aggregate.expect("overflow row");
+        assert_eq!(
+            overflow_row.labels.get("_bucket"),
+            Some(&"__overflow__".to_string())
+        );
+        assert_eq!(overflow_row.metrics.bytes, 123);
+    }
+
+    #[test]
+    fn facet_accumulator_reports_overflow_when_value_cap_is_reached() {
+        let mut field_acc = super::FacetFieldAccumulator::default();
+        for idx in 0..super::DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD {
+            field_acc
+                .values
+                .insert(idx.to_string(), super::FlowMetrics::default());
+        }
+        let mut by_field: BTreeMap<String, super::FacetFieldAccumulator> =
+            BTreeMap::from([("PROTOCOL".to_string(), field_acc)]);
+
+        let record = super::FlowRecord {
+            timestamp_usec: 100,
+            fields: BTreeMap::from([
+                ("PROTOCOL".to_string(), "new".to_string()),
+                ("BYTES".to_string(), "9".to_string()),
+                ("PACKETS".to_string(), "1".to_string()),
+                ("FLOWS".to_string(), "1".to_string()),
+            ]),
+        };
+        let metrics = metrics_from_fields(&record.fields);
+        super::accumulate_facet_record(
+            &record,
+            metrics,
+            &mut by_field,
+            super::DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD,
+        );
+
+        let field = by_field.get("PROTOCOL").expect("field");
+        assert_eq!(
+            field.values.len(),
+            super::DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD
+        );
+        assert_eq!(field.overflow_records, 1);
+
+        let facets = super::build_facets_from_accumulator(
+            by_field,
+            SortBy::Bytes,
+            &["PROTOCOL".to_string()],
+            &HashMap::new(),
+            super::DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD,
+        );
+        assert_eq!(facets["overflowed_fields"], 1);
+        assert_eq!(facets["overflowed_records"], 1);
+        let fields = facets["fields"].as_array().expect("fields array");
+        let protocol = fields
+            .iter()
+            .find(|entry| entry["field"] == "PROTOCOL")
+            .expect("PROTOCOL facet");
+        assert_eq!(protocol["overflowed"], true);
+        assert_eq!(protocol["overflow_records"], 1);
     }
 }
