@@ -122,28 +122,13 @@ async fn run_internal() -> Result<()> {
         )
         .serve(addr);
 
-    // 10. Keepalive future (PluginRuntime doesn't send keepalive automatically)
-    let writer_clone = writer.clone();
-    let keepalive = async move {
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
-        loop {
-            interval.tick().await;
-            if let Ok(mut w) = writer_clone.try_lock() {
-                let _ = w.write_raw(b"PLUGIN_KEEPALIVE\n").await;
-            }
-        }
-    };
-
-    // 11. Run gRPC server, plugin runtime, and keepalive concurrently
+    // 10. Run gRPC server and plugin runtime concurrently
     tokio::select! {
         result = grpc_server => {
             result.with_context(|| format!("gRPC server error on {}", config.endpoint.path))?;
         }
         result = runtime.run() => {
             result.context("PluginRuntime error")?;
-        }
-        _ = keepalive => {
-            // Keepalive loop never completes normally
         }
     }
 

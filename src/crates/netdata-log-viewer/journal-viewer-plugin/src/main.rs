@@ -98,27 +98,7 @@ async fn run_plugin() -> std::result::Result<(), Box<dyn std::error::Error>> {
         info!("notify event processing task terminated");
     });
 
-    // Keepalive future to prevent Netdata from killing the plugin
-    let writer = runtime.writer();
-    let keepalive = async move {
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
-        loop {
-            interval.tick().await;
-            if let Ok(mut w) = writer.try_lock() {
-                let _ = w.write_raw(b"PLUGIN_KEEPALIVE\n").await;
-            }
-        }
-    };
-
-    // Run plugin runtime and keepalive concurrently
-    tokio::select! {
-        result = runtime.run() => {
-            result?;
-        }
-        _ = keepalive => {
-            // Keepalive loop never completes normally
-        }
-    }
+    runtime.run().await?;
 
     Ok(())
 }

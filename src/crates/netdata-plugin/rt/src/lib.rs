@@ -825,10 +825,28 @@ where
             .expect("outbound_rx consumed only once");
 
         let writer_task = tokio::spawn(async move {
-            while let Some(msg) = outbound_rx.recv().await {
-                if let Err(e) = writer.lock().await.send(msg).await {
-                    error!("outbound writer error: {}", e);
-                    break;
+            let mut keepalive =
+                tokio::time::interval(tokio::time::Duration::from_secs(60));
+
+            loop {
+                tokio::select! {
+                    msg = outbound_rx.recv() => {
+                        match msg {
+                            Some(msg) => {
+                                if let Err(e) = writer.lock().await.send(msg).await {
+                                    error!("outbound writer error: {}", e);
+                                    break;
+                                }
+                            }
+                            None => break,
+                        }
+                    }
+                    _ = keepalive.tick() => {
+                        if let Err(e) = writer.lock().await.write_raw(b"PLUGIN_KEEPALIVE\n").await {
+                            error!("keepalive write error: {}", e);
+                            break;
+                        }
+                    }
                 }
             }
         });
