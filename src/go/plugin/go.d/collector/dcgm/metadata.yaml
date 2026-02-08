@@ -54,6 +54,16 @@ modules:
               [`dcgm-exporter-netdata.csv`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv)
               (raw download: `https://raw.githubusercontent.com/netdata/netdata/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv`).
 
+              The Netdata profile enables 127 fields by default and documents all remaining known DCGM fields as commented entries.
+              To customize beyond the baseline, uncomment the field you need and comment one currently enabled field.
+
+              Runtime validation artifact:
+              `src/go/plugin/go.d/collector/dcgm/runtime-validation-driver-590.48.01-dcgm-exporter-4.4.1-4.5.2.md`
+              and
+              `src/go/plugin/go.d/collector/dcgm/runtime-validation-driver-590.48.01-dcgm-exporter-4.4.1-4.5.2.json`
+
+              Validation is primarily version-scoped (NVIDIA driver + DCGM/DCGM-exporter versions), so treat it as a strong baseline rather than universal compatibility.
+
               Example:
               `dcgm-exporter -f /path/to/dcgm-exporter-netdata.csv`
           - title: Keep collection intervals aligned
@@ -244,131 +254,1937 @@ modules:
       availability: []
       scopes:
         - name: gpu
-          description: These metrics refer to a GPU device instance.
+          description: These metrics refer to GPU device instances.
           labels:
             - name: gpu
-              description: GPU index from exporter labels.
+              description: gpu label from exporter metrics.
             - name: uuid
-              description: GPU UUID, if available.
+              description: uuid label from exporter metrics.
           metrics:
-            - name: dcgm.gpu.compute.utilization
-              description: Device and engine utilization metrics.
-              unit: percentage
+            - name: dcgm.gpu.capability.support
+              description: GPU Capability Support metrics.
+              unit: state
               chart_type: line
               dimensions:
-                - name: gpu
-                - name: memory_copy
-                - name: encoder
-                - name: decoder
+                - name: cc_mode
+                - name: cuda_compute_capability
+                - name: gpm_support
+                - name: mig_attributes
+                - name: mig_ci_info
+                - name: mig_gi_info
+                - name: mig_max_slices
+                - name: supported_clocks
+                - name: supported_type_info
+            - name: dcgm.gpu.clock.frequency
+              description: GPU Clock Frequency metrics.
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: app_mem_clock
+                  visibility: hidden
+                - name: app_sm_clock
+                  visibility: hidden
+                - name: max_mem_clock
+                  visibility: hidden
+                - name: max_sm_clock
+                  visibility: hidden
+                - name: max_video_clock
+                  visibility: hidden
+                - name: memory
+                - name: sm
+                - name: video_clock
             - name: dcgm.gpu.compute.activity
-              description: Profiling activity ratios (SM, tensor, FP pipelines, DRAM, etc.).
-              unit: ratio
+              description: GPU Compute Pipeline Activity metrics.
+              unit: '%'
               chart_type: line
               dimensions:
-                - name: sm_active
-                - name: sm_occupancy
-                - name: tensor
+                - name: dram
                 - name: fp16
                 - name: fp32
                 - name: fp64
-            - name: dcgm.gpu.memory.usage
-              description: GPU memory usage.
+                - name: graphics_engine_active
+                - name: hostmem_cache_hit
+                - name: hostmem_cache_miss
+                - name: nvdec0_active
+                - name: nvdec1_active
+                - name: nvdec2_active
+                - name: nvdec3_active
+                - name: nvdec4_active
+                - name: nvdec5_active
+                - name: nvdec6_active
+                - name: nvdec7_active
+                - name: nvjpg0_active
+                - name: nvjpg1_active
+                - name: nvjpg2_active
+                - name: nvjpg3_active
+                - name: nvjpg4_active
+                - name: nvjpg5_active
+                - name: nvjpg6_active
+                - name: nvjpg7_active
+                - name: nvofa0_active
+                - name: nvofa1_active
+                - name: peermem_cache_hit
+                - name: peermem_cache_miss
+                - name: pipe_int_active
+                - name: pipe_tensor_dfma_active
+                - name: pipe_tensor_hmma_active
+                - name: pipe_tensor_imma_active
+                - name: sm_active
+                - name: sm_occupancy
+                - name: tensor
+            - name: dcgm.gpu.compute.utilization
+              description: GPU Compute Utilization metrics.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: decoder
+                - name: encoder
+                - name: gpu
+                - name: memory_copy
+            - name: dcgm.gpu.cpu.power
+              description: GPU CPU Power metrics.
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: module_power_util_current
+                - name: sysio_power_util_current
+            - name: dcgm.gpu.diagnostics.results
+              description: GPU Diagnostics Results metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: diag_diagnostic_result
+                - name: diag_eud_result
+                - name: diag_memory_bandwidth_result
+                - name: diag_memory_result
+                - name: diag_memtest_result
+                - name: diag_nccl_tests_result
+                - name: diag_nvbandwidth_result
+                - name: diag_pulse_test_result
+                - name: diag_software_result
+                - name: diag_targeted_power_result
+                - name: diag_targeted_stress_result
+            - name: dcgm.gpu.diagnostics.status
+              description: GPU Diagnostics Status metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: diag_status
+            - name: dcgm.gpu.health.status
+              description: GPU Health Status metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: imex_daemon_status
+                - name: imex_domain_status
+            - name: dcgm.gpu.interconnect.connectx.error_status
+              description: GPU ConnectX Error Status metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: connectx_correctable_err_mask
+                - name: connectx_correctable_err_status
+                - name: connectx_uncorrectable_err_mask
+                - name: connectx_uncorrectable_err_severity
+                - name: connectx_uncorrectable_err_status
+            - name: dcgm.gpu.interconnect.connectx.errors
+              description: GPU ConnectX Errors metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: connectx_correctable_err_mask
+                - name: connectx_correctable_err_status
+                - name: connectx_uncorrectable_err_mask
+                - name: connectx_uncorrectable_err_severity
+                - name: connectx_uncorrectable_err_status
+            - name: dcgm.gpu.interconnect.connectx.link
+              description: GPU ConnectX Link metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: connectx_active_pcie_link_speed
+                - name: connectx_expect_pcie_link_speed
+            - name: dcgm.gpu.interconnect.connectx.status
+              description: GPU ConnectX Status metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: connectx_health
+            - name: dcgm.gpu.interconnect.error_rate
+              description: GPU Interconnect Error Rate metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: c2c_link_error_intr
+                - name: c2c_link_error_replay
+                - name: c2c_link_error_replay_b2b
+            - name: dcgm.gpu.interconnect.fabric
+              description: GPU Fabric State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: fabric_clique_id
+                - name: fabric_cluster_uuid
+                - name: fabric_health_mask
+                - name: fabric_manager_error_code
+                - name: fabric_manager_status
+            - name: dcgm.gpu.interconnect.nvlink.error_rate
+              description: GPU NVLink Error Rate metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: gpu_nvlink_errors
+            - name: dcgm.gpu.interconnect.pcie.error_rate
+              description: GPU PCIe Error Rate metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: pcie_count_correctable_errors
+                - name: pcie_replay
+            - name: dcgm.gpu.interconnect.pcie.link.generation
+              description: GPU PCIe Link Generation metrics.
+              unit: generation
+              chart_type: line
+              dimensions:
+                - name: link_gen
+                - name: max_link_gen
+                  visibility: hidden
+            - name: dcgm.gpu.interconnect.pcie.link.width
+              description: GPU PCIe Link Width metrics.
+              unit: lanes
+              chart_type: line
+              dimensions:
+                - name: connectx_active_pcie_link_width
+                - name: connectx_expect_pcie_link_width
+                - name: link_width
+                - name: max_link_width
+                  visibility: hidden
+            - name: dcgm.gpu.interconnect.state
+              description: GPU Interconnect State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: c2c_link
+                - name: c2c_link_power_state
+                - name: c2c_link_status
+            - name: dcgm.gpu.interconnect.pcie.state
+              description: GPU PCIe State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: diag_pcie_result
+            - name: dcgm.gpu.interconnect.throughput
+              description: GPU Interconnect Throughput metrics.
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: c2c_max_bandwidth
+                - name: c2c_rx_all_bytes
+                - name: c2c_rx_data_bytes
+                - name: c2c_tx_all_bytes
+                - name: c2c_tx_data_bytes
+            - name: dcgm.gpu.interconnect.pcie.throughput
+              description: GPU PCIe Throughput metrics.
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: pcie_rx
+                - name: pcie_rx_throughput
+                - name: pcie_tx
+                - name: pcie_tx_throughput
+            - name: dcgm.gpu.interconnect.nvlink.throughput
+              description: GPU NVLink Throughput metrics.
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: nvlink_bandwidth
+                - name: nvlink_rx_bytes
+                - name: nvlink_tx_bytes
+            - name: dcgm.gpu.interconnect.total.throughput
+              description: GPU Interconnect Total Throughput metrics.
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: pcie
+                - name: nvlink
+            - name: dcgm.gpu.internal.boundary
+              description: GPU Internal Boundary Fields metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: first_connectx_field_id
+                - name: first_vgpu_field_id
+                - name: internal_fields_0_end
+                - name: internal_fields_0_start
+                - name: last_connectx_field_id
+                - name: last_vgpu_field_id
+            - name: dcgm.gpu.inventory.identity
+              description: GPU Inventory Identity metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: brand
+                - name: count
+                - name: cuda_visible_devices_str
+                - name: minor_number
+                - name: name
+                - name: nvml_index
+                - name: serial
+                - name: uuid
+            - name: dcgm.gpu.inventory.platform
+              description: GPU Platform Inventory metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: platform_chassis_serial_number
+                - name: platform_chassis_slot_number
+                - name: platform_host_id
+                - name: platform_infiniband_guid
+                - name: platform_module_id
+                - name: platform_peer_type
+                - name: platform_tray_index
+            - name: dcgm.gpu.inventory.software
+              description: GPU Software and Firmware metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: inforom_config_check
+                - name: inforom_config_valid
+                - name: inforom_image_ver
+                - name: oem_inforom_ver
+                - name: power_inforom_ver
+                - name: process_name
+                - name: vbios_version
+            - name: dcgm.gpu.memory.bar1_usage
+              description: GPU BAR1 Memory Usage metrics.
               unit: B
               chart_type: stacked
               dimensions:
                 - name: free
                 - name: used
+            - name: dcgm.gpu.memory.bar1_capacity
+              description: GPU BAR1 Memory Capacity metrics.
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: dcgm.gpu.memory.ecc_error_rate
+              description: GPU ECC Error Rate metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: ecc_current
+                - name: ecc_dbe_agg
+                - name: ecc_dbe_agg_cbu
+                - name: ecc_dbe_agg_dev
+                - name: ecc_dbe_agg_l1
+                - name: ecc_dbe_agg_l2
+                - name: ecc_dbe_agg_reg
+                - name: ecc_dbe_agg_shm
+                - name: ecc_dbe_agg_srm
+                - name: ecc_dbe_agg_tex
+                - name: ecc_dbe_vol
+                - name: ecc_dbe_vol_cbu
+                - name: ecc_dbe_vol_dev
+                - name: ecc_dbe_vol_l1
+                - name: ecc_dbe_vol_l2
+                - name: ecc_dbe_vol_reg
+                - name: ecc_dbe_vol_shm
+                - name: ecc_dbe_vol_srm
+                - name: ecc_dbe_vol_tex
+                - name: ecc_pending
+                - name: ecc_sbe_agg
+                - name: ecc_sbe_agg_cbu
+                - name: ecc_sbe_agg_dev
+                - name: ecc_sbe_agg_l1
+                - name: ecc_sbe_agg_l2
+                - name: ecc_sbe_agg_reg
+                - name: ecc_sbe_agg_shm
+                - name: ecc_sbe_agg_srm
+                - name: ecc_sbe_agg_tex
+                - name: ecc_sbe_vol
+                - name: ecc_sbe_vol_cbu
+                - name: ecc_sbe_vol_dev
+                - name: ecc_sbe_vol_l1
+                - name: ecc_sbe_vol_l2
+                - name: ecc_sbe_vol_reg
+                - name: ecc_sbe_vol_shm
+                - name: ecc_sbe_vol_srm
+                - name: ecc_sbe_vol_tex
+            - name: dcgm.gpu.memory.ecc_errors
+              description: GPU ECC Errors metrics.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: ecc_current
+                - name: ecc_dbe_agg_cbu
+                - name: ecc_dbe_agg_dev
+                - name: ecc_dbe_agg_l1
+                - name: ecc_dbe_agg_l2
+                - name: ecc_dbe_agg_reg
+                - name: ecc_dbe_agg_shm
+                - name: ecc_dbe_agg_srm
+                - name: ecc_dbe_agg_tex
+                - name: ecc_dbe_vol_cbu
+                - name: ecc_dbe_vol_dev
+                - name: ecc_dbe_vol_l1
+                - name: ecc_dbe_vol_l2
+                - name: ecc_dbe_vol_reg
+                - name: ecc_dbe_vol_shm
+                - name: ecc_dbe_vol_srm
+                - name: ecc_dbe_vol_tex
+                - name: ecc_inforom_ver
+                - name: ecc_pending
+                - name: ecc_sbe_agg_cbu
+                - name: ecc_sbe_agg_dev
+                - name: ecc_sbe_agg_l1
+                - name: ecc_sbe_agg_l2
+                - name: ecc_sbe_agg_reg
+                - name: ecc_sbe_agg_shm
+                - name: ecc_sbe_agg_srm
+                - name: ecc_sbe_agg_tex
+                - name: ecc_sbe_vol_cbu
+                - name: ecc_sbe_vol_dev
+                - name: ecc_sbe_vol_l1
+                - name: ecc_sbe_vol_l2
+                - name: ecc_sbe_vol_reg
+                - name: ecc_sbe_vol_shm
+                - name: ecc_sbe_vol_srm
+                - name: ecc_sbe_vol_tex
+            - name: dcgm.gpu.memory.page_retirements
+              description: GPU Retired Memory Pages metrics.
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: retired_dbe
+                - name: retired_pending
+                - name: retired_sbe
+            - name: dcgm.gpu.memory.usage
+              description: GPU Memory Usage metrics.
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: free
                 - name: reserved
-            - name: dcgm.gpu.clock.frequency
-              description: GPU and memory clock metrics.
-              unit: MHz
+                - name: used
+            - name: dcgm.gpu.memory.capacity
+              description: GPU Memory Capacity metrics.
+              unit: B
               chart_type: line
               dimensions:
-                - name: sm
-                - name: memory
-            - name: dcgm.gpu.thermal.temperature
-              description: GPU and memory temperatures.
-              unit: Celsius
+                - name: total
+            - name: dcgm.gpu.memory.utilization
+              description: GPU Memory Utilization metrics.
+              unit: '%'
               chart_type: line
               dimensions:
-                - name: gpu
-                - name: memory
-            - name: dcgm.gpu.power.usage
-              description: Instantaneous power metrics.
-              unit: Watts
-              chart_type: line
-              dimensions:
-                - name: draw
+                - name: used_percent
             - name: dcgm.gpu.power.energy
-              description: Energy consumption rate metrics.
+              description: GPU Energy Consumption Rate metrics.
               unit: mJ/s
               chart_type: line
               dimensions:
                 - name: total
-            - name: dcgm.gpu.throttle.violations
-              description: Power and thermal violation duration counters.
-              unit: milliseconds/s
-              chart_type: line
-              dimensions:
-                - name: power_violation
-                - name: thermal_violation
-            - name: dcgm.gpu.interconnect.throughput
-              description: PCIe and NVLink throughput metrics.
-              unit: B/s
-              chart_type: area
-              dimensions:
-                - name: pcie_tx
-                - name: pcie_rx
-            - name: dcgm.gpu.reliability.xid
-              description: Last XID error code.
-              unit: code
-              chart_type: line
-              dimensions:
-                - name: xid
-            - name: dcgm.gpu.reliability.row_remap_status
-              description: Row remap status indicators.
+            - name: dcgm.gpu.power.profiles
+              description: GPU Power Profiles metrics.
               unit: state
               chart_type: line
               dimensions:
-                - name: row_remap_failure
+                - name: enforced_power_profile_mask
+                - name: requested_power_profile_mask
+                - name: valid_power_profile_mask
+            - name: dcgm.gpu.power.smoothing
+              description: GPU Power Smoothing metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: pwr_smoothing_active_preset_profile
+                - name: pwr_smoothing_admin_override_percent_tmp_floor
+                - name: pwr_smoothing_admin_override_ramp_down_hyst_val
+                - name: pwr_smoothing_admin_override_ramp_down_rate
+                - name: pwr_smoothing_admin_override_ramp_up_rate
+                - name: pwr_smoothing_applied_tmp_ceil
+                - name: pwr_smoothing_applied_tmp_floor
+                - name: pwr_smoothing_enabled
+                - name: pwr_smoothing_hw_circuitry_percent_lifetime_remaining
+                - name: pwr_smoothing_imm_ramp_down_enabled
+                - name: pwr_smoothing_max_num_preset_profiles
+                - name: pwr_smoothing_max_percent_tmp_floor_setting
+                - name: pwr_smoothing_min_percent_tmp_floor_setting
+                - name: pwr_smoothing_priv_lvl
+                - name: pwr_smoothing_profile_percent_tmp_floor
+                - name: pwr_smoothing_profile_ramp_down_hyst_val
+                - name: pwr_smoothing_profile_ramp_down_rate
+                - name: pwr_smoothing_profile_ramp_up_rate
+            - name: dcgm.gpu.power.usage
+              description: GPU Power Usage metrics.
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: draw
+                - name: enforced_limit
+                  visibility: hidden
+                - name: power_mgmt_limit
+                  visibility: hidden
+                - name: power_mgmt_limit_def
+                  visibility: hidden
+                - name: power_mgmt_limit_max
+                  visibility: hidden
+                - name: power_mgmt_limit_min
+                  visibility: hidden
+                - name: power_usage_instant
+            - name: dcgm.gpu.reliability.memory_health
+              description: GPU Memory Health metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: banks_remap_rows_avail_high
+                - name: banks_remap_rows_avail_low
+                - name: banks_remap_rows_avail_max
+                - name: banks_remap_rows_avail_none
+                - name: banks_remap_rows_avail_partial
+                - name: memory_unrepairable_flag
+                - name: threshold_srm
+            - name: dcgm.gpu.reliability.recovery_action
+              description: GPU Recovery Action metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: get_gpu_recovery_action
             - name: dcgm.gpu.reliability.row_remap_events
-              description: Row remap event counters.
+              description: GPU Row Remap Events metrics.
               unit: rows/s
               chart_type: line
               dimensions:
                 - name: correctable_remapped_rows
                 - name: uncorrectable_remapped_rows
-        - name: mig
-          description: These metrics refer to a MIG instance.
-          labels:
-            - name: gpu
-              description: Parent GPU index.
-            - name: gpu_i_id
-              description: MIG instance identifier.
-          metrics:
-            - name: dcgm.mig.compute.utilization
-              description: MIG utilization metrics.
-              unit: percentage
+            - name: dcgm.gpu.reliability.row_remap_status
+              description: GPU Row Remap Status metrics.
+              unit: state
               chart_type: line
               dimensions:
+                - name: row_remap_failure
+                - name: row_remap_pending
+            - name: dcgm.gpu.reliability.xid
+              description: GPU XID Errors metrics.
+              unit: code
+              chart_type: line
+              dimensions:
+                - name: xid
+            - name: dcgm.gpu.state.configuration
+              description: GPU Configuration State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: autoboost
+                - name: compute_mode
+                - name: persistence_mode
+                - name: sync_boost
+                - name: sync_boost_violation
+            - name: dcgm.gpu.state.performance
+              description: GPU Performance State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: pstate
+            - name: dcgm.gpu.state.virtualization
+              description: GPU Virtualization State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: mig_mode
+                - name: virtual_mode
+            - name: dcgm.gpu.thermal.fan_speed
+              description: GPU Fan Speed metrics.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: fan_speed
+            - name: dcgm.gpu.thermal.temperature
+              description: GPU Temperature metrics.
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: connectx_device_temperature
                 - name: gpu
-        - name: nvlink
-          description: These metrics refer to NVLink link instances.
+                - name: gpu_max_op_temp
+                  visibility: hidden
+                - name: gpu_temp_limit
+                  visibility: hidden
+                - name: mem_max_op_temp
+                  visibility: hidden
+                - name: memory
+                - name: shutdown_temp
+                  visibility: hidden
+                - name: slowdown_temp
+                  visibility: hidden
+            - name: dcgm.gpu.throttle.reasons
+              description: GPU Throttle Reasons metrics.
+              unit: bitmask
+              chart_type: line
+              dimensions:
+                - name: clocks_event_reasons
+            - name: dcgm.gpu.throttle.violations
+              description: GPU Throttle Violation Duration metrics.
+              unit: milliseconds/s
+              chart_type: line
+              dimensions:
+                - name: board_limit_violation
+                - name: hw_power_brake_slowdown
+                - name: hw_therm_slowdown
+                - name: low_utilization_violation
+                - name: power_violation
+                - name: reliability_violation
+                - name: sw_power_cap
+                - name: sw_therm_slowdown
+                - name: sync_boost
+                - name: thermal_violation
+                - name: total_app_clocks_violation
+                - name: total_base_clocks_violation
+            - name: dcgm.gpu.topology.affinity
+              description: GPU Topology and Affinity metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: cpu_affinity_0
+                - name: cpu_affinity_1
+                - name: cpu_affinity_2
+                - name: cpu_affinity_3
+                - name: gpu_topology_affinity
+                - name: gpu_topology_pci
+                - name: mem_affinity_0
+                - name: mem_affinity_1
+                - name: mem_affinity_2
+                - name: mem_affinity_3
+                - name: pci_busid
+                - name: pci_combined_id
+                - name: pci_subsys_id
+            - name: dcgm.gpu.virtualization.vgpu.frame_rate
+              description: GPU vGPU Frame Rate metrics.
+              unit: fps
+              chart_type: line
+              dimensions:
+                - name: vgpu_frame_rate_limit
+            - name: dcgm.gpu.virtualization.vgpu.instance
+              description: GPU vGPU Instance metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: vgpu_instance_ids
+                - name: vgpu_pci_id
+                - name: vgpu_uuid
+            - name: dcgm.gpu.virtualization.vgpu.license
+              description: GPU vGPU License metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: vgpu_instance_license_state
+                - name: vgpu_license_status
+                - name: vgpu_type_license
+            - name: dcgm.gpu.virtualization.vgpu.memory
+              description: GPU vGPU Memory metrics.
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: vgpu_memory_usage
+            - name: dcgm.gpu.virtualization.vgpu.sessions
+              description: GPU vGPU Sessions metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: vgpu_enc_sessions_info
+                - name: vgpu_enc_stats
+                - name: vgpu_fbc_sessions_info
+                - name: vgpu_fbc_stats
+            - name: dcgm.gpu.virtualization.vgpu.software
+              description: GPU vGPU Software metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: vgpu_driver_version
+            - name: dcgm.gpu.virtualization.vgpu.type
+              description: GPU vGPU Type metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: creatable_vgpu_type_ids
+                - name: supported_vgpu_type_ids
+                - name: vgpu_type
+                - name: vgpu_type_class
+                - name: vgpu_type_info
+                - name: vgpu_type_name
+            - name: dcgm.gpu.virtualization.vgpu.utilization
+              description: GPU vGPU Utilization metrics.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: vgpu_per_process_utilization
+                - name: vgpu_utilizations
+            - name: dcgm.gpu.virtualization.vgpu.vm
+              description: GPU vGPU VM metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: vgpu_vm_gpu_instance_id
+                - name: vgpu_vm_id
+                - name: vgpu_vm_name
+            - name: dcgm.gpu.workload.sessions
+              description: GPU Workload Sessions metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: accounting_data
+                - name: enc_stats
+                - name: fbc_sessions_info
+                - name: fbc_stats
+        - name: mig
+          description: These metrics refer to MIG instance instances.
           labels:
-            - name: nvlink
-              description: NVLink index.
             - name: gpu
-              description: GPU index related to this link.
+              description: gpu label from exporter metrics.
+            - name: gpu_i_id
+              description: gpu_i_id label from exporter metrics.
+            - name: gpu_i_profile
+              description: gpu_i_profile label from exporter metrics.
           metrics:
-            - name: dcgm.nvlink.interconnect.throughput
-              description: NVLink per-link throughput metrics.
+            - name: dcgm.mig.clock.frequency
+              description: MIG Clock Frequency metrics.
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: app_mem_clock
+                  visibility: hidden
+                - name: app_sm_clock
+                  visibility: hidden
+                - name: max_mem_clock
+                  visibility: hidden
+                - name: max_sm_clock
+                  visibility: hidden
+                - name: max_video_clock
+                  visibility: hidden
+                - name: memory
+                - name: sm
+                - name: video_clock
+            - name: dcgm.mig.compute.activity
+              description: MIG Compute Pipeline Activity metrics.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: dram
+                - name: fp16
+                - name: fp32
+                - name: fp64
+                - name: graphics_engine_active
+                - name: hostmem_cache_hit
+                - name: hostmem_cache_miss
+                - name: nvdec0_active
+                - name: nvdec1_active
+                - name: nvdec2_active
+                - name: nvdec3_active
+                - name: nvdec4_active
+                - name: nvdec5_active
+                - name: nvdec6_active
+                - name: nvdec7_active
+                - name: nvjpg0_active
+                - name: nvjpg1_active
+                - name: nvjpg2_active
+                - name: nvjpg3_active
+                - name: nvjpg4_active
+                - name: nvjpg5_active
+                - name: nvjpg6_active
+                - name: nvjpg7_active
+                - name: nvofa0_active
+                - name: nvofa1_active
+                - name: peermem_cache_hit
+                - name: peermem_cache_miss
+                - name: pipe_int_active
+                - name: pipe_tensor_dfma_active
+                - name: pipe_tensor_hmma_active
+                - name: pipe_tensor_imma_active
+                - name: sm_active
+                - name: sm_occupancy
+                - name: tensor
+            - name: dcgm.mig.compute.utilization
+              description: MIG Compute Utilization metrics.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: decoder
+                - name: encoder
+                - name: gpu
+                - name: memory_copy
+            - name: dcgm.mig.interconnect.nvlink.ber
+              description: MIG NVLink Bit Error Rate metrics.
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: nvlink_count_effective_ber
+                - name: nvlink_count_effective_ber_float
+                - name: nvlink_count_symbol_ber
+                - name: nvlink_count_symbol_ber_float
+            - name: dcgm.mig.interconnect.nvlink.congestion
+              description: MIG NVLink Congestion metrics.
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: nvlink_ppcnt_ibpc_port_xmit_wait
+            - name: dcgm.mig.interconnect.error_rate
+              description: MIG Interconnect Error Rate metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: c2c_link_error_intr
+                - name: c2c_link_error_replay
+                - name: c2c_link_error_replay_b2b
+            - name: dcgm.mig.interconnect.nvlink.error_rate
+              description: MIG NVLink Error Rate metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: gpu_nvlink_errors
+                - name: nvlink_count_effective_errors
+                - name: nvlink_count_fec_history_0
+                - name: nvlink_count_fec_history_1
+                - name: nvlink_count_fec_history_10
+                - name: nvlink_count_fec_history_11
+                - name: nvlink_count_fec_history_12
+                - name: nvlink_count_fec_history_13
+                - name: nvlink_count_fec_history_14
+                - name: nvlink_count_fec_history_15
+                - name: nvlink_count_fec_history_2
+                - name: nvlink_count_fec_history_3
+                - name: nvlink_count_fec_history_4
+                - name: nvlink_count_fec_history_5
+                - name: nvlink_count_fec_history_6
+                - name: nvlink_count_fec_history_7
+                - name: nvlink_count_fec_history_8
+                - name: nvlink_count_fec_history_9
+                - name: nvlink_count_link_recovery_events
+                - name: nvlink_count_link_recovery_failed_events
+                - name: nvlink_count_link_recovery_successful_events
+                - name: nvlink_count_local_link_integrity_errors
+                - name: nvlink_count_rx_buffer_overrun_errors
+                - name: nvlink_count_rx_errors
+                - name: nvlink_count_rx_general_errors
+                - name: nvlink_count_rx_malformed_packet_errors
+                - name: nvlink_count_rx_remote_errors
+                - name: nvlink_count_rx_symbol_errors
+                - name: nvlink_count_tx_discards
+                - name: nvlink_crc_data_error
+                - name: nvlink_crc_data_error_count_l0
+                - name: nvlink_crc_data_error_count_l1
+                - name: nvlink_crc_data_error_count_l10
+                - name: nvlink_crc_data_error_count_l11
+                - name: nvlink_crc_data_error_count_l12
+                - name: nvlink_crc_data_error_count_l13
+                - name: nvlink_crc_data_error_count_l14
+                - name: nvlink_crc_data_error_count_l15
+                - name: nvlink_crc_data_error_count_l16
+                - name: nvlink_crc_data_error_count_l17
+                - name: nvlink_crc_data_error_count_l2
+                - name: nvlink_crc_data_error_count_l3
+                - name: nvlink_crc_data_error_count_l4
+                - name: nvlink_crc_data_error_count_l5
+                - name: nvlink_crc_data_error_count_l6
+                - name: nvlink_crc_data_error_count_l7
+                - name: nvlink_crc_data_error_count_l8
+                - name: nvlink_crc_data_error_count_l9
+                - name: nvlink_crc_flit_error
+                - name: nvlink_crc_flit_error_count_l0
+                - name: nvlink_crc_flit_error_count_l1
+                - name: nvlink_crc_flit_error_count_l10
+                - name: nvlink_crc_flit_error_count_l11
+                - name: nvlink_crc_flit_error_count_l12
+                - name: nvlink_crc_flit_error_count_l13
+                - name: nvlink_crc_flit_error_count_l14
+                - name: nvlink_crc_flit_error_count_l15
+                - name: nvlink_crc_flit_error_count_l16
+                - name: nvlink_crc_flit_error_count_l17
+                - name: nvlink_crc_flit_error_count_l2
+                - name: nvlink_crc_flit_error_count_l3
+                - name: nvlink_crc_flit_error_count_l4
+                - name: nvlink_crc_flit_error_count_l5
+                - name: nvlink_crc_flit_error_count_l6
+                - name: nvlink_crc_flit_error_count_l7
+                - name: nvlink_crc_flit_error_count_l8
+                - name: nvlink_crc_flit_error_count_l9
+                - name: nvlink_error_dl_crc
+                - name: nvlink_error_dl_recovery
+                - name: nvlink_error_dl_replay
+                - name: nvlink_ppcnt_physical_successful_recovery_events
+                - name: nvlink_ppcnt_plr_rcv_uncorrectable_code
+                - name: nvlink_ppcnt_recovery_time_since_last
+                - name: nvlink_ppcnt_recovery_total_successful_events
+                - name: nvlink_pprm_oper_recovery
+                - name: nvlink_recovery_error
+                - name: nvlink_recovery_error_count_l0
+                - name: nvlink_recovery_error_count_l1
+                - name: nvlink_recovery_error_count_l10
+                - name: nvlink_recovery_error_count_l11
+                - name: nvlink_recovery_error_count_l12
+                - name: nvlink_recovery_error_count_l13
+                - name: nvlink_recovery_error_count_l14
+                - name: nvlink_recovery_error_count_l15
+                - name: nvlink_recovery_error_count_l16
+                - name: nvlink_recovery_error_count_l17
+                - name: nvlink_recovery_error_count_l2
+                - name: nvlink_recovery_error_count_l3
+                - name: nvlink_recovery_error_count_l4
+                - name: nvlink_recovery_error_count_l5
+                - name: nvlink_recovery_error_count_l6
+                - name: nvlink_recovery_error_count_l7
+                - name: nvlink_recovery_error_count_l8
+                - name: nvlink_recovery_error_count_l9
+                - name: nvlink_replay_error
+                - name: nvlink_replay_error_count_l0
+                - name: nvlink_replay_error_count_l1
+                - name: nvlink_replay_error_count_l10
+                - name: nvlink_replay_error_count_l11
+                - name: nvlink_replay_error_count_l12
+                - name: nvlink_replay_error_count_l13
+                - name: nvlink_replay_error_count_l14
+                - name: nvlink_replay_error_count_l15
+                - name: nvlink_replay_error_count_l16
+                - name: nvlink_replay_error_count_l17
+                - name: nvlink_replay_error_count_l2
+                - name: nvlink_replay_error_count_l3
+                - name: nvlink_replay_error_count_l4
+                - name: nvlink_replay_error_count_l5
+                - name: nvlink_replay_error_count_l6
+                - name: nvlink_replay_error_count_l7
+                - name: nvlink_replay_error_count_l8
+                - name: nvlink_replay_error_count_l9
+            - name: dcgm.mig.interconnect.pcie.error_rate
+              description: MIG PCIe Error Rate metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: pcie_count_correctable_errors
+                - name: pcie_replay
+            - name: dcgm.mig.interconnect.nvlink.errors
+              description: MIG NVLink Errors metrics.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: nvlink_ppcnt_plr_rcv_uncorrectable_code
+            - name: dcgm.mig.interconnect.fabric
+              description: MIG Fabric State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: fabric_clique_id
+                - name: fabric_cluster_uuid
+                - name: fabric_health_mask
+                - name: fabric_manager_error_code
+                - name: fabric_manager_status
+            - name: dcgm.mig.interconnect.pcie.link.generation
+              description: MIG PCIe Link Generation metrics.
+              unit: generation
+              chart_type: line
+              dimensions:
+                - name: link_gen
+                - name: max_link_gen
+                  visibility: hidden
+            - name: dcgm.mig.interconnect.pcie.link.width
+              description: MIG PCIe Link Width metrics.
+              unit: lanes
+              chart_type: line
+              dimensions:
+                - name: link_width
+                - name: max_link_width
+                  visibility: hidden
+            - name: dcgm.mig.interconnect.state
+              description: MIG Interconnect State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: c2c_link
+                - name: c2c_link_power_state
+                - name: c2c_link_status
+            - name: dcgm.mig.interconnect.pcie.state
+              description: MIG PCIe State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: diag_pcie_result
+            - name: dcgm.mig.interconnect.nvlink.state
+              description: MIG NVLink State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: gpu_topology_nvlink
+                - name: nvlink_get_state
+                - name: nvlink_ppcnt_physical_link_down_counter
+                - name: nvlink_ppcnt_plr_rcv_code_err
+                - name: nvlink_ppcnt_plr_sync_events
+                - name: nvlink_ppcnt_plr_xmit_retry_events
+                - name: p2p_nvlink_status
+            - name: dcgm.mig.interconnect.throughput
+              description: MIG Interconnect Throughput metrics.
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: c2c_max_bandwidth
+                - name: c2c_rx_all_bytes
+                - name: c2c_rx_data_bytes
+                - name: c2c_tx_all_bytes
+                - name: c2c_tx_data_bytes
+            - name: dcgm.mig.interconnect.nvlink.throughput
+              description: MIG NVLink Throughput metrics.
               unit: B/s
               chart_type: area
               dimensions:
                 - name: nvlink_bandwidth
-            - name: dcgm.nvlink.interconnect.error_rate
-              description: NVLink error counters as rates.
+                - name: nvlink_bandwidth_l0
+                - name: nvlink_bandwidth_l1
+                - name: nvlink_bandwidth_l10
+                - name: nvlink_bandwidth_l11
+                - name: nvlink_bandwidth_l12
+                - name: nvlink_bandwidth_l13
+                - name: nvlink_bandwidth_l14
+                - name: nvlink_bandwidth_l15
+                - name: nvlink_bandwidth_l16
+                - name: nvlink_bandwidth_l17
+                - name: nvlink_bandwidth_l2
+                - name: nvlink_bandwidth_l3
+                - name: nvlink_bandwidth_l4
+                - name: nvlink_bandwidth_l5
+                - name: nvlink_bandwidth_l6
+                - name: nvlink_bandwidth_l7
+                - name: nvlink_bandwidth_l8
+                - name: nvlink_bandwidth_l9
+                - name: nvlink_count_rx_bytes
+                - name: nvlink_count_tx_bytes
+                - name: nvlink_l0_rx_bytes
+                - name: nvlink_l0_tx_bytes
+                - name: nvlink_l10_rx_bytes
+                - name: nvlink_l10_tx_bytes
+                - name: nvlink_l11_rx_bytes
+                - name: nvlink_l11_tx_bytes
+                - name: nvlink_l12_rx_bytes
+                - name: nvlink_l12_tx_bytes
+                - name: nvlink_l13_rx_bytes
+                - name: nvlink_l13_tx_bytes
+                - name: nvlink_l14_rx_bytes
+                - name: nvlink_l14_tx_bytes
+                - name: nvlink_l15_rx_bytes
+                - name: nvlink_l15_tx_bytes
+                - name: nvlink_l16_rx_bytes
+                - name: nvlink_l16_tx_bytes
+                - name: nvlink_l17_rx_bytes
+                - name: nvlink_l17_tx_bytes
+                - name: nvlink_l1_rx_bytes
+                - name: nvlink_l1_tx_bytes
+                - name: nvlink_l2_rx_bytes
+                - name: nvlink_l2_tx_bytes
+                - name: nvlink_l3_rx_bytes
+                - name: nvlink_l3_tx_bytes
+                - name: nvlink_l4_rx_bytes
+                - name: nvlink_l4_tx_bytes
+                - name: nvlink_l5_rx_bytes
+                - name: nvlink_l5_tx_bytes
+                - name: nvlink_l6_rx_bytes
+                - name: nvlink_l6_tx_bytes
+                - name: nvlink_l7_rx_bytes
+                - name: nvlink_l7_tx_bytes
+                - name: nvlink_l8_rx_bytes
+                - name: nvlink_l8_tx_bytes
+                - name: nvlink_l9_rx_bytes
+                - name: nvlink_l9_tx_bytes
+                - name: nvlink_rx_bandwidth
+                - name: nvlink_rx_bandwidth_l0
+                - name: nvlink_rx_bandwidth_l1
+                - name: nvlink_rx_bandwidth_l10
+                - name: nvlink_rx_bandwidth_l11
+                - name: nvlink_rx_bandwidth_l12
+                - name: nvlink_rx_bandwidth_l13
+                - name: nvlink_rx_bandwidth_l14
+                - name: nvlink_rx_bandwidth_l15
+                - name: nvlink_rx_bandwidth_l16
+                - name: nvlink_rx_bandwidth_l17
+                - name: nvlink_rx_bandwidth_l2
+                - name: nvlink_rx_bandwidth_l3
+                - name: nvlink_rx_bandwidth_l4
+                - name: nvlink_rx_bandwidth_l5
+                - name: nvlink_rx_bandwidth_l6
+                - name: nvlink_rx_bandwidth_l7
+                - name: nvlink_rx_bandwidth_l8
+                - name: nvlink_rx_bandwidth_l9
+                - name: nvlink_rx_bytes
+                - name: nvlink_tx_bandwidth
+                - name: nvlink_tx_bandwidth_l0
+                - name: nvlink_tx_bandwidth_l1
+                - name: nvlink_tx_bandwidth_l10
+                - name: nvlink_tx_bandwidth_l11
+                - name: nvlink_tx_bandwidth_l12
+                - name: nvlink_tx_bandwidth_l13
+                - name: nvlink_tx_bandwidth_l14
+                - name: nvlink_tx_bandwidth_l15
+                - name: nvlink_tx_bandwidth_l16
+                - name: nvlink_tx_bandwidth_l17
+                - name: nvlink_tx_bandwidth_l2
+                - name: nvlink_tx_bandwidth_l3
+                - name: nvlink_tx_bandwidth_l4
+                - name: nvlink_tx_bandwidth_l5
+                - name: nvlink_tx_bandwidth_l6
+                - name: nvlink_tx_bandwidth_l7
+                - name: nvlink_tx_bandwidth_l8
+                - name: nvlink_tx_bandwidth_l9
+                - name: nvlink_tx_bytes
+            - name: dcgm.mig.interconnect.pcie.throughput
+              description: MIG PCIe Throughput metrics.
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: pcie_rx
+                - name: pcie_rx_throughput
+                - name: pcie_tx
+                - name: pcie_tx_throughput
+            - name: dcgm.mig.interconnect.total.throughput
+              description: MIG Interconnect Total Throughput metrics.
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: pcie
+                - name: nvlink
+            - name: dcgm.mig.interconnect.nvlink.traffic
+              description: MIG NVLink Traffic metrics.
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: nvlink_count_rx_packets
+                - name: nvlink_count_tx_packets
+                - name: nvlink_ppcnt_plr_rcv_codes
+                - name: nvlink_ppcnt_plr_xmit_codes
+                - name: nvlink_ppcnt_plr_xmit_retry_codes
+            - name: dcgm.mig.memory.bar1_usage
+              description: MIG BAR1 Memory Usage metrics.
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+            - name: dcgm.mig.memory.bar1_capacity
+              description: MIG BAR1 Memory Capacity metrics.
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: dcgm.mig.memory.ecc_error_rate
+              description: MIG ECC Error Rate metrics.
               unit: errors/s
               chart_type: line
               dimensions:
+                - name: ecc_current
+                - name: ecc_dbe_agg
+                - name: ecc_dbe_agg_cbu
+                - name: ecc_dbe_agg_dev
+                - name: ecc_dbe_agg_l1
+                - name: ecc_dbe_agg_l2
+                - name: ecc_dbe_agg_reg
+                - name: ecc_dbe_agg_shm
+                - name: ecc_dbe_agg_srm
+                - name: ecc_dbe_agg_tex
+                - name: ecc_dbe_vol
+                - name: ecc_dbe_vol_cbu
+                - name: ecc_dbe_vol_dev
+                - name: ecc_dbe_vol_l1
+                - name: ecc_dbe_vol_l2
+                - name: ecc_dbe_vol_reg
+                - name: ecc_dbe_vol_shm
+                - name: ecc_dbe_vol_srm
+                - name: ecc_dbe_vol_tex
+                - name: ecc_pending
+                - name: ecc_sbe_agg
+                - name: ecc_sbe_agg_cbu
+                - name: ecc_sbe_agg_dev
+                - name: ecc_sbe_agg_l1
+                - name: ecc_sbe_agg_l2
+                - name: ecc_sbe_agg_reg
+                - name: ecc_sbe_agg_shm
+                - name: ecc_sbe_agg_srm
+                - name: ecc_sbe_agg_tex
+                - name: ecc_sbe_vol
+                - name: ecc_sbe_vol_cbu
+                - name: ecc_sbe_vol_dev
+                - name: ecc_sbe_vol_l1
+                - name: ecc_sbe_vol_l2
+                - name: ecc_sbe_vol_reg
+                - name: ecc_sbe_vol_shm
+                - name: ecc_sbe_vol_srm
+                - name: ecc_sbe_vol_tex
+                - name: nvlink_ecc_data_error
+            - name: dcgm.mig.memory.ecc_errors
+              description: MIG ECC Errors metrics.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: ecc_current
+                - name: ecc_dbe_agg_cbu
+                - name: ecc_dbe_agg_dev
+                - name: ecc_dbe_agg_l1
+                - name: ecc_dbe_agg_l2
+                - name: ecc_dbe_agg_reg
+                - name: ecc_dbe_agg_shm
+                - name: ecc_dbe_agg_srm
+                - name: ecc_dbe_agg_tex
+                - name: ecc_dbe_vol_cbu
+                - name: ecc_dbe_vol_dev
+                - name: ecc_dbe_vol_l1
+                - name: ecc_dbe_vol_l2
+                - name: ecc_dbe_vol_reg
+                - name: ecc_dbe_vol_shm
+                - name: ecc_dbe_vol_srm
+                - name: ecc_dbe_vol_tex
+                - name: ecc_inforom_ver
+                - name: ecc_pending
+                - name: ecc_sbe_agg_cbu
+                - name: ecc_sbe_agg_dev
+                - name: ecc_sbe_agg_l1
+                - name: ecc_sbe_agg_l2
+                - name: ecc_sbe_agg_reg
+                - name: ecc_sbe_agg_shm
+                - name: ecc_sbe_agg_srm
+                - name: ecc_sbe_agg_tex
+                - name: ecc_sbe_vol_cbu
+                - name: ecc_sbe_vol_dev
+                - name: ecc_sbe_vol_l1
+                - name: ecc_sbe_vol_l2
+                - name: ecc_sbe_vol_reg
+                - name: ecc_sbe_vol_shm
+                - name: ecc_sbe_vol_srm
+                - name: ecc_sbe_vol_tex
+            - name: dcgm.mig.memory.page_retirements
+              description: MIG Retired Memory Pages metrics.
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: retired_dbe
+                - name: retired_pending
+                - name: retired_sbe
+            - name: dcgm.mig.memory.usage
+              description: MIG Memory Usage metrics.
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: reserved
+                - name: used
+            - name: dcgm.mig.memory.capacity
+              description: MIG Memory Capacity metrics.
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: dcgm.mig.memory.utilization
+              description: MIG Memory Utilization metrics.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: used_percent
+            - name: dcgm.mig.power.energy
+              description: MIG Energy Consumption Rate metrics.
+              unit: mJ/s
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: dcgm.mig.power.profiles
+              description: MIG Power Profiles metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: enforced_power_profile_mask
+                - name: requested_power_profile_mask
+                - name: valid_power_profile_mask
+            - name: dcgm.mig.power.smoothing
+              description: MIG Power Smoothing metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: pwr_smoothing_active_preset_profile
+                - name: pwr_smoothing_admin_override_percent_tmp_floor
+                - name: pwr_smoothing_admin_override_ramp_down_hyst_val
+                - name: pwr_smoothing_admin_override_ramp_down_rate
+                - name: pwr_smoothing_admin_override_ramp_up_rate
+                - name: pwr_smoothing_applied_tmp_ceil
+                - name: pwr_smoothing_applied_tmp_floor
+                - name: pwr_smoothing_enabled
+                - name: pwr_smoothing_hw_circuitry_percent_lifetime_remaining
+                - name: pwr_smoothing_imm_ramp_down_enabled
+                - name: pwr_smoothing_max_num_preset_profiles
+                - name: pwr_smoothing_max_percent_tmp_floor_setting
+                - name: pwr_smoothing_min_percent_tmp_floor_setting
+                - name: pwr_smoothing_priv_lvl
+                - name: pwr_smoothing_profile_percent_tmp_floor
+                - name: pwr_smoothing_profile_ramp_down_hyst_val
+                - name: pwr_smoothing_profile_ramp_down_rate
+                - name: pwr_smoothing_profile_ramp_up_rate
+            - name: dcgm.mig.power.usage
+              description: MIG Power Usage metrics.
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: draw
+                - name: enforced_limit
+                  visibility: hidden
+                - name: power_mgmt_limit
+                  visibility: hidden
+                - name: power_mgmt_limit_def
+                  visibility: hidden
+                - name: power_mgmt_limit_max
+                  visibility: hidden
+                - name: power_mgmt_limit_min
+                  visibility: hidden
+                - name: power_usage_instant
+            - name: dcgm.mig.reliability.memory_health
+              description: MIG Memory Health metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: banks_remap_rows_avail_high
+                - name: banks_remap_rows_avail_low
+                - name: banks_remap_rows_avail_max
+                - name: banks_remap_rows_avail_none
+                - name: banks_remap_rows_avail_partial
+                - name: memory_unrepairable_flag
+                - name: threshold_srm
+            - name: dcgm.mig.reliability.recovery_action
+              description: MIG Recovery Action metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: get_gpu_recovery_action
+            - name: dcgm.mig.reliability.row_remap_events
+              description: MIG Row Remap Events metrics.
+              unit: rows/s
+              chart_type: line
+              dimensions:
+                - name: correctable_remapped_rows
+                - name: uncorrectable_remapped_rows
+            - name: dcgm.mig.reliability.row_remap_status
+              description: MIG Row Remap Status metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: row_remap_failure
+                - name: row_remap_pending
+            - name: dcgm.mig.reliability.xid
+              description: MIG XID Errors metrics.
+              unit: code
+              chart_type: line
+              dimensions:
+                - name: xid
+            - name: dcgm.mig.state.configuration
+              description: MIG Configuration State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: autoboost
+                - name: compute_mode
+                - name: persistence_mode
+                - name: sync_boost
+                - name: sync_boost_violation
+            - name: dcgm.mig.state.performance
+              description: MIG Performance State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: pstate
+            - name: dcgm.mig.state.virtualization
+              description: MIG Virtualization State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: mig_mode
+                - name: virtual_mode
+            - name: dcgm.mig.thermal.fan_speed
+              description: MIG Fan Speed metrics.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: fan_speed
+            - name: dcgm.mig.thermal.temperature
+              description: MIG Temperature metrics.
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: gpu
+                - name: gpu_max_op_temp
+                  visibility: hidden
+                - name: gpu_temp_limit
+                  visibility: hidden
+                - name: mem_max_op_temp
+                  visibility: hidden
+                - name: memory
+                - name: shutdown_temp
+                  visibility: hidden
+                - name: slowdown_temp
+                  visibility: hidden
+            - name: dcgm.mig.throttle.reasons
+              description: MIG Throttle Reasons metrics.
+              unit: bitmask
+              chart_type: line
+              dimensions:
+                - name: clocks_event_reasons
+            - name: dcgm.mig.throttle.violations
+              description: MIG Throttle Violation Duration metrics.
+              unit: milliseconds/s
+              chart_type: line
+              dimensions:
+                - name: board_limit_violation
+                - name: hw_power_brake_slowdown
+                - name: hw_therm_slowdown
+                - name: low_utilization_violation
+                - name: power_violation
+                - name: reliability_violation
+                - name: sw_power_cap
+                - name: sw_therm_slowdown
+                - name: sync_boost
+                - name: thermal_violation
+                - name: total_app_clocks_violation
+                - name: total_base_clocks_violation
+        - name: nvlink
+          description: These metrics refer to NVLink link instances.
+          labels:
+            - name: gpu
+              description: gpu label from exporter metrics.
+            - name: gpu_uuid
+              description: gpu_uuid label from exporter metrics.
+            - name: nvlink
+              description: nvlink label from exporter metrics.
+          metrics:
+            - name: dcgm.nvlink.interconnect.ber
+              description: NVLink Interconnect Bit Error Rate metrics.
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: nvlink_count_effective_ber
+                - name: nvlink_count_effective_ber_float
+                - name: nvlink_count_symbol_ber
+                - name: nvlink_count_symbol_ber_float
+            - name: dcgm.nvlink.interconnect.congestion
+              description: NVLink Interconnect Congestion metrics.
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: nvlink_ppcnt_ibpc_port_xmit_wait
+            - name: dcgm.nvlink.interconnect.error_rate
+              description: NVLink Interconnect Error Rate metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: gpu_nvlink_errors
+                - name: nvlink_count_effective_errors
+                - name: nvlink_count_fec_history_0
+                - name: nvlink_count_fec_history_1
+                - name: nvlink_count_fec_history_10
+                - name: nvlink_count_fec_history_11
+                - name: nvlink_count_fec_history_12
+                - name: nvlink_count_fec_history_13
+                - name: nvlink_count_fec_history_14
+                - name: nvlink_count_fec_history_15
+                - name: nvlink_count_fec_history_2
+                - name: nvlink_count_fec_history_3
+                - name: nvlink_count_fec_history_4
+                - name: nvlink_count_fec_history_5
+                - name: nvlink_count_fec_history_6
+                - name: nvlink_count_fec_history_7
+                - name: nvlink_count_fec_history_8
+                - name: nvlink_count_fec_history_9
+                - name: nvlink_count_link_recovery_events
+                - name: nvlink_count_link_recovery_failed_events
+                - name: nvlink_count_link_recovery_successful_events
+                - name: nvlink_count_local_link_integrity_errors
+                - name: nvlink_count_rx_buffer_overrun_errors
+                - name: nvlink_count_rx_errors
+                - name: nvlink_count_rx_general_errors
+                - name: nvlink_count_rx_malformed_packet_errors
+                - name: nvlink_count_rx_remote_errors
+                - name: nvlink_count_rx_symbol_errors
+                - name: nvlink_count_tx_discards
+                - name: nvlink_crc_data_error
+                - name: nvlink_crc_data_error_count_l0
+                - name: nvlink_crc_data_error_count_l1
+                - name: nvlink_crc_data_error_count_l10
+                - name: nvlink_crc_data_error_count_l11
+                - name: nvlink_crc_data_error_count_l12
+                - name: nvlink_crc_data_error_count_l13
+                - name: nvlink_crc_data_error_count_l14
+                - name: nvlink_crc_data_error_count_l15
+                - name: nvlink_crc_data_error_count_l16
+                - name: nvlink_crc_data_error_count_l17
+                - name: nvlink_crc_data_error_count_l2
+                - name: nvlink_crc_data_error_count_l3
+                - name: nvlink_crc_data_error_count_l4
+                - name: nvlink_crc_data_error_count_l5
+                - name: nvlink_crc_data_error_count_l6
+                - name: nvlink_crc_data_error_count_l7
+                - name: nvlink_crc_data_error_count_l8
+                - name: nvlink_crc_data_error_count_l9
+                - name: nvlink_crc_flit_error
+                - name: nvlink_crc_flit_error_count_l0
+                - name: nvlink_crc_flit_error_count_l1
+                - name: nvlink_crc_flit_error_count_l10
+                - name: nvlink_crc_flit_error_count_l11
+                - name: nvlink_crc_flit_error_count_l12
+                - name: nvlink_crc_flit_error_count_l13
+                - name: nvlink_crc_flit_error_count_l14
+                - name: nvlink_crc_flit_error_count_l15
+                - name: nvlink_crc_flit_error_count_l16
+                - name: nvlink_crc_flit_error_count_l17
+                - name: nvlink_crc_flit_error_count_l2
+                - name: nvlink_crc_flit_error_count_l3
+                - name: nvlink_crc_flit_error_count_l4
+                - name: nvlink_crc_flit_error_count_l5
+                - name: nvlink_crc_flit_error_count_l6
+                - name: nvlink_crc_flit_error_count_l7
+                - name: nvlink_crc_flit_error_count_l8
+                - name: nvlink_crc_flit_error_count_l9
+                - name: nvlink_error_dl_crc
+                - name: nvlink_error_dl_recovery
+                - name: nvlink_error_dl_replay
+                - name: nvlink_ppcnt_physical_successful_recovery_events
+                - name: nvlink_ppcnt_plr_rcv_uncorrectable_code
+                - name: nvlink_ppcnt_recovery_time_since_last
+                - name: nvlink_ppcnt_recovery_total_successful_events
+                - name: nvlink_pprm_oper_recovery
+                - name: nvlink_recovery_error
+                - name: nvlink_recovery_error_count_l0
+                - name: nvlink_recovery_error_count_l1
+                - name: nvlink_recovery_error_count_l10
+                - name: nvlink_recovery_error_count_l11
+                - name: nvlink_recovery_error_count_l12
+                - name: nvlink_recovery_error_count_l13
+                - name: nvlink_recovery_error_count_l14
+                - name: nvlink_recovery_error_count_l15
+                - name: nvlink_recovery_error_count_l16
+                - name: nvlink_recovery_error_count_l17
+                - name: nvlink_recovery_error_count_l2
+                - name: nvlink_recovery_error_count_l3
+                - name: nvlink_recovery_error_count_l4
+                - name: nvlink_recovery_error_count_l5
+                - name: nvlink_recovery_error_count_l6
+                - name: nvlink_recovery_error_count_l7
+                - name: nvlink_recovery_error_count_l8
+                - name: nvlink_recovery_error_count_l9
                 - name: nvlink_replay_error
+                - name: nvlink_replay_error_count_l0
+                - name: nvlink_replay_error_count_l1
+                - name: nvlink_replay_error_count_l10
+                - name: nvlink_replay_error_count_l11
+                - name: nvlink_replay_error_count_l12
+                - name: nvlink_replay_error_count_l13
+                - name: nvlink_replay_error_count_l14
+                - name: nvlink_replay_error_count_l15
+                - name: nvlink_replay_error_count_l16
+                - name: nvlink_replay_error_count_l17
+                - name: nvlink_replay_error_count_l2
+                - name: nvlink_replay_error_count_l3
+                - name: nvlink_replay_error_count_l4
+                - name: nvlink_replay_error_count_l5
+                - name: nvlink_replay_error_count_l6
+                - name: nvlink_replay_error_count_l7
+                - name: nvlink_replay_error_count_l8
+                - name: nvlink_replay_error_count_l9
+            - name: dcgm.nvlink.interconnect.errors
+              description: NVLink Interconnect Errors metrics.
+              unit: errors
+              chart_type: line
+              dimensions:
+                - name: nvlink_ppcnt_plr_rcv_uncorrectable_code
+            - name: dcgm.nvlink.interconnect.state
+              description: NVLink Interconnect State metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: gpu_topology_nvlink
+                - name: nvlink_get_state
+                - name: nvlink_ppcnt_physical_link_down_counter
+                - name: nvlink_ppcnt_plr_rcv_code_err
+                - name: nvlink_ppcnt_plr_sync_events
+                - name: nvlink_ppcnt_plr_xmit_retry_events
+                - name: p2p_nvlink_status
+            - name: dcgm.nvlink.interconnect.throughput
+              description: NVLink Interconnect Throughput metrics.
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: nvlink_bandwidth
+                - name: nvlink_bandwidth_l0
+                - name: nvlink_bandwidth_l1
+                - name: nvlink_bandwidth_l10
+                - name: nvlink_bandwidth_l11
+                - name: nvlink_bandwidth_l12
+                - name: nvlink_bandwidth_l13
+                - name: nvlink_bandwidth_l14
+                - name: nvlink_bandwidth_l15
+                - name: nvlink_bandwidth_l16
+                - name: nvlink_bandwidth_l17
+                - name: nvlink_bandwidth_l2
+                - name: nvlink_bandwidth_l3
+                - name: nvlink_bandwidth_l4
+                - name: nvlink_bandwidth_l5
+                - name: nvlink_bandwidth_l6
+                - name: nvlink_bandwidth_l7
+                - name: nvlink_bandwidth_l8
+                - name: nvlink_bandwidth_l9
+                - name: nvlink_count_rx_bytes
+                - name: nvlink_count_tx_bytes
+                - name: nvlink_l0_rx_bytes
+                - name: nvlink_l0_tx_bytes
+                - name: nvlink_l10_rx_bytes
+                - name: nvlink_l10_tx_bytes
+                - name: nvlink_l11_rx_bytes
+                - name: nvlink_l11_tx_bytes
+                - name: nvlink_l12_rx_bytes
+                - name: nvlink_l12_tx_bytes
+                - name: nvlink_l13_rx_bytes
+                - name: nvlink_l13_tx_bytes
+                - name: nvlink_l14_rx_bytes
+                - name: nvlink_l14_tx_bytes
+                - name: nvlink_l15_rx_bytes
+                - name: nvlink_l15_tx_bytes
+                - name: nvlink_l16_rx_bytes
+                - name: nvlink_l16_tx_bytes
+                - name: nvlink_l17_rx_bytes
+                - name: nvlink_l17_tx_bytes
+                - name: nvlink_l1_rx_bytes
+                - name: nvlink_l1_tx_bytes
+                - name: nvlink_l2_rx_bytes
+                - name: nvlink_l2_tx_bytes
+                - name: nvlink_l3_rx_bytes
+                - name: nvlink_l3_tx_bytes
+                - name: nvlink_l4_rx_bytes
+                - name: nvlink_l4_tx_bytes
+                - name: nvlink_l5_rx_bytes
+                - name: nvlink_l5_tx_bytes
+                - name: nvlink_l6_rx_bytes
+                - name: nvlink_l6_tx_bytes
+                - name: nvlink_l7_rx_bytes
+                - name: nvlink_l7_tx_bytes
+                - name: nvlink_l8_rx_bytes
+                - name: nvlink_l8_tx_bytes
+                - name: nvlink_l9_rx_bytes
+                - name: nvlink_l9_tx_bytes
+                - name: nvlink_rx_bandwidth
+                - name: nvlink_rx_bandwidth_l0
+                - name: nvlink_rx_bandwidth_l1
+                - name: nvlink_rx_bandwidth_l10
+                - name: nvlink_rx_bandwidth_l11
+                - name: nvlink_rx_bandwidth_l12
+                - name: nvlink_rx_bandwidth_l13
+                - name: nvlink_rx_bandwidth_l14
+                - name: nvlink_rx_bandwidth_l15
+                - name: nvlink_rx_bandwidth_l16
+                - name: nvlink_rx_bandwidth_l17
+                - name: nvlink_rx_bandwidth_l2
+                - name: nvlink_rx_bandwidth_l3
+                - name: nvlink_rx_bandwidth_l4
+                - name: nvlink_rx_bandwidth_l5
+                - name: nvlink_rx_bandwidth_l6
+                - name: nvlink_rx_bandwidth_l7
+                - name: nvlink_rx_bandwidth_l8
+                - name: nvlink_rx_bandwidth_l9
+                - name: nvlink_rx_bytes
+                - name: nvlink_tx_bandwidth
+                - name: nvlink_tx_bandwidth_l0
+                - name: nvlink_tx_bandwidth_l1
+                - name: nvlink_tx_bandwidth_l10
+                - name: nvlink_tx_bandwidth_l11
+                - name: nvlink_tx_bandwidth_l12
+                - name: nvlink_tx_bandwidth_l13
+                - name: nvlink_tx_bandwidth_l14
+                - name: nvlink_tx_bandwidth_l15
+                - name: nvlink_tx_bandwidth_l16
+                - name: nvlink_tx_bandwidth_l17
+                - name: nvlink_tx_bandwidth_l2
+                - name: nvlink_tx_bandwidth_l3
+                - name: nvlink_tx_bandwidth_l4
+                - name: nvlink_tx_bandwidth_l5
+                - name: nvlink_tx_bandwidth_l6
+                - name: nvlink_tx_bandwidth_l7
+                - name: nvlink_tx_bandwidth_l8
+                - name: nvlink_tx_bandwidth_l9
+                - name: nvlink_tx_bytes
+            - name: dcgm.nvlink.interconnect.traffic
+              description: NVLink Interconnect Traffic metrics.
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: nvlink_count_rx_packets
+                - name: nvlink_count_tx_packets
+                - name: nvlink_ppcnt_plr_rcv_codes
+                - name: nvlink_ppcnt_plr_xmit_codes
+                - name: nvlink_ppcnt_plr_xmit_retry_codes
+            - name: dcgm.nvlink.internal.boundary
+              description: NVLink Internal Boundary Fields metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: nvlink_ppcnt_recovery_time_between_last_two
+            - name: dcgm.nvlink.memory.ecc_error_rate
+              description: NVLink ECC Error Rate metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: nvlink_ecc_data_error
+        - name: nvswitch
+          description: These metrics refer to NVSwitch instances.
+          labels:
+            - name: nvswitch
+              description: nvswitch label from exporter metrics.
+          metrics:
+            - name: dcgm.nvswitch.interconnect.nvswitch.current
+              description: NVSwitch NVSwitch Current metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: nvswitch_current_iddq
+                - name: nvswitch_current_iddq_dvdd
+                - name: nvswitch_current_iddq_rev
+            - name: dcgm.nvswitch.interconnect.nvswitch.errors
+              description: NVSwitch NVSwitch Errors metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: nvswitch_fatal_errors
+                - name: nvswitch_link_crc_errors
+                - name: nvswitch_link_crc_errors_lane0
+                - name: nvswitch_link_crc_errors_lane1
+                - name: nvswitch_link_crc_errors_lane2
+                - name: nvswitch_link_crc_errors_lane3
+                - name: nvswitch_link_crc_errors_lane4
+                - name: nvswitch_link_crc_errors_lane5
+                - name: nvswitch_link_crc_errors_lane6
+                - name: nvswitch_link_crc_errors_lane7
+                - name: nvswitch_link_fatal_errors
+                - name: nvswitch_link_flit_errors
+                - name: nvswitch_link_non_fatal_errors
+                - name: nvswitch_link_recovery_errors
+                - name: nvswitch_link_replay_errors
+                - name: nvswitch_non_fatal_errors
+            - name: dcgm.nvswitch.interconnect.nvswitch.latency
+              description: NVSwitch NVSwitch Link Latency metrics.
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: nvswitch_link_latency_count_vc0
+                - name: nvswitch_link_latency_count_vc1
+                - name: nvswitch_link_latency_count_vc2
+                - name: nvswitch_link_latency_count_vc3
+                - name: nvswitch_link_latency_high_vc0
+                - name: nvswitch_link_latency_high_vc1
+                - name: nvswitch_link_latency_high_vc2
+                - name: nvswitch_link_latency_high_vc3
+                - name: nvswitch_link_latency_low_vc0
+                - name: nvswitch_link_latency_low_vc1
+                - name: nvswitch_link_latency_low_vc2
+                - name: nvswitch_link_latency_low_vc3
+                - name: nvswitch_link_latency_medium_vc0
+                - name: nvswitch_link_latency_medium_vc1
+                - name: nvswitch_link_latency_medium_vc2
+                - name: nvswitch_link_latency_medium_vc3
+                - name: nvswitch_link_latency_panic_vc0
+                - name: nvswitch_link_latency_panic_vc1
+                - name: nvswitch_link_latency_panic_vc2
+                - name: nvswitch_link_latency_panic_vc3
+            - name: dcgm.nvswitch.interconnect.nvswitch.power
+              description: NVSwitch NVSwitch Power metrics.
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: nvswitch_power_dvdd
+                - name: nvswitch_power_hvdd
+                - name: nvswitch_power_vdd
+            - name: dcgm.nvswitch.interconnect.nvswitch.status
+              description: NVSwitch NVSwitch Status metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: nvswitch_link_status
+                - name: nvswitch_link_type
+                - name: nvswitch_reset_required
+            - name: dcgm.nvswitch.interconnect.nvswitch.throughput
+              description: NVSwitch NVSwitch Throughput metrics.
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: nvswitch_link_throughput_rx
+                - name: nvswitch_link_throughput_tx
+                - name: nvswitch_throughput_rx
+                - name: nvswitch_throughput_tx
+            - name: dcgm.nvswitch.interconnect.nvswitch.topology
+              description: NVSwitch NVSwitch Topology metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: nvswitch_device_uuid
+                - name: nvswitch_link_device_link_id
+                - name: nvswitch_link_device_link_sid
+                - name: nvswitch_link_id
+                - name: nvswitch_link_remote_pcie_bus
+                - name: nvswitch_link_remote_pcie_device
+                - name: nvswitch_link_remote_pcie_domain
+                - name: nvswitch_link_remote_pcie_function
+                - name: nvswitch_pcie_bus
+                - name: nvswitch_pcie_device
+                - name: nvswitch_pcie_domain
+                - name: nvswitch_pcie_function
+                - name: nvswitch_phys_id
+            - name: dcgm.nvswitch.interconnect.nvswitch.voltage
+              description: NVSwitch NVSwitch Voltage metrics.
+              unit: mV
+              chart_type: line
+              dimensions:
+                - name: nvswitch_voltage_mvolt
+            - name: dcgm.nvswitch.internal.boundary
+              description: NVSwitch Internal Boundary Fields metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: first_nvswitch_field_id
+                - name: last_nvswitch_field_id
+            - name: dcgm.nvswitch.memory.ecc_error_rate
+              description: NVSwitch ECC Error Rate metrics.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: nvswitch_link_ecc_errors
+                - name: nvswitch_link_ecc_errors_lane0
+                - name: nvswitch_link_ecc_errors_lane1
+                - name: nvswitch_link_ecc_errors_lane2
+                - name: nvswitch_link_ecc_errors_lane3
+                - name: nvswitch_link_ecc_errors_lane4
+                - name: nvswitch_link_ecc_errors_lane5
+                - name: nvswitch_link_ecc_errors_lane6
+                - name: nvswitch_link_ecc_errors_lane7
+            - name: dcgm.nvswitch.thermal.temperature
+              description: NVSwitch Temperature metrics.
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: nvswitch_temperature_current
+                - name: nvswitch_temperature_limit_shutdown
+                - name: nvswitch_temperature_limit_slowdown
+        - name: cpu
+          description: These metrics refer to host CPU instances.
+          labels:
+            - name: cpu
+              description: cpu label from exporter metrics.
+          metrics:
+            - name: dcgm.cpu.clock.frequency
+              description: CPU Clock Frequency metrics.
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: cpu_clock_current
+            - name: dcgm.cpu.cpu.info
+              description: CPU CPU Information metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: cpu_model
+                - name: cpu_vendor
+            - name: dcgm.cpu.cpu.power
+              description: CPU CPU Power metrics.
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: cpu_power_limit
+                - name: cpu_power_util_current
+            - name: dcgm.cpu.cpu.temperature
+              description: CPU CPU Temperature metrics.
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: cpu_temp_critical
+                - name: cpu_temp_current
+                - name: cpu_temp_warning
+            - name: dcgm.cpu.cpu.utilization
+              description: CPU CPU Utilization metrics.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: cpu_util
+                - name: cpu_util_irq
+                - name: cpu_util_nice
+                - name: cpu_util_sys
+                - name: cpu_util_user
+            - name: dcgm.cpu.diagnostics.results
+              description: CPU Diagnostics Results metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: diag_cpu_eud_result
+        - name: cpu_core
+          description: These metrics refer to host CPU core instances.
+          labels:
+            - name: cpu
+              description: cpu label from exporter metrics.
+            - name: cpucore
+              description: cpucore label from exporter metrics.
+          metrics:
+            - name: dcgm.cpu_core.clock.frequency
+              description: CPU Core Clock Frequency metrics.
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: cpu_clock_current
+            - name: dcgm.cpu_core.cpu.info
+              description: CPU Core CPU Information metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: cpu_model
+                - name: cpu_vendor
+            - name: dcgm.cpu_core.cpu.power
+              description: CPU Core CPU Power metrics.
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: cpu_power_limit
+                - name: cpu_power_util_current
+            - name: dcgm.cpu_core.cpu.temperature
+              description: CPU Core CPU Temperature metrics.
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: cpu_temp_critical
+                - name: cpu_temp_current
+                - name: cpu_temp_warning
+            - name: dcgm.cpu_core.cpu.utilization
+              description: CPU Core CPU Utilization metrics.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: cpu_util
+                - name: cpu_util_irq
+                - name: cpu_util_nice
+                - name: cpu_util_sys
+                - name: cpu_util_user
+            - name: dcgm.cpu_core.diagnostics.results
+              description: CPU Core Diagnostics Results metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: diag_cpu_eud_result
+        - name: exporter
+          description: These metrics refer to exporter/global instances.
+          labels:
+            - name: job
+              description: job label from exporter metrics.
+          metrics:
+            - name: dcgm.exporter.health.status
+              description: Exporter Health Status metrics.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: bind_unbind_event
+            - name: dcgm.exporter.inventory.software
+              description: Exporter Software and Firmware metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: cuda_driver_version
+                - name: driver_version
+                - name: nvml_version

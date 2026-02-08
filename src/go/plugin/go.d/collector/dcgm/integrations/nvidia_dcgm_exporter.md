@@ -47,60 +47,22 @@ Netdata provides a recommended exporter profile file:
 Example:
 `dcgm-exporter -f /path/to/dcgm-exporter-netdata.csv`
 
-Suggested baseline profile (comprehensive coverage with actionable throttling fields):
+The Netdata profile enables 127 high-value fields by default and keeps all other known DCGM fields in the same file as commented entries for easy customization.
 
-- Utilization and compute activity:
-  - `DCGM_FI_DEV_GPU_UTIL`
-  - `DCGM_FI_DEV_MEM_COPY_UTIL`
-  - `DCGM_FI_DEV_ENC_UTIL`
-  - `DCGM_FI_DEV_DEC_UTIL`
-  - `DCGM_FI_PROF_GR_ENGINE_ACTIVE`
-  - `DCGM_FI_PROF_SM_ACTIVE`
-  - `DCGM_FI_PROF_SM_OCCUPANCY`
-  - `DCGM_FI_PROF_PIPE_TENSOR_ACTIVE`
-  - `DCGM_FI_PROF_DRAM_ACTIVE`
-  - `DCGM_FI_PROF_PIPE_FP16_ACTIVE`
-  - `DCGM_FI_PROF_PIPE_FP32_ACTIVE`
-  - `DCGM_FI_PROF_PIPE_FP64_ACTIVE`
-- Frame buffer and memory:
-  - `DCGM_FI_DEV_FB_TOTAL`
-  - `DCGM_FI_DEV_FB_USED`
-  - `DCGM_FI_DEV_FB_FREE`
-  - `DCGM_FI_DEV_FB_RESERVED`
-  - `DCGM_FI_DEV_FB_USED_PERCENT`
-- Thermals, clocks, and power:
-  - `DCGM_FI_DEV_GPU_TEMP`
-  - `DCGM_FI_DEV_MEMORY_TEMP`
-  - `DCGM_FI_DEV_SLOWDOWN_TEMP`
-  - `DCGM_FI_DEV_SM_CLOCK`
-  - `DCGM_FI_DEV_MEM_CLOCK`
-  - `DCGM_FI_DEV_FAN_SPEED`
-  - `DCGM_FI_DEV_POWER_USAGE`
-  - `DCGM_FI_DEV_POWER_MGMT_LIMIT`
-  - `DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION`
-  - `DCGM_FI_DEV_PSTATE`
-  - `DCGM_FI_DEV_CLOCK_THROTTLE_REASONS`
-- Reliability and violations:
-  - `DCGM_FI_DEV_XID_ERRORS`
-  - `DCGM_FI_DEV_ROW_REMAP_FAILURE`
-  - `DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS`
-  - `DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS`
-  - `DCGM_FI_DEV_POWER_VIOLATION`
-  - `DCGM_FI_DEV_THERMAL_VIOLATION`
-- Interconnect:
-  - `DCGM_FI_DEV_PCIE_REPLAY_COUNTER`
-  - `DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL`
-  - `DCGM_FI_PROF_PCIE_TX_BYTES`
-  - `DCGM_FI_PROF_PCIE_RX_BYTES`
-- Device and virtualization:
-  - `DCGM_FI_DEV_COUNT`
-  - `DCGM_FI_DEV_VGPU_LICENSE_STATUS`
-  - `DCGM_FI_DEV_UUID`
-  - `DCGM_FI_DRIVER_VERSION`
-  - `DCGM_FI_DEV_NAME`
-  - `DCGM_FI_DEV_SERIAL`
-  - `DCGM_FI_DEV_BRAND`
-  - `DCGM_FI_DEV_MINOR_NUMBER`
+Runtime validation artifact:
+- `src/go/plugin/go.d/collector/dcgm/runtime-validation-driver-590.48.01-dcgm-exporter-4.4.1-4.5.2.md`
+- `src/go/plugin/go.d/collector/dcgm/runtime-validation-driver-590.48.01-dcgm-exporter-4.4.1-4.5.2.json`
+
+Validation results are primarily version-scoped (NVIDIA driver + DCGM/dcgm-exporter versions). Use the artifact as a concrete baseline, not as a universal compatibility guarantee.
+
+Each field line includes a comment with:
+- Netdata context
+- Netdata family
+- Netdata dimension
+
+When customizing:
+- Uncomment the field you need.
+- Comment one currently enabled field.
 
 ## Alerts
 

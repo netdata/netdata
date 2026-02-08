@@ -19,6 +19,15 @@ import (
 
 const precision = 1000.0
 
+type interconnectThroughputTotals struct {
+	instance            entityInstance
+	pcie                int64
+	nvlink              int64
+	hasPcie             bool
+	hasNvlink           bool
+	hasExplicitNvlinkTt bool
+}
+
 func (c *Collector) collect() (map[string]int64, error) {
 	mfs, err := c.prom.Scrape()
 	if err != nil {
@@ -42,6 +51,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	}
 
 	mx := make(map[string]int64)
+	totals := make(map[string]*interconnectThroughputTotals)
 	c.cache.reset()
 
 	for _, mf := range mfs {
@@ -76,10 +86,13 @@ func (c *Collector) collect() (map[string]int64, error) {
 			chartKey, chart := c.ensureChart(instance, spec.Context)
 			dimID := c.ensureDim(chartKey, chart, spec, metric.Labels(), typ)
 
-			mx[dimID] += int64(value * spec.Scale * precision)
+			scaled := int64(value * spec.Scale * precision)
+			mx[dimID] += scaled
+			c.accumulateInterconnectTotals(totals, instance, spec.Context.ID, mf.Name(), scaled)
 		}
 	}
 
+	c.emitInterconnectTotals(mx, totals)
 	c.removeStaleChartsAndDims()
 
 	if len(mx) == 0 {
@@ -87,6 +100,72 @@ func (c *Collector) collect() (map[string]int64, error) {
 	}
 
 	return mx, nil
+}
+
+func (c *Collector) accumulateInterconnectTotals(
+	totals map[string]*interconnectThroughputTotals,
+	instance entityInstance,
+	contextID, metricName string,
+	scaled int64,
+) {
+	isPCIe := strings.HasSuffix(contextID, ".interconnect.pcie.throughput")
+	isNVLink := strings.HasSuffix(contextID, ".interconnect.nvlink.throughput")
+	if !isPCIe && !isNVLink {
+		return
+	}
+
+	key := string(instance.entity) + "|" + instance.key
+	tot, ok := totals[key]
+	if !ok {
+		tot = &interconnectThroughputTotals{instance: instance}
+		totals[key] = tot
+	}
+
+	if isPCIe {
+		tot.pcie += scaled
+		tot.hasPcie = true
+		return
+	}
+
+	if isNVLinkTotalMetricName(metricName) {
+		if !tot.hasExplicitNvlinkTt {
+			tot.nvlink = 0
+			tot.hasExplicitNvlinkTt = true
+		}
+		tot.nvlink += scaled
+		tot.hasNvlink = true
+		return
+	}
+
+	if tot.hasExplicitNvlinkTt {
+		return
+	}
+	tot.nvlink += scaled
+	tot.hasNvlink = true
+}
+
+func (c *Collector) emitInterconnectTotals(mx map[string]int64, totals map[string]*interconnectThroughputTotals) {
+	for _, tot := range totals {
+		if !tot.hasPcie && !tot.hasNvlink {
+			continue
+		}
+
+		ctxID := fmt.Sprintf("dcgm.%s.interconnect.total.throughput", tot.instance.entity)
+		spec, ok := contextCatalog[ctxID]
+		if !ok {
+			continue
+		}
+
+		chartKey, chart := c.ensureChart(tot.instance, spec)
+		if tot.hasPcie {
+			dimID := c.ensureDim(chartKey, chart, metricSpec{Context: spec, DimName: "pcie", Scale: 1}, nil, sampleGauge)
+			mx[dimID] += tot.pcie
+		}
+		if tot.hasNvlink {
+			dimID := c.ensureDim(chartKey, chart, metricSpec{Context: spec, DimName: "nvlink", Scale: 1}, nil, sampleGauge)
+			mx[dimID] += tot.nvlink
+		}
+	}
 }
 
 func (c *Collector) ensureChart(instance entityInstance, spec contextSpec) (string, *module.Chart) {
@@ -144,6 +223,9 @@ func (c *Collector) ensureDim(
 			dim.Algo = module.Incremental
 		default:
 			dim.Algo = module.Absolute
+		}
+		if shouldHideDimensionByDefault(spec.Context.ID, dimName) {
+			dim.Hidden = true
 		}
 
 		if err := chart.AddDim(dim); err != nil {
@@ -378,6 +460,46 @@ func semanticDimSuffix(lbls promlabels.Labels) string {
 func normalizeLabelKey(s string) string {
 	s = strings.ToLower(s)
 	return sanitizeID(s)
+}
+
+func shouldHideDimensionByDefault(contextID, dimName string) bool {
+	switch {
+	case strings.HasSuffix(contextID, ".clock.frequency"):
+		return containsAny(dimName,
+			"app_mem_clock",
+			"app_sm_clock",
+			"max_mem_clock",
+			"max_sm_clock",
+			"max_video_clock",
+		)
+	case strings.HasSuffix(contextID, ".thermal.temperature"):
+		return containsAny(dimName,
+			"gpu_max_op_temp",
+			"gpu_temp_limit",
+			"mem_max_op_temp",
+			"shutdown_temp",
+			"slowdown_temp",
+		)
+	case strings.HasSuffix(contextID, ".power.usage"):
+		return containsAny(dimName,
+			"enforced_limit",
+			"power_mgmt_limit",
+			"power_mgmt_limit_def",
+			"power_mgmt_limit_max",
+			"power_mgmt_limit_min",
+		)
+	case strings.HasSuffix(contextID, ".interconnect.pcie.link.generation"):
+		return containsAny(dimName, "max_link_gen")
+	case strings.HasSuffix(contextID, ".interconnect.pcie.link.width"):
+		return containsAny(dimName, "max_link_width")
+	default:
+		return false
+	}
+}
+
+func isNVLinkTotalMetricName(name string) bool {
+	n := strings.ToUpper(name)
+	return strings.Contains(n, "NVLINK") && containsAny(n, "BANDWIDTH_TOTAL", "RX_BANDWIDTH_TOTAL", "TX_BANDWIDTH_TOTAL")
 }
 
 func makeID(parts ...string) string {

@@ -57,7 +57,9 @@ var groupCatalog = []groupSpec{
 	{Suffix: "compute.activity", Title: "Compute Pipeline Activity", Units: "percentage", Family: "compute", Type: module.Line},
 	{Suffix: "memory.utilization", Title: "Memory Utilization", Units: "percentage", Family: "memory", Type: module.Line},
 	{Suffix: "memory.usage", Title: "Memory Usage", Units: "bytes", Family: "memory", Type: module.Stacked},
+	{Suffix: "memory.capacity", Title: "Memory Capacity", Units: "bytes", Family: "memory", Type: module.Line},
 	{Suffix: "memory.bar1_usage", Title: "BAR1 Memory Usage", Units: "bytes", Family: "memory", Type: module.Stacked},
+	{Suffix: "memory.bar1_capacity", Title: "BAR1 Memory Capacity", Units: "bytes", Family: "memory", Type: module.Line},
 	{Suffix: "memory.ecc_errors", Title: "ECC Errors", Units: "errors", Family: "memory", Type: module.Line},
 	{Suffix: "memory.ecc_error_rate", Title: "ECC Error Rate", Units: "errors/s", Family: "memory", Type: module.Line},
 	{Suffix: "memory.page_retirements", Title: "Retired Memory Pages", Units: "pages/s", Family: "memory", Type: module.Line},
@@ -74,14 +76,28 @@ var groupCatalog = []groupSpec{
 	{Suffix: "power.profiles", Title: "Power Profiles", Units: "state", Family: "power", Type: module.Line},
 	{Suffix: "power.smoothing", Title: "Power Smoothing", Units: "value", Family: "power", Type: module.Line},
 	{Suffix: "throttle.violations", Title: "Throttle Violation Duration", Units: "milliseconds/s", Family: "throttle", Type: module.Line},
+	{Suffix: "interconnect.total.throughput", Title: "Interconnect Total Throughput", Units: "bytes/s", Family: "interconnect/overview", Type: module.Area},
+	{Suffix: "interconnect.pcie.throughput", Title: "PCIe Throughput", Units: "bytes/s", Family: "interconnect/pcie", Type: module.Area},
+	{Suffix: "interconnect.nvlink.throughput", Title: "NVLink Throughput", Units: "bytes/s", Family: "interconnect/nvlink", Type: module.Area},
 	{Suffix: "interconnect.throughput", Title: "Interconnect Throughput", Units: "bytes/s", Family: "interconnect", Type: module.Area},
+	{Suffix: "interconnect.pcie.traffic", Title: "PCIe Traffic", Units: "events/s", Family: "interconnect/pcie", Type: module.Line},
+	{Suffix: "interconnect.nvlink.traffic", Title: "NVLink Traffic", Units: "events/s", Family: "interconnect/nvlink", Type: module.Line},
 	{Suffix: "interconnect.traffic", Title: "Interconnect Traffic", Units: "events/s", Family: "interconnect", Type: module.Line},
+	{Suffix: "interconnect.pcie.ber", Title: "PCIe Bit Error Rate", Units: "ratio", Family: "interconnect/pcie", Type: module.Line},
+	{Suffix: "interconnect.nvlink.ber", Title: "NVLink Bit Error Rate", Units: "ratio", Family: "interconnect/nvlink", Type: module.Line},
 	{Suffix: "interconnect.ber", Title: "Interconnect Bit Error Rate", Units: "ratio", Family: "interconnect", Type: module.Line},
-	{Suffix: "interconnect.link.generation", Title: "PCIe Link Generation", Units: "generation", Family: "interconnect", Type: module.Line},
-	{Suffix: "interconnect.link.width", Title: "PCIe Link Width", Units: "lanes", Family: "interconnect", Type: module.Line},
+	{Suffix: "interconnect.pcie.link.generation", Title: "PCIe Link Generation", Units: "generation", Family: "interconnect/pcie", Type: module.Line},
+	{Suffix: "interconnect.pcie.link.width", Title: "PCIe Link Width", Units: "lanes", Family: "interconnect/pcie", Type: module.Line},
+	{Suffix: "interconnect.pcie.state", Title: "PCIe State", Units: "state", Family: "interconnect/pcie", Type: module.Line},
+	{Suffix: "interconnect.nvlink.state", Title: "NVLink State", Units: "state", Family: "interconnect/nvlink", Type: module.Line},
 	{Suffix: "interconnect.state", Title: "Interconnect State", Units: "state", Family: "interconnect", Type: module.Line},
+	{Suffix: "interconnect.nvlink.congestion", Title: "NVLink Congestion", Units: "events/s", Family: "interconnect/nvlink", Type: module.Line},
 	{Suffix: "interconnect.congestion", Title: "Interconnect Congestion", Units: "events/s", Family: "interconnect", Type: module.Line},
 	{Suffix: "interconnect.fabric", Title: "Fabric State", Units: "state", Family: "interconnect", Type: module.Line},
+	{Suffix: "interconnect.pcie.errors", Title: "PCIe Errors", Units: "errors", Family: "interconnect/pcie", Type: module.Line},
+	{Suffix: "interconnect.pcie.error_rate", Title: "PCIe Error Rate", Units: "errors/s", Family: "interconnect/pcie", Type: module.Line},
+	{Suffix: "interconnect.nvlink.errors", Title: "NVLink Errors", Units: "errors", Family: "interconnect/nvlink", Type: module.Line},
+	{Suffix: "interconnect.nvlink.error_rate", Title: "NVLink Error Rate", Units: "errors/s", Family: "interconnect/nvlink", Type: module.Line},
 	{Suffix: "interconnect.errors", Title: "Interconnect Errors", Units: "errors", Family: "interconnect", Type: module.Line},
 	{Suffix: "interconnect.error_rate", Title: "Interconnect Error Rate", Units: "errors/s", Family: "interconnect", Type: module.Line},
 	{Suffix: "interconnect.connectx.status", Title: "ConnectX Status", Units: "state", Family: "interconnect", Type: module.Line},
@@ -184,7 +200,7 @@ func entityFamilyPrefix(entity metricEntity) string {
 }
 
 func classifyMetric(entity metricEntity, metricName, help string, typ sampleKind) metricSpec {
-	group := classifyMetricGroup(metricName, typ)
+	group := classifyMetricGroup(entity, metricName, typ)
 	ctxID := fmt.Sprintf("dcgm.%s.%s", entity, group)
 	spec, ok := contextCatalog[ctxID]
 	if !ok {
@@ -202,7 +218,7 @@ func classifyMetric(entity metricEntity, metricName, help string, typ sampleKind
 	}
 }
 
-func classifyMetricGroup(metricName string, typ sampleKind) string {
+func classifyMetricGroup(entity metricEntity, metricName string, typ sampleKind) string {
 	name := strings.ToUpper(metricName)
 
 	switch {
@@ -232,9 +248,13 @@ func classifyMetricGroup(metricName string, typ sampleKind) string {
 		return "compute.activity"
 	case strings.Contains(name, "FB_USED_PERCENT"):
 		return "memory.utilization"
+	case strings.Contains(name, "BAR1_TOTAL"):
+		return "memory.bar1_capacity"
 	case strings.Contains(name, "BAR1"):
 		return "memory.bar1_usage"
-	case containsAny(name, "FB_TOTAL", "FB_FREE", "FB_USED", "FB_RESERVED", "FRAME_BUFFER"):
+	case strings.Contains(name, "FB_TOTAL"):
+		return "memory.capacity"
+	case containsAny(name, "FB_FREE", "FB_USED", "FB_RESERVED", "FRAME_BUFFER"):
 		return "memory.usage"
 	case strings.Contains(name, "ECC_"):
 		if typ == sampleCounter {
@@ -255,6 +275,10 @@ func classifyMetricGroup(metricName string, typ sampleKind) string {
 		return "reliability.recovery_action"
 	case containsAny(name, "HEALTH_STATUS", "P2P_STATUS", "CLOCK_EVENTS_COUNT", "IMEX_DOMAIN_STATUS", "IMEX_DAEMON_STATUS", "BIND_UNBIND_EVENT"):
 		return "health.status"
+	case strings.Contains(name, "CLOCKS_EVENT_REASONS"):
+		return "throttle.reasons"
+	case strings.Contains(name, "CLOCKS_EVENT_REASON"):
+		return "throttle.violations"
 	case strings.Contains(name, "CLOCK_THROTTLE_REASONS"):
 		return "throttle.reasons"
 	case strings.Contains(name, "PSTATE"):
@@ -263,10 +287,6 @@ func classifyMetricGroup(metricName string, typ sampleKind) string {
 		return "state.virtualization"
 	case containsAny(name, "COMPUTE_MODE", "PERSISTENCE_MODE", "AUTOBOOST", "SYNC_BOOST"):
 		return "state.configuration"
-	case strings.Contains(name, "CLOCKS_EVENT_REASON"):
-		return "throttle.violations"
-	case strings.Contains(name, "CLOCKS_EVENT_REASONS"):
-		return "throttle.reasons"
 	case containsAny(name, "GPU_TEMP", "MEMORY_TEMP", "SLOWDOWN_TEMP", "MAX_OP_TEMP", "SHUTDOWN_TEMP", "TEMPERATURE"):
 		return "thermal.temperature"
 	case strings.Contains(name, "FAN_SPEED"):
@@ -282,9 +302,9 @@ func classifyMetricGroup(metricName string, typ sampleKind) string {
 	case strings.Contains(name, "VIOLATION"):
 		return "throttle.violations"
 	case strings.Contains(name, "PCIE") && strings.Contains(name, "LINK_GEN"):
-		return "interconnect.link.generation"
+		return "interconnect.pcie.link.generation"
 	case strings.Contains(name, "PCIE") && strings.Contains(name, "LINK_WIDTH"):
-		return "interconnect.link.width"
+		return "interconnect.pcie.link.width"
 	case strings.Contains(name, "NVSWITCH"):
 		return classifyNVSwitchGroup(name, typ)
 	case strings.Contains(name, "CONNECTX"):
@@ -292,7 +312,7 @@ func classifyMetricGroup(metricName string, typ sampleKind) string {
 	case strings.Contains(name, "C2C_"):
 		return classifyC2CGroup(name, typ)
 	case strings.Contains(name, "PCIE") || strings.Contains(name, "NVLINK") || strings.Contains(name, "P2P_") || strings.Contains(name, "FABRIC_"):
-		return classifyInterconnectGroup(name, typ)
+		return classifyInterconnectGroup(entity, name, typ)
 	case strings.Contains(name, "XID"):
 		return "reliability.xid"
 	case strings.Contains(name, "DIAG_"):
@@ -332,26 +352,86 @@ func classifyMetricGroup(metricName string, typ sampleKind) string {
 	}
 }
 
-func classifyInterconnectGroup(name string, typ sampleKind) string {
+func classifyInterconnectGroup(entity metricEntity, name string, typ sampleKind) string {
 	switch {
 	case containsAny(name, "P2P_STATUS"):
 		return "health.status"
 	case containsAny(name, "FABRIC_"):
 		return "interconnect.fabric"
+	case strings.Contains(name, "PCIE") && containsAny(name, "BYTES", "THROUGHPUT", "BANDWIDTH"):
+		return "interconnect.pcie.throughput"
+	case strings.Contains(name, "NVLINK") && containsAny(name, "BYTES", "THROUGHPUT", "BANDWIDTH"):
+		if entity == entityNVLink {
+			return "interconnect.throughput"
+		}
+		return "interconnect.nvlink.throughput"
 	case containsAny(name, "XMIT_WAIT"):
+		if strings.Contains(name, "NVLINK") {
+			if entity == entityNVLink {
+				return "interconnect.congestion"
+			}
+			return "interconnect.nvlink.congestion"
+		}
 		return "interconnect.congestion"
 	case containsAny(name, "BER"):
+		if strings.Contains(name, "PCIE") {
+			return "interconnect.pcie.ber"
+		}
+		if strings.Contains(name, "NVLINK") {
+			if entity == entityNVLink {
+				return "interconnect.ber"
+			}
+			return "interconnect.nvlink.ber"
+		}
 		return "interconnect.ber"
 	case containsAny(name, "PACKETS", "CODES"):
+		if strings.Contains(name, "PCIE") {
+			return "interconnect.pcie.traffic"
+		}
+		if strings.Contains(name, "NVLINK") {
+			if entity == entityNVLink {
+				return "interconnect.traffic"
+			}
+			return "interconnect.nvlink.traffic"
+		}
 		return "interconnect.traffic"
 	case containsAny(name, "BYTES", "THROUGHPUT", "BANDWIDTH"):
 		return "interconnect.throughput"
 	case containsAny(name, "ERROR", "CRC", "REPLAY", "RECOVERY", "DISCARD", "FEC", "UNCORRECTABLE", "INTEGRITY"):
+		if strings.Contains(name, "PCIE") {
+			if typ == sampleCounter {
+				return "interconnect.pcie.error_rate"
+			}
+			return "interconnect.pcie.errors"
+		}
+		if strings.Contains(name, "NVLINK") {
+			if entity == entityNVLink {
+				if typ == sampleCounter {
+					return "interconnect.error_rate"
+				}
+				return "interconnect.errors"
+			}
+			if typ == sampleCounter {
+				return "interconnect.nvlink.error_rate"
+			}
+			return "interconnect.nvlink.errors"
+		}
 		if typ == sampleCounter {
 			return "interconnect.error_rate"
 		}
 		return "interconnect.errors"
+	case strings.Contains(name, "PCIE") && strings.Contains(name, "RESULT"):
+		return "interconnect.pcie.state"
 	case containsAny(name, "STATE", "STATUS", "POWER_STATE", "LINK_COUNT"):
+		if strings.Contains(name, "PCIE") {
+			return "interconnect.pcie.state"
+		}
+		if strings.Contains(name, "NVLINK") {
+			if entity == entityNVLink {
+				return "interconnect.state"
+			}
+			return "interconnect.nvlink.state"
+		}
 		return "interconnect.state"
 	default:
 		return "interconnect.state"
@@ -455,7 +535,10 @@ func metricScale(metricName, help string, spec contextSpec) float64 {
 		return 100
 	}
 
-	if (strings.HasSuffix(spec.ID, ".memory.usage") || strings.HasSuffix(spec.ID, ".memory.bar1_usage")) &&
+	if (strings.HasSuffix(spec.ID, ".memory.usage") ||
+		strings.HasSuffix(spec.ID, ".memory.capacity") ||
+		strings.HasSuffix(spec.ID, ".memory.bar1_usage") ||
+		strings.HasSuffix(spec.ID, ".memory.bar1_capacity")) &&
 		(containsAny(name, "FB_", "BAR1") || strings.Contains(h, "mib") || strings.Contains(h, " mb")) {
 		return 1024 * 1024
 	}
