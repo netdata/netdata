@@ -55,6 +55,7 @@ type groupSpec struct {
 var groupCatalog = []groupSpec{
 	{Suffix: "compute.utilization", Title: "Compute Utilization", Units: "percentage", Family: "compute", Type: module.Line},
 	{Suffix: "compute.activity", Title: "Compute Pipeline Activity", Units: "percentage", Family: "compute", Type: module.Line},
+	{Suffix: "compute.tensor.activity", Title: "Tensor Core Activity by Precision", Units: "percentage", Family: "compute", Type: module.Line},
 	{Suffix: "memory.utilization", Title: "Memory Utilization", Units: "percentage", Family: "memory", Type: module.Line},
 	{Suffix: "memory.usage", Title: "Memory Usage", Units: "bytes", Family: "memory", Type: module.Stacked},
 	{Suffix: "memory.capacity", Title: "Memory Capacity", Units: "bytes", Family: "memory", Type: module.Line},
@@ -228,6 +229,8 @@ func classifyMetricGroup(entity metricEntity, metricName string, typ sampleKind)
 		return "internal.boundary"
 	case !strings.Contains(name, "VGPU_") && containsAny(name, "GPU_UTIL", "MEM_COPY_UTIL", "ENC_UTIL", "DEC_UTIL"):
 		return "compute.utilization"
+	case containsAny(name, "TENSOR_HMMA", "TENSOR_IMMA", "TENSOR_DFMA"):
+		return "compute.tensor.activity"
 	case containsAny(name,
 		"SM_ACTIVE",
 		"SM_OCCUPANCY",
@@ -527,7 +530,8 @@ func metricScale(metricName, help string, spec contextSpec) float64 {
 		return 1
 	}
 
-	if strings.HasSuffix(spec.ID, ".compute.activity") {
+	if strings.HasSuffix(spec.ID, ".compute.activity") ||
+		strings.HasSuffix(spec.ID, ".compute.tensor.activity") {
 		return 100
 	}
 

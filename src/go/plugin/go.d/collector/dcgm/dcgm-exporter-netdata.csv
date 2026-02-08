@@ -1249,11 +1249,11 @@ DCGM_FI_PROF_PIPE_FP64_ACTIVE, gauge, Pipe fp64 active
 DCGM_FI_PROF_PIPE_INT_ACTIVE, gauge, Pipe int active
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=tensor
 DCGM_FI_PROF_PIPE_TENSOR_ACTIVE, gauge, Pipe tensor active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=tensor_dfma
+# context=dcgm.gpu.compute.tensor.activity family=gpu compute dimension=tensor_dfma
 DCGM_FI_PROF_PIPE_TENSOR_DFMA_ACTIVE, gauge, Pipe tensor dfma active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=tensor_hmma
+# context=dcgm.gpu.compute.tensor.activity family=gpu compute dimension=tensor_hmma
 DCGM_FI_PROF_PIPE_TENSOR_HMMA_ACTIVE, gauge, Pipe tensor hmma active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=tensor_imma
+# context=dcgm.gpu.compute.tensor.activity family=gpu compute dimension=tensor_imma
 DCGM_FI_PROF_PIPE_TENSOR_IMMA_ACTIVE, gauge, Pipe tensor imma active
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=sm_active
 DCGM_FI_PROF_SM_ACTIVE, gauge, Sm active

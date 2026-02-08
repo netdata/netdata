@@ -305,6 +305,7 @@ modules:
                 - name: graphics_engine_active
                 - name: hostmem_cache_hit
                 - name: hostmem_cache_miss
+                - name: integer
                 - name: nvdec0_active
                 - name: nvdec1_active
                 - name: nvdec2_active
@@ -325,13 +326,17 @@ modules:
                 - name: nvofa1_active
                 - name: peermem_cache_hit
                 - name: peermem_cache_miss
-                - name: pipe_int_active
-                - name: pipe_tensor_dfma_active
-                - name: pipe_tensor_hmma_active
-                - name: pipe_tensor_imma_active
                 - name: sm_active
                 - name: sm_occupancy
                 - name: tensor
+            - name: dcgm.gpu.compute.tensor.activity
+              description: GPU Tensor Core Activity by precision type.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: tensor_dfma
+                - name: tensor_hmma
+                - name: tensor_imma
             - name: dcgm.gpu.compute.utilization
               description: GPU Compute Utilization metrics.
               unit: '%'
@@ -983,6 +988,7 @@ modules:
                 - name: graphics_engine_active
                 - name: hostmem_cache_hit
                 - name: hostmem_cache_miss
+                - name: integer
                 - name: nvdec0_active
                 - name: nvdec1_active
                 - name: nvdec2_active
@@ -1003,13 +1009,17 @@ modules:
                 - name: nvofa1_active
                 - name: peermem_cache_hit
                 - name: peermem_cache_miss
-                - name: pipe_int_active
-                - name: pipe_tensor_dfma_active
-                - name: pipe_tensor_hmma_active
-                - name: pipe_tensor_imma_active
                 - name: sm_active
                 - name: sm_occupancy
                 - name: tensor
+            - name: dcgm.mig.compute.tensor.activity
+              description: MIG Tensor Core Activity by precision type.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: tensor_dfma
+                - name: tensor_hmma
+                - name: tensor_imma
             - name: dcgm.mig.compute.utilization
               description: MIG Compute Utilization metrics.
               unit: '%'
