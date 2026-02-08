@@ -88,6 +88,22 @@ const CANONICAL_FLOW_DEFAULTS: &[(&str, &str)] = &[
     ("DST_MASK", "0"),
     ("SRC_AS", "0"),
     ("DST_AS", "0"),
+    ("SRC_NET_NAME", ""),
+    ("DST_NET_NAME", ""),
+    ("SRC_NET_ROLE", ""),
+    ("DST_NET_ROLE", ""),
+    ("SRC_NET_SITE", ""),
+    ("DST_NET_SITE", ""),
+    ("SRC_NET_REGION", ""),
+    ("DST_NET_REGION", ""),
+    ("SRC_NET_TENANT", ""),
+    ("DST_NET_TENANT", ""),
+    ("SRC_COUNTRY", ""),
+    ("DST_COUNTRY", ""),
+    ("SRC_GEO_CITY", ""),
+    ("DST_GEO_CITY", ""),
+    ("SRC_GEO_STATE", ""),
+    ("DST_GEO_STATE", ""),
     ("DST_AS_PATH", ""),
     ("DST_COMMUNITIES", ""),
     ("DST_LARGE_COMMUNITIES", ""),
@@ -792,6 +808,12 @@ impl FlowDecoders {
 
     pub(crate) fn set_enricher(&mut self, enricher: Option<FlowEnricher>) {
         self.enricher = enricher;
+    }
+
+    pub(crate) fn refresh_enrichment_state(&mut self) {
+        if let Some(enricher) = &mut self.enricher {
+            enricher.refresh_runtime_state();
+        }
     }
 
     #[cfg_attr(not(test), allow(dead_code))]
