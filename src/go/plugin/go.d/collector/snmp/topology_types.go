@@ -2,19 +2,17 @@
 
 package snmp
 
-import "time"
+import "github.com/netdata/netdata/go/plugins/pkg/topology"
 
-const topologySchemaVersion = "1.0"
+const topologySchemaVersion = "2.0"
 
-type topologyData struct {
-	SchemaVersion string           `json:"schema_version"`
-	AgentID       string           `json:"agent_id"`
-	CollectedAt   time.Time        `json:"collected_at"`
-	Devices       []topologyDevice `json:"devices"`
-	Links         []topologyLink   `json:"links"`
-	Stats         map[string]any   `json:"stats,omitempty"`
-	Metrics       map[string]any   `json:"metrics,omitempty"`
-}
+type topologyData = topology.Data
+type topologyActor = topology.Actor
+type topologyMatch = topology.Match
+type topologyLink = topology.Link
+type topologyLinkEndpoint = topology.LinkEndpoint
+type topologyFlow = topology.Flow
+type topologyIPPolicy = topology.IPPolicy
 
 type topologyManagementAddress struct {
 	Address     string `json:"address"`
@@ -58,14 +56,4 @@ type topologyEndpoint struct {
 	ManagementAddresses []topologyManagementAddress `json:"management_addresses,omitempty"`
 	AgentID             string                      `json:"agent_id,omitempty"`
 	Labels              map[string]string           `json:"labels,omitempty"`
-}
-
-type topologyLink struct {
-	Protocol      string           `json:"protocol"`
-	Src           topologyEndpoint `json:"src"`
-	Dst           topologyEndpoint `json:"dst"`
-	DiscoveredAt  time.Time        `json:"discovered_at,omitempty"`
-	LastSeen      time.Time        `json:"last_seen,omitempty"`
-	Bidirectional bool             `json:"bidirectional,omitempty"`
-	Validated     bool             `json:"validated,omitempty"`
 }

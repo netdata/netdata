@@ -47,15 +47,17 @@ pub(super) struct OwnedChain {
 }
 
 impl OwnedChain {
-    pub(super) fn new(path: PathBuf, machine_id: Uuid) -> Result<Self> {
+    pub(super) fn new(path: PathBuf, machine_id: Uuid, machine_id_suffix: bool) -> Result<Self> {
         #[cfg(debug_assertions)]
         {
             use std::os::unix::ffi::OsStrExt;
 
             debug_assert!(path.exists() && path.is_dir());
 
-            let filename = path.file_name().unwrap().as_bytes();
-            debug_assert_eq!(Ok(machine_id), Uuid::try_parse_ascii(filename));
+            if machine_id_suffix {
+                let filename = path.file_name().unwrap().as_bytes();
+                debug_assert_eq!(Ok(machine_id), Uuid::try_parse_ascii(filename));
+            }
         }
 
         let mut chain = Self {

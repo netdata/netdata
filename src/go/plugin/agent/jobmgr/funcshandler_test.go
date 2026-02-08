@@ -215,9 +215,9 @@ func TestRespondWithParams_MethodTypeFallback(t *testing.T) {
 	dataResp := &funcapi.FunctionResponse{
 		Status: 200,
 	}
-	mgr.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "flows")
+	mgr.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology")
 
-	assert.Equal(t, "flows", (*resp)["type"])
+	assert.Equal(t, "topology", (*resp)["type"])
 }
 
 func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
@@ -225,11 +225,11 @@ func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
 
 	mgr.moduleFuncs.registerModule("snmp", module.Creator{
 		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{ID: "topology", ResponseType: "topology"}}
+			return []funcapi.MethodConfig{{ID: "topology:snmp", ResponseType: "topology"}}
 		},
 	})
 
-	mgr.handleMethodFuncInfo("snmp", "topology", functions.Function{})
+	mgr.handleMethodFuncInfo("snmp", "topology:snmp", functions.Function{})
 
 	assert.Equal(t, "topology", (*resp)["type"])
 }
@@ -239,10 +239,10 @@ func TestHandleJobMethodFuncInfo_UsesResponseType(t *testing.T) {
 
 	mgr.moduleFuncs.registerModule("netflow", module.Creator{})
 	mgr.moduleFuncs.registerJobMethods("netflow", "job1", []funcapi.MethodConfig{
-		{ID: "flows", ResponseType: "flows"},
+		{ID: "flows:netflow", ResponseType: "flows"},
 	})
 
-	mgr.handleJobMethodFuncInfo("netflow", "job1", "flows", functions.Function{})
+	mgr.handleJobMethodFuncInfo("netflow", "job1", "flows:netflow", functions.Function{})
 
 	assert.Equal(t, "flows", (*resp)["type"])
 }

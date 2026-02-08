@@ -57,6 +57,15 @@ func TestNetFlowIntegrationReplayPCAP(t *testing.T) {
 		snapshot := collector.aggregator.Snapshot("agent")
 		return len(snapshot.Buckets) > 0
 	}, 3*time.Second, 100*time.Millisecond)
+
+	snapshot := collector.aggregator.Snapshot("agent")
+	summary := collector.buildFlowsResponse(snapshot, viewSummary)
+	require.NotEmpty(t, summary.Links)
+	require.NotEmpty(t, summary.Actors)
+
+	live := collector.buildFlowsResponse(snapshot, viewLive)
+	require.NotEmpty(t, live.Flows)
+	require.NotEmpty(t, live.Actors)
 }
 
 func replayPCAPToUDP(t *testing.T, conn *net.UDPConn, path string) {
