@@ -688,6 +688,21 @@ static void cachestat_calculate_from_values(
 }
 
 /**
+ * Initialize cachestat
+ *
+ * Initialize prev values on first call.
+ *
+ * @param publish the structure where we will store the data.
+ */
+static void cachestat_initialize(netdata_publish_cachestat_t *publish)
+{
+    publish->prev.mark_page_accessed = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED];
+    publish->prev.account_page_dirtied = cachestat_hash_values[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED];
+    publish->prev.add_to_page_cache_lru = cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU];
+    publish->prev.mark_buffer_dirty = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY];
+}
+
+/**
  * Calculate statistics
  *
  * @param publish the structure where we will store the data.
@@ -696,10 +711,7 @@ static void calculate_stats(netdata_publish_cachestat_t *publish)
 {
     if (!publish->prev.mark_page_accessed && !publish->prev.add_to_page_cache_lru && !publish->prev.mark_buffer_dirty &&
         !publish->prev.account_page_dirtied) {
-        publish->prev.mark_page_accessed = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED];
-        publish->prev.account_page_dirtied = cachestat_hash_values[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED];
-        publish->prev.add_to_page_cache_lru = cachestat_hash_values[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU];
-        publish->prev.mark_buffer_dirty = cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY];
+        cachestat_initialize(publish);
         return;
     }
 
@@ -745,7 +757,7 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_pe
             total->ct = w->ct;
 
         if (!total->name[0] && w->name[0])
-            strncpyz(total->name, w->name, sizeof(total->name) - 1);
+            strncpyz(total->name, w->name, sizeof(total->name));
     }
 }
 
@@ -760,9 +772,7 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_pe
 static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, netdata_cachestat_pid_t *in)
 {
     out->ct = in->ct;
-    if (out->current.mark_page_accessed) {
-        memcpy(&out->prev, &out->current, sizeof(netdata_cachestat_t));
-    }
+    memcpy(&out->prev, &out->current, sizeof(netdata_cachestat_t));
 
     out->current.account_page_dirtied = in[0].account_page_dirtied;
     out->current.add_to_page_cache_lru = in[0].add_to_page_cache_lru;
@@ -876,26 +886,7 @@ static void cachestat_sum_pids_internal(netdata_publish_cachestat_t *publish, vo
     publish->prev = new_prev;
 }
 
-static void write_cachestat_charts(const char *family, const char *name, const netdata_publish_cachestat_t *npc)
-{
-    ebpf_write_begin_chart(family, name, "_ebpf_cachestat_hit_ratio");
-    write_chart_dimension("ratio", (long long)npc->ratio);
-    ebpf_write_end_chart();
-
-    ebpf_write_begin_chart(family, name, "_ebpf_cachestat_dirty_pages");
-    write_chart_dimension("pages", (long long)npc->dirty);
-    ebpf_write_end_chart();
-
-    ebpf_write_begin_chart(family, name, "_ebpf_cachestat_access");
-    write_chart_dimension("hits", (long long)npc->hit);
-    ebpf_write_end_chart();
-
-    ebpf_write_begin_chart(family, name, "_ebpf_cachestat_misses");
-    write_chart_dimension("misses", (long long)npc->miss);
-    ebpf_write_end_chart();
-}
-
-static void write_cachestat_charts_with_dims(
+static void write_cachestat_charts(
     const char *family,
     const char *name,
     const netdata_publish_cachestat_t *npc,
@@ -904,6 +895,14 @@ static void write_cachestat_charts_with_dims(
     const char *hit_name,
     const char *miss_name)
 {
+    if (!ratio_name) {
+        ratio_name = "ratio";
+        dirty_name = "pages";
+        hit_name = "hits";
+        miss_name = "misses";
+        name = name ? name : "";
+    }
+
     ebpf_write_begin_chart(family, name, NETDATA_CACHESTAT_HIT_RATIO_CHART);
     write_chart_dimension(ratio_name, (long long)npc->ratio);
     ebpf_write_end_chart();
@@ -1159,7 +1158,7 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
             continue;
 
         cachestat_calculate_from_values(&w->cachestat, &w->cachestat.current, &w->cachestat.prev);
-        write_cachestat_charts(NETDATA_APP_FAMILY, w->clean_name, &w->cachestat);
+        write_cachestat_charts(NETDATA_APP_FAMILY, w->clean_name, &w->cachestat, NULL, NULL, NULL, NULL);
     }
     netdata_mutex_unlock(&collect_data_mutex);
 }
@@ -1281,8 +1280,7 @@ static void ebpf_send_systemd_cachestat_charts()
             continue;
         }
 
-        write_cachestat_charts_with_dims(
-            ect->name, "", &ect->publish_cachestat, "percentage", "pages", "hits", "misses");
+        write_cachestat_charts(ect->name, "", &ect->publish_cachestat, "percentage", "pages", "hits", "misses");
     }
 }
 
@@ -1293,7 +1291,7 @@ static void ebpf_send_systemd_cachestat_charts()
  */
 static void ebpf_send_specific_cachestat_data(char *type, netdata_publish_cachestat_t *npc)
 {
-    write_cachestat_charts_with_dims(
+    write_cachestat_charts(
         type,
         "",
         npc,

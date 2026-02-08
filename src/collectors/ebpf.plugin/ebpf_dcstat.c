@@ -550,7 +550,7 @@ static void ebpf_dcstat_apps_accumulator(netdata_dcstat_pid_t *out, int maps_per
             ct = w->ct;
 
         if (!total->name[0] && w->name[0])
-            strncpyz(total->name, w->name, sizeof(total->name) - 1);
+            strncpyz(total->name, w->name, sizeof(total->name));
     }
     total->ct = ct;
 }
@@ -722,10 +722,10 @@ void ebpf_read_dcstat_thread(void *ptr)
         counter = 0;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
+        else
+            running_time = update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
@@ -829,10 +829,9 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  * Read the table with number of calls for all functions
  *
- * @param stats         vector used to read data from control table.
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_dc_read_global_tables(netdata_idx_t *stats, int maps_per_core)
+static void ebpf_dc_read_global_tables(int maps_per_core)
 {
     ebpf_read_global_table_stats(
         dcstat_hash_values,
@@ -841,14 +840,6 @@ static void ebpf_dc_read_global_tables(netdata_idx_t *stats, int maps_per_core)
         maps_per_core,
         NETDATA_KEY_DC_REFERENCE,
         NETDATA_DIRECTORY_CACHE_END);
-
-    ebpf_read_global_table_stats(
-        stats,
-        dcstat_values,
-        dcstat_maps[NETDATA_DCSTAT_CTRL].map_fd,
-        maps_per_core,
-        NETDATA_CONTROLLER_PID_TABLE_ADD,
-        NETDATA_CONTROLLER_END);
 }
 
 /**
@@ -1344,8 +1335,6 @@ static void dcstat_collector(ebpf_module_t *em)
     int maps_per_core = em->maps_per_core;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
-    netdata_idx_t *stats = em->hash_table_stats;
-    memset(stats, 0, NETDATA_EBPF_GLOBAL_TABLE_STATUS_END * sizeof(netdata_idx_t));
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
 
@@ -1354,7 +1343,7 @@ static void dcstat_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_dc_read_global_tables(stats, maps_per_core);
+        ebpf_dc_read_global_tables(maps_per_core);
 
         netdata_mutex_lock(&lock);
 
@@ -1369,10 +1358,10 @@ static void dcstat_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
+        else
+            running_time = update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);

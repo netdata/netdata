@@ -883,8 +883,11 @@ netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array
         (netdata_ebpf_judy_pid_stats_t **)ebpf_judy_insert_unsafe(judy_array, pid);
     netdata_ebpf_judy_pid_stats_t *pid_ptr = *pid_pptr;
     if (likely(*pid_pptr == NULL)) {
-        // a new PID added to the index
         *pid_pptr = aral_mallocz(ebpf_judy_pid.pid_table);
+        if (unlikely(*pid_pptr == NULL)) {
+            netdata_log_error("Cannot allocate memory for PID %u", pid);
+            return NULL;
+        }
 
         pid_ptr = *pid_pptr;
 
@@ -935,26 +938,23 @@ ARAL *ebpf_allocate_pid_aral(char *name, size_t size)
  */
 static inline void ebpf_check_before2go()
 {
-    int i;
     usec_t max = USEC_PER_SEC, step = 200000;
     int j;
     while (max) {
         max -= step;
         sleep_usec(step);
-        i = 0;
+        int active_count = 0;
         netdata_mutex_lock(&ebpf_exit_cleanup);
         for (j = 0; ebpf_modules[j].info.thread_name != NULL; j++) {
             if (ebpf_modules[j].enabled < NETDATA_THREAD_EBPF_STOPPING)
-                i++;
+                active_count++;
         }
         netdata_mutex_unlock(&ebpf_exit_cleanup);
-        if (!i)
-            break;
+        if (!active_count)
+            return;
     }
 
-    if (i) {
-        netdata_log_error("eBPF cannot unload all threads on time, but it will go away");
-    }
+    netdata_log_error("eBPF cannot unload all threads on time, but it will go away");
 }
 
 /**
