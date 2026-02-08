@@ -403,8 +403,10 @@
             },
             "stats": { "type": "object" },
             "metrics": { "type": "object" },
+            "warnings": { "type": ["array", "object"] },
             "facets": { "type": ["array", "object"] },
             "histogram": { "type": "object" },
+            "visualizations": { "type": "object" },
             "pagination": { "type": "object" }
           },
           "additionalProperties": true
