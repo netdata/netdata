@@ -17,7 +17,7 @@
 # context=dcgm.exporter.health.status family=exporter health dimension=bind_unbind_event
 # DCGM_FI_BIND_UNBIND_EVENT, gauge, Bind unbind event
 # context=dcgm.exporter.inventory.software family=exporter inventory dimension=cuda_driver_version
-# DCGM_FI_CUDA_DRIVER_VERSION, label, Cuda driver version
+DCGM_FI_CUDA_DRIVER_VERSION, label, Cuda driver version
 # context=dcgm.gpu.workload.sessions family=gpu workload dimension=accounting_data
 # DCGM_FI_DEV_ACCOUNTING_DATA, gauge, Accounting data
 # context=dcgm.gpu.clock.frequency family=gpu clock dimension=app_mem_clock
@@ -46,22 +46,23 @@ DCGM_FI_DEV_BAR1_USED, gauge, Bar1 used
 DCGM_FI_DEV_BOARD_LIMIT_VIOLATION, counter, Board limit violation
 # context=dcgm.gpu.inventory.identity family=gpu inventory dimension=brand
 DCGM_FI_DEV_BRAND, label, Brand
-# context=dcgm.gpu.interconnect.state family=gpu interconnect dimension=c2c_link
+# context=dcgm.gpu.interconnect.state family=gpu interconnect/overview dimension=c2c_link
 # DCGM_FI_DEV_C2C_LINK_COUNT, counter, C2c link count
-# context=dcgm.gpu.interconnect.error_rate family=gpu interconnect dimension=c2c_link_error_intr
+# context=dcgm.gpu.interconnect.error_rate family=gpu interconnect/overview dimension=c2c_link_error_intr
 # DCGM_FI_DEV_C2C_LINK_ERROR_INTR, counter, C2c link error intr
-# context=dcgm.gpu.interconnect.error_rate family=gpu interconnect dimension=c2c_link_error_replay
+# context=dcgm.gpu.interconnect.error_rate family=gpu interconnect/overview dimension=c2c_link_error_replay
 # DCGM_FI_DEV_C2C_LINK_ERROR_REPLAY, counter, C2c link error replay
-# context=dcgm.gpu.interconnect.error_rate family=gpu interconnect dimension=c2c_link_error_replay_b2b
+# context=dcgm.gpu.interconnect.error_rate family=gpu interconnect/overview dimension=c2c_link_error_replay_b2b
 # DCGM_FI_DEV_C2C_LINK_ERROR_REPLAY_B2B, counter, C2c link error replay b2b
-# context=dcgm.gpu.interconnect.state family=gpu interconnect dimension=c2c_link_power_state
+# context=dcgm.gpu.interconnect.state family=gpu interconnect/overview dimension=c2c_link_power_state
 # DCGM_FI_DEV_C2C_LINK_POWER_STATE, gauge, C2c link power state
-# context=dcgm.gpu.interconnect.state family=gpu interconnect dimension=c2c_link_status
+# context=dcgm.gpu.interconnect.state family=gpu interconnect/overview dimension=c2c_link_status
 # DCGM_FI_DEV_C2C_LINK_STATUS, gauge, C2c link status
-# context=dcgm.gpu.interconnect.throughput family=gpu interconnect dimension=c2c_max_bandwidth
+# context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_max_bandwidth
 # DCGM_FI_DEV_C2C_MAX_BANDWIDTH, gauge, C2c max bandwidth
 # context=dcgm.gpu.capability.support family=gpu capability dimension=cc_mode
 # DCGM_FI_DEV_CC_MODE, gauge, Cc mode
+# Legacy name in older stacks: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS.
 # context=dcgm.gpu.throttle.reasons family=gpu throttle dimension=clocks_event_reasons
 DCGM_FI_DEV_CLOCKS_EVENT_REASONS, gauge, Clocks event reasons
 # context=dcgm.gpu.throttle.violations family=gpu throttle dimension=hw_power_brake_slowdown
@@ -75,33 +76,33 @@ DCGM_FI_DEV_CLOCKS_EVENT_REASON_SW_THERM_SLOWDOWN_NS, counter, Clocks event reas
 # context=dcgm.gpu.throttle.violations family=gpu throttle dimension=sync_boost
 DCGM_FI_DEV_CLOCKS_EVENT_REASON_SYNC_BOOST_NS, counter, Clocks event reason sync boost ns
 # context=dcgm.gpu.state.configuration family=gpu state dimension=compute_mode
-DCGM_FI_DEV_COMPUTE_MODE, gauge, Compute mode
-# context=dcgm.gpu.interconnect.connectx.link family=gpu interconnect dimension=connectx_active_pcie_link_speed
+# DCGM_FI_DEV_COMPUTE_MODE, gauge, Compute mode
+# context=dcgm.gpu.interconnect.connectx.link family=gpu interconnect/pcie dimension=connectx_active_pcie_link_speed
 # DCGM_FI_DEV_CONNECTX_ACTIVE_PCIE_LINK_SPEED, gauge, Connectx active pcie link speed
-# context=dcgm.gpu.interconnect.link.width family=gpu interconnect dimension=connectx_active_pcie_link_width
+# context=dcgm.gpu.interconnect.pcie.link.width family=gpu interconnect/pcie dimension=connectx_active_pcie_link_width
 # DCGM_FI_DEV_CONNECTX_ACTIVE_PCIE_LINK_WIDTH, gauge, Connectx active pcie link width
-# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect dimension=connectx_correctable_err_mask
+# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect/pcie dimension=connectx_correctable_err_mask
 # DCGM_FI_DEV_CONNECTX_CORRECTABLE_ERR_MASK, gauge, Connectx correctable err mask
-# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect dimension=connectx_correctable_err_status
+# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect/pcie dimension=connectx_correctable_err_status
 # DCGM_FI_DEV_CONNECTX_CORRECTABLE_ERR_STATUS, gauge, Connectx correctable err status
 # context=dcgm.gpu.thermal.temperature family=gpu thermal dimension=connectx_device_temperature
 # DCGM_FI_DEV_CONNECTX_DEVICE_TEMPERATURE, gauge, Connectx device temperature
-# context=dcgm.gpu.interconnect.connectx.link family=gpu interconnect dimension=connectx_expect_pcie_link_speed
+# context=dcgm.gpu.interconnect.connectx.link family=gpu interconnect/pcie dimension=connectx_expect_pcie_link_speed
 # DCGM_FI_DEV_CONNECTX_EXPECT_PCIE_LINK_SPEED, gauge, Connectx expect pcie link speed
-# context=dcgm.gpu.interconnect.link.width family=gpu interconnect dimension=connectx_expect_pcie_link_width
+# context=dcgm.gpu.interconnect.pcie.link.width family=gpu interconnect/pcie dimension=connectx_expect_pcie_link_width
 # DCGM_FI_DEV_CONNECTX_EXPECT_PCIE_LINK_WIDTH, gauge, Connectx expect pcie link width
-# context=dcgm.gpu.interconnect.connectx.status family=gpu interconnect dimension=connectx_health
+# context=dcgm.gpu.interconnect.connectx.status family=gpu interconnect/pcie dimension=connectx_health
 # DCGM_FI_DEV_CONNECTX_HEALTH, gauge, Connectx health
-# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect dimension=connectx_uncorrectable_err_mask
+# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect/pcie dimension=connectx_uncorrectable_err_mask
 # DCGM_FI_DEV_CONNECTX_UNCORRECTABLE_ERR_MASK, gauge, Connectx uncorrectable err mask
-# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect dimension=connectx_uncorrectable_err_severity
+# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect/pcie dimension=connectx_uncorrectable_err_severity
 # DCGM_FI_DEV_CONNECTX_UNCORRECTABLE_ERR_SEVERITY, gauge, Connectx uncorrectable err severity
-# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect dimension=connectx_uncorrectable_err_status
+# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect/pcie dimension=connectx_uncorrectable_err_status
 # DCGM_FI_DEV_CONNECTX_UNCORRECTABLE_ERR_STATUS, gauge, Connectx uncorrectable err status
 # context=dcgm.gpu.reliability.row_remap_events family=gpu reliability dimension=correctable_remapped_rows
 DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS, counter, Correctable remapped rows
 # context=dcgm.gpu.inventory.identity family=gpu inventory dimension=count
-# DCGM_FI_DEV_COUNT, gauge, Count
+DCGM_FI_DEV_COUNT, gauge, Count
 # context=dcgm.gpu.topology.affinity family=gpu topology dimension=cpu_affinity_0
 # DCGM_FI_DEV_CPU_AFFINITY_0, gauge, Cpu affinity 0
 # context=dcgm.gpu.topology.affinity family=gpu topology dimension=cpu_affinity_1
@@ -160,7 +161,7 @@ DCGM_FI_DEV_DEC_UTIL, gauge, Dec util
 # DCGM_FI_DEV_DIAG_NCCL_TESTS_RESULT, gauge, Diag nccl tests result
 # context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_nvbandwidth_result
 # DCGM_FI_DEV_DIAG_NVBANDWIDTH_RESULT, gauge, Diag nvbandwidth result
-# context=dcgm.gpu.interconnect.state family=gpu interconnect dimension=diag_pcie_result
+# context=dcgm.gpu.interconnect.pcie.state family=gpu interconnect/pcie dimension=diag_pcie_result
 DCGM_FI_DEV_DIAG_PCIE_RESULT, gauge, Diag pcie result
 # context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_pulse_test_result
 # DCGM_FI_DEV_DIAG_PULSE_TEST_RESULT, gauge, Diag pulse test result
@@ -258,15 +259,15 @@ DCGM_FI_DEV_ENC_UTIL, gauge, Enc util
 DCGM_FI_DEV_ENFORCED_POWER_LIMIT, gauge, Enforced power limit
 # context=dcgm.gpu.power.profiles family=gpu power dimension=enforced_power_profile_mask
 # DCGM_FI_DEV_ENFORCED_POWER_PROFILE_MASK, counter, Enforced power profile mask
-# context=dcgm.gpu.interconnect.fabric family=gpu interconnect dimension=fabric_clique_id
+# context=dcgm.gpu.interconnect.fabric family=gpu interconnect/overview dimension=fabric_clique_id
 # DCGM_FI_DEV_FABRIC_CLIQUE_ID, gauge, Fabric clique id
-# context=dcgm.gpu.interconnect.fabric family=gpu interconnect dimension=fabric_cluster_uuid
+# context=dcgm.gpu.interconnect.fabric family=gpu interconnect/overview dimension=fabric_cluster_uuid
 # DCGM_FI_DEV_FABRIC_CLUSTER_UUID, label, Fabric cluster uuid
-# context=dcgm.gpu.interconnect.fabric family=gpu interconnect dimension=fabric_health_mask
+# context=dcgm.gpu.interconnect.fabric family=gpu interconnect/overview dimension=fabric_health_mask
 # DCGM_FI_DEV_FABRIC_HEALTH_MASK, gauge, Fabric health mask
-# context=dcgm.gpu.interconnect.fabric family=gpu interconnect dimension=fabric_manager_error_code
+# context=dcgm.gpu.interconnect.fabric family=gpu interconnect/overview dimension=fabric_manager_error_code
 DCGM_FI_DEV_FABRIC_MANAGER_ERROR_CODE, counter, Fabric manager error code
-# context=dcgm.gpu.interconnect.fabric family=gpu interconnect dimension=fabric_manager_status
+# context=dcgm.gpu.interconnect.fabric family=gpu interconnect/overview dimension=fabric_manager_status
 DCGM_FI_DEV_FABRIC_MANAGER_STATUS, gauge, Fabric manager status
 # context=dcgm.gpu.thermal.fan_speed family=gpu thermal dimension=fan_speed
 DCGM_FI_DEV_FAN_SPEED, gauge, Fan speed
@@ -436,7 +437,7 @@ DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL, counter, Nvlink bandwidth total
 # DCGM_FI_DEV_NVLINK_COUNT_LOCAL_LINK_INTEGRITY_ERRORS, counter, Nvlink count local link integrity errors
 # context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_rx_buffer_overrun_errors
 # DCGM_FI_DEV_NVLINK_COUNT_RX_BUFFER_OVERRUN_ERRORS, counter, Nvlink count rx buffer overrun errors
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_count_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_count_rx
 DCGM_FI_DEV_NVLINK_COUNT_RX_BYTES, counter, Nvlink count rx bytes
 # context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_rx_errors
 # DCGM_FI_DEV_NVLINK_COUNT_RX_ERRORS, counter, Nvlink count rx errors
@@ -454,7 +455,7 @@ DCGM_FI_DEV_NVLINK_COUNT_RX_BYTES, counter, Nvlink count rx bytes
 # DCGM_FI_DEV_NVLINK_COUNT_SYMBOL_BER, counter, Nvlink count symbol ber
 # context=dcgm.nvlink.interconnect.ber family=nvlink interconnect dimension=nvlink_count_symbol_ber_float
 # DCGM_FI_DEV_NVLINK_COUNT_SYMBOL_BER_FLOAT, counter, Nvlink count symbol ber float
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_count_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_count_tx
 DCGM_FI_DEV_NVLINK_COUNT_TX_BYTES, counter, Nvlink count tx bytes
 # context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_tx_discards
 # DCGM_FI_DEV_NVLINK_COUNT_TX_DISCARDS, counter, Nvlink count tx discards
@@ -882,21 +883,21 @@ DCGM_FI_DEV_NVSWITCH_TEMPERATURE_CURRENT, gauge, Nvswitch temperature current
 # DCGM_FI_DEV_OEM_INFOROM_VER, label, Oem inforom ver
 # context=dcgm.nvlink.interconnect.state family=nvlink interconnect dimension=p2p_nvlink_status
 # DCGM_FI_DEV_P2P_NVLINK_STATUS, gauge, P2p nvlink status
-# context=dcgm.gpu.interconnect.error_rate family=gpu interconnect dimension=pcie_count_correctable_errors
+# context=dcgm.gpu.interconnect.pcie.error_rate family=gpu interconnect/pcie dimension=pcie_count_correctable_errors
 # DCGM_FI_DEV_PCIE_COUNT_CORRECTABLE_ERRORS, counter, Pcie count correctable errors
-# context=dcgm.gpu.interconnect.link.generation family=gpu interconnect dimension=link_gen
+# context=dcgm.gpu.interconnect.pcie.link.generation family=gpu interconnect/pcie dimension=link_gen
 DCGM_FI_DEV_PCIE_LINK_GEN, gauge, Pcie link gen
-# context=dcgm.gpu.interconnect.link.width family=gpu interconnect dimension=link_width
+# context=dcgm.gpu.interconnect.pcie.link.width family=gpu interconnect/pcie dimension=link_width
 DCGM_FI_DEV_PCIE_LINK_WIDTH, gauge, Pcie link width
-# context=dcgm.gpu.interconnect.link.generation family=gpu interconnect dimension=max_link_gen
-DCGM_FI_DEV_PCIE_MAX_LINK_GEN, gauge, Pcie max link gen
-# context=dcgm.gpu.interconnect.link.width family=gpu interconnect dimension=max_link_width
-DCGM_FI_DEV_PCIE_MAX_LINK_WIDTH, gauge, Pcie max link width
-# context=dcgm.gpu.interconnect.error_rate family=gpu interconnect dimension=pcie_replay
+# context=dcgm.gpu.interconnect.pcie.link.generation family=gpu interconnect/pcie dimension=max_link_gen
+# DCGM_FI_DEV_PCIE_MAX_LINK_GEN, gauge, Pcie max link gen
+# context=dcgm.gpu.interconnect.pcie.link.width family=gpu interconnect/pcie dimension=max_link_width
+# DCGM_FI_DEV_PCIE_MAX_LINK_WIDTH, gauge, Pcie max link width
+# context=dcgm.gpu.interconnect.pcie.error_rate family=gpu interconnect/pcie dimension=pcie_replay
 DCGM_FI_DEV_PCIE_REPLAY_COUNTER, counter, Pcie replay counter
-# context=dcgm.gpu.interconnect.throughput family=gpu interconnect dimension=pcie_rx_throughput
+# context=dcgm.gpu.interconnect.pcie.throughput family=gpu interconnect/pcie dimension=pcie_rx_throughput
 DCGM_FI_DEV_PCIE_RX_THROUGHPUT, counter, Pcie rx throughput
-# context=dcgm.gpu.interconnect.throughput family=gpu interconnect dimension=pcie_tx_throughput
+# context=dcgm.gpu.interconnect.pcie.throughput family=gpu interconnect/pcie dimension=pcie_tx_throughput
 DCGM_FI_DEV_PCIE_TX_THROUGHPUT, counter, Pcie tx throughput
 # context=dcgm.gpu.topology.affinity family=gpu topology dimension=pci_busid
 # DCGM_FI_DEV_PCI_BUSID, label, Pci busid
@@ -1101,14 +1102,14 @@ DCGM_FI_DRIVER_VERSION, label, Driver version
 # context=dcgm.exporter.inventory.software family=exporter inventory dimension=nvml_version
 # DCGM_FI_NVML_VERSION, label, Nvml version
 # context=dcgm.gpu.inventory.software family=gpu inventory dimension=process_name
-# DCGM_FI_PROCESS_NAME, label, Process name
-# context=dcgm.gpu.interconnect.throughput family=gpu interconnect dimension=c2c_rx_all_bytes
+DCGM_FI_PROCESS_NAME, label, Process name
+# context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_rx_all_bytes
 # DCGM_FI_PROF_C2C_RX_ALL_BYTES, gauge, C2c rx all bytes
-# context=dcgm.gpu.interconnect.throughput family=gpu interconnect dimension=c2c_rx_data_bytes
+# context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_rx_data_bytes
 # DCGM_FI_PROF_C2C_RX_DATA_BYTES, gauge, C2c rx data bytes
-# context=dcgm.gpu.interconnect.throughput family=gpu interconnect dimension=c2c_tx_all_bytes
+# context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_tx_all_bytes
 # DCGM_FI_PROF_C2C_TX_ALL_BYTES, gauge, C2c tx all bytes
-# context=dcgm.gpu.interconnect.throughput family=gpu interconnect dimension=c2c_tx_data_bytes
+# context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_tx_data_bytes
 # DCGM_FI_PROF_C2C_TX_DATA_BYTES, gauge, C2c tx data bytes
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=dram
 DCGM_FI_PROF_DRAM_ACTIVE, gauge, Dram active
@@ -1150,89 +1151,89 @@ DCGM_FI_PROF_GR_ENGINE_ACTIVE, gauge, Gr engine active
 # DCGM_FI_PROF_NVJPG6_ACTIVE, gauge, Nvjpg6 active
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=nvjpg7_active
 # DCGM_FI_PROF_NVJPG7_ACTIVE, gauge, Nvjpg7 active
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l0_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l0_rx
 # DCGM_FI_PROF_NVLINK_L0_RX_BYTES, gauge, Nvlink l0 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l0_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l0_tx
 # DCGM_FI_PROF_NVLINK_L0_TX_BYTES, gauge, Nvlink l0 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l10_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l10_rx
 # DCGM_FI_PROF_NVLINK_L10_RX_BYTES, gauge, Nvlink l10 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l10_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l10_tx
 # DCGM_FI_PROF_NVLINK_L10_TX_BYTES, gauge, Nvlink l10 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l11_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l11_rx
 # DCGM_FI_PROF_NVLINK_L11_RX_BYTES, gauge, Nvlink l11 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l11_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l11_tx
 # DCGM_FI_PROF_NVLINK_L11_TX_BYTES, gauge, Nvlink l11 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l12_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l12_rx
 # DCGM_FI_PROF_NVLINK_L12_RX_BYTES, gauge, Nvlink l12 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l12_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l12_tx
 # DCGM_FI_PROF_NVLINK_L12_TX_BYTES, gauge, Nvlink l12 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l13_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l13_rx
 # DCGM_FI_PROF_NVLINK_L13_RX_BYTES, gauge, Nvlink l13 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l13_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l13_tx
 # DCGM_FI_PROF_NVLINK_L13_TX_BYTES, gauge, Nvlink l13 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l14_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l14_rx
 # DCGM_FI_PROF_NVLINK_L14_RX_BYTES, gauge, Nvlink l14 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l14_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l14_tx
 # DCGM_FI_PROF_NVLINK_L14_TX_BYTES, gauge, Nvlink l14 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l15_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l15_rx
 # DCGM_FI_PROF_NVLINK_L15_RX_BYTES, gauge, Nvlink l15 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l15_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l15_tx
 # DCGM_FI_PROF_NVLINK_L15_TX_BYTES, gauge, Nvlink l15 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l16_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l16_rx
 # DCGM_FI_PROF_NVLINK_L16_RX_BYTES, gauge, Nvlink l16 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l16_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l16_tx
 # DCGM_FI_PROF_NVLINK_L16_TX_BYTES, gauge, Nvlink l16 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l17_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l17_rx
 # DCGM_FI_PROF_NVLINK_L17_RX_BYTES, gauge, Nvlink l17 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l17_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l17_tx
 # DCGM_FI_PROF_NVLINK_L17_TX_BYTES, gauge, Nvlink l17 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l1_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l1_rx
 # DCGM_FI_PROF_NVLINK_L1_RX_BYTES, gauge, Nvlink l1 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l1_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l1_tx
 # DCGM_FI_PROF_NVLINK_L1_TX_BYTES, gauge, Nvlink l1 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l2_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l2_rx
 # DCGM_FI_PROF_NVLINK_L2_RX_BYTES, gauge, Nvlink l2 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l2_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l2_tx
 # DCGM_FI_PROF_NVLINK_L2_TX_BYTES, gauge, Nvlink l2 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l3_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l3_rx
 # DCGM_FI_PROF_NVLINK_L3_RX_BYTES, gauge, Nvlink l3 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l3_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l3_tx
 # DCGM_FI_PROF_NVLINK_L3_TX_BYTES, gauge, Nvlink l3 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l4_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l4_rx
 # DCGM_FI_PROF_NVLINK_L4_RX_BYTES, gauge, Nvlink l4 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l4_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l4_tx
 # DCGM_FI_PROF_NVLINK_L4_TX_BYTES, gauge, Nvlink l4 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l5_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l5_rx
 # DCGM_FI_PROF_NVLINK_L5_RX_BYTES, gauge, Nvlink l5 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l5_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l5_tx
 # DCGM_FI_PROF_NVLINK_L5_TX_BYTES, gauge, Nvlink l5 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l6_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l6_rx
 # DCGM_FI_PROF_NVLINK_L6_RX_BYTES, gauge, Nvlink l6 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l6_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l6_tx
 # DCGM_FI_PROF_NVLINK_L6_TX_BYTES, gauge, Nvlink l6 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l7_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l7_rx
 # DCGM_FI_PROF_NVLINK_L7_RX_BYTES, gauge, Nvlink l7 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l7_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l7_tx
 # DCGM_FI_PROF_NVLINK_L7_TX_BYTES, gauge, Nvlink l7 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l8_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l8_rx
 # DCGM_FI_PROF_NVLINK_L8_RX_BYTES, gauge, Nvlink l8 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l8_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l8_tx
 # DCGM_FI_PROF_NVLINK_L8_TX_BYTES, gauge, Nvlink l8 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l9_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l9_rx
 # DCGM_FI_PROF_NVLINK_L9_RX_BYTES, gauge, Nvlink l9 rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l9_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l9_tx
 # DCGM_FI_PROF_NVLINK_L9_TX_BYTES, gauge, Nvlink l9 tx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx
 DCGM_FI_PROF_NVLINK_RX_BYTES, gauge, Nvlink rx bytes
-# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx
 DCGM_FI_PROF_NVLINK_TX_BYTES, gauge, Nvlink tx bytes
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=nvofa0_active
 # DCGM_FI_PROF_NVOFA0_ACTIVE, gauge, Nvofa0 active
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=nvofa1_active
 # DCGM_FI_PROF_NVOFA1_ACTIVE, gauge, Nvofa1 active
-# context=dcgm.gpu.interconnect.throughput family=gpu interconnect dimension=pcie_rx
+# context=dcgm.gpu.interconnect.pcie.throughput family=gpu interconnect/pcie dimension=pcie_rx
 DCGM_FI_PROF_PCIE_RX_BYTES, gauge, Pcie rx bytes
-# context=dcgm.gpu.interconnect.throughput family=gpu interconnect dimension=pcie_tx
+# context=dcgm.gpu.interconnect.pcie.throughput family=gpu interconnect/pcie dimension=pcie_tx
 DCGM_FI_PROF_PCIE_TX_BYTES, gauge, Pcie tx bytes
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=peermem_cache_hit
 # DCGM_FI_PROF_PEERMEM_CACHE_HIT, gauge, Peermem cache hit

@@ -198,6 +198,53 @@ func TestCollector_Collect(t *testing.T) {
 	assert.False(t, seenCtx["dcgm.gpu.thermal.temperature"])
 }
 
+func TestCollector_Collect_NVLinkTotalOnlyInOverviewAndCleanDimNames(t *testing.T) {
+	metrics := []byte(`
+# HELP DCGM_FI_PROF_NVLINK_RX_BYTES NVLink RX bytes.
+# TYPE DCGM_FI_PROF_NVLINK_RX_BYTES gauge
+DCGM_FI_PROF_NVLINK_RX_BYTES{gpu="0",UUID="GPU-aaa"} 10
+# HELP DCGM_FI_PROF_NVLINK_TX_BYTES NVLink TX bytes.
+# TYPE DCGM_FI_PROF_NVLINK_TX_BYTES gauge
+DCGM_FI_PROF_NVLINK_TX_BYTES{gpu="0",UUID="GPU-aaa"} 20
+# HELP DCGM_FI_PROF_NVLINK_RX_BYTES NVLink RX bytes.
+# TYPE DCGM_FI_PROF_NVLINK_RX_BYTES gauge
+DCGM_FI_PROF_NVLINK_RX_BYTES{gpu="0",gpu_uuid="GPU-aaa",nvlink="1"} 11
+# HELP DCGM_FI_PROF_NVLINK_TX_BYTES NVLink TX bytes.
+# TYPE DCGM_FI_PROF_NVLINK_TX_BYTES gauge
+DCGM_FI_PROF_NVLINK_TX_BYTES{gpu="0",gpu_uuid="GPU-aaa",nvlink="1"} 22
+# HELP DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL Total NVLink bandwidth.
+# TYPE DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL counter
+DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL{gpu="0",UUID="GPU-aaa"} 400
+`)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(metrics)
+	}))
+	defer srv.Close()
+
+	collr := New()
+	collr.URL = srv.URL
+	require.NoError(t, collr.Init(context.Background()))
+
+	mx := collr.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	gpuKey := "gpu=0|uuid=GPU-aaa"
+	linkKey := "gpu=0|gpu_uuid=GPU-aaa|nvlink=1"
+	nvlinkCtxID := "dcgm.gpu.interconnect.nvlink.throughput"
+	nvlinkEntityCtxID := "dcgm.nvlink.interconnect.throughput"
+	totalCtxID := "dcgm.gpu.interconnect.total.throughput"
+
+	assert.Equal(t, int64(10000), mx[makeID(makeID(nvlinkCtxID, gpuKey), "nvlink_rx")])
+	assert.Equal(t, int64(20000), mx[makeID(makeID(nvlinkCtxID, gpuKey), "nvlink_tx")])
+	assert.NotContains(t, mx, makeID(makeID(nvlinkCtxID, gpuKey), "nvlink_bandwidth"))
+	assert.Equal(t, int64(11000), mx[makeID(makeID(nvlinkEntityCtxID, linkKey), "nvlink_rx")])
+	assert.Equal(t, int64(22000), mx[makeID(makeID(nvlinkEntityCtxID, linkKey), "nvlink_tx")])
+	assert.NotContains(t, mx, makeID(makeID(nvlinkEntityCtxID, linkKey), "nvlink_rx_bytes"))
+	assert.NotContains(t, mx, makeID(makeID(nvlinkEntityCtxID, linkKey), "nvlink_tx_bytes"))
+	// Explicit NVLink total metric should win over rx+tx aggregation for overview.
+	assert.Equal(t, int64(400000), mx[makeID(makeID(totalCtxID, gpuKey), "nvlink")])
+}
+
 func TestCollector_Collect_XIDErrorCodeCreatesCleanDimensions(t *testing.T) {
 	metrics := []byte(`
 # HELP DCGM_FI_DEV_XID_ERRORS Value of the last XID error encountered.
@@ -617,6 +664,24 @@ func TestClassifier_NIDLInterconnectAndVGPUSplits(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestCatalog_GPUInterconnectFamiliesOnlyThreeVariants(t *testing.T) {
+	got := make(map[string]struct{})
+	for _, g := range groupCatalog {
+		if !strings.HasPrefix(g.Suffix, "interconnect.") {
+			continue
+		}
+		got["gpu "+g.Family] = struct{}{}
+	}
+
+	want := map[string]struct{}{
+		"gpu interconnect/overview": {},
+		"gpu interconnect/pcie":     {},
+		"gpu interconnect/nvlink":   {},
+	}
+
+	assert.Equal(t, want, got)
 }
 
 func TestCollector_Cleanup(t *testing.T) {

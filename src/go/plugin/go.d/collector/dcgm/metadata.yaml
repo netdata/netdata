@@ -348,6 +348,13 @@ modules:
               dimensions:
                 - name: module_power_util_current
                 - name: sysio_power_util_current
+            - name: dcgm.gpu.cpu.info
+              description: GPU CPU Information metrics.
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: cpu_model
+                - name: cpu_vendor
             - name: dcgm.gpu.diagnostics.results
               description: GPU Diagnostics Results metrics.
               unit: state
@@ -497,9 +504,8 @@ modules:
               unit: B/s
               chart_type: area
               dimensions:
-                - name: nvlink_bandwidth
-                - name: nvlink_rx_bytes
-                - name: nvlink_tx_bytes
+                - name: nvlink_rx
+                - name: nvlink_tx
             - name: dcgm.gpu.interconnect.total.throughput
               description: GPU Interconnect Total Throughput metrics.
               unit: B/s
@@ -1234,7 +1240,6 @@ modules:
               unit: B/s
               chart_type: area
               dimensions:
-                - name: nvlink_bandwidth
                 - name: nvlink_bandwidth_l0
                 - name: nvlink_bandwidth_l1
                 - name: nvlink_bandwidth_l10
@@ -1253,44 +1258,44 @@ modules:
                 - name: nvlink_bandwidth_l7
                 - name: nvlink_bandwidth_l8
                 - name: nvlink_bandwidth_l9
-                - name: nvlink_count_rx_bytes
-                - name: nvlink_count_tx_bytes
-                - name: nvlink_l0_rx_bytes
-                - name: nvlink_l0_tx_bytes
-                - name: nvlink_l10_rx_bytes
-                - name: nvlink_l10_tx_bytes
-                - name: nvlink_l11_rx_bytes
-                - name: nvlink_l11_tx_bytes
-                - name: nvlink_l12_rx_bytes
-                - name: nvlink_l12_tx_bytes
-                - name: nvlink_l13_rx_bytes
-                - name: nvlink_l13_tx_bytes
-                - name: nvlink_l14_rx_bytes
-                - name: nvlink_l14_tx_bytes
-                - name: nvlink_l15_rx_bytes
-                - name: nvlink_l15_tx_bytes
-                - name: nvlink_l16_rx_bytes
-                - name: nvlink_l16_tx_bytes
-                - name: nvlink_l17_rx_bytes
-                - name: nvlink_l17_tx_bytes
-                - name: nvlink_l1_rx_bytes
-                - name: nvlink_l1_tx_bytes
-                - name: nvlink_l2_rx_bytes
-                - name: nvlink_l2_tx_bytes
-                - name: nvlink_l3_rx_bytes
-                - name: nvlink_l3_tx_bytes
-                - name: nvlink_l4_rx_bytes
-                - name: nvlink_l4_tx_bytes
-                - name: nvlink_l5_rx_bytes
-                - name: nvlink_l5_tx_bytes
-                - name: nvlink_l6_rx_bytes
-                - name: nvlink_l6_tx_bytes
-                - name: nvlink_l7_rx_bytes
-                - name: nvlink_l7_tx_bytes
-                - name: nvlink_l8_rx_bytes
-                - name: nvlink_l8_tx_bytes
-                - name: nvlink_l9_rx_bytes
-                - name: nvlink_l9_tx_bytes
+                - name: nvlink_count_rx
+                - name: nvlink_count_tx
+                - name: nvlink_l0_rx
+                - name: nvlink_l0_tx
+                - name: nvlink_l10_rx
+                - name: nvlink_l10_tx
+                - name: nvlink_l11_rx
+                - name: nvlink_l11_tx
+                - name: nvlink_l12_rx
+                - name: nvlink_l12_tx
+                - name: nvlink_l13_rx
+                - name: nvlink_l13_tx
+                - name: nvlink_l14_rx
+                - name: nvlink_l14_tx
+                - name: nvlink_l15_rx
+                - name: nvlink_l15_tx
+                - name: nvlink_l16_rx
+                - name: nvlink_l16_tx
+                - name: nvlink_l17_rx
+                - name: nvlink_l17_tx
+                - name: nvlink_l1_rx
+                - name: nvlink_l1_tx
+                - name: nvlink_l2_rx
+                - name: nvlink_l2_tx
+                - name: nvlink_l3_rx
+                - name: nvlink_l3_tx
+                - name: nvlink_l4_rx
+                - name: nvlink_l4_tx
+                - name: nvlink_l5_rx
+                - name: nvlink_l5_tx
+                - name: nvlink_l6_rx
+                - name: nvlink_l6_tx
+                - name: nvlink_l7_rx
+                - name: nvlink_l7_tx
+                - name: nvlink_l8_rx
+                - name: nvlink_l8_tx
+                - name: nvlink_l9_rx
+                - name: nvlink_l9_tx
                 - name: nvlink_rx_bandwidth
                 - name: nvlink_rx_bandwidth_l0
                 - name: nvlink_rx_bandwidth_l1
@@ -1310,7 +1315,7 @@ modules:
                 - name: nvlink_rx_bandwidth_l7
                 - name: nvlink_rx_bandwidth_l8
                 - name: nvlink_rx_bandwidth_l9
-                - name: nvlink_rx_bytes
+                - name: nvlink_rx
                 - name: nvlink_tx_bandwidth
                 - name: nvlink_tx_bandwidth_l0
                 - name: nvlink_tx_bandwidth_l1
@@ -1330,7 +1335,7 @@ modules:
                 - name: nvlink_tx_bandwidth_l7
                 - name: nvlink_tx_bandwidth_l8
                 - name: nvlink_tx_bandwidth_l9
-                - name: nvlink_tx_bytes
+                - name: nvlink_tx
             - name: dcgm.mig.interconnect.pcie.throughput
               description: MIG PCIe Throughput metrics.
               unit: B/s
@@ -1828,44 +1833,44 @@ modules:
                 - name: nvlink_bandwidth_l7
                 - name: nvlink_bandwidth_l8
                 - name: nvlink_bandwidth_l9
-                - name: nvlink_count_rx_bytes
-                - name: nvlink_count_tx_bytes
-                - name: nvlink_l0_rx_bytes
-                - name: nvlink_l0_tx_bytes
-                - name: nvlink_l10_rx_bytes
-                - name: nvlink_l10_tx_bytes
-                - name: nvlink_l11_rx_bytes
-                - name: nvlink_l11_tx_bytes
-                - name: nvlink_l12_rx_bytes
-                - name: nvlink_l12_tx_bytes
-                - name: nvlink_l13_rx_bytes
-                - name: nvlink_l13_tx_bytes
-                - name: nvlink_l14_rx_bytes
-                - name: nvlink_l14_tx_bytes
-                - name: nvlink_l15_rx_bytes
-                - name: nvlink_l15_tx_bytes
-                - name: nvlink_l16_rx_bytes
-                - name: nvlink_l16_tx_bytes
-                - name: nvlink_l17_rx_bytes
-                - name: nvlink_l17_tx_bytes
-                - name: nvlink_l1_rx_bytes
-                - name: nvlink_l1_tx_bytes
-                - name: nvlink_l2_rx_bytes
-                - name: nvlink_l2_tx_bytes
-                - name: nvlink_l3_rx_bytes
-                - name: nvlink_l3_tx_bytes
-                - name: nvlink_l4_rx_bytes
-                - name: nvlink_l4_tx_bytes
-                - name: nvlink_l5_rx_bytes
-                - name: nvlink_l5_tx_bytes
-                - name: nvlink_l6_rx_bytes
-                - name: nvlink_l6_tx_bytes
-                - name: nvlink_l7_rx_bytes
-                - name: nvlink_l7_tx_bytes
-                - name: nvlink_l8_rx_bytes
-                - name: nvlink_l8_tx_bytes
-                - name: nvlink_l9_rx_bytes
-                - name: nvlink_l9_tx_bytes
+                - name: nvlink_count_rx
+                - name: nvlink_count_tx
+                - name: nvlink_l0_rx
+                - name: nvlink_l0_tx
+                - name: nvlink_l10_rx
+                - name: nvlink_l10_tx
+                - name: nvlink_l11_rx
+                - name: nvlink_l11_tx
+                - name: nvlink_l12_rx
+                - name: nvlink_l12_tx
+                - name: nvlink_l13_rx
+                - name: nvlink_l13_tx
+                - name: nvlink_l14_rx
+                - name: nvlink_l14_tx
+                - name: nvlink_l15_rx
+                - name: nvlink_l15_tx
+                - name: nvlink_l16_rx
+                - name: nvlink_l16_tx
+                - name: nvlink_l17_rx
+                - name: nvlink_l17_tx
+                - name: nvlink_l1_rx
+                - name: nvlink_l1_tx
+                - name: nvlink_l2_rx
+                - name: nvlink_l2_tx
+                - name: nvlink_l3_rx
+                - name: nvlink_l3_tx
+                - name: nvlink_l4_rx
+                - name: nvlink_l4_tx
+                - name: nvlink_l5_rx
+                - name: nvlink_l5_tx
+                - name: nvlink_l6_rx
+                - name: nvlink_l6_tx
+                - name: nvlink_l7_rx
+                - name: nvlink_l7_tx
+                - name: nvlink_l8_rx
+                - name: nvlink_l8_tx
+                - name: nvlink_l9_rx
+                - name: nvlink_l9_tx
                 - name: nvlink_rx_bandwidth
                 - name: nvlink_rx_bandwidth_l0
                 - name: nvlink_rx_bandwidth_l1
@@ -1885,7 +1890,7 @@ modules:
                 - name: nvlink_rx_bandwidth_l7
                 - name: nvlink_rx_bandwidth_l8
                 - name: nvlink_rx_bandwidth_l9
-                - name: nvlink_rx_bytes
+                - name: nvlink_rx
                 - name: nvlink_tx_bandwidth
                 - name: nvlink_tx_bandwidth_l0
                 - name: nvlink_tx_bandwidth_l1
@@ -1905,7 +1910,7 @@ modules:
                 - name: nvlink_tx_bandwidth_l7
                 - name: nvlink_tx_bandwidth_l8
                 - name: nvlink_tx_bandwidth_l9
-                - name: nvlink_tx_bytes
+                - name: nvlink_tx
             - name: dcgm.nvlink.interconnect.traffic
               description: NVLink Interconnect Traffic metrics.
               unit: events/s

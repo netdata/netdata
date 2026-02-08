@@ -82,13 +82,17 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 			instance := resolveEntityInstance(metric.Labels())
 			spec := classifyMetric(instance.entity, mf.Name(), mf.Help(), typ)
+			skipPrimary := shouldSkipPrimarySeries(spec.Context.ID, mf.Name())
+			scaled := int64(value * spec.Scale * precision)
+			c.accumulateInterconnectTotals(totals, instance, spec.Context.ID, mf.Name(), scaled)
+			if skipPrimary {
+				continue
+			}
 
 			chartKey, chart := c.ensureChart(instance, spec.Context)
 			dimID := c.ensureDim(chartKey, chart, spec, metric.Labels(), typ)
 
-			scaled := int64(value * spec.Scale * precision)
 			mx[dimID] += scaled
-			c.accumulateInterconnectTotals(totals, instance, spec.Context.ID, mf.Name(), scaled)
 		}
 	}
 
@@ -205,6 +209,7 @@ func (c *Collector) ensureDim(
 		extra = semanticDimSuffix(lbls)
 	}
 	dimName := spec.DimName
+	dimName = normalizeDimName(spec.Context.ID, dimName)
 	if extra != "" {
 		dimName = dimName + "_" + extra
 	}
@@ -236,6 +241,24 @@ func (c *Collector) ensureDim(
 	}
 
 	return dimID
+}
+
+func shouldSkipPrimarySeries(contextID, metricName string) bool {
+	// Keep NVLink total-only bandwidth in the interconnect overview context.
+	return strings.HasSuffix(contextID, ".interconnect.nvlink.throughput") &&
+		isNVLinkTotalMetricName(metricName)
+}
+
+func normalizeDimName(contextID, dimName string) string {
+	if isNVLinkThroughputContext(contextID) && strings.HasSuffix(dimName, "_bytes") {
+		return strings.TrimSuffix(dimName, "_bytes")
+	}
+	return dimName
+}
+
+func isNVLinkThroughputContext(contextID string) bool {
+	return strings.HasSuffix(contextID, ".interconnect.nvlink.throughput") ||
+		strings.HasPrefix(contextID, "dcgm.nvlink.") && strings.HasSuffix(contextID, ".interconnect.throughput")
 }
 
 func metricFamilyKind(mf *prometheus.MetricFamily) sampleKind {
