@@ -894,7 +894,7 @@ mod tests {
 
     fn fixture_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../go/plugin/go.d/collector/netflow/testdata/flows")
+            .join("testdata/flows")
     }
 
     fn decode_fixture_sequence(
