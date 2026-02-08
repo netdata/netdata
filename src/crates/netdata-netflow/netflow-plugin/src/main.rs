@@ -3,9 +3,12 @@
 mod decoder;
 mod enrichment;
 mod ingest;
+mod network_sources;
 mod plugin_config;
 mod query;
 mod rollup;
+mod routing_bioris;
+mod routing_bmp;
 mod tiering;
 
 use async_trait::async_trait;
@@ -210,6 +213,8 @@ async fn main() {
             std::process::exit(1);
         }
     };
+    let routing_runtime = ingest_service.routing_runtime();
+    let network_sources_runtime = ingest_service.network_sources_runtime();
 
     let mut runtime = PluginRuntime::new("netflow-plugin");
     runtime.register_handler(NetflowFlowsHandler::new(
@@ -228,6 +233,66 @@ async fn main() {
 
     let ingest_shutdown = shutdown.clone();
     let ingest_task = tokio::spawn(async move { ingest_service.run(ingest_shutdown).await });
+    let mut bmp_task = None;
+    if config.enrichment.routing_dynamic.bmp.enabled {
+        if let Some(runtime_state) = routing_runtime.clone() {
+            let bmp_cfg = config.enrichment.routing_dynamic.bmp.clone();
+            let bmp_shutdown = shutdown.clone();
+            bmp_task = Some(tokio::spawn(async move {
+                if let Err(err) =
+                    routing_bmp::run_bmp_listener(bmp_cfg, runtime_state, bmp_shutdown).await
+                {
+                    tracing::error!("dynamic BMP routing listener failed: {err:#}");
+                }
+            }));
+        } else {
+            tracing::warn!(
+                "dynamic BMP routing is enabled but enrichment runtime is unavailable; listener not started"
+            );
+        }
+    }
+    let mut bioris_task = None;
+    if config.enrichment.routing_dynamic.bioris.enabled {
+        if let Some(runtime_state) = routing_runtime.clone() {
+            let bioris_cfg = config.enrichment.routing_dynamic.bioris.clone();
+            let bioris_metrics = Arc::clone(&metrics);
+            let bioris_shutdown = shutdown.clone();
+            bioris_task = Some(tokio::spawn(async move {
+                if let Err(err) = routing_bioris::run_bioris_listener(
+                    bioris_cfg,
+                    runtime_state,
+                    bioris_metrics,
+                    bioris_shutdown,
+                )
+                .await
+                {
+                    tracing::error!("dynamic BioRIS routing listener failed: {err:#}");
+                }
+            }));
+        } else {
+            tracing::warn!(
+                "dynamic BioRIS routing is enabled but enrichment runtime is unavailable; listener not started"
+            );
+        }
+    }
+    let mut network_sources_task = None;
+    if let Some(runtime_state) = network_sources_runtime {
+        let network_sources_cfg = config.enrichment.network_sources.clone();
+        if !network_sources_cfg.is_empty() {
+            let sources_shutdown = shutdown.clone();
+            network_sources_task = Some(tokio::spawn(async move {
+                if let Err(err) = network_sources::run_network_sources_refresher(
+                    network_sources_cfg,
+                    runtime_state,
+                    sources_shutdown,
+                )
+                .await
+                {
+                    tracing::error!("network-sources refresher failed: {err:#}");
+                }
+            }));
+        }
+    }
 
     let mut exit_code = 0;
 
@@ -249,6 +314,36 @@ async fn main() {
             exit_code = 1;
         }
         Err(_) => {}
+    }
+    if let Some(task) = bmp_task {
+        match task.await {
+            Ok(()) => {}
+            Err(err) if !err.is_cancelled() => {
+                tracing::error!("BMP listener task join error: {err}");
+                exit_code = 1;
+            }
+            Err(_) => {}
+        }
+    }
+    if let Some(task) = bioris_task {
+        match task.await {
+            Ok(()) => {}
+            Err(err) if !err.is_cancelled() => {
+                tracing::error!("BioRIS listener task join error: {err}");
+                exit_code = 1;
+            }
+            Err(_) => {}
+        }
+    }
+    if let Some(task) = network_sources_task {
+        match task.await {
+            Ok(()) => {}
+            Err(err) if !err.is_cancelled() => {
+                tracing::error!("network-sources task join error: {err}");
+                exit_code = 1;
+            }
+            Err(_) => {}
+        }
     }
 
     if exit_code != 0 {

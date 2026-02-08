@@ -2,7 +2,7 @@ use crate::decoder::{
     DecapsulationMode as DecoderDecapsulationMode, DecodeStats, FlowDecoders,
     TimestampSource as DecoderTimestampSource,
 };
-use crate::enrichment::FlowEnricher;
+use crate::enrichment::{DynamicRoutingRuntime, FlowEnricher, NetworkSourcesRuntime};
 use crate::plugin_config::{
     DecapsulationMode as ConfigDecapsulationMode, PluginConfig,
     TimestampSource as ConfigTimestampSource,
@@ -54,6 +54,14 @@ pub(crate) struct IngestMetrics {
     pub(crate) tier_entries_written: AtomicU64,
     pub(crate) tier_write_errors: AtomicU64,
     pub(crate) tier_flushes: AtomicU64,
+    pub(crate) bioris_refresh_success: AtomicU64,
+    pub(crate) bioris_refresh_errors: AtomicU64,
+    pub(crate) bioris_dump_success: AtomicU64,
+    pub(crate) bioris_dump_errors: AtomicU64,
+    pub(crate) bioris_observe_stream_starts: AtomicU64,
+    pub(crate) bioris_observe_stream_reconnects: AtomicU64,
+    pub(crate) bioris_observe_stream_errors: AtomicU64,
+    pub(crate) bioris_observe_streams_active: AtomicU64,
 }
 
 impl IngestMetrics {
@@ -148,6 +156,39 @@ impl IngestMetrics {
             "tier_flushes".to_string(),
             self.tier_flushes.load(Ordering::Relaxed),
         );
+        stats.insert(
+            "bioris_refresh_success".to_string(),
+            self.bioris_refresh_success.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "bioris_refresh_errors".to_string(),
+            self.bioris_refresh_errors.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "bioris_dump_success".to_string(),
+            self.bioris_dump_success.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "bioris_dump_errors".to_string(),
+            self.bioris_dump_errors.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "bioris_observe_stream_starts".to_string(),
+            self.bioris_observe_stream_starts.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "bioris_observe_stream_reconnects".to_string(),
+            self.bioris_observe_stream_reconnects
+                .load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "bioris_observe_stream_errors".to_string(),
+            self.bioris_observe_stream_errors.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "bioris_observe_streams_active".to_string(),
+            self.bioris_observe_streams_active.load(Ordering::Relaxed),
+        );
         stats
     }
 }
@@ -186,6 +227,8 @@ pub(crate) struct IngestService {
     tier_writers: MaterializedTierWriters,
     tier_accumulators: HashMap<TierKind, TierAccumulator>,
     open_tiers: Arc<RwLock<OpenTierState>>,
+    routing_runtime: Option<DynamicRoutingRuntime>,
+    network_sources_runtime: Option<NetworkSourcesRuntime>,
 }
 
 impl IngestService {
@@ -271,6 +314,12 @@ impl IngestService {
         );
         let enricher = FlowEnricher::from_config(&cfg.enrichment)
             .context("failed to initialize netflow enrichment pipeline")?;
+        let routing_runtime = enricher
+            .as_ref()
+            .and_then(FlowEnricher::dynamic_routing_runtime);
+        let network_sources_runtime = enricher
+            .as_ref()
+            .and_then(FlowEnricher::network_sources_runtime);
         decoders.set_enricher(enricher);
         let decoder_state_path = cfg.journal.decoder_state_path();
         if decoder_state_path.is_file() {
@@ -304,7 +353,17 @@ impl IngestService {
             tier_writers,
             tier_accumulators,
             open_tiers,
+            routing_runtime,
+            network_sources_runtime,
         })
+    }
+
+    pub(crate) fn routing_runtime(&self) -> Option<DynamicRoutingRuntime> {
+        self.routing_runtime.clone()
+    }
+
+    pub(crate) fn network_sources_runtime(&self) -> Option<NetworkSourcesRuntime> {
+        self.network_sources_runtime.clone()
     }
 
     pub(crate) async fn run(mut self, shutdown: CancellationToken) -> Result<()> {
@@ -326,6 +385,7 @@ impl IngestService {
                 }
                 _ = sync_tick.tick() => {
                     let now = now_usec();
+                    self.decoders.refresh_enrichment_state();
                     if let Err(err) = self.flush_closed_tiers(now) {
                         tracing::warn!("tier flush failed: {}", err);
                     }

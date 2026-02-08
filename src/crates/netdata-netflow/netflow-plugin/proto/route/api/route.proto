@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package bio.route;
+
+import "net/api/net.proto";
+option go_package = "github.com/bio-routing/bio-rd/route/api";
+
+message Route {
+    bio.net.Prefix pfx = 1;
+    repeated Path paths = 2;
+}
+
+message Path {
+    enum Type {
+        Static = 0;
+        BGP = 1;
+    }
+    enum HiddenReason {
+        HiddenReasonNone = 0;
+        HiddenReasonNextHopUnreachable = 1;
+        HiddenReasonFilteredByPolicy = 2;
+        HiddenReasonASLoop = 3;
+        HiddenReasonOurOriginatorID = 4;
+        HiddenReasonClusterLoop = 5;
+        HiddenReasonOTCMismatch = 6;
+    }
+    Type type = 1;
+    StaticPath static_path = 2;
+    BGPPath bgp_path = 3;
+    HiddenReason hidden_reason = 4;
+    uint32 time_learned = 5;
+    GRPPath grp_path = 6;
+}
+
+message StaticPath {
+    bio.net.IP next_hop = 1;
+}
+
+message GRPPath {
+    bio.net.IP next_hop = 1;
+    map<string,string> meta_data = 2;
+}
+
+message BGPPath {
+    uint32 path_identifier = 1;
+    bio.net.IP next_hop = 2;
+    uint32 local_pref = 3;
+    repeated ASPathSegment as_path = 4;
+    uint32 origin = 5;
+    uint32 med = 6;
+    bool ebgp = 7;
+    uint32 bgp_identifier = 8;
+    bio.net.IP source = 9;
+    repeated uint32 communities = 10;
+    repeated LargeCommunity large_communities = 11;
+    uint32 originator_id = 12;
+    repeated uint32 cluster_list = 13;
+    repeated UnknownPathAttribute unknown_attributes = 14;
+    bool bmp_post_policy = 15;
+    uint32 only_to_customer = 16;
+}
+
+message ASPathSegment {
+    bool as_sequence = 1;
+    repeated uint32 asns = 2;
+}
+
+message LargeCommunity {
+    uint32 global_administrator = 1;
+    uint32 data_part1 = 2;
+    uint32 data_part2 = 3;
+}
+
+message UnknownPathAttribute {
+    bool optional = 1;
+    bool transitive = 2;
+    bool partial = 3;
+    uint32 type_code = 4;
+    bytes value = 5;
+}
