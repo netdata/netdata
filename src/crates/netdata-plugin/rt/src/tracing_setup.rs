@@ -47,7 +47,7 @@ fn log_level_to_filter(level: &LogLevel) -> &'static str {
         LogLevel::Error => "error",
         LogLevel::Warning => "warn",
         LogLevel::Notice | LogLevel::Info => "info",
-        LogLevel::Debug => "debug",
+        LogLevel::Debug => "trace",
     }
 }
 
@@ -68,8 +68,10 @@ pub fn init_tracing() {
         .map(log_level_to_filter)
         .unwrap_or("info");
 
-    // Create environment filter
-    let env_filter = EnvFilter::new(filter_str);
+    // Create environment filter: configured level as default, but limit noisy
+    // third-party crates to warn.
+    let filter = format!("{filter_str},foyer=warn,notify=warn");
+    let env_filter = EnvFilter::new(&filter);
 
     // Build the registry with base layers
     let registry = tracing_subscriber::registry().with(env_filter);

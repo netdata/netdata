@@ -16,9 +16,6 @@ pub use journal_engine::{
     calculate_bucket_duration, entry_data_to_table,
 };
 
-// Re-export Timeout from foundation (via rt for backward compatibility)
-pub use rt::Timeout;
-
 // Re-export Netdata-specific charts/metrics
 pub use charts::{
     BucketCacheMetrics, BucketOperationsMetrics, FileIndexingMetrics, JournalMetrics,

@@ -23,6 +23,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true}
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 notify = { workspace = true }
 thiserror = { workspace = true }
 foyer = { workspace = true }

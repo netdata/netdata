@@ -130,6 +130,12 @@ void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut)
                                                    "Timeout waiting for a response.",
                                                    HTTP_RESP_GATEWAY_TIMEOUT);
 
+            // Notify the plugin that the transaction has been cancelled due to timeout,
+            // so it can stop any in-progress work for this transaction.
+            char buffer[2048];
+            snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_CANCEL " %s\n", pf_dfe.name);
+            send_to_plugin(buffer, pf->parser, STREAM_TRAFFIC_TYPE_FUNCTIONS);
+
             dictionary_del(parser->inflight.functions, pf_dfe.name);
         }
 

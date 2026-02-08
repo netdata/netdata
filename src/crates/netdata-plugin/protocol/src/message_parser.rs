@@ -32,7 +32,8 @@ pub enum Message {
     FunctionCall(Box<FunctionCall>),
     FunctionResult(Box<FunctionResult>),
     FunctionCancel(Box<FunctionCancel>),
-    FunctionProgress(Box<FunctionProgress>),
+    FunctionProgressRequest(Box<FunctionProgressRequest>),
+    FunctionProgressResponse(Box<FunctionProgressResponse>),
     ConfigDeclaration(Box<ConfigDeclaration>),
 }
 
@@ -263,14 +264,41 @@ impl MessageParser {
         Some(Message::FunctionCancel(function_cancel))
     }
 
-    /// Parse FUNCTION_PROGRESS command
-    /// Expected format: FUNCTION_PROGRESS transaction
+    /// Parse FUNCTION_PROGRESS command - behavior depends on parser direction
     fn parse_function_progress(&self, args: &[u8]) -> Option<Message> {
+        match self.direction {
+            ParserDirection::Input => self.parse_function_progress_request(args),
+            ParserDirection::Output => self.parse_function_progress_response(args),
+        }
+    }
+
+    /// Parse FUNCTION_PROGRESS for input context (request from agent to plugin)
+    /// Expected format: FUNCTION_PROGRESS transaction
+    fn parse_function_progress_request(&self, args: &[u8]) -> Option<Message> {
         let mut words = WordIterator::new(args);
 
         let transaction = words.next_string()?;
-        let function_progress = Box::new(FunctionProgress { transaction });
 
-        Some(Message::FunctionProgress(function_progress))
+        Some(Message::FunctionProgressRequest(Box::new(
+            FunctionProgressRequest { transaction },
+        )))
+    }
+
+    /// Parse FUNCTION_PROGRESS for output context (progress report from plugin to agent)
+    /// Expected format: FUNCTION_PROGRESS transaction done all
+    fn parse_function_progress_response(&self, args: &[u8]) -> Option<Message> {
+        let mut words = WordIterator::new(args);
+
+        let transaction = words.next_string()?;
+        let done = words.next_usize()?;
+        let all = words.next_usize()?;
+
+        Some(Message::FunctionProgressResponse(Box::new(
+            FunctionProgressResponse {
+                transaction,
+                done,
+                all,
+            },
+        )))
     }
 }

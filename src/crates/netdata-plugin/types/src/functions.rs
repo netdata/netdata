@@ -77,9 +77,20 @@ pub struct FunctionCancel {
     pub transaction: String,
 }
 
-/// A message for reporting function call progress
+/// A request from the agent for a progress report on a running function call
 #[derive(Debug, Clone)]
-pub struct FunctionProgress {
-    /// Transaction ID of the function call that should report the progress
+pub struct FunctionProgressRequest {
+    /// Transaction ID of the function call to report progress for
     pub transaction: String,
+}
+
+/// A progress report sent from the plugin to the agent
+#[derive(Debug, Clone)]
+pub struct FunctionProgressResponse {
+    /// Transaction ID of the function call reporting progress
+    pub transaction: String,
+    /// Number of units completed
+    pub done: usize,
+    /// Total number of units to complete
+    pub all: usize,
 }

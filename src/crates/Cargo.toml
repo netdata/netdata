@@ -11,7 +11,6 @@ members = [
     "rdp",
 
     # Netdata plugin workspace members
-    "netdata-plugin/foundation",
     "netdata-plugin/error",
     "netdata-plugin/protocol",
     "netdata-plugin/rt",
@@ -136,7 +135,6 @@ journalctl = { path = "journalctl" }
 rdp = { path = "rdp" }
 
 # Netdata plugin crates
-foundation = { path = "netdata-plugin/foundation" }
 netdata-plugin-error = { path = "netdata-plugin/error" }
 netdata-plugin-protocol = { path = "netdata-plugin/protocol" }
 netdata-plugin-rt = { path = "netdata-plugin/rt" }

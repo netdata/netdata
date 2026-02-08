@@ -23,7 +23,7 @@
 //! use async_trait::async_trait;
 //! use netdata_plugin_error::Result;
 //! use netdata_plugin_protocol::FunctionDeclaration;
-//! use rt::{FunctionHandler, PluginRuntime};
+//! use rt::{FunctionCallContext, FunctionHandler, PluginRuntime};
 //! use serde::{Deserialize, Serialize};
 //!
 //! #[derive(Deserialize)]
@@ -43,20 +43,14 @@
 //!     type Request = MyRequest;
 //!     type Response = MyResponse;
 //!
-//!     async fn on_call(&self, request: Self::Request) -> Result<Self::Response> {
+//!     async fn on_call(
+//!         &self,
+//!         _ctx: FunctionCallContext,
+//!         request: Self::Request,
+//!     ) -> Result<Self::Response> {
 //!         Ok(MyResponse {
 //!             greeting: format!("Hello, {}!", request.name),
 //!         })
-//!     }
-//!
-//!     async fn on_cancellation(&self) -> Result<Self::Response> {
-//!         Err(netdata_plugin_error::NetdataPluginError::Other {
-//!             message: "Operation cancelled".to_string(),
-//!         })
-//!     }
-//!
-//!     async fn on_progress(&self) {
-//!         // Report progress if needed
 //!     }
 //!
 //!     fn declaration(&self) -> FunctionDeclaration {
@@ -97,19 +91,20 @@ use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use netdata_plugin_error::Result;
 use netdata_plugin_protocol::{
-    FunctionCall, FunctionCancel, FunctionDeclaration, FunctionProgress, FunctionResult, Message,
-    MessageReader, MessageWriter,
+    FunctionCall, FunctionCancel, FunctionDeclaration, FunctionProgressRequest,
+    FunctionProgressResponse, FunctionResult, Message, MessageReader, MessageWriter,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{Mutex, mpsc};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{error, info, instrument, trace, warn};
 
 // Charts module and re-exports
 pub mod charts;
@@ -131,39 +126,109 @@ pub use netdata_env::{LogFormat, LogLevel, LogMethod, NetdataEnv, SyslogFacility
 mod tracing_setup;
 pub use tracing_setup::init_tracing;
 
-// Re-export foundational utilities
-pub use foundation::Timeout;
+/// Atomic progress state shared between handlers and the runtime ticker.
+///
+/// Handlers write counters from any context (async, `spawn_blocking`, rayon),
+/// and the runtime sends progress to the agent once per second.
+///
+/// # Example
+///
+/// ```ignore
+/// // Set total work items before handing the counter to workers.
+/// ctx.progress.set_total(files.len());
+///
+/// // Give the done counter to a rayon/blocking worker.
+/// let counter = ctx.progress.done_counter();
+/// rayon::spawn(move || {
+///     // ... process item ...
+///     counter.fetch_add(1, Ordering::Relaxed);
+/// });
+///
+/// // Or update both at once from async code.
+/// ctx.progress.update(done, total);
+/// ```
+#[derive(Clone)]
+pub struct ProgressState {
+    done: Arc<AtomicUsize>,
+    total: Arc<AtomicUsize>,
+}
 
-/// Internal control signals sent to running functions.
-enum RuntimeSignal {
-    /// Signal to request progress update from a running function.
-    Progress,
+impl ProgressState {
+    fn new() -> Self {
+        Self {
+            done: Arc::new(AtomicUsize::new(0)),
+            total: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    /// Update both done and total. Safe from any context.
+    pub fn update(&self, done: usize, total: usize) {
+        self.done.store(done, Ordering::Relaxed);
+        self.total.store(total, Ordering::Relaxed);
+    }
+
+    /// Set the total work items (e.g. before handing `done_counter` to workers).
+    pub fn set_total(&self, total: usize) {
+        self.total.store(total, Ordering::Relaxed);
+    }
+
+    /// Get a clone of the done counter for sharing with worker threads.
+    /// Workers call `counter.fetch_add(1, Ordering::Relaxed)` directly.
+    pub fn done_counter(&self) -> Arc<AtomicUsize> {
+        self.done.clone()
+    }
+
+    fn load(&self) -> (usize, usize) {
+        (
+            self.done.load(Ordering::Relaxed),
+            self.total.load(Ordering::Relaxed),
+        )
+    }
+}
+
+/// Context provided to function handlers during execution.
+///
+/// Contains the transaction identifier, atomic progress state, and a
+/// cancellation token that signals when the function should stop.
+pub struct FunctionCallContext {
+    /// Unique identifier for this function call.
+    transaction: String,
+    /// Atomic progress state. The runtime reads these counters once per
+    /// second and sends progress to the agent automatically.
+    pub progress: ProgressState,
+    /// Token that signals when the function should stop.
+    /// Check `is_cancelled()` in sync code, or `await cancelled()` in async code.
+    pub cancellation: CancellationToken,
+}
+
+impl FunctionCallContext {
+    /// Returns the transaction identifier for this function call.
+    pub fn transaction(&self) -> &str {
+        &self.transaction
+    }
 }
 
 /// Represents an active function call transaction.
 ///
 /// Each transaction tracks a single function invocation, including its
-/// unique identifier, control channel for signals, and cancellation token.
+/// unique identifier and cancellation token.
 struct Transaction {
     /// Unique identifier for this transaction.
     id: String,
-    /// Channel for sending control signals to the running function.
-    control_tx: mpsc::Sender<RuntimeSignal>,
     /// Token for cancelling this specific function execution.
     cancellation_token: CancellationToken,
 }
 
-/// Execution context provided to function handlers.
+/// Execution context provided to the handler adapter layer.
 ///
-/// Contains all the information and control mechanisms needed for
-/// a function to execute, handle cancellation, and report progress.
+/// Contains all the information needed for a function to execute.
 struct FunctionContext {
     /// The original function call request from Netdata.
     function_call: Box<FunctionCall>,
     /// Token for detecting cancellation requests.
     cancellation_token: CancellationToken,
-    /// Receiver for runtime control signals (e.g., progress requests).
-    signal_rx: Mutex<mpsc::Receiver<RuntimeSignal>>,
+    /// Sender for outbound messages (e.g., progress reports back to the agent).
+    outbound_tx: mpsc::UnboundedSender<Message>,
 }
 
 /// Type alias for a future that produces a function result.
@@ -205,20 +270,14 @@ type FunctionFuture = BoxFuture<'static, (String, FunctionResult)>;
 ///     type Request = AddRequest;
 ///     type Response = AddResponse;
 ///
-///     async fn on_call(&self, request: Self::Request) -> Result<Self::Response> {
+///     async fn on_call(
+///         &self,
+///         _ctx: FunctionCallContext,
+///         request: Self::Request,
+///     ) -> Result<Self::Response> {
 ///         Ok(AddResponse {
 ///             sum: request.a + request.b,
 ///         })
-///     }
-///
-///     async fn on_cancellation(&self) -> Result<Self::Response> {
-///         Err(netdata_plugin_error::NetdataPluginError::Other {
-///             message: "Addition cancelled".to_string(),
-///         })
-///     }
-///
-///     async fn on_progress(&self) {
-///         // Not needed for quick operations
 ///     }
 ///
 ///     fn declaration(&self) -> FunctionDeclaration {
@@ -243,11 +302,13 @@ pub trait FunctionHandler: Send + Sync + 'static {
     /// Main function logic executed when the function is called.
     ///
     /// This method contains the primary computation or operation that the
-    /// function performs. It receives the deserialized request and should
-    /// return either a successful response or an error.
+    /// function performs. It receives the deserialized request, a context
+    /// for progress reporting and cancellation, and should return either
+    /// a successful response or an error.
     ///
     /// # Arguments
     ///
+    /// * `ctx` - Context with transaction ID, progress sender, and cancellation token
     /// * `request` - The deserialized request payload
     ///
     /// # Returns
@@ -256,32 +317,14 @@ pub trait FunctionHandler: Send + Sync + 'static {
     ///
     /// # Cancellation
     ///
-    /// This method may be interrupted if a cancellation is requested.
-    /// When cancelled, the runtime will call [`on_cancellation`](Self::on_cancellation) instead.
-    async fn on_call(&self, transaction: String, request: Self::Request) -> Result<Self::Response>;
-
-    /// Handle cancellation requests while the function is running.
-    ///
-    /// Called when Netdata requests cancellation of a running function.
-    /// This method should quickly return an appropriate error or partial result.
-    ///
-    /// # Returns
-    ///
-    /// Typically returns an error indicating the operation was cancelled,
-    /// but may return a partial result if appropriate.
-    async fn on_cancellation(&self, transaction: String) -> Result<Self::Response>;
-
-    /// Handle progress report requests while the function is running.
-    ///
-    /// Called when Netdata requests a progress update from a long-running function.
-    /// This method should log or report the current progress but doesn't need
-    /// to return a value (progress is typically reported through logging).
-    ///
-    /// # Note
-    ///
-    /// This is called asynchronously while `on_call` is still running,
-    /// so any shared state must be properly synchronized.
-    async fn on_progress(&self, transaction: String);
+    /// When cancelled, the runtime cancels the token in `ctx.cancellation`
+    /// and drops this future. Check `ctx.cancellation.is_cancelled()` in
+    /// synchronous code paths.
+    async fn on_call(
+        &self,
+        ctx: FunctionCallContext,
+        request: Self::Request,
+    ) -> Result<Self::Response>;
 
     /// Provide the function's declaration metadata.
     ///
@@ -362,32 +405,61 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
             },
         };
 
-        // Drive the handler with cancellation and progress handling
-        let handler = self.handler.clone();
+        // Build the function call context
+        let call_ctx = FunctionCallContext {
+            transaction: transaction.clone(),
+            progress: ProgressState::new(),
+            cancellation: ctx.cancellation_token.clone(),
+        };
 
-        let mut call_future = Box::pin(handler.on_call(transaction.clone(), payload));
-        let mut signal_rx = ctx.signal_rx.lock().await;
+        // Spawn a background ticker that reads the atomic progress counters
+        // once per second and sends FunctionProgressResponse to the agent.
+        let progress = call_ctx.progress.clone();
+        let ticker_tx = ctx.outbound_tx.clone();
+        let ticker_transaction = transaction.clone();
 
-        let result = loop {
-            tokio::select! {
-                // Poll the main computation
-                result = &mut call_future => {
-                    break result;
-                }
-                // Handle progress requests
-                Some(msg) = signal_rx.recv() => {
-                    match msg {
-                        RuntimeSignal::Progress => {
-                            handler.on_progress(transaction.clone()).await;
-                        }
+        let ticker = tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            loop {
+                interval.tick().await;
+                let (done, total) = progress.load();
+                if total > 0 {
+                    let msg =
+                        Message::FunctionProgressResponse(Box::new(FunctionProgressResponse {
+                            transaction: ticker_transaction.clone(),
+                            done,
+                            all: total,
+                        }));
+                    tracing::trace!(
+                        "[{}] progress {}/{}",
+                        ticker_transaction.clone(),
+                        done,
+                        total
+                    );
+                    if ticker_tx.send(msg).is_err() {
+                        tracing::error!(
+                            "[{}] outbound channel closed, stopping progress ticker",
+                            ticker_transaction
+                        );
+                        break;
                     }
                 }
-                // Handle cancellation
-                _ = ctx.cancellation_token.cancelled() => {
-                    break handler.on_cancellation(transaction.clone()).await;
-                }
+            }
+        });
+
+        let handler = self.handler.clone();
+
+        let result = tokio::select! {
+            result = handler.on_call(call_ctx, payload) => result,
+            _ = ctx.cancellation_token.cancelled() => {
+                Err(netdata_plugin_error::NetdataPluginError::Other {
+                    message: "Function cancelled".to_string(),
+                })
             }
         };
+
+        ticker.abort();
 
         let current_timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -421,7 +493,11 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                 }
             }
             Err(e) => {
-                error!("function handler error: {}", e);
+                if ctx.cancellation_token.is_cancelled() {
+                    info!("function handler cancelled: {}", e);
+                } else {
+                    error!("function handler error: {}", e);
+                }
                 let error_json = json!({
                     "error": format!("{}", e),
                     "status": 500
@@ -501,6 +577,11 @@ where
     /// Token for initiating graceful shutdown.
     shutdown_token: CancellationToken,
 
+    /// Sender for outbound messages (progress reports, function results).
+    outbound_tx: mpsc::UnboundedSender<Message>,
+    /// Receiver for outbound messages — consumed by the writer task.
+    outbound_rx: Option<mpsc::UnboundedReceiver<Message>>,
+
     /// Optional chart registry for managing metrics emission.
     chart_registry: Option<ChartRegistry<W>>,
     /// Handle to chart registry background task.
@@ -566,6 +647,8 @@ where
     /// }
     /// ```
     pub fn with_streams(name: &str, reader: R, writer: W) -> Self {
+        let (outbound_tx, outbound_rx) = mpsc::unbounded_channel();
+
         Self {
             plugin_name: String::from(name),
             reader: MessageReader::new(reader),
@@ -576,6 +659,8 @@ where
             futures: FuturesUnordered::new(),
 
             shutdown_token: CancellationToken::default(),
+            outbound_tx,
+            outbound_rx: Some(outbound_rx),
             chart_registry: None,
             chart_registry_handle: None,
         }
@@ -730,8 +815,49 @@ where
         }
 
         self.declare_functions().await?;
+
+        // Spawn a dedicated writer task so stdout I/O never blocks the
+        // main select loop (which must keep reading stdin).
+        let writer = Arc::clone(&self.writer);
+        let mut outbound_rx = self
+            .outbound_rx
+            .take()
+            .expect("outbound_rx consumed only once");
+
+        let writer_task = tokio::spawn(async move {
+            let mut keepalive =
+                tokio::time::interval(tokio::time::Duration::from_secs(60));
+
+            loop {
+                tokio::select! {
+                    msg = outbound_rx.recv() => {
+                        match msg {
+                            Some(msg) => {
+                                if let Err(e) = writer.lock().await.send(msg).await {
+                                    error!("outbound writer error: {}", e);
+                                    break;
+                                }
+                            }
+                            None => break,
+                        }
+                    }
+                    _ = keepalive.tick() => {
+                        if let Err(e) = writer.lock().await.write_raw(b"PLUGIN_KEEPALIVE\n").await {
+                            error!("keepalive write error: {}", e);
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
         self.process_messages().await?;
         self.shutdown().await?;
+
+        // All outbound senders (including those in handler contexts) are now
+        // dropped, so the writer task will drain and exit.
+        drop(self);
+        let _ = writer_task.await;
 
         Ok(())
     }
@@ -805,19 +931,17 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
 
         loop {
             tokio::select! {
-                // Make the shutdown signal higher priority by putting it first
                 _ = self.shutdown_token.cancelled() => {
-                    info!("shutdown requested... Stop processing messages from stdin");
-                    // Reader will be dropped here, closing stdin
+                    info!("shutdown requested, stop processing messages from stdin");
                     break;
+                }
+                Some((transaction, result)) = self.futures.next() => {
+                    self.handle_completed(transaction, result).await?;
                 }
                 message = self.reader.next() => {
                     if self.handle_message(message).await? {
                         break;
                     }
-                }
-                Some((transaction, result)) = self.futures.next() => {
-                    self.handle_completed(transaction, result).await?;
                 }
             }
         }
@@ -838,11 +962,11 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
             Some(Ok(Message::FunctionCancel(function_cancel))) => {
                 self.handle_function_cancel(function_cancel.as_ref());
             }
-            Some(Ok(Message::FunctionProgress(function_progress))) => {
-                self.handle_function_progress(&function_progress).await;
+            Some(Ok(Message::FunctionProgressRequest(req))) => {
+                trace!(transaction = %req.transaction, "ignoring inbound progress request");
             }
             Some(Ok(msg)) => {
-                debug!("received message: {:?}", msg);
+                trace!("received message: {:?}", msg);
             }
             Some(Err(e)) => {
                 error!("error parsing message: {:?}", e);
@@ -850,9 +974,10 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
             None => {
                 info!("input stream ended");
                 self.shutdown_token.cancel();
-                return Ok(true); // Signal to break the loop
+                return Ok(true);
             }
         }
+
         Ok(false)
     }
 
@@ -907,13 +1032,12 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
         };
 
         // Create a new function context
-        let (control_tx, control_rx) = mpsc::channel(4);
         let cancellation_token = CancellationToken::new();
 
         let function_context = Arc::new(FunctionContext {
             function_call,
             cancellation_token: cancellation_token.clone(),
-            signal_rx: Mutex::new(control_rx),
+            outbound_tx: self.outbound_tx.clone(),
         });
 
         // Create new transaction
@@ -921,7 +1045,6 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
         let transaction = Arc::new(Transaction {
             id,
             cancellation_token,
-            control_tx,
         });
         self.transaction_registry
             .insert(transaction.id.clone(), transaction.clone());
@@ -950,42 +1073,23 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
         transaction.cancellation_token.cancel();
     }
 
-    /// Handle a progress report request.
-    ///
-    /// Sends a progress signal to the corresponding running function.
-    async fn handle_function_progress(&mut self, function_progress: &FunctionProgress) {
-        let Some(transaction) = self
-            .transaction_registry
-            .get(&function_progress.transaction)
-        else {
-            warn!(
-                "can not get progress of non-existing transaction {}",
-                function_progress.transaction
-            );
-            return;
-        };
-
-        info!(
-            "requesting progress of transaction {}",
-            function_progress.transaction
-        );
-        let _ = transaction.control_tx.send(RuntimeSignal::Progress).await;
-    }
-
     /// Handle a completed function execution.
     ///
-    /// Removes the transaction from the registry and sends the result back to Netdata.
+    /// Removes the transaction from the registry and sends the result
+    /// through the outbound channel (written to stdout by the writer task).
     async fn handle_completed(
         &mut self,
         transaction: String,
         result: FunctionResult,
     ) -> Result<()> {
         self.transaction_registry.remove(&transaction);
-        self.writer
-            .lock()
-            .await
-            .send(Message::FunctionResult(Box::new(result)))
-            .await?;
+        let msg = Message::FunctionResult(Box::new(result));
+        if self.outbound_tx.send(msg).is_err() {
+            error!(
+                "outbound channel closed, cannot send result for transaction {}",
+                transaction
+            );
+        }
         Ok(())
     }
 
