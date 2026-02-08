@@ -346,11 +346,11 @@ DCGM_FI_DEV_MIG_MAX_SLICES, gauge, Mig max slices
 # context=dcgm.gpu.state.virtualization family=gpu state dimension=mig_mode
 DCGM_FI_DEV_MIG_MODE, gauge, Mig mode
 # context=dcgm.gpu.inventory.identity family=gpu inventory dimension=minor_number
-DCGM_FI_DEV_MINOR_NUMBER, label, Minor number
+# DCGM_FI_DEV_MINOR_NUMBER, label, Minor number
 # context=dcgm.gpu.cpu.power family=gpu cpu dimension=module_power_util_current
 # DCGM_FI_DEV_MODULE_POWER_UTIL_CURRENT, gauge, Module power util current
 # context=dcgm.gpu.inventory.identity family=gpu inventory dimension=name
-DCGM_FI_DEV_NAME, label, Name
+# DCGM_FI_DEV_NAME, label, Name
 # context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l0
 # DCGM_FI_DEV_NVLINK_BANDWIDTH_L0, counter, Nvlink bandwidth l0
 # context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l1
@@ -1020,7 +1020,7 @@ DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION, counter, Total energy consumption
 # context=dcgm.gpu.reliability.row_remap_events family=gpu reliability dimension=uncorrectable_remapped_rows
 DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS, counter, Uncorrectable remapped rows
 # context=dcgm.gpu.inventory.identity family=gpu inventory dimension=uuid
-DCGM_FI_DEV_UUID, label, Uuid
+# DCGM_FI_DEV_UUID, label, Uuid
 # context=dcgm.gpu.power.profiles family=gpu power dimension=valid_power_profile_mask
 # DCGM_FI_DEV_VALID_POWER_PROFILE_MASK, counter, Valid power profile mask
 # context=dcgm.gpu.inventory.software family=gpu inventory dimension=vbios_version
