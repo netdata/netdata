@@ -8,8 +8,17 @@
 #   dcgm-exporter -f /path/to/dcgm-exporter-netdata.csv -c 30000
 #
 # This file documents all known DCGM fields (623 in current source dataset).
-# Exactly 127 fields are enabled by default below.
+# Exactly 123 fields are enabled by default below (127 max per field group).
 # To enable a different field, uncomment one line and comment another enabled line.
+#
+# IMPORTANT: Fields with DCGM_FT_BINARY type (structs/blobs) MUST remain disabled.
+# They return non-numeric values that break Prometheus metric parsing.
+# Known BINARY fields: ACCOUNTING_DATA, COMPUTE_PIDS, CREATABLE_VGPU_TYPE_IDS,
+# ENC_STATS, FBC_SESSIONS_INFO, FBC_STATS, GRAPHICS_PIDS, SUPPORTED_CLOCKS,
+# SUPPORTED_TYPE_INFO, VGPU_ENC_SESSIONS_INFO, VGPU_ENC_STATS,
+# VGPU_FBC_SESSIONS_INFO, VGPU_FBC_STATS, VGPU_INSTANCE_IDS,
+# VGPU_PER_PROCESS_UTILIZATION, VGPU_UTILIZATIONS, GPU_TOPOLOGY_AFFINITY,
+# GPU_TOPOLOGY_NVLINK, GPU_TOPOLOGY_PCI, SYNC_BOOST
 #
 # Format:
 # DCGM FIELD, Prometheus metric type, help message
@@ -1060,7 +1069,7 @@ DCGM_FI_DEV_VGPU_MEMORY_USAGE, gauge, Vgpu memory usage
 # context=dcgm.gpu.virtualization.vgpu.type family=gpu virtualization dimension=vgpu_type_name
 # DCGM_FI_DEV_VGPU_TYPE_NAME, label, Vgpu type name
 # context=dcgm.gpu.virtualization.vgpu.utilization family=gpu virtualization dimension=vgpu_utilizations
-DCGM_FI_DEV_VGPU_UTILIZATIONS, gauge, Vgpu utilizations
+# DCGM_FI_DEV_VGPU_UTILIZATIONS, gauge, Vgpu utilizations
 # context=dcgm.gpu.virtualization.vgpu.instance family=gpu virtualization dimension=vgpu_uuid
 # DCGM_FI_DEV_VGPU_UUID, label, Vgpu uuid
 # context=dcgm.gpu.virtualization.vgpu.vm family=gpu virtualization dimension=vgpu_vm_gpu_instance_id

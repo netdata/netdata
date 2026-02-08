@@ -940,7 +940,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: vgpu_per_process_utilization
-                - name: vgpu_utilizations
             - name: dcgm.gpu.virtualization.vgpu.vm
               description: GPU vGPU VM metrics.
               unit: value
