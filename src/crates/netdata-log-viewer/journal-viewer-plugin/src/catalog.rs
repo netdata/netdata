@@ -9,7 +9,7 @@ use rt::{FunctionCallContext, FunctionHandler};
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{error, instrument, trace, warn};
 
 // Import types from journal-function crate
 use journal_function::{
@@ -330,7 +330,7 @@ impl CatalogFunction {
 
             // Apply regex search if search_query is not empty
             if !search_query.is_empty() {
-                debug!("applying regex filter to opposite direction query");
+                trace!("applying regex filter to opposite direction query");
                 opposite_query = opposite_query.with_regex(search_query);
             }
 
@@ -448,7 +448,7 @@ impl FunctionHandler for CatalogFunction {
                 message: format!("[{}] transaction already exists", transaction),
             });
         };
-        debug!("[{}] started transaction", txn.id());
+        trace!("[{}] started transaction", txn.id());
 
         // Create query time range with automatic alignment
         let time_range = journal_function::QueryTimeRange::new(request.after, request.before)
@@ -457,7 +457,7 @@ impl FunctionHandler for CatalogFunction {
                 netdata_plugin_error::NetdataPluginError::Other { message: msg }
             })?;
 
-        debug!(
+        trace!(
             "[{}] time range: [{}, {}), aligned: [{}, {}), bucket duration: {} seconds",
             txn.id(),
             time_range.requested_start(),
@@ -478,7 +478,7 @@ impl FunctionHandler for CatalogFunction {
                 netdata_plugin_error::NetdataPluginError::Other { message: msg }
             })?;
         let find_files_duration = op_start.elapsed();
-        debug!("[{}] found {} files in time range", txn.id(), files.len(),);
+        trace!("[{}] found {} files in time range", txn.id(), files.len(),);
         if tracing::enabled!(tracing::Level::TRACE) {
             for (idx, file_info) in files.iter().enumerate() {
                 tracing::trace!(
@@ -493,11 +493,11 @@ impl FunctionHandler for CatalogFunction {
 
         // Build filter expression
         let filter_expr = build_filter_from_selections(&request.selections);
-        debug!("[{}] filter expression: {}", txn.id(), filter_expr);
+        trace!("[{}] filter expression: {}", txn.id(), filter_expr);
 
         // Build facets for file indexes
         let facets = Facets::new(&request.facets);
-        debug!(
+        trace!(
             "[{}] using {} facets with precomputed hash {}",
             txn.id(),
             facets.len(),
@@ -541,7 +541,7 @@ impl FunctionHandler for CatalogFunction {
         // catches up.
         ctx.progress.set_total(2 * num_files);
 
-        debug!(
+        trace!(
             "[{}] retrieved {}/{} file indexes for histogram buckets and log entries",
             txn.id(),
             indexed_files.len(),
@@ -618,7 +618,7 @@ impl FunctionHandler for CatalogFunction {
             }
         };
         let query_logs_duration = op_start.elapsed();
-        debug!(
+        trace!(
             "[{}] retrieved {} log entries (has before: {}, has after: {})",
             txn.id(),
             log_entries.len(),
@@ -679,7 +679,7 @@ impl FunctionHandler for CatalogFunction {
                 message: format!("[{}] transaction does not exist", transaction),
             });
         };
-        debug!(
+        trace!(
             "[{}] completed transaction (find_files: {:?}, indexing: {:?}, histogram: {:?}, query_logs: {:?}, total: {:?})",
             txn.id(),
             find_files_duration,
@@ -697,7 +697,6 @@ impl FunctionHandler for CatalogFunction {
         // calls in a consistent way. If you rename this function, you should
         // update the `rt` crate as well.
 
-        info!("generating journal-viewer function declaration");
         let mut func_decl = FunctionDeclaration::new(
             "journal-viewer",
             "Query and visualize journal log entries with histograms and facets",

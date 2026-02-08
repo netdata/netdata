@@ -104,7 +104,7 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{Mutex, mpsc};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{error, info, instrument, trace, warn};
 
 // Charts module and re-exports
 pub mod charts;
@@ -431,7 +431,7 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                             done,
                             all: total,
                         }));
-                    tracing::error!(
+                    tracing::trace!(
                         "[{}] progress {}/{}",
                         ticker_transaction.clone(),
                         done,
@@ -493,7 +493,11 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                 }
             }
             Err(e) => {
-                error!("function handler error: {}", e);
+                if ctx.cancellation_token.is_cancelled() {
+                    info!("function handler cancelled: {}", e);
+                } else {
+                    error!("function handler error: {}", e);
+                }
                 let error_json = json!({
                     "error": format!("{}", e),
                     "status": 500
@@ -944,7 +948,7 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
                 trace!(transaction = %req.transaction, "ignoring inbound progress request");
             }
             Some(Ok(msg)) => {
-                debug!("received message: {:?}", msg);
+                trace!("received message: {:?}", msg);
             }
             Some(Err(e)) => {
                 error!("error parsing message: {:?}", e);

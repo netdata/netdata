@@ -66,7 +66,6 @@ async fn run_plugin() -> std::result::Result<(), Box<dyn std::error::Error>> {
     };
 
     // Create catalog function with disk-backed cache
-    info!("creating catalog function with Foyer hybrid cache");
     let indexing_limits = IndexingLimits {
         max_unique_values_per_field: config.indexing.max_unique_values_per_field,
         max_field_payload_size: config.indexing.max_field_payload_size,
@@ -79,22 +78,15 @@ async fn run_plugin() -> std::result::Result<(), Box<dyn std::error::Error>> {
         indexing_limits,
     )
     .await?;
-    info!("catalog function initialized");
 
     // Watch configured journal directories
     for path in &config.journal.paths {
-        match catalog_function.watch_directory(path) {
-            Ok(()) => {
-                info!("watching journal directory: {}", path);
-            }
-            Err(e) => {
-                error!("failed to watch directory {}: {:#?}", path, e);
-            }
+        if let Err(e) = catalog_function.watch_directory(path) {
+            error!("failed to watch directory {}: {:#?}", path, e);
         }
     }
 
     runtime.register_handler(catalog_function.clone());
-    info!("catalog function handler registered");
 
     // Spawn task to process notify events
     let catalog_function_clone = catalog_function.clone();
@@ -117,8 +109,6 @@ async fn run_plugin() -> std::result::Result<(), Box<dyn std::error::Error>> {
             }
         }
     };
-
-    info!("starting plugin runtime");
 
     // Run plugin runtime and keepalive concurrently
     tokio::select! {
