@@ -303,9 +303,23 @@ modules:
                 - name: fp32
                 - name: fp64
                 - name: graphics_engine_active
-                - name: hostmem_cache_hit
-                - name: hostmem_cache_miss
                 - name: integer
+                - name: sm_active
+                - name: sm_occupancy
+                - name: tensor
+            - name: dcgm.gpu.compute.tensor.activity
+              description: GPU Tensor Core Activity by precision type.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: tensor_dfma
+                - name: tensor_hmma
+                - name: tensor_imma
+            - name: dcgm.gpu.compute.media.activity
+              description: GPU Media Engine Activity metrics.
+              unit: '%'
+              chart_type: line
+              dimensions:
                 - name: nvdec0_active
                 - name: nvdec1_active
                 - name: nvdec2_active
@@ -324,19 +338,15 @@ modules:
                 - name: nvjpg7_active
                 - name: nvofa0_active
                 - name: nvofa1_active
-                - name: peermem_cache_hit
-                - name: peermem_cache_miss
-                - name: sm_active
-                - name: sm_occupancy
-                - name: tensor
-            - name: dcgm.gpu.compute.tensor.activity
-              description: GPU Tensor Core Activity by precision type.
+            - name: dcgm.gpu.compute.cache.activity
+              description: GPU Memory Cache Hit/Miss metrics.
               unit: '%'
               chart_type: line
               dimensions:
-                - name: tensor_dfma
-                - name: tensor_hmma
-                - name: tensor_imma
+                - name: hostmem_cache_hit
+                - name: hostmem_cache_miss
+                - name: peermem_cache_hit
+                - name: peermem_cache_miss
             - name: dcgm.gpu.compute.utilization
               description: GPU Compute Utilization metrics.
               unit: '%'
@@ -986,9 +996,23 @@ modules:
                 - name: fp32
                 - name: fp64
                 - name: graphics_engine_active
-                - name: hostmem_cache_hit
-                - name: hostmem_cache_miss
                 - name: integer
+                - name: sm_active
+                - name: sm_occupancy
+                - name: tensor
+            - name: dcgm.mig.compute.tensor.activity
+              description: MIG Tensor Core Activity by precision type.
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: tensor_dfma
+                - name: tensor_hmma
+                - name: tensor_imma
+            - name: dcgm.mig.compute.media.activity
+              description: MIG Media Engine Activity metrics.
+              unit: '%'
+              chart_type: line
+              dimensions:
                 - name: nvdec0_active
                 - name: nvdec1_active
                 - name: nvdec2_active
@@ -1007,19 +1031,15 @@ modules:
                 - name: nvjpg7_active
                 - name: nvofa0_active
                 - name: nvofa1_active
-                - name: peermem_cache_hit
-                - name: peermem_cache_miss
-                - name: sm_active
-                - name: sm_occupancy
-                - name: tensor
-            - name: dcgm.mig.compute.tensor.activity
-              description: MIG Tensor Core Activity by precision type.
+            - name: dcgm.mig.compute.cache.activity
+              description: MIG Memory Cache Hit/Miss metrics.
               unit: '%'
               chart_type: line
               dimensions:
-                - name: tensor_dfma
-                - name: tensor_hmma
-                - name: tensor_imma
+                - name: hostmem_cache_hit
+                - name: hostmem_cache_miss
+                - name: peermem_cache_hit
+                - name: peermem_cache_miss
             - name: dcgm.mig.compute.utilization
               description: MIG Compute Utilization metrics.
               unit: '%'

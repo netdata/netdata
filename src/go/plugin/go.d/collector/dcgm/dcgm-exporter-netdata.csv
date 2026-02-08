@@ -1115,41 +1115,41 @@ DCGM_FI_DRIVER_VERSION, label, Driver version
 DCGM_FI_PROF_DRAM_ACTIVE, gauge, Dram active
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=graphics_engine_active
 DCGM_FI_PROF_GR_ENGINE_ACTIVE, gauge, Gr engine active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=hostmem_cache_hit
+# context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=hostmem_cache_hit
 # DCGM_FI_PROF_HOSTMEM_CACHE_HIT, gauge, Hostmem cache hit
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=hostmem_cache_miss
+# context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=hostmem_cache_miss
 # DCGM_FI_PROF_HOSTMEM_CACHE_MISS, gauge, Hostmem cache miss
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvdec0_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec0_active
 # DCGM_FI_PROF_NVDEC0_ACTIVE, gauge, Nvdec0 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvdec1_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec1_active
 # DCGM_FI_PROF_NVDEC1_ACTIVE, gauge, Nvdec1 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvdec2_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec2_active
 # DCGM_FI_PROF_NVDEC2_ACTIVE, gauge, Nvdec2 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvdec3_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec3_active
 # DCGM_FI_PROF_NVDEC3_ACTIVE, gauge, Nvdec3 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvdec4_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec4_active
 # DCGM_FI_PROF_NVDEC4_ACTIVE, gauge, Nvdec4 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvdec5_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec5_active
 # DCGM_FI_PROF_NVDEC5_ACTIVE, gauge, Nvdec5 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvdec6_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec6_active
 # DCGM_FI_PROF_NVDEC6_ACTIVE, gauge, Nvdec6 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvdec7_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec7_active
 # DCGM_FI_PROF_NVDEC7_ACTIVE, gauge, Nvdec7 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvjpg0_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg0_active
 # DCGM_FI_PROF_NVJPG0_ACTIVE, gauge, Nvjpg0 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvjpg1_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg1_active
 # DCGM_FI_PROF_NVJPG1_ACTIVE, gauge, Nvjpg1 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvjpg2_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg2_active
 # DCGM_FI_PROF_NVJPG2_ACTIVE, gauge, Nvjpg2 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvjpg3_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg3_active
 # DCGM_FI_PROF_NVJPG3_ACTIVE, gauge, Nvjpg3 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvjpg4_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg4_active
 # DCGM_FI_PROF_NVJPG4_ACTIVE, gauge, Nvjpg4 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvjpg5_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg5_active
 # DCGM_FI_PROF_NVJPG5_ACTIVE, gauge, Nvjpg5 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvjpg6_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg6_active
 # DCGM_FI_PROF_NVJPG6_ACTIVE, gauge, Nvjpg6 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvjpg7_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg7_active
 # DCGM_FI_PROF_NVJPG7_ACTIVE, gauge, Nvjpg7 active
 # context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l0_rx
 # DCGM_FI_PROF_NVLINK_L0_RX_BYTES, gauge, Nvlink l0 rx bytes
@@ -1227,17 +1227,17 @@ DCGM_FI_PROF_GR_ENGINE_ACTIVE, gauge, Gr engine active
 DCGM_FI_PROF_NVLINK_RX_BYTES, gauge, Nvlink rx bytes
 # context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx
 DCGM_FI_PROF_NVLINK_TX_BYTES, gauge, Nvlink tx bytes
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvofa0_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvofa0_active
 # DCGM_FI_PROF_NVOFA0_ACTIVE, gauge, Nvofa0 active
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=nvofa1_active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvofa1_active
 # DCGM_FI_PROF_NVOFA1_ACTIVE, gauge, Nvofa1 active
 # context=dcgm.gpu.interconnect.pcie.throughput family=gpu interconnect/pcie dimension=pcie_rx
 DCGM_FI_PROF_PCIE_RX_BYTES, gauge, Pcie rx bytes
 # context=dcgm.gpu.interconnect.pcie.throughput family=gpu interconnect/pcie dimension=pcie_tx
 DCGM_FI_PROF_PCIE_TX_BYTES, gauge, Pcie tx bytes
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=peermem_cache_hit
+# context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=peermem_cache_hit
 # DCGM_FI_PROF_PEERMEM_CACHE_HIT, gauge, Peermem cache hit
-# context=dcgm.gpu.compute.activity family=gpu compute dimension=peermem_cache_miss
+# context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=peermem_cache_miss
 # DCGM_FI_PROF_PEERMEM_CACHE_MISS, gauge, Peermem cache miss
 # context=dcgm.gpu.compute.activity family=gpu compute dimension=fp16
 DCGM_FI_PROF_PIPE_FP16_ACTIVE, gauge, Pipe fp16 active

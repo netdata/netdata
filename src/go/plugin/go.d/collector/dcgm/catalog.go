@@ -56,6 +56,8 @@ var groupCatalog = []groupSpec{
 	{Suffix: "compute.utilization", Title: "Compute Utilization", Units: "percentage", Family: "compute", Type: module.Line},
 	{Suffix: "compute.activity", Title: "Compute Pipeline Activity", Units: "percentage", Family: "compute", Type: module.Line},
 	{Suffix: "compute.tensor.activity", Title: "Tensor Core Activity by Precision", Units: "percentage", Family: "compute", Type: module.Line},
+	{Suffix: "compute.media.activity", Title: "Media Engine Activity", Units: "percentage", Family: "compute", Type: module.Line},
+	{Suffix: "compute.cache.activity", Title: "Memory Cache Hit/Miss", Units: "percentage", Family: "compute", Type: module.Line},
 	{Suffix: "memory.utilization", Title: "Memory Utilization", Units: "percentage", Family: "memory", Type: module.Line},
 	{Suffix: "memory.usage", Title: "Memory Usage", Units: "bytes", Family: "memory", Type: module.Stacked},
 	{Suffix: "memory.capacity", Title: "Memory Capacity", Units: "bytes", Family: "memory", Type: module.Line},
@@ -231,6 +233,10 @@ func classifyMetricGroup(entity metricEntity, metricName string, typ sampleKind)
 		return "compute.utilization"
 	case containsAny(name, "TENSOR_HMMA", "TENSOR_IMMA", "TENSOR_DFMA"):
 		return "compute.tensor.activity"
+	case containsAny(name, "NVDEC", "NVJPG", "NVOFA"):
+		return "compute.media.activity"
+	case containsAny(name, "HOSTMEM_CACHE", "PEERMEM_CACHE"):
+		return "compute.cache.activity"
 	case containsAny(name,
 		"SM_ACTIVE",
 		"SM_OCCUPANCY",
@@ -242,11 +248,6 @@ func classifyMetricGroup(entity metricEntity, metricName string, typ sampleKind)
 		"FP32",
 		"FP64",
 		"INTEGER_ACTIVE",
-		"HOSTMEM_CACHE",
-		"PEERMEM_CACHE",
-		"NVDEC",
-		"NVJPG",
-		"NVOFA",
 	):
 		return "compute.activity"
 	case strings.Contains(name, "FB_USED_PERCENT"):
@@ -531,7 +532,9 @@ func metricScale(metricName, help string, spec contextSpec) float64 {
 	}
 
 	if strings.HasSuffix(spec.ID, ".compute.activity") ||
-		strings.HasSuffix(spec.ID, ".compute.tensor.activity") {
+		strings.HasSuffix(spec.ID, ".compute.tensor.activity") ||
+		strings.HasSuffix(spec.ID, ".compute.media.activity") ||
+		strings.HasSuffix(spec.ID, ".compute.cache.activity") {
 		return 100
 	}
 
