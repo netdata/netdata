@@ -295,6 +295,8 @@
 - Docs: Add bearer token protection as recommended security method ([#21712](https://github.com/netdata/netdata/issues/21712))
 - Use info-level log for undhandled modification events. ([#21719](https://github.com/netdata/netdata/issues/21719))
 - Improve log message when deferred response is too big. ([#21720](https://github.com/netdata/netdata/issues/21720))
+- Fix timeout cleanup race for long-running first web requests ([#21722](https://github.com/netdata/netdata/issues/21722))
+- Refactor function progress: move timeout and progress authority to the plugin runtime and agent ([#21723](https://github.com/netdata/netdata/issues/21723))
 
 ## [2.8.0] - 2025-11-19
 
