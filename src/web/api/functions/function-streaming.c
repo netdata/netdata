@@ -14,6 +14,288 @@
     }\
     buffer_json_object_close(wb);
 
+static bool function_param_info_requested(const char *function) {
+    char function_copy[strlen(function) + 1];
+    memcpy(function_copy, function, sizeof(function_copy));
+
+    char *words[1024];
+    size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
+    for(size_t i = 1; i < num_words; i++) {
+        char *param = get_word(words, num_words, i);
+        if(strcmp(param, "info") == 0)
+            return true;
+    }
+
+    return false;
+}
+
+static bool streaming_peer_is_set(const char *ip) {
+    return ip && *ip && strcmp(ip, "localhost") != 0;
+}
+
+static void streaming_topology_add_host_match(BUFFER *wb, RRDHOST *host) {
+    buffer_json_member_add_object(wb, "match");
+    {
+        buffer_json_member_add_array(wb, "hostnames");
+        {
+            buffer_json_add_array_item_string(wb, rrdhost_hostname(host));
+        }
+        buffer_json_array_close(wb);
+
+        if(*host->machine_guid)
+            buffer_json_member_add_string(wb, "netdata_machine_guid", host->machine_guid);
+
+        if(!UUIDiszero(host->node_id))
+            buffer_json_member_add_uuid(wb, "netdata_node_id", host->node_id.uuid);
+    }
+    buffer_json_object_close(wb);
+}
+
+int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payload __maybe_unused, const char *source __maybe_unused) {
+    time_t now = now_realtime_sec();
+    usec_t now_ut = now_realtime_usec();
+    bool info_only = function_param_info_requested(function);
+
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "topology");
+    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_TOPOLOGY_HELP);
+    buffer_json_member_add_array(wb, "accepted_params");
+    buffer_json_array_close(wb);
+    buffer_json_member_add_array(wb, "required_params");
+    buffer_json_array_close(wb);
+
+    if(!info_only) {
+        size_t actors_total = 0;
+        size_t links_total = 0;
+        size_t inbound_links = 0;
+        size_t outbound_links = 0;
+
+        buffer_json_member_add_object(wb, "data");
+        {
+            buffer_json_member_add_string(wb, "schema_version", "2.0");
+            buffer_json_member_add_string(wb, "source", "streaming");
+            buffer_json_member_add_string(wb, "layer", "infra");
+            buffer_json_member_add_string(wb, "agent_id", localhost->machine_guid);
+            buffer_json_member_add_datetime_rfc3339(wb, "collected_at", now_ut, true);
+
+            buffer_json_member_add_array(wb, "actors");
+            {
+                RRDHOST *host;
+                dfe_start_read(rrdhost_root_index, host) {
+                    RRDHOST_STATUS s;
+                    rrdhost_status(host, now, &s, RRDHOST_STATUS_ALL);
+
+                    actors_total++;
+                    buffer_json_add_array_item_object(wb);
+                    {
+                        buffer_json_member_add_string(wb, "actor_type", "netdata-agent");
+                        buffer_json_member_add_string(wb, "layer", "infra");
+                        buffer_json_member_add_string(wb, "source", "streaming");
+                        streaming_topology_add_host_match(wb, host);
+
+                        buffer_json_member_add_object(wb, "attributes");
+                        {
+                            buffer_json_member_add_string(wb, "ephemerality", rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST) ? "ephemeral" : "permanent");
+                            buffer_json_member_add_string(wb, "agent_name", rrdhost_program_name(host));
+                            buffer_json_member_add_string(wb, "agent_version", rrdhost_program_version(host));
+                            buffer_json_member_add_string(wb, "ingest_status", rrdhost_ingest_status_to_string(s.ingest.status));
+                            buffer_json_member_add_string(wb, "stream_status", rrdhost_streaming_status_to_string(s.stream.status));
+                            buffer_json_member_add_string(wb, "ml_status", rrdhost_ml_status_to_string(s.ml.status));
+                            buffer_json_member_add_string(wb, "ingest_reason", stream_handshake_error_to_string(s.ingest.reason));
+                            buffer_json_member_add_string(wb, "stream_reason", stream_handshake_error_to_string(s.stream.reason));
+                            buffer_json_member_add_uint64(wb, "ingest_hops", s.ingest.hops);
+                            buffer_json_member_add_uint64(wb, "stream_hops", s.stream.hops);
+                            buffer_json_member_add_uint64(wb, "ingest_connections", s.host->stream.rcv.status.connections);
+                            buffer_json_member_add_uint64(wb, "stream_connections", s.host->stream.snd.status.connections);
+                            buffer_json_member_add_string(wb, "ingest_local_ip", s.ingest.peers.local.ip);
+                            buffer_json_member_add_uint64(wb, "ingest_local_port", s.ingest.peers.local.port);
+                            buffer_json_member_add_string(wb, "ingest_remote_ip", s.ingest.peers.peer.ip);
+                            buffer_json_member_add_uint64(wb, "ingest_remote_port", s.ingest.peers.peer.port);
+                            buffer_json_member_add_string(wb, "stream_local_ip", s.stream.peers.local.ip);
+                            buffer_json_member_add_uint64(wb, "stream_local_port", s.stream.peers.local.port);
+                            buffer_json_member_add_string(wb, "stream_remote_ip", s.stream.peers.peer.ip);
+                            buffer_json_member_add_uint64(wb, "stream_remote_port", s.stream.peers.peer.port);
+                            buffer_json_member_add_string(wb, "stream_ssl", s.stream.ssl ? "SSL" : "PLAIN");
+                            buffer_json_member_add_string(wb, "stream_compression", s.stream.compression ? "COMPRESSED" : "UNCOMPRESSED");
+                            buffer_json_member_add_uint64(wb, "stream_bytes_data", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DATA]);
+                            buffer_json_member_add_uint64(wb, "stream_bytes_metadata", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA]);
+                            buffer_json_member_add_uint64(wb, "stream_bytes_replication", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION]);
+                            buffer_json_member_add_uint64(wb, "stream_bytes_functions", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
+                        }
+                        buffer_json_object_close(wb);
+
+                        buffer_json_member_add_object(wb, "labels");
+                        {
+                            buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+                            buffer_json_member_add_string(wb, "ephemerality", rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST) ? "ephemeral" : "permanent");
+                            buffer_json_member_add_string(wb, "ingest_status", rrdhost_ingest_status_to_string(s.ingest.status));
+                            buffer_json_member_add_string(wb, "stream_status", rrdhost_streaming_status_to_string(s.stream.status));
+                            buffer_json_member_add_string(wb, "ml_status", rrdhost_ml_status_to_string(s.ml.status));
+                        }
+                        buffer_json_object_close(wb);
+                    }
+                    buffer_json_object_close(wb);
+                }
+                dfe_done(host);
+            }
+            buffer_json_array_close(wb); // actors
+
+            buffer_json_member_add_array(wb, "links");
+            {
+                RRDHOST *host;
+                dfe_start_read(rrdhost_root_index, host) {
+                    RRDHOST_STATUS s;
+                    rrdhost_status(host, now, &s, RRDHOST_STATUS_ALL);
+
+                    if(streaming_peer_is_set(s.ingest.peers.peer.ip)) {
+                        links_total++;
+                        inbound_links++;
+
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "layer", "infra");
+                            buffer_json_member_add_string(wb, "protocol", "streaming");
+                            buffer_json_member_add_string(wb, "direction", "inbound");
+                            buffer_json_member_add_string(wb, "state", rrdhost_ingest_status_to_string(s.ingest.status));
+                            buffer_json_member_add_datetime_rfc3339(wb, "discovered_at", ((uint64_t)(s.ingest.since ? s.ingest.since : now)) * USEC_PER_SEC, true);
+                            buffer_json_member_add_datetime_rfc3339(wb, "last_seen", now_ut, true);
+
+                            buffer_json_member_add_object(wb, "src");
+                            {
+                                buffer_json_member_add_object(wb, "match");
+                                {
+                                    buffer_json_member_add_array(wb, "ip_addresses");
+                                    {
+                                        buffer_json_add_array_item_string(wb, s.ingest.peers.peer.ip);
+                                    }
+                                    buffer_json_array_close(wb);
+                                }
+                                buffer_json_object_close(wb);
+
+                                buffer_json_member_add_object(wb, "attributes");
+                                {
+                                    buffer_json_member_add_uint64(wb, "port", s.ingest.peers.peer.port);
+                                }
+                                buffer_json_object_close(wb);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "dst");
+                            {
+                                streaming_topology_add_host_match(wb, host);
+                                buffer_json_member_add_object(wb, "attributes");
+                                {
+                                    buffer_json_member_add_uint64(wb, "port", s.ingest.peers.local.port);
+                                    buffer_json_member_add_string(wb, "ssl", s.ingest.ssl ? "SSL" : "PLAIN");
+                                }
+                                buffer_json_object_close(wb);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "metrics");
+                            {
+                                buffer_json_member_add_uint64(wb, "connections", s.host->stream.rcv.status.connections);
+                                buffer_json_member_add_uint64(wb, "hops", s.ingest.hops);
+                                buffer_json_member_add_uint64(wb, "replication_instances", s.ingest.replication.instances);
+                                buffer_json_member_add_double(wb, "replication_completion", s.ingest.replication.completion);
+                                buffer_json_member_add_uint64(wb, "collected_metrics", s.ingest.collected.metrics);
+                                buffer_json_member_add_uint64(wb, "collected_instances", s.ingest.collected.instances);
+                                buffer_json_member_add_uint64(wb, "collected_contexts", s.ingest.collected.contexts);
+                            }
+                            buffer_json_object_close(wb);
+                        }
+                        buffer_json_object_close(wb);
+                    }
+
+                    if(streaming_peer_is_set(s.stream.peers.peer.ip)) {
+                        links_total++;
+                        outbound_links++;
+
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "layer", "infra");
+                            buffer_json_member_add_string(wb, "protocol", "streaming");
+                            buffer_json_member_add_string(wb, "direction", "outbound");
+                            buffer_json_member_add_string(wb, "state", rrdhost_streaming_status_to_string(s.stream.status));
+                            buffer_json_member_add_datetime_rfc3339(wb, "discovered_at", ((uint64_t)(s.stream.since ? s.stream.since : now)) * USEC_PER_SEC, true);
+                            buffer_json_member_add_datetime_rfc3339(wb, "last_seen", now_ut, true);
+
+                            buffer_json_member_add_object(wb, "src");
+                            {
+                                streaming_topology_add_host_match(wb, host);
+                                buffer_json_member_add_object(wb, "attributes");
+                                {
+                                    buffer_json_member_add_uint64(wb, "port", s.stream.peers.local.port);
+                                    buffer_json_member_add_string(wb, "ssl", s.stream.ssl ? "SSL" : "PLAIN");
+                                    buffer_json_member_add_string(wb, "compression", s.stream.compression ? "COMPRESSED" : "UNCOMPRESSED");
+                                }
+                                buffer_json_object_close(wb);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "dst");
+                            {
+                                buffer_json_member_add_object(wb, "match");
+                                {
+                                    buffer_json_member_add_array(wb, "ip_addresses");
+                                    {
+                                        buffer_json_add_array_item_string(wb, s.stream.peers.peer.ip);
+                                    }
+                                    buffer_json_array_close(wb);
+                                }
+                                buffer_json_object_close(wb);
+
+                                buffer_json_member_add_object(wb, "attributes");
+                                {
+                                    buffer_json_member_add_uint64(wb, "port", s.stream.peers.peer.port);
+                                }
+                                buffer_json_object_close(wb);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "metrics");
+                            {
+                                buffer_json_member_add_uint64(wb, "connections", s.host->stream.snd.status.connections);
+                                buffer_json_member_add_uint64(wb, "hops", s.stream.hops);
+                                buffer_json_member_add_uint64(wb, "replication_instances", s.stream.replication.instances);
+                                buffer_json_member_add_double(wb, "replication_completion", s.stream.replication.completion);
+                                buffer_json_member_add_uint64(wb, "bytes_data", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DATA]);
+                                buffer_json_member_add_uint64(wb, "bytes_metadata", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA]);
+                                buffer_json_member_add_uint64(wb, "bytes_replication", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION]);
+                                buffer_json_member_add_uint64(wb, "bytes_functions", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
+                            }
+                            buffer_json_object_close(wb);
+                        }
+                        buffer_json_object_close(wb);
+                    }
+                }
+                dfe_done(host);
+            }
+            buffer_json_array_close(wb); // links
+
+            buffer_json_member_add_object(wb, "stats");
+            {
+                buffer_json_member_add_uint64(wb, "actors_total", actors_total);
+                buffer_json_member_add_uint64(wb, "links_total", links_total);
+                buffer_json_member_add_uint64(wb, "links_inbound", inbound_links);
+                buffer_json_member_add_uint64(wb, "links_outbound", outbound_links);
+            }
+            buffer_json_object_close(wb);
+        }
+        buffer_json_object_close(wb); // data
+    }
+
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+    buffer_json_finalize(wb);
+    return HTTP_RESP_OK;
+}
+
 
 int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused, const char *source __maybe_unused) {
 
