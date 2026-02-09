@@ -37,6 +37,12 @@ You can change your plan, billing frequency, or committed nodes at any time. For
 
 :::
 
+:::note Cancellation
+
+Subscription cancellations do not take effect immediately. When you submit a cancellation request, it becomes effective on your plan's next billing anniversary date. For monthly subscriptions, this is the same calendar day each month when your subscription renews. Usage up to the effective cancellation date remains billable.
+
+:::
+
 #### Areas That Change Upon Subscription
 
 Please refer to the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page for more information on what each plan provides.
