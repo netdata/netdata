@@ -184,7 +184,7 @@ function(_nd_add_install_hook cmd component)
   set(code "${code}if(hook_status)\n")
   set(code "${code}  message(WARNING [=[Install hook failed: ${cmd}]=])\n")
   set(code "${code}endif()\n")
-  install(CODE "${code}")
+  install(CODE "${code}" COMPONENT "${component}")
 endfunction()
 
 # Add shell script to the specified variable to handle restricting
@@ -341,7 +341,7 @@ function(netdata_install_extra_permissions)
 
     if(CREATE_USER AND NOT BUILD_FOR_PACKAGING)
       if(NOT entry_component IN_LIST user_components)
-        _nd_add_install_hook("${CMAKE_SOURCE_DIR}/packaging/cmake/install-user-hook.sh ${NETDATA_USER} ${NETDATA_GROUP} ${nd_homedir}" "${entry_component}")
+        _nd_add_install_hook("${CMAKE_SOURCE_DIR}/packaging/cmake/install-user-hook.sh ${NETDATA_USER} ${NETDATA_GROUP} ${nd_homedir} ${CMAKE_INSTALL_PREFIX}" "${entry_component}")
         list(APPEND user_components "${entry_component}")
       endif()
     endif()

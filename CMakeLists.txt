@@ -185,8 +185,8 @@ cmake_dependent_option(CREATE_USER "Create the netdata user and group if they do
 if(BUILD_FOR_PACKAGING)
   set(PACKAGE_TYPE "none" CACHE STRING "Specify the type of package to build for.")
   mark_as_advanced(PACKAGE_TYPE)
-  set(SUPPORTED_PACKAGE_TYPES "docker;static;windows;deb")
-  set(NATIVE_PACKAGE_TYPES "deb")
+  set(SUPPORTED_PACKAGE_TYPES "docker;static;windows;deb;rpm")
+  set(NATIVE_PACKAGE_TYPES "deb;rpm")
   string(TOLOWER "${PACKAGE_TYPE}" PACKAGE_TYPE)
 
   if(PACKAGE_TYPE STREQUAL "none")
@@ -3313,8 +3313,8 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER)
                       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
                       COMPONENT plugin-journal-viewer)
-    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/cgroup-network
-                            COMPONENT netdata
+    netdata_add_permissions(PATH usr/libexec/netdata/plugins.d/journal-viewer-plugin
+                            COMPONENT plugin-journal-viewer
                             PERMISSIONS dac_read_search)
 endif()
 

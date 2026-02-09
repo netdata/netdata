@@ -32,7 +32,7 @@ RUN chmod +x netdata-installer.sh && \
     cp -rp /deps/* /usr/local/ && \
     BUILD_ARCH="${BUILD_ARCH:-"$(uname -m)"}" && \
     /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='${BUILD_ARCH}'" > ./system/.install-type && \
-    NETDATA_CMAKE_OPTIONS="-DBUILD_FOR_PACKAGING=On, -DPACKAGE_TYPE=docker" \
+    NETDATA_CMAKE_OPTIONS="-DBUILD_FOR_PACKAGING=On -DPACKAGE_TYPE=docker" \
     NETDATA_BUILD_DIR=/build \
     CFLAGS="$(packaging/docker/gen-cflags.sh)" \
     LDFLAGS="-Wl,--gc-sections" \

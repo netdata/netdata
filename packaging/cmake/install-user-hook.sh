@@ -5,11 +5,12 @@ set -e
 user="${1}"
 group="${2}"
 homedir="${3}"
+prefix="${4}"
 
 [ "$(id -u)" -eq 0 ] || exit 0
 
 if command -v systemd-sysusers > /dev/null 2>&1; then
-    systemd-sysusers /usr/lib/netdata/system/systemd/sysusers.conf
+    systemd-sysusers "${prefix}/usr/lib/netdata/system/systemd/sysusers.conf"
 else
     need_group=1
     need_user=1

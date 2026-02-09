@@ -235,7 +235,7 @@ if command -v setcap >/dev/null 2>&1; then
 else
   for x in ${caps_plugins}; do
     f="usr/libexec/netdata/plugins.d/${x}"
-    run chmod 4750 "${f}"
+    [ -f "${f}" ] && run chmod 4750 "${f}"
   done
 fi
 
