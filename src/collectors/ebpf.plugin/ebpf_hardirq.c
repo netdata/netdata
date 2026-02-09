@@ -242,13 +242,7 @@ static int hardirq_val_cmp(void *a, void *b)
     hardirq_val_t *ptr1 = a;
     hardirq_val_t *ptr2 = b;
 
-    if (ptr1->irq > ptr2->irq) {
-        return 1;
-    } else if (ptr1->irq < ptr2->irq) {
-        return -1;
-    } else {
-        return 0;
-    }
+    return ptr1->irq - ptr2->irq;
 }
 
 /**
@@ -332,8 +326,6 @@ static int hardirq_read_latency_map(int mapfd)
 
     hardirq_ebpf_key_t key = {};
     hardirq_ebpf_key_t next_key = {};
-    hardirq_val_t search_v = {};
-    hardirq_val_t *v = NULL;
 
     while (bpf_map_get_next_key(mapfd, &key, &next_key) == 0) {
         int test = bpf_map_lookup_elem(mapfd, &key, hardirq_ebpf_dynamic_vals);
@@ -342,26 +334,13 @@ static int hardirq_read_latency_map(int mapfd)
             continue;
         }
 
-        bool v_is_new = false;
-        search_v.irq = key.irq;
-        v = (hardirq_val_t *)avl_search_lock(&hardirq_pub, (avl_t *)&search_v);
+        hardirq_val_t search_v = {.irq = key.irq};
+        hardirq_val_t *v = (hardirq_val_t *)avl_search_lock(&hardirq_pub, (avl_t *)&search_v);
         if (unlikely(v == NULL)) {
             v = ebpf_hardirq_get();
             v->irq = key.irq;
             v->dim_exists = false;
 
-            v_is_new = true;
-        }
-
-        uint64_t latency = 0;
-        int i;
-        for (i = 0; i < ebpf_nprocs; i++) {
-            latency += hardirq_ebpf_dynamic_vals[i].latency / 1000;
-        }
-
-        v->latency = latency;
-
-        if (v_is_new) {
             if (hardirq_parse_interrupts(v->name, v->irq)) {
                 ebpf_hardirq_release(v);
                 return -1;
@@ -372,6 +351,13 @@ static int hardirq_read_latency_map(int mapfd)
                 netdata_log_error("Internal error, cannot insert the AVL tree.");
             }
         }
+
+        uint64_t latency = 0;
+        int i;
+        for (i = 0; i < ebpf_nprocs; i++) {
+            latency += hardirq_ebpf_dynamic_vals[i].latency / 1000;
+        }
+        v->latency = latency;
 
         key = next_key;
     }
@@ -385,17 +371,16 @@ static void hardirq_read_latency_static_map(int mapfd)
     if (!hardirq_ebpf_static_vals)
         hardirq_ebpf_static_vals = callocz(ebpf_nprocs, sizeof(hardirq_ebpf_static_val_t));
 
+    int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
-        uint32_t map_i = hardirq_static_vals[i].idx;
-        int test = bpf_map_lookup_elem(mapfd, &map_i, hardirq_ebpf_static_vals);
+        int test = bpf_map_lookup_elem(mapfd, &i, hardirq_ebpf_static_vals);
         if (unlikely(test < 0)) {
             continue;
         }
 
         uint64_t latency = 0;
         int cpu_i;
-        int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
         for (cpu_i = 0; cpu_i < end; cpu_i++) {
             latency += hardirq_ebpf_static_vals[cpu_i].latency / 1000;
         }
@@ -481,7 +466,6 @@ static inline void hardirq_write_static_dims()
 */
 static void hardirq_collector(ebpf_module_t *em)
 {
-    memset(&hardirq_pub, 0, sizeof(hardirq_pub));
     avl_init_lock(&hardirq_pub, hardirq_val_cmp);
     ebpf_hardirq_aral_init();
 

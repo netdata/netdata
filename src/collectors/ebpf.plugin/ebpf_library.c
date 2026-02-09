@@ -64,12 +64,10 @@ void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move
 {
     ebpf_write_begin_chart(family, name, "");
 
-    uint32_t i = 0;
-    while (move && i < end) {
+    uint32_t i;
+    for (i = 0; move && i < end; i++) {
         write_chart_dimension(move->name, move->ncall);
-
         move = move->next;
-        i++;
     }
 
     ebpf_write_end_chart();
@@ -79,12 +77,10 @@ void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, 
 {
     ebpf_write_begin_chart(family, name, "");
 
-    int i = 0;
-    while (move && i < end) {
+    int i;
+    for (i = 0; move && i < end; i++) {
         write_chart_dimension(move->name, move->nerr);
-
         move = move->next;
-        i++;
     }
 
     ebpf_write_end_chart();
@@ -671,9 +667,9 @@ static void ebpf_link_hostnames(const char *parse)
             *end++ = '\0';
         }
 
-        int neg = 0;
+        bool neg = false;
         if (*move == '!') {
-            neg++;
+            neg = true;
             move++;
         }
 
@@ -874,7 +870,6 @@ void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
         ebpf_network_viewer_ip_list_t *next = move->next;
         freez(move->value);
         freez(move);
-
         move = next;
     }
     *clean = NULL;
@@ -894,7 +889,6 @@ void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean)
         ebpf_network_viewer_port_list_t *next = move->next;
         freez(move->value);
         freez(move);
-
         move = next;
     }
     *clean = NULL;
@@ -927,7 +921,6 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
     }
 
     char *end = strdupz(ip);
-    char *clean_end = end;
     // Move while I cannot find a separator
     while (*end && *end != '/' && *end != '-')
         end++;
@@ -1070,7 +1063,7 @@ storethisip:
 
 cleanipdup:
     freez(ipdup);
-    freez(clean_end);
+    freez(end);
 }
 
 /**
@@ -1115,12 +1108,12 @@ void ebpf_fill_ip_list_unsafe(
     ebpf_network_viewer_ip_list_t *in,
     char *table __maybe_unused)
 {
-    if (in->ver == AF_INET) { // It is simpler to compare using host order
+    if (in->ver == AF_INET) {
         in->first.addr32[0] = ntohl(in->first.addr32[0]);
         in->last.addr32[0] = ntohl(in->last.addr32[0]);
     }
     if (likely(*out)) {
-        ebpf_network_viewer_ip_list_t *move = *out, *store = *out;
+        ebpf_network_viewer_ip_list_t *move = *out;
         while (move) {
             if (in->ver == move->ver &&
                 ebpf_is_ip_inside_range(&move->first, &move->last, &in->first, &in->last, in->ver)) {
@@ -1134,11 +1127,12 @@ void ebpf_fill_ip_list_unsafe(
                 freez(in);
                 return;
             }
-            store = move;
             move = move->next;
         }
-
-        store->next = in;
+        move = *out;
+        while (move->next)
+            move = move->next;
+        move->next = in;
     } else {
         *out = in;
     }
@@ -1194,15 +1188,15 @@ void ebpf_parse_ips_unsafe(const char *ptr)
             *end++ = '\0';
         }
 
-        int neg = 0;
+        bool neg = false;
         if (*ptr == '!') {
-            neg++;
+            neg = true;
             ptr++;
         }
 
-        if (isascii(*ptr)) { // Parse port
+        if (isascii(*ptr)) {
             ebpf_parse_ip_list_unsafe(
-                (!neg) ? (void **)&network_viewer_opt.included_ips : (void **)&network_viewer_opt.excluded_ips, ptr);
+                neg ? (void **)&network_viewer_opt.excluded_ips : (void **)&network_viewer_opt.included_ips, ptr);
         }
 
         ptr = end;
@@ -1313,17 +1307,17 @@ void ebpf_read_global_table_stats(
     uint32_t begin,
     uint32_t end)
 {
-    uint32_t idx, order;
+    uint32_t idx;
+    int before = (maps_per_core) ? ebpf_nprocs : 1;
 
-    for (idx = begin, order = 0; idx < end; idx++, order++) {
+    for (idx = begin; idx < end; idx++) {
         if (!bpf_map_lookup_elem(map_fd, &idx, values)) {
-            int i;
-            int before = (maps_per_core) ? ebpf_nprocs : 1;
             netdata_idx_t total = 0;
+            int i;
             for (i = 0; i < before; i++)
                 total += values[i];
 
-            stats[order] = total;
+            stats[idx - begin] = total;
         }
     }
 }
@@ -1343,7 +1337,7 @@ void ebpf_read_global_table_stats(
 static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_network_viewer_port_list_t *in)
 {
     if (likely(*out)) {
-        ebpf_network_viewer_port_list_t *move = *out, *store = *out;
+        ebpf_network_viewer_port_list_t *move = *out;
         uint16_t first = ntohs(in->first);
         uint16_t last = ntohs(in->last);
         while (move) {
@@ -1374,11 +1368,12 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
                 return;
             }
 
-            store = move;
             move = move->next;
         }
-
-        store->next = in;
+        move = *out;
+        while (move->next)
+            move = move->next;
+        move->next = in;
     } else {
         *out = in;
     }
@@ -1529,21 +1524,21 @@ void ebpf_parse_ports(const char *ptr)
             *end++ = '\0';
         }
 
-        int neg = 0;
+        bool neg = false;
         if (*ptr == '!') {
-            neg++;
+            neg = true;
             ptr++;
         }
 
         if (isdigit(*ptr)) { // Parse port
             ebpf_parse_port_list(
-                (!neg) ? (void **)&network_viewer_opt.included_port : (void **)&network_viewer_opt.excluded_port, ptr);
+                neg ? (void **)&network_viewer_opt.excluded_port : (void **)&network_viewer_opt.included_port, ptr);
         } else if (isalpha(*ptr)) { // Parse service
             ebpf_parse_service_list(
-                (!neg) ? (void **)&network_viewer_opt.included_port : (void **)&network_viewer_opt.excluded_port, ptr);
+                neg ? (void **)&network_viewer_opt.excluded_port : (void **)&network_viewer_opt.included_port, ptr);
         } else if (*ptr == '*') { // All
             ebpf_parse_port_list(
-                (!neg) ? (void **)&network_viewer_opt.included_port : (void **)&network_viewer_opt.excluded_port, ptr);
+                neg ? (void **)&network_viewer_opt.excluded_port : (void **)&network_viewer_opt.included_port, ptr);
         }
 
         ptr = end;
@@ -1773,7 +1768,7 @@ uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps)
         if (ebpf_enable_tracepoint(&tps[i]) == -1) {
             netdata_log_error("Failed to enable tracepoint %s:%s", tps[i].class, tps[i].event);
         } else {
-            cnt += 1;
+            cnt++;
         }
     }
     return cnt;
