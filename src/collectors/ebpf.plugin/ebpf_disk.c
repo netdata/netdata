@@ -97,6 +97,30 @@ static inline int ebpf_disk_load_and_attach(struct disk_bpf *obj)
  *****************************************************************/
 
 /**
+ * Read file to string
+ *
+ * @param filename file to read
+ * @param buffer   buffer to store content
+ * @param size     buffer size
+ *
+ * @return It returns content length on success and -1 otherwise
+ */
+static inline ssize_t ebpf_read_file_to_str(const char *filename, char *buffer, size_t size)
+{
+    int fd = open(filename, O_RDONLY, 0);
+    if (fd < 0)
+        return -1;
+
+    ssize_t file_length = read(fd, buffer, size);
+    close(fd);
+    if (file_length <= 0)
+        return -1;
+
+    buffer[file_length] = '\0';
+    return file_length;
+}
+
+/**
  * Parse start
  *
  * Parse start address of disk
@@ -109,18 +133,10 @@ static inline int ebpf_disk_load_and_attach(struct disk_bpf *obj)
 static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *filename)
 {
     char content[FILENAME_MAX + 1];
-    int fd = open(filename, O_RDONLY, 0);
-    if (fd < 0) {
+    ssize_t file_length = ebpf_read_file_to_str(filename, content, FILENAME_MAX);
+    if (file_length <= 0)
         return -1;
-    }
 
-    ssize_t file_length = read(fd, content, FILENAME_MAX);
-    close(fd);
-    if (file_length <= 0) {
-        return -1;
-    }
-
-    content[file_length] = '\0';
     w->start = strtoul(content, NULL, 10);
 
     return 0;
@@ -138,26 +154,11 @@ static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *filename)
  */
 static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *filename)
 {
+    (void)w;
     char content[FILENAME_MAX + 1];
-    int fd = open(filename, O_RDONLY, 0);
-    if (fd < 0) {
+    ssize_t file_length = ebpf_read_file_to_str(filename, content, FILENAME_MAX);
+    if (file_length <= 0)
         return -1;
-    }
-
-    ssize_t file_length = read(fd, content, FILENAME_MAX);
-    close(fd);
-    if (file_length <= 0) {
-        return -1;
-    }
-
-    content[file_length] = '\0';
-
-    char *s = strstr(content, "PARTNAME=EFI");
-    if (s) {
-        w->main->boot_partition = w;
-        w->flags |= NETDATA_DISK_HAS_EFI;
-        w->boot_chart = strdupz("disk_bootsector");
-    }
 
     return 0;
 }
@@ -173,18 +174,10 @@ static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *filename)
 static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *filename)
 {
     char content[FILENAME_MAX + 1];
-    int fd = open(filename, O_RDONLY, 0);
-    if (fd < 0) {
+    ssize_t file_length = ebpf_read_file_to_str(filename, content, FILENAME_MAX);
+    if (file_length <= 0)
         return -1;
-    }
 
-    ssize_t file_length = read(fd, content, FILENAME_MAX);
-    close(fd);
-    if (file_length <= 0) {
-        return -1;
-    }
-
-    content[file_length] = '\0';
     w->end = w->start + strtoul(content, NULL, 10) - 1;
 
     return 0;
@@ -203,7 +196,7 @@ static inline int ebpf_parse_size(netdata_ebpf_disks_t *w, char *filename)
 static void
 ebpf_read_disk_info(netdata_ebpf_disks_t *w, char *name, netdata_ebpf_disks_t **main_disk, uint32_t *bootsector_key)
 {
-    char *path = {"/sys/block"};
+    char *path = "/sys/block";
     char disk[NETDATA_DISK_NAME_LEN + 1];
     char filename[FILENAME_MAX + 1];
     snprintfz(disk, NETDATA_DISK_NAME_LEN, "%s", name);
@@ -229,7 +222,6 @@ ebpf_read_disk_info(netdata_ebpf_disks_t *w, char *name, netdata_ebpf_disks_t **
 
     // This is a partition, link it to main disk
     w->bootsector_key = *bootsector_key;
-    w->main = *main_disk;
 
     snprintfz(filename, FILENAME_MAX, "%s/%s/%s/uevent", path, disk, name);
     if (ebpf_parse_uevent(w, filename))
@@ -273,12 +265,7 @@ static int ebpf_compare_disks(void *a, void *b)
     netdata_ebpf_disks_t *ptr1 = a;
     netdata_ebpf_disks_t *ptr2 = b;
 
-    if (ptr1->dev > ptr2->dev)
-        return 1;
-    if (ptr1->dev < ptr2->dev)
-        return -1;
-
-    return 0;
+    return (ptr1->dev > ptr2->dev) - (ptr1->dev < ptr2->dev);
 }
 
 /**
@@ -297,8 +284,9 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
     static uint32_t bootsector_key = 0;
 
     netdata_ebpf_disks_t find;
-    netdata_ebpf_disks_t *w;
-    size_t length;
+    size_t length = strlen(name);
+    if (length >= NETDATA_DISK_NAME_LEN)
+        length = NETDATA_DISK_NAME_LEN;
 
     uint32_t dev = netdata_new_encode_dev(major, minor);
     find.dev = dev;
@@ -309,36 +297,22 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
         return;
     }
 
+    netdata_ebpf_disks_t *w;
     if (likely(disk_list)) {
         w = callocz(1, sizeof(netdata_ebpf_disks_t));
-        length = strlen(name);
-        if (length >= NETDATA_DISK_NAME_LEN)
-            length = NETDATA_DISK_NAME_LEN;
-
-        memcpy(w->family, name, length);
-        w->family[length] = '\0';
-        w->major = major;
-        w->minor = minor;
-        w->dev = netdata_new_encode_dev(major, minor);
-
         netdata_ebpf_disks_t *update_next = disk_list;
         while (update_next->next)
             update_next = update_next->next;
         update_next->next = w;
     } else {
-        disk_list = callocz(1, sizeof(netdata_ebpf_disks_t));
-        length = strlen(name);
-        if (length >= NETDATA_DISK_NAME_LEN)
-            length = NETDATA_DISK_NAME_LEN;
-
-        memcpy(disk_list->family, name, length);
-        disk_list->family[length] = '\0';
-        disk_list->major = major;
-        disk_list->minor = minor;
-        disk_list->dev = netdata_new_encode_dev(major, minor);
-
-        w = disk_list;
+        disk_list = w = callocz(1, sizeof(netdata_ebpf_disks_t));
     }
+
+    memcpy(w->family, name, length);
+    w->family[length] = '\0';
+    w->major = major;
+    w->minor = minor;
+    w->dev = dev;
 
     ebpf_read_disk_info(w, name, &main_disk, &bootsector_key);
 
@@ -426,7 +400,7 @@ void ebpf_update_disks(ebpf_module_t *em)
  */
 static void ebpf_disk_disable_tracepoints()
 {
-    char *default_message = {"Cannot disable the tracepoint"};
+    const char *default_message = "Cannot disable the tracepoint";
     int block_issue_enabled;
     int block_rq_complete_enabled;
 
@@ -455,8 +429,6 @@ static void ebpf_cleanup_disk_list()
     while (move) {
         netdata_ebpf_disks_t *next = move->next;
 
-        freez(move->histogram.name);
-        freez(move->boot_chart);
         freez(move);
 
         move = next;
@@ -590,10 +562,7 @@ static void read_hard_disk_tables(int table, int maps_per_core)
         netdata_ebpf_disks_t find;
         find.dev = key.dev;
 
-        if (likely(ret)) {
-            if (find.dev != ret->dev)
-                ret = (netdata_ebpf_disks_t *)avl_search_lock(&disk_tree, (avl_t *)&find);
-        } else
+        if (!ret || find.dev != ret->dev)
             ret = (netdata_ebpf_disks_t *)avl_search_lock(&disk_tree, (avl_t *)&find);
 
         // Disk was inserted after we parse /proc/partitions
@@ -713,14 +682,10 @@ static void ebpf_remove_pointer_from_plot_disk(ebpf_module_t *em)
                 prev->next = move->next;
                 netdata_ebpf_disks_t *clean = move;
                 move = move->next;
-                freez(clean->histogram.name);
-                freez(clean->boot_chart);
                 freez(clean);
                 continue;
             } else {
                 disk_list = move->next;
-                freez(move->histogram.name);
-                freez(move->boot_chart);
                 freez(move);
                 move = disk_list;
                 continue;

@@ -941,7 +941,7 @@ static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t
 }
 
 /**
- * Read hard disk table
+ * Read filesystem table
  *
  * @param efp           structure with filesystem monitored
  * @param fd            file descriptor to get data.
@@ -982,7 +982,7 @@ static void read_filesystem_table(ebpf_filesystem_partitions_t *efp, int fd, int
 }
 
 /**
- * Read hard disk table
+ * Read filesystem table
  *
  * Read the table with number of calls for all functions
  *
@@ -1000,10 +1000,10 @@ static void read_filesystem_tables(int maps_per_core)
 }
 
 /**
- * Socket read hash
+ * Filesystem read hash
  *
  * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
+ * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy filesystem.
  *
  * @param ptr It is a NULL value for this thread.
  *
@@ -1143,7 +1143,7 @@ static void ebpf_set_maps()
 /**
  * Filesystem thread
  *
- * Thread used to generate socket charts.
+ * Thread used to generate filesystem charts.
  *
  * @param ptr a pointer to `struct ebpf_module`
  *

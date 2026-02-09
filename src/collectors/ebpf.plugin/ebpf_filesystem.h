@@ -7,7 +7,10 @@
 #define NETDATA_EBPF_MODULE_NAME_FILESYSTEM "filesystem"
 #define NETDATA_EBPF_FS_MODULE_DESC "Monitor filesystem latency for: btrfs, ext4, nfs, xfs and zfs."
 
-#include "ebpf.h"
+#include "libnetdata/libnetdata.h"
+
+// Forward declaration to avoid circular dependency
+struct ebpf_module;
 
 // Constants
 #define NETDATA_FS_MAX_DIST_NAME 64UL
@@ -58,6 +61,31 @@ enum netdata_filesystem_localfs_idx {
  * @param ptr Pointer to module data (struct ebpf_module *)
  */
 void ebpf_filesystem_thread(void *ptr);
+
+/**
+ * Initialize eBPF data
+ *
+ * @param em Main thread structure
+ *
+ * @return 0 on success, -1 on error
+ */
+int ebpf_filesystem_initialize_ebpf_data(struct ebpf_module *em);
+
+/**
+ * Cleanup eBPF data
+ *
+ * Frees allocated resources and cleans up filesystem partitions
+ */
+void ebpf_filesystem_cleanup_ebpf_data();
+
+/**
+ * Read filesystem hash
+ *
+ * Reads histogram data from filesystem eBPF maps
+ *
+ * @param em Pointer to module structure
+ */
+void ebpf_filesystem_read_hash(struct ebpf_module *em);
 
 /**
  * Filesystem module configuration

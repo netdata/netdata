@@ -100,7 +100,6 @@ enum fd_close_syscall {
 
 void ebpf_fd_thread(void *ptr);
 void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);
-void ebpf_fd_release(netdata_fd_stat_t *stat);
 extern struct config fd_config;
 extern netdata_ebpf_targets_t fd_targets[];
 

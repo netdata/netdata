@@ -60,6 +60,8 @@ static netdata_idx_t *fd_values = NULL;
 
 netdata_fd_stat_t *fd_vector = NULL;
 
+static int fd_use_close_fd = -1;
+
 netdata_ebpf_targets_t fd_targets[] = {
     {.name = "open", .mode = EBPF_LOAD_TRAMPOLINE},
     {.name = "close", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -77,6 +79,18 @@ struct netdata_static_thread ebpf_read_fd = {
 
 #ifdef LIBBPF_MAJOR_VERSION
 /**
+ * Check if using close_fd
+ *
+ * @return true if using close_fd, false if using __close_fd
+ */
+static inline int ebpf_fd_using_close_fd(void)
+{
+    if (fd_use_close_fd == -1)
+        fd_use_close_fd = !strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD]);
+    return fd_use_close_fd;
+}
+
+/**
  * Disable probe
  *
  * Disable all probes to use exclusively another method.
@@ -87,7 +101,7 @@ static inline void ebpf_fd_disable_probes(struct fd_bpf *obj)
 {
     bpf_program__set_autoload(obj->progs.netdata_sys_open_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_sys_open_kretprobe, false);
-    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
+    if (ebpf_fd_using_close_fd()) {
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kretprobe, false);
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kprobe, false);
         bpf_program__set_autoload(obj->progs.netdata_close_fd_kprobe, false);
@@ -107,7 +121,7 @@ static inline void ebpf_fd_disable_probes(struct fd_bpf *obj)
  */
 static inline void ebpf_disable_specific_probes(struct fd_bpf *obj)
 {
-    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
+    if (ebpf_fd_using_close_fd()) {
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kretprobe, false);
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kprobe, false);
     } else {
@@ -142,7 +156,7 @@ static inline void ebpf_disable_trampoline(struct fd_bpf *obj)
  */
 static inline void ebpf_disable_specific_trampoline(struct fd_bpf *obj)
 {
-    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
+    if (ebpf_fd_using_close_fd()) {
         bpf_program__set_autoload(obj->progs.netdata___close_fd_fentry, false);
         bpf_program__set_autoload(obj->progs.netdata___close_fd_fexit, false);
     } else {
@@ -163,7 +177,7 @@ static void ebpf_set_trampoline_target(struct fd_bpf *obj)
     bpf_program__set_attach_target(obj->progs.netdata_sys_open_fentry, 0, fd_targets[NETDATA_FD_SYSCALL_OPEN].name);
     bpf_program__set_attach_target(obj->progs.netdata_sys_open_fexit, 0, fd_targets[NETDATA_FD_SYSCALL_OPEN].name);
 
-    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
+    if (ebpf_fd_using_close_fd()) {
         bpf_program__set_attach_target(
             obj->progs.netdata_close_fd_fentry, 0, fd_targets[NETDATA_FD_SYSCALL_CLOSE].name);
         bpf_program__set_attach_target(obj->progs.netdata_close_fd_fexit, 0, fd_targets[NETDATA_FD_SYSCALL_CLOSE].name);
@@ -198,7 +212,7 @@ static int ebpf_fd_attach_probe(struct fd_bpf *obj)
     if (ret)
         return -1;
 
-    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
+    if (ebpf_fd_using_close_fd()) {
         obj->links.netdata_close_fd_kretprobe = bpf_program__attach_kprobe(
             obj->progs.netdata_close_fd_kretprobe, true, fd_targets[NETDATA_FD_SYSCALL_CLOSE].name);
         ret = libbpf_get_error(obj->links.netdata_close_fd_kretprobe);
@@ -842,9 +856,9 @@ static void ebpf_update_fd_cgroup()
 }
 
 /**
- * DCstat thread
+ * FD thread
  *
- * Thread used to generate dcstat charts.
+ * Thread used to generate fd charts.
  *
  * @param ptr a pointer to `struct ebpf_module`
  *

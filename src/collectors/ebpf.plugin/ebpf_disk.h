@@ -24,8 +24,7 @@ enum netdata_latency_disks_flags {
     NETDATA_DISK_NONE = 0,
     NETDATA_DISK_ADDED_TO_PLOT_LIST = 1,
     NETDATA_DISK_CHART_CREATED = 2,
-    NETDATA_DISK_IS_HERE = 4,
-    NETDATA_DISK_HAS_EFI = 8
+    NETDATA_DISK_IS_HERE = 4
 };
 
 /*
@@ -49,9 +48,6 @@ typedef struct netdata_ebpf_disks {
 
     char family[NETDATA_DISK_NAME_LEN + 1];
 
-    char *boot_chart;
-    struct netdata_ebpf_disks *main;
-    struct netdata_ebpf_disks *boot_partition;
     struct netdata_ebpf_disks *next;
 
     netdata_ebpf_histogram_t histogram;
@@ -68,16 +64,12 @@ static inline void ebpf_disks_init(netdata_ebpf_disks_t *d)
     d->flags = 0;
     d->last_update = 0;
     d->family[0] = '\0';
-    d->boot_chart = NULL;
-    d->main = NULL;
-    d->boot_partition = NULL;
     d->next = NULL;
     memset(&d->histogram, 0, sizeof(d->histogram));
 }
 
 static inline void ebpf_disks_cleanup(netdata_ebpf_disks_t *d)
 {
-    freez(d->boot_chart);
     freez(d->histogram.name);
     freez(d->histogram.title);
     freez(d->histogram.ctx);
