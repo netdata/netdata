@@ -110,10 +110,6 @@ if(ENABLE_PLUGIN_OTEL)
   list(APPEND _main_deps "netdata-plugin-otel")
 endif()
 
-if(ENABLE_PLUGIN_NETFLOW)
-  list(APPEND _main_deps "netdata-plugin-netflow")
-endif()
-
 if(ENABLE_PLUGIN_CHARTS)
   list(APPEND _main_deps "netdata-plugin-chartsd")
 endif()

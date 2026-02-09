@@ -238,52 +238,59 @@ impl IngestService {
         open_tiers: Arc<RwLock<OpenTierState>>,
     ) -> Result<Self> {
         let machine_id = load_machine_id().context("failed to load machine id")?;
-        let origin = Origin {
-            machine_id: Some(machine_id),
-            namespace: None,
-            source: Source::System,
+        let build_journal_cfg = |tier: TierKind| {
+            let origin = Origin {
+                machine_id: Some(machine_id.clone()),
+                namespace: None,
+                source: Source::System,
+            };
+            let rotation_policy = RotationPolicy::default()
+                .with_size_of_journal_file(cfg.journal.size_of_journal_file.as_u64())
+                .with_duration_of_journal_file(cfg.journal.duration_of_journal_file);
+            let retention = cfg.journal.retention_for_tier(tier);
+            let retention_policy = RetentionPolicy::default()
+                .with_number_of_journal_files(retention.number_of_journal_files)
+                .with_size_of_journal_files(retention.size_of_journal_files.as_u64())
+                .with_duration_of_journal_files(retention.duration_of_journal_files);
+            Config::new(origin, rotation_policy, retention_policy).with_machine_id_suffix(false)
         };
 
-        let rotation_policy = RotationPolicy::default()
-            .with_size_of_journal_file(cfg.journal.size_of_journal_file.as_u64())
-            .with_duration_of_journal_file(cfg.journal.duration_of_journal_file);
-        let retention_policy = RetentionPolicy::default()
-            .with_number_of_journal_files(cfg.journal.number_of_journal_files)
-            .with_size_of_journal_files(cfg.journal.size_of_journal_files.as_u64())
-            .with_duration_of_journal_files(cfg.journal.duration_of_journal_files);
-
-        let journal_cfg =
-            Config::new(origin, rotation_policy, retention_policy).with_machine_id_suffix(false);
         let raw_dir = cfg.journal.raw_tier_dir();
-        let raw_journal = Log::new(&raw_dir, journal_cfg.clone()).with_context(|| {
-            format!(
-                "failed to create journal writer in directory {}",
-                raw_dir.display()
-            )
-        })?;
+        let raw_journal =
+            Log::new(&raw_dir, build_journal_cfg(TierKind::Raw)).with_context(|| {
+                format!(
+                    "failed to create journal writer in directory {}",
+                    raw_dir.display()
+                )
+            })?;
         let minute_1_dir = cfg.journal.minute_1_tier_dir();
         let minute_5_dir = cfg.journal.minute_5_tier_dir();
         let hour_1_dir = cfg.journal.hour_1_tier_dir();
-        let tier_writers = MaterializedTierWriters {
-            minute_1: Log::new(&minute_1_dir, journal_cfg.clone()).with_context(|| {
-                format!(
-                    "failed to create 1m tier writer in directory {}",
-                    minute_1_dir.display()
-                )
-            })?,
-            minute_5: Log::new(&minute_5_dir, journal_cfg.clone()).with_context(|| {
-                format!(
-                    "failed to create 5m tier writer in directory {}",
-                    minute_5_dir.display()
-                )
-            })?,
-            hour_1: Log::new(&hour_1_dir, journal_cfg).with_context(|| {
-                format!(
-                    "failed to create 1h tier writer in directory {}",
-                    hour_1_dir.display()
-                )
-            })?,
-        };
+        let tier_writers =
+            MaterializedTierWriters {
+                minute_1: Log::new(&minute_1_dir, build_journal_cfg(TierKind::Minute1))
+                    .with_context(|| {
+                        format!(
+                            "failed to create 1m tier writer in directory {}",
+                            minute_1_dir.display()
+                        )
+                    })?,
+                minute_5: Log::new(&minute_5_dir, build_journal_cfg(TierKind::Minute5))
+                    .with_context(|| {
+                        format!(
+                            "failed to create 5m tier writer in directory {}",
+                            minute_5_dir.display()
+                        )
+                    })?,
+                hour_1: Log::new(&hour_1_dir, build_journal_cfg(TierKind::Hour1)).with_context(
+                    || {
+                        format!(
+                            "failed to create 1h tier writer in directory {}",
+                            hour_1_dir.display()
+                        )
+                    },
+                )?,
+            };
         let mut tier_accumulators = HashMap::new();
         for tier in MATERIALIZED_TIERS {
             tier_accumulators.insert(tier, TierAccumulator::new(tier));
@@ -893,8 +900,7 @@ mod tests {
     }
 
     fn fixture_dir() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("testdata/flows")
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/flows")
     }
 
     fn decode_fixture_sequence(

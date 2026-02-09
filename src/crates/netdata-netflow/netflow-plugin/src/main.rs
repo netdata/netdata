@@ -19,7 +19,9 @@ use rt::{FunctionHandler, PluginRuntime};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::io::{IsTerminal, Write};
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Serialize)]
@@ -223,6 +225,16 @@ async fn main() {
         }
     };
 
+    if !config.enabled {
+        tracing::info!("netflow plugin disabled by config (enabled=false)");
+        if !std::io::stdout().is_terminal() {
+            let mut stdout = std::io::stdout();
+            let _ = stdout.write_all(b"DISABLE\n");
+            let _ = stdout.flush();
+        }
+        return;
+    }
+
     let shutdown = CancellationToken::new();
     let metrics = Arc::new(ingest::IngestMetrics::default());
     let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
@@ -330,7 +342,29 @@ async fn main() {
 
     let mut exit_code = 0;
 
-    if let Err(err) = runtime.run().await {
+    let keepalive_required = !std::io::stdout().is_terminal();
+    if keepalive_required {
+        let writer = runtime.writer();
+        let keepalive = async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(60));
+            loop {
+                interval.tick().await;
+                if let Ok(mut w) = writer.try_lock() {
+                    let _ = w.write_raw(b"PLUGIN_KEEPALIVE\n").await;
+                }
+            }
+        };
+
+        tokio::select! {
+            result = runtime.run() => {
+                if let Err(err) = result {
+                    tracing::error!("plugin runtime error: {err:#}");
+                    exit_code = 1;
+                }
+            }
+            _ = keepalive => {}
+        }
+    } else if let Err(err) = runtime.run().await {
         tracing::error!("plugin runtime error: {err:#}");
         exit_code = 1;
     }
@@ -677,8 +711,7 @@ mod tests {
     }
 
     fn fixture_dir() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("testdata/flows")
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/flows")
     }
 
     fn reserve_udp_listen_addr() -> String {

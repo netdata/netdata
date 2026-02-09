@@ -90,6 +90,22 @@ fn default_network_source_tls_verify() -> bool {
     true
 }
 
+fn default_plugin_enabled() -> bool {
+    true
+}
+
+fn default_retention_number_of_journal_files() -> usize {
+    64
+}
+
+fn default_retention_size_of_journal_files() -> ByteSize {
+    ByteSize::gb(10)
+}
+
+fn default_retention_duration_of_journal_files() -> Duration {
+    Duration::from_secs(7 * 24 * 60 * 60)
+}
+
 #[derive(Debug, Parser, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListenerConfig {
@@ -231,6 +247,10 @@ pub(crate) struct JournalConfig {
     #[serde(with = "humantime_serde")]
     pub(crate) duration_of_journal_files: Duration,
 
+    #[arg(skip)]
+    #[serde(default)]
+    pub(crate) tiers: JournalTierRetentionOverrides,
+
     #[arg(
         long = "netflow-query-1m-max-window",
         default_value = "6h",
@@ -262,15 +282,72 @@ pub(crate) struct JournalConfig {
     pub(crate) query_facet_max_values_per_field: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JournalTierRetentionConfig {
+    #[serde(default = "default_retention_number_of_journal_files")]
+    pub(crate) number_of_journal_files: usize,
+
+    #[serde(
+        default = "default_retention_size_of_journal_files",
+        with = "bytesize_serde"
+    )]
+    pub(crate) size_of_journal_files: ByteSize,
+
+    #[serde(
+        default = "default_retention_duration_of_journal_files",
+        with = "humantime_serde"
+    )]
+    pub(crate) duration_of_journal_files: Duration,
+}
+
+impl Default for JournalTierRetentionConfig {
+    fn default() -> Self {
+        Self {
+            number_of_journal_files: default_retention_number_of_journal_files(),
+            size_of_journal_files: default_retention_size_of_journal_files(),
+            duration_of_journal_files: default_retention_duration_of_journal_files(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JournalTierRetentionOverrides {
+    #[serde(default)]
+    pub(crate) raw: Option<JournalTierRetentionConfig>,
+
+    #[serde(default, alias = "1m", alias = "minute-1", alias = "minute1")]
+    pub(crate) minute_1: Option<JournalTierRetentionConfig>,
+
+    #[serde(default, alias = "5m", alias = "minute-5", alias = "minute5")]
+    pub(crate) minute_5: Option<JournalTierRetentionConfig>,
+
+    #[serde(default, alias = "1h", alias = "hour-1", alias = "hour1")]
+    pub(crate) hour_1: Option<JournalTierRetentionConfig>,
+}
+
+impl JournalTierRetentionOverrides {
+    pub(crate) fn get(&self, tier: TierKind) -> Option<&JournalTierRetentionConfig> {
+        match tier {
+            TierKind::Raw => self.raw.as_ref(),
+            TierKind::Minute1 => self.minute_1.as_ref(),
+            TierKind::Minute5 => self.minute_5.as_ref(),
+            TierKind::Hour1 => self.hour_1.as_ref(),
+        }
+    }
+}
+
 impl Default for JournalConfig {
     fn default() -> Self {
         Self {
             journal_dir: "flows".to_string(),
             size_of_journal_file: ByteSize::mb(256),
             duration_of_journal_file: Duration::from_secs(60 * 60),
-            number_of_journal_files: 64,
-            size_of_journal_files: ByteSize::gb(10),
-            duration_of_journal_files: Duration::from_secs(7 * 24 * 60 * 60),
+            number_of_journal_files: default_retention_number_of_journal_files(),
+            size_of_journal_files: default_retention_size_of_journal_files(),
+            duration_of_journal_files: default_retention_duration_of_journal_files(),
+            tiers: JournalTierRetentionOverrides::default(),
             query_1m_max_window: Duration::from_secs(6 * 60 * 60),
             query_5m_max_window: Duration::from_secs(24 * 60 * 60),
             query_max_groups: default_query_max_groups(),
@@ -311,6 +388,21 @@ impl JournalConfig {
             self.minute_5_tier_dir(),
             self.hour_1_tier_dir(),
         ]
+    }
+
+    fn default_retention(&self) -> JournalTierRetentionConfig {
+        JournalTierRetentionConfig {
+            number_of_journal_files: self.number_of_journal_files,
+            size_of_journal_files: self.size_of_journal_files,
+            duration_of_journal_files: self.duration_of_journal_files,
+        }
+    }
+
+    pub(crate) fn retention_for_tier(&self, tier: TierKind) -> JournalTierRetentionConfig {
+        self.tiers
+            .get(tier)
+            .cloned()
+            .unwrap_or_else(|| self.default_retention())
     }
 
     pub(crate) fn decoder_state_path(&self) -> PathBuf {
@@ -787,6 +879,10 @@ where
 #[command(version = "0.1")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PluginConfig {
+    #[arg(long = "netflow-enabled", default_value_t = true)]
+    #[serde(default = "default_plugin_enabled")]
+    pub(crate) enabled: bool,
+
     #[command(flatten)]
     #[serde(rename = "listener")]
     pub(crate) listener: ListenerConfig,
@@ -815,6 +911,7 @@ pub(crate) struct PluginConfig {
 impl Default for PluginConfig {
     fn default() -> Self {
         Self {
+            enabled: default_plugin_enabled(),
             listener: ListenerConfig::default(),
             protocols: ProtocolConfig::default(),
             journal: JournalConfig::default(),
@@ -876,6 +973,20 @@ impl PluginConfig {
     }
 
     fn validate(&self) -> Result<()> {
+        let validate_retention =
+            |scope: &str, retention: &JournalTierRetentionConfig| -> Result<()> {
+                if retention.number_of_journal_files == 0 {
+                    anyhow::bail!("{scope}.number_of_journal_files must be greater than 0");
+                }
+                if retention.size_of_journal_files.as_u64() == 0 {
+                    anyhow::bail!("{scope}.size_of_journal_files must be greater than 0");
+                }
+                if retention.duration_of_journal_files.is_zero() {
+                    anyhow::bail!("{scope}.duration_of_journal_files must be greater than 0");
+                }
+                Ok(())
+            };
+
         if self.listener.max_packet_size == 0 {
             anyhow::bail!("listener.max_packet_size must be greater than 0");
         }
@@ -911,6 +1022,22 @@ impl PluginConfig {
         if self.journal.query_facet_max_values_per_field == 0 {
             anyhow::bail!("journal.query_facet_max_values_per_field must be greater than 0");
         }
+
+        let default_retention = self.journal.default_retention();
+        validate_retention("journal", &default_retention)?;
+        if let Some(raw) = &self.journal.tiers.raw {
+            validate_retention("journal.tiers.raw", raw)?;
+        }
+        if let Some(minute_1) = &self.journal.tiers.minute_1 {
+            validate_retention("journal.tiers.minute_1", minute_1)?;
+        }
+        if let Some(minute_5) = &self.journal.tiers.minute_5 {
+            validate_retention("journal.tiers.minute_5", minute_5)?;
+        }
+        if let Some(hour_1) = &self.journal.tiers.hour_1 {
+            validate_retention("journal.tiers.hour_1", hour_1)?;
+        }
+
         if self.enrichment.routing_dynamic.bmp.enabled {
             self.enrichment
                 .routing_dynamic
@@ -1178,6 +1305,103 @@ mod tests {
         assert!(
             err.to_string()
                 .contains("journal.query_facet_max_values_per_field must be greater than 0")
+        );
+    }
+
+    #[test]
+    fn plugin_enabled_defaults_to_true() {
+        let cfg = PluginConfig::default();
+        assert!(cfg.enabled);
+    }
+
+    #[test]
+    fn yaml_can_disable_plugin() {
+        let yaml = r#"
+enabled: false
+listener:
+  listen: "127.0.0.1:2055"
+  max_packet_size: 9216
+  sync_every_entries: 1024
+  sync_interval: 1s
+protocols:
+  v5: true
+  v7: true
+  v9: true
+  ipfix: true
+  sflow: true
+  decapsulation_mode: none
+  timestamp_source: input
+journal:
+  journal_dir: flows
+  size_of_journal_file: 256MB
+  duration_of_journal_file: 1h
+  number_of_journal_files: 64
+  size_of_journal_files: 10GB
+  duration_of_journal_files: 7d
+  query_1m_max_window: 6h
+  query_5m_max_window: 24h
+  query_max_groups: 50000
+  query_facet_max_values_per_field: 5000
+"#;
+
+        let cfg: PluginConfig = serde_yaml::from_str(yaml).expect("yaml should parse");
+        assert!(!cfg.enabled);
+    }
+
+    #[test]
+    fn journal_tier_retention_inherits_global_defaults_when_no_overrides_exist() {
+        let mut cfg = PluginConfig::default();
+        cfg.journal.number_of_journal_files = 111;
+        cfg.journal.size_of_journal_files = ByteSize::gb(11);
+        cfg.journal.duration_of_journal_files = Duration::from_secs(11 * 24 * 60 * 60);
+
+        let raw = cfg.journal.retention_for_tier(TierKind::Raw);
+        let minute_1 = cfg.journal.retention_for_tier(TierKind::Minute1);
+        let minute_5 = cfg.journal.retention_for_tier(TierKind::Minute5);
+        let hour_1 = cfg.journal.retention_for_tier(TierKind::Hour1);
+
+        for retention in [raw, minute_1, minute_5, hour_1] {
+            assert_eq!(retention.number_of_journal_files, 111);
+            assert_eq!(
+                retention.size_of_journal_files.as_u64(),
+                ByteSize::gb(11).as_u64()
+            );
+            assert_eq!(
+                retention.duration_of_journal_files,
+                Duration::from_secs(11 * 24 * 60 * 60)
+            );
+        }
+    }
+
+    #[test]
+    fn journal_tier_retention_uses_tier_override_when_present() {
+        let mut cfg = PluginConfig::default();
+        cfg.journal.number_of_journal_files = 111;
+        cfg.journal.size_of_journal_files = ByteSize::gb(11);
+        cfg.journal.duration_of_journal_files = Duration::from_secs(11 * 24 * 60 * 60);
+        cfg.journal.tiers.raw = Some(JournalTierRetentionConfig {
+            number_of_journal_files: 7,
+            size_of_journal_files: ByteSize::gb(2),
+            duration_of_journal_files: Duration::from_secs(2 * 24 * 60 * 60),
+        });
+
+        let raw = cfg.journal.retention_for_tier(TierKind::Raw);
+        assert_eq!(raw.number_of_journal_files, 7);
+        assert_eq!(raw.size_of_journal_files.as_u64(), ByteSize::gb(2).as_u64());
+        assert_eq!(
+            raw.duration_of_journal_files,
+            Duration::from_secs(2 * 24 * 60 * 60)
+        );
+
+        let minute_1 = cfg.journal.retention_for_tier(TierKind::Minute1);
+        assert_eq!(minute_1.number_of_journal_files, 111);
+        assert_eq!(
+            minute_1.size_of_journal_files.as_u64(),
+            ByteSize::gb(11).as_u64()
+        );
+        assert_eq!(
+            minute_1.duration_of_journal_files,
+            Duration::from_secs(11 * 24 * 60 * 60)
         );
     }
 }
