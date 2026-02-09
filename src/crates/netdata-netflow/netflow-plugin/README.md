@@ -12,6 +12,10 @@ When running under Netdata, config is loaded from `netflow.yaml` in:
 - `${NETDATA_USER_CONFIG_DIR}/netflow.yaml` (preferred)
 - `${NETDATA_STOCK_CONFIG_DIR}/netflow.yaml` (fallback)
 
+Top-level toggle:
+
+- `enabled: true|false` controls the netflow plugin itself.
+
 If `journal.journal_dir` is relative (default: `flows`), it is resolved against
 `NETDATA_CACHE_DIR`. With the standard cache directory this becomes:
 
@@ -179,13 +183,15 @@ should emit objects with fields compatible with:
 Example:
 
 ```yaml
+enabled: true
+
 listener:
   listen: "0.0.0.0:2055"
 
 protocols:
-  netflow_v5: true
-  netflow_v7: true
-  netflow_v9: true
+  v5: true
+  v7: true
+  v9: true
   ipfix: true
   sflow: true
   decapsulation_mode: srv6
@@ -198,6 +204,23 @@ journal:
   number_of_journal_files: 64
   size_of_journal_files: 10GB
   duration_of_journal_files: 7d
+  tiers:
+    raw:
+      number_of_journal_files: 256
+      size_of_journal_files: 200GB
+      duration_of_journal_files: 24h
+    minute_1:
+      number_of_journal_files: 192
+      size_of_journal_files: 40GB
+      duration_of_journal_files: 14d
+    minute_5:
+      number_of_journal_files: 288
+      size_of_journal_files: 30GB
+      duration_of_journal_files: 30d
+    hour_1:
+      number_of_journal_files: 720
+      size_of_journal_files: 20GB
+      duration_of_journal_files: 365d
   query_1m_max_window: 6h
   query_5m_max_window: 24h
   query_max_groups: 50000
@@ -207,3 +230,18 @@ journal:
 `query_max_groups` and `query_facet_max_values_per_field` are guardrails for
 query-time accumulator cardinality. When limits are hit, overflow is reported
 via response stats/facet metadata instead of growing unbounded memory.
+
+`journal.tiers` optionally allows per-tier retention overrides for:
+
+- `raw`
+- `minute_1` (aliases: `1m`, `minute-1`, `minute1`)
+- `minute_5` (aliases: `5m`, `minute-5`, `minute5`)
+- `hour_1` (aliases: `1h`, `hour-1`, `hour1`)
+
+If a tier override is omitted, that tier inherits top-level journal retention
+(`number_of_journal_files`, `size_of_journal_files`, `duration_of_journal_files`).
+
+## plugins.d protocol
+
+When stdout is not a TTY (normal `plugins.d` runtime), `netflow-plugin` emits
+`PLUGIN_KEEPALIVE` periodically to avoid parser inactivity timeouts.

@@ -6750,8 +6750,7 @@ mod tests {
     }
 
     fn fixture_dir() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("testdata/flows")
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/flows")
     }
 
     fn decode_pcap(path: &Path, decoders: &mut FlowDecoders) -> (DecodeStats, usize) {
