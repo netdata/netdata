@@ -1,5 +1,7 @@
 use crate::plugin_config::PluginConfig;
-use crate::tiering::{OpenTierState, TierKind, dimensions_for_rollup};
+#[cfg(test)]
+use crate::tiering::dimensions_for_rollup;
+use crate::tiering::{OpenTierState, TierKind};
 use anyhow::{Context, Result};
 use chrono::{TimeZone, Utc};
 use foundation::Timeout;
@@ -28,8 +30,10 @@ const CACHE_MEMORY_CAPACITY: usize = 128;
 const CACHE_DISK_CAPACITY: usize = 256 * 1024 * 1024;
 const CACHE_BLOCK_SIZE: usize = 4 * 1024 * 1024;
 const QUERY_PAGE_LIMIT: usize = 4096;
+#[cfg(test)]
 const DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS: usize = 50_000;
 const FACET_VALUE_LIMIT: usize = 100;
+#[cfg(test)]
 const DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD: usize = 5_000;
 const HISTOGRAM_TARGET_BUCKETS: u32 = 60;
 const OTHER_BUCKET_LABEL: &str = "__other__";
@@ -713,6 +717,7 @@ struct FacetFieldAccumulator {
     overflow_records: u64,
 }
 
+#[cfg(test)]
 fn build_aggregated_flows(records: &[FlowRecord]) -> BuildResult {
     let default_group_by = GROUP_BY_DEFAULT_AGGREGATED
         .iter()
@@ -726,6 +731,7 @@ fn build_aggregated_flows(records: &[FlowRecord]) -> BuildResult {
     )
 }
 
+#[cfg(test)]
 fn build_grouped_flows(
     records: &[FlowRecord],
     group_by: &[String],
@@ -1106,6 +1112,7 @@ fn build_filter_from_selections(selections: &HashMap<String, Vec<String>>) -> Fi
     }
 }
 
+#[cfg(test)]
 fn build_facets(
     records: &[FlowRecord],
     sort_by: SortBy,
@@ -1411,6 +1418,7 @@ fn metrics_from_fields(fields: &BTreeMap<String, String>) -> FlowMetrics {
     }
 }
 
+#[cfg(test)]
 fn dimensions_from_fields(fields: &BTreeMap<String, String>) -> BTreeMap<String, String> {
     dimensions_for_rollup(fields)
 }
