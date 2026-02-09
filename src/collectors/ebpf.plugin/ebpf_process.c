@@ -59,10 +59,10 @@ static ebpf_local_maps_t process_maps[] = {
 #endif
     }};
 
-char *tracepoint_sched_type = {"sched"};
-char *tracepoint_sched_process_exit = {"sched_process_exit"};
-char *tracepoint_sched_process_exec = {"sched_process_exec"};
-char *tracepoint_sched_process_fork = {"sched_process_fork"};
+char *tracepoint_sched_type = "sched";
+char *tracepoint_sched_process_exit = "sched_process_exit";
+char *tracepoint_sched_process_exec = "sched_process_exec";
+char *tracepoint_sched_process_fork = "sched_process_fork";
 static int was_sched_process_exit_enabled = 0;
 static int was_sched_process_exec_enabled = 0;
 static int was_sched_process_fork_enabled = 0;
@@ -194,8 +194,7 @@ static void ebpf_process_set_hash_tables(struct process_bpf *obj)
  */
 static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_module_t *em)
 {
-    netdata_ebpf_targets_t *mt = em->targets;
-    netdata_ebpf_program_loaded_t test = mt[PROCESS_RELEASE_TASK_NAME].mode;
+    netdata_ebpf_program_loaded_t test = em->targets[PROCESS_RELEASE_TASK_NAME].mode;
     if (test == EBPF_LOAD_TRAMPOLINE) {
         ebpf_process_disable_probe(obj);
         ebpf_disable_tracepoints(obj);
@@ -922,7 +921,7 @@ static void ebpf_obsolete_process_global(ebpf_module_t *em)
  */
 static void ebpf_process_disable_tracepoints()
 {
-    char *default_message = {"Cannot disable the tracepoint"};
+    char *default_message = "Cannot disable the tracepoint";
     if (!was_sched_process_exit_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exit))
             netdata_log_error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exit);
@@ -1533,7 +1532,6 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
                 w->ct = process_stat_vector[0].ct;
                 w->create_thread = process_stat_vector[0].create_thread;
                 w->exit_call = process_stat_vector[0].exit_call;
-                w->create_thread = process_stat_vector[0].create_thread;
                 w->create_process = process_stat_vector[0].create_process;
                 w->release_call = process_stat_vector[0].release_call;
                 w->task_err = process_stat_vector[0].task_err;
@@ -1580,7 +1578,7 @@ static void process_collector(ebpf_module_t *em)
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
-    memset(stats, 0, sizeof(em->hash_table_stats));
+    memset(stats, 0, sizeof(netdata_idx_t) * NETDATA_EBPF_GLOBAL_TABLE_STATUS_END);
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
     int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
@@ -1664,7 +1662,7 @@ static void ebpf_process_allocate_global_vectors(size_t length)
 
 static void change_syscalls()
 {
-    static char *lfork = {"do_fork"};
+    static char *lfork = "do_fork";
     process_id_names[NETDATA_KEY_PUBLISH_PROCESS_FORK] = lfork;
 }
 
@@ -1685,6 +1683,29 @@ static void set_local_pointers()
  *****************************************************************/
 
 /**
+ * Enable a single tracepoint
+ *
+ * Enable a tracepoint and store whether it was already enabled.
+ *
+ * @param event    the tracepoint event name
+ * @param was_enabled  pointer to store the previous state
+ *
+ * @return 0 on success, -1 on error
+ */
+static int ebpf_enable_single_tracepoint(const char *event, int *was_enabled)
+{
+    int test = ebpf_is_tracepoint_enabled(tracepoint_sched_type, event);
+    if (test == -1)
+        return -1;
+    if (!test) {
+        if (ebpf_enable_tracing_values(tracepoint_sched_type, event))
+            return -1;
+    }
+    *was_enabled = test;
+    return 0;
+}
+
+/**
  * Enable tracepoints
  *
  * Enable necessary tracepoints for thread.
@@ -1693,32 +1714,14 @@ static void set_local_pointers()
  */
 static int ebpf_process_enable_tracepoints()
 {
-    int test = ebpf_is_tracepoint_enabled(tracepoint_sched_type, tracepoint_sched_process_exit);
-    if (test == -1)
+    if (ebpf_enable_single_tracepoint(tracepoint_sched_process_exit, &was_sched_process_exit_enabled))
         return -1;
-    else if (!test) {
-        if (ebpf_enable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exit))
-            return -1;
-    }
-    was_sched_process_exit_enabled = test;
 
-    test = ebpf_is_tracepoint_enabled(tracepoint_sched_type, tracepoint_sched_process_exec);
-    if (test == -1)
+    if (ebpf_enable_single_tracepoint(tracepoint_sched_process_exec, &was_sched_process_exec_enabled))
         return -1;
-    else if (!test) {
-        if (ebpf_enable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exec))
-            return -1;
-    }
-    was_sched_process_exec_enabled = test;
 
-    test = ebpf_is_tracepoint_enabled(tracepoint_sched_type, tracepoint_sched_process_fork);
-    if (test == -1)
+    if (ebpf_enable_single_tracepoint(tracepoint_sched_process_fork, &was_sched_process_fork_enabled))
         return -1;
-    else if (!test) {
-        if (ebpf_enable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_fork))
-            return -1;
-    }
-    was_sched_process_fork_enabled = test;
 
     return 0;
 }

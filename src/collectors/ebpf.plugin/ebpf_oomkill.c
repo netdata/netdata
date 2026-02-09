@@ -6,7 +6,6 @@
 
 struct config oomkill_config = APPCONFIG_INITIALIZER;
 
-#define OOMKILL_MAP_KILLCNT 0
 static ebpf_local_maps_t oomkill_maps[] = {
     {.name = "tbl_oomkill",
      .internal_input = NETDATA_OOMKILL_MAX_ENTRIES,
@@ -383,23 +382,17 @@ static uint32_t oomkill_read_data(int32_t *keys)
 
     uint32_t curr_key = 0;
     uint32_t key = 0;
-    int mapfd = oomkill_maps[OOMKILL_MAP_KILLCNT].map_fd;
-    uint32_t limit = NETDATA_OOMKILL_MAX_ENTRIES - 1;
+    int mapfd = oomkill_maps[0].map_fd;
     while (bpf_map_get_next_key(mapfd, &curr_key, &key) == 0) {
         curr_key = key;
 
         keys[i] = (int32_t)key;
         i += 1;
 
-        // delete this key now that we've recorded its existence. there's no
-        // race here, as the same PID will only get OOM killed once.
-        int test = bpf_map_delete_elem(mapfd, &key);
-        if (unlikely(test < 0)) {
-            // since there's only 1 thread doing these deletions, it should be
-            // impossible to get this condition.
+        if (unlikely(bpf_map_delete_elem(mapfd, &key) < 0)) {
             netdata_log_error("key unexpectedly not available for deletion.");
         }
-        if (i > limit)
+        if (i >= NETDATA_OOMKILL_MAX_ENTRIES)
             break;
     }
 
@@ -469,7 +462,6 @@ static void oomkill_collector(ebpf_module_t *em)
     int cgroups = em->cgroup_charts;
     int update_every = em->update_every;
     int32_t keys[NETDATA_OOMKILL_MAX_ENTRIES];
-    memset(keys, 0, sizeof(keys));
 
     // loop and read until ebpf plugin is closed.
     int counter = update_every - 1;

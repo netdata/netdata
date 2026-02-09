@@ -179,8 +179,7 @@ static void ebpf_mount_set_hash_tables(struct mount_bpf *obj)
  */
 static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_t *em)
 {
-    netdata_ebpf_targets_t *mt = em->targets;
-    netdata_ebpf_program_loaded_t test = mt[NETDATA_MOUNT_SYSCALL].mode;
+    netdata_ebpf_program_loaded_t test = em->targets[NETDATA_MOUNT_SYSCALL].mode;
 
     // We are testing only one, because all will have the same behavior
     if (test == EBPF_LOAD_TRAMPOLINE) {
@@ -323,7 +322,7 @@ static void ebpf_mount_read_global_table(int maps_per_core)
     int fd = mount_maps[NETDATA_KEY_MOUNT_TABLE].map_fd;
 
     for (idx = NETDATA_KEY_MOUNT_CALL; idx < NETDATA_MOUNT_END; idx++) {
-        if (!bpf_map_lookup_elem(fd, &idx, stored)) {
+        if (bpf_map_lookup_elem(fd, &idx, stored) == 0) {
             int i;
             int end = (maps_per_core) ? ebpf_nprocs : 1;
             netdata_idx_t total = 0;
