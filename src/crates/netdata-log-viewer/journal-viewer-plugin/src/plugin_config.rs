@@ -21,10 +21,7 @@ pub struct JournalConfig {
 impl Default for JournalConfig {
     fn default() -> Self {
         Self {
-            paths: vec![
-                String::from("/var/log/journal"),
-                String::from("/run/log/journal"),
-            ],
+            paths: vec![String::from("/var/log/journal")],
         }
     }
 }

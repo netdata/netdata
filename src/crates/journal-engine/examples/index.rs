@@ -30,6 +30,7 @@
 // # Let's say it's 259:0, Set a 10MB/s read and write limit
 // echo "259:0 rbps=10485760 wbps=10485760" | sudo tee /sys/fs/cgroup/slow-io/io.max
 
+use foundation::Timeout;
 use journal_engine::{
     Facets, FileIndexCacheBuilder, FileIndexKey, IndexingLimits, QueryTimeRange,
     batch_compute_file_indexes,
@@ -38,7 +39,7 @@ use journal_index::FieldName;
 use journal_registry::{Monitor, Registry};
 use std::env;
 use std::path::PathBuf;
-use tokio_util::sync::CancellationToken;
+use std::time::Duration;
 
 #[allow(unused_imports)]
 use tracing::{info, warn};
@@ -109,11 +110,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs() as u32;
     let time_range = QueryTimeRange::new(now - 86400, now)?;
-    let cancellation = CancellationToken::new();
+    let timeout = Timeout::new(Duration::from_secs(60));
 
     info!(
-        "computing {} file indexes, bucket duration: {}s",
+        "computing {} file indexes with timeout {:?}, bucket duration: {}s",
         keys.len(),
+        timeout.remaining(),
         time_range.bucket_duration()
     );
 
@@ -124,9 +126,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &registry,
         keys,
         &time_range,
-        cancellation,
+        timeout,
         IndexingLimits::default(),
-        None,
     )
     .await?;
 

@@ -5,11 +5,9 @@ use netdata_plugin_error::Result;
 use netdata_plugin_protocol::FunctionDeclaration;
 use netdata_plugin_schema::HttpAccess;
 use parking_lot::RwLock;
-use rt::{FunctionCallContext, FunctionHandler};
+use rt::FunctionHandler;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
-use tokio_util::sync::CancellationToken;
-use tracing::{error, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 // Import types from journal-function crate
 use journal_function::{
@@ -100,11 +98,15 @@ fn required_params() -> Vec<netdata::RequiredParam> {
 struct TransactionInner {
     id: String,
     start_time: tokio::time::Instant,
+    report_progress: bool,
+    cancel_call: bool,
+    timeout: Option<journal_function::Timeout>,
 }
 
 /// Represents a tracked transaction for a function call.
 ///
-/// Transactions track the lifecycle of individual function calls.
+/// Transactions track the lifecycle and state of individual function calls,
+/// allowing for cancellation checks, progress reporting, and timeout detection.
 #[derive(Debug, Clone)]
 struct Transaction {
     inner: Arc<RwLock<TransactionInner>>,
@@ -112,11 +114,14 @@ struct Transaction {
 
 impl Transaction {
     /// Create a new transaction with the given ID.
-    fn new(id: String) -> Self {
+    fn new(id: String, timeout: Option<journal_function::Timeout>) -> Self {
         Self {
             inner: Arc::new(RwLock::new(TransactionInner {
                 id,
                 start_time: tokio::time::Instant::now(),
+                report_progress: false,
+                cancel_call: false,
+                timeout,
             })),
         }
     }
@@ -126,9 +131,40 @@ impl Transaction {
         self.inner.read().id.clone()
     }
 
+    /// Check if the transaction has been marked for cancellation.
+    #[allow(dead_code)]
+    fn is_cancelled(&self) -> bool {
+        self.inner.read().cancel_call
+    }
+
+    /// Mark the transaction for cancellation.
+    fn cancel(&self) {
+        self.inner.write().cancel_call = true;
+    }
+
+    /// Check if progress reporting is requested for this transaction.
+    #[allow(dead_code)]
+    fn should_report_progress(&self) -> bool {
+        self.inner.read().report_progress
+    }
+
+    /// Set the progress reporting flag.
+    fn set_report_progress(&self, report: bool) {
+        self.inner.write().report_progress = report;
+    }
+
     /// Get the elapsed time since the transaction started.
     fn elapsed(&self) -> std::time::Duration {
         self.inner.read().start_time.elapsed()
+    }
+
+    /// Reset the timeout to the initial budget from the current time.
+    ///
+    /// This is called when progress is reported to give the operation its full timeout budget again.
+    fn reset_timeout(&self) {
+        if let Some(timeout) = &self.inner.read().timeout {
+            timeout.reset();
+        }
     }
 }
 
@@ -152,7 +188,11 @@ impl TransactionRegistry {
     /// Create and register a new transaction with the given ID.
     ///
     /// Returns None if a transaction with this ID already exists.
-    fn create(&self, id: String) -> Option<Transaction> {
+    fn create(
+        &self,
+        id: String,
+        timeout: Option<journal_function::Timeout>,
+    ) -> Option<Transaction> {
         let mut transactions = self.transactions.write();
 
         if transactions.contains_key(&id) {
@@ -160,17 +200,49 @@ impl TransactionRegistry {
             return None;
         }
 
-        let transaction = Transaction::new(id.clone());
+        let transaction = Transaction::new(id.clone(), timeout);
         transactions.insert(id, transaction.clone());
 
         Some(transaction)
+    }
+
+    /// Get an existing transaction by ID.
+    fn get(&self, id: &str) -> Option<Transaction> {
+        self.transactions.read().get(id).cloned()
     }
 
     /// Remove a transaction from the registry.
     ///
     /// Returns the removed transaction if it existed.
     fn remove(&self, id: &str) -> Option<Transaction> {
-        self.transactions.write().remove(id)
+        let transaction = self.transactions.write().remove(id);
+        transaction
+    }
+
+    /// Cancel a transaction by ID.
+    ///
+    /// Returns true if the transaction was found and cancelled.
+    fn cancel(&self, id: &str) -> bool {
+        if let Some(transaction) = self.get(id) {
+            transaction.cancel();
+            info!("Cancelled transaction {}", id);
+            true
+        } else {
+            warn!("Cannot cancel non-existent transaction {}", id);
+            false
+        }
+    }
+
+    /// Get the number of active transactions.
+    #[allow(dead_code)]
+    fn len(&self) -> usize {
+        self.transactions.read().len()
+    }
+
+    /// Check if the registry is empty.
+    #[allow(dead_code)]
+    fn is_empty(&self) -> bool {
+        self.transactions.read().is_empty()
     }
 }
 
@@ -201,6 +273,7 @@ impl CatalogFunction {
     /// - has_before: true if there are more entries before the returned window
     /// - has_after: true if there are more entries after the returned window
     fn query_logs_from_indexes(
+        &self,
         indexed_files: &[journal_index::FileIndex],
         time_range: &journal_function::QueryTimeRange,
         anchor: Option<u64>,
@@ -208,8 +281,6 @@ impl CatalogFunction {
         search_query: &str,
         limit: usize,
         direction: journal_index::Direction,
-        cancellation: Option<CancellationToken>,
-        progress: Option<Arc<AtomicUsize>>,
     ) -> (Vec<journal_function::LogEntryData>, bool, bool) {
         use journal_function::LogQuery;
 
@@ -253,14 +324,6 @@ impl CatalogFunction {
             .with_limit(limit + 1)
             .with_after_usec(after_usec)
             .with_before_usec(before_usec);
-
-        if let Some(ref t) = cancellation {
-            query = query.with_cancellation(t.clone());
-        }
-
-        if let Some(counter) = progress {
-            query = query.with_progress(counter);
-        }
 
         // Only apply filter if it's not Filter::none() (which matches nothing)
         if !filter.is_none() {
@@ -319,10 +382,6 @@ impl CatalogFunction {
                     .with_after_usec(after_usec)
                     .with_before_usec(before_usec);
 
-            if let Some(ref t) = cancellation {
-                opposite_query = opposite_query.with_cancellation(t.clone());
-            }
-
             // Only apply filter if it's not Filter::none() (which matches nothing)
             if !filter.is_none() {
                 opposite_query = opposite_query.with_filter(filter.clone());
@@ -330,7 +389,7 @@ impl CatalogFunction {
 
             // Apply regex search if search_query is not empty
             if !search_query.is_empty() {
-                trace!("applying regex filter to opposite direction query");
+                debug!("applying regex filter to opposite direction query");
                 opposite_query = opposite_query.with_regex(search_query);
             }
 
@@ -431,24 +490,19 @@ impl FunctionHandler for CatalogFunction {
     type Request = CatalogRequest;
     type Response = CatalogResponse;
 
-    async fn on_call(
-        &self,
-        ctx: FunctionCallContext,
-        request: Self::Request,
-    ) -> Result<Self::Response> {
-        let transaction = ctx.transaction();
-
-        // Register the transaction
+    async fn on_call(&self, transaction: String, request: Self::Request) -> Result<Self::Response> {
+        // Register the transaction with the timeout
+        let timeout = journal_function::Timeout::new(std::time::Duration::from_secs(10));
         let Some(txn) = self
             .inner
             .transaction_registry
-            .create(transaction.to_owned())
+            .create(transaction.clone(), Some(timeout.clone()))
         else {
             return Err(netdata_plugin_error::NetdataPluginError::Other {
                 message: format!("[{}] transaction already exists", transaction),
             });
         };
-        trace!("[{}] started transaction", txn.id());
+        debug!("[{}] started transaction", txn.id());
 
         // Create query time range with automatic alignment
         let time_range = journal_function::QueryTimeRange::new(request.after, request.before)
@@ -457,7 +511,7 @@ impl FunctionHandler for CatalogFunction {
                 netdata_plugin_error::NetdataPluginError::Other { message: msg }
             })?;
 
-        trace!(
+        debug!(
             "[{}] time range: [{}, {}), aligned: [{}, {}), bucket duration: {} seconds",
             txn.id(),
             time_range.requested_start(),
@@ -478,7 +532,7 @@ impl FunctionHandler for CatalogFunction {
                 netdata_plugin_error::NetdataPluginError::Other { message: msg }
             })?;
         let find_files_duration = op_start.elapsed();
-        trace!("[{}] found {} files in time range", txn.id(), files.len(),);
+        debug!("[{}] found {} files in time range", txn.id(), files.len(),);
         if tracing::enabled!(tracing::Level::TRACE) {
             for (idx, file_info) in files.iter().enumerate() {
                 tracing::trace!(
@@ -493,11 +547,11 @@ impl FunctionHandler for CatalogFunction {
 
         // Build filter expression
         let filter_expr = build_filter_from_selections(&request.selections);
-        trace!("[{}] filter expression: {}", txn.id(), filter_expr);
+        debug!("[{}] filter expression: {}", txn.id(), filter_expr);
 
         // Build facets for file indexes
         let facets = Facets::new(&request.facets);
-        trace!(
+        debug!(
             "[{}] using {} facets with precomputed hash {}",
             txn.id(),
             facets.len(),
@@ -511,23 +565,15 @@ impl FunctionHandler for CatalogFunction {
             .map(|f| FileIndexKey::new(&f.file, &facets, Some(source_timestamp_field.clone())))
             .collect();
 
-        // Progress is reported in two phases: indexing and querying.
-        // Start with total = number of files for the indexing phase. After
-        // indexing completes we extend the total so the query phase gets its
-        // own progress range. This avoids over-estimating total work when the
-        // second phase is fast (which is the common case).
-        let num_files = keys.len();
-        ctx.progress.set_total(num_files);
-
+        // Index all files
         let op_start = std::time::Instant::now();
         let indexed_files = journal_function::batch_compute_file_indexes(
             &self.inner.cache,
             &self.inner.registry,
             keys,
             &time_range,
-            ctx.cancellation.clone(),
+            timeout,
             self.inner.indexing_limits,
-            Some(ctx.progress.done_counter()),
         )
         .await
         .map_err(|e| {
@@ -536,12 +582,7 @@ impl FunctionHandler for CatalogFunction {
         })?;
         let indexing_duration = op_start.elapsed();
 
-        // Extend progress to cover the query phase. The done counter is
-        // already at ~keys.len(), so the UI will show ~50% until querying
-        // catches up.
-        ctx.progress.set_total(2 * num_files);
-
-        trace!(
+        debug!(
             "[{}] retrieved {}/{} file indexes for histogram buckets and log entries",
             txn.id(),
             indexed_files.len(),
@@ -574,51 +615,21 @@ impl FunctionHandler for CatalogFunction {
             })?;
         let histogram_duration = op_start.elapsed();
 
-        // Query logs from pre-indexed files, wrapped in spawn_blocking so the
-        // async runtime can handle cancellation while this runs.
+        // Query logs from pre-indexed files
         let op_start = std::time::Instant::now();
         let limit = request.last.unwrap_or(200);
         let file_indexes: Vec<_> = indexed_files.iter().map(|(_, idx)| idx.clone()).collect();
-        let query_progress = ctx.progress.done_counter();
-
-        let query_filter = filter_expr.clone();
-        let query_search = request.query.clone();
-        let query_direction = request.direction;
-        let query_anchor = request.anchor;
-        let query_time_range = time_range.clone();
-        let query_cancellation = ctx.cancellation.clone();
-
-        let query_task = tokio::task::spawn_blocking(move || {
-            CatalogFunction::query_logs_from_indexes(
-                &file_indexes,
-                &query_time_range,
-                query_anchor,
-                &query_filter,
-                &query_search,
-                limit,
-                query_direction,
-                Some(query_cancellation),
-                Some(query_progress),
-            )
-        });
-
-        let (log_entries, has_before, has_after) = tokio::select! {
-            result = query_task => {
-                match result {
-                    Ok(result) => result,
-                    Err(e) => {
-                        error!("[{}] log query task panicked: {}", txn.id(), e);
-                        (Vec::new(), false, false)
-                    }
-                }
-            }
-            _ = ctx.cancellation.cancelled() => {
-                warn!("[{}] log query cancelled", txn.id());
-                (Vec::new(), false, false)
-            }
-        };
+        let (log_entries, has_before, has_after) = self.query_logs_from_indexes(
+            &file_indexes,
+            &time_range,
+            request.anchor,
+            &filter_expr,
+            &request.query,
+            limit,
+            request.direction,
+        );
         let query_logs_duration = op_start.elapsed();
-        trace!(
+        debug!(
             "[{}] retrieved {} log entries (has before: {}, has after: {})",
             txn.id(),
             log_entries.len(),
@@ -679,7 +690,7 @@ impl FunctionHandler for CatalogFunction {
                 message: format!("[{}] transaction does not exist", transaction),
             });
         };
-        trace!(
+        debug!(
             "[{}] completed transaction (find_files: {:?}, indexing: {:?}, histogram: {:?}, query_logs: {:?}, total: {:?})",
             txn.id(),
             find_files_duration,
@@ -692,11 +703,49 @@ impl FunctionHandler for CatalogFunction {
         Ok(response)
     }
 
+    async fn on_cancellation(&self, transaction: String) -> Result<Self::Response> {
+        warn!("catalog function call {} cancelled by Netdata", transaction);
+
+        // Mark the transaction as cancelled
+        self.inner.transaction_registry.cancel(&transaction);
+
+        // Remove the transaction from the registry
+        self.inner.transaction_registry.remove(&transaction);
+
+        Err(netdata_plugin_error::NetdataPluginError::Other {
+            message: "catalog function cancelled by user".to_string(),
+        })
+    }
+
+    async fn on_progress(&self, transaction: String) {
+        info!(
+            "progress report requested for catalog function call {}",
+            transaction
+        );
+
+        // Mark the transaction for progress reporting and reset the timeout
+        if let Some(txn) = self.inner.transaction_registry.get(&transaction) {
+            txn.set_report_progress(true);
+            txn.reset_timeout();
+            info!(
+                "Transaction {} marked for progress reporting and timeout reset to initial budget (elapsed: {:?})",
+                transaction,
+                txn.elapsed()
+            );
+        } else {
+            warn!(
+                "Progress requested for non-existent transaction {}",
+                transaction
+            );
+        }
+    }
+
     fn declaration(&self) -> FunctionDeclaration {
         // NOTE: `rt` special cases this function call to handle GET/POST
         // calls in a consistent way. If you rename this function, you should
         // update the `rt` crate as well.
 
+        info!("generating journal-viewer function declaration");
         let mut func_decl = FunctionDeclaration::new(
             "journal-viewer",
             "Query and visualize journal log entries with histograms and facets",

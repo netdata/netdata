@@ -9,6 +9,7 @@ workspace = true
 
 [dependencies]
 # Local crates
+foundation = { workspace = true }
 netdata-plugin-error = { path = "../error" }
 netdata-plugin-protocol = { path = "../protocol" }
 netdata-plugin-schema = { path = "../schema" }

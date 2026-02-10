@@ -7,7 +7,7 @@ use journal_core::repository::File;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroU64;
-use tracing::{error, trace};
+use tracing::{debug, error};
 
 /// Index for a single journal file, enabling efficient querying and filtering.
 ///
@@ -348,10 +348,10 @@ impl LogQueryParamsBuilder {
 
         // Compile regex pattern if provided
         let regex = if let Some(pattern) = self.regex_pattern {
-            trace!("compiling regex pattern for log query: {:?}", pattern);
+            debug!("compiling regex pattern for log query: {:?}", pattern);
             match Regex::new(&pattern) {
                 Ok(regex) => {
-                    trace!("regex pattern compiled successfully");
+                    debug!("regex pattern compiled successfully");
                     Some(regex)
                 }
                 Err(e) => {
@@ -599,7 +599,7 @@ impl FileIndex {
         // Log if regex filtering is active
         let mut regex_filtered_count = 0usize;
         if params.regex().is_some() {
-            trace!(
+            debug!(
                 "regex filtering enabled for query, will filter {} candidate entries",
                 entry_offsets.len()
             );
@@ -795,7 +795,7 @@ impl FileIndex {
 
         // Log regex filtering statistics if regex was used
         if params.regex().is_some() {
-            trace!(
+            debug!(
                 "regex filtering complete: {} entries matched, {} entries filtered out",
                 log_entry_ids.len(),
                 regex_filtered_count

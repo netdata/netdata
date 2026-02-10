@@ -13,9 +13,6 @@ use journal_index::{
 use journal_registry::File;
 use std::collections::HashMap;
 use std::num::NonZeroU64;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use tokio_util::sync::CancellationToken;
 use tracing::warn;
 
 /// Pagination state for multi-file log queries.
@@ -54,8 +51,6 @@ pub struct PaginationState {
 pub struct LogQuery<'a> {
     file_indexes: &'a [FileIndex],
     builder: LogQueryParamsBuilder,
-    cancellation: Option<CancellationToken>,
-    progress: Option<Arc<AtomicUsize>>,
 }
 
 impl<'a> LogQuery<'a> {
@@ -79,8 +74,6 @@ impl<'a> LogQuery<'a> {
             builder: LogQueryParamsBuilder::new(anchor, direction).with_source_timestamp_field(
                 Some(FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP")),
             ),
-            cancellation: None,
-            progress: None,
         }
     }
 
@@ -139,24 +132,6 @@ impl<'a> LogQuery<'a> {
         self
     }
 
-    /// Set a cancellation token for the query (optional).
-    ///
-    /// When set, the query will check the token before processing each file
-    /// and return early with partial results if cancelled.
-    pub fn with_cancellation(mut self, token: CancellationToken) -> Self {
-        self.cancellation = Some(token);
-        self
-    }
-
-    /// Set a progress counter for the query (optional).
-    ///
-    /// When set, the counter is incremented (via `fetch_add`) after each file
-    /// is processed in `retrieve_log_entries`.
-    pub fn with_progress(mut self, counter: Arc<AtomicUsize>) -> Self {
-        self.progress = Some(counter);
-        self
-    }
-
     /// Execute the query and return log entries.
     ///
     /// This consumes the builder and returns a vector of log entries sorted by timestamp
@@ -167,13 +142,8 @@ impl<'a> LogQuery<'a> {
     /// Returns an error if anchor or direction were not set, or if time boundaries are invalid.
     pub fn execute(self) -> Result<Vec<LogEntryData>> {
         let params = self.builder.build()?;
-        let (log_entry_ids, _state) = retrieve_log_entries(
-            self.file_indexes.to_vec(),
-            params,
-            None,
-            self.cancellation.as_ref(),
-            self.progress.as_ref(),
-        );
+        let (log_entry_ids, _state) =
+            retrieve_log_entries(self.file_indexes.to_vec(), params, None);
 
         extract_entry_data(&log_entry_ids)
     }
@@ -200,13 +170,8 @@ impl<'a> LogQuery<'a> {
         state: Option<&PaginationState>,
     ) -> Result<(Vec<LogEntryData>, PaginationState)> {
         let params = self.builder.build()?;
-        let (log_entry_ids, new_state) = retrieve_log_entries(
-            self.file_indexes.to_vec(),
-            params,
-            state,
-            self.cancellation.as_ref(),
-            self.progress.as_ref(),
-        );
+        let (log_entry_ids, new_state) =
+            retrieve_log_entries(self.file_indexes.to_vec(), params, state);
 
         let data = extract_entry_data(&log_entry_ids)?;
         Ok((data, new_state))
@@ -232,8 +197,6 @@ fn retrieve_log_entries(
     file_indexes: Vec<FileIndex>,
     params: LogQueryParams,
     state: Option<&PaginationState>,
-    cancellation: Option<&CancellationToken>,
-    progress: Option<&Arc<AtomicUsize>>,
 ) -> (Vec<LogEntryId>, PaginationState) {
     // Handle edge cases
     if params.limit() == Some(0) || file_indexes.is_empty() {
@@ -279,11 +242,6 @@ fn retrieve_log_entries(
         }
     };
 
-    if let Some(counter) = progress {
-        let filtered = file_indexes.len() - relevant_indexes.len();
-        counter.fetch_add(filtered, Ordering::Relaxed);
-    }
-
     if relevant_indexes.is_empty() {
         return (Vec::new(), PaginationState::default());
     }
@@ -310,21 +268,6 @@ fn retrieve_log_entries(
     let mut new_state = state.cloned().unwrap_or_default();
 
     for file_index in relevant_indexes {
-        // Check cancellation before processing each file
-        if let Some(token) = cancellation {
-            if token.is_cancelled() {
-                warn!(
-                    "log query cancelled after processing {} files, returning partial results",
-                    new_state.file_positions.len()
-                );
-                break;
-            }
-        }
-
-        if let Some(counter) = progress {
-            counter.fetch_add(1, Ordering::Relaxed);
-        }
-
         // Pruning optimization: if we have a full result set, check if we can skip
         // remaining files based on their time ranges
         if collected_entries.len() >= limit {
@@ -378,10 +321,14 @@ fn retrieve_log_entries(
             }
         };
 
-        if !new_entries.is_empty() {
-            collected_entries =
-                merge_log_entries(collected_entries, new_entries, limit, params.direction());
+        if new_entries.is_empty() {
+            continue;
         }
+
+        // Merge the new entries with our existing results, maintaining
+        // sorted order and respecting the limit constraint
+        collected_entries =
+            merge_log_entries(collected_entries, new_entries, limit, params.direction());
     }
 
     // Update pagination state based on the last position for each file in collected_entries
