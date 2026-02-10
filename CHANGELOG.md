@@ -297,6 +297,11 @@
 - Improve log message when deferred response is too big. ([#21720](https://github.com/netdata/netdata/issues/21720))
 - Fix timeout cleanup race for long-running first web requests ([#21722](https://github.com/netdata/netdata/issues/21722))
 - Refactor function progress: move timeout and progress authority to the plugin runtime and agent ([#21723](https://github.com/netdata/netdata/issues/21723))
+- Build(deps): bump github.com/ibm-messaging/mq-golang/v5 from 5.7.0 to 5.7.1 in /src/go ([#21726](https://github.com/netdata/netdata/issues/21726))
+- Build(deps): bump go.mongodb.org/mongo-driver from 1.17.8 to 1.17.9 in /src/go ([#21724](https://github.com/netdata/netdata/issues/21724))
+- Build(deps): bump github.com/prometheus-community/pro-bing from 0.7.0 to 0.8.0 in /src/go ([#21725](https://github.com/netdata/netdata/issues/21725))
+- Chore(go.d/snmp): add Westermo Teleindustri to org_to_vendor ([#21727](https://github.com/netdata/netdata/issues/21727))
+- Build(deps): bump github.com/lmittmann/tint from 1.1.2 to 1.1.3 in /src/go ([#21704](https://github.com/netdata/netdata/issues/21704))
 
 ## [2.8.0] - 2025-11-19
 
