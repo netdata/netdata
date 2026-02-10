@@ -246,7 +246,11 @@ Requires: %{name}-plugin-ebpf = %{version}
 %endif
 %if 0%{?_have_rust}
 Requires: %{name}-plugin-otel = %{version}
+%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Recommends: %{name}-plugin-otel-signal-viewer = %{version}
+%else
+Requires: %{name}-plugin-otel-signal-viewer = %{version}
+%endif
 %endif
 Requires: %{name}-plugin-apps = %{version}
 Requires: %{name}-plugin-pythond = %{version}
@@ -813,7 +817,7 @@ Summary: The eBPF metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
-%if 0%{?centos_ver} != 7
+%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Recommends: %{name}-plugin-apps = %{version}
 Recommends: %{name}-ebpf-legacy-code >= %{version}
 %else
@@ -3187,7 +3191,7 @@ Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
 %if 0%{?_have_ebpf}
-%if 0%{?centos_ver} != 7
+%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Recommends: %{name}-plugin-ebpf = %{version}
 %else
 Requires: %{name}-plugin-ebpf = %{version}
