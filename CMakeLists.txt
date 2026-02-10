@@ -132,6 +132,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_JOURNAL_VIEWER "Enable journal viewer plugin" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
 cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD OR OS_MACOS OR OS_WINDOWS" False)
@@ -187,7 +188,7 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
 
 # Setup Rust/Corrosion for plugins that need it
-if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL)
+if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_JOURNAL_VIEWER)
     include(FetchContent)
     FetchContent_Declare(
         Corrosion
@@ -195,17 +196,23 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL)
         GIT_TAG f3b91559efca32c6b54837866ef35ba98ff5b2ca # stable/v0.5
     )
     FetchContent_MakeAvailable(Corrosion)
-    if(ENABLE_NETDATA_JOURNAL_FILE_READER AND ENABLE_PLUGIN_OTEL)
+
+    if(ENABLE_NETDATA_JOURNAL_FILE_READER)
         corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml
                                CRATES journal_reader_ffi)
+    endif()
+
+    # Import crates from the main cargo workspace
+    set(_WORKSPACE_CRATES "")
+    if(ENABLE_PLUGIN_OTEL)
+        list(APPEND _WORKSPACE_CRATES otel-plugin)
+    endif()
+    if(ENABLE_PLUGIN_JOURNAL_VIEWER)
+        list(APPEND _WORKSPACE_CRATES journal-viewer-plugin)
+    endif()
+    if(_WORKSPACE_CRATES)
         corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
-                               CRATES otel-plugin)
-    elseif(ENABLE_NETDATA_JOURNAL_FILE_READER)
-        corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml
-                               CRATES journal_reader_ffi)
-    elseif(ENABLE_PLUGIN_OTEL)
-        corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
-                               CRATES otel-plugin)
+                               CRATES ${_WORKSPACE_CRATES})
     endif()
 
     if(ENABLE_PLUGIN_OTEL)
@@ -214,6 +221,24 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL)
       else()
         corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable)
       endif()
+    endif()
+
+    if(ENABLE_PLUGIN_JOURNAL_VIEWER)
+      set(JOURNAL_VIEWER_RUSTFLAGS --cfg=tracing_unstable)
+
+      # We depend (transitively) on the `io-uring` crate which doesn't provide
+      # prebuilt bindings for 32-bit arches. Considering this is a compile-time
+      # and not a runtime dependency (because we don't use foyer's io-uring
+      # engine), we can simply skip the check.
+      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        list(APPEND JOURNAL_VIEWER_RUSTFLAGS --cfg=io_uring_skip_arch_check)
+      endif()
+
+      if(STATIC_BUILD)
+        list(APPEND JOURNAL_VIEWER_RUSTFLAGS "-C" "target-feature=+crt-static")
+      endif()
+
+      corrosion_add_target_rustflags(journal-viewer-plugin ${JOURNAL_VIEWER_RUSTFLAGS})
     endif()
 endif()
 
@@ -3272,6 +3297,17 @@ if(ENABLE_PLUGIN_OTEL)
 endif()
 
 #
+# journal-viewer-plugin
+#
+# Handle journal-viewer plugin
+if(ENABLE_PLUGIN_JOURNAL_VIEWER)
+    corrosion_install(TARGETS journal-viewer-plugin
+                      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
+                      RUNTIME DESTINATION usr/libexec/netdata/plugins.d
+                      COMPONENT plugin-journal-viewer)
+endif()
+
+#
 # Generate config file
 #
 
@@ -3375,6 +3411,19 @@ install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-name.sh
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
+
+#
+# journal-viewer config
+#
+if(ENABLE_PLUGIN_JOURNAL_VIEWER)
+    configure_file(src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yaml.in
+                   src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yaml
+                   @ONLY)
+
+    install(FILES ${CMAKE_BINARY_DIR}/src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yaml
+            COMPONENT plugin-journal-viewer
+            DESTINATION usr/lib/netdata/conf.d)
+endif()
 
 #
 # statsd
