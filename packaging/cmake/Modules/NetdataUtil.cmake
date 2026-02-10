@@ -241,3 +241,30 @@ function(precompile_python dir component)
     COMPONENT ${component}
   )
 endfunction()
+
+# Handle adding a library to a target with the given scope.
+#
+# Expects the target name, scope, and variable prefix in that order.
+function(netdata_add_lib_to_target _target _scope _prefix)
+  target_link_libraries(${_target} ${_scope} ${${_prefix}_LIBRARIES})
+
+  if(DEFINED ${_prefix}_LIBRARY_DIRS)
+    target_link_directories(${_target} ${_scope} ${${_prefix}_LIBRARY_DIRS})
+  endif()
+
+  if(DEFINED ${_prefix}_LDFLAGS_OTHER)
+    target_link_options(${_target} ${_scope} ${${_prefix}_LDFLAGS_OTHER})
+  endif()
+
+  if(DEFINED ${_prefix}_INCLUDE_DIRS)
+    target_include_directories(${_target} BEFORE ${_scope} ${${_prefix}_INCLUDE_DIRS})
+  endif()
+
+  if(DEFINED ${_prefix}_CFLAGS_OTHER)
+    target_compile_options(${_target} ${_scope} ${${_prefix}_CFLAGS_OTHER})
+  endif()
+
+  if(DEFINED ${_prefix}_DEFINITIONS)
+    target_compile_definitions(${_target} ${_scope} ${${_prefix}_DEFINITIONS})
+  endif()
+endfunction()
