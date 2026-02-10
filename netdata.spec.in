@@ -3130,6 +3130,18 @@ Requires(pre): %{name}-user >= %{version}
 # CAP_DAC_READ_SEARCH required for data collection.
 %caps(cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/debugfs.plugin
 
+%package plugin-journal-viewer
+Summary: Transitional dummy package
+Group: Applications/System
+Requires: %{name}-plugin-systemd-journal
+
+%description plugin-journal-viewer
+ This package simply ensures a clean upgrade to the renamed
+ netdata-plugin-systemd-journal package. Once that package is installed,
+ you can safely remove this one.
+
+%files plugin-journal-viewer
+
 %package plugin-systemd-journal
 Summary: The systemd-journal plugin for the Netdata Agent
 Group: Applications/System
@@ -3252,7 +3264,6 @@ Summary: The OTel signal viewer plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
-Obsoletes: %{name}-plugin-journal-viewer
 %if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
 %endif
@@ -3311,6 +3322,9 @@ done
 %attr(0644,root,root) %{_sysusersdir}/%{name}.conf
 
 %changelog
+* Tue Feb 10 2026 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-38
+- Add new otel-signal-viewer plugin
+- Add back systemd-journal plugin with journal-viewer plugin as a transitional package
 * Tue Nov 11 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-37
 - Update to use sysusers infrastructure when available.
 * Fri Oct 24 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-36
