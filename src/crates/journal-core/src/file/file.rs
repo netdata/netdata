@@ -1158,11 +1158,7 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
                 // Try to get the data object
                 match self.journal.data_ref(data_offset) {
                     Ok(data_guard) => Some(Ok(data_guard)),
-                    Err(e) => {
-                        // If we can't read the data, return the error and stop iteration
-                        self.current_index = self.total_items;
-                        Some(Err(e))
-                    }
+                    Err(e) => Some(Err(e)),
                 }
             }
             Err(e) => {

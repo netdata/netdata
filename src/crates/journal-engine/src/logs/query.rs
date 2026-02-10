@@ -13,7 +13,6 @@ use journal_index::{
 use journal_registry::File;
 use std::collections::HashMap;
 use std::num::NonZeroU64;
-use tracing::warn;
 
 /// Pagination state for multi-file log queries.
 ///
@@ -315,10 +314,7 @@ fn retrieve_log_entries(
 
         let new_entries = match file_index.find_log_entries(file, &file_params) {
             Ok(entries) => entries,
-            Err(e) => {
-                warn!(file = file.path(), "failed to retrieve log entries: {e}");
-                continue;
-            }
+            Err(_) => continue, // Skip files that fail to read
         };
 
         if new_entries.is_empty() {
