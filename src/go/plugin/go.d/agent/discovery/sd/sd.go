@@ -28,7 +28,7 @@ var isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdin
 // When true (default): templates are not registered, file configs auto-start without dyncfg.
 // When false: full dyncfg integration (used in tests).
 // TODO: Remove this flag after SD dyncfg feature is validated in production.
-var disableDyncfg = true
+var disableDyncfg = false
 
 type Config struct {
 	ConfigDefaults confgroup.Registry
