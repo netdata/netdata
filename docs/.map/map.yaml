@@ -459,7 +459,7 @@ sidebar:
       label: Logs
     items:
       - meta:
-          label: OTel Signal Viewer Plugin
+          label: Journal Viewer Plugin
           edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/README.md
           description: View and analyze logs available in systemd journal
           path: Systemd Journal Logs
