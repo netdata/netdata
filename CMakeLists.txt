@@ -3287,10 +3287,6 @@ if(ENABLE_PLUGIN_OTEL)
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
                       COMPONENT plugin-otel)
 
-    install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.yaml
-            COMPONENT plugin-otel
-            DESTINATION usr/lib/netdata/conf.d)
-
     install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml
             COMPONENT plugin-otel
             DESTINATION usr/lib/netdata/conf.d/otel.d/v1/metrics)
@@ -3413,6 +3409,19 @@ install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-name.sh
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
+
+#
+# otel config
+#
+if(ENABLE_PLUGIN_OTEL)
+    configure_file(src/crates/netdata-otel/otel-plugin/configs/otel.yaml.in
+                   src/crates/netdata-otel/otel-plugin/configs/otel.yaml
+                   @ONLY)
+
+    install(FILES ${CMAKE_BINARY_DIR}/src/crates/netdata-otel/otel-plugin/configs/otel.yaml
+            COMPONENT plugin-otel
+            DESTINATION usr/lib/netdata/conf.d)
+endif()
 
 #
 # otel-signal-viewer config

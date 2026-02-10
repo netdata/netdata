@@ -173,10 +173,6 @@ impl PluginConfig {
             Config::default()
         };
 
-        // Resolve relative paths
-        config.cache.directory =
-            resolve_relative_path(&config.cache.directory, netdata_env.cache_dir.as_deref());
-
         // Add host-prefixed journal paths for containerized environments
         if let Some(ref host_prefix) = netdata_env.host_prefix {
             if !host_prefix.is_empty() {
@@ -256,18 +252,6 @@ impl Config {
         let config: Config = serde_yaml::from_str(&contents)
             .with_context(|| format!("Failed to parse YAML config file: {}", path.display()))?;
         Ok(config)
-    }
-}
-
-/// Helper function to resolve relative paths against a base directory
-fn resolve_relative_path(path: &str, base_dir: Option<&Path>) -> String {
-    let path = Path::new(path);
-    if path.is_absolute() {
-        path.to_string_lossy().to_string()
-    } else if let Some(base) = base_dir {
-        base.join(path).to_string_lossy().to_string()
-    } else {
-        path.to_string_lossy().to_string()
     }
 }
 

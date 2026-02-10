@@ -10,8 +10,7 @@ journal:
 
 cache:
   # Directory to store the hybrid cache (memory + disk backed by Foyer)
-  # Relative paths are resolved based on Netdata's cache directory
-  directory: "@cachedir_POST@/log-viewer"
+  directory: "@cachedir_POST@/otel-signal-viewer"
 
   # Memory cache capacity (number of indexed journal files to keep in memory)
   # Higher values improve query performance but use more RAM

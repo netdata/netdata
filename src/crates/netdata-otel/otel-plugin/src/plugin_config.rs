@@ -211,7 +211,7 @@ impl PluginConfig {
     pub fn new() -> Result<Self> {
         let netdata_env = NetdataEnv::from_environment();
 
-        let mut config = if netdata_env.running_under_netdata() {
+        let config = if netdata_env.running_under_netdata() {
             // Try user config first, fallback to stock config
             let user_config = netdata_env
                 .user_config_dir
@@ -240,14 +240,6 @@ impl PluginConfig {
             // load from CLI args
             Self::parse()
         };
-
-        // Resolve relative paths
-        if let Some(charts_config_dir) = &mut config.metrics.chart_configs_dir {
-            *charts_config_dir =
-                resolve_relative_path(charts_config_dir, netdata_env.user_config_dir.as_deref());
-        }
-        config.logs.journal_dir =
-            resolve_relative_path(&config.logs.journal_dir, netdata_env.log_dir.as_deref());
 
         // Validate configuration
         if config.metrics.buffer_samples == 0 {
@@ -304,17 +296,5 @@ impl PluginConfig {
         let config: PluginConfig = serde_yaml::from_str(&contents)
             .with_context(|| format!("Failed to parse YAML config file: {}", path.display()))?;
         Ok(config)
-    }
-}
-
-// Helper function to resolve relative paths
-fn resolve_relative_path(path: &str, base_dir: Option<&Path>) -> String {
-    let path = Path::new(path);
-    if path.is_absolute() {
-        path.to_string_lossy().to_string()
-    } else if let Some(base) = base_dir {
-        base.join(path).to_string_lossy().to_string()
-    } else {
-        path.to_string_lossy().to_string()
     }
 }
