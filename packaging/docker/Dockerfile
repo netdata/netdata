@@ -32,12 +32,17 @@ RUN chmod +x netdata-installer.sh && \
     cp -rp /deps/* /usr/local/ && \
     BUILD_ARCH="${BUILD_ARCH:-"$(uname -m)"}" && \
     /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='${BUILD_ARCH}'" > ./system/.install-type && \
-    EXTRA_INSTALL_OPTS="${EXTRA_INSTALL_OPTS} --enable-plugin-systemd-journal" && \
+    NETDATA_CMAKE_OPTIONS="-DBUILD_FOR_PACKAGING=On -DPACKAGE_TYPE=docker" \
     NETDATA_BUILD_DIR=/build \
-    CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" ./netdata-installer.sh --dont-wait --dont-start-it \
+    CFLAGS="$(packaging/docker/gen-cflags.sh)" \
+    LDFLAGS="-Wl,--gc-sections" \
+    ./netdata-installer.sh \
+    --dont-wait \
+    --dont-start-it \
     --use-system-protobuf \
     --disable-ebpf \
     --enable-plugin-otel \
+    --enable-plugin-systemd-journal \
     ${EXTRA_INSTALL_OPTS} \
     --install-no-prefix / \
     "$([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)" && \
