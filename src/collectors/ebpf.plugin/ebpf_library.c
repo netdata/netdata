@@ -155,13 +155,13 @@ void ebpf_write_chart_cmd(
 
 void ebpf_write_chart_obsolete(
     char *type,
-    char *id,
+    const char *id,
     char *suffix,
     char *title,
     char *units,
     char *family,
     char *charttype,
-    char *context,
+    const char *context,
     int order,
     int update_every)
 {
@@ -921,6 +921,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
     }
 
     char *end = strdupz(ip);
+    char *clean_end = end;
     // Move while I cannot find a separator
     while (*end && *end != '/' && *end != '-')
         end++;
@@ -1063,7 +1064,7 @@ storethisip:
 
 cleanipdup:
     freez(ipdup);
-    freez(end);
+    freez(clean_end);
 }
 
 /**

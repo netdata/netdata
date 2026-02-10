@@ -57,13 +57,13 @@ void ebpf_write_chart_cmd(
 
 void ebpf_write_chart_obsolete(
     char *type,
-    char *id,
+    const char *id,
     char *suffix,
     char *title,
     char *units,
     char *family,
     char *charttype,
-    char *context,
+    const char *context,
     int order,
     int update_every);
 
