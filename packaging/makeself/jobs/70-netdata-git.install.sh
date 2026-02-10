@@ -22,13 +22,13 @@ export IS_NETDATA_STATIC_BINARY="yes"
 NETDATA_BUILD_DIR="$(build_path netdata)"
 export NETDATA_BUILD_DIR
 
+export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
+
 case "${BUILDARCH}" in
     armv6l)
-        export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
         export INSTALLER_ARGS="--disable-plugin-systemd-journal --disable-plugin-otel --disable-plugin-otel-signal-viewer"
         ;;
     *)
-        export NETDATA_CMAKE_OPTIONS="-DSTATIC_BUILD=On -DENABLE_LIBBACKTRACE=On"
         export INSTALLER_ARGS="--enable-plugin-systemd-journal --internal-systemd-journal --enable-plugin-otel --enable-plugin-otel-signal-viewer"
         ;;
 esac

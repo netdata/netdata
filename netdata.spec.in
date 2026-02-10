@@ -3252,6 +3252,7 @@ Summary: The OTel signal viewer plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+Obsoletes: %{name}-plugin-journal-viewer
 %if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
 %endif

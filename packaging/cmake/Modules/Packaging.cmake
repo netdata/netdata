@@ -442,6 +442,8 @@ set(CPACK_DEBIAN_PLUGIN-OTEL_DEBUGINFO_PACKAGE Off)
 #
 
 set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_REPLACES "netdata-plugin-journal-viewer")
+set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_CONFLICTS "netdata-plugin-journal-viewer")
 set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_DESCRIPTION
 		"The OTel signal viewer plugin for the Netdata Agent
  This plugin provides OTel signal viewing and querying functionality
