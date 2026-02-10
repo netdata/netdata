@@ -501,7 +501,7 @@ impl FunctionHandler for CatalogFunction {
                 message: format!("[{}] transaction already exists", transaction),
             });
         };
-        debug!("[{}] started transaction", txn.id());
+        info!("[{}] started transaction", txn.id());
 
         // Create query time range with automatic alignment
         let time_range = journal_function::QueryTimeRange::new(request.after, request.before)
@@ -510,7 +510,7 @@ impl FunctionHandler for CatalogFunction {
                 netdata_plugin_error::NetdataPluginError::Other { message: msg }
             })?;
 
-        debug!(
+        info!(
             "[{}] time range: [{}, {}), aligned: [{}, {}), bucket duration: {} seconds",
             txn.id(),
             time_range.requested_start(),
@@ -531,7 +531,7 @@ impl FunctionHandler for CatalogFunction {
                 netdata_plugin_error::NetdataPluginError::Other { message: msg }
             })?;
         let find_files_duration = op_start.elapsed();
-        debug!("[{}] found {} files in time range", txn.id(), files.len(),);
+        info!("[{}] found {} files in time range", txn.id(), files.len(),);
         if tracing::enabled!(tracing::Level::DEBUG) {
             for (idx, file_info) in files.iter().enumerate() {
                 debug!(
@@ -546,11 +546,11 @@ impl FunctionHandler for CatalogFunction {
 
         // Build filter expression
         let filter_expr = build_filter_from_selections(&request.selections);
-        debug!("[{}] filter expression: {}", txn.id(), filter_expr);
+        info!("[{}] filter expression: {}", txn.id(), filter_expr);
 
         // Build facets for file indexes
         let facets = Facets::new(&request.facets);
-        debug!(
+        info!(
             "[{}] using {} facets with precomputed hash {}",
             txn.id(),
             facets.len(),
@@ -591,7 +591,7 @@ impl FunctionHandler for CatalogFunction {
         })?;
         let indexing_duration = op_start.elapsed();
 
-        debug!(
+        info!(
             "[{}] retrieved {}/{} file indexes for histogram buckets and log entries",
             txn.id(),
             indexed_files.len(),
@@ -638,7 +638,7 @@ impl FunctionHandler for CatalogFunction {
             request.direction,
         );
         let query_logs_duration = op_start.elapsed();
-        debug!(
+        info!(
             "[{}] retrieved {} log entries (has before: {}, has after: {})",
             txn.id(),
             log_entries.len(),
@@ -699,7 +699,7 @@ impl FunctionHandler for CatalogFunction {
                 message: format!("[{}] transaction does not exist", transaction),
             });
         };
-        debug!(
+        info!(
             "[{}] completed transaction (find_files: {:?}, indexing: {:?}, histogram: {:?}, query_logs: {:?}, total: {:?})",
             txn.id(),
             find_files_duration,
