@@ -218,8 +218,8 @@ USAGE: ${PROGRAM} [options]
   --internal-systemd-journal Enable the internal journal file reader instead of using libsystemd
   --enable-plugin-otel Enable the Netdata OpenTelemetry plugin. Default: disabled
   --disable-plugin-otel Explicitly disable the Netdata OpenTelemetry plugin.
-  --enable-plugin-otel-signal-viewer-plugin Enable the OTel signal viewer plugin. Default: disabled
-  --disable-plugin-otel-signal-viewer-plugin Explicitly disable the OTel signal viewer plugin.
+  --enable-plugin-otel-signal-viewer Enable the OTel signal viewer plugin. Default: disabled
+  --disable-plugin-otel-signal-viewer Explicitly disable the OTel signal viewer plugin.
   --enable-plugin-ibm        Enable the IBM ecosystem monitoring plugin. Default: disabled
   --disable-plugin-ibm       Explicitly disable the IBM ecosystem monitoring plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
@@ -307,8 +307,8 @@ while [ -n "${1}" ]; do
     "--internal-systemd-journal") USE_RUST_JOURNAL_FILE=1 ;;
     "--enable-plugin-otel") ENABLE_OTEL=1 ;;
     "--disable-plugin-otel") ENABLE_OTEL=0 ;;
-    "--enable-plugin-otel-signal-viewer-plugin") ENABLE_OTEL_SIGNAL_VIEWER=1 ;;
-    "--disable-plugin-otel-signal-viewer-plugin") ENABLE_OTEL_SIGNAL_VIEWER=0 ;;
+    "--enable-plugin-otel-signal-viewer") ENABLE_OTEL_SIGNAL_VIEWER=1 ;;
+    "--disable-plugin-otel-signal-viewer") ENABLE_OTEL_SIGNAL_VIEWER=0 ;;
     "--enable-plugin-ibm") ENABLE_IBM=1 ;;
     "--disable-plugin-ibm") ENABLE_IBM=0 ;;
     "--enable-exporting-kinesis" | "--enable-backend-kinesis")
