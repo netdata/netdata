@@ -146,7 +146,7 @@ impl JournalWriter {
 
             entry_guard.header.object_header.aligned_size()
         };
-        self.object_added(journal_file, entry_offset, entry_size);
+        self.object_added(entry_offset, entry_size);
 
         self.append_to_entry_array(journal_file, entry_offset)?;
         for entry_item_index in 0..self.entry_items.len() {
@@ -158,20 +158,10 @@ impl JournalWriter {
         Ok(())
     }
 
-    fn object_added(
-        &mut self,
-        journal_file: &mut JournalFile<MmapMut>,
-        object_offset: NonZeroU64,
-        object_size: u64,
-    ) {
+    fn object_added(&mut self, object_offset: NonZeroU64, object_size: u64) {
         self.tail_object_offset = object_offset;
         self.append_offset = object_offset.saturating_add(object_size);
         self.num_written_objects += 1;
-
-        // Update arena_size immediately after writing, so subsequent reads
-        // within the same write operation can find the newly written object.
-        let header = journal_file.journal_header_mut();
-        header.arena_size = self.append_offset.get() - header.header_size;
     }
 
     fn entry_added(&mut self, header: &mut JournalHeader, realtime: u64, monotonic: u64) {
@@ -221,7 +211,7 @@ impl JournalWriter {
                     data_guard.header.object_header.aligned_size()
                 };
 
-                self.object_added(journal_file, data_offset, data_size);
+                self.object_added(data_offset, data_size);
 
                 // Update hash table
                 journal_file.data_hash_table_set_tail_offset(hash, data_offset)?;
@@ -274,7 +264,7 @@ impl JournalWriter {
                     field_guard.set_payload(payload);
                     field_guard.header.object_header.aligned_size()
                 };
-                self.object_added(journal_file, field_offset, field_size);
+                self.object_added(field_offset, field_size);
 
                 // Update hash table
                 journal_file.field_hash_table_set_tail_offset(hash, field_offset)?;
@@ -287,7 +277,7 @@ impl JournalWriter {
 
     fn allocate_new_array(
         &mut self,
-        journal_file: &mut JournalFile<MmapMut>,
+        journal_file: &JournalFile<MmapMut>,
         capacity: NonZeroU64,
     ) -> Result<NonZeroU64> {
         // let new_capacity = previous_capacity.saturating_mul(NonZeroU64::new(2).unwrap());
@@ -298,7 +288,7 @@ impl JournalWriter {
 
             array_guard.header.object_header.aligned_size()
         };
-        self.object_added(journal_file, array_offset, array_size);
+        self.object_added(array_offset, array_size);
 
         Ok(array_offset)
     }
