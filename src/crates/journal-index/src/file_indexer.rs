@@ -98,25 +98,8 @@ impl FileIndexer {
         // Capture indexing timestamp
         let indexed_at = Seconds::now();
 
-        // Capture whether the file was online when indexed.
-        //
-        // A file is considered online if:
-        // 1. The journal header state is 1 (STATE_ONLINE), OR
-        // 2. The file is an "Active" file by filename (e.g., system.journal
-        //    without the @seqnum_id-head_seqnum-head_realtime suffix)
-        //
-        // We check both conditions because systemd-journal may temporarily set
-        // `state != 1` on active journal files (e.g., during flush operations).
-        // If we only checked the header state, we might incorrectly mark an
-        // active file as offline/archived, causing its cache entry to be
-        // considered "always fresh" and never re-indexed. This would result
-        // in the file being excluded from queries for current time ranges
-        // because its bounded time range (from when it was indexed) doesn't
-        // overlap with the query range.
-        //
-        // The otel-plugin does not suffer from this issue because it always
-        // uses "archived", instead of "active", filenames.
-        let was_online = journal_file.journal_header_ref().state == 1 || file.is_active();
+        // Capture whether the file was online when indexed
+        let was_online = journal_file.journal_header_ref().state == 1;
 
         let field_map = journal_file.load_fields()?;
 
