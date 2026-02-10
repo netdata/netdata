@@ -698,7 +698,7 @@ impl FunctionHandler for CatalogFunction {
         // update the `rt` crate as well.
 
         let mut func_decl = FunctionDeclaration::new(
-            "journal-viewer",
+            "otel-signal-viewer",
             "Query and visualize journal log entries with histograms and facets",
         );
         func_decl.global = true;

@@ -31,7 +31,7 @@ RUN chmod +x netdata-installer.sh && \
    --use-system-protobuf \
    --disable-ebpf \
    --enable-plugin-otel \
-   --enable-plugin-journal-viewer \
+   --enable-plugin-otel-signal-viewer \
    --internal-systemd-journal \
    ${EXTRA_INSTALL_OPTS} \
    --install-no-prefix / \
@@ -135,7 +135,7 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 slabinfo.plugin \
                 network-viewer.plugin \
                 otel-plugin \
-                journal-viewer-plugin \
+                otel-signal-viewer-plugin \
                 systemd-journal.plugin; do \
         [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/usr/libexec/netdata/plugins.d/$name"; \
     done && \

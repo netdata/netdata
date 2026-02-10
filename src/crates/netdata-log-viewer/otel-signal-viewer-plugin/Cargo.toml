@@ -1,5 +1,5 @@
 [package]
-name = "journal-viewer-plugin"
+name = "otel-signal-viewer-plugin"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ rust-version.workspace = true
 workspace = true
 
 [[bin]]
-name = "journal-viewer-plugin"
+name = "otel-signal-viewer-plugin"
 path = "src/main.rs"
 
 [dependencies]

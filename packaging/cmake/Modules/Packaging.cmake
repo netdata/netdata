@@ -110,8 +110,8 @@ if(ENABLE_PLUGIN_OTEL)
   list(APPEND _main_deps "netdata-plugin-otel")
 endif()
 
-if(ENABLE_PLUGIN_JOURNAL_VIEWER)
-  list(APPEND _main_deps "netdata-plugin-journal-viewer")
+if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
+  list(APPEND _main_deps "netdata-plugin-otel-signal-viewer")
 endif()
 
 if(ENABLE_PLUGIN_CHARTS)
@@ -438,23 +438,23 @@ set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-OTEL_DEBUGINFO_PACKAGE Off)
 
 #
-# journal-viewer.plugin
+# otel-signal-viewer
 #
 
-set(CPACK_COMPONENT_PLUGIN-JOURNAL-VIEWER_DEPENDS "netdata")
-set(CPACK_COMPONENT_PLUGIN-JOURNAL-VIEWER_DESCRIPTION
-		"The journal viewer plugin for the Netdata Agent
- This plugin provides systemd journal log viewing and querying functionality
+set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_DESCRIPTION
+		"The OTel signal viewer plugin for the Netdata Agent
+ This plugin provides OTel signal viewing and querying functionality
  with histogram analysis and faceted search capabilities.")
 
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_NAME "netdata-plugin-journal-viewer")
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_SECTION "net")
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_NAME "netdata-plugin-otel-signal-viewer")
+set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_CONTROL_EXTRA
-		"${PKG_FILES_PATH}/deb/plugin-journal-viewer/postinst")
+set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_CONTROL_EXTRA
+		"${PKG_FILES_PATH}/deb/plugin-otel-signal-viewer/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_DEBUGINFO_PACKAGE Off)
 
 #
 # nfacct.plugin
@@ -661,8 +661,8 @@ endif()
 if(ENABLE_PLUGIN_OTEL)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-otel")
 endif()
-if(ENABLE_PLUGIN_JOURNAL_VIEWER)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-journal-viewer")
+if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-otel-signal-viewer")
 endif()
 
 include(CPack)

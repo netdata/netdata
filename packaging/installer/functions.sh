@@ -378,7 +378,7 @@ prepare_cmake_options() {
   enable_feature ML "${NETDATA_ENABLE_ML:-1}"
   enable_feature PLUGIN_APPS "${ENABLE_APPS:-1}"
   enable_feature PLUGIN_OTEL "${ENABLE_OTEL:-0}"
-  enable_feature PLUGIN_JOURNAL_VIEWER "${ENABLE_JOURNAL_VIEWER:-0}"
+  enable_feature PLUGIN_OTEL_SIGNAL_VIEWER "${ENABLE_OTEL_SIGNAL_VIEWER:-0}"
   enable_feature PLUGIN_IBM "${ENABLE_IBM:-0}"
 
   check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy

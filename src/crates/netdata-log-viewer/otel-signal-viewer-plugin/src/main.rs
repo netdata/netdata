@@ -1,4 +1,4 @@
-//! journal-viewer-plugin standalone binary
+//! otel-signal-viewer standalone binary
 
 use journal_function::IndexingLimits;
 use journal_registry::Monitor;
@@ -54,7 +54,7 @@ async fn run_plugin() -> std::result::Result<(), Box<dyn std::error::Error>> {
         config.indexing.max_field_payload_size
     );
 
-    let mut runtime = PluginRuntime::new("journal-viewer");
+    let mut runtime = PluginRuntime::new("otel-signal-viewer");
     info!("plugin runtime created");
 
     let (monitor, notify_rx) = match Monitor::new() {
