@@ -1718,7 +1718,6 @@ set(STATSD_PLUGIN_FILES
 )
 
 set(SYSTEMD_JOURNAL_PLUGIN_FILES
-        src/collectors/systemd-journal.plugin/systemd-journal.c
         src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
         src/collectors/systemd-journal.plugin/systemd-internals.h
         src/collectors/systemd-journal.plugin/systemd-main.c
