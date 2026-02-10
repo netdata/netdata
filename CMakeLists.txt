@@ -200,6 +200,9 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
     if(ENABLE_NETDATA_JOURNAL_FILE_READER)
         corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml
                                CRATES journal_reader_ffi)
+        if(STATIC_BUILD)
+            corrosion_add_target_rustflags(journal_reader_ffi "-C" "target-feature=+crt-static")
+        endif()
     endif()
 
     # Import crates from the main cargo workspace
