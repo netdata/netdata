@@ -66,9 +66,6 @@ pub enum JournalError {
     #[error("zerocopy failure")]
     ZerocopyFailure,
 
-    #[error("misaligned object offset: {0:#x}")]
-    MisalignedOffset(u64),
-
     #[error("sigbus handler error")]
     SigbusHandlerError,
 
