@@ -28,6 +28,9 @@ case "${BUILDARCH}" in
     armv6l)
         export INSTALLER_ARGS="--disable-plugin-otel --disable-plugin-systemd-journal"
         ;;
+    armv7l)
+        export INSTALLER_ARGS="--enable-plugin-otel --disable-plugin-systemd-journal"
+        ;;
     *)
         export INSTALLER_ARGS="--enable-plugin-otel --enable-plugin-systemd-journal"
         ;;
