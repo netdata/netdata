@@ -11,14 +11,7 @@ pub trait HashableObject {
     fn hash(&self) -> u64;
 
     /// Get the payload data for matching
-    fn raw_payload(&self) -> &[u8];
-
-    /// Check if the payload is compressed
-    fn is_compressed(&self) -> bool;
-
-    /// Decompress the payload into the provided buffer.
-    /// Returns the number of decompressed bytes.
-    fn decompress(&self, buf: &mut Vec<u8>) -> Result<usize>;
+    fn get_payload(&self) -> &[u8];
 
     /// Get the offset to the next object in the hash chain
     fn next_hash_offset(&self) -> Option<NonZeroU64>;
@@ -165,18 +158,8 @@ impl<B: ByteSlice> HashableObject for FieldObject<B> {
         self.header.hash
     }
 
-    fn raw_payload(&self) -> &[u8] {
+    fn get_payload(&self) -> &[u8] {
         &self.payload
-    }
-
-    fn is_compressed(&self) -> bool {
-        false
-    }
-
-    fn decompress(&self, buf: &mut Vec<u8>) -> Result<usize> {
-        buf.clear();
-        buf.extend_from_slice(&self.payload);
-        Ok(buf.len())
     }
 
     fn next_hash_offset(&self) -> Option<NonZeroU64> {
@@ -203,16 +186,8 @@ impl<B: ByteSlice> HashableObject for DataObject<B> {
         self.header.hash
     }
 
-    fn raw_payload(&self) -> &[u8] {
-        self.raw_payload()
-    }
-
-    fn is_compressed(&self) -> bool {
-        DataObject::is_compressed(self)
-    }
-
-    fn decompress(&self, buf: &mut Vec<u8>) -> Result<usize> {
-        DataObject::decompress(self, buf)
+    fn get_payload(&self) -> &[u8] {
+        self.payload_bytes()
     }
 
     fn next_hash_offset(&self) -> Option<NonZeroU64> {
@@ -933,7 +908,7 @@ impl<B: SplitByteSliceMut> JournalObjectMut<B> for DataObject<B> {
 }
 
 impl<B: ByteSlice> DataObject<B> {
-    pub fn raw_payload(&self) -> &[u8] {
+    pub fn payload_bytes(&self) -> &[u8] {
         match &self.payload {
             DataPayloadType::Regular(payload) => payload,
             DataPayloadType::Compact { payload, .. } => payload,
@@ -967,37 +942,9 @@ impl<B: ByteSlice> DataObject<B> {
             use ruzstd::decoding::StreamingDecoder;
             use ruzstd::io::Read;
 
-            let payload = self.raw_payload();
+            let payload = self.payload_bytes();
             let mut decoder =
                 StreamingDecoder::new(payload).map_err(|_| JournalError::DecompressorError)?;
-
-            buf.clear();
-            decoder
-                .read_to_end(buf)
-                .map_err(|_| JournalError::DecompressorError)
-        } else if self.lz4_compressed() {
-            let payload = self.raw_payload();
-
-            // First 8 bytes are the uncompressed size (little-endian u64)
-            if payload.len() < 8 {
-                return Err(JournalError::DecompressorError);
-            }
-
-            let uncompressed_size =
-                u64::from_le_bytes(payload[..8].try_into().unwrap()) as usize;
-            let compressed_data = &payload[8..];
-
-            buf.clear();
-            buf.resize(uncompressed_size, 0);
-
-            lz4_flex::block::decompress_into(compressed_data, buf)
-                .map_err(|_| JournalError::DecompressorError)
-        } else if self.xz_compressed() {
-            use lzma_rust2::XzReader;
-            use std::io::Read;
-
-            let payload = self.raw_payload();
-            let mut decoder = XzReader::new(payload, false);
 
             buf.clear();
             decoder

@@ -75,16 +75,8 @@ impl<T: HashableObject> HashableObject for ValueGuard<'_, T> {
         self.value.hash()
     }
 
-    fn raw_payload(&self) -> &[u8] {
-        self.value.raw_payload()
-    }
-
-    fn is_compressed(&self) -> bool {
-        self.value.is_compressed()
-    }
-
-    fn decompress(&self, buf: &mut Vec<u8>) -> crate::error::Result<usize> {
-        self.value.decompress(buf)
+    fn get_payload(&self) -> &[u8] {
+        self.value.get_payload()
     }
 
     fn next_hash_offset(&self) -> Option<NonZeroU64> {
