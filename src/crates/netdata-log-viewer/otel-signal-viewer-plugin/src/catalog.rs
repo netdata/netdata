@@ -699,7 +699,7 @@ impl FunctionHandler for CatalogFunction {
 
         let mut func_decl = FunctionDeclaration::new(
             "otel-signal-viewer",
-            "Query and visualize journal log entries with histograms and facets",
+            "Query and visualize OpenTelemetry logs",
         );
         func_decl.global = true;
         func_decl.tags = Some(String::from("logs"));
