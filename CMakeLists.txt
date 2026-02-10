@@ -195,8 +195,26 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL)
         GIT_TAG f3b91559efca32c6b54837866ef35ba98ff5b2ca # stable/v0.5
     )
     FetchContent_MakeAvailable(Corrosion)
-    corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml
-                           CRATES journal_reader_ffi otel-plugin)
+    if(ENABLE_NETDATA_JOURNAL_FILE_READER AND ENABLE_PLUGIN_OTEL)
+        corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml
+                               CRATES journal_reader_ffi)
+        corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
+                               CRATES otel-plugin)
+    elseif(ENABLE_NETDATA_JOURNAL_FILE_READER)
+        corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml
+                               CRATES journal_reader_ffi)
+    elseif(ENABLE_PLUGIN_OTEL)
+        corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
+                               CRATES otel-plugin)
+    endif()
+
+    if(ENABLE_PLUGIN_OTEL)
+      if(STATIC_BUILD)
+        corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable "-C" "target-feature=+crt-static")
+      else()
+        corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable)
+      endif()
+    endif()
 endif()
 
 option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)
@@ -3242,11 +3260,11 @@ if(ENABLE_PLUGIN_OTEL)
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
                       COMPONENT plugin-otel)
 
-    install(FILES src/crates/jf/otel-plugin/configs/otel.yml
+    install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.yaml
             COMPONENT plugin-otel
             DESTINATION usr/lib/netdata/conf.d)
 
-    install(FILES src/crates/jf/otel-plugin/configs/otel.d/v1/metrics/hostmetrics-receiver.yml
+    install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml
             COMPONENT plugin-otel
             DESTINATION usr/lib/netdata/conf.d/otel.d/v1/metrics)
 
