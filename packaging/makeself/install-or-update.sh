@@ -219,6 +219,9 @@ else
     f="usr/libexec/netdata/plugins.d/${x}"
     run chmod 4750 "${f}"
   done
+  if [ -f "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin" ]; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
+  fi
 fi
 
 for x in ndsudo freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin; do
