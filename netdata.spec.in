@@ -246,11 +246,6 @@ Requires: %{name}-plugin-ebpf = %{version}
 %endif
 %if 0%{?_have_rust}
 Requires: %{name}-plugin-otel = %{version}
-%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
-Recommends: %{name}-plugin-otel-signal-viewer = %{version}
-%else
-Requires: %{name}-plugin-otel-signal-viewer = %{version}
-%endif
 %endif
 Requires: %{name}-plugin-apps = %{version}
 Requires: %{name}-plugin-pythond = %{version}
@@ -3243,6 +3238,7 @@ Requires(pre): %{name}-user >= %{version}
 Summary: The Open Telemetry plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} >= %{version}
+Requires: %{name}-plugin-otel-signal-viewer
 Conflicts: %{name} < %{version}
 %if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}

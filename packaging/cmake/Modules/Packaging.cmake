@@ -110,10 +110,6 @@ if(ENABLE_PLUGIN_OTEL)
   list(APPEND _main_deps "netdata-plugin-otel")
 endif()
 
-if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
-  list(APPEND _main_deps "netdata-plugin-otel-signal-viewer")
-endif()
-
 if(ENABLE_PLUGIN_CHARTS)
   list(APPEND _main_deps "netdata-plugin-chartsd")
 endif()
@@ -420,7 +416,12 @@ set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_DEBUGINFO_PACKAGE On)
 # otel.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-OTEL_DEPENDS "netdata")
+if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
+  set(CPACK_COMPONENT_PLUGIN-OTEL_DEPENDS "netdata, netdata-plugin-otel-signal-viewer")
+else()
+  set(CPACK_COMPONENT_PLUGIN-OTEL_DEPENDS "netdata")
+endif()
+
 set(CPACK_COMPONENT_PLUGIN-OTEL_DESCRIPTION
 		"The OpenTelemetry collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect metrics and logs via
