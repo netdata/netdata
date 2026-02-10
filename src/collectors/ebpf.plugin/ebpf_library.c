@@ -209,7 +209,7 @@ void ebpf_create_chart(
 
 int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 {
-    static int priority = NETATA_EBPF_ORDER_STAT_ARAL_BEGIN;
+    static int priority = NETDATA_EBPF_ORDER_STAT_ARAL_BEGIN;
     char *mem = NETDATA_EBPF_STAT_DIMENSION_MEMORY;
     char *aral = NETDATA_EBPF_STAT_DIMENSION_ARAL;
 

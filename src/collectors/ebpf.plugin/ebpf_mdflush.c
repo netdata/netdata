@@ -192,7 +192,13 @@ static int mdflush_val_cmp(void *a, void *b)
     netdata_mdflush_t *ptr1 = a;
     netdata_mdflush_t *ptr2 = b;
 
-    return ptr1->unit - ptr2->unit;
+    if (ptr1->unit > ptr2->unit) {
+        return 1;
+    } else if (ptr1->unit < ptr2->unit) {
+        return -1;
+    }
+
+    return 0;
 }
 
 /**
