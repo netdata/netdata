@@ -67,16 +67,17 @@ async fn run_internal() -> Result<()> {
     let config = PluginConfig::new().context("Failed to initialize plugin configuration")?;
 
     // 5. Create gRPC services
-    let metrics_service =
-        NetdataMetricsService::new(config.clone()).context("Failed to create metrics service")?;
-    let logs_service =
-        NetdataLogsService::new(config.clone()).context("Failed to create logs service")?;
+    let metrics_service = NetdataMetricsService::new(config.clone())
+        .context("Failed to create metrics service")?;
+    let logs_service = NetdataLogsService::new(config.clone())
+        .context("Failed to create logs service")?;
 
     // 7. Parse gRPC endpoint address
-    let addr =
-        config.endpoint.path.parse().with_context(|| {
-            format!("Failed to parse endpoint address: {}", config.endpoint.path)
-        })?;
+    let addr = config
+        .endpoint
+        .path
+        .parse()
+        .with_context(|| format!("Failed to parse endpoint address: {}", config.endpoint.path))?;
 
     // 8. Build gRPC server (with TLS if configured)
     let mut server_builder = Server::builder();
