@@ -180,7 +180,7 @@ fi
 
 progress "changing plugins ownership and permissions"
 
-for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin ioping.plugin cgroup-network-helper.sh; do
+for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin python.d.plugin charts.d.plugin go.d.plugin ioping.plugin cgroup-network-helper.sh otel-plugin otel-signal-viewer-plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
   if [ -f "${f}" ]; then
     run chown root:${NETDATA_GROUP} "${f}"
@@ -208,6 +208,11 @@ if command -v setcap >/dev/null 2>&1; then
 
   if ! run setcap "${perf_caps}" "usr/libexec/netdata/plugins.d/perf.plugin"; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/perf.plugin"
+  fi
+  if [ -f "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin" ]; then
+    if ! run setcap "cap_dac_read_search=eip" "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
+    fi
   fi
 else
   for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
