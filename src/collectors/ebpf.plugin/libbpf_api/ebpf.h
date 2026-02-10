@@ -216,7 +216,7 @@ typedef enum netdata_apps_level {
 } netdata_apps_level_t;
 
 typedef struct ebpf_local_maps {
-    char *name;
+    const char *name;
     uint32_t internal_input;
     uint32_t user_input;
     uint32_t type;
