@@ -103,9 +103,8 @@ impl Facets {
                 .collect()
         };
 
-        // Sort and deduplicate to get a canonical set of fields
+        // Sort in order to get the same hash for the same set of fields
         facets.sort();
-        facets.dedup();
 
         use std::hash::Hasher;
         let mut hasher = std::hash::DefaultHasher::new();

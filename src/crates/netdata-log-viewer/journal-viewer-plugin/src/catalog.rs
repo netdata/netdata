@@ -11,8 +11,8 @@ use tracing::{debug, error, info, instrument, warn};
 
 // Import types from journal-function crate
 use journal_function::{
-    Facets, FileIndexCache, FileIndexCacheBuilder, FileIndexKey, HistogramEngine, IndexingLimits,
-    Monitor, Registry, Result as CatalogResult, netdata,
+    Facets, FileIndexCache, FileIndexCacheBuilder, FileIndexKey, HistogramEngine, Monitor,
+    Registry, Result as CatalogResult, netdata,
 };
 
 /*
@@ -252,7 +252,6 @@ struct CatalogFunctionInner {
     cache: FileIndexCache,
     histogram_engine: Arc<HistogramEngine>,
     transaction_registry: TransactionRegistry,
-    indexing_limits: IndexingLimits,
 }
 
 /// Function handler that provides catalog information about journal files
@@ -433,13 +432,14 @@ impl CatalogFunction {
     /// * `cache_dir` - Directory path for disk cache storage
     /// * `memory_capacity` - Number of file indexes to keep in memory
     /// * `disk_capacity` - Disk cache size in bytes
-    /// * `indexing_limits` - Configuration limits for indexing (cardinality, payload size)
+    /// * `file_indexing_metrics` - Metrics chart for file indexing operations
+    /// * `bucket_cache_metrics` - Metrics chart for bucket cache operations
+    /// * `bucket_operations_metrics` - Metrics chart for bucket operations
     pub async fn new(
         monitor: Monitor,
         cache_dir: impl Into<std::path::PathBuf>,
         memory_capacity: usize,
         disk_capacity: usize,
-        indexing_limits: IndexingLimits,
     ) -> CatalogResult<Self> {
         let registry = Registry::new(monitor);
 
@@ -460,7 +460,6 @@ impl CatalogFunction {
             cache,
             histogram_engine: Arc::new(histogram_engine),
             transaction_registry: TransactionRegistry::new(),
-            indexing_limits,
         };
 
         Ok(Self {
@@ -533,9 +532,9 @@ impl FunctionHandler for CatalogFunction {
             })?;
         let find_files_duration = op_start.elapsed();
         debug!("[{}] found {} files in time range", txn.id(), files.len(),);
-        if tracing::enabled!(tracing::Level::TRACE) {
+        if tracing::enabled!(tracing::Level::DEBUG) {
             for (idx, file_info) in files.iter().enumerate() {
-                tracing::trace!(
+                debug!(
                     "[{}] file[{}/{}]: {}",
                     txn.id(),
                     idx + 1,
@@ -557,6 +556,17 @@ impl FunctionHandler for CatalogFunction {
             facets.len(),
             facets.precomputed_hash()
         );
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            for (idx, facet) in facets.iter().enumerate() {
+                debug!(
+                    "[{}] facet[{}/{}]: {}",
+                    txn.id(),
+                    idx + 1,
+                    facets.len(),
+                    facet.as_str(),
+                );
+            }
+        }
 
         // Build file index keys
         let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
@@ -573,7 +583,6 @@ impl FunctionHandler for CatalogFunction {
             keys,
             &time_range,
             timeout,
-            self.inner.indexing_limits,
         )
         .await
         .map_err(|e| {
@@ -588,9 +597,9 @@ impl FunctionHandler for CatalogFunction {
             indexed_files.len(),
             files.len(),
         );
-        if tracing::enabled!(tracing::Level::TRACE) {
+        if tracing::enabled!(tracing::Level::DEBUG) {
             for (idx, (key, file_index)) in indexed_files.iter().enumerate() {
-                tracing::trace!(
+                debug!(
                     "[{}] file index[{}/{}]: {}, indexed at: {}, online: {}, bucket duration: {}",
                     txn.id(),
                     idx + 1,

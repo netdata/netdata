@@ -1,6 +1,5 @@
 //! journal-viewer-plugin standalone binary
 
-use journal_function::IndexingLimits;
 use journal_registry::Monitor;
 
 mod catalog;
@@ -44,14 +43,12 @@ async fn run_plugin() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let config = &plugin_config.config;
 
     info!(
-        "configuration loaded: journal_paths={:?}, cache_dir={}, memory_capacity={}, disk_capacity={}, workers={}, max_unique_values_per_field={}, max_field_payload_size={}",
+        "configuration loaded: journal_paths={:?}, cache_dir={}, memory_capacity={}, disk_capacity={}, workers={}",
         config.journal.paths,
         config.cache.directory,
         config.cache.memory_capacity,
         config.cache.disk_capacity,
-        config.cache.workers,
-        config.indexing.max_unique_values_per_field,
-        config.indexing.max_field_payload_size
+        config.cache.workers
     );
 
     let mut runtime = PluginRuntime::new("journal-viewer");
@@ -67,16 +64,11 @@ async fn run_plugin() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     // Create catalog function with disk-backed cache
     info!("creating catalog function with Foyer hybrid cache");
-    let indexing_limits = IndexingLimits {
-        max_unique_values_per_field: config.indexing.max_unique_values_per_field,
-        max_field_payload_size: config.indexing.max_field_payload_size,
-    };
     let catalog_function = CatalogFunction::new(
         monitor,
         &config.cache.directory,
         config.cache.memory_capacity,
         config.cache.disk_capacity.as_u64() as usize,
-        indexing_limits,
     )
     .await?;
     info!("catalog function initialized");

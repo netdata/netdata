@@ -34,6 +34,5 @@ pub use histogram::{
     BucketRequest, BucketResponse, Histogram, HistogramEngine, calculate_bucket_duration,
 };
 pub use indexing::{FileIndexCacheBuilder, batch_compute_file_indexes};
-pub use journal_index::IndexingLimits;
 pub use logs::{CellValue, ColumnInfo, LogEntryData, LogQuery, Table, entry_data_to_table};
 pub use query_time_range::QueryTimeRange;

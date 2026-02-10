@@ -43,19 +43,3 @@ cache:
   # Controls backpressure on the indexing system
   # Default: 100
   queue_capacity: 100
-
-indexing:
-  # Maximum number of unique values to index per field.
-  # Fields with more unique values than this limit will have their indexing
-  # truncated to prevent unbounded memory growth. This protects against
-  # high-cardinality fields (e.g., MESSAGE with millions of unique values)
-  # causing memory exhaustion during indexing.
-  # Default: 500
-  max_unique_values_per_field: 500
-
-  # Maximum payload size (in bytes) for field values to index.
-  # Field values with payloads larger than this limit (or compressed values)
-  # will be skipped. This prevents large binary data or encoded content
-  # from consuming excessive memory.
-  # Default: 100
-  max_field_payload_size: 100

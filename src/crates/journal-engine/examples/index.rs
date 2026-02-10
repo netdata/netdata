@@ -32,8 +32,7 @@
 
 use foundation::Timeout;
 use journal_engine::{
-    Facets, FileIndexCacheBuilder, FileIndexKey, IndexingLimits, QueryTimeRange,
-    batch_compute_file_indexes,
+    Facets, FileIndexCacheBuilder, FileIndexKey, QueryTimeRange, batch_compute_file_indexes,
 };
 use journal_index::FieldName;
 use journal_registry::{Monitor, Registry};
@@ -121,15 +120,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Run batch indexing
     let start = std::time::Instant::now();
-    let responses = batch_compute_file_indexes(
-        &cache,
-        &registry,
-        keys,
-        &time_range,
-        timeout,
-        IndexingLimits::default(),
-    )
-    .await?;
+    let responses =
+        batch_compute_file_indexes(&cache, &registry, keys, &time_range, timeout).await?;
 
     let elapsed = start.elapsed();
 
