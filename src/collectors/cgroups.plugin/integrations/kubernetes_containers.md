@@ -26,7 +26,9 @@ Monitor containers and virtual machines resource utilization — CPU, memory, di
 
 
 
-This collector is supported on all platforms.
+This collector is only supported on the following platforms:
+
+- Linux
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
