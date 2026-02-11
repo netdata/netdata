@@ -18,10 +18,22 @@ modules:
       keywords:
         - containers
         - docker
+        - podman
+        - containerd
+        - cri-o
+        - lxc
+        - lxd
+        - incus
+        - nomad
+        - ecs
+        - systemd-nspawn
+        - nspawn
+        - cgroups
+        - linux containers
       most_popular: true
     overview: &overview
       data_collection: &data_collection
-        metrics_description: "Monitor Containers for performance, resource usage, and health status."
+        metrics_description: "Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
         method_description: ""
       supported_platforms:
         include: []
@@ -422,12 +434,29 @@ modules:
         - kubernetes
         - pods
         - containers
+        - openshift
+        - rancher
+        - rke
+        - rke2
+        - k3s
+        - microk8s
+        - eks
+        - gke
+        - aks
+        - tanzu
+        - minikube
+        - kind
+        - containerd
+        - cri-o
+        - kubelet
+        - kubepods
+      most_popular: true
     overview:
       <<: *overview
       data-collection:
         <<: *data_collection
-        metrics_description: Monitor Kubernetes Clusters for performance, resource usage, and health status.
-    alerts:
+        metrics_description: Monitor Kubernetes pod and container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups.
+    alerts: &k8s_alerts
       - name: k8s_cgroup_10min_cpu_usage
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf
         metric: k8s.cgroup.cpu_limit
@@ -446,7 +475,7 @@ modules:
         info:
           ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over
           the last minute
-    metrics:
+    metrics: &k8s_metrics
       folding:
         title: Metrics
         enabled: false
@@ -814,14 +843,18 @@ modules:
         icon_filename: systemd.svg
         categories:
           - data-collection.systemd
-        keywords:
-          - systemd
-          - services
+      keywords:
+        - systemd
+        - services
+        - units
+        - daemons
+        - systemctl
+        - cgroups
     overview:
       <<: *overview
       data-collection:
         <<: *data_collection
-        metrics_desctiption: "Monitor Systemd Services for performance, resource usage, and health status."
+        metrics_description: "Monitor Systemd service resource utilization — CPU, memory, and disk I/O — via Linux cgroups."
     alerts: []
     metrics:
       folding:
@@ -945,13 +978,23 @@ modules:
           - data-collection.containers-and-vms
       keywords:
         - vms
+        - virtual machines
         - virtualization
-        - container
+        - hypervisor
+        - kvm
+        - qemu
+        - libvirt
+        - proxmox
+        - proxmox ve
+        - ovirt
+        - openstack
+        - openstack nova
+        - cgroups
     overview:
       <<: *overview
       data_collection:
         <<: *data_collection
-        metrics_description: "Monitor Virtual Machines for performance, resource usage, and health status."
+        metrics_description: "Monitor virtual machine resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
   - <<: *module
     meta:
       <<: *meta
@@ -964,60 +1007,255 @@ modules:
       keywords:
         - lxc
         - lxd
+        - incus
+        - linux containers
+        - system containers
         - container
     overview:
       <<: *overview
       data_collection:
         <<: *data_collection
-        metrics_description: "Monitor LXC Containers for performance, resource usage, and health status."
+        metrics_description: "Monitor LXC/LXD/Incus container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
   - <<: *module
     meta:
       <<: *meta
       monitored_instance:
-        name: Libvirt Containers
+        name: Libvirt VMs and Containers
         link: ""
         icon_filename: libvirt.png
         categories:
           - data-collection.containers-and-vms
       keywords:
         - libvirt
+        - kvm
+        - qemu
+        - virsh
+        - virt-manager
+        - virtual machine
+        - vm
         - container
     overview:
       <<: *overview
       data_collection:
         <<: *data_collection
-        metrics_description: "Monitor Libvirt for performance, resource usage, and health status."
+        metrics_description: "Monitor libvirt-managed VM and container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
   - <<: *module
     meta:
       <<: *meta
       monitored_instance:
-        name: oVirt Containers
+        name: oVirt VMs
         link: ""
         icon_filename: ovirt.svg
         categories:
           - data-collection.containers-and-vms
       keywords:
         - ovirt
-        - container
+        - rhev
+        - red hat virtualization
+        - red hat enterprise virtualization
+        - kvm
+        - qemu
+        - libvirt
+        - virtual machine
+        - vm
     overview:
       <<: *overview
       data_collection:
         <<: *data_collection
-        metrics_description: "Monitor oVirt for performance, resource usage, and health status."
+        metrics_description: "Monitor oVirt/RHEV virtual machine resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
   - <<: *module
     meta:
       <<: *meta
       monitored_instance:
-        name: Proxmox Containers
+        name: Proxmox VMs and Containers
         link: ""
         icon_filename: proxmox.png
         categories:
           - data-collection.containers-and-vms
       keywords:
         - proxmox
+        - proxmox ve
+        - pve
+        - kvm
+        - qemu
+        - lxc
+        - libvirt
+        - virtual machine
+        - vm
         - container
     overview:
       <<: *overview
       data_collection:
         <<: *data_collection
-        metrics_description: "Monitor Proxmox for performance, resource usage, and health status."
+        metrics_description: "Monitor Proxmox VE virtual machine and container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: Docker Containers
+        link: https://www.docker.com/
+        icon_filename: docker.svg
+        categories:
+          - data-collection.containers-and-vms
+      keywords:
+        - docker
+        - containers
+        - docker compose
+        - docker swarm
+        - moby
+        - containerd
+        - runc
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: "Monitor Docker container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: Podman Containers
+        link: https://podman.io/
+        icon_filename: podman.svg
+        categories:
+          - data-collection.containers-and-vms
+      keywords:
+        - podman
+        - containers
+        - pods
+        - oci
+        - crun
+        - runc
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: "Monitor Podman container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: AWS ECS Containers
+        link: https://aws.amazon.com/ecs/
+        icon_filename: aws.svg
+        categories:
+          - data-collection.containers-and-vms
+      keywords:
+        - aws
+        - ecs
+        - elastic container service
+        - amazon
+        - containers
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: "Monitor AWS ECS container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: Nomad Containers
+        link: https://www.nomadproject.io/
+        icon_filename: nomad.svg
+        categories:
+          - data-collection.containers-and-vms
+      keywords:
+        - nomad
+        - hashicorp
+        - containers
+        - orchestrator
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: "Monitor HashiCorp Nomad container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: containerd Containers
+        link: https://containerd.io/
+        icon_filename: containerd.svg
+        categories:
+          - data-collection.containers-and-vms
+      keywords:
+        - containerd
+        - containers
+        - cri
+        - container runtime
+        - nerdctl
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: "Monitor containerd container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: systemd-nspawn Containers
+        link: https://www.freedesktop.org/software/systemd/man/systemd-nspawn.html
+        icon_filename: systemd.svg
+        categories:
+          - data-collection.containers-and-vms
+      keywords:
+        - systemd-nspawn
+        - nspawn
+        - machinectl
+        - systemd
+        - containers
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: "Monitor systemd-nspawn container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: OpenShift Containers
+        link: https://www.redhat.com/en/technologies/cloud-computing/openshift
+        icon_filename: openshift.svg
+        categories:
+          - data-collection.containers-and-vms
+          - data-collection.kubernetes
+      keywords:
+        - openshift
+        - red hat openshift
+        - okd
+        - kubernetes
+        - k8s
+        - containers
+        - pods
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: "Monitor Red Hat OpenShift container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
+    alerts: *k8s_alerts
+    metrics: *k8s_metrics
+  - <<: *module
+    meta:
+      <<: *meta
+      monitored_instance:
+        name: OpenStack VMs
+        link: https://www.openstack.org/
+        icon_filename: openstack.svg
+        categories:
+          - data-collection.containers-and-vms
+      keywords:
+        - openstack
+        - openstack nova
+        - openstack compute
+        - kvm
+        - qemu
+        - libvirt
+        - virtual machine
+        - vm
+        - cloud
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: "Monitor OpenStack Nova virtual machine resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
