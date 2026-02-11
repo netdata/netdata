@@ -22,7 +22,11 @@ impl<T: NetdataChart + Default + PartialEq + Clone> TrackedChart<T> {
     }
 
     /// Create a new tracked chart with explicit metadata (used for instantiated templates)
-    pub(crate) fn new_with_metadata(initial: T, interval: Duration, metadata: ChartMetadata) -> Self {
+    pub(crate) fn new_with_metadata(
+        initial: T,
+        interval: Duration,
+        metadata: ChartMetadata,
+    ) -> Self {
         Self {
             previous: initial.clone(),
             current: initial,
@@ -116,15 +120,24 @@ mod tests {
 
     #[test]
     fn test_change_detection() {
-        let initial = TestMetrics { value1: 10, value2: 20 };
+        let initial = TestMetrics {
+            value1: 10,
+            value2: 20,
+        };
         let mut tracker = TrackedChart::new(initial.clone(), Duration::from_secs(1));
 
         assert!(!tracker.has_changed());
 
-        tracker.update(TestMetrics { value1: 15, value2: 20 });
+        tracker.update(TestMetrics {
+            value1: 15,
+            value2: 20,
+        });
         assert!(tracker.has_changed());
 
-        tracker.update(TestMetrics { value1: 15, value2: 20 });
+        tracker.update(TestMetrics {
+            value1: 15,
+            value2: 20,
+        });
         assert!(!tracker.has_changed());
     }
 

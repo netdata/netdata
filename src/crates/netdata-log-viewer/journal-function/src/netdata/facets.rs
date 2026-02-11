@@ -3,11 +3,11 @@
 //! This module converts histogram responses into facet structures for the
 //! Netdata dashboard filtering UI.
 
-use journal_engine::Histogram;
 use super::transformations::TransformationRegistry;
 use super::ui_types::{Facet, FacetOption};
-use journal_index::FieldValuePair;
 use journal_core::collections::HashMap;
+use journal_engine::Histogram;
+use journal_index::FieldValuePair;
 
 /// Creates a list of facets from a Histogram.
 ///

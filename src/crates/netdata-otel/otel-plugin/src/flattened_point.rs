@@ -101,7 +101,10 @@ impl FlattenedPoint {
                     Some(JsonValue::Number(n)) => n.to_string(),
                     Some(JsonValue::Bool(b)) => b.to_string(),
                     Some(value) => {
-                        eprintln!("Only strings/number/bool values can be used for dimension name >>>{:#?}<<<", value);
+                        eprintln!(
+                            "Only strings/number/bool values can be used for dimension name >>>{:#?}<<<",
+                            value
+                        );
                         return None;
                     }
                     _ => {

@@ -825,8 +825,7 @@ where
             .expect("outbound_rx consumed only once");
 
         let writer_task = tokio::spawn(async move {
-            let mut keepalive =
-                tokio::time::interval(tokio::time::Duration::from_secs(60));
+            let mut keepalive = tokio::time::interval(tokio::time::Duration::from_secs(60));
 
             loop {
                 tokio::select! {

@@ -282,7 +282,11 @@ impl NetdataChart {
     }
 
     fn emit_set(&self, buffer: &mut ChartOutputBuffer, dimension_name: &str, value: f64) {
-        buffer.push_str(&format!("SET {} {}\n", dimension_name, value * self.divisor as f64));
+        buffer.push_str(&format!(
+            "SET {} {}\n",
+            dimension_name,
+            value * self.divisor as f64
+        ));
     }
 
     fn emit_end(&self, buffer: &mut ChartOutputBuffer) {

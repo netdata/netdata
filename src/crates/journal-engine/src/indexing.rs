@@ -9,11 +9,11 @@ use crate::{
     error::{EngineError, Result},
     query_time_range::QueryTimeRange,
 };
-use tokio_util::sync::CancellationToken;
 use journal_index::{FileIndex, FileIndexer, IndexingLimits};
 use journal_registry::Registry;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
+use tokio_util::sync::CancellationToken;
 use tracing::{error, trace};
 
 // ============================================================================

@@ -1,7 +1,7 @@
 //! Query time range with automatic alignment for histogram bucketing
 
-use crate::histogram::calculate_bucket_duration;
 use crate::EngineError;
+use crate::histogram::calculate_bucket_duration;
 use journal_index::Seconds;
 
 /// A time range for querying journal entries with automatic alignment.
@@ -55,10 +55,7 @@ impl QueryTimeRange {
     /// ```
     pub fn new(start: u32, end: u32) -> Result<Self, EngineError> {
         if start >= end {
-            return Err(EngineError::InvalidTimeRange {
-                start,
-                end,
-            });
+            return Err(EngineError::InvalidTimeRange { start, end });
         }
 
         let duration = end - start;
@@ -181,7 +178,10 @@ mod tests {
         assert_eq!(range.requested_end(), 500);
         assert_eq!(range.requested_duration(), 400);
         assert!(range.bucket_duration() > 0);
-        assert_eq!(range.aligned_duration(), range.aligned_end() - range.aligned_start());
+        assert_eq!(
+            range.aligned_duration(),
+            range.aligned_end() - range.aligned_start()
+        );
     }
 
     #[test]

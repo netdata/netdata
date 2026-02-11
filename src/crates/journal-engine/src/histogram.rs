@@ -198,7 +198,7 @@ impl HistogramEngine {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             responses: RwLock::new(LruCache::new(
-                NonZeroUsize::new(capacity).expect("capacity must be non-zero")
+                NonZeroUsize::new(capacity).expect("capacity must be non-zero"),
             )),
         }
     }
@@ -288,8 +288,7 @@ impl HistogramEngine {
                     };
 
                     // Count total entries in this file for this bucket's time range
-                    let all_entries =
-                        Bitmap::insert_range(0..file_index.total_entries() as u32);
+                    let all_entries = Bitmap::insert_range(0..file_index.total_entries() as u32);
                     let unfiltered_total = file_index
                         .count_entries_in_time_range(
                             &all_entries,
@@ -358,7 +357,11 @@ impl HistogramEngine {
             // Cache only the responses that are safe to cache (no online file contributions)
             let mut responses_guard = self.responses.write();
             for (bucket_request, response) in &new_responses {
-                if bucket_cacheable.get(bucket_request).copied().unwrap_or(false) {
+                if bucket_cacheable
+                    .get(bucket_request)
+                    .copied()
+                    .unwrap_or(false)
+                {
                     responses_guard.put(bucket_request.clone(), response.clone());
                 }
             }

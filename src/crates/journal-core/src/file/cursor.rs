@@ -1,7 +1,7 @@
-use crate::file::{file::JournalFile, filter::FilterExpr, offset_array, offset_array::Direction};
-use crate::error::{JournalError, Result};
-use std::num::NonZeroU64;
 use super::mmap::MemoryMap;
+use crate::error::{JournalError, Result};
+use crate::file::{file::JournalFile, filter::FilterExpr, offset_array, offset_array::Direction};
+use std::num::NonZeroU64;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Location {
