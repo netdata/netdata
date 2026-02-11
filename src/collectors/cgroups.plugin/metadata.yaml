@@ -36,7 +36,8 @@ modules:
         metrics_description: "Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
         method_description: ""
       supported_platforms:
-        include: []
+        include:
+          - Linux
         exclude: []
       multi_instance: true
       additional_permissions:
