@@ -25,7 +25,7 @@ By default, badges can be accessed from any source. To restrict access:
 
 1. Edit `netdata.conf`:
 
-```ini
+```
 [web]
     allow badges from = 10.* 192.168.* YOUR_IP
 ```
@@ -108,11 +108,7 @@ Display available memory in GB with one decimal place:
 ![Memory](http://localhost:19999/api/v1/badge.svg?chart=mem.available&label=RAM&precision=1)
 ```
 
-**Note:** The `mem.available` chart shows total available memory when no dimension is specified. To display specific memory components, check if your Netdata configuration provides dimensions like `free` or `used`:
-
-```markdown
-![Memory Free](http://localhost:19999/api/v1/badge.svg?chart=mem.available&dimension=free&label=RAM+Free&precision=1)
-```
+**Note:** The `mem.available` chart shows total available memory and does not have dimensions. To display specific memory components like `free` or `used`, use the `system.ram` chart:
 
 ### Aggregated Values
 
@@ -250,17 +246,17 @@ The `options` parameter accepts pipe-delimited values:
 
 When using the `alarm` parameter, badges display the alert status along with the current metric value. The badge color reflects the alert state:
 
-- **CLEAR** - Green badge, alert is not triggered
+- **CLEAR** - Bright green badge, alert is not triggered
 - **WARNING** - Orange badge, warning threshold exceeded
 - **CRITICAL** - Red badge, critical threshold exceeded
 - **UNDEFINED** - Grey badge, alert cannot be evaluated
 - **UNINITIALIZED** - Black badge, alert has not been initialized
 - **REMOVED** - Grey badge, alert has been removed (shutdown, disconnect)
 
-Example:
+Example (replace `YOUR_ALARM_NAME` with your actual alarm name):
 
 ```markdown
-![CPU Alert](http://localhost:19999/api/v1/badge.svg?chart=system.cpu&alarm=system.cpu.10min_cpu_usage&label=CPU+Alert)
+![CPU Alert](http://localhost:19999/api/v1/badge.svg?chart=system.cpu&alarm=YOUR_ALARM_NAME&label=CPU+Alert)
 ```
 
 ## Refresh Behavior
