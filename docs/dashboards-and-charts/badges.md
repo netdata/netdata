@@ -426,6 +426,24 @@ Netdata can generate approximately **2,000 badges per second per CPU core**, wit
 
 For badges calculating aggregates over long durations (days or more), response times will increase. Check `access.log` for timing information. Consider caching such badges or using a cron job to periodically save them.
 
+## Auto-Refresh
+
+For pages that support HTTP refresh headers, use `refresh=auto` or `refresh=SECONDS`:
+
+```markdown
+![CPU](http://YOUR_NETDATA:19999/api/v1/badge.svg?chart=system.cpu&refresh=auto)
+```
+
+For `embed` or `iframe` elements that don't support HTTP refresh headers, use JavaScript:
+
+```html
+<embed
+  src="http://YOUR_NETDATA:19999/api/v1/badge.svg?chart=system.cpu&refresh=auto"
+  type="image/svg+xml"
+  height="20"
+/>
+```
+
 ## Auto-Refresh with JavaScript
 
 For pages without HTTP refresh header support, use JavaScript to auto-refresh badges:
@@ -453,6 +471,20 @@ Alternatively, include the Netdata refresh script:
 ```html
 <script src="http://YOUR_NETDATA:19999/refresh-badges.js"></script>
 ```
+
+## Character Escaping
+
+When embedding badges in HTML, special characters must be URL-encoded:
+
+| Character |           Name           | Escape Sequence |
+| :-------: | :----------------------: | :-------------: |
+|  (space)  | Space (in labels/units)  |      `%20`      |
+|    `#`    |    Hash (for colors)     |      `%23`      |
+|    `%`    |    Percent (in units)    |      `%25`      |
+|    `<`    |        Less than         |      `%3C`      |
+|    `>`    |       Greater than       |      `%3E`      |
+|    `\`    |   Backslash (for `/`)    |      `%5C`      |
+|   `\|`    | Pipe (delimiting params) |      `%7C`      |
 
 ## GitHub Limitations
 
