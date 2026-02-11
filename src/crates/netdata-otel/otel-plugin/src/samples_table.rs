@@ -1,10 +1,203 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::num::NonZeroU64;
+use tracing::debug;
 
-#[derive(Default, Clone, Copy, PartialEq, Debug)]
-pub struct SamplePoint {
-    unix_time: u64,
-    pub value: f64,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SlotState {
+    Accepting,
+    Finalized,
+}
+
+#[derive(Debug, Clone)]
+pub struct TimeSlot {
+    pub slot_start_nano: u64,
+    pub value: Option<f64>,
+    pub last_update_nano: u64,
+    pub state: SlotState,
+}
+
+impl TimeSlot {
+    pub fn new(slot_start_nano: u64) -> Self {
+        Self {
+            slot_start_nano,
+            value: None,
+            last_update_nano: 0,
+            state: SlotState::Accepting,
+        }
+    }
+
+    pub fn insert(&mut self, unix_time_nano: u64, value: f64, aggregation_type: AggregationType) {
+        match aggregation_type {
+            AggregationType::LastValue => {
+                if unix_time_nano >= self.last_update_nano {
+                    self.value = Some(value);
+                    self.last_update_nano = unix_time_nano;
+                }
+            }
+            AggregationType::Sum => {
+                self.value = Some(self.value.unwrap_or(0.0) + value);
+                self.last_update_nano = self.last_update_nano.max(unix_time_nano);
+            }
+        }
+    }
+
+    /// Returns the aggregated value stored in this time slot.
+    ///
+    /// The `aggregation_type` parameter is currently unused because aggregation
+    /// is applied at insertion time in [`TimeSlot::insert`], and this method
+    /// simply exposes the already-aggregated value. The parameter is kept to
+    /// preserve API consistency and allow for future aggregation strategies
+    /// that might affect retrieval.
+    pub fn aggregate(&self, _aggregation_type: AggregationType) -> Option<f64> {
+        self.value
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum AggregationType {
+    LastValue, // For gauges and cumulative counters
+    Sum,       // For delta counters
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum GapFillStrategy {
+    RepeatLastValue,
+    FillWithZero,
+}
+
+#[derive(Debug, Clone)]
+pub struct DimensionBuffer {
+    pub dimension_name: String,
+    pub slots: VecDeque<TimeSlot>,
+    pub last_value: Option<f64>,
+    pub last_seen_nano: u64,
+}
+
+impl DimensionBuffer {
+    pub fn new(dimension_name: String) -> Self {
+        Self {
+            dimension_name,
+            slots: VecDeque::new(),
+            last_value: None,
+            last_seen_nano: 0,
+        }
+    }
+
+    fn get_or_create_slot(&mut self, slot_start_nano: u64) -> &mut TimeSlot {
+        // Insert in order, or find existing slot
+        let insert_pos = self.slots.binary_search_by_key(&slot_start_nano, |s| s.slot_start_nano)
+            .unwrap_or_else(|e| {
+                let new_slot = TimeSlot::new(slot_start_nano);
+                self.slots.insert(e, new_slot);
+                e
+            });
+        
+        &mut self.slots[insert_pos]
+    }
+
+    pub fn insert(&mut self, unix_time_nano: u64, value: f64, interval_nano: u64, aggregation_type: AggregationType) -> Result<(), &'static str> {
+        if interval_nano == 0 {
+            return Err("Collection interval cannot be zero");
+        }
+        let slot_start_nano = (unix_time_nano / interval_nano) * interval_nano;
+        
+        // Reject if trying to insert into a finalized slot (no backfill)
+        if let Some(first_slot) = self.slots.front() {
+            if first_slot.state == SlotState::Finalized && slot_start_nano <= first_slot.slot_start_nano {
+                return Err("Data arrived after slot was finalized");
+            }
+        }
+        
+        let slot = self.get_or_create_slot(slot_start_nano);
+        if slot.state == SlotState::Finalized {
+            return Err("Data arrived after slot was finalized");
+        }
+
+        slot.insert(unix_time_nano, value, aggregation_type);
+        self.last_seen_nano = self.last_seen_nano.max(unix_time_nano);
+        Ok(())
+    }
+
+    pub fn finalize_slots(&mut self, current_time_nano: u64, grace_period_nano: u64, interval_nano: u64) {
+        for slot in self.slots.iter_mut() {
+            if slot.state == SlotState::Accepting {
+                // If current time is past the slot end + grace period
+                if current_time_nano > slot.slot_start_nano + interval_nano + grace_period_nano {
+                    slot.state = SlotState::Finalized;
+                }
+            }
+        }
+    }
+
+    pub fn pop_finalized_slot(&mut self) -> Option<TimeSlot> {
+        if let Some(slot) = self.slots.front() {
+            if slot.state == SlotState::Finalized {
+                return self.slots.pop_front();
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct SamplesTable {
+    dimensions: HashMap<String, DimensionBuffer>,
+}
+
+impl SamplesTable {
+    pub fn insert(&mut self, dimension: &str, unix_time_nano: u64, value: f64, interval_nano: u64, aggregation_type: AggregationType) -> bool {
+        let mut is_new_dimension = false;
+        let db = self.dimensions.entry(dimension.to_string()).or_insert_with(|| {
+            is_new_dimension = true;
+            DimensionBuffer::new(dimension.to_string())
+        });
+
+        // For late data, we log it at debug level
+        if let Err(e) = db.insert(unix_time_nano, value, interval_nano, aggregation_type) {
+            debug!(dimension = dimension, error = e, "OTLP metric data dropped");
+        }
+        
+        is_new_dimension
+    }
+
+    pub fn finalize_slots(&mut self, current_time_nano: u64, grace_period_nano: u64, interval_nano: u64) {
+        for db in self.dimensions.values_mut() {
+            db.finalize_slots(current_time_nano, grace_period_nano, interval_nano);
+        }
+    }
+
+    pub fn archive_stale_dimensions(&mut self, current_time_nano: u64, timeout_nano: u64) {
+        self.dimensions.retain(|_, db| {
+            current_time_nano <= db.last_seen_nano + timeout_nano
+        });
+    }
+
+    pub fn iter_dimensions(&self) -> impl Iterator<Item = &String> {
+        self.dimensions.keys()
+    }
+
+    pub fn get_buffer_mut(&mut self, dimension: &str) -> Option<&mut DimensionBuffer> {
+        self.dimensions.get_mut(dimension)
+    }
+
+    pub fn scaling_factors(&self) -> (i32, i32) {
+        let mut has_nonzero = false;
+
+        for db in self.dimensions.values() {
+            for slot in &db.slots {
+                if let Some(value) = slot.value {
+                    if !(-100.0..=100.0).contains(&value) {
+                        return (1, 1);
+                    }
+                    if value != 0.0 {
+                        has_nonzero = true;
+                    }
+                }
+            }
+        }
+
+        if has_nonzero { (1, 1000) } else { (1, 1) }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -14,24 +207,6 @@ pub struct CollectionInterval {
 }
 
 impl CollectionInterval {
-    fn from_samples(sample_points: &[SamplePoint]) -> Option<Self> {
-        if sample_points.len() < 2 {
-            return None;
-        }
-
-        let collection_time = sample_points[0].unix_time;
-        let mut update_every = u64::MAX;
-
-        for w in sample_points.windows(2) {
-            update_every = update_every.min(w[1].unix_time - w[0].unix_time);
-        }
-
-        NonZeroU64::new(update_every).map(|update_every| Self {
-            end_time: collection_time,
-            update_every,
-        })
-    }
-
     pub fn next_interval(&self) -> Self {
         Self {
             end_time: self.end_time + self.update_every.get(),
@@ -41,22 +216,6 @@ impl CollectionInterval {
 
     pub fn collection_time(&self) -> u64 {
         self.end_time + self.update_every.get()
-    }
-
-    fn is_stale(&self, sp: &SamplePoint) -> bool {
-        sp.unix_time < self.end_time
-    }
-
-    pub fn is_on_time(&self, sp: &SamplePoint) -> bool {
-        let window = self.update_every.get() / 4;
-        let window_start = self.end_time + self.update_every.get() - window;
-        let window_end = self.end_time + self.update_every.get() + window;
-
-        sp.unix_time >= window_start && sp.unix_time <= window_end
-    }
-
-    pub fn is_in_gap(&self, sp: &SamplePoint) -> bool {
-        !self.is_stale(sp) && !self.is_on_time(sp)
     }
 
     pub fn aligned_interval(&self) -> Option<Self> {
@@ -69,7 +228,7 @@ impl CollectionInterval {
         Self::from_secs(end_time, update_every)
     }
 
-    fn from_secs(end_time: u64, update_every: u64) -> Option<Self> {
+    pub fn from_secs(end_time: u64, update_every: u64) -> Option<Self> {
         let end_time = std::time::Duration::from_secs(end_time).as_nanos() as u64;
         let update_every = std::time::Duration::from_secs(update_every).as_nanos() as u64;
 
@@ -80,137 +239,85 @@ impl CollectionInterval {
     }
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct SamplesBuffer(Vec<SamplePoint>);
 
-impl SamplesBuffer {
-    pub fn push(&mut self, sp: SamplePoint) {
-        match self.0.binary_search_by_key(&sp.unix_time, |p| p.unix_time) {
-            Ok(idx) => self.0[idx] = sp,
-            Err(idx) => self.0.insert(idx, sp),
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_slot_creation_and_aggregation() {
+        let mut db = DimensionBuffer::new("test".to_string());
+        let interval = 10_000_000_000; // 10s
+        
+        // Point at 5s (Slot 0)
+        db.insert(5_000_000_000, 10.0, interval, AggregationType::Sum).unwrap();
+        // Point at 6s (Slot 0)
+        db.insert(6_000_000_000, 20.0, interval, AggregationType::Sum).unwrap();
+        
+        assert_eq!(db.slots.len(), 1);
+        assert_eq!(db.slots[0].value, Some(30.0));
+        assert_eq!(db.slots[0].slot_start_nano, 0);
+
+        // Point at 15s (Slot 10)
+        db.insert(15_000_000_000, 5.0, interval, AggregationType::Sum).unwrap();
+        assert_eq!(db.slots.len(), 2);
+        assert_eq!(db.slots[1].slot_start_nano, 10_000_000_000);
+        assert_eq!(db.slots[1].value, Some(5.0));
     }
 
-    pub fn pop(&mut self) -> Option<SamplePoint> {
-        if self.0.is_empty() {
-            None
-        } else {
-            Some(self.0.remove(0))
-        }
+    #[test]
+    fn test_last_value_out_of_order() {
+        let mut db = DimensionBuffer::new("test".to_string());
+        let interval = 10_000_000_000;
+        
+        // Point at 6s
+        db.insert(6_000_000_000, 20.0, interval, AggregationType::LastValue).unwrap();
+        // Point at 5s (arrived late, but within same slot)
+        db.insert(5_000_000_000, 10.0, interval, AggregationType::LastValue).unwrap();
+        
+        // Should keep 20.0 because 6s > 5s
+        assert_eq!(db.slots[0].value, Some(20.0));
+
+        // Point at 7s
+        db.insert(7_000_000_000, 30.0, interval, AggregationType::LastValue).unwrap();
+        assert_eq!(db.slots[0].value, Some(30.0));
     }
 
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
+    #[test]
+    fn test_slot_finalization() {
+        let mut db = DimensionBuffer::new("test".to_string());
+        let interval = 10_000_000_000;
+        let grace = 5_000_000_000;
+        
+        db.insert(5_000_000_000, 10.0, interval, AggregationType::Sum).unwrap();
+        
+        // At 14s, slot is still accepting (10s interval + 5s grace = 15s threshold)
+        db.finalize_slots(14_000_000_000, grace, interval);
+        assert_eq!(db.slots[0].state, SlotState::Accepting);
+        
+        // At 16s, pulse slot is finalized
+        db.finalize_slots(16_000_000_000, grace, interval);
+        assert_eq!(db.slots[0].state, SlotState::Finalized);
+        
+        // New data for finalized slot should be rejected
+        let res = db.insert(7_000_000_000, 20.0, interval, AggregationType::Sum);
+        assert!(res.is_err());
     }
 
-    pub fn first(&self) -> Option<&SamplePoint> {
-        self.0.first()
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn drop_stale_samples(&mut self, ci: &CollectionInterval) -> usize {
-        let split_idx = self
-            .0
-            .iter()
-            .position(|sp| !ci.is_stale(sp))
-            .unwrap_or(self.0.len());
-
-        self.0.drain(..split_idx);
-
-        split_idx
-    }
-
-    pub fn collection_interval(&self) -> Option<CollectionInterval> {
-        CollectionInterval::from_samples(&self.0)
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct SamplesTable {
-    dimensions: HashMap<String, SamplesBuffer>,
-}
-
-impl SamplesTable {
-    pub fn insert(&mut self, dimension: &str, unix_time: u64, value: f64) -> bool {
-        let sp = SamplePoint { unix_time, value };
-
-        // returns true if this we added a new dimension
-        if let Some(sb) = self.dimensions.get_mut(dimension) {
-            sb.push(sp);
-            false
-        } else {
-            let mut sb = SamplesBuffer::default();
-            sb.push(sp);
-            self.dimensions.insert(dimension.to_string(), sb);
-            true
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.dimensions.values().all(|sb| sb.is_empty())
-    }
-
-    pub fn total_samples(&self) -> usize {
-        self.dimensions
-            .values()
-            .map(|sb| sb.len())
-            .max()
-            .unwrap_or(0)
-    }
-
-    pub fn drop_stale_samples(&mut self, ci: &CollectionInterval) -> usize {
-        let mut dropped_samples = 0;
-
-        for sb in self.dimensions.values_mut() {
-            dropped_samples += sb.drop_stale_samples(ci);
-        }
-
-        dropped_samples
-    }
-
-    pub fn collection_interval(&self) -> Option<CollectionInterval> {
-        self.dimensions
-            .values()
-            .filter_map(|sb| sb.collection_interval())
-            .min_by_key(|ci| ci.collection_time())
-    }
-
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&String, &mut SamplesBuffer)> {
-        self.dimensions.iter_mut()
-    }
-
-    pub fn iter_dimensions(&self) -> impl Iterator<Item = &String> {
-        self.dimensions.keys()
-    }
-
-    pub fn iter_samples_buffers(&self) -> impl Iterator<Item = &SamplesBuffer> {
-        self.dimensions.values()
-    }
-
-    // returns multiplier/divisor
-    pub fn scaling_factors(&self) -> (i32, i32) {
-        let mut has_nonzero = false;
-
-        for buffer in self.dimensions.values() {
-            for sample in &buffer.0 {
-                let value = sample.value;
-
-                // Check if value is outside the -100 to 100 range
-                if !(-100.0..=100.0).contains(&value) {
-                    return (1, 1);
-                }
-
-                // Check for non-zero values
-                if value != 0.0 {
-                    has_nonzero = true;
-                }
-            }
-        }
-
-        // Return 1/1000 scaling if all values are in range and at least one is non-zero
-        if has_nonzero { (1, 1000) } else { (1, 1) }
+    #[test]
+    fn test_archive_stale_dimensions() {
+        let mut table = SamplesTable::default();
+        let interval = 10_000_000_000;
+        
+        table.insert("dim1", 5_000_000_000, 10.0, interval, AggregationType::Sum);
+        table.insert("dim2", 6_000_000_000, 20.0, interval, AggregationType::Sum);
+        
+        // At 100s, both are fresh (timeout 1000s)
+        table.archive_stale_dimensions(100_000_000_000, 1000_000_000_000);
+        assert_eq!(table.dimensions.len(), 2);
+        
+        // At 100s, with 10s timeout, both are stale
+        table.archive_stale_dimensions(100_000_000_000, 10_000_000_000);
+        assert_eq!(table.dimensions.len(), 0);
     }
 }
