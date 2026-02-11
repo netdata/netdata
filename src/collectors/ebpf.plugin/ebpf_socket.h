@@ -100,6 +100,11 @@ typedef enum ebpf_socket_idx {
 } ebpf_socket_index_t;
 
 #define NETDATA_SOCKET_KERNEL_FUNCTIONS "kernel"
+#define NETDATA_SOCKET_CHART_ORDER_BASE 21070
+#define NETDATA_SOCKET_CGROUP_ORDER_BASE 5300
+#define NETDATA_SOCKET_APPS_ORDER_BASE 20130
+#define NETDATA_SOCKET_SYSTEMD_ORDER_BASE 20080
+#define TCP_V6_CONNECT_TYPE 'T'
 #define NETDATA_CGROUP_NET_GROUP "network"
 
 // Global chart name
