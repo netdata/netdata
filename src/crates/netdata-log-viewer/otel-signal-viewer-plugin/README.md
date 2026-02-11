@@ -25,7 +25,7 @@ sudo ./edit-config otel-signal-viewer.yaml
 ### Journal
 
 The `journal` section specifies the directories containing journal files to
-watch and index. By default, it points to the the same directory the `otel`
+watch and index. By default, it points to the same directory the `otel`
 plugin uses to store OpenTelemetry logs. At least one path must be specified:
 
 ```yaml
