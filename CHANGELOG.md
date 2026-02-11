@@ -305,6 +305,11 @@
 - Update view-plan-and-billing.md ([#21728](https://github.com/netdata/netdata/issues/21728))
 - Fix handling of LZ4 dependency version. ([#21669](https://github.com/netdata/netdata/issues/21669))
 - Go.d/sd: enable dyncfg integration and update config format ([#21730](https://github.com/netdata/netdata/issues/21730))
+- Reinstate systemd-journal plugin. ([#21729](https://github.com/netdata/netdata/issues/21729))
+- Improve synchronization of dyncfg generated alert configurations to cloud ([#21706](https://github.com/netdata/netdata/issues/21706))
+- Format workspace with `cargo fmt` ([#21733](https://github.com/netdata/netdata/issues/21733))
+- Fix SIGSEGV in dbengine extent flush due to unacquired UUID reference ([#21667](https://github.com/netdata/netdata/issues/21667))
+- Remove redundant operations from event loops ([#21657](https://github.com/netdata/netdata/issues/21657))
 
 ## [2.8.0] - 2025-11-19
 
