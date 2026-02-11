@@ -4,7 +4,7 @@ Chat with your infrastructure using natural language through two distinct integr
 
 ## Integration Architecture
 
-### Method 1: Client-Controlled Communication (Available Now)
+### Method 1: Connect to a Local Agent or Parent
 
 ```mermaid
 flowchart TB
@@ -61,34 +61,36 @@ flowchart TB
 - No internet access required for Netdata Agent
 - Full control over data flow and privacy
 
-### Method 2: LLM-Direct Communication (Coming Soon)
+### Method 2: Connect to Netdata Cloud
 
 ```mermaid
 flowchart TB
     LLM("LLM Provider<br/>OpenAI, Anthropic, etc.")
-    CloudMCP("Netdata Cloud<br/>with MCP Server")
-    
+    CloudMCP("Netdata Cloud MCP<br/>app.netdata.cloud/api/v1/mcp")
+
     subgraph infra["Your Infrastructure"]
         direction TB
         subgraph userLayer[" "]
             direction LR
             User("User")
-            Client("AI Client")
-            
+            Client("AI Client<br/>Claude Desktop, Cursor, etc.")
+
             User -->|"(1) Ask question"| Client
-            Client -->|"(6) Display response"| User
+            Client -->|"(8) Display response"| User
         end
-        
+
         Agents("Netdata Agents<br/>and Parents")
     end
-    
+
     Client -->|"(2) Send query"| LLM
-    LLM -.->|"(3) Access tools"| CloudMCP
-    CloudMCP -.->|"(4) Return data"| LLM
-    LLM -->|"(5) Final answer"| Client
-    
-    Agents -.-> CloudMCP
-    
+    LLM -->|"(3) Tool commands"| Client
+    Client -->|"(4) Execute tools"| CloudMCP
+    CloudMCP -->|"(5) Return data"| Client
+    Client -->|"(6) Send results"| LLM
+    LLM -->|"(7) Final answer"| Client
+
+    Agents -.->|"Stream metrics"| CloudMCP
+
     %% Style definitions
     classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
     classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
@@ -106,23 +108,27 @@ flowchart TB
 **How it works:**
 
 1. You ask a question to your AI client
-2. LLM directly accesses Netdata Cloud MCP tools
-3. LLM provides the final answer with integrated data
+2. LLM responds with tool execution commands
+3. Your AI client executes tools against Netdata Cloud MCP (over the internet)
+4. Your AI client sends tool responses back to LLM
+5. LLM provides the final answer
 
 **Key characteristics:**
 
-- LLM provider manages MCP integration
-- Direct connection between LLM and MCP tools
-- Netdata Cloud MCP accessible via internet
-- Simplified setup, no local MCP configuration needed
+- Same client-controlled architecture as Method 1, but with a cloud-hosted MCP endpoint
+- No direct network access to Netdata Agents required
+- Complete visibility across all nodes in your infrastructure
+- Any MCP-aware client can connect
 
 ## Quick Comparison
 
-| Aspect | Method 1: Client-Controlled | Method 2: LLM-Direct |
+| Aspect | Method 1: Local Agent/Parent | Method 2: Netdata Cloud |
 |--------|---------------------------|---------------------|
-| **Availability** | ✅ Available now | 🚧 Coming soon |
-| **Setup Complexity** | Moderate (configure AI client + MCP) | Simple (just AI client) |
+| **Setup Complexity** | Moderate (configure AI client + local MCP) | Simple (configure AI client + cloud endpoint) |
 | **Data Privacy** | Depends on LLM provider | Depends on LLM provider |
 | **Internet Requirements** | AI client needs internet, MCP is local | Both AI client and MCP need internet |
-| **Supported AI Clients** | Any MCP-aware client (including those using LLM APIs) | Only clients from providers that support MCP on LLM side |
-| **Infrastructure Access** | Limited to one Parent's scope | Complete visibility across all infrastructure |
+| **Supported AI Clients** | Any MCP-aware client | Any MCP-aware client |
+| **Infrastructure Access** | Limited to one Agent or Parent's scope | Complete visibility across all infrastructure |
+| **Network Access** | Direct access to Netdata IP required | No firewall changes needed |
+
+To get started with Method 2, see [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp) for setup instructions.

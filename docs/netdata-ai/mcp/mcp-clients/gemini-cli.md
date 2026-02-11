@@ -39,7 +39,41 @@ npm run build
 
 Gemini CLI has built-in MCP server support. For detailed MCP configuration, see the [official MCP documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md).
 
-### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
+### Netdata Cloud MCP
+
+Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local setup, bridges, or firewall changes needed.
+
+**Prerequisites:** Netdata Cloud account with Business plan, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+
+```bash
+# Using CLI command
+gemini mcp add --transport http netdata-cloud https://app.netdata.cloud/api/v1/mcp \
+  --header "Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+```
+
+Or configure in `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "netdata-cloud": {
+      "url": "https://app.netdata.cloud/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+      },
+      "timeout": 30000
+    }
+  }
+}
+```
+
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your Netdata Cloud API token (must have `scope:mcp`). For more details, see [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+
+### Local Agent or Parent
+
+The following methods connect directly to a Netdata Agent or Parent on your network.
+
+#### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
 
 Connect directly to Netdata's HTTP endpoint without needing any bridge:
 
@@ -69,7 +103,7 @@ Or configure in `~/.gemini/settings.json`:
 }
 ```
 
-### Method 2: Direct SSE Connection (v2.7.2+)
+#### Method 2: Direct SSE Connection (v2.7.2+)
 
 Connect directly to Netdata's SSE endpoint:
 
@@ -95,7 +129,7 @@ Or configure in `~/.gemini/settings.json`:
 }
 ```
 
-### Method 3: Using nd-mcp Bridge (stdio)
+#### Method 3: Using nd-mcp Bridge (stdio)
 
 For environments where you prefer or need to use the bridge:
 
@@ -123,7 +157,7 @@ Or configure in `~/.gemini/settings.json`:
 }
 ```
 
-### Method 4: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
+#### Method 4: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
 
 If nd-mcp is not available, use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/netdata-ai/mcp/README.md#using-mcp-remote-client).
 

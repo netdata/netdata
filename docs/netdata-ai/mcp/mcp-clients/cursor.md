@@ -30,7 +30,35 @@ Cursor’s MCP client natively supports multiple transports (https://cursor.com/
 
 Cursor reads MCP definitions from `.cursor/mcp.json` in the workspace root. For user-wide defaults, open Cursor’s Settings and add the same structure to the global config path documented by Cursor (https://cursor.com/docs/context/mcp#configuration-locations).
 
-### Method 1: stdio Bridge (All Netdata versions)
+### Netdata Cloud MCP
+
+Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local setup, bridges, or firewall changes needed.
+
+**Prerequisites:** Netdata Cloud account with Business plan, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+
+Add to `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "netdata-cloud": {
+      "type": "streamable-http",
+      "url": "https://app.netdata.cloud/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+      }
+    }
+  }
+}
+```
+
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your Netdata Cloud API token (must have `scope:mcp`). Restart Cursor or run "Reload Window" for the new server to appear. For more details, see [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+
+### Local Agent or Parent
+
+The following methods connect directly to a Netdata Agent or Parent on your network.
+
+#### Method 1: stdio Bridge (All Netdata versions)
 
 ```json
 {
@@ -46,7 +74,7 @@ Cursor reads MCP definitions from `.cursor/mcp.json` in the workspace root. For 
 }
 ```
 
-### Method 2: Direct SSE (Netdata v2.7.2+)
+#### Method 2: Direct SSE (Netdata v2.7.2+)
 
 ```json
 {
@@ -62,7 +90,7 @@ Cursor reads MCP definitions from `.cursor/mcp.json` in the workspace root. For 
 }
 ```
 
-### Method 3: Streamable HTTP (Netdata v2.7.2+)
+#### Method 3: Streamable HTTP (Netdata v2.7.2+)
 
 ```json
 {

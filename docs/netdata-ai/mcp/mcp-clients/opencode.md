@@ -48,7 +48,35 @@ curl -fsSL https://opencode.ai/install.sh | bash
 
 OpenCode uses an `opencode.json` configuration file with MCP servers defined under the `mcp` key.
 
-### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
+### Netdata Cloud MCP
+
+Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local setup, bridges, or firewall changes needed.
+
+**Prerequisites:** Netdata Cloud account with Business plan, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+
+```json
+{
+  "mcp": {
+    "netdata-cloud": {
+      "type": "remote",
+      "url": "https://app.netdata.cloud/api/v1/mcp",
+      "oauth": false,
+      "headers": {
+        "Authorization": "Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+      },
+      "enabled": true
+    }
+  }
+}
+```
+
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your Netdata Cloud API token (must have `scope:mcp`). For more details, see [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+
+### Local Agent or Parent
+
+The following methods connect directly to a Netdata Agent or Parent on your network.
+
+#### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
 
 Connect directly to Netdata's HTTP endpoint without needing the nd-mcp bridge:
 
@@ -84,7 +112,7 @@ For HTTPS connections:
 }
 ```
 
-### Method 2: Using nd-mcp Bridge (Local)
+#### Method 2: Using nd-mcp Bridge (Local)
 
 For environments where you prefer or need to use the bridge:
 
@@ -100,7 +128,7 @@ For environments where you prefer or need to use the bridge:
 }
 ```
 
-### Method 3: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
+#### Method 3: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
 
 If nd-mcp is not available, use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/netdata-ai/mcp/README.md#using-mcp-remote-client).
 

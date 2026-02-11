@@ -42,7 +42,35 @@ brew install codex
 
 Codex CLI uses a TOML configuration file at `~/.codex/config.toml` for MCP server settings.
 
-### Method 1: Native Streamable HTTP (Recommended for v2.7.2+)
+### Netdata Cloud MCP
+
+Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local setup, bridges, or firewall changes needed.
+
+**Prerequisites:** Netdata Cloud account with Business plan, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+
+```toml
+# ~/.codex/config.toml
+
+[mcp_servers.netdata-cloud]
+url = "https://app.netdata.cloud/api/v1/mcp"
+bearer_token_env_var = "NETDATA_CLOUD_API_TOKEN"
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+```
+
+Set the environment variable before starting Codex CLI:
+
+```bash
+export NETDATA_CLOUD_API_TOKEN="your-netdata-cloud-api-token"
+```
+
+The token must have `scope:mcp`. For more details, see [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+
+### Local Agent or Parent
+
+The following methods connect directly to a Netdata Agent or Parent on your network.
+
+#### Method 1: Native Streamable HTTP (Recommended for v2.7.2+)
 
 Enable the RMCP client and point Codex directly at Netdata’s HTTP endpoint:
 
@@ -60,7 +88,7 @@ tool_timeout_sec = 120
 
 > `bearer_token` is sent as `Authorization: Bearer <token>`. Consider sourcing it from an environment variable to avoid plain-text secrets.
 
-### Method 2: Using `npx mcp-remote` (Works for HTTP or SSE)
+#### Method 2: Using `npx mcp-remote` (Works for HTTP or SSE)
 
 This launcher wraps Netdata’s remote transports in stdio for clients that cannot speak HTTP directly or when you prefer a consistent launcher across tools. For detailed options, see [Using MCP Remote Client](/docs/netdata-ai/mcp/README.md#using-mcp-remote-client).
 
@@ -96,7 +124,7 @@ args = [
 ]
 ```
 
-### Method 3: Using nd-mcp Bridge (WebSocket only)
+#### Method 3: Using nd-mcp Bridge (WebSocket only)
 
 For environments where nd-mcp is available and preferred:
 

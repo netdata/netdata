@@ -56,7 +56,36 @@ JetBrains AI Assistant currently communicates with MCP servers over `stdio` only
 MCP support in JetBrains IDEs may require additional plugins or configuration. Check the plugin documentation for the latest setup instructions.
 :::
 
-### Method 1: Using nd-mcp Bridge (All Netdata versions v2.6.0+)
+### Netdata Cloud MCP
+
+Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local Netdata setup or firewall changes needed.
+
+**Prerequisites:** Netdata Cloud account with Business plan, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+
+Since JetBrains AI Assistant only supports stdio, use `npx mcp-remote` as a bridge:
+
+**AI Assistant Settings:**
+
+```json
+{
+  "name": "netdata-cloud",
+  "command": "npx",
+  "args": [
+    "mcp-remote@latest",
+    "https://app.netdata.cloud/api/v1/mcp",
+    "--header",
+    "Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+  ]
+}
+```
+
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your Netdata Cloud API token (must have `scope:mcp`). For more details, see [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+
+### Local Agent or Parent
+
+The following methods connect directly to a Netdata Agent or Parent on your network.
+
+#### Method 1: Using nd-mcp Bridge (All Netdata versions v2.6.0+)
 
 **AI Assistant Settings:**
 
@@ -83,7 +112,7 @@ MCP support in JetBrains IDEs may require additional plugins or configuration. C
    - **Program**: `/usr/sbin/nd-mcp`
    - **Arguments**: `ws://YOUR_NETDATA_IP:19999/mcp`
 
-### Method 2: Using npx mcp-remote (Netdata v2.7.2+)
+#### Method 2: Using npx mcp-remote (Netdata v2.7.2+)
 
 For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/netdata-ai/mcp/README.md#using-mcp-remote-client). JetBrains still launches this command over stdio; `mcp-remote` converts the remote HTTP/SSE session into the format AI Assistant understands.
 

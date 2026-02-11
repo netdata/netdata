@@ -28,7 +28,47 @@ Claude Code has comprehensive MCP server management capabilities. For detailed d
 
 > **Reference:** Claude Code’s official guide documents HTTP, SSE, and stdio transports with both CLI and `.mcp.json` configurations (https://docs.claude.com/en/docs/claude-code/mcp).
 
-### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
+### Netdata Cloud MCP
+
+Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local setup, bridges, or firewall changes needed.
+
+**Prerequisites:** Netdata Cloud account with Business plan, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+
+```bash
+# Add for all your projects (user-scoped, personal)
+claude mcp add --transport http --scope user netdata-cloud \
+  https://app.netdata.cloud/api/v1/mcp \
+  --header "Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+
+# Or add for team sharing via version control (project-scoped)
+claude mcp add --transport http --scope project netdata-cloud \
+  https://app.netdata.cloud/api/v1/mcp \
+  --header "Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+```
+
+Or in `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "netdata-cloud": {
+      "type": "http",
+      "url": "https://app.netdata.cloud/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+      }
+    }
+  }
+}
+```
+
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your Netdata Cloud API token (must have `scope:mcp`). For more details, see [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+
+### Local Agent or Parent
+
+The following methods connect directly to a Netdata Agent or Parent on your network.
+
+#### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
 
 Connect directly to Netdata's HTTP endpoint without needing the nd-mcp bridge:
 
@@ -49,7 +89,7 @@ claude mcp add --transport http --scope project netdata \
   --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 ```
 
-### Method 2: Using nd-mcp Bridge (stdio)
+#### Method 2: Using nd-mcp Bridge (stdio)
 
 For environments where you prefer or need to use the bridge:
 
@@ -65,7 +105,7 @@ claude mcp add netdata /usr/sbin/nd-mcp \
   ws://YOUR_NETDATA_IP:19999/mcp
 ```
 
-### Method 3: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
+#### Method 3: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
 
 If nd-mcp is not available, you can use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/netdata-ai/mcp/README.md#using-mcp-remote-client).
 
@@ -83,7 +123,7 @@ claude mcp add --scope project netdata npx mcp-remote@latest \
   --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 ```
 
-### Verify Configuration
+#### Verify Configuration
 
 ```bash
 # List configured servers
