@@ -131,7 +131,7 @@ Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
 - Verify your API token has `scope:mcp`
 - Ensure the token is passed as `Authorization: Bearer <token>` (not as a query parameter)
 - Check that your Netdata Cloud subscription
-  includes a space in the Business/Homelab plan
+  includes a space in the Business plan
 
 #### No Nodes Visible
 
@@ -247,7 +247,7 @@ where nd-mcp.exe
 
 #### Option 2: Building nd-mcp for Your Desktop
 
-If you don't have Netdata installed loca you can build just the nd-mcp bridge. Netdata provides three implementations - choose the one that best fits your environment:
+If you don't have Netdata installed locally you can build just the nd-mcp bridge. Netdata provides three implementations - choose the one that best fits your environment:
 
 1. **Go bridge** (recommended) - [Go bridge source code](https://github.com/netdata/netdata/tree/master/src/web/mcp/bridges/stdio-golang)
    - Produces a single binary with no dependencies

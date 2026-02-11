@@ -108,10 +108,14 @@ flowchart TB
 **How it works:**
 
 1. You ask a question to your AI client
-2. LLM responds with tool execution commands
-3. Your AI client executes tools against Netdata Cloud MCP (over the internet)
-4. Your AI client sends tool responses back to LLM
-5. LLM provides the final answer
+2. Your AI client sends the query to the LLM
+3. LLM responds with tool execution commands
+4. Your AI client executes tools against
+   Netdata Cloud MCP (over the internet)
+5. Netdata Cloud MCP returns the data
+6. Your AI client sends tool responses back to LLM
+7. LLM provides the final answer
+8. Your AI client displays the response
 
 **Key characteristics:**
 
