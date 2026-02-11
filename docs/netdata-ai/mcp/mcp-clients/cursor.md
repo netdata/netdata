@@ -34,7 +34,7 @@ Cursor reads MCP definitions from `.cursor/mcp.json` in the workspace root. For 
 
 Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local setup, bridges, or firewall changes needed.
 
-**Prerequisites:** Netdata Cloud account with Business plan, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+**Prerequisites:** Netdata Cloud account with Business plan, nodes claimed to Netdata Cloud, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
 
 Add to `.cursor/mcp.json`:
 

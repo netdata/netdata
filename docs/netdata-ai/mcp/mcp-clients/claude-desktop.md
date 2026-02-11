@@ -50,7 +50,7 @@ Claude Desktop supports MCP servers through two methods: Custom Connectors for r
 
 Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local Netdata setup or firewall changes needed.
 
-**Prerequisites:** Netdata Cloud account with Business plan, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+**Prerequisites:** Netdata Cloud account with Business plan, nodes claimed to Netdata Cloud, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
 
 Edit `claude_desktop_config.json` (see Method 2 below for file location):
 

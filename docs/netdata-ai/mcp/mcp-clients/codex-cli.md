@@ -46,7 +46,7 @@ Codex CLI uses a TOML configuration file at `~/.codex/config.toml` for MCP serve
 
 Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local setup, bridges, or firewall changes needed.
 
-**Prerequisites:** Netdata Cloud account with Business plan, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+**Prerequisites:** Netdata Cloud account with Business plan, nodes claimed to Netdata Cloud, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
 
 ```toml
 # ~/.codex/config.toml

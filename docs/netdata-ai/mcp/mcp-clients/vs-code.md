@@ -46,7 +46,7 @@ VS Code extensions typically support stdio-based MCP servers:
 
 Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local setup, bridges, or firewall changes needed.
 
-**Prerequisites:** Netdata Cloud account with Business plan, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+**Prerequisites:** Netdata Cloud account with Business plan, nodes claimed to Netdata Cloud, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
 
 ### Continue Extension
 
@@ -67,16 +67,19 @@ mcpServers:
 
 ### Cline Extension
 
-Add to `cline_mcp_settings.json`:
+Cline only supports stdio and SSE transports. Since Netdata Cloud MCP uses Streamable HTTP, you need the `mcp-remote` bridge to convert stdio to HTTP:
 
 ```json
 {
   "mcpServers": {
     "netdata-cloud": {
-      "url": "https://app.netdata.cloud/api/v1/mcp",
-      "headers": {
-        "Authorization": "Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
-      },
+      "command": "npx",
+      "args": [
+        "mcp-remote@latest",
+        "https://app.netdata.cloud/api/v1/mcp",
+        "--header",
+        "Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+      ],
       "alwaysAllow": [],
       "disabled": false
     }
