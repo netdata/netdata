@@ -531,6 +531,19 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     uuid_copy(t.transaction_uuid, uuid);
 
     struct rrd_function_inflight *r = dictionary_set(rrd_functions_inflight_requests, transaction, &t, sizeof(t));
+    if(!r) {
+        // dictionary_set() returns NULL when the dictionary is destroyed (shutdown in progress)
+        code = rrd_call_function_error(result_wb, "Service is shutting down.", HTTP_RESP_SERVICE_UNAVAILABLE);
+
+        rrd_functions_inflight_cleanup(&t);
+        dictionary_acquired_item_release(host->functions, t.host_function_acquired);
+
+        if(result_cb)
+            result_cb(result_wb, code, result_cb_data);
+
+        return code;
+    }
+
     if(r->used) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "FUNCTIONS: duplicate transaction '%s', function: '%s'",
