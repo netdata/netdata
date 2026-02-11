@@ -245,7 +245,11 @@ fn test_boot_id_injection() {
         })
         .collect();
 
-    assert_eq!(journal_files.len(), 1, "Should have created exactly one journal file");
+    assert_eq!(
+        journal_files.len(),
+        1,
+        "Should have created exactly one journal file"
+    );
 
     let journal_path = journal_files[0].path();
     let boot_id = load_boot_id().unwrap();

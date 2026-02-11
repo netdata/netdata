@@ -78,21 +78,51 @@ mod tests {
 
     #[test]
     fn test_from_name() {
-        assert_eq!(DynCfgSourceType::from_name("internal"), Some(DynCfgSourceType::Internal));
-        assert_eq!(DynCfgSourceType::from_name("stock"), Some(DynCfgSourceType::Stock));
-        assert_eq!(DynCfgSourceType::from_name("user"), Some(DynCfgSourceType::User));
-        assert_eq!(DynCfgSourceType::from_name("dyncfg"), Some(DynCfgSourceType::Dyncfg));
-        assert_eq!(DynCfgSourceType::from_name("discovered"), Some(DynCfgSourceType::Discovered));
+        assert_eq!(
+            DynCfgSourceType::from_name("internal"),
+            Some(DynCfgSourceType::Internal)
+        );
+        assert_eq!(
+            DynCfgSourceType::from_name("stock"),
+            Some(DynCfgSourceType::Stock)
+        );
+        assert_eq!(
+            DynCfgSourceType::from_name("user"),
+            Some(DynCfgSourceType::User)
+        );
+        assert_eq!(
+            DynCfgSourceType::from_name("dyncfg"),
+            Some(DynCfgSourceType::Dyncfg)
+        );
+        assert_eq!(
+            DynCfgSourceType::from_name("discovered"),
+            Some(DynCfgSourceType::Discovered)
+        );
         assert_eq!(DynCfgSourceType::from_name("invalid"), None);
     }
 
     #[test]
     fn test_from_slice() {
-        assert_eq!(DynCfgSourceType::from_slice(b"internal"), Some(DynCfgSourceType::Internal));
-        assert_eq!(DynCfgSourceType::from_slice(b"  stock  "), Some(DynCfgSourceType::Stock));
-        assert_eq!(DynCfgSourceType::from_slice(b"user"), Some(DynCfgSourceType::User));
-        assert_eq!(DynCfgSourceType::from_slice(b"dyncfg"), Some(DynCfgSourceType::Dyncfg));
-        assert_eq!(DynCfgSourceType::from_slice(b"discovered"), Some(DynCfgSourceType::Discovered));
+        assert_eq!(
+            DynCfgSourceType::from_slice(b"internal"),
+            Some(DynCfgSourceType::Internal)
+        );
+        assert_eq!(
+            DynCfgSourceType::from_slice(b"  stock  "),
+            Some(DynCfgSourceType::Stock)
+        );
+        assert_eq!(
+            DynCfgSourceType::from_slice(b"user"),
+            Some(DynCfgSourceType::User)
+        );
+        assert_eq!(
+            DynCfgSourceType::from_slice(b"dyncfg"),
+            Some(DynCfgSourceType::Dyncfg)
+        );
+        assert_eq!(
+            DynCfgSourceType::from_slice(b"discovered"),
+            Some(DynCfgSourceType::Discovered)
+        );
         assert_eq!(DynCfgSourceType::from_slice(b"invalid"), None);
         assert_eq!(DynCfgSourceType::from_slice(&[0xFF, 0xFE]), None); // Invalid UTF-8
     }
@@ -108,11 +138,26 @@ mod tests {
 
     #[test]
     fn test_from_str() {
-        assert_eq!("internal".parse::<DynCfgSourceType>(), Ok(DynCfgSourceType::Internal));
-        assert_eq!("stock".parse::<DynCfgSourceType>(), Ok(DynCfgSourceType::Stock));
-        assert_eq!("user".parse::<DynCfgSourceType>(), Ok(DynCfgSourceType::User));
-        assert_eq!("dyncfg".parse::<DynCfgSourceType>(), Ok(DynCfgSourceType::Dyncfg));
-        assert_eq!("discovered".parse::<DynCfgSourceType>(), Ok(DynCfgSourceType::Discovered));
+        assert_eq!(
+            "internal".parse::<DynCfgSourceType>(),
+            Ok(DynCfgSourceType::Internal)
+        );
+        assert_eq!(
+            "stock".parse::<DynCfgSourceType>(),
+            Ok(DynCfgSourceType::Stock)
+        );
+        assert_eq!(
+            "user".parse::<DynCfgSourceType>(),
+            Ok(DynCfgSourceType::User)
+        );
+        assert_eq!(
+            "dyncfg".parse::<DynCfgSourceType>(),
+            Ok(DynCfgSourceType::Dyncfg)
+        );
+        assert_eq!(
+            "discovered".parse::<DynCfgSourceType>(),
+            Ok(DynCfgSourceType::Discovered)
+        );
         assert_eq!("invalid".parse::<DynCfgSourceType>(), Err(()));
     }
 

@@ -66,7 +66,8 @@ fn chart_from_histogram(
     field: &FieldName,
     transformations: &TransformationRegistry,
 ) -> Chart {
-    let (raw_values, result) = chart_result_from_histogram(histogram_response, field, transformations);
+    let (raw_values, result) =
+        chart_result_from_histogram(histogram_response, field, transformations);
     let view = chart_view_from_histogram(histogram_response, field, &raw_values, &result.labels);
 
     Chart { view, result }

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use flatten_otel::flatten_metrics_request;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
-    metrics_service_server::MetricsService, ExportMetricsServiceRequest,
-    ExportMetricsServiceResponse,
+    ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+    metrics_service_server::MetricsService,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
