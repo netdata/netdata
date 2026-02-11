@@ -26,7 +26,9 @@ Monitor containerd container resource utilization — CPU, memory, disk I/O, and
 
 
 
-This collector is supported on all platforms.
+This collector is only supported on the following platforms:
+
+- Linux
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
