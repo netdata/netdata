@@ -3,9 +3,13 @@
 Netdata provides [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers that enable AI assistants to interact with your infrastructure monitoring data. You can connect via:
 
 - **[Netdata Cloud](#netdata-cloud-mcp)** — A single cloud-hosted endpoint at `https://app.netdata.cloud/api/v1/mcp` with full visibility across all your nodes. No bridges, no firewall changes.
-- **[Local Agent or Parent](#local-agent-or-parent-mcp)** — Connect directly to any Netdata Agent or Parent (v2.6.0+) on your network at `http://YOUR_IP:19999/mcp`.
+- **[Local Agent or Parent](#local-agent-or-parent-mcp)** —
+  Connect directly to any Netdata Agent or Parent
+  (v2.6.0+) on your network at
+  `http://YOUR_IP:19999/mcp`.
 
-Both options provide comprehensive access to all available observability data through MCP:
+Both options provide comprehensive access to all
+available observability data through MCP:
 
 - **Node Discovery** - Hardware specifications, operating system details, version information, streaming topology, and associated metadata
 - **Metrics Discovery** - Full-text search capabilities across contexts, instances, dimensions, and labels
@@ -27,22 +31,26 @@ AI assistants have different visibility depending on where they connect:
 
 | Feature | Cloud MCP | Agent/Parent MCP |
 |---------|-----------|------------------|
-| **Scope** | All nodes across your infrastructure | Single agent or parent and its children |
-| **Endpoint** | `https://app.netdata.cloud/api/v1/mcp` | `http://YOUR_IP:19999/mcp` |
+| **Scope** | All nodes | Single agent/parent |
+| **Endpoint** | `app.netdata.cloud/api/v1/mcp` | `YOUR_IP:19999/mcp` |
 | **Transport** | Streamable HTTP | HTTP, SSE, WebSocket |
-| **Authentication** | Netdata Cloud API token (`scope:mcp`) | Local MCP API key |
+| **Authentication** | Cloud API token (`scope:mcp`) | Local MCP API key |
 | **Network access** | Internet only | Direct access to Netdata IP required |
 | **Local setup** | None | Bridge may be needed for some clients |
 
 ## Netdata Cloud MCP
 
-Connect AI assistants to your entire Netdata Cloud infrastructure through a single MCP endpoint — no local setup, no bridges, no firewall changes.
+Connect AI assistants to your entire Netdata Cloud
+infrastructure through a single MCP endpoint —
+no local setup, no bridges, no firewall changes.
 
 ### Prerequisites
 
 1. **Netdata Cloud account** with a **Business plan**
 2. **API token** with `scope:mcp` — [Create one in API Tokens settings](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md)
-3. **Nodes claimed to Netdata Cloud** — The Cloud MCP server can only access nodes that are connected to your Netdata Cloud space
+3. **Nodes claimed to Netdata Cloud** —
+   The Cloud MCP server can only access nodes
+   connected to your Netdata Cloud space
 
 ### Endpoint
 
@@ -54,7 +62,8 @@ https://app.netdata.cloud/api/v1/mcp
 
 ### Authentication
 
-All requests to the Cloud MCP endpoint require a Bearer token in the `Authorization` header:
+All requests to the Cloud MCP endpoint require a
+Bearer token in the `Authorization` header:
 
 ```
 Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN
@@ -111,7 +120,9 @@ For MCP clients that only support stdio transport, use `npx mcp-remote` as a bri
 }
 ```
 
-Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your [API token](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md) (must have `scope:mcp`).
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
+[API token](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md)
+(must have `scope:mcp`).
 
 ### Cloud MCP Troubleshooting
 
@@ -119,7 +130,8 @@ Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your [API token](/docs/netdata-cloud
 
 - Verify your API token has `scope:mcp`
 - Ensure the token is passed as `Authorization: Bearer <token>` (not as a query parameter)
-- Check that your Netdata Cloud subscription includes a space in the Business/Homelab plan
+- Check that your Netdata Cloud subscription
+  includes a space in the Business/Homelab plan
 
 #### No Nodes Visible
 

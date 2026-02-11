@@ -58,9 +58,16 @@ MCP support in JetBrains IDEs may require additional plugins or configuration. C
 
 ### Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local Netdata setup or firewall changes needed.
+Connect to your entire Netdata Cloud infrastructure
+through a single endpoint — no local Netdata setup
+or firewall changes needed.
 
-**Prerequisites:** Netdata Cloud account with Business plan, nodes claimed to Netdata Cloud, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+**Prerequisites:**
+
+- Netdata Cloud account with Business plan
+- Nodes claimed to Netdata Cloud
+- API token with `scope:mcp`
+  ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
 
 Since JetBrains AI Assistant only supports stdio, use `npx mcp-remote` as a bridge:
 
@@ -79,7 +86,10 @@ Since JetBrains AI Assistant only supports stdio, use `npx mcp-remote` as a brid
 }
 ```
 
-Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your Netdata Cloud API token (must have `scope:mcp`). For more details, see [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
+Netdata Cloud API token (must have `scope:mcp`).
+For more details, see
+[Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
 
 ### Local Agent or Parent
 

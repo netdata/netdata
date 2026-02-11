@@ -61,9 +61,16 @@ Crush uses JSON configuration files with the following priority:
 
 ### Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local setup, bridges, or firewall changes needed.
+Connect to your entire Netdata Cloud infrastructure
+through a single endpoint — no local setup, bridges,
+or firewall changes needed.
 
-**Prerequisites:** Netdata Cloud account with Business plan, nodes claimed to Netdata Cloud, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+**Prerequisites:**
+
+- Netdata Cloud account with Business plan
+- Nodes claimed to Netdata Cloud
+- API token with `scope:mcp`
+  ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
 
 ```json
 {
@@ -82,7 +89,10 @@ Connect to your entire Netdata Cloud infrastructure through a single endpoint �
 }
 ```
 
-Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your Netdata Cloud API token (must have `scope:mcp`). For more details, see [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
+Netdata Cloud API token (must have `scope:mcp`).
+For more details, see
+[Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
 
 ### Local Agent or Parent
 

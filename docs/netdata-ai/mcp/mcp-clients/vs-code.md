@@ -44,9 +44,16 @@ VS Code extensions typically support stdio-based MCP servers:
 
 ## Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure through a single endpoint — no local setup, bridges, or firewall changes needed.
+Connect to your entire Netdata Cloud infrastructure
+through a single endpoint — no local setup, bridges,
+or firewall changes needed.
 
-**Prerequisites:** Netdata Cloud account with Business plan, nodes claimed to Netdata Cloud, API token with `scope:mcp` ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+**Prerequisites:**
+
+- Netdata Cloud account with Business plan
+- Nodes claimed to Netdata Cloud
+- API token with `scope:mcp`
+  ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
 
 ### Continue Extension
 
@@ -67,7 +74,10 @@ mcpServers:
 
 ### Cline Extension
 
-Cline only supports stdio and SSE transports. Since Netdata Cloud MCP uses Streamable HTTP, you need the `mcp-remote` bridge to convert stdio to HTTP:
+Cline only supports stdio and SSE transports.
+Since Netdata Cloud MCP uses Streamable HTTP,
+you need the `mcp-remote` bridge to convert
+stdio to HTTP:
 
 ```json
 {
@@ -87,7 +97,10 @@ Cline only supports stdio and SSE transports. Since Netdata Cloud MCP uses Strea
 }
 ```
 
-Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your Netdata Cloud API token (must have `scope:mcp`). For more details, see [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
+Netdata Cloud API token (must have `scope:mcp`).
+For more details, see
+[Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
 
 ## Local Agent or Parent
 
@@ -123,7 +136,10 @@ Continue stores MCP definitions as YAML or JSON blocks. The recommended flow is:
 2. Click "**+ Add MCP Servers**" to scaffold `.continue/mcpServers/<name>.yaml`
 3. Replace the contents with one of the configurations below
 
-> Continue's reference guide documents the `type` field (`stdio`, `sse`, or `streamable-http`) and block syntax (https://docs.continue.dev/customize/deep-dives/mcp).
+> Continue's reference guide documents the `type`
+> field (`stdio`, `sse`, or `streamable-http`)
+> and block syntax
+> (https://docs.continue.dev/customize/deep-dives/mcp).
 
 **Method 1: stdio launcher (all Netdata versions)**
 
@@ -192,7 +208,8 @@ Press `Ctrl+L` to open Continue chat, then:
 
 #### Configuration
 
-Cline's official docs describe two workflows (https://docs.cline.bot/mcp/configuring-mcp-servers):
+Cline's official docs describe two workflows
+(<https://docs.cline.bot/mcp/configuring-mcp-servers>):
 
 - **UI configuration** – Click the MCP Servers icon → Configure tab → add/update servers, restart, toggle, and set timeouts.
 - **JSON configuration** – Click **Configure MCP Servers** to open `cline_mcp_settings.json` and edit the underlying JSON.
@@ -233,7 +250,11 @@ Cline's official docs describe two workflows (https://docs.cline.bot/mcp/configu
 }
 ```
 
-> Optional fields such as `networkTimeout`, `alwaysAllow`, and `env` map directly to Cline's UI controls. SSE and stdio are the two transports Cline supports today; pick the one that matches your Netdata deployment.
+> Optional fields such as `networkTimeout`,
+> `alwaysAllow`, and `env` map directly to
+> Cline's UI controls. SSE and stdio are the
+> two transports Cline supports today; pick
+> the one that matches your Netdata deployment.
 
 #### Usage
 

@@ -128,7 +128,9 @@ flowchart TB
 | **Data Privacy** | Depends on LLM provider | Depends on LLM provider |
 | **Internet Requirements** | AI client needs internet, MCP is local | Both AI client and MCP need internet |
 | **Supported AI Clients** | Any MCP-aware client | Any MCP-aware client |
-| **Infrastructure Access** | Limited to one Agent or Parent's scope | Complete visibility across all infrastructure |
-| **Network Access** | Direct access to Netdata IP required | No firewall changes needed |
+| **Infrastructure Access** | One Agent or Parent's scope | All infrastructure |
+| **Network Access** | Direct access to Netdata IP | No firewall changes |
 
-To get started with Method 2, see [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp) for setup instructions.
+To get started with Method 2, see
+[Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp)
+for setup instructions.
