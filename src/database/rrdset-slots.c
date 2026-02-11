@@ -76,11 +76,21 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
     // Check collector_tid inside spinlock - if set, collector is active, skip
     pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
     if(collector_tid != 0) {
-        // This shouldn't happen if caller ensured collector is stopped
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
                      "PLUGINSD: rrdset_pluginsd_receive_unslot called while collector (tid %d) is active, skipping",
                      collector_tid);
+
+        RRDHOST *host = st->rrdhost;
+        if(st->pluginsd.last_slot >= 0 &&
+            (uint32_t)st->pluginsd.last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
+            host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] == st) {
+            host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] = NULL;
+        }
+
+        st->pluginsd.last_slot = -1;
+        st->pluginsd.dims_with_slots = false;
+
         spinlock_unlock(&st->pluginsd.spinlock);
         return;
     }
