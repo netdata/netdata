@@ -974,9 +974,9 @@ static void ebpf_update_global_publish(
     while (move) {
         if (input->call != move->pcall) {
             if (move->pcall) {
-                move->ncall = llabs((long long)input->call - (long long)move->pcall);
-                move->nbyte = llabs((long long)input->bytes - (long long)move->pbyte);
-                move->nerr = llabs((long long)input->ecall - (long long)move->perr);
+                move->ncall = (input->call > move->pcall) ? input->call - move->pcall : move->pcall - input->call;
+                move->nbyte = (input->bytes > move->pbyte) ? input->bytes - move->pbyte : move->pbyte - input->bytes;
+                move->nerr = (input->ecall > move->perr) ? input->ecall - move->perr : move->perr - input->ecall;
             } else {
                 move->ncall = 0;
                 move->nbyte = 0;
