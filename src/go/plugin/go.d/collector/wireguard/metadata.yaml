@@ -8,7 +8,7 @@ modules:
         name: WireGuard
         link: https://www.wireguard.com/
         categories:
-          - data-collection.vpns
+          - data-collection.networking
         icon_filename: wireguard.svg
       keywords:
         - wireguard

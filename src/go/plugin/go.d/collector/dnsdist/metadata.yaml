@@ -9,7 +9,7 @@ modules:
         link: https://dnsdist.org/
         icon_filename: network-wired.svg
         categories:
-          - data-collection.dns-and-dhcp-servers
+          - data-collection.networking
       keywords:
         - dnsdist
         - dns

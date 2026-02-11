@@ -7,7 +7,7 @@ modules:
         name: Libreswan
         link: "https://libreswan.org/"
         categories:
-          - data-collection.vpns
+          - data-collection.networking
         icon_filename: "libreswan.png"
       related_resources:
         integrations:

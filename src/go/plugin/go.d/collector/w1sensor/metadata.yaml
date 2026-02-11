@@ -7,7 +7,7 @@ modules:
         name: 1-Wire Sensors
         link: "https://www.analog.com/en/product-category/1wire-temperature-sensors.html"
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.hardware-and-iot
         icon_filename: "1-wire.png"
       related_resources:
         integrations:

@@ -7,7 +7,7 @@ modules:
         name: Ceph
         link: "https://ceph.io/"
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
         icon_filename: "ceph.svg"
       related_resources:
         integrations:

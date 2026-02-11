@@ -8,7 +8,7 @@ modules:
         name: Typesense
         link: https://typesense.org/
         categories:
-          - data-collection.search-engines
+          - data-collection.databases
         icon_filename: typesense.svg
       related_resources:
         integrations:

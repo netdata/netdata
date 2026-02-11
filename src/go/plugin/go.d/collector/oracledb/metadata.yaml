@@ -8,7 +8,7 @@ modules:
         name: Oracle DB
         link: https://www.oracle.com/database/
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
         icon_filename: oracle.svg
       related_resources:
         integrations:

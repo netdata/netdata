@@ -7,7 +7,7 @@ modules:
         name: Xen XCP-ng
         link: "https://xenproject.org/"
         categories:
-          - data-collection.containers-and-vms
+          - data-collection.containers-and-orchestration
         icon_filename: "xen.png"
       related_resources:
         integrations:

@@ -8,7 +8,7 @@ modules:
         name: SQL databases (generic)
         link: https://en.wikipedia.org/wiki/SQL
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
         icon_filename: sql.svg
       related_resources:
         integrations:

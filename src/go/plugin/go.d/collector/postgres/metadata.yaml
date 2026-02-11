@@ -8,7 +8,7 @@ modules:
         name: PostgreSQL
         link: https://www.postgresql.org/
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
         icon_filename: postgres.svg
       related_resources:
         integrations:
@@ -16,7 +16,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       alternative_monitored_instances: []
       info_provided_to_referring_integrations:
         description: ""

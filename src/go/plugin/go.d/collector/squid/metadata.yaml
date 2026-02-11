@@ -8,7 +8,7 @@ modules:
         name: Squid
         link: "https://www.squid-cache.org/"
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
         icon_filename: "squid.png"
       related_resources:
         integrations:

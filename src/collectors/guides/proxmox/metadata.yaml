@@ -1,0 +1,149 @@
+# yamllint disable rule:line-length
+---
+plugin_name: guides
+modules:
+  - meta:
+      plugin_name: guides
+      module_name: proxmox
+      monitored_instance:
+        name: Proxmox VE Monitoring
+        link: https://www.proxmox.com/
+        icon_filename: proxmox.png
+        categories:
+          - data-collection.containers-and-orchestration
+      keywords:
+        - proxmox
+        - proxmox ve
+        - pve
+        - kvm
+        - qemu
+        - lxc
+        - virtualization
+        - hypervisor
+        - virtual machines
+        - containers
+        - ceph
+        - zfs
+        - corosync
+        - cluster
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: cgroups.plugin
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Proxmox VMs and Containers
+            - plugin_name: cgroups.plugin
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Systemd Services
+            - plugin_name: apps.plugin
+              module_name: apps
+              monitored_instance_name: Applications
+            - plugin_name: go.d.plugin
+              module_name: zfspool
+            - plugin_name: go.d.plugin
+              module_name: ceph
+            - plugin_name: go.d.plugin
+              module_name: smartctl
+            - plugin_name: go.d.plugin
+              module_name: sensors
+            - plugin_name: proc.plugin
+              module_name: /proc/net/dev
+            - plugin_name: proc.plugin
+              module_name: /proc/diskstats
+            - plugin_name: proc.plugin
+              module_name: /proc/stat
+            - plugin_name: proc.plugin
+              module_name: /proc/meminfo
+            - plugin_name: proc.plugin
+              module_name: /proc/spl/kstat/zfs/arcstats
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This guide describes how Netdata monitors Proxmox VE hypervisors. Netdata provides comprehensive, zero-configuration monitoring of Proxmox hosts, including per-VM and per-container resource utilization, host system metrics, storage health, and cluster components.
+
+          When installed on a Proxmox host, Netdata automatically discovers and monitors all KVM/QEMU virtual machines and LXC containers through Linux cgroups, resolving friendly names for each VM and container.
+        method_description: |
+          Netdata uses multiple collectors working together to provide full Proxmox visibility:
+
+          - **cgroups.plugin** monitors per-VM and per-container CPU, memory, disk I/O, and network via Linux cgroups. It automatically resolves VM names from `/etc/pve/qemu-server/<VMID>.conf` and container hostnames from `/etc/pve/lxc/<CTID>.conf`.
+          - **proc.plugin** monitors host-level system metrics (CPU, memory, network interfaces, disk I/O).
+          - **apps.plugin** monitors Proxmox-specific process groups (`proxmox-ve`, `libvirt`, `qemu-guest-agent`).
+          - **go.d/zfspool** monitors ZFS pool health, space utilization, and fragmentation (ZFS is common on Proxmox).
+          - **go.d/ceph** monitors Ceph cluster health and performance (for Proxmox clusters using Ceph storage).
+          - **go.d/smartctl** monitors physical disk SMART health data.
+          - **go.d/sensors** monitors hardware temperature, fan speed, and voltage.
+          - **ebpf.plugin** provides kernel-level visibility into VM/container syscalls, file I/O, and network activity.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            When Netdata is installed on a Proxmox VE host, it automatically detects and monitors:
+
+            - All running KVM/QEMU virtual machines
+            - All running LXC containers
+            - Host system resources (CPU, memory, network, disks)
+            - Systemd services (pveproxy, pvedaemon, pvestatd, corosync, etc.)
+            - ZFS pools (if ZFS is used)
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Install Netdata on the Proxmox host
+            description: |
+              Netdata must be installed directly on the Proxmox VE host (not inside a VM or container) to access cgroups for all VMs and containers.
+
+              ```bash
+              wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
+              ```
+      configuration:
+        file:
+          name: ""
+          description: "No configuration is required. All Proxmox monitoring works automatically."
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list: []
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list:
+          - name: VM or container names not resolved
+            description: |
+              If VMs or containers show raw cgroup paths instead of friendly names, verify that:
+
+              1. Netdata is installed on the Proxmox host (not inside a VM)
+              2. The `/etc/pve/` directory is accessible to the netdata user
+              3. The `cgroup-name.sh` script can read VM/container configuration files
+          - name: Missing ZFS metrics
+            description: |
+              If ZFS pool metrics are not showing, ensure the `zfspool` collector is enabled and the `zpool` command is available to the netdata user.
+          - name: Missing Ceph metrics
+            description: |
+              Ceph metrics require the Ceph collector to be configured with the Ceph REST API endpoint. See the Ceph integration page for details.
+    alerts: []
+    metrics:
+      folding:
+        title: ""
+        enabled: false
+      description: |
+        This guide does not collect metrics directly. Metrics are collected by the related integrations listed above. See each integration's page for detailed metric documentation.
+      availability: []
+      scopes: []

@@ -9,7 +9,7 @@ modules:
         link: "https://github.com/fail2ban/fail2ban#readme"
         icon_filename: fail2ban.png
         categories:
-          - data-collection.authentication-and-authorization
+          - data-collection.applications
       keywords:
         - fail2ban
         - security

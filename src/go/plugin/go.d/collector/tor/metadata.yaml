@@ -8,7 +8,7 @@ modules:
         name: Tor
         link: https://www.torproject.org/
         categories:
-          - data-collection.vpns
+          - data-collection.networking
         icon_filename: "tor.svg"
       related_resources:
         integrations:
