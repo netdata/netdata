@@ -302,6 +302,9 @@
 - Build(deps): bump github.com/prometheus-community/pro-bing from 0.7.0 to 0.8.0 in /src/go ([#21725](https://github.com/netdata/netdata/issues/21725))
 - Chore(go.d/snmp): add Westermo Teleindustri to org_to_vendor ([#21727](https://github.com/netdata/netdata/issues/21727))
 - Build(deps): bump github.com/lmittmann/tint from 1.1.2 to 1.1.3 in /src/go ([#21704](https://github.com/netdata/netdata/issues/21704))
+- Update view-plan-and-billing.md ([#21728](https://github.com/netdata/netdata/issues/21728))
+- Fix handling of LZ4 dependency version. ([#21669](https://github.com/netdata/netdata/issues/21669))
+- Go.d/sd: enable dyncfg integration and update config format ([#21730](https://github.com/netdata/netdata/issues/21730))
 
 ## [2.8.0] - 2025-11-19
 
