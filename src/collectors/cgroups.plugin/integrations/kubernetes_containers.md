@@ -33,6 +33,14 @@ This collector is only supported on the following platforms:
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 
+Kubernetes Containers can be monitored further using the following other integrations:
+
+- [Kubernetes Cluster State](/src/go/plugin/go.d/collector/k8s_state/integrations/kubernetes_cluster_state.md)
+- [Kubernetes API Server](/src/go/plugin/go.d/collector/k8s_apiserver/integrations/kubernetes_api_server.md)
+- [Kubelet](/src/go/plugin/go.d/collector/k8s_kubelet/integrations/kubelet.md)
+- [Kubeproxy](/src/go/plugin/go.d/collector/k8s_kubeproxy/integrations/kubeproxy.md)
+- [CoreDNS](/src/go/plugin/go.d/collector/coredns/integrations/coredns.md)
+
 ### Default Behavior
 
 #### Auto-Detection

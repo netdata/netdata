@@ -48,18 +48,18 @@ This collector only supports collecting metrics from a single instance of this i
 
 Proxmox VE Monitoring can be monitored further using the following other integrations:
 
-- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Proxmox_VMs_and_Containers" %}Proxmox VMs and Containers{% /relatedResource %}
-- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Systemd_Services" %}Systemd Services{% /relatedResource %}
-- {% relatedResource id="apps.plugin-apps-Applications" %}Applications{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-zfspool-ZFS_Pools" %}ZFS Pools{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-ceph-Ceph" %}Ceph{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-smartctl-S.M.A.R.T." %}S.M.A.R.T.{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-sensors-Linux_Sensors" %}Linux Sensors{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/net/dev-Network_interfaces" %}Network interfaces{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/diskstats-Disk_Statistics" %}Disk Statistics{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/stat-System_statistics" %}System statistics{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/meminfo-Memory_Usage" %}Memory Usage{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/spl/kstat/zfs/arcstats-ZFS_Adaptive_Replacement_Cache" %}ZFS Adaptive Replacement Cache{% /relatedResource %}
+- [Proxmox VMs and Containers](/src/collectors/cgroups.plugin/integrations/proxmox_vms_and_containers.md)
+- [Systemd Services](/src/collectors/cgroups.plugin/integrations/systemd_services.md)
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
+- [ZFS Pools](/src/go/plugin/go.d/collector/zfspool/integrations/zfs_pools.md)
+- [Ceph](/src/go/plugin/go.d/collector/ceph/integrations/ceph.md)
+- [S.M.A.R.T.](/src/go/plugin/go.d/collector/smartctl/integrations/s.m.a.r.t..md)
+- [Linux Sensors](/src/go/plugin/go.d/collector/sensors/integrations/linux_sensors.md)
+- [Network interfaces](/src/collectors/proc.plugin/integrations/network_interfaces.md)
+- [Disk Statistics](/src/collectors/proc.plugin/integrations/disk_statistics.md)
+- [System statistics](/src/collectors/proc.plugin/integrations/system_statistics.md)
+- [Memory Usage](/src/collectors/proc.plugin/integrations/memory_usage.md)
+- [ZFS Adaptive Replacement Cache](/src/collectors/proc.plugin/integrations/zfs_adaptive_replacement_cache.md)
 
 ### Default Behavior
 

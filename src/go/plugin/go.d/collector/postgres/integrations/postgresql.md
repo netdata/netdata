@@ -36,8 +36,8 @@ This collector supports collecting metrics from multiple instances of this integ
 
 PostgreSQL can be monitored further using the following other integrations:
 
-- {% relatedResource id="apps.plugin-apps-Applications" %}Applications{% /relatedResource %}
-- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Containers" %}Containers{% /relatedResource %}
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
+- [Containers](/src/collectors/cgroups.plugin/integrations/containers.md)
 
 ### Default Behavior
 

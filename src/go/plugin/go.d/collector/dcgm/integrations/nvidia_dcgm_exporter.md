@@ -34,6 +34,10 @@ This collector is supported on all platforms.
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 
+NVIDIA DCGM Exporter can be monitored further using the following other integrations:
+
+- [Nvidia GPU](/src/go/plugin/go.d/collector/nvidia_smi/integrations/nvidia_gpu.md)
+
 ### Default Behavior
 
 #### Auto-Detection

@@ -16,7 +16,18 @@ modules:
         - kubernetes
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: go.d.plugin
+              module_name: k8s_state
+            - plugin_name: go.d.plugin
+              module_name: k8s_apiserver
+            - plugin_name: go.d.plugin
+              module_name: k8s_kubelet
+            - plugin_name: go.d.plugin
+              module_name: k8s_kubeproxy
+            - plugin_name: cgroups.plugin
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: "Kubernetes Containers"
       info_provided_to_referring_integrations:
         description: ""
       most_popular: false

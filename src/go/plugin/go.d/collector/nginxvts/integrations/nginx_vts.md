@@ -36,9 +36,9 @@ This collector supports collecting metrics from multiple instances of this integ
 
 NGINX VTS can be monitored further using the following other integrations:
 
-- {% relatedResource id="go.d.plugin-web_log-Web_server_log_files" %}Web server log files{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-httpcheck-HTTP_Endpoints" %}HTTP Endpoints{% /relatedResource %}
-- {% relatedResource id="apps.plugin-apps-Applications" %}Applications{% /relatedResource %}
+- [Web server log files](/src/go/plugin/go.d/collector/weblog/integrations/web_server_log_files.md)
+- [HTTP Endpoints](/src/go/plugin/go.d/collector/httpcheck/integrations/http_endpoints.md)
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
 
 ### Default Behavior
 
