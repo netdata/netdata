@@ -25,7 +25,7 @@ const (
 func StateChart(meta JobIdentity, priority int) *module.Chart {
 	chart := telemetryChartBase(meta, TelemetryStateMetric)
 	chart.ID = meta.TelemetryChartID(TelemetryStateMetric)
-	chart.Title = fmt.Sprintf("Nagios %s state", meta.ScriptTitle)
+	chart.Title = "Nagios Plugin State"
 	chart.Units = "state"
 	chart.Priority = priority
 	chart.Dims = module.Dims{
@@ -43,7 +43,7 @@ func StateChart(meta JobIdentity, priority int) *module.Chart {
 func RuntimeChart(meta JobIdentity, priority int) *module.Chart {
 	chart := telemetryChartBase(meta, TelemetryRuntimeMetric)
 	chart.ID = meta.TelemetryChartID(TelemetryRuntimeMetric)
-	chart.Title = fmt.Sprintf("Nagios %s runtime state", meta.ScriptTitle)
+	chart.Title = "Nagios Plugin Runtime State"
 	chart.Units = "boolean"
 	chart.Priority = priority
 	chart.Dims = module.Dims{
@@ -59,7 +59,7 @@ func RuntimeChart(meta JobIdentity, priority int) *module.Chart {
 func LatencyChart(meta JobIdentity, priority int) *module.Chart {
 	chart := telemetryChartBase(meta, TelemetryLatencyMetric)
 	chart.ID = meta.TelemetryChartID(TelemetryLatencyMetric)
-	chart.Title = fmt.Sprintf("Nagios %s latency", meta.ScriptTitle)
+	chart.Title = "Nagios Plugin Execution Time"
 	chart.Units = "seconds"
 	chart.Priority = priority
 	chart.Dims = module.Dims{{ID: meta.TelemetryMetricID(TelemetryLatencyMetric, "duration"), Name: "duration", Algo: module.Absolute, Div: 1_000_000_000}}
@@ -69,7 +69,7 @@ func LatencyChart(meta JobIdentity, priority int) *module.Chart {
 func CPUChart(meta JobIdentity, priority int) *module.Chart {
 	chart := telemetryChartBase(meta, TelemetryCPUMetric)
 	chart.ID = meta.TelemetryChartID(TelemetryCPUMetric)
-	chart.Title = fmt.Sprintf("Nagios %s CPU", meta.ScriptTitle)
+	chart.Title = "Nagios Plugin CPU Usage"
 	chart.Units = "seconds"
 	chart.Priority = priority
 	chart.Dims = module.Dims{{ID: meta.TelemetryMetricID(TelemetryCPUMetric, "cpu_time"), Name: "cpu", Algo: module.Absolute, Div: 1_000_000_000}}
@@ -79,7 +79,7 @@ func CPUChart(meta JobIdentity, priority int) *module.Chart {
 func MemoryChart(meta JobIdentity, priority int) *module.Chart {
 	chart := telemetryChartBase(meta, TelemetryMemoryMetric)
 	chart.ID = meta.TelemetryChartID(TelemetryMemoryMetric)
-	chart.Title = fmt.Sprintf("Nagios %s memory", meta.ScriptTitle)
+	chart.Title = "Nagios Plugin Memory Usage"
 	chart.Units = "bytes"
 	chart.Priority = priority
 	chart.Dims = module.Dims{{ID: meta.TelemetryMetricID(TelemetryMemoryMetric, "rss"), Name: "rss", Algo: module.Absolute}}
@@ -89,7 +89,7 @@ func MemoryChart(meta JobIdentity, priority int) *module.Chart {
 func DiskChart(meta JobIdentity, priority int) *module.Chart {
 	chart := telemetryChartBase(meta, TelemetryDiskMetric)
 	chart.ID = meta.TelemetryChartID(TelemetryDiskMetric)
-	chart.Title = fmt.Sprintf("Nagios %s disk IO", meta.ScriptTitle)
+	chart.Title = "Nagios Plugin Disk I/O"
 	chart.Units = "bytes"
 	chart.Priority = priority
 	chart.Dims = module.Dims{
@@ -149,7 +149,7 @@ func PerfdataChart(meta JobIdentity, label string, scale units.Scale, priority i
 		labelID = "metric"
 	}
 	chart.ID = meta.PerfdataChartID(labelID)
-	chart.Title = fmt.Sprintf("Nagios %s %s", meta.ScriptTitle, label)
+	chart.Title = "Nagios Plugin Performance Data"
 	chart.Units = canonicalUnit(scale, label)
 	chart.Priority = priority
 	chart.Ctx = fmt.Sprintf("%s.%s.%s", ctxPrefix, meta.ScriptKey, labelID)

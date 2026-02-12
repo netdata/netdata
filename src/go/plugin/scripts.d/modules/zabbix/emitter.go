@@ -259,13 +259,7 @@ func (e *pipelineEmitter) getState(name string) *jobState {
 }
 
 func buildChart(job pkgzabbix.JobConfig, inst *instanceBinding, pipe *pkgzabbix.PipelineConfig, macros map[string]string) *module.Chart {
-	title := expandTemplate(pipe.Title, macros)
-	if title == "" {
-		title = expandTemplate(pipe.Context, macros)
-	}
-	if title == "" {
-		title = fmt.Sprintf("%s %s", job.Name, pipe.Name)
-	}
+	title := "Zabbix Pipeline Data"
 	units := expandTemplate(pipe.Unit, macros)
 	if units == "" {
 		units = "value"
@@ -317,7 +311,7 @@ func buildJobStateChart(job pkgzabbix.JobConfig) *module.Chart {
 	dims, _ := buildStateChartDims(chartID)
 	return &module.Chart{
 		ID:    chartID,
-		Title: fmt.Sprintf("Zabbix %s state", job.Name),
+		Title: "Zabbix Job State",
 		Units: "state",
 		Fam:   job.Name,
 		Ctx:   fmt.Sprintf("zabbix.%s.state", ids.Sanitize(job.Name)),
@@ -338,7 +332,7 @@ func buildInstanceStateChart(job pkgzabbix.JobConfig, inst *instanceBinding) *mo
 	dims, _ := buildStateChartDims(chartID)
 	return &module.Chart{
 		ID:    chartID,
-		Title: fmt.Sprintf("Zabbix %s %s state", job.Name, inst.id),
+		Title: "Zabbix Instance State",
 		Units: "state",
 		Fam:   job.Name,
 		Ctx:   fmt.Sprintf("zabbix.%s.instance.state", ids.Sanitize(job.Name)),
