@@ -37,9 +37,8 @@ def clean_and_write(md: str, path: Path):
     """
     Convert custom {% details %} markers to HTML <details> and write file.
     """
-    md = md.replace('{% details open=true summary="', "<details open><summary>")
-    md = md.replace('{% details summary="', "<details><summary>")
-    md = md.replace('" %}', "</summary>\n")
+    md = re.sub(r'\{% details open=true summary="(.*?)" %\}', r'<details open><summary>\1</summary>\n', md)
+    md = re.sub(r'\{% details summary="(.*?)" %\}', r'<details><summary>\1</summary>\n', md)
     md = md.replace("{% /details %}", "</details>\n")
     path.write_text(md, encoding="utf-8")
 
@@ -131,7 +130,7 @@ def create_overview(integration, filename: str, overview_key_name: str = "overvi
     if not overview_key_name:
         return f"# {integration['meta']['name']}\n\n<img src=\"https://netdata.cloud/img/{filename}\" width=\"150\"/>\n"
 
-    split = re.split(r"(#.*\n)", integration[overview_key_name], 1)
+    split = re.split(r"(#.*\n)", integration[overview_key_name], maxsplit=1)
     first_overview_part = split[1]
     rest_overview_part = split[2]
 

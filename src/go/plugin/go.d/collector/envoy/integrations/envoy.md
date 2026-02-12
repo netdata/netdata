@@ -32,10 +32,9 @@ This collector is supported on all platforms.
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 
- can be monitored further using the following other integrations:
+Envoy can be monitored further using the following other integrations:
 
-- {% relatedResource id="apps.plugin-apps-Applications</summary>
-Applications{% /relatedResource %}
+- {% relatedResource id="apps.plugin-apps-Applications" %}Applications{% /relatedResource %}
 
 ### Default Behavior
 
