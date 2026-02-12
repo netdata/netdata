@@ -53,6 +53,13 @@ SQL Agent job monitoring is part of collector startup, so access to
 `msdb.dbo.sysjobs` is required.
 
 
+ can be monitored further using the following other integrations:
+
+- {% relatedResource id="apps.plugin-apps-Applications</summary>
+Applications{% /relatedResource %}
+- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Containers</summary>
+Containers{% /relatedResource %}
+
 ### Default Behavior
 
 #### Auto-Detection
