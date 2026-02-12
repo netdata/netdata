@@ -637,12 +637,13 @@ static inline void link_all_processes_to_their_parents(void)
 /**
  * Aggregate PIDs to targets.
  *
- * This function performs target inheritance in a single efficient pass.
+ * This function performs target inheritance iteratively to ensure
+ * proper propagation even when children appear before parents in the list.
  * Algorithm:
- * 1. Propagate targets from parent to children without targets (BFS-style)
- * 2. Merge leaf processes upward to their parents
+ * 1. Propagate targets from parent to children without targets (iterative)
+ * 2. Merge leaf processes upward to their parents (iterative)
  * 3. Assign default target to unmerged top-level processes
- * 4. Propagate targets to merged children via their parents
+ * 4. Propagate targets to merged children via their parents (iterative)
  */
 static void apply_apps_groups_targets_inheritance(void)
 {
@@ -655,9 +656,15 @@ static void apply_apps_groups_targets_inheritance(void)
     pid_entry = ebpf_find_or_create_pid_data(0);
     pid_entry->target = apps_groups_default_target;
 
-    for (p = ebpf_pids_link_list; p; p = p->next) {
-        if (unlikely(!p->target && p->parent && p->parent->target))
-            p->target = p->parent->target;
+    int found = 1;
+    while (found) {
+        found = 0;
+        for (p = ebpf_pids_link_list; p; p = p->next) {
+            if (unlikely(!p->target && p->parent && p->parent->target)) {
+                p->target = p->parent->target;
+                found++;
+            }
+        }
     }
 
     for (p = ebpf_pids_link_list; p; p = p->next) {
@@ -665,15 +672,21 @@ static void apply_apps_groups_targets_inheritance(void)
             p->sortlist = sortlist++;
     }
 
-    for (p = ebpf_pids_link_list; p; p = p->next) {
-        if (unlikely(
-                !p->children_count && !p->merged && p->parent && p->parent->children_count &&
-                (p->target == p->parent->target || !p->parent->target) && p->ppid != INIT_PID)) {
-            p->parent->children_count--;
-            p->merged = 1;
+    found = 1;
+    while (found) {
+        found = 0;
+        for (p = ebpf_pids_link_list; p; p = p->next) {
+            if (unlikely(
+                    !p->children_count && !p->merged && p->parent && p->parent->children_count &&
+                    (p->target == p->parent->target || !p->parent->target) && p->ppid != INIT_PID)) {
+                p->parent->children_count--;
+                p->merged = 1;
 
-            if (unlikely(p->target && !p->parent->target))
-                p->parent->target = p->target;
+                if (unlikely(p->target && !p->parent->target))
+                    p->parent->target = p->target;
+
+                found++;
+            }
         }
     }
 
@@ -688,9 +701,15 @@ static void apply_apps_groups_targets_inheritance(void)
     pid_entry = ebpf_find_or_create_pid_data(1);
     pid_entry->sortlist = sortlist++;
 
-    for (p = ebpf_pids_link_list; p; p = p->next) {
-        if (unlikely(!p->target && p->merged && p->parent && p->parent->target))
-            p->target = p->parent->target;
+    found = 1;
+    while (found) {
+        found = 0;
+        for (p = ebpf_pids_link_list; p; p = p->next) {
+            if (unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
+                p->target = p->parent->target;
+                found++;
+            }
+        }
     }
 }
 
