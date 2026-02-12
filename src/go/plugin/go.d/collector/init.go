@@ -21,6 +21,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/coredns"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/couchbase"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/couchdb"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/dcgm"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/dmcache"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/dnsdist"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/dnsmasq"

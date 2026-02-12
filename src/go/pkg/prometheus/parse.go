@@ -164,7 +164,11 @@ func (p *promTextParser) setMetricFamilyBySeries() {
 	p.isSum, p.isCount, p.isQuantile, p.isBucket = false, false, false, false
 	p.currQuantile, p.currBucket = 0, 0
 
-	name := p.currSeries[0].Value
+	name, ok := metricNameValue(p.currSeries)
+	if !ok {
+		p.currMF = nil
+		return
+	}
 
 	if p.currMF != nil && p.currMF.name == name {
 		if p.currMF.typ == model.MetricTypeSummary {
@@ -180,7 +184,7 @@ func (p *promTextParser) setMetricFamilyBySeries() {
 		n := strings.TrimSuffix(name, sumSuffix)
 		if mf, ok := p.metrics[n]; ok && isSummaryOrHistogram(mf.typ) {
 			p.isSum = true
-			p.currSeries[0].Value = n
+			_ = setLabelValue(p.currSeries, labels.MetricName, n)
 			p.currMF = mf
 			return
 		}
@@ -188,20 +192,20 @@ func (p *promTextParser) setMetricFamilyBySeries() {
 		n := strings.TrimSuffix(name, countSuffix)
 		if mf, ok := p.metrics[n]; ok && isSummaryOrHistogram(mf.typ) {
 			p.isCount = true
-			p.currSeries[0].Value = n
+			_ = setLabelValue(p.currSeries, labels.MetricName, n)
 			p.currMF = mf
 			return
 		}
 	case strings.HasSuffix(name, bucketSuffix):
 		n := strings.TrimSuffix(name, bucketSuffix)
 		if mf, ok := p.metrics[n]; ok && isSummaryOrHistogram(mf.typ) {
-			p.currSeries[0].Value = n
+			_ = setLabelValue(p.currSeries, labels.MetricName, n)
 			p.setBucket()
 			p.currMF = mf
 			return
 		}
 		if p.currSeries.Has(bucketLabel) {
-			p.currSeries[0].Value = n
+			_ = setLabelValue(p.currSeries, labels.MetricName, n)
 			p.setBucket()
 			name = n
 			typ = model.MetricTypeHistogram
@@ -234,7 +238,7 @@ func (p *promTextParser) setBucket() {
 }
 
 func (p *promTextParser) addGauge(value float64) {
-	p.currSeries = p.currSeries[1:] // remove "__name__"
+	p.currSeries, _, _ = removeLabel(p.currSeries, labels.MetricName)
 
 	if v := len(p.currMF.metrics); v == cap(p.currMF.metrics) {
 		p.currMF.metrics = append(p.currMF.metrics, Metric{
@@ -253,7 +257,7 @@ func (p *promTextParser) addGauge(value float64) {
 }
 
 func (p *promTextParser) addCounter(value float64) {
-	p.currSeries = p.currSeries[1:] // remove "__name__"
+	p.currSeries, _, _ = removeLabel(p.currSeries, labels.MetricName)
 
 	if v := len(p.currMF.metrics); v == cap(p.currMF.metrics) {
 		p.currMF.metrics = append(p.currMF.metrics, Metric{
@@ -272,7 +276,7 @@ func (p *promTextParser) addCounter(value float64) {
 }
 
 func (p *promTextParser) addUnknown(value float64) {
-	p.currSeries = p.currSeries[1:] // remove "__name__"
+	p.currSeries, _, _ = removeLabel(p.currSeries, labels.MetricName)
 
 	if v := len(p.currMF.metrics); v == cap(p.currMF.metrics) {
 		p.currMF.metrics = append(p.currMF.metrics, Metric{
@@ -293,7 +297,7 @@ func (p *promTextParser) addUnknown(value float64) {
 func (p *promTextParser) addSummary(value float64) {
 	hash := p.currSeries.Hash()
 
-	p.currSeries = p.currSeries[1:] // remove "__name__"
+	p.currSeries, _, _ = removeLabel(p.currSeries, labels.MetricName)
 
 	s, ok := p.summaries[hash]
 	if !ok {
@@ -332,7 +336,7 @@ func (p *promTextParser) addSummary(value float64) {
 func (p *promTextParser) addHistogram(value float64) {
 	hash := p.currSeries.Hash()
 
-	p.currSeries = p.currSeries[1:] // remove "__name__"
+	p.currSeries, _, _ = removeLabel(p.currSeries, labels.MetricName)
 
 	h, ok := p.histograms[hash]
 	if !ok {
@@ -407,6 +411,25 @@ func removeLabel(lbs labels.Labels, name string) (labels.Labels, string, bool) {
 		}
 	}
 	return lbs, "", false
+}
+
+func metricNameValue(lbs labels.Labels) (string, bool) {
+	for _, v := range lbs {
+		if v.Name == labels.MetricName {
+			return v.Value, true
+		}
+	}
+	return "", false
+}
+
+func setLabelValue(lbs labels.Labels, name, value string) bool {
+	for i, v := range lbs {
+		if v.Name == name {
+			lbs[i].Value = value
+			return true
+		}
+	}
+	return false
 }
 
 func isSummaryOrHistogram(typ model.MetricType) bool {
