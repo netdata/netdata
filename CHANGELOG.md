@@ -310,6 +310,13 @@
 - Format workspace with `cargo fmt` ([#21733](https://github.com/netdata/netdata/issues/21733))
 - Fix SIGSEGV in dbengine extent flush due to unacquired UUID reference ([#21667](https://github.com/netdata/netdata/issues/21667))
 - Remove redundant operations from event loops ([#21657](https://github.com/netdata/netdata/issues/21657))
+- Improve cgroups.plugin discoverability with per-technology modules ([#21737](https://github.com/netdata/netdata/issues/21737))
+- Add missing type = api to streaming parent config examples ([#21739](https://github.com/netdata/netdata/issues/21739))
+- Regenerate integrations docs ([#21738](https://github.com/netdata/netdata/issues/21738))
+- Fix cgroups.plugin supported_platforms to Linux only ([#21740](https://github.com/netdata/netdata/issues/21740))
+- Regenerate integrations docs ([#21741](https://github.com/netdata/netdata/issues/21741))
+- Fix crash in plugin function callback ([#21713](https://github.com/netdata/netdata/issues/21713))
+- Remove unused crates. ([#21735](https://github.com/netdata/netdata/issues/21735))
 
 ## [2.8.0] - 2025-11-19
 
