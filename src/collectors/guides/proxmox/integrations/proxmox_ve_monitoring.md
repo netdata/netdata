@@ -46,32 +46,20 @@ This collector is only supported on the following platforms:
 This collector only supports collecting metrics from a single instance of this integration.
 
 
- can be monitored further using the following other integrations:
+Proxmox VE Monitoring can be monitored further using the following other integrations:
 
-- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Proxmox_VMs_and_Containers</summary>
-Proxmox VMs and Containers{% /relatedResource %}
-- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Systemd_Services</summary>
-Systemd Services{% /relatedResource %}
-- {% relatedResource id="apps.plugin-apps-Applications</summary>
-Applications{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-zfspool-ZFS_Pools</summary>
-ZFS Pools{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-ceph-Ceph</summary>
-Ceph{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-smartctl-S.M.A.R.T.</summary>
-S.M.A.R.T.{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-sensors-Linux_Sensors</summary>
-Linux Sensors{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/net/dev-Network_interfaces</summary>
-Network interfaces{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/diskstats-Disk_Statistics</summary>
-Disk Statistics{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/stat-System_statistics</summary>
-System statistics{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/meminfo-Memory_Usage</summary>
-Memory Usage{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/spl/kstat/zfs/arcstats-ZFS_Adaptive_Replacement_Cache</summary>
-ZFS Adaptive Replacement Cache{% /relatedResource %}
+- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Proxmox_VMs_and_Containers" %}Proxmox VMs and Containers{% /relatedResource %}
+- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Systemd_Services" %}Systemd Services{% /relatedResource %}
+- {% relatedResource id="apps.plugin-apps-Applications" %}Applications{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-zfspool-ZFS_Pools" %}ZFS Pools{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-ceph-Ceph" %}Ceph{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-smartctl-S.M.A.R.T." %}S.M.A.R.T.{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-sensors-Linux_Sensors" %}Linux Sensors{% /relatedResource %}
+- {% relatedResource id="proc.plugin-/proc/net/dev-Network_interfaces" %}Network interfaces{% /relatedResource %}
+- {% relatedResource id="proc.plugin-/proc/diskstats-Disk_Statistics" %}Disk Statistics{% /relatedResource %}
+- {% relatedResource id="proc.plugin-/proc/stat-System_statistics" %}System statistics{% /relatedResource %}
+- {% relatedResource id="proc.plugin-/proc/meminfo-Memory_Usage" %}Memory Usage{% /relatedResource %}
+- {% relatedResource id="proc.plugin-/proc/spl/kstat/zfs/arcstats-ZFS_Adaptive_Replacement_Cache" %}ZFS Adaptive Replacement Cache{% /relatedResource %}
 
 ### Default Behavior
 

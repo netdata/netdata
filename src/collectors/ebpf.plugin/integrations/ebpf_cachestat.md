@@ -34,12 +34,10 @@ This collector supports collecting metrics from multiple instances of this integ
 
 The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time.
 
- can be monitored further using the following other integrations:
+eBPF Cachestat can be monitored further using the following other integrations:
 
-- {% relatedResource id="apps.plugin-apps-Applications</summary>
-Applications{% /relatedResource %}
-- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Containers</summary>
-Containers{% /relatedResource %}
+- {% relatedResource id="apps.plugin-apps-Applications" %}Applications{% /relatedResource %}
+- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Containers" %}Containers{% /relatedResource %}
 
 ### Default Behavior
 
