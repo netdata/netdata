@@ -35,7 +35,7 @@ modules:
 
           Scheduler-level metrics (jobs status, throughput, next run time) are exposed through the nagios and zabbix modules that use it.
         method_description: |
-          The scheduler maintains an internal timer heap and dispatches jobs to a worker pool.
+          The scheduler manages per-job timers and dispatches jobs to a worker pool.
           Each worker executes a job via the configured runner (nagios or zabbix) and reports results back.
       default_behavior:
         auto_detection:

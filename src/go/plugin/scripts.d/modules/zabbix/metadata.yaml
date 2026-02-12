@@ -212,17 +212,18 @@ modules:
               dimensions:
                 - name: "{dimension}"
         - name: job
-          description: Per-job state tracking.
+          description: Per-job instance state tracking.
           labels:
             - name: zabbix_job
               description: Job name.
           metrics:
             - name: zabbix.{job}.state
-              description: Zabbix job state
+              description: Zabbix job instance state
               unit: state
               chart_type: line
               dimensions:
                 - name: ok
-                - name: warning
-                - name: error
-                - name: unknown
+                - name: collect_failure
+                - name: lld_failure
+                - name: extraction_failure
+                - name: dimension_failure

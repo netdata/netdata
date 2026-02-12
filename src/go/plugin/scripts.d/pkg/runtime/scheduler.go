@@ -279,6 +279,7 @@ func (s *Scheduler) Stop() {
 	for _, js := range s.jobs {
 		if js.timer != nil {
 			js.timer.Stop()
+			js.timer = nil
 		}
 	}
 	s.executor.Stop()

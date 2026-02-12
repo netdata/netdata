@@ -203,7 +203,7 @@ modules:
               Macros like `$HOSTADDRESS$` are not expanded.
             solutions:
               - description: |
-                  The job must reference a `vnode` that is configured in the vnodes directory (`/etc/netdata/vnodes.d/`).
+                  The job must reference a `vnode` that is configured in the vnodes directory (`/etc/netdata/vnodes/`).
                   The vnode must have the corresponding label set. See the **Virtual Node Label Conventions** section below.
     alerts: []
     metrics:
@@ -222,7 +222,7 @@ modules:
         | `_VARNAME` | `$_HOSTVARNAME$` | `NAGIOS__HOSTVARNAME` | Custom host variable (any `_` prefixed key except `_address` and `_alias`) |
         | `key` | `$_HOSTLABEL_KEY$` | `NAGIOS__HOSTLABEL_KEY` | Regular label (no `_` prefix) |
 
-        Example vnode configuration (`/etc/netdata/vnodes.d/hosts.yaml`):
+        Example vnode configuration (`/etc/netdata/vnodes/hosts.yaml`):
 
         ```yaml
         - hostname: web-server-1
