@@ -34,11 +34,11 @@ This collector only supports collecting metrics from a single instance of this i
 
 Kubernetes Cluster State can be monitored further using the following other integrations:
 
-- Kubernetes API Server
-- Kubelet
-- Kubeproxy
-- Kubernetes Containers
-- CoreDNS
+- [Kubernetes API Server](/src/go/plugin/go.d/collector/k8s_apiserver/integrations/kubernetes_api_server.md)
+- [Kubelet](/src/go/plugin/go.d/collector/k8s_kubelet/integrations/kubelet.md)
+- [Kubeproxy](/src/go/plugin/go.d/collector/k8s_kubeproxy/integrations/kubeproxy.md)
+- [Kubernetes Containers](/src/collectors/cgroups.plugin/integrations/kubernetes_containers.md)
+- [CoreDNS](/src/go/plugin/go.d/collector/coredns/integrations/coredns.md)
 
 ### Default Behavior
 

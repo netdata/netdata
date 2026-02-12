@@ -36,8 +36,8 @@ This collector supports collecting metrics from multiple instances of this integ
 
 PostgreSQL can be monitored further using the following other integrations:
 
-- Applications
-- Containers
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
+- [Containers](/src/collectors/cgroups.plugin/integrations/containers.md)
 
 ### Default Behavior
 

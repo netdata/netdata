@@ -35,7 +35,7 @@ This collector supports collecting metrics from multiple instances of this integ
 
 Nvidia GPU can be monitored further using the following other integrations:
 
-- NVIDIA DCGM Exporter
+- [NVIDIA DCGM Exporter](/src/go/plugin/go.d/collector/dcgm/integrations/nvidia_dcgm_exporter.md)
 
 ### Default Behavior
 

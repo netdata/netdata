@@ -34,12 +34,12 @@ This collector supports collecting metrics from multiple instances of this integ
 
 Kubeproxy can be monitored further using the following other integrations:
 
-- Applications
-- Kubernetes Cluster State
-- Kubernetes API Server
-- Kubelet
-- Kubernetes Containers
-- CoreDNS
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
+- [Kubernetes Cluster State](/src/go/plugin/go.d/collector/k8s_state/integrations/kubernetes_cluster_state.md)
+- [Kubernetes API Server](/src/go/plugin/go.d/collector/k8s_apiserver/integrations/kubernetes_api_server.md)
+- [Kubelet](/src/go/plugin/go.d/collector/k8s_kubelet/integrations/kubelet.md)
+- [Kubernetes Containers](/src/collectors/cgroups.plugin/integrations/kubernetes_containers.md)
+- [CoreDNS](/src/go/plugin/go.d/collector/coredns/integrations/coredns.md)
 
 ### Default Behavior
 

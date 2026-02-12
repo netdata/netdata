@@ -34,7 +34,7 @@ This collector supports collecting metrics from multiple instances of this integ
 
 Envoy can be monitored further using the following other integrations:
 
-- Applications
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
 
 ### Default Behavior
 

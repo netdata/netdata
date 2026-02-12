@@ -35,10 +35,10 @@ This collector supports collecting metrics from multiple instances of this integ
 
 NGINX can be monitored further using the following other integrations:
 
-- HTTP Endpoints
-- Web server log files
-- Applications
-- Containers
+- [HTTP Endpoints](/src/go/plugin/go.d/collector/httpcheck/integrations/http_endpoints.md)
+- [Web server log files](/src/go/plugin/go.d/collector/weblog/integrations/web_server_log_files.md)
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
+- [Containers](/src/collectors/cgroups.plugin/integrations/containers.md)
 
 ### Default Behavior
 

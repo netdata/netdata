@@ -55,8 +55,8 @@ SQL Agent job monitoring is part of collector startup, so access to
 
 Microsoft SQL Server can be monitored further using the following other integrations:
 
-- Applications
-- Containers
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
+- [Containers](/src/collectors/cgroups.plugin/integrations/containers.md)
 
 ### Default Behavior
 

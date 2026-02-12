@@ -36,8 +36,8 @@ The plugin needs setuid because it loads data inside kernel. Netada sets necessa
 
 eBPF SWAP can be monitored further using the following other integrations:
 
-- Applications
-- Containers
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
+- [Containers](/src/collectors/cgroups.plugin/integrations/containers.md)
 
 ### Default Behavior
 

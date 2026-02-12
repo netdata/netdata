@@ -48,18 +48,18 @@ This collector only supports collecting metrics from a single instance of this i
 
 Proxmox VE Monitoring can be monitored further using the following other integrations:
 
-- Proxmox VMs and Containers
-- Systemd Services
-- Applications
-- ZFS Pools
-- Ceph
-- S.M.A.R.T.
-- Linux Sensors
-- Network interfaces
-- Disk Statistics
-- System statistics
-- Memory Usage
-- ZFS Adaptive Replacement Cache
+- [Proxmox VMs and Containers](/src/collectors/cgroups.plugin/integrations/proxmox_vms_and_containers.md)
+- [Systemd Services](/src/collectors/cgroups.plugin/integrations/systemd_services.md)
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
+- [ZFS Pools](/src/go/plugin/go.d/collector/zfspool/integrations/zfs_pools.md)
+- [Ceph](/src/go/plugin/go.d/collector/ceph/integrations/ceph.md)
+- [S.M.A.R.T.](/src/go/plugin/go.d/collector/smartctl/integrations/s.m.a.r.t..md)
+- [Linux Sensors](/src/go/plugin/go.d/collector/sensors/integrations/linux_sensors.md)
+- [Network interfaces](/src/collectors/proc.plugin/integrations/network_interfaces.md)
+- [Disk Statistics](/src/collectors/proc.plugin/integrations/disk_statistics.md)
+- [System statistics](/src/collectors/proc.plugin/integrations/system_statistics.md)
+- [Memory Usage](/src/collectors/proc.plugin/integrations/memory_usage.md)
+- [ZFS Adaptive Replacement Cache](/src/collectors/proc.plugin/integrations/zfs_adaptive_replacement_cache.md)
 
 ### Default Behavior
 

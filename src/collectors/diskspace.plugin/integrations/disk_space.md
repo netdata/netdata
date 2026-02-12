@@ -33,7 +33,7 @@ This collector supports collecting metrics from multiple instances of this integ
 
 Disk space can be monitored further using the following other integrations:
 
-- eBPF Disk
+- [eBPF Disk](/src/collectors/ebpf.plugin/integrations/ebpf_disk.md)
 
 ### Default Behavior
 

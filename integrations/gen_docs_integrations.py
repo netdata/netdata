@@ -9,6 +9,9 @@ from pathlib import Path
 # Registry used to decide which README.md should symlink to which generated file
 symlink_dict = {}
 
+# Mapping of integration id → output file path (repo-relative), populated by write_to_file()
+id_to_path = {}
+
 
 # -----------------------------
 # FS utilities
@@ -36,13 +39,38 @@ def cleanup(only_base_paths=None):
 def clean_and_write(md: str, path: Path):
     """
     Convert custom markers to HTML/plain text for GitHub-rendered .md files.
+    relatedResource tags are left as-is here; they are resolved in a post-pass
+    once id_to_path is fully populated.
     """
     md = re.sub(r'\{% details open=true summary="(.*?)" %\}', r'<details open><summary>\1</summary>\n', md)
     md = re.sub(r'\{% details summary="(.*?)" %\}', r'<details><summary>\1</summary>\n', md)
     md = md.replace("{% /details %}", "</details>\n")
-    md = re.sub(r'\{% relatedResource id="[^"]*" %\}', '', md)
-    md = md.replace("{% /relatedResource %}", "")
     path.write_text(md, encoding="utf-8")
+
+
+def resolve_related_links():
+    """
+    Post-process all written files: convert relatedResource tags to markdown links.
+    Must be called after all files are written and id_to_path is fully populated.
+    """
+    for fpath in id_to_path.values():
+        p = Path(fpath)
+        if not p.exists():
+            continue
+        md = p.read_text(encoding="utf-8")
+        if '{% relatedResource' not in md:
+            continue
+
+        def _resolve(m):
+            rid = m.group(1)
+            name = m.group(2)
+            target = id_to_path.get(rid)
+            if target:
+                return f'[{name}](/{target})'
+            return name
+
+        md = re.sub(r'\{% relatedResource id="([^"]*)" %\}(.*?)\{% /relatedResource %\}', _resolve, md)
+        p.write_text(md, encoding="utf-8")
 
 
 def build_path(meta_yaml_link: str) -> str:
@@ -347,10 +375,11 @@ def create_overview_banner(md: str, community_badge: str) -> str:
 
 
 def write_to_file(path: str, md: str, meta_yaml: str, sidebar_label: str, community: str, integration=None,
-                  mode: str = "default"):
+                  mode: str = "default", integration_id: str = None):
     """
     Write the generated markdown into an `integrations/` subdirectory located alongside the `metadata.yaml` file.
     This mirrors the original behavior of placing docs next to their source metadata.
+    Also registers the actual output path in id_to_path for later link resolution.
     """
     md = create_overview_banner(md, community)
 
@@ -364,6 +393,8 @@ def write_to_file(path: str, md: str, meta_yaml: str, sidebar_label: str, commun
                 md2 = add_custom_edit_url(md, meta_yaml, sidebar_label)
                 outfile = integrations_dir / f"{clean_string(sidebar_label)}.md"
                 clean_and_write(md2, outfile)
+                if integration_id:
+                    id_to_path[integration_id] = str(outfile)
             except FileNotFoundError as e:
                 print("Exception in writing to file", e)
 
@@ -385,6 +416,8 @@ def write_to_file(path: str, md: str, meta_yaml: str, sidebar_label: str, commun
         finalpath = integrations_dir / f"{name}.md"
         try:
             clean_and_write(md2, finalpath)
+            if integration_id:
+                id_to_path[integration_id] = str(finalpath)
         except FileNotFoundError as e:
             print("Exception in writing to file", e)
 
@@ -393,6 +426,8 @@ def write_to_file(path: str, md: str, meta_yaml: str, sidebar_label: str, commun
         finalpath = Path(path) / "README.md"
         try:
             clean_and_write(md2, finalpath)
+            if integration_id:
+                id_to_path[integration_id] = str(finalpath)
         except FileNotFoundError as e:
             print("Exception in writing to file", e)
 
@@ -405,6 +440,8 @@ def write_to_file(path: str, md: str, meta_yaml: str, sidebar_label: str, commun
         finalpath = integrations_dir / f"{name}.md"
         try:
             clean_and_write(md2, finalpath)
+            if integration_id:
+                id_to_path[integration_id] = str(finalpath)
         except FileNotFoundError as e:
             print("Exception in writing to file", e)
 
@@ -417,6 +454,8 @@ def write_to_file(path: str, md: str, meta_yaml: str, sidebar_label: str, commun
         finalpath = integrations_dir / f"{name}.md"
         try:
             clean_and_write(md2, finalpath)
+            if integration_id:
+                id_to_path[integration_id] = str(finalpath)
         except FileNotFoundError as e:
             print("Exception in writing to file", e)
 
@@ -493,9 +532,10 @@ def main():
         # full cleanup (legacy behavior)
         cleanup()
 
-    # Generate
+    # Generate (pass 1: write all files, record id → actual output path)
     for integration in integrations:
         itype = integration.get("integration_type")
+        iid = integration.get("id")
 
         # If -c is used, process ONLY the matching collector; skip everything else
         if args.collector:
@@ -512,14 +552,14 @@ def main():
                 integration, categories, mode="collector"
             )
             path = build_path(meta_yaml)
-            write_to_file(path, md, meta_yaml, sidebar_label, community)
+            write_to_file(path, md, meta_yaml, sidebar_label, community, integration_id=iid)
 
         elif itype == "exporter" and not args.collector:
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
                 integration, categories, mode="exporter"
             )
             path = build_path(meta_yaml)
-            write_to_file(path, md, meta_yaml, sidebar_label, community)
+            write_to_file(path, md, meta_yaml, sidebar_label, community, integration_id=iid)
 
         elif itype == "agent_notification" and not args.collector:
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
@@ -527,7 +567,7 @@ def main():
             )
             path = build_path(meta_yaml)
             write_to_file(path, md, meta_yaml, sidebar_label, community, integration=integration,
-                          mode="agent-notification")
+                          mode="agent-notification", integration_id=iid)
 
         elif itype == "cloud_notification" and not args.collector:
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
@@ -535,21 +575,26 @@ def main():
             )
             path = build_path(meta_yaml)
             write_to_file(path, md, meta_yaml, sidebar_label, community, integration=integration,
-                          mode="cloud-notification")
+                          mode="cloud-notification", integration_id=iid)
 
         elif itype == "logs" and not args.collector:
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
                 integration, categories, mode="logs"
             )
             path = build_path(meta_yaml)
-            write_to_file(path, md, meta_yaml, sidebar_label, community, integration=integration, mode="logs")
+            write_to_file(path, md, meta_yaml, sidebar_label, community, integration=integration,
+                          mode="logs", integration_id=iid)
 
         elif itype == "authentication" and not args.collector:
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
                 integration, categories, mode="authentication"
             )
             path = build_path(meta_yaml)
-            write_to_file(path, md, meta_yaml, sidebar_label, community, integration=integration, mode="authentication")
+            write_to_file(path, md, meta_yaml, sidebar_label, community, integration=integration,
+                          mode="authentication", integration_id=iid)
+
+    # Pass 2: resolve relatedResource tags to markdown links now that all paths are known
+    resolve_related_links()
 
     make_symlinks(symlink_dict)
 
