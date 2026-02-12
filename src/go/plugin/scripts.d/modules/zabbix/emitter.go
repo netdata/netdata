@@ -292,15 +292,15 @@ func buildChart(job pkgzabbix.JobConfig, inst *instanceBinding, pipe *pkgzabbix.
 	chartIdentifier := chartID(job, inst.id, sanitizedCtx)
 	dimensionID := dimID(chartIdentifier, dimName)
 	chart := &module.Chart{
-		ID:           chartIdentifier,
-		Title:        title,
-		Units:        units,
-		Fam:          fam,
-		Ctx:          fmt.Sprintf("zabbix.%s", sanitizedCtx),
-		Type:         chartType(pipe.ChartType),
+		ID:    chartIdentifier,
+		Title: title,
+		Units: units,
+		Fam:   fam,
+		Ctx:   fmt.Sprintf("zabbix.%s", sanitizedCtx),
+		Type:  chartType(pipe.ChartType),
 
-		Priority:     1000,
-		Labels:       buildLabels(job, inst, pipe, macros),
+		Priority: 1000,
+		Labels:   buildLabels(job, inst, pipe, macros),
 		Dims: module.Dims{
 			{
 				ID:   dimensionID,
@@ -316,16 +316,16 @@ func buildJobStateChart(job pkgzabbix.JobConfig) *module.Chart {
 	chartID := jobStateChartID(job)
 	dims, _ := buildStateChartDims(chartID)
 	return &module.Chart{
-		ID:           chartID,
-		Title:        fmt.Sprintf("Zabbix %s state", job.Name),
-		Units:        "state",
-		Fam:          job.Name,
-		Ctx:          fmt.Sprintf("zabbix.%s.state", ids.Sanitize(job.Name)),
-		Type:         module.Line,
+		ID:    chartID,
+		Title: fmt.Sprintf("Zabbix %s state", job.Name),
+		Units: "state",
+		Fam:   job.Name,
+		Ctx:   fmt.Sprintf("zabbix.%s.state", ids.Sanitize(job.Name)),
+		Type:  module.Line,
 
-		Priority:     800,
-		Labels:       jobLabels(job),
-		Dims:         dims,
+		Priority: 800,
+		Labels:   jobLabels(job),
+		Dims:     dims,
 		Opts: module.Opts{
 			Detail: true,
 		},
@@ -337,16 +337,16 @@ func buildInstanceStateChart(job pkgzabbix.JobConfig, inst *instanceBinding) *mo
 	macros := cloneMacros(inst.macros)
 	dims, _ := buildStateChartDims(chartID)
 	return &module.Chart{
-		ID:           chartID,
-		Title:        fmt.Sprintf("Zabbix %s %s state", job.Name, inst.id),
-		Units:        "state",
-		Fam:          job.Name,
-		Ctx:          fmt.Sprintf("zabbix.%s.instance.state", ids.Sanitize(job.Name)),
-		Type:         module.Line,
+		ID:    chartID,
+		Title: fmt.Sprintf("Zabbix %s %s state", job.Name, inst.id),
+		Units: "state",
+		Fam:   job.Name,
+		Ctx:   fmt.Sprintf("zabbix.%s.instance.state", ids.Sanitize(job.Name)),
+		Type:  module.Line,
 
-		Priority:     850,
-		Labels:       buildLabels(job, inst, nil, macros),
-		Dims:         dims,
+		Priority: 850,
+		Labels:   buildLabels(job, inst, nil, macros),
+		Dims:     dims,
 		Opts: module.Opts{
 			Detail: true,
 		},

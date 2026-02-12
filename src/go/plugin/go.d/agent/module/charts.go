@@ -87,18 +87,18 @@ type (
 		typ string
 		id  string
 
-		OverModule string
-		IDSep      bool
-		ID           string
-		OverID       string
-		Title        string
-		Units        string
-		Fam          string
-		Ctx          string
-		Type         ChartType
-		Priority     int
-		UpdateEvery  int  // Override for this chart's update interval (0 means use job default)
-		SkipGaps     bool // Skip chart entirely (no BEGIN/END) when no dimensions have data
+		OverModule  string
+		IDSep       bool
+		ID          string
+		OverID      string
+		Title       string
+		Units       string
+		Fam         string
+		Ctx         string
+		Type        ChartType
+		Priority    int
+		UpdateEvery int  // Override for this chart's update interval (0 means use job default)
+		SkipGaps    bool // Skip chart entirely (no BEGIN/END) when no dimensions have data
 		Opts
 
 		Labels []Label
