@@ -7,7 +7,7 @@ modules:
         name: Access Points
         link: ""
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:

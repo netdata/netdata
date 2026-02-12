@@ -488,7 +488,7 @@ modules:
         name: eBPF Disk
         link: "https://kernel.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -935,7 +935,7 @@ modules:
         name: eBPF Sync
         link: "https://kernel.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1117,7 +1117,7 @@ modules:
         name: eBPF MDflush
         link: "https://kernel.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1531,7 +1531,7 @@ modules:
         name: eBPF Socket
         link: "https://kernel.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2114,7 +2114,7 @@ modules:
         name: eBPF Filesystem
         link: "https://kernel.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2619,7 +2619,7 @@ modules:
         name: eBPF Mount
         link: "https://kernel.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2743,7 +2743,7 @@ modules:
         name: eBPF VFS
         link: "https://kernel.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:

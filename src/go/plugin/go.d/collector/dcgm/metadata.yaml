@@ -5,11 +5,11 @@ modules:
       plugin_name: go.d.plugin
       module_name: dcgm
       monitored_instance:
-        name: NVIDIA DCGM Exporter
+        name: Nvidia Data Center GPU Manager (DCGM)
         link: https://github.com/NVIDIA/dcgm-exporter
         icon_filename: nvidia.svg
         categories:
-          - data-collection.hardware-and-iot
+          - data-collection.hardware-and-sensors
       keywords:
         - nvidia
         - gpu

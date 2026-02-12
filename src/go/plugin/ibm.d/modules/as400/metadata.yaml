@@ -8,7 +8,7 @@ modules:
         name: IBM i (AS/400)
         link: https://www.ibm.com/products/power-systems
         categories:
-          - data-collection.infrastructure
+          - data-collection.operating-systems
         icon_filename: "ibm-i.svg"
       related_resources:
         integrations:

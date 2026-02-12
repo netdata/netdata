@@ -73,3 +73,39 @@
     prerequisites:
       description: |
         - Netdata Cloud paid subscription
+- id: "logs-opentelemetry"
+  meta:
+    name: "OpenTelemetry Logs"
+    link: "https://github.com/netdata/netdata/blob/master/src/crates/netdata-log-viewer/README.md"
+    categories:
+      - logs
+    icon_filename: "opentelemetry.svg"
+  keywords:
+    - opentelemetry
+    - otel
+    - otlp
+    - logs
+  overview:
+    description: |
+      The OpenTelemetry log viewer plugin by Netdata makes viewing, exploring and analyzing OpenTelemetry logs simple and efficient.
+
+      It works with logs ingested by the `otel.plugin`, which receives OTLP-formatted log data and stores them in
+      systemd-compatible journal files. The log viewer provides the same powerful exploration interface used for
+      systemd journal logs.
+    visualization:
+      description: |
+        You can start exploring OpenTelemetry logs on the "Logs" tab of the Netdata UI.
+    key_features:
+      description: |
+        - Views logs ingested via **OpenTelemetry OTLP/gRPC** protocol.
+        - Allows filtering on **any log field** or **field value**, for any time-frame.
+        - Allows **full text search** (`grep`) on all log fields, for any time-frame.
+        - Provides a **histogram** for log entries over time, with a break down per field-value, for any field and any time-frame.
+        - Uses **fast indexed lookups** with pre-built indexes for performance.
+        - Supports **faceted search** across log fields (severity, hostname, service, etc.).
+        - In PLAY mode shows new log entries immediately after they are received.
+  setup:
+    prerequisites:
+      description: |
+        - A Netdata Cloud account
+        - The `otel.plugin` configured to ingest OpenTelemetry logs

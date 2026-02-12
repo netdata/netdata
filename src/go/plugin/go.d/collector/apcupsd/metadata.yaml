@@ -9,7 +9,7 @@ modules:
         link: https://www.apc.com
         icon_filename: apc.svg
         categories:
-          - data-collection.hardware-and-iot
+          - data-collection.hardware-and-sensors
       keywords:
         - ups
         - apcupsd

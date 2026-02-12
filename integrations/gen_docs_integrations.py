@@ -24,6 +24,9 @@ def cleanup(only_base_paths=None):
     """
     targets = [
         "src/go/plugin/go.d/collector",
+        "src/go/plugin/ibm.d/modules",
+        "src/go/plugin/scripts.d/modules",
+        "src/crates/netdata-otel",
         "src/collectors",
         "src/exporting",
         "integrations/cloud-notifications",

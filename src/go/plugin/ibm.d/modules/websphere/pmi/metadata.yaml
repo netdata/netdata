@@ -8,7 +8,7 @@ modules:
         name: IBM WebSphere PMI
         link: https://www.ibm.com/docs/en/was
         categories:
-          - data-collection.application_servers
+          - data-collection.web-servers-and-proxies
         icon_filename: "ibm.svg"
       related_resources:
         integrations:

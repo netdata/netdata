@@ -8,7 +8,7 @@ modules:
         name: IBM WebSphere MicroProfile
         link: https://www.ibm.com/products/websphere-application-server
         categories:
-          - data-collection.application_servers
+          - data-collection.web-servers-and-proxies
         icon_filename: "ibm.svg"
       related_resources:
         integrations:
