@@ -1079,11 +1079,29 @@ static inline void vfs_aggregate_set_vfs(netdata_publish_vfs_t *vfs, netdata_ebp
  */
 static inline void vfs_aggregate_publish_vfs(netdata_publish_vfs_t *vfs, netdata_publish_vfs_t *w)
 {
-    uint64_t *vfs64 = (uint64_t *)vfs;
-    uint64_t *w64 = (uint64_t *)w;
-    size_t count = sizeof(netdata_publish_vfs_t) / sizeof(uint64_t);
-    for (size_t i = 0; i < count; i++)
-        vfs64[i] += w64[i];
+    vfs->ct += w->ct;
+    vfs->write_bytes += w->write_bytes;
+    vfs->writev_bytes += w->writev_bytes;
+    vfs->readv_bytes += w->readv_bytes;
+    vfs->read_bytes += w->read_bytes;
+
+    vfs->write_call += w->write_call;
+    vfs->writev_call += w->writev_call;
+    vfs->read_call += w->read_call;
+    vfs->readv_call += w->readv_call;
+    vfs->unlink_call += w->unlink_call;
+    vfs->fsync_call += w->fsync_call;
+    vfs->open_call += w->open_call;
+    vfs->create_call += w->create_call;
+
+    vfs->write_err += w->write_err;
+    vfs->writev_err += w->writev_err;
+    vfs->read_err += w->read_err;
+    vfs->readv_err += w->readv_err;
+    vfs->unlink_err += w->unlink_err;
+    vfs->fsync_err += w->fsync_err;
+    vfs->open_err += w->open_err;
+    vfs->create_err += w->create_err;
 }
 
 /**
@@ -1205,11 +1223,28 @@ static void vfs_apps_accumulator(netdata_ebpf_vfs_t *out, int maps_per_core)
     for (i = 1; i < end; i++) {
         netdata_ebpf_vfs_t *w = &out[i];
 
-        uint64_t *total64 = (uint64_t *)total;
-        uint64_t *w64 = (uint64_t *)w;
-        size_t count = (offsetof(netdata_ebpf_vfs_t, write_call)) / sizeof(uint64_t);
-        for (size_t j = 0; j < count; j++)
-            total64[j] += w64[j];
+        total->write_bytes += w->write_bytes;
+        total->writev_bytes += w->writev_bytes;
+        total->readv_bytes += w->readv_bytes;
+        total->read_bytes += w->read_bytes;
+
+        total->write_call += w->write_call;
+        total->writev_call += w->writev_call;
+        total->read_call += w->read_call;
+        total->readv_call += w->readv_call;
+        total->unlink_call += w->unlink_call;
+        total->fsync_call += w->fsync_call;
+        total->open_call += w->open_call;
+        total->create_call += w->create_call;
+
+        total->write_err += w->write_err;
+        total->writev_err += w->writev_err;
+        total->read_err += w->read_err;
+        total->readv_err += w->readv_err;
+        total->unlink_err += w->unlink_err;
+        total->fsync_err += w->fsync_err;
+        total->open_err += w->open_err;
+        total->create_err += w->create_err;
 
         if (w->ct > ct)
             ct = w->ct;
@@ -1306,11 +1341,29 @@ static void ebpf_vfs_sum_cgroup_pids(netdata_publish_vfs_t *vfs, struct pid_on_t
     while (pids) {
         netdata_publish_vfs_t *w = &pids->vfs;
 
-        uint64_t *acc64 = (uint64_t *)&accumulator;
-        uint64_t *w64 = (uint64_t *)w;
-        size_t count = sizeof(netdata_publish_vfs_t) / sizeof(uint64_t);
-        for (size_t i = 0; i < count; i++)
-            acc64[i] += w64[i];
+        accumulator.ct += w->ct;
+        accumulator.write_bytes += w->write_bytes;
+        accumulator.writev_bytes += w->writev_bytes;
+        accumulator.readv_bytes += w->readv_bytes;
+        accumulator.read_bytes += w->read_bytes;
+
+        accumulator.write_call += w->write_call;
+        accumulator.writev_call += w->writev_call;
+        accumulator.read_call += w->read_call;
+        accumulator.readv_call += w->readv_call;
+        accumulator.unlink_call += w->unlink_call;
+        accumulator.fsync_call += w->fsync_call;
+        accumulator.open_call += w->open_call;
+        accumulator.create_call += w->create_call;
+
+        accumulator.write_err += w->write_err;
+        accumulator.writev_err += w->writev_err;
+        accumulator.read_err += w->read_err;
+        accumulator.readv_err += w->readv_err;
+        accumulator.unlink_err += w->unlink_err;
+        accumulator.fsync_err += w->fsync_err;
+        accumulator.open_err += w->open_err;
+        accumulator.create_err += w->create_err;
 
         pids = pids->next;
     }
