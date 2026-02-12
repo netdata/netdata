@@ -33,6 +33,14 @@ This collector is only supported on the following platforms:
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 
+Kubernetes Containers can be monitored further using the following other integrations:
+
+- {% relatedResource id="go.d.plugin-k8s_state-Kubernetes_Cluster_State" %}Kubernetes Cluster State{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-k8s_apiserver-Kubernetes_API_Server" %}Kubernetes API Server{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-k8s_kubelet-Kubelet" %}Kubelet{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-k8s_kubeproxy-Kubeproxy" %}Kubeproxy{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-coredns-CoreDNS" %}CoreDNS{% /relatedResource %}
+
 ### Default Behavior
 
 #### Auto-Detection

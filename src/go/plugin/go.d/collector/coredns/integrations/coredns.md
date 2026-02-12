@@ -32,6 +32,14 @@ This collector is supported on all platforms.
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 
+CoreDNS can be monitored further using the following other integrations:
+
+- {% relatedResource id="go.d.plugin-k8s_state-Kubernetes_Cluster_State" %}Kubernetes Cluster State{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-k8s_apiserver-Kubernetes_API_Server" %}Kubernetes API Server{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-k8s_kubelet-Kubelet" %}Kubelet{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-k8s_kubeproxy-Kubeproxy" %}Kubeproxy{% /relatedResource %}
+- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Kubernetes_Containers" %}Kubernetes Containers{% /relatedResource %}
+
 ### Default Behavior
 
 #### Auto-Detection

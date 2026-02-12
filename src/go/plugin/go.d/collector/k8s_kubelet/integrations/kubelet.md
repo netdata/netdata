@@ -35,6 +35,11 @@ This collector supports collecting metrics from multiple instances of this integ
 Kubelet can be monitored further using the following other integrations:
 
 - {% relatedResource id="apps.plugin-apps-Applications" %}Applications{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-k8s_state-Kubernetes_Cluster_State" %}Kubernetes Cluster State{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-k8s_apiserver-Kubernetes_API_Server" %}Kubernetes API Server{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-k8s_kubeproxy-Kubeproxy" %}Kubeproxy{% /relatedResource %}
+- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Kubernetes_Containers" %}Kubernetes Containers{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-coredns-CoreDNS" %}CoreDNS{% /relatedResource %}
 
 ### Default Behavior
 

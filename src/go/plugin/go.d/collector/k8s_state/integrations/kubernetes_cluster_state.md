@@ -32,6 +32,14 @@ This collector is supported on all platforms.
 This collector only supports collecting metrics from a single instance of this integration.
 
 
+Kubernetes Cluster State can be monitored further using the following other integrations:
+
+- {% relatedResource id="go.d.plugin-k8s_apiserver-Kubernetes_API_Server" %}Kubernetes API Server{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-k8s_kubelet-Kubelet" %}Kubelet{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-k8s_kubeproxy-Kubeproxy" %}Kubeproxy{% /relatedResource %}
+- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Kubernetes_Containers" %}Kubernetes Containers{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-coredns-CoreDNS" %}CoreDNS{% /relatedResource %}
+
 ### Default Behavior
 
 #### Auto-Detection

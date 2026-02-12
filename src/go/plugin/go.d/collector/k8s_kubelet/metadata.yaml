@@ -19,6 +19,17 @@ modules:
           list:
             - plugin_name: apps.plugin
               module_name: apps
+            - plugin_name: go.d.plugin
+              module_name: k8s_state
+            - plugin_name: go.d.plugin
+              module_name: k8s_apiserver
+            - plugin_name: go.d.plugin
+              module_name: k8s_kubeproxy
+            - plugin_name: cgroups.plugin
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: "Kubernetes Containers"
+            - plugin_name: go.d.plugin
+              module_name: coredns
       info_provided_to_referring_integrations:
         description: ""
       most_popular: true

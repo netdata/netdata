@@ -51,6 +51,8 @@ Kubernetes API Server can be monitored further using the following other integra
 - {% relatedResource id="go.d.plugin-k8s_kubelet-Kubelet" %}Kubelet{% /relatedResource %}
 - {% relatedResource id="go.d.plugin-k8s_kubeproxy-Kubeproxy" %}Kubeproxy{% /relatedResource %}
 - {% relatedResource id="go.d.plugin-k8s_state-Kubernetes_Cluster_State" %}Kubernetes Cluster State{% /relatedResource %}
+- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Kubernetes_Containers" %}Kubernetes Containers{% /relatedResource %}
+- {% relatedResource id="go.d.plugin-coredns-CoreDNS" %}CoreDNS{% /relatedResource %}
 
 ### Default Behavior
 
