@@ -1,0 +1,25 @@
+---
+- name: Ensure profile definitions are provided
+  assert:
+    that:
+      - netdata_profiles_definitions is mapping
+    fail_msg: "netdata_profiles_definitions must be a map of profile names to definitions"
+
+- name: Initialize profile managed files list
+  set_fact:
+    netdata_profile_managed_files: []
+
+- name: Collect profile managed files
+  include_tasks: profile-files.yml
+  loop: "{{ netdata_profiles }}"
+  loop_control:
+    loop_var: profile_name
+  when: netdata_profiles | length > 0
+
+- name: Build effective managed files list
+  set_fact:
+    netdata_managed_files_effective: >-
+      {{
+        (netdata_managed_files | default([]) | map('combine', {'__profile': 'host'}) | list)
+        + (netdata_profile_managed_files | default([]))
+      }}

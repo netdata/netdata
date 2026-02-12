@@ -1,0 +1,102 @@
+---
+- name: Set db mode (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/netdata.conf"
+    section: db
+    option: mode
+    value: "{{ netdata_db_mode }}"
+    create: true
+  when: netdata_db_mode | string | length > 0
+  notify: Restart Netdata
+
+- name: Set db retention (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/netdata.conf"
+    section: db
+    option: retention
+    value: "{{ netdata_db_retention }}"
+    create: true
+  when: netdata_db_retention | string | length > 0
+  notify: Restart Netdata
+
+- name: Set db update every (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/netdata.conf"
+    section: db
+    option: update every
+    value: "{{ netdata_db_update_every }}"
+    create: true
+  when: netdata_db_update_every | string | length > 0
+  notify: Restart Netdata
+
+- name: Set dbengine multihost disk space (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/netdata.conf"
+    section: global
+    option: dbengine multihost disk space
+    value: "{{ netdata_dbengine_multihost_disk_space }}"
+    create: true
+  when: netdata_dbengine_multihost_disk_space | string | length > 0
+  notify: Restart Netdata
+
+- name: Set ML enabled (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/netdata.conf"
+    section: ml
+    option: enabled
+    value: "{{ 'yes' if (netdata_ml_enabled | bool) else 'no' }}"
+    create: true
+  when: netdata_ml_enabled | string | length > 0
+  notify: Restart Netdata
+
+- name: Set health enabled (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/netdata.conf"
+    section: health
+    option: enabled
+    value: "{{ 'yes' if (netdata_health_enabled | bool) else 'no' }}"
+    create: true
+  when: netdata_health_enabled | string | length > 0
+  notify: Restart Netdata
+
+- name: Set web mode (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/netdata.conf"
+    section: web
+    option: mode
+    value: "{{ netdata_web_mode }}"
+    create: true
+  when: netdata_web_mode | string | length > 0
+  notify: Restart Netdata
+
+- name: Set web bind to (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/netdata.conf"
+    section: web
+    option: bind to
+    value: "{{ netdata_web_bind_to }}"
+    create: true
+  when: netdata_web_bind_to | string | length > 0
+  notify: Restart Netdata
+
+- name: Set hostname (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/netdata.conf"
+    section: global
+    option: hostname
+    value: "{{ netdata_hostname }}"
+    create: true
+  when: netdata_hostname | length > 0
+  notify: Restart Netdata
+
+- name: Set netdata.conf entries (optional)
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/netdata.conf"
+    section: "{{ item.section }}"
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    create: true
+  loop: "{{ netdata_conf_entries }}"
+  when: netdata_conf_entries | length > 0
+  notify: Restart Netdata
+

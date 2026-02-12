@@ -1,0 +1,12 @@
+---
+- name: Set parent key option
+  ini_file:
+    path: "{{ netdata_config_dir_effective }}/stream.conf"
+    section: "{{ parent_key.key }}"
+    option: "{{ parent_option.key }}"
+    value: "{{ parent_option.value }}"
+    create: true
+  loop: "{{ parent_key.options | dict2items }}"
+  loop_control:
+    loop_var: parent_option
+  notify: Restart Netdata

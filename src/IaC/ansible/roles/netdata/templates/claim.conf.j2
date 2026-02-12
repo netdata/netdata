@@ -1,0 +1,10 @@
+[global]
+url = {{ netdata_claim_url }}
+token = {{ netdata_claim_token }}
+{% if netdata_claim_rooms | length > 0 %}
+rooms = {{ netdata_claim_rooms }}
+{% endif %}
+{% if netdata_claim_proxy | length > 0 %}
+proxy = {{ netdata_claim_proxy }}
+{% endif %}
+insecure = {{ 'yes' if (netdata_claim_insecure | bool) else 'no' }}

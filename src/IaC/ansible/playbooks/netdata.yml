@@ -1,0 +1,6 @@
+---
+- name: Install and claim Netdata
+  hosts: all
+  become: true
+  roles:
+    - role: netdata
