@@ -1,0 +1,229 @@
+plugin_name: scripts.d.plugin
+modules:
+  - meta:
+      id: collector-scripts.d.plugin-zabbix
+      plugin_name: scripts.d.plugin
+      module_name: zabbix
+      monitored_instance:
+        name: Zabbix Preprocessing
+        link: https://www.zabbix.com/
+        icon_filename: zabbix.svg
+        categories:
+          - data-collection.generic-data-collection
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - zabbix
+        - preprocessing
+        - scripts
+        - monitoring
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This module runs Zabbix-style data collection jobs natively inside Netdata.
+
+          It supports Zabbix's master-item + dependent-pipeline pattern: a single collection step
+          (command, HTTP, or SNMP) produces raw data, and one or more **preprocessing pipelines**
+          extract individual metrics using Zabbix-compatible preprocessing steps (JSONPath, regex,
+          JavaScript, SNMP walk, Prometheus parsing, CSV, XPath, and more).
+
+          For each configured job it collects:
+
+          - **User-defined metrics**: Each dependent pipeline produces a charted metric with configurable context, unit, family, chart type, and dimension algorithm.
+          - **Job state**: OK / WARNING / ERROR / UNKNOWN state tracking per job and per discovered instance.
+          - **Low-level discovery (LLD)**: Optional discovery pipelines that dynamically create instances from JSON arrays, similar to Zabbix LLD.
+        method_description: |
+          Collection supports three modes:
+
+          - **Command**: Runs an external script/binary via `nd-run` and captures stdout.
+          - **HTTP**: Performs an HTTP request and captures the response body.
+          - **SNMP**: Queries an SNMP agent (GET or WALK) and captures the result.
+
+          The raw output is then processed through Zabbix-compatible preprocessing steps to extract metrics.
+          Zabbix macros (`{HOST.NAME}`, `{HOST.IP}`, `{#MACRO}`, etc.) are expanded before execution.
+      default_behavior:
+        auto_detection:
+          description: |
+            No auto-detection. Each job must be explicitly configured with a `collection` definition and one or more `dependent_pipelines`.
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            Command-mode jobs spawn a subprocess per execution. HTTP and SNMP modes use in-process clients.
+      additional_permissions:
+        description: |
+          Command-mode plugins run as the `netdata` user via `nd-run`.
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: scripts.d/zabbix.conf
+        options:
+          description: |
+            Each job defines a collection source and one or more dependent preprocessing pipelines.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: collection.type
+              description: Collection mode (`command`, `http`, or `snmp`).
+              default_value: ""
+              required: true
+              group: Collection
+            - name: collection.command
+              description: Command to execute (for `command` type).
+              default_value: ""
+              required: false
+              group: Collection
+            - name: collection.http.url
+              description: URL to fetch (for `http` type).
+              default_value: ""
+              required: false
+              group: Collection
+            - name: collection.snmp.target
+              description: SNMP target host (for `snmp` type).
+              default_value: ""
+              required: false
+              group: Collection
+            - name: collection.snmp.oid
+              description: SNMP OID to query.
+              default_value: ""
+              required: false
+              group: Collection
+            - name: dependent_pipelines[].name
+              description: Pipeline name (used for chart identification).
+              default_value: ""
+              required: true
+              group: Pipelines
+            - name: dependent_pipelines[].context
+              description: Netdata chart context.
+              default_value: ""
+              required: true
+              group: Pipelines
+            - name: dependent_pipelines[].dimension
+              description: Dimension name within the chart.
+              default_value: ""
+              required: true
+              group: Pipelines
+            - name: dependent_pipelines[].unit
+              description: Metric unit string.
+              default_value: ""
+              required: true
+              group: Pipelines
+            - name: dependent_pipelines[].steps
+              description: Array of Zabbix preprocessing steps applied to the raw collection output.
+              default_value: "[]"
+              required: true
+              group: Pipelines
+            - name: vnode
+              description: Virtual node name for host macro resolution.
+              default_value: ""
+              required: false
+              group: General
+            - name: lld
+              description: Low-level discovery configuration for dynamic instance creation.
+              default_value: ""
+              required: false
+              group: Discovery
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Command collection with JSONPath extraction
+              description: Run a script and extract a metric using JSONPath.
+              config: |
+                jobs:
+                  - name: api_latency
+                    collection:
+                      type: command
+                      command: /usr/local/bin/get_api_stats.sh
+                    dependent_pipelines:
+                      - name: latency
+                        context: myapp.api.latency
+                        dimension: p99
+                        unit: milliseconds
+                        steps:
+                          - type: jsonpath
+                            params: "$.latency.p99"
+            - name: SNMP collection
+              description: Query an SNMP OID and chart the result.
+              config: |
+                jobs:
+                  - name: disk_usage
+                    vnode: my-switch
+                    collection:
+                      type: snmp
+                      snmp:
+                        target: "{HOST.IP}"
+                        oid: ".1.3.6.1.2.1.25.2.3.1.6"
+                        version: v2c
+                        community: public
+                    dependent_pipelines:
+                      - name: used
+                        context: zabbix.disk.used
+                        dimension: used
+                        unit: bytes
+                        steps:
+                          - type: snmp_get_value
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        ### Virtual Node Label Conventions
+
+        When a job references a `vnode`, the module reads Zabbix host macros from the virtual node's **labels** using prefix conventions:
+
+        | Label key | Zabbix macro | Description |
+        |-----------|-------------|-------------|
+        | `_address` | `{HOST.IP}`, `{HOST.CONN}` | IP address or DNS name of the host |
+        | `_alias` | `{HOST.ALIAS}` | Human-readable host alias |
+        | Other `_` prefixed | N/A | Reserved for future use |
+
+        The `{HOST.NAME}`, `{HOST.HOST}`, and `{HOST.DNS}` macros are derived from the vnode hostname.
+      availability: []
+      scopes:
+        - name: pipeline
+          description: Metrics produced by each dependent preprocessing pipeline.
+          labels:
+            - name: zabbix_job
+              description: Job name.
+            - name: zabbix_pipeline
+              description: Pipeline name.
+          metrics:
+            - name: zabbix.{context}
+              description: User-defined metric (context is configured per pipeline)
+              unit: varies
+              chart_type: line
+              dimensions:
+                - name: "{dimension}"
+        - name: job
+          description: Per-job instance state tracking.
+          labels:
+            - name: zabbix_job
+              description: Job name.
+          metrics:
+            - name: zabbix.{job}.state
+              description: Zabbix job instance state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: collect_failure
+                - name: lld_failure
+                - name: extraction_failure
+                - name: dimension_failure

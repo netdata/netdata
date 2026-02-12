@@ -1,0 +1,105 @@
+---
+test case: 'empty input parameters'
+in:
+  xml: ''
+  xpath: ''
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'single start tag'
+in:
+  xml: '<a>'
+  xpath: ''
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'single end tag'
+in:
+  xml: '<a/>'
+  xpath: ''
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'wrong operation format'
+in:
+  xml: '<a/>'
+  xpath: '/a[\'
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'wrong operation expression'
+in:
+  xml: '<a/>'
+  xpath: '1 div 0'
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'wrong operation format 2'
+in:
+  xml: '<a/>'
+  xpath: '-a'
+out:
+  result: ''
+  return: 'FAIL'
+---
+test case: 'empty output'
+in:
+  xml: '<a/>'
+  xpath: '/b'
+out:
+  result: ''
+  return: 'SUCCEED'
+---
+test case: 'successful expression'
+in:
+  xml: '<a/>'
+  xpath: '3 div 2'
+out:
+  result: '1.5'
+  return: 'SUCCEED'
+---
+test case: 'return end tag'
+in:
+  xml: '<a/>'
+  xpath: '/a'
+out:
+  result: '<a/>'
+  return: 'SUCCEED'
+---
+test case: 'return text'
+in:
+  xml: '<a>1</a>'
+  xpath: '/a/text()'
+out:
+  result: '1'
+  return: 'SUCCEED'
+---
+test case: 'return string'
+in:
+  xml: '<a>1</a>'
+  xpath: 'string(/a)'
+out:
+  result: '1'
+  return: 'SUCCEED'
+---
+test case: 'return attribute'
+in:
+  xml: '<a b="10">1</a>'
+  xpath: 'string(/a/@b)'
+out:
+  result: '10'
+  return: 'SUCCEED'
+---
+test case: 'return pattern'
+in:
+  xml: '<a><b x="1"/><c x="2"/><d x="1"/></a>'
+  xpath: '//*[@x="1"]'
+out:
+  result: '<b x="1"/><d x="1"/>'
+  return: 'SUCCEED'
+...

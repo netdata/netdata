@@ -1,0 +1,348 @@
+plugin_name: scripts.d.plugin
+modules:
+  - meta:
+      id: collector-scripts.d.plugin-nagios
+      plugin_name: scripts.d.plugin
+      module_name: nagios
+      monitored_instance:
+        name: Nagios Plugins
+        link: https://www.nagios-plugins.org/
+        icon_filename: nagios.svg
+        categories:
+          - data-collection.synthetic-checks
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - nagios
+        - plugins
+        - checks
+        - scripts
+        - monitoring
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This module runs unmodified [Nagios plugins](https://www.nagios-plugins.org/) inside Netdata without any changes to the plugins themselves.
+
+          For each configured job it collects:
+
+          - **Check state**: OK / WARNING / CRITICAL / UNKNOWN (with soft/hard state tracking).
+          - **Performance data**: Every `label=value;warn;crit;min;max` metric emitted by the plugin is parsed and charted automatically, with unit normalization where possible.
+          - **Execution telemetry**: Runtime duration, scheduling latency, CPU time, peak RSS memory, and disk I/O per job.
+          - **Scheduler health**: Running / queued / scheduled job counts and throughput rates.
+        method_description: |
+          Jobs are executed via `nd-run` (the Netdata unprivileged helper) at the configured `check_interval`.
+          Standard Nagios macros (`$HOSTADDRESS$`, `$ARG1$`, `$USERn$`, etc.) are expanded before execution.
+          Plugin output is parsed according to the [Nagios Plugin API](https://nagios-plugins.org/doc/guidelines.html):
+          the first line provides the status and optional performance data after the `|` separator.
+      default_behavior:
+        auto_detection:
+          description: |
+            No auto-detection. Each job must be explicitly configured with a `plugin` path pointing to the Nagios plugin executable.
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            Each job spawns a subprocess via `nd-run`. Resource usage (CPU, memory, disk I/O) is tracked per execution and exposed as telemetry charts.
+      additional_permissions:
+        description: |
+          Plugins run as the `netdata` user via `nd-run`. If a plugin requires elevated privileges, configure it through `ndsudo` or adjust filesystem permissions accordingly.
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Install Nagios plugins
+            description: |
+              Install the plugins you want to run. Most distributions provide packages:
+
+              ```bash
+              # Debian/Ubuntu
+              apt install nagios-plugins
+
+              # RHEL/CentOS/Fedora
+              dnf install nagios-plugins-all
+              ```
+
+              You can also use any script or binary that follows the [Nagios Plugin API](https://nagios-plugins.org/doc/guidelines.html).
+      configuration:
+        file:
+          name: scripts.d/nagios.conf
+        options:
+          description: |
+            Each job defines a single Nagios plugin execution. Jobs are listed under the `jobs` key.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: plugin
+              description: Absolute path to the Nagios plugin executable.
+              default_value: ""
+              required: true
+              group: General
+            - name: args
+              description: Command-line arguments passed to the plugin. Nagios macros are expanded before execution.
+              default_value: "[]"
+              required: false
+              group: Arguments
+            - name: arg_values
+              description: Values bound to positional `$ARGn$` macros (max 32).
+              default_value: "[]"
+              required: false
+              group: Arguments
+            - name: vnode
+              description: Virtual node name to associate with this job. The vnode must be defined in the vnodes configuration directory.
+              default_value: ""
+              required: false
+              group: General
+            - name: scheduler
+              description: Name of the scheduler that executes this job.
+              default_value: default
+              required: false
+              group: General
+            - name: timeout
+              description: Maximum execution time before the plugin is killed. Duration string (e.g. `30s`, `1m`).
+              default_value: 30s
+              required: false
+              group: Timing
+            - name: timeout_state
+              description: State reported when a timeout occurs.
+              default_value: critical
+              required: false
+              group: Timing
+            - name: check_interval
+              description: Base scheduling interval between executions. Duration string.
+              default_value: 1m
+              required: false
+              group: Timing
+            - name: retry_interval
+              description: Interval between soft retries after a non-OK result. Duration string.
+              default_value: 30s
+              required: false
+              group: Timing
+            - name: max_check_attempts
+              description: Number of soft-state attempts before transitioning to a hard state.
+              default_value: 3
+              required: false
+              group: Timing
+            - name: user_macros
+              description: Key/value pairs exposed as `$USERn$` macros. For example, `USER1` becomes `$USER1$`.
+              default_value: "{}"
+              required: false
+              group: Environment
+            - name: custom_vars
+              description: Key/value pairs exported as `$_SERVICEvar$` environment variables (`NAGIOS__SERVICEvar`).
+              default_value: "{}"
+              required: false
+              group: Environment
+            - name: environment
+              description: Additional environment variables set before executing the plugin.
+              default_value: "{}"
+              required: false
+              group: Environment
+            - name: working_directory
+              description: Working directory for plugin execution.
+              default_value: ""
+              required: false
+              group: General
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: SSL certificate check
+              description: Check SSL certificate expiry for a host.
+              config: |
+                jobs:
+                  - name: ssl_github
+                    plugin: /usr/lib/nagios/plugins/check_http
+                    args: ["-H", "github.com", "--ssl", "-C", "30,15"]
+                    timeout: 30s
+                    check_interval: 1h
+                    retry_interval: 5m
+                    max_check_attempts: 3
+            - name: Check with macros and vnode
+              description: |
+                Run a plugin against a virtual node using Nagios macros.
+                The `$HOSTADDRESS$` and `$ARG1$` macros are expanded from the vnode labels and `arg_values`.
+              config: |
+                jobs:
+                  - name: check_ssh
+                    plugin: /usr/lib/nagios/plugins/check_ssh
+                    args: ["-H", "$HOSTADDRESS$", "-p", "$ARG1$"]
+                    arg_values: ["22"]
+                    vnode: my-server
+                    check_interval: 5m
+            - name: Check with custom vars
+              description: |
+                Pass service-level custom variables to a plugin as `$_SERVICEvar$` macros.
+              config: |
+                jobs:
+                  - name: check_api
+                    plugin: /usr/local/bin/check_api
+                    args: ["-u", "$_SERVICEENDPOINT$"]
+                    custom_vars:
+                      ENDPOINT: "/health"
+    troubleshooting:
+      problems:
+        list:
+          - description: |
+              Plugin exits with "permission denied".
+            solutions:
+              - description: |
+                  Ensure the plugin file has execute permission for the `netdata` user:
+                  ```bash
+                  chmod +x /usr/lib/nagios/plugins/check_http
+                  ```
+          - description: |
+              Macros like `$HOSTADDRESS$` are not expanded.
+            solutions:
+              - description: |
+                  The job must reference a `vnode` that is configured in the vnodes directory (`/etc/netdata/vnodes/`).
+                  The vnode must have the corresponding label set. See the **Virtual Node Label Conventions** section below.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        ### Virtual Node Label Conventions
+
+        When a job references a `vnode`, the module reads Nagios macros from the virtual node's **labels** using prefix conventions:
+
+        | Label key | Nagios macro | Environment variable | Description |
+        |-----------|-------------|---------------------|-------------|
+        | `_address` | `$HOSTADDRESS$` | `NAGIOS_HOSTADDRESS` | IP address or DNS name of the host |
+        | `_alias` | `$HOSTALIAS$` | `NAGIOS_HOSTALIAS` | Human-readable host alias |
+        | `_VARNAME` | `$_HOSTVARNAME$` | `NAGIOS__HOSTVARNAME` | Custom host variable (any `_` prefixed key except `_address` and `_alias`) |
+        | `key` | `$_HOSTLABEL_KEY$` | `NAGIOS__HOSTLABEL_KEY` | Regular label (no `_` prefix) |
+
+        Example vnode configuration (`/etc/netdata/vnodes/hosts.yaml`):
+
+        ```yaml
+        - hostname: web-server-1
+          guid: 12345678-1234-1234-1234-123456789abc
+          labels:
+            _address: "192.168.1.10"
+            _alias: "Web Server 1"
+            _DATACENTER: "us-east-1"
+            role: "frontend"
+            environment: "production"
+        ```
+
+        This produces:
+
+        | Macro | Value |
+        |-------|-------|
+        | `$HOSTADDRESS$` | `192.168.1.10` |
+        | `$HOSTALIAS$` | `Web Server 1` |
+        | `$_HOSTDATACENTER$` | `us-east-1` |
+        | `$_HOSTLABEL_ROLE$` | `frontend` |
+        | `$_HOSTLABEL_ENVIRONMENT$` | `production` |
+      availability: []
+      scopes:
+        - name: job
+          description: Metrics for each configured Nagios plugin job.
+          labels:
+            - name: nagios_job
+              description: Job name as defined in the configuration.
+            - name: nagios_plugin
+              description: Basename of the plugin executable.
+            - name: nagios_vnode
+              description: Virtual node associated with the job (if any).
+            - name: nagios_scheduler
+              description: Scheduler executing the job.
+          metrics:
+            - name: nagios.jobs.state
+              description: Nagios plugin check state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: nagios.jobs.runtime
+              description: Nagios plugin runtime state
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: retrying
+                - name: skipped
+            - name: nagios.jobs.latency
+              description: Nagios plugin execution latency
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: nagios.jobs.cpu
+              description: Nagios plugin CPU time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: cpu
+            - name: nagios.jobs.mem
+              description: Nagios plugin peak memory (RSS)
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: rss
+            - name: nagios.jobs.disk
+              description: Nagios plugin disk I/O
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+        - name: perfdata
+          description: |
+            Metrics extracted from the plugin's performance data output.
+            Each `label=value;warn;crit;min;max` entry produces a separate chart.
+          labels:
+            - name: nagios_job
+              description: Job name.
+            - name: nagios_plugin
+              description: Plugin executable.
+            - name: perf_label
+              description: Performance data label as emitted by the plugin.
+          metrics:
+            - name: nagios.{script}.{label}
+              description: Performance data metric (context is dynamic per plugin and label)
+              unit: varies
+              chart_type: line
+              dimensions:
+                - name: value
+        - name: scheduler
+          description: Scheduler-level metrics.
+          labels:
+            - name: nagios_scheduler
+              description: Scheduler name.
+          metrics:
+            - name: nagios.scheduler.jobs
+              description: Scheduler job status
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: queued
+                - name: scheduled
+            - name: nagios.scheduler.rate
+              description: Scheduler workload throughput
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: started
+                - name: finished
+                - name: skipped
+            - name: nagios.scheduler.next
+              description: Scheduler next run time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: next

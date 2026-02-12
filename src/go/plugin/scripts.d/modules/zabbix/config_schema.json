@@ -1,0 +1,664 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "scripts.d Zabbix job configuration",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "scheduler": {
+        "title": "Scheduler name",
+        "description": "Named scripts.d scheduler to execute this job (defaults to 'default')",
+        "type": "string"
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Polling interval in seconds (defaults to 60 when omitted)",
+        "type": "integer",
+        "minimum": 1
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Optional vnode identifier for routing results",
+        "type": "string"
+      },
+      "notes": {
+        "title": "Notes",
+        "type": "string"
+      },
+      "collection": {
+        "$ref": "#/definitions/Collection"
+      },
+      "lld": {
+        "$ref": "#/definitions/LLD"
+      },
+      "user_macros": {
+        "title": "User macros",
+        "description": "Key/value pairs exposed as $USERn$ templates (e.g. key USER1 becomes $USER1$).",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "dependent_pipelines": {
+        "title": "Dependent pipelines",
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "$ref": "#/definitions/Pipeline"
+        }
+      }
+    },
+    "required": [
+      "collection",
+      "dependent_pipelines"
+    ],
+    "definitions": {
+      "Collection": {
+        "type": "object",
+        "description": "Zabbix collection (master item) definition",
+        "oneOf": [
+          {
+            "$ref": "#/definitions/CollectionCommand"
+          },
+          {
+            "$ref": "#/definitions/CollectionHTTP"
+          },
+          {
+            "$ref": "#/definitions/CollectionSNMP"
+          }
+        ]
+      },
+      "CollectionCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "command"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string",
+            "minLength": 1
+          },
+          "args": {
+            "title": "Arguments",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeout": {
+            "$ref": "#/definitions/Duration"
+          },
+          "environment": {
+            "title": "Environment variables",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "command"
+        ]
+      },
+      "CollectionHTTP": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "http"
+          },
+          "http": {
+            "$ref": "#/definitions/HTTPConfig"
+          },
+          "timeout": {
+            "$ref": "#/definitions/Duration"
+          },
+          "headers": {
+            "title": "Legacy headers",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "body": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "http"
+                ]
+              },
+              {
+                "required": [
+                  "url"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "CollectionSNMP": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "snmp"
+          },
+          "snmp": {
+            "$ref": "#/definitions/SNMPConfig"
+          },
+          "timeout": {
+            "$ref": "#/definitions/Duration"
+          }
+        },
+        "required": [
+          "type",
+          "snmp"
+        ]
+      },
+      "HTTPConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "title": "URL",
+            "type": "string",
+            "format": "uri"
+          },
+          "method": {
+            "title": "HTTP method",
+            "type": "string",
+            "default": "GET"
+          },
+          "headers": {
+            "title": "Headers",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "body": {
+            "type": "string"
+          },
+          "tls": {
+            "title": "Force TLS",
+            "description": "When enabled, requests are sent via HTTPS (scheme upgraded if necessary).",
+            "type": "boolean"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "SNMPConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "title": "Target host",
+            "type": "string",
+            "minLength": 1
+          },
+          "oid": {
+            "title": "OID",
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "title": "SNMP version",
+            "type": "string",
+            "enum": [
+              "v1",
+              "v2c",
+              "v3",
+              "1",
+              "2c",
+              "3"
+            ],
+            "default": "v2c"
+          },
+          "community": {
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          },
+          "auth_password": {
+            "type": "string"
+          },
+          "privacy_password": {
+            "type": "string"
+          },
+          "auth_protocol": {
+            "type": "string",
+            "enum": [
+              "md5",
+              "sha",
+              "",
+              null
+            ]
+          },
+          "privacy_protocol": {
+            "type": "string",
+            "enum": [
+              "des",
+              "aes",
+              "",
+              null
+            ]
+          },
+          "context": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "oid"
+        ]
+      },
+      "LLD": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "steps": {
+            "title": "Discovery steps",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/definitions/Step"
+            }
+          },
+          "discovery_interval": {
+            "title": "Discovery interval",
+            "$ref": "#/definitions/Duration"
+          },
+          "instance_id_template": {
+            "title": "Instance ID template",
+            "type": "string"
+          },
+          "family": {
+            "title": "Default family",
+            "type": "string"
+          },
+          "labels": {
+            "title": "Labels",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "max_missing": {
+            "title": "Max missing",
+            "description": "Number of consecutive discovery misses before an instance is removed",
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "Pipeline": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Pipeline name",
+            "type": "string",
+            "minLength": 1
+          },
+          "context": {
+            "title": "Metric context",
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "title": "Chart title",
+            "type": "string"
+          },
+          "dimension": {
+            "title": "Dimension name",
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "title": "Units",
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "title": "Chart family",
+            "type": "string"
+          },
+          "chart_type": {
+            "title": "Chart type",
+            "type": "string",
+            "enum": [
+              "line",
+              "area",
+              "stacked"
+            ],
+            "default": "line"
+          },
+          "data_type": {
+            "title": "Data type",
+            "type": "string"
+          },
+          "precision": {
+            "title": "Precision",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "algorithm": {
+            "title": "Dimension algorithm",
+            "type": "string",
+            "enum": [
+              "absolute",
+              "incremental",
+              "percentage-of-absolute-row",
+              "percentage-of-incremental-row"
+            ],
+            "default": "absolute"
+          },
+          "steps": {
+            "title": "Preprocessing steps",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/definitions/Step"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "context",
+          "dimension",
+          "unit",
+          "steps"
+        ]
+      },
+      "Step": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "title": "Step type",
+            "type": "string",
+            "enum": [
+              "multiplier",
+              "rtrim",
+              "ltrim",
+              "trim",
+              "regex_substitution",
+              "bool_to_decimal",
+              "octal_to_decimal",
+              "hex_to_decimal",
+              "delta_value",
+              "delta_speed",
+              "xpath",
+              "jsonpath",
+              "validate_range",
+              "validate_regex",
+              "validate_not_regex",
+              "error_field_json",
+              "error_field_xml",
+              "error_field_regex",
+              "throttle_value",
+              "throttle_timed_value",
+              "javascript",
+              "prometheus_pattern",
+              "prometheus_to_json",
+              "csv_to_json",
+              "string_replace",
+              "validate_not_supported",
+              "xml_to_json",
+              "snmp_walk_value",
+              "snmp_walk_to_json",
+              "snmp_get_value",
+              "prometheus_to_json_multi",
+              "jsonpath_multi",
+              "snmp_walk_to_json_multi",
+              "csv_to_json_multi"
+            ]
+          },
+          "params": {
+            "title": "Parameters",
+            "type": "string"
+          },
+          "error_handler": {
+            "title": "Error handler",
+            "type": "string",
+            "enum": [
+              "default",
+              "discard",
+              "set-value",
+              "set-error"
+            ]
+          },
+          "error_handler_params": {
+            "title": "Error handler parameters",
+            "description": "Value used when error_handler is set to set-value or set-error",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "Duration": {
+        "title": "Duration",
+        "type": "string",
+        "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"
+      }
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "General",
+          "fields": [
+            "scheduler",
+            "update_every",
+            "vnode",
+            "notes"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "collection"
+          ]
+        },
+        {
+          "title": "Discovery",
+          "fields": [
+            "lld"
+          ]
+        },
+        {
+          "title": "Metrics Extraction",
+          "fields": [
+            "dependent_pipelines"
+          ]
+        }
+      ]
+    },
+    "scheduler": {
+      "ui:placeholder": "default"
+    },
+    "update_every": {
+      "ui:placeholder": "60",
+      "ui:help": "Seconds between runs. Leave empty to inherit the default interval."
+    },
+    "vnode": {
+      "ui:placeholder": "my-vnode"
+    },
+    "collection": {
+      "ui:help": "Defines how the master item collects raw data. Command collections can use standard Netdata macros as well as legacy Zabbix macros (e.g. {HOST.NAME}). HTTP/SNMP collections expose the same payload to all dependent pipelines.",
+      "type": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "command": {
+        "ui:placeholder": "/usr/lib/zabbix/externalscripts/myscript.sh"
+      },
+      "args": {
+        "ui:listFlavour": "list",
+        "items": {
+          "ui:placeholder": "{HOST.NAME}"
+        },
+        "ui:help": "Command arguments may use macros such as {HOST.NAME}, {#MACRO}, and positional $ARGn style placeholders."
+      },
+      "environment": {
+        "ui:help": "Optional environment variables exported before executing the collection command."
+      },
+      "http": {
+        "url": {
+          "ui:placeholder": "https://example/api/status"
+        },
+        "body": {
+          "ui:widget": "textarea",
+          "ui:options": {
+            "rows": 3
+          }
+        }
+      },
+      "snmp": {
+        "target": {
+          "ui:placeholder": "192.0.2.10"
+        },
+        "oid": {
+          "ui:placeholder": ".1.3.6.1.2.1.25.2.3.1.6"
+        },
+        "community": {
+          "ui:placeholder": "public"
+        }
+      }
+    },
+    "lld": {
+      "ui:help": "Optional discovery pipeline. When defined, each run must output a JSON array of macro maps (e.g. [{\"{#FSNAME}\":\"/\"}]). Leave empty to emit a single default instance.",
+      "steps": {
+        "ui:listFlavour": "list",
+        "items": {
+          "type": {
+            "ui:help": "Choose the preprocessing step (e.g. jsonpath, csv_to_json).",
+            "ui:placeholder": "jsonpath"
+          },
+          "params": {
+            "ui:widget": "textarea",
+            "ui:help": "Parameters can reference discovery macros (e.g. {#MACRO}) and will be rendered per execution.",
+            "ui:options": {
+              "rows": 3
+            }
+          },
+          "error_handler": {
+            "ui:widget": "radio",
+            "ui:options": {
+              "inline": true
+            }
+          },
+          "error_handler_params": {
+            "ui:help": "Value used when error_handler is set to set-value or set-error"
+          }
+        }
+      },
+      "instance_id_template": {
+        "ui:placeholder": "{#FSNAME}"
+      },
+      "labels": {
+        "ui:help": "Key/value templates that become Netdata labels (e.g. region: {#REGION})."
+      }
+    },
+    "dependent_pipelines": {
+      "ui:listFlavour": "list",
+      "ui:openEmptyItem": true,
+      "ui:help": "Each pipeline turns the shared collection payload into a Netdata metric. Use macros ({#MACRO}, {ITEM.VALUE}) to tailor chart metadata and preprocessing steps per instance.",
+      "items": {
+        "ui:flavour": "tabs",
+        "ui:options": {
+          "tabs": [
+            {
+              "title": "Metadata",
+              "fields": [
+                "name",
+                "context",
+                "title",
+                "dimension",
+                "unit",
+                "family",
+                "chart_type",
+                "data_type",
+                "precision",
+                "algorithm"
+              ]
+            },
+            {
+              "title": "Steps",
+              "fields": [
+                "steps"
+              ]
+            }
+          ]
+        },
+        "context": {
+          "ui:placeholder": "zabbix.fs.free"
+        },
+        "dimension": {
+          "ui:placeholder": "free"
+        },
+        "unit": {
+          "ui:placeholder": "MiB"
+        },
+        "steps": {
+          "ui:listFlavour": "list",
+          "items": {
+            "type": {
+              "ui:help": "Select the preprocessing step using the string enum (e.g. jsonpath, csv_to_json, snmp_walk_to_json).",
+              "ui:placeholder": "jsonpath"
+            },
+            "params": {
+              "ui:widget": "textarea",
+              "ui:help": "Step parameters. Macro substitution ({#MACRO}, {ITEM.VALUE}, {ITEM.VALUE1}) occurs before execution.",
+              "ui:options": {
+                "rows": 3
+              }
+            },
+            "error_handler": {
+              "ui:widget": "radio",
+              "ui:options": {
+                "inline": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
