@@ -8,7 +8,7 @@ modules:
         name: IBM DB2
         link: https://www.ibm.com/products/db2
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
         icon_filename: "ibm.svg"
       related_resources:
         integrations:

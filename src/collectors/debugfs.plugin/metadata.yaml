@@ -294,7 +294,7 @@ modules:
         name: Power Capping
         link: 'https://www.kernel.org/doc/html/next/power/powercap/powercap.html'
         categories:
-          - data-collection.operating-systems
+          - data-collection.hardware-and-sensors
         icon_filename: 'powersupply.svg'
       related_resources:
         integrations:

@@ -9,7 +9,7 @@ modules:
         name: Docker
         link: https://www.docker.com/
         categories:
-          - data-collection.containers-and-orchestration
+          - data-collection.containers-and-vms
         icon_filename: docker.svg
       related_resources:
         integrations:

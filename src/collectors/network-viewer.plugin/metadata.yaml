@@ -1,0 +1,90 @@
+plugin_name: network-viewer.plugin
+modules:
+  - meta:
+      id: collector-network-viewer.plugin
+      plugin_name: network-viewer.plugin
+      module_name: network-viewer.plugin
+      monitored_instance:
+        name: Network Connections
+        link: ""
+        categories:
+          - data-collection.networking
+        icon_filename: network.svg
+      alternative_monitored_instances: []
+      keywords:
+        - network
+        - connections
+        - sockets
+        - tcp
+        - udp
+        - ports
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: ""
+        method_description: |
+          This plugin reads the system's socket tables to enumerate all active network connections,
+          including TCP and UDP sockets in all states, for both IPv4 and IPv6.
+      supported_platforms:
+        include:
+          - description: Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The plugin automatically detects all active network connections on the system.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: ""
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: false
+          list: []
+        examples:
+          folding:
+            title: ""
+            enabled: false
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes: []
+    functions:
+      description: |
+        This plugin exposes a real-time function for viewing active network connections.
+      list:
+        - id: network-connections
+          name: Network Connections
+          description: |
+            Shows active network connections with protocol details, states, addresses, ports, and performance metrics.
+
+            Provides both aggregated and detailed views of TCP and UDP connections for IPv4 and IPv6,
+            including connection direction (listen, inbound, outbound, local), process information,
+            and TCP performance metrics (RTT, retransmissions).
+
+            Connections are classified as system or container based on network namespace.
+          parameters: []

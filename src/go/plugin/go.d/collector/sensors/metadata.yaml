@@ -9,7 +9,7 @@ modules:
         link: https://hwmon.wiki.kernel.org/lm_sensors
         icon_filename: "microchip.svg"
         categories:
-          - data-collection.hardware-and-iot
+          - data-collection.hardware-and-sensors
       keywords:
         - sensors
         - temperature

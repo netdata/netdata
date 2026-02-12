@@ -1,0 +1,170 @@
+plugin_name: otel.plugin
+modules:
+  - meta:
+      id: collector-otel.plugin-otel
+      plugin_name: otel.plugin
+      module_name: otel
+      monitored_instance:
+        name: OpenTelemetry
+        link: https://opentelemetry.io/
+        categories:
+          - data-collection.cloud-and-devops
+        icon_filename: opentelemetry.svg
+      alternative_monitored_instances: []
+      keywords:
+        - opentelemetry
+        - otel
+        - otlp
+        - grpc
+        - metrics
+        - logs
+        - observability
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This plugin ingests OpenTelemetry metrics and logs via the OTLP/gRPC protocol.
+
+          It receives OTLP-formatted data from any OpenTelemetry-compatible source (collectors, SDKs, instrumented applications)
+          and automatically creates Netdata charts for visualization and alerting.
+
+          For logs, it stores them in systemd-compatible journal files with configurable rotation and retention policies.
+        method_description: |
+          The plugin listens on a gRPC endpoint (default `127.0.0.1:4317`) for incoming OTLP data.
+          It supports both metrics and logs signals. Metrics are mapped to Netdata charts using configurable
+          mapping rules. Logs are stored in journal files for querying via the Netdata Logs tab.
+      supported_platforms:
+        include:
+          - description: Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The plugin starts automatically and listens on `127.0.0.1:4317` for incoming OTLP/gRPC connections.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: OpenTelemetry data source
+            description: |
+              An OpenTelemetry Collector, SDK, or instrumented application configured to send OTLP data
+              to the Netdata agent's gRPC endpoint.
+      configuration:
+        file:
+          name: otel.yaml
+        options:
+          description: |
+            The plugin is configured via `otel.yaml` in the Netdata configuration directory.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: endpoint.path
+              description: gRPC endpoint to listen on for incoming OTLP data.
+              default_value: "127.0.0.1:4317"
+              required: false
+            - name: endpoint.tls_cert_path
+              description: Path to TLS certificate file. Enables TLS when provided.
+              default_value: ""
+              required: false
+            - name: endpoint.tls_key_path
+              description: Path to TLS private key file. Required when TLS certificate is provided.
+              default_value: ""
+              required: false
+            - name: endpoint.tls_ca_cert_path
+              description: Path to TLS CA certificate file for client authentication.
+              default_value: ""
+              required: false
+            - name: metrics.chart_configs_dir
+              description: Directory with YAML files for mapping OTLP metrics to Netdata charts.
+              default_value: "otel.d/v1/metrics/"
+              required: false
+            - name: metrics.buffer_samples
+              description: Number of samples to buffer for collection interval detection.
+              default_value: 10
+              required: false
+            - name: metrics.throttle_charts
+              description: Maximum number of new charts to create per collection interval.
+              default_value: 100
+              required: false
+            - name: logs.journal_dir
+              description: Directory to store journal files for ingested logs.
+              default_value: ""
+              required: true
+            - name: logs.size_of_journal_file
+              description: Maximum file size before rotating to a new journal file.
+              default_value: "100MB"
+              required: false
+            - name: logs.entries_of_journal_file
+              description: Maximum log entries per journal file.
+              default_value: 50000
+              required: false
+            - name: logs.duration_of_journal_file
+              description: Maximum time span within a single journal file.
+              default_value: "2 hours"
+              required: false
+            - name: logs.number_of_journal_files
+              description: Maximum number of journal files to keep.
+              default_value: 10
+              required: false
+            - name: logs.size_of_journal_files
+              description: Maximum total size of all journal files.
+              default_value: "1GB"
+              required: false
+            - name: logs.duration_of_journal_files
+              description: Maximum age of journal files.
+              default_value: "7 days"
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic configuration
+              folding:
+                enabled: false
+              description: Listen on default endpoint with default settings.
+              config: |
+                endpoint:
+                  path: "127.0.0.1:4317"
+                metrics:
+                  chart_configs_dir: otel.d/v1/metrics/
+                  buffer_samples: 10
+                logs:
+                  journal_dir: /var/log/netdata/otel-journals
+            - name: TLS-enabled configuration
+              description: Listen with TLS enabled for secure connections.
+              config: |
+                endpoint:
+                  path: "0.0.0.0:4317"
+                  tls_cert_path: /etc/netdata/ssl/cert.pem
+                  tls_key_path: /etc/netdata/ssl/key.pem
+                metrics:
+                  chart_configs_dir: otel.d/v1/metrics/
+                  buffer_samples: 10
+                logs:
+                  journal_dir: /var/log/netdata/otel-journals
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Metrics are dynamically created based on the OpenTelemetry data received.
+        The specific metrics depend on the OTLP sources sending data to the plugin.
+      availability: []
+      scopes: []

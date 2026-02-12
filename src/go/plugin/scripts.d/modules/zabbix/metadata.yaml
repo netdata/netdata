@@ -9,7 +9,7 @@ modules:
         link: https://www.zabbix.com/
         icon_filename: zabbix.svg
         categories:
-          - data-collection.generic-data-collection
+          - data-collection.applications
       related_resources:
         integrations:
           list: []

@@ -317,7 +317,7 @@ modules:
         name: Physical and Logical Disk Performance Metrics
         link: "https://learn.microsoft.com/en-us/windows/win32/fileio/disk-management"
         categories:
-          - data-collection.operating-systems
+          - data-collection.storage
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -500,7 +500,7 @@ modules:
         name: Network Subsystem
         link: "https://learn.microsoft.com/en-us/windows/win32/networking"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -916,7 +916,7 @@ modules:
         name: Hardware information collected from kernel ring.
         link: "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -998,7 +998,7 @@ modules:
         name: System thermal zone
         link: "https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/design-guide"
         categories:
-          - data-collection.operating-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -1080,7 +1080,7 @@ modules:
         name: Power supply
         link: "https://learn.microsoft.com/en-us/windows/win32/power/power-management-portal"
         categories:
-          - data-collection.operating-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "powersupply.svg"
       related_resources:
         integrations:
@@ -1173,7 +1173,7 @@ modules:
         name: Sensors
         link: "https://learn.microsoft.com/en-us/windows/win32/sensorsapi/portal"
         categories:
-          - data-collection.operating-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -1399,7 +1399,7 @@ modules:
         name: IIS
         link: "https://www.iis.net/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.web-servers-and-proxies
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -1716,7 +1716,7 @@ modules:
         name: Hyper-V
         link: "https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/about/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.containers-and-vms
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -2084,7 +2084,7 @@ modules:
         name: MS SQL Server
         link: "https://www.microsoft.com/en-us/sql-server/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.databases
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -2707,7 +2707,7 @@ modules:
         name: NET Framework
         link: "https://dotnet.microsoft.com/en-us/learn/dotnet/what-is-dotnet-framework"
         categories:
-          - data-collection.operating-systems
+          - data-collection.applications
         icon_filename: "dotnet.svg"
       related_resources:
         integrations:
@@ -2973,7 +2973,7 @@ modules:
         name: Active Directory
         link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview"
         categories:
-          - data-collection.operating-systems
+          - data-collection.applications
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3139,7 +3139,7 @@ modules:
         name: Active Directory Certificate Service
         link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-cs/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.applications
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3316,7 +3316,7 @@ modules:
         name: Active Directory Federation Service
         link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-fs/ad-fs-overview"
         categories:
-          - data-collection.operating-systems
+          - data-collection.applications
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3686,7 +3686,7 @@ modules:
         name: MS Exchange
         link: "https://www.microsoft.com/en-us/microsoft-365/exchange/email"
         categories:
-          - data-collection.operating-systems
+          - data-collection.applications
         icon_filename: "exchange.svg"
       related_resources:
         integrations:
@@ -4037,7 +4037,7 @@ modules:
         name: ASP.NET
         link: "https://dotnet.microsoft.com/en-us/apps/aspnet"
         categories:
-          - data-collection.operating-systems
+          - data-collection.web-servers-and-proxies
         icon_filename: "windows.svg"
       related_resources:
         integrations:

@@ -322,7 +322,7 @@ modules:
         name: dev.cpu.temperature
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -1495,7 +1495,7 @@ modules:
         name: net.isr
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -1609,7 +1609,7 @@ modules:
         name: devstat
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.storage
         icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
@@ -1801,7 +1801,7 @@ modules:
         name: net.inet.tcp.states
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -1883,7 +1883,7 @@ modules:
         name: net.inet.tcp.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2070,7 +2070,7 @@ modules:
         name: net.inet.udp.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2172,7 +2172,7 @@ modules:
         name: net.inet.icmp.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2275,7 +2275,7 @@ modules:
         name: net.inet.ip.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2394,7 +2394,7 @@ modules:
         name: net.inet6.ip6.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2515,7 +2515,7 @@ modules:
         name: net.inet6.icmp6.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2681,7 +2681,7 @@ modules:
         name: ipfw
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "firewall.svg"
       related_resources:
         integrations:
@@ -2791,7 +2791,7 @@ modules:
         name: getifaddrs
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -3011,7 +3011,7 @@ modules:
         name: getmntinfo
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.storage
         icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
@@ -3124,7 +3124,7 @@ modules:
         name: zfs
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.operating-systems
+          - data-collection.storage
         icon_filename: "filesystem.svg"
       related_resources:
         integrations:

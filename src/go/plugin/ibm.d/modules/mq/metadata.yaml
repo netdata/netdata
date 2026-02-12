@@ -8,7 +8,7 @@ modules:
         name: IBM MQ
         link: https://www.ibm.com/products/mq
         categories:
-          - data-collection.message-brokers
+          - data-collection.databases
         icon_filename: "ibm-mq.svg"
       related_resources:
         integrations:
