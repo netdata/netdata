@@ -42,7 +42,8 @@ impl ChartWriter {
         self.buffer.put_slice(b"' '");
         self.buffer.put_slice(metadata.context.as_bytes());
         self.buffer.put_slice(b"' ");
-        self.buffer.put_slice(metadata.chart_type.as_str().as_bytes());
+        self.buffer
+            .put_slice(metadata.chart_type.as_str().as_bytes());
         self.buffer.put_slice(b" ");
         self.write_i64(metadata.priority);
         self.buffer.put_slice(b" ");
@@ -201,7 +202,10 @@ mod tests {
         writer.end_chart(UNIX_EPOCH + Duration::from_secs(1609459200)); // 2021-01-01 00:00:00 UTC
 
         let output = String::from_utf8_lossy(&writer.buffer);
-        assert_eq!(output, "BEGIN test.chart 1000000\nSET value1 = 42\nSET value2 = 13\nEND 1609459200\n");
+        assert_eq!(
+            output,
+            "BEGIN test.chart 1000000\nSET value1 = 42\nSET value2 = 13\nEND 1609459200\n"
+        );
     }
 
     #[test]

@@ -2,7 +2,7 @@
 
 use super::metadata::{ChartMetadata, ChartType, DimensionAlgorithm, DimensionMetadata};
 use super::writer::ChartWriter;
-use schemars::{schema_for, JsonSchema};
+use schemars::{JsonSchema, schema_for};
 use serde_json::Value;
 
 /// Trait for writing chart dimensions efficiently.
@@ -142,7 +142,10 @@ fn extract_chart_metadata<T: serde::Serialize>(schema: &T) -> ChartMetadata {
 }
 
 /// Extract dimension metadata from a field schema
-fn extract_dimension_metadata(field_name: &str, field_obj: &serde_json::Map<String, Value>) -> DimensionMetadata {
+fn extract_dimension_metadata(
+    field_name: &str,
+    field_obj: &serde_json::Map<String, Value>,
+) -> DimensionMetadata {
     let mut dim = DimensionMetadata::new(field_name);
 
     if let Some(name) = extract_string_from_json(field_obj, "x-dimension-name") {
@@ -176,9 +179,7 @@ fn extract_dimension_metadata(field_name: &str, field_obj: &serde_json::Map<Stri
 
 /// Helper to extract string from JSON object
 fn extract_string_from_json(obj: &serde_json::Map<String, Value>, key: &str) -> Option<String> {
-    obj.get(key)
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
+    obj.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
 }
 
 /// Helper to extract i64 from JSON object

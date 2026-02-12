@@ -330,14 +330,24 @@ prepare_cmake_options() {
   fi
 
   if [ -z "${ENABLE_SYSTEMD_JOURNAL}" ]; then
-    if command -v rustc > /dev/null 2>&1; then
-      ENABLE_SYSTEMD_JOURNAL=1
+    if check_for_module libsystemd; then
+      if check_for_module libelogind; then
+        ENABLE_SYSTEMD_JOURNAL=0
+      else
+        ENABLE_SYSTEMD_JOURNAL=1
+      fi
     else
       ENABLE_SYSTEMD_JOURNAL=0
     fi
   fi
 
-  enable_feature NETDATA_JOURNAL_FILE_READER "${ENABLE_SYSTEMD_JOURNAL}"
+  enable_feature PLUGIN_SYSTEMD_JOURNAL "${ENABLE_SYSTEMD_JOURNAL}"
+
+  if [ "${ENABLE_SYSTEMD_JOURNAL}" -eq 1 ] && [ -n "${USE_RUST_JOURNAL_FILE}" ]; then
+    enable_feature NETDATA_JOURNAL_FILE_READER 1
+  else
+    enable_feature NETDATA_JOURNAL_FILE_READER 0
+  fi
 
   if check_for_module 'libsystemd >= 221'; then
     enable_feature PLUGIN_SYSTEMD_UNITS 1
@@ -368,6 +378,7 @@ prepare_cmake_options() {
   enable_feature ML "${NETDATA_ENABLE_ML:-1}"
   enable_feature PLUGIN_APPS "${ENABLE_APPS:-1}"
   enable_feature PLUGIN_OTEL "${ENABLE_OTEL:-0}"
+  enable_feature PLUGIN_OTEL_SIGNAL_VIEWER "${ENABLE_OTEL_SIGNAL_VIEWER:-0}"
   enable_feature PLUGIN_IBM "${ENABLE_IBM:-0}"
 
   check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy

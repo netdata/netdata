@@ -1,0 +1,46 @@
+# HELP DCGM_FI_DEV_GPU_UTIL GPU utilization (in %).
+# TYPE DCGM_FI_DEV_GPU_UTIL gauge
+DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-aaa",Hostname="host1"} 80
+
+# HELP DCGM_FI_DEV_FB_USED Framebuffer memory used (in MiB).
+# TYPE DCGM_FI_DEV_FB_USED gauge
+DCGM_FI_DEV_FB_USED{gpu="0",UUID="GPU-aaa",Hostname="host1"} 1024
+
+# HELP DCGM_FI_DEV_XID_ERRORS Value of the last XID error encountered.
+# TYPE DCGM_FI_DEV_XID_ERRORS gauge
+DCGM_FI_DEV_XID_ERRORS{gpu="0",UUID="GPU-aaa"} 31
+
+# HELP DCGM_FI_DEV_ROW_REMAP_FAILURE Whether remapping of rows has failed.
+# TYPE DCGM_FI_DEV_ROW_REMAP_FAILURE gauge
+DCGM_FI_DEV_ROW_REMAP_FAILURE{gpu="0",UUID="GPU-aaa"} 1
+
+# HELP DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS Number of remapped rows for uncorrectable errors.
+# TYPE DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS counter
+DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS{gpu="0",UUID="GPU-aaa"} 7
+
+# HELP DCGM_FI_DEV_POWER_VIOLATION Throttling duration due to power constraints (in ns).
+# TYPE DCGM_FI_DEV_POWER_VIOLATION counter
+DCGM_FI_DEV_POWER_VIOLATION{gpu="0",UUID="GPU-aaa"} 2000000
+
+# HELP DCGM_FI_DEV_THERMAL_VIOLATION Throttling duration due to thermal constraints (in ns).
+# TYPE DCGM_FI_DEV_THERMAL_VIOLATION counter
+DCGM_FI_DEV_THERMAL_VIOLATION{gpu="0",UUID="GPU-aaa"} 5000000
+
+# HELP DCGM_FI_DEV_MEMORY_TEMP Memory temperature (in C).
+# TYPE DCGM_FI_DEV_MEMORY_TEMP gauge
+DCGM_FI_DEV_MEMORY_TEMP{gpu="0",UUID="GPU-aaa"} 9223372036854775794
+
+# HELP DCGM_FI_PROF_PCIE_TX_BYTES PCIe TX bytes.
+# TYPE DCGM_FI_PROF_PCIE_TX_BYTES gauge
+DCGM_FI_PROF_PCIE_TX_BYTES{gpu="0",UUID="GPU-aaa"} 123456
+
+# HELP DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_TOTAL Total number of NVLink retries.
+# TYPE DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_TOTAL counter
+DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_TOTAL{gpu="0",gpu_uuid="GPU-aaa",nvlink="1"} 4
+
+# MIG sample for the same DCGM_FI_DEV_GPU_UTIL metric family.
+DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-aaa",GPU_I_ID="2",GPU_I_PROFILE="1g.10gb"} 60
+
+# HELP go_gc_duration_seconds A Go runtime metric that should be ignored by the collector.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0.5"} 0.001

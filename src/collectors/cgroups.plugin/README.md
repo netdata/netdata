@@ -12,6 +12,40 @@ To visualize cgroup metrics Netdata provides configuration for cherry-picking th
 Netdata should pick **systemd services**, all kinds of **containers** (lxc, docker, etc.) and **virtual machines** spawn
 by managers that register them with cgroups (qemu, libvirt, etc.).
 
+## Supported Technologies
+
+cgroups.plugin monitors **any process** that creates Linux cgroups. For the following technologies, Netdata also
+resolves friendly names (e.g., showing "my-web-app" instead of a raw cgroup path like
+`/sys/fs/cgroup/system.slice/docker-abc123.scope`).
+
+The **Naming** column below indicates whether Netdata can resolve the cgroup path to a human-readable name
+(e.g., the container name, VM name, or service name):
+
+| Technology | Naming |
+|:---|:---:|
+| Docker | Yes |
+| Podman | Yes |
+| Kubernetes pods/containers | Yes |
+| Nomad (via Docker) | Yes |
+| AWS ECS (via Docker) | Yes |
+| containerd (via Docker) | Yes |
+| Proxmox QEMU/KVM VMs | Yes |
+| Proxmox LXC containers | Yes |
+| libvirt QEMU/KVM VMs | Yes |
+| libvirt LXC containers | Yes |
+| LXC 4.0+ (including Incus) | Yes |
+| systemd-nspawn | Yes |
+| Systemd services | Yes |
+| KubeVirt VMs (in K8s) | Partial |
+
+Technologies that use the above as their underlying infrastructure are also covered. For example:
+- **OpenShift** and other Kubernetes distributions (k3s, RKE, RKE2, MicroK8s, EKS, GKE, AKS) — via Kubernetes cgroup paths
+- **OpenStack Nova** — via libvirt/QEMU cgroup paths
+- **oVirt / RHV** — via libvirt/QEMU cgroup paths
+
+Any other technology creating Linux cgroups is **monitored** (CPU, memory, disk I/O, network), but will show its
+raw cgroup path as the name.
+
 ## Configuring Netdata for cgroups
 
 In general, no additional settings are required. Netdata discovers all available cgroups on the host system and

@@ -625,7 +625,10 @@ pub fn systemd_transformations() -> TransformationRegistry {
     registry.register("MESSAGE_ID", Arc::new(MessageIdTransformation));
 
     // OpenTelemetry log fields
-    registry.register("log.severity_number", Arc::new(OtelSeverityNumberTransformation));
+    registry.register(
+        "log.severity_number",
+        Arc::new(OtelSeverityNumberTransformation),
+    );
 
     // Also register variations that exist in the wild
     registry.register("OBJECT_UID", Arc::new(UidTransformation));

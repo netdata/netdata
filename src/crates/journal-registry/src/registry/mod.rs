@@ -17,7 +17,7 @@ use notify::{
 };
 use parking_lot::RwLock;
 use std::sync::Arc;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{error, info, trace, warn};
 
 mod monitor;
 pub use monitor::Monitor;
@@ -186,7 +186,7 @@ impl Registry {
 
         // Insert all discovered files into repository (automatically initializes metadata)
         for file in files {
-            debug!("adding file to repository: {:?}", file.path());
+            trace!("adding file to repository: {:?}", file.path());
 
             if let Err(e) = inner.repository.insert(file) {
                 error!("failed to insert file into repository: {}", e);
@@ -227,7 +227,7 @@ impl Registry {
         match event.kind {
             EventKind::Create(_) => {
                 for path in &event.paths {
-                    debug!("adding file to repository: {:?}", path);
+                    trace!("adding file to repository: {:?}", path);
 
                     if let Some(file) = File::from_path(path) {
                         if let Err(e) = inner.repository.insert(file) {
@@ -240,7 +240,7 @@ impl Registry {
             }
             EventKind::Remove(_) => {
                 for path in &event.paths {
-                    debug!("removing file from repository: {:?}", path);
+                    trace!("removing file from repository: {:?}", path);
 
                     if let Some(file) = File::from_path(path) {
                         if let Err(e) = inner.repository.remove(&file) {
@@ -284,10 +284,9 @@ impl Registry {
                     rename_mode
                 );
             }
-            event_kind => {
-                // Ignore other events (content modifications, access, etc.)
-                trace!("ignoring notify event kind: {:?}", event_kind);
-            }
+
+            // Ignore other events (content modifications, access, etc.)
+            _ => {}
         }
         Ok(())
     }

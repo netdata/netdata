@@ -11,13 +11,10 @@ pub mod netdata;
 // Re-export types from journal-engine for convenience
 pub use journal_engine::{
     BucketRequest, BucketResponse, CellValue, ColumnInfo, Facets, FileIndexCache,
-    FileIndexCacheBuilder, FileIndexKey, Histogram, HistogramEngine, IndexingLimits,
-    LogEntryData, LogQuery, QueryTimeRange, Result, Table, batch_compute_file_indexes,
-    calculate_bucket_duration, entry_data_to_table,
+    FileIndexCacheBuilder, FileIndexKey, Histogram, HistogramEngine, IndexingLimits, LogEntryData,
+    LogQuery, QueryTimeRange, Result, Table, batch_compute_file_indexes, calculate_bucket_duration,
+    entry_data_to_table,
 };
-
-// Re-export Timeout from foundation (via rt for backward compatibility)
-pub use rt::Timeout;
 
 // Re-export Netdata-specific charts/metrics
 pub use charts::{

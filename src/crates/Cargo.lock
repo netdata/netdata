@@ -856,13 +856,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "foundation"
-version = "0.1.3"
-dependencies = [
- "tokio",
-]
-
-[[package]]
 name = "foyer"
 version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1623,7 +1616,6 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
- "foundation",
  "foyer",
  "futures",
  "journal-common",
@@ -1639,6 +1631,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
  "uuid",
@@ -1722,35 +1715,6 @@ dependencies = [
  "tracing",
  "uuid",
  "walkdir",
-]
-
-[[package]]
-name = "journal-viewer-plugin"
-version = "0.1.3"
-dependencies = [
- "anyhow",
- "async-trait",
- "bytesize",
- "bytesize-serde",
- "foyer",
- "journal-core",
- "journal-function",
- "journal-index",
- "journal-registry",
- "netdata-plugin-error",
- "netdata-plugin-protocol",
- "netdata-plugin-schema",
- "notify",
- "num_cpus",
- "parking_lot",
- "rt",
- "schemars",
- "serde",
- "serde_json",
- "serde_yaml",
- "thiserror",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -2284,6 +2248,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "otel-signal-viewer-plugin"
+version = "0.1.3"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytesize",
+ "bytesize-serde",
+ "foyer",
+ "journal-core",
+ "journal-function",
+ "journal-index",
+ "journal-registry",
+ "netdata-plugin-error",
+ "netdata-plugin-protocol",
+ "netdata-plugin-schema",
+ "notify",
+ "num_cpus",
+ "parking_lot",
+ "rt",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "panic-message"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2740,7 +2734,6 @@ dependencies = [
  "async-trait",
  "bytes",
  "console-subscriber",
- "foundation",
  "futures",
  "itoa",
  "netdata-plugin-charts-derive",

@@ -104,6 +104,8 @@ const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, "
     "unique_id INT, date_created INT,  UNIQUE(host_id, health_log_id))",
 
+    "CREATE TABLE IF NOT EXISTS alert_hash_cloud (hash_id BLOB PRIMARY KEY)",
+
     "CREATE TABLE IF NOT EXISTS ctx_metadata_cleanup (id INTEGER PRIMARY KEY, host_id BLOB, context TEXT NOT NULL, date_created INT NOT NULL, "
     "UNIQUE (host_id, context))",
 
@@ -124,6 +126,7 @@ const char *database_cleanup[] = {
     "DROP INDEX IF EXISTS health_log_d_ind_4",
     "DROP INDEX IF EXISTS health_log_d_ind_1",
     "DROP INDEX IF EXISTS health_log_d_ind_5",
+    "DELETE FROM alert_hash_cloud WHERE hash_id NOT IN (SELECT hash_id FROM alert_hash)",
     NULL
 };
 
@@ -1542,10 +1545,9 @@ static cmd_data_t metadata_deq_cmd()
     return ret;
 }
 
-static void async_cb(uv_async_t *handle)
+static void async_cb(uv_async_t *handle __maybe_unused)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
+    ;
 }
 
 #define TIMER_INITIAL_PERIOD_MS (1000)
@@ -1553,9 +1555,6 @@ static void async_cb(uv_async_t *handle)
 
 static void timer_cb(uv_timer_t *handle)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
-
    struct meta_config_s *config = handle->data;
    if (config->metadata_check_after <  now_realtime_sec())
        config->store_metadata = true;

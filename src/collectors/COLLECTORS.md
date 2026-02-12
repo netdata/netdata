@@ -160,18 +160,26 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 
 | Integration | Description |
 |-------------|-------------|
-| [Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/containers.md) | Monitor Containers for performance, resource usage, and health status. |
+| [AWS ECS Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/aws_ecs_containers.md) | Monitor AWS ECS container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
+| [containerd Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/containerd_containers.md) | Monitor containerd container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
+| [Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/containers.md) | Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
 | [Docker](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/docker/integrations/docker.md) | This collector monitors Docker containers state, health status and more. |
+| [Docker Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/docker_containers.md) | Monitor Docker container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
 | [Docker Engine](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/docker_engine/integrations/docker_engine.md) | This collector monitors the activity and health of Docker Engine and Docker Swarm. |
 | [Docker Hub repository](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/dockerhub/integrations/docker_hub_repository.md) | This collector keeps track of DockerHub repositories statistics such as the number of stars, pulls, current status, and more. |
-| [Libvirt Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/libvirt_containers.md) | Monitor Libvirt for performance, resource usage, and health status. |
-| [LXC Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/lxc_containers.md) | Monitor LXC Containers for performance, resource usage, and health status. |
-| [oVirt Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/ovirt_containers.md) | Monitor oVirt for performance, resource usage, and health status. |
+| [Libvirt VMs and Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/libvirt_vms_and_containers.md) | Monitor libvirt-managed VM and container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
+| [LXC Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/lxc_containers.md) | Monitor LXC/LXD/Incus container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
+| [Nomad Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/nomad_containers.md) | Monitor HashiCorp Nomad container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
+| [OpenShift Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/openshift_containers.md) | Monitor Red Hat OpenShift container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
+| [OpenStack VMs](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/openstack_vms.md) | Monitor OpenStack Nova virtual machine resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
+| [oVirt VMs](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/ovirt_vms.md) | Monitor oVirt/RHEV virtual machine resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
 | [Podman](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/podman.md) | Keep tabs on Podman container runtime metrics for efficient container management and performance. |
-| [Proxmox Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/proxmox_containers.md) | Monitor Proxmox for performance, resource usage, and health status. |
+| [Podman Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/podman_containers.md) | Monitor Podman container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
 | [Proxmox VE](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/proxmox_ve.md) | Keep tabs on Proxmox Virtual Environment metrics for efficient virtualization and container management. |
+| [Proxmox VMs and Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/proxmox_vms_and_containers.md) | Monitor Proxmox VE virtual machine and container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
+| [systemd-nspawn Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/systemd-nspawn_containers.md) | Monitor systemd-nspawn container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
 | [vCenter Server Appliance](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/vcsa/integrations/vcenter_server_appliance.md) | This collector monitors [health statistics](https://developer.vmware.com/apis/vsphere-automation/latest/appliance/health/) of vCenter Server Appliance servers. |
-| [Virtual Machines](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/virtual_machines.md) | Monitor Virtual Machines for performance, resource usage, and health status. |
+| [Virtual Machines](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/virtual_machines.md) | Monitor virtual machine resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
 | [VMware vCenter Server](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/vsphere/integrations/vmware_vcenter_server.md) | This collector monitors hosts and vms performance statistics from `vCenter` servers. |
 | [Xen XCP-ng](https://github.com/netdata/netdata/blob/master/src/collectors/xenstat.plugin/integrations/xen_xcp-ng.md) | This collector monitors XenServer and XCP-ng host and domains statistics. |
 
@@ -224,7 +232,8 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Kubelet](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/k8s_kubelet/integrations/kubelet.md) | This collector monitors Kubelet instances. |
 | [Kubeproxy](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/k8s_kubeproxy/integrations/kubeproxy.md) | This collector monitors Kubeproxy instances. |
 | [Kubernetes Cluster State](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/k8s_state/integrations/kubernetes_cluster_state.md) | This collector monitors Kubernetes Nodes, Pods and Containers. |
-| [Kubernetes Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/kubernetes_containers.md) | Monitor Containers for performance, resource usage, and health status. |
+| [Kubernetes Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/kubernetes_containers.md) | Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
+| [OpenShift Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/openshift_containers.md) | Monitor Red Hat OpenShift container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
 
 ### Incident Management
 
@@ -340,6 +349,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Intel GPU](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/intelgpu/integrations/intel_gpu.md) | This collector gathers performance metrics for Intel integrated GPUs. |
 | [Intelligent Platform Management Interface (IPMI)](https://github.com/netdata/netdata/blob/master/src/collectors/freeipmi.plugin/integrations/intelligent_platform_management_interface_ipmi.md) | "Monitor enterprise server sensor readings, event log entries, and hardware statuses to ensure reliable server operations." |
 | [Linux Sensors](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/sensors/integrations/linux_sensors.md) | This collector gathers real-time system sensor statistics using the [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) interface. |
+| [NVIDIA DCGM Exporter](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/dcgm/integrations/nvidia_dcgm_exporter.md) | This collector gathers NVIDIA GPU telemetry from a `dcgm-exporter` endpoint. |
 | [Nvidia GPU](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/nvidia_smi/integrations/nvidia_gpu.md) | This collector monitors GPUs performance metrics using the [nvidia-smi](https://developer.nvidia.com/nvidia-system-management-interface) CLI tool. |
 | [Raritan PDU](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/raritan_pdu.md) | Monitor Raritan Power Distribution Unit (PDU) metrics for efficient power management and monitoring. |
 | [S.M.A.R.T.](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/smartctl/integrations/s.m.a.r.t..md) | This collector monitors the health status of storage devices by analyzing S.M.A.R.T. |
@@ -602,7 +612,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 
 | Integration | Description |
 |-------------|-------------|
-| [Systemd Services](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/systemd_services.md) | Monitor Containers for performance, resource usage, and health status. |
+| [Systemd Services](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/systemd_services.md) | Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
 | [Systemd Units](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/systemdunits/integrations/systemd_units.md) | This collector monitors the state of Systemd units and unit files. |
 | [systemd-logind users](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/logind/integrations/systemd-logind_users.md) | This collector monitors number of sessions and users as reported by the `org.freedesktop.login1` DBus API. |
 

@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+exclude = ["jf"]
 members = [
     # Individual crates
     "journal-common",
@@ -11,7 +12,6 @@ members = [
     "rdp",
 
     # Netdata plugin workspace members
-    "netdata-plugin/foundation",
     "netdata-plugin/error",
     "netdata-plugin/protocol",
     "netdata-plugin/rt",
@@ -22,7 +22,7 @@ members = [
 
     # Netdata log viewer workspace members
     "netdata-log-viewer/journal-function",
-    "netdata-log-viewer/journal-viewer-plugin",
+    "netdata-log-viewer/otel-signal-viewer-plugin",
 
     # Netdata OTEL workspace members
     "netdata-otel/otel-plugin",
@@ -136,7 +136,6 @@ journalctl = { path = "journalctl" }
 rdp = { path = "rdp" }
 
 # Netdata plugin crates
-foundation = { path = "netdata-plugin/foundation" }
 netdata-plugin-error = { path = "netdata-plugin/error" }
 netdata-plugin-protocol = { path = "netdata-plugin/protocol" }
 netdata-plugin-rt = { path = "netdata-plugin/rt" }
@@ -148,7 +147,7 @@ rt = { path = "netdata-plugin/rt" }
 
 # Netdata log viewer crates
 journal-function = { path = "netdata-log-viewer/journal-function" }
-journal-viewer-plugin = { path = "netdata-log-viewer/journal-viewer-plugin" }
+otel-signal-viewer-plugin = { path = "netdata-log-viewer/otel-signal-viewer-plugin" }
 
 # Netdata OTEL crates
 otel-plugin = { path = "netdata-otel/otel-plugin" }

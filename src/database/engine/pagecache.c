@@ -35,7 +35,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
         time_t end_time_s = entries_array[Index].end_time_s;
         struct page_descr_with_data *descr = page_descriptor_get();
 
-        descr->id = mrg_metric_uuid(main_mrg, (METRIC *) entries_array[Index].metric_id);
+        descr->uuid_id = mrg_metric_uuidmap_id_dup(main_mrg, (METRIC *) entries_array[Index].metric_id);
         descr->metric_id = entries_array[Index].metric_id;
         descr->start_time_ut = start_time_s * USEC_PER_SEC;
         descr->end_time_ut = end_time_s * USEC_PER_SEC;

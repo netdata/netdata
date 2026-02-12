@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = [
+    "error",
+    "journal_file",
+    "journal_reader_ffi",
+    "window_manager",
+    "sigbus",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+
+[workspace.dependencies]
+memmap2 = "0.9"
+zerocopy = { version = "0.9.0-alpha.0", features = ["derive"] }
+thiserror = "2"
+rand = "0.9"
+siphasher = "1.0"
+twox-hash = { version = "2.1", default-features = false, features = ["std"] }
+static_assertions = "1.1"
+serde_json = "1.0"
+ruzstd = "0.8"
+libc = "0.2"
+hex = "0.4"
+tempfile = "3"
+
+[profile.release]
+lto = true
+codegen-units = 1
