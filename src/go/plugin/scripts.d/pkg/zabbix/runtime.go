@@ -434,8 +434,8 @@ func buildCollectionMacros(cfg JobConfig, job runtime.JobRuntime) map[string]str
 	if host == "" {
 		host = cfg.Name
 	}
-	alias := firstNonEmpty(strings.TrimSpace(job.Vnode.Alias), host)
-	ip := strings.TrimSpace(job.Vnode.Address)
+	alias := firstNonEmpty(strings.TrimSpace(job.Vnode.Labels["_alias"]), host)
+	ip := strings.TrimSpace(job.Vnode.Labels["_address"])
 	conn := firstNonEmpty(ip, host)
 	macros["{HOST.NAME}"] = host
 	macros["{HOST.HOST}"] = host

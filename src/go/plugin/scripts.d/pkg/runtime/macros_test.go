@@ -20,10 +20,12 @@ func TestBuildMacroSet(t *testing.T) {
 		UserMacros: map[string]string{"USER1": "/usr/lib/nagios/plugins"},
 		Vnode: VnodeInfo{
 			Hostname: "web1",
-			Address:  "192.0.2.10",
-			Alias:    "web-node",
-			Custom:   map[string]string{"DATACENTER": "us-east-1"},
-			Labels:   map[string]string{"role": "frontend"},
+			Labels: map[string]string{
+				"_address":    "192.0.2.10",
+				"_alias":      "web-node",
+				"_DATACENTER": "us-east-1",
+				"role":        "frontend",
+			},
 		},
 		State: StateInfo{ServiceState: "OK", ServiceAttempt: 2, ServiceMaxAttempts: 5, HostState: "UP", HostStateID: "0"},
 	}

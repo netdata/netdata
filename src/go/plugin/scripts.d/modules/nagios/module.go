@@ -355,10 +355,18 @@ func (c *Collector) refreshVnodeInfo() {
 		}
 		converted := runtime.VnodeInfo{
 			Hostname: firstNonEmpty(vnode.Hostname, vnode.Name, key),
-			Alias:    firstNonEmpty(vnode.Alias, vnode.Name, key),
-			Address:  firstNonEmpty(vnode.Address, vnode.Labels["address"], vnode.Labels["_net_default_iface_ip"]),
 			Labels:   maps.Clone(vnode.Labels),
-			Custom:   maps.Clone(vnode.Custom),
+		}
+		if converted.Labels == nil {
+			converted.Labels = make(map[string]string)
+		}
+		if _, ok := converted.Labels["_alias"]; !ok {
+			converted.Labels["_alias"] = firstNonEmpty(vnode.Name, key)
+		}
+		if _, ok := converted.Labels["_address"]; !ok {
+			if v := vnode.Labels["_net_default_iface_ip"]; v != "" {
+				converted.Labels["_address"] = v
+			}
 		}
 		for _, alias := range []string{key, vnode.Hostname, vnode.Name, vnode.GUID} {
 			if alias == "" {
@@ -386,11 +394,6 @@ func cloneVnodeInfo(src runtime.VnodeInfo) runtime.VnodeInfo {
 		clone.Labels = maps.Clone(src.Labels)
 	} else {
 		clone.Labels = nil
-	}
-	if len(src.Custom) > 0 {
-		clone.Custom = maps.Clone(src.Custom)
-	} else {
-		clone.Custom = nil
 	}
 	return clone
 }
@@ -439,10 +442,7 @@ func (c *Collector) setCurrentVnode(info runtime.VnodeInfo) {
 	converted := &vnodes.VirtualNode{
 		Name:     info.Hostname,
 		Hostname: info.Hostname,
-		Alias:    info.Alias,
-		Address:  info.Address,
 		Labels:   maps.Clone(info.Labels),
-		Custom:   maps.Clone(info.Custom),
 	}
 	c.vnodeMu.Lock()
 	c.currentVnode = converted

@@ -14,30 +14,9 @@
         "description": "Uniquely identifies the node. Must be in [UUID format](https://www.guidgen.com/). Changing this value will result in creating a **new Virtual Node** - the existing Virtual Node and its history will not be modified.",
         "type": "string"
       },
-      "address": {
-        "title": "Address",
-        "description": "Optional IP address or DNS name that plugins can use for $HOSTADDRESS$ macros.",
-        "type": ["string", "null"]
-      },
-      "alias": {
-        "title": "Alias",
-        "description": "Optional human-readable alias exposed via $HOSTALIAS$.",
-        "type": ["string", "null"]
-      },
       "labels": {
         "title": "Labels",
-        "description": "Optional key-value pairs that help categorize and organize virtual nodes.",
-        "type": [
-          "object",
-          "null"
-        ],
-        "additionalProperties": {
-          "type": "string"
-        }
-      },
-      "custom_vars": {
-        "title": "Custom host variables",
-        "description": "Optional key-value pairs exposed to plugins as $_HOSTVAR$ macros.",
+        "description": "Optional key-value pairs that help categorize and organize virtual nodes. Labels prefixed with `_` have special meaning for the scripts.d plugin: `_address` maps to $HOSTADDRESS$, `_alias` maps to $HOSTALIAS$, and other `_`-prefixed keys (e.g. `_DATACENTER`) map to $_HOST*$ custom variables.",
         "type": [
           "object",
           "null"

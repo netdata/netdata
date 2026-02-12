@@ -20,12 +20,14 @@ type MacroContext struct {
 }
 
 // VnodeInfo mirrors the subset of data needed from Netdata virtual nodes.
+// Nagios-specific fields are derived from labels using prefix conventions:
+//   - "_address" label  → $HOSTADDRESS$
+//   - "_alias" label    → $HOSTALIAS$
+//   - "_" prefixed keys → $_HOST*$ custom variables (prefix stripped)
+//   - other keys        → $_HOSTLABEL_*$ label macros
 type VnodeInfo struct {
 	Hostname string
-	Address  string
-	Alias    string
 	Labels   map[string]string
-	Custom   map[string]string
 }
 
 // StateInfo contains runtime state variables for macros (SERVICESTATE, etc.).
@@ -58,8 +60,8 @@ func BuildMacroSet(ctx MacroContext) MacroSet {
 	set("NAGIOS_PLUGIN", ctx.Job.Plugin)
 	set("NAGIOS_JOB", ctx.Job.Name)
 	set("NAGIOS_HOSTNAME", firstNonEmpty(ctx.Job.Vnode, ctx.Vnode.Hostname))
-	set("NAGIOS_HOSTADDRESS", ctx.Vnode.Address)
-	set("NAGIOS_HOSTALIAS", ctx.Vnode.Alias)
+	set("NAGIOS_HOSTADDRESS", ctx.Vnode.Labels["_address"])
+	set("NAGIOS_HOSTALIAS", ctx.Vnode.Labels["_alias"])
 	set("NAGIOS_SERVICEDESC", ctx.Job.Name)
 	set("NAGIOS_SERVICESTATE", ctx.State.ServiceState)
 	set("NAGIOS_SERVICESTATEID", stateID(ctx.State.ServiceState))
@@ -84,13 +86,13 @@ func BuildMacroSet(ctx MacroContext) MacroSet {
 		}
 	}
 
-	for k, v := range ctx.Vnode.Custom {
-		key := fmt.Sprintf("NAGIOS__HOST%s", strings.ToUpper(k))
-		env[key] = v
-	}
 	for k, v := range ctx.Vnode.Labels {
-		key := fmt.Sprintf("NAGIOS__HOSTLABEL_%s", strings.ToUpper(k))
-		env[key] = v
+		if strings.HasPrefix(k, "_") && k != "_address" && k != "_alias" {
+			// "_" prefixed labels → $_HOST*$ custom variables (prefix stripped).
+			env[fmt.Sprintf("NAGIOS__HOST%s", strings.ToUpper(k[1:]))] = v
+		} else if !strings.HasPrefix(k, "_") {
+			env[fmt.Sprintf("NAGIOS__HOSTLABEL_%s", strings.ToUpper(k))] = v
+		}
 	}
 	for k, v := range ctx.Job.CustomVars {
 		key := fmt.Sprintf("NAGIOS__SERVICE%s", strings.ToUpper(k))

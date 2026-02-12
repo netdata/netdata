@@ -417,12 +417,13 @@ func (s *Scheduler) armTimer(js *jobState) {
 		delay = 0
 	}
 	jobID := js.runtime.ID
+	ctx := s.ctx // capture to avoid racing with Stop() nilling s.ctx
 
 	if js.timer == nil {
 		js.timer = time.AfterFunc(delay, func() {
 			select {
 			case s.timerCh <- jobID:
-			case <-s.ctx.Done():
+			case <-ctx.Done():
 			}
 		})
 	} else {

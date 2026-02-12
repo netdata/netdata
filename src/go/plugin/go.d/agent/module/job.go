@@ -243,11 +243,6 @@ func (j *Job) Vnode() vnodes.VirtualNode {
 	return j.vnode
 }
 
-// Module returns the underlying collector module instance.
-func (j *Job) Module() Module {
-	return j.module
-}
-
 // AutoDetection invokes init, check and postCheck. It handles panic.
 func (j *Job) AutoDetection() (err error) {
 	defer func() {
@@ -339,6 +334,12 @@ func (j *Job) Tick(clock int) {
 // This is safe to call from any goroutine.
 func (j *Job) IsRunning() bool {
 	return j.running.Load()
+}
+
+// Module returns the underlying module instance.
+// This allows function handlers to access the collector for querying data.
+func (j *Job) Module() Module {
+	return j.module
 }
 
 // IsFunctionOnly returns true if this job is function-only (no metrics collection).

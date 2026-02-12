@@ -1,0 +1,110 @@
+plugin_name: scripts.d.plugin
+modules:
+  - meta:
+      id: collector-scripts.d.plugin-scheduler
+      plugin_name: scripts.d.plugin
+      module_name: scheduler
+      monitored_instance:
+        name: scripts.d Scheduler
+        link: ""
+        icon_filename: netdata.svg
+        categories:
+          - data-collection.generic-data-collection
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: scripts.d.plugin
+              module_name: nagios
+            - plugin_name: scripts.d.plugin
+              module_name: zabbix
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - scheduler
+        - scripts
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          The scheduler module manages the execution of jobs defined by the nagios and zabbix modules.
+
+          It provides:
+
+          - **Worker pool**: Concurrent execution with configurable worker count and queue depth.
+          - **OTLP logging**: Optional structured log export via gRPC for job execution results.
+
+          Scheduler-level metrics (jobs status, throughput, next run time) are exposed through the nagios and zabbix modules that use it.
+        method_description: |
+          The scheduler maintains an internal timer heap and dispatches jobs to a worker pool.
+          Each worker executes a job via the configured runner (nagios or zabbix) and reports results back.
+      default_behavior:
+        auto_detection:
+          description: |
+            A `default` scheduler is created automatically. Additional named schedulers can be defined in the configuration.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: scripts.d/scheduler.conf
+        options:
+          description: |
+            Scheduler configuration controls the worker pool and optional OTLP logging.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: workers
+              description: Number of concurrent workers executing jobs.
+              default_value: 50
+              required: false
+              group: General
+            - name: queue_size
+              description: Capacity of the internal work queue.
+              default_value: 128
+              required: false
+              group: General
+            - name: logging.enabled
+              description: Enable structured OTLP log export for job results.
+              default_value: "true"
+              required: false
+              group: Logging
+            - name: logging.otlp.endpoint
+              description: gRPC endpoint for OTLP log export.
+              default_value: "127.0.0.1:4317"
+              required: false
+              group: Logging
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom scheduler
+              description: Define a scheduler with a larger worker pool.
+              config: |
+                jobs:
+                  - name: heavy
+                    workers: 100
+                    queue_size: 256
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Scheduler metrics are exposed through the nagios and zabbix modules under the `nagios.scheduler.*` context.
+      availability: []
+      scopes: []

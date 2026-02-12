@@ -139,7 +139,7 @@ func TestBuildJobSpecsDefaultInterval(t *testing.T) {
 
 func TestBuildCollectionMacros(t *testing.T) {
 	cfg := JobConfig{Name: "disk", Collection: CollectionConfig{Type: CollectionCommand, Command: "/bin/true"}}
-	job := runtime.JobRuntime{Spec: spec.JobSpec{Name: cfg.Name}, Vnode: runtime.VnodeInfo{Hostname: "agent", Address: "10.0.0.1", Alias: "agent-alias"}}
+	job := runtime.JobRuntime{Spec: spec.JobSpec{Name: cfg.Name}, Vnode: runtime.VnodeInfo{Hostname: "agent", Labels: map[string]string{"_address": "10.0.0.1", "_alias": "agent-alias"}}}
 	macros := buildCollectionMacros(cfg, job)
 	if macros["{HOST.NAME}"] != "agent" {
 		t.Fatalf("expected host macro 'agent', got %q", macros["{HOST.NAME}"])

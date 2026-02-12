@@ -223,10 +223,12 @@ func vnodeLookup(spec specpkg.JobSpec) runtimepkg.VnodeInfo {
 	}
 	return runtimepkg.VnodeInfo{
 		Hostname: spec.Vnode,
-		Address:  "203.0.113.10",
-		Alias:    spec.Vnode + "-alias",
-		Labels:   map[string]string{"region": "testlab"},
-		Custom:   map[string]string{"DC": "east"},
+		Labels: map[string]string{
+			"_address": "203.0.113.10",
+			"_alias":   spec.Vnode + "-alias",
+			"_DC":      "east",
+			"region":   "testlab",
+		},
 	}
 }
 
