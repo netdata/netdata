@@ -341,12 +341,6 @@ func (j *Job) IsRunning() bool {
 	return j.running.Load()
 }
 
-// Module returns the underlying module instance.
-// This allows function handlers to access the collector for querying data.
-func (j *Job) Module() Module {
-	return j.module
-}
-
 // IsFunctionOnly returns true if this job is function-only (no metrics collection).
 func (j *Job) IsFunctionOnly() bool {
 	return j.functionOnly
