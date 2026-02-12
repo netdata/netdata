@@ -33,6 +33,14 @@ This collector is only supported on the following platforms:
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 
+Kubernetes Containers can be monitored further using the following other integrations:
+
+- Kubernetes Cluster State
+- Kubernetes API Server
+- Kubelet
+- Kubeproxy
+- CoreDNS
+
 ### Default Behavior
 
 #### Auto-Detection

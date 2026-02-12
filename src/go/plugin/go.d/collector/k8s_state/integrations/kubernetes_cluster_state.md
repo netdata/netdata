@@ -32,6 +32,14 @@ This collector is supported on all platforms.
 This collector only supports collecting metrics from a single instance of this integration.
 
 
+Kubernetes Cluster State can be monitored further using the following other integrations:
+
+- Kubernetes API Server
+- Kubelet
+- Kubeproxy
+- Kubernetes Containers
+- CoreDNS
+
 ### Default Behavior
 
 #### Auto-Detection

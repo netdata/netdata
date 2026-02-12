@@ -451,6 +451,19 @@ modules:
         - cri-o
         - kubelet
         - kubepods
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: go.d.plugin
+              module_name: k8s_state
+            - plugin_name: go.d.plugin
+              module_name: k8s_apiserver
+            - plugin_name: go.d.plugin
+              module_name: k8s_kubelet
+            - plugin_name: go.d.plugin
+              module_name: k8s_kubeproxy
+            - plugin_name: go.d.plugin
+              module_name: coredns
       most_popular: true
     overview:
       <<: *overview

@@ -35,6 +35,11 @@ This collector supports collecting metrics from multiple instances of this integ
 Kubelet can be monitored further using the following other integrations:
 
 - Applications
+- Kubernetes Cluster State
+- Kubernetes API Server
+- Kubeproxy
+- Kubernetes Containers
+- CoreDNS
 
 ### Default Behavior
 

@@ -51,6 +51,8 @@ Kubernetes API Server can be monitored further using the following other integra
 - Kubelet
 - Kubeproxy
 - Kubernetes Cluster State
+- Kubernetes Containers
+- CoreDNS
 
 ### Default Behavior
 
