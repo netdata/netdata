@@ -35,11 +35,13 @@ def cleanup(only_base_paths=None):
 
 def clean_and_write(md: str, path: Path):
     """
-    Convert custom {% details %} markers to HTML <details> and write file.
+    Convert custom markers to HTML/plain text for GitHub-rendered .md files.
     """
     md = re.sub(r'\{% details open=true summary="(.*?)" %\}', r'<details open><summary>\1</summary>\n', md)
     md = re.sub(r'\{% details summary="(.*?)" %\}', r'<details><summary>\1</summary>\n', md)
     md = md.replace("{% /details %}", "</details>\n")
+    md = re.sub(r'\{% relatedResource id="[^"]*" %\}', '', md)
+    md = md.replace("{% /relatedResource %}", "")
     path.write_text(md, encoding="utf-8")
 
 

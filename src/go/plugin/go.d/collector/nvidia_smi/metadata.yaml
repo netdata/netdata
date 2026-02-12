@@ -16,7 +16,9 @@ modules:
         - hardware
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: go.d.plugin
+              module_name: dcgm
       info_provided_to_referring_integrations:
         description: ""
       most_popular: false

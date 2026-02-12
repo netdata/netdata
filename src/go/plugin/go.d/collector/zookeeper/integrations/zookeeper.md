@@ -36,7 +36,7 @@ This collector supports collecting metrics from multiple instances of this integ
 
 ZooKeeper can be monitored further using the following other integrations:
 
-- {% relatedResource id="apps.plugin-apps-Applications" %}Applications{% /relatedResource %}
+- Applications
 
 ### Default Behavior
 

@@ -45,8 +45,8 @@ This collector supports collecting metrics from multiple instances of this integ
 
 OpenSearch can be monitored further using the following other integrations:
 
-- {% relatedResource id="apps.plugin-apps-Applications" %}Applications{% /relatedResource %}
-- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Containers" %}Containers{% /relatedResource %}
+- Applications
+- Containers
 
 ### Default Behavior
 

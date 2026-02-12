@@ -48,18 +48,18 @@ This collector only supports collecting metrics from a single instance of this i
 
 Proxmox VE Monitoring can be monitored further using the following other integrations:
 
-- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Proxmox_VMs_and_Containers" %}Proxmox VMs and Containers{% /relatedResource %}
-- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Systemd_Services" %}Systemd Services{% /relatedResource %}
-- {% relatedResource id="apps.plugin-apps-Applications" %}Applications{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-zfspool-ZFS_Pools" %}ZFS Pools{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-ceph-Ceph" %}Ceph{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-smartctl-S.M.A.R.T." %}S.M.A.R.T.{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-sensors-Linux_Sensors" %}Linux Sensors{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/net/dev-Network_interfaces" %}Network interfaces{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/diskstats-Disk_Statistics" %}Disk Statistics{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/stat-System_statistics" %}System statistics{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/meminfo-Memory_Usage" %}Memory Usage{% /relatedResource %}
-- {% relatedResource id="proc.plugin-/proc/spl/kstat/zfs/arcstats-ZFS_Adaptive_Replacement_Cache" %}ZFS Adaptive Replacement Cache{% /relatedResource %}
+- Proxmox VMs and Containers
+- Systemd Services
+- Applications
+- ZFS Pools
+- Ceph
+- S.M.A.R.T.
+- Linux Sensors
+- Network interfaces
+- Disk Statistics
+- System statistics
+- Memory Usage
+- ZFS Adaptive Replacement Cache
 
 ### Default Behavior
 

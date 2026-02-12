@@ -34,6 +34,10 @@ This collector is supported on all platforms.
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 
+NVIDIA DCGM Exporter can be monitored further using the following other integrations:
+
+- Nvidia GPU
+
 ### Default Behavior
 
 #### Auto-Detection

@@ -48,9 +48,9 @@ In most clusters, this requires cluster-admin or a custom ClusterRole with metri
 
 Kubernetes API Server can be monitored further using the following other integrations:
 
-- {% relatedResource id="go.d.plugin-k8s_kubelet-Kubelet" %}Kubelet{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-k8s_kubeproxy-Kubeproxy" %}Kubeproxy{% /relatedResource %}
-- {% relatedResource id="go.d.plugin-k8s_state-Kubernetes_Cluster_State" %}Kubernetes Cluster State{% /relatedResource %}
+- Kubelet
+- Kubeproxy
+- Kubernetes Cluster State
 
 ### Default Behavior
 

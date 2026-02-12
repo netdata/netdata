@@ -36,8 +36,8 @@ The plugin needs setuid because it loads data inside kernel. Netada sets necessa
 
 eBPF DCstat can be monitored further using the following other integrations:
 
-- {% relatedResource id="apps.plugin-apps-Applications" %}Applications{% /relatedResource %}
-- {% relatedResource id="cgroups.plugin-/sys/fs/cgroup-Containers" %}Containers{% /relatedResource %}
+- Applications
+- Containers
 
 ### Default Behavior
 
