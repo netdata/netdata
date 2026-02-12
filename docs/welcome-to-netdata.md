@@ -226,7 +226,7 @@ Netdata thrives as part of a vibrant open-source community with 1.5 million down
 - **Metrics export**: Exports metrics to all open standards and commonly used time-series databases (Prometheus, Graphite, InfluxDB, OpenTSDB, and more)
 - **Logs**: Uses battle tested systemd journal files for storing logs, providing maximum interoperability
 - **Alert routing**: Delivers notifications to PagerDuty, Slack, email, webhooks, and 20+ platforms
-- **AI integration**: Supports AI assistants via Model Context Protocol (MCP)
+- **AI integration**: Supports AI assistants via Model Context Protocol (MCP) — available via Netdata Cloud (infrastructure-wide) and on every Agent/Parent (local access)
 - **Visualization**: Works with Grafana through native datasource plugin
 - **Container orchestration**: Integrates with Kubernetes, Docker Swarm, and Nomad
 
@@ -250,7 +250,7 @@ Netdata will automatically provide:
 3. Live and interactive exploration of running **processes**, **network connections**, **systemd units**, **systemd services**, **IMPI sensors**, and more
 4. Unsupervised **machine-learning based anomaly detection** for all metrics
 5. Hundreds of **pre-configured alerts** for systems and applications
-6. **AI insights** (reports) and **AI-assistant** (chat) connections via MCP
+6. **AI insights** (reports) and **AI-assistant** (chat) connections via MCP (Cloud MCP for infrastructure-wide access, Agent/Parent MCP for local access)
 
 :::tip
 
