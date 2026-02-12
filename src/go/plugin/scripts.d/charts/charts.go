@@ -22,20 +22,18 @@ func SchedulerMetricKey(scheduler, suffix, dim string) string {
 
 func telemetryChartBase(meta JobIdentity, metric string) module.Chart {
 	return module.Chart{
-		Fam:          "jobs",
-		Ctx:          fmt.Sprintf("%s.jobs.%s", ctxPrefix, metric),
-		Type:         module.Line,
-		TypeOverride: ctxPrefix,
-		Labels:       meta.Labels(),
+		Fam:    "jobs",
+		Ctx:    fmt.Sprintf("%s.jobs.%s", ctxPrefix, metric),
+		Type:   module.Line,
+		Labels: meta.Labels(),
 	}
 }
 
 func perfdataChartBase(meta JobIdentity) module.Chart {
 	return module.Chart{
-		Fam:          meta.ScriptKey,
-		Ctx:          fmt.Sprintf("%s.%s", ctxPrefix, meta.ScriptKey),
-		Type:         module.Line,
-		TypeOverride: ctxPrefix,
-		Labels:       meta.Labels(),
+		Fam:    meta.ScriptKey,
+		Ctx:    fmt.Sprintf("%s.%s", ctxPrefix, meta.ScriptKey),
+		Type:   module.Line,
+		Labels: meta.Labels(),
 	}
 }

@@ -817,10 +817,6 @@ func getChartType(chart *Chart, j *Job) string {
 	if chart.typ != "" {
 		return chart.typ
 	}
-	if chart.TypeOverride != "" {
-		chart.typ = chart.TypeOverride
-		return chart.typ
-	}
 	if !chart.IDSep {
 		chart.typ = j.FullName()
 	} else if i := strings.IndexByte(chart.ID, '.'); i != -1 {

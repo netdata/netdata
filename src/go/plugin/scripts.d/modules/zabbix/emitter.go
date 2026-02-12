@@ -298,7 +298,7 @@ func buildChart(job pkgzabbix.JobConfig, inst *instanceBinding, pipe *pkgzabbix.
 		Fam:          fam,
 		Ctx:          fmt.Sprintf("zabbix.%s", sanitizedCtx),
 		Type:         chartType(pipe.ChartType),
-		TypeOverride: "zabbix",
+
 		Priority:     1000,
 		Labels:       buildLabels(job, inst, pipe, macros),
 		Dims: module.Dims{
@@ -322,7 +322,7 @@ func buildJobStateChart(job pkgzabbix.JobConfig) *module.Chart {
 		Fam:          job.Name,
 		Ctx:          fmt.Sprintf("zabbix.%s.state", ids.Sanitize(job.Name)),
 		Type:         module.Line,
-		TypeOverride: "zabbix",
+
 		Priority:     800,
 		Labels:       jobLabels(job),
 		Dims:         dims,
@@ -343,7 +343,7 @@ func buildInstanceStateChart(job pkgzabbix.JobConfig, inst *instanceBinding) *mo
 		Fam:          job.Name,
 		Ctx:          fmt.Sprintf("zabbix.%s.instance.state", ids.Sanitize(job.Name)),
 		Type:         module.Line,
-		TypeOverride: "zabbix",
+
 		Priority:     850,
 		Labels:       buildLabels(job, inst, nil, macros),
 		Dims:         dims,

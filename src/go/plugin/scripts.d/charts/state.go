@@ -190,10 +190,9 @@ func canonicalUnit(scale units.Scale, fallback string) string {
 
 func schedulerChartBase(scheduler string) module.Chart {
 	return module.Chart{
-		Fam:          "scheduler",
-		Ctx:          fmt.Sprintf("%s.scheduler", ctxPrefix),
-		Type:         module.Line,
-		TypeOverride: ctxPrefix,
+		Fam:  "scheduler",
+		Ctx:  fmt.Sprintf("%s.scheduler", ctxPrefix),
+		Type: module.Line,
 		Labels: []module.Label{
 			{Key: "nagios_scheduler", Value: scheduler, Source: module.LabelSourceConf},
 		},

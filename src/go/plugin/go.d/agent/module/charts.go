@@ -87,9 +87,8 @@ type (
 		typ string
 		id  string
 
-		OverModule   string
-		TypeOverride string
-		IDSep        bool
+		OverModule string
+		IDSep      bool
 		ID           string
 		OverID       string
 		Title        string
