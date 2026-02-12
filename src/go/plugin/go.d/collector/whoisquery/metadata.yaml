@@ -9,7 +9,7 @@ modules:
         link: ""
         icon_filename: globe.svg
         categories:
-          - data-collection.synthetic-checks
+          - data-collection.synthetic-testing
       keywords:
         - whois
       related_resources:

@@ -8,7 +8,7 @@ modules:
         name: IPFS
         link: "https://ipfs.tech/"
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
         icon_filename: "ipfs.svg"
       related_resources:
         integrations:

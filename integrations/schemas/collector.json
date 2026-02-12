@@ -49,12 +49,18 @@
                             "module_name": {
                               "type": "string",
                               "description": "Related integration module name."
+                            },
+                            "monitored_instance_name": {
+                              "type": "string",
+                              "description": "Related integration monitored instance name. Use to reference a specific module when a plugin+module combination has multiple monitored instances (e.g. cgroups.plugin)."
                             }
                           },
                           "required": [
-                            "plugin_name",
-                            "module_name"
-                          ]
+                            "plugin_name"
+                          ],
+                          "dependencies": {
+                            "monitored_instance_name": ["module_name"]
+                          }
                         }
                       }
                     },
@@ -346,7 +352,8 @@
                             "enum": [
                               "line",
                               "area",
-                              "stacked"
+                              "stacked",
+                              "heatmap"
                             ]
                           },
                           "dimensions": {

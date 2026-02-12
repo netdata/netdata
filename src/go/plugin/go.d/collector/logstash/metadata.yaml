@@ -9,9 +9,9 @@ modules:
         link: https://www.elastic.co/products/logstash
         icon_filename: elastic-logstash.svg
         categories:
-          - data-collection.logs-servers
+          - data-collection.applications
       keywords:
-        - logstatsh
+        - logstash
       related_resources:
         integrations:
           list: []

@@ -7,7 +7,7 @@ modules:
         name: vm.loadavg
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -106,7 +106,7 @@ modules:
         name: vm.vmtotal
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "memory.svg"
       related_resources:
         integrations:
@@ -208,7 +208,7 @@ modules:
         name: kern.cp_time
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -322,7 +322,7 @@ modules:
         name: dev.cpu.temperature
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -399,7 +399,7 @@ modules:
         name: dev.cpu.0.freq
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -476,7 +476,7 @@ modules:
         name: hw.intrcnt
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -559,7 +559,7 @@ modules:
         name: vm.stats.sys.v_intr
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -636,7 +636,7 @@ modules:
         name: vm.stats.sys.v_soft
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -713,7 +713,7 @@ modules:
         name: vm.stats.sys.v_swtch
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -796,7 +796,7 @@ modules:
         name: vm.swap_info
         link: ""
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -879,7 +879,7 @@ modules:
         name: system.ram
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "memory.svg"
       related_resources:
         integrations:
@@ -988,7 +988,7 @@ modules:
         name: vm.stats.vm.v_swappgs
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "memory.svg"
       related_resources:
         integrations:
@@ -1071,7 +1071,7 @@ modules:
         name: vm.stats.vm.v_pgfaults
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "memory.svg"
       related_resources:
         integrations:
@@ -1152,7 +1152,7 @@ modules:
         name: kern.ipc.sem
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -1245,7 +1245,7 @@ modules:
         name: kern.ipc.shm
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "memory.svg"
       related_resources:
         integrations:
@@ -1328,7 +1328,7 @@ modules:
         name: kern.ipc.msq
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -1418,7 +1418,7 @@ modules:
         name: uptime
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -1495,7 +1495,7 @@ modules:
         name: net.isr
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -1609,7 +1609,7 @@ modules:
         name: devstat
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
@@ -1801,7 +1801,7 @@ modules:
         name: net.inet.tcp.states
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -1883,7 +1883,7 @@ modules:
         name: net.inet.tcp.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2070,7 +2070,7 @@ modules:
         name: net.inet.udp.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2172,7 +2172,7 @@ modules:
         name: net.inet.icmp.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2275,7 +2275,7 @@ modules:
         name: net.inet.ip.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2394,7 +2394,7 @@ modules:
         name: net.inet6.ip6.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2515,7 +2515,7 @@ modules:
         name: net.inet6.icmp6.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2681,7 +2681,7 @@ modules:
         name: ipfw
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "firewall.svg"
       related_resources:
         integrations:
@@ -2791,7 +2791,7 @@ modules:
         name: getifaddrs
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -3011,7 +3011,7 @@ modules:
         name: getmntinfo
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
@@ -3124,7 +3124,7 @@ modules:
         name: zfs
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "filesystem.svg"
       related_resources:
         integrations:

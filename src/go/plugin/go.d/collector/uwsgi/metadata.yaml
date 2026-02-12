@@ -8,7 +8,7 @@ modules:
         name: uWSGI
         link: https://uwsgi-docs.readthedocs.io/en/latest/
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
         icon_filename: "uwsgi.svg"
       related_resources:
         integrations:

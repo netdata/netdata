@@ -8,7 +8,7 @@ modules:
         name: Riak KV
         link: https://riak.com/products/riak-kv/index.html
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
         icon_filename: "riak.svg"
       related_resources:
         integrations:

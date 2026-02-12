@@ -9,7 +9,7 @@ modules:
         link: https://www.haproxy.org/
         icon_filename: haproxy.svg
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
       keywords:
         - haproxy
         - web

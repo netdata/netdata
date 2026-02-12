@@ -8,7 +8,7 @@ modules:
         name: Rspamd
         link: https://rspamd.com/
         categories:
-          - data-collection.security-systems
+          - data-collection.applications
         icon_filename: globe.svg
       related_resources:
         integrations:

@@ -8,7 +8,7 @@ modules:
         name: Monit
         link: https://mmonit.com/monit/
         categories:
-          - data-collection.synthetic-checks
+          - data-collection.synthetic-testing
         icon_filename: monit.png
       related_resources:
         integrations:

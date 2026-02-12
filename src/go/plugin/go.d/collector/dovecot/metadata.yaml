@@ -8,7 +8,7 @@ modules:
         name: Dovecot
         link: 'https://www.dovecot.org/'
         categories:
-          - data-collection.mail-servers
+          - data-collection.applications
         icon_filename: "dovecot.svg"
       related_resources:
         integrations:

@@ -7,7 +7,7 @@ modules:
         name: Pandas
         link: https://pandas.pydata.org/
         categories:
-          - data-collection.generic-data-collection
+          - data-collection.applications
         icon_filename: pandas.png
       related_resources:
         integrations:

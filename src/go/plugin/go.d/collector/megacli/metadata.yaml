@@ -9,7 +9,7 @@ modules:
         link: "https://wikitech.wikimedia.org/wiki/MegaCli"
         icon_filename: "hard-drive.svg"
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords:
         - storage
         - raid-controller

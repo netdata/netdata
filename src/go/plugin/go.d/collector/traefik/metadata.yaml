@@ -6,10 +6,10 @@ modules:
       module_name: traefik
       monitored_instance:
         name: Traefik
-        link: Traefik
+        link: https://traefik.io/
         icon_filename: traefik.svg
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
       keywords:
         - traefik
         - proxy
