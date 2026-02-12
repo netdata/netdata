@@ -445,6 +445,8 @@ sidebar:
           label: Enable an exporting connector
           edit_url: https://github.com/netdata/netdata/edit/master/docs/exporting-metrics/enable-an-exporting-connector.md
           description: Learn how to enable and configure any connector using examples to start exporting metrics to external time-series databases in minutes.
+      - type: integration_placeholder
+        integration_kind: exporters
       - meta:
           label: Prometheus
           edit_url: https://github.com/netdata/netdata/edit/master/src/exporting/prometheus/README.md
@@ -452,21 +454,20 @@ sidebar:
       - meta:
           label: Shell Scripts
           edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/exporters/shell/README.md
-      - type: integration_placeholder
-        integration_kind: exporters
   # Logs
   - meta:
       label: Logs
     items:
       - meta:
-          label: Journal Viewer Plugin
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/README.md
-          description: View and analyze logs available in systemd journal
-          path: Systemd Journal Logs
+          label: Systemd Journal Logs
         items:
           - meta:
+              label: Systemd Journal Plugin Reference
+              edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/README.md
+              description: View and analyze logs available in systemd journal
+          - meta:
               label: Forward Secure Sealing (FSS) in Systemd-Journal
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/forward_secure_sealing.md
+              edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/forward_secure_sealing.md
       - meta:
           label: Windows Events Plugin Reference
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/windows-events.plugin/README.md
@@ -490,7 +491,7 @@ sidebar:
               edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/passive-journal-centralization-without-encryption.md
           - meta:
               label: Active journal source without encryption
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/logs/active_journal_centralization_guide_no_encryption.md
+              edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/active_journal_centralization_guide_no_encryption.md
       - type: integration_placeholder
         integration_kind: logs
   # Top Consumers
@@ -520,18 +521,20 @@ sidebar:
           description: Send Netdata alerts from a centralized place with Netdata Cloud, or configure nodes individually, to enable incident response and faster resolution.
         items:
           - meta:
-              label: Agent Notifications Reference
-              edit_url: https://github.com/netdata/netdata/edit/master/src/health/notifications/README.md
-              path: Agent Dispatched Notifications
+              label: Agent Dispatched Notifications
             items:
+              - meta:
+                  label: Agent Notifications Reference
+                  edit_url: https://github.com/netdata/netdata/edit/master/src/health/notifications/README.md
               - type: integration_placeholder
                 integration_kind: agent_notifications
           - meta:
-              label: Centralized Cloud Notifications Reference
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md
-              description: Configure Netdata Cloud to send notifications to your team whenever any node on your infrastructure triggers an alert threshold.
-              path: Centralized Cloud Notifications
+              label: Centralized Cloud Notifications
             items:
+              - meta:
+                  label: Centralized Cloud Notifications Reference
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md
+                  description: Configure Netdata Cloud to send notifications to your team whenever any node on your infrastructure triggers an alert threshold.
               - meta:
                   label: Manage notification methods
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md
@@ -753,6 +756,10 @@ sidebar:
       label: Security and Privacy Design
       edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/README.md
     items:
+      - meta:
+          label: Access Control and Feature Availability
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-oss-limitations.md
+          description: Feature availability across Anonymous access Netdata Cloud Community and Business tiers
       - meta:
           label: Netdata Agent
           edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-agent-security.md

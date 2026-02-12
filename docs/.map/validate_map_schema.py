@@ -143,10 +143,11 @@ def check_integration_placeholder_rule(
     node: Any, path: str, errors: List[MapValidationError]
 ) -> None:
     """
-    Check that nodes without edit_url have integration_placeholder children.
+    Check that leaf nodes have edit_url.
 
-    Custom rule: A node can only omit edit_url if it has at least one
-    integration_placeholder child.
+    Custom rule:
+    - Structural nodes (with children) may omit edit_url.
+    - Leaf nodes (without children) must provide edit_url.
     """
     if not isinstance(node, dict):
         return
@@ -164,13 +165,15 @@ def check_integration_placeholder_rule(
     edit_url = meta.get("edit_url")
     items = node.get("items", [])
 
-    # If edit_url is missing, check if there's an integration placeholder
+    has_items = isinstance(items, list) and len(items) > 0
+
+    # If edit_url is missing, only structural category nodes are allowed.
     if edit_url is None:
-        if not check_has_integration_placeholder(items):
+        if not has_items:
             errors.append(
                 MapValidationError(
                     node_path,
-                    "Missing 'edit_url' field (only allowed for nodes with integration_placeholder children)",
+                    "Missing 'edit_url' field (only allowed for structural nodes with children)",
                 )
             )
 
