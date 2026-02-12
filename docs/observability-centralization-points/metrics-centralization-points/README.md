@@ -92,3 +92,5 @@ Copies **recent past samples** (replication) and **real-time new samples** (stre
 ## **Best Practices**
 
 For detailed guidelines, check [Best Practices for Observability Centralization Points](/docs/observability-centralization-points/best-practices.md).
+
+To understand how node connection states (Live, Stale, Offline) work with Parent-Child setups, see [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).

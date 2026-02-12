@@ -310,8 +310,6 @@ void ebpf_parse_cgroup_shm_data()
         previous,
         shm_ebpf_cgroup.header->cgroup_root_count);
 #endif
-
-    sem_post(shm_sem_ebpf_cgroup);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

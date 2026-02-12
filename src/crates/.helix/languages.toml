@@ -1,0 +1,5 @@
+[[language]]
+name = "rust"
+
+[language-server.rust-analyzer.config.cargo]
+features = [ "allocative" ]

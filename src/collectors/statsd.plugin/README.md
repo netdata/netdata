@@ -859,7 +859,7 @@ Private charts clearly show the metric type (gauge, timer, etc.) and available o
 <summary><strong>Creating a StatsD Configuration File</strong></summary>
 <br/> 
 
-Use Netdata's [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) to create a new file:
+Use Netdata's [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) to create a new file:
 
 ```bash
 sudo ./edit-config statsd.d/k6.conf

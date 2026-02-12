@@ -202,7 +202,7 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: paged
-                - name: pool-paged
+                - name: non-paged
             - name: mem.system_page_table_entries
               description: Unused page table entries.
               unit: "pages"
@@ -903,6 +903,12 @@ modules:
               chart_type: area
               dimensions:
                 - name: semaphores
+            - name: system.ipc_mutexes
+              description: IPC Mutexes
+              unit: "mutexes"
+              chart_type: area
+              dimensions:
+                - name: mutexes
   - meta:
       plugin_name: windows.plugin
       module_name: GetHardwareInfo
@@ -1293,9 +1299,21 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
-            - name: system.hw.sensor.resistence.input
-              description: Electrical resistence.
+            - name: system.hw.sensor.resistance.input
+              description: Electrical resistance
               unit: "Ohms"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.capacitance.input
+              description: Electrical capacitance
+              unit: "F"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.inductance.input
+              description: Electrical indutance
+              unit: "H"
               chart_type: line
               dimensions:
                 - name: input
@@ -1326,6 +1344,18 @@ modules:
             - name: system.hw.sensor.gauge_pressure.input
               description: Gauge Pressure
               unit: "Pa"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.human_presence.input
+              description: Human presence
+              unit: "presence"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.human_proximity.input
+              description: Human proximity
+              unit: "m"
               chart_type: line
               dimensions:
                 - name: input
@@ -2225,6 +2255,10 @@ modules:
               description: Set to yes to use Windows credentials instead of SQL Server authentication.
               default_value: no
               required: false
+            - name: trust server certificate
+              description: Set to yes to trust the server's SSL certificate chain.
+              default_value: yes
+              required: false
             - name: express
               description: Set to yes when running SQL Express version.
               default_value: no
@@ -2255,6 +2289,14 @@ modules:
               required: false
             - name: collect database size
               description: Run queries to collect information from the server's database size.
+              default_value: yes
+              required: false
+            - name: collect user connections
+              description: Run queries to collect information from the server's connection.
+              default_value: yes
+              required: false
+            - name: collect blocked processes
+              description: Run queries to collect information from the server's blocked processes.
               default_value: yes
               required: false
         examples:
@@ -2317,6 +2359,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: user
+            - name: mssql.instance_sessions_connections
+              description: Session connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: session
             - name: mssql.instance_sqlstats_batch_requests
               description: Total of batches requests
               unit: requests/s
@@ -2851,19 +2899,19 @@ modules:
               unit: objects/s
               chart_type: line
               dimensions:
-                - name: objects
+                - name: allocated
             - name: netframework.clrremoting_context_proxies
               description: Remoting proxy objects
               unit: objects/s
               chart_type: line
               dimensions:
-                - name: contexts
+                - name: objects
             - name: netframework.clrremoting_remote_calls
               description: Remote Procedure Calls (RPC) invoked
               unit: calls/s
               chart_type: line
               dimensions:
-                - name: rpc
+                - name: calls
             - name: netframework.clrsecurity_link_time_checks
               description: Link-time code access security checks
               unit: checks/s
@@ -3054,18 +3102,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: request
-            - name: ad.dra_replication_sync_objects_remaining
-              description: DRA replication full sync objects remaining
-              unit: objects
-              chart_type: line
-              dimensions:
-                - name: object
-            - name: ad.dra_replication_sync_objects_remaining
-              description: DRA replication full sync objects remaining
-              unit: objects
-              chart_type: line
-              dimensions:
-                - name: object
             - name: ad.name_cache_hits
               description: Name cache hits
               unit: hits/s
@@ -3994,7 +4030,6 @@ modules:
               dimensions:
                 - name: free
                 - name: standby
-                - name: available
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibASP
@@ -4151,6 +4186,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: not found
+            - name: aspnet.requests_not_authorized
+              description: Requests that were not authorized.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: not_authorized
             - name: aspnet.requests_in_application_queue
               description: Requests in the application queue.
               unit: requests

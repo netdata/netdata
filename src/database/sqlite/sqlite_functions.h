@@ -57,6 +57,10 @@ void analytics_set_data_str(char **name, const char *value);
         (db) != NULL;                                                                                                  \
     })
 
+extern bool sqlite_databases_closed;
+#define REQUIRE_HEALTH_DB_OPEN()                                                                                       \
+    (!__atomic_load_n(&sqlite_databases_closed, __ATOMIC_ACQUIRE))
+
 #define PREPARE_COMPILED_STATEMENT(db, sql, stmt_ptr)                                                                  \
     ({                                                                                                                 \
         bool _ret = true;                                                                                              \
@@ -73,7 +77,7 @@ void analytics_set_data_str(char **name, const char *value);
 
 #define PREPARE_STATEMENT(db, sql, stmt_ptr)                                                                           \
     ({                                                                                                                 \
-        int _rc = sqlite3_prepare_v2((db), (sql), -1, stmt_ptr, 0);                                                    \
+        int _rc = simple_prepare_statement((db), (sql), stmt_ptr);                                                     \
         if (_rc != SQLITE_OK) {                                                                                        \
             internal_error(true, "Failed to prepare statement \"%s\", rc=%d in %s", (sql), _rc, __FUNCTION__);         \
             nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to prepare statement, rc=%d in %s", _rc, __FUNCTION__);              \
@@ -101,6 +105,7 @@ int configure_sqlite_database(sqlite3 *database, int target_version, const char 
 // Helpers
 int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null);
 int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement);
+int simple_prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement);
 void finalize_self_prepared_sql_statements();
 void finalize_all_prepared_sql_statements();
 

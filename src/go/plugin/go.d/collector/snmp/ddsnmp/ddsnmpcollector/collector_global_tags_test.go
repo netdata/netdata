@@ -389,7 +389,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 			missingOIDs := make(map[string]bool)
 			collector := newGlobalTagsCollector(mockHandler, missingOIDs, logger.New())
 
-			result, err := collector.Collect(tc.profile)
+			result, err := collector.collect(tc.profile)
 
 			if tc.expectedError {
 				assert.Error(t, err)

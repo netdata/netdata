@@ -805,7 +805,7 @@ void ebpf_function_thread(void *ptr)
 {
     (void)ptr;
 
-    struct functions_evloop_globals *wg = functions_evloop_init(1, "EBPF", &lock, &ebpf_plugin_exit);
+    struct functions_evloop_globals *wg = functions_evloop_init(1, "EBPF", &lock, &ebpf_plugin_exit, NULL);
 
     functions_evloop_add_function(
         wg, EBPF_FUNCTION_SOCKET, ebpf_function_socket_manipulation, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);

@@ -22,6 +22,6 @@ From any dashboard or time window, surface the charts most related to your selec
 
 ## See also
 
-- Troubleshoot Button (how to trigger analysis from anywhere)
-- Investigations (ask open‑ended questions with rich context)
+- [Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md) (AI‑powered alert creation and suggestions)
+- [Investigations](/docs/netdata-ai/investigations/index.md) (ask open‑ended questions with rich context)
 

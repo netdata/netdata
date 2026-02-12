@@ -1,0 +1,46 @@
+[package]
+name = "otel-plugin"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "otel_plugin"
+path = "src/lib.rs"
+
+[[bin]]
+name = "otel-plugin"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+atty = { workspace = true }
+bytesize-serde = { workspace = true }
+bytesize = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+humantime-serde = { workspace = true }
+humantime = { workspace = true }
+regex = { workspace = true }
+serde_json = { workspace = true, features = ["preserve_order"] }
+serde_regex = { workspace = true }
+serde = { workspace=true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true, features = ["gzip", "tls-ring"] }
+
+journal-common = { workspace = true }
+journal-core = { workspace = true }
+journal-log-writer = { workspace = true }
+journal-registry = { workspace = true }
+flatten_otel = { path = "../flatten_otel" }
+rt = { workspace = true }
+
+tracing = { workspace = true }
+
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true , features = ["rt-tokio", "logs"] }
+opentelemetry-otlp = { workspace = true, features = ["grpc-tonic", "logs"] }
+opentelemetry-proto = { workspace = true }

@@ -7,6 +7,8 @@ extern sqlite3 *db_meta;
 
 void aclk_send_alert_configuration(char *config_hash);
 void aclk_push_alert_config_event(char *node_id, char *config_hash);
+bool alert_hash_has_transitioned(nd_uuid_t *hash_id);
+void alert_hash_mark_sent(nd_uuid_t *hash_id);
 void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version);
 void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_version);
 

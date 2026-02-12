@@ -22,16 +22,16 @@ type iwInterface struct {
 }
 
 type stationStats struct {
-	clients   int64
-	rxBytes   int64
-	rxPackets int64
-	txBytes   int64
-	txPackets int64
-	txRetries int64
-	txFailed  int64
-	signalAvg int64
-	txBitrate float64
-	rxBitrate float64
+	clients   *int64
+	rxBytes   *int64
+	rxPackets *int64
+	txBytes   *int64
+	txPackets *int64
+	txRetries *int64
+	txFailed  *int64
+	signalAvg *int64
+	txBitrate *float64
+	rxBitrate *float64
 }
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -59,10 +59,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 			return nil, fmt.Errorf("getting station statistics for %s: %v", iface, err)
 		}
 
-		stats, err := parseIwStationStatistics(bs)
-		if err != nil {
-			return nil, fmt.Errorf("parsing station statistics for %s: %v", iface, err)
-		}
+		stats := parseIwStationStatistics(bs)
 
 		key := fmt.Sprintf("%s-%s", iface.name, iface.ssid)
 
@@ -75,18 +72,39 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 		px := fmt.Sprintf("ap_%s_%s_", iface.name, iface.ssid)
 
-		mx[px+"clients"] = stats.clients
-		mx[px+"bw_received"] = stats.rxBytes
-		mx[px+"bw_sent"] = stats.txBytes
-		mx[px+"packets_received"] = stats.rxPackets
-		mx[px+"packets_sent"] = stats.txPackets
-		mx[px+"issues_retries"] = stats.txRetries
-		mx[px+"issues_failures"] = stats.txFailed
-		mx[px+"average_signal"], mx[px+"bitrate_receive"], mx[px+"bitrate_transmit"] = 0, 0, 0
-		if clients := float64(stats.clients); clients > 0 {
-			mx[px+"average_signal"] = int64(float64(stats.signalAvg) / clients * precision)
-			mx[px+"bitrate_receive"] = int64(stats.rxBitrate / clients * precision)
-			mx[px+"bitrate_transmit"] = int64(stats.txBitrate / clients * precision)
+		if stats.clients != nil {
+			mx[px+"clients"] = *stats.clients
+		}
+		if stats.rxBytes != nil {
+			mx[px+"bw_received"] = *stats.rxBytes
+		}
+		if stats.txBytes != nil {
+			mx[px+"bw_sent"] = *stats.txBytes
+		}
+		if stats.rxPackets != nil {
+			mx[px+"packets_received"] = *stats.rxPackets
+		}
+		if stats.txPackets != nil {
+			mx[px+"packets_sent"] = *stats.txPackets
+		}
+		if stats.txRetries != nil {
+			mx[px+"issues_retries"] = *stats.txRetries
+		}
+		if stats.txFailed != nil {
+			mx[px+"issues_failures"] = *stats.txFailed
+		}
+
+		if stats.clients != nil && *stats.clients > 0 {
+			clients := float64(*stats.clients)
+			if stats.signalAvg != nil {
+				mx[px+"average_signal"] = int64(float64(*stats.signalAvg) / clients * precision)
+			}
+			if stats.rxBitrate != nil {
+				mx[px+"bitrate_receive"] = int64(*stats.rxBitrate / clients * precision)
+			}
+			if stats.txBitrate != nil {
+				mx[px+"bitrate_transmit"] = int64(*stats.txBitrate / clients * precision)
+			}
 		}
 	}
 
@@ -146,7 +164,7 @@ func parseIwDevices(resp []byte) ([]*iwInterface, error) {
 	return apIfaces, nil
 }
 
-func parseIwStationStatistics(resp []byte) (*stationStats, error) {
+func parseIwStationStatistics(resp []byte) *stationStats {
 	var stats stationStats
 
 	sc := bufio.NewScanner(bytes.NewReader(resp))
@@ -154,58 +172,49 @@ func parseIwStationStatistics(resp []byte) (*stationStats, error) {
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 
-		var v float64
-		var err error
-
 		switch {
 		case strings.HasPrefix(line, "Station"):
-			stats.clients++
+			stats.addInt64(&stats.clients, 1)
 		case strings.HasPrefix(line, "rx bytes:"):
-			if v, err = get3rdValue(line); err == nil {
-				stats.rxBytes += int64(v)
+			if v, err := get3rdValue(line); err == nil {
+				stats.addInt64(&stats.rxBytes, int64(v))
 			}
 		case strings.HasPrefix(line, "rx packets:"):
-			if v, err = get3rdValue(line); err == nil {
-				stats.rxPackets += int64(v)
+			if v, err := get3rdValue(line); err == nil {
+				stats.addInt64(&stats.rxPackets, int64(v))
 			}
 		case strings.HasPrefix(line, "tx bytes:"):
-			if v, err = get3rdValue(line); err == nil {
-				stats.txBytes += int64(v)
+			if v, err := get3rdValue(line); err == nil {
+				stats.addInt64(&stats.txBytes, int64(v))
 			}
 		case strings.HasPrefix(line, "tx packets:"):
-			if v, err = get3rdValue(line); err == nil {
-				stats.txPackets += int64(v)
+			if v, err := get3rdValue(line); err == nil {
+				stats.addInt64(&stats.txPackets, int64(v))
 			}
 		case strings.HasPrefix(line, "tx retries:"):
-			if v, err = get3rdValue(line); err == nil {
-				stats.txRetries += int64(v)
+			if v, err := get3rdValue(line); err == nil {
+				stats.addInt64(&stats.txRetries, int64(v))
 			}
 		case strings.HasPrefix(line, "tx failed:"):
-			if v, err = get3rdValue(line); err == nil {
-				stats.txFailed += int64(v)
+			if v, err := get3rdValue(line); err == nil {
+				stats.addInt64(&stats.txFailed, int64(v))
 			}
 		case strings.HasPrefix(line, "signal avg:"):
-			if v, err = get3rdValue(line); err == nil {
-				stats.signalAvg += int64(v)
+			if v, err := get3rdValue(line); err == nil {
+				stats.addInt64(&stats.signalAvg, int64(v))
 			}
 		case strings.HasPrefix(line, "tx bitrate:"):
-			if v, err = get3rdValue(line); err == nil {
-				stats.txBitrate += v
+			if v, err := get3rdValue(line); err == nil {
+				stats.addFloat64(&stats.txBitrate, v)
 			}
 		case strings.HasPrefix(line, "rx bitrate:"):
-			if v, err = get3rdValue(line); err == nil {
-				stats.rxBitrate += v
+			if v, err := get3rdValue(line); err == nil {
+				stats.addFloat64(&stats.rxBitrate, v)
 			}
-		default:
-			continue
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("parsing line '%s': %v", line, err)
 		}
 	}
 
-	return &stats, nil
+	return &stats
 }
 
 func get3rdValue(line string) (float64, error) {
@@ -220,4 +229,18 @@ func get3rdValue(line string) (float64, error) {
 		return 0.0, nil
 	}
 	return strconv.ParseFloat(v, 64)
+}
+
+func (s *stationStats) addInt64(dst **int64, v int64) {
+	if *dst == nil {
+		*dst = new(int64)
+	}
+	**dst += v
+}
+
+func (s *stationStats) addFloat64(dst **float64, v float64) {
+	if *dst == nil {
+		*dst = new(float64)
+	}
+	**dst += v
 }

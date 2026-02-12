@@ -218,8 +218,16 @@ bool replicate_chart_request(send_command callback, struct parser *parser, RRDHO
     if (unlikely(r.child_db.first_entry_t > r.child_db.last_entry_t))
         return send_replay_chart_cmd(&r, "sending empty replication request, child timings are invalid (first entry > last entry)", true);
 
-    if (unlikely(r.local_db.last_entry_t > r.child_db.last_entry_t))
-        return send_replay_chart_cmd(&r, "sending empty replication request, local last entry is later than the child one", false);
+    // Check if parent is already caught up with or ahead of child
+    // This check uses >= (not just >) to handle the case where parent and child are exactly equal
+    // When equal, there's no gap to replicate, so we should finish replication
+    if (unlikely(r.local_db.last_entry_t >= r.child_db.last_entry_t)) {
+        // Parent is at or ahead of child - no replication needed
+        // Send empty request (after=0, before=0) with start_streaming=true to finish replication
+        // The child will receive this, recognize it as empty, and respond with start_streaming=true
+        // which will properly terminate the replication process
+        return send_replay_chart_cmd(&r, "sending empty replication request, local last entry is at or later than the child one", false);
+    }
 
     // let's find what the child can provide to fill that gap
 

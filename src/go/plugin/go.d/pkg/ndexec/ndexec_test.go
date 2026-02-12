@@ -71,7 +71,7 @@ exec "$@"
 		"nonzero_with_trimmed_stderr": {
 			helperPath:  helper,
 			argv:        []string{longErr},
-			timeout:     time.Second,
+			timeout:     5 * time.Second,
 			wantErr:     true,
 			errContains: []string{"stderr:", "truncated"},
 		},

@@ -887,9 +887,8 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrremoting_channels_total", windows_shared_buffer);
                 p->rd_clrremoting_channels =
-                    rrddim_add(p->st_clrremoting_channels, id, "registered", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(p->st_clrremoting_channels, "registered", "registered", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrdlabels_add(
                     p->st_clrremoting_channels->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
@@ -919,13 +918,8 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id,
-                    RRD_ID_LENGTH_MAX,
-                    "netframework_%s_clrremoting_context_bound_classes_loaded",
-                    windows_shared_buffer);
                 p->rd_clrremoting_context_bound_classes_loaded = rrddim_add(
-                    p->st_clrremoting_context_bound_classes_loaded, id, "loaded", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    p->st_clrremoting_context_bound_classes_loaded, "loaded", "loaded", 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(
                     p->st_clrremoting_context_bound_classes_loaded->rrdlabels,
@@ -958,13 +952,8 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id,
-                    RRD_ID_LENGTH_MAX,
-                    "netframework_%s_clrremoting_context_bound_objects_total",
-                    windows_shared_buffer);
                 p->rd_clrremoting_context_bound_objects = rrddim_add(
-                    p->st_clrremoting_context_bound_objects, id, "allocated", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    p->st_clrremoting_context_bound_objects, "allocated", "allocated", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrdlabels_add(
                     p->st_clrremoting_context_bound_objects->rrdlabels,
@@ -996,10 +985,8 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id, RRD_ID_LENGTH_MAX, "netframework_%s_clrremoting_context_proxies_total", windows_shared_buffer);
                 p->rd_clrremoting_context_proxies =
-                    rrddim_add(p->st_clrremoting_context_proxies, id, "objects", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(p->st_clrremoting_context_proxies, "objects", "objects", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrdlabels_add(
                     p->st_clrremoting_context_proxies->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
@@ -1029,9 +1016,8 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrremoting_contexts", windows_shared_buffer);
                 p->rd_clrremoting_contexts =
-                    rrddim_add(p->st_clrremoting_contexts, id, "contexts", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(p->st_clrremoting_contexts, "contexts", "contexts", 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(
                     p->st_clrremoting_contexts->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
@@ -1061,10 +1047,8 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id, RRD_ID_LENGTH_MAX, "netframework_%s_clrremoting_remote_calls_total", windows_shared_buffer);
                 p->rd_clrremoting_remote_calls =
-                    rrddim_add(p->st_clrremoting_remote_calls, id, "contexts", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(p->st_clrremoting_remote_calls, "calls", "calls", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrdlabels_add(
                     p->st_clrremoting_remote_calls->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
@@ -1073,7 +1057,7 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
             rrddim_set_by_pointer(
                 p->st_clrremoting_remote_calls,
                 p->rd_clrremoting_remote_calls,
-                (collected_number)p->NETFrameworkCLRRemotingContexts.current.Data);
+                (collected_number)p->NETFrameworkCLRRemotingRemoteCalls.current.Data);
             rrdset_done(p->st_clrremoting_remote_calls);
         }
     }
@@ -1114,10 +1098,8 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id, RRD_ID_LENGTH_MAX, "netframework_%s_clrsecurity_link_time_checks_total", windows_shared_buffer);
                 p->rd_clrsecurity_link_time_checks =
-                    rrddim_add(p->st_clrsecurity_link_time_checks, id, "linktime", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(p->st_clrsecurity_link_time_checks, "linktime", "linktime", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrdlabels_add(
                     p->st_clrsecurity_link_time_checks->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
@@ -1132,9 +1114,9 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRSecurityPercentTimeinRTChecks) &&
             perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRSecurityFrequency_PerfTime)) {
-            if (!p->st_clrsecurity_link_time_checks) {
+            if (!p->st_clrsecurity_rt_checks_time) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_checks_time", windows_shared_buffer);
-                p->st_clrsecurity_link_time_checks = rrdset_create_localhost(
+                p->st_clrsecurity_rt_checks_time = rrdset_create_localhost(
                     "netframework",
                     id,
                     NULL,
@@ -1148,23 +1130,21 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id, RRD_ID_LENGTH_MAX, "netframework_%s_clrsecurity_checks_time_percent", windows_shared_buffer);
-                p->rd_clrsecurity_link_time_checks =
-                    rrddim_add(p->st_clrsecurity_link_time_checks, id, "time", 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_clrsecurity_rt_checks_time =
+                    rrddim_add(p->st_clrsecurity_rt_checks_time, "time", "time", 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(
-                    p->st_clrsecurity_link_time_checks->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                    p->st_clrsecurity_rt_checks_time->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
             NETDATA_DOUBLE value = (NETDATA_DOUBLE)p->NETFrameworkCLRSecurityPercentTimeinRTChecks.current.Data;
             value /= (NETDATA_DOUBLE)p->NETFrameworkCLRSecurityFrequency_PerfTime.current.Data;
 
             rrddim_set_by_pointer(
-                p->st_clrsecurity_link_time_checks,
-                p->rd_clrsecurity_link_time_checks,
+                p->st_clrsecurity_rt_checks_time,
+                p->rd_clrsecurity_rt_checks_time,
                 (collected_number)(value * 100.0));
-            rrdset_done(p->st_clrsecurity_link_time_checks);
+            rrdset_done(p->st_clrsecurity_rt_checks_time);
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRSecurityStackWalkDepth)) {
@@ -1184,9 +1164,8 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(id, RRD_ID_LENGTH_MAX, "netframework_%s_clrsecurity_stack_walk_depth", windows_shared_buffer);
                 p->rd_clrsecurity_stack_walk_depth =
-                    rrddim_add(p->st_clrsecurity_stack_walk_depth, id, "stack", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    rrddim_add(p->st_clrsecurity_stack_walk_depth, "stack", "stack", 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(
                     p->st_clrsecurity_stack_walk_depth->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
@@ -1200,9 +1179,9 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
         }
 
         if (perflibGetObjectCounter(pDataBlock, pObjectType, &p->NETFrameworkCLRSecurityRunTimeChecks)) {
-            if (!p->st_clrsecurity_stack_walk_depth) {
+            if (!p->st_clrsecurity_run_time_checks) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_runtime_checks", windows_shared_buffer);
-                p->st_clrsecurity_stack_walk_depth = rrdset_create_localhost(
+                p->st_clrsecurity_run_time_checks = rrdset_create_localhost(
                     "netframework",
                     id,
                     NULL,
@@ -1216,20 +1195,18 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id, RRD_ID_LENGTH_MAX, "netframework_%s_clrsecurity_runtime_checks_total", windows_shared_buffer);
-                p->rd_clrsecurity_stack_walk_depth =
-                    rrddim_add(p->st_clrsecurity_stack_walk_depth, id, "runtime", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                p->rd_clrsecurity_run_time_checks =
+                    rrddim_add(p->st_clrsecurity_run_time_checks, "runtime", "runtime", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrdlabels_add(
-                    p->st_clrsecurity_stack_walk_depth->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+                    p->st_clrsecurity_run_time_checks->rrdlabels, "process", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
 
             rrddim_set_by_pointer(
-                p->st_clrsecurity_stack_walk_depth,
-                p->rd_clrsecurity_stack_walk_depth,
+                p->st_clrsecurity_run_time_checks,
+                p->rd_clrsecurity_run_time_checks,
                 (collected_number)p->NETFrameworkCLRSecurityRunTimeChecks.current.Data);
-            rrdset_done(p->st_clrsecurity_stack_walk_depth);
+            rrdset_done(p->st_clrsecurity_run_time_checks);
         }
     }
 }
@@ -1270,13 +1247,8 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id,
-                    RRD_ID_LENGTH_MAX,
-                    "netframework_%s_clrlocksandthreads_recognized_threads_total",
-                    windows_shared_buffer);
                 p->rd_locksandthreads_queue_length =
-                    rrddim_add(p->st_clrlocksandthreads_queue_length, id, "threads", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rrddim_add(p->st_clrlocksandthreads_queue_length, "threads", "threads", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrdlabels_add(
                     p->st_clrlocksandthreads_queue_length->rrdlabels,
@@ -1310,13 +1282,8 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id,
-                    RRD_ID_LENGTH_MAX,
-                    "netframework_%s_clrlocksandthreads_current_logical_threads",
-                    windows_shared_buffer);
                 p->rd_locksandthreads_current_logical_threads = rrddim_add(
-                    p->st_clrlocksandthreads_current_logical_threads, id, "logical", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    p->st_clrlocksandthreads_current_logical_threads, "logical", "logical", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrdlabels_add(
                     p->st_clrlocksandthreads_current_logical_threads->rrdlabels,
@@ -1350,13 +1317,8 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id,
-                    RRD_ID_LENGTH_MAX,
-                    "netframework_%s_clrlocksandthreads_physical_threads_current",
-                    windows_shared_buffer);
                 p->rd_locksandthreads_current_physical_threads = rrddim_add(
-                    p->st_clrlocksandthreads_current_physical_threads, id, "physical", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    p->st_clrlocksandthreads_current_physical_threads, "physical", "physical", 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(
                     p->st_clrlocksandthreads_current_physical_threads->rrdlabels,
@@ -1389,13 +1351,8 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id,
-                    RRD_ID_LENGTH_MAX,
-                    "netframework_%s_clrlocksandthreads_recognized_threads_total",
-                    windows_shared_buffer);
                 p->rd_locksandthreads_recognized_threads = rrddim_add(
-                    p->st_clrlocksandthreads_recognized_threads, id, "threads", 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                    p->st_clrlocksandthreads_recognized_threads, "threads", "threads", 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrdlabels_add(
                     p->st_clrlocksandthreads_recognized_threads->rrdlabels,
@@ -1428,13 +1385,8 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                snprintfz(
-                    id,
-                    RRD_ID_LENGTH_MAX,
-                    "netframework_%s_clrlocksandthreads_contentions_total",
-                    windows_shared_buffer);
                 p->rd_locksandthreads_contentions = rrddim_add(
-                    p->st_clrlocksandthreads_contentions, id, "contentions", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    p->st_clrlocksandthreads_contentions, "contentions", "contentions", 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 rrdlabels_add(
                     p->st_clrlocksandthreads_contentions->rrdlabels,

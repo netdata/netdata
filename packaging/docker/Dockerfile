@@ -19,6 +19,10 @@ ARG DEBUG_BUILD
 
 ENV DEBUG_BUILD=$DEBUG_BUILD
 
+ARG BUILD_ARCH
+
+ENV BUILD_ARCH=$BUILD_ARCH
+
 # Copy source
 COPY . /opt/netdata.git
 WORKDIR /opt/netdata.git
@@ -26,11 +30,13 @@ WORKDIR /opt/netdata.git
 # Install from source
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
-   /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='$(uname -m)'" > ./system/.install-type && \
+   BUILD_ARCH="${BUILD_ARCH:-"$(uname -m)"}" && \
+   /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='${BUILD_ARCH}'" > ./system/.install-type && \
    CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" ./netdata-installer.sh --dont-wait --dont-start-it \
    --use-system-protobuf \
    --disable-ebpf \
    --enable-plugin-otel \
+   --enable-plugin-otel-signal-viewer \
    --internal-systemd-journal \
    ${EXTRA_INSTALL_OPTS} \
    --install-no-prefix / \
@@ -134,6 +140,7 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 slabinfo.plugin \
                 network-viewer.plugin \
                 otel-plugin \
+                otel-signal-viewer-plugin \
                 systemd-journal.plugin; do \
         [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/usr/libexec/netdata/plugins.d/$name"; \
     done && \

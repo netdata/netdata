@@ -41,6 +41,10 @@ type Module interface {
 	VirtualNode() *vnodes.VirtualNode
 }
 
+type MetricCollector interface {
+	CollectMetrics(context.Context) map[string]float64
+}
+
 // Base is a helper struct. All modules should embed this struct.
 type Base struct {
 	*logger.Logger

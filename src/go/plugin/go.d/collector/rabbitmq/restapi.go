@@ -40,8 +40,7 @@ func (a *apiWhoamiTags) UnmarshalJSON(data []byte) error {
 }
 
 type apiDefinitionsResp struct {
-	RabbitmqVersion string `json:"rabbitmq_version"`
-	GlobalParams    []struct {
+	GlobalParams []struct {
 		Name  string `json:"name"`
 		Value any    `json:"value"`
 	} `json:"global_parameters"`

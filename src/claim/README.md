@@ -259,7 +259,7 @@ Failed to write new machine GUID. Please make sure you have rights to write to /
 
 **Problem:** If you're running an older Linux distribution or one that has reached EOL, such as Ubuntu 14.04 LTS, Debian 8, or CentOS 6, your Agent may not be able to securely connect to Netdata Cloud due to an outdated version of OpenSSL. These old versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.org/index.php/Hostname_validation), which helps securely encrypt SSL connections.
 
-**Solution:** We recommend you reinstall Netdata with a [static build](/packaging/installer/methods/kickstart.md#install-type), which uses an up-to-date version of OpenSSL with hostname validation enabled.
+**Solution:** We recommend you reinstall Netdata with a [static build](/packaging/makeself/README.md), which uses an up-to-date version of OpenSSL with hostname validation enabled.
 
 :::warning
 

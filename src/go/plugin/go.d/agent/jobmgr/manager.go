@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
@@ -31,6 +33,10 @@ import (
 var isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdin.Fd())
 
 func New() *Manager {
+	seen := dyncfg.NewSeenCache[confgroup.Config]()
+	exposed := dyncfg.NewExposedCache[confgroup.Config]()
+	api := dyncfg.NewResponder(netdataapi.New(safewriter.Stdout))
+
 	mgr := &Manager{
 		Logger: logger.New().With(
 			slog.String("component", "job manager"),
@@ -40,20 +46,52 @@ func New() *Manager {
 
 		Vnodes: make(map[string]*vnodes.VirtualNode),
 
+		moduleFuncs:       newModuleFuncRegistry(),
 		discoveredConfigs: newDiscoveredConfigsCache(),
-		seenConfigs:       newSeenConfigCache(),
-		exposedConfigs:    newExposedConfigCache(),
+		seen:              seen,
+		exposed:           exposed,
 		runningJobs:       newRunningJobsCache(),
 		retryingTasks:     newRetryingTasksCache(),
 
 		started:   make(chan struct{}),
 		addCh:     make(chan confgroup.Config),
 		rmCh:      make(chan confgroup.Config),
-		dyncfgCh:  make(chan functions.Function),
-		dyncfgApi: dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
+		dyncfgCh:  make(chan dyncfg.Function),
+		dyncfgApi: api,
 	}
 
+	mgr.collectorCb = &collectorCallbacks{mgr: mgr}
+	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[confgroup.Config]{
+		Logger:    mgr.Logger,
+		API:       api,
+		Seen:      seen,
+		Exposed:   exposed,
+		Callbacks: mgr.collectorCb,
+
+		Path:                    fmt.Sprintf(dyncfgCollectorPath, executable.Name),
+		EnableFailCode:          200,
+		RemoveStockOnEnableFail: true,
+		JobCommands: []dyncfg.Command{
+			dyncfg.CommandSchema,
+			dyncfg.CommandGet,
+			dyncfg.CommandEnable,
+			dyncfg.CommandDisable,
+			dyncfg.CommandUpdate,
+			dyncfg.CommandRestart,
+			dyncfg.CommandTest,
+			dyncfg.CommandUserconfig,
+		},
+	})
+
 	return mgr
+}
+
+// SetDyncfgResponder allows overriding the default responder (e.g., to silence output in CLI mode).
+func (m *Manager) SetDyncfgResponder(responder *dyncfg.Responder) {
+	if responder != nil {
+		m.dyncfgApi = responder
+		m.handler.SetAPI(responder)
+	}
 }
 
 type Manager struct {
@@ -73,24 +111,31 @@ type Manager struct {
 	DumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
 	DumpDataDir  string
 
-	fileStatus *fileStatus
+	fileStatus  *fileStatus
+	moduleFuncs *moduleFuncRegistry
 
 	discoveredConfigs *discoveredConfigs
-	seenConfigs       *seenConfigs
-	exposedConfigs    *exposedConfigs
+	seen              *dyncfg.SeenCache[confgroup.Config]
+	exposed           *dyncfg.ExposedCache[confgroup.Config]
 	retryingTasks     *retryingTasks
 	runningJobs       *runningJobs
+
+	handler     *dyncfg.Handler[confgroup.Config]
+	collectorCb *collectorCallbacks
 
 	ctx     context.Context
 	started chan struct{}
 	//api      dyncfgAPI
 	addCh    chan confgroup.Config
 	rmCh     chan confgroup.Config
-	dyncfgCh chan functions.Function
+	dyncfgCh chan dyncfg.Function
 
 	waitCfgOnOff string // block processing of discovered configs until "enable"/"disable" is received from Netdata
 
 	dyncfgApi *dyncfg.Responder
+
+	// FunctionJSONWriter, when set, bypasses Netdata protocol output and writes raw JSON.
+	FunctionJSONWriter func(payload []byte, code int)
 }
 
 func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
@@ -98,8 +143,8 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	defer func() { m.cleanup(); m.Info("instance is stopped") }()
 	m.ctx = ctx
 
-	m.FnReg.RegisterPrefix("config", m.dyncfgCollectorPrefixValue(), m.dyncfgConfig)
-	m.FnReg.RegisterPrefix("config", m.dyncfgVnodePrefixValue(), m.dyncfgConfig)
+	m.FnReg.RegisterPrefix("config", m.dyncfgCollectorPrefixValue(), m.dyncfgConfigHandler)
+	m.FnReg.RegisterPrefix("config", m.dyncfgVnodePrefixValue(), m.dyncfgConfigHandler)
 
 	m.dyncfgVnodeModuleCreate()
 
@@ -107,8 +152,49 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 		m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
 	}
 
-	for name := range m.Modules {
+	for name, creator := range m.Modules {
 		m.dyncfgCollectorModuleCreate(name)
+
+		// Register module if it provides static methods OR per-job methods
+		if creator.Methods != nil || creator.JobMethods != nil {
+			m.moduleFuncs.registerModule(name, creator)
+		}
+
+		// Register static module-level functions
+		if creator.Methods != nil {
+			methods := creator.Methods()
+			for _, method := range methods {
+				if method.ID == "" {
+					m.Warningf("skipping function registration for module '%s': empty method ID", name)
+					continue
+				}
+				funcName := fmt.Sprintf("%s:%s", name, method.ID)
+				m.FnReg.Register(funcName, m.makeMethodFuncHandler(name, method.ID))
+
+				// Notify Netdata about this function so it appears in the functions API
+				help := method.Help
+				if help == "" {
+					help = fmt.Sprintf("%s %s data function", name, method.ID)
+				}
+
+				// https://github.com/netdata/netdata/blob/1bc1775a17590b3c0fe3a4fe547dc6146d07be89/src/libnetdata/user-auth/http-access.h#L21
+				const cloudAccess = "0x0013" // SIGNED_ID | SAME_SPACE | SENSITIVE_DATA
+				access := "0x0000"
+				if method.RequireCloud {
+					access = cloudAccess
+				}
+				m.dyncfgApi.FunctionGlobal(netdataapi.FunctionGlobalOpts{
+					Name:     funcName,
+					Timeout:  60,
+					Help:     help,
+					Tags:     "top",
+					Access:   access,
+					Priority: 100,
+					Version:  3,
+				})
+			}
+		}
+		// Note: Per-job methods (JobMethods) are registered in startRunningJob
 	}
 
 	m.loadFileStatus()
@@ -131,6 +217,32 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 
 	wg.Wait()
 	<-m.ctx.Done()
+}
+
+// WaitStarted blocks until Run has completed initialization or the context is canceled.
+func (m *Manager) WaitStarted(ctx context.Context) bool {
+	select {
+	case <-m.started:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// GetJobNames returns the currently running job names for a module.
+func (m *Manager) GetJobNames(moduleName string) []string {
+	return m.moduleFuncs.getJobNames(moduleName)
+}
+
+// ExecuteFunction executes a function handler directly (function name must be module:method).
+func (m *Manager) ExecuteFunction(functionName string, fn functions.Function) {
+	moduleName, methodID, err := functions.SplitFunctionName(functionName)
+	if err != nil {
+		m.respondError(fn, 400, "%v", err)
+		return
+	}
+	handler := m.makeMethodFuncHandler(moduleName, methodID)
+	handler(fn)
 }
 
 func (m *Manager) runProcessConfGroups(in chan []*confgroup.Group) {
@@ -185,60 +297,55 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 
 	m.retryingTasks.remove(cfg)
 
-	scfg, ok := m.seenConfigs.lookup(cfg)
-	if !ok {
-		scfg = &seenConfig{cfg: cfg}
-		m.seenConfigs.add(scfg)
+	if _, ok := m.seen.Lookup(cfg); !ok {
+		m.seen.Add(cfg)
 	}
 
-	ecfg, ok := m.exposedConfigs.lookup(cfg)
+	entry, ok := m.exposed.LookupByKey(cfg.ExposedKey())
 	if !ok {
-		scfg.status = dyncfg.StatusAccepted
-		ecfg = scfg
-		m.exposedConfigs.add(ecfg)
+		entry = &dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusAccepted}
+		m.exposed.Add(entry)
 	} else {
-		sp, ep := scfg.cfg.SourceTypePriority(), ecfg.cfg.SourceTypePriority()
-		if ep > sp || (ep == sp && ecfg.status == dyncfg.StatusRunning) {
+		sp, ep := cfg.SourceTypePriority(), entry.Cfg.SourceTypePriority()
+		if ep > sp || (ep == sp && entry.Status == dyncfg.StatusRunning) {
 			return
 		}
-		if ecfg.status == dyncfg.StatusRunning {
-			m.stopRunningJob(ecfg.cfg.FullName())
-			m.fileStatus.remove(ecfg.cfg)
+		if entry.Status == dyncfg.StatusRunning {
+			m.stopRunningJob(entry.Cfg.FullName())
+			m.fileStatus.remove(entry.Cfg)
 		}
-		scfg.status = dyncfg.StatusAccepted
-		m.exposedConfigs.add(scfg) // replace existing exposed
-		ecfg = scfg
+		entry = &dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusAccepted}
+		m.exposed.Add(entry) // replace existing exposed
 	}
 
-	m.dyncfgCollectorJobCreate(ecfg.cfg, ecfg.status)
+	m.handler.NotifyJobCreate(entry.Cfg, entry.Status)
 
 	if isTerminal || m.PluginName == "nodyncfg" { // FIXME: quick fix of TestAgent_Run (agent_test.go)
-		m.dyncfgConfigEnable(functions.Function{Args: []string{m.dyncfgJobID(ecfg.cfg), "enable"}})
+		m.handler.CmdEnable(dyncfg.NewFunction(functions.Function{Args: []string{m.dyncfgJobID(entry.Cfg), "enable"}}))
 	} else {
-		m.waitCfgOnOff = ecfg.cfg.FullName()
+		m.waitCfgOnOff = entry.Cfg.FullName()
 	}
 }
 
 func (m *Manager) removeConfig(cfg confgroup.Config) {
 	m.retryingTasks.remove(cfg)
 
-	scfg, ok := m.seenConfigs.lookup(cfg)
-	if !ok {
+	if _, ok := m.seen.Lookup(cfg); !ok {
 		return
 	}
-	m.seenConfigs.remove(cfg)
+	m.seen.Remove(cfg)
 
-	ecfg, ok := m.exposedConfigs.lookup(cfg)
-	if !ok || scfg.cfg.UID() != ecfg.cfg.UID() {
+	entry, ok := m.exposed.LookupByKey(cfg.ExposedKey())
+	if !ok || cfg.UID() != entry.Cfg.UID() {
 		return
 	}
 
-	m.exposedConfigs.remove(cfg)
+	m.exposed.Remove(cfg)
 	m.stopRunningJob(cfg.FullName())
 	m.fileStatus.remove(cfg)
 
-	if !isStock(cfg) || ecfg.status == dyncfg.StatusRunning {
-		m.dyncfgJobRemove(cfg)
+	if !isStock(cfg) || entry.Status == dyncfg.StatusRunning {
+		m.handler.NotifyJobRemove(cfg)
 	}
 }
 
@@ -259,30 +366,61 @@ func (m *Manager) runNotifyRunningJobs() {
 }
 
 func (m *Manager) startRunningJob(job *module.Job) {
+	m.stopRunningJob(job.FullName())
+
 	m.runningJobs.lock()
 	defer m.runningJobs.unlock()
 
-	if job, ok := m.runningJobs.lookup(job.FullName()); ok {
-		job.Stop()
-	}
-
 	go job.Start()
 	m.runningJobs.add(job.FullName(), job)
+
+	// Track job for module function routing
+	m.moduleFuncs.addJob(job.ModuleName(), job.Name(), job)
+
+	// Register job-specific methods if module provides JobMethods callback
+	creator, ok := m.Modules.Lookup(job.ModuleName())
+	if ok && creator.JobMethods != nil {
+		methods := creator.JobMethods(job)
+		if len(methods) > 0 {
+			m.registerJobMethods(job, methods)
+		}
+	}
 }
 
 func (m *Manager) stopRunningJob(name string) {
 	m.runningJobs.lock()
-	defer m.runningJobs.unlock()
-
-	if job, ok := m.runningJobs.lookup(name); ok {
-		job.Stop()
+	job, ok := m.runningJobs.lookup(name)
+	if ok {
 		m.runningJobs.remove(name)
+	}
+	m.runningJobs.unlock()
+
+	if ok {
+		// Unregister job-specific methods
+		m.unregisterJobMethods(job)
+
+		// Remove job from module function registry
+		m.moduleFuncs.removeJob(job.ModuleName(), job.Name())
+		job.Stop()
 	}
 }
 
 func (m *Manager) cleanup() {
 	m.FnReg.UnregisterPrefix("config", m.dyncfgCollectorPrefixValue())
 	m.FnReg.UnregisterPrefix("config", m.dyncfgVnodePrefixValue())
+
+	// Unregister module functions
+	for name, creator := range m.Modules {
+		if creator.Methods != nil {
+			for _, method := range creator.Methods() {
+				if method.ID == "" {
+					continue
+				}
+				funcName := fmt.Sprintf("%s:%s", name, method.ID)
+				m.FnReg.Unregister(funcName)
+			}
+		}
+	}
 
 	m.runningJobs.lock()
 	defer m.runningJobs.unlock()
@@ -292,10 +430,88 @@ func (m *Manager) cleanup() {
 	})
 }
 
+// registerJobMethods registers methods for a specific job with Netdata
+func (m *Manager) registerJobMethods(job *module.Job, methods []funcapi.MethodConfig) {
+	for _, method := range methods {
+		if method.ID == "" {
+			m.Warningf("skipping job method registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
+			continue
+		}
+
+		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
+
+		// Register Go handler for this function
+		m.FnReg.Register(funcName, m.makeJobMethodFuncHandler(job.ModuleName(), job.Name(), method.ID))
+
+		// Notify Netdata about this function
+		help := method.Help
+		if help == "" {
+			help = fmt.Sprintf("%s %s data function", job.ModuleName(), method.ID)
+		}
+
+		const cloudAccess = "0x0013" // SIGNED_ID | SAME_SPACE | SENSITIVE_DATA
+		access := "0x0000"
+		if method.RequireCloud {
+			access = cloudAccess
+		}
+
+		m.dyncfgApi.FunctionGlobal(netdataapi.FunctionGlobalOpts{
+			Name:     funcName,
+			Timeout:  60,
+			Help:     help,
+			Tags:     "top",
+			Access:   access,
+			Priority: 100,
+			Version:  3,
+		})
+
+		m.Debugf("registered job method: %s for job %s[%s]", funcName, job.ModuleName(), job.Name())
+	}
+
+	// Store methods in registry for later unregistration
+	m.moduleFuncs.registerJobMethods(job.ModuleName(), job.Name(), methods)
+}
+
+// unregisterJobMethods unregisters methods for a specific job
+func (m *Manager) unregisterJobMethods(job *module.Job) {
+	methods := m.moduleFuncs.getJobMethods(job.ModuleName(), job.Name())
+	if len(methods) == 0 {
+		return
+	}
+
+	for _, method := range methods {
+		if method.ID == "" {
+			continue
+		}
+
+		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
+
+		// Unregister Go handler
+		m.FnReg.Unregister(funcName)
+
+		// Notify Netdata to remove function (no-op until Netdata supports it)
+		m.dyncfgApi.FunctionRemove(funcName)
+
+		m.Debugf("unregistered job method: %s for job %s[%s]", funcName, job.ModuleName(), job.Name())
+	}
+
+	// Remove from registry
+	m.moduleFuncs.unregisterJobMethods(job.ModuleName(), job.Name())
+}
+
 func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) {
 	creator, ok := m.Modules[cfg.Module()]
 	if !ok {
 		return nil, fmt.Errorf("can not find %s module", cfg.Module())
+	}
+
+	// Determine if job is function-only (module-level OR config-level)
+	functionOnly := creator.FunctionOnly || cfg.FunctionOnly()
+
+	// Reject if config sets function_only but module has no methods
+	// Note: module-level FunctionOnly without Methods is caught at registration time
+	if cfg.FunctionOnly() && creator.Methods == nil && creator.JobMethods == nil {
+		return nil, fmt.Errorf("function_only is set but %s module has no methods defined", cfg.Module())
 	}
 
 	var vnode *vnodes.VirtualNode
@@ -344,6 +560,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) 
 		Out:             m.Out,
 		DumpMode:        m.DumpMode,
 		DumpAnalyzer:    m.DumpAnalyzer,
+		FunctionOnly:    functionOnly,
 	}
 
 	if vnode != nil {

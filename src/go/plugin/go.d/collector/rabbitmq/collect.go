@@ -83,10 +83,6 @@ func (c *Collector) getClusterMeta() (id string, name string, err error) {
 		return "", "", err
 	}
 
-	if resp.RabbitmqVersion == "" {
-		return "", "", fmt.Errorf("unexpected response: rabbitmq version is empty")
-	}
-
 	id = "unknown"
 	name = "unset"
 

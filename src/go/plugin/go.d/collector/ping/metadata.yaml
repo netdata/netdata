@@ -116,6 +116,17 @@ modules:
               required: false
               group: Ping Settings
 
+            - name: jitter_ewma_samples
+              description: EWMA smoothing factor for jitter calculation. Higher values = smoother, slower response.
+              default_value: 16
+              required: false
+              group: Jitter Settings
+            - name: jitter_sma_window
+              description: Number of iterations for SMA jitter calculation.
+              default_value: 10
+              required: false
+              group: Jitter Settings
+
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
@@ -166,7 +177,7 @@ modules:
     alerts:
       - name: ping_host_reachable
         metric: ping.host_packet_loss
-        info: "network host ${lab1el:host} reachability status"
+        info: "network host ${label:host} reachability status"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf
       - name: ping_packet_loss
         metric: ping.host_packet_loss
@@ -192,7 +203,7 @@ modules:
             - name: ping.host_rtt
               description: Ping round-trip time
               unit: milliseconds
-              chart_type: line
+              chart_type: area
               dimensions:
                 - name: min
                 - name: max
@@ -203,6 +214,20 @@ modules:
               chart_type: line
               dimensions:
                 - name: std_dev
+            - name: ping.host_jitter
+              description: Ping latency jitter
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: mean
+                - name: ewma
+                - name: sma
+            - name: ping.host_rtt_variance
+              description: Ping round-trip time variance
+              unit: ms²
+              chart_type: line
+              dimensions:
+                - name: variance
             - name: ping.host_packet_loss
               description: Ping packet loss
               unit: percentage

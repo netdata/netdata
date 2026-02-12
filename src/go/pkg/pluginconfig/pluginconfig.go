@@ -19,6 +19,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+
+	"github.com/mattn/go-isatty"
 )
 
 var (
@@ -130,11 +132,11 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 		roots = append(roots, p)
 	}
 
-	// 2) NETDATA_USER_CONFIG_DIR
-	if buildinfo.UserConfigDir != "" {
-		roots = append(roots, safePathClean(buildinfo.UserConfigDir))
-	} else if dir := safePathClean(env.userDir); dir != "" {
+	// 2) NETDATA_USER_CONFIG_DIR (env has priority over buildinfo)
+	if dir := safePathClean(env.userDir); dir != "" {
 		roots = append(roots, dir)
+	} else if buildinfo.UserConfigDir != "" {
+		roots = append(roots, safePathClean(buildinfo.UserConfigDir))
 	}
 
 	if len(roots) != 0 {
@@ -143,6 +145,7 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 	}
 
 	relDir := safePathClean(filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata"))
+	relDir = handleDirOnWin(env.cygwinBase, relDir, execDir)
 	if isDirExists(relDir) {
 		d.userConfigDirs = multipath.New(relDir)
 		return
@@ -164,16 +167,18 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 
 // Build step 2: initialize single "stock" root: env, common locations, build-relative fallback.
 func (d *directories) initStockRoot(env envData, execDir string) {
-	if buildinfo.StockConfigDir != "" {
-		d.stockConfigDir = safePathClean(buildinfo.StockConfigDir)
-		return
-	}
+	// env.stockDir has priority
 	if stock := safePathClean(env.stockDir); stock != "" {
 		d.stockConfigDir = stock
 		return
 	}
+	if buildinfo.StockConfigDir != "" {
+		d.stockConfigDir = safePathClean(buildinfo.StockConfigDir)
+		return
+	}
 
 	relDir := safePathClean(filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d"))
+	relDir = handleDirOnWin(env.cygwinBase, relDir, execDir)
 	if isDirExists(relDir) {
 		d.stockConfigDir = relDir
 		return
@@ -254,19 +259,28 @@ func (d *directories) validate() error {
 	return nil
 }
 
+var isTerm = isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsTerminal(os.Stdout.Fd())
+
 func readEnvFromOS(execDir string) envData {
 	e := envData{
 		cygwinBase: os.Getenv("NETDATA_CYGWIN_BASE_PATH"),
 		userDir:    os.Getenv("NETDATA_USER_CONFIG_DIR"),
 		stockDir:   os.Getenv("NETDATA_STOCK_CONFIG_DIR"),
-		varLibDir:  os.Getenv("NETDATA_LIB_DIR"),
 		watchPath:  os.Getenv("NETDATA_PLUGINS_GOD_WATCH_PATH"),
+		varLibDir:  os.Getenv("NETDATA_LIB_DIR"),
 		logLevel:   os.Getenv("NETDATA_LOG_LEVEL"),
 	}
 	e.userDir = handleDirOnWin(e.cygwinBase, safePathClean(e.userDir), execDir)
 	e.stockDir = handleDirOnWin(e.cygwinBase, safePathClean(e.stockDir), execDir)
 	e.varLibDir = handleDirOnWin(e.cygwinBase, safePathClean(e.varLibDir), execDir)
 	e.watchPath = handleDirOnWin(e.cygwinBase, safePathClean(e.watchPath), execDir)
+
+	if isTerm {
+		e.userDir = ""
+		e.stockDir = ""
+		e.watchPath = ""
+	}
+
 	return e
 }
 
@@ -280,7 +294,7 @@ func handleDirOnWin(base, p string, execDir string) string {
 	if base == "" || !strings.HasPrefix(p, "/") {
 		return p
 	}
-	return filepath.Join(base, p)
+	return filepath.Join(base, strings.TrimPrefix(p, "/"))
 }
 
 func isDirExists(dir string) bool {

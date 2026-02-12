@@ -322,3 +322,22 @@ func TestConfig_Apply(t *testing.T) {
 		})
 	}
 }
+
+func TestConfig_FunctionOnly(t *testing.T) {
+	tests := map[string]struct {
+		cfg      Config
+		expected bool
+	}{
+		"true":     {cfg: Config{"function_only": true}, expected: true},
+		"false":    {cfg: Config{"function_only": false}, expected: false},
+		"not bool": {cfg: Config{"function_only": "true"}, expected: false},
+		"not set":  {cfg: Config{}, expected: false},
+		"nil cfg":  {expected: false},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.expected, test.cfg.FunctionOnly())
+		})
+	}
+}

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 )
 
 // Responder handles standardized responses for dyncfg operations
@@ -23,8 +22,8 @@ func NewResponder(api *netdataapi.API) *Responder {
 }
 
 // SendCodef sends a response with a specific code and message
-func (r *Responder) SendCodef(fn functions.Function, code int, message string, args ...any) {
-	if fn.UID == "" {
+func (r *Responder) SendCodef(fn Function, code int, message string, args ...any) {
+	if fn.UID() == "" {
 		return
 	}
 
@@ -33,18 +32,27 @@ func (r *Responder) SendCodef(fn functions.Function, code int, message string, a
 		msg = fmt.Sprintf(message, args...)
 	}
 
-	response := struct {
-		Status  int    `json:"status"`
-		Message string `json:"message"`
-	}{
-		Status:  code,
-		Message: msg,
+	var payload []byte
+	if code >= 400 && code < 600 {
+		payload, _ = json.Marshal(struct {
+			Status       int    `json:"status"`
+			ErrorMessage string `json:"errorMessage"`
+		}{
+			Status:       code,
+			ErrorMessage: msg,
+		})
+	} else {
+		payload, _ = json.Marshal(struct {
+			Status  int    `json:"status"`
+			Message string `json:"message"`
+		}{
+			Status:  code,
+			Message: msg,
+		})
 	}
 
-	payload, _ := json.Marshal(response)
-
 	r.api.FUNCRESULT(netdataapi.FunctionResult{
-		UID:             fn.UID,
+		UID:             fn.UID(),
 		ContentType:     "application/json",
 		Payload:         string(payload),
 		Code:            strconv.Itoa(code),
@@ -52,24 +60,39 @@ func (r *Responder) SendCodef(fn functions.Function, code int, message string, a
 	})
 }
 
-// SendJSON sends a JSON payload response
-func (r *Responder) SendJSON(fn functions.Function, payload string) {
+// SendJSON sends a JSON payload response with HTTP 200 status
+func (r *Responder) SendJSON(fn Function, payload string) {
 	r.sendPayload(fn, payload, "application/json")
 }
 
-// SendYAML sends a YAML payload response
-func (r *Responder) SendYAML(fn functions.Function, payload string) {
-	r.sendPayload(fn, payload, "application/yaml")
-}
-
-// sendPayload sends a response with a specific payload and content type
-func (r *Responder) sendPayload(fn functions.Function, payload, contentType string) {
-	if fn.UID == "" {
+// SendJSONWithCode sends a JSON payload response with a specific HTTP status code
+func (r *Responder) SendJSONWithCode(fn Function, payload string, code int) {
+	if fn.UID() == "" {
 		return
 	}
 
 	r.api.FUNCRESULT(netdataapi.FunctionResult{
-		UID:             fn.UID,
+		UID:             fn.UID(),
+		ContentType:     "application/json",
+		Payload:         payload,
+		Code:            strconv.Itoa(code),
+		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
+	})
+}
+
+// SendYAML sends a YAML payload response
+func (r *Responder) SendYAML(fn Function, payload string) {
+	r.sendPayload(fn, payload, "application/yaml")
+}
+
+// sendPayload sends a response with a specific payload and content type
+func (r *Responder) sendPayload(fn Function, payload, contentType string) {
+	if fn.UID() == "" {
+		return
+	}
+
+	r.api.FUNCRESULT(netdataapi.FunctionResult{
+		UID:             fn.UID(),
 		ContentType:     contentType,
 		Payload:         payload,
 		Code:            "200",
@@ -89,4 +112,14 @@ func (r *Responder) ConfigStatus(id string, status Status) {
 // ConfigDelete sends a CONFIG DELETE command
 func (r *Responder) ConfigDelete(id string) {
 	r.api.CONFIGDELETE(id)
+}
+
+// FunctionGlobal registers a global function with Netdata
+func (r *Responder) FunctionGlobal(opts netdataapi.FunctionGlobalOpts) {
+	r.api.FUNCTIONGLOBAL(opts)
+}
+
+// FunctionRemove removes a function from Netdata (no-op until Netdata core supports it)
+func (r *Responder) FunctionRemove(name string) {
+	r.api.FUNCTIONREMOVE(name)
 }

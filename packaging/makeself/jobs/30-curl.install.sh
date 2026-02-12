@@ -46,6 +46,7 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
         --with-openssl \
         --with-ca-bundle=/opt/netdata/etc/ssl/certs/ca-certificates.crt \
         --with-ca-path=/opt/netdata/etc/ssl/certs \
+        --without-brotli \
         --disable-dependency-tracking
 
     # Curl autoconf does not honour the curl_LDFLAGS environment variable

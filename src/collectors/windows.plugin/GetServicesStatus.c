@@ -23,6 +23,12 @@ struct win_service {
 
 static DICTIONARY *win_services = NULL;
 
+static void win_service_cleanup(struct win_service *s)
+{
+    freez(s->service_name);
+    s->service_name = NULL;
+}
+
 void dict_win_service_insert_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused)
 {
     struct win_service *ptr = value;
@@ -31,23 +37,38 @@ void dict_win_service_insert_cb(const DICTIONARY_ITEM *item, void *value, void *
     ptr->service_name = strdupz(name);
 }
 
+void dict_win_service_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct win_service *s = value;
+    win_service_cleanup(s);
+}
+
+void do_GetServicesStatus_cleanup(void)
+{
+    if (win_services) {
+        dictionary_destroy(win_services);
+        win_services = NULL;
+    }
+}
+
 static void initialize(void)
 {
     win_services = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct win_service));
 
     dictionary_register_insert_callback(win_services, dict_win_service_insert_cb, NULL);
+    dictionary_register_delete_callback(win_services, dict_win_service_delete_cb, NULL);
 }
 
 static BOOL fill_dictionary_with_content()
 {
-    static PVOID buffer = NULL;
-    static DWORD bytes_needed = 0;
+    PVOID buffer = NULL;
+    DWORD bytes_needed = 0;
 
     LPENUM_SERVICE_STATUS_PROCESS service, services;
     DWORD total_services = 0;
     SC_HANDLE ndSCMH = OpenSCManager(NULL, NULL, SC_MANAGER_ENUMERATE_SERVICE | SC_MANAGER_CONNECT);
-    if (!ndSCMH) {
+    if (unlikely(!ndSCMH)) {
         return FALSE;
     }
 
@@ -64,34 +85,36 @@ static BOOL fill_dictionary_with_content()
         NULL,
         NULL);
 
-    if (GetLastError() == ERROR_MORE_DATA) {
-        if (!buffer)
-            buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytes_needed);
-        else
-            buffer = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, buffer, bytes_needed);
+    if (ret) {
+        // This only happens if there are truly 0 services in the system (a valid edge case).
+        goto endServiceCollection;
     }
 
+    if (GetLastError() != ERROR_MORE_DATA) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to query service status (error: %lu)", GetLastError());
+        goto endServiceCollection;
+    }
+
+    buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytes_needed);
     if (!buffer) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to allocate memory for service enumeration");
         ret = FALSE;
         goto endServiceCollection;
     }
 
-    if (!ret) {
-        ret = EnumServicesStatusEx(
+    if (!EnumServicesStatusEx(
             ndSCMH,
             SC_ENUM_PROCESS_INFO,
             SERVICE_WIN32,
             SERVICE_STATE_ALL,
             (LPBYTE)buffer,
             bytes_needed,
-            (LPDWORD)&bytes_needed,
-            (LPDWORD)&total_services,
+            &bytes_needed,
+            &total_services,
             NULL,
-            NULL);
-
-        if (!ret) {
-            goto endServiceCollection;
-        }
+            NULL)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to enumerate services (error: %lu)", GetLastError());
+        goto endServiceCollection;
     }
 
     services = (LPENUM_SERVICE_STATUS_PROCESS)buffer;
@@ -112,6 +135,8 @@ static BOOL fill_dictionary_with_content()
     ret = TRUE;
 
 endServiceCollection:
+    if (buffer)
+        HeapFree(GetProcessHeap(), 0, buffer);
 
     CloseServiceHandle(ndSCMH);
     return ret;
@@ -141,8 +166,7 @@ static RRDDIM *win_service_select_dim(struct win_service *p, uint32_t selector)
     }
 }
 
-static int
-dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+static int dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data)
 {
     struct win_service *p = value;
     int *update_every = data;
@@ -160,10 +184,13 @@ dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
             "Service state",
             "state",
             PLUGIN_WINDOWS_NAME,
-            "PerflibbService",
+            "PerflibService",
             PRIO_SERVICE_STATE,
             *update_every,
             RRDSET_TYPE_LINE);
+
+        if (unlikely(!p->st_service_state))
+            return 1;
 
         p->rd_service_state_running = rrddim_add(p->st_service_state, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
@@ -188,20 +215,18 @@ dict_win_services_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
         rrdlabels_add(p->st_service_state->rrdlabels, "service", p->service_name, RRDLABEL_SRC_AUTO);
     }
 
-    if (p->st_service_state) {
 #define NETDATA_WINDOWS_SERVICE_STATE_TOTAL_STATES (8)
-        uint32_t current_state = (uint32_t)p->ServiceState.current.Data;
-        for (uint32_t i = 1; i <= NETDATA_WINDOWS_SERVICE_STATE_TOTAL_STATES; i++) {
-            RRDDIM *dim = win_service_select_dim(p, i);
-            if (!dim)
-                continue;
-            uint32_t chart_value = (current_state == i) ? 1 : 0;
+    uint32_t current_state = (uint32_t)p->ServiceState.current.Data;
+    for (uint32_t i = 1; i <= NETDATA_WINDOWS_SERVICE_STATE_TOTAL_STATES; i++) {
+        RRDDIM *dim = win_service_select_dim(p, i);
+        if (!dim)
+            continue;
+        uint32_t chart_value = (current_state == i) ? 1 : 0;
 
-            rrddim_set_by_pointer(p->st_service_state, dim, (collected_number)chart_value);
-        }
-
-        rrdset_done(p->st_service_state);
+        rrddim_set_by_pointer(p->st_service_state, dim, (collected_number)chart_value);
     }
+
+    rrdset_done(p->st_service_state);
 
     return 1;
 }

@@ -2,6 +2,7 @@
 
 #include "health_internals.h"
 #include "health-alert-entry.h"
+#include "database/sqlite/sqlite_aclk_alert.h"
 
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -388,6 +389,14 @@ void health_prototype_hash_id(RRD_ALERT_PROTOTYPE *ap) {
     uuid_copy(ap->config.hash_id, uuid.uuid);
 
     sql_alert_store_config(ap);
+
+    if (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG &&
+        !__atomic_load_n(&health_globals.prototypes.registering, __ATOMIC_RELAXED) &&
+        !alert_hash_has_transitioned(&ap->config.hash_id)) {
+        char hash_id_str[UUID_STR_LEN];
+        uuid_unparse_lower(ap->config.hash_id, hash_id_str);
+        aclk_send_alert_configuration(hash_id_str);
+    }
 }
 
 bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg) {
@@ -490,7 +499,9 @@ void health_reload_prototypes(void) {
         NULL, 0);
 
     // register all loaded prototypes
+    __atomic_store_n(&health_globals.prototypes.registering, true, __ATOMIC_RELAXED);
     health_dyncfg_register_all_prototypes();
+    __atomic_store_n(&health_globals.prototypes.registering, false, __ATOMIC_RELAXED);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

@@ -154,7 +154,7 @@ All capabilities are set automatically during Netdata installation using the [of
 ## Configuration
 
 Edit the `go.d.conf` configuration file using `edit-config` from the
-Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory),
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#locate-your-config-directory),
 which is typically at `/etc/netdata`.
 
 ```bash

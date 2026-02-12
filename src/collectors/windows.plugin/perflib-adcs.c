@@ -210,7 +210,7 @@ static void netdata_adcs_retrievals(
     rrdset_done(ac->st_adcs_retrievals_total);
 }
 
-static void netdata_adcs_failed_requets(
+static void netdata_adcs_failed_requests(
     struct adcs_certificate *ac,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -250,7 +250,7 @@ static void netdata_adcs_failed_requets(
     rrdset_done(ac->st_adcs_failed_requests_total);
 }
 
-static void netdata_adcs_issued_requets(
+static void netdata_adcs_issued_requests(
     struct adcs_certificate *ac,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -290,7 +290,7 @@ static void netdata_adcs_issued_requets(
     rrdset_done(ac->st_adcs_issued_requests_total);
 }
 
-static void netdata_adcs_pending_requets(
+static void netdata_adcs_pending_requests(
     struct adcs_certificate *ac,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -381,9 +381,9 @@ static void netdata_adcs_retrieval_processing(
         return;
     }
 
-    if (!ac->st_adcs_challenge_response_processing_time_seconds) {
+    if (!ac->st_adcs_retrievals_processing_time_seconds) {
         snprintfz(id, RRD_ID_LENGTH_MAX, "cert_%s_retrievals_processing_time", ac->name);
-        ac->st_adcs_challenge_response_processing_time_seconds = rrdset_create_localhost(
+        ac->st_adcs_retrievals_processing_time_seconds = rrdset_create_localhost(
             "adcs",
             id,
             NULL,
@@ -397,33 +397,27 @@ static void netdata_adcs_retrieval_processing(
             update_every,
             RRDSET_TYPE_LINE);
 
-        ac->rd_adcs_challenge_response_processing_time_seconds = rrddim_add(
-            ac->st_adcs_challenge_response_processing_time_seconds,
-            "processing_time",
-            NULL,
-            1,
-            1000,
-            RRD_ALGORITHM_ABSOLUTE);
+        ac->rd_adcs_retrievals_processing_time_seconds = rrddim_add(
+            ac->st_adcs_retrievals_processing_time_seconds, "processing_time", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
 
-        rrdlabels_add(
-            ac->st_adcs_challenge_response_processing_time_seconds->rrdlabels, "cert", ac->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(ac->st_adcs_retrievals_processing_time_seconds->rrdlabels, "cert", ac->name, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
-        ac->st_adcs_challenge_response_processing_time_seconds,
-        ac->rd_adcs_challenge_response_processing_time_seconds,
+        ac->st_adcs_retrievals_processing_time_seconds,
+        ac->rd_adcs_retrievals_processing_time_seconds,
         (collected_number)ac->ADCSRetrievalsProcessingTime.current.Data);
-    rrdset_done(ac->st_adcs_challenge_response_processing_time_seconds);
+    rrdset_done(ac->st_adcs_retrievals_processing_time_seconds);
 }
 
-static void netdata_adcs_crypto_singing_time(
+static void netdata_adcs_crypto_signing_time(
     struct adcs_certificate *ac,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
-    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ac->ADCSRetrievalsProcessingTime)) {
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ac->ADCSRequestCryptoSigningTime)) {
         return;
     }
 
@@ -445,7 +439,7 @@ static void netdata_adcs_crypto_singing_time(
 
         ac->rd_adcs_request_cryptographic_signing_time_seconds = rrddim_add(
             ac->st_adcs_request_cryptographic_signing_time_seconds,
-            "singing_time",
+            "signing_time",
             NULL,
             1,
             1000,
@@ -458,7 +452,7 @@ static void netdata_adcs_crypto_singing_time(
     rrddim_set_by_pointer(
         ac->st_adcs_request_cryptographic_signing_time_seconds,
         ac->rd_adcs_request_cryptographic_signing_time_seconds,
-        (collected_number)ac->ADCSRetrievalsProcessingTime.current.Data);
+        (collected_number)ac->ADCSRequestCryptoSigningTime.current.Data);
     rrdset_done(ac->st_adcs_request_cryptographic_signing_time_seconds);
 }
 
@@ -554,7 +548,7 @@ static void netdata_adcs_challenge_response_processing_time(
     rrdset_done(ac->st_adcs_challenge_response_processing_time_seconds);
 }
 
-static void netdata_adcs_signed_certificate_timetamp_list(
+static void netdata_adcs_signed_certificate_timestamp_list(
     struct adcs_certificate *ac,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -583,7 +577,7 @@ static void netdata_adcs_signed_certificate_timetamp_list(
 
         ac->rd_adcs_signed_certificate_timestamp_lists_total = rrddim_add(
             ac->st_adcs_signed_certificate_timestamp_lists_total,
-            "processing_time",
+            "signed_timestamp_list",
             NULL,
             1,
             1,
@@ -600,7 +594,7 @@ static void netdata_adcs_signed_certificate_timetamp_list(
     rrdset_done(ac->st_adcs_signed_certificate_timestamp_lists_total);
 }
 
-static void netdata_adcs_signed_certificate_timetamp_list_processing(
+static void netdata_adcs_signed_certificate_timestamp_list_processing(
     struct adcs_certificate *ac,
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -649,9 +643,10 @@ static void netdata_adcs_signed_certificate_timetamp_list_processing(
     rrdset_done(ac->st_adcs_signed_certificate_timestamp_list_processing_time_seconds);
 }
 
+#define CERTIFICATION_AUTHORITY "Certification Authority"
 static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Certification Authority");
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, CERTIFICATION_AUTHORITY);
     if (!pObjectType)
         return false;
 
@@ -659,17 +654,16 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every)
         netdata_adcs_requests,
         netdata_adcs_requests_processing_time,
         netdata_adcs_retrievals,
-        netdata_adcs_failed_requets,
-        netdata_adcs_issued_requets,
-        netdata_adcs_pending_requets,
+        netdata_adcs_failed_requests,
+        netdata_adcs_issued_requests,
+        netdata_adcs_pending_requests,
         netdata_adcs_challenge_response,
         netdata_adcs_retrieval_processing,
-        netdata_adcs_crypto_singing_time,
+        netdata_adcs_crypto_signing_time,
         netdata_adcs_policy_mod_processing_time,
         netdata_adcs_challenge_response_processing_time,
-        netdata_adcs_signed_certificate_timetamp_list,
-        netdata_adcs_signed_certificate_timetamp_list_processing,
-        netdata_adcs_retrieval_processing,
+        netdata_adcs_signed_certificate_timestamp_list,
+        netdata_adcs_signed_certificate_timestamp_list_processing,
 
         // This must be the end
         NULL};
@@ -688,7 +682,7 @@ static bool do_ADCS(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         struct adcs_certificate *ptr = dictionary_set(adcs_certificates, windows_shared_buffer, NULL, sizeof(*ptr));
 
-        for (int j = 0; doADCS[j] ;j++)
+        for (int j = 0; doADCS[j]; j++)
             doADCS[j](ptr, pDataBlock, pObjectType, update_every);
     }
 
@@ -704,7 +698,7 @@ int do_PerflibADCS(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    DWORD id = RegistryFindIDByName("Certification Authority");
+    DWORD id = RegistryFindIDByName(CERTIFICATION_AUTHORITY);
     if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
 
@@ -712,7 +706,8 @@ int do_PerflibADCS(int update_every, usec_t dt __maybe_unused)
     if (!pDataBlock)
         return -1;
 
-    do_ADCS(pDataBlock, update_every);
+    if (!do_ADCS(pDataBlock, update_every))
+        return -1;
 
     return 0;
 }

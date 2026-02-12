@@ -14,6 +14,7 @@ src/collectors/freebsd.plugin/ @thiagoftsm
 src/collectors/macos.plugin/ @thiagoftsm
 src/collectors/python.d.plugin/ @ilyam8
 src/collectors/cups.plugin/ @thiagoftsm
+src/crates/ @vkalintiris
 src/exporting/ @thiagoftsm
 src/daemon/ @thiagoftsm @vkalintiris
 src/database/ @thiagoftsm @vkalintiris

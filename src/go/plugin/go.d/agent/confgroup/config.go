@@ -14,13 +14,14 @@ import (
 )
 
 const (
-	keyName        = "name"
-	keyModule      = "module"
-	keyUpdateEvery = "update_every"
-	keyDetectRetry = "autodetection_retry"
-	keyPriority    = "priority"
-	keyLabels      = "labels"
-	keyVnode       = "vnode"
+	keyName         = "name"
+	keyModule       = "module"
+	keyUpdateEvery  = "update_every"
+	keyDetectRetry  = "autodetection_retry"
+	keyPriority     = "priority"
+	keyLabels       = "labels"
+	keyVnode        = "vnode"
+	keyFunctionOnly = "function_only"
 
 	ikeySource     = "__source__"
 	ikeySourceType = "__source_type__"
@@ -47,12 +48,14 @@ func (c Config) Get(key string) any               { return c[key] }
 func (c Config) Name() string            { v, _ := c.Get(keyName).(string); return v }
 func (c Config) Module() string          { v, _ := c.Get(keyModule).(string); return v }
 func (c Config) FullName() string        { return fullName(c.Name(), c.Module()) }
+func (c Config) ExposedKey() string      { return c.FullName() }
 func (c Config) UpdateEvery() int        { v, _ := c.Get(keyUpdateEvery).(int); return v }
 func (c Config) AutoDetectionRetry() int { v, _ := c.Get(keyDetectRetry).(int); return v }
 func (c Config) Priority() int           { v, _ := c.Get(keyPriority).(int); return v }
 func (c Config) Labels() map[any]any     { v, _ := c.Get(keyLabels).(map[any]any); return v }
 func (c Config) Hash() uint64            { return calcHash(c) }
 func (c Config) Vnode() string           { v, _ := c.Get(keyVnode).(string); return v }
+func (c Config) FunctionOnly() bool      { v, _ := c.Get(keyFunctionOnly).(bool); return v }
 
 func (c Config) SetName(v string) Config   { return c.Set(keyName, v) }
 func (c Config) SetModule(v string) Config { return c.Set(keyModule, v) }

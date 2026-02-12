@@ -33,15 +33,22 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         redisMethods,
+		MethodHandler:   redisFunctionHandler,
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			Address:     "redis://@localhost:6379",
 			Timeout:     confopt.Duration(time.Second),
 			PingSamples: 5,
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		addAOFChartsOnce:       &sync.Once{},
@@ -50,6 +57,8 @@ func New() *Collector {
 		collectedCommands:      make(map[string]bool),
 		collectedDbs:           make(map[string]bool),
 	}
+	c.funcRouter = newFuncRouter(c)
+	return c
 }
 
 type Config struct {
@@ -61,7 +70,32 @@ type Config struct {
 	Username           string           `yaml:"username,omitempty" json:"username"`
 	Password           string           `yaml:"password,omitempty" json:"password"`
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
-	PingSamples        int `yaml:"ping_samples" json:"ping_samples"`
+	PingSamples        int             `yaml:"ping_samples" json:"ping_samples"`
+	Functions          FunctionsConfig `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	TopQueries TopQueriesConfig `yaml:"top_queries,omitempty" json:"top_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
 }
 
 type (
@@ -75,6 +109,8 @@ type (
 
 		rdb redisClient
 
+		funcRouter *funcRouter
+
 		server            string
 		version           *semver.Version
 		pingSummary       metrix.Summary
@@ -84,6 +120,7 @@ type (
 	redisClient interface {
 		Info(ctx context.Context, section ...string) *redis.StringCmd
 		Ping(context.Context) *redis.StatusCmd
+		SlowLogGet(ctx context.Context, num int64) *redis.SlowLogCmd
 		Close() error
 	}
 )
@@ -140,7 +177,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return ms
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.rdb == nil {
 		return
 	}

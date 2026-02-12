@@ -23,6 +23,8 @@ func init() {
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
 		JobConfigSchema: configSchema,
+		Methods:         clickhouseMethods,
+		MethodHandler:   clickhouseFunctionHandler,
 	})
 }
 
@@ -37,6 +39,11 @@ func New() *Collector {
 					Timeout: confopt.Duration(time.Second),
 				},
 			},
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 		charts:       chCharts.Copy(),
 		seenDisks:    make(map[string]*seenDisk),
@@ -49,6 +56,31 @@ type Config struct {
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	web.HTTPConfig     `yaml:",inline" json:""`
+	Functions          FunctionsConfig `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	TopQueries TopQueriesConfig `yaml:"top_queries,omitempty" json:"top_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
 }
 
 type (
@@ -62,6 +94,9 @@ type (
 
 		seenDisks    map[string]*seenDisk
 		seenDbTables map[string]*seenTable
+
+		// Function handler (singleton, initialized in Init)
+		funcRouter *funcRouter
 	}
 	seenDisk  struct{ disk string }
 	seenTable struct{ db, table string }
@@ -81,6 +116,8 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("init HTTP client: %v", err)
 	}
 	c.httpClient = httpClient
+
+	c.funcRouter = newFuncRouter(c)
 
 	c.Debugf("using URL %s", c.URL)
 	c.Debugf("using timeout: %s", c.Timeout)
@@ -118,7 +155,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.httpClient != nil {
 		c.httpClient.CloseIdleConnections()
 	}

@@ -79,7 +79,7 @@ When Netdata runs under systemd as the `netdata` user, it can’t directly modif
 <details>
 <summary>Change (Non-Systemd)</summary>
 
-To modify the scheduling policy, [edit](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) `netdata.conf`:
+To modify the scheduling policy, [edit](/docs/netdata-agent/configuration/README.md#edit-configuration-files) `netdata.conf`:
 
 ```text
 [global]

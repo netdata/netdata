@@ -301,7 +301,7 @@ Don't include full paths, beginning from the system's root (`/`), as these might
 |                 |                                                                                                                                                                                                                                                                         |
 |-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Not recommended | Use `edit-config` to edit Netdata's configuration: `sudo /etc/netdata/edit-config netdata.conf`.                                                                                                                                                                        |
-| **Recommended** | Use `edit-config` to edit Netdata's configuration by first navigating to your [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory), which is typically at `/etc/netdata`, then running `sudo edit-config netdata.conf`. |
+| **Recommended** | Use `edit-config` to edit Netdata's configuration by first navigating to your [Netdata config directory](/docs/netdata-agent/configuration/README.md#locate-your-config-directory), which is typically at `/etc/netdata`, then running `sudo edit-config netdata.conf`. |
 
 ### `sudo`
 

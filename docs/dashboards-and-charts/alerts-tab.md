@@ -65,7 +65,7 @@ In the **Raised Alerts** tab:
 - The **Silencing column** shows whether a silencing rule exists for an alert.
 - The **Actions column** allows you to:
     - Create a new [silencing rule](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notification-silencing-rules).
-    - Ask for help from the [Netdata Assistant](/docs/netdata-assistant.md).
+    - Ask AI to troubleshoot the alert.
 
 ## Alert Configurations Tab
 

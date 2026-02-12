@@ -13,7 +13,7 @@ Answers to common questions about scaling Netdata Parents, clustering, retention
 
 Netdata Parents generally scale well. According [to our tests](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/), Netdata Parents scale better than Prometheus for the same workload: -35% CPU utilization, -49% Memory Consumption, -12% Network Bandwidth, -98% Disk I/O, -75% Disk footprint.
 
-For more information, Check [Sizing Netdata Parents](/docs/observability-centralization-points/metrics-centralization-points/sizing-netdata-parents.md).
+For more information, Check [Sizing Netdata Parents](/docs/netdata-agent/sizing-netdata-agents/README.md).
 
 <br/>
 </details>

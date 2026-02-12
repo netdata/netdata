@@ -87,14 +87,21 @@ func (a *API) SET(id string, value int64) {
 	_, _ = a.Write([]byte("SET '" + id + "' = " + strconv.FormatInt(value, 10) + "\n"))
 }
 
+// SETFLOAT sets the value of a dimension for the initialized chart.
+func (a *API) SETFLOAT(id string, value float64) {
+	v := strconv.FormatFloat(value, 'f', -1, 64)
+	_, _ = a.Write([]byte("SET '" + id + "' = " + v + "\n"))
+}
+
 // SETEMPTY sets an empty value for a dimension in the initialized chart.
 func (a *API) SETEMPTY(id string) {
 	_, _ = a.Write([]byte("SET '" + id + "' = \n"))
 }
 
 // VARIABLE sets the value of a CHART scope variable for the initialized chart.
-func (a *API) VARIABLE(ID string, value int64) {
-	_, _ = a.Write([]byte("VARIABLE CHART '" + ID + "' = " + strconv.FormatInt(value, 10) + "\n"))
+func (a *API) VARIABLE(ID string, value float64) {
+	v := strconv.FormatFloat(value, 'f', -1, 64)
+	_, _ = a.Write([]byte("VARIABLE CHART '" + ID + "' = " + v + "\n"))
 }
 
 // END completes data collection for the initialized chart.
@@ -177,4 +184,25 @@ func (a *API) CONFIGDELETE(id string) {
 // CONFIGSTATUS updates a configuration status
 func (a *API) CONFIGSTATUS(id, status string) {
 	_, _ = a.Write([]byte("CONFIG " + id + " status " + status + "\n\n"))
+}
+
+// FUNCTIONGLOBAL registers a global function with Netdata.
+// Format: FUNCTION GLOBAL "<name>" <timeout> "<help>" "<tags>" <access> <priority> <version>
+func (a *API) FUNCTIONGLOBAL(opts FunctionGlobalOpts) {
+	_, _ = a.Write([]byte("FUNCTION GLOBAL \"" +
+		opts.Name + "\" " +
+		strconv.Itoa(opts.Timeout) + " \"" +
+		opts.Help + "\" \"" +
+		opts.Tags + "\" " +
+		opts.Access + " " +
+		strconv.Itoa(opts.Priority) + " " +
+		strconv.Itoa(opts.Version) + "\n\n"))
+}
+
+// FUNCTIONREMOVE removes a function from Netdata.
+// NOTE: This is a no-op placeholder - Netdata core does not yet support function removal.
+// When Netdata implements this, the protocol format will be added here.
+func (a *API) FUNCTIONREMOVE(name string) {
+	// TODO: Implement when Netdata core supports function removal
+	// For now, this is intentionally a no-op
 }

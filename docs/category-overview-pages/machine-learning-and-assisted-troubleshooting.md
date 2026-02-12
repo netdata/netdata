@@ -13,7 +13,11 @@ Netdata AI is a set of analysis and troubleshooting capabilities built into Netd
 
 ## Capabilities
 
-### 1) Insights
+### 1) Conversations
+
+[Real-Time Conversations](/docs/netdata-ai/conversations.md) provide a live, interactive dialogue with Netdata AI. Ask rapid-fire questions, explore hypotheses, and get instant visualizations (Live Exhibits) embedded directly in the chat. Use Conversations for the exploratory phase of troubleshooting, then pivot to Investigations for comprehensive reports.
+
+### 2) Insights
 
 Generates on‑demand, professional reports (see [AI Insights](/docs/ml-ai/ai-insights.md)):
 
@@ -24,25 +28,29 @@ Generates on‑demand, professional reports (see [AI Insights](/docs/ml-ai/ai-in
 
 Each report includes an executive summary, evidence, and actionable recommendations. Reports are downloadable as PDFs and shareable with your team. You can also [schedule reports](/docs/netdata-ai/insights/scheduled-reports.md).
 
-### 2) Investigations
+### 3) Investigations
 
-Ask open‑ended questions (“what changed here?”, “why did X regress?”) and get a researched answer using your telemetry — see the [Investigations overview](/docs/netdata-ai/investigations/index.md). Launch from the “Troubleshoot with AI” button (captures current scope) or from Insights → New Investigation. Create [Custom Investigations](/docs/netdata-ai/investigations/custom-investigations.md) and set up [Scheduled Investigations](/docs/netdata-ai/investigations/scheduled-investigations.md).
+Ask open‑ended questions ("what changed here?", "why did X regress?") and get a researched answer using your telemetry — see the [Investigations overview](/docs/netdata-ai/investigations/index.md). Launch from Insights → New Investigation. Create [Custom Investigations](/docs/netdata-ai/investigations/custom-investigations.md) and set up [Scheduled Investigations](/docs/netdata-ai/investigations/scheduled-investigations.md).
 
-### 3) Troubleshooting
+### 4) Troubleshooting
 
 - [Alert Troubleshooting](/docs/troubleshooting/troubleshoot.md) – one‑click analysis for any alert with a root‑cause hypothesis and supporting signals
 - [Anomaly Advisor](/docs/ml-ai/anomaly-advisor.md) – interactive exploration of how anomalies propagate across systems
 - [Metric Correlations](/docs/metric-correlations.md) – focus on the most relevant charts for any time window
 
-See the [Troubleshooting overview](/docs/netdata-ai/troubleshooting/index.md). From any view, use the [Troubleshoot with AI button](/docs/netdata-ai/troubleshooting/troubleshoot-button.md).
+See the [Troubleshooting overview](/docs/netdata-ai/troubleshooting/index.md).
 
-### 4) Anomaly Detection
+### 5) Alerts Automation
+
+[Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md) lets you describe alert conditions in plain English while AI handles the syntax. Create production-ready alerts, get intelligent suggestions based on your infrastructure, and explain existing alert definitions.
+
+### 6) Anomaly Detection
 
 Local, unsupervised ML runs on every agent, learning normal behavior and scoring anomalies for all metrics in real time. Anomaly ribbons appear on charts, and historical scores are stored alongside metrics for analysis. See [ML Anomaly Detection](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md), configure via [ML Configuration](/src/ml/ml-configuration.md), and review methodology in [ML Accuracy](/docs/ml-ai/ml-anomaly-detection/ml-accuracy.md).
 
-### 5) MCP (Model Context Protocol)
+### 7) MCP (Model Context Protocol)
 
-Connect AI clients to Netdata’s MCP server to bring live observability into natural‑language workflows and optional automation. Options include [MCP](/docs/learn/mcp.md), [Chat with Netdata](/docs/ml-ai/ai-chat-netdata/ai-chat-netdata.md), and [MCP Clients](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md) like Claude Desktop, Cursor, VS Code, JetBrains IDEs, Claude Code, Gemini CLI, and the Netdata Web Client.
+Connect AI clients to Netdata’s MCP server to bring live observability into natural‑language workflows and optional automation. Options include [MCP](/docs/netdata-ai/mcp/README.md), [Chat with Netdata](/docs/netdata-ai/mcp/ai-chat-netdata.md), and [MCP Clients](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md) like Claude Desktop, Cursor, VS Code, JetBrains IDEs, Claude Code, Gemini CLI, and the Netdata Web Client.
 
 ## Usage and credits
 

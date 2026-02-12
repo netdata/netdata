@@ -333,6 +333,7 @@ struct page_descr_with_data *page_descriptor_get(void) {
 }
 
 static inline void page_descriptor_release(struct page_descr_with_data *descr) {
+    uuidmap_free(descr->uuid_id);
     aral_freez(rrdeng_main.descriptors.ar, descr);
 }
 
@@ -740,7 +741,7 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
 
 // Main event loop callback
 
-static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile) {
+static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, uint64_t extent_size) {
     bool ret = false;
 
     spinlock_lock(&datafile->writers.spinlock);
@@ -754,7 +755,8 @@ static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_da
     }
 #endif
 
-    if(datafile->pos > rrdeng_target_data_file_size(ctx))
+    // Check if adding this extent would exceed the target size
+    if(datafile->pos + extent_size > rrdeng_target_data_file_size(ctx))
         ret = true;
 
     spinlock_unlock(&datafile->writers.spinlock);
@@ -847,8 +849,13 @@ static void __attribute__((destructor)) destroy_mutex(void) {
     netdata_mutex_destroy(&mutex);
 }
 
-static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_instance *ctx) {
+static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_instance *ctx, uint64_t extent_size) {
     struct rrdengine_datafile *datafile;
+
+    // Acquire the mutex at the beginning to make the entire check-and-act atomic
+    // This prevents the race condition where multiple threads pass the "is full" check
+    // before any of them increments the position, causing files to grow beyond limits
+    netdata_mutex_lock(&mutex);
 
     // get the latest datafile
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
@@ -860,23 +867,15 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
     spinlock_unlock(&datafile->writers.spinlock);
     netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    if(datafile_is_full(ctx, datafile)) {
+    if(datafile_is_full(ctx, datafile, extent_size)) {
         // remember the datafile we have become writers to
         struct rrdengine_datafile *old_datafile = datafile;
 
-        // only 1 datafile creation at a time
-
-        netdata_mutex_lock(&mutex);
-
-        // take the latest datafile again - without this, multiple threads may create multiple files
-        datafile = get_last_ctx_datafile(ctx, false);
-
-        if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx) == 0)
+        // Create a new datafile - since we hold the mutex, no other thread can interfere
+        if(create_new_datafile_pair(ctx) == 0)
             __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
 
-        netdata_mutex_unlock(&mutex);
-
-        // get the new latest datafile again, like above
+        // get the new datafile
         netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
         datafile = get_last_ctx_datafile(ctx, true);
         // become a writer on this datafile, to prevent it from vanishing
@@ -896,6 +895,8 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
 #endif
         spinlock_unlock(&old_datafile->writers.spinlock);
     }
+
+    netdata_mutex_unlock(&mutex);
 
     return datafile;
 }
@@ -950,7 +951,7 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
         header->descr[i].type = descr->type;
-        uuid_copy(*(nd_uuid_t *)header->descr[i].uuid, *descr->id);
+        uuid_copy(*(nd_uuid_t *)header->descr[i].uuid, *uuidmap_uuid_ptr(descr->uuid_id));
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time_ut = descr->start_time_ut;
 
@@ -1007,7 +1008,8 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
 
     real_io_size = ALIGN_BYTES_CEILING(size_bytes);
 
-    datafile = get_datafile_to_write_extent(ctx);
+    // Pass the extent size so the check can determine if this extent will fit
+    datafile = get_datafile_to_write_extent(ctx, real_io_size);
     spinlock_lock(&datafile->writers.spinlock);
     xt_io_descr->datafile = datafile;
     xt_io_descr->pos = datafile->pos;
@@ -1826,9 +1828,6 @@ uint64_t last_async_callback;
 
 void async_cb(uv_async_t *handle)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
-
     last_async_callback = uv_hrtime();
 
     netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
@@ -1844,10 +1843,8 @@ static void async_closed_cb(uv_handle_t *handle)
     __atomic_store_n(&main->async_ready, true, __ATOMIC_RELEASE);
 }
 #else
-void async_cb(uv_async_t *handle)
+void async_cb(uv_async_t *handle __maybe_unused)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
     netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 #endif

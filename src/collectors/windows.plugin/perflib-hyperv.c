@@ -379,7 +379,7 @@ struct hypervisor_root_partition {
     RRDSET *st_IOTLBFlushesSec;
     RRDSET *st_AddressSpaces;
     RRDSET *st_VirtualTLBPages;
-    RRDSET *st_VirtualTLBFlushEntiresSec;
+    RRDSET *st_VirtualTLBFlushEntriesSec;
 
     DEFINE_RD(DeviceSpacePages4K);
     DEFINE_RD(DeviceSpacePages2M);
@@ -398,7 +398,7 @@ struct hypervisor_root_partition {
     DEFINE_RD(IOTLBFlushesSec);
     DEFINE_RD(AddressSpaces);
     DEFINE_RD(VirtualTLBPages);
-    DEFINE_RD(VirtualTLBFlushEntiresSec);
+    DEFINE_RD(VirtualTLBFlushEntriesSec);
 
     COUNTER_DATA DeviceSpacePages4K;
     COUNTER_DATA DeviceSpacePages2M;
@@ -415,7 +415,7 @@ struct hypervisor_root_partition {
     COUNTER_DATA IOTLBFlushesSec;
     COUNTER_DATA AddressSpaces;
     COUNTER_DATA VirtualTLBPages;
-    COUNTER_DATA VirtualTLBFlushEntiresSec;
+    COUNTER_DATA VirtualTLBFlushEntriesSec;
 };
 
 // Initialize the keys for the root partition metrics
@@ -439,7 +439,7 @@ void initialize_hyperv_root_partition_keys(struct hypervisor_root_partition *p)
     p->IOTLBFlushesSec.key = "I/O TLB Flushes/sec";
     p->AddressSpaces.key = "Address Spaces";
     p->VirtualTLBPages.key = "Virtual TLB Pages";
-    p->VirtualTLBFlushEntiresSec.key = "Virtual TLB Flush Entires/sec";
+    p->VirtualTLBFlushEntriesSec.key = "Virtual TLB Flush Entries/sec";
 }
 
 // Callback function for inserting root partition metrics into the dictionary
@@ -496,7 +496,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         GET_INSTANCE_COUNTER(IOTLBFlushesSec);
         GET_INSTANCE_COUNTER(AddressSpaces);
         GET_INSTANCE_COUNTER(VirtualTLBPages);
-        GET_INSTANCE_COUNTER(VirtualTLBFlushEntiresSec);
+        GET_INSTANCE_COUNTER(VirtualTLBFlushEntriesSec);
 
         // Create charts
         if (!p->charts_created) {
@@ -689,13 +689,13 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
 
             p->rd_VirtualTLBPages = rrddim_add(p->st_VirtualTLBPages, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-            p->st_VirtualTLBFlushEntiresSec = rrdset_create_localhost(
+            p->st_VirtualTLBFlushEntriesSec = rrdset_create_localhost(
                 "root_partition_virtual_tlb_flush_entries",
                 windows_shared_buffer,
                 NULL,
                 HYPERV,
                 HYPERV ".root_partition_virtual_tlb_flush_entries",
-                "Root partition flushes of the entire virtual TLB",
+                "Root partition flushes of entire virtual TLB",
                 "flushes/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
@@ -703,8 +703,8 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_VirtualTLBFlushEntiresSec =
-                rrddim_add(p->st_VirtualTLBFlushEntiresSec, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_VirtualTLBFlushEntriesSec =
+                rrddim_add(p->st_VirtualTLBFlushEntriesSec, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         // Set the data for each dimension
@@ -728,7 +728,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         SETP_DIM_VALUE(st_IOTLBFlushesSec, IOTLBFlushesSec);
         SETP_DIM_VALUE(st_AddressSpaces, AddressSpaces);
         SETP_DIM_VALUE(st_VirtualTLBPages, VirtualTLBPages);
-        SETP_DIM_VALUE(st_VirtualTLBFlushEntiresSec, VirtualTLBFlushEntiresSec);
+        SETP_DIM_VALUE(st_VirtualTLBFlushEntriesSec, VirtualTLBFlushEntriesSec);
 
         // Mark the charts as done
         rrdset_done(p->st_device_space_pages);
@@ -742,7 +742,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
         rrdset_done(p->st_AddressSpaces);
         rrdset_done(p->st_DeviceDMAErrors);
         rrdset_done(p->st_VirtualTLBPages);
-        rrdset_done(p->st_VirtualTLBFlushEntiresSec);
+        rrdset_done(p->st_VirtualTLBFlushEntriesSec);
     }
 
     return true;
@@ -1557,7 +1557,7 @@ static bool do_hyperv_network_adapter(PERF_DATA_BLOCK *pDataBlock, int update_ev
                 "packets/s",
                 _COMMON_PLUGIN_NAME,
                 _COMMON_PLUGIN_MODULE_NAME,
-                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_PACKETS,
+                NETDATA_CHART_PRIO_WINDOWS_HYPERV_VM_NET_INTERFACE_BROADCAST_PACKETS,
                 update_every,
                 RRDSET_TYPE_LINE);
 

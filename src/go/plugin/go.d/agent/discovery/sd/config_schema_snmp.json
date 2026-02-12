@@ -1,0 +1,295 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SNMP Device Discovery",
+    "description": "Discovers SNMP devices by scanning network subnets.",
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "description": "Pipeline name (must be unique).",
+        "type": "string",
+        "minLength": 1
+      },
+      "discoverer": {
+        "title": "Discoverer",
+        "type": "object",
+        "properties": {
+          "snmp": {
+            "title": "SNMP",
+            "type": "object",
+            "properties": {
+              "rescan_interval": {
+                "title": "Rescan interval",
+                "description": "How often to scan networks for devices.",
+                "type": "string",
+                "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
+                "default": "30m"
+              },
+              "timeout": {
+                "title": "Timeout",
+                "description": "Timeout for SNMP device responses, in seconds.",
+                "type": "number",
+                "minimum": 0.1,
+                "default": 1
+              },
+              "device_cache_ttl": {
+                "title": "Device cache TTL",
+                "description": "How long to cache discovery results.",
+                "type": "string",
+                "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
+                "default": "12h"
+              },
+              "parallel_scans_per_network": {
+                "title": "Parallel scans",
+                "description": "Concurrent IPs to scan per subnet.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 256,
+                "default": 32
+              },
+              "credentials": {
+                "title": "Credentials",
+                "description": "SNMP credentials for authentication.",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "title": "Name",
+                      "description": "Credential identifier (referenced by networks).",
+                      "type": "string"
+                    },
+                    "version": {
+                      "title": "SNMP version",
+                      "description": "SNMP protocol version.",
+                      "type": "string",
+                      "enum": [
+                        "1",
+                        "2",
+                        "2c",
+                        "3"
+                      ],
+                      "default": "2c"
+                    },
+                    "community": {
+                      "title": "Community",
+                      "description": "Community string (for SNMP v1/v2c).",
+                      "type": "string",
+                      "default": "public"
+                    },
+                    "username": {
+                      "title": "Username",
+                      "description": "Username (for SNMPv3).",
+                      "type": "string"
+                    },
+                    "security_level": {
+                      "title": "Security level",
+                      "description": "Security level (for SNMPv3).",
+                      "type": "string",
+                      "enum": [
+                        "noAuthNoPriv",
+                        "authNoPriv",
+                        "authPriv"
+                      ]
+                    },
+                    "auth_protocol": {
+                      "title": "Auth protocol",
+                      "description": "Authentication protocol (for SNMPv3).",
+                      "type": "string",
+                      "enum": [
+                        "md5",
+                        "sha",
+                        "sha224",
+                        "sha256",
+                        "sha384",
+                        "sha512"
+                      ]
+                    },
+                    "auth_password": {
+                      "title": "Auth password",
+                      "description": "Authentication passphrase (for SNMPv3).",
+                      "type": "string"
+                    },
+                    "priv_protocol": {
+                      "title": "Privacy protocol",
+                      "description": "Privacy protocol (for SNMPv3).",
+                      "type": "string",
+                      "enum": [
+                        "des",
+                        "aes",
+                        "aes192",
+                        "aes256",
+                        "aes192c",
+                        "aes256c"
+                      ]
+                    },
+                    "priv_password": {
+                      "title": "Privacy password",
+                      "description": "Privacy passphrase (for SNMPv3).",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "version"
+                  ]
+                }
+              },
+              "networks": {
+                "title": "Networks",
+                "description": "Network subnets to scan.",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "subnet": {
+                      "title": "Subnet",
+                      "description": "IP range to scan (e.g., '192.168.1.0/24', '10.0.0.1-10.0.0.50').",
+                      "type": "string"
+                    },
+                    "credential": {
+                      "title": "Credential",
+                      "description": "Name of credential to use for this network.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "subnet",
+                    "credential"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "credentials",
+              "networks"
+            ]
+          }
+        },
+        "required": [
+          "snmp"
+        ]
+      },
+      "services": {
+        "title": "Service rules",
+        "description": "- Match discovered SNMP devices and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a device matches, a data collection job is created.\n- The **default service rule** is sufficient for most cases. It creates an SNMP data collection job for each discovered device and handles both SNMPv2 and SNMPv3.",
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "title": "Rule ID",
+              "description": "Unique identifier for this rule. Used in logs to identify which rule matched a device.",
+              "type": "string",
+              "default": "snmp"
+            },
+            "match": {
+              "title": "Match expression",
+              "description": "Go template expression that must evaluate to 'true' for the rule to match the discovered SNMP device.",
+              "type": "string",
+              "default": "{{ true }}"
+            },
+            "config_template": {
+              "title": "Config template",
+              "description": "**Uses the same fields as match expression**. Go template that generates the data collection job configuration in YAML format. **Must include 'module' and 'name' fields**, plus any module-specific settings.",
+              "type": "string",
+              "default": "{{- if .SysInfo.Name }}\nname: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}\n{{- else }}\nname: ip-{{ .IPAddress }}\n{{- end }}\nhostname: {{ .IPAddress }}\noptions:\n  version: {{ .Credential.Version }}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" }}\ncommunity: {{ .Credential.Community }}\n{{- else }}\nuser:\n  name: {{ .Credential.UserName }}\n  level: {{ .Credential.SecurityLevel }}\n  auth_proto: {{ .Credential.AuthProtocol }}\n  auth_key: {{ .Credential.AuthPassphrase }}\n  priv_proto: {{ .Credential.PrivacyProtocol }}\n  priv_key: {{ .Credential.PrivacyPassphrase }}\n{{- end }}"
+            }
+          },
+          "required": [
+            "id",
+            "match"
+          ]
+        }
+      }
+    },
+    "required": [
+      "name",
+      "discoverer",
+      "services"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "name",
+            "discoverer"
+          ]
+        },
+        {
+          "title": "Services",
+          "fields": [
+            "services"
+          ]
+        }
+      ]
+    },
+    "discoverer": {
+      "snmp": {
+        "rescan_interval": {
+          "ui:placeholder": "30m",
+          "ui:help": "Examples: 30m, 1h, 2h"
+        },
+        "timeout": {
+          "ui:placeholder": "1",
+          "ui:help": "Value in seconds. Examples: 1, 5, 0.5"
+        },
+        "device_cache_ttl": {
+          "ui:placeholder": "12h",
+          "ui:help": "Examples: 12h, 24h, 1d, 1w"
+        },
+        "credentials": {
+          "ui:listFlavour": "list",
+          "items": {
+            "community": {
+              "ui:widget": "password"
+            },
+            "auth_password": {
+              "ui:widget": "password"
+            },
+            "priv_password": {
+              "ui:widget": "password"
+            }
+          }
+        },
+        "networks": {
+          "ui:listFlavour": "list",
+          "items": {
+            "subnet": {
+              "ui:placeholder": "192.168.1.0/24"
+            }
+          }
+        }
+      }
+    },
+    "services": {
+      "ui:listFlavour": "list",
+      "items": {
+        "id": {
+          "ui:placeholder": "snmp",
+          "ui:help": "Use descriptive names like 'snmp', 'cisco-switches', 'hp-printers'"
+        },
+        "match": {
+          "ui:widget": "textarea",
+          "ui:placeholder": "{{ true }}",
+          "ui:help": "| Field | Description |\n|-------|-------------|\n| `.IPAddress` | Device IP address |\n| `.SysInfo.Descr` | System description |\n| `.SysInfo.Contact` | System contact |\n| `.SysInfo.Name` | System name |\n| `.SysInfo.Location` | System location |\n| `.SysInfo.Organization` | Organization |\n| `.SysInfo.Vendor` | Device vendor |\n| `.SysInfo.Category` | Device category |\n| `.SysInfo.Model` | Device model |\n| `.Credential.Name` | Credential name |\n| `.Credential.Version` | SNMP version |\n\n**Functions:** eq, ne, glob, regexp, and, or, not"
+        },
+        "config_template": {
+          "ui:widget": "textarea",
+          "ui:placeholder": "{{- if .SysInfo.Name }}\nname: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}\n{{- else }}\nname: ip-{{ .IPAddress }}\n{{- end }}\nhostname: {{ .IPAddress }}\noptions:\n  version: {{ .Credential.Version }}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" }}\ncommunity: {{ .Credential.Community }}\n{{- else }}\nuser:\n  name: {{ .Credential.UserName }}\n  level: {{ .Credential.SecurityLevel }}\n  auth_proto: {{ .Credential.AuthProtocol }}\n  auth_key: {{ .Credential.AuthPassphrase }}\n  priv_proto: {{ .Credential.PrivacyProtocol }}\n  priv_key: {{ .Credential.PrivacyPassphrase }}\n{{- end }}"
+        }
+      }
+    }
+  }
+}

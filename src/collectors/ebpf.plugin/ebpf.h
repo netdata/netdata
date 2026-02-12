@@ -366,7 +366,7 @@ extern uint64_t collect_pids;
 
 static inline bool ebpf_plugin_stop(void)
 {
-    return ebpf_plugin_exit || nd_thread_signaled_to_cancel();
+    return __atomic_load_n(&ebpf_plugin_exit, __ATOMIC_ACQUIRE) || nd_thread_signaled_to_cancel();
 }
 
 void ebpf_stop_threads(int sig);

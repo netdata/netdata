@@ -27,6 +27,8 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         mysqlMethods,
+		MethodHandler:   mysqlFunctionHandler,
 	})
 }
 
@@ -35,6 +37,11 @@ func New() *Collector {
 		Config: Config{
 			DSN:     "root@tcp(localhost:3306)/",
 			Timeout: confopt.Duration(time.Second),
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		charts:                         baseCharts.Copy(),
@@ -67,6 +74,57 @@ type Config struct {
 	DSN                string           `yaml:"dsn" json:"dsn"`
 	MyCNF              string           `yaml:"my.cnf,omitempty" json:"my.cnf"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Functions          FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	TopQueries   TopQueriesConfig   `yaml:"top_queries,omitempty" json:"top_queries"`
+	DeadlockInfo DeadlockInfoConfig `yaml:"deadlock_info,omitempty" json:"deadlock_info"`
+	ErrorInfo    ErrorInfoConfig    `yaml:"error_info,omitempty" json:"error_info"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+type DeadlockInfoConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+}
+
+type ErrorInfoConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
+}
+
+func (c Config) deadlockInfoTimeout() time.Duration {
+	if c.Functions.DeadlockInfo.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.DeadlockInfo.Timeout.Duration()
+}
+
+func (c Config) errorInfoTimeout() time.Duration {
+	if c.Functions.ErrorInfo.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.ErrorInfo.Timeout.Duration()
 }
 
 type Collector struct {
@@ -105,6 +163,12 @@ type Collector struct {
 	varDisabledStorageEngine string
 	varLogBin                string
 	varPerformanceSchema     string
+	varPerfSchemaMu          sync.RWMutex // protects varPerformanceSchema for concurrent access
+
+	stmtSummaryCols   map[string]bool // cached column names from events_statements_summary_by_digest
+	stmtSummaryColsMu sync.RWMutex    // protects stmtSummaryCols for concurrent access
+
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -133,6 +197,8 @@ func (c *Collector) Init(context.Context) error {
 	c.safeDSN = cfg.FormatDSN()
 
 	c.Debugf("using DSN [%s]", c.DSN)
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -164,7 +230,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.db == nil {
 		return
 	}

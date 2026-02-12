@@ -98,7 +98,7 @@ This section assumes you have read the documentation on [how to edit the Netdata
 ### SSL Setup Process
 
 1. **Parent node**  
-   To generate an SSL key and certificate using `openssl`, take a look at the related section around [Securing Netdata Agents](/src/web/server/README.md#enable-httpstls-support) in our Documentation.
+   To generate an SSL key and certificate using `openssl`, take a look at the related section around [Securing Netdata Agents](/src/web/server/README.md#examples) in our Documentation.
 
 2. **Child node**  
    Update `stream.conf` to enable SSL/TLS and allow self-signed certificates. Append ':SSL' to the destination and uncomment 'ssl skip certificate verification'.

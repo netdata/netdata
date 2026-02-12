@@ -141,3 +141,10 @@ func parseConfigTemplateData(bs []byte) ([]confgroup.Config, error) {
 		return nil, errors.New("unknown config format")
 	}
 }
+
+func parseTemplate(s string, fmap template.FuncMap) (*template.Template, error) {
+	return template.New("root").
+		Option("missingkey=error").
+		Funcs(fmap).
+		Parse(s)
+}

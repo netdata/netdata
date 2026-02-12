@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/file"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 
@@ -75,7 +76,7 @@ func (a *Agent) loadEnabledModules(cfg config) module.Registry {
 	return enabled
 }
 
-func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
+func (a *Agent) buildDiscoveryConf(enabled module.Registry, fnReg functions.Registry) discovery.Config {
 	a.Info("building discovery config")
 
 	reg := confgroup.Registry{}
@@ -142,7 +143,9 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 			Names: dummyPaths,
 		}
 		cfg.SD = sd.Config{
-			ConfDir: a.ServiceDiscoveryConfigDir,
+			ConfigDefaults: reg,
+			ConfDir:        a.ServiceDiscoveryConfigDir,
+			FnReg:          fnReg,
 		}
 	}
 

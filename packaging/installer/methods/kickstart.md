@@ -1,4 +1,4 @@
-import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
+import { OneLineInstall } from '@site/src/components/OneLineInstall/'
 import { Install, InstallBox } from '@site/src/components/Install/'
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -37,19 +37,27 @@ To install and connect to Netdata Cloud in a single step from your terminal:
 
 <Tabs>
   <TabItem value="wget" label="wget">
-
-<OneLineInstallWget/>
-
+    <OneLineInstall
+      method="wget"
+      privacyMd="[anonymous statistics?](/docs/netdata-agent/configuration/anonymous-telemetry-events.md)"
+      connectMd="[connect](/src/claim/README.md)"
+    />
   </TabItem>
+
   <TabItem value="curl" label="curl">
-
-<OneLineInstallCurl/>
-
+    <OneLineInstall
+      method="curl"
+      privacyMd="[anonymous statistics?](/docs/netdata-agent/configuration/anonymous-telemetry-events.md)"
+      connectMd="[connect](/src/claim/README.md)"
+    />
   </TabItem>
 </Tabs>
 
-> **Tip**
-> Pick **Stable** or **Nightly**: Check the [guide](/docs/netdata-agent/versions-and-platforms.md) for differences.
+:::tip
+
+Pick **Stable** or **Nightly**: Check the [guide](/docs/netdata-agent/versions-and-platforms.md) for differences.
+
+:::
 
 <details><summary>🔍 Where to find your claim token</summary>
 
@@ -57,9 +65,6 @@ To install and connect to Netdata Cloud in a single step from your terminal:
 2. Navigate to your Space
 3. Go to **Space Settings** → **Nodes**
 4. Click **Add Node** → Copy Claim Token
-
-<!-- Screenshot Placeholder -->
-<!-- ![Claim Token in Netdata Cloud UI](../img/kickstart/claim-token-ui.png) -->
 
 </details>
 
@@ -92,8 +97,11 @@ These environment variables provide additional customization options (most users
 | `ROOTCMD`           | Command to run with root privileges          | Uses `sudo`, `doas`, or `pkexec` (in order) |
 | `DISABLE_TELEMETRY` | Disable telemetry when set to non-zero value | Telemetry enabled                           |
 
-> [!NOTE]
-> The user running the script needs write and execute permissions in the temporary directory specified by TMPDIR.
+:::note
+
+The user running the script needs write and execute permissions in the temporary directory specified by TMPDIR.
+
+:::
 
 ## Verify Script Integrity
 
@@ -114,7 +122,7 @@ If the script is valid, this command will return `OK, VALID`. We recommend verif
 
 ## Related Docs
 
-- [Connect to Netdata Cloud](/docs/netdata-cloud/connect-agent-to-cloud)
+- [Connect to Netdata Cloud](/src/claim/README.md)
 - [Release Channels & Versions](/docs/netdata-agent/versions-and-platforms.md)
-- [Uninstall Guide](/docs/netdata-agent/maintenance/uninstall)
+- [Uninstall Guide](/packaging/installer/UNINSTALL.md)
 - [Offline Installation Guide](/packaging/installer/methods/offline.md)

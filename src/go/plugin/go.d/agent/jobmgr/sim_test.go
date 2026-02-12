@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
@@ -20,12 +21,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type wantExposedEntry struct {
+	cfg    confgroup.Config
+	status dyncfg.Status
+}
+
 type runSim struct {
 	do func(mgr *Manager, in chan []*confgroup.Group)
 
 	wantDiscovered []confgroup.Config
-	wantSeen       []seenConfig
-	wantExposed    []seenConfig
+	wantSeen       []confgroup.Config
+	wantExposed    []wantExposedEntry
 	wantRunning    []string
 	wantDyncfg     string
 }
@@ -37,7 +43,7 @@ func (s *runSim) run(t *testing.T) {
 
 	var buf bytes.Buffer
 	mgr := New()
-	mgr.dyncfgApi = dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf)))
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
 	mgr.Modules = prepareMockRegistry()
 
 	done := make(chan struct{})
@@ -68,6 +74,9 @@ func (s *runSim) run(t *testing.T) {
 		if strings.HasPrefix(s, "CONFIG") && strings.Contains(s, " template ") {
 			continue
 		}
+		if strings.HasPrefix(s, "FUNCTION GLOBAL") {
+			continue
+		}
 		if strings.HasPrefix(s, "FUNCTION_RESULT_BEGIN") {
 			parts := strings.Fields(s)
 			s = strings.Join(parts[:len(parts)-1], " ") // remove timestamp
@@ -95,22 +104,21 @@ func (s *runSim) run(t *testing.T) {
 		require.Truef(t, ok, "discoveredConfigs: source %s config %d is not found", cfg.Source(), cfg.Hash())
 	}
 
-	wantLen, gotLen = len(s.wantSeen), len(mgr.seenConfigs.items)
-	require.Equalf(t, wantLen, gotLen, "seenConfigs: different len (want %d got %d)", wantLen, gotLen)
+	wantLen, gotLen = len(s.wantSeen), mgr.seen.Count()
+	require.Equalf(t, wantLen, gotLen, "seen: different len (want %d got %d)", wantLen, gotLen)
 
-	for _, scfg := range s.wantSeen {
-		v, ok := mgr.seenConfigs.lookup(scfg.cfg)
-		require.Truef(t, ok, "seenConfigs: config '%s' is not found", scfg.cfg.UID())
-		require.Truef(t, scfg.status == v.status, "seenConfigs: wrong status, want %s got %s", scfg.status, v.status)
+	for _, cfg := range s.wantSeen {
+		_, ok := mgr.seen.Lookup(cfg)
+		require.Truef(t, ok, "seen: config '%s' is not found", cfg.UID())
 	}
 
-	wantLen, gotLen = len(s.wantExposed), len(mgr.exposedConfigs.items)
-	require.Equalf(t, wantLen, gotLen, "exposedConfigs: different len (want %d got %d)", wantLen, gotLen)
+	wantLen, gotLen = len(s.wantExposed), mgr.exposed.Count()
+	require.Equalf(t, wantLen, gotLen, "exposed: different len (want %d got %d)", wantLen, gotLen)
 
-	for _, scfg := range s.wantExposed {
-		v, ok := mgr.exposedConfigs.lookup(scfg.cfg)
-		require.Truef(t, ok && scfg.cfg.UID() == v.cfg.UID(), "exposedConfigs: config '%s' is not found", scfg.cfg.UID())
-		require.Truef(t, scfg.status == v.status, "exposedConfigs: wrong status, want %s got %s", scfg.status, v.status)
+	for _, we := range s.wantExposed {
+		entry, ok := mgr.exposed.LookupByKey(we.cfg.ExposedKey())
+		require.Truef(t, ok && we.cfg.UID() == entry.Cfg.UID(), "exposed: config '%s' is not found", we.cfg.UID())
+		require.Truef(t, we.status == entry.Status, "exposed: wrong status for '%s', want %s got %s", we.cfg.UID(), we.status, entry.Status)
 	}
 
 	wantLen, gotLen = len(s.wantRunning), len(mgr.runningJobs.items)
@@ -147,6 +155,47 @@ func prepareMockRegistry() module.Registry {
 			return &module.MockModule{
 				InitFunc: func(context.Context) error { return errors.New("mock failed init") },
 			}
+		},
+	})
+
+	// Module without Methods - for testing function_only config rejection
+	reg.Register("nofuncs", module.Creator{
+		Create: func() module.Module {
+			return &module.MockModule{
+				ChartsFunc: func() *module.Charts {
+					return &module.Charts{&module.Chart{ID: "id", Title: "title", Units: "units", Dims: module.Dims{{ID: "id1"}}}}
+				},
+				CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"id1": 1} },
+			}
+		},
+	})
+
+	// Module with Methods - for testing config-level function_only
+	reg.Register("withfuncs", module.Creator{
+		Create: func() module.Module {
+			return &module.MockModule{
+				ChartsFunc: func() *module.Charts {
+					return &module.Charts{&module.Chart{ID: "id", Title: "title", Units: "units", Dims: module.Dims{{ID: "id1"}}}}
+				},
+				CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"id1": 1} },
+			}
+		},
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{ID: "test-method", Name: "Test Method"}}
+		},
+	})
+
+	// FunctionOnly module - for testing module-level function-only
+	reg.Register("funconly", module.Creator{
+		FunctionOnly: true,
+		Create: func() module.Module {
+			return &module.MockModule{
+				ChartsFunc:  func() *module.Charts { return nil },
+				CollectFunc: func(context.Context) map[string]int64 { return nil },
+			}
+		},
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{ID: "test-method", Name: "Test Method"}}
 		},
 	})
 

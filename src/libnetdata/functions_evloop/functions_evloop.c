@@ -49,6 +49,7 @@ struct functions_evloop_globals {
 
     netdata_mutex_t *stdout_mutex;
     bool *plugin_should_exit;
+    int *status;
     bool workers_exit; // all workers are waiting on the same condition - this makes them all exit, when any is cancelled
 
     ND_THREAD *reader_thread;
@@ -289,7 +290,7 @@ static bool rrd_function_worker_global_process_input(struct functions_evloop_glo
             nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received PROGRESS for transaction '%s', but it not available here", transaction);
     }
     else if(keyword && strcmp(keyword, PLUGINSD_CALL_QUIT) == 0) {
-        *wg->plugin_should_exit = true;
+        __atomic_store_n(wg->plugin_should_exit, true, __ATOMIC_RELEASE);
         return true;
     }
     else
@@ -306,7 +307,7 @@ static void rrd_functions_worker_globals_reader_main(void *arg) {
     buffered_reader_init(&wg->reader);
     wg->buffer = buffer_create(sizeof(wg->reader.read_buffer) + 2, NULL);
 
-    while(!(*wg->plugin_should_exit)) {
+    while(!__atomic_load_n(wg->plugin_should_exit, __ATOMIC_ACQUIRE)) {
         if(unlikely(!buffered_reader_next_line(&wg->reader, wg->buffer))) {
             buffered_reader_ret_t ret = buffered_reader_read_timeout(
                 &wg->reader,
@@ -326,14 +327,16 @@ static void rrd_functions_worker_globals_reader_main(void *arg) {
     }
 
     int status = 0;
-    if(!(*wg->plugin_should_exit)) {
+    if(!__atomic_load_n(wg->plugin_should_exit, __ATOMIC_ACQUIRE)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Read error on stdin");
         status = 1;
     }
 
-    *wg->plugin_should_exit = true;
     buffer_free(wg->buffer);
-    exit(status);
+
+    if (wg->status)
+        __atomic_store_n(wg->status, status, __ATOMIC_RELEASE);
+    __atomic_store_n(wg->plugin_should_exit, true, __ATOMIC_RELEASE);
 }
 
 void worker_queue_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -341,7 +344,10 @@ void worker_queue_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
     worker_job_cleanup(j);
 }
 
-struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, const char *tag, netdata_mutex_t *stdout_mutex, bool *plugin_should_exit) {
+struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, const char *tag,
+                                                       netdata_mutex_t *stdout_mutex, bool *plugin_should_exit,
+                                                       int *status)
+{
     struct functions_evloop_globals *wg = callocz(1, sizeof(struct functions_evloop_globals));
 
     wg->worker_queue = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
@@ -357,6 +363,7 @@ struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, co
     wg->workers = worker_threads;
     wg->worker_threads = callocz(wg->workers, sizeof(ND_THREAD *));
     wg->tag = tag;
+    wg->status = status;
 
     char tag_buffer[NETDATA_THREAD_TAG_MAX + 1];
     snprintfz(tag_buffer, NETDATA_THREAD_TAG_MAX, "%s_READER", wg->tag);

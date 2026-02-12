@@ -11,7 +11,5 @@ type Vnodes interface {
 	Lookup(key string) (*vnodes.VirtualNode, bool)
 }
 
-type FunctionRegistry interface {
-	RegisterPrefix(name, prefix string, fn func(functions.Function))
-	UnregisterPrefix(name string, prefix string)
-}
+// FunctionRegistry is an alias to functions.Registry for backward compatibility.
+type FunctionRegistry = functions.Registry

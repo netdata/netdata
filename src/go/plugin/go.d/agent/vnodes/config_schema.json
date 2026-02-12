@@ -30,7 +30,10 @@
         "type": [
           "object",
           "null"
-        ]
+        ],
+        "additionalProperties": {
+          "type": "string"
+        }
       },
       "custom_vars": {
         "title": "Custom host variables",
@@ -38,7 +41,10 @@
         "type": [
           "object",
           "null"
-        ]
+        ],
+        "additionalProperties": {
+          "type": "string"
+        }
       }
     },
     "required": [

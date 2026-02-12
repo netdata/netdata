@@ -96,11 +96,17 @@ Using the above, you access Netdata on the backend servers like this:
 
 ### Encrypt the communication between H2O and Netdata
 
-In case Netdata's web server has been [configured to use TLS](/src/web/server/README.md#enable-httpstls-support), it is
+In case Netdata's web server has been [configured to use TLS](/src/web/server/README.md#examples), it is
 necessary to specify inside the H2O configuration that the final destination is using TLS. To do this, change the
 `http://` on the `proxy.reverse.url` line in your H2O configuration with `https://`
 
 ### Enable authentication
+
+:::tip Simpler Alternative
+
+If you use Netdata Cloud, [Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md) provides authentication with a single setting - no htpasswd files or H2O auth configuration needed.
+
+:::
 
 Create an authentication file to enable basic authentication via H2O, this secures your Netdata dashboard.
 

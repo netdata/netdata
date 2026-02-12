@@ -24,3 +24,8 @@ collect_node_stats: yes
 collect_cluster_health: yes
 collect_cluster_stats: yes
 collect_indices_stats: yes
+functions:
+  top_queries:
+    disabled: true
+    timeout: 123.123
+    limit: 123
