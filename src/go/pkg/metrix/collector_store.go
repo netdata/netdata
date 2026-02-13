@@ -112,7 +112,10 @@ type storeCore struct {
 	successSeq  uint64
 	active      *cycleFrame
 	instruments map[string]*instrumentDescriptor // metric name => descriptor (mode/kind locked)
-	retention   collectorRetentionPolicy
+	// Captured schema for snapshot histograms declared without explicit bounds.
+	// Accessed only under c.mu during cycle commit.
+	snapshotHistogramSchema map[string]*histogramSchema // metric name => captured bounds
+	retention               collectorRetentionPolicy
 
 	snapshot atomic.Pointer[readSnapshot] // atomically swapped immutable read view
 }
@@ -142,7 +145,8 @@ type storeCycleController struct {
 // NewCollectorStore creates a collection store with staged writes and immutable read snapshots.
 func NewCollectorStore() CollectorStore {
 	core := &storeCore{
-		instruments: make(map[string]*instrumentDescriptor),
+		instruments:             make(map[string]*instrumentDescriptor),
+		snapshotHistogramSchema: make(map[string]*histogramSchema),
 		retention: collectorRetentionPolicy{
 			expireAfterSuccessCycles: defaultCollectorExpireAfterSuccessCycles,
 			maxSeries:                defaultCollectorMaxSeries,
@@ -302,8 +306,20 @@ func (c *storeCycleController) CommitCycleSuccess() {
 			next.series[key] = series
 		}
 
+		if series.desc == nil {
+			panic("metrix: missing histogram descriptor")
+		}
 		if series.desc.histogram == nil {
-			series.desc.histogram = &histogramSchema{bounds: append([]float64(nil), staged.bounds...)}
+			schema := c.core.snapshotHistogramSchema[series.name]
+			if schema == nil {
+				schema = &histogramSchema{bounds: append([]float64(nil), staged.bounds...)}
+				c.core.snapshotHistogramSchema[series.name] = schema
+			} else if !equalHistogramBounds(schema.bounds, staged.bounds) {
+				panic("metrix: histogram schema drift detected")
+			}
+			// Descriptor pointers can be shared across published snapshots.
+			// Never mutate shared descriptor state in-place; attach schema via a cloned descriptor.
+			series.desc = cloneInstrumentDescriptorWithHistogram(series.desc, schema.bounds)
 		} else if !equalHistogramBounds(series.desc.histogram.bounds, staged.bounds) {
 			panic("metrix: histogram schema drift detected")
 		}
@@ -609,6 +625,12 @@ func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	if s.summarySketch != nil {
 		cp.summarySketch = s.summarySketch.clone()
 	}
+	return &cp
+}
+
+func cloneInstrumentDescriptorWithHistogram(desc *instrumentDescriptor, bounds []float64) *instrumentDescriptor {
+	cp := *desc
+	cp.histogram = &histogramSchema{bounds: append([]float64(nil), bounds...)}
 	return &cp
 }
 
