@@ -10,7 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -266,7 +266,7 @@ func ensureChartsDynamicDimsCreated(t *testing.T, collr *Collector) {
 	ensureDynamicDimsCreated(t, collr, mimeTypeChart.ID, pxMimeType, collr.mx.MimeType)
 }
 
-func ensureDynamicDimsCreated(t *testing.T, collr *Collector, chartID, dimPrefix string, data metrix.CounterVec) {
+func ensureDynamicDimsCreated(t *testing.T, collr *Collector, chartID, dimPrefix string, data oldmetrix.CounterVec) {
 	chart := collr.Charts().Get(chartID)
 	assert.NotNilf(t, chart, "chart '%s' is not created", chartID)
 	if chart == nil {

@@ -14,7 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 
 	"github.com/jackc/pgx/v5/stdlib"
 )
@@ -157,8 +157,8 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.dbSr = sr
 
-	c.mx.xactTimeHist = metrix.NewHistogramWithRangeBuckets(c.XactTimeHistogram)
-	c.mx.queryTimeHist = metrix.NewHistogramWithRangeBuckets(c.QueryTimeHistogram)
+	c.mx.xactTimeHist = oldmetrix.NewHistogramWithRangeBuckets(c.XactTimeHistogram)
+	c.mx.queryTimeHist = oldmetrix.NewHistogramWithRangeBuckets(c.QueryTimeHistogram)
 
 	c.funcRouter = newFuncRouter(c)
 

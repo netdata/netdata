@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func TestToMap_empty(t *testing.T) {
@@ -22,20 +22,20 @@ func TestToMap_empty(t *testing.T) {
 
 func TestToMap_metrics(t *testing.T) {
 	s := struct {
-		C metrix.Counter   `stm:"c"`
-		G metrix.Gauge     `stm:"g,100"`
-		H metrix.Histogram `stm:"h,100"`
-		S metrix.Summary   `stm:"s,200,2"`
+		C oldmetrix.Counter   `stm:"c"`
+		G oldmetrix.Gauge     `stm:"g,100"`
+		H oldmetrix.Histogram `stm:"h,100"`
+		S oldmetrix.Summary   `stm:"s,200,2"`
 	}{}
 	s.C.Inc()
 	s.G.Set(3.14)
-	s.H = metrix.NewHistogram([]float64{1, 5, 10})
+	s.H = oldmetrix.NewHistogram([]float64{1, 5, 10})
 
 	s.H.Observe(3.14)
 	s.H.Observe(6.28)
 	s.H.Observe(20)
 
-	s.S = metrix.NewSummary()
+	s.S = oldmetrix.NewSummary()
 	s.S.Observe(3.14)
 	s.S.Observe(6.28)
 
@@ -327,7 +327,7 @@ func TestToMap_badTag(t *testing.T) {
 func TestToMap_nilValue(t *testing.T) {
 	assert.Panics(t, func() {
 		s := struct {
-			a metrix.CounterVec `stm:"a"`
+			a oldmetrix.CounterVec `stm:"a"`
 		}{nil}
 		stm.ToMap(s)
 	})
