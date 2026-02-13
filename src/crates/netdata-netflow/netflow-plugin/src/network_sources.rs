@@ -175,13 +175,22 @@ fn publish_source_records(
     runtime: &NetworkSourcesRuntime,
     state: &SourceRecordState,
 ) {
-    if let Ok(mut guard) = state.by_source.write() {
-        guard.insert(source_name.to_string(), records);
-        let merged = guard
-            .values()
-            .flat_map(|items| items.iter().cloned())
-            .collect::<Vec<_>>();
-        runtime.replace_records(merged);
+    match state.by_source.write() {
+        Ok(mut guard) => {
+            guard.insert(source_name.to_string(), records);
+            let merged = guard
+                .values()
+                .flat_map(|items| items.iter().cloned())
+                .collect::<Vec<_>>();
+            runtime.replace_records(merged);
+        }
+        Err(err) => {
+            tracing::warn!(
+                "network-sources source '{}' failed to publish records due to poisoned lock: {}",
+                source_name,
+                err
+            );
+        }
     }
 }
 
