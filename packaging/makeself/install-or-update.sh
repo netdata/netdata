@@ -232,7 +232,7 @@ for x in ndsudo freeipmi.plugin ioping cgroup-network local-listeners network-vi
   fi
 done
 
-for x in journal-viewer-plugin otel-plugin netflow-plugin; do
+for x in otel-signal-viewer-plugin otel-plugin netflow-plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
   if [ -f "${f}" ]; then
     run chmod 0750 "${f}"

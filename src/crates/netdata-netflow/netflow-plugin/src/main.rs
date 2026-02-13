@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use netdata_plugin_error::{NetdataPluginError, Result};
 use netdata_plugin_protocol::{FunctionDeclaration, HttpAccess};
-use rt::{FunctionHandler, PluginRuntime};
+use rt::{FunctionCallContext, FunctionHandler, PluginRuntime};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -86,18 +86,8 @@ impl NetflowFlowsHandler {
     fn new(metrics: Arc<ingest::IngestMetrics>, query: Arc<query::FlowQueryService>) -> Self {
         Self { metrics, query }
     }
-}
 
-#[async_trait]
-impl FunctionHandler for NetflowFlowsHandler {
-    type Request = query::FlowsRequest;
-    type Response = FlowsResponse;
-
-    async fn on_call(
-        &self,
-        _transaction: String,
-        request: Self::Request,
-    ) -> Result<Self::Response> {
+    async fn handle_request(&self, request: query::FlowsRequest) -> Result<FlowsResponse> {
         let query_output =
             self.query
                 .query_flows(&request)
@@ -186,14 +176,20 @@ impl FunctionHandler for NetflowFlowsHandler {
             help: "NetFlow/IPFIX/sFlow flow analysis data from journal-backed storage".to_string(),
         })
     }
+}
 
-    async fn on_cancellation(&self, _transaction: String) -> Result<Self::Response> {
-        Err(NetdataPluginError::Other {
-            message: "flows:netflow cancelled by user".to_string(),
-        })
+#[async_trait]
+impl FunctionHandler for NetflowFlowsHandler {
+    type Request = query::FlowsRequest;
+    type Response = FlowsResponse;
+
+    async fn on_call(
+        &self,
+        _ctx: FunctionCallContext,
+        request: Self::Request,
+    ) -> Result<Self::Response> {
+        self.handle_request(request).await
     }
-
-    async fn on_progress(&self, _transaction: String) {}
 
     fn declaration(&self) -> FunctionDeclaration {
         let mut func_decl =
@@ -425,7 +421,6 @@ mod tests {
     use chrono::Utc;
     use etherparse::{SlicedPacket, TransportSlice};
     use pcap_file::pcap::PcapReader;
-    use rt::FunctionHandler;
     use std::fs;
     use std::net::UdpSocket as StdUdpSocket;
     use std::path::{Path, PathBuf};
@@ -499,16 +494,13 @@ mod tests {
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
 
         let response = handler
-            .on_call(
-                "test-transaction".to_string(),
-                query::FlowsRequest {
-                    view: "detailed".to_string(),
-                    after: Some(1),
-                    before: Some(before),
-                    last: Some(100),
-                    ..Default::default()
-                },
-            )
+            .handle_request(query::FlowsRequest {
+                view: "detailed".to_string(),
+                after: Some(1),
+                before: Some(before),
+                last: Some(100),
+                ..Default::default()
+            })
             .await
             .expect("flows function call");
 
@@ -586,7 +578,7 @@ mod tests {
 
         let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
         let response = handler
-            .on_call("test-rollup-tier".to_string(), request)
+            .handle_request(request)
             .await
             .expect("flows function call for aggregated view");
         assert!(

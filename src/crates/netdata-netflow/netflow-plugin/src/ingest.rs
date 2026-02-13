@@ -8,11 +8,10 @@ use crate::plugin_config::{
     TimestampSource as ConfigTimestampSource,
 };
 use crate::tiering::{MATERIALIZED_TIERS, OpenTierState, TierAccumulator, TierKind};
-use anyhow::{Context, Result};
-use foundation::Timeout;
+use anyhow::{Context, Result, anyhow};
 use journal_common::load_machine_id;
 use journal_engine::{
-    Facets, FileIndexCacheBuilder, FileIndexKey, LogQuery, QueryTimeRange,
+    Facets, FileIndexCacheBuilder, FileIndexKey, IndexingLimits, LogQuery, QueryTimeRange,
     batch_compute_file_indexes,
 };
 use journal_index::{Anchor, Direction, FieldName, Microseconds, Seconds};
@@ -514,14 +513,28 @@ impl IngestService {
             })
             .collect();
 
-        let timeout = Timeout::new(Duration::from_secs(REBUILD_TIMEOUT_SECONDS));
         let time_range =
             QueryTimeRange::new(after, before).context("invalid rebuild raw time range")?;
 
-        let indexed_files =
-            batch_compute_file_indexes(&cache, &registry, keys, &time_range, timeout)
-                .await
-                .context("failed to build raw indexes for tier rebuild")?;
+        let indexing_cancellation = CancellationToken::new();
+        let indexed_files = tokio::select! {
+            result = batch_compute_file_indexes(
+                &cache,
+                &registry,
+                keys,
+                &time_range,
+                indexing_cancellation.clone(),
+                IndexingLimits::default(),
+                None,
+            ) => result.context("failed to build raw indexes for tier rebuild"),
+            _ = tokio::time::sleep(Duration::from_secs(REBUILD_TIMEOUT_SECONDS)) => {
+                indexing_cancellation.cancel();
+                Err(anyhow!(
+                    "timed out building raw indexes for tier rebuild after {}s",
+                    REBUILD_TIMEOUT_SECONDS
+                ))
+            }
+        }?;
         let file_indexes: Vec<_> = indexed_files.into_iter().map(|(_, idx)| idx).collect();
 
         if file_indexes.is_empty() {
