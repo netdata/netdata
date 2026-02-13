@@ -191,6 +191,11 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 	if schema == nil {
 		return
 	}
+	if len(src.histogramCumulative) != len(schema.bounds) {
+		// Defensive guard against malformed snapshots.
+		// Histogram() follows the same rule and returns unavailable.
+		return
+	}
 
 	for i, ub := range schema.bounds {
 		labelsMap := make(map[string]string, len(src.labels)+1)
