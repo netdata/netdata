@@ -31,6 +31,13 @@ type instrumentDescriptor struct {
 	kind      metricKind
 	mode      metricMode
 	freshness FreshnessPolicy // visibility policy used by Read()
+	stateSet  *stateSetSchema // set for kindStateSet only
+}
+
+type stateSetSchema struct {
+	mode   StateSetMode
+	states []string
+	index  map[string]struct{}
 }
 
 type committedSeries struct {
@@ -49,6 +56,9 @@ type committedSeries struct {
 	counterCurrentAttemptSeq  uint64
 	counterPreviousAttemptSeq uint64
 
+	// StateSet current sample (used by StateSet()).
+	stateSetValues map[string]bool
+
 	meta SeriesMeta
 }
 
@@ -62,6 +72,7 @@ type cycleFrame struct {
 	seq      uint64
 	gauges   map[string]*stagedGauge
 	counters map[string]*stagedCounter
+	stateSet map[string]*stagedStateSet
 }
 
 type storeCore struct {
@@ -154,6 +165,7 @@ func (c *storeCycleController) BeginCycle() {
 		seq:      c.core.sequence,
 		gauges:   make(map[string]*stagedGauge),
 		counters: make(map[string]*stagedCounter),
+		stateSet: make(map[string]*stagedStateSet),
 	}
 }
 
@@ -174,8 +186,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for k, s := range oldSnap.series {
-		cp := *s
-		next.series[k] = &cp
+		next.series[k] = cloneCommittedSeries(s)
 	}
 
 	for key, staged := range c.core.active.gauges {
@@ -226,6 +237,24 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
 	}
 
+	for key, staged := range c.core.active.stateSet {
+		series := next.series[key]
+		if series == nil {
+			series = &committedSeries{
+				id:        SeriesID(key),
+				key:       key,
+				name:      staged.name,
+				labels:    append([]Label(nil), staged.labels...),
+				labelsKey: staged.labelsKey,
+				desc:      staged.desc,
+			}
+			next.series[key] = series
+		}
+
+		series.stateSetValues = cloneStateMap(staged.states)
+		series.meta.LastSeenSuccessSeq = c.core.active.seq
+	}
+
 	next.collectMeta.LastAttemptSeq = c.core.active.seq
 	next.collectMeta.LastAttemptStatus = CollectStatusSuccess
 	next.collectMeta.LastSuccessSeq = c.core.active.seq
@@ -262,6 +291,9 @@ func (c *storeCycleController) AbortCycle() {
 func buildByName(series map[string]*committedSeries) map[string][]*committedSeries {
 	byName := make(map[string][]*committedSeries)
 	for _, s := range series {
+		if s.desc == nil || !isScalarKind(s.desc.kind) {
+			continue
+		}
 		byName[s.name] = append(byName[s.name], s)
 	}
 	for _, lst := range byName {
@@ -287,8 +319,11 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		}
 	}
 
-	if cfg.windowSet && (kind == kindGauge || kind == kindCounter) {
-		return nil, fmt.Errorf("metrix: WithWindow is invalid for this instrument kind")
+	if cfg.windowSet && !isWindowAllowed(kind, mode) {
+		return nil, fmt.Errorf("metrix: WithWindow is valid only for stateful histogram/summary")
+	}
+	if (len(cfg.states) > 0 || cfg.stateSetMode != nil) && kind != kindStateSet {
+		return nil, fmt.Errorf("metrix: stateset options are invalid for this instrument kind")
 	}
 
 	fresh := defaultFreshness(mode)
@@ -297,6 +332,15 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 	}
 	if mode == modeSnapshot && fresh == FreshnessCommitted {
 		return nil, fmt.Errorf("metrix: snapshot instruments cannot use FreshnessCommitted")
+	}
+
+	var schema *stateSetSchema
+	if kind == kindStateSet {
+		s, err := buildStateSetSchema(cfg)
+		if err != nil {
+			return nil, err
+		}
+		schema = s
 	}
 
 	c.mu.Lock()
@@ -312,10 +356,13 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		if d.freshness != fresh {
 			return nil, fmt.Errorf("metrix: instrument freshness mismatch for %s", name)
 		}
+		if kind == kindStateSet && !equalStateSetSchema(d.stateSet, schema) {
+			return nil, fmt.Errorf("metrix: stateset schema mismatch for %s", name)
+		}
 		return d, nil
 	}
 
-	d := &instrumentDescriptor{name: name, kind: kind, mode: mode, freshness: fresh}
+	d := &instrumentDescriptor{name: name, kind: kind, mode: mode, freshness: fresh, stateSet: schema}
 	c.instruments[name] = d
 	return d, nil
 }
@@ -326,4 +373,79 @@ func makeSeriesKey(name, labelsKey string) string {
 		return name
 	}
 	return name + "\xfe" + labelsKey
+}
+
+func cloneCommittedSeries(s *committedSeries) *committedSeries {
+	cp := *s
+	if len(s.labels) > 0 {
+		cp.labels = append([]Label(nil), s.labels...)
+	}
+	if s.stateSetValues != nil {
+		cp.stateSetValues = cloneStateMap(s.stateSetValues)
+	}
+	return &cp
+}
+
+func cloneStateMap(in map[string]bool) map[string]bool {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]bool, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func isScalarKind(kind metricKind) bool {
+	return kind == kindGauge || kind == kindCounter
+}
+
+func buildStateSetSchema(cfg instrumentConfig) (*stateSetSchema, error) {
+	if len(cfg.states) == 0 {
+		return nil, fmt.Errorf("metrix: stateset requires WithStateSetStates")
+	}
+
+	mode := ModeBitSet
+	if cfg.stateSetMode != nil {
+		mode = *cfg.stateSetMode
+	}
+
+	seen := make(map[string]struct{}, len(cfg.states))
+	states := make([]string, 0, len(cfg.states))
+	for _, st := range cfg.states {
+		if st == "" {
+			return nil, fmt.Errorf("metrix: stateset state cannot be empty")
+		}
+		if _, ok := seen[st]; ok {
+			return nil, fmt.Errorf("metrix: duplicate stateset state %q", st)
+		}
+		seen[st] = struct{}{}
+		states = append(states, st)
+	}
+
+	return &stateSetSchema{
+		mode:   mode,
+		states: states,
+		index:  seen,
+	}, nil
+}
+
+func equalStateSetSchema(a, b *stateSetSchema) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.mode != b.mode || len(a.states) != len(b.states) {
+		return false
+	}
+	for i := range a.states {
+		if a.states[i] != b.states[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func isWindowAllowed(kind metricKind, mode metricMode) bool {
+	return mode == modeStateful && (kind == kindHistogram || kind == kindSummary)
 }
