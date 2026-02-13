@@ -23,4 +23,7 @@ var (
 	errStateSetEnumCount    = errors.New("metrix: stateset enum mode requires exactly one active state")
 	errStateSetUnknownState = errors.New("metrix: stateset point contains undeclared state")
 	errStateSetLabelKey     = errors.New("metrix: stateset flatten label key collides with existing label")
+	errRuntimeSnapshotWrite = errors.New("metrix: runtime store supports stateful writes only")
+	errRuntimeFreshness     = errors.New("metrix: runtime store freshness is fixed to FreshnessCommitted")
+	errRuntimeWindowCycle   = errors.New("metrix: runtime store does not support window=cycle")
 )

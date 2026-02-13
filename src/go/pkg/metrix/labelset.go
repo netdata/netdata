@@ -4,8 +4,12 @@ package metrix
 
 // compileLabelSet validates and canonicalizes labels into a reusable immutable handle.
 func (c *storeCore) compileLabelSet(labels ...Label) LabelSet {
+	return compileLabelSetForOwner(c, labels...)
+}
+
+func compileLabelSetForOwner(owner meterBackend, labels ...Label) LabelSet {
 	if len(labels) == 0 {
-		return LabelSet{set: &compiledLabelSet{owner: c}}
+		return LabelSet{set: &compiledLabelSet{owner: owner}}
 	}
 
 	m := make(map[string]string, len(labels))
@@ -24,5 +28,5 @@ func (c *storeCore) compileLabelSet(labels ...Label) LabelSet {
 		panic(err)
 	}
 
-	return LabelSet{set: &compiledLabelSet{owner: c, items: items, key: key}}
+	return LabelSet{set: &compiledLabelSet{owner: owner, items: items, key: key}}
 }
