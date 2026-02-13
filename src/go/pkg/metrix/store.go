@@ -34,11 +34,16 @@ type instrumentDescriptor struct {
 	freshness FreshnessPolicy // visibility policy used by Read()
 	window    MetricWindow
 	histogram *histogramSchema // set for kindHistogram only
+	summary   *summarySchema   // set for kindSummary only
 	stateSet  *stateSetSchema  // set for kindStateSet only
 }
 
 type histogramSchema struct {
 	bounds []float64
+}
+
+type summarySchema struct {
+	quantiles []float64
 }
 
 type stateSetSchema struct {
@@ -68,6 +73,12 @@ type committedSeries struct {
 	histogramSum        SampleValue
 	histogramCumulative []SampleValue
 
+	// Summary current sample (used by Summary()).
+	summaryCount     SampleValue
+	summarySum       SampleValue
+	summaryQuantiles []SampleValue
+	summarySketch    *summaryQuantileSketch // cumulative stateful quantile estimator
+
 	// StateSet current sample (used by StateSet()).
 	stateSetValues map[string]bool
 
@@ -85,6 +96,7 @@ type cycleFrame struct {
 	gauges     map[string]*stagedGauge
 	counters   map[string]*stagedCounter
 	histograms map[string]*stagedHistogram
+	summaries  map[string]*stagedSummary
 	stateSet   map[string]*stagedStateSet
 }
 
@@ -179,6 +191,7 @@ func (c *storeCycleController) BeginCycle() {
 		gauges:     make(map[string]*stagedGauge),
 		counters:   make(map[string]*stagedCounter),
 		histograms: make(map[string]*stagedHistogram),
+		summaries:  make(map[string]*stagedSummary),
 		stateSet:   make(map[string]*stagedStateSet),
 	}
 }
@@ -277,6 +290,44 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
 	}
 
+	for key, staged := range c.core.active.summaries {
+		series := next.series[key]
+		if series == nil {
+			series = &committedSeries{
+				id:        SeriesID(key),
+				key:       key,
+				name:      staged.name,
+				labels:    append([]Label(nil), staged.labels...),
+				labelsKey: staged.labelsKey,
+				desc:      staged.desc,
+			}
+			next.series[key] = series
+		}
+
+		if staged.desc.mode == modeStateful && len(staged.desc.summaryQuantiles()) > 0 {
+			if staged.sketch != nil {
+				staged.quantileValues = staged.sketch.quantiles(staged.desc.summaryQuantiles())
+			} else {
+				// Defensive fallback for malformed staged state.
+				staged.quantileValues = computeSummaryQuantiles(nil, staged.desc.summaryQuantiles())
+			}
+		}
+
+		series.summaryCount = staged.count
+		series.summarySum = staged.sum
+		if len(staged.quantileValues) > 0 {
+			series.summaryQuantiles = append(series.summaryQuantiles[:0], staged.quantileValues...)
+		} else {
+			series.summaryQuantiles = nil
+		}
+		if staged.sketch != nil && series.desc != nil && series.desc.window == WindowCumulative {
+			series.summarySketch = staged.sketch.clone()
+		} else {
+			series.summarySketch = nil
+		}
+		series.meta.LastSeenSuccessSeq = c.core.active.seq
+	}
+
 	for key, staged := range c.core.active.stateSet {
 		series := next.series[key]
 		if series == nil {
@@ -365,6 +416,9 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 	if len(cfg.histogramBounds) > 0 && kind != kindHistogram {
 		return nil, fmt.Errorf("metrix: histogram bounds are invalid for this instrument kind")
 	}
+	if len(cfg.summaryQuantile) > 0 && kind != kindSummary {
+		return nil, fmt.Errorf("metrix: summary quantiles are invalid for this instrument kind")
+	}
 	if (len(cfg.states) > 0 || cfg.stateSetMode != nil) && kind != kindStateSet {
 		return nil, fmt.Errorf("metrix: stateset options are invalid for this instrument kind")
 	}
@@ -397,6 +451,15 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		histogram = s
 	}
 
+	var summary *summarySchema
+	if kind == kindSummary {
+		s, err := buildSummarySchema(cfg)
+		if err != nil {
+			return nil, err
+		}
+		summary = s
+	}
+
 	var schema *stateSetSchema
 	if kind == kindStateSet {
 		s, err := buildStateSetSchema(cfg)
@@ -427,6 +490,9 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 				return nil, fmt.Errorf("metrix: histogram schema mismatch for %s", name)
 			}
 		}
+		if kind == kindSummary && !equalSummarySchema(d.summary, summary) {
+			return nil, fmt.Errorf("metrix: summary schema mismatch for %s", name)
+		}
 		if kind == kindStateSet && !equalStateSetSchema(d.stateSet, schema) {
 			return nil, fmt.Errorf("metrix: stateset schema mismatch for %s", name)
 		}
@@ -440,6 +506,7 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		freshness: fresh,
 		window:    window,
 		histogram: histogram,
+		summary:   summary,
 		stateSet:  schema,
 	}
 	c.instruments[name] = d
@@ -464,6 +531,12 @@ func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	}
 	if len(s.histogramCumulative) > 0 {
 		cp.histogramCumulative = append([]SampleValue(nil), s.histogramCumulative...)
+	}
+	if len(s.summaryQuantiles) > 0 {
+		cp.summaryQuantiles = append([]SampleValue(nil), s.summaryQuantiles...)
+	}
+	if s.summarySketch != nil {
+		cp.summarySketch = s.summarySketch.clone()
 	}
 	return &cp
 }
@@ -495,6 +568,17 @@ func buildHistogramSchema(cfg instrumentConfig, mode metricMode) (*histogramSche
 		return nil, nil
 	}
 	return &histogramSchema{bounds: bounds}, nil
+}
+
+func buildSummarySchema(cfg instrumentConfig) (*summarySchema, error) {
+	qs, err := normalizeSummaryQuantiles(cfg.summaryQuantile)
+	if err != nil {
+		return nil, err
+	}
+	if len(qs) == 0 {
+		return nil, nil
+	}
+	return &summarySchema{quantiles: qs}, nil
 }
 
 func buildStateSetSchema(cfg instrumentConfig) (*stateSetSchema, error) {
@@ -549,6 +633,21 @@ func equalHistogramSchema(a, b *histogramSchema) bool {
 	return equalHistogramBounds(a.bounds, b.bounds)
 }
 
+func equalSummarySchema(a, b *summarySchema) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	if len(a.quantiles) != len(b.quantiles) {
+		return false
+	}
+	for i := range a.quantiles {
+		if a.quantiles[i] != b.quantiles[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func equalHistogramBounds(a, b []float64) bool {
 	if len(a) != len(b) {
 		return false
@@ -586,6 +685,25 @@ func normalizeHistogramBounds(in []float64) ([]float64, error) {
 		prev = b
 	}
 	return out, nil
+}
+
+func normalizeSummaryQuantiles(in []float64) ([]float64, error) {
+	if len(in) == 0 {
+		return nil, nil
+	}
+
+	qs := append([]float64(nil), in...)
+	prev := -1.0
+	for _, q := range qs {
+		if math.IsNaN(q) || q < 0 || q > 1 {
+			return nil, fmt.Errorf("metrix: invalid summary quantile %v", q)
+		}
+		if q <= prev {
+			return nil, fmt.Errorf("metrix: summary quantiles must be strictly increasing")
+		}
+		prev = q
+	}
+	return qs, nil
 }
 
 func isWindowAllowed(kind metricKind, mode metricMode) bool {

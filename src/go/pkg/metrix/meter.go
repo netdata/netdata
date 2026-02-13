@@ -42,12 +42,6 @@ func (m *snapshotMeter) WithLabelSet(labels ...LabelSet) SnapshotMeter {
 	return &snapshotMeter{backend: m.backend, prefix: m.prefix, sets: appendLabelSets(m.sets, labels)}
 }
 
-func (m *snapshotMeter) Summary(name string, opts ...InstrumentOption) SnapshotSummary {
-	_ = name
-	_ = opts
-	return snapshotSummaryNotImplemented{}
-}
-
 func (m *snapshotMeter) LabelSet(labels ...Label) LabelSet {
 	return m.backend.compileLabelSet(labels...)
 }
@@ -64,12 +58,6 @@ func (m *statefulMeter) WithLabelSet(labels ...LabelSet) StatefulMeter {
 		}
 	}
 	return &statefulMeter{backend: m.backend, prefix: m.prefix, sets: appendLabelSets(m.sets, labels)}
-}
-
-func (m *statefulMeter) Summary(name string, opts ...InstrumentOption) StatefulSummary {
-	_ = name
-	_ = opts
-	return statefulSummaryNotImplemented{}
 }
 
 func (m *statefulMeter) LabelSet(labels ...Label) LabelSet {

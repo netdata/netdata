@@ -14,6 +14,8 @@ type meterBackend interface {
 	recordCounterAdd(desc *instrumentDescriptor, delta SampleValue, sets []LabelSet)
 	recordHistogramObservePoint(desc *instrumentDescriptor, point HistogramPoint, sets []LabelSet)
 	recordHistogramObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet)
+	recordSummaryObservePoint(desc *instrumentDescriptor, point SummaryPoint, sets []LabelSet)
+	recordSummaryObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet)
 	recordStateSetObserve(desc *instrumentDescriptor, point StateSetPoint, sets []LabelSet)
 }
 

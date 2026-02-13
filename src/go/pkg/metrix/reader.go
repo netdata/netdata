@@ -80,9 +80,37 @@ func (r *storeReader) Histogram(name string, labels Labels) (HistogramPoint, boo
 }
 
 func (r *storeReader) Summary(name string, labels Labels) (SummaryPoint, bool) {
-	_ = name
-	_ = labels
-	return SummaryPoint{}, false
+	if r.flattened {
+		return SummaryPoint{}, false
+	}
+
+	s, ok := r.lookup(name, labels)
+	if !ok || !r.visible(s) {
+		return SummaryPoint{}, false
+	}
+	if s.desc == nil || s.desc.kind != kindSummary {
+		return SummaryPoint{}, false
+	}
+
+	point := SummaryPoint{
+		Count: s.summaryCount,
+		Sum:   s.summarySum,
+	}
+
+	if schema := s.desc.summary; schema != nil && len(schema.quantiles) > 0 {
+		if len(s.summaryQuantiles) != len(schema.quantiles) {
+			return SummaryPoint{}, false
+		}
+		point.Quantiles = make([]QuantilePoint, len(schema.quantiles))
+		for i, q := range schema.quantiles {
+			point.Quantiles[i] = QuantilePoint{
+				Quantile: q,
+				Value:    s.summaryQuantiles[i],
+			}
+		}
+	}
+
+	return point, true
 }
 
 func (r *storeReader) StateSet(name string, labels Labels) (StateSetPoint, bool) {
@@ -145,6 +173,8 @@ func flattenSnapshot(src *readSnapshot) *readSnapshot {
 			dst.series[s.key] = cloneCommittedSeries(s)
 		case kindHistogram:
 			appendFlattenedHistogramSeries(dst, s)
+		case kindSummary:
+			appendFlattenedSummarySeries(dst, s)
 		case kindStateSet:
 			appendFlattenedStateSetSeries(dst, s)
 		}
@@ -245,6 +275,48 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Lab
 		},
 		value: value,
 		meta:  meta,
+	}
+}
+
+func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
+	appendFlattenedHistogramScalar(dst, src.name+"_count", src.labels, src.summaryCount, src.meta, src.desc)
+	appendFlattenedHistogramScalar(dst, src.name+"_sum", src.labels, src.summarySum, src.meta, src.desc)
+
+	schema := src.desc.summary
+	if schema == nil {
+		return
+	}
+	if len(src.summaryQuantiles) != len(schema.quantiles) {
+		return
+	}
+
+	for i, q := range schema.quantiles {
+		labelsMap := make(map[string]string, len(src.labels)+1)
+		for _, lbl := range src.labels {
+			labelsMap[lbl.Key] = lbl.Value
+		}
+		labelsMap[summaryQuantileLabel] = formatSummaryQuantileLabel(q)
+
+		labels, labelsKey, err := canonicalizeLabels(labelsMap)
+		if err != nil {
+			continue
+		}
+		key := makeSeriesKey(src.name, labelsKey)
+		dst.series[key] = &committedSeries{
+			id:        SeriesID(key),
+			key:       key,
+			name:      src.name,
+			labels:    labels,
+			labelsKey: labelsKey,
+			desc: &instrumentDescriptor{
+				name:      src.name,
+				kind:      kindGauge,
+				mode:      src.desc.mode,
+				freshness: src.desc.freshness,
+			},
+			value: src.summaryQuantiles[i],
+			meta:  src.meta,
+		}
 	}
 }
 

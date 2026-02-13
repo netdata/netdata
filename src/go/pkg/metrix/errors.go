@@ -17,6 +17,8 @@ var (
 	errHistogramSchema      = errors.New("metrix: histogram schema is missing")
 	errHistogramBounds      = errors.New("metrix: histogram bounds are required")
 	errHistogramPoint       = errors.New("metrix: invalid histogram point")
+	errSummaryLabelKey      = errors.New("metrix: summary flatten label key collides with existing label")
+	errSummaryPoint         = errors.New("metrix: invalid summary point")
 	errStateSetSchema       = errors.New("metrix: stateset schema is missing")
 	errStateSetEnumCount    = errors.New("metrix: stateset enum mode requires exactly one active state")
 	errStateSetUnknownState = errors.New("metrix: stateset point contains undeclared state")
