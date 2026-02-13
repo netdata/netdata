@@ -64,6 +64,8 @@ func (c *statefulCounterInstrument) Add(delta SampleValue, labels ...LabelSet) {
 
 // recordCounterObserveTotal writes one sampled monotonic total for snapshot counters.
 func (c *storeCore) recordCounterObserveTotal(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+	mustFiniteSample(value)
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -93,6 +95,8 @@ func (c *storeCore) recordCounterObserveTotal(desc *instrumentDescriptor, value 
 
 // recordCounterAdd accumulates delta for stateful counters.
 func (c *storeCore) recordCounterAdd(desc *instrumentDescriptor, delta SampleValue, sets []LabelSet) {
+	mustFiniteSample(delta)
+
 	if delta < 0 {
 		panic(errCounterNegativeDelta)
 	}

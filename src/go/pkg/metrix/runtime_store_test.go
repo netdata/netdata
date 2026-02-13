@@ -137,6 +137,21 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				mustValue(t, s.Read(), "runtime.events_total", nil, workers*perWorker)
 			},
 		},
+		"runtime counter delta works with intervening writes to other metrics": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				m := s.Write().StatefulMeter("runtime")
+				c := m.Counter("events_total")
+				g := m.Gauge("heap_bytes")
+
+				c.Add(10)
+				g.Set(5) // intervening non-counter write
+				c.Add(4)
+
+				mustValue(t, s.Read(), "runtime.events_total", nil, 14)
+				mustDelta(t, s.Read(), "runtime.events_total", nil, 4)
+			},
+		},
 		"runtime wall-clock retention evicts stale series": {
 			run: func(t *testing.T) {
 				s := NewRuntimeStore()

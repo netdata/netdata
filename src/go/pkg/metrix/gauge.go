@@ -69,6 +69,8 @@ func (g *statefulGaugeInstrument) Add(delta SampleValue, labels ...LabelSet) {
 
 // recordGaugeSet writes one gauge sample into the active frame (last-write-wins in-cycle).
 func (c *storeCore) recordGaugeSet(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+	mustFiniteSample(value)
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -98,6 +100,8 @@ func (c *storeCore) recordGaugeSet(desc *instrumentDescriptor, value SampleValue
 
 // recordGaugeAdd accumulates delta into the active frame using committed baseline on first write.
 func (c *storeCore) recordGaugeAdd(desc *instrumentDescriptor, delta SampleValue, sets []LabelSet) {
+	mustFiniteSample(delta)
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

@@ -122,6 +122,8 @@ func (c *storeCore) recordHistogramObservePoint(desc *instrumentDescriptor, poin
 
 // recordHistogramObserve adds one sample to a stateful histogram in the active frame.
 func (c *storeCore) recordHistogramObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+	mustFiniteSample(value)
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -178,6 +180,9 @@ func (c *storeCore) recordHistogramObserve(desc *instrumentDescriptor, value Sam
 }
 
 func normalizeHistogramPoint(point HistogramPoint, schema *histogramSchema) ([]float64, SampleValue, SampleValue, []SampleValue) {
+	mustFiniteSample(point.Count)
+	mustFiniteSample(point.Sum)
+
 	if point.Count < 0 {
 		panic(fmt.Errorf("%w: negative count", errHistogramPoint))
 	}
@@ -207,6 +212,7 @@ func normalizeHistogramPoint(point HistogramPoint, schema *histogramSchema) ([]f
 		if b.CumulativeCount < 0 {
 			panic(fmt.Errorf("%w: cumulative bucket counts must be non-negative", errHistogramPoint))
 		}
+		mustFiniteSample(b.CumulativeCount)
 		bounds = append(bounds, ub)
 		cumulative = append(cumulative, b.CumulativeCount)
 		prevBound = ub

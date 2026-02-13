@@ -12,10 +12,10 @@ import (
 //
 //	go test ./pkg/metrix -run '^$' -bench 'VecVsWithLabelsSnapshotGauge' -benchmem
 //
-// BenchmarkVecVsWithLabelsSnapshotGauge/vec_100_series-14           25422  46416 ns/op   81458 B/op   1234 allocs/op
-// BenchmarkVecVsWithLabelsSnapshotGauge/with_labels_10_series-14   178431   6881 ns/op   13616 B/op    235 allocs/op
-// BenchmarkVecVsWithLabelsSnapshotGauge/vec_10_series-14           242992   4805 ns/op    9056 B/op    145 allocs/op
-// BenchmarkVecVsWithLabelsSnapshotGauge/with_labels_100_series-14   17409  68293 ns/op  127057 B/op   2134 allocs/op
+// BenchmarkVecVsWithLabelsSnapshotGauge/with_labels_10_series-14   188834   6332 ns/op   13456 B/op    215 allocs/op
+// BenchmarkVecVsWithLabelsSnapshotGauge/vec_10_series-14           273654   4356 ns/op    8976 B/op    135 allocs/op
+// BenchmarkVecVsWithLabelsSnapshotGauge/with_labels_100_series-14   18757  63167 ns/op  125457 B/op   1934 allocs/op
+// BenchmarkVecVsWithLabelsSnapshotGauge/vec_100_series-14           27187  44716 ns/op   80658 B/op   1134 allocs/op
 //
 // Keep this block updated when changing vec or label-merging write paths.
 func BenchmarkVecVsWithLabelsSnapshotGauge(b *testing.B) {
