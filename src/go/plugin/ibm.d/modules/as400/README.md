@@ -159,6 +159,18 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
+| netdata.plugin_ibm.as400_query_latency_fast | count_disks, count_http_servers, count_network_interfaces, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, memory_pools, network_connections, network_interfaces, serial_number, system_name, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, active_job | ms |
+| netdata.plugin_ibm.as400_query_latency_slow | analyze_plan_cache, count_subsystems, subsystems, message_queue_aggregates, job_queues, output_queue_info, plan_cache_summary | ms |
+| netdata.plugin_ibm.as400_query_latency_batch | message_queue_totals, job_queue_totals, output_queue_totals | ms |
+
+These metrics refer to the entire monitored IBM i (AS/400) instance.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
 | as400.cpu_utilization | utilization | percentage |
 | as400.cpu_utilization_entitled | utilization | percentage |
 | as400.cpu_configuration | configured | cpus |
@@ -313,22 +325,6 @@ Metrics:
 | as400.network_interface_status | active | status |
 | as400.network_interface_mtu | mtu | bytes |
 
-### Per observability
-
-These metrics refer to individual observability instances.
-
-Labels:
-
-| Label | Description |
-|:------|:------------|
-| path | Path identifier |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:-------|:-----------|:-----|
-| netdata.plugin_ibm.as400_query_latency | analyze_plan_cache, count_disks, count_http_servers, count_network_interfaces, count_subsystems, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, job_queues, job_queue_totals, memory_pools, message_queue_aggregates, message_queue_totals, network_connections, network_interfaces, output_queue_info, output_queue_totals, plan_cache_summary, serial_number, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, active_job, other | ms |
-
 ### Per outputqueue
 
 These metrics refer to individual outputqueue instances.
@@ -462,7 +458,7 @@ The following options can be defined globally or per job.
 | SlowPath | SlowPath enables the asynchronous slow-path worker for heavy queries. | `true` | no | - | - |
 | SlowPathUpdateEvery | SlowPathUpdateEvery controls the beat interval for the slow-path worker. | `10000000000` | no | - | - |
 | SlowPathMaxConnections | SlowPathMaxConnections caps the number of concurrent queries the slow-path worker may run. | `1` | no | - | - |
-| BatchPath | BatchPath enables the long-period batch worker for expensive queue aggregates. | `true` | no | - | - |
+| BatchPath | BatchPath enables the long-period batch worker for expensive queue aggregates. | `false` | no | - | - |
 | BatchPathUpdateEvery | BatchPathUpdateEvery controls the beat interval for the batch worker. | `60000000000` | no | - | - |
 | BatchPathMaxConnections | BatchPathMaxConnections caps concurrent queries for the batch worker. | `1` | no | - | - |
 | MaxDisks | MaxDisks caps how many disk units may be charted. | `100` | no | - | - |

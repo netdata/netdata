@@ -32,7 +32,7 @@ modules:
           including TCP and UDP sockets in all states, for both IPv4 and IPv6.
       supported_platforms:
         include:
-          - description: Linux
+          - Linux
         exclude: []
       multi_instance: false
       additional_permissions:
@@ -88,3 +88,9 @@ modules:
 
             Connections are classified as system or container based on network namespace.
           parameters: []
+          returns:
+            description: ""
+            columns: []
+          performance: ""
+          security: ""
+          availability: ""

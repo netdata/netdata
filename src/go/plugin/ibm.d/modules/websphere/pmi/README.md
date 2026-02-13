@@ -574,6 +574,7 @@ The following options can be defined globally or per job.
 | Vnode | Vnode allows binding the collector to a virtual node. | `` | no | - | - |
 | PMIStatsType | PMIStatsType selects which PMI statistics tier to request (`basic`, `extended`, `all`, or `custom`). | `extended` | no | - | - |
 | PMIRefreshRate | PMIRefreshRate overrides the global PMI servlet refresh interval in seconds when a value >0 is provided. | `60` | no | - | - |
+| PMICustomStatsPaths | PMICustomStatsPaths adds extra PMI XML paths when `pmi_stats_type` is set to `custom`. | `nil` | no | - | - |
 | ClusterName | ClusterName appends the WebSphere cluster identifier label to every exported time-series. | `` | no | - | - |
 | CellName | CellName appends the WebSphere cell identifier label to every exported time-series. | `` | no | - | - |
 | NodeName | NodeName appends the WebSphere node identifier label to every exported time-series. | `` | no | - | - |

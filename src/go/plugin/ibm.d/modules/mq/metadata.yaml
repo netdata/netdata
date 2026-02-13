@@ -8,7 +8,7 @@ modules:
         name: IBM MQ
         link: https://www.ibm.com/products/mq
         categories:
-          - data-collection.databases
+          - data-collection.applications
         icon_filename: "ibm-mq.svg"
       related_resources:
         integrations:
@@ -45,6 +45,13 @@ modules:
       multi_instance: true
       additional_permissions:
         description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
     setup:
       prerequisites:
         list:

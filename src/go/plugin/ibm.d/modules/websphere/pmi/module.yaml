@@ -5,7 +5,7 @@ description: |
   covering JVM, thread pools, JDBC/JMS resources, applications, and clustering information.
 link: https://www.ibm.com/docs/en/was
 categories:
-  - data-collection.application_servers
+  - data-collection.applications
 icon: ibm.svg
 keywords:
   - websphere

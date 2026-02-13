@@ -18,7 +18,7 @@ description: |
   high-level visibility is never lost even when detailed charts are trimmed.
 icon: ibm-mq.svg
 categories:
-  - data-collection.message-brokers
+  - data-collection.applications
 link: https://www.ibm.com/products/mq
 keywords:
   - message queue
