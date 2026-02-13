@@ -38,15 +38,15 @@ type LinkEndpoint struct {
 }
 
 type Link struct {
-	Layer        string          `json:"layer"`
-	Protocol     string          `json:"protocol"`
-	Direction    string          `json:"direction,omitempty"`
-	State        string          `json:"state,omitempty"`
-	Src          LinkEndpoint    `json:"src"`
-	Dst          LinkEndpoint    `json:"dst"`
-	DiscoveredAt *time.Time      `json:"discovered_at,omitempty"`
-	LastSeen     *time.Time      `json:"last_seen,omitempty"`
-	Metrics      map[string]any  `json:"metrics,omitempty"`
+	Layer        string         `json:"layer"`
+	Protocol     string         `json:"protocol"`
+	Direction    string         `json:"direction,omitempty"`
+	State        string         `json:"state,omitempty"`
+	Src          LinkEndpoint   `json:"src"`
+	Dst          LinkEndpoint   `json:"dst"`
+	DiscoveredAt *time.Time     `json:"discovered_at,omitempty"`
+	LastSeen     *time.Time     `json:"last_seen,omitempty"`
+	Metrics      map[string]any `json:"metrics,omitempty"`
 }
 
 type FlowExporter struct {
