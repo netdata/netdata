@@ -3,9 +3,6 @@
 package hpssa
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -51,20 +48,5 @@ func newDirectSsacliExec(ssacliPath string, timeout time.Duration, log *logger.L
 }
 
 func (e *directSsacliExec) controllersInfo() ([]byte, error) {
-	return e.execute("ctrl", "all", "show", "config", "detail")
-}
-
-func (e *directSsacliExec) execute(args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.ssacliPath, args...)
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("'%s' execution failed: %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunDirect(e.Logger, e.timeout, e.ssacliPath, "ctrl", "all", "show", "config", "detail")
 }

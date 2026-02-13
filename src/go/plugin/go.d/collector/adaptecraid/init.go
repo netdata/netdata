@@ -5,9 +5,10 @@ package adaptecraid
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 func (c *Collector) initArcconfCliExec() (arcconfCli, error) {
@@ -23,27 +24,19 @@ func (c *Collector) initNdsudoArcconfCliExec() (arcconfCli, error) {
 }
 
 func (c *Collector) initDirectArcconfCliExec() (arcconfCli, error) {
-	// Try to find arcconf in PATH first
-	for _, name := range []string{"arcconf", "ARCCONF"} {
-		if path, err := exec.LookPath(name); err == nil {
-			c.Debugf("found arcconf at: %s", path)
-			return newDirectArcconfCliExec(path, c.Timeout.Duration(), c.Logger), nil
-		}
+	path, err := ndexec.FindBinary(
+		[]string{"arcconf", "ARCCONF"},
+		[]string{
+			filepath.Join(os.Getenv("ProgramFiles"), "Adaptec", "ARCCONF", "arcconf.exe"),
+			filepath.Join(os.Getenv("ProgramFiles"), "Microsemi", "ARCCONF", "arcconf.exe"),
+			filepath.Join(os.Getenv("ProgramFiles(x86)"), "Adaptec", "ARCCONF", "arcconf.exe"),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("arcconf: %w", err)
 	}
 
-	// Try default Windows installation paths
-	defaultPaths := []string{
-		filepath.Join(os.Getenv("ProgramFiles"), "Adaptec", "ARCCONF", "arcconf.exe"),
-		filepath.Join(os.Getenv("ProgramFiles"), "Microsemi", "ARCCONF", "arcconf.exe"),
-		filepath.Join(os.Getenv("ProgramFiles(x86)"), "Adaptec", "ARCCONF", "arcconf.exe"),
-	}
+	c.Debugf("found arcconf at: %s", path)
 
-	for _, path := range defaultPaths {
-		if _, err := os.Stat(path); err == nil {
-			c.Debugf("found arcconf at: %s", path)
-			return newDirectArcconfCliExec(path, c.Timeout.Duration(), c.Logger), nil
-		}
-	}
-
-	return nil, fmt.Errorf("arcconf executable not found in PATH or default locations")
+	return newDirectArcconfCliExec(path, c.Timeout.Duration(), c.Logger), nil
 }

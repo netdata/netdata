@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -112,6 +113,52 @@ func SetRunnerPathsForTests(ndRunPath, ndSudoPath string) {
 	if ndSudoPath != "" {
 		defaultRunner.ndSudoPath = ndSudoPath
 	}
+}
+
+// RunDirect runs binPath directly with a timeout, without any wrapper (nd-run/ndsudo).
+// Returns stdout. On error, includes the command string and a trimmed stderr snippet.
+func RunDirect(log *logger.Logger, timeout time.Duration, binPath string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binPath, args...)
+
+	if log != nil {
+		log.Debugf("executing '%s'", cmd)
+	}
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	bs, err := cmd.Output()
+	if err != nil {
+		s := stderr.String()
+		if len(s) > stderrLimit {
+			s = s[:stderrLimit] + "… (truncated)"
+		}
+		return nil, fmt.Errorf("'%s' execution failed: %w (stderr: %s)", cmd, err, strings.TrimSpace(s))
+	}
+
+	return bs, nil
+}
+
+// FindBinary searches for a binary by trying names in PATH first,
+// then checking defaultPaths on the filesystem.
+// Returns the first found path, or an error if not found.
+func FindBinary(names []string, defaultPaths []string) (string, error) {
+	for _, name := range names {
+		if path, err := exec.LookPath(name); err == nil {
+			return path, nil
+		}
+	}
+
+	for _, path := range defaultPaths {
+		if fi, err := os.Stat(path); err == nil && !fi.IsDir() {
+			return path, nil
+		}
+	}
+
+	return "", fmt.Errorf("executable not found in PATH (%v) or default locations", names)
 }
 
 func (r *runner) run(log *logger.Logger, timeout time.Duration, dir string, helperPath, label string, env []string, argv ...string) ([]byte, string, ResourceUsage, error) {

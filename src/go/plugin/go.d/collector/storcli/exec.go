@@ -3,9 +3,6 @@
 package storcli
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -56,24 +53,9 @@ func newDirectStorCliExec(storcliPath string, timeout time.Duration, log *logger
 }
 
 func (e *directStorCliExec) controllersInfo() ([]byte, error) {
-	return e.execute("/cALL", "show", "all", "J", "nolog")
+	return ndexec.RunDirect(e.Logger, e.timeout, e.storcliPath, "/cALL", "show", "all", "J", "nolog")
 }
 
 func (e *directStorCliExec) drivesInfo() ([]byte, error) {
-	return e.execute("/cALL/eALL/sALL", "show", "all", "J", "nolog")
-}
-
-func (e *directStorCliExec) execute(args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.storcliPath, args...)
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("'%s' execution failed: %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunDirect(e.Logger, e.timeout, e.storcliPath, "/cALL/eALL/sALL", "show", "all", "J", "nolog")
 }

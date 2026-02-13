@@ -5,9 +5,10 @@ package nvme
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 func (c *Collector) initNVMeCLIExec() (nvmeCli, error) {
@@ -23,34 +24,22 @@ func (c *Collector) initNdsudoNvmeCliExec() (nvmeCli, error) {
 }
 
 func (c *Collector) initDirectNvmeCliExec() (nvmeCli, error) {
-	// Try to find nvme in PATH first
-	for _, name := range []string{"nvme", "nvme-cli"} {
-		if path, err := exec.LookPath(name); err == nil {
-			c.Debugf("found nvme at: %s", path)
-			return &directNvmeCliExec{
-				Logger:   c.Logger,
-				nvmePath: path,
-				timeout:  c.Timeout.Duration(),
-			}, nil
-		}
+	path, err := ndexec.FindBinary(
+		[]string{"nvme", "nvme-cli"},
+		[]string{
+			filepath.Join(os.Getenv("ProgramFiles"), "nvme-cli", "nvme.exe"),
+			filepath.Join(os.Getenv("ProgramFiles(x86)"), "nvme-cli", "nvme.exe"),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("nvme: %w", err)
 	}
 
-	// Try default Windows installation paths
-	defaultPaths := []string{
-		filepath.Join(os.Getenv("ProgramFiles"), "nvme-cli", "nvme.exe"),
-		filepath.Join(os.Getenv("ProgramFiles(x86)"), "nvme-cli", "nvme.exe"),
-	}
+	c.Debugf("found nvme at: %s", path)
 
-	for _, path := range defaultPaths {
-		if _, err := os.Stat(path); err == nil {
-			c.Debugf("found nvme at: %s", path)
-			return &directNvmeCliExec{
-				Logger:   c.Logger,
-				nvmePath: path,
-				timeout:  c.Timeout.Duration(),
-			}, nil
-		}
-	}
-
-	return nil, fmt.Errorf("nvme executable not found in PATH or default locations")
+	return &directNvmeCliExec{
+		Logger:   c.Logger,
+		nvmePath: path,
+		timeout:  c.Timeout.Duration(),
+	}, nil
 }

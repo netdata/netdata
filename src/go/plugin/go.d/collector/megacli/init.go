@@ -5,9 +5,10 @@ package megacli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 func (c *Collector) initMegaCliExec() (megaCli, error) {
@@ -23,27 +24,19 @@ func (c *Collector) initNdsudoMegaCliExec() (megaCli, error) {
 }
 
 func (c *Collector) initDirectMegaCliExec() (megaCli, error) {
-	// Try to find megacli in PATH first (try multiple names)
-	for _, name := range []string{"megacli", "MegaCli", "MegaCli64", "megacli64"} {
-		if path, err := exec.LookPath(name); err == nil {
-			c.Debugf("found megacli at: %s", path)
-			return newDirectMegaCliExec(path, c.Timeout.Duration(), c.Logger), nil
-		}
+	path, err := ndexec.FindBinary(
+		[]string{"megacli", "MegaCli", "MegaCli64", "megacli64"},
+		[]string{
+			filepath.Join(os.Getenv("ProgramFiles"), "LSI", "MegaCLI", "MegaCli64.exe"),
+			filepath.Join(os.Getenv("ProgramFiles"), "Broadcom", "MegaCLI", "MegaCli64.exe"),
+			filepath.Join(os.Getenv("ProgramFiles(x86)"), "MegaCLI", "MegaCli64.exe"),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("megacli: %w", err)
 	}
 
-	// Try default Windows installation paths
-	defaultPaths := []string{
-		filepath.Join(os.Getenv("ProgramFiles"), "LSI", "MegaCLI", "MegaCli64.exe"),
-		filepath.Join(os.Getenv("ProgramFiles"), "Broadcom", "MegaCLI", "MegaCli64.exe"),
-		filepath.Join(os.Getenv("ProgramFiles(x86)"), "MegaCLI", "MegaCli64.exe"),
-	}
+	c.Debugf("found megacli at: %s", path)
 
-	for _, path := range defaultPaths {
-		if _, err := os.Stat(path); err == nil {
-			c.Debugf("found megacli at: %s", path)
-			return newDirectMegaCliExec(path, c.Timeout.Duration(), c.Logger), nil
-		}
-	}
-
-	return nil, fmt.Errorf("megacli executable not found in PATH or default locations")
+	return newDirectMegaCliExec(path, c.Timeout.Duration(), c.Logger), nil
 }

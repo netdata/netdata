@@ -5,9 +5,10 @@ package hpssa
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 func (c *Collector) initSsacliBinary() (ssacliBinary, error) {
@@ -23,28 +24,20 @@ func (c *Collector) initNdsudoSsacliExec() (ssacliBinary, error) {
 }
 
 func (c *Collector) initDirectSsacliExec() (ssacliBinary, error) {
-	// Try to find ssacli in PATH first
-	for _, name := range []string{"ssacli", "SSACLI", "hpssacli"} {
-		if path, err := exec.LookPath(name); err == nil {
-			c.Debugf("found ssacli at: %s", path)
-			return newDirectSsacliExec(path, c.Timeout.Duration(), c.Logger), nil
-		}
+	path, err := ndexec.FindBinary(
+		[]string{"ssacli", "SSACLI", "hpssacli"},
+		[]string{
+			filepath.Join(os.Getenv("ProgramFiles"), "Smart Storage Administrator", "ssacli", "bin", "ssacli.exe"),
+			filepath.Join(os.Getenv("ProgramFiles"), "HP", "hpssacli", "bin", "hpssacli.exe"),
+			filepath.Join(os.Getenv("ProgramFiles"), "Compaq", "Hpacucli", "Bin", "hpacucli.exe"),
+			filepath.Join(os.Getenv("ProgramFiles(x86)"), "Smart Storage Administrator", "ssacli", "bin", "ssacli.exe"),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("ssacli: %w", err)
 	}
 
-	// Try default Windows installation paths
-	defaultPaths := []string{
-		filepath.Join(os.Getenv("ProgramFiles"), "Smart Storage Administrator", "ssacli", "bin", "ssacli.exe"),
-		filepath.Join(os.Getenv("ProgramFiles"), "HP", "hpssacli", "bin", "hpssacli.exe"),
-		filepath.Join(os.Getenv("ProgramFiles"), "Compaq", "Hpacucli", "Bin", "hpacucli.exe"),
-		filepath.Join(os.Getenv("ProgramFiles(x86)"), "Smart Storage Administrator", "ssacli", "bin", "ssacli.exe"),
-	}
+	c.Debugf("found ssacli at: %s", path)
 
-	for _, path := range defaultPaths {
-		if _, err := os.Stat(path); err == nil {
-			c.Debugf("found ssacli at: %s", path)
-			return newDirectSsacliExec(path, c.Timeout.Duration(), c.Logger), nil
-		}
-	}
-
-	return nil, fmt.Errorf("ssacli executable not found in PATH or default locations")
+	return newDirectSsacliExec(path, c.Timeout.Duration(), c.Logger), nil
 }

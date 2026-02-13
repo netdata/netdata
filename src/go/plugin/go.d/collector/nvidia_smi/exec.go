@@ -5,9 +5,7 @@ package nvidia_smi
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"errors"
-	"fmt"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -78,18 +76,7 @@ type nvidiaSmiDirectExec struct {
 }
 
 func (e *nvidiaSmiDirectExec) queryGPUInfo() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.binPath, "-q", "-x")
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("'%s' execution failed: %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunDirect(e.Logger, e.timeout, e.binPath, "-q", "-x")
 }
 
 func (e *nvidiaSmiDirectExec) stop() error { return nil }

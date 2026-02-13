@@ -5,9 +5,10 @@ package storcli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 func (c *Collector) initStorCliExec() (storCli, error) {
@@ -23,27 +24,19 @@ func (c *Collector) initNdsudoStorCliExec() (storCli, error) {
 }
 
 func (c *Collector) initDirectStorCliExec() (storCli, error) {
-	// Try to find storcli in PATH first (try multiple names)
-	for _, name := range []string{"storcli", "storcli64", "StorCLI", "StorCLI64"} {
-		if path, err := exec.LookPath(name); err == nil {
-			c.Debugf("found storcli at: %s", path)
-			return newDirectStorCliExec(path, c.Timeout.Duration(), c.Logger), nil
-		}
+	path, err := ndexec.FindBinary(
+		[]string{"storcli", "storcli64", "StorCLI", "StorCLI64"},
+		[]string{
+			filepath.Join(os.Getenv("ProgramFiles"), "Broadcom", "StorCLI", "storcli64.exe"),
+			filepath.Join(os.Getenv("ProgramFiles"), "LSI", "StorCLI", "storcli64.exe"),
+			filepath.Join(os.Getenv("ProgramFiles(x86)"), "StorCLI", "storcli64.exe"),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("storcli: %w", err)
 	}
 
-	// Try default Windows installation paths
-	defaultPaths := []string{
-		filepath.Join(os.Getenv("ProgramFiles"), "Broadcom", "StorCLI", "storcli64.exe"),
-		filepath.Join(os.Getenv("ProgramFiles"), "LSI", "StorCLI", "storcli64.exe"),
-		filepath.Join(os.Getenv("ProgramFiles(x86)"), "StorCLI", "storcli64.exe"),
-	}
+	c.Debugf("found storcli at: %s", path)
 
-	for _, path := range defaultPaths {
-		if _, err := os.Stat(path); err == nil {
-			c.Debugf("found storcli at: %s", path)
-			return newDirectStorCliExec(path, c.Timeout.Duration(), c.Logger), nil
-		}
-	}
-
-	return nil, fmt.Errorf("storcli executable not found in PATH or default locations")
+	return newDirectStorCliExec(path, c.Timeout.Duration(), c.Logger), nil
 }

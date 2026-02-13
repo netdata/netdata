@@ -4,10 +4,7 @@ package nvme
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
-	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -187,7 +184,7 @@ type directNvmeCliExec struct {
 }
 
 func (n *directNvmeCliExec) list() (*nvmeDeviceList, error) {
-	bs, err := n.execute("list", "--output-format=json")
+	bs, err := ndexec.RunDirect(n.Logger, n.timeout, n.nvmePath, "list", "--output-format=json")
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +198,7 @@ func (n *directNvmeCliExec) list() (*nvmeDeviceList, error) {
 }
 
 func (n *directNvmeCliExec) smartLog(devicePath string) (*nvmeDeviceSmartLog, error) {
-	bs, err := n.execute("smart-log", devicePath, "--output-format=json")
+	bs, err := ndexec.RunDirect(n.Logger, n.timeout, n.nvmePath, "smart-log", devicePath, "--output-format=json")
 	if err != nil {
 		return nil, err
 	}
@@ -212,19 +209,4 @@ func (n *directNvmeCliExec) smartLog(devicePath string) (*nvmeDeviceSmartLog, er
 	}
 
 	return &v, nil
-}
-
-func (n *directNvmeCliExec) execute(args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), n.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, n.nvmePath, args...)
-	n.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("'%s' execution failed: %v", cmd, err)
-	}
-
-	return bs, nil
 }

@@ -3,9 +3,6 @@
 package megacli
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -56,24 +53,9 @@ func newDirectMegaCliExec(megacliPath string, timeout time.Duration, log *logger
 }
 
 func (e *directMegaCliExec) physDrivesInfo() ([]byte, error) {
-	return e.execute("-LDPDInfo", "-aAll", "-NoLog")
+	return ndexec.RunDirect(e.Logger, e.timeout, e.megacliPath, "-LDPDInfo", "-aAll", "-NoLog")
 }
 
 func (e *directMegaCliExec) bbuInfo() ([]byte, error) {
-	return e.execute("-AdpBbuCmd", "-aAll", "-NoLog")
-}
-
-func (e *directMegaCliExec) execute(args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.megacliPath, args...)
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("'%s' execution failed: %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunDirect(e.Logger, e.timeout, e.megacliPath, "-AdpBbuCmd", "-aAll", "-NoLog")
 }
