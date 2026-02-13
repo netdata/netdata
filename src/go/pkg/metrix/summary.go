@@ -117,6 +117,8 @@ func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, point 
 
 // recordSummaryObserve adds one sample to a stateful summary in the active frame.
 func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+	mustFiniteSample(value)
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -165,6 +167,9 @@ func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, value Sampl
 }
 
 func normalizeSummaryPoint(point SummaryPoint, schema *summarySchema) (SampleValue, SampleValue, []SampleValue) {
+	mustFiniteSample(point.Count)
+	mustFiniteSample(point.Sum)
+
 	if point.Count < 0 {
 		panic(fmt.Errorf("%w: negative count", errSummaryPoint))
 	}
@@ -195,6 +200,7 @@ func normalizeSummaryPoint(point SummaryPoint, schema *summarySchema) (SampleVal
 		if idx == -1 {
 			panic(fmt.Errorf("%w: quantile %v is not declared", errSummaryPoint, q.Quantile))
 		}
+		mustFiniteSample(q.Value)
 		values[idx] = q.Value
 	}
 
@@ -213,7 +219,7 @@ func summaryQuantileIndex(schema []float64, q float64) int {
 	return -1
 }
 
-func computeSummaryQuantiles(samples []SampleValue, quantiles []float64) []SampleValue {
+func nanSummaryQuantiles(quantiles []float64) []SampleValue {
 	if len(quantiles) == 0 {
 		return nil
 	}

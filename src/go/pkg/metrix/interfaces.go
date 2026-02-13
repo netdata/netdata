@@ -43,9 +43,17 @@ type Reader interface {
 	SeriesMeta(name string, labels Labels) (SeriesMeta, bool)
 	CollectMeta() CollectMeta
 	Flatten() Reader
+	// Family returns a scalar-only view. For non-scalar families use Histogram/Summary/StateSet,
+	// or call Flatten() first and iterate flattened scalar series.
 	Family(name string) (FamilyView, bool)
+	// ForEachByName iterates scalar series only. For non-scalar families use typed getters
+	// or Flatten() first.
 	ForEachByName(name string, fn func(labels LabelView, v SampleValue))
+	// ForEachSeries iterates scalar series only. For non-scalar families use typed getters
+	// or Flatten() first.
 	ForEachSeries(fn func(name string, labels LabelView, v SampleValue))
+	// ForEachMatch iterates scalar series only. For non-scalar families use typed getters
+	// or Flatten() first.
 	ForEachMatch(name string, match func(labels LabelView) bool, fn func(labels LabelView, v SampleValue))
 }
 

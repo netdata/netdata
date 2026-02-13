@@ -12,10 +12,10 @@ import (
 //
 //	go test ./pkg/metrix -run '^$' -bench 'CollectStyleSnapshot' -benchmem
 //
-// BenchmarkCollectStyleSnapshot/lazy_declare_3_metrics-14    737848   1603 ns/op   3872 B/op   64 allocs/op
-// BenchmarkCollectStyleSnapshot/cached_handles_3_metrics-14  946352   1273 ns/op   3136 B/op   47 allocs/op
-// BenchmarkCollectStyleSnapshot/lazy_declare_20_metrics-14   134784   9080 ns/op  20480 B/op  332 allocs/op
-// BenchmarkCollectStyleSnapshot/cached_handles_20_metrics-14 166788   7185 ns/op  16480 B/op  247 allocs/op
+// BenchmarkCollectStyleSnapshot/lazy_declare_3_metrics-14    764806   1544 ns/op   3912 B/op   57 allocs/op
+// BenchmarkCollectStyleSnapshot/cached_handles_3_metrics-14  940884   1286 ns/op   3208 B/op   44 allocs/op
+// BenchmarkCollectStyleSnapshot/lazy_declare_20_metrics-14   138122   8734 ns/op  20792 B/op  291 allocs/op
+// BenchmarkCollectStyleSnapshot/cached_handles_20_metrics-14 167974   7197 ns/op  16960 B/op  227 allocs/op
 //
 // Keep this block updated when changing metrix write/declaration paths.
 func BenchmarkCollectStyleSnapshot(b *testing.B) {

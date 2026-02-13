@@ -106,6 +106,8 @@ func (r *runtimeStoreBackend) registerInstrument(name string, kind metricKind, m
 }
 
 func (r *runtimeStoreBackend) recordGaugeSet(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+	mustFiniteSample(value)
+
 	labels, labelsKey, err := labelsFromSet(sets, r)
 	if err != nil {
 		panic(err)
@@ -120,6 +122,8 @@ func (r *runtimeStoreBackend) recordGaugeSet(desc *instrumentDescriptor, value S
 }
 
 func (r *runtimeStoreBackend) recordGaugeAdd(desc *instrumentDescriptor, delta SampleValue, sets []LabelSet) {
+	mustFiniteSample(delta)
+
 	labels, labelsKey, err := labelsFromSet(sets, r)
 	if err != nil {
 		panic(err)
@@ -138,6 +142,8 @@ func (r *runtimeStoreBackend) recordCounterObserveTotal(_ *instrumentDescriptor,
 }
 
 func (r *runtimeStoreBackend) recordCounterAdd(desc *instrumentDescriptor, delta SampleValue, sets []LabelSet) {
+	mustFiniteSample(delta)
+
 	if delta < 0 {
 		panic(errCounterNegativeDelta)
 	}
@@ -150,19 +156,20 @@ func (r *runtimeStoreBackend) recordCounterAdd(desc *instrumentDescriptor, delta
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
 		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
 
-		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentAttemptSeq > 0
+		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentSeq > 0
 		if hadCurrent {
 			series.counterPrevious = series.counterCurrent
-			series.counterPreviousAttemptSeq = series.counterCurrentAttemptSeq
+			series.counterPreviousSeq = series.counterCurrentSeq
 			series.counterHasPrev = true
 		} else {
 			series.counterPrevious = 0
-			series.counterPreviousAttemptSeq = 0
+			series.counterPreviousSeq = 0
 			series.counterHasPrev = false
 		}
 
 		series.counterCurrent += delta
-		series.counterCurrentAttemptSeq = seq
+		// Runtime delta contiguity is per-series, not global store sequence.
+		series.counterCurrentSeq++
 		series.value = series.counterCurrent
 		series.meta.LastSeenSuccessSeq = seq
 		series.runtimeLastSeenUnixNano = nowUnixNano
@@ -174,6 +181,8 @@ func (r *runtimeStoreBackend) recordHistogramObservePoint(_ *instrumentDescripto
 }
 
 func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+	mustFiniteSample(value)
+
 	schema := desc.histogram
 	if schema == nil || len(schema.bounds) == 0 {
 		panic(errHistogramBounds)
@@ -216,6 +225,8 @@ func (r *runtimeStoreBackend) recordSummaryObservePoint(_ *instrumentDescriptor,
 }
 
 func (r *runtimeStoreBackend) recordSummaryObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet) {
+	mustFiniteSample(value)
+
 	labels, labelsKey, err := labelsFromSet(sets, r)
 	if err != nil {
 		panic(err)

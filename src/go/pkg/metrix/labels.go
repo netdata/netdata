@@ -98,7 +98,10 @@ func labelsFromSet(sets []LabelSet, owner meterBackend) ([]Label, string, error)
 
 func appendLabelSets(base []LabelSet, extra []LabelSet) []LabelSet {
 	if len(extra) == 0 {
-		return append([]LabelSet(nil), base...)
+		return base
+	}
+	if len(base) == 0 {
+		return extra
 	}
 	out := make([]LabelSet, 0, len(base)+len(extra))
 	out = append(out, base...)

@@ -67,11 +67,11 @@ type committedSeries struct {
 	runtimeLastSeenUnixNano int64
 
 	// Counter two-sample state (used by Delta()).
-	counterCurrent            SampleValue
-	counterPrevious           SampleValue
-	counterHasPrev            bool
-	counterCurrentAttemptSeq  uint64
-	counterPreviousAttemptSeq uint64
+	counterCurrent     SampleValue
+	counterPrevious    SampleValue
+	counterHasPrev     bool
+	counterCurrentSeq  uint64
+	counterPreviousSeq uint64
 
 	// Histogram current sample (used by Histogram()).
 	histogramCount      SampleValue
@@ -274,19 +274,19 @@ func (c *storeCycleController) CommitCycleSuccess() {
 			next.series[key] = series
 		}
 
-		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentAttemptSeq > 0
+		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentSeq > 0
 		if hadCurrent {
 			series.counterPrevious = series.counterCurrent
-			series.counterPreviousAttemptSeq = series.counterCurrentAttemptSeq
+			series.counterPreviousSeq = series.counterCurrentSeq
 			series.counterHasPrev = true
 		} else {
 			series.counterPrevious = 0
-			series.counterPreviousAttemptSeq = 0
+			series.counterPreviousSeq = 0
 			series.counterHasPrev = false
 		}
 
 		series.counterCurrent = staged.current
-		series.counterCurrentAttemptSeq = c.core.active.seq
+		series.counterCurrentSeq = c.core.active.seq
 		series.value = staged.current // Value() for counters returns current total.
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
 		series.lastSeenSuccessCycle = successSeq
@@ -350,7 +350,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 				staged.quantileValues = staged.sketch.quantiles(staged.desc.summaryQuantiles())
 			} else {
 				// Defensive fallback for malformed staged state.
-				staged.quantileValues = computeSummaryQuantiles(nil, staged.desc.summaryQuantiles())
+				staged.quantileValues = nanSummaryQuantiles(staged.desc.summaryQuantiles())
 			}
 		}
 

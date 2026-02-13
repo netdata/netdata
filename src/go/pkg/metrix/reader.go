@@ -42,7 +42,7 @@ func (r *storeReader) Delta(name string, labels Labels) (SampleValue, bool) {
 	if s.desc == nil || s.desc.kind != kindCounter {
 		return 0, false
 	}
-	if !s.counterHasPrev || s.counterCurrentAttemptSeq != s.counterPreviousAttemptSeq+1 {
+	if !s.counterHasPrev || s.counterCurrentSeq != s.counterPreviousSeq+1 {
 		return 0, false
 	}
 	if s.counterCurrent < s.counterPrevious {
@@ -153,9 +153,6 @@ func (r *storeReader) Flatten() Reader {
 			flattened: true,
 		}
 	})
-	if r.flatten == nil {
-		return r
-	}
 	return r.flatten
 }
 
@@ -222,6 +219,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				kind:      kindCounter,
 				mode:      src.desc.mode,
 				freshness: src.desc.freshness,
+				window:    src.desc.window,
 			},
 			value: src.histogramCumulative[i],
 			meta:  src.meta,
@@ -248,6 +246,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				kind:      kindCounter,
 				mode:      src.desc.mode,
 				freshness: src.desc.freshness,
+				window:    src.desc.window,
 			},
 			value: src.histogramCount,
 			meta:  src.meta,
@@ -279,6 +278,7 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Lab
 			kind:      kindCounter,
 			mode:      desc.mode,
 			freshness: desc.freshness,
+			window:    desc.window,
 		},
 		value: value,
 		meta:  meta,
@@ -320,6 +320,7 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 				kind:      kindGauge,
 				mode:      src.desc.mode,
 				freshness: src.desc.freshness,
+				window:    src.desc.window,
 			},
 			value: src.summaryQuantiles[i],
 			meta:  src.meta,
@@ -362,6 +363,7 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 				kind:      kindGauge,
 				mode:      src.desc.mode,
 				freshness: src.desc.freshness,
+				window:    src.desc.window,
 			},
 			value: value,
 			meta:  src.meta,

@@ -10,6 +10,7 @@ var (
 	errForeignLabelSet      = errors.New("metrix: foreign label set")
 	errDuplicateLabelKey    = errors.New("metrix: duplicate label key")
 	errVecLabelValueCount   = errors.New("metrix: vec label values count does not match label keys")
+	errInvalidSampleValue   = errors.New("metrix: invalid sample value (NaN/Inf)")
 	errCounterNegativeDelta = errors.New("metrix: counter Add delta cannot be negative")
 	errCycleInactive        = errors.New("metrix: write outside active cycle")
 	errCycleActive          = errors.New("metrix: cycle already active")
