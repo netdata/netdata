@@ -25,7 +25,7 @@ func BenchmarkSummaryStatefulWindowCycle(b *testing.B) {
 
 	for name, tc := range tests {
 		b.Run(name, func(b *testing.B) {
-			s := NewStore()
+			s := NewCollectorStore()
 			cc := benchmarkCycleController(b, s)
 			sum := s.Write().StatefulMeter("bench").Summary(
 				"latency_seconds",
@@ -74,7 +74,7 @@ func BenchmarkSummaryStatefulCumulativeWithPreload(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := benchmarkCycleController(b, s)
 				sum := s.Write().StatefulMeter("bench").Summary(
 					"latency_seconds",
@@ -112,7 +112,7 @@ func BenchmarkSummarySnapshotObservePoint(b *testing.B) {
 
 	for name, tc := range tests {
 		b.Run(name, func(b *testing.B) {
-			s := NewStore()
+			s := NewCollectorStore()
 			cc := benchmarkCycleController(b, s)
 			sum := s.Write().SnapshotMeter("bench").Summary("latency_seconds", WithSummaryQuantiles(tc.quantiles...))
 
@@ -139,7 +139,7 @@ func BenchmarkSummarySnapshotObservePoint(b *testing.B) {
 	}
 }
 
-func benchmarkCycleController(b *testing.B, s Store) CycleController {
+func benchmarkCycleController(b *testing.B, s CollectorStore) CycleController {
 	b.Helper()
 	managed, ok := AsCycleManagedStore(s)
 	if !ok {

@@ -10,7 +10,7 @@ func TestCounterStoreScenarios(t *testing.T) {
 	}{
 		"snapshot counter delta and reset-aware semantics": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				c := s.Write().SnapshotMeter("http").Counter("requests_total")
 
@@ -34,7 +34,7 @@ func TestCounterStoreScenarios(t *testing.T) {
 		},
 		"snapshot counter delta unavailable on attempt gap": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				c := s.Write().SnapshotMeter("db").Counter("queries_total")
 
@@ -59,7 +59,7 @@ func TestCounterStoreScenarios(t *testing.T) {
 		},
 		"snapshot counter repeated writes are last-write-wins in cycle": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				c := s.Write().SnapshotMeter("app").Counter("events_total")
 
@@ -72,7 +72,7 @@ func TestCounterStoreScenarios(t *testing.T) {
 		},
 		"stateful counter add baselines from committed and accumulates": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				c := s.Write().StatefulMeter("runtime").Counter("jobs_total")
 
@@ -92,7 +92,7 @@ func TestCounterStoreScenarios(t *testing.T) {
 		},
 		"stateful counter negative add panics": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				c := s.Write().StatefulMeter("runtime").Counter("bad_total")
 
@@ -105,7 +105,7 @@ func TestCounterStoreScenarios(t *testing.T) {
 		},
 		"counter mode mixing snapshot and stateful panics": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				s.Write().SnapshotMeter("mixed").Counter("metric")
 				expectPanic(t, func() {
 					_ = s.Write().StatefulMeter("mixed").Counter("metric")
@@ -114,7 +114,7 @@ func TestCounterStoreScenarios(t *testing.T) {
 		},
 		"delta on non-counter returns unavailable": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				g := s.Write().SnapshotMeter("g").Gauge("value")
 				cc.BeginCycle()
@@ -125,7 +125,7 @@ func TestCounterStoreScenarios(t *testing.T) {
 		},
 		"snapshot counter hidden from Read on failed latest attempt": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				c := s.Write().SnapshotMeter("svc").Counter("requests_total")
 

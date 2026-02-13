@@ -13,7 +13,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 	}{
 		"snapshot summary count sum read and flatten": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				sm := s.Write().SnapshotMeter("svc")
 				sum := sm.Summary("latency")
@@ -37,7 +37,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 		},
 		"snapshot summary quantiles are validated and flattened": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				sum := s.Write().SnapshotMeter("svc").Summary("latency", WithSummaryQuantiles(0.5, 0.9))
 
@@ -70,7 +70,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 		},
 		"snapshot summary point quantiles must match declaration": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				sum := s.Write().SnapshotMeter("svc").Summary("latency", WithSummaryQuantiles(0.5, 0.9))
 
@@ -89,7 +89,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 		},
 		"stateful summary cumulative accumulates count sum and quantiles": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				sum := s.Write().StatefulMeter("svc").Summary("latency", WithSummaryQuantiles(0.5, 1.0))
 
@@ -122,7 +122,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 		},
 		"stateful summary cycle window resets and uses freshness cycle": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				sum := s.Write().StatefulMeter("svc").Summary(
 					"latency",
@@ -173,7 +173,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 		},
 		"window option on snapshot summary panics": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				expectPanic(t, func() {
 					_ = s.Write().SnapshotMeter("svc").Summary("latency", WithWindow(WindowCycle))
 				})
@@ -181,7 +181,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 		},
 		"summary reservoir option validation and custom size": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 
 				expectPanic(t, func() {
@@ -216,7 +216,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 		},
 		"summary flatten quantile label collision panics": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				sum := s.Write().SnapshotMeter("svc").
 					WithLabels(Label{Key: "quantile", Value: "x"}).
@@ -237,7 +237,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 		},
 		"summary schema mismatch and mode mixing panic": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				_ = s.Write().SnapshotMeter("svc").Summary("latency", WithSummaryQuantiles(0.5))
 
 				expectPanic(t, func() {

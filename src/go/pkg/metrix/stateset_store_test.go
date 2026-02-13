@@ -10,7 +10,7 @@ func TestStateSetStoreScenarios(t *testing.T) {
 	}{
 		"snapshot stateset read and flatten": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				ss := s.Write().SnapshotMeter("svc").StateSet(
 					"mode",
@@ -39,7 +39,7 @@ func TestStateSetStoreScenarios(t *testing.T) {
 		},
 		"snapshot stateset freshness hides stale series from Read but not ReadRaw": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				ss := s.Write().SnapshotMeter("svc").StateSet(
 					"mode",
@@ -70,7 +70,7 @@ func TestStateSetStoreScenarios(t *testing.T) {
 		},
 		"stateful stateset remains visible across cycles without writes": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				ss := s.Write().StatefulMeter("svc").StateSet(
 					"feature_flags",
@@ -96,7 +96,7 @@ func TestStateSetStoreScenarios(t *testing.T) {
 		},
 		"stateset enum mode validation panics on invalid active count": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				ss := s.Write().SnapshotMeter("svc").StateSet(
 					"mode",
@@ -113,7 +113,7 @@ func TestStateSetStoreScenarios(t *testing.T) {
 		},
 		"stateset observe panics on undeclared state": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				ss := s.Write().SnapshotMeter("svc").StateSet(
 					"mode",
@@ -129,7 +129,7 @@ func TestStateSetStoreScenarios(t *testing.T) {
 		},
 		"stateset declaration requires WithStateSetStates": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				expectPanic(t, func() {
 					_ = s.Write().SnapshotMeter("svc").StateSet("mode")
 				})
@@ -137,7 +137,7 @@ func TestStateSetStoreScenarios(t *testing.T) {
 		},
 		"stateset schema mismatch panics on redeclaration": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				_ = s.Write().SnapshotMeter("svc").StateSet(
 					"mode",
 					WithStateSetStates("maintenance", "operational"),
@@ -152,7 +152,7 @@ func TestStateSetStoreScenarios(t *testing.T) {
 		},
 		"flatten label key collision panics": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				ss := s.Write().SnapshotMeter("svc").
 					WithLabels(Label{Key: "svc.mode", Value: "already-present"}).
@@ -167,7 +167,7 @@ func TestStateSetStoreScenarios(t *testing.T) {
 		},
 		"stateset read returns a copy": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				ss := s.Write().SnapshotMeter("svc").StateSet("mode", WithStateSetStates("a", "b"))
 

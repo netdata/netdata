@@ -4,7 +4,7 @@ package metrix
 
 import "testing"
 
-func cycleController(t *testing.T, s Store) CycleController {
+func cycleController(t *testing.T, s CollectorStore) CycleController {
 	t.Helper()
 	managed, ok := AsCycleManagedStore(s)
 	if !ok {

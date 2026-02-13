@@ -123,8 +123,8 @@ type storeCycleController struct {
 	core *storeCore
 }
 
-// NewStore creates a collection store with staged writes and immutable read snapshots.
-func NewStore() Store {
+// NewCollectorStore creates a collection store with staged writes and immutable read snapshots.
+func NewCollectorStore() CollectorStore {
 	core := &storeCore{
 		instruments: make(map[string]*instrumentDescriptor),
 	}
@@ -136,9 +136,9 @@ func NewStore() Store {
 	return &storeView{core: core}
 }
 
-// AsCycleManagedStore exposes runtime cycle control for stores created by NewStore.
+// AsCycleManagedStore exposes runtime cycle control for stores created by NewCollectorStore.
 // This is intended for runtime internals, not collector code.
-func AsCycleManagedStore(s Store) (CycleManagedStore, bool) {
+func AsCycleManagedStore(s CollectorStore) (CycleManagedStore, bool) {
 	switch v := s.(type) {
 	case *managedStore:
 		return v, true
