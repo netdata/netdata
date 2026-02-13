@@ -42,7 +42,6 @@
     link: "https://github.com/netdata/netdata/blob/master/src/collectors/windows-events.plugin/README.md"
     categories:
       - logs
-      - data-collection.windows-systems
     icon_filename: "windows.svg"
   keywords:
     - windows
