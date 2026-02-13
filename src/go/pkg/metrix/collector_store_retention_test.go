@@ -1,0 +1,89 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package metrix
+
+import "testing"
+
+func TestCollectorStoreRetentionScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"retention aging advances on successful cycles only": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				sv := collectorStoreViewForTest(t, s)
+				sv.core.retention = collectorRetentionPolicy{
+					expireAfterSuccessCycles: 2,
+					maxSeries:                0,
+				}
+				cc := cycleController(t, s)
+				m := s.Write().SnapshotMeter("collector")
+				g := m.Gauge("g")
+
+				cc.BeginCycle()
+				g.Observe(11)
+				cc.CommitCycleSuccess()
+
+				cc.BeginCycle()
+				cc.AbortCycle()
+
+				cc.BeginCycle()
+				cc.CommitCycleSuccess()
+				mustValue(t, s.ReadRaw(), "collector.g", nil, 11)
+
+				cc.BeginCycle()
+				cc.CommitCycleSuccess()
+				mustNoValue(t, s.ReadRaw(), "collector.g", nil)
+			},
+		},
+		"max-series cap evicts oldest series deterministically": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				sv := collectorStoreViewForTest(t, s)
+				sv.core.retention = collectorRetentionPolicy{
+					expireAfterSuccessCycles: 0,
+					maxSeries:                2,
+				}
+				cc := cycleController(t, s)
+				m := s.Write().SnapshotMeter("collector")
+				g := m.Gauge("g")
+				lsa := m.LabelSet(Label{Key: "id", Value: "a"})
+				lsb := m.LabelSet(Label{Key: "id", Value: "b"})
+				lsc := m.LabelSet(Label{Key: "id", Value: "c"})
+
+				cc.BeginCycle()
+				g.Observe(1, lsa)
+				g.Observe(2, lsb)
+				cc.CommitCycleSuccess()
+
+				cc.BeginCycle()
+				g.Observe(3, lsc)
+				cc.CommitCycleSuccess()
+
+				mustNoValue(t, s.ReadRaw(), "collector.g", Labels{"id": "a"})
+				mustValue(t, s.ReadRaw(), "collector.g", Labels{"id": "b"}, 2)
+				mustValue(t, s.ReadRaw(), "collector.g", Labels{"id": "c"}, 3)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
+func collectorStoreViewForTest(t *testing.T, s CollectorStore) *storeView {
+	t.Helper()
+	v, ok := s.(*storeView)
+	if !ok {
+		t.Fatalf("unexpected collector store implementation: %T", s)
+	}
+	return v
+}
+
+func mustNoValue(t *testing.T, r Reader, name string, labels Labels) {
+	t.Helper()
+	if _, ok := r.Value(name, labels); ok {
+		t.Fatalf("expected no value for %s labels=%v", name, labels)
+	}
+}

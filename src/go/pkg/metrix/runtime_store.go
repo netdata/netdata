@@ -2,6 +2,11 @@
 
 package metrix
 
+import (
+	"sort"
+	"time"
+)
+
 type runtimeStoreView struct {
 	core    *storeCore
 	backend *runtimeStoreBackend
@@ -10,11 +15,23 @@ type runtimeStoreView struct {
 type runtimeStoreBackend struct {
 	core            *storeCore
 	summarySketches map[string]*summaryQuantileSketch
+	retention       runtimeRetentionPolicy
+	now             func() time.Time
 }
 
 type runtimeWriteView struct {
 	backend *runtimeStoreBackend
 }
+
+type runtimeRetentionPolicy struct {
+	ttl       time.Duration
+	maxSeries int
+}
+
+const (
+	defaultRuntimeRetentionTTL       = 30 * time.Minute
+	defaultRuntimeRetentionMaxSeries = 0 // disabled
+)
 
 // NewRuntimeStore creates a dedicated runtime/internal metrics store with
 // stateful-only, immediate-commit write semantics.
@@ -29,6 +46,11 @@ func NewRuntimeStore() RuntimeStore {
 
 	backend := &runtimeStoreBackend{core: core}
 	backend.summarySketches = make(map[string]*summaryQuantileSketch)
+	backend.retention = runtimeRetentionPolicy{
+		ttl:       defaultRuntimeRetentionTTL,
+		maxSeries: defaultRuntimeRetentionMaxSeries,
+	}
+	backend.now = time.Now
 	return &runtimeStoreView{
 		core:    core,
 		backend: backend,
@@ -89,10 +111,11 @@ func (r *runtimeStoreBackend) recordGaugeSet(desc *instrumentDescriptor, value S
 		panic(err)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)
-	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64) {
+	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
 		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
 		series.value = value
 		series.meta.LastSeenSuccessSeq = seq
+		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
 }
 
@@ -102,10 +125,11 @@ func (r *runtimeStoreBackend) recordGaugeAdd(desc *instrumentDescriptor, delta S
 		panic(err)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)
-	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64) {
+	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
 		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
 		series.value += delta
 		series.meta.LastSeenSuccessSeq = seq
+		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
 }
 
@@ -123,7 +147,7 @@ func (r *runtimeStoreBackend) recordCounterAdd(desc *instrumentDescriptor, delta
 		panic(err)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)
-	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64) {
+	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
 		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
 
 		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentAttemptSeq > 0
@@ -141,6 +165,7 @@ func (r *runtimeStoreBackend) recordCounterAdd(desc *instrumentDescriptor, delta
 		series.counterCurrentAttemptSeq = seq
 		series.value = series.counterCurrent
 		series.meta.LastSeenSuccessSeq = seq
+		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
 }
 
@@ -163,7 +188,7 @@ func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor,
 	}
 
 	key := makeSeriesKey(desc.name, labelsKey)
-	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64) {
+	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
 		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
 
 		if series.desc.histogram == nil || !equalHistogramBounds(series.desc.histogram.bounds, schema.bounds) {
@@ -182,6 +207,7 @@ func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor,
 		series.histogramCount++
 		series.histogramSum += value
 		series.meta.LastSeenSuccessSeq = seq
+		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
 }
 
@@ -199,7 +225,7 @@ func (r *runtimeStoreBackend) recordSummaryObserve(desc *instrumentDescriptor, v
 	}
 
 	key := makeSeriesKey(desc.name, labelsKey)
-	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64) {
+	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
 		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
 
 		series.summaryCount++
@@ -219,6 +245,7 @@ func (r *runtimeStoreBackend) recordSummaryObserve(desc *instrumentDescriptor, v
 			series.summaryQuantiles = nil
 		}
 		series.meta.LastSeenSuccessSeq = seq
+		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
 }
 
@@ -238,14 +265,15 @@ func (r *runtimeStoreBackend) recordStateSetObserve(desc *instrumentDescriptor, 
 	states := normalizeStateSetPoint(point, schema)
 
 	key := makeSeriesKey(desc.name, labelsKey)
-	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64) {
+	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
 		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
 		series.stateSetValues = cloneStateMap(states)
 		series.meta.LastSeenSuccessSeq = seq
+		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
 }
 
-func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnapshot, seq uint64)) {
+func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnapshot, seq uint64, nowUnixNano int64)) {
 	r.core.mu.Lock()
 	defer r.core.mu.Unlock()
 
@@ -260,9 +288,14 @@ func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnaps
 		next.series[k] = s
 	}
 
+	nowUnixNano := r.now().UnixNano()
 	r.core.sequence++
 	seq := r.core.sequence
-	apply(oldSnap, next, seq)
+	apply(oldSnap, next, seq, nowUnixNano)
+	evicted := applyRuntimeRetention(next.series, r.retention, nowUnixNano)
+	for _, key := range evicted {
+		delete(r.summarySketches, key)
+	}
 
 	next.collectMeta.LastAttemptSeq = seq
 	next.collectMeta.LastAttemptStatus = CollectStatusSuccess
@@ -289,6 +322,49 @@ func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name string, label
 	}
 	next.series[key] = series
 	return series
+}
+
+func applyRuntimeRetention(series map[string]*committedSeries, policy runtimeRetentionPolicy, nowUnixNano int64) []string {
+	evicted := make([]string, 0)
+
+	if policy.ttl > 0 {
+		cutoff := nowUnixNano - int64(policy.ttl)
+		for key, s := range series {
+			if s.runtimeLastSeenUnixNano <= cutoff {
+				delete(series, key)
+				evicted = append(evicted, key)
+			}
+		}
+	}
+
+	if policy.maxSeries > 0 && len(series) > policy.maxSeries {
+		type candidate struct {
+			key      string
+			lastSeen int64
+		}
+		candidates := make([]candidate, 0, len(series))
+		for key, s := range series {
+			candidates = append(candidates, candidate{
+				key:      key,
+				lastSeen: s.runtimeLastSeenUnixNano,
+			})
+		}
+		sort.Slice(candidates, func(i, j int) bool {
+			if candidates[i].lastSeen != candidates[j].lastSeen {
+				return candidates[i].lastSeen < candidates[j].lastSeen
+			}
+			return candidates[i].key < candidates[j].key
+		})
+
+		evictCount := len(series) - policy.maxSeries
+		for i := 0; i < evictCount; i++ {
+			key := candidates[i].key
+			delete(series, key)
+			evicted = append(evicted, key)
+		}
+	}
+
+	return evicted
 }
 
 var _ RuntimeStore = (*runtimeStoreView)(nil)
