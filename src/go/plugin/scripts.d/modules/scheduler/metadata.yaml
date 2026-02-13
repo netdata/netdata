@@ -7,7 +7,7 @@ modules:
       monitored_instance:
         name: scripts.d Scheduler
         link: ""
-        icon_filename: netdata.svg
+        icon_filename: netdata-logomark.svg
         categories:
           - data-collection.applications
       related_resources:

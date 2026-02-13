@@ -16,7 +16,7 @@ description: |
   groups. Parallel queue-group charts summarise depth, traffic, and backlog per naming
   prefix (first two dot-separated segments, collapsing all `SYSTEM.*` queues together), so
   high-level visibility is never lost even when detailed charts are trimmed.
-icon: ibm-mq.svg
+icon: ibm-mq.png
 categories:
   - data-collection.applications
 link: https://www.ibm.com/products/mq

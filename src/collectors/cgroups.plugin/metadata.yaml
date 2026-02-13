@@ -1130,7 +1130,7 @@ modules:
       monitored_instance:
         name: Podman Containers
         link: https://podman.io/
-        icon_filename: podman.svg
+        icon_filename: podman.png
         categories:
           - data-collection.containers-and-vms
       keywords:
@@ -1171,7 +1171,7 @@ modules:
       monitored_instance:
         name: Nomad Containers
         link: https://www.nomadproject.io/
-        icon_filename: nomad.svg
+        icon_filename: nomad.png
         categories:
           - data-collection.containers-and-vms
       keywords:
@@ -1190,7 +1190,7 @@ modules:
       monitored_instance:
         name: containerd Containers
         link: https://containerd.io/
-        icon_filename: containerd.svg
+        icon_filename: containerd.png
         categories:
           - data-collection.containers-and-vms
       keywords:
@@ -1230,7 +1230,7 @@ modules:
       monitored_instance:
         name: OpenShift Containers
         link: https://www.redhat.com/en/technologies/cloud-computing/openshift
-        icon_filename: openshift.svg
+        icon_filename: openshift.png
         categories:
           - data-collection.containers-and-vms
       keywords:
