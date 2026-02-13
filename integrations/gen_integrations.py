@@ -267,8 +267,8 @@ def load_categories():
 
     try:
         CATEGORY_VALIDATOR.validate(categories)
-    except ValidationError:
-        warn(f'Failed to validate {CATEGORIES_FILE} against the schema.', CATEGORIES_FILE)
+    except ValidationError as e:
+        warn(f'Failed to validate {CATEGORIES_FILE} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', CATEGORIES_FILE)
         sys.exit(1)
 
     return categories
@@ -288,8 +288,8 @@ def load_collectors():
 
         try:
             COLLECTOR_VALIDATOR.validate(data)
-        except ValidationError:
-            warn(f'Failed to validate {path} against the schema.', path)
+        except ValidationError as e:
+            warn(f'Failed to validate {path} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', path)
             continue
 
         for idx, item in enumerate(data['modules']):
@@ -313,8 +313,8 @@ def _load_deploy_file(file, repo):
 
     try:
         DEPLOY_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     for idx, item in enumerate(data):
@@ -349,8 +349,8 @@ def _load_exporter_file(file, repo):
 
     try:
         EXPORTER_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     if 'id' in data:
@@ -395,8 +395,8 @@ def _load_agent_notification_file(file, repo):
 
     try:
         AGENT_NOTIFICATION_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     if 'id' in data:
@@ -441,8 +441,8 @@ def _load_cloud_notification_file(file, repo):
 
     try:
         CLOUD_NOTIFICATION_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     if 'id' in data:
@@ -487,8 +487,8 @@ def _load_logs_file(file, repo):
 
     try:
         LOGS_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     if 'id' in data:
@@ -533,8 +533,8 @@ def _load_authentication_file(file, repo):
 
     try:
         AUTHENTICATION_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     if 'id' in data:

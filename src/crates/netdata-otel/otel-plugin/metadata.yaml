@@ -40,7 +40,7 @@ modules:
           mapping rules. Logs are stored in journal files for querying via the Netdata Logs tab.
       supported_platforms:
         include:
-          - description: Linux
+          - Linux
         exclude: []
       multi_instance: false
       additional_permissions:

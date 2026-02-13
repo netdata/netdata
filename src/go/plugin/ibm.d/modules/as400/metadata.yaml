@@ -166,6 +166,13 @@ modules:
       multi_instance: true
       additional_permissions:
         description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
     setup:
       prerequisites:
         list:
@@ -422,22 +429,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: mtu
-        - name: observability
-          description: These metrics refer to observability instances.
-          labels:
-            - name: path
-              description: Path identifier
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
           metrics:
-            - name: netdata.plugin_ibm.as400_query_latency
-              description: AS400 Query Latency
+            - name: netdata.plugin_ibm.as400_query_latency_fast
+              description: AS400 Query Latency (Fast Path)
               unit: ms
               chart_type: stacked
               dimensions:
-                - name: analyze_plan_cache
                 - name: count_disks
                 - name: count_http_servers
                 - name: count_network_interfaces
-                - name: count_subsystems
                 - name: detect_ibmi_version_primary
                 - name: detect_ibmi_version_fallback
                 - name: disk_instances
@@ -445,17 +448,11 @@ modules:
                 - name: disk_status
                 - name: http_server_info
                 - name: job_info
-                - name: job_queues
                 - name: memory_pools
-                - name: message_queue_aggregates
                 - name: network_connections
                 - name: network_interfaces
-                - name: output_queue_info
-                - name: plan_cache_summary
-                - name: job_queue_totals
-                - name: message_queue_totals
-                - name: output_queue_totals
                 - name: serial_number
+                - name: system_name
                 - name: system_activity
                 - name: system_model
                 - name: system_status
@@ -463,7 +460,26 @@ modules:
                 - name: temp_storage_total
                 - name: technology_refresh_level
                 - name: active_job
-                - name: other
+            - name: netdata.plugin_ibm.as400_query_latency_slow
+              description: AS400 Query Latency (Slow Path)
+              unit: ms
+              chart_type: stacked
+              dimensions:
+                - name: analyze_plan_cache
+                - name: count_subsystems
+                - name: subsystems
+                - name: message_queue_aggregates
+                - name: job_queues
+                - name: output_queue_info
+                - name: plan_cache_summary
+            - name: netdata.plugin_ibm.as400_query_latency_batch
+              description: AS400 Query Latency (Batch Path)
+              unit: ms
+              chart_type: stacked
+              dimensions:
+                - name: message_queue_totals
+                - name: job_queue_totals
+                - name: output_queue_totals
         - name: outputqueue
           description: These metrics refer to outputqueue instances.
           labels:

@@ -139,7 +139,7 @@ description: |
   Network interface metrics have a fixed internal limit of 50 instances, and HTTP server metrics are capped at 200 instances; these limits are currently not configurable.
 icon: ibm-i.svg
 categories:
-  - data-collection.infrastructure
+  - data-collection.operating-systems
 link: https://www.ibm.com/products/power-systems
 keywords:
   - ibm i

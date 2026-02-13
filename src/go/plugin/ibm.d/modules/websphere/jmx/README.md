@@ -163,12 +163,12 @@ The following options can be defined globally or per job.
 | update_every | Data collection frequency | `5` | no | 1 | - |
 | Vnode | Vnode | `` | no | - | - |
 | JMXURL | Connection settings | `` | no | - | - |
-| JMXUsername | Username for authentication | `` | no | - | - |
-| JMXPassword | Password for authentication | `` | no | - | - |
+| JMXUsername | Username | `` | no | - | - |
+| JMXPassword | Password | `` | no | - | - |
 | JMXClasspath | J m x classpath | `` | no | - | - |
 | JavaExecPath | Java exec path | `` | no | - | - |
-| JMXTimeout | Connection timeout duration in seconds | `5000000000` | no | - | - |
-| InitTimeout | Connection timeout duration in seconds | `30000000000` | no | - | - |
+| JMXTimeout | Timeout | `5000000000` | no | - | - |
+| InitTimeout | Timeout | `30000000000` | no | - | - |
 | ShutdownDelay | Shutdown delay | `100000000` | no | - | - |
 | ClusterName | Identity labels | `` | no | - | - |
 | CellName | Cell name | `` | no | - | - |
@@ -176,29 +176,29 @@ The following options can be defined globally or per job.
 | ServerName | Server name | `` | no | - | - |
 | ServerType | Server type | `` | no | - | - |
 | CollectJVMMetrics | Metric toggles | `enabled` | no | - | - |
-| CollectThreadPoolMetrics | Enable collection of thread pool metrics metrics | `enabled` | no | - | - |
-| CollectJDBCMetrics | Enable collection of j d b c metrics metrics | `enabled` | no | - | - |
-| CollectJCAMetrics | Enable collection of j c a metrics metrics | `enabled` | no | - | - |
-| CollectJMSMetrics | Enable collection of j m s metrics metrics | `enabled` | no | - | - |
-| CollectWebAppMetrics | Enable collection of web app metrics metrics | `enabled` | no | - | - |
-| CollectSessionMetrics | Enable collection of session metrics metrics | `enabled` | no | - | - |
-| CollectTransactionMetrics | Enable collection of transaction metrics metrics | `enabled` | no | - | - |
-| CollectClusterMetrics | Enable collection of cluster metrics metrics | `enabled` | no | - | - |
-| CollectServletMetrics | Enable collection of servlet metrics metrics | `enabled` | no | - | - |
-| CollectEJBMetrics | Enable collection of e j b metrics metrics | `enabled` | no | - | - |
-| CollectJDBCAdvanced | Enable collection of j d b c advanced metrics | `disabled` | no | - | - |
+| CollectThreadPoolMetrics | Collect Thread pool metrics | `enabled` | no | - | - |
+| CollectJDBCMetrics | Collect J d b c metrics | `enabled` | no | - | - |
+| CollectJCAMetrics | Collect J c a metrics | `enabled` | no | - | - |
+| CollectJMSMetrics | Collect J m s metrics | `enabled` | no | - | - |
+| CollectWebAppMetrics | Collect Web app metrics | `enabled` | no | - | - |
+| CollectSessionMetrics | Collect Session metrics | `enabled` | no | - | - |
+| CollectTransactionMetrics | Collect Transaction metrics | `enabled` | no | - | - |
+| CollectClusterMetrics | Collect Cluster metrics | `enabled` | no | - | - |
+| CollectServletMetrics | Collect Servlet metrics | `enabled` | no | - | - |
+| CollectEJBMetrics | Collect E j b metrics | `enabled` | no | - | - |
+| CollectJDBCAdvanced | Collect J d b c advanced | `disabled` | no | - | - |
 | MaxThreadPools | Cardinality guards | `50` | no | - | - |
-| MaxJDBCPools | Maximum number of j d b c pools to monitor | `50` | no | - | - |
-| MaxJCAPools | Maximum number of j c a pools to monitor | `50` | no | - | - |
-| MaxJMSDestinations | Maximum number of j m s destinations to monitor | `50` | no | - | - |
-| MaxApplications | Maximum number of applications to monitor | `100` | no | - | - |
-| MaxServlets | Maximum number of servlets to monitor | `50` | no | - | - |
-| MaxEJBs | Maximum number of e j bs to monitor | `50` | no | - | - |
+| MaxJDBCPools | Max J d b c pools | `50` | no | - | - |
+| MaxJCAPools | Max J c a pools | `50` | no | - | - |
+| MaxJMSDestinations | Max J m s destinations | `50` | no | - | - |
+| MaxApplications | Max Applications | `100` | no | - | - |
+| MaxServlets | Max Servlets | `50` | no | - | - |
+| MaxEJBs | Max E j bs | `50` | no | - | - |
 | CollectPoolsMatching | Filters | `` | no | - | - |
-| CollectJMSMatching | Enable collection of j m s matching metrics | `` | no | - | - |
-| CollectAppsMatching | Enable collection of apps matching metrics | `` | no | - | - |
-| CollectServletsMatching | Enable collection of servlets matching metrics | `` | no | - | - |
-| CollectEJBsMatching | Enable collection of e j bs matching metrics | `` | no | - | - |
+| CollectJMSMatching | Collect J m s matching | `` | no | - | - |
+| CollectAppsMatching | Collect Apps matching | `` | no | - | - |
+| CollectServletsMatching | Collect Servlets matching | `` | no | - | - |
+| CollectEJBsMatching | Collect E j bs matching | `` | no | - | - |
 | MaxRetries | Resilience tuning | `3` | no | - | - |
 | RetryBackoffMultiplier | Retry backoff multiplier | `2` | no | - | - |
 | CircuitBreakerThreshold | Circuit breaker threshold | `5` | no | - | - |
