@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const (
@@ -174,7 +174,7 @@ func (c *Collector) collectStatsMySQLConnectionPool(mx map[string]int64) error {
 			px = "backend_" + backendID(hg, host, port) + "_"
 		case "status":
 			for _, st := range statuses {
-				mx[px+"status_"+st] = metrix.Bool(value == st)
+				mx[px+"status_"+st] = oldmetrix.Bool(value == st)
 			}
 			hgStatusCounts[hg][value]++
 		default:

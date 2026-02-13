@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package metrix
+package oldmetrix
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/stm"

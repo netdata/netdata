@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -98,8 +98,8 @@ func (c *Collector) collectHealthz(mx map[string]int64) error {
 		return fmt.Errorf("healthz response missing status")
 	}
 
-	mx["varz_srv_healthz_status_ok"] = metrix.Bool(*resp.Status == "ok")
-	mx["varz_srv_healthz_status_error"] = metrix.Bool(*resp.Status != "ok")
+	mx["varz_srv_healthz_status_ok"] = oldmetrix.Bool(*resp.Status == "ok")
+	mx["varz_srv_healthz_status_error"] = oldmetrix.Bool(*resp.Status != "ok")
 
 	return nil
 }
@@ -278,8 +278,8 @@ func (c *Collector) collectJsz(mx map[string]int64) error {
 		return err
 	}
 
-	mx["jsz_disabled"] = metrix.Bool(resp.Disabled)
-	mx["jsz_enabled"] = metrix.Bool(!resp.Disabled)
+	mx["jsz_disabled"] = oldmetrix.Bool(resp.Disabled)
+	mx["jsz_enabled"] = oldmetrix.Bool(!resp.Disabled)
 	mx["jsz_streams"] = int64(resp.Streams)
 	mx["jsz_consumers"] = int64(resp.Consumers)
 	mx["jsz_bytes"] = int64(resp.Bytes)

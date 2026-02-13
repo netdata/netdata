@@ -14,7 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const precision = 1000
@@ -150,25 +150,25 @@ func (c *Collector) collectPodsState(mx map[string]int64) {
 			ns.stats.podsCondPodScheduled += condStatusToInt(ps.condPodScheduled)
 			ns.stats.podsCondPodInitialized += condStatusToInt(ps.condPodInitialized)
 			ns.stats.podsCondContainersReady += condStatusToInt(ps.condContainersReady)
-			ns.stats.podsReadinessReady += metrix.Bool(ps.condPodReady == corev1.ConditionTrue)
-			ns.stats.podsReadinessUnready += metrix.Bool(ps.condPodReady != corev1.ConditionTrue)
-			ns.stats.podsPhasePending += metrix.Bool(ps.phase == corev1.PodPending)
-			ns.stats.podsPhaseRunning += metrix.Bool(ps.phase == corev1.PodRunning)
-			ns.stats.podsPhaseSucceeded += metrix.Bool(ps.phase == corev1.PodSucceeded)
-			ns.stats.podsPhaseFailed += metrix.Bool(ps.phase == corev1.PodFailed)
+			ns.stats.podsReadinessReady += oldmetrix.Bool(ps.condPodReady == corev1.ConditionTrue)
+			ns.stats.podsReadinessUnready += oldmetrix.Bool(ps.condPodReady != corev1.ConditionTrue)
+			ns.stats.podsPhasePending += oldmetrix.Bool(ps.phase == corev1.PodPending)
+			ns.stats.podsPhaseRunning += oldmetrix.Bool(ps.phase == corev1.PodRunning)
+			ns.stats.podsPhaseSucceeded += oldmetrix.Bool(ps.phase == corev1.PodSucceeded)
+			ns.stats.podsPhaseFailed += oldmetrix.Bool(ps.phase == corev1.PodFailed)
 
 			for _, cs := range ps.initContainers {
 				ns.stats.initContainers++
-				ns.stats.initContStateRunning += metrix.Bool(cs.stateRunning)
-				ns.stats.initContStateWaiting += metrix.Bool(cs.stateWaiting)
-				ns.stats.initContStateTerminated += metrix.Bool(cs.stateTerminated)
+				ns.stats.initContStateRunning += oldmetrix.Bool(cs.stateRunning)
+				ns.stats.initContStateWaiting += oldmetrix.Bool(cs.stateWaiting)
+				ns.stats.initContStateTerminated += oldmetrix.Bool(cs.stateTerminated)
 			}
 
 			for _, cs := range ps.containers {
 				ns.stats.containers++
-				ns.stats.contStateRunning += metrix.Bool(cs.stateRunning)
-				ns.stats.contStateWaiting += metrix.Bool(cs.stateWaiting)
-				ns.stats.contStateTerminated += metrix.Bool(cs.stateTerminated)
+				ns.stats.contStateRunning += oldmetrix.Bool(cs.stateRunning)
+				ns.stats.contStateWaiting += oldmetrix.Bool(cs.stateWaiting)
+				ns.stats.contStateTerminated += oldmetrix.Bool(cs.stateTerminated)
 			}
 		}
 
@@ -178,10 +178,10 @@ func (c *Collector) collectPodsState(mx map[string]int64) {
 		mx[px+"cond_podscheduled"] = condStatusToInt(ps.condPodScheduled)
 		mx[px+"cond_podinitialized"] = condStatusToInt(ps.condPodInitialized)
 		mx[px+"cond_containersready"] = condStatusToInt(ps.condContainersReady)
-		mx[px+"phase_running"] = metrix.Bool(ps.phase == corev1.PodRunning)
-		mx[px+"phase_failed"] = metrix.Bool(ps.phase == corev1.PodFailed)
-		mx[px+"phase_succeeded"] = metrix.Bool(ps.phase == corev1.PodSucceeded)
-		mx[px+"phase_pending"] = metrix.Bool(ps.phase == corev1.PodPending)
+		mx[px+"phase_running"] = oldmetrix.Bool(ps.phase == corev1.PodRunning)
+		mx[px+"phase_failed"] = oldmetrix.Bool(ps.phase == corev1.PodFailed)
+		mx[px+"phase_succeeded"] = oldmetrix.Bool(ps.phase == corev1.PodSucceeded)
+		mx[px+"phase_pending"] = oldmetrix.Bool(ps.phase == corev1.PodPending)
 		mx[px+"age"] = int64(now.Sub(ps.creationTime).Seconds())
 
 		for _, v := range podStatusReasons {
@@ -207,9 +207,9 @@ func (c *Collector) collectPodsState(mx map[string]int64) {
 		mx[px+"init_containers_state_terminated"] = 0
 
 		for _, cs := range ps.initContainers {
-			mx[px+"init_containers_state_running"] += metrix.Bool(cs.stateRunning)
-			mx[px+"init_containers_state_waiting"] += metrix.Bool(cs.stateWaiting)
-			mx[px+"init_containers_state_terminated"] += metrix.Bool(cs.stateTerminated)
+			mx[px+"init_containers_state_running"] += oldmetrix.Bool(cs.stateRunning)
+			mx[px+"init_containers_state_waiting"] += oldmetrix.Bool(cs.stateWaiting)
+			mx[px+"init_containers_state_terminated"] += oldmetrix.Bool(cs.stateTerminated)
 		}
 		mx[px+"containers_state_running"] = 0
 		mx[px+"containers_state_waiting"] = 0
@@ -220,15 +220,15 @@ func (c *Collector) collectPodsState(mx map[string]int64) {
 				cs.new = false
 				c.addContainerCharts(ps, cs)
 			}
-			mx[px+"containers_state_running"] += metrix.Bool(cs.stateRunning)
-			mx[px+"containers_state_waiting"] += metrix.Bool(cs.stateWaiting)
-			mx[px+"containers_state_terminated"] += metrix.Bool(cs.stateTerminated)
+			mx[px+"containers_state_running"] += oldmetrix.Bool(cs.stateRunning)
+			mx[px+"containers_state_waiting"] += oldmetrix.Bool(cs.stateWaiting)
+			mx[px+"containers_state_terminated"] += oldmetrix.Bool(cs.stateTerminated)
 
 			ppx := fmt.Sprintf("%scontainer_%s_", px, cs.name)
-			mx[ppx+"state_running"] = metrix.Bool(cs.stateRunning)
-			mx[ppx+"state_waiting"] = metrix.Bool(cs.stateWaiting)
-			mx[ppx+"state_terminated"] = metrix.Bool(cs.stateTerminated)
-			mx[ppx+"readiness"] = metrix.Bool(cs.ready)
+			mx[ppx+"state_running"] = oldmetrix.Bool(cs.stateRunning)
+			mx[ppx+"state_waiting"] = oldmetrix.Bool(cs.stateWaiting)
+			mx[ppx+"state_terminated"] = oldmetrix.Bool(cs.stateTerminated)
+			mx[ppx+"readiness"] = oldmetrix.Bool(cs.ready)
 			mx[ppx+"restarts"] = cs.restarts
 
 			for _, v := range containerWaitingStateReasons {
@@ -290,8 +290,8 @@ func (c *Collector) collectNodesState(mx map[string]int64) {
 		mx[px+"pods_cond_podinitialized"] = ns.stats.podsCondPodInitialized
 		mx[px+"pods_cond_containersready"] = ns.stats.podsCondContainersReady
 		mx[px+"pods_cond_containersready"] = ns.stats.podsCondContainersReady
-		mx[px+"schedulability_schedulable"] = metrix.Bool(!ns.unSchedulable)
-		mx[px+"schedulability_unschedulable"] = metrix.Bool(ns.unSchedulable)
+		mx[px+"schedulability_schedulable"] = oldmetrix.Bool(!ns.unSchedulable)
+		mx[px+"schedulability_unschedulable"] = oldmetrix.Bool(ns.unSchedulable)
 		mx[px+"alloc_pods_available"] = ns.allocatablePods - ns.stats.pods
 		mx[px+"alloc_pods_allocated"] = ns.stats.pods
 		mx[px+"alloc_cpu_requests_util"] = calcPercentage(ns.stats.reqCPU, ns.allocatableCPU)
@@ -339,7 +339,7 @@ func (c *Collector) collectDeploymentState(mx map[string]int64) {
 		mx[px+"condition_replica_failure"] = 0
 
 		for _, cond := range ds.conditions {
-			v := metrix.Bool(cond.Status == corev1.ConditionTrue)
+			v := oldmetrix.Bool(cond.Status == corev1.ConditionTrue)
 			switch cond.Type {
 			case appsv1.DeploymentAvailable:
 				// https://github.com/kubernetes/kubernetes/blob/2b3da7dfc846fec7c4044a320f8f38b4a45367a3/pkg/controller/deployment/sync.go#L518-L525
@@ -388,8 +388,8 @@ func (c *Collector) collectCronJobState(mx map[string]int64) {
 		mx[px+"complete_jobs"] = 0
 		mx[px+"suspended_jobs"] = 0
 
-		mx[px+"suspend_status_enabled"] = metrix.Bool(!st.suspend)
-		mx[px+"suspend_status_suspended"] = metrix.Bool(st.suspend)
+		mx[px+"suspend_status_enabled"] = oldmetrix.Bool(!st.suspend)
+		mx[px+"suspend_status_suspended"] = oldmetrix.Bool(st.suspend)
 
 		mx[px+"failed_jobs_reason_pod_failure_policy"] = 0
 		mx[px+"failed_jobs_reason_backoff_limit_exceeded"] = 0
@@ -431,9 +431,9 @@ func (c *Collector) collectCronJobState(mx map[string]int64) {
 					}
 				case batchv1.JobFailed:
 					mx[px+"failed_jobs"]++
-					mx[px+"failed_jobs_reason_pod_failure_policy"] += metrix.Bool(cond.Reason == batchv1.JobReasonPodFailurePolicy)
-					mx[px+"failed_jobs_reason_backoff_limit_exceeded"] += metrix.Bool(cond.Reason == batchv1.JobReasonBackoffLimitExceeded)
-					mx[px+"failed_jobs_reason_deadline_exceeded"] += metrix.Bool(cond.Reason == batchv1.JobReasonDeadlineExceeded)
+					mx[px+"failed_jobs_reason_pod_failure_policy"] += oldmetrix.Bool(cond.Reason == batchv1.JobReasonPodFailurePolicy)
+					mx[px+"failed_jobs_reason_backoff_limit_exceeded"] += oldmetrix.Bool(cond.Reason == batchv1.JobReasonBackoffLimitExceeded)
+					mx[px+"failed_jobs_reason_deadline_exceeded"] += oldmetrix.Bool(cond.Reason == batchv1.JobReasonDeadlineExceeded)
 					if cond.LastTransitionTime.Time.After(lastExecutedEndTime) {
 						lastExecutedEndTime = cond.LastTransitionTime.Time
 						mx[px+"last_execution_status_succeeded"] = 0
@@ -450,7 +450,7 @@ func (c *Collector) collectCronJobState(mx map[string]int64) {
 }
 
 func condStatusToInt(cs corev1.ConditionStatus) int64 {
-	return metrix.Bool(cs == corev1.ConditionTrue)
+	return oldmetrix.Bool(cs == corev1.ConditionTrue)
 }
 
 func calcPercentage(value, total int64) int64 {

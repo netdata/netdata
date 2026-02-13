@@ -16,7 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 //go:embed "config_schema.json"
@@ -53,7 +53,7 @@ func New() *Collector {
 
 		addAOFChartsOnce:       &sync.Once{},
 		addReplSlaveChartsOnce: &sync.Once{},
-		pingSummary:            metrix.NewSummary(),
+		pingSummary:            oldmetrix.NewSummary(),
 		collectedCommands:      make(map[string]bool),
 		collectedDbs:           make(map[string]bool),
 	}
@@ -113,7 +113,7 @@ type (
 
 		server            string
 		version           *semver.Version
-		pingSummary       metrix.Summary
+		pingSummary       oldmetrix.Summary
 		collectedCommands map[string]bool
 		collectedDbs      map[string]bool
 	}

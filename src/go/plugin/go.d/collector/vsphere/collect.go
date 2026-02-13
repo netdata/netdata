@@ -8,7 +8,7 @@ import (
 	"time"
 
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 
 	"github.com/vmware/govmomi/performance"
 )
@@ -79,7 +79,7 @@ func writeHostMetrics(mx map[string]int64, host *rs.Host, metrics []performance.
 	}
 	for _, v := range overallStatuses {
 		key := fmt.Sprintf("%s_overall.status.%s", host.ID, v)
-		mx[key] = metrix.Bool(host.OverallStatus == v)
+		mx[key] = oldmetrix.Bool(host.OverallStatus == v)
 	}
 }
 
@@ -121,6 +121,6 @@ func writeVMMetrics(mx map[string]int64, vm *rs.VM, metrics []performance.Metric
 	}
 	for _, v := range overallStatuses {
 		key := fmt.Sprintf("%s_overall.status.%s", vm.ID, v)
-		mx[key] = metrix.Bool(vm.OverallStatus == v)
+		mx[key] = oldmetrix.Bool(vm.OverallStatus == v)
 	}
 }
