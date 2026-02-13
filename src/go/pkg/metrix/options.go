@@ -17,10 +17,12 @@ type instrumentConfig struct {
 	windowSet bool
 	window    MetricWindow
 
-	histogramBounds []float64
-	summaryQuantile []float64
-	states          []string
-	stateSetMode    *StateSetMode
+	histogramBounds     []float64
+	summaryQuantile     []float64
+	summaryReservoirSet bool
+	summaryReservoir    int
+	states              []string
+	stateSetMode        *StateSetMode
 }
 
 func WithFreshness(policy FreshnessPolicy) InstrumentOption {
@@ -46,6 +48,15 @@ func WithHistogramBounds(bounds ...float64) InstrumentOption {
 func WithSummaryQuantiles(qs ...float64) InstrumentOption {
 	return optionFunc(func(cfg *instrumentConfig) {
 		cfg.summaryQuantile = append([]float64(nil), qs...)
+	})
+}
+
+// WithSummaryReservoirSize sets the bounded sample size used for stateful summary quantile estimation.
+// Valid only for stateful summaries.
+func WithSummaryReservoirSize(size int) InstrumentOption {
+	return optionFunc(func(cfg *instrumentConfig) {
+		cfg.summaryReservoirSet = true
+		cfg.summaryReservoir = size
 	})
 }
 
