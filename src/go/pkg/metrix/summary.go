@@ -152,7 +152,7 @@ func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, value Sampl
 			}
 		}
 		if len(desc.summaryQuantiles()) > 0 && entry.sketch == nil {
-			entry.sketch = newSummaryQuantileSketch(defaultSummaryReservoirSize, summarySketchSeed(key))
+			entry.sketch = newSummaryQuantileSketch(desc.summaryReservoirSize(), summarySketchSeed(key))
 		}
 		c.active.summaries[key] = entry
 	}
@@ -233,6 +233,13 @@ func (d *instrumentDescriptor) summaryQuantiles() []float64 {
 		return nil
 	}
 	return d.summary.quantiles
+}
+
+func (d *instrumentDescriptor) summaryReservoirSize() int {
+	if d == nil || d.summary == nil || d.summary.reservoirSize <= 0 {
+		return defaultSummaryReservoirSize
+	}
+	return d.summary.reservoirSize
 }
 
 // summaryQuantileSketch keeps bounded-memory approximate quantiles.

@@ -179,6 +179,41 @@ func TestSummaryStoreScenarios(t *testing.T) {
 				})
 			},
 		},
+		"summary reservoir option validation and custom size": {
+			run: func(t *testing.T) {
+				s := NewStore()
+				cc := cycleController(t, s)
+
+				expectPanic(t, func() {
+					_ = s.Write().SnapshotMeter("svc").Summary("latency", WithSummaryReservoirSize(128))
+				})
+				expectPanic(t, func() {
+					_ = s.Write().StatefulMeter("svc").Summary("latency_bad", WithSummaryQuantiles(0.9), WithSummaryReservoirSize(0))
+				})
+
+				sum := s.Write().StatefulMeter("svc").Summary(
+					"latency_small_reservoir",
+					WithSummaryQuantiles(0.5),
+					WithSummaryReservoirSize(8),
+				)
+				cc.BeginCycle()
+				for i := 0; i < 100; i++ {
+					sum.Observe(SampleValue(i))
+				}
+				cc.CommitCycleSuccess()
+
+				p, ok := s.Read().Summary("svc.latency_small_reservoir", nil)
+				if !ok {
+					t.Fatalf("expected summary for custom reservoir series")
+				}
+				if p.Count != 100 {
+					t.Fatalf("unexpected count: got=%v want=100", p.Count)
+				}
+				if len(p.Quantiles) != 1 || math.IsNaN(p.Quantiles[0].Value) {
+					t.Fatalf("expected non-NaN quantile value with custom reservoir")
+				}
+			},
+		},
 		"summary flatten quantile label collision panics": {
 			run: func(t *testing.T) {
 				s := NewStore()

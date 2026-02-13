@@ -43,7 +43,8 @@ type histogramSchema struct {
 }
 
 type summarySchema struct {
-	quantiles []float64
+	quantiles     []float64
+	reservoirSize int
 }
 
 type stateSetSchema struct {
@@ -419,6 +420,9 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 	if len(cfg.summaryQuantile) > 0 && kind != kindSummary {
 		return nil, fmt.Errorf("metrix: summary quantiles are invalid for this instrument kind")
 	}
+	if cfg.summaryReservoirSet && !(kind == kindSummary && mode == modeStateful) {
+		return nil, fmt.Errorf("metrix: summary reservoir size is valid only for stateful summaries")
+	}
 	if (len(cfg.states) > 0 || cfg.stateSetMode != nil) && kind != kindStateSet {
 		return nil, fmt.Errorf("metrix: stateset options are invalid for this instrument kind")
 	}
@@ -571,14 +575,28 @@ func buildHistogramSchema(cfg instrumentConfig, mode metricMode) (*histogramSche
 }
 
 func buildSummarySchema(cfg instrumentConfig) (*summarySchema, error) {
+	if cfg.summaryReservoirSet && cfg.summaryReservoir <= 0 {
+		return nil, fmt.Errorf("metrix: summary reservoir size must be > 0")
+	}
+
 	qs, err := normalizeSummaryQuantiles(cfg.summaryQuantile)
 	if err != nil {
 		return nil, err
 	}
+
 	if len(qs) == 0 {
 		return nil, nil
 	}
-	return &summarySchema{quantiles: qs}, nil
+
+	size := defaultSummaryReservoirSize
+	if cfg.summaryReservoirSet {
+		size = cfg.summaryReservoir
+	}
+
+	return &summarySchema{
+		quantiles:     qs,
+		reservoirSize: size,
+	}, nil
 }
 
 func buildStateSetSchema(cfg instrumentConfig) (*stateSetSchema, error) {
@@ -637,7 +655,7 @@ func equalSummarySchema(a, b *summarySchema) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
-	if len(a.quantiles) != len(b.quantiles) {
+	if a.reservoirSize != b.reservoirSize || len(a.quantiles) != len(b.quantiles) {
 		return false
 	}
 	for i := range a.quantiles {
