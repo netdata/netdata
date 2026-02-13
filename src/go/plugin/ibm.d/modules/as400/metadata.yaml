@@ -9,7 +9,7 @@ modules:
         link: https://www.ibm.com/products/power-systems
         categories:
           - data-collection.operating-systems
-        icon_filename: "ibm-i.svg"
+        icon_filename: "ibm-i.png"
       related_resources:
         integrations:
           list: []

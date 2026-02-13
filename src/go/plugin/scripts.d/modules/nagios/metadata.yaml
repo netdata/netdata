@@ -7,7 +7,7 @@ modules:
       monitored_instance:
         name: Nagios Plugins
         link: https://www.nagios-plugins.org/
-        icon_filename: nagios.svg
+        icon_filename: nagios.png
         categories:
           - data-collection.synthetic-testing
       related_resources:

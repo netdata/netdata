@@ -512,7 +512,7 @@ modules:
       monitored_instance:
         name: ScyllaDB
         link: https://www.scylladb.com/
-        icon_filename: scylladb.png
+        icon_filename: scylladb.svg
         categories:
           - data-collection.databases
       keywords: [ ]
@@ -3150,7 +3150,7 @@ modules:
       monitored_instance:
         name: Keepalived
         link: https://github.com/gen2brain/keepalived_exporter
-        icon_filename: keepalived.png
+        icon_filename: Keepalived.png
         categories:
           - data-collection.networking
       keywords: [ ]

@@ -452,7 +452,7 @@
     <<: *meta
     name: GreptimeDB
     link: https://greptime.com/product/db
-    icon_filename: 'greptimedb.png'
+    icon_filename: 'greptimedb.svg'
     keywords:
       - export
       - GreptimeDB

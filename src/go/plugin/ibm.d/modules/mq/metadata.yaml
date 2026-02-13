@@ -9,7 +9,7 @@ modules:
         link: https://www.ibm.com/products/mq
         categories:
           - data-collection.applications
-        icon_filename: "ibm-mq.svg"
+        icon_filename: "ibm-mq.png"
       related_resources:
         integrations:
           list: []
