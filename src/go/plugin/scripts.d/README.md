@@ -119,14 +119,14 @@ etc.) keep separate time-series across restarts.
 Netdata stores integers, so scripts.d.plugin normalizes perfdata to base units
 before emitting metrics:
 
-| Input unit                    | Canonical unit | Scaling behaviour                                |
-|------------------------------|----------------|---------------------------------------------------|
-| Bytes, KB, MB, GB, TB        | bytes          | Converted to raw bytes, divider = 1               |
-| Bytes per second (KB/s …)    | bytes/s        | Converted to bytes/s, divider = 1                 |
-| Seconds, ms, µs, ns          | seconds        | Stored as nanoseconds, divider = 1 000 000 000    |
-| Percent (`%`)                | %              | Value ×1000, divider = 1000                       |
-| Counters (`c`)               | c              | Stored as-is                                      |
-| Any other unit or unitless   | original text  | Value ×1000, divider = 1000                       |
+| Input unit                 | Canonical unit | Scaling behaviour                              |
+|----------------------------|----------------|------------------------------------------------|
+| Bytes, KB, MB, GB, TB      | bytes          | Converted to raw bytes, divider = 1            |
+| Bytes per second (KB/s …)  | bytes/s        | Converted to bytes/s, divider = 1              |
+| Seconds, ms, µs, ns        | seconds        | Stored as nanoseconds, divider = 1 000 000 000 |
+| Percent (`%`)              | %              | Value ×1000, divider = 1000                    |
+| Counters (`c`)             | c              | Stored as-is                                   |
+| Any other unit or unitless | original text  | Value ×1000, divider = 1000                    |
 
 When a plugin flips between `KB` and `MB` (or `ms` and `s`) the collector still
 publishes a single chart in base units, so there are no spurious RRD resets. If
@@ -143,9 +143,7 @@ track the configured intervals; spikes indicate the executor is falling behind
 
 Jobs follow the same cadence controls as go.d collectors: set `update_every`
 (seconds) inside each job definition to run faster or slower than the default
-60 s interval. When omitted, scripts.d picks a conservative default (currently
-60 s). This field applies to both Nagios and Zabbix jobs so you can mirror your
-existing polling schedules.
+60 s interval. When omitted, scripts.d picks a conservative default (currently 60 s).
 
 ### Logging over OTLP (TLS support)
 
@@ -162,22 +160,6 @@ Structured logs are forwarded to OTEL via `logging.otlp`. Besides `endpoint`,
 When `tls` is `true`, the plugin always establishes a TLS 1.2 connection using
 these settings. Set `tls: false` only for loopback collectors or other trusted
 plaintext networks.
-
-### LLD lifecycle
-
-Zabbix-style jobs keep their LLD catalogs and missing-instance counters in
-memory. Restarting the agent or reloading the plugin resets that state, mirroring
-how go.d collectors reset transient discovery data. If you need longer retention,
-keep the plugin running continuously; no on-disk cache is maintained.
-
-### Zabbix preprocessing
-
-Dependent pipelines share the same `.steps` schema as the standalone
-`zabbix-preproc` library. Step `type` accepts human-readable tokens such as
-`jsonpath`, `csv_to_json`, or `snmp_walk_value`. The optional `error_handler`
-field understands the native Zabbix actions: `default`, `discard`, `set-value`,
-and `set-error`. When you choose `set-value` or `set-error` provide the fallback
-text via `error_handler_params`.
 
 ### Mock integration tests
 

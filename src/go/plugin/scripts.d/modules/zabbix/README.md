@@ -1,1 +1,0 @@
-integrations/zabbix_preprocessing.md
