@@ -471,7 +471,6 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Vault PKI](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/vault_pki.md) | Monitor HashiCorp Vault Public Key Infrastructure (PKI) metrics for efficient certificate management and security. |
 | [VSCode](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/vscode.md) | Track Visual Studio Code editor metrics for efficient development environment management and performance. |
 | [YOURLS URL Shortener](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/yourls_url_shortener.md) | Monitor YOURLS (Your Own URL Shortener) metrics for efficient URL shortening service management and performance. |
-| [Zabbix Preprocessing](https://github.com/netdata/netdata/blob/master/src/go/plugin/scripts.d/modules/zabbix/integrations/zabbix_preprocessing.md) | This module runs Zabbix-style data collection jobs natively inside Netdata. |
 | [ZooKeeper](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/zookeeper/integrations/zookeeper.md) | It connects to the Zookeeper instance via a TCP and executes the following commands: |
 
 ### Storage and Filesystems
