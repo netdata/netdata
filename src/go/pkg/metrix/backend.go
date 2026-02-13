@@ -12,6 +12,8 @@ type meterBackend interface {
 	recordGaugeAdd(desc *instrumentDescriptor, delta SampleValue, sets []LabelSet)
 	recordCounterObserveTotal(desc *instrumentDescriptor, value SampleValue, sets []LabelSet)
 	recordCounterAdd(desc *instrumentDescriptor, delta SampleValue, sets []LabelSet)
+	recordHistogramObservePoint(desc *instrumentDescriptor, point HistogramPoint, sets []LabelSet)
+	recordHistogramObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet)
 	recordStateSetObserve(desc *instrumentDescriptor, point StateSetPoint, sets []LabelSet)
 }
 
