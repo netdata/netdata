@@ -61,6 +61,10 @@ type committedSeries struct {
 	labelsKey string
 	desc      *instrumentDescriptor
 	value     SampleValue // last committed sample value
+	// Internal successful-cycle clock used only for retention aging.
+	lastSeenSuccessCycle uint64
+	// Internal runtime clock (unix nanos) used only by runtime retention.
+	runtimeLastSeenUnixNano int64
 
 	// Counter two-sample state (used by Delta()).
 	counterCurrent            SampleValue
@@ -105,11 +109,23 @@ type storeCore struct {
 	mu sync.RWMutex
 
 	sequence    uint64
+	successSeq  uint64
 	active      *cycleFrame
 	instruments map[string]*instrumentDescriptor // metric name => descriptor (mode/kind locked)
+	retention   collectorRetentionPolicy
 
 	snapshot atomic.Pointer[readSnapshot] // atomically swapped immutable read view
 }
+
+type collectorRetentionPolicy struct {
+	expireAfterSuccessCycles uint64
+	maxSeries                int
+}
+
+const (
+	defaultCollectorExpireAfterSuccessCycles uint64 = 10
+	defaultCollectorMaxSeries                       = 0 // disabled
+)
 
 type storeView struct {
 	core *storeCore
@@ -127,6 +143,10 @@ type storeCycleController struct {
 func NewCollectorStore() CollectorStore {
 	core := &storeCore{
 		instruments: make(map[string]*instrumentDescriptor),
+		retention: collectorRetentionPolicy{
+			expireAfterSuccessCycles: defaultCollectorExpireAfterSuccessCycles,
+			maxSeries:                defaultCollectorMaxSeries,
+		},
 	}
 	core.snapshot.Store(&readSnapshot{
 		collectMeta: CollectMeta{LastAttemptStatus: CollectStatusUnknown},
@@ -207,6 +227,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	oldSnap := c.core.snapshot.Load()
+	successSeq := c.core.successSeq + 1
 	next := &readSnapshot{
 		collectMeta: oldSnap.collectMeta,
 		series:      make(map[string]*committedSeries, len(oldSnap.series)),
@@ -232,6 +253,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		}
 		series.value = staged.value
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
+		series.lastSeenSuccessCycle = successSeq
 	}
 
 	for key, staged := range c.core.active.counters {
@@ -263,6 +285,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		series.counterCurrentAttemptSeq = c.core.active.seq
 		series.value = staged.current // Value() for counters returns current total.
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
+		series.lastSeenSuccessCycle = successSeq
 	}
 
 	for key, staged := range c.core.active.histograms {
@@ -289,6 +312,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		series.histogramSum = staged.sum
 		series.histogramCumulative = append(series.histogramCumulative[:0], staged.cumulative...)
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
+		series.lastSeenSuccessCycle = successSeq
 	}
 
 	for key, staged := range c.core.active.summaries {
@@ -327,6 +351,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 			series.summarySketch = nil
 		}
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
+		series.lastSeenSuccessCycle = successSeq
 	}
 
 	for key, staged := range c.core.active.stateSet {
@@ -345,14 +370,17 @@ func (c *storeCycleController) CommitCycleSuccess() {
 
 		series.stateSetValues = cloneStateMap(staged.states)
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
+		series.lastSeenSuccessCycle = successSeq
 	}
 
+	applyCollectorRetention(next.series, c.core.retention, successSeq)
 	next.collectMeta.LastAttemptSeq = c.core.active.seq
 	next.collectMeta.LastAttemptStatus = CollectStatusSuccess
 	next.collectMeta.LastSuccessSeq = c.core.active.seq
 	next.byName = buildByName(next.series)
 
 	c.core.snapshot.Store(next)
+	c.core.successSeq = successSeq
 	c.core.active = nil
 }
 
@@ -394,6 +422,45 @@ func buildByName(series map[string]*committedSeries) map[string][]*committedSeri
 		})
 	}
 	return byName
+}
+
+func applyCollectorRetention(series map[string]*committedSeries, policy collectorRetentionPolicy, successSeq uint64) {
+	if policy.expireAfterSuccessCycles > 0 {
+		for key, s := range series {
+			seen := s.lastSeenSuccessCycle
+			if seen == 0 || successSeq < seen {
+				continue
+			}
+			if successSeq-seen >= policy.expireAfterSuccessCycles {
+				delete(series, key)
+			}
+		}
+	}
+
+	if policy.maxSeries > 0 && len(series) > policy.maxSeries {
+		type candidate struct {
+			key      string
+			lastSeen uint64
+		}
+		candidates := make([]candidate, 0, len(series))
+		for key, s := range series {
+			candidates = append(candidates, candidate{
+				key:      key,
+				lastSeen: s.lastSeenSuccessCycle,
+			})
+		}
+		sort.Slice(candidates, func(i, j int) bool {
+			if candidates[i].lastSeen != candidates[j].lastSeen {
+				return candidates[i].lastSeen < candidates[j].lastSeen
+			}
+			return candidates[i].key < candidates[j].key
+		})
+
+		evictCount := len(series) - policy.maxSeries
+		for i := 0; i < evictCount; i++ {
+			delete(series, candidates[i].key)
+		}
+	}
 }
 
 func defaultFreshness(mode metricMode) FreshnessPolicy {

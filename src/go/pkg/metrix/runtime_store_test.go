@@ -6,6 +6,7 @@ import (
 	"math"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestRuntimeStoreScenarios(t *testing.T) {
@@ -136,9 +137,72 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				mustValue(t, s.Read(), "runtime.events_total", nil, workers*perWorker)
 			},
 		},
+		"runtime wall-clock retention evicts stale series": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				view := runtimeStoreViewForTest(t, s)
+				now := time.Unix(1_700_000_000, 0)
+				view.backend.now = func() time.Time { return now }
+				view.backend.retention = runtimeRetentionPolicy{
+					ttl:       5 * time.Second,
+					maxSeries: 0,
+				}
+
+				m := s.Write().StatefulMeter("runtime")
+				g := m.Gauge("queue_depth")
+				lsa := m.LabelSet(Label{Key: "id", Value: "a"})
+				lsb := m.LabelSet(Label{Key: "id", Value: "b"})
+
+				g.Set(10, lsa)
+				now = now.Add(2 * time.Second)
+				g.Set(20, lsb)
+				mustValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "a"}, 10)
+				mustValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "b"}, 20)
+
+				now = now.Add(4 * time.Second)
+				g.Set(21, lsb) // triggers retention sweep
+				mustNoValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "a"})
+				mustValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "b"}, 21)
+			},
+		},
+		"runtime max-series cap evicts oldest series deterministically": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				view := runtimeStoreViewForTest(t, s)
+				now := time.Unix(1_700_000_000, 0)
+				view.backend.now = func() time.Time { return now }
+				view.backend.retention = runtimeRetentionPolicy{
+					ttl:       0,
+					maxSeries: 2,
+				}
+
+				m := s.Write().StatefulMeter("runtime")
+				g := m.Gauge("queue_depth")
+				lsa := m.LabelSet(Label{Key: "id", Value: "a"})
+				lsb := m.LabelSet(Label{Key: "id", Value: "b"})
+				lsc := m.LabelSet(Label{Key: "id", Value: "c"})
+
+				g.Set(10, lsa)
+				g.Set(20, lsb)
+				g.Set(30, lsc)
+
+				mustNoValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "a"})
+				mustValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "b"}, 20)
+				mustValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "c"}, 30)
+			},
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, tc.run)
 	}
+}
+
+func runtimeStoreViewForTest(t *testing.T, s RuntimeStore) *runtimeStoreView {
+	t.Helper()
+	v, ok := s.(*runtimeStoreView)
+	if !ok {
+		t.Fatalf("unexpected runtime store implementation: %T", s)
+	}
+	return v
 }
