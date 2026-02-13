@@ -12,7 +12,7 @@ endmeta-->
 # containerd Containers
 
 
-<img src="https://netdata.cloud/img/containerd.svg" width="150"/>
+<img src="https://netdata.cloud/img/containerd.png" width="150"/>
 
 
 Plugin: cgroups.plugin

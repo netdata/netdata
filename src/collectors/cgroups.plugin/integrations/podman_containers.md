@@ -12,7 +12,7 @@ endmeta-->
 # Podman Containers
 
 
-<img src="https://netdata.cloud/img/podman.svg" width="150"/>
+<img src="https://netdata.cloud/img/podman.png" width="150"/>
 
 
 Plugin: cgroups.plugin

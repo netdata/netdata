@@ -11,7 +11,7 @@ endmeta-->
 # Keepalived
 
 
-<img src="https://netdata.cloud/img/keepalived.png" width="150"/>
+<img src="https://netdata.cloud/img/Keepalived.png" width="150"/>
 
 
 Plugin: go.d.plugin

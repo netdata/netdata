@@ -12,7 +12,7 @@ endmeta-->
 # Nomad Containers
 
 
-<img src="https://netdata.cloud/img/nomad.svg" width="150"/>
+<img src="https://netdata.cloud/img/nomad.png" width="150"/>
 
 
 Plugin: cgroups.plugin

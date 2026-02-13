@@ -12,7 +12,7 @@ endmeta-->
 # Nagios Plugins
 
 
-<img src="https://netdata.cloud/img/nagios.svg" width="150"/>
+<img src="https://netdata.cloud/img/nagios.png" width="150"/>
 
 
 Plugin: scripts.d.plugin

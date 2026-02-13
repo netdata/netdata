@@ -12,7 +12,7 @@ endmeta-->
 # IBM i (AS/400)
 
 
-<img src="https://netdata.cloud/img/ibm-i.svg" width="150"/>
+<img src="https://netdata.cloud/img/ibm-i.png" width="150"/>
 
 
 Plugin: ibm.d.plugin

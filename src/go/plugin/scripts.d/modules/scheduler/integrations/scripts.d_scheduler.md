@@ -12,7 +12,7 @@ endmeta-->
 # scripts.d Scheduler
 
 
-<img src="https://netdata.cloud/img/netdata.svg" width="150"/>
+<img src="https://netdata.cloud/img/netdata-logomark.svg" width="150"/>
 
 
 Plugin: scripts.d.plugin
