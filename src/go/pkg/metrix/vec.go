@@ -8,332 +8,297 @@ import (
 	"sync"
 )
 
-// snapshotGaugeVec caches snapshot gauge series handles by vec label values.
-type snapshotGaugeVec struct {
+// vecCache stores per-label-values instrument handles with a read-fast path.
+type vecCache[T any] struct {
 	backend meterBackend
-	desc    *instrumentDescriptor
 	base    []LabelSet
 	keys    []string
 
 	mu    sync.RWMutex
-	cache map[string]*snapshotGaugeInstrument
+	cache map[string]T
+
+	makeHandle func(base []LabelSet, vecSet LabelSet) T
 }
 
-// statefulGaugeVec caches stateful gauge series handles by vec label values.
-type statefulGaugeVec struct {
-	backend meterBackend
-	desc    *instrumentDescriptor
-	base    []LabelSet
-	keys    []string
-
-	mu    sync.RWMutex
-	cache map[string]*statefulGaugeInstrument
-}
-
-// snapshotCounterVec caches snapshot counter series handles by vec label values.
-type snapshotCounterVec struct {
-	backend meterBackend
-	desc    *instrumentDescriptor
-	base    []LabelSet
-	keys    []string
-
-	mu    sync.RWMutex
-	cache map[string]*snapshotCounterInstrument
-}
-
-// statefulCounterVec caches stateful counter series handles by vec label values.
-type statefulCounterVec struct {
-	backend meterBackend
-	desc    *instrumentDescriptor
-	base    []LabelSet
-	keys    []string
-
-	mu    sync.RWMutex
-	cache map[string]*statefulCounterInstrument
-}
-
-// snapshotHistogramVec caches snapshot histogram series handles by vec label values.
-type snapshotHistogramVec struct {
-	backend meterBackend
-	desc    *instrumentDescriptor
-	base    []LabelSet
-	keys    []string
-
-	mu    sync.RWMutex
-	cache map[string]*snapshotHistogramInstrument
-}
-
-// statefulHistogramVec caches stateful histogram series handles by vec label values.
-type statefulHistogramVec struct {
-	backend meterBackend
-	desc    *instrumentDescriptor
-	base    []LabelSet
-	keys    []string
-
-	mu    sync.RWMutex
-	cache map[string]*statefulHistogramInstrument
-}
-
-// snapshotSummaryVec caches snapshot summary series handles by vec label values.
-type snapshotSummaryVec struct {
-	backend meterBackend
-	desc    *instrumentDescriptor
-	base    []LabelSet
-	keys    []string
-
-	mu    sync.RWMutex
-	cache map[string]*snapshotSummaryInstrument
-}
-
-// statefulSummaryVec caches stateful summary series handles by vec label values.
-type statefulSummaryVec struct {
-	backend meterBackend
-	desc    *instrumentDescriptor
-	base    []LabelSet
-	keys    []string
-
-	mu    sync.RWMutex
-	cache map[string]*statefulSummaryInstrument
-}
-
-// snapshotStateSetVec caches snapshot stateset series handles by vec label values.
-type snapshotStateSetVec struct {
-	backend meterBackend
-	desc    *instrumentDescriptor
-	base    []LabelSet
-	keys    []string
-
-	mu    sync.RWMutex
-	cache map[string]*snapshotStateSetInstrument
-}
-
-// statefulStateSetVec caches stateful stateset series handles by vec label values.
-type statefulStateSetVec struct {
-	backend meterBackend
-	desc    *instrumentDescriptor
-	base    []LabelSet
-	keys    []string
-
-	mu    sync.RWMutex
-	cache map[string]*statefulStateSetInstrument
-}
-
-// GaugeVec declares or reuses a snapshot gauge and exposes a label-values lookup API.
-func (m *snapshotMeter) GaugeVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotGaugeVec {
-	desc, err := m.backend.registerInstrument(metricName(m.prefix, name), kindGauge, modeSnapshot, opts...)
-	if err != nil {
-		panic(err)
-	}
-	keys, err := normalizeVecLabelKeys(labelKeys)
-	if err != nil {
-		panic(err)
-	}
-	return &snapshotGaugeVec{
-		backend: m.backend,
-		desc:    desc,
-		base:    appendLabelSets(m.sets, nil),
-		keys:    keys,
-		cache:   make(map[string]*snapshotGaugeInstrument),
+func newVecCache[T any](
+	backend meterBackend,
+	base []LabelSet,
+	keys []string,
+	makeHandle func(base []LabelSet, vecSet LabelSet) T,
+) *vecCache[T] {
+	return &vecCache[T]{
+		backend:    backend,
+		base:       base,
+		keys:       keys,
+		cache:      make(map[string]T),
+		makeHandle: makeHandle,
 	}
 }
 
-// GaugeVec declares or reuses a stateful gauge and exposes a label-values lookup API.
-func (m *statefulMeter) GaugeVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulGaugeVec {
-	desc, err := m.backend.registerInstrument(metricName(m.prefix, name), kindGauge, modeStateful, opts...)
-	if err != nil {
-		panic(err)
-	}
-	keys, err := normalizeVecLabelKeys(labelKeys)
-	if err != nil {
-		panic(err)
-	}
-	return &statefulGaugeVec{
-		backend: m.backend,
-		desc:    desc,
-		base:    appendLabelSets(m.sets, nil),
-		keys:    keys,
-		cache:   make(map[string]*statefulGaugeInstrument),
-	}
-}
+func (v *vecCache[T]) get(labelValues ...string) (T, error) {
+	var zero T
 
-// CounterVec declares or reuses a snapshot counter and exposes a label-values lookup API.
-func (m *snapshotMeter) CounterVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotCounterVec {
-	desc, err := m.backend.registerInstrument(metricName(m.prefix, name), kindCounter, modeSnapshot, opts...)
-	if err != nil {
-		panic(err)
-	}
-	keys, err := normalizeVecLabelKeys(labelKeys)
-	if err != nil {
-		panic(err)
-	}
-	return &snapshotCounterVec{
-		backend: m.backend,
-		desc:    desc,
-		base:    appendLabelSets(m.sets, nil),
-		keys:    keys,
-		cache:   make(map[string]*snapshotCounterInstrument),
-	}
-}
-
-// CounterVec declares or reuses a stateful counter and exposes a label-values lookup API.
-func (m *statefulMeter) CounterVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulCounterVec {
-	desc, err := m.backend.registerInstrument(metricName(m.prefix, name), kindCounter, modeStateful, opts...)
-	if err != nil {
-		panic(err)
-	}
-	keys, err := normalizeVecLabelKeys(labelKeys)
-	if err != nil {
-		panic(err)
-	}
-	return &statefulCounterVec{
-		backend: m.backend,
-		desc:    desc,
-		base:    appendLabelSets(m.sets, nil),
-		keys:    keys,
-		cache:   make(map[string]*statefulCounterInstrument),
-	}
-}
-
-// HistogramVec declares or reuses a snapshot histogram and exposes a label-values lookup API.
-func (m *snapshotMeter) HistogramVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotHistogramVec {
-	desc, err := m.backend.registerInstrument(metricName(m.prefix, name), kindHistogram, modeSnapshot, opts...)
-	if err != nil {
-		panic(err)
-	}
-	keys, err := normalizeVecLabelKeys(labelKeys)
-	if err != nil {
-		panic(err)
-	}
-	return &snapshotHistogramVec{
-		backend: m.backend,
-		desc:    desc,
-		base:    appendLabelSets(m.sets, nil),
-		keys:    keys,
-		cache:   make(map[string]*snapshotHistogramInstrument),
-	}
-}
-
-// HistogramVec declares or reuses a stateful histogram and exposes a label-values lookup API.
-func (m *statefulMeter) HistogramVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulHistogramVec {
-	desc, err := m.backend.registerInstrument(metricName(m.prefix, name), kindHistogram, modeStateful, opts...)
-	if err != nil {
-		panic(err)
-	}
-	keys, err := normalizeVecLabelKeys(labelKeys)
-	if err != nil {
-		panic(err)
-	}
-	return &statefulHistogramVec{
-		backend: m.backend,
-		desc:    desc,
-		base:    appendLabelSets(m.sets, nil),
-		keys:    keys,
-		cache:   make(map[string]*statefulHistogramInstrument),
-	}
-}
-
-// SummaryVec declares or reuses a snapshot summary and exposes a label-values lookup API.
-func (m *snapshotMeter) SummaryVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotSummaryVec {
-	desc, err := m.backend.registerInstrument(metricName(m.prefix, name), kindSummary, modeSnapshot, opts...)
-	if err != nil {
-		panic(err)
-	}
-	keys, err := normalizeVecLabelKeys(labelKeys)
-	if err != nil {
-		panic(err)
-	}
-	return &snapshotSummaryVec{
-		backend: m.backend,
-		desc:    desc,
-		base:    appendLabelSets(m.sets, nil),
-		keys:    keys,
-		cache:   make(map[string]*snapshotSummaryInstrument),
-	}
-}
-
-// SummaryVec declares or reuses a stateful summary and exposes a label-values lookup API.
-func (m *statefulMeter) SummaryVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulSummaryVec {
-	desc, err := m.backend.registerInstrument(metricName(m.prefix, name), kindSummary, modeStateful, opts...)
-	if err != nil {
-		panic(err)
-	}
-	keys, err := normalizeVecLabelKeys(labelKeys)
-	if err != nil {
-		panic(err)
-	}
-	return &statefulSummaryVec{
-		backend: m.backend,
-		desc:    desc,
-		base:    appendLabelSets(m.sets, nil),
-		keys:    keys,
-		cache:   make(map[string]*statefulSummaryInstrument),
-	}
-}
-
-// StateSetVec declares or reuses a snapshot stateset and exposes a label-values lookup API.
-func (m *snapshotMeter) StateSetVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotStateSetVec {
-	desc, err := m.backend.registerInstrument(metricName(m.prefix, name), kindStateSet, modeSnapshot, opts...)
-	if err != nil {
-		panic(err)
-	}
-	keys, err := normalizeVecLabelKeys(labelKeys)
-	if err != nil {
-		panic(err)
-	}
-	return &snapshotStateSetVec{
-		backend: m.backend,
-		desc:    desc,
-		base:    appendLabelSets(m.sets, nil),
-		keys:    keys,
-		cache:   make(map[string]*snapshotStateSetInstrument),
-	}
-}
-
-// StateSetVec declares or reuses a stateful stateset and exposes a label-values lookup API.
-func (m *statefulMeter) StateSetVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulStateSetVec {
-	desc, err := m.backend.registerInstrument(metricName(m.prefix, name), kindStateSet, modeStateful, opts...)
-	if err != nil {
-		panic(err)
-	}
-	keys, err := normalizeVecLabelKeys(labelKeys)
-	if err != nil {
-		panic(err)
-	}
-	return &statefulStateSetVec{
-		backend: m.backend,
-		desc:    desc,
-		base:    appendLabelSets(m.sets, nil),
-		keys:    keys,
-		cache:   make(map[string]*statefulStateSetInstrument),
-	}
-}
-
-// GetWithLabelValues returns a snapshot gauge handle for the provided vec label values.
-func (v *snapshotGaugeVec) GetWithLabelValues(labelValues ...string) (SnapshotGauge, error) {
 	cacheKey, vecSet, err := vecSeriesLabelSet(v.backend, v.keys, labelValues)
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 
 	v.mu.RLock()
-	inst := v.cache[cacheKey]
+	inst, ok := v.cache[cacheKey]
 	v.mu.RUnlock()
-	if inst != nil {
+	if ok {
 		return inst, nil
 	}
 
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	if inst = v.cache[cacheKey]; inst != nil {
+	inst, ok = v.cache[cacheKey]
+	if ok {
 		return inst, nil
 	}
-	inst = &snapshotGaugeInstrument{
-		backend: v.backend,
-		desc:    v.desc,
-		base:    appendLabelSets(v.base, []LabelSet{vecSet}),
-	}
+
+	inst = v.makeHandle(v.base, vecSet)
 	v.cache[cacheKey] = inst
+	return inst, nil
+}
+
+func appendVecSet(base []LabelSet, vecSet LabelSet) []LabelSet {
+	return appendLabelSets(base, []LabelSet{vecSet})
+}
+
+func mustRegisterInstrument(backend meterBackend, name string, kind metricKind, mode metricMode, opts ...InstrumentOption) *instrumentDescriptor {
+	desc, err := backend.registerInstrument(name, kind, mode, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return desc
+}
+
+func mustNormalizeVecLabelKeys(labelKeys []string) []string {
+	keys, err := normalizeVecLabelKeys(labelKeys)
+	if err != nil {
+		panic(err)
+	}
+	return keys
+}
+
+// snapshotGaugeVec caches snapshot gauge series handles by vec label values.
+type snapshotGaugeVec struct {
+	cache *vecCache[*snapshotGaugeInstrument]
+}
+
+// statefulGaugeVec caches stateful gauge series handles by vec label values.
+type statefulGaugeVec struct {
+	cache *vecCache[*statefulGaugeInstrument]
+}
+
+// snapshotCounterVec caches snapshot counter series handles by vec label values.
+type snapshotCounterVec struct {
+	cache *vecCache[*snapshotCounterInstrument]
+}
+
+// statefulCounterVec caches stateful counter series handles by vec label values.
+type statefulCounterVec struct {
+	cache *vecCache[*statefulCounterInstrument]
+}
+
+// snapshotHistogramVec caches snapshot histogram series handles by vec label values.
+type snapshotHistogramVec struct {
+	cache *vecCache[*snapshotHistogramInstrument]
+}
+
+// statefulHistogramVec caches stateful histogram series handles by vec label values.
+type statefulHistogramVec struct {
+	cache *vecCache[*statefulHistogramInstrument]
+}
+
+// snapshotSummaryVec caches snapshot summary series handles by vec label values.
+type snapshotSummaryVec struct {
+	cache *vecCache[*snapshotSummaryInstrument]
+}
+
+// statefulSummaryVec caches stateful summary series handles by vec label values.
+type statefulSummaryVec struct {
+	cache *vecCache[*statefulSummaryInstrument]
+}
+
+// snapshotStateSetVec caches snapshot stateset series handles by vec label values.
+type snapshotStateSetVec struct {
+	cache *vecCache[*snapshotStateSetInstrument]
+}
+
+// statefulStateSetVec caches stateful stateset series handles by vec label values.
+type statefulStateSetVec struct {
+	cache *vecCache[*statefulStateSetInstrument]
+}
+
+// GaugeVec declares or reuses a snapshot gauge and exposes a label-values lookup API.
+func (m *snapshotMeter) GaugeVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotGaugeVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindGauge, modeSnapshot, opts...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &snapshotGaugeVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotGaugeInstrument {
+			return &snapshotGaugeInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// GaugeVec declares or reuses a stateful gauge and exposes a label-values lookup API.
+func (m *statefulMeter) GaugeVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulGaugeVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindGauge, modeStateful, opts...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &statefulGaugeVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulGaugeInstrument {
+			return &statefulGaugeInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// CounterVec declares or reuses a snapshot counter and exposes a label-values lookup API.
+func (m *snapshotMeter) CounterVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotCounterVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindCounter, modeSnapshot, opts...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &snapshotCounterVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotCounterInstrument {
+			return &snapshotCounterInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// CounterVec declares or reuses a stateful counter and exposes a label-values lookup API.
+func (m *statefulMeter) CounterVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulCounterVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindCounter, modeStateful, opts...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &statefulCounterVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulCounterInstrument {
+			return &statefulCounterInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// HistogramVec declares or reuses a snapshot histogram and exposes a label-values lookup API.
+func (m *snapshotMeter) HistogramVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotHistogramVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindHistogram, modeSnapshot, opts...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &snapshotHistogramVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotHistogramInstrument {
+			return &snapshotHistogramInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// HistogramVec declares or reuses a stateful histogram and exposes a label-values lookup API.
+func (m *statefulMeter) HistogramVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulHistogramVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindHistogram, modeStateful, opts...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &statefulHistogramVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulHistogramInstrument {
+			return &statefulHistogramInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// SummaryVec declares or reuses a snapshot summary and exposes a label-values lookup API.
+func (m *snapshotMeter) SummaryVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotSummaryVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindSummary, modeSnapshot, opts...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &snapshotSummaryVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotSummaryInstrument {
+			return &snapshotSummaryInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// SummaryVec declares or reuses a stateful summary and exposes a label-values lookup API.
+func (m *statefulMeter) SummaryVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulSummaryVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindSummary, modeStateful, opts...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &statefulSummaryVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulSummaryInstrument {
+			return &statefulSummaryInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// StateSetVec declares or reuses a snapshot stateset and exposes a label-values lookup API.
+func (m *snapshotMeter) StateSetVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotStateSetVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindStateSet, modeSnapshot, opts...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &snapshotStateSetVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotStateSetInstrument {
+			return &snapshotStateSetInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// StateSetVec declares or reuses a stateful stateset and exposes a label-values lookup API.
+func (m *statefulMeter) StateSetVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulStateSetVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindStateSet, modeStateful, opts...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &statefulStateSetVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulStateSetInstrument {
+			return &statefulStateSetInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// GetWithLabelValues returns a snapshot gauge handle for the provided vec label values.
+func (v *snapshotGaugeVec) GetWithLabelValues(labelValues ...string) (SnapshotGauge, error) {
+	inst, err := v.cache.get(labelValues...)
+	if err != nil {
+		return nil, err
+	}
 	return inst, nil
 }
 
@@ -348,30 +313,10 @@ func (v *snapshotGaugeVec) WithLabelValues(labelValues ...string) SnapshotGauge 
 
 // GetWithLabelValues returns a stateful gauge handle for the provided vec label values.
 func (v *statefulGaugeVec) GetWithLabelValues(labelValues ...string) (StatefulGauge, error) {
-	cacheKey, vecSet, err := vecSeriesLabelSet(v.backend, v.keys, labelValues)
+	inst, err := v.cache.get(labelValues...)
 	if err != nil {
 		return nil, err
 	}
-
-	v.mu.RLock()
-	inst := v.cache[cacheKey]
-	v.mu.RUnlock()
-	if inst != nil {
-		return inst, nil
-	}
-
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	if inst = v.cache[cacheKey]; inst != nil {
-		return inst, nil
-	}
-	inst = &statefulGaugeInstrument{
-		backend: v.backend,
-		desc:    v.desc,
-		base:    appendLabelSets(v.base, []LabelSet{vecSet}),
-	}
-	v.cache[cacheKey] = inst
 	return inst, nil
 }
 
@@ -386,30 +331,10 @@ func (v *statefulGaugeVec) WithLabelValues(labelValues ...string) StatefulGauge 
 
 // GetWithLabelValues returns a snapshot counter handle for the provided vec label values.
 func (v *snapshotCounterVec) GetWithLabelValues(labelValues ...string) (SnapshotCounter, error) {
-	cacheKey, vecSet, err := vecSeriesLabelSet(v.backend, v.keys, labelValues)
+	inst, err := v.cache.get(labelValues...)
 	if err != nil {
 		return nil, err
 	}
-
-	v.mu.RLock()
-	inst := v.cache[cacheKey]
-	v.mu.RUnlock()
-	if inst != nil {
-		return inst, nil
-	}
-
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	if inst = v.cache[cacheKey]; inst != nil {
-		return inst, nil
-	}
-	inst = &snapshotCounterInstrument{
-		backend: v.backend,
-		desc:    v.desc,
-		base:    appendLabelSets(v.base, []LabelSet{vecSet}),
-	}
-	v.cache[cacheKey] = inst
 	return inst, nil
 }
 
@@ -424,30 +349,10 @@ func (v *snapshotCounterVec) WithLabelValues(labelValues ...string) SnapshotCoun
 
 // GetWithLabelValues returns a stateful counter handle for the provided vec label values.
 func (v *statefulCounterVec) GetWithLabelValues(labelValues ...string) (StatefulCounter, error) {
-	cacheKey, vecSet, err := vecSeriesLabelSet(v.backend, v.keys, labelValues)
+	inst, err := v.cache.get(labelValues...)
 	if err != nil {
 		return nil, err
 	}
-
-	v.mu.RLock()
-	inst := v.cache[cacheKey]
-	v.mu.RUnlock()
-	if inst != nil {
-		return inst, nil
-	}
-
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	if inst = v.cache[cacheKey]; inst != nil {
-		return inst, nil
-	}
-	inst = &statefulCounterInstrument{
-		backend: v.backend,
-		desc:    v.desc,
-		base:    appendLabelSets(v.base, []LabelSet{vecSet}),
-	}
-	v.cache[cacheKey] = inst
 	return inst, nil
 }
 
@@ -462,30 +367,10 @@ func (v *statefulCounterVec) WithLabelValues(labelValues ...string) StatefulCoun
 
 // GetWithLabelValues returns a snapshot histogram handle for the provided vec label values.
 func (v *snapshotHistogramVec) GetWithLabelValues(labelValues ...string) (SnapshotHistogram, error) {
-	cacheKey, vecSet, err := vecSeriesLabelSet(v.backend, v.keys, labelValues)
+	inst, err := v.cache.get(labelValues...)
 	if err != nil {
 		return nil, err
 	}
-
-	v.mu.RLock()
-	inst := v.cache[cacheKey]
-	v.mu.RUnlock()
-	if inst != nil {
-		return inst, nil
-	}
-
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	if inst = v.cache[cacheKey]; inst != nil {
-		return inst, nil
-	}
-	inst = &snapshotHistogramInstrument{
-		backend: v.backend,
-		desc:    v.desc,
-		base:    appendLabelSets(v.base, []LabelSet{vecSet}),
-	}
-	v.cache[cacheKey] = inst
 	return inst, nil
 }
 
@@ -500,30 +385,10 @@ func (v *snapshotHistogramVec) WithLabelValues(labelValues ...string) SnapshotHi
 
 // GetWithLabelValues returns a stateful histogram handle for the provided vec label values.
 func (v *statefulHistogramVec) GetWithLabelValues(labelValues ...string) (StatefulHistogram, error) {
-	cacheKey, vecSet, err := vecSeriesLabelSet(v.backend, v.keys, labelValues)
+	inst, err := v.cache.get(labelValues...)
 	if err != nil {
 		return nil, err
 	}
-
-	v.mu.RLock()
-	inst := v.cache[cacheKey]
-	v.mu.RUnlock()
-	if inst != nil {
-		return inst, nil
-	}
-
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	if inst = v.cache[cacheKey]; inst != nil {
-		return inst, nil
-	}
-	inst = &statefulHistogramInstrument{
-		backend: v.backend,
-		desc:    v.desc,
-		base:    appendLabelSets(v.base, []LabelSet{vecSet}),
-	}
-	v.cache[cacheKey] = inst
 	return inst, nil
 }
 
@@ -538,30 +403,10 @@ func (v *statefulHistogramVec) WithLabelValues(labelValues ...string) StatefulHi
 
 // GetWithLabelValues returns a snapshot summary handle for the provided vec label values.
 func (v *snapshotSummaryVec) GetWithLabelValues(labelValues ...string) (SnapshotSummary, error) {
-	cacheKey, vecSet, err := vecSeriesLabelSet(v.backend, v.keys, labelValues)
+	inst, err := v.cache.get(labelValues...)
 	if err != nil {
 		return nil, err
 	}
-
-	v.mu.RLock()
-	inst := v.cache[cacheKey]
-	v.mu.RUnlock()
-	if inst != nil {
-		return inst, nil
-	}
-
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	if inst = v.cache[cacheKey]; inst != nil {
-		return inst, nil
-	}
-	inst = &snapshotSummaryInstrument{
-		backend: v.backend,
-		desc:    v.desc,
-		base:    appendLabelSets(v.base, []LabelSet{vecSet}),
-	}
-	v.cache[cacheKey] = inst
 	return inst, nil
 }
 
@@ -576,30 +421,10 @@ func (v *snapshotSummaryVec) WithLabelValues(labelValues ...string) SnapshotSumm
 
 // GetWithLabelValues returns a stateful summary handle for the provided vec label values.
 func (v *statefulSummaryVec) GetWithLabelValues(labelValues ...string) (StatefulSummary, error) {
-	cacheKey, vecSet, err := vecSeriesLabelSet(v.backend, v.keys, labelValues)
+	inst, err := v.cache.get(labelValues...)
 	if err != nil {
 		return nil, err
 	}
-
-	v.mu.RLock()
-	inst := v.cache[cacheKey]
-	v.mu.RUnlock()
-	if inst != nil {
-		return inst, nil
-	}
-
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	if inst = v.cache[cacheKey]; inst != nil {
-		return inst, nil
-	}
-	inst = &statefulSummaryInstrument{
-		backend: v.backend,
-		desc:    v.desc,
-		base:    appendLabelSets(v.base, []LabelSet{vecSet}),
-	}
-	v.cache[cacheKey] = inst
 	return inst, nil
 }
 
@@ -614,30 +439,10 @@ func (v *statefulSummaryVec) WithLabelValues(labelValues ...string) StatefulSumm
 
 // GetWithLabelValues returns a snapshot stateset handle for the provided vec label values.
 func (v *snapshotStateSetVec) GetWithLabelValues(labelValues ...string) (StateSetInstrument, error) {
-	cacheKey, vecSet, err := vecSeriesLabelSet(v.backend, v.keys, labelValues)
+	inst, err := v.cache.get(labelValues...)
 	if err != nil {
 		return nil, err
 	}
-
-	v.mu.RLock()
-	inst := v.cache[cacheKey]
-	v.mu.RUnlock()
-	if inst != nil {
-		return inst, nil
-	}
-
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	if inst = v.cache[cacheKey]; inst != nil {
-		return inst, nil
-	}
-	inst = &snapshotStateSetInstrument{
-		backend: v.backend,
-		desc:    v.desc,
-		base:    appendLabelSets(v.base, []LabelSet{vecSet}),
-	}
-	v.cache[cacheKey] = inst
 	return inst, nil
 }
 
@@ -652,30 +457,10 @@ func (v *snapshotStateSetVec) WithLabelValues(labelValues ...string) StateSetIns
 
 // GetWithLabelValues returns a stateful stateset handle for the provided vec label values.
 func (v *statefulStateSetVec) GetWithLabelValues(labelValues ...string) (StateSetInstrument, error) {
-	cacheKey, vecSet, err := vecSeriesLabelSet(v.backend, v.keys, labelValues)
+	inst, err := v.cache.get(labelValues...)
 	if err != nil {
 		return nil, err
 	}
-
-	v.mu.RLock()
-	inst := v.cache[cacheKey]
-	v.mu.RUnlock()
-	if inst != nil {
-		return inst, nil
-	}
-
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	if inst = v.cache[cacheKey]; inst != nil {
-		return inst, nil
-	}
-	inst = &statefulStateSetInstrument{
-		backend: v.backend,
-		desc:    v.desc,
-		base:    appendLabelSets(v.base, []LabelSet{vecSet}),
-	}
-	v.cache[cacheKey] = inst
 	return inst, nil
 }
 
