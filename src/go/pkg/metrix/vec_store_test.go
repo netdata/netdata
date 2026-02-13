@@ -1,0 +1,275 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package metrix
+
+import (
+	"errors"
+	"math"
+	"testing"
+)
+
+func TestVecStoreScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"snapshot gauge vec writes labeled series": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				vec := s.Write().SnapshotMeter("apache").GaugeVec("workers", []string{"state"})
+
+				cc.BeginCycle()
+				vec.WithLabelValues("busy").Observe(7)
+				vec.WithLabelValues("idle").Observe(3)
+				cc.CommitCycleSuccess()
+
+				mustValue(t, s.Read(), "apache.workers", Labels{"state": "busy"}, 7)
+				mustValue(t, s.Read(), "apache.workers", Labels{"state": "idle"}, 3)
+			},
+		},
+		"snapshot counter vec merges meter labels and vec labels": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				sm := s.Write().SnapshotMeter("http").WithLabels(Label{Key: "instance", Value: "job1"})
+				vec := sm.CounterVec("requests_total", []string{"code"})
+
+				cc.BeginCycle()
+				vec.WithLabelValues("200").ObserveTotal(11)
+				cc.CommitCycleSuccess()
+
+				mustValue(t, s.Read(), "http.requests_total", Labels{"instance": "job1", "code": "200"}, 11)
+			},
+		},
+		"stateful counter vec preserves baseline and delta semantics": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				vec := s.Write().StatefulMeter("runtime").CounterVec("jobs_total", []string{"queue"})
+
+				cc.BeginCycle()
+				vec.WithLabelValues("default").Add(5)
+				cc.CommitCycleSuccess()
+				mustValue(t, s.Read(), "runtime.jobs_total", Labels{"queue": "default"}, 5)
+				mustNoDelta(t, s.Read(), "runtime.jobs_total", Labels{"queue": "default"})
+
+				cc.BeginCycle()
+				vec.WithLabelValues("default").Add(2)
+				cc.CommitCycleSuccess()
+				mustValue(t, s.Read(), "runtime.jobs_total", Labels{"queue": "default"}, 7)
+				mustDelta(t, s.Read(), "runtime.jobs_total", Labels{"queue": "default"}, 2)
+			},
+		},
+		"vec returns cached handle for same label values": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				vec := s.Write().SnapshotMeter("svc").GaugeVec("load", []string{"zone"})
+
+				a := vec.WithLabelValues("a")
+				b := vec.WithLabelValues("a")
+				if a != b {
+					t.Fatalf("expected same cached handle for repeated label values")
+				}
+			},
+		},
+		"GetWithLabelValues validates label value count": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				vec := s.Write().SnapshotMeter("svc").GaugeVec("load", []string{"zone", "role"})
+
+				_, err := vec.GetWithLabelValues("only-one")
+				if !errors.Is(err, errVecLabelValueCount) {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				expectPanic(t, func() {
+					_ = vec.WithLabelValues("only-one")
+				})
+			},
+		},
+		"vec with no label keys accepts empty label values": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				vec := s.Write().SnapshotMeter("svc").GaugeVec("load", nil)
+
+				cc.BeginCycle()
+				vec.WithLabelValues().Observe(9)
+				cc.CommitCycleSuccess()
+
+				mustValue(t, s.Read(), "svc.load", nil, 9)
+			},
+		},
+		"vec constructor rejects invalid label keys": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				expectPanic(t, func() {
+					_ = s.Write().SnapshotMeter("svc").GaugeVec("load", []string{"zone", "zone"})
+				})
+				expectPanic(t, func() {
+					_ = s.Write().SnapshotMeter("svc").CounterVec("requests_total", []string{""})
+				})
+			},
+		},
+		"snapshot histogram vec writes and reads point": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				vec := s.Write().SnapshotMeter("mysql").HistogramVec(
+					"query_seconds",
+					[]string{"database"},
+					WithHistogramBounds(0.1, 0.5),
+				)
+
+				cc.BeginCycle()
+				vec.WithLabelValues("db1").ObservePoint(HistogramPoint{
+					Count: 2,
+					Sum:   0.4,
+					Buckets: []BucketPoint{
+						{UpperBound: 0.1, CumulativeCount: 1},
+						{UpperBound: 0.5, CumulativeCount: 2},
+					},
+				})
+				cc.CommitCycleSuccess()
+
+				p, ok := s.Read().Histogram("mysql.query_seconds", Labels{"database": "db1"})
+				if !ok {
+					t.Fatalf("expected histogram point")
+				}
+				if p.Count != 2 || p.Sum != 0.4 || len(p.Buckets) != 2 {
+					t.Fatalf("unexpected histogram point: %#v", p)
+				}
+			},
+		},
+		"stateful histogram vec observes cumulative samples": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				vec := s.Write().StatefulMeter("mysql").HistogramVec(
+					"query_seconds",
+					[]string{"database"},
+					WithHistogramBounds(0.1, 0.5),
+				)
+
+				cc.BeginCycle()
+				vec.WithLabelValues("db1").Observe(0.05)
+				cc.CommitCycleSuccess()
+
+				cc.BeginCycle()
+				vec.WithLabelValues("db1").Observe(0.2)
+				cc.CommitCycleSuccess()
+
+				p, ok := s.Read().Histogram("mysql.query_seconds", Labels{"database": "db1"})
+				if !ok {
+					t.Fatalf("expected histogram point")
+				}
+				if p.Count != 2 || math.Abs(float64(p.Sum-0.25)) > 1e-9 || len(p.Buckets) != 2 {
+					t.Fatalf("unexpected histogram point: %#v", p)
+				}
+			},
+		},
+		"snapshot summary vec writes and reads point": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				vec := s.Write().SnapshotMeter("mysql").SummaryVec(
+					"query_seconds",
+					[]string{"database"},
+					WithSummaryQuantiles(0.5),
+				)
+
+				cc.BeginCycle()
+				vec.WithLabelValues("db1").ObservePoint(SummaryPoint{
+					Count: 2,
+					Sum:   0.4,
+					Quantiles: []QuantilePoint{
+						{Quantile: 0.5, Value: 0.2},
+					},
+				})
+				cc.CommitCycleSuccess()
+
+				p, ok := s.Read().Summary("mysql.query_seconds", Labels{"database": "db1"})
+				if !ok {
+					t.Fatalf("expected summary point")
+				}
+				if p.Count != 2 || p.Sum != 0.4 || len(p.Quantiles) != 1 {
+					t.Fatalf("unexpected summary point: %#v", p)
+				}
+			},
+		},
+		"stateful summary vec observes cumulative samples": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				vec := s.Write().StatefulMeter("mysql").SummaryVec("query_seconds", []string{"database"})
+
+				cc.BeginCycle()
+				vec.WithLabelValues("db1").Observe(0.1)
+				cc.CommitCycleSuccess()
+
+				cc.BeginCycle()
+				vec.WithLabelValues("db1").Observe(0.2)
+				cc.CommitCycleSuccess()
+
+				p, ok := s.Read().Summary("mysql.query_seconds", Labels{"database": "db1"})
+				if !ok {
+					t.Fatalf("expected summary point")
+				}
+				if p.Count != 2 || math.Abs(float64(p.Sum-0.3)) > 1e-9 {
+					t.Fatalf("unexpected summary point: %#v", p)
+				}
+			},
+		},
+		"snapshot stateset vec enable writes active state": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				vec := s.Write().SnapshotMeter("net").StateSetVec(
+					"link_state",
+					[]string{"nic"},
+					WithStateSetStates("up", "down"),
+					WithStateSetMode(ModeEnum),
+				)
+
+				cc.BeginCycle()
+				vec.WithLabelValues("eth0").Enable("up")
+				cc.CommitCycleSuccess()
+
+				p, ok := s.Read().StateSet("net.link_state", Labels{"nic": "eth0"})
+				if !ok {
+					t.Fatalf("expected stateset point")
+				}
+				if !p.States["up"] || p.States["down"] {
+					t.Fatalf("unexpected stateset: %#v", p.States)
+				}
+			},
+		},
+		"stateful stateset vec observe writes full state": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				vec := s.Write().StatefulMeter("net").StateSetVec(
+					"link_state",
+					[]string{"nic"},
+					WithStateSetStates("up", "down"),
+					WithStateSetMode(ModeBitSet),
+				)
+
+				cc.BeginCycle()
+				vec.WithLabelValues("eth0").ObserveStateSet(StateSetPoint{States: map[string]bool{"down": true}})
+				cc.CommitCycleSuccess()
+
+				p, ok := s.Read().StateSet("net.link_state", Labels{"nic": "eth0"})
+				if !ok {
+					t.Fatalf("expected stateset point")
+				}
+				if p.States["up"] || !p.States["down"] {
+					t.Fatalf("unexpected stateset: %#v", p.States)
+				}
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
