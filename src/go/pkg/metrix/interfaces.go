@@ -2,9 +2,9 @@
 
 package metrix
 
-// Store is the collector-facing metrics container.
+// CollectorStore is the collector-facing metrics container.
 // Writes are cycle-scoped and reads are snapshot-bound.
-type Store interface {
+type CollectorStore interface {
 	Read() Reader
 	ReadRaw() Reader
 	Write() Writer
@@ -26,9 +26,9 @@ type CycleController interface {
 	AbortCycle()
 }
 
-// CycleManagedStore extends Store with runtime-only cycle control.
+// CycleManagedStore extends CollectorStore with runtime-only cycle control.
 type CycleManagedStore interface {
-	Store
+	CollectorStore
 	CycleController() CycleController
 }
 

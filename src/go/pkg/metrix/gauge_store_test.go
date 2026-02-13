@@ -10,7 +10,7 @@ func TestGaugeStoreScenarios(t *testing.T) {
 	}{
 		"snapshot gauge freshness and raw visibility": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				g := s.Write().SnapshotMeter("apache").Gauge("workers_busy")
 
@@ -30,7 +30,7 @@ func TestGaugeStoreScenarios(t *testing.T) {
 		},
 		"stateful gauge set and add semantics": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				g := s.Write().StatefulMeter("runtime").Gauge("heap_bytes")
 
@@ -63,7 +63,7 @@ func TestGaugeStoreScenarios(t *testing.T) {
 		},
 		"abort keeps committed data and marks failed attempt": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				g := s.Write().SnapshotMeter("svc").Gauge("load")
 
@@ -88,7 +88,7 @@ func TestGaugeStoreScenarios(t *testing.T) {
 		},
 		"mode mixing snapshot and stateful panics": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				s.Write().SnapshotMeter("mixed").Gauge("metric")
 				expectPanic(t, func() {
 					_ = s.Write().StatefulMeter("mixed").Gauge("metric")
@@ -97,7 +97,7 @@ func TestGaugeStoreScenarios(t *testing.T) {
 		},
 		"write outside cycle panics": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				g := s.Write().SnapshotMeter("panic").Gauge("outside")
 				expectPanic(t, func() {
 					g.Observe(1)
@@ -106,7 +106,7 @@ func TestGaugeStoreScenarios(t *testing.T) {
 		},
 		"label set validation and merging": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				sm := s.Write().SnapshotMeter("apache").WithLabels(Label{Key: "instance", Value: "a"})
 				g := sm.Gauge("workers")
@@ -132,8 +132,8 @@ func TestGaugeStoreScenarios(t *testing.T) {
 		},
 		"foreign label set panics": {
 			run: func(t *testing.T) {
-				s1 := NewStore()
-				s2 := NewStore()
+				s1 := NewCollectorStore()
+				s2 := NewCollectorStore()
 				cc := cycleController(t, s1)
 				g := s1.Write().SnapshotMeter("svc").Gauge("reqs")
 				foreign := s2.Write().SnapshotMeter("svc").LabelSet(Label{Key: "instance", Value: "x"})

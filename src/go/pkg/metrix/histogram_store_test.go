@@ -10,7 +10,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 	}{
 		"snapshot histogram with explicit bounds read and flatten": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				h := s.Write().SnapshotMeter("svc").Histogram("request_duration_seconds", WithHistogramBounds(0.1, 0.5, 1))
 
@@ -50,7 +50,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 		},
 		"snapshot histogram without bounds captures schema after successful cycle": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				h := s.Write().SnapshotMeter("svc").Histogram("latency")
 
@@ -96,7 +96,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 		},
 		"stateful histogram requires bounds": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				expectPanic(t, func() {
 					_ = s.Write().StatefulMeter("svc").Histogram("latency")
 				})
@@ -104,7 +104,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 		},
 		"stateful histogram cumulative window accumulates across cycles": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				h := s.Write().StatefulMeter("svc").Histogram("latency", WithHistogramBounds(1, 2))
 
@@ -135,7 +135,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 		},
 		"stateful histogram window cycle resets each cycle and uses FreshnessCycle": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				h := s.Write().StatefulMeter("svc").Histogram("latency", WithHistogramBounds(1, 2), WithWindow(WindowCycle))
 
@@ -174,7 +174,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 		},
 		"window option on snapshot histogram panics": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				expectPanic(t, func() {
 					_ = s.Write().SnapshotMeter("svc").Histogram("latency", WithWindow(WindowCycle))
 				})
@@ -182,7 +182,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 		},
 		"histogram point validation panics on invalid buckets": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				h := s.Write().SnapshotMeter("svc").Histogram("latency")
 
@@ -213,7 +213,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 		},
 		"snapshot histogram stale visibility behavior for flatten": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				h := s.Write().SnapshotMeter("svc").Histogram("latency", WithHistogramBounds(1))
 
@@ -237,7 +237,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 		},
 		"histogram flatten label collision panics": {
 			run: func(t *testing.T) {
-				s := NewStore()
+				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				h := s.Write().SnapshotMeter("svc").
 					WithLabels(Label{Key: "le", Value: "x"}).

@@ -43,7 +43,7 @@ func BenchmarkCollectStyleSnapshot(b *testing.B) {
 
 	for name, tc := range tests {
 		b.Run(name, func(b *testing.B) {
-			s := NewStore()
+			s := NewCollectorStore()
 			cc := benchmarkCycleController(b, s)
 			base := s.Write().SnapshotMeter("bench.collect")
 			instanceLS := base.LabelSet(Label{Key: "instance", Value: "collector-A"})
