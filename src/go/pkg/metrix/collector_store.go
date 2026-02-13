@@ -410,6 +410,8 @@ func (c *storeCycleController) AbortCycle() {
 	}
 
 	oldSnap := c.core.snapshot.Load()
+	// Alias previous committed maps directly. Safe by invariant:
+	// committed series/snapshots are immutable after publish.
 	abortSnap := &readSnapshot{
 		collectMeta: oldSnap.collectMeta,
 		series:      oldSnap.series,
