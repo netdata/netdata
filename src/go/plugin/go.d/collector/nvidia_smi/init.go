@@ -44,5 +44,5 @@ func (c *Collector) initNvidiaSmiExec() (nvidiaSmiBinary, error) {
 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
-	return err == nil
+	return !os.IsNotExist(err)
 }

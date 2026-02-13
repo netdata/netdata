@@ -158,7 +158,10 @@ func FindBinary(names []string, defaultPaths []string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("executable not found in PATH (%v) or default locations", names)
+	if len(names) == 0 {
+		return "", fmt.Errorf("executable not found in default locations")
+	}
+	return "", fmt.Errorf("executable not found in PATH (%s) or default locations", strings.Join(names, ", "))
 }
 
 func (r *runner) run(log *logger.Logger, timeout time.Duration, dir string, helperPath, label string, env []string, argv ...string) ([]byte, string, ResourceUsage, error) {
