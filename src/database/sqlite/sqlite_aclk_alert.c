@@ -476,7 +476,7 @@ void health_alarm_log_populate(
     " AND hl.host_id = @host_id AND aq.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
     " ORDER BY aq.sequence_id ASC LIMIT "ACLK_MAX_ALERT_UPDATES
 
-static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stmt **res_version)
+static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stmt **res_version, sqlite3_stmt **res_mark)
 {
     CLAIM_ID claim_id = claim_id_get();
 
@@ -510,7 +510,7 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
 
         nd_uuid_t hash_id;
         if (alarm_log.config_hash && !uuid_parse(alarm_log.config_hash, hash_id))
-            alert_hash_mark_sent(&hash_id);
+            alert_hash_mark_sent(&hash_id, res_mark);
 
         aclk_host_config->alert_count++;
 
@@ -690,6 +690,7 @@ void aclk_push_alert_events_for_all_hosts(void)
 
     sqlite3_stmt *res = NULL;               // used to scan pending alerts to send
     sqlite3_stmt *res_version = NULL;       // used to update the alert version
+    sqlite3_stmt *res_mark = NULL;          // used to mark transition sent (for an alert config)
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS) ||
             rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
@@ -716,30 +717,30 @@ void aclk_push_alert_events_for_all_hosts(void)
             aclk_host_config->send_snapshot = 0;
         }
         else
-            aclk_push_alert_event(host, &res, &res_version);
+            aclk_push_alert_event(host, &res, &res_version, &res_mark);
     }
     dfe_done(host);
     SQLITE_FINALIZE(res);
     SQLITE_FINALIZE(res_version);
+    SQLITE_FINALIZE(res_mark);
 }
 
 #define SQL_SELECT_ALERT_HASH_CLOUD "SELECT 1 FROM alert_hash_cloud WHERE hash_id = @hash_id"
 #define SQL_INSERT_ALERT_HASH_CLOUD "INSERT OR IGNORE INTO alert_hash_cloud (hash_id) VALUES (@hash_id)"
 
-void alert_hash_mark_sent(nd_uuid_t *hash_id)
+void alert_hash_mark_sent(nd_uuid_t *hash_id, sqlite3_stmt **res_mark)
 {
     if (!hash_id)
         return;
 
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_HASH_CLOUD, &compiled_res))
+    if (res_mark) {
+        if (!*res_mark) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_HASH_CLOUD, res_mark))
                 return;
         }
-        res = compiled_res;
+        res = *res_mark;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_ALERT_HASH_CLOUD, &res))
             return;
@@ -753,7 +754,7 @@ void alert_hash_mark_sent(nd_uuid_t *hash_id)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (res_mark)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
@@ -764,32 +765,25 @@ bool alert_hash_has_transitioned(nd_uuid_t *hash_id)
     if (!hash_id)
         return false;
 
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_ALERT_HASH_CLOUD, &compiled_res))
-                return false;
-        }
-        res = compiled_res;
-    } else {
-        if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_HASH_CLOUD, &res))
-            return false;
-    }
+    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_HASH_CLOUD, &res))
+        return false;
 
     int param = 0;
+
+    // Assume found -- in case of lookup failure we will assume a transition has been sent
+    // This is to avoid sending configs in case of database issues
+    // if the config does not exist in cloud, it will be requested anyway
+    bool found = true;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, hash_id, sizeof(*hash_id), SQLITE_STATIC));
 
     param = 0;
-    bool found = (sqlite3_step_monitored(res) == SQLITE_ROW);
+    found = (sqlite3_step_monitored(res) == SQLITE_ROW);
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
-        SQLITE_RESET(res);
-    else
-        SQLITE_FINALIZE(res);
+    SQLITE_FINALIZE(res);
     return found;
 }
 
@@ -825,7 +819,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
 
     RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
-    if (!host || !(aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED))) {
+    if (!host || !((aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))) {
         freez(config_hash);
         freez(node_id);
         return;
@@ -918,7 +912,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
             aclk_host_config->node_id,
             aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A", config_hash);
         aclk_send_provide_alarm_cfg(&p_alarm_config);
-        alert_hash_mark_sent(&hash_uuid);
+        alert_hash_mark_sent(&hash_uuid, NULL);
         freez(p_alarm_config.cfg_hash);
         destroy_aclk_alarm_configuration(&alarm_config);
     }
@@ -1148,7 +1142,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version)
     struct aclk_sync_cfg_t *aclk_host_config;
     RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
-    if (!host || !(aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED))) {
+    if (!host || !((aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))) {
         nd_log(NDLS_ACCESS, NDLP_NOTICE, "ACLK STA [%s (N/A)]: Ignoring request to stream alert state changes, invalid node.", node_id);
         return;
     }
@@ -1183,7 +1177,7 @@ void aclk_alert_version_check(char *node_id, char *claim_id, uint64_t cloud_vers
     struct aclk_sync_cfg_t *aclk_host_config;
     RRDHOST *host = rrdhost_find_by_node_id(node_id);
 
-    if (!host || !(aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED)))
+    if (!host || !((aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED))))
         nd_log(NDLS_ACCESS, NDLP_NOTICE,
                "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT VALIDATION REQUEST RECEIVED FOR INVALID NODE",
                node_id);
