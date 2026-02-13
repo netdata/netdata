@@ -53,6 +53,10 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				h := s.Write().SnapshotMeter("svc").Histogram("latency")
+				view, ok := s.(*storeView)
+				if !ok {
+					t.Fatalf("expected *storeView")
+				}
 
 				cc.BeginCycle()
 				h.ObservePoint(HistogramPoint{
@@ -64,6 +68,14 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				})
 				cc.AbortCycle() // schema must not be captured on abort
 
+				desc := view.core.instruments["svc.latency"]
+				if desc == nil {
+					t.Fatalf("expected registered descriptor")
+				}
+				if desc.histogram != nil {
+					t.Fatalf("expected shared descriptor histogram schema to remain unset after abort")
+				}
+
 				cc.BeginCycle()
 				h.ObservePoint(HistogramPoint{
 					Count: 2, Sum: 0.8,
@@ -73,6 +85,11 @@ func TestHistogramStoreScenarios(t *testing.T) {
 					},
 				})
 				cc.CommitCycleSuccess()
+
+				// Shared descriptor remains immutable after publish; per-series descriptor carries schema.
+				if desc.histogram != nil {
+					t.Fatalf("expected shared descriptor histogram schema to remain unset")
+				}
 				mustHistogram(t, s.Read(), "svc.latency", nil, HistogramPoint{
 					Count: 2, Sum: 0.8,
 					Buckets: []BucketPoint{

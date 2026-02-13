@@ -91,7 +91,13 @@ func (c *storeCore) recordHistogramObservePoint(desc *instrumentDescriptor, poin
 		panic(errHistogramLabelKey)
 	}
 
-	bounds, count, sum, cumulative := normalizeHistogramPoint(point, desc.histogram)
+	schema := desc.histogram
+	if schema == nil {
+		// For snapshot histograms without explicit bounds, validate against
+		// previously captured family schema (if available).
+		schema = c.snapshotHistogramSchema[desc.name]
+	}
+	bounds, count, sum, cumulative := normalizeHistogramPoint(point, schema)
 
 	key := makeSeriesKey(desc.name, labelsKey)
 	entry, ok := c.active.histograms[key]
