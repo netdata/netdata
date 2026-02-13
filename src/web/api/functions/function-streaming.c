@@ -15,18 +15,26 @@
     buffer_json_object_close(wb);
 
 static bool function_param_info_requested(const char *function) {
-    char function_copy[strlen(function) + 1];
-    memcpy(function_copy, function, sizeof(function_copy));
+    if(!function || !*function)
+        return false;
+
+    char *function_copy = strdupz(function);
+    if(!function_copy)
+        return false;
 
     char *words[1024];
     size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
+    bool info_only = false;
     for(size_t i = 1; i < num_words; i++) {
         char *param = get_word(words, num_words, i);
-        if(strcmp(param, "info") == 0)
-            return true;
+        if(strcmp(param, "info") == 0) {
+            info_only = true;
+            break;
+        }
     }
 
-    return false;
+    freez(function_copy);
+    return info_only;
 }
 
 static bool streaming_peer_is_set(const char *ip) {
