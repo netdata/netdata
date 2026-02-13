@@ -12,7 +12,7 @@ endmeta-->
 # IBM MQ
 
 
-<img src="https://netdata.cloud/img/ibm-mq.svg" width="150"/>
+<img src="https://netdata.cloud/img/ibm-mq.png" width="150"/>
 
 
 Plugin: ibm.d.plugin

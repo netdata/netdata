@@ -11,7 +11,7 @@ endmeta-->
 # ScyllaDB
 
 
-<img src="https://netdata.cloud/img/scylladb.png" width="150"/>
+<img src="https://netdata.cloud/img/scylladb.svg" width="150"/>
 
 
 Plugin: go.d.plugin
