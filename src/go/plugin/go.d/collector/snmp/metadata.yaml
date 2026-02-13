@@ -610,6 +610,12 @@ modules:
                 unit: "packets/s"
                 visibility: hidden
                 description: Rate of multicast packets transmitted per second.
+          performance: |
+            Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many interfaces may return many rows
+          security: |
+            Exposes interface names, operational status, and traffic counters only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed
+          availability: |
+            Available when:<br/>• The collector has completed at least one data collection cycle<br/>• Interface data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet
 
         - id: topology
           name: Network Topology
