@@ -42,12 +42,6 @@ func (m *snapshotMeter) WithLabelSet(labels ...LabelSet) SnapshotMeter {
 	return &snapshotMeter{backend: m.backend, prefix: m.prefix, sets: appendLabelSets(m.sets, labels)}
 }
 
-func (m *snapshotMeter) Histogram(name string, opts ...InstrumentOption) SnapshotHistogram {
-	_ = name
-	_ = opts
-	return snapshotHistogramNotImplemented{}
-}
-
 func (m *snapshotMeter) Summary(name string, opts ...InstrumentOption) SnapshotSummary {
 	_ = name
 	_ = opts
@@ -70,12 +64,6 @@ func (m *statefulMeter) WithLabelSet(labels ...LabelSet) StatefulMeter {
 		}
 	}
 	return &statefulMeter{backend: m.backend, prefix: m.prefix, sets: appendLabelSets(m.sets, labels)}
-}
-
-func (m *statefulMeter) Histogram(name string, opts ...InstrumentOption) StatefulHistogram {
-	_ = name
-	_ = opts
-	return statefulHistogramNotImplemented{}
 }
 
 func (m *statefulMeter) Summary(name string, opts ...InstrumentOption) StatefulSummary {

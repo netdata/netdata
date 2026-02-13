@@ -4,6 +4,7 @@ package metrix
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -31,7 +32,13 @@ type instrumentDescriptor struct {
 	kind      metricKind
 	mode      metricMode
 	freshness FreshnessPolicy // visibility policy used by Read()
-	stateSet  *stateSetSchema // set for kindStateSet only
+	window    MetricWindow
+	histogram *histogramSchema // set for kindHistogram only
+	stateSet  *stateSetSchema  // set for kindStateSet only
+}
+
+type histogramSchema struct {
+	bounds []float64
 }
 
 type stateSetSchema struct {
@@ -56,6 +63,11 @@ type committedSeries struct {
 	counterCurrentAttemptSeq  uint64
 	counterPreviousAttemptSeq uint64
 
+	// Histogram current sample (used by Histogram()).
+	histogramCount      SampleValue
+	histogramSum        SampleValue
+	histogramCumulative []SampleValue
+
 	// StateSet current sample (used by StateSet()).
 	stateSetValues map[string]bool
 
@@ -69,10 +81,11 @@ type readSnapshot struct {
 }
 
 type cycleFrame struct {
-	seq      uint64
-	gauges   map[string]*stagedGauge
-	counters map[string]*stagedCounter
-	stateSet map[string]*stagedStateSet
+	seq        uint64
+	gauges     map[string]*stagedGauge
+	counters   map[string]*stagedCounter
+	histograms map[string]*stagedHistogram
+	stateSet   map[string]*stagedStateSet
 }
 
 type storeCore struct {
@@ -162,10 +175,11 @@ func (c *storeCycleController) BeginCycle() {
 
 	c.core.sequence++
 	c.core.active = &cycleFrame{
-		seq:      c.core.sequence,
-		gauges:   make(map[string]*stagedGauge),
-		counters: make(map[string]*stagedCounter),
-		stateSet: make(map[string]*stagedStateSet),
+		seq:        c.core.sequence,
+		gauges:     make(map[string]*stagedGauge),
+		counters:   make(map[string]*stagedCounter),
+		histograms: make(map[string]*stagedHistogram),
+		stateSet:   make(map[string]*stagedStateSet),
 	}
 }
 
@@ -234,6 +248,32 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		series.counterCurrent = staged.current
 		series.counterCurrentAttemptSeq = c.core.active.seq
 		series.value = staged.current // Value() for counters returns current total.
+		series.meta.LastSeenSuccessSeq = c.core.active.seq
+	}
+
+	for key, staged := range c.core.active.histograms {
+		series := next.series[key]
+		if series == nil {
+			series = &committedSeries{
+				id:        SeriesID(key),
+				key:       key,
+				name:      staged.name,
+				labels:    append([]Label(nil), staged.labels...),
+				labelsKey: staged.labelsKey,
+				desc:      staged.desc,
+			}
+			next.series[key] = series
+		}
+
+		if series.desc.histogram == nil {
+			series.desc.histogram = &histogramSchema{bounds: append([]float64(nil), staged.bounds...)}
+		} else if !equalHistogramBounds(series.desc.histogram.bounds, staged.bounds) {
+			panic("metrix: histogram schema drift detected")
+		}
+
+		series.histogramCount = staged.count
+		series.histogramSum = staged.sum
+		series.histogramCumulative = append(series.histogramCumulative[:0], staged.cumulative...)
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
 	}
 
@@ -322,16 +362,39 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 	if cfg.windowSet && !isWindowAllowed(kind, mode) {
 		return nil, fmt.Errorf("metrix: WithWindow is valid only for stateful histogram/summary")
 	}
+	if len(cfg.histogramBounds) > 0 && kind != kindHistogram {
+		return nil, fmt.Errorf("metrix: histogram bounds are invalid for this instrument kind")
+	}
 	if (len(cfg.states) > 0 || cfg.stateSetMode != nil) && kind != kindStateSet {
 		return nil, fmt.Errorf("metrix: stateset options are invalid for this instrument kind")
+	}
+
+	window := WindowCumulative
+	if cfg.windowSet {
+		window = cfg.window
 	}
 
 	fresh := defaultFreshness(mode)
 	if cfg.freshnessSet {
 		fresh = cfg.freshness
 	}
+	if mode == modeStateful && window == WindowCycle && (kind == kindHistogram || kind == kindSummary) {
+		if cfg.freshnessSet && fresh != FreshnessCycle {
+			return nil, fmt.Errorf("metrix: window=cycle requires FreshnessCycle")
+		}
+		fresh = FreshnessCycle
+	}
 	if mode == modeSnapshot && fresh == FreshnessCommitted {
 		return nil, fmt.Errorf("metrix: snapshot instruments cannot use FreshnessCommitted")
+	}
+
+	var histogram *histogramSchema
+	if kind == kindHistogram {
+		s, err := buildHistogramSchema(cfg, mode)
+		if err != nil {
+			return nil, err
+		}
+		histogram = s
 	}
 
 	var schema *stateSetSchema
@@ -356,13 +419,29 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		if d.freshness != fresh {
 			return nil, fmt.Errorf("metrix: instrument freshness mismatch for %s", name)
 		}
+		if d.window != window {
+			return nil, fmt.Errorf("metrix: instrument window mismatch for %s", name)
+		}
+		if kind == kindHistogram {
+			if !(mode == modeSnapshot && histogram == nil) && !equalHistogramSchema(d.histogram, histogram) {
+				return nil, fmt.Errorf("metrix: histogram schema mismatch for %s", name)
+			}
+		}
 		if kind == kindStateSet && !equalStateSetSchema(d.stateSet, schema) {
 			return nil, fmt.Errorf("metrix: stateset schema mismatch for %s", name)
 		}
 		return d, nil
 	}
 
-	d := &instrumentDescriptor{name: name, kind: kind, mode: mode, freshness: fresh, stateSet: schema}
+	d := &instrumentDescriptor{
+		name:      name,
+		kind:      kind,
+		mode:      mode,
+		freshness: fresh,
+		window:    window,
+		histogram: histogram,
+		stateSet:  schema,
+	}
 	c.instruments[name] = d
 	return d, nil
 }
@@ -383,6 +462,9 @@ func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	if s.stateSetValues != nil {
 		cp.stateSetValues = cloneStateMap(s.stateSetValues)
 	}
+	if len(s.histogramCumulative) > 0 {
+		cp.histogramCumulative = append([]SampleValue(nil), s.histogramCumulative...)
+	}
 	return &cp
 }
 
@@ -399,6 +481,20 @@ func cloneStateMap(in map[string]bool) map[string]bool {
 
 func isScalarKind(kind metricKind) bool {
 	return kind == kindGauge || kind == kindCounter
+}
+
+func buildHistogramSchema(cfg instrumentConfig, mode metricMode) (*histogramSchema, error) {
+	bounds, err := normalizeHistogramBounds(cfg.histogramBounds)
+	if err != nil {
+		return nil, err
+	}
+	if mode == modeStateful && len(bounds) == 0 {
+		return nil, fmt.Errorf("%w for stateful histogram", errHistogramBounds)
+	}
+	if len(bounds) == 0 {
+		return nil, nil
+	}
+	return &histogramSchema{bounds: bounds}, nil
 }
 
 func buildStateSetSchema(cfg instrumentConfig) (*stateSetSchema, error) {
@@ -444,6 +540,52 @@ func equalStateSetSchema(a, b *stateSetSchema) bool {
 		}
 	}
 	return true
+}
+
+func equalHistogramSchema(a, b *histogramSchema) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return equalHistogramBounds(a.bounds, b.bounds)
+}
+
+func equalHistogramBounds(a, b []float64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func normalizeHistogramBounds(in []float64) ([]float64, error) {
+	if len(in) == 0 {
+		return nil, nil
+	}
+
+	bounds := append([]float64(nil), in...)
+	out := make([]float64, 0, len(bounds))
+	prev := math.Inf(-1)
+	for i, b := range bounds {
+		if math.IsNaN(b) || math.IsInf(b, -1) {
+			return nil, fmt.Errorf("%w: invalid upper bound", errHistogramPoint)
+		}
+		if math.IsInf(b, +1) {
+			if i != len(bounds)-1 {
+				return nil, fmt.Errorf("%w: +Inf bucket must be last", errHistogramPoint)
+			}
+			break // +Inf is implicit.
+		}
+		if b <= prev {
+			return nil, fmt.Errorf("%w: bounds must be strictly increasing", errHistogramPoint)
+		}
+		out = append(out, b)
+		prev = b
+	}
+	return out, nil
 }
 
 func isWindowAllowed(kind metricKind, mode metricMode) bool {

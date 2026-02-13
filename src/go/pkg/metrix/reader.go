@@ -3,6 +3,7 @@
 package metrix
 
 import (
+	"math"
 	"sort"
 	"sync"
 )
@@ -49,9 +50,33 @@ func (r *storeReader) Delta(name string, labels Labels) (SampleValue, bool) {
 }
 
 func (r *storeReader) Histogram(name string, labels Labels) (HistogramPoint, bool) {
-	_ = name
-	_ = labels
-	return HistogramPoint{}, false
+	if r.flattened {
+		return HistogramPoint{}, false
+	}
+
+	s, ok := r.lookup(name, labels)
+	if !ok || !r.visible(s) {
+		return HistogramPoint{}, false
+	}
+	if s.desc == nil || s.desc.kind != kindHistogram || s.desc.histogram == nil {
+		return HistogramPoint{}, false
+	}
+	if len(s.histogramCumulative) != len(s.desc.histogram.bounds) {
+		return HistogramPoint{}, false
+	}
+
+	point := HistogramPoint{
+		Count:   s.histogramCount,
+		Sum:     s.histogramSum,
+		Buckets: make([]BucketPoint, len(s.desc.histogram.bounds)),
+	}
+	for i, ub := range s.desc.histogram.bounds {
+		point.Buckets[i] = BucketPoint{
+			UpperBound:      ub,
+			CumulativeCount: s.histogramCumulative[i],
+		}
+	}
+	return point, true
 }
 
 func (r *storeReader) Summary(name string, labels Labels) (SummaryPoint, bool) {
@@ -118,6 +143,8 @@ func flattenSnapshot(src *readSnapshot) *readSnapshot {
 		switch s.desc.kind {
 		case kindGauge, kindCounter:
 			dst.series[s.key] = cloneCommittedSeries(s)
+		case kindHistogram:
+			appendFlattenedHistogramSeries(dst, s)
 		case kindStateSet:
 			appendFlattenedStateSetSeries(dst, s)
 		}
@@ -125,6 +152,100 @@ func flattenSnapshot(src *readSnapshot) *readSnapshot {
 
 	dst.byName = buildByName(dst.series)
 	return dst
+}
+
+func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
+	schema := src.desc.histogram
+	if schema == nil {
+		return
+	}
+
+	for i, ub := range schema.bounds {
+		labelsMap := make(map[string]string, len(src.labels)+1)
+		for _, lbl := range src.labels {
+			labelsMap[lbl.Key] = lbl.Value
+		}
+		labelsMap[histogramBucketLabel] = formatHistogramBucketLabel(ub)
+
+		labels, labelsKey, err := canonicalizeLabels(labelsMap)
+		if err != nil {
+			continue
+		}
+
+		name := src.name + "_bucket"
+		key := makeSeriesKey(name, labelsKey)
+		dst.series[key] = &committedSeries{
+			id:        SeriesID(key),
+			key:       key,
+			name:      name,
+			labels:    labels,
+			labelsKey: labelsKey,
+			desc: &instrumentDescriptor{
+				name:      name,
+				kind:      kindCounter,
+				mode:      src.desc.mode,
+				freshness: src.desc.freshness,
+			},
+			value: src.histogramCumulative[i],
+			meta:  src.meta,
+		}
+	}
+
+	infMap := make(map[string]string, len(src.labels)+1)
+	for _, lbl := range src.labels {
+		infMap[lbl.Key] = lbl.Value
+	}
+	infMap[histogramBucketLabel] = formatHistogramBucketLabel(math.Inf(1))
+	infLabels, infLabelsKey, err := canonicalizeLabels(infMap)
+	if err == nil {
+		infName := src.name + "_bucket"
+		infKey := makeSeriesKey(infName, infLabelsKey)
+		dst.series[infKey] = &committedSeries{
+			id:        SeriesID(infKey),
+			key:       infKey,
+			name:      infName,
+			labels:    infLabels,
+			labelsKey: infLabelsKey,
+			desc: &instrumentDescriptor{
+				name:      infName,
+				kind:      kindCounter,
+				mode:      src.desc.mode,
+				freshness: src.desc.freshness,
+			},
+			value: src.histogramCount,
+			meta:  src.meta,
+		}
+	}
+
+	appendFlattenedHistogramScalar(dst, src.name+"_count", src.labels, src.histogramCount, src.meta, src.desc)
+	appendFlattenedHistogramScalar(dst, src.name+"_sum", src.labels, src.histogramSum, src.meta, src.desc)
+}
+
+func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Label, value SampleValue, meta SeriesMeta, desc *instrumentDescriptor) {
+	labelsMap := make(map[string]string, len(labels))
+	for _, lbl := range labels {
+		labelsMap[lbl.Key] = lbl.Value
+	}
+	items, labelsKey, err := canonicalizeLabels(labelsMap)
+	if err != nil {
+		return
+	}
+	key := makeSeriesKey(name, labelsKey)
+	dst.series[key] = &committedSeries{
+		id:        SeriesID(key),
+		key:       key,
+		name:      name,
+		labels:    items,
+		labelsKey: labelsKey,
+		desc: &instrumentDescriptor{
+			name:      name,
+			kind:      kindCounter,
+			mode:      desc.mode,
+			freshness: desc.freshness,
+		},
+		value: value,
+		meta:  meta,
+	}
 }
 
 func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
