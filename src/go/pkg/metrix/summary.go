@@ -287,6 +287,7 @@ func (s *summaryQuantileSketch) clone() *summaryQuantileSketch {
 }
 
 func (s *summaryQuantileSketch) observe(v SampleValue) {
+	// Not safe for concurrent use. Callers must hold the owning store mutex.
 	s.count++
 	if len(s.values) < s.capacity {
 		s.values = append(s.values, v)
