@@ -14,6 +14,8 @@ type storeReader struct {
 	flattened   bool
 	flattenOnce sync.Once
 	flatten     Reader
+	indexOnce   sync.Once
+	index       map[string][]*committedSeries
 }
 
 type familyView struct {
@@ -363,14 +365,16 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 }
 
 func (r *storeReader) Family(name string) (FamilyView, bool) {
-	if len(r.snap.byName[name]) == 0 {
+	index := r.byNameIndex()
+	if len(index[name]) == 0 {
 		return nil, false
 	}
 	return familyView{name: name, reader: r}, true
 }
 
 func (r *storeReader) ForEachByName(name string, fn func(labels LabelView, v SampleValue)) {
-	for _, s := range r.snap.byName[name] {
+	index := r.byNameIndex()
+	for _, s := range index[name] {
 		if r.visible(s) {
 			fn(labelView{items: s.labels}, s.value)
 		}
@@ -378,13 +382,14 @@ func (r *storeReader) ForEachByName(name string, fn func(labels LabelView, v Sam
 }
 
 func (r *storeReader) ForEachSeries(fn func(name string, labels LabelView, v SampleValue)) {
-	names := make([]string, 0, len(r.snap.byName))
-	for name := range r.snap.byName {
+	index := r.byNameIndex()
+	names := make([]string, 0, len(index))
+	for name := range index {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		for _, s := range r.snap.byName[name] {
+		for _, s := range index[name] {
 			if r.visible(s) {
 				fn(name, labelView{items: s.labels}, s.value)
 			}
@@ -393,7 +398,8 @@ func (r *storeReader) ForEachSeries(fn func(name string, labels LabelView, v Sam
 }
 
 func (r *storeReader) ForEachMatch(name string, match func(labels LabelView) bool, fn func(labels LabelView, v SampleValue)) {
-	for _, s := range r.snap.byName[name] {
+	index := r.byNameIndex()
+	for _, s := range index[name] {
 		if !r.visible(s) {
 			continue
 		}
@@ -421,6 +427,16 @@ func (r *storeReader) lookup(name string, labels Labels) (*committedSeries, bool
 	key := makeSeriesKey(name, labelsKey)
 	s, ok := r.snap.series[key]
 	return s, ok
+}
+
+func (r *storeReader) byNameIndex() map[string][]*committedSeries {
+	if r.snap.byName != nil {
+		return r.snap.byName
+	}
+	r.indexOnce.Do(func() {
+		r.index = buildByName(r.snap.series)
+	})
+	return r.index
 }
 
 // visible applies freshness policy for Read(); ReadRaw() bypasses it.

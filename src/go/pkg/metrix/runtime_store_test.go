@@ -1,0 +1,144 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package metrix
+
+import (
+	"math"
+	"sync"
+	"testing"
+)
+
+func TestRuntimeStoreScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"stateful writes are immediate commit with runtime metadata sequence": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				m := s.Write().StatefulMeter("runtime")
+				g := m.Gauge("heap_bytes")
+				c := m.Counter("jobs_total")
+
+				g.Set(5)
+				mustValue(t, s.Read(), "runtime.heap_bytes", nil, 5)
+				meta := s.Read().CollectMeta()
+				if meta.LastAttemptStatus != CollectStatusSuccess || meta.LastAttemptSeq != 1 || meta.LastSuccessSeq != 1 {
+					t.Fatalf("unexpected metadata after gauge set: %#v", meta)
+				}
+
+				c.Add(10)
+				mustValue(t, s.Read(), "runtime.jobs_total", nil, 10)
+				mustNoDelta(t, s.Read(), "runtime.jobs_total", nil)
+				meta = s.Read().CollectMeta()
+				if meta.LastAttemptSeq != 2 || meta.LastSuccessSeq != 2 {
+					t.Fatalf("unexpected metadata after first counter add: %#v", meta)
+				}
+
+				c.Add(4)
+				mustValue(t, s.Read(), "runtime.jobs_total", nil, 14)
+				mustDelta(t, s.Read(), "runtime.jobs_total", nil, 4)
+				meta = s.Read().CollectMeta()
+				if meta.LastAttemptSeq != 3 || meta.LastSuccessSeq != 3 {
+					t.Fatalf("unexpected metadata after second counter add: %#v", meta)
+				}
+			},
+		},
+		"runtime rejects snapshot-style constraints": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+
+				expectPanic(t, func() {
+					_ = s.Write().StatefulMeter("runtime").Gauge("x", WithFreshness(FreshnessCycle))
+				})
+				expectPanic(t, func() {
+					_ = s.Write().StatefulMeter("runtime").Summary("s", WithSummaryQuantiles(0.5), WithWindow(WindowCycle))
+				})
+			},
+		},
+		"runtime summary read and flatten are chart-compatible": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				sum := s.Write().StatefulMeter("runtime").Summary("latency", WithSummaryQuantiles(0.5, 1.0))
+
+				sum.Observe(1)
+				sum.Observe(3)
+
+				p, ok := s.Read().Summary("runtime.latency", nil)
+				if !ok {
+					t.Fatalf("expected runtime summary point")
+				}
+				if p.Count != 2 || p.Sum != 4 || len(p.Quantiles) != 2 {
+					t.Fatalf("unexpected runtime summary point: %#v", p)
+				}
+				if math.IsNaN(p.Quantiles[0].Value) || math.IsNaN(p.Quantiles[1].Value) {
+					t.Fatalf("expected finite quantile values: %#v", p.Quantiles)
+				}
+
+				fr := s.Read().Flatten()
+				mustValue(t, fr, "runtime.latency_count", nil, 2)
+				mustValue(t, fr, "runtime.latency_sum", nil, 4)
+				if _, ok := fr.Summary("runtime.latency", nil); ok {
+					t.Fatalf("expected flattened view to hide typed summary getter")
+				}
+			},
+		},
+		"runtime histogram and stateset are readable and flattenable": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				m := s.Write().StatefulMeter("runtime")
+				h := m.Histogram("req_duration", WithHistogramBounds(1, 2))
+				ss := m.StateSet("mode", WithStateSetStates("maintenance", "operational"), WithStateSetMode(ModeEnum))
+
+				h.Observe(0.5)
+				h.Observe(3)
+				ss.Enable("operational")
+
+				mustHistogram(t, s.Read(), "runtime.req_duration", nil, HistogramPoint{
+					Count: 2, Sum: 3.5,
+					Buckets: []BucketPoint{
+						{UpperBound: 1, CumulativeCount: 1},
+						{UpperBound: 2, CumulativeCount: 1},
+					},
+				})
+				mustStateSet(t, s.Read(), "runtime.mode", nil, map[string]bool{
+					"maintenance": false,
+					"operational": true,
+				})
+
+				fr := s.Read().Flatten()
+				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "1"}, 1)
+				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "2"}, 1)
+				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "+Inf"}, 2)
+				mustValue(t, fr, "runtime.mode", Labels{"runtime.mode": "maintenance"}, 0)
+				mustValue(t, fr, "runtime.mode", Labels{"runtime.mode": "operational"}, 1)
+			},
+		},
+		"runtime counter is thread-safe for concurrent writers": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				c := s.Write().StatefulMeter("runtime").Counter("events_total")
+
+				const workers = 8
+				const perWorker = 200
+
+				var wg sync.WaitGroup
+				wg.Add(workers)
+				for i := 0; i < workers; i++ {
+					go func() {
+						defer wg.Done()
+						for j := 0; j < perWorker; j++ {
+							c.Add(1)
+						}
+					}()
+				}
+				wg.Wait()
+
+				mustValue(t, s.Read(), "runtime.events_total", nil, workers*perWorker)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
