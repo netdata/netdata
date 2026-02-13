@@ -245,6 +245,26 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
 
       corrosion_add_target_rustflags(otel-signal-viewer-plugin ${OTEL_SIGNAL_VIEWER_RUSTFLAGS})
     endif()
+
+    if(ENABLE_PLUGIN_NETFLOW)
+      set(NETFLOW_PLUGIN_RUSTFLAGS "")
+
+      # We depend (transitively) on the `io-uring` crate which doesn't provide
+      # prebuilt bindings for 32-bit arches. Considering this is a compile-time
+      # and not a runtime dependency (because we don't use foyer's io-uring
+      # engine), we can simply skip the check.
+      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        list(APPEND NETFLOW_PLUGIN_RUSTFLAGS --cfg=io_uring_skip_arch_check)
+      endif()
+
+      if(STATIC_BUILD)
+        list(APPEND NETFLOW_PLUGIN_RUSTFLAGS "-C" "target-feature=+crt-static")
+      endif()
+
+      if(NETFLOW_PLUGIN_RUSTFLAGS)
+        corrosion_add_target_rustflags(netflow-plugin ${NETFLOW_PLUGIN_RUSTFLAGS})
+      endif()
+    endif()
 endif()
 
 option(ENABLE_MIMALLOC "Enable mimalloc allocator" OFF)
