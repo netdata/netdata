@@ -48,7 +48,7 @@ jobs:
 
       - name: Start snmpsim
         run: |
-          docker run -d --name snmpsim -p 1161:161/udp -v /tmp/snmpsim-data:/usr/share/snmpsim/data tandoor/snmpsim:latest
+          docker run -d --name snmpsim -p 1161:161/udp -v /tmp/snmpsim-data:/usr/local/snmpsim/data tandrup/snmpsim:latest
           sleep 3
 
       - name: Run integration tests
