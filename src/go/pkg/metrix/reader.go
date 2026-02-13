@@ -2,11 +2,17 @@
 
 package metrix
 
-import "sort"
+import (
+	"sort"
+	"sync"
+)
 
 type storeReader struct {
-	snap *readSnapshot
-	raw  bool // true => ReadRaw semantics (no freshness filtering)
+	snap        *readSnapshot
+	raw         bool // true => ReadRaw semantics (no freshness filtering)
+	flattened   bool
+	flattenOnce sync.Once
+	flatten     Reader
 }
 
 type familyView struct {
@@ -17,6 +23,9 @@ type familyView struct {
 func (r *storeReader) Value(name string, labels Labels) (SampleValue, bool) {
 	s, ok := r.lookup(name, labels)
 	if !ok || !r.visible(s) {
+		return 0, false
+	}
+	if s.desc == nil || !isScalarKind(s.desc.kind) {
 		return 0, false
 	}
 	return s.value, true
@@ -52,9 +61,18 @@ func (r *storeReader) Summary(name string, labels Labels) (SummaryPoint, bool) {
 }
 
 func (r *storeReader) StateSet(name string, labels Labels) (StateSetPoint, bool) {
-	_ = name
-	_ = labels
-	return StateSetPoint{}, false
+	if r.flattened {
+		return StateSetPoint{}, false
+	}
+
+	s, ok := r.lookup(name, labels)
+	if !ok || !r.visible(s) {
+		return StateSetPoint{}, false
+	}
+	if s.desc == nil || s.desc.kind != kindStateSet {
+		return StateSetPoint{}, false
+	}
+	return StateSetPoint{States: cloneStateMap(s.stateSetValues)}, true
 }
 
 func (r *storeReader) SeriesMeta(name string, labels Labels) (SeriesMeta, bool) {
@@ -70,7 +88,85 @@ func (r *storeReader) CollectMeta() CollectMeta {
 }
 
 func (r *storeReader) Flatten() Reader {
-	return r
+	if r.flattened {
+		return r
+	}
+	r.flattenOnce.Do(func() {
+		r.flatten = &storeReader{
+			snap:      flattenSnapshot(r.snap),
+			raw:       r.raw,
+			flattened: true,
+		}
+	})
+	if r.flatten == nil {
+		return r
+	}
+	return r.flatten
+}
+
+func flattenSnapshot(src *readSnapshot) *readSnapshot {
+	dst := &readSnapshot{
+		collectMeta: src.collectMeta,
+		series:      make(map[string]*committedSeries, len(src.series)),
+		byName:      make(map[string][]*committedSeries),
+	}
+
+	for _, s := range src.series {
+		if s.desc == nil {
+			continue
+		}
+		switch s.desc.kind {
+		case kindGauge, kindCounter:
+			dst.series[s.key] = cloneCommittedSeries(s)
+		case kindStateSet:
+			appendFlattenedStateSetSeries(dst, s)
+		}
+	}
+
+	dst.byName = buildByName(dst.series)
+	return dst
+}
+
+func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
+	schema := src.desc.stateSet
+	if schema == nil {
+		return
+	}
+
+	for _, state := range schema.states {
+		value := SampleValue(0)
+		if src.stateSetValues[state] {
+			value = 1
+		}
+
+		labelsMap := make(map[string]string, len(src.labels)+1)
+		for _, lbl := range src.labels {
+			labelsMap[lbl.Key] = lbl.Value
+		}
+		labelsMap[src.name] = state
+
+		labels, labelsKey, err := canonicalizeLabels(labelsMap)
+		if err != nil {
+			continue
+		}
+
+		key := makeSeriesKey(src.name, labelsKey)
+		dst.series[key] = &committedSeries{
+			id:        SeriesID(key),
+			key:       key,
+			name:      src.name,
+			labels:    labels,
+			labelsKey: labelsKey,
+			desc: &instrumentDescriptor{
+				name:      src.name,
+				kind:      kindGauge,
+				mode:      src.desc.mode,
+				freshness: src.desc.freshness,
+			},
+			value: value,
+			meta:  src.meta,
+		}
+	}
 }
 
 func (r *storeReader) Family(name string) (FamilyView, bool) {

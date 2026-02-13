@@ -13,4 +13,8 @@ var (
 	errCycleInactive        = errors.New("metrix: write outside active cycle")
 	errCycleActive          = errors.New("metrix: cycle already active")
 	errCycleMissing         = errors.New("metrix: cycle is not active")
+	errStateSetSchema       = errors.New("metrix: stateset schema is missing")
+	errStateSetEnumCount    = errors.New("metrix: stateset enum mode requires exactly one active state")
+	errStateSetUnknownState = errors.New("metrix: stateset point contains undeclared state")
+	errStateSetLabelKey     = errors.New("metrix: stateset flatten label key collides with existing label")
 )

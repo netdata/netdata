@@ -54,12 +54,6 @@ func (m *snapshotMeter) Summary(name string, opts ...InstrumentOption) SnapshotS
 	return snapshotSummaryNotImplemented{}
 }
 
-func (m *snapshotMeter) StateSet(name string, opts ...InstrumentOption) StateSetInstrument {
-	_ = name
-	_ = opts
-	return stateSetNotImplemented{}
-}
-
 func (m *snapshotMeter) LabelSet(labels ...Label) LabelSet {
 	return m.backend.compileLabelSet(labels...)
 }
@@ -88,12 +82,6 @@ func (m *statefulMeter) Summary(name string, opts ...InstrumentOption) StatefulS
 	_ = name
 	_ = opts
 	return statefulSummaryNotImplemented{}
-}
-
-func (m *statefulMeter) StateSet(name string, opts ...InstrumentOption) StateSetInstrument {
-	_ = name
-	_ = opts
-	return stateSetNotImplemented{}
 }
 
 func (m *statefulMeter) LabelSet(labels ...Label) LabelSet {
