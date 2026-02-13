@@ -44,7 +44,6 @@ This collector supports collecting metrics from multiple instances of this integ
 scripts.d Scheduler can be monitored further using the following other integrations:
 
 - [Nagios Plugins](/src/go/plugin/scripts.d/modules/nagios/integrations/nagios_plugins.md)
-- [Zabbix Preprocessing](/src/go/plugin/scripts.d/modules/zabbix/integrations/zabbix_preprocessing.md)
 
 ### Default Behavior
 
