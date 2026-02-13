@@ -120,6 +120,114 @@ exec "$@"
 	}
 }
 
+func TestRunDirect(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses sh scripts")
+	}
+
+	tmp := t.TempDir()
+
+	writeExe := func(path, body string) {
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o755))
+	}
+
+	echoArgs := filepath.Join(tmp, "echoargs.sh")
+	writeExe(echoArgs, "#!/bin/sh\nprintf '%s|' \"$@\"\necho\n")
+
+	stderrScript := filepath.Join(tmp, "stderr.sh")
+	writeExe(stderrScript, "#!/bin/sh\necho 'some error' 1>&2\nexit 1\n")
+
+	sleeper := filepath.Join(tmp, "sleep.sh")
+	writeExe(sleeper, "#!/bin/sh\nsleep 2\n")
+
+	t.Run("success", func(t *testing.T) {
+		out, err := RunDirect(nil, time.Second, echoArgs, "hello", "world")
+		require.NoError(t, err)
+		assert.Equal(t, "hello|world|\n", string(out))
+	})
+
+	t.Run("non-zero exit with stderr", func(t *testing.T) {
+		_, err := RunDirect(nil, time.Second, stderrScript)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "execution failed")
+		assert.Contains(t, err.Error(), "some error")
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		_, err := RunDirect(nil, 200*time.Millisecond, sleeper)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "execution failed")
+	})
+
+	t.Run("binary not found", func(t *testing.T) {
+		_, err := RunDirect(nil, time.Second, filepath.Join(tmp, "nonexistent"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "execution failed")
+	})
+
+	t.Run("long stderr truncated", func(t *testing.T) {
+		longStderr := filepath.Join(tmp, "longstderr.sh")
+		writeExe(longStderr, "#!/bin/sh\nprintf '"+strings.Repeat("x", 9000)+"' 1>&2\nexit 1\n")
+
+		_, err := RunDirect(nil, 5*time.Second, longStderr)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "truncated")
+	})
+}
+
+func TestFindBinary(t *testing.T) {
+	tmp := t.TempDir()
+
+	binPath := filepath.Join(tmp, "testbin")
+	require.NoError(t, os.WriteFile(binPath, []byte("#!/bin/sh\n"), 0o755))
+
+	t.Run("found in default paths", func(t *testing.T) {
+		path, err := FindBinary(
+			[]string{"nonexistent-binary-12345"},
+			[]string{filepath.Join(tmp, "missing"), binPath},
+		)
+		require.NoError(t, err)
+		assert.Equal(t, binPath, path)
+	})
+
+	t.Run("not found anywhere", func(t *testing.T) {
+		_, err := FindBinary(
+			[]string{"nonexistent-binary-12345"},
+			[]string{filepath.Join(tmp, "also-missing")},
+		)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "executable not found")
+	})
+
+	t.Run("skips directories", func(t *testing.T) {
+		dirPath := filepath.Join(tmp, "adir")
+		require.NoError(t, os.Mkdir(dirPath, 0o755))
+
+		_, err := FindBinary(
+			[]string{"nonexistent-binary-12345"},
+			[]string{dirPath},
+		)
+		require.Error(t, err)
+	})
+
+	t.Run("nil names searches only default paths", func(t *testing.T) {
+		path, err := FindBinary(nil, []string{binPath})
+		require.NoError(t, err)
+		assert.Equal(t, binPath, path)
+	})
+
+	t.Run("nil names not found", func(t *testing.T) {
+		_, err := FindBinary(nil, []string{filepath.Join(tmp, "missing")})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "executable not found")
+	})
+
+	t.Run("both nil", func(t *testing.T) {
+		_, err := FindBinary(nil, nil)
+		require.Error(t, err)
+	})
+}
+
 func TestRunUnprivilegedWithOptionsCmdWorkingDir(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("uses sh scripts")

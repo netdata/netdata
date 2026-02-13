@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build linux || freebsd || openbsd || netbsd || dragonfly
-
 package nvme
 
 import (
@@ -11,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
@@ -143,11 +142,12 @@ type nvmeCli interface {
 	smartLog(devicePath string) (*nvmeDeviceSmartLog, error)
 }
 
-type nvmeCLIExec struct {
+// ndsudoNvmeCliExec executes nvme via ndsudo (Linux/BSD)
+type ndsudoNvmeCliExec struct {
 	timeout time.Duration
 }
 
-func (n *nvmeCLIExec) list() (*nvmeDeviceList, error) {
+func (n *ndsudoNvmeCliExec) list() (*nvmeDeviceList, error) {
 	bs, err := ndexec.RunNDSudo(nil, n.timeout, "nvme-list")
 	if err != nil {
 		return nil, err
@@ -161,8 +161,44 @@ func (n *nvmeCLIExec) list() (*nvmeDeviceList, error) {
 	return &v, nil
 }
 
-func (n *nvmeCLIExec) smartLog(devicePath string) (*nvmeDeviceSmartLog, error) {
+func (n *ndsudoNvmeCliExec) smartLog(devicePath string) (*nvmeDeviceSmartLog, error) {
 	bs, err := ndexec.RunNDSudo(nil, n.timeout, "nvme-smart-log", "--device", devicePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var v nvmeDeviceSmartLog
+	if err := json.Unmarshal(bs, &v); err != nil {
+		return nil, err
+	}
+
+	return &v, nil
+}
+
+// directNvmeCliExec executes nvme directly (Windows)
+type directNvmeCliExec struct {
+	*logger.Logger
+
+	nvmePath string
+	timeout  time.Duration
+}
+
+func (n *directNvmeCliExec) list() (*nvmeDeviceList, error) {
+	bs, err := ndexec.RunDirect(n.Logger, n.timeout, n.nvmePath, "list", "--output-format=json")
+	if err != nil {
+		return nil, err
+	}
+
+	var v nvmeDeviceList
+	if err := json.Unmarshal(bs, &v); err != nil {
+		return nil, err
+	}
+
+	return &v, nil
+}
+
+func (n *directNvmeCliExec) smartLog(devicePath string) (*nvmeDeviceSmartLog, error) {
+	bs, err := ndexec.RunDirect(n.Logger, n.timeout, n.nvmePath, "smart-log", devicePath, "--output-format=json")
 	if err != nil {
 		return nil, err
 	}
