@@ -240,6 +240,8 @@ mod tests {
         fields.insert("PROTOCOL".to_string(), "6".to_string());
         fields.insert("SRC_ADDR".to_string(), "10.0.0.1".to_string());
         fields.insert("DST_ADDR".to_string(), "10.0.0.2".to_string());
+        fields.insert("SRC_PORT".to_string(), "12345".to_string());
+        fields.insert("DST_PORT".to_string(), "443".to_string());
         fields.insert("BYTES".to_string(), "100".to_string());
         fields.insert("PACKETS".to_string(), "2".to_string());
         fields.insert("FLOWS".to_string(), "1".to_string());
@@ -255,6 +257,8 @@ mod tests {
         assert_eq!(rows[0].fields.get("BYTES").map(String::as_str), Some("100"));
         assert!(rows[0].fields.get("SRC_ADDR").is_none());
         assert!(rows[0].fields.get("DST_ADDR").is_none());
+        assert!(rows[0].fields.get("SRC_PORT").is_none());
+        assert!(rows[0].fields.get("DST_PORT").is_none());
         assert!(rows[0].fields.get("V9_IN_BYTES").is_none());
     }
 

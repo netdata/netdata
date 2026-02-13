@@ -24,6 +24,8 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
+const FLOWS_SCHEMA_VERSION: &str = "2.0";
+
 #[derive(Debug, Serialize)]
 struct RequiredParamOption {
     id: String,
@@ -103,7 +105,7 @@ impl NetflowFlowsHandler {
             status: 200,
             response_type: "flows".to_string(),
             data: FlowsData {
-                schema_version: "2.0".to_string(),
+                schema_version: FLOWS_SCHEMA_VERSION.to_string(),
                 source: "netflow".to_string(),
                 layer: "3".to_string(),
                 agent_id: query_output.agent_id,

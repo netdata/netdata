@@ -247,6 +247,8 @@ impl Log {
         let boot_id = load_boot_id()?;
         let seqnum_id = uuid::Uuid::new_v4();
         let rotation_state = RotationState::new(&config.rotation_policy);
+        // When there is no tail monotonic timestamp for this boot we start at 0.
+        // The first clamped write becomes 1us if an override asks for 0, preserving strict monotonicity.
         let last_monotonic_usec = chain.tail_monotonic_for_boot(boot_id)?.unwrap_or(0);
 
         // Initialize clock with last entry timestamp if available

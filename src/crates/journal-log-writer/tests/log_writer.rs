@@ -495,9 +495,10 @@ fn test_monotonic_override_remains_strict_after_restart() {
     {
         let mut log = Log::new(dir.path(), test_config()).unwrap();
         let second = [b"MESSAGE=restart-second" as &[u8], b"PRIORITY=6"];
+        // Equal monotonic override must still be bumped above the persisted tail value.
         let ts = EntryTimestamps::default()
             .with_entry_realtime_usec(1)
-            .with_entry_monotonic_usec(1);
+            .with_entry_monotonic_usec(first_monotonic);
         log.write_entry_with_timestamps(&second, ts).unwrap();
         log.sync().unwrap();
     }
