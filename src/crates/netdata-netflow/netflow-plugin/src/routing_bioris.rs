@@ -253,9 +253,9 @@ async fn refresh_instance_once(
             continue;
         };
         for afisafi in [AfiSafi::Ipv4Unicast, AfiSafi::Ipv6Unicast] {
-            let peer = bioris_peer_key(instance, router_ip, afisafi);
+            let routing_key = bioris_peer_key(instance, router_ip, afisafi);
             expected_targets.insert(
-                peer.clone(),
+                routing_key.clone(),
                 ObserveTarget {
                     router: router.address.clone(),
                     afisafi,
@@ -268,7 +268,7 @@ async fn refresh_instance_once(
                 afisafi,
                 refresh_timeout,
                 runtime,
-                peer,
+                routing_key,
             )
             .await
             {

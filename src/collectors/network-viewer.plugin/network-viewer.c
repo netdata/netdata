@@ -30,6 +30,7 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Shows active network connections with protocol details, states, addresses, ports, and performance metrics."
 #define NETWORK_TOPOLOGY_VIEWER_FUNCTION "topology:network-viewer"
 #define NETWORK_TOPOLOGY_VIEWER_HELP "Shows live L7 topology from observed local sockets, including process and endpoint relations."
+// Keep in sync with the topology schema contract used across topology producers.
 #define NETWORK_TOPOLOGY_SCHEMA_VERSION "2.0"
 #define NETWORK_TOPOLOGY_SOURCE "network-viewer"
 #define NETWORK_TOPOLOGY_LAYER "l7"
