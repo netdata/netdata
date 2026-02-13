@@ -66,10 +66,15 @@ type SnapshotMeter interface {
 	WithLabels(labels ...Label) SnapshotMeter
 	WithLabelSet(labels ...LabelSet) SnapshotMeter
 	Gauge(name string, opts ...InstrumentOption) SnapshotGauge
+	GaugeVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotGaugeVec
 	Counter(name string, opts ...InstrumentOption) SnapshotCounter
+	CounterVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotCounterVec
 	Histogram(name string, opts ...InstrumentOption) SnapshotHistogram
+	HistogramVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotHistogramVec
 	Summary(name string, opts ...InstrumentOption) SnapshotSummary
+	SummaryVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotSummaryVec
 	StateSet(name string, opts ...InstrumentOption) StateSetInstrument
+	StateSetVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotStateSetVec
 	LabelSet(labels ...Label) LabelSet
 }
 
@@ -78,16 +83,30 @@ type StatefulMeter interface {
 	WithLabels(labels ...Label) StatefulMeter
 	WithLabelSet(labels ...LabelSet) StatefulMeter
 	Gauge(name string, opts ...InstrumentOption) StatefulGauge
+	GaugeVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulGaugeVec
 	Counter(name string, opts ...InstrumentOption) StatefulCounter
+	CounterVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulCounterVec
 	Histogram(name string, opts ...InstrumentOption) StatefulHistogram
+	HistogramVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulHistogramVec
 	Summary(name string, opts ...InstrumentOption) StatefulSummary
+	SummaryVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulSummaryVec
 	StateSet(name string, opts ...InstrumentOption) StateSetInstrument
+	StateSetVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulStateSetVec
 	LabelSet(labels ...Label) LabelSet
 }
 
 // SnapshotGauge writes sampled absolute values; last write wins in a cycle.
 type SnapshotGauge interface {
 	Observe(v SampleValue, labels ...LabelSet)
+}
+
+// SnapshotGaugeVec provides labeled series handles for snapshot gauges.
+// It follows the Prometheus vec pattern:
+// - GetWithLabelValues returns (metric, error)
+// - WithLabelValues panics on invalid label values
+type SnapshotGaugeVec interface {
+	GetWithLabelValues(labelValues ...string) (SnapshotGauge, error)
+	WithLabelValues(labelValues ...string) SnapshotGauge
 }
 
 // StatefulGauge writes maintained values:
@@ -97,31 +116,85 @@ type StatefulGauge interface {
 	Add(delta SampleValue, labels ...LabelSet)
 }
 
+// StatefulGaugeVec provides labeled series handles for stateful gauges.
+type StatefulGaugeVec interface {
+	GetWithLabelValues(labelValues ...string) (StatefulGauge, error)
+	WithLabelValues(labelValues ...string) StatefulGauge
+}
+
 type SnapshotCounter interface {
 	ObserveTotal(v SampleValue, labels ...LabelSet)
+}
+
+// SnapshotCounterVec provides labeled series handles for snapshot counters.
+type SnapshotCounterVec interface {
+	GetWithLabelValues(labelValues ...string) (SnapshotCounter, error)
+	WithLabelValues(labelValues ...string) SnapshotCounter
 }
 
 type StatefulCounter interface {
 	Add(delta SampleValue, labels ...LabelSet)
 }
 
+// StatefulCounterVec provides labeled series handles for stateful counters.
+type StatefulCounterVec interface {
+	GetWithLabelValues(labelValues ...string) (StatefulCounter, error)
+	WithLabelValues(labelValues ...string) StatefulCounter
+}
+
 type SnapshotHistogram interface {
 	ObservePoint(p HistogramPoint, labels ...LabelSet)
+}
+
+// SnapshotHistogramVec provides labeled series handles for snapshot histograms.
+type SnapshotHistogramVec interface {
+	GetWithLabelValues(labelValues ...string) (SnapshotHistogram, error)
+	WithLabelValues(labelValues ...string) SnapshotHistogram
 }
 
 type StatefulHistogram interface {
 	Observe(v SampleValue, labels ...LabelSet)
 }
 
+// StatefulHistogramVec provides labeled series handles for stateful histograms.
+type StatefulHistogramVec interface {
+	GetWithLabelValues(labelValues ...string) (StatefulHistogram, error)
+	WithLabelValues(labelValues ...string) StatefulHistogram
+}
+
 type SnapshotSummary interface {
 	ObservePoint(p SummaryPoint, labels ...LabelSet)
+}
+
+// SnapshotSummaryVec provides labeled series handles for snapshot summaries.
+type SnapshotSummaryVec interface {
+	GetWithLabelValues(labelValues ...string) (SnapshotSummary, error)
+	WithLabelValues(labelValues ...string) SnapshotSummary
 }
 
 type StatefulSummary interface {
 	Observe(v SampleValue, labels ...LabelSet)
 }
 
+// StatefulSummaryVec provides labeled series handles for stateful summaries.
+type StatefulSummaryVec interface {
+	GetWithLabelValues(labelValues ...string) (StatefulSummary, error)
+	WithLabelValues(labelValues ...string) StatefulSummary
+}
+
 type StateSetInstrument interface {
 	ObserveStateSet(p StateSetPoint, labels ...LabelSet)
 	Enable(actives ...string)
+}
+
+// SnapshotStateSetVec provides labeled series handles for snapshot statesets.
+type SnapshotStateSetVec interface {
+	GetWithLabelValues(labelValues ...string) (StateSetInstrument, error)
+	WithLabelValues(labelValues ...string) StateSetInstrument
+}
+
+// StatefulStateSetVec provides labeled series handles for stateful statesets.
+type StatefulStateSetVec interface {
+	GetWithLabelValues(labelValues ...string) (StateSetInstrument, error)
+	WithLabelValues(labelValues ...string) StateSetInstrument
 }
