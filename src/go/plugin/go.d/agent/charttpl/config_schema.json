@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "go.d chart template spec v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "groups"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "context_namespace": {
+      "type": "string"
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/group"
+      }
+    }
+  },
+  "$defs": {
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family"
+      ],
+      "properties": {
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_namespace": {
+          "type": "string"
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/group"
+          }
+        },
+        "charts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/chart"
+          }
+        }
+      }
+    },
+    "chart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "context",
+        "units",
+        "dimensions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family": {
+          "type": "string"
+        },
+        "context_namespace": {
+          "type": "string"
+        },
+        "context": {
+          "type": "string",
+          "minLength": 1
+        },
+        "units": {
+          "type": "string",
+          "minLength": 1
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "absolute",
+            "incremental"
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "line",
+            "area",
+            "stacked",
+            "heatmap"
+          ]
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "label_promotion": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "instances": {
+          "$ref": "#/$defs/instances"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        },
+        "dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/dimension"
+          }
+        }
+      }
+    },
+    "instances": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "by_labels"
+      ],
+      "properties": {
+        "by_labels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_instances": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expire_after_cycles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dimensions": {
+          "$ref": "#/$defs/dimension_lifecycle"
+        }
+      }
+    },
+    "dimension_lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_dims": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expire_after_cycles": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector"
+      ],
+      "properties": {
+        "selector": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "name_from_label": {
+          "type": "string"
+        },
+        "hidden": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
