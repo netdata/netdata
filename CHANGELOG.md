@@ -317,6 +317,21 @@
 - Regenerate integrations docs ([#21741](https://github.com/netdata/netdata/issues/21741))
 - Fix crash in plugin function callback ([#21713](https://github.com/netdata/netdata/issues/21713))
 - Remove unused crates. ([#21735](https://github.com/netdata/netdata/issues/21735))
+- Fix the yaml map ([#21743](https://github.com/netdata/netdata/issues/21743))
+- Go.d: add dcgm-exporter collector with full field classification ([#21721](https://github.com/netdata/netdata/issues/21721))
+- Regenerate integrations docs ([#21744](https://github.com/netdata/netdata/issues/21744))
+- Feat: Adds Netdata Cloud MCP server docs ([#21736](https://github.com/netdata/netdata/issues/21736))
+- Nagios plugin support ([#21294](https://github.com/netdata/netdata/issues/21294))
+- Allow for empty categories with items ([#21745](https://github.com/netdata/netdata/issues/21745))
+- Update docs to reference Cloud MCP alongside Agent/Parent MCP ([#21746](https://github.com/netdata/netdata/issues/21746))
+- Update MCP Registry entry with Cloud MCP endpoint ([#21747](https://github.com/netdata/netdata/issues/21747))
+- Restructure integration categories, fix related_resources, add guides ([#21742](https://github.com/netdata/netdata/issues/21742))
+- Regenerate integrations docs ([#21748](https://github.com/netdata/netdata/issues/21748))
+- Fix MDX build errors in integration docs and regenerate ([#21749](https://github.com/netdata/netdata/issues/21749))
+- Regenerate integrations docs ([#21750](https://github.com/netdata/netdata/issues/21750))
+- Strip relatedResource tags from GitHub-rendered md files ([#21751](https://github.com/netdata/netdata/issues/21751))
+- Restructure integration categories, add missing metadata ([#21753](https://github.com/netdata/netdata/issues/21753))
+- Regenerate integrations docs ([#21754](https://github.com/netdata/netdata/issues/21754))
 
 ## [2.8.0] - 2025-11-19
 
