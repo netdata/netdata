@@ -38,7 +38,7 @@ func newVecCache[T any](
 func (v *vecCache[T]) get(labelValues ...string) (T, error) {
 	var zero T
 
-	cacheKey, vecSet, err := vecSeriesLabelSet(v.backend, v.keys, labelValues)
+	cacheKey, err := vecSeriesCacheKey(v.keys, labelValues)
 	if err != nil {
 		return zero, err
 	}
@@ -56,6 +56,11 @@ func (v *vecCache[T]) get(labelValues ...string) (T, error) {
 	inst, ok = v.cache[cacheKey]
 	if ok {
 		return inst, nil
+	}
+
+	vecSet, err := vecSeriesCompileLabelSet(v.backend, v.keys, labelValues)
+	if err != nil {
+		return zero, err
 	}
 
 	inst = v.makeHandle(v.base, vecSet)
@@ -489,20 +494,32 @@ func normalizeVecLabelKeys(labelKeys []string) ([]string, error) {
 	return keys, nil
 }
 
-// vecSeriesLabelSet compiles a vec label-values tuple into a store-owned LabelSet.
-func vecSeriesLabelSet(backend meterBackend, keys []string, values []string) (string, LabelSet, error) {
+// vecSeriesCacheKey validates vec arity and returns a collision-safe cache key.
+func vecSeriesCacheKey(keys []string, values []string) (string, error) {
 	if len(values) != len(keys) {
-		return "", LabelSet{}, errVecLabelValueCount
+		return "", errVecLabelValueCount
 	}
 	if len(keys) == 0 {
-		return "", backend.compileLabelSet(), nil
+		return "", nil
+	}
+	return packVecLabelValues(values), nil
+}
+
+// vecSeriesCompileLabelSet compiles a vec label-values tuple into a store-owned LabelSet.
+// Callers should validate arity first via vecSeriesCacheKey.
+func vecSeriesCompileLabelSet(backend meterBackend, keys []string, values []string) (LabelSet, error) {
+	if len(values) != len(keys) {
+		return LabelSet{}, errVecLabelValueCount
+	}
+	if len(keys) == 0 {
+		return backend.compileLabelSet(), nil
 	}
 
 	labels := make([]Label, len(keys))
 	for i, key := range keys {
 		labels[i] = Label{Key: key, Value: values[i]}
 	}
-	return packVecLabelValues(values), backend.compileLabelSet(labels...), nil
+	return backend.compileLabelSet(labels...), nil
 }
 
 // packVecLabelValues builds a collision-safe cache key for an ordered values tuple.
