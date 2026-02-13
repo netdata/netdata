@@ -204,9 +204,9 @@ Use cases:
 |:-------|:------------|
 | Name | `Snmp:topology` |
 | Require Cloud | no |
-| Performance | Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many interfaces may return many rows |
-| Security | Exposes interface names, operational status, and traffic counters only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed |
-| Availability | Available when:<br/>• The collector has completed at least one data collection cycle<br/>• Interface data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet |
+| Performance | Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many discovered neighbors may return many rows |
+| Security | Exposes discovered device identifiers, interface/port identifiers, and management addresses only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed |
+| Availability | Available when:<br/>• The collector has completed at least one successful topology collection cycle<br/>• LLDP/CDP topology data is present in cache from the last successful SNMP collection<br/>• Returns HTTP 503 if topology cache is not ready yet |
 
 #### Prerequisites
 
