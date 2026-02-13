@@ -21,7 +21,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/nagios"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/scheduler"
-	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/zabbix"
 )
 
 func init() {
