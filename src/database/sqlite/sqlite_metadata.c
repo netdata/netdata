@@ -2619,9 +2619,7 @@ static void metadata_event_loop(void *arg)
                     worker->pending_ctx_cleanup_list = pending_ctx_cleanup_list;
                     worker->pending_uuid_deletion = pending_uuid_deletion;
                     worker->pending_sql_statement = pending_sql_statement;
-                    pending_alert_list = NULL;
 
-                    worker->work_buffer = work_buffer;
                     pending_ctx_cleanup_list = NULL;
                     pending_uuid_deletion = NULL;
                     pending_sql_statement = NULL;
