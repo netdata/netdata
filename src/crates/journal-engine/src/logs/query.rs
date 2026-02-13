@@ -5,6 +5,7 @@
 //! functions for extracting raw field data from journal entries.
 
 use crate::error::Result;
+use journal_core::field_map::REMAPPING_MARKER;
 use journal_core::file::{JournalFile, Mmap};
 use journal_index::{
     Anchor, Direction, FieldName, FieldValuePair, FileIndex, Filter, LogEntryId, LogQueryParams,
@@ -555,8 +556,13 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
             entry_guard.collect_offsets(&mut data_offsets)?;
             drop(entry_guard);
 
-            // Extract all field=value pairs
+            // Extract all field=value pairs, skipping field remapping entries.
+            // Remapping entries are internal bookkeeping (ND_REMAPPING=1) that map
+            // systemd field names back to OTEL names. Their data objects contain
+            // "SYSTEMD_NAME=otel.name", so if processed as log data the OTEL name
+            // would appear as the cell value — which is exactly the column name.
             let mut fields = Vec::new();
+            let mut is_remapping_entry = false;
             for data_offset in data_offsets.iter().copied() {
                 let data_guard = journal_file.data_ref(data_offset)?;
                 let payload_bytes = if data_guard.is_compressed() {
@@ -565,6 +571,12 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
                 } else {
                     data_guard.raw_payload()
                 };
+
+                if payload_bytes == REMAPPING_MARKER {
+                    is_remapping_entry = true;
+                    break;
+                }
+
                 let payload_str = String::from_utf8_lossy(payload_bytes);
 
                 if let Some(mut pair) = FieldValuePair::parse(&payload_str) {
@@ -579,6 +591,10 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
                 }
             }
 
+            if is_remapping_entry {
+                continue;
+            }
+
             result[original_idx] = Some(LogEntryData {
                 timestamp: entry.timestamp.get(),
                 fields,
@@ -586,6 +602,6 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
         }
     }
 
-    // Unwrap all Options (they're all Some at this point)
-    Ok(result.into_iter().map(|opt| opt.unwrap()).collect())
+    // Filter out None entries (remapping entries are skipped and left as None)
+    Ok(result.into_iter().flatten().collect())
 }
