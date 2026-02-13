@@ -18,7 +18,6 @@ bytesize = { workspace = true }
 bytesize-serde = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
-foundation = { workspace = true }
 journal-common = { workspace = true }
 journal-core = { workspace = true }
 journal-engine = { workspace = true }

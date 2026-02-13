@@ -2,13 +2,12 @@ use crate::plugin_config::PluginConfig;
 #[cfg(test)]
 use crate::tiering::dimensions_for_rollup;
 use crate::tiering::{OpenTierState, TierKind};
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{TimeZone, Utc};
-use foundation::Timeout;
 use journal_common::load_machine_id;
 use journal_engine::{
-    Facets, FileIndexCache, FileIndexCacheBuilder, FileIndexKey, LogQuery, QueryTimeRange,
-    batch_compute_file_indexes,
+    Facets, FileIndexCache, FileIndexCacheBuilder, FileIndexKey, IndexingLimits, LogQuery,
+    QueryTimeRange, batch_compute_file_indexes,
 };
 use journal_index::{Anchor, Direction, FieldName, FieldValuePair, Filter, Microseconds, Seconds};
 use journal_registry::{Monitor, Registry};
@@ -21,6 +20,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedReceiver;
+use tokio_util::sync::CancellationToken;
 
 const DEFAULT_QUERY_WINDOW_SECONDS: u32 = 15 * 60;
 const DEFAULT_QUERY_LIMIT: usize = 1000;
@@ -423,11 +423,25 @@ impl FlowQueryService {
             })
             .collect();
 
-        let timeout = Timeout::new(Duration::from_secs(QUERY_TIMEOUT_SECONDS));
-        let indexed_files =
-            batch_compute_file_indexes(&self.cache, &self.registry, keys, &time_range, timeout)
-                .await
-                .context("failed to index netflow journal files")?;
+        let indexing_cancellation = CancellationToken::new();
+        let indexed_files = tokio::select! {
+            result = batch_compute_file_indexes(
+                &self.cache,
+                &self.registry,
+                keys,
+                &time_range,
+                indexing_cancellation.clone(),
+                IndexingLimits::default(),
+                None,
+            ) => result.context("failed to index netflow journal files"),
+            _ = tokio::time::sleep(Duration::from_secs(QUERY_TIMEOUT_SECONDS)) => {
+                indexing_cancellation.cancel();
+                Err(anyhow!(
+                    "timed out indexing netflow journal files after {}s",
+                    QUERY_TIMEOUT_SECONDS
+                ))
+            }
+        }?;
 
         let file_indexes: Vec<_> = indexed_files.into_iter().map(|(_, idx)| idx).collect();
         if file_indexes.is_empty() {
