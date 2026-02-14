@@ -24,6 +24,10 @@ const (
 	prioInternalStatsErrors
 )
 
+const (
+	prioTopology = prioInternalStatsErrors + 1
+)
+
 var (
 	pingCharts = module.Charts{
 		pingRTTChart.Copy(),
@@ -56,6 +60,38 @@ var (
 	}
 )
 
+var (
+	topologyCharts = module.Charts{
+		topologyDevicesChart.Copy(),
+		topologyLinksChart.Copy(),
+	}
+	topologyDevicesChart = module.Chart{
+		ID:       "topology_devices",
+		Title:    "Topology devices",
+		Units:    "devices",
+		Fam:      "Topology",
+		Ctx:      "snmp.topology_devices",
+		Priority: prioTopology,
+		Dims: module.Dims{
+			{ID: "snmp_topology_devices_total", Name: "total"},
+			{ID: "snmp_topology_devices_discovered", Name: "discovered"},
+		},
+	}
+	topologyLinksChart = module.Chart{
+		ID:       "topology_links",
+		Title:    "Topology links",
+		Units:    "links",
+		Fam:      "Topology",
+		Ctx:      "snmp.topology_links",
+		Priority: prioTopology,
+		Dims: module.Dims{
+			{ID: "snmp_topology_links_total", Name: "total"},
+			{ID: "snmp_topology_links_lldp", Name: "lldp"},
+			{ID: "snmp_topology_links_cdp", Name: "cdp"},
+		},
+	}
+)
+
 func (c *Collector) addPingCharts() {
 	charts := pingCharts.Copy()
 
@@ -69,6 +105,22 @@ func (c *Collector) addPingCharts() {
 
 	if err := c.Charts().Add(*charts...); err != nil {
 		c.Warningf("failed to add ping charts: %v", err)
+	}
+}
+
+func (c *Collector) addTopologyCharts() {
+	charts := topologyCharts.Copy()
+
+	labels := c.chartBaseLabels()
+
+	for _, chart := range *charts {
+		for k, v := range labels {
+			chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warningf("failed to add topology charts: %v", err)
 	}
 }
 
