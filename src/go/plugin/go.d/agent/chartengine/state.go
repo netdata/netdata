@@ -5,8 +5,9 @@ package chartengine
 import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 
 type engineState struct {
-	cfg        engineConfig
-	program    *program.Program
-	routeCache *routeCache
-	stats      engineStats
+	cfg          engineConfig
+	program      *program.Program
+	routeCache   *routeCache
+	materialized materializedState
+	stats        engineStats
 }

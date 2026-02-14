@@ -126,6 +126,7 @@ func cloneRouteBindings(in []routeBinding) []routeBinding {
 }
 
 func (e *Engine) resolveSeriesRoutes(
+	cache *routeCache,
 	identity metrix.SeriesIdentity,
 	name string,
 	labels metrix.LabelView,
@@ -134,9 +135,6 @@ func (e *Engine) resolveSeriesRoutes(
 	index matchIndex,
 	revision uint64,
 ) ([]routeBinding, bool, error) {
-	e.mu.RLock()
-	cache := e.state.routeCache
-	e.mu.RUnlock()
 	if cache == nil {
 		return nil, false, fmt.Errorf("chartengine: route cache is not initialized")
 	}

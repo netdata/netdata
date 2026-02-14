@@ -31,8 +31,9 @@ func New(opts ...Option) (*Engine, error) {
 	}
 	return &Engine{
 		state: engineState{
-			cfg:        cfg,
-			routeCache: newRouteCache(),
+			cfg:          cfg,
+			routeCache:   newRouteCache(),
+			materialized: newMaterializedState(),
 		},
 	}, nil
 }
@@ -52,6 +53,7 @@ func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 	e.state.program = compiled
 	// Template revision change resets routing/materialization internals.
 	e.state.routeCache = newRouteCache()
+	e.state.materialized = newMaterializedState()
 	e.mu.Unlock()
 	return nil
 }
