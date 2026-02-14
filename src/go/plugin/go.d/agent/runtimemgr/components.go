@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package jobmgr
+package runtimemgr
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
 )
 
-// RuntimeComponentConfig registers one internal/runtime metrics component.
+// ComponentConfig registers one internal/runtime metrics component.
 //
 // The component provides:
 //   - RuntimeStore: writer-owned internal metrics store.
@@ -21,7 +21,7 @@ import (
 //   - EmitEnv fields: chart emission metadata (TypeID, plugin/module/job labels).
 //
 // Emission cadence is owned by the dedicated runtime metrics job.
-type RuntimeComponentConfig struct {
+type ComponentConfig struct {
 	Name string
 
 	Store        metrix.RuntimeStore
@@ -36,7 +36,7 @@ type RuntimeComponentConfig struct {
 	JobLabels map[string]string
 }
 
-type runtimeComponentSpec struct {
+type componentSpec struct {
 	Name       string
 	Generation uint64
 
@@ -47,19 +47,19 @@ type runtimeComponentSpec struct {
 	EmitEnv      chartemit.EmitEnv
 }
 
-type runtimeComponentRegistry struct {
+type componentRegistry struct {
 	mu    sync.RWMutex
 	rev   uint64
-	items map[string]runtimeComponentSpec
+	items map[string]componentSpec
 }
 
-func newRuntimeComponentRegistry() *runtimeComponentRegistry {
-	return &runtimeComponentRegistry{
-		items: make(map[string]runtimeComponentSpec),
+func newComponentRegistry() *componentRegistry {
+	return &componentRegistry{
+		items: make(map[string]componentSpec),
 	}
 }
 
-func (r *runtimeComponentRegistry) upsert(spec runtimeComponentSpec) uint64 {
+func (r *componentRegistry) upsert(spec componentSpec) uint64 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -69,19 +69,19 @@ func (r *runtimeComponentRegistry) upsert(spec runtimeComponentSpec) uint64 {
 	return spec.Generation
 }
 
-func (r *runtimeComponentRegistry) remove(name string) {
+func (r *componentRegistry) remove(name string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.items, name)
 }
 
-func (r *runtimeComponentRegistry) snapshot() []runtimeComponentSpec {
+func (r *componentRegistry) snapshot() []componentSpec {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	out := make([]runtimeComponentSpec, 0, len(r.items))
+	out := make([]componentSpec, 0, len(r.items))
 	for _, spec := range r.items {
-		out = append(out, runtimeComponentSpec{
+		out = append(out, componentSpec{
 			Name:       spec.Name,
 			Generation: spec.Generation,
 			Store:      spec.Store,
@@ -107,39 +107,16 @@ func cloneEmitEnv(env chartemit.EmitEnv) chartemit.EmitEnv {
 	return out
 }
 
-func (m *Manager) RegisterRuntimeComponent(cfg RuntimeComponentConfig) error {
-	if m == nil {
-		return fmt.Errorf("jobmgr: nil manager")
-	}
-	spec, err := m.normalizeRuntimeComponent(cfg)
-	if err != nil {
-		return err
-	}
-	m.runtimeComponents.upsert(spec)
-	return nil
-}
-
-func (m *Manager) UnregisterRuntimeComponent(name string) {
-	if m == nil {
-		return
-	}
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return
-	}
-	m.runtimeComponents.remove(name)
-}
-
-func (m *Manager) normalizeRuntimeComponent(cfg RuntimeComponentConfig) (runtimeComponentSpec, error) {
+func normalizeComponent(cfg ComponentConfig, pluginName string) (componentSpec, error) {
 	name := strings.TrimSpace(cfg.Name)
 	if name == "" {
-		return runtimeComponentSpec{}, fmt.Errorf("jobmgr: runtime component name is required")
+		return componentSpec{}, fmt.Errorf("runtimemgr: runtime component name is required")
 	}
 	if cfg.Store == nil {
-		return runtimeComponentSpec{}, fmt.Errorf("jobmgr: runtime component %q store is required", name)
+		return componentSpec{}, fmt.Errorf("runtimemgr: runtime component %q store is required", name)
 	}
 	if len(cfg.TemplateYAML) == 0 {
-		return runtimeComponentSpec{}, fmt.Errorf("jobmgr: runtime component %q template is required", name)
+		return componentSpec{}, fmt.Errorf("runtimemgr: runtime component %q template is required", name)
 	}
 	updateEvery := cfg.UpdateEvery
 	if updateEvery <= 0 {
@@ -148,18 +125,18 @@ func (m *Manager) normalizeRuntimeComponent(cfg RuntimeComponentConfig) (runtime
 
 	typeID := strings.TrimSpace(cfg.TypeID)
 	if typeID == "" {
-		typeID = fmt.Sprintf("%s.internal.%s", sanitizeName(m.PluginName), sanitizeName(name))
+		typeID = fmt.Sprintf("%s.internal.%s", sanitizeName(pluginName), sanitizeName(name))
 	}
 	env := chartemit.EmitEnv{
 		TypeID:      typeID,
 		UpdateEvery: updateEvery,
-		Plugin:      firstNotEmpty(strings.TrimSpace(cfg.Plugin), m.PluginName),
+		Plugin:      firstNotEmpty(strings.TrimSpace(cfg.Plugin), pluginName),
 		Module:      firstNotEmpty(strings.TrimSpace(cfg.Module), "internal"),
 		JobName:     firstNotEmpty(strings.TrimSpace(cfg.JobName), name),
 		JobLabels:   cloneStringMap(cfg.JobLabels),
 	}
 
-	return runtimeComponentSpec{
+	return componentSpec{
 		Name:         name,
 		Store:        cfg.Store,
 		TemplateYAML: append([]byte(nil), cfg.TemplateYAML...),
@@ -187,4 +164,9 @@ func firstNotEmpty(items ...string) string {
 		}
 	}
 	return ""
+}
+
+func sanitizeName(name string) string {
+	replacer := strings.NewReplacer("/", "_", "\\", "_", " ", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
+	return replacer.Replace(name)
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimemgr"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 
 	"github.com/mattn/go-isatty"
@@ -36,13 +37,14 @@ func New() *Manager {
 	seen := dyncfg.NewSeenCache[confgroup.Config]()
 	exposed := dyncfg.NewExposedCache[confgroup.Config]()
 	api := dyncfg.NewResponder(netdataapi.New(safewriter.Stdout))
+	baseLogger := logger.New().With(
+		slog.String("component", "job manager"),
+	)
 
 	mgr := &Manager{
-		Logger: logger.New().With(
-			slog.String("component", "job manager"),
-		),
-		Out:   io.Discard,
-		FnReg: noop{},
+		Logger: baseLogger,
+		Out:    io.Discard,
+		FnReg:  noop{},
 
 		Vnodes: make(map[string]*vnodes.VirtualNode),
 
@@ -52,7 +54,6 @@ func New() *Manager {
 		exposed:           exposed,
 		runningJobs:       newRunningJobsCache(),
 		retryingTasks:     newRetryingTasksCache(),
-		runtimeComponents: newRuntimeComponentRegistry(),
 
 		started:   make(chan struct{}),
 		addCh:     make(chan confgroup.Config),
@@ -60,6 +61,7 @@ func New() *Manager {
 		dyncfgCh:  make(chan dyncfg.Function),
 		dyncfgApi: api,
 	}
+	mgr.runtimeService = runtimemgr.New(baseLogger.With(slog.String("component", "runtime metrics service")))
 
 	mgr.collectorCb = &collectorCallbacks{mgr: mgr}
 	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[confgroup.Config]{
@@ -120,9 +122,7 @@ type Manager struct {
 	exposed           *dyncfg.ExposedCache[confgroup.Config]
 	retryingTasks     *retryingTasks
 	runningJobs       *runningJobs
-	runtimeComponents *runtimeComponentRegistry
-	runtimeJob        *runtimeMetricsJob
-	runtimeProducers  []runtimeProducer
+	runtimeService    *runtimemgr.Service
 
 	handler     *dyncfg.Handler[confgroup.Config]
 	collectorCb *collectorCallbacks
@@ -146,6 +146,9 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	m.Info("instance is started")
 	defer func() { m.cleanup(); m.Info("instance is stopped") }()
 	m.ctx = ctx
+	if m.runtimeService != nil {
+		m.runtimeService.Start(m.PluginName, m.Out)
+	}
 
 	m.FnReg.RegisterPrefix("config", m.dyncfgCollectorPrefixValue(), m.dyncfgConfigHandler)
 	m.FnReg.RegisterPrefix("config", m.dyncfgVnodePrefixValue(), m.dyncfgConfigHandler)
@@ -202,16 +205,8 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	}
 
 	m.loadFileStatus()
-	m.bootstrapRuntimeComponents()
 
 	var wg sync.WaitGroup
-
-	m.runtimeJob = newRuntimeMetricsJob(
-		m.Out,
-		m.runtimeComponents,
-		m.Logger.With(slog.String("component", "runtime metrics job")),
-	)
-	go m.runtimeJob.Start()
 
 	wg.Add(1)
 	go func() { defer wg.Done(); m.runFileStatusPersistence() }()
@@ -373,9 +368,8 @@ func (m *Manager) runNotifyRunningJobs() {
 			m.runningJobs.lock()
 			m.runningJobs.forEach(func(_ string, job *module.Job) { job.Tick(clock) })
 			m.runningJobs.unlock()
-			m.tickRuntimeProducers()
-			if m.runtimeJob != nil {
-				m.runtimeJob.Tick(clock)
+			if m.runtimeService != nil {
+				m.runtimeService.Tick(clock)
 			}
 		}
 	}
@@ -424,8 +418,8 @@ func (m *Manager) stopRunningJob(name string) {
 func (m *Manager) cleanup() {
 	m.FnReg.UnregisterPrefix("config", m.dyncfgCollectorPrefixValue())
 	m.FnReg.UnregisterPrefix("config", m.dyncfgVnodePrefixValue())
-	if m.runtimeJob != nil {
-		m.runtimeJob.Stop()
+	if m.runtimeService != nil {
+		m.runtimeService.Stop()
 	}
 
 	// Unregister module functions

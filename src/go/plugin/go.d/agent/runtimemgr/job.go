@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package jobmgr
+package runtimemgr
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ import (
 )
 
 type runtimeComponentState struct {
-	spec        runtimeComponentSpec
+	spec        componentSpec
 	engine      *chartengine.Engine
 	prev        time.Time
 	knownCharts map[string]chartengine.ChartMeta
@@ -28,7 +28,7 @@ type runtimeMetricsJob struct {
 	*logger.Logger
 
 	out      io.Writer
-	registry *runtimeComponentRegistry
+	registry *componentRegistry
 
 	running atomic.Bool
 	stop    chan struct{}
@@ -40,7 +40,7 @@ type runtimeMetricsJob struct {
 	components map[string]*runtimeComponentState
 }
 
-func newRuntimeMetricsJob(out io.Writer, reg *runtimeComponentRegistry, log *logger.Logger) *runtimeMetricsJob {
+func newRuntimeMetricsJob(out io.Writer, reg *componentRegistry, log *logger.Logger) *runtimeMetricsJob {
 	if out == nil {
 		out = io.Discard
 	}
@@ -152,7 +152,7 @@ func (j *runtimeMetricsJob) runOnce(clock int) {
 	}
 }
 
-func (j *runtimeMetricsJob) ensureComponent(spec runtimeComponentSpec) (*runtimeComponentState, error) {
+func (j *runtimeMetricsJob) ensureComponent(spec componentSpec) (*runtimeComponentState, error) {
 	current, ok := j.components[spec.Name]
 	if ok && current.spec.Generation == spec.Generation {
 		return current, nil
