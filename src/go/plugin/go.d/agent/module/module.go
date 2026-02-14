@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 
 	"github.com/stretchr/testify/assert"
@@ -43,6 +45,30 @@ type Module interface {
 
 type MetricCollector interface {
 	CollectMetrics(context.Context) map[string]float64
+}
+
+// ModuleV2 is the collector contract for the new metrics+template runtime.
+//
+// Collectors implementing this interface:
+//   - write metrics into CollectorStore during Collect(),
+//   - provide chart template YAML consumed by chartengine.
+type ModuleV2 interface {
+	Init(context.Context) error
+	Check(context.Context) error
+	Collect(context.Context) error
+	Cleanup(context.Context)
+
+	GetBase() *Base
+	Configuration() any
+	VirtualNode() *vnodes.VirtualNode
+
+	MetricStore() metrix.CollectorStore
+	ChartTemplateYAML() []byte
+}
+
+// ModuleV2Autogen allows a V2 collector to opt into unmatched-series fallback.
+type ModuleV2Autogen interface {
+	AutogenPolicy() chartengine.AutogenPolicy
 }
 
 // Base is a helper struct. All modules should embed this struct.
