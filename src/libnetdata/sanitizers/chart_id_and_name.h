@@ -11,6 +11,8 @@ char *rrdset_strncpyz_name(char *dst, const char *src, size_t dst_size_minus_1);
 bool rrdvar_fix_name(char *variable);
 
 extern unsigned char chart_names_allowed_chars[256];
+extern unsigned char rrd_string_allowed_chars[256];
+
 static inline bool is_netdata_api_valid_character(char c) {
     if(IS_UTF8_BYTE(c)) return true;
     unsigned char t = chart_names_allowed_chars[(unsigned char)c];
