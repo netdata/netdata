@@ -41,7 +41,6 @@ enum hardirq_maps { HARDIRQ_MAP_LATENCY, HARDIRQ_MAP_LATENCY_STATIC };
 
 typedef struct hardirq_ebpf_static_val {
     uint64_t latency;
-    uint64_t ts;
 } hardirq_ebpf_static_val_t;
 
 /*****************************************************************
@@ -49,7 +48,7 @@ typedef struct hardirq_ebpf_static_val {
  *****************************************************************/
 
 // ARAL Name
-#define NETDATA_EBPF_HARDIRQ_ARAL_NAME "ebpf_harddirq"
+#define NETDATA_EBPF_HARDIRQ_ARAL_NAME "ebpf_hardirq"
 
 #define NETDATA_EBPF_MODULE_NAME_HARDIRQ "hardirq"
 #define NETDATA_HARDIRQ_CONFIG_FILE "hardirq.conf"

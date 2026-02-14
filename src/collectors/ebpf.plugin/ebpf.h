@@ -56,7 +56,7 @@ extern struct mount_bpf *mount_bpf_obj;
 extern struct mdflush_bpf *mdflush_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
 extern struct socket_bpf *socket_bpf_obj;
-extern struct swap_bpf *bpf_obj;
+extern struct swap_bpf *swap_bpf_obj;
 extern struct vfs_bpf *vfs_bpf_obj;
 extern struct process_bpf *process_bpf_obj;
 #endif
@@ -204,46 +204,6 @@ void ebpf_global_labels(
     int *algorithm,
     int end);
 
-void ebpf_write_chart_cmd(
-    char *type,
-    char *id,
-    char *suffix,
-    char *title,
-    char *units,
-    char *family,
-    char *charttype,
-    char *context,
-    int order,
-    int update_every,
-    char *module);
-
-void ebpf_write_global_dimension(char *name, char *id, char *algorithm);
-
-void ebpf_create_global_dimension(void *ptr, int end);
-
-void ebpf_create_chart(
-    char *type,
-    char *id,
-    char *title,
-    char *units,
-    char *family,
-    char *context,
-    char *charttype,
-    int order,
-    void (*ncd)(void *, int),
-    void *move,
-    int end,
-    int update_every,
-    char *module);
-
-void write_chart_dimension(char *dim, long long value);
-
-void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, uint32_t end);
-
-void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end);
-
-void write_io_chart(char *chart, char *family, char *dwrite, long long vwrite, char *dread, long long vread);
-
 /**
  * Create Chart labels
  *
@@ -273,7 +233,7 @@ static inline void ebpf_commit_label()
  * @param name   the chart name
  * @param metric the chart suffix (used with apps and cgroups)
  */
-static inline void ebpf_write_begin_chart(char *family, char *name, char *metric)
+static inline void ebpf_write_begin_chart(const char *family, const char *name, const char *metric)
 {
     printf("BEGIN %s.%s%s\n", family, name, metric);
 }
@@ -325,21 +285,8 @@ extern void *default_btf;
 void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr);
 void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *root);
-void ebpf_one_dimension_write_charts(char *family, char *chart, char *dim, long long v1);
 collected_number get_value_from_structure(char *basis, size_t offset);
 void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em);
-void ebpf_write_chart_obsolete(
-    char *type,
-    char *id,
-    char *suffix,
-    char *title,
-    char *units,
-    char *family,
-    char *charttype,
-    char *context,
-    int order,
-    int update_every);
-void write_histogram_chart(char *family, char *name, const netdata_idx_t *hist, char **dimensions, uint32_t end);
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
 ARAL *ebpf_allocate_pid_aral(char *name, size_t size);
 void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links);
@@ -354,7 +301,6 @@ void ebpf_read_global_table_stats(
 void **ebpf_judy_insert_unsafe(PPvoid_t arr, Word_t key);
 netdata_ebpf_judy_pid_stats_t *ebpf_get_pid_from_judy_unsafe(PPvoid_t judy_array, uint32_t pid);
 
-void parse_network_viewer_section(struct config *cfg);
 void ebpf_clean_ip_structure(ebpf_network_viewer_ip_list_t **clean);
 void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 void ebpf_read_local_addresses_unsafe();

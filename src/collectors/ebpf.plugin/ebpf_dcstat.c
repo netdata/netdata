@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_dcstat.h"
+#include "ebpf_library.h"
 
 static char *dcstat_counter_dimension_name[NETDATA_DCSTAT_IDX_END] = {"ratio", "reference", "slow", "miss"};
 static netdata_syscall_stat_t dcstat_counter_aggregated_data[NETDATA_DCSTAT_IDX_END];
@@ -190,7 +191,8 @@ static void ebpf_dc_set_hash_tables(struct dc_bpf *obj)
  */
 netdata_ebpf_program_loaded_t ebpf_dc_update_load(ebpf_module_t *em)
 {
-    if (!strcmp(
+    if (dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].optional &&
+        !strcmp(
             dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].optional,
             dc_optional_name[NETDATA_DC_TARGET_LOOKUP_FAST].function_to_attach))
         return EBPF_LOAD_TRAMPOLINE;
@@ -260,6 +262,8 @@ static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
 void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access, uint64_t not_found)
 {
     NETDATA_DOUBLE successful_access = (NETDATA_DOUBLE)(((long long)cache_access) - ((long long)not_found));
+    if (successful_access < 0)
+        successful_access = 0;
     NETDATA_DOUBLE ratio = (cache_access) ? successful_access / (NETDATA_DOUBLE)cache_access : 0;
 
     out->ratio = (long long)(ratio * 100);
@@ -546,7 +550,7 @@ static void ebpf_dcstat_apps_accumulator(netdata_dcstat_pid_t *out, int maps_per
             ct = w->ct;
 
         if (!total->name[0] && w->name[0])
-            strncpyz(total->name, w->name, sizeof(total->name) - 1);
+            strncpyz(total->name, w->name, sizeof(total->name));
     }
     total->ct = ct;
 }
@@ -703,21 +707,25 @@ void ebpf_read_dcstat_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        sem_wait(shm_mutex_ebpf_integration);
-        ebpf_read_dc_apps_table(maps_per_core);
-        ebpf_dc_resume_apps_data();
-        if (cgroups && shm_ebpf_cgroup.header)
-            ebpf_update_dc_cgroup();
+        if (sem_wait(shm_mutex_ebpf_integration) == 0) {
+            ebpf_read_dc_apps_table(maps_per_core);
+            ebpf_dc_resume_apps_data();
+            if (cgroups && shm_ebpf_cgroup.header)
+                ebpf_update_dc_cgroup();
 
-        sem_post(shm_mutex_ebpf_integration);
+            if (sem_post(shm_mutex_ebpf_integration))
+                netdata_log_error("DCSTAT: Failed to post semaphore.");
+        } else {
+            netdata_log_error("DCSTAT: Failed to wait on semaphore.");
+        }
 
         counter = 0;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
+        else
+            running_time = update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
@@ -821,10 +829,9 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  * Read the table with number of calls for all functions
  *
- * @param stats         vector used to read data from control table.
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_dc_read_global_tables(netdata_idx_t *stats, int maps_per_core)
+static void ebpf_dc_read_global_tables(int maps_per_core)
 {
     ebpf_read_global_table_stats(
         dcstat_hash_values,
@@ -833,14 +840,6 @@ static void ebpf_dc_read_global_tables(netdata_idx_t *stats, int maps_per_core)
         maps_per_core,
         NETDATA_KEY_DC_REFERENCE,
         NETDATA_DIRECTORY_CACHE_END);
-
-    ebpf_read_global_table_stats(
-        stats,
-        dcstat_values,
-        dcstat_maps[NETDATA_DCSTAT_CTRL].map_fd,
-        maps_per_core,
-        NETDATA_CONTROLLER_PID_TABLE_ADD,
-        NETDATA_CONTROLLER_END);
 }
 
 /**
@@ -910,23 +909,18 @@ static void dcstat_send_global(netdata_publish_dcstat_t *publish)
         publish, dcstat_hash_values[NETDATA_KEY_DC_REFERENCE], dcstat_hash_values[NETDATA_KEY_DC_MISS]);
 
     netdata_publish_syscall_t *ptr = dcstat_counter_publish_aggregated;
-    netdata_idx_t value = dcstat_hash_values[NETDATA_KEY_DC_REFERENCE];
-    if (value != ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall) {
-        ptr[NETDATA_DCSTAT_IDX_REFERENCE].ncall = value - ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall;
-        ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall = value;
 
-        value = dcstat_hash_values[NETDATA_KEY_DC_SLOW];
-        ptr[NETDATA_DCSTAT_IDX_SLOW].ncall = value - ptr[NETDATA_DCSTAT_IDX_SLOW].pcall;
-        ptr[NETDATA_DCSTAT_IDX_SLOW].pcall = value;
+    netdata_idx_t ref_value = dcstat_hash_values[NETDATA_KEY_DC_REFERENCE];
+    ptr[NETDATA_DCSTAT_IDX_REFERENCE].ncall = ref_value - ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall;
+    ptr[NETDATA_DCSTAT_IDX_REFERENCE].pcall = ref_value;
 
-        value = dcstat_hash_values[NETDATA_KEY_DC_MISS];
-        ptr[NETDATA_DCSTAT_IDX_MISS].ncall = value - ptr[NETDATA_DCSTAT_IDX_MISS].pcall;
-        ptr[NETDATA_DCSTAT_IDX_MISS].pcall = value;
-    } else {
-        ptr[NETDATA_DCSTAT_IDX_REFERENCE].ncall = 0;
-        ptr[NETDATA_DCSTAT_IDX_SLOW].ncall = 0;
-        ptr[NETDATA_DCSTAT_IDX_MISS].ncall = 0;
-    }
+    netdata_idx_t slow_value = dcstat_hash_values[NETDATA_KEY_DC_SLOW];
+    ptr[NETDATA_DCSTAT_IDX_SLOW].ncall = slow_value - ptr[NETDATA_DCSTAT_IDX_SLOW].pcall;
+    ptr[NETDATA_DCSTAT_IDX_SLOW].pcall = slow_value;
+
+    netdata_idx_t miss_value = dcstat_hash_values[NETDATA_KEY_DC_MISS];
+    ptr[NETDATA_DCSTAT_IDX_MISS].ncall = miss_value - ptr[NETDATA_DCSTAT_IDX_MISS].pcall;
+    ptr[NETDATA_DCSTAT_IDX_MISS].pcall = miss_value;
 
     ebpf_one_dimension_write_charts(
         NETDATA_FILESYSTEM_FAMILY, NETDATA_DC_HIT_CHART, ptr[NETDATA_DCSTAT_IDX_RATIO].dimension, publish->ratio);
@@ -1087,7 +1081,7 @@ static void ebpf_obsolete_specific_dc_charts(char *type, int update_every)
  */
 void ebpf_dc_sum_cgroup_pids(netdata_publish_dcstat_t *publish, struct pid_on_target2 *root)
 {
-    memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
+    memset(&publish->curr, 0, sizeof(netdata_publish_dcstat_pid_t));
     while (root) {
         netdata_dcstat_pid_t *src = &root->dc;
 
@@ -1341,8 +1335,6 @@ static void dcstat_collector(ebpf_module_t *em)
     int maps_per_core = em->maps_per_core;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
-    netdata_idx_t *stats = em->hash_table_stats;
-    memset(stats, 0, sizeof(em->hash_table_stats));
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
 
@@ -1351,7 +1343,7 @@ static void dcstat_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
-        ebpf_dc_read_global_tables(stats, maps_per_core);
+        ebpf_dc_read_global_tables(maps_per_core);
 
         netdata_mutex_lock(&lock);
 
@@ -1366,10 +1358,10 @@ static void dcstat_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
+        else
+            running_time = update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
@@ -1495,6 +1487,10 @@ void ebpf_dcstat_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     CLEANUP_FUNCTION_REGISTER(ebpf_dcstat_exit) cleanup_ptr = em;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto enddcstat;
+    }
 
     em->maps = dcstat_maps;
 

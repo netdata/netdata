@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_functions.h"
+#include "ebpf_library.h"
 
 /*****************************************************************
  *  EBPF FUNCTION COMMON
