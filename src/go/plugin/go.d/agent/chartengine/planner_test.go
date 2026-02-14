@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 )
 
 func TestInferDimensionLabelKeyScenarios(t *testing.T) {
@@ -661,6 +662,436 @@ groups:
 	assert.False(t, hasDirection)
 }
 
+func TestBuildPlanAutogenDisabledSkipsUnmatchedSeries(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	unmatched := store.Write().SnapshotMeter("svc").Counter("errors_total")
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Empty(t, plan.Actions)
+}
+
+func TestBuildPlanAutogenCreatesChartForUnmatchedScalar(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	unmatched := sm.Counter("errors_total")
+	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10, methodGET)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc.errors_total-method=GET", create.ChartID)
+	assert.Equal(t, "autogen.svc.errors_total", create.Meta.Context)
+	assert.Equal(t, "events/s", create.Meta.Units)
+	assert.Equal(t, "GET", create.Labels["method"])
+	update := findUpdateAction(plan)
+	require.NotNil(t, update)
+	assert.Equal(t, "svc.errors_total-method=GET", update.ChartID)
+	require.Len(t, update.Values, 1)
+	assert.Equal(t, "svc.errors_total", update.Values[0].Name)
+	assert.Equal(t, float64(10), update.Values[0].Float64)
+}
+
+func TestBuildPlanTemplatePrecedenceOverAutogen(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - id: svc_requests
+        title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	m := sm.Counter("requests_total")
+	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+
+	cc.BeginCycle()
+	m.ObserveTotal(10, methodGET)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc_requests", create.ChartID)
+	assert.NotEqual(t, "svc.requests_total-method=GET", create.ChartID)
+}
+
+func TestBuildPlanAutogenStrictOverflowDrop(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{
+		Enabled:      true,
+		TypeID:       "collector.job",
+		MaxTypeIDLen: 32,
+	}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	metric := sm.Counter("this_metric_name_is_long_total")
+	ls := sm.LabelSet(metrix.Label{Key: "tenant", Value: "a_very_long_tenant_name"})
+
+	cc.BeginCycle()
+	metric.ObserveTotal(10, ls)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Empty(t, plan.Actions)
+}
+
+func TestBuildPlanAutogenUsesFlattenMetadataForHistogramBuckets(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	h := sm.Histogram("latency_seconds", metrix.WithHistogramBounds(1, 2))
+	method := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+
+	cc.BeginCycle()
+	h.ObservePoint(metrix.HistogramPoint{
+		Count: 3,
+		Sum:   4,
+		Buckets: []metrix.BucketPoint{
+			{UpperBound: 1, CumulativeCount: 1},
+			{UpperBound: 2, CumulativeCount: 3},
+		},
+	}, method)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+
+	var bucketChart *CreateChartAction
+	for _, action := range plan.Actions {
+		create, ok := action.(CreateChartAction)
+		if !ok {
+			continue
+		}
+		if create.ChartID == "svc.latency_seconds-method=GET" {
+			bucketChart = &create
+			break
+		}
+	}
+	require.NotNil(t, bucketChart)
+	assert.Equal(t, "GET", bucketChart.Labels["method"])
+	_, hasLE := bucketChart.Labels["le"]
+	assert.False(t, hasLE)
+
+	dims := map[string]struct{}{}
+	for _, action := range plan.Actions {
+		create, ok := action.(CreateDimensionAction)
+		if !ok || create.ChartID != "svc.latency_seconds-method=GET" {
+			continue
+		}
+		dims[create.Name] = struct{}{}
+	}
+	assert.Contains(t, dims, "bucket_1")
+	assert.Contains(t, dims, "bucket_2")
+	assert.Contains(t, dims, "bucket_+Inf")
+}
+
+func TestBuildPlanAutogenCreatesChartForUnmatchedGauge(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	g := sm.Gauge("queue_depth")
+	queueMain := sm.LabelSet(metrix.Label{Key: "queue", Value: "main"})
+
+	cc.BeginCycle()
+	g.Observe(7, queueMain)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc.queue_depth-queue=main", create.ChartID)
+	assert.Equal(t, "autogen.svc.queue_depth", create.Meta.Context)
+	assert.Equal(t, "depth", create.Meta.Units)
+	assert.Equal(t, program.AlgorithmAbsolute, create.Meta.Algorithm)
+
+	update := findUpdateAction(plan)
+	require.NotNil(t, update)
+	require.Len(t, update.Values, 1)
+	assert.Equal(t, "svc.queue_depth", update.Values[0].Name)
+	assert.Equal(t, float64(7), update.Values[0].Float64)
+}
+
+func TestBuildPlanAutogenCreatesChartForUnmatchedStateSet(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	ss := sm.StateSet("service_mode",
+		metrix.WithStateSetStates("maintenance", "operational"),
+		metrix.WithStateSetMode(metrix.ModeEnum),
+	)
+
+	cc.BeginCycle()
+	ss.Enable("operational")
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+
+	assert.Equal(t, []ActionKind{
+		ActionCreateChart,
+		ActionCreateDimension,
+		ActionCreateDimension,
+		ActionUpdateChart,
+	}, actionKinds(plan.Actions))
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc.service_mode", create.ChartID)
+	assert.Equal(t, "autogen.svc.service_mode", create.Meta.Context)
+	assert.Equal(t, "state", create.Meta.Units)
+	_, hasStateLabel := create.Labels["svc.service_mode"]
+	assert.False(t, hasStateLabel)
+
+	dims := map[string]struct{}{}
+	for _, action := range plan.Actions {
+		dim, ok := action.(CreateDimensionAction)
+		if !ok || dim.ChartID != "svc.service_mode" {
+			continue
+		}
+		dims[dim.Name] = struct{}{}
+	}
+	assert.Contains(t, dims, "maintenance")
+	assert.Contains(t, dims, "operational")
+}
+
+func TestBuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.foo_total
+    charts:
+      - id: svc.errors_total-method=GET
+        title: Foo requests
+        context: foo_requests
+        units: requests/s
+        dimensions:
+          - selector: svc.foo_total{method="GET"}
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	errorsTotal := sm.Counter("errors_total")
+	fooTotal := sm.Counter("foo_total")
+	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+
+	cc.BeginCycle()
+	errorsTotal.ObserveTotal(10, methodGET)
+	fooTotal.ObserveTotal(7, methodGET)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc.errors_total-method=GET", create.ChartID)
+	assert.Equal(t, "foo_requests", create.Meta.Context)
+
+	update := findUpdateAction(plan)
+	require.NotNil(t, update)
+	require.Len(t, update.Values, 1)
+	assert.Equal(t, "total", update.Values[0].Name)
+	assert.Equal(t, float64(7), update.Values[0].Float64)
+}
+
+func TestBuildPlanAutogenRemovalLifecycleExpiry(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{
+		Enabled:                  true,
+		ExpireAfterSuccessCycles: 1,
+	}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	c := store.Write().SnapshotMeter("svc").Counter("errors_total")
+
+	cc.BeginCycle()
+	c.ObserveTotal(10)
+	cc.CommitCycleSuccess()
+
+	plan1, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
+
+	cc.BeginCycle()
+	cc.CommitCycleSuccess()
+
+	plan2, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan2.Actions))
+}
+
 func actionKinds(actions []EngineAction) []ActionKind {
 	out := make([]ActionKind, 0, len(actions))
 	for _, action := range actions {
@@ -673,6 +1104,15 @@ func findUpdateAction(plan Plan) *UpdateChartAction {
 	for _, action := range plan.Actions {
 		if update, ok := action.(UpdateChartAction); ok {
 			return &update
+		}
+	}
+	return nil
+}
+
+func findCreateChartAction(plan Plan) *CreateChartAction {
+	for _, action := range plan.Actions {
+		if create, ok := action.(CreateChartAction); ok {
+			return &create
 		}
 	}
 	return nil

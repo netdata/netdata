@@ -199,3 +199,69 @@ func TestApplyPlanChartLabelsOverrideJobLabels(t *testing.T) {
 	assert.NotContains(t, out, "CLABEL 'instance' 'localhost' '2'")
 	assert.NotContains(t, out, "CLABEL '_collect_job' 'ignored' '1'")
 }
+
+func TestApplyPlanAutogenChartCreateUpdateRemove(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := program.ChartMeta{
+		Title:     `Metric "svc.errors_total"`,
+		Family:    "svc_errors",
+		Context:   "autogen.svc.errors_total",
+		Units:     "events/s",
+		Algorithm: program.AlgorithmIncremental,
+		Type:      program.ChartTypeLine,
+	}
+
+	plan := Plan{
+		Actions: []EngineAction{
+			CreateChartAction{
+				ChartTemplateID: "__autogen__:svc.errors_total-method=GET",
+				ChartID:         "svc.errors_total-method=GET",
+				Meta:            meta,
+				Labels: map[string]string{
+					"method": "GET",
+				},
+			},
+			CreateDimensionAction{
+				ChartID:    "svc.errors_total-method=GET",
+				ChartMeta:  meta,
+				Name:       "svc.errors_total",
+				Algorithm:  program.AlgorithmIncremental,
+				Multiplier: 1,
+				Divisor:    1,
+			},
+			UpdateChartAction{
+				ChartID: "svc.errors_total-method=GET",
+				Values: []UpdateDimensionValue{
+					{
+						Name:    "svc.errors_total",
+						IsFloat: true,
+						Float64: 10,
+					},
+				},
+			},
+			RemoveChartAction{
+				ChartID: "svc.errors_total-method=GET",
+				Meta:    meta,
+			},
+		},
+	}
+
+	err := ApplyPlan(api, plan, EmitEnv{
+		TypeID:      "collector.job",
+		UpdateEvery: 1,
+		Plugin:      "go.d.plugin",
+		Module:      "prometheus",
+		JobName:     "job01",
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, out, "CHART 'collector.job.svc.errors_total-method=GET'")
+	assert.Contains(t, out, "CLABEL 'method' 'GET' '1'")
+	assert.Contains(t, out, "DIMENSION 'svc.errors_total' 'svc.errors_total' 'incremental' '1' '1' ''")
+	assert.Contains(t, out, "BEGIN 'collector.job.svc.errors_total-method=GET'")
+	assert.Contains(t, out, "SET 'svc.errors_total' = 10")
+	assert.Contains(t, out, "obsolete")
+}
