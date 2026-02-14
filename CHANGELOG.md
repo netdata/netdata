@@ -332,6 +332,17 @@
 - Strip relatedResource tags from GitHub-rendered md files ([#21751](https://github.com/netdata/netdata/issues/21751))
 - Restructure integration categories, add missing metadata ([#21753](https://github.com/netdata/netdata/issues/21753))
 - Regenerate integrations docs ([#21754](https://github.com/netdata/netdata/issues/21754))
+- Fix metadata validation for ibm.d, network-viewer, and netdata-otel ([#21756](https://github.com/netdata/netdata/issues/21756))
+- Regenerate integrations docs ([#21757](https://github.com/netdata/netdata/issues/21757))
+- No such category ([#21758](https://github.com/netdata/netdata/issues/21758))
+- Feat(collectors): add Windows support for hardware monitoring collectors ([#21635](https://github.com/netdata/netdata/issues/21635))
+- Chore(scripts.d): remove zabbix ([#21759](https://github.com/netdata/netdata/issues/21759))
+- Build(deps): bump golang.org/x/net from 0.49.0 to 0.50.0 in /src/go ([#21764](https://github.com/netdata/netdata/issues/21764))
+- Regenerate integrations docs ([#21765](https://github.com/netdata/netdata/issues/21765))
+- Build(deps): bump google.golang.org/grpc from 1.77.0 to 1.79.1 in /src/go ([#21766](https://github.com/netdata/netdata/issues/21766))
+- Icons ([#21767](https://github.com/netdata/netdata/issues/21767))
+- Regenerate integrations docs ([#21768](https://github.com/netdata/netdata/issues/21768))
+- Skip field remapping entries when querying logs. ([#21755](https://github.com/netdata/netdata/issues/21755))
 
 ## [2.8.0] - 2025-11-19
 
