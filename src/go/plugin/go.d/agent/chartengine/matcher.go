@@ -169,7 +169,6 @@ func (e *Engine) resolveSeriesRoutes(
 	identity metrix.SeriesIdentity,
 	name string,
 	labels metrix.LabelView,
-	labelsMap map[string]string,
 	meta metrix.SeriesMeta,
 	index matchIndex,
 	revision uint64,
@@ -188,14 +187,14 @@ func (e *Engine) resolveSeriesRoutes(
 
 	routes := make([]routeBinding, 0)
 	for _, candidate := range candidates {
-		if !candidate.dimension.Selector.Matcher.Matches(name, labelsMap) {
+		if !candidate.dimension.Selector.Matcher.Matches(name, labels) {
 			continue
 		}
 		chart, ok := index.chartsByID[candidate.chartTemplateID]
 		if !ok {
 			return nil, false, fmt.Errorf("chartengine: route references unknown chart template %q", candidate.chartTemplateID)
 		}
-		chartID, ok, err := renderChartInstanceID(chart.Identity, labelsMap)
+		chartID, ok, err := renderChartInstanceIDFromView(chart.Identity, labels)
 		if err != nil {
 			return nil, false, err
 		}

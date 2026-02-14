@@ -11,7 +11,7 @@ import (
 
 type trueMatcher struct{}
 
-func (trueMatcher) Matches(_ string, _ map[string]string) bool { return true }
+func (trueMatcher) Matches(_ string, _ SelectorLabels) bool { return true }
 
 func TestNewProgramScenarios(t *testing.T) {
 	tests := map[string]struct {

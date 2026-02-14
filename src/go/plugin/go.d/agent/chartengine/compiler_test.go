@@ -3,6 +3,7 @@
 package chartengine
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,28 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/charttpl"
 )
+
+type mapLabelView map[string]string
+
+func (m mapLabelView) Len() int { return len(m) }
+
+func (m mapLabelView) Get(key string) (string, bool) {
+	value, ok := m[key]
+	return value, ok
+}
+
+func (m mapLabelView) Range(fn func(key, value string) bool) {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if !fn(key, m[key]) {
+			return
+		}
+	}
+}
 
 func TestCompileScenarios(t *testing.T) {
 	tests := map[string]struct {
@@ -65,8 +88,8 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, program.ChartTypeLine, charts[0].Meta.Type)
 				assert.True(t, charts[0].Identity.Static)
 
-				assert.True(t, charts[0].Dimensions[0].Selector.Matcher.Matches("mysql_queries_total", map[string]string{}))
-				assert.False(t, charts[0].Dimensions[0].Selector.Matcher.Matches("mysql_queries", map[string]string{}))
+				assert.True(t, charts[0].Dimensions[0].Selector.Matcher.Matches("mysql_queries_total", mapLabelView{}))
+				assert.False(t, charts[0].Dimensions[0].Selector.Matcher.Matches("mysql_queries", mapLabelView{}))
 			},
 		},
 		"infer histogram dimension name_from_label and parse instance selectors": {
