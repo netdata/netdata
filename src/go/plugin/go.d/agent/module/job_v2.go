@@ -119,6 +119,7 @@ func (j *JobV2) Name() string       { return j.name }
 func (j *JobV2) Panicked() bool     { return j.panicked }
 func (j *JobV2) IsRunning() bool    { return j.running.Load() }
 func (j *JobV2) Module() ModuleV2   { return j.module }
+func (j *JobV2) Collector() any     { return j.module }
 func (j *JobV2) AutoDetectionEvery() int {
 	return j.autoDetectEvery
 }

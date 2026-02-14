@@ -59,8 +59,8 @@ func rethinkdbMethods() []funcapi.MethodConfig {
 	}
 }
 
-func rethinkdbFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
+func rethinkdbFunctionHandler(job module.RuntimeJob) funcapi.MethodHandler {
+	c, ok := job.Collector().(*Collector)
 	if !ok {
 		return nil
 	}
