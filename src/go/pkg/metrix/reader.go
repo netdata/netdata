@@ -222,7 +222,12 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				window:    src.desc.window,
 			},
 			value: src.histogramCumulative[i],
-			meta:  src.meta,
+			meta: flattenedSeriesMeta(
+				src.meta,
+				MetricKindCounter,
+				MetricKindHistogram,
+				FlattenRoleHistogramBucket,
+			),
 		}
 	}
 
@@ -249,12 +254,31 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				window:    src.desc.window,
 			},
 			value: src.histogramCount,
-			meta:  src.meta,
+			meta: flattenedSeriesMeta(
+				src.meta,
+				MetricKindCounter,
+				MetricKindHistogram,
+				FlattenRoleHistogramBucket,
+			),
 		}
 	}
 
-	appendFlattenedHistogramScalar(dst, src.name+"_count", src.labels, src.histogramCount, src.meta, src.desc)
-	appendFlattenedHistogramScalar(dst, src.name+"_sum", src.labels, src.histogramSum, src.meta, src.desc)
+	appendFlattenedHistogramScalar(
+		dst,
+		src.name+"_count",
+		src.labels,
+		src.histogramCount,
+		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindHistogram, FlattenRoleHistogramCount),
+		src.desc,
+	)
+	appendFlattenedHistogramScalar(
+		dst,
+		src.name+"_sum",
+		src.labels,
+		src.histogramSum,
+		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindHistogram, FlattenRoleHistogramSum),
+		src.desc,
+	)
 }
 
 func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Label, value SampleValue, meta SeriesMeta, desc *instrumentDescriptor) {
@@ -286,8 +310,22 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Lab
 }
 
 func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
-	appendFlattenedHistogramScalar(dst, src.name+"_count", src.labels, src.summaryCount, src.meta, src.desc)
-	appendFlattenedHistogramScalar(dst, src.name+"_sum", src.labels, src.summarySum, src.meta, src.desc)
+	appendFlattenedHistogramScalar(
+		dst,
+		src.name+"_count",
+		src.labels,
+		src.summaryCount,
+		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindSummary, FlattenRoleSummaryCount),
+		src.desc,
+	)
+	appendFlattenedHistogramScalar(
+		dst,
+		src.name+"_sum",
+		src.labels,
+		src.summarySum,
+		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindSummary, FlattenRoleSummarySum),
+		src.desc,
+	)
 
 	schema := src.desc.summary
 	if schema == nil {
@@ -323,7 +361,12 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 				window:    src.desc.window,
 			},
 			value: src.summaryQuantiles[i],
-			meta:  src.meta,
+			meta: flattenedSeriesMeta(
+				src.meta,
+				MetricKindGauge,
+				MetricKindSummary,
+				FlattenRoleSummaryQuantile,
+			),
 		}
 	}
 }
@@ -366,7 +409,12 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 				window:    src.desc.window,
 			},
 			value: value,
-			meta:  src.meta,
+			meta: flattenedSeriesMeta(
+				src.meta,
+				MetricKindGauge,
+				MetricKindStateSet,
+				FlattenRoleStateSetState,
+			),
 		}
 	}
 }

@@ -32,8 +32,42 @@ const (
 )
 
 type SeriesMeta struct {
+	// LastSeenSuccessSeq is the collect/runtime sequence of last successful write.
 	LastSeenSuccessSeq uint64
+	// Kind is the exposed kind in current reader view (e.g. flattened scalar kind).
+	Kind MetricKind
+	// SourceKind is the original family kind before flattening.
+	SourceKind MetricKind
+	// FlattenRole identifies synthetic component semantics in flattened views.
+	FlattenRole FlattenRole
 }
+
+// MetricKind identifies the logical metric family type.
+// For flattened views, Kind can differ from SourceKind.
+type MetricKind uint8
+
+const (
+	MetricKindUnknown MetricKind = iota
+	MetricKindGauge
+	MetricKindCounter
+	MetricKindHistogram
+	MetricKindSummary
+	MetricKindStateSet
+)
+
+// FlattenRole describes synthetic scalar roles produced by Reader.Flatten().
+type FlattenRole uint8
+
+const (
+	FlattenRoleNone FlattenRole = iota
+	FlattenRoleHistogramBucket
+	FlattenRoleHistogramCount
+	FlattenRoleHistogramSum
+	FlattenRoleSummaryCount
+	FlattenRoleSummarySum
+	FlattenRoleSummaryQuantile
+	FlattenRoleStateSetState
+)
 
 type CollectMeta struct {
 	LastAttemptSeq    uint64

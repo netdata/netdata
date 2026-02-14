@@ -252,9 +252,11 @@ func (c *storeCycleController) CommitCycleSuccess() {
 				labels:    append([]Label(nil), staged.labels...),
 				labelsKey: staged.labelsKey,
 				desc:      staged.desc,
+				meta:      baseSeriesMeta(staged.desc),
 			}
 			next.series[key] = series
 		}
+		ensureSeriesMeta(series.desc, &series.meta)
 		series.value = staged.value
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
 		series.lastSeenSuccessCycle = successSeq
@@ -270,9 +272,11 @@ func (c *storeCycleController) CommitCycleSuccess() {
 				labels:    append([]Label(nil), staged.labels...),
 				labelsKey: staged.labelsKey,
 				desc:      staged.desc,
+				meta:      baseSeriesMeta(staged.desc),
 			}
 			next.series[key] = series
 		}
+		ensureSeriesMeta(series.desc, &series.meta)
 
 		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentSeq > 0
 		if hadCurrent {
@@ -302,9 +306,11 @@ func (c *storeCycleController) CommitCycleSuccess() {
 				labels:    append([]Label(nil), staged.labels...),
 				labelsKey: staged.labelsKey,
 				desc:      staged.desc,
+				meta:      baseSeriesMeta(staged.desc),
 			}
 			next.series[key] = series
 		}
+		ensureSeriesMeta(series.desc, &series.meta)
 
 		if series.desc == nil {
 			panic("metrix: missing histogram descriptor")
@@ -341,9 +347,11 @@ func (c *storeCycleController) CommitCycleSuccess() {
 				labels:    append([]Label(nil), staged.labels...),
 				labelsKey: staged.labelsKey,
 				desc:      staged.desc,
+				meta:      baseSeriesMeta(staged.desc),
 			}
 			next.series[key] = series
 		}
+		ensureSeriesMeta(series.desc, &series.meta)
 
 		if staged.desc.mode == modeStateful && len(staged.desc.summaryQuantiles()) > 0 {
 			if staged.sketch != nil {
@@ -380,9 +388,11 @@ func (c *storeCycleController) CommitCycleSuccess() {
 				labels:    append([]Label(nil), staged.labels...),
 				labelsKey: staged.labelsKey,
 				desc:      staged.desc,
+				meta:      baseSeriesMeta(staged.desc),
 			}
 			next.series[key] = series
 		}
+		ensureSeriesMeta(series.desc, &series.meta)
 
 		series.stateSetValues = cloneStateMap(staged.states)
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
@@ -612,6 +622,7 @@ func makeSeriesKey(name, labelsKey string) string {
 
 func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	cp := *s
+	ensureSeriesMeta(cp.desc, &cp.meta)
 	if len(s.labels) > 0 {
 		cp.labels = append([]Label(nil), s.labels...)
 	}

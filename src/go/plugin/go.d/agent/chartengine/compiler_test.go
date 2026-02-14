@@ -107,19 +107,20 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, "le", charts[0].Identity.InstanceByLabels[1].Key)
 
 				require.Len(t, charts[0].Dimensions, 1)
-				assert.Equal(t, "le", charts[0].Dimensions[0].NameFromLabel)
+				assert.Equal(t, "", charts[0].Dimensions[0].NameFromLabel)
+				assert.True(t, charts[0].Dimensions[0].InferNameFromSeriesMeta)
 				assert.True(t, charts[0].Dimensions[0].Dynamic)
 				assert.Equal(t, program.AlgorithmIncremental, charts[0].Meta.Algorithm)
 			},
 		},
-		"infer stateset dimension name_from_label from metric family name": {
+		"infer stateset dimension naming from runtime series metadata": {
 			rev: 8,
 			spec: charttpl.Spec{
 				Version: charttpl.VersionV1,
 				Groups: []charttpl.Group{
 					{
 						Family:  "Replication",
-						Metrics: []string{"mysql_replication_state"},
+						Metrics: []string{"system_status"},
 						Charts: []charttpl.Chart{
 							{
 								Title:   "Replication state",
@@ -127,7 +128,7 @@ func TestCompileScenarios(t *testing.T) {
 								Units:   "state",
 								Dimensions: []charttpl.Dimension{
 									{
-										Selector: "mysql_replication_state",
+										Selector: "system_status",
 									},
 								},
 							},
@@ -140,11 +141,12 @@ func TestCompileScenarios(t *testing.T) {
 				charts := p.Charts()
 				require.Len(t, charts, 1)
 				require.Len(t, charts[0].Dimensions, 1)
-				assert.Equal(t, "mysql_replication_state", charts[0].Dimensions[0].NameFromLabel)
+				assert.Equal(t, "", charts[0].Dimensions[0].NameFromLabel)
+				assert.True(t, charts[0].Dimensions[0].InferNameFromSeriesMeta)
 				assert.Equal(t, program.AlgorithmAbsolute, charts[0].Meta.Algorithm)
 			},
 		},
-		"fails when dimension naming cannot be inferred": {
+		"allows runtime inference when dimension naming is omitted": {
 			spec: charttpl.Spec{
 				Version: charttpl.VersionV1,
 				Groups: []charttpl.Group{
@@ -166,8 +168,13 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
-			errLike: "name or name_from_label is required",
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.True(t, charts[0].Dimensions[0].InferNameFromSeriesMeta)
+				assert.True(t, charts[0].Dimensions[0].Dynamic)
+			},
 		},
 		"compiles id placeholders and label exclusion metadata": {
 			spec: charttpl.Spec{
