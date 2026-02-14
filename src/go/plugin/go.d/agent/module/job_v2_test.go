@@ -94,6 +94,29 @@ groups:
 `)
 }
 
+func chartTemplateV2Dynamic() []byte {
+	return []byte(`
+version: v1
+groups:
+  - family: Net
+    metrics:
+      - windows_net_bytes_received_total
+      - windows_net_bytes_sent_total
+    charts:
+      - id: win_nic_traffic
+        title: NIC traffic
+        context: nic_traffic
+        units: bytes/s
+        instances:
+          by_labels: [nic]
+        dimensions:
+          - selector: windows_net_bytes_received_total
+            name: received
+          - selector: windows_net_bytes_sent_total
+            name: sent
+`)
+}
+
 func TestJobV2Scenarios(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T)
@@ -197,6 +220,44 @@ func TestJobV2Scenarios(t *testing.T) {
 				assert.False(t, job.Panicked())
 				assert.Equal(t, metrix.CollectStatusSuccess, store.ReadRaw().CollectMeta().LastAttemptStatus)
 				assert.Contains(t, out.String(), "SET 'busy' = 11")
+			},
+		},
+		"runOnce materializes dynamic chart instances from labels": {
+			run: func(t *testing.T) {
+				store := metrix.NewCollectorStore()
+				mod := &mockModuleV2{
+					store:    store,
+					template: chartTemplateV2Dynamic(),
+					collectFunc: func(context.Context) error {
+						sm := store.Write().SnapshotMeter("")
+						rx := sm.Counter("windows_net_bytes_received_total")
+						tx := sm.Counter("windows_net_bytes_sent_total")
+
+						eth0 := sm.LabelSet(metrix.Label{Key: "nic", Value: "eth0"})
+						eth1 := sm.LabelSet(metrix.Label{Key: "nic", Value: "eth1"})
+
+						rx.ObserveTotal(100, eth0)
+						tx.ObserveTotal(80, eth0)
+						rx.ObserveTotal(50, eth1)
+						tx.ObserveTotal(40, eth1)
+						return nil
+					},
+				}
+
+				var out bytes.Buffer
+				job := newTestJobV2(mod, &out)
+				require.NoError(t, job.AutoDetection())
+				job.runOnce()
+
+				wire := out.String()
+				assert.Contains(t, wire, "CHART 'module_job.win_nic_traffic_eth0'")
+				assert.Contains(t, wire, "CHART 'module_job.win_nic_traffic_eth1'")
+				assert.Contains(t, wire, "BEGIN 'module_job.win_nic_traffic_eth0'")
+				assert.Contains(t, wire, "SET 'received' = 100")
+				assert.Contains(t, wire, "SET 'sent' = 80")
+				assert.Contains(t, wire, "BEGIN 'module_job.win_nic_traffic_eth1'")
+				assert.Contains(t, wire, "SET 'received' = 50")
+				assert.Contains(t, wire, "SET 'sent' = 40")
 			},
 		},
 	}
