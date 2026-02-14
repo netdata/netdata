@@ -3,9 +3,10 @@
 package metrix
 
 import (
-	"errors"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestVecStoreScenarios(t *testing.T) {
@@ -67,9 +68,7 @@ func TestVecStoreScenarios(t *testing.T) {
 
 				a := vec.WithLabelValues("a")
 				b := vec.WithLabelValues("a")
-				if a != b {
-					t.Fatalf("expected same cached handle for repeated label values")
-				}
+				require.Same(t, a, b, "expected same cached handle for repeated label values")
 			},
 		},
 		"GetWithLabelValues validates label value count": {
@@ -78,9 +77,7 @@ func TestVecStoreScenarios(t *testing.T) {
 				vec := s.Write().SnapshotMeter("svc").GaugeVec("load", []string{"zone", "role"})
 
 				_, err := vec.GetWithLabelValues("only-one")
-				if !errors.Is(err, errVecLabelValueCount) {
-					t.Fatalf("unexpected error: %v", err)
-				}
+				require.ErrorIs(t, err, errVecLabelValueCount)
 				expectPanic(t, func() {
 					_ = vec.WithLabelValues("only-one")
 				})
@@ -132,12 +129,10 @@ func TestVecStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 
 				p, ok := s.Read().Histogram("mysql.query_seconds", Labels{"database": "db1"})
-				if !ok {
-					t.Fatalf("expected histogram point")
-				}
-				if p.Count != 2 || p.Sum != 0.4 || len(p.Buckets) != 2 {
-					t.Fatalf("unexpected histogram point: %#v", p)
-				}
+				require.True(t, ok, "expected histogram point")
+				require.Equal(t, SampleValue(2), p.Count)
+				require.Equal(t, SampleValue(0.4), p.Sum)
+				require.Len(t, p.Buckets, 2)
 			},
 		},
 		"stateful histogram vec observes cumulative samples": {
@@ -159,12 +154,10 @@ func TestVecStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 
 				p, ok := s.Read().Histogram("mysql.query_seconds", Labels{"database": "db1"})
-				if !ok {
-					t.Fatalf("expected histogram point")
-				}
-				if p.Count != 2 || math.Abs(float64(p.Sum-0.25)) > 1e-9 || len(p.Buckets) != 2 {
-					t.Fatalf("unexpected histogram point: %#v", p)
-				}
+				require.True(t, ok, "expected histogram point")
+				require.Equal(t, SampleValue(2), p.Count)
+				require.LessOrEqual(t, math.Abs(float64(p.Sum-0.25)), 1e-9)
+				require.Len(t, p.Buckets, 2)
 			},
 		},
 		"snapshot summary vec writes and reads point": {
@@ -188,12 +181,10 @@ func TestVecStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 
 				p, ok := s.Read().Summary("mysql.query_seconds", Labels{"database": "db1"})
-				if !ok {
-					t.Fatalf("expected summary point")
-				}
-				if p.Count != 2 || p.Sum != 0.4 || len(p.Quantiles) != 1 {
-					t.Fatalf("unexpected summary point: %#v", p)
-				}
+				require.True(t, ok, "expected summary point")
+				require.Equal(t, SampleValue(2), p.Count)
+				require.Equal(t, SampleValue(0.4), p.Sum)
+				require.Len(t, p.Quantiles, 1)
 			},
 		},
 		"stateful summary vec observes cumulative samples": {
@@ -211,12 +202,9 @@ func TestVecStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 
 				p, ok := s.Read().Summary("mysql.query_seconds", Labels{"database": "db1"})
-				if !ok {
-					t.Fatalf("expected summary point")
-				}
-				if p.Count != 2 || math.Abs(float64(p.Sum-0.3)) > 1e-9 {
-					t.Fatalf("unexpected summary point: %#v", p)
-				}
+				require.True(t, ok, "expected summary point")
+				require.Equal(t, SampleValue(2), p.Count)
+				require.LessOrEqual(t, math.Abs(float64(p.Sum-0.3)), 1e-9)
 			},
 		},
 		"snapshot stateset vec enable writes active state": {
@@ -235,12 +223,9 @@ func TestVecStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 
 				p, ok := s.Read().StateSet("net.link_state", Labels{"nic": "eth0"})
-				if !ok {
-					t.Fatalf("expected stateset point")
-				}
-				if !p.States["up"] || p.States["down"] {
-					t.Fatalf("unexpected stateset: %#v", p.States)
-				}
+				require.True(t, ok, "expected stateset point")
+				require.True(t, p.States["up"], "unexpected stateset: %#v", p.States)
+				require.False(t, p.States["down"], "unexpected stateset: %#v", p.States)
 			},
 		},
 		"stateful stateset vec observe writes full state": {
@@ -259,12 +244,9 @@ func TestVecStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 
 				p, ok := s.Read().StateSet("net.link_state", Labels{"nic": "eth0"})
-				if !ok {
-					t.Fatalf("expected stateset point")
-				}
-				if p.States["up"] || !p.States["down"] {
-					t.Fatalf("unexpected stateset: %#v", p.States)
-				}
+				require.True(t, ok, "expected stateset point")
+				require.False(t, p.States["up"], "unexpected stateset: %#v", p.States)
+				require.True(t, p.States["down"], "unexpected stateset: %#v", p.States)
 			},
 		},
 	}

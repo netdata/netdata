@@ -2,7 +2,11 @@
 
 package metrix
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestGaugeStoreScenarios(t *testing.T) {
 	tests := map[string]struct {
@@ -22,9 +26,8 @@ func TestGaugeStoreScenarios(t *testing.T) {
 				cc.BeginCycle()
 				cc.CommitCycleSuccess()
 
-				if _, ok := s.Read().Value("apache.workers_busy", nil); ok {
-					t.Fatalf("expected snapshot gauge hidden after successful cycle with no sample")
-				}
+				_, ok := s.Read().Value("apache.workers_busy", nil)
+				require.False(t, ok, "expected snapshot gauge hidden after successful cycle with no sample")
 				mustValue(t, s.ReadRaw(), "apache.workers_busy", nil, 10)
 			},
 		},
@@ -77,12 +80,11 @@ func TestGaugeStoreScenarios(t *testing.T) {
 				cc.AbortCycle()
 
 				meta := s.Read().CollectMeta()
-				if meta.LastAttemptStatus != CollectStatusFailed || meta.LastAttemptSeq != 2 || meta.LastSuccessSeq != 1 {
-					t.Fatalf("unexpected collect meta after abort: %#v", meta)
-				}
-				if _, ok := s.Read().Value("svc.load", nil); ok {
-					t.Fatalf("expected snapshot gauge hidden after failed attempt")
-				}
+				require.Equal(t, CollectStatusFailed, meta.LastAttemptStatus, "unexpected collect meta after abort: %#v", meta)
+				require.Equal(t, uint64(2), meta.LastAttemptSeq, "unexpected collect meta after abort: %#v", meta)
+				require.Equal(t, uint64(1), meta.LastSuccessSeq, "unexpected collect meta after abort: %#v", meta)
+				_, ok := s.Read().Value("svc.load", nil)
+				require.False(t, ok, "expected snapshot gauge hidden after failed attempt")
 				mustValue(t, s.ReadRaw(), "svc.load", nil, 11)
 			},
 		},

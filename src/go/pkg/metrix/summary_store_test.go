@@ -5,6 +5,8 @@ package metrix
 import (
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSummaryStoreScenarios(t *testing.T) {
@@ -23,16 +25,14 @@ func TestSummaryStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 
 				mustSummary(t, s.Read(), "svc.latency", nil, SummaryPoint{Count: 3, Sum: 1.2})
-				if _, ok := s.Read().Value("svc.latency", nil); ok {
-					t.Fatalf("expected non-scalar summary unavailable via Value")
-				}
+				_, ok := s.Read().Value("svc.latency", nil)
+				require.False(t, ok, "expected non-scalar summary unavailable via Value")
 
 				fr := s.Read().Flatten()
 				mustValue(t, fr, "svc.latency_count", nil, 3)
 				mustValue(t, fr, "svc.latency_sum", nil, 1.2)
-				if _, ok := fr.Summary("svc.latency", nil); ok {
-					t.Fatalf("expected flattened reader to hide typed summary getter")
-				}
+				_, ok = fr.Summary("svc.latency", nil)
+				require.False(t, ok, "expected flattened reader to hide typed summary getter")
 			},
 		},
 		"snapshot summary quantiles are validated and flattened": {
@@ -155,9 +155,8 @@ func TestSummaryStoreScenarios(t *testing.T) {
 
 				cc.BeginCycle()
 				cc.CommitCycleSuccess()
-				if _, ok := s.Read().Summary("svc.latency", nil); ok {
-					t.Fatalf("expected stale cycle-window summary hidden from Read")
-				}
+				_, ok := s.Read().Summary("svc.latency", nil)
+				require.False(t, ok, "expected stale cycle-window summary hidden from Read")
 				mustSummary(t, s.ReadRaw(), "svc.latency", nil, SummaryPoint{
 					Count: 1,
 					Sum:   1,
@@ -165,9 +164,8 @@ func TestSummaryStoreScenarios(t *testing.T) {
 						{Quantile: 0.5, Value: 1},
 					},
 				})
-				if _, ok := s.Read().Flatten().Value("svc.latency_count", nil); ok {
-					t.Fatalf("expected stale cycle-window summary flatten hidden from Read().Flatten()")
-				}
+				_, ok = s.Read().Flatten().Value("svc.latency_count", nil)
+				require.False(t, ok, "expected stale cycle-window summary flatten hidden from Read().Flatten()")
 				mustValue(t, s.ReadRaw().Flatten(), "svc.latency_count", nil, 1)
 			},
 		},
@@ -203,15 +201,10 @@ func TestSummaryStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 
 				p, ok := s.Read().Summary("svc.latency_small_reservoir", nil)
-				if !ok {
-					t.Fatalf("expected summary for custom reservoir series")
-				}
-				if p.Count != 100 {
-					t.Fatalf("unexpected count: got=%v want=100", p.Count)
-				}
-				if len(p.Quantiles) != 1 || math.IsNaN(p.Quantiles[0].Value) {
-					t.Fatalf("expected non-NaN quantile value with custom reservoir")
-				}
+				require.True(t, ok, "expected summary for custom reservoir series")
+				require.Equal(t, SampleValue(100), p.Count, "unexpected count")
+				require.Len(t, p.Quantiles, 1)
+				require.False(t, math.IsNaN(p.Quantiles[0].Value), "expected non-NaN quantile value with custom reservoir")
 			},
 		},
 		"summary flatten quantile label collision panics": {
@@ -258,21 +251,15 @@ func TestSummaryStoreScenarios(t *testing.T) {
 func mustSummary(t *testing.T, r Reader, name string, labels Labels, want SummaryPoint) {
 	t.Helper()
 	got, ok := r.Summary(name, labels)
-	if !ok {
-		t.Fatalf("expected summary for %s", name)
-	}
-	if !equalSample(got.Count, want.Count) || !equalSample(got.Sum, want.Sum) {
-		t.Fatalf("unexpected summary count/sum for %s: got=(%v,%v) want=(%v,%v)", name, got.Count, got.Sum, want.Count, want.Sum)
-	}
-	if len(got.Quantiles) != len(want.Quantiles) {
-		t.Fatalf("unexpected summary quantiles length for %s: got=%d want=%d", name, len(got.Quantiles), len(want.Quantiles))
-	}
+	require.True(t, ok, "expected summary for %s", name)
+	require.True(t, equalSample(got.Count, want.Count), "unexpected summary count for %s: got=%v want=%v", name, got.Count, want.Count)
+	require.True(t, equalSample(got.Sum, want.Sum), "unexpected summary sum for %s: got=%v want=%v", name, got.Sum, want.Sum)
+	require.Len(t, got.Quantiles, len(want.Quantiles), "unexpected summary quantiles length for %s", name)
 	for i := range want.Quantiles {
 		gq := got.Quantiles[i]
 		wq := want.Quantiles[i]
-		if gq.Quantile != wq.Quantile || !equalSample(gq.Value, wq.Value) {
-			t.Fatalf("unexpected summary quantile[%d] for %s: got=(%v,%v) want=(%v,%v)", i, name, gq.Quantile, gq.Value, wq.Quantile, wq.Value)
-		}
+		require.Equal(t, wq.Quantile, gq.Quantile, "unexpected summary quantile[%d] for %s", i, name)
+		require.True(t, equalSample(gq.Value, wq.Value), "unexpected summary quantile value[%d] for %s: got=%v want=%v", i, name, gq.Value, wq.Value)
 	}
 }
 

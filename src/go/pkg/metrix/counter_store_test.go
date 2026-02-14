@@ -2,7 +2,11 @@
 
 package metrix
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestCounterStoreScenarios(t *testing.T) {
 	tests := map[string]struct {
@@ -138,9 +142,8 @@ func TestCounterStoreScenarios(t *testing.T) {
 				c.ObserveTotal(11)
 				cc.AbortCycle()
 
-				if _, ok := s.Read().Value("svc.requests_total", nil); ok {
-					t.Fatalf("expected snapshot counter hidden after failed attempt")
-				}
+				_, ok := s.Read().Value("svc.requests_total", nil)
+				require.False(t, ok, "expected snapshot counter hidden after failed attempt")
 				mustValue(t, s.ReadRaw(), "svc.requests_total", nil, 9)
 			},
 		},

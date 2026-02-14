@@ -2,23 +2,23 @@
 
 package metrix
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func cycleController(t *testing.T, s CollectorStore) CycleController {
 	t.Helper()
 	managed, ok := AsCycleManagedStore(s)
-	if !ok {
-		t.Fatalf("store does not expose cycle control")
-	}
+	require.True(t, ok, "store does not expose cycle control")
 	return managed.CycleController()
 }
 
 func expectPanic(t *testing.T, fn func()) {
 	t.Helper()
 	defer func() {
-		if recover() == nil {
-			t.Fatalf("expected panic")
-		}
+		require.NotNil(t, recover(), "expected panic")
 	}()
 	fn()
 }
@@ -26,28 +26,19 @@ func expectPanic(t *testing.T, fn func()) {
 func mustValue(t *testing.T, r Reader, name string, labels Labels, want SampleValue) {
 	t.Helper()
 	got, ok := r.Value(name, labels)
-	if !ok {
-		t.Fatalf("expected value for %s", name)
-	}
-	if got != want {
-		t.Fatalf("unexpected value for %s: got=%v want=%v", name, got, want)
-	}
+	require.True(t, ok, "expected value for %s", name)
+	require.Equal(t, want, got, "unexpected value for %s", name)
 }
 
 func mustDelta(t *testing.T, r Reader, name string, labels Labels, want SampleValue) {
 	t.Helper()
 	got, ok := r.Delta(name, labels)
-	if !ok {
-		t.Fatalf("expected delta for %s", name)
-	}
-	if got != want {
-		t.Fatalf("unexpected delta for %s: got=%v want=%v", name, got, want)
-	}
+	require.True(t, ok, "expected delta for %s", name)
+	require.Equal(t, want, got, "unexpected delta for %s", name)
 }
 
 func mustNoDelta(t *testing.T, r Reader, name string, labels Labels) {
 	t.Helper()
-	if _, ok := r.Delta(name, labels); ok {
-		t.Fatalf("expected no delta for %s", name)
-	}
+	_, ok := r.Delta(name, labels)
+	require.False(t, ok, "expected no delta for %s", name)
 }

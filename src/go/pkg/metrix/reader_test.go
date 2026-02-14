@@ -2,7 +2,11 @@
 
 package metrix
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestFlattenSnapshotScenarios(t *testing.T) {
 	tests := map[string]struct {
@@ -28,15 +32,12 @@ func TestFlattenSnapshotScenarios(t *testing.T) {
 				flat := flattenSnapshot(src)
 				r := &storeReader{snap: flat}
 
-				if _, ok := r.Value("svc.latency_bucket", Labels{"le": "1"}); ok {
-					t.Fatalf("expected malformed histogram bucket series to be skipped")
-				}
-				if _, ok := r.Value("svc.latency_count", nil); ok {
-					t.Fatalf("expected malformed histogram count series to be skipped")
-				}
-				if _, ok := r.Value("svc.latency_sum", nil); ok {
-					t.Fatalf("expected malformed histogram sum series to be skipped")
-				}
+				_, ok := r.Value("svc.latency_bucket", Labels{"le": "1"})
+				require.False(t, ok, "expected malformed histogram bucket series to be skipped")
+				_, ok = r.Value("svc.latency_count", nil)
+				require.False(t, ok, "expected malformed histogram count series to be skipped")
+				_, ok = r.Value("svc.latency_sum", nil)
+				require.False(t, ok, "expected malformed histogram sum series to be skipped")
 			},
 		},
 	}
