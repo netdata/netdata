@@ -1,3 +1,470 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 package chartengine
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
+)
+
+const (
+	autogenTemplatePrefix = "__autogen__:"
+	autogenContextPrefix  = "autogen"
+)
+
+type autogenRoute struct {
+	chartID           string
+	chartName         string
+	dimensionName     string
+	dimensionKeyLabel string
+	algorithm         program.Algorithm
+	units             string
+	chartType         program.ChartType
+	family            string
+	contextName       string
+	staticDimension   bool
+}
+
+func (e *Engine) resolveAutogenRoute(
+	metricName string,
+	labels metrix.LabelView,
+	meta metrix.SeriesMeta,
+) ([]routeBinding, bool, error) {
+	if e == nil {
+		return nil, false, fmt.Errorf("chartengine: nil engine")
+	}
+	policy := e.state.cfg.autogen
+	if !policy.Enabled {
+		return nil, false, nil
+	}
+
+	route, ok, err := buildAutogenRoute(metricName, labels, meta, policy)
+	if err != nil {
+		return nil, false, err
+	}
+	if !ok {
+		return nil, false, nil
+	}
+	return []routeBinding{
+		{
+			ChartTemplateID:   autogenTemplatePrefix + route.chartID,
+			ChartID:           route.chartID,
+			DimensionIndex:    0,
+			DimensionName:     route.dimensionName,
+			DimensionKeyLabel: route.dimensionKeyLabel,
+			Algorithm:         route.algorithm,
+			Hidden:            false,
+			Static:            route.staticDimension,
+			Inferred:          false,
+			Autogen:           true,
+			Meta: program.ChartMeta{
+				Title:     getAutogenChartTitle(route.chartName),
+				Family:    route.family,
+				Context:   getAutogenChartContext(route.contextName),
+				Units:     route.units,
+				Algorithm: route.algorithm,
+				Type:      route.chartType,
+				Priority:  0,
+			},
+			Lifecycle: autogenLifecyclePolicy(policy),
+		},
+	}, true, nil
+}
+
+func buildAutogenRoute(
+	metricName string,
+	labels metrix.LabelView,
+	meta metrix.SeriesMeta,
+	policy AutogenPolicy,
+) (autogenRoute, bool, error) {
+	if strings.TrimSpace(metricName) == "" {
+		return autogenRoute{}, false, nil
+	}
+
+	switch meta.SourceKind {
+	case metrix.MetricKindHistogram:
+		return buildHistogramAutogenRoute(metricName, labels, meta, policy)
+	case metrix.MetricKindSummary:
+		return buildSummaryAutogenRoute(metricName, labels, meta, policy)
+	case metrix.MetricKindStateSet:
+		return buildStateSetAutogenRoute(metricName, labels, meta, policy)
+	default:
+		return buildScalarAutogenRoute(metricName, labels, meta, policy)
+	}
+}
+
+func buildHistogramAutogenRoute(
+	metricName string,
+	labels metrix.LabelView,
+	meta metrix.SeriesMeta,
+	policy AutogenPolicy,
+) (autogenRoute, bool, error) {
+	switch meta.FlattenRole {
+	case metrix.FlattenRoleHistogramBucket:
+		baseName := strings.TrimSuffix(metricName, "_bucket")
+		if baseName == "" {
+			baseName = metricName
+		}
+		upperBound, ok := labels.Get(histogramBucketLabel)
+		if !ok || strings.TrimSpace(upperBound) == "" {
+			return autogenRoute{}, false, nil
+		}
+		chartID := buildJoinedLabelAutogenID(baseName, labels, map[string]struct{}{
+			histogramBucketLabel: {},
+		})
+		if !fitsTypeIDBudget(policy, chartID) {
+			return autogenRoute{}, false, nil
+		}
+		return autogenRoute{
+			chartID:           chartID,
+			chartName:         baseName,
+			dimensionName:     "bucket_" + upperBound,
+			dimensionKeyLabel: histogramBucketLabel,
+			algorithm:         program.AlgorithmIncremental,
+			units:             "observations/s",
+			chartType:         program.ChartTypeLine,
+			family:            getAutogenChartFamily(baseName),
+			contextName:       baseName,
+			staticDimension:   false,
+		}, true, nil
+
+	case metrix.FlattenRoleHistogramCount:
+		baseName := strings.TrimSuffix(metricName, "_count")
+		if baseName == "" {
+			baseName = metricName
+		}
+		chartName := baseName + "_count"
+		chartID := buildJoinedLabelAutogenID(chartName, labels, nil)
+		if !fitsTypeIDBudget(policy, chartID) {
+			return autogenRoute{}, false, nil
+		}
+		return autogenRoute{
+			chartID:         chartID,
+			chartName:       baseName,
+			dimensionName:   chartName,
+			algorithm:       program.AlgorithmIncremental,
+			units:           "events/s",
+			chartType:       program.ChartTypeLine,
+			family:          getAutogenChartFamily(baseName),
+			contextName:     chartName,
+			staticDimension: true,
+		}, true, nil
+
+	case metrix.FlattenRoleHistogramSum:
+		baseName := strings.TrimSuffix(metricName, "_sum")
+		if baseName == "" {
+			baseName = metricName
+		}
+		chartName := baseName + "_sum"
+		chartID := buildJoinedLabelAutogenID(chartName, labels, nil)
+		if !fitsTypeIDBudget(policy, chartID) {
+			return autogenRoute{}, false, nil
+		}
+		units := getAutogenCounterUnits(baseName)
+		return autogenRoute{
+			chartID:         chartID,
+			chartName:       baseName,
+			dimensionName:   chartName,
+			algorithm:       program.AlgorithmIncremental,
+			units:           units,
+			chartType:       chartTypeFromUnits(units),
+			family:          getAutogenChartFamily(baseName),
+			contextName:     chartName,
+			staticDimension: true,
+		}, true, nil
+	default:
+		return autogenRoute{}, false, nil
+	}
+}
+
+func buildSummaryAutogenRoute(
+	metricName string,
+	labels metrix.LabelView,
+	meta metrix.SeriesMeta,
+	policy AutogenPolicy,
+) (autogenRoute, bool, error) {
+	switch meta.FlattenRole {
+	case metrix.FlattenRoleSummaryQuantile:
+		quantile, ok := labels.Get(summaryQuantileLabel)
+		if !ok || strings.TrimSpace(quantile) == "" {
+			return autogenRoute{}, false, nil
+		}
+		chartID := buildJoinedLabelAutogenID(metricName, labels, map[string]struct{}{
+			summaryQuantileLabel: {},
+		})
+		if !fitsTypeIDBudget(policy, chartID) {
+			return autogenRoute{}, false, nil
+		}
+		units := getAutogenSummaryUnits(metricName)
+		return autogenRoute{
+			chartID:           chartID,
+			chartName:         metricName,
+			dimensionName:     "quantile_" + quantile,
+			dimensionKeyLabel: summaryQuantileLabel,
+			algorithm:         program.AlgorithmAbsolute,
+			units:             units,
+			chartType:         chartTypeFromUnits(units),
+			family:            getAutogenChartFamily(metricName),
+			contextName:       metricName,
+			staticDimension:   false,
+		}, true, nil
+
+	case metrix.FlattenRoleSummaryCount:
+		baseName := strings.TrimSuffix(metricName, "_count")
+		if baseName == "" {
+			baseName = metricName
+		}
+		chartName := baseName + "_count"
+		chartID := buildJoinedLabelAutogenID(chartName, labels, nil)
+		if !fitsTypeIDBudget(policy, chartID) {
+			return autogenRoute{}, false, nil
+		}
+		return autogenRoute{
+			chartID:         chartID,
+			chartName:       baseName,
+			dimensionName:   chartName,
+			algorithm:       program.AlgorithmIncremental,
+			units:           "events/s",
+			chartType:       program.ChartTypeLine,
+			family:          getAutogenChartFamily(baseName),
+			contextName:     chartName,
+			staticDimension: true,
+		}, true, nil
+
+	case metrix.FlattenRoleSummarySum:
+		baseName := strings.TrimSuffix(metricName, "_sum")
+		if baseName == "" {
+			baseName = metricName
+		}
+		chartName := baseName + "_sum"
+		chartID := buildJoinedLabelAutogenID(chartName, labels, nil)
+		if !fitsTypeIDBudget(policy, chartID) {
+			return autogenRoute{}, false, nil
+		}
+		units := getAutogenCounterUnits(baseName)
+		return autogenRoute{
+			chartID:         chartID,
+			chartName:       baseName,
+			dimensionName:   chartName,
+			algorithm:       program.AlgorithmIncremental,
+			units:           units,
+			chartType:       chartTypeFromUnits(units),
+			family:          getAutogenChartFamily(baseName),
+			contextName:     chartName,
+			staticDimension: true,
+		}, true, nil
+	default:
+		return autogenRoute{}, false, nil
+	}
+}
+
+func buildStateSetAutogenRoute(
+	metricName string,
+	labels metrix.LabelView,
+	meta metrix.SeriesMeta,
+	policy AutogenPolicy,
+) (autogenRoute, bool, error) {
+	if meta.FlattenRole != metrix.FlattenRoleStateSetState {
+		return autogenRoute{}, false, nil
+	}
+	state, ok := labels.Get(metricName)
+	if !ok || strings.TrimSpace(state) == "" {
+		return autogenRoute{}, false, nil
+	}
+	chartID := buildJoinedLabelAutogenID(metricName, labels, map[string]struct{}{
+		metricName: {},
+	})
+	if !fitsTypeIDBudget(policy, chartID) {
+		return autogenRoute{}, false, nil
+	}
+	return autogenRoute{
+		chartID:           chartID,
+		chartName:         metricName,
+		dimensionName:     state,
+		dimensionKeyLabel: metricName,
+		algorithm:         program.AlgorithmAbsolute,
+		units:             "state",
+		chartType:         program.ChartTypeLine,
+		family:            getAutogenChartFamily(metricName),
+		contextName:       metricName,
+		staticDimension:   false,
+	}, true, nil
+}
+
+func buildScalarAutogenRoute(
+	metricName string,
+	labels metrix.LabelView,
+	meta metrix.SeriesMeta,
+	policy AutogenPolicy,
+) (autogenRoute, bool, error) {
+	chartID := buildJoinedLabelAutogenID(metricName, labels, nil)
+	if !fitsTypeIDBudget(policy, chartID) {
+		return autogenRoute{}, false, nil
+	}
+	algorithm := program.AlgorithmAbsolute
+	units := getAutogenGaugeUnits(metricName)
+	if meta.Kind == metrix.MetricKindCounter {
+		algorithm = program.AlgorithmIncremental
+		units = getAutogenCounterUnits(metricName)
+	}
+	return autogenRoute{
+		chartID:         chartID,
+		chartName:       metricName,
+		dimensionName:   metricName,
+		algorithm:       algorithm,
+		units:           units,
+		chartType:       chartTypeFromUnits(units),
+		family:          getAutogenChartFamily(metricName),
+		contextName:     metricName,
+		staticDimension: true,
+	}, true, nil
+}
+
+func fitsTypeIDBudget(policy AutogenPolicy, chartID string) bool {
+	maxLen := policy.MaxTypeIDLen
+	if maxLen <= 0 {
+		maxLen = defaultMaxTypeIDLen
+	}
+	if strings.TrimSpace(policy.TypeID) == "" {
+		return len(chartID) <= maxLen
+	}
+	return len(policy.TypeID)+1+len(chartID) <= maxLen
+}
+
+func buildJoinedLabelAutogenID(metricName string, labels metrix.LabelView, exclude map[string]struct{}) string {
+	var b strings.Builder
+	b.Grow(len(metricName) + labels.Len()*8)
+	b.WriteString(metricName)
+	labels.Range(func(key, value string) bool {
+		if key == "" || value == "" {
+			return true
+		}
+		if _, skip := exclude[key]; skip {
+			return true
+		}
+		b.WriteByte('-')
+		b.WriteString(key)
+		b.WriteByte('=')
+		b.WriteString(normalizeAutogenLabelValue(value))
+		return true
+	})
+	return b.String()
+}
+
+func normalizeAutogenLabelValue(value string) string {
+	if strings.IndexByte(value, ' ') != -1 {
+		value = strings.ReplaceAll(value, " ", "_")
+	}
+	if strings.IndexByte(value, '\\') != -1 {
+		if v := decodeAutogenLabelValue(value); strings.IndexByte(v, '\\') != -1 {
+			value = strings.ReplaceAll(v, `\`, "_")
+		} else {
+			value = v
+		}
+	}
+	if strings.IndexByte(value, '\'') != -1 {
+		value = strings.ReplaceAll(value, "'", "")
+	}
+	return value
+}
+
+func decodeAutogenLabelValue(value string) string {
+	v, err := strconv.Unquote("\"" + value + "\"")
+	if err != nil {
+		return value
+	}
+	return v
+}
+
+func getAutogenChartTitle(metricName string) string {
+	return fmt.Sprintf("Metric \"%s\"", metricName)
+}
+
+func getAutogenChartContext(metricName string) string {
+	metricName = strings.TrimSpace(metricName)
+	if metricName == "" {
+		return autogenContextPrefix
+	}
+	return autogenContextPrefix + "." + metricName
+}
+
+func getAutogenChartFamily(metric string) string {
+	if strings.HasPrefix(metric, "go_") {
+		return "go"
+	}
+	if strings.HasPrefix(metric, "process_") {
+		return "process"
+	}
+	parts := strings.SplitN(metric, "_", 3)
+	family := metric
+	if len(parts) >= 3 {
+		family = parts[0] + "_" + parts[1]
+	}
+	i := len(family) - 1
+	for i >= 0 && family[i] >= '0' && family[i] <= '9' {
+		i--
+	}
+	if i > 0 {
+		return family[:i+1]
+	}
+	return family
+}
+
+func getAutogenGaugeUnits(metric string) string {
+	return getAutogenMetricUnits(metric)
+}
+
+func getAutogenCounterUnits(metric string) string {
+	units := getAutogenMetricUnits(metric)
+	switch units {
+	case "seconds", "time":
+	default:
+		units += "/s"
+	}
+	return units
+}
+
+func getAutogenSummaryUnits(metric string) string {
+	return getAutogenCounterUnits(metric)
+}
+
+func getAutogenMetricUnits(metric string) string {
+	idx := strings.LastIndexByte(metric, '_')
+	if idx == -1 {
+		return "events"
+	}
+	switch suffix := metric[idx:]; suffix {
+	case "_total", "_sum", "_count", "_ratio":
+		return getAutogenMetricUnits(metric[:idx])
+	}
+	switch units := metric[idx+1:]; units {
+	case "hertz":
+		return "Hz"
+	default:
+		return units
+	}
+}
+
+func chartTypeFromUnits(units string) program.ChartType {
+	if strings.HasSuffix(units, "bytes") || strings.HasSuffix(units, "bytes/s") {
+		return program.ChartTypeArea
+	}
+	return program.ChartTypeLine
+}
+
+func autogenLifecyclePolicy(policy AutogenPolicy) program.LifecyclePolicy {
+	expire := 0
+	if policy.ExpireAfterSuccessCycles > 0 {
+		expire = int(policy.ExpireAfterSuccessCycles)
+	}
+	return program.LifecyclePolicy{
+		ExpireAfterCycles: expire,
+		Dimensions: program.DimensionLifecyclePolicy{
+			ExpireAfterCycles: expire,
+		},
+	}
+}

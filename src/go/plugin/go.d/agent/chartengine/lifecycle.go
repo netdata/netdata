@@ -44,6 +44,10 @@ func (s *materializedState) ensureChart(
 ) (*materializedChartState, bool) {
 	chart, ok := s.charts[chartID]
 	if ok {
+		if chart.templateID != templateID {
+			chart.templateID = templateID
+			chart.dimensions = make(map[string]*materializedDimensionState)
+		}
 		chart.meta = meta
 		chart.lifecycle = lifecycle
 		return chart, false

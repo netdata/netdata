@@ -63,7 +63,10 @@ type chartLabelAccumulator struct {
 
 // BuildPlan builds a minimal plan snapshot from the provided reader.
 //
-// This scaffold currently resolves runtime-inferred dimension names only.
+// Current scope:
+//   - template routes with cache,
+//   - optional unmatched-series autogen fallback,
+//   - runtime-inferred dimension names from flattened metadata.
 func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	if e == nil {
 		return Plan{}, fmt.Errorf("chartengine: nil engine")
@@ -144,22 +147,45 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 		} else {
 			e.addRouteCacheMiss()
 		}
+		if len(routes) == 0 {
+			autoRoutes, ok, err := e.resolveAutogenRoute(name, labels, meta)
+			if err != nil {
+				firstErr = err
+				return
+			}
+			if ok {
+				routes = autoRoutes
+			}
+		}
 
 		for _, route := range routes {
 			ownerTemplateID, ownerExists := chartOwners[route.ChartID]
 			if ownerExists && ownerTemplateID != route.ChartTemplateID {
-				// Cross-template rendered-id collision.
-				// Existing owner keeps chart-id ownership.
-				continue
+				if !route.Autogen && isAutogenTemplateID(ownerTemplateID) {
+					// Template wins over autogen on chart-id collision.
+					// Drop autogen accumulation for this chart in current plan cycle.
+					chartOwners[route.ChartID] = route.ChartTemplateID
+					delete(chartsByID, route.ChartID)
+				} else {
+					// Cross-template rendered-id collision.
+					// Existing owner keeps chart-id ownership.
+					continue
+				}
 			}
 			if !ownerExists {
 				chartOwners[route.ChartID] = route.ChartTemplateID
 			}
 
-			chart, ok := index.chartsByID[route.ChartTemplateID]
-			if !ok {
-				firstErr = fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
-				return
+			identity := program.ChartIdentity{}
+			labelsAcc := newAutogenChartLabelAccumulator()
+			if !route.Autogen {
+				chart, ok := index.chartsByID[route.ChartTemplateID]
+				if !ok {
+					firstErr = fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
+					return
+				}
+				identity = chart.Identity
+				labelsAcc = newChartLabelAccumulator(chart)
 			}
 
 			cs, exists := chartsByID[route.ChartID]
@@ -167,9 +193,9 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 				cs = &chartState{
 					templateID: route.ChartTemplateID,
 					chartID:    route.ChartID,
-					meta:       chart.Meta,
-					lifecycle:  chart.Lifecycle,
-					labels:     newChartLabelAccumulator(chart),
+					meta:       route.Meta,
+					lifecycle:  route.Lifecycle,
+					labels:     labelsAcc,
 					values:     make(map[string]metrix.SampleValue),
 					dimensions: make(map[string]dimensionState),
 					dynamicSet: make(map[string]struct{}),
@@ -196,7 +222,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 			}
 
 			cs.values[route.DimensionName] += v
-			if err := cs.labels.observe(chart.Identity, labels, route.DimensionKeyLabel); err != nil {
+			if err := cs.labels.observe(identity, labels, route.DimensionKeyLabel); err != nil {
 				firstErr = err
 				return
 			}
@@ -382,6 +408,10 @@ func inferDimensionLabelKey(metricName string, meta metrix.SeriesMeta) (string, 
 	default:
 		return "", false, fmt.Errorf("chartengine: unsupported flatten role %d for runtime dimension inference", meta.FlattenRole)
 	}
+}
+
+func isAutogenTemplateID(templateID string) bool {
+	return strings.HasPrefix(templateID, autogenTemplatePrefix)
 }
 
 func orderedMaterializedDimensionNames(dimensions map[string]*materializedDimensionState) []string {
@@ -748,6 +778,16 @@ func newChartLabelAccumulator(chart program.Chart) *chartLabelAccumulator {
 		acc.excluded[key] = struct{}{}
 	}
 	return acc
+}
+
+func newAutogenChartLabelAccumulator() *chartLabelAccumulator {
+	return &chartLabelAccumulator{
+		mode:        program.PromotionModeAutoIntersection,
+		promoteKeys: make(map[string]struct{}),
+		excluded:    make(map[string]struct{}),
+		instance:    make(map[string]string),
+		selected:    make(map[string]string),
+	}
 }
 
 func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels metrix.LabelView, dimensionKeyLabel string) error {

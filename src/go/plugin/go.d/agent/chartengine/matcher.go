@@ -22,6 +22,9 @@ type routeBinding struct {
 	Hidden            bool
 	Static            bool
 	Inferred          bool
+	Autogen           bool
+	Meta              program.ChartMeta
+	Lifecycle         program.LifecyclePolicy
 }
 
 type routeCandidate struct {
@@ -218,6 +221,9 @@ func (e *Engine) resolveSeriesRoutes(
 			Hidden:            candidate.dimension.Hidden,
 			Static:            !candidate.dimension.Dynamic,
 			Inferred:          candidate.dimension.InferNameFromSeriesMeta,
+			Autogen:           false,
+			Meta:              chart.Meta,
+			Lifecycle:         chart.Lifecycle,
 		})
 	}
 
