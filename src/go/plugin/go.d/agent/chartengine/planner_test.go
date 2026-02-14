@@ -195,12 +195,70 @@ groups:
 	}
 }
 
+func TestBuildPlanUsesRouteCacheReuse(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	c := store.Write().SnapshotMeter("svc").Counter("requests_total")
+
+	cc.BeginCycle()
+	c.ObserveTotal(10)
+	cc.CommitCycleSuccess()
+
+	plan1, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	stats1 := e.Stats()
+	assert.Equal(t, uint64(0), stats1.RouteCacheHits)
+	assert.Equal(t, uint64(1), stats1.RouteCacheMisses)
+	require.NotNil(t, findUpdateAction(plan1))
+	assert.Equal(t, float64(10), findUpdateAction(plan1).Values[0].Float64)
+
+	cc.BeginCycle()
+	c.ObserveTotal(20)
+	cc.CommitCycleSuccess()
+
+	plan2, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	stats2 := e.Stats()
+	assert.Equal(t, uint64(1), stats2.RouteCacheHits)
+	assert.Equal(t, uint64(1), stats2.RouteCacheMisses)
+	require.NotNil(t, findUpdateAction(plan2))
+	assert.Equal(t, float64(20), findUpdateAction(plan2).Values[0].Float64)
+}
+
 func actionKinds(actions []EngineAction) []ActionKind {
 	out := make([]ActionKind, 0, len(actions))
 	for _, action := range actions {
 		out = append(out, action.Kind())
 	}
 	return out
+}
+
+func findUpdateAction(plan Plan) *UpdateChartAction {
+	for _, action := range plan.Actions {
+		if update, ok := action.(UpdateChartAction); ok {
+			return &update
+		}
+	}
+	return nil
 }
 
 func mustCycleController(t *testing.T, s metrix.CollectorStore) metrix.CycleController {
