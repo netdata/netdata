@@ -52,6 +52,9 @@ type Reader interface {
 	// ForEachSeries iterates scalar series only. For non-scalar families use typed getters
 	// or Flatten() first.
 	ForEachSeries(fn func(name string, labels LabelView, v SampleValue))
+	// ForEachSeriesIdentity iterates scalar series and includes stable identity/hash.
+	// For non-scalar families use typed getters or Flatten() first.
+	ForEachSeriesIdentity(fn func(identity SeriesIdentity, name string, labels LabelView, v SampleValue))
 	// ForEachMatch iterates scalar series only. For non-scalar families use typed getters
 	// or Flatten() first.
 	ForEachMatch(name string, match func(labels LabelView) bool, fn func(labels LabelView, v SampleValue))

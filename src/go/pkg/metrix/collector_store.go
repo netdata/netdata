@@ -55,6 +55,7 @@ type stateSetSchema struct {
 
 type committedSeries struct {
 	id        SeriesID
+	hash64    uint64
 	key       string
 	name      string
 	labels    []Label
@@ -247,6 +248,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		if series == nil {
 			series = &committedSeries{
 				id:        SeriesID(key),
+				hash64:    seriesIDHash(SeriesID(key)),
 				key:       key,
 				name:      staged.name,
 				labels:    append([]Label(nil), staged.labels...),
@@ -267,6 +269,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		if series == nil {
 			series = &committedSeries{
 				id:        SeriesID(key),
+				hash64:    seriesIDHash(SeriesID(key)),
 				key:       key,
 				name:      staged.name,
 				labels:    append([]Label(nil), staged.labels...),
@@ -301,6 +304,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		if series == nil {
 			series = &committedSeries{
 				id:        SeriesID(key),
+				hash64:    seriesIDHash(SeriesID(key)),
 				key:       key,
 				name:      staged.name,
 				labels:    append([]Label(nil), staged.labels...),
@@ -342,6 +346,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		if series == nil {
 			series = &committedSeries{
 				id:        SeriesID(key),
+				hash64:    seriesIDHash(SeriesID(key)),
 				key:       key,
 				name:      staged.name,
 				labels:    append([]Label(nil), staged.labels...),
@@ -383,6 +388,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		if series == nil {
 			series = &committedSeries{
 				id:        SeriesID(key),
+				hash64:    seriesIDHash(SeriesID(key)),
 				key:       key,
 				name:      staged.name,
 				labels:    append([]Label(nil), staged.labels...),

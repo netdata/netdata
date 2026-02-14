@@ -74,6 +74,7 @@ func TestBuildPlanResolvesInferDimensionNames(t *testing.T) {
 		yaml      string
 		setup     func(t *testing.T, s metrix.CollectorStore)
 		wantNames []string
+		wantKinds []ActionKind
 	}{
 		"histogram bucket inference resolves bucket names from le": {
 			yaml: `
@@ -105,6 +106,7 @@ groups:
 				cc.CommitCycleSuccess()
 			},
 			wantNames: []string{"+Inf", "1", "2"},
+			wantKinds: []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart},
 		},
 		"summary quantile inference resolves quantile labels": {
 			yaml: `
@@ -138,6 +140,7 @@ groups:
 				cc.CommitCycleSuccess()
 			},
 			wantNames: []string{"0.5", "0.9"},
+			wantKinds: []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart},
 		},
 		"stateset inference resolves state names from metric-family label key": {
 			yaml: `
@@ -166,6 +169,7 @@ groups:
 				cc.CommitCycleSuccess()
 			},
 			wantNames: []string{"failed", "ok"},
+			wantKinds: []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart},
 		},
 	}
 
@@ -186,8 +190,17 @@ groups:
 				got = append(got, dim.Name)
 			}
 			assert.Equal(t, tc.wantNames, got)
+			assert.Equal(t, tc.wantKinds, actionKinds(plan.Actions))
 		})
 	}
+}
+
+func actionKinds(actions []EngineAction) []ActionKind {
+	out := make([]ActionKind, 0, len(actions))
+	for _, action := range actions {
+		out = append(out, action.Kind())
+	}
+	return out
 }
 
 func mustCycleController(t *testing.T, s metrix.CollectorStore) metrix.CycleController {
