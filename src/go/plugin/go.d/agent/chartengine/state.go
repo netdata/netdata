@@ -2,7 +2,11 @@
 
 package chartengine
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
+import (
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
+)
 
 type engineState struct {
 	cfg          engineConfig
@@ -11,4 +15,7 @@ type engineState struct {
 	routeCache   *routeCache
 	materialized materializedState
 	stats        engineStats
+	runtimeStore metrix.RuntimeStore
+	runtimeStats *runtimeMetrics
+	log          *logger.Logger
 }
