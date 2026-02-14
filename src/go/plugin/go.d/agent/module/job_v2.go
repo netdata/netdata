@@ -54,6 +54,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 		out:             cfg.Out,
 		stop:            make(chan struct{}),
 		tick:            make(chan int),
+		updVnode:        make(chan *vnodes.VirtualNode, 1),
 		buf:             &buf,
 		api:             netdataapi.New(&buf),
 		vnode:           cfg.Vnode,
@@ -102,8 +103,9 @@ type JobV2 struct {
 	prevRun time.Time
 	retries int
 
-	vnodeMu sync.RWMutex
-	vnode   vnodes.VirtualNode
+	vnodeMu  sync.RWMutex
+	vnode    vnodes.VirtualNode
+	updVnode chan *vnodes.VirtualNode
 
 	tick chan int
 	out  io.Writer
@@ -142,14 +144,11 @@ func (j *JobV2) UpdateVnode(vnode *vnodes.VirtualNode) {
 	if vnode == nil {
 		return
 	}
-	j.vnodeMu.Lock()
-	j.vnode = *vnode.Copy()
-	j.vnodeMu.Unlock()
-	if j.module != nil {
-		if mv := j.module.VirtualNode(); mv != nil {
-			*mv = *vnode.Copy()
-		}
+	select {
+	case <-j.updVnode:
+	default:
 	}
+	j.updVnode <- vnode
 }
 func (j *JobV2) Cleanup() {
 	if j.module != nil {
@@ -273,17 +272,47 @@ func (j *JobV2) postCheck() error {
 }
 
 func (j *JobV2) runOnce() {
+	j.applyPendingVnodeUpdate()
+
 	curTime := time.Now()
 	sinceLastRun := calcSinceLastRun(curTime, j.prevRun)
 	j.prevRun = curTime
 
-	if j.collectAndEmit(sinceLastRun) {
+	ok := j.collectAndEmit(sinceLastRun)
+	if ok {
 		j.retries = 0
 	} else {
 		j.retries++
 	}
-	_, _ = io.Copy(j.out, j.buf)
+
+	// Never flush buffered output from failed or panicked cycles:
+	// a panic can leave partial protocol lines in the buffer.
+	if ok && !j.panicked {
+		_, _ = io.Copy(j.out, j.buf)
+	}
 	j.buf.Reset()
+}
+
+func (j *JobV2) applyPendingVnodeUpdate() {
+	select {
+	case vnode := <-j.updVnode:
+		if vnode == nil {
+			return
+		}
+
+		next := vnode.Copy()
+
+		j.vnodeMu.Lock()
+		j.vnode = *next
+		j.vnodeMu.Unlock()
+
+		if j.module != nil {
+			if mv := j.module.VirtualNode(); mv != nil {
+				*mv = *next
+			}
+		}
+	default:
+	}
 }
 
 func (j *JobV2) collectAndEmit(sinceLastRun int) bool {

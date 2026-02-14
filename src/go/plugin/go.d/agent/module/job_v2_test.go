@@ -26,6 +26,7 @@ type mockModuleV2 struct {
 	store    metrix.CollectorStore
 	template []byte
 	cleaned  bool
+	vnode    *vnodes.VirtualNode
 }
 
 func (m *mockModuleV2) Init(ctx context.Context) error {
@@ -57,7 +58,7 @@ func (m *mockModuleV2) Cleanup(ctx context.Context) {
 }
 
 func (m *mockModuleV2) Configuration() any                 { return nil }
-func (m *mockModuleV2) VirtualNode() *vnodes.VirtualNode   { return nil }
+func (m *mockModuleV2) VirtualNode() *vnodes.VirtualNode   { return m.vnode }
 func (m *mockModuleV2) MetricStore() metrix.CollectorStore { return m.store }
 func (m *mockModuleV2) ChartTemplateYAML() []byte          { return m.template }
 
@@ -73,6 +74,22 @@ func newTestJobV2(mod ModuleV2, out *bytes.Buffer) *JobV2 {
 		Labels: map[string]string{
 			"instance": "localhost",
 		},
+	})
+}
+
+func newTestJobV2WithVnode(mod ModuleV2, out *bytes.Buffer, vnode vnodes.VirtualNode) *JobV2 {
+	return NewJobV2(JobV2Config{
+		PluginName:  pluginName,
+		Name:        jobName,
+		ModuleName:  modName,
+		FullName:    modName + "_" + jobName,
+		Module:      mod,
+		Out:         out,
+		UpdateEvery: 1,
+		Labels: map[string]string{
+			"instance": "localhost",
+		},
+		Vnode: vnode,
 	})
 }
 
@@ -258,6 +275,89 @@ func TestJobV2Scenarios(t *testing.T) {
 				assert.Contains(t, wire, "BEGIN 'module_job.win_nic_traffic_eth1'")
 				assert.Contains(t, wire, "SET 'received' = 50")
 				assert.Contains(t, wire, "SET 'sent' = 40")
+			},
+		},
+		"panic cycle drops buffered partial output": {
+			run: func(t *testing.T) {
+				store := metrix.NewCollectorStore()
+				mod := &mockModuleV2{
+					store:    store,
+					template: chartTemplateV2(),
+					collectFunc: func(context.Context) error {
+						panic("boom")
+					},
+				}
+
+				var out bytes.Buffer
+				job := newTestJobV2(mod, &out)
+				require.NoError(t, job.AutoDetection())
+
+				// Simulate partial protocol bytes already present in the cycle buffer.
+				_, err := job.buf.WriteString("BEGIN 'broken'\nSET 'x' = 1\n")
+				require.NoError(t, err)
+
+				job.runOnce()
+				assert.True(t, job.Panicked())
+				assert.Equal(t, "", out.String())
+				assert.Zero(t, job.buf.Len())
+			},
+		},
+		"vnode update is deferred until next cycle and not written during in-flight collect": {
+			run: func(t *testing.T) {
+				store := metrix.NewCollectorStore()
+				mod := &mockModuleV2{
+					store:    store,
+					template: chartTemplateV2(),
+					vnode: &vnodes.VirtualNode{
+						Name:     "old",
+						Hostname: "old-host",
+						GUID:     "old-guid",
+					},
+				}
+
+				collectStarted := make(chan struct{})
+				collectRelease := make(chan struct{})
+				firstCollectDone := make(chan struct{})
+				collectCalls := 0
+
+				mod.collectFunc = func(context.Context) error {
+					collectCalls++
+					if collectCalls == 1 {
+						close(collectStarted)
+						<-collectRelease
+						assert.Equal(t, "old-guid", mod.vnode.GUID)
+						close(firstCollectDone)
+					} else {
+						assert.Equal(t, "new-guid", mod.vnode.GUID)
+					}
+					store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(1)
+					return nil
+				}
+
+				job := newTestJobV2WithVnode(mod, &bytes.Buffer{}, *mod.vnode.Copy())
+				require.NoError(t, job.AutoDetection())
+
+				runDone := make(chan struct{})
+				go func() {
+					job.runOnce()
+					close(runDone)
+				}()
+
+				<-collectStarted
+				job.UpdateVnode(&vnodes.VirtualNode{
+					Name:     "new",
+					Hostname: "new-host",
+					GUID:     "new-guid",
+				})
+				assert.Equal(t, "old-guid", mod.vnode.GUID)
+
+				close(collectRelease)
+				<-firstCollectDone
+				<-runDone
+
+				job.runOnce()
+				assert.Equal(t, "new-guid", mod.vnode.GUID)
+				assert.Equal(t, "new-guid", job.Vnode().GUID)
 			},
 		},
 	}
