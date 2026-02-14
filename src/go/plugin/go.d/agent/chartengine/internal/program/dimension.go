@@ -31,6 +31,9 @@ type Dimension struct {
 	NameTemplate Template
 	// NameFromLabel is explicit dynamic name source in placeholder-free mode.
 	NameFromLabel string
+	// InferNameFromSeriesMeta requests runtime inference based on series origin
+	// metadata (e.g. histogram/state-set flatten semantics).
+	InferNameFromSeriesMeta bool
 
 	// Hidden maps to DIMENSION hidden option.
 	Hidden bool
@@ -45,7 +48,7 @@ func validateDimension(dimension Dimension) error {
 	if dimension.Selector.Matcher == nil {
 		return fmt.Errorf("selector matcher is required")
 	}
-	if dimension.NameTemplate.Raw == "" && dimension.NameFromLabel == "" {
+	if dimension.NameTemplate.Raw == "" && dimension.NameFromLabel == "" && !dimension.InferNameFromSeriesMeta {
 		return fmt.Errorf("dimension name is required (name template or name_from_label)")
 	}
 	return nil

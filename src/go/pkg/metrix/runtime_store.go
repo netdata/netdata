@@ -321,6 +321,7 @@ func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name string, label
 			series = cloneCommittedSeries(series)
 			next.series[key] = series
 		}
+		ensureSeriesMeta(series.desc, &series.meta)
 		return series
 	}
 	series = &committedSeries{
@@ -330,6 +331,7 @@ func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name string, label
 		labels:    append([]Label(nil), labels...),
 		labelsKey: labelsKey,
 		desc:      desc,
+		meta:      baseSeriesMeta(desc),
 	}
 	next.series[key] = series
 	return series

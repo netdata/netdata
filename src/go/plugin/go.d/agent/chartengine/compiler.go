@@ -204,13 +204,9 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 
 	name := strings.TrimSpace(dim.Name)
 	nameFromLabel := strings.TrimSpace(dim.NameFromLabel)
-	if name == "" && nameFromLabel == "" {
-		if inferred, ok := inferNameFromLabel(meta.MetricNames); ok {
-			nameFromLabel = inferred
-		} else {
-			return compiledDimension{}, fmt.Errorf("name or name_from_label is required when selector kind defaults are not applicable")
-		}
-	}
+	// If dimension naming is omitted, runtime planner resolves dynamic key source
+	// from series origin metadata (metrix.Reader.SeriesMeta on flattened series).
+	inferFromSeriesMeta := name == "" && nameFromLabel == ""
 
 	nameTemplate := program.Template{}
 	dynamicLabelKeys := make([]string, 0, 1)
@@ -234,10 +230,11 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 				MetricNames:          append([]string(nil), meta.MetricNames...),
 				ConstrainedLabelKeys: append([]string(nil), meta.ConstrainedLabelKeys...),
 			},
-			NameTemplate:  nameTemplate,
-			NameFromLabel: nameFromLabel,
-			Hidden:        dim.Hidden,
-			Dynamic:       nameFromLabel != "" || nameTemplate.IsDynamic(),
+			NameTemplate:            nameTemplate,
+			NameFromLabel:           nameFromLabel,
+			InferNameFromSeriesMeta: inferFromSeriesMeta,
+			Hidden:                  dim.Hidden,
+			Dynamic:                 inferFromSeriesMeta || nameFromLabel != "" || nameTemplate.IsDynamic(),
 		},
 		selectorKeys:     append([]string(nil), meta.ConstrainedLabelKeys...),
 		dynamicLabelKeys: normalizeUnique(dynamicLabelKeys),
@@ -328,23 +325,6 @@ func compileInstanceByLabels(instances *charttpl.Instances) ([]program.InstanceL
 		}
 	}
 	return out, nil
-}
-
-func inferNameFromLabel(metricNames []string) (string, bool) {
-	if len(metricNames) != 1 {
-		return "", false
-	}
-	name := metricNames[0]
-	if strings.HasSuffix(name, "_bucket") {
-		return "le", true
-	}
-	// Phase-2 stateset flatten semantics: synthetic label key equals metric
-	// family name. For the v1 template compiler we infer this for *_state
-	// series when dimension naming is omitted.
-	if strings.HasSuffix(name, "_state") {
-		return name, true
-	}
-	return "", false
 }
 
 func metricKindsFromNames(names []string) []string {
