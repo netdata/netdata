@@ -176,7 +176,7 @@ func TestCompileScenarios(t *testing.T) {
 				assert.True(t, charts[0].Dimensions[0].Dynamic)
 			},
 		},
-		"compiles id placeholders and label exclusion metadata": {
+		"compiles literal id with instances and label exclusion metadata": {
 			spec: charttpl.Spec{
 				Version: charttpl.VersionV1,
 				Groups: []charttpl.Group{
@@ -185,16 +185,19 @@ func TestCompileScenarios(t *testing.T) {
 						Metrics: []string{"ceph_osd_space_bytes"},
 						Charts: []charttpl.Chart{
 							{
-								ID:               "osd_{osd_uuid}_space_usage",
+								ID:               "osd_space_usage",
 								Title:            "OSD space usage",
 								Context:          "osd_space_usage",
 								Units:            "bytes",
 								LabelPromoted:    []string{"cluster", "cluster", "host"},
 								ContextNamespace: "ceph",
+								Instances: &charttpl.Instances{
+									ByLabels: []string{"osd_uuid"},
+								},
 								Dimensions: []charttpl.Dimension{
 									{
-										Selector: `ceph_osd_space_bytes{state="used"}`,
-										Name:     "{state}",
+										Selector:      `ceph_osd_space_bytes{state="used"}`,
+										NameFromLabel: "state",
 									},
 								},
 							},
@@ -206,7 +209,9 @@ func TestCompileScenarios(t *testing.T) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
-				assert.Equal(t, []string{"osd_uuid"}, charts[0].Identity.IDPlaceholders)
+				assert.Empty(t, charts[0].Identity.IDPlaceholders)
+				require.Len(t, charts[0].Identity.InstanceByLabels, 1)
+				assert.Equal(t, "osd_uuid", charts[0].Identity.InstanceByLabels[0].Key)
 				assert.Equal(t, "Disk", charts[0].Meta.Family)
 				assert.Equal(t, "ceph.osd_space_usage", charts[0].Meta.Context)
 
@@ -242,6 +247,54 @@ func TestCompileScenarios(t *testing.T) {
 			},
 			wantErr: true,
 			errLike: "algorithm inference is ambiguous",
+		},
+		"fails on placeholder chart id in phase-1 syntax": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Disk",
+						Metrics: []string{"ceph_osd_space_bytes"},
+						Charts: []charttpl.Chart{
+							{
+								ID:      "osd_{osd_uuid}_space_usage",
+								Title:   "OSD space usage",
+								Context: "osd_space_usage",
+								Units:   "bytes",
+								Dimensions: []charttpl.Dimension{
+									{Selector: "ceph_osd_space_bytes", Name: "used"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "id: placeholders are not allowed",
+		},
+		"fails on placeholder dimension name in phase-1 syntax": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Disk",
+						Metrics: []string{"ceph_osd_space_bytes"},
+						Charts: []charttpl.Chart{
+							{
+								ID:      "osd_space_usage",
+								Title:   "OSD space usage",
+								Context: "osd_space_usage",
+								Units:   "bytes",
+								Dimensions: []charttpl.Dimension{
+									{Selector: "ceph_osd_space_bytes", Name: "{state}"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "name: placeholders are not allowed",
 		},
 	}
 

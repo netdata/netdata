@@ -132,6 +132,9 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 	if err != nil {
 		return program.Chart{}, fmt.Errorf("id: %w", err)
 	}
+	if len(idTemplate.Keys) > 0 {
+		return program.Chart{}, fmt.Errorf("id: placeholders are not allowed in phase-1 syntax; use instances.by_labels")
+	}
 
 	instanceByLabels, err := compileInstanceByLabels(chart.Instances)
 	if err != nil {
@@ -149,7 +152,7 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 		IDPlaceholders:   append([]string(nil), idTemplate.Keys...),
 		InstanceByLabels: instanceByLabels,
 		ContextNamespace: append([]string(nil), scope.contextParts...),
-		Static:           len(idTemplate.Keys) == 0 && len(instanceByLabels) == 0,
+		Static:           len(instanceByLabels) == 0,
 	}
 	metaFamily := composeFamily(scope.familyParts, chart.Family)
 
@@ -214,6 +217,9 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 		nameTemplate, err = parseTemplate(name)
 		if err != nil {
 			return compiledDimension{}, fmt.Errorf("name: %w", err)
+		}
+		if len(nameTemplate.Keys) > 0 {
+			return compiledDimension{}, fmt.Errorf("name: placeholders are not allowed in phase-1 syntax; use name_from_label")
 		}
 		dynamicLabelKeys = append(dynamicLabelKeys, nameTemplate.Keys...)
 	} else if nameFromLabel != "" {

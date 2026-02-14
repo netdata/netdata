@@ -391,6 +391,210 @@ groups:
 	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan3.Actions))
 }
 
+func TestBuildPlanRendersChartIDsFromInstances(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Net
+    metrics:
+      - windows_net_bytes_received_total
+    charts:
+      - id: win_nic_traffic
+        title: NIC traffic
+        context: nic_traffic
+        units: bytes/s
+        instances:
+          by_labels: [nic]
+        dimensions:
+          - selector: windows_net_bytes_received_total
+            name: received
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("")
+	rx := sm.Counter("windows_net_bytes_received_total")
+
+	eth0 := sm.LabelSet(metrix.Label{Key: "nic", Value: "eth0"})
+	eth1 := sm.LabelSet(metrix.Label{Key: "nic", Value: "eth1"})
+
+	cc.BeginCycle()
+	rx.ObserveTotal(10, eth1)
+	rx.ObserveTotal(20, eth0)
+	cc.CommitCycleSuccess()
+
+	plan1, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{
+		ActionCreateChart, ActionCreateDimension, ActionUpdateChart,
+		ActionCreateChart, ActionCreateDimension, ActionUpdateChart,
+	}, actionKinds(plan1.Actions))
+
+	createChartIDs := make([]string, 0, 2)
+	updateChartIDs := make([]string, 0, 2)
+	for _, action := range plan1.Actions {
+		switch v := action.(type) {
+		case CreateChartAction:
+			createChartIDs = append(createChartIDs, v.ChartID)
+		case UpdateChartAction:
+			updateChartIDs = append(updateChartIDs, v.ChartID)
+		}
+	}
+	assert.Equal(t, []string{"win_nic_traffic_eth0", "win_nic_traffic_eth1"}, createChartIDs)
+	assert.Equal(t, []string{"win_nic_traffic_eth0", "win_nic_traffic_eth1"}, updateChartIDs)
+
+	cc.BeginCycle()
+	rx.ObserveTotal(21, eth0)
+	rx.ObserveTotal(11, eth1)
+	cc.CommitCycleSuccess()
+
+	plan2, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionUpdateChart, ActionUpdateChart}, actionKinds(plan2.Actions))
+}
+
+func TestBuildPlanEnforcesMaxInstancesDeterministically(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Net
+    metrics:
+      - windows_net_bytes_received_total
+    charts:
+      - id: win_nic_traffic
+        title: NIC traffic
+        context: nic_traffic
+        units: bytes/s
+        lifecycle:
+          max_instances: 1
+        instances:
+          by_labels: [nic]
+        dimensions:
+          - selector: windows_net_bytes_received_total
+            name: received
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("")
+	rx := sm.Counter("windows_net_bytes_received_total")
+
+	eth0 := sm.LabelSet(metrix.Label{Key: "nic", Value: "eth0"})
+	eth1 := sm.LabelSet(metrix.Label{Key: "nic", Value: "eth1"})
+
+	cc.BeginCycle()
+	rx.ObserveTotal(10, eth0)
+	cc.CommitCycleSuccess()
+
+	plan1, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
+
+	cc.BeginCycle()
+	rx.ObserveTotal(11, eth0)
+	rx.ObserveTotal(20, eth1)
+	cc.CommitCycleSuccess()
+
+	plan2, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	// eth0 exists and is seen, so eth1 is dropped under max_instances=1.
+	assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(plan2.Actions))
+	update2 := findUpdateAction(plan2)
+	require.NotNil(t, update2)
+	assert.Equal(t, "win_nic_traffic_eth0", update2.ChartID)
+
+	cc.BeginCycle()
+	rx.ObserveTotal(21, eth1)
+	cc.CommitCycleSuccess()
+
+	plan3, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{
+		ActionRemoveChart,
+		ActionCreateChart,
+		ActionCreateDimension,
+		ActionUpdateChart,
+	}, actionKinds(plan3.Actions))
+}
+
+func TestBuildPlanEnforcesMaxDimsDeterministically(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc_mode
+    charts:
+      - id: service_mode
+        title: Service mode
+        context: service_mode
+        units: state
+        lifecycle:
+          dimensions:
+            max_dims: 2
+        dimensions:
+          - selector: svc_mode
+            name_from_label: mode
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("")
+	g := sm.Gauge("svc_mode")
+
+	modeA := sm.LabelSet(metrix.Label{Key: "mode", Value: "a"})
+	modeB := sm.LabelSet(metrix.Label{Key: "mode", Value: "b"})
+	modeC := sm.LabelSet(metrix.Label{Key: "mode", Value: "c"})
+
+	cc.BeginCycle()
+	g.Observe(1, modeA)
+	g.Observe(1, modeB)
+	cc.CommitCycleSuccess()
+
+	plan1, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
+
+	cc.BeginCycle()
+	g.Observe(1, modeA)
+	g.Observe(1, modeB)
+	g.Observe(1, modeC)
+	cc.CommitCycleSuccess()
+
+	plan2, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	// a,b seen; c is dropped under max_dims=2.
+	assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(plan2.Actions))
+	update2 := findUpdateAction(plan2)
+	require.NotNil(t, update2)
+	assert.Len(t, update2.Values, 2)
+
+	cc.BeginCycle()
+	g.Observe(1, modeB)
+	g.Observe(1, modeC)
+	cc.CommitCycleSuccess()
+
+	plan3, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{
+		ActionRemoveDimension,
+		ActionCreateDimension,
+		ActionUpdateChart,
+	}, actionKinds(plan3.Actions))
+}
+
 func actionKinds(actions []EngineAction) []ActionKind {
 	out := make([]ActionKind, 0, len(actions))
 	for _, action := range actions {

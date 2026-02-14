@@ -23,6 +23,7 @@ type EngineAction interface {
 // CreateChartAction materializes a chart instance before updates.
 type CreateChartAction struct {
 	ChartTemplateID string
+	ChartID         string
 	Meta            program.ChartMeta
 }
 
@@ -30,9 +31,13 @@ func (a CreateChartAction) Kind() ActionKind { return ActionCreateChart }
 
 // CreateDimensionAction materializes one dimension for a chart instance.
 type CreateDimensionAction struct {
-	ChartTemplateID string
-	Name            string
-	Hidden          bool
+	ChartID    string
+	ChartMeta  program.ChartMeta
+	Name       string
+	Hidden     bool
+	Algorithm  program.Algorithm
+	Multiplier int
+	Divisor    int
 }
 
 func (a CreateDimensionAction) Kind() ActionKind { return ActionCreateDimension }
@@ -48,23 +53,29 @@ type UpdateDimensionValue struct {
 
 // UpdateChartAction updates one chart instance values in deterministic order.
 type UpdateChartAction struct {
-	ChartTemplateID string
-	Values          []UpdateDimensionValue
+	ChartID string
+	Values  []UpdateDimensionValue
 }
 
 func (a UpdateChartAction) Kind() ActionKind { return ActionUpdateChart }
 
 // RemoveDimensionAction marks one dimension obsolete.
 type RemoveDimensionAction struct {
-	ChartTemplateID string
-	Name            string
+	ChartID    string
+	ChartMeta  program.ChartMeta
+	Name       string
+	Hidden     bool
+	Algorithm  program.Algorithm
+	Multiplier int
+	Divisor    int
 }
 
 func (a RemoveDimensionAction) Kind() ActionKind { return ActionRemoveDimension }
 
 // RemoveChartAction marks one chart obsolete.
 type RemoveChartAction struct {
-	ChartTemplateID string
+	ChartID string
+	Meta    program.ChartMeta
 }
 
 func (a RemoveChartAction) Kind() ActionKind { return ActionRemoveChart }
