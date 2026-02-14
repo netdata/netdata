@@ -342,6 +342,11 @@ func (j *Job) Module() Module {
 	return j.module
 }
 
+// Collector returns the underlying collector instance bound to this job.
+func (j *Job) Collector() any {
+	return j.module
+}
+
 // IsFunctionOnly returns true if this job is function-only (no metrics collection).
 func (j *Job) IsFunctionOnly() bool {
 	return j.functionOnly

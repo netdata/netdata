@@ -55,8 +55,8 @@ func mongoMethods() []funcapi.MethodConfig {
 	}
 }
 
-func mongoFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
+func mongoFunctionHandler(job module.RuntimeJob) funcapi.MethodHandler {
+	c, ok := job.Collector().(*Collector)
 	if !ok {
 		return nil
 	}

@@ -68,24 +68,24 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 			},
 			wantV2: true,
 		},
-		"fallback to v1 when job methods are configured": {
+		"prefer v2 when job methods are configured": {
 			creator: module.Creator{
 				Create: func() module.Module { return &testV1Module{} },
 				CreateV2: func() module.ModuleV2 {
 					return &testV2Module{store: metrix.NewCollectorStore()}
 				},
-				JobMethods: func(_ *module.Job) []funcapi.MethodConfig { return nil },
+				JobMethods: func(_ module.RuntimeJob) []funcapi.MethodConfig { return nil },
 			},
-			wantV2: false,
+			wantV2: true,
 		},
-		"reject v2 only creator when job methods require legacy runtime": {
+		"allow v2 only creator when job methods are configured": {
 			creator: module.Creator{
 				CreateV2: func() module.ModuleV2 {
 					return &testV2Module{store: metrix.NewCollectorStore()}
 				},
-				JobMethods: func(_ *module.Job) []funcapi.MethodConfig { return nil },
+				JobMethods: func(_ module.RuntimeJob) []funcapi.MethodConfig { return nil },
 			},
-			wantErr: "require legacy job runtime",
+			wantV2: true,
 		},
 	}
 

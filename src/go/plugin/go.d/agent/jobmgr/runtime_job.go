@@ -15,6 +15,7 @@ type runtimeJob interface {
 	FullName() string
 	ModuleName() string
 	Name() string
+	Collector() any
 
 	Start()
 	Stop()

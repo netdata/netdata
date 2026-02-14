@@ -59,8 +59,8 @@ func mysqlMethods() []funcapi.MethodConfig {
 	}
 }
 
-func mysqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
+func mysqlFunctionHandler(job module.RuntimeJob) funcapi.MethodHandler {
+	c, ok := job.Collector().(*Collector)
 	if !ok {
 		return nil
 	}

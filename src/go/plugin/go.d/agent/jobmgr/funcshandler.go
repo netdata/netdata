@@ -246,7 +246,7 @@ func (m *Manager) buildRequiredParams(moduleName string, methodParams []funcapi.
 	return required
 }
 
-func (m *Manager) resolveMethodParamsForJob(ctx context.Context, moduleName, methodID string, methodCfg *funcapi.MethodConfig, job *module.Job, handler funcapi.MethodHandler) ([]funcapi.ParamConfig, bool, error) {
+func (m *Manager) resolveMethodParamsForJob(ctx context.Context, moduleName, methodID string, methodCfg *funcapi.MethodConfig, job module.RuntimeJob, handler funcapi.MethodHandler) ([]funcapi.ParamConfig, bool, error) {
 	methodParams := methodCfg.RequiredParams
 
 	jobParams, err := handler.MethodParams(ctx, methodID)

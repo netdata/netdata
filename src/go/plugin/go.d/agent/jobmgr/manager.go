@@ -373,24 +373,17 @@ func (m *Manager) startRunningJob(job runtimeJob) {
 	go job.Start()
 	m.runningJobs.add(job.FullName(), job)
 
-	legacyJob, isLegacy := job.(*module.Job)
-	if isLegacy {
-		// Track legacy job for module function routing.
-		m.moduleFuncs.addJob(job.ModuleName(), job.Name(), legacyJob)
-	}
+	// Track job for module function routing.
+	m.moduleFuncs.addJob(job.ModuleName(), job.Name(), job)
 
 	// Register job-specific methods if module provides JobMethods callback
 	creator, ok := m.Modules.Lookup(job.ModuleName())
 	if !ok || creator.JobMethods == nil {
 		return
 	}
-	if !isLegacy {
-		m.Warningf("module %s provides JobMethods but is running as V2; per-job methods are only supported for legacy jobs", job.ModuleName())
-		return
-	}
-	methods := creator.JobMethods(legacyJob)
+	methods := creator.JobMethods(job)
 	if len(methods) > 0 {
-		m.registerJobMethods(legacyJob, methods)
+		m.registerJobMethods(job, methods)
 	}
 }
 
@@ -403,12 +396,10 @@ func (m *Manager) stopRunningJob(name string) {
 	m.runningJobs.unlock()
 
 	if ok {
-		if legacyJob, isLegacy := job.(*module.Job); isLegacy {
-			// Unregister job-specific methods.
-			m.unregisterJobMethods(legacyJob)
-			// Remove legacy job from module function registry.
-			m.moduleFuncs.removeJob(job.ModuleName(), job.Name())
-		}
+		// Unregister job-specific methods.
+		m.unregisterJobMethods(job)
+		// Remove job from module function registry.
+		m.moduleFuncs.removeJob(job.ModuleName(), job.Name())
 		job.Stop()
 	}
 }
@@ -439,7 +430,7 @@ func (m *Manager) cleanup() {
 }
 
 // registerJobMethods registers methods for a specific job with Netdata
-func (m *Manager) registerJobMethods(job *module.Job, methods []funcapi.MethodConfig) {
+func (m *Manager) registerJobMethods(job module.RuntimeJob, methods []funcapi.MethodConfig) {
 	for _, method := range methods {
 		if method.ID == "" {
 			m.Warningf("skipping job method registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
@@ -481,7 +472,7 @@ func (m *Manager) registerJobMethods(job *module.Job, methods []funcapi.MethodCo
 }
 
 // unregisterJobMethods unregisters methods for a specific job
-func (m *Manager) unregisterJobMethods(job *module.Job) {
+func (m *Manager) unregisterJobMethods(job module.RuntimeJob) {
 	methods := m.moduleFuncs.getJobMethods(job.ModuleName(), job.Name())
 	if len(methods) == 0 {
 		return
@@ -545,7 +536,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		}
 	}
 
-	useV2 := creator.CreateV2 != nil && creator.MethodHandler == nil && creator.JobMethods == nil
+	useV2 := creator.CreateV2 != nil
 	if useV2 {
 		if functionOnly {
 			return nil, fmt.Errorf("function_only is not supported for V2 runtime jobs")
@@ -583,9 +574,6 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 	}
 
 	if creator.Create == nil {
-		if creator.CreateV2 != nil && (creator.MethodHandler != nil || creator.JobMethods != nil) {
-			return nil, fmt.Errorf("module %s uses V2 creator with function hooks that require legacy job runtime", cfg.Module())
-		}
 		return nil, fmt.Errorf("module %s has no compatible creator", cfg.Module())
 	}
 
