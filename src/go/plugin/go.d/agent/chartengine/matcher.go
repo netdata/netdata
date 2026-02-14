@@ -5,6 +5,7 @@ package chartengine
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -13,8 +14,10 @@ import (
 
 type routeBinding struct {
 	ChartTemplateID string
+	ChartID         string
 	DimensionIndex  int
 	DimensionName   string
+	Algorithm       program.Algorithm
 	Hidden          bool
 	Static          bool
 	Inferred        bool
@@ -152,6 +155,17 @@ func (e *Engine) resolveSeriesRoutes(
 		if !candidate.dimension.Selector.Matcher.Matches(name, labelsMap) {
 			continue
 		}
+		chart, ok := index.chartsByID[candidate.chartTemplateID]
+		if !ok {
+			return nil, false, fmt.Errorf("chartengine: route references unknown chart template %q", candidate.chartTemplateID)
+		}
+		chartID, ok, err := renderChartInstanceID(chart.Identity, labelsMap)
+		if err != nil {
+			return nil, false, err
+		}
+		if !ok || strings.TrimSpace(chartID) == "" {
+			continue
+		}
 		dimName, ok, err := resolveDimensionName(candidate.dimension, name, labels, meta)
 		if err != nil {
 			return nil, false, err
@@ -161,8 +175,10 @@ func (e *Engine) resolveSeriesRoutes(
 		}
 		routes = append(routes, routeBinding{
 			ChartTemplateID: candidate.chartTemplateID,
+			ChartID:         chartID,
 			DimensionIndex:  candidate.dimensionIndex,
 			DimensionName:   dimName,
+			Algorithm:       chart.Meta.Algorithm,
 			Hidden:          candidate.dimension.Hidden,
 			Static:          !candidate.dimension.Dynamic,
 			Inferred:        candidate.dimension.InferNameFromSeriesMeta,
@@ -170,6 +186,9 @@ func (e *Engine) resolveSeriesRoutes(
 	}
 
 	sort.Slice(routes, func(i, j int) bool {
+		if routes[i].ChartID != routes[j].ChartID {
+			return routes[i].ChartID < routes[j].ChartID
+		}
 		if routes[i].ChartTemplateID != routes[j].ChartTemplateID {
 			return routes[i].ChartTemplateID < routes[j].ChartTemplateID
 		}
