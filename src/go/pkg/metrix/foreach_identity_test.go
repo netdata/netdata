@@ -35,7 +35,7 @@ func TestForEachSeriesIdentityScenarios(t *testing.T) {
 				}
 				got := make([]gotSeries, 0)
 
-				s.Read().ForEachSeriesIdentity(func(identity SeriesIdentity, name string, _ LabelView, v SampleValue) {
+				s.Read().ForEachSeriesIdentity(func(identity SeriesIdentity, _ SeriesMeta, name string, _ LabelView, v SampleValue) {
 					got = append(got, gotSeries{
 						id:    identity.ID,
 						hash:  identity.Hash64,

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 )
 
@@ -15,7 +16,47 @@ type instanceLabelValue struct {
 	Value string
 }
 
+type labelAccessor interface {
+	Get(key string) (string, bool)
+	Range(fn func(key, value string) bool)
+}
+
+type mapLabelAccessor map[string]string
+
+func (m mapLabelAccessor) Get(key string) (string, bool) {
+	value, ok := m[key]
+	return value, ok
+}
+
+func (m mapLabelAccessor) Range(fn func(key, value string) bool) {
+	for key, value := range m {
+		if !fn(key, value) {
+			return
+		}
+	}
+}
+
+type labelViewAccessor struct {
+	view metrix.LabelView
+}
+
+func (l labelViewAccessor) Get(key string) (string, bool) {
+	return l.view.Get(key)
+}
+
+func (l labelViewAccessor) Range(fn func(key, value string) bool) {
+	l.view.Range(fn)
+}
+
 func renderChartInstanceID(identity program.ChartIdentity, labels map[string]string) (string, bool, error) {
+	return renderChartInstanceIDWithAccessor(identity, mapLabelAccessor(labels))
+}
+
+func renderChartInstanceIDFromView(identity program.ChartIdentity, labels metrix.LabelView) (string, bool, error) {
+	return renderChartInstanceIDWithAccessor(identity, labelViewAccessor{view: labels})
+}
+
+func renderChartInstanceIDWithAccessor(identity program.ChartIdentity, labels labelAccessor) (string, bool, error) {
 	baseID, ok, err := renderTemplate(identity.IDTemplate, labels)
 	if err != nil {
 		return "", false, err
@@ -37,7 +78,7 @@ func renderChartInstanceID(identity program.ChartIdentity, labels map[string]str
 	return baseID + suffix, true, nil
 }
 
-func renderTemplate(tpl program.Template, labels map[string]string) (string, bool, error) {
+func renderTemplate(tpl program.Template, labels labelAccessor) (string, bool, error) {
 	if len(tpl.Parts) == 0 {
 		return tpl.Raw, true, nil
 	}
@@ -49,7 +90,7 @@ func renderTemplate(tpl program.Template, labels map[string]string) (string, boo
 			continue
 		}
 
-		value, ok := labels[part.PlaceholderKey]
+		value, ok := labels.Get(part.PlaceholderKey)
 		if !ok || strings.TrimSpace(value) == "" {
 			return "", false, nil
 		}
@@ -90,7 +131,7 @@ func applyTemplateTransform(value string, transform program.TemplateTransform) (
 	}
 }
 
-func renderInstanceSuffix(identity program.ChartIdentity, labels map[string]string) (string, bool, error) {
+func renderInstanceSuffix(identity program.ChartIdentity, labels labelAccessor) (string, bool, error) {
 	values, ok, err := resolveInstanceLabelValues(identity, labels)
 	if err != nil {
 		return "", false, err
@@ -109,7 +150,7 @@ func renderInstanceSuffix(identity program.ChartIdentity, labels map[string]stri
 	return "_" + strings.Join(parts, "_"), true, nil
 }
 
-func resolveInstanceLabelValues(identity program.ChartIdentity, labels map[string]string) ([]instanceLabelValue, bool, error) {
+func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAccessor) ([]instanceLabelValue, bool, error) {
 	if len(identity.InstanceByLabels) == 0 {
 		return nil, true, nil
 	}
@@ -141,7 +182,7 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels map[strin
 			if _, exists := seenKeys[token.Key]; exists {
 				continue
 			}
-			if _, ok := labels[token.Key]; !ok {
+			if _, ok := labels.Get(token.Key); !ok {
 				// Explicit instance key is required to materialize one instance.
 				return nil, false, nil
 			}
@@ -151,19 +192,20 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels map[strin
 	}
 
 	if includeAll {
-		all := make([]string, 0, len(labels))
-		for key := range labels {
+		all := make([]string, 0)
+		labels.Range(func(key, _ string) bool {
 			if _, skip := placeholderSet[key]; skip {
-				continue
+				return true
 			}
 			if _, excluded := excludeSet[key]; excluded {
-				continue
+				return true
 			}
 			if _, exists := seenKeys[key]; exists {
-				continue
+				return true
 			}
 			all = append(all, key)
-		}
+			return true
+		})
 		sort.Strings(all)
 		for _, key := range all {
 			seenKeys[key] = struct{}{}
@@ -173,7 +215,7 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels map[strin
 
 	out := make([]instanceLabelValue, 0, len(keys))
 	for _, key := range keys {
-		value, ok := labels[key]
+		value, ok := labels.Get(key)
 		if !ok || strings.TrimSpace(value) == "" {
 			return nil, false, nil
 		}

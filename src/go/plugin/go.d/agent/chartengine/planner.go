@@ -115,18 +115,13 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	}
 	var firstErr error
 
-	flat.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, name string, labels metrix.LabelView, v metrix.SampleValue) {
+	flat.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, v metrix.SampleValue) {
 		aliveSeries[identity.ID] = struct{}{}
 
 		if firstErr != nil {
 			return
 		}
 
-		labelsMap := labels.CloneMap()
-		meta, ok := flat.SeriesMeta(name, labelsMap)
-		if !ok {
-			return
-		}
 		if meta.LastSeenSuccessSeq != collectMeta.LastSuccessSeq {
 			return
 		}
@@ -136,7 +131,6 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 			identity,
 			name,
 			labels,
-			labelsMap,
 			meta,
 			index,
 			prog.Revision(),
@@ -202,7 +196,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 			}
 
 			cs.values[route.DimensionName] += v
-			if err := cs.labels.observe(chart.Identity, labelsMap, route.DimensionKeyLabel); err != nil {
+			if err := cs.labels.observe(chart.Identity, labels, route.DimensionKeyLabel); err != nil {
 				firstErr = err
 				return
 			}
@@ -756,8 +750,8 @@ func newChartLabelAccumulator(chart program.Chart) *chartLabelAccumulator {
 	return acc
 }
 
-func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels map[string]string, dimensionKeyLabel string) error {
-	if a == nil || len(labels) == 0 {
+func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels metrix.LabelView, dimensionKeyLabel string) error {
+	if a == nil || labels.Len() == 0 {
 		return nil
 	}
 
@@ -765,7 +759,7 @@ func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels m
 		a.excluded[key] = struct{}{}
 	}
 
-	instanceLabels, ok, err := resolveInstanceLabelValues(identity, labels)
+	instanceLabels, ok, err := resolveInstanceLabelValues(identity, labelViewAccessor{view: labels})
 	if err != nil {
 		return err
 	}
@@ -791,22 +785,23 @@ func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels m
 			if _, identityKey := instanceSet[key]; identityKey {
 				continue
 			}
-			value, ok := labels[key]
+			value, ok := labels.Get(key)
 			if !ok {
 				continue
 			}
 			eligible[key] = value
 		}
 	default:
-		for key, value := range labels {
+		labels.Range(func(key, value string) bool {
 			if _, excluded := a.excluded[key]; excluded {
-				continue
+				return true
 			}
 			if _, identityKey := instanceSet[key]; identityKey {
-				continue
+				return true
 			}
 			eligible[key] = value
-		}
+			return true
+		})
 	}
 
 	if !a.initialized {

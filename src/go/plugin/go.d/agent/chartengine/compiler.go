@@ -441,26 +441,21 @@ type selectorMatcher struct {
 	compiled selector.Compiled
 }
 
-func (m selectorMatcher) Matches(metricName string, lbs map[string]string) bool {
-	promLabels := make(labels.Labels, 0, len(lbs)+1)
+func (m selectorMatcher) Matches(metricName string, lbs program.SelectorLabels) bool {
+	promLabels := make(labels.Labels, 0, lbs.Len()+1)
 	promLabels = append(promLabels, labels.Label{
 		Name:  labels.MetricName,
 		Value: metricName,
 	})
-
-	keys := make([]string, 0, len(lbs))
-	for key := range lbs {
+	lbs.Range(func(key, value string) bool {
 		if key == labels.MetricName {
-			continue
+			return true
 		}
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
 		promLabels = append(promLabels, labels.Label{
 			Name:  key,
-			Value: lbs[key],
+			Value: value,
 		})
-	}
+		return true
+	})
 	return m.compiled.Matches(promLabels)
 }

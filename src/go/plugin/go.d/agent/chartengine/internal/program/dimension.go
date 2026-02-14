@@ -8,7 +8,15 @@ import "fmt"
 //
 // Implementations are expected to be immutable and safe for concurrent reads.
 type SelectorMatcher interface {
-	Matches(metricName string, labels map[string]string) bool
+	Matches(metricName string, labels SelectorLabels) bool
+}
+
+// SelectorLabels is the minimal read-only label view required by selector
+// matchers. metrix.LabelView satisfies this interface.
+type SelectorLabels interface {
+	Len() int
+	Get(key string) (string, bool)
+	Range(fn func(key, value string) bool)
 }
 
 // SelectorBinding stores selector expression + compiled runtime matcher metadata.
