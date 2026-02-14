@@ -55,16 +55,33 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	if reader == nil {
 		return Plan{}, fmt.Errorf("chartengine: nil metrics reader")
 	}
-	prog := e.Program()
-	if prog == nil {
-		return Plan{}, fmt.Errorf("chartengine: no compiled program loaded")
-	}
-
-	flat := reader.Flatten()
 	out := Plan{
 		Actions:            make([]EngineAction, 0),
 		InferredDimensions: make([]InferredDimension, 0),
 	}
+	collectMeta := reader.CollectMeta()
+	// Failed attempt must not trigger lifecycle transitions.
+	if collectMeta.LastAttemptStatus != metrix.CollectStatusSuccess {
+		return out, nil
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	prog := e.state.program
+	if prog == nil {
+		return Plan{}, fmt.Errorf("chartengine: no compiled program loaded")
+	}
+	cache := e.state.routeCache
+	if cache == nil {
+		cache = newRouteCache()
+		e.state.routeCache = cache
+	}
+	if e.state.materialized.charts == nil {
+		e.state.materialized = newMaterializedState()
+	}
+
+	flat := reader.Flatten()
 	seenInfer := make(map[string]struct{})
 	chartsByTemplate := make(map[string]*chartState)
 	index := buildMatchIndex(prog.Charts())
@@ -80,8 +97,11 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 		if !ok {
 			return
 		}
+		if meta.LastSeenSuccessSeq != collectMeta.LastSuccessSeq {
+			return
+		}
 
-		routes, hit, err := e.resolveSeriesRoutes(identity, name, labels, labelsMap, meta, index, prog.Revision())
+		routes, hit, err := e.resolveSeriesRoutes(cache, identity, name, labels, labelsMap, meta, index, prog.Revision())
 		if err != nil {
 			firstErr = err
 			return
@@ -150,50 +170,63 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 			continue
 		}
 		templateIDs = append(templateIDs, templateID)
-		out.Actions = append(out.Actions, CreateChartAction{
-			ChartTemplateID: templateID,
-			Meta:            cs.meta,
-		})
 	}
 	sort.Strings(templateIDs)
 
 	for _, templateID := range templateIDs {
 		cs := chartsByTemplate[templateID]
-		allNames := orderedDimensionNamesFromState(cs.dimensions, cs.dynamicSet)
-		for _, name := range allNames {
-			d := cs.dimensions[name]
-			out.Actions = append(out.Actions, CreateDimensionAction{
+		matChart, chartCreated := e.state.materialized.ensureChart(templateID, cs.meta)
+		if chartCreated {
+			out.Actions = append(out.Actions, CreateChartAction{
 				ChartTemplateID: templateID,
-				Name:            name,
-				Hidden:          d.hidden,
+				Meta:            cs.meta,
 			})
 		}
-	}
+		matChart.lastSeenSuccessSeq = collectMeta.LastSuccessSeq
 
-	for _, templateID := range templateIDs {
-		cs := chartsByTemplate[templateID]
-		allNames := orderedDimensionNamesFromState(cs.dimensions, cs.dynamicSet)
+		observedNames := orderedDimensionNamesFromState(cs.dimensions, cs.dynamicSet)
+		for _, name := range observedNames {
+			d := cs.dimensions[name]
+			matDim, dimCreated := matChart.ensureDimension(name, d)
+			if dimCreated {
+				out.Actions = append(out.Actions, CreateDimensionAction{
+					ChartTemplateID: templateID,
+					Name:            name,
+					Hidden:          d.hidden,
+				})
+			}
+			matDim.lastSeenSuccessSeq = collectMeta.LastSuccessSeq
+		}
 
-		values := make([]UpdateDimensionValue, 0, len(allNames))
-		for _, name := range allNames {
+		updateNames := orderedMaterializedDimensionNames(matChart.dimensions)
+		values := make([]UpdateDimensionValue, 0, len(updateNames))
+		for _, name := range updateNames {
 			value, ok := cs.values[name]
-			if !ok {
+			if ok {
 				values = append(values, UpdateDimensionValue{
 					Name:    name,
-					IsEmpty: true,
+					IsFloat: true,
+					Float64: value,
 				})
 				continue
 			}
 			values = append(values, UpdateDimensionValue{
 				Name:    name,
-				IsFloat: true,
-				Float64: value,
+				IsEmpty: true,
 			})
 		}
 		out.Actions = append(out.Actions, UpdateChartAction{
 			ChartTemplateID: templateID,
 			Values:          values,
 		})
+	}
+
+	removeDims, removeCharts := collectExpiryRemovals(collectMeta.LastSuccessSeq, index, &e.state.materialized)
+	for _, action := range removeDims {
+		out.Actions = append(out.Actions, action)
+	}
+	for _, action := range removeCharts {
+		out.Actions = append(out.Actions, action)
 	}
 
 	sort.Slice(out.InferredDimensions, func(i, j int) bool {
@@ -275,6 +308,93 @@ func inferDimensionLabelKey(metricName string, meta metrix.SeriesMeta) (string, 
 	default:
 		return "", false, fmt.Errorf("chartengine: unsupported flatten role %d for runtime dimension inference", meta.FlattenRole)
 	}
+}
+
+func orderedMaterializedDimensionNames(dimensions map[string]*materializedDimensionState) []string {
+	dimState := make(map[string]dimensionState, len(dimensions))
+	dynamicSet := make(map[string]struct{})
+	for name, dim := range dimensions {
+		dimState[name] = dimensionState{
+			hidden: dim.hidden,
+			static: dim.static,
+			order:  dim.order,
+		}
+		if !dim.static {
+			dynamicSet[name] = struct{}{}
+		}
+	}
+	return orderedDimensionNamesFromState(dimState, dynamicSet)
+}
+
+func collectExpiryRemovals(
+	currentSuccessSeq uint64,
+	index matchIndex,
+	state *materializedState,
+) ([]RemoveDimensionAction, []RemoveChartAction) {
+	if state == nil || len(state.charts) == 0 {
+		return nil, nil
+	}
+
+	chartIDs := make([]string, 0, len(state.charts))
+	for chartID := range state.charts {
+		chartIDs = append(chartIDs, chartID)
+	}
+	sort.Strings(chartIDs)
+
+	toRemoveChart := make(map[string]struct{})
+	for _, chartID := range chartIDs {
+		matChart := state.charts[chartID]
+		compiled, ok := index.chartsByID[chartID]
+		if !ok {
+			toRemoveChart[chartID] = struct{}{}
+			continue
+		}
+		if shouldExpire(matChart.lastSeenSuccessSeq, currentSuccessSeq, compiled.Lifecycle.ExpireAfterCycles) {
+			toRemoveChart[chartID] = struct{}{}
+		}
+	}
+
+	removeDims := make([]RemoveDimensionAction, 0)
+	for _, chartID := range chartIDs {
+		if _, removed := toRemoveChart[chartID]; removed {
+			continue
+		}
+		matChart := state.charts[chartID]
+		compiled := index.chartsByID[chartID]
+		expireAfter := compiled.Lifecycle.Dimensions.ExpireAfterCycles
+		if expireAfter <= 0 || len(matChart.dimensions) == 0 {
+			continue
+		}
+
+		dimNames := make([]string, 0, len(matChart.dimensions))
+		for name := range matChart.dimensions {
+			dimNames = append(dimNames, name)
+		}
+		sort.Strings(dimNames)
+		for _, name := range dimNames {
+			dim := matChart.dimensions[name]
+			if !shouldExpire(dim.lastSeenSuccessSeq, currentSuccessSeq, expireAfter) {
+				continue
+			}
+			removeDims = append(removeDims, RemoveDimensionAction{
+				ChartTemplateID: chartID,
+				Name:            name,
+			})
+			delete(matChart.dimensions, name)
+		}
+	}
+
+	removeCharts := make([]RemoveChartAction, 0, len(toRemoveChart))
+	for _, chartID := range chartIDs {
+		if _, removed := toRemoveChart[chartID]; !removed {
+			continue
+		}
+		removeCharts = append(removeCharts, RemoveChartAction{
+			ChartTemplateID: chartID,
+		})
+		delete(state.charts, chartID)
+	}
+	return removeDims, removeCharts
 }
 
 func orderedDimensionNamesFromState(dimensions map[string]dimensionState, dynamicSet map[string]struct{}) []string {

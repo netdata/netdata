@@ -225,6 +225,7 @@ groups:
 
 	plan1, err := e.BuildPlan(store.Read())
 	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
 	stats1 := e.Stats()
 	assert.Equal(t, uint64(0), stats1.RouteCacheHits)
 	assert.Equal(t, uint64(1), stats1.RouteCacheMisses)
@@ -237,11 +238,157 @@ groups:
 
 	plan2, err := e.BuildPlan(store.Read())
 	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(plan2.Actions))
 	stats2 := e.Stats()
 	assert.Equal(t, uint64(1), stats2.RouteCacheHits)
 	assert.Equal(t, uint64(1), stats2.RouteCacheMisses)
 	require.NotNil(t, findUpdateAction(plan2))
 	assert.Equal(t, float64(20), findUpdateAction(plan2).Values[0].Float64)
+}
+
+func TestBuildPlanLifecycleDimensionExpiry(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.total
+      - svc.mode_metric
+    charts:
+      - title: Service status
+        context: service_status
+        units: state
+        lifecycle:
+          dimensions:
+            expire_after_cycles: 1
+        dimensions:
+          - selector: svc.total
+            name: total
+          - selector: svc.mode_metric
+            name_from_label: mode
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	total := sm.Gauge("total")
+	modeMetric := sm.Gauge("mode_metric")
+	modeOK := sm.LabelSet(metrix.Label{Key: "mode", Value: "ok"})
+
+	cc.BeginCycle()
+	total.Observe(100)
+	modeMetric.Observe(1, modeOK)
+	cc.CommitCycleSuccess()
+
+	plan1, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
+
+	cc.BeginCycle()
+	total.Observe(101)
+	cc.CommitCycleSuccess()
+
+	plan2, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionUpdateChart, ActionRemoveDimension}, actionKinds(plan2.Actions))
+	removeDim := findRemoveDimensionAction(plan2)
+	require.NotNil(t, removeDim)
+	assert.Equal(t, "ok", removeDim.Name)
+}
+
+func TestBuildPlanLifecycleChartExpiry(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        lifecycle:
+          expire_after_cycles: 1
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	c := store.Write().SnapshotMeter("svc").Counter("requests_total")
+
+	cc.BeginCycle()
+	c.ObserveTotal(10)
+	cc.CommitCycleSuccess()
+
+	plan1, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
+
+	cc.BeginCycle()
+	cc.CommitCycleSuccess()
+
+	plan2, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan2.Actions))
+}
+
+func TestBuildPlanLifecycleNoRemovalOnFailedCycle(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        lifecycle:
+          expire_after_cycles: 1
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	c := store.Write().SnapshotMeter("svc").Counter("requests_total")
+
+	cc.BeginCycle()
+	c.ObserveTotal(10)
+	cc.CommitCycleSuccess()
+
+	plan1, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
+
+	cc.BeginCycle()
+	cc.AbortCycle()
+
+	plan2, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Empty(t, plan2.Actions)
+
+	cc.BeginCycle()
+	cc.CommitCycleSuccess()
+
+	plan3, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan3.Actions))
 }
 
 func actionKinds(actions []EngineAction) []ActionKind {
@@ -256,6 +403,15 @@ func findUpdateAction(plan Plan) *UpdateChartAction {
 	for _, action := range plan.Actions {
 		if update, ok := action.(UpdateChartAction); ok {
 			return &update
+		}
+	}
+	return nil
+}
+
+func findRemoveDimensionAction(plan Plan) *RemoveDimensionAction {
+	for _, action := range plan.Actions {
+		if remove, ok := action.(RemoveDimensionAction); ok {
+			return &remove
 		}
 	}
 	return nil
