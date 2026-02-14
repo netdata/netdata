@@ -29,6 +29,7 @@ type (
 	Creator struct {
 		Defaults
 		Create          func() Module
+		CreateV2        func() ModuleV2
 		JobConfigSchema string
 		Config          func() any
 

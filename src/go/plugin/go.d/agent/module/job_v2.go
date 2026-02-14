@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"runtime/debug"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -17,17 +18,21 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
 
 type JobV2Config struct {
-	PluginName  string
-	Name        string
-	ModuleName  string
-	FullName    string
-	Module      ModuleV2
-	Labels      map[string]string
-	Out         io.Writer
-	UpdateEvery int
+	PluginName      string
+	Name            string
+	ModuleName      string
+	FullName        string
+	Module          ModuleV2
+	Labels          map[string]string
+	Out             io.Writer
+	UpdateEvery     int
+	AutoDetectEvery int
+	Vnode           vnodes.VirtualNode
+	FunctionOnly    bool
 }
 
 func NewJobV2(cfg JobV2Config) *JobV2 {
@@ -37,18 +42,21 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	}
 
 	j := &JobV2{
-		pluginName:  cfg.PluginName,
-		name:        cfg.Name,
-		moduleName:  cfg.ModuleName,
-		fullName:    cfg.FullName,
-		updateEvery: cfg.UpdateEvery,
-		module:      cfg.Module,
-		labels:      cloneLabels(cfg.Labels),
-		out:         cfg.Out,
-		stop:        make(chan struct{}),
-		tick:        make(chan int),
-		buf:         &buf,
-		api:         netdataapi.New(&buf),
+		pluginName:      cfg.PluginName,
+		name:            cfg.Name,
+		moduleName:      cfg.ModuleName,
+		fullName:        cfg.FullName,
+		updateEvery:     cfg.UpdateEvery,
+		autoDetectEvery: cfg.AutoDetectEvery,
+		functionOnly:    cfg.FunctionOnly,
+		module:          cfg.Module,
+		labels:          cloneLabels(cfg.Labels),
+		out:             cfg.Out,
+		stop:            make(chan struct{}),
+		tick:            make(chan int),
+		buf:             &buf,
+		api:             netdataapi.New(&buf),
+		vnode:           cfg.Vnode,
 	}
 	if j.out == nil {
 		j.out = io.Discard
@@ -61,17 +69,22 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	j.Logger = log
 	if j.module != nil {
 		j.module.GetBase().Logger = log
+		if vnode := j.module.VirtualNode(); vnode != nil {
+			*vnode = *cfg.Vnode.Copy()
+		}
 	}
 	return j
 }
 
 type JobV2 struct {
-	pluginName  string
-	name        string
-	moduleName  string
-	fullName    string
-	updateEvery int
-	labels      map[string]string
+	pluginName      string
+	name            string
+	moduleName      string
+	fullName        string
+	updateEvery     int
+	autoDetectEvery int
+	functionOnly    bool
+	labels          map[string]string
 
 	*logger.Logger
 
@@ -89,6 +102,9 @@ type JobV2 struct {
 	prevRun time.Time
 	retries int
 
+	vnodeMu sync.RWMutex
+	vnode   vnodes.VirtualNode
+
 	tick chan int
 	out  io.Writer
 	buf  *bytes.Buffer
@@ -103,6 +119,42 @@ func (j *JobV2) Name() string       { return j.name }
 func (j *JobV2) Panicked() bool     { return j.panicked }
 func (j *JobV2) IsRunning() bool    { return j.running.Load() }
 func (j *JobV2) Module() ModuleV2   { return j.module }
+func (j *JobV2) AutoDetectionEvery() int {
+	return j.autoDetectEvery
+}
+func (j *JobV2) RetryAutoDetection() bool {
+	return j.autoDetectEvery > 0
+}
+func (j *JobV2) Configuration() any {
+	if j.module == nil {
+		return nil
+	}
+	return j.module.Configuration()
+}
+func (j *JobV2) IsFunctionOnly() bool { return j.functionOnly }
+func (j *JobV2) Vnode() vnodes.VirtualNode {
+	j.vnodeMu.RLock()
+	defer j.vnodeMu.RUnlock()
+	return *j.vnode.Copy()
+}
+func (j *JobV2) UpdateVnode(vnode *vnodes.VirtualNode) {
+	if vnode == nil {
+		return
+	}
+	j.vnodeMu.Lock()
+	j.vnode = *vnode.Copy()
+	j.vnodeMu.Unlock()
+	if j.module != nil {
+		if mv := j.module.VirtualNode(); mv != nil {
+			*mv = *vnode.Copy()
+		}
+	}
+}
+func (j *JobV2) Cleanup() {
+	if j.module != nil {
+		j.module.Cleanup(context.TODO())
+	}
+}
 
 func (j *JobV2) AutoDetection() (err error) {
 	defer func() {
@@ -153,7 +205,7 @@ LOOP:
 			}
 		}
 	}
-	j.module.Cleanup(context.TODO())
+	j.Cleanup()
 	j.stop <- struct{}{}
 }
 

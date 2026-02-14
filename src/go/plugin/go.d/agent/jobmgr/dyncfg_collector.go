@@ -17,7 +17,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 const (
@@ -214,7 +213,12 @@ func (m *Manager) dyncfgConfigTest(fn dyncfg.Function) {
 	cfg.SetModule(mn)
 	cfg.SetName(jn)
 
-	job := creator.Create()
+	job, err := newConfigModule(creator)
+	if err != nil {
+		m.Warningf("dyncfg: %s: module %s: failed to create module: %v", cmd, mn, err)
+		m.dyncfgApi.SendCodef(fn, 500, "Module %s instantiation failed: %v.", mn, err)
+		return
+	}
 
 	if err := applyConfig(cfg, job); err != nil {
 		m.Warningf("dyncfg: %s: module %s: failed to apply config: %v", cmd, mn, err)
@@ -297,7 +301,12 @@ func (m *Manager) dyncfgConfigGet(fn dyncfg.Function) {
 		return
 	}
 
-	mod := creator.Create()
+	mod, err := newConfigModule(creator)
+	if err != nil {
+		m.Warningf("dyncfg: %s: module %s job %s failed to create module: %v", cmd, mn, jn, err)
+		m.dyncfgApi.SendCodef(fn, 500, "Module %s instantiation failed: %v.", mn, err)
+		return
+	}
 
 	if err := applyConfig(entry.Cfg, mod); err != nil {
 		m.Warningf("dyncfg: %s: module %s job %s failed to apply config: %v", cmd, mn, jn, err)
@@ -334,7 +343,7 @@ func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string,
 }
 
 // scheduleRetryTask schedules a retry if the job supports auto-detection retry.
-func (m *Manager) scheduleRetryTask(cfg confgroup.Config, job *module.Job) {
+func (m *Manager) scheduleRetryTask(cfg confgroup.Config, job runtimeJob) {
 	if !job.RetryAutoDetection() {
 		return
 	}
