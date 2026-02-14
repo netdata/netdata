@@ -52,6 +52,7 @@ func New() *Manager {
 		exposed:           exposed,
 		runningJobs:       newRunningJobsCache(),
 		retryingTasks:     newRetryingTasksCache(),
+		runtimeComponents: newRuntimeComponentRegistry(),
 
 		started:   make(chan struct{}),
 		addCh:     make(chan confgroup.Config),
@@ -119,6 +120,9 @@ type Manager struct {
 	exposed           *dyncfg.ExposedCache[confgroup.Config]
 	retryingTasks     *retryingTasks
 	runningJobs       *runningJobs
+	runtimeComponents *runtimeComponentRegistry
+	runtimeJob        *runtimeMetricsJob
+	runtimeProducers  []runtimeProducer
 
 	handler     *dyncfg.Handler[confgroup.Config]
 	collectorCb *collectorCallbacks
@@ -198,8 +202,16 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	}
 
 	m.loadFileStatus()
+	m.bootstrapRuntimeComponents()
 
 	var wg sync.WaitGroup
+
+	m.runtimeJob = newRuntimeMetricsJob(
+		m.Out,
+		m.runtimeComponents,
+		m.Logger.With(slog.String("component", "runtime metrics job")),
+	)
+	go m.runtimeJob.Start()
 
 	wg.Add(1)
 	go func() { defer wg.Done(); m.runFileStatusPersistence() }()
@@ -361,6 +373,10 @@ func (m *Manager) runNotifyRunningJobs() {
 			m.runningJobs.lock()
 			m.runningJobs.forEach(func(_ string, job *module.Job) { job.Tick(clock) })
 			m.runningJobs.unlock()
+			m.tickRuntimeProducers()
+			if m.runtimeJob != nil {
+				m.runtimeJob.Tick(clock)
+			}
 		}
 	}
 }
@@ -408,6 +424,9 @@ func (m *Manager) stopRunningJob(name string) {
 func (m *Manager) cleanup() {
 	m.FnReg.UnregisterPrefix("config", m.dyncfgCollectorPrefixValue())
 	m.FnReg.UnregisterPrefix("config", m.dyncfgVnodePrefixValue())
+	if m.runtimeJob != nil {
+		m.runtimeJob.Stop()
+	}
 
 	// Unregister module functions
 	for name, creator := range m.Modules {

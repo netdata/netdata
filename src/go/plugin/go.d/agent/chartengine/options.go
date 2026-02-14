@@ -14,6 +14,7 @@ type engineConfig struct {
 	runtimeStore    metrix.RuntimeStore
 	runtimeStoreSet bool
 	log             *logger.Logger
+	seriesSelection seriesSelectionMode
 }
 
 // Option mutates engine configuration at construction time.
@@ -21,6 +22,13 @@ type Option func(*engineConfig) error
 
 const (
 	defaultMaxTypeIDLen = 1200
+)
+
+type seriesSelectionMode uint8
+
+const (
+	seriesSelectionLastSuccessOnly seriesSelectionMode = iota
+	seriesSelectionAllVisible
 )
 
 // AutogenPolicy controls unmatched-series fallback chart generation.
@@ -80,9 +88,20 @@ func WithLogger(l *logger.Logger) Option {
 	}
 }
 
+// WithSeriesSelectionAllVisible configures planner scan to use all visible
+// series from the reader (instead of only latest-success-seq series).
+// This is intended for runtime/internal stores.
+func WithSeriesSelectionAllVisible() Option {
+	return func(cfg *engineConfig) error {
+		cfg.seriesSelection = seriesSelectionAllVisible
+		return nil
+	}
+}
+
 func applyOptions(opts ...Option) (engineConfig, error) {
 	cfg := engineConfig{
-		autogen: defaultAutogenPolicy(),
+		autogen:         defaultAutogenPolicy(),
+		seriesSelection: seriesSelectionLastSuccessOnly,
 	}
 	for i, opt := range opts {
 		if opt == nil {
