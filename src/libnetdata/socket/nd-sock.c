@@ -34,6 +34,16 @@ static bool nd_sock_open_ssl(ND_SOCK *s) {
     if(!s) return false;
 
     if (netdata_ssl_open_ext(&s->ssl, s->ctx, s->fd, alpn_proto_list, sizeof(alpn_proto_list))) {
+        // Set SNI hostname if available
+        if(s->sni_hostname && *s->sni_hostname) {
+            if(!SSL_set_tlsext_host_name(s->ssl.conn, s->sni_hostname)) {
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "Failed to set SNI hostname '%s' for SSL connection",
+                       s->sni_hostname);
+                // Continue anyway - SNI failure is not fatal
+            }
+        }
+
         if(!netdata_ssl_connect(&s->ssl)) {
             // couldn't connect
             s->error = ND_SOCK_ERR_SSL_CANT_ESTABLISH_SSL_CONNECTION;
@@ -55,6 +65,40 @@ static bool nd_sock_open_ssl(ND_SOCK *s) {
 
 bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_port, time_t timeout, bool ssl) {
     nd_sock_close(s);
+
+    // Extract hostname for SNI before establishing connection
+    if(ssl && definition) {
+        char buffer[strlen(definition) + 1];
+        strcpy(buffer, definition);
+        
+        char *host = buffer;
+        
+        // Skip protocol prefix if present
+        if(strncmp(host, "tcp:", 4) == 0)
+            host += 4;
+        else if(strncmp(host, "udp:", 4) == 0)
+            host += 4;
+        
+        // Handle IPv6 addresses in brackets
+        char *hostname_end = host;
+        if(*host == '[') {
+            host++;  // Skip opening bracket
+            while(*hostname_end && *hostname_end != ']') hostname_end++;
+            if(*hostname_end == ']')
+                *hostname_end = '\0';
+        }
+        else {
+            // For IPv4 or hostnames, find the end (before port or interface)
+            while(*hostname_end && *hostname_end != ':' && *hostname_end != '%') hostname_end++;
+            if(*hostname_end)
+                *hostname_end = '\0';
+        }
+        
+        // Store the hostname for SNI if it's not empty
+        if(host && *host) {
+            s->sni_hostname = strdupz(host);
+        }
+    }
 
     struct timeval tv = {
         .tv_sec = timeout,
