@@ -24,7 +24,6 @@ func Compile(spec *charttpl.Spec, revision uint64) (*program.Program, error) {
 	}
 
 	c := compiler{
-		spec:       spec,
 		metricsSet: make(map[string]struct{}),
 	}
 
@@ -44,7 +43,6 @@ func Compile(spec *charttpl.Spec, revision uint64) (*program.Program, error) {
 }
 
 type compiler struct {
-	spec       *charttpl.Spec
 	charts     []program.Chart
 	metricsSet map[string]struct{}
 }
@@ -339,6 +337,12 @@ func inferNameFromLabel(metricNames []string) (string, bool) {
 	name := metricNames[0]
 	if strings.HasSuffix(name, "_bucket") {
 		return "le", true
+	}
+	// Phase-2 stateset flatten semantics: synthetic label key equals metric
+	// family name. For the v1 template compiler we infer this for *_state
+	// series when dimension naming is omitted.
+	if strings.HasSuffix(name, "_state") {
+		return name, true
 	}
 	return "", false
 }

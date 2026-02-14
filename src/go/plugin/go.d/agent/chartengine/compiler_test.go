@@ -112,6 +112,38 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, program.AlgorithmIncremental, charts[0].Meta.Algorithm)
 			},
 		},
+		"infer stateset dimension name_from_label from metric family name": {
+			rev: 8,
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Replication",
+						Metrics: []string{"mysql_replication_state"},
+						Charts: []charttpl.Chart{
+							{
+								Title:   "Replication state",
+								Context: "replication_state",
+								Units:   "state",
+								Dimensions: []charttpl.Dimension{
+									{
+										Selector: "mysql_replication_state",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				require.Len(t, charts[0].Dimensions, 1)
+				assert.Equal(t, "mysql_replication_state", charts[0].Dimensions[0].NameFromLabel)
+				assert.Equal(t, program.AlgorithmAbsolute, charts[0].Meta.Algorithm)
+			},
+		},
 		"fails when dimension naming cannot be inferred": {
 			spec: charttpl.Spec{
 				Version: charttpl.VersionV1,
