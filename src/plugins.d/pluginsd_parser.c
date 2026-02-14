@@ -1386,6 +1386,8 @@ ALWAYS_INLINE PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *key
             return pluginsd_clabel_commit(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_FUNCTION:
             return pluginsd_function(words, num_words, parser);
+        case PLUGINSD_KEYWORD_ID_FUNCTION_DEL:
+            return pluginsd_function_del(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_FUNCTION_RESULT_BEGIN:
             return pluginsd_function_result_begin(words, num_words, parser);
         case PLUGINSD_KEYWORD_ID_FUNCTION_PROGRESS:

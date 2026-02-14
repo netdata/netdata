@@ -49,6 +49,7 @@ typedef enum {
     STREAM_CAP_NODE_ID          = (1 << 24), // support for sending NODE_ID back to the child
     STREAM_CAP_PATHS            = (1 << 25), // support for sending PATHS upstream and downstream
     STREAM_CAP_ML_MODELS        = (1 << 26), // support for sending MODELS upstream
+    STREAM_CAP_FUNCTION_DEL     = (1 << 27), // support for FUNCTION_DEL command
 
     STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit
