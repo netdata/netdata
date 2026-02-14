@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	routecache "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/cache"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 )
 
@@ -67,104 +67,10 @@ func buildMatchIndex(charts []program.Chart) matchIndex {
 	return index
 }
 
-type routeCacheEntry struct {
-	identity metrix.SeriesIdentity
-	revision uint64
-	bindings []routeBinding
-}
-
-type routeCache struct {
-	// Intentionally unbounded:
-	// - cardinality/retention source-of-truth lives in metrix store ingress/retention,
-	// - chartengine must not introduce a second independent cap.
-	// Entries are pruned by retainSeries() each successful plan build using
-	// snapshot membership provided by planner.
-	mu      sync.RWMutex
-	buckets map[uint64][]routeCacheEntry
-}
+type routeCache = routecache.RouteCache[routeBinding]
 
 func newRouteCache() *routeCache {
-	return &routeCache{
-		buckets: make(map[uint64][]routeCacheEntry),
-	}
-}
-
-func (c *routeCache) lookup(identity metrix.SeriesIdentity, revision uint64) ([]routeBinding, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	bucket := c.buckets[identity.Hash64]
-	for _, entry := range bucket {
-		if entry.identity.ID != identity.ID {
-			continue
-		}
-		if entry.revision != revision {
-			return nil, false
-		}
-		return cloneRouteBindings(entry.bindings), true
-	}
-	return nil, false
-}
-
-func (c *routeCache) store(identity metrix.SeriesIdentity, revision uint64, bindings []routeBinding) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	bucket := c.buckets[identity.Hash64]
-	for i := range bucket {
-		if bucket[i].identity.ID != identity.ID {
-			continue
-		}
-		bucket[i].revision = revision
-		bucket[i].bindings = cloneRouteBindings(bindings)
-		c.buckets[identity.Hash64] = bucket
-		return
-	}
-
-	c.buckets[identity.Hash64] = append(bucket, routeCacheEntry{
-		identity: identity,
-		revision: revision,
-		bindings: cloneRouteBindings(bindings),
-	})
-}
-
-// retainSeries keeps cache entries only for series IDs currently present in the
-// metrics snapshot passed to planner. This makes cache lifecycle follow metrix
-// store retention/source-of-truth.
-func (c *routeCache) retainSeries(alive map[metrix.SeriesID]struct{}) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if len(alive) == 0 {
-		for hash := range c.buckets {
-			delete(c.buckets, hash)
-		}
-		return
-	}
-
-	for hash, bucket := range c.buckets {
-		kept := bucket[:0]
-		for i := range bucket {
-			if _, ok := alive[bucket[i].identity.ID]; !ok {
-				continue
-			}
-			kept = append(kept, bucket[i])
-		}
-		if len(kept) == 0 {
-			delete(c.buckets, hash)
-			continue
-		}
-		c.buckets[hash] = kept
-	}
-}
-
-func cloneRouteBindings(in []routeBinding) []routeBinding {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make([]routeBinding, len(in))
-	copy(out, in)
-	return out
+	return routecache.NewRouteCache[routeBinding]()
 }
 
 func (e *Engine) resolveSeriesRoutes(
@@ -180,7 +86,7 @@ func (e *Engine) resolveSeriesRoutes(
 		return nil, false, fmt.Errorf("chartengine: route cache is not initialized")
 	}
 
-	if cached, ok := cache.lookup(identity, revision); ok {
+	if cached, ok := cache.Lookup(identity, revision); ok {
 		return cached, true, nil
 	}
 
@@ -240,6 +146,6 @@ func (e *Engine) resolveSeriesRoutes(
 		return routes[i].DimensionName < routes[j].DimensionName
 	})
 
-	cache.store(identity, revision, routes)
+	cache.Store(identity, revision, routes)
 	return routes, false, nil
 }

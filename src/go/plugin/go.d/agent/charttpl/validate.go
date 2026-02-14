@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 )
 
 var (
@@ -145,9 +143,6 @@ func validateChart(chart Chart, path string, effectiveMetrics map[string]struct{
 		selectorExpr := strings.TrimSpace(d.Selector)
 		if selectorExpr == "" {
 			return semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), "must not be empty")
-		}
-		if _, err := selector.Parse(selectorExpr); err != nil {
-			return semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), err.Error())
 		}
 
 		metricName, ok := selectorMetricName(selectorExpr)

@@ -319,6 +319,52 @@ func TestCompileScenarios(t *testing.T) {
 			wantErr: true,
 			errLike: "name: placeholders are not allowed",
 		},
+		"fails on invalid selector syntax via compiler parse": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Service",
+						Metrics: []string{"svc_requests_total"},
+						Charts: []charttpl.Chart{
+							{
+								Title:   "Requests",
+								Context: "requests",
+								Units:   "requests/s",
+								Dimensions: []charttpl.Dimension{
+									{Selector: `svc_requests_total{method="GET",}`},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "selector:",
+		},
+		"fails when selector metric is not visible in compile path": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Service",
+						Metrics: []string{"svc_requests_total"},
+						Charts: []charttpl.Chart{
+							{
+								Title:   "Errors",
+								Context: "errors",
+								Units:   "errors/s",
+								Dimensions: []charttpl.Dimension{
+									{Selector: "svc_errors_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "not visible in current group scope",
+		},
 	}
 
 	for name, tc := range tests {
