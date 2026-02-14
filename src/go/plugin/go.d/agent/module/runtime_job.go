@@ -11,4 +11,3 @@ type RuntimeJob interface {
 	IsRunning() bool
 	Collector() any
 }
-
