@@ -32,6 +32,19 @@ type InferredDimension struct {
 	Name            string
 }
 
+type dimensionState struct {
+	hidden bool
+	static bool
+	order  int
+}
+
+type chartState struct {
+	meta       program.ChartMeta
+	values     map[string]metrix.SampleValue
+	dimensions map[string]dimensionState
+	dynamicSet map[string]struct{}
+}
+
 // BuildPlan builds a minimal plan snapshot from the provided reader.
 //
 // This scaffold currently resolves runtime-inferred dimension names only.
@@ -52,91 +65,83 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 		Actions:            make([]EngineAction, 0),
 		InferredDimensions: make([]InferredDimension, 0),
 	}
-	seen := make(map[string]struct{})
-	type dimensionState struct {
-		hidden bool
-		static bool
-		order  int
-	}
-	type chartState struct {
-		meta        program.ChartMeta
-		values      map[string]metrix.SampleValue
-		dimensions  map[string]dimensionState
-		staticNames []string
-		dynamicSet  map[string]struct{}
-	}
+	seenInfer := make(map[string]struct{})
 	chartsByTemplate := make(map[string]*chartState)
+	index := buildMatchIndex(prog.Charts())
+	var firstErr error
 
-	for _, chart := range prog.Charts() {
-		cs := &chartState{
-			meta:       chart.Meta,
-			values:     make(map[string]metrix.SampleValue),
-			dimensions: make(map[string]dimensionState),
-			dynamicSet: make(map[string]struct{}),
+	flat.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, name string, labels metrix.LabelView, v metrix.SampleValue) {
+		if firstErr != nil {
+			return
 		}
-		chartsByTemplate[chart.TemplateID] = cs
 
-		for i, dim := range chart.Dimensions {
-			var firstErr error
-			flat.ForEachSeriesIdentity(func(_ metrix.SeriesIdentity, name string, labels metrix.LabelView, v metrix.SampleValue) {
-				if firstErr != nil {
-					return
-				}
-				labelsMap := labels.CloneMap()
-				if !dim.Selector.Matcher.Matches(name, labelsMap) {
-					return
-				}
-				meta, ok := flat.SeriesMeta(name, labelsMap)
-				if !ok {
-					return
-				}
-				dimName, ok, err := resolveDimensionName(dim, name, labels, meta)
-				if err != nil {
-					firstErr = err
-					return
-				}
-				if !ok {
-					return
-				}
+		labelsMap := labels.CloneMap()
+		meta, ok := flat.SeriesMeta(name, labelsMap)
+		if !ok {
+			return
+		}
 
-				prevState, exists := cs.dimensions[dimName]
-				if !exists {
-					cs.dimensions[dimName] = dimensionState{
-						hidden: dim.Hidden,
-						static: !dim.Dynamic,
-						order:  i,
-					}
-					if !dim.Dynamic {
-						cs.staticNames = append(cs.staticNames, dimName)
-					} else {
-						cs.dynamicSet[dimName] = struct{}{}
-					}
-				} else if prevState.hidden != dim.Hidden {
-					// For now keep first resolved hidden option for deterministic shape.
-					// Conflict handling metrics/warnings are added in later planner phases.
-				}
-				cs.values[dimName] += v
+		routes, hit, err := e.resolveSeriesRoutes(identity, name, labels, labelsMap, meta, index, prog.Revision())
+		if err != nil {
+			firstErr = err
+			return
+		}
+		if hit {
+			e.addRouteCacheHit()
+		} else {
+			e.addRouteCacheMiss()
+		}
 
-				if !dim.InferNameFromSeriesMeta {
-					return
-				}
+		for _, route := range routes {
+			chart, ok := index.chartsByID[route.ChartTemplateID]
+			if !ok {
+				firstErr = fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
+				return
+			}
 
-				key := fmt.Sprintf("%s\xff%d\xff%s", chart.TemplateID, i, dimName)
-				if _, exists := seen[key]; exists {
-					return
+			cs, exists := chartsByTemplate[route.ChartTemplateID]
+			if !exists {
+				cs = &chartState{
+					meta:       chart.Meta,
+					values:     make(map[string]metrix.SampleValue),
+					dimensions: make(map[string]dimensionState),
+					dynamicSet: make(map[string]struct{}),
 				}
-				seen[key] = struct{}{}
-				out.InferredDimensions = append(out.InferredDimensions, InferredDimension{
-					ChartTemplateID: chart.TemplateID,
-					DimensionIndex:  i,
-					Name:            dimName,
-				})
-			})
+				chartsByTemplate[route.ChartTemplateID] = cs
+			}
 
-			if firstErr != nil {
-				return Plan{}, firstErr
+			prevState, exists := cs.dimensions[route.DimensionName]
+			if !exists {
+				cs.dimensions[route.DimensionName] = dimensionState{
+					hidden: route.Hidden,
+					static: route.Static,
+					order:  route.DimensionIndex,
+				}
+				if !route.Static {
+					cs.dynamicSet[route.DimensionName] = struct{}{}
+				}
+			} else if prevState.hidden != route.Hidden {
+				// Keep first resolved hidden option for deterministic shape.
+				// Conflict handling metrics/warnings are added in later planner phases.
+			}
+
+			cs.values[route.DimensionName] += v
+
+			if route.Inferred {
+				key := fmt.Sprintf("%s\xff%d\xff%s", route.ChartTemplateID, route.DimensionIndex, route.DimensionName)
+				if _, exists := seenInfer[key]; !exists {
+					seenInfer[key] = struct{}{}
+					out.InferredDimensions = append(out.InferredDimensions, InferredDimension{
+						ChartTemplateID: route.ChartTemplateID,
+						DimensionIndex:  route.DimensionIndex,
+						Name:            route.DimensionName,
+					})
+				}
 			}
 		}
+	})
+	if firstErr != nil {
+		return Plan{}, firstErr
 	}
 
 	templateIDs := make([]string, 0, len(chartsByTemplate))
@@ -154,8 +159,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 
 	for _, templateID := range templateIDs {
 		cs := chartsByTemplate[templateID]
-		dynamicNames := mapKeysSorted(cs.dynamicSet)
-		allNames := orderedDimensionNames(cs.staticNames, dynamicNames)
+		allNames := orderedDimensionNamesFromState(cs.dimensions, cs.dynamicSet)
 		for _, name := range allNames {
 			d := cs.dimensions[name]
 			out.Actions = append(out.Actions, CreateDimensionAction{
@@ -168,8 +172,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 
 	for _, templateID := range templateIDs {
 		cs := chartsByTemplate[templateID]
-		dynamicNames := mapKeysSorted(cs.dynamicSet)
-		allNames := orderedDimensionNames(cs.staticNames, dynamicNames)
+		allNames := orderedDimensionNamesFromState(cs.dimensions, cs.dynamicSet)
 
 		values := make([]UpdateDimensionValue, 0, len(allNames))
 		for _, name := range allNames {
@@ -274,22 +277,32 @@ func inferDimensionLabelKey(metricName string, meta metrix.SeriesMeta) (string, 
 	}
 }
 
-func orderedDimensionNames(staticNames []string, dynamicNames []string) []string {
-	seen := make(map[string]struct{}, len(staticNames)+len(dynamicNames))
-	out := make([]string, 0, len(staticNames)+len(dynamicNames))
-	for _, name := range staticNames {
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		seen[name] = struct{}{}
-		out = append(out, name)
+func orderedDimensionNamesFromState(dimensions map[string]dimensionState, dynamicSet map[string]struct{}) []string {
+	type staticEntry struct {
+		name  string
+		order int
 	}
-	for _, name := range dynamicNames {
-		if _, ok := seen[name]; ok {
-			continue
+	staticEntries := make([]staticEntry, 0, len(dimensions))
+	for name, state := range dimensions {
+		if state.static {
+			staticEntries = append(staticEntries, staticEntry{
+				name:  name,
+				order: state.order,
+			})
 		}
-		seen[name] = struct{}{}
-		out = append(out, name)
 	}
+	sort.Slice(staticEntries, func(i, j int) bool {
+		if staticEntries[i].order != staticEntries[j].order {
+			return staticEntries[i].order < staticEntries[j].order
+		}
+		return staticEntries[i].name < staticEntries[j].name
+	})
+
+	dynamicNames := mapKeysSorted(dynamicSet)
+	out := make([]string, 0, len(staticEntries)+len(dynamicNames))
+	for _, entry := range staticEntries {
+		out = append(out, entry.name)
+	}
+	out = append(out, dynamicNames...)
 	return out
 }
