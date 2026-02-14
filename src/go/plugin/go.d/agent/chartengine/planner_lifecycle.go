@@ -35,7 +35,16 @@ func enforceLifecycleCaps(
 	if len(chartsByID) == 0 || state == nil {
 		return nil, nil
 	}
+	removeCharts := enforceChartInstanceCaps(currentSuccessSeq, chartsByID, state)
+	removeDims := enforceDimensionCaps(currentSuccessSeq, chartsByID, state)
+	return removeDims, removeCharts
+}
 
+func enforceChartInstanceCaps(
+	currentSuccessSeq uint64,
+	chartsByID map[string]*chartState,
+	state *materializedState,
+) []RemoveChartAction {
 	observedByTemplate := make(map[string][]string)
 	for chartID, cs := range chartsByID {
 		observedByTemplate[cs.templateID] = append(observedByTemplate[cs.templateID], chartID)
@@ -53,7 +62,6 @@ func enforceLifecycleCaps(
 	}
 
 	removeCharts := make([]RemoveChartAction, 0)
-	removeDims := make([]RemoveDimensionAction, 0)
 
 	templateIDs := make([]string, 0, len(observedByTemplate))
 	for templateID := range observedByTemplate {
@@ -141,8 +149,16 @@ func enforceLifecycleCaps(
 			}
 		}
 	}
+	return removeCharts
+}
 
+func enforceDimensionCaps(
+	currentSuccessSeq uint64,
+	chartsByID map[string]*chartState,
+	state *materializedState,
+) []RemoveDimensionAction {
 	// Per-chart dimension caps: evict least-recently-seen inactive dims first, then drop new dims.
+	removeDims := make([]RemoveDimensionAction, 0)
 	chartIDs := make([]string, 0, len(chartsByID))
 	for chartID := range chartsByID {
 		chartIDs = append(chartIDs, chartID)
@@ -233,8 +249,7 @@ func enforceLifecycleCaps(
 			}
 		}
 	}
-
-	return removeDims, removeCharts
+	return removeDims
 }
 
 func collectExpiryRemovals(

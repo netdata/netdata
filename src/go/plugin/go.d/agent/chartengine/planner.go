@@ -286,8 +286,7 @@ func (ctx *planBuildContext) accumulateRoute(
 			cs.dynamicSet[route.DimensionName] = struct{}{}
 		}
 	} else if prevState.hidden != route.Hidden {
-		// Keep first resolved hidden option for deterministic shape.
-		// Conflict handling metrics/warnings are added in later planner phases.
+		// First-observed hidden flag wins; conflicting routes are ignored.
 	}
 
 	cs.values[route.DimensionName] += value
@@ -426,7 +425,7 @@ func resolveDimensionName(dim program.Dimension, metricName string, labels metri
 	}
 
 	if dim.NameTemplate.Raw != "" {
-		// Full placeholder template rendering is added in a later planner step.
+		// Dynamic name templates are not supported in phase-1 syntax.
 		if dim.NameTemplate.IsDynamic() {
 			return "", "", false, fmt.Errorf("chartengine: dynamic name template rendering is not implemented yet")
 		}

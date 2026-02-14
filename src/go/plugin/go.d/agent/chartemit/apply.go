@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	// Netdata wire protocol label sources (CLABEL third argument).
 	labelSourceAuto         = 1
 	labelSourceConf         = 2
 	collectJobReservedLabel = "_collect_job"
@@ -94,6 +95,7 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 				Divisor:    dim.Divisor,
 			})
 		}
+		// Mark dimensions as emitted alongside explicit chart-create path.
 		delete(actions.createDimsByID, chartID)
 	}
 
