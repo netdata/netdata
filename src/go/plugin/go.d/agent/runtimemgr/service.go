@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/ticker"
 )
 
 // Service owns runtime/internal metrics components and their cadence-driven
@@ -21,10 +23,13 @@ type Service struct {
 	pluginName string
 	out        io.Writer
 	started    bool
+	tickEvery  time.Duration
 
 	registry  *componentRegistry
 	job       *runtimeMetricsJob
 	producers []runtimeProducer
+	tkStop    chan struct{}
+	tkDone    chan struct{}
 }
 
 func New(log *logger.Logger) *Service {
@@ -32,9 +37,22 @@ func New(log *logger.Logger) *Service {
 		log = logger.New().With(slog.String("component", "runtime metrics service"))
 	}
 	return &Service{
-		Logger:   log,
-		registry: newComponentRegistry(),
+		Logger:    log,
+		registry:  newComponentRegistry(),
+		tickEvery: time.Second,
 	}
+}
+
+// SetTickEvery updates the service scheduler interval. Non-positive values are
+// ignored. Changing this value while running does not affect the current ticker
+// and applies on next Start.
+func (s *Service) SetTickEvery(interval time.Duration) {
+	if s == nil || interval <= 0 {
+		return
+	}
+	s.mu.Lock()
+	s.tickEvery = interval
+	s.mu.Unlock()
 }
 
 // Start initializes the runtime metrics service and starts the runtime emitter
@@ -67,10 +85,19 @@ func (s *Service) Start(pluginName string, out io.Writer) {
 		s.Logger.With(slog.String("component", "runtime metrics job")),
 	)
 	job := s.job
+	stopCh := make(chan struct{})
+	doneCh := make(chan struct{})
+	interval := s.tickEvery
+	if interval <= 0 {
+		interval = time.Second
+	}
+	s.tkStop = stopCh
+	s.tkDone = doneCh
 	s.started = true
 	s.mu.Unlock()
 
 	go job.Start()
+	go s.runTicker(interval, stopCh, doneCh)
 }
 
 // Stop terminates the runtime emitter job. Calling Stop multiple times is safe.
@@ -85,10 +112,20 @@ func (s *Service) Stop() {
 		return
 	}
 	job := s.job
+	stopCh := s.tkStop
+	doneCh := s.tkDone
 	s.job = nil
+	s.tkStop = nil
+	s.tkDone = nil
 	s.started = false
 	s.mu.Unlock()
 
+	if stopCh != nil {
+		close(stopCh)
+	}
+	if doneCh != nil {
+		<-doneCh
+	}
 	if job != nil {
 		job.Stop()
 	}
@@ -119,6 +156,22 @@ func (s *Service) Tick(clock int) {
 	}
 	if job != nil {
 		job.Tick(clock)
+	}
+}
+
+func (s *Service) runTicker(interval time.Duration, stop <-chan struct{}, done chan<- struct{}) {
+	defer close(done)
+
+	tk := ticker.New(interval)
+	defer tk.Stop()
+
+	for {
+		select {
+		case <-stop:
+			return
+		case clock := <-tk.C:
+			s.Tick(clock)
+		}
 	}
 }
 
