@@ -16,14 +16,14 @@ func TestRouteCacheStoresPositiveAndNegativeRoutes(t *testing.T) {
 	a := metrix.SeriesIdentity{ID: "a", Hash64: 1}
 	b := metrix.SeriesIdentity{ID: "b", Hash64: 1}
 
-	cache.store(a, 1, []routeBinding{{ChartID: "ca"}})
-	cache.store(b, 1, nil) // negative-cache entry
+	cache.Store(a, 1, []routeBinding{{ChartID: "ca"}})
+	cache.Store(b, 1, nil) // negative-cache entry
 
-	routesA, ok := cache.lookup(a, 1)
+	routesA, ok := cache.Lookup(a, 1)
 	assert.True(t, ok)
 	assert.Equal(t, "ca", routesA[0].ChartID)
 
-	routesB, ok := cache.lookup(b, 1)
+	routesB, ok := cache.Lookup(b, 1)
 	assert.True(t, ok)
 	assert.Empty(t, routesB)
 }
@@ -35,22 +35,22 @@ func TestRouteCacheRetainSeriesPrunesBySnapshotMembership(t *testing.T) {
 	b := metrix.SeriesIdentity{ID: "b", Hash64: 11}
 	c := metrix.SeriesIdentity{ID: "c", Hash64: 12}
 
-	cache.store(a, 1, []routeBinding{{ChartID: "ca"}})
-	cache.store(b, 1, []routeBinding{{ChartID: "cb"}})
-	cache.store(c, 1, nil)
+	cache.Store(a, 1, []routeBinding{{ChartID: "ca"}})
+	cache.Store(b, 1, []routeBinding{{ChartID: "cb"}})
+	cache.Store(c, 1, nil)
 
-	cache.retainSeries(map[metrix.SeriesID]struct{}{
+	cache.RetainSeries(map[metrix.SeriesID]struct{}{
 		"a": {},
 		"c": {},
 	})
 
-	_, ok := cache.lookup(a, 1)
+	_, ok := cache.Lookup(a, 1)
 	assert.True(t, ok)
 
-	_, ok = cache.lookup(b, 1)
+	_, ok = cache.Lookup(b, 1)
 	assert.False(t, ok)
 
-	_, ok = cache.lookup(c, 1)
+	_, ok = cache.Lookup(c, 1)
 	assert.True(t, ok)
 }
 
@@ -58,8 +58,8 @@ func TestRouteCacheLookupMissOnRevisionChange(t *testing.T) {
 	cache := newRouteCache()
 	id := metrix.SeriesIdentity{ID: "a", Hash64: 1}
 
-	cache.store(id, 1, []routeBinding{{ChartID: "ca"}})
+	cache.Store(id, 1, []routeBinding{{ChartID: "ca"}})
 
-	_, ok := cache.lookup(id, 2)
+	_, ok := cache.Lookup(id, 2)
 	assert.False(t, ok)
 }

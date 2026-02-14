@@ -1092,6 +1092,204 @@ groups:
 	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan2.Actions))
 }
 
+func TestPlannerStageBoundaries(t *testing.T) {
+	tests := map[string]func(t *testing.T){
+		"scan stage accumulates per-chart state": func(t *testing.T) {
+			e, err := New()
+			require.NoError(t, err)
+
+			yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc_mode
+    charts:
+      - id: service_mode
+        title: Service mode
+        context: service_mode
+        units: state
+        dimensions:
+          - selector: svc_mode
+            name_from_label: mode
+`
+			require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+			store := metrix.NewCollectorStore()
+			cc := mustCycleController(t, store)
+			sm := store.Write().SnapshotMeter("")
+			mode := sm.Gauge("svc_mode")
+			a := sm.LabelSet(metrix.Label{Key: "mode", Value: "a"})
+			b := sm.LabelSet(metrix.Label{Key: "mode", Value: "b"})
+
+			cc.BeginCycle()
+			mode.Observe(1, a)
+			mode.Observe(2, b)
+			cc.CommitCycleSuccess()
+
+			out := Plan{
+				Actions:            make([]EngineAction, 0),
+				InferredDimensions: make([]InferredDimension, 0),
+			}
+			reader := store.Read()
+			ctx, err := e.preparePlanBuildContext(reader, &out, reader.CollectMeta())
+			require.NoError(t, err)
+			require.NoError(t, e.scanPlanSeries(ctx))
+
+			require.Len(t, ctx.chartsByID, 1)
+			cs, ok := ctx.chartsByID["service_mode"]
+			require.True(t, ok)
+			assert.Equal(t, metrix.SampleValue(1), cs.values["a"])
+			assert.Equal(t, metrix.SampleValue(2), cs.values["b"])
+			assert.Empty(t, out.InferredDimensions)
+			assert.Len(t, ctx.aliveSeries, 2)
+		},
+		"materialize stage emits create and update actions": func(t *testing.T) {
+			e, err := New()
+			require.NoError(t, err)
+
+			yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc_mode
+    charts:
+      - id: service_mode
+        title: Service mode
+        context: service_mode
+        units: state
+        dimensions:
+          - selector: svc_mode
+            name_from_label: mode
+`
+			require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+			store := metrix.NewCollectorStore()
+			cc := mustCycleController(t, store)
+			sm := store.Write().SnapshotMeter("")
+			mode := sm.Gauge("svc_mode")
+			okLabel := sm.LabelSet(metrix.Label{Key: "mode", Value: "ok"})
+
+			cc.BeginCycle()
+			mode.Observe(1, okLabel)
+			cc.CommitCycleSuccess()
+
+			out := Plan{
+				Actions:            make([]EngineAction, 0),
+				InferredDimensions: make([]InferredDimension, 0),
+			}
+			reader := store.Read()
+			ctx, err := e.preparePlanBuildContext(reader, &out, reader.CollectMeta())
+			require.NoError(t, err)
+			require.NoError(t, e.scanPlanSeries(ctx))
+			require.NoError(t, e.materializePlanCharts(ctx))
+
+			assert.Equal(t, []ActionKind{
+				ActionCreateChart,
+				ActionCreateDimension,
+				ActionUpdateChart,
+			}, actionKinds(out.Actions))
+
+			update := findUpdateAction(out)
+			require.NotNil(t, update)
+			require.Len(t, update.Values, 1)
+			assert.Equal(t, "ok", update.Values[0].Name)
+			assert.Equal(t, float64(1), update.Values[0].Float64)
+		},
+		"caps stage evicts deterministically": func(t *testing.T) {
+			lifecycle := program.LifecyclePolicy{
+				MaxInstances: 1,
+			}
+			meta := program.ChartMeta{
+				Title:     "Requests",
+				Context:   "requests",
+				Family:    "Service",
+				Units:     "requests/s",
+				Algorithm: program.AlgorithmIncremental,
+				Type:      program.ChartTypeLine,
+			}
+			chartsByID := map[string]*chartState{
+				"svc_a": {
+					templateID: "tpl.requests",
+					chartID:    "svc_a",
+					meta:       meta,
+					lifecycle:  lifecycle,
+					values:     map[string]metrix.SampleValue{"total": 10},
+					dimensions: map[string]dimensionState{"total": {static: true, order: 0}},
+					dynamicSet: map[string]struct{}{},
+				},
+				"svc_b": {
+					templateID: "tpl.requests",
+					chartID:    "svc_b",
+					meta:       meta,
+					lifecycle:  lifecycle,
+					values:     map[string]metrix.SampleValue{"total": 20},
+					dimensions: map[string]dimensionState{"total": {static: true, order: 0}},
+					dynamicSet: map[string]struct{}{},
+				},
+			}
+
+			state := newMaterializedState()
+			oldChart, created := state.ensureChart("svc_old", "tpl.requests", meta, lifecycle)
+			require.True(t, created)
+			oldChart.lastSeenSuccessSeq = 1
+
+			removeDims, removeCharts := enforceLifecycleCaps(2, chartsByID, &state)
+			assert.Empty(t, removeDims)
+			require.Len(t, removeCharts, 1)
+			assert.Equal(t, "svc_old", removeCharts[0].ChartID)
+
+			assert.Contains(t, chartsByID, "svc_a")
+			assert.NotContains(t, chartsByID, "svc_b")
+		},
+		"expiry stage removes stale dimensions and charts": func(t *testing.T) {
+			state := newMaterializedState()
+
+			liveMeta := program.ChartMeta{
+				Title:   "Service mode",
+				Context: "service_mode",
+			}
+			liveChart, created := state.ensureChart("svc_mode", "tpl.mode", liveMeta, program.LifecyclePolicy{
+				Dimensions: program.DimensionLifecyclePolicy{ExpireAfterCycles: 1},
+			})
+			require.True(t, created)
+			liveChart.lastSeenSuccessSeq = 3
+			liveDim, dimCreated := liveChart.ensureDimension("stale_mode", dimensionState{
+				static:     false,
+				order:      1,
+				algorithm:  program.AlgorithmAbsolute,
+				multiplier: 1,
+				divisor:    1,
+			})
+			require.True(t, dimCreated)
+			liveDim.lastSeenSuccessSeq = 1
+
+			oldMeta := program.ChartMeta{
+				Title:   "Old chart",
+				Context: "old_chart",
+			}
+			oldChart, oldCreated := state.ensureChart("old_chart", "tpl.old", oldMeta, program.LifecyclePolicy{
+				ExpireAfterCycles: 1,
+			})
+			require.True(t, oldCreated)
+			oldChart.lastSeenSuccessSeq = 1
+
+			removeDims, removeCharts := collectExpiryRemovals(3, &state)
+			require.Len(t, removeDims, 1)
+			assert.Equal(t, "svc_mode", removeDims[0].ChartID)
+			assert.Equal(t, "stale_mode", removeDims[0].Name)
+
+			require.Len(t, removeCharts, 1)
+			assert.Equal(t, "old_chart", removeCharts[0].ChartID)
+		},
+	}
+
+	for name, run := range tests {
+		t.Run(name, run)
+	}
+}
+
 func actionKinds(actions []EngineAction) []ActionKind {
 	out := make([]ActionKind, 0, len(actions))
 	for _, action := range actions {

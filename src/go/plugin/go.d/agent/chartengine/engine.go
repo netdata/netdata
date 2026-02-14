@@ -16,8 +16,7 @@ import (
 //   - owns compiled immutable program snapshots,
 //   - supports load/reload from decoded specs or YAML,
 //   - keeps previous compiled snapshot on failed reload.
-//
-// Planning/matching/action execution is added in later phase-3 steps.
+//   - owns planner runtime state (match index, route cache, materialized lifecycle).
 type Engine struct {
 	mu    sync.RWMutex
 	state engineState

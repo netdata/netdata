@@ -55,6 +55,33 @@ groups:
 				assert.Equal(t, []string{"mysql_queries_total"}, p.MetricNames())
 			},
 		},
+		"invalid selector syntax on reload is rejected and keeps previous program": {
+			initialYAML: validTemplateYAML(),
+			initialRev:  300,
+			reloadYAML: `
+version: v1
+groups:
+  - family: Database
+    metrics:
+      - mysql_queries_total
+    charts:
+      - title: Broken selector
+        context: broken_selector
+        units: queries/s
+        dimensions:
+          - selector: mysql_queries_total{method="GET",}
+            name: total
+`,
+			reloadRev: 301,
+			reloadErr: true,
+			assert: func(t *testing.T, e *Engine) {
+				t.Helper()
+				p := e.Program()
+				require.NotNil(t, p)
+				assert.Equal(t, uint64(300), p.Revision())
+				assert.Equal(t, []string{"mysql_queries_total"}, p.MetricNames())
+			},
+		},
 	}
 
 	for name, tc := range tests {

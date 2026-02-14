@@ -16,6 +16,23 @@ const (
 	collectJobReservedLabel = "_collect_job"
 )
 
+type normalizedActions struct {
+	createCharts     map[string]CreateChartAction
+	createDimsByID   map[string][]CreateDimensionAction
+	updateCharts     []UpdateChartAction
+	removeDimensions []RemoveDimensionAction
+	removeCharts     []RemoveChartAction
+}
+
+type dimensionEmission struct {
+	Name       string
+	Hidden     bool
+	Algorithm  string
+	Multiplier int
+	Divisor    int
+	Obsolete   bool
+}
+
 // ApplyPlan emits chartengine actions to the Netdata wire API.
 func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	if api == nil {
@@ -27,72 +44,84 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	if env.UpdateEvery <= 0 {
 		env.UpdateEvery = 1
 	}
+	normalized := normalizeActions(plan.Actions)
+	emitCreatePhase(api, env, normalized)
+	emitUpdatePhase(api, env, normalized.updateCharts)
+	emitRemovePhase(api, env, normalized)
+	return nil
+}
 
-	// 1) Create phase.
-	createCharts := make(map[string]CreateChartAction)
-	createDimsByChart := make(map[string][]CreateDimensionAction)
-	for _, action := range plan.Actions {
+func normalizeActions(actions []EngineAction) normalizedActions {
+	out := normalizedActions{
+		createCharts:   make(map[string]CreateChartAction),
+		createDimsByID: make(map[string][]CreateDimensionAction),
+	}
+	for _, action := range actions {
 		switch v := action.(type) {
 		case CreateChartAction:
-			createCharts[v.ChartID] = v
+			out.createCharts[v.ChartID] = v
 		case CreateDimensionAction:
-			createDimsByChart[v.ChartID] = append(createDimsByChart[v.ChartID], v)
+			out.createDimsByID[v.ChartID] = append(out.createDimsByID[v.ChartID], v)
+		case UpdateChartAction:
+			out.updateCharts = append(out.updateCharts, v)
+		case RemoveDimensionAction:
+			out.removeDimensions = append(out.removeDimensions, v)
+		case RemoveChartAction:
+			out.removeCharts = append(out.removeCharts, v)
 		}
 	}
+	return out
+}
 
-	createdChartIDs := make([]string, 0, len(createCharts))
-	for chartID := range createCharts {
+func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions) {
+	createdChartIDs := make([]string, 0, len(actions.createCharts))
+	for chartID := range actions.createCharts {
 		createdChartIDs = append(createdChartIDs, chartID)
 	}
 	sort.Strings(createdChartIDs)
 	for _, chartID := range createdChartIDs {
-		createChart := createCharts[chartID]
+		createChart := actions.createCharts[chartID]
 		emitChart(api, env, createChart.ChartID, createChart.Meta, false)
 		emitChartLabels(api, env, createChart.Labels)
 		api.CLABELCOMMIT()
-		dims := createDimsByChart[chartID]
+		dims := actions.createDimsByID[chartID]
 		for _, dim := range dims {
-			api.DIMENSION(netdataapi.DimensionOpts{
-				ID:         dim.Name,
+			emitDimension(api, dimensionEmission{
 				Name:       dim.Name,
+				Hidden:     dim.Hidden,
 				Algorithm:  string(dim.Algorithm),
-				Multiplier: handleZero(dim.Multiplier),
-				Divisor:    handleZero(dim.Divisor),
-				Options:    makeDimensionOptions(dim.Hidden, false),
+				Multiplier: dim.Multiplier,
+				Divisor:    dim.Divisor,
 			})
 		}
-		delete(createDimsByChart, chartID)
+		delete(actions.createDimsByID, chartID)
 	}
 
-	remainingChartIDs := make([]string, 0, len(createDimsByChart))
-	for chartID := range createDimsByChart {
+	remainingChartIDs := make([]string, 0, len(actions.createDimsByID))
+	for chartID := range actions.createDimsByID {
 		remainingChartIDs = append(remainingChartIDs, chartID)
 	}
 	sort.Strings(remainingChartIDs)
 	for _, chartID := range remainingChartIDs {
-		dims := createDimsByChart[chartID]
+		dims := actions.createDimsByID[chartID]
 		if len(dims) == 0 {
 			continue
 		}
 		emitChart(api, env, chartID, dims[0].ChartMeta, false)
 		for _, dim := range dims {
-			api.DIMENSION(netdataapi.DimensionOpts{
-				ID:         dim.Name,
+			emitDimension(api, dimensionEmission{
 				Name:       dim.Name,
+				Hidden:     dim.Hidden,
 				Algorithm:  string(dim.Algorithm),
-				Multiplier: handleZero(dim.Multiplier),
-				Divisor:    handleZero(dim.Divisor),
-				Options:    makeDimensionOptions(dim.Hidden, false),
+				Multiplier: dim.Multiplier,
+				Divisor:    dim.Divisor,
 			})
 		}
 	}
+}
 
-	// 2) Update phase.
-	for _, action := range plan.Actions {
-		update, ok := action.(UpdateChartAction)
-		if !ok {
-			continue
-		}
+func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartAction) {
+	for _, update := range updates {
 		api.BEGIN(env.TypeID, update.ChartID, env.MSSinceLast)
 		for _, dim := range update.Values {
 			if dim.IsEmpty {
@@ -107,30 +136,32 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 		}
 		api.END()
 	}
+}
 
-	// 3) Remove phase.
-	for _, action := range plan.Actions {
-		removeDim, ok := action.(RemoveDimensionAction)
-		if !ok {
-			continue
-		}
+func emitRemovePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions) {
+	for _, removeDim := range actions.removeDimensions {
 		emitChart(api, env, removeDim.ChartID, removeDim.ChartMeta, false)
-		api.DIMENSION(netdataapi.DimensionOpts{
-			ID:         removeDim.Name,
+		emitDimension(api, dimensionEmission{
 			Name:       removeDim.Name,
+			Hidden:     removeDim.Hidden,
 			Algorithm:  string(removeDim.Algorithm),
-			Multiplier: handleZero(removeDim.Multiplier),
-			Divisor:    handleZero(removeDim.Divisor),
-			Options:    makeDimensionOptions(removeDim.Hidden, true),
+			Multiplier: removeDim.Multiplier,
+			Divisor:    removeDim.Divisor,
+			Obsolete:   true,
 		})
 	}
-	for _, action := range plan.Actions {
-		removeChart, ok := action.(RemoveChartAction)
-		if !ok {
-			continue
-		}
+	for _, removeChart := range actions.removeCharts {
 		emitChart(api, env, removeChart.ChartID, removeChart.Meta, true)
 	}
+}
 
-	return nil
+func emitDimension(api *netdataapi.API, dim dimensionEmission) {
+	api.DIMENSION(netdataapi.DimensionOpts{
+		ID:         dim.Name,
+		Name:       dim.Name,
+		Algorithm:  dim.Algorithm,
+		Multiplier: handleZero(dim.Multiplier),
+		Divisor:    handleZero(dim.Divisor),
+		Options:    makeDimensionOptions(dim.Hidden, dim.Obsolete),
+	})
 }
