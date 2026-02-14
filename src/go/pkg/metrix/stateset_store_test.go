@@ -2,7 +2,11 @@
 
 package metrix
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestStateSetStoreScenarios(t *testing.T) {
 	tests := map[string]struct {
@@ -27,9 +31,8 @@ func TestStateSetStoreScenarios(t *testing.T) {
 					"operational": true,
 					"recovery":    false,
 				})
-				if _, ok := s.Read().Value("svc.mode", nil); ok {
-					t.Fatalf("expected non-scalar stateset to be unavailable via Value")
-				}
+				_, ok := s.Read().Value("svc.mode", nil)
+				require.False(t, ok, "expected non-scalar stateset to be unavailable via Value")
 
 				fr := s.Read().Flatten()
 				mustValue(t, fr, "svc.mode", Labels{"svc.mode": "maintenance"}, 0)
@@ -54,17 +57,15 @@ func TestStateSetStoreScenarios(t *testing.T) {
 				cc.BeginCycle()
 				cc.CommitCycleSuccess()
 
-				if _, ok := s.Read().StateSet("svc.mode", nil); ok {
-					t.Fatalf("expected stale snapshot stateset hidden from Read")
-				}
+				_, ok := s.Read().StateSet("svc.mode", nil)
+				require.False(t, ok, "expected stale snapshot stateset hidden from Read")
 				mustStateSet(t, s.ReadRaw(), "svc.mode", nil, map[string]bool{
 					"maintenance": false,
 					"operational": true,
 				})
 
-				if _, ok := s.Read().Flatten().Value("svc.mode", Labels{"svc.mode": "operational"}); ok {
-					t.Fatalf("expected stale snapshot stateset flattened series hidden from Read().Flatten()")
-				}
+				_, ok = s.Read().Flatten().Value("svc.mode", Labels{"svc.mode": "operational"})
+				require.False(t, ok, "expected stale snapshot stateset flattened series hidden from Read().Flatten()")
 				mustValue(t, s.ReadRaw().Flatten(), "svc.mode", Labels{"svc.mode": "operational"}, 1)
 			},
 		},
@@ -176,9 +177,7 @@ func TestStateSetStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 
 				p, ok := s.Read().StateSet("svc.mode", nil)
-				if !ok {
-					t.Fatalf("expected stateset point")
-				}
+				require.True(t, ok, "expected stateset point")
 				p.States["a"] = false
 
 				mustStateSet(t, s.Read(), "svc.mode", nil, map[string]bool{"a": true, "b": false})
@@ -194,15 +193,11 @@ func TestStateSetStoreScenarios(t *testing.T) {
 func mustStateSet(t *testing.T, r Reader, name string, labels Labels, want map[string]bool) {
 	t.Helper()
 	got, ok := r.StateSet(name, labels)
-	if !ok {
-		t.Fatalf("expected stateset for %s", name)
-	}
-	if len(got.States) != len(want) {
-		t.Fatalf("unexpected stateset size for %s: got=%d want=%d", name, len(got.States), len(want))
-	}
+	require.True(t, ok, "expected stateset for %s", name)
+	require.Len(t, got.States, len(want), "unexpected stateset size for %s", name)
 	for k, w := range want {
-		if g, ok := got.States[k]; !ok || g != w {
-			t.Fatalf("unexpected stateset state %s for %s: got=%v want=%v", k, name, g, w)
-		}
+		g, present := got.States[k]
+		require.True(t, present, "missing stateset state %s for %s", k, name)
+		require.Equal(t, w, g, "unexpected stateset state %s for %s", k, name)
 	}
 }

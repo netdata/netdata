@@ -2,7 +2,11 @@
 
 package metrix
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestHistogramStoreScenarios(t *testing.T) {
 	tests := map[string]struct {
@@ -35,9 +39,8 @@ func TestHistogramStoreScenarios(t *testing.T) {
 						{UpperBound: 1, CumulativeCount: 3},
 					},
 				})
-				if _, ok := s.Read().Value("svc.request_duration_seconds", nil); ok {
-					t.Fatalf("expected non-scalar histogram unavailable via Value")
-				}
+				_, ok := s.Read().Value("svc.request_duration_seconds", nil)
+				require.False(t, ok, "expected non-scalar histogram unavailable via Value")
 
 				fr := s.Read().Flatten()
 				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "0.1"}, 1)
@@ -54,9 +57,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				cc := cycleController(t, s)
 				h := s.Write().SnapshotMeter("svc").Histogram("latency")
 				view, ok := s.(*storeView)
-				if !ok {
-					t.Fatalf("expected *storeView")
-				}
+				require.True(t, ok, "expected *storeView")
 
 				cc.BeginCycle()
 				h.ObservePoint(HistogramPoint{
@@ -69,12 +70,8 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				cc.AbortCycle() // schema must not be captured on abort
 
 				desc := view.core.instruments["svc.latency"]
-				if desc == nil {
-					t.Fatalf("expected registered descriptor")
-				}
-				if desc.histogram != nil {
-					t.Fatalf("expected shared descriptor histogram schema to remain unset after abort")
-				}
+				require.NotNil(t, desc, "expected registered descriptor")
+				require.Nil(t, desc.histogram, "expected shared descriptor histogram schema to remain unset after abort")
 
 				cc.BeginCycle()
 				h.ObservePoint(HistogramPoint{
@@ -87,9 +84,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 
 				// Shared descriptor remains immutable after publish; per-series descriptor carries schema.
-				if desc.histogram != nil {
-					t.Fatalf("expected shared descriptor histogram schema to remain unset")
-				}
+				require.Nil(t, desc.histogram, "expected shared descriptor histogram schema to remain unset")
 				mustHistogram(t, s.Read(), "svc.latency", nil, HistogramPoint{
 					Count: 2, Sum: 0.8,
 					Buckets: []BucketPoint{
@@ -181,12 +176,10 @@ func TestHistogramStoreScenarios(t *testing.T) {
 
 				cc.BeginCycle()
 				cc.CommitCycleSuccess()
-				if _, ok := s.Read().Histogram("svc.latency", nil); ok {
-					t.Fatalf("expected stale cycle-window histogram hidden from Read")
-				}
-				if _, ok := s.ReadRaw().Histogram("svc.latency", nil); !ok {
-					t.Fatalf("expected raw histogram to remain visible")
-				}
+				_, ok := s.Read().Histogram("svc.latency", nil)
+				require.False(t, ok, "expected stale cycle-window histogram hidden from Read")
+				_, ok = s.ReadRaw().Histogram("svc.latency", nil)
+				require.True(t, ok, "expected raw histogram to remain visible")
 			},
 		},
 		"window option on snapshot histogram panics": {
@@ -246,9 +239,8 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				cc.BeginCycle()
 				cc.CommitCycleSuccess()
 
-				if _, ok := s.Read().Flatten().Value("svc.latency_bucket", Labels{"le": "1"}); ok {
-					t.Fatalf("expected stale snapshot flattened histogram hidden from Read().Flatten()")
-				}
+				_, ok := s.Read().Flatten().Value("svc.latency_bucket", Labels{"le": "1"})
+				require.False(t, ok, "expected stale snapshot flattened histogram hidden from Read().Flatten()")
 				mustValue(t, s.ReadRaw().Flatten(), "svc.latency_bucket", Labels{"le": "1"}, 1)
 			},
 		},
@@ -282,20 +274,14 @@ func TestHistogramStoreScenarios(t *testing.T) {
 func mustHistogram(t *testing.T, r Reader, name string, labels Labels, want HistogramPoint) {
 	t.Helper()
 	got, ok := r.Histogram(name, labels)
-	if !ok {
-		t.Fatalf("expected histogram for %s", name)
-	}
-	if got.Count != want.Count || got.Sum != want.Sum {
-		t.Fatalf("unexpected histogram count/sum for %s: got=(%v,%v) want=(%v,%v)", name, got.Count, got.Sum, want.Count, want.Sum)
-	}
-	if len(got.Buckets) != len(want.Buckets) {
-		t.Fatalf("unexpected histogram bucket count for %s: got=%d want=%d", name, len(got.Buckets), len(want.Buckets))
-	}
+	require.True(t, ok, "expected histogram for %s", name)
+	require.Equal(t, want.Count, got.Count, "unexpected histogram count for %s", name)
+	require.Equal(t, want.Sum, got.Sum, "unexpected histogram sum for %s", name)
+	require.Len(t, got.Buckets, len(want.Buckets), "unexpected histogram bucket count for %s", name)
 	for i := range want.Buckets {
 		gb := got.Buckets[i]
 		wb := want.Buckets[i]
-		if gb.UpperBound != wb.UpperBound || gb.CumulativeCount != wb.CumulativeCount {
-			t.Fatalf("unexpected histogram bucket[%d] for %s: got=(%v,%v) want=(%v,%v)", i, name, gb.UpperBound, gb.CumulativeCount, wb.UpperBound, wb.CumulativeCount)
-		}
+		require.Equal(t, wb.UpperBound, gb.UpperBound, "unexpected histogram bucket upper-bound[%d] for %s", i, name)
+		require.Equal(t, wb.CumulativeCount, gb.CumulativeCount, "unexpected histogram bucket cumulative count[%d] for %s", i, name)
 	}
 }

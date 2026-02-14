@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestRuntimeStoreScenarios(t *testing.T) {
@@ -23,25 +25,23 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				g.Set(5)
 				mustValue(t, s.Read(), "runtime.heap_bytes", nil, 5)
 				meta := s.Read().CollectMeta()
-				if meta.LastAttemptStatus != CollectStatusSuccess || meta.LastAttemptSeq != 1 || meta.LastSuccessSeq != 1 {
-					t.Fatalf("unexpected metadata after gauge set: %#v", meta)
-				}
+				require.Equal(t, CollectStatusSuccess, meta.LastAttemptStatus, "unexpected metadata after gauge set: %#v", meta)
+				require.Equal(t, uint64(1), meta.LastAttemptSeq, "unexpected metadata after gauge set: %#v", meta)
+				require.Equal(t, uint64(1), meta.LastSuccessSeq, "unexpected metadata after gauge set: %#v", meta)
 
 				c.Add(10)
 				mustValue(t, s.Read(), "runtime.jobs_total", nil, 10)
 				mustNoDelta(t, s.Read(), "runtime.jobs_total", nil)
 				meta = s.Read().CollectMeta()
-				if meta.LastAttemptSeq != 2 || meta.LastSuccessSeq != 2 {
-					t.Fatalf("unexpected metadata after first counter add: %#v", meta)
-				}
+				require.Equal(t, uint64(2), meta.LastAttemptSeq, "unexpected metadata after first counter add: %#v", meta)
+				require.Equal(t, uint64(2), meta.LastSuccessSeq, "unexpected metadata after first counter add: %#v", meta)
 
 				c.Add(4)
 				mustValue(t, s.Read(), "runtime.jobs_total", nil, 14)
 				mustDelta(t, s.Read(), "runtime.jobs_total", nil, 4)
 				meta = s.Read().CollectMeta()
-				if meta.LastAttemptSeq != 3 || meta.LastSuccessSeq != 3 {
-					t.Fatalf("unexpected metadata after second counter add: %#v", meta)
-				}
+				require.Equal(t, uint64(3), meta.LastAttemptSeq, "unexpected metadata after second counter add: %#v", meta)
+				require.Equal(t, uint64(3), meta.LastSuccessSeq, "unexpected metadata after second counter add: %#v", meta)
 			},
 		},
 		"runtime rejects snapshot-style constraints": {
@@ -65,22 +65,17 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				sum.Observe(3)
 
 				p, ok := s.Read().Summary("runtime.latency", nil)
-				if !ok {
-					t.Fatalf("expected runtime summary point")
-				}
-				if p.Count != 2 || p.Sum != 4 || len(p.Quantiles) != 2 {
-					t.Fatalf("unexpected runtime summary point: %#v", p)
-				}
-				if math.IsNaN(p.Quantiles[0].Value) || math.IsNaN(p.Quantiles[1].Value) {
-					t.Fatalf("expected finite quantile values: %#v", p.Quantiles)
-				}
+				require.True(t, ok, "expected runtime summary point")
+				require.Equal(t, SampleValue(2), p.Count)
+				require.Equal(t, SampleValue(4), p.Sum)
+				require.Len(t, p.Quantiles, 2)
+				require.False(t, math.IsNaN(p.Quantiles[0].Value) || math.IsNaN(p.Quantiles[1].Value), "expected finite quantile values: %#v", p.Quantiles)
 
 				fr := s.Read().Flatten()
 				mustValue(t, fr, "runtime.latency_count", nil, 2)
 				mustValue(t, fr, "runtime.latency_sum", nil, 4)
-				if _, ok := fr.Summary("runtime.latency", nil); ok {
-					t.Fatalf("expected flattened view to hide typed summary getter")
-				}
+				_, ok = fr.Summary("runtime.latency", nil)
+				require.False(t, ok, "expected flattened view to hide typed summary getter")
 			},
 		},
 		"runtime histogram and stateset are readable and flattenable": {
@@ -216,8 +211,6 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 func runtimeStoreViewForTest(t *testing.T, s RuntimeStore) *runtimeStoreView {
 	t.Helper()
 	v, ok := s.(*runtimeStoreView)
-	if !ok {
-		t.Fatalf("unexpected runtime store implementation: %T", s)
-	}
+	require.True(t, ok, "unexpected runtime store implementation: %T", s)
 	return v
 }

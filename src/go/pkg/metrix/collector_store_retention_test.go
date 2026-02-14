@@ -2,7 +2,11 @@
 
 package metrix
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestCollectorStoreRetentionScenarios(t *testing.T) {
 	tests := map[string]struct {
@@ -75,15 +79,12 @@ func TestCollectorStoreRetentionScenarios(t *testing.T) {
 func collectorStoreViewForTest(t *testing.T, s CollectorStore) *storeView {
 	t.Helper()
 	v, ok := s.(*storeView)
-	if !ok {
-		t.Fatalf("unexpected collector store implementation: %T", s)
-	}
+	require.True(t, ok, "unexpected collector store implementation: %T", s)
 	return v
 }
 
 func mustNoValue(t *testing.T, r Reader, name string, labels Labels) {
 	t.Helper()
-	if _, ok := r.Value(name, labels); ok {
-		t.Fatalf("expected no value for %s labels=%v", name, labels)
-	}
+	_, ok := r.Value(name, labels)
+	require.False(t, ok, "expected no value for %s labels=%v", name, labels)
 }
