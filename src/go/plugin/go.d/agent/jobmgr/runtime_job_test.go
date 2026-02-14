@@ -1,0 +1,225 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package jobmgr
+
+import (
+	"bytes"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
+)
+
+func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"registration applies defaults and stores normalized emit env": {
+			run: func(t *testing.T) {
+				m := New()
+				m.PluginName = "go.d"
+				store := metrix.NewRuntimeStore()
+				err := m.RegisterRuntimeComponent(RuntimeComponentConfig{
+					Name:         "chartengine",
+					Store:        store,
+					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
+				})
+				require.NoError(t, err)
+
+				specs := m.runtimeComponents.snapshot()
+				require.Len(t, specs, 1)
+
+				spec := specs[0]
+				assert.Equal(t, "chartengine", spec.Name)
+				assert.Equal(t, 1, spec.UpdateEvery)
+				assert.Equal(t, "go.d.internal.chartengine", spec.EmitEnv.TypeID)
+				assert.Equal(t, "go.d", spec.EmitEnv.Plugin)
+				assert.Equal(t, "internal", spec.EmitEnv.Module)
+				assert.Equal(t, "chartengine", spec.EmitEnv.JobName)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
+func TestRuntimeMetricsJobScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"runtime job respects component cadence and emits on scheduled tick": {
+			run: func(t *testing.T) {
+				reg := newRuntimeComponentRegistry()
+				store := metrix.NewRuntimeStore()
+				g := store.Write().StatefulMeter("component").Gauge("load")
+				g.Set(5)
+
+				reg.upsert(runtimeComponentSpec{
+					Name:         "component",
+					Store:        store,
+					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
+					UpdateEvery:  2,
+					EmitEnv: chartemit.EmitEnv{
+						TypeID:      "go.d.internal.component",
+						UpdateEvery: 2,
+						Plugin:      "go.d",
+						Module:      "internal",
+						JobName:     "component",
+					},
+				})
+
+				var out bytes.Buffer
+				job := newRuntimeMetricsJob(&out, reg, nil)
+
+				job.runOnce(1)
+				assert.Equal(t, 0, out.Len())
+
+				job.runOnce(2)
+				result := out.String()
+				assert.Contains(t, result, "CHART")
+				assert.Contains(t, result, "BEGIN")
+			},
+		},
+		"runtime job observes all visible runtime series (not only latest seq)": {
+			run: func(t *testing.T) {
+				reg := newRuntimeComponentRegistry()
+				store := metrix.NewRuntimeStore()
+				vec := store.Write().StatefulMeter("component").GaugeVec("load", []string{"id"})
+				vec.WithLabelValues("a").Set(1)
+				vec.WithLabelValues("b").Set(2)
+
+				reg.upsert(runtimeComponentSpec{
+					Name:         "component",
+					Store:        store,
+					TemplateYAML: []byte(runtimeDynamicDimTemplateYAML()),
+					UpdateEvery:  1,
+					EmitEnv: chartemit.EmitEnv{
+						TypeID:      "go.d.internal.component",
+						UpdateEvery: 1,
+						Plugin:      "go.d",
+						Module:      "internal",
+						JobName:     "component",
+					},
+				})
+
+				var out bytes.Buffer
+				job := newRuntimeMetricsJob(&out, reg, nil)
+				job.runOnce(1)
+
+				result := out.String()
+				assert.Contains(t, result, "DIMENSION 'a' 'a' 'absolute'")
+				assert.Contains(t, result, "DIMENSION 'b' 'b' 'absolute'")
+			},
+		},
+		"runtime job emits obsolete chart when component is removed": {
+			run: func(t *testing.T) {
+				reg := newRuntimeComponentRegistry()
+				store := metrix.NewRuntimeStore()
+				store.Write().StatefulMeter("component").Gauge("load").Set(3)
+
+				reg.upsert(runtimeComponentSpec{
+					Name:         "component",
+					Store:        store,
+					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
+					UpdateEvery:  1,
+					EmitEnv: chartemit.EmitEnv{
+						TypeID:      "go.d.internal.component",
+						UpdateEvery: 1,
+						Plugin:      "go.d",
+						Module:      "internal",
+						JobName:     "component",
+					},
+				})
+
+				var out bytes.Buffer
+				job := newRuntimeMetricsJob(&out, reg, nil)
+				job.runOnce(1)
+				require.Contains(t, out.String(), "CHART 'go.d.internal.component.component_load'")
+
+				out.Reset()
+				reg.remove("component")
+				job.runOnce(2)
+				result := out.String()
+				assert.Contains(t, result, "CHART 'go.d.internal.component.component_load'")
+				assert.Contains(t, result, "'obsolete'")
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
+func TestRuntimeBootstrapScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"bootstrap registers chartengine producer component and ticking produces metrics": {
+			run: func(t *testing.T) {
+				m := New()
+				m.PluginName = "go.d"
+
+				m.bootstrapRuntimeComponents()
+				specs := m.runtimeComponents.snapshot()
+				require.Len(t, specs, 1)
+				assert.Equal(t, chartengineInternalComponentName, specs[0].Name)
+
+				m.tickRuntimeProducers()
+				value, ok := specs[0].Store.ReadRaw().Value("chartengine.build_calls_total", nil)
+				require.True(t, ok)
+				assert.GreaterOrEqual(t, value, float64(1))
+
+				// Idempotent bootstrap.
+				m.bootstrapRuntimeComponents()
+				assert.Len(t, m.runtimeProducers, 1)
+				assert.Len(t, m.runtimeComponents.snapshot(), 1)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
+func runtimeGaugeTemplateYAML() string {
+	return `
+version: v1
+groups:
+  - family: Runtime
+    metrics:
+      - component.load
+    charts:
+      - id: component_load
+        title: Component Load
+        context: component_load
+        units: load
+        dimensions:
+          - selector: component.load
+            name: value
+`
+}
+
+func runtimeDynamicDimTemplateYAML() string {
+	return `
+version: v1
+groups:
+  - family: Runtime
+    metrics:
+      - component.load
+    charts:
+      - id: component_load
+        title: Component Load
+        context: component_load
+        units: load
+        dimensions:
+          - selector: component.load
+            name_from_label: id
+`
+}

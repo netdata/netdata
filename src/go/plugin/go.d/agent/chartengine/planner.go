@@ -218,7 +218,8 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 		if firstErr != nil {
 			return
 		}
-		if meta.LastSeenSuccessSeq != ctx.collectMeta.LastSuccessSeq {
+		if e.state.cfg.seriesSelection == seriesSelectionLastSuccessOnly &&
+			meta.LastSeenSuccessSeq != ctx.collectMeta.LastSuccessSeq {
 			return
 		}
 
