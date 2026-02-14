@@ -51,6 +51,7 @@ func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 
 	e.mu.Lock()
 	e.state.program = compiled
+	e.state.matchIndex = buildMatchIndex(compiled.Charts())
 	// Template revision change resets routing/materialization internals.
 	e.state.routeCache = newRouteCache()
 	e.state.materialized = newMaterializedState()

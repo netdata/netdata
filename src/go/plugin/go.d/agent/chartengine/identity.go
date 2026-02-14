@@ -10,6 +10,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 )
 
+type instanceLabelValue struct {
+	Key   string
+	Value string
+}
+
 func renderChartInstanceID(identity program.ChartIdentity, labels map[string]string) (string, bool, error) {
 	baseID, ok, err := renderTemplate(identity.IDTemplate, labels)
 	if err != nil {
@@ -86,8 +91,27 @@ func applyTemplateTransform(value string, transform program.TemplateTransform) (
 }
 
 func renderInstanceSuffix(identity program.ChartIdentity, labels map[string]string) (string, bool, error) {
-	if len(identity.InstanceByLabels) == 0 {
+	values, ok, err := resolveInstanceLabelValues(identity, labels)
+	if err != nil {
+		return "", false, err
+	}
+	if !ok {
+		return "", false, nil
+	}
+	if len(values) == 0 {
 		return "", true, nil
+	}
+
+	parts := make([]string, 0, len(values))
+	for _, item := range values {
+		parts = append(parts, sanitizeIDComponent(item.Value))
+	}
+	return "_" + strings.Join(parts, "_"), true, nil
+}
+
+func resolveInstanceLabelValues(identity program.ChartIdentity, labels map[string]string) ([]instanceLabelValue, bool, error) {
+	if len(identity.InstanceByLabels) == 0 {
+		return nil, true, nil
 	}
 
 	placeholderSet := make(map[string]struct{}, len(identity.IDPlaceholders))
@@ -119,7 +143,7 @@ func renderInstanceSuffix(identity program.ChartIdentity, labels map[string]stri
 			}
 			if _, ok := labels[token.Key]; !ok {
 				// Explicit instance key is required to materialize one instance.
-				return "", false, nil
+				return nil, false, nil
 			}
 			seenKeys[token.Key] = struct{}{}
 			keys = append(keys, token.Key)
@@ -147,19 +171,18 @@ func renderInstanceSuffix(identity program.ChartIdentity, labels map[string]stri
 		}
 	}
 
-	if len(keys) == 0 {
-		return "", true, nil
-	}
-
-	values := make([]string, 0, len(keys))
+	out := make([]instanceLabelValue, 0, len(keys))
 	for _, key := range keys {
 		value, ok := labels[key]
 		if !ok || strings.TrimSpace(value) == "" {
-			return "", false, nil
+			return nil, false, nil
 		}
-		values = append(values, sanitizeIDComponent(value))
+		out = append(out, instanceLabelValue{
+			Key:   key,
+			Value: value,
+		})
 	}
-	return "_" + strings.Join(values, "_"), true, nil
+	return out, true, nil
 }
 
 func sanitizeIDComponent(value string) string {

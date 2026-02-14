@@ -100,3 +100,102 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 	require.NotEqual(t, -1, beginPos)
 	assert.Less(t, createPos, beginPos)
 }
+
+func TestApplyPlanEmitsOneChartPerCreateDimensionBatch(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := program.ChartMeta{
+		Title:     "NIC traffic",
+		Family:    "Net",
+		Context:   "nic_traffic",
+		Units:     "bytes/s",
+		Algorithm: program.AlgorithmIncremental,
+		Type:      program.ChartTypeLine,
+		Priority:  1,
+	}
+
+	plan := Plan{
+		Actions: []EngineAction{
+			CreateChartAction{
+				ChartTemplateID: "g0c0",
+				ChartID:         "win_nic_traffic_eth0",
+				Meta:            meta,
+			},
+			CreateDimensionAction{
+				ChartID:    "win_nic_traffic_eth0",
+				ChartMeta:  meta,
+				Name:       "received",
+				Algorithm:  program.AlgorithmIncremental,
+				Multiplier: 1,
+				Divisor:    1,
+			},
+			CreateDimensionAction{
+				ChartID:    "win_nic_traffic_eth0",
+				ChartMeta:  meta,
+				Name:       "sent",
+				Algorithm:  program.AlgorithmIncremental,
+				Multiplier: 1,
+				Divisor:    1,
+			},
+		},
+	}
+
+	err := ApplyPlan(api, plan, EmitEnv{
+		TypeID:      "collector.job",
+		UpdateEvery: 5,
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Equal(t, 1, strings.Count(out, "CHART 'collector.job.win_nic_traffic_eth0'"))
+	assert.Equal(t, 2, strings.Count(out, "DIMENSION '"))
+}
+
+func TestApplyPlanChartLabelsOverrideJobLabels(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := program.ChartMeta{
+		Title:     "NIC traffic",
+		Family:    "Net",
+		Context:   "nic_traffic",
+		Units:     "bytes/s",
+		Algorithm: program.AlgorithmIncremental,
+		Type:      program.ChartTypeLine,
+		Priority:  1,
+	}
+	plan := Plan{
+		Actions: []EngineAction{
+			CreateChartAction{
+				ChartTemplateID: "g0c0",
+				ChartID:         "win_nic_traffic_eth0",
+				Meta:            meta,
+				Labels: map[string]string{
+					"instance":     "eth0",
+					"interface":    "ethernet",
+					"_collect_job": "ignored",
+				},
+			},
+		},
+	}
+
+	err := ApplyPlan(api, plan, EmitEnv{
+		TypeID:      "collector.job",
+		UpdateEvery: 5,
+		JobName:     "job01",
+		JobLabels: map[string]string{
+			"instance": "localhost",
+			"owner":    "ops",
+		},
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, out, "CLABEL 'owner' 'ops' '2'")
+	assert.Contains(t, out, "CLABEL 'instance' 'eth0' '1'")
+	assert.Contains(t, out, "CLABEL 'interface' 'ethernet' '1'")
+	assert.Contains(t, out, "CLABEL '_collect_job' 'job01' '1'")
+	assert.NotContains(t, out, "CLABEL 'instance' 'localhost' '2'")
+	assert.NotContains(t, out, "CLABEL '_collect_job' 'ignored' '1'")
+}

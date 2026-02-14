@@ -25,6 +25,7 @@ type CreateChartAction struct {
 	ChartTemplateID string
 	ChartID         string
 	Meta            program.ChartMeta
+	Labels          map[string]string
 }
 
 func (a CreateChartAction) Kind() ActionKind { return ActionCreateChart }
