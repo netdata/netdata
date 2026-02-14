@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
@@ -74,6 +75,13 @@ type planBuildContext struct {
 	seenInfer   map[string]struct{}
 	chartsByID  map[string]*chartState
 	chartOwners map[string]string
+
+	routeCacheHits       uint64
+	routeCacheMisses     uint64
+	seriesScanned        uint64
+	seriesMatched        uint64
+	seriesUnmatched      uint64
+	seriesAutogenMatched uint64
 }
 
 // BuildPlan builds a minimal plan snapshot from the provided reader.
@@ -89,6 +97,9 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	if reader == nil {
 		return Plan{}, fmt.Errorf("chartengine: nil metrics reader")
 	}
+	sample := planRuntimeSample{startedAt: time.Now()}
+	defer func() { e.observeBuildSample(sample) }()
+
 	out := Plan{
 		Actions:            make([]EngineAction, 0),
 		InferredDimensions: make([]InferredDimension, 0),
@@ -96,6 +107,8 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	collectMeta := reader.CollectMeta()
 	// Failed attempt must not trigger lifecycle transitions.
 	if collectMeta.LastAttemptStatus != metrix.CollectStatusSuccess {
+		sample.skippedFailed = true
+		e.logDebugf("chartengine build skipped: collect status=%d", collectMeta.LastAttemptStatus)
 		return out, nil
 	}
 
@@ -104,9 +117,13 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 
 	ctx, err := e.preparePlanBuildContext(reader, &out, collectMeta)
 	if err != nil {
+		sample.buildErr = true
+		e.logWarningf("chartengine build prepare failed: %v", err)
 		return Plan{}, err
 	}
 	if err := e.scanPlanSeries(ctx); err != nil {
+		sample.buildErr = true
+		e.logWarningf("chartengine build scan failed: %v", err)
 		return Plan{}, err
 	}
 
@@ -121,6 +138,8 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 		out.Actions = append(out.Actions, action)
 	}
 	if err := e.materializePlanCharts(ctx); err != nil {
+		sample.buildErr = true
+		e.logWarningf("chartengine build materialization failed: %v", err)
 		return Plan{}, err
 	}
 	removeDims, removeCharts := collectExpiryRemovals(ctx.collectMeta.LastSuccessSeq, &e.state.materialized)
@@ -131,6 +150,23 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 		out.Actions = append(out.Actions, action)
 	}
 	sortInferredDimensions(out.InferredDimensions)
+
+	sample.routeCacheHits = ctx.routeCacheHits
+	sample.routeCacheMisses = ctx.routeCacheMisses
+	sample.seriesScanned = ctx.seriesScanned
+	sample.seriesMatched = ctx.seriesMatched
+	sample.seriesUnmatched = ctx.seriesUnmatched
+	sample.seriesAutogenMatched = ctx.seriesAutogenMatched
+	sample.planChartInstances = len(ctx.chartsByID)
+	sample.planInferredDimensions = len(out.InferredDimensions)
+
+	actionCounts := actionKindCounts(out.Actions)
+	sample.actionCreateChart = actionCounts.actionCreateChart
+	sample.actionCreateDimension = actionCounts.actionCreateDimension
+	sample.actionUpdateChart = actionCounts.actionUpdateChart
+	sample.actionRemoveDimension = actionCounts.actionRemoveDimension
+	sample.actionRemoveChart = actionCounts.actionRemoveChart
+
 	return out, nil
 }
 
@@ -178,6 +214,7 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 	var firstErr error
 	ctx.flat.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, v metrix.SampleValue) {
 		ctx.aliveSeries[identity.ID] = struct{}{}
+		ctx.seriesScanned++
 		if firstErr != nil {
 			return
 		}
@@ -200,8 +237,10 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 		}
 		if hit {
 			e.addRouteCacheHit()
+			ctx.routeCacheHits++
 		} else {
 			e.addRouteCacheMiss()
+			ctx.routeCacheMisses++
 		}
 		if len(routes) == 0 {
 			autoRoutes, ok, err := e.resolveAutogenRoute(name, labels, meta)
@@ -211,7 +250,14 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 			}
 			if ok {
 				routes = autoRoutes
+				ctx.seriesAutogenMatched++
+				ctx.seriesMatched++
+			} else {
+				ctx.seriesUnmatched++
+				return
 			}
+		} else {
+			ctx.seriesMatched++
 		}
 
 		for _, route := range routes {

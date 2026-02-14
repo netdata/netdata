@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/charttpl"
 )
@@ -28,11 +29,20 @@ func New(opts ...Option) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	runtimeStore := cfg.runtimeStore
+	if !cfg.runtimeStoreSet {
+		runtimeStore = metrix.NewRuntimeStore()
+	}
+
 	return &Engine{
 		state: engineState{
 			cfg:          cfg,
 			routeCache:   newRouteCache(),
 			materialized: newMaterializedState(),
+			runtimeStore: runtimeStore,
+			runtimeStats: newRuntimeMetrics(runtimeStore),
+			log:          cfg.log,
 		},
 	}, nil
 }
@@ -45,6 +55,7 @@ func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 
 	compiled, err := Compile(spec, revision)
 	if err != nil {
+		e.logWarningf("chartengine load failed revision=%d: %v", revision, err)
 		return err
 	}
 
@@ -55,6 +66,7 @@ func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 	e.state.routeCache = newRouteCache()
 	e.state.materialized = newMaterializedState()
 	e.mu.Unlock()
+	e.logInfof("chartengine program loaded revision=%d charts=%d metrics=%d", revision, len(compiled.Charts()), len(compiled.MetricNames()))
 	return nil
 }
 

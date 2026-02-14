@@ -2,10 +2,18 @@
 
 package chartengine
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+)
 
 type engineConfig struct {
-	autogen AutogenPolicy
+	autogen         AutogenPolicy
+	runtimeStore    metrix.RuntimeStore
+	runtimeStoreSet bool
+	log             *logger.Logger
 }
 
 // Option mutates engine configuration at construction time.
@@ -50,6 +58,24 @@ func WithAutogenPolicy(policy AutogenPolicy) Option {
 		}
 		policy.MaxTypeIDLen = maxLen
 		cfg.autogen = policy
+		return nil
+	}
+}
+
+// WithRuntimeStore configures internal chartengine runtime metrics store.
+// Passing nil disables chartengine self-metrics.
+func WithRuntimeStore(store metrix.RuntimeStore) Option {
+	return func(cfg *engineConfig) error {
+		cfg.runtimeStore = store
+		cfg.runtimeStoreSet = true
+		return nil
+	}
+}
+
+// WithLogger configures chartengine logger.
+func WithLogger(l *logger.Logger) Option {
+	return func(cfg *engineConfig) error {
+		cfg.log = l
 		return nil
 	}
 }
