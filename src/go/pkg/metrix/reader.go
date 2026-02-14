@@ -210,6 +210,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		key := makeSeriesKey(name, labelsKey)
 		dst.series[key] = &committedSeries{
 			id:        SeriesID(key),
+			hash64:    seriesIDHash(SeriesID(key)),
 			key:       key,
 			name:      name,
 			labels:    labels,
@@ -242,6 +243,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		infKey := makeSeriesKey(infName, infLabelsKey)
 		dst.series[infKey] = &committedSeries{
 			id:        SeriesID(infKey),
+			hash64:    seriesIDHash(SeriesID(infKey)),
 			key:       infKey,
 			name:      infName,
 			labels:    infLabels,
@@ -293,6 +295,7 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Lab
 	key := makeSeriesKey(name, labelsKey)
 	dst.series[key] = &committedSeries{
 		id:        SeriesID(key),
+		hash64:    seriesIDHash(SeriesID(key)),
 		key:       key,
 		name:      name,
 		labels:    items,
@@ -349,6 +352,7 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 		key := makeSeriesKey(src.name, labelsKey)
 		dst.series[key] = &committedSeries{
 			id:        SeriesID(key),
+			hash64:    seriesIDHash(SeriesID(key)),
 			key:       key,
 			name:      src.name,
 			labels:    labels,
@@ -397,6 +401,7 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 		key := makeSeriesKey(src.name, labelsKey)
 		dst.series[key] = &committedSeries{
 			id:        SeriesID(key),
+			hash64:    seriesIDHash(SeriesID(key)),
 			key:       key,
 			name:      src.name,
 			labels:    labels,
@@ -437,6 +442,12 @@ func (r *storeReader) ForEachByName(name string, fn func(labels LabelView, v Sam
 }
 
 func (r *storeReader) ForEachSeries(fn func(name string, labels LabelView, v SampleValue)) {
+	r.ForEachSeriesIdentity(func(_ SeriesIdentity, name string, labels LabelView, v SampleValue) {
+		fn(name, labels, v)
+	})
+}
+
+func (r *storeReader) ForEachSeriesIdentity(fn func(identity SeriesIdentity, name string, labels LabelView, v SampleValue)) {
 	index := r.byNameIndex()
 	names := make([]string, 0, len(index))
 	for name := range index {
@@ -446,7 +457,14 @@ func (r *storeReader) ForEachSeries(fn func(name string, labels LabelView, v Sam
 	for _, name := range names {
 		for _, s := range index[name] {
 			if r.visible(s) {
-				fn(name, labelView{items: s.labels}, s.value)
+				hash := s.hash64
+				if hash == 0 {
+					hash = seriesIDHash(s.id)
+				}
+				fn(SeriesIdentity{
+					ID:     s.id,
+					Hash64: hash,
+				}, name, labelView{items: s.labels}, s.value)
 			}
 		}
 	}

@@ -326,6 +326,7 @@ func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name string, label
 	}
 	series = &committedSeries{
 		id:        SeriesID(key),
+		hash64:    seriesIDHash(SeriesID(key)),
 		key:       key,
 		name:      name,
 		labels:    append([]Label(nil), labels...),

@@ -23,6 +23,12 @@ type LabelSet struct {
 // SeriesID identifies one metric series in canonical storage.
 type SeriesID string
 
+// SeriesIdentity is the stable per-series identity handle used by readers/engines.
+type SeriesIdentity struct {
+	ID     SeriesID
+	Hash64 uint64
+}
+
 type CollectStatus uint8
 
 const (
