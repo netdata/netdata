@@ -5,7 +5,7 @@ use crate::file::{
     EntryItemsType,
     cursor::{JournalCursor, Location},
     file::{EntryDataIterator, FieldDataIterator, FieldIterator, JournalFile},
-    filter::{JournalFilter, LogicalOp},
+    filter::{FilterExpr, JournalFilter, LogicalOp},
     object::{DataObject, FieldObject, HashableObject},
     offset_array::Direction,
     value_guard::ValueGuard,
@@ -75,6 +75,26 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
         }
 
         self.cursor.step(journal_file, direction)
+    }
+
+    /// Build the pending filter expression (if any) and return it.
+    ///
+    /// After `add_match` / `add_disjunction` calls, the filter is stored inside
+    /// the reader in an unresolved form.  This method resolves it against
+    /// `journal_file`'s hash table and returns the resulting [`FilterExpr`].
+    /// The internal pending filter is consumed; subsequent calls return `Ok(None)`
+    /// until new matches are added.
+    ///
+    /// This is useful when the caller wants to drive iteration through
+    /// [`JournalCursor`] directly rather than through [`JournalReader::step`].
+    pub fn build_filter(&mut self, journal_file: &JournalFile<M>) -> Result<Option<FilterExpr>> {
+        if let Some(filter) = self.filter.as_mut() {
+            let expr = filter.build(journal_file)?;
+            self.filter = None;
+            Ok(Some(expr))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Adds a match filter for the given field=value pair.
@@ -212,6 +232,25 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     pub fn entry_data_restart(&mut self) {
         self.drop_guards();
         self.entry_data_iterator = None;
+    }
+
+    pub fn entry_data_enumerate(
+        &mut self,
+        journal_file: &'a JournalFile<M>,
+    ) -> Result<Option<&ValueGuard<'_, DataObject<&'a [u8]>>>> {
+        self.drop_guards();
+
+        if self.entry_data_iterator.is_none() {
+            let entry_offset = self.cursor.position()?;
+            self.entry_data_iterator = Some(journal_file.entry_data_objects(entry_offset)?);
+        }
+
+        if let Some(iter) = &mut self.entry_data_iterator {
+            self.data_guard = iter.next().transpose()?;
+            Ok(self.data_guard.as_ref())
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn entry_data_offsets(
