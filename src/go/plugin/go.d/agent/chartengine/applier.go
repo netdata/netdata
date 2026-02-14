@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	labelSourceAuto = 1
-	labelSourceConf = 2
+	labelSourceAuto         = 1
+	labelSourceConf         = 2
+	collectJobReservedLabel = "_collect_job"
 )
 
 // EmitEnv carries runtime context for translating engine actions to Netdata wire.
@@ -40,29 +41,62 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	}
 
 	// 1) Create phase.
+	createCharts := make(map[string]CreateChartAction)
+	createDimsByChart := make(map[string][]CreateDimensionAction)
 	for _, action := range plan.Actions {
-		createChart, ok := action.(CreateChartAction)
-		if !ok {
-			continue
+		switch v := action.(type) {
+		case CreateChartAction:
+			createCharts[v.ChartID] = v
+		case CreateDimensionAction:
+			createDimsByChart[v.ChartID] = append(createDimsByChart[v.ChartID], v)
 		}
-		emitChart(api, env, createChart.ChartID, createChart.Meta, false)
-		emitChartLabels(api, env)
-		api.CLABELCOMMIT()
 	}
-	for _, action := range plan.Actions {
-		createDim, ok := action.(CreateDimensionAction)
-		if !ok {
+
+	createdChartIDs := make([]string, 0, len(createCharts))
+	for chartID := range createCharts {
+		createdChartIDs = append(createdChartIDs, chartID)
+	}
+	sort.Strings(createdChartIDs)
+	for _, chartID := range createdChartIDs {
+		createChart := createCharts[chartID]
+		emitChart(api, env, createChart.ChartID, createChart.Meta, false)
+		emitChartLabels(api, env, createChart.Labels)
+		api.CLABELCOMMIT()
+		dims := createDimsByChart[chartID]
+		for _, dim := range dims {
+			api.DIMENSION(netdataapi.DimensionOpts{
+				ID:         dim.Name,
+				Name:       dim.Name,
+				Algorithm:  string(dim.Algorithm),
+				Multiplier: handleZero(dim.Multiplier),
+				Divisor:    handleZero(dim.Divisor),
+				Options:    makeDimensionOptions(dim.Hidden, false),
+			})
+		}
+		delete(createDimsByChart, chartID)
+	}
+
+	remainingChartIDs := make([]string, 0, len(createDimsByChart))
+	for chartID := range createDimsByChart {
+		remainingChartIDs = append(remainingChartIDs, chartID)
+	}
+	sort.Strings(remainingChartIDs)
+	for _, chartID := range remainingChartIDs {
+		dims := createDimsByChart[chartID]
+		if len(dims) == 0 {
 			continue
 		}
-		emitChart(api, env, createDim.ChartID, createDim.ChartMeta, false)
-		api.DIMENSION(netdataapi.DimensionOpts{
-			ID:         createDim.Name,
-			Name:       createDim.Name,
-			Algorithm:  string(createDim.Algorithm),
-			Multiplier: handleZero(createDim.Multiplier),
-			Divisor:    handleZero(createDim.Divisor),
-			Options:    makeDimensionOptions(createDim.Hidden, false),
-		})
+		emitChart(api, env, chartID, dims[0].ChartMeta, false)
+		for _, dim := range dims {
+			api.DIMENSION(netdataapi.DimensionOpts{
+				ID:         dim.Name,
+				Name:       dim.Name,
+				Algorithm:  string(dim.Algorithm),
+				Multiplier: handleZero(dim.Multiplier),
+				Divisor:    handleZero(dim.Divisor),
+				Options:    makeDimensionOptions(dim.Hidden, false),
+			})
+		}
 	}
 
 	// 2) Update phase.
@@ -135,17 +169,35 @@ func emitChart(api *netdataapi.API, env EmitEnv, chartID string, meta program.Ch
 	})
 }
 
-func emitChartLabels(api *netdataapi.API, env EmitEnv) {
+func emitChartLabels(api *netdataapi.API, env EmitEnv, chartLabels map[string]string) {
+	chartKeys := make([]string, 0, len(chartLabels))
+	for key := range chartLabels {
+		if strings.TrimSpace(key) == "" || key == collectJobReservedLabel {
+			continue
+		}
+		chartKeys = append(chartKeys, key)
+	}
+	sort.Strings(chartKeys)
+
 	keys := make([]string, 0, len(env.JobLabels))
 	for key := range env.JobLabels {
+		if _, overridden := chartLabels[key]; overridden {
+			continue
+		}
+		if key == collectJobReservedLabel {
+			continue
+		}
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
 		api.CLABEL(key, env.JobLabels[key], labelSourceConf)
 	}
+	for _, key := range chartKeys {
+		api.CLABEL(key, chartLabels[key], labelSourceAuto)
+	}
 	if strings.TrimSpace(env.JobName) != "" {
-		api.CLABEL("_collect_job", env.JobName, labelSourceAuto)
+		api.CLABEL(collectJobReservedLabel, env.JobName, labelSourceAuto)
 	}
 }
 

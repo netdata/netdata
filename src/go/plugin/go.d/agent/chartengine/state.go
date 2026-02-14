@@ -7,6 +7,7 @@ import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/inte
 type engineState struct {
 	cfg          engineConfig
 	program      *program.Program
+	matchIndex   matchIndex
 	routeCache   *routeCache
 	materialized materializedState
 	stats        engineStats

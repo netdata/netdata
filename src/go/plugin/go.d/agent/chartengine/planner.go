@@ -46,9 +46,19 @@ type chartState struct {
 	chartID    string
 	meta       program.ChartMeta
 	lifecycle  program.LifecyclePolicy
+	labels     *chartLabelAccumulator
 	values     map[string]metrix.SampleValue
 	dimensions map[string]dimensionState
 	dynamicSet map[string]struct{}
+}
+
+type chartLabelAccumulator struct {
+	mode        program.PromotionMode
+	promoteKeys map[string]struct{}
+	excluded    map[string]struct{}
+	instance    map[string]string
+	selected    map[string]string
+	initialized bool
 }
 
 // BuildPlan builds a minimal plan snapshot from the provided reader.
@@ -88,16 +98,26 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	}
 
 	flat := reader.Flatten()
+	// NOTE: reader used for planning should expose all retained series identity
+	// membership (typically ReadRaw() at JobV2 seam). retainSeries() below uses
+	// this set to keep/drop route-cache entries in sync with metrix retention.
+	aliveSeries := make(map[metrix.SeriesID]struct{})
 	seenInfer := make(map[string]struct{})
 	chartsByID := make(map[string]*chartState)
 	chartOwners := make(map[string]string, len(e.state.materialized.charts))
 	for chartID, matChart := range e.state.materialized.charts {
 		chartOwners[chartID] = matChart.templateID
 	}
-	index := buildMatchIndex(prog.Charts())
+	index := e.state.matchIndex
+	if index.chartsByID == nil {
+		index = buildMatchIndex(prog.Charts())
+		e.state.matchIndex = index
+	}
 	var firstErr error
 
 	flat.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, name string, labels metrix.LabelView, v metrix.SampleValue) {
+		aliveSeries[identity.ID] = struct{}{}
+
 		if firstErr != nil {
 			return
 		}
@@ -111,7 +131,16 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 			return
 		}
 
-		routes, hit, err := e.resolveSeriesRoutes(cache, identity, name, labels, labelsMap, meta, index, prog.Revision())
+		routes, hit, err := e.resolveSeriesRoutes(
+			cache,
+			identity,
+			name,
+			labels,
+			labelsMap,
+			meta,
+			index,
+			prog.Revision(),
+		)
 		if err != nil {
 			firstErr = err
 			return
@@ -146,6 +175,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 					chartID:    route.ChartID,
 					meta:       chart.Meta,
 					lifecycle:  chart.Lifecycle,
+					labels:     newChartLabelAccumulator(chart),
 					values:     make(map[string]metrix.SampleValue),
 					dimensions: make(map[string]dimensionState),
 					dynamicSet: make(map[string]struct{}),
@@ -172,6 +202,10 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 			}
 
 			cs.values[route.DimensionName] += v
+			if err := cs.labels.observe(chart.Identity, labelsMap, route.DimensionKeyLabel); err != nil {
+				firstErr = err
+				return
+			}
 
 			if route.Inferred {
 				key := fmt.Sprintf("%s\xff%d\xff%s", route.ChartTemplateID, route.DimensionIndex, route.DimensionName)
@@ -189,6 +223,8 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	if firstErr != nil {
 		return Plan{}, firstErr
 	}
+	// Route-cache lifecycle follows metrix snapshot membership.
+	cache.retainSeries(aliveSeries)
 
 	removeByCapDims, removeByCapCharts := enforceLifecycleCaps(collectMeta.LastSuccessSeq, chartsByID, &e.state.materialized)
 	for _, action := range removeByCapDims {
@@ -211,10 +247,15 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 		cs := chartsByID[chartID]
 		matChart, chartCreated := e.state.materialized.ensureChart(cs.chartID, cs.templateID, cs.meta, cs.lifecycle)
 		if chartCreated {
+			chartLabels, err := cs.labels.materialize()
+			if err != nil {
+				return Plan{}, err
+			}
 			out.Actions = append(out.Actions, CreateChartAction{
 				ChartTemplateID: cs.templateID,
 				ChartID:         cs.chartID,
 				Meta:            cs.meta,
+				Labels:          chartLabels,
 			})
 		}
 		matChart.lastSeenSuccessSeq = collectMeta.LastSuccessSeq
@@ -291,39 +332,39 @@ func BuildPlan(engine *Engine, reader metrix.Reader) (Plan, error) {
 	return engine.BuildPlan(reader)
 }
 
-func resolveDimensionName(dim program.Dimension, metricName string, labels metrix.LabelView, meta metrix.SeriesMeta) (string, bool, error) {
+func resolveDimensionName(dim program.Dimension, metricName string, labels metrix.LabelView, meta metrix.SeriesMeta) (string, string, bool, error) {
 	if dim.InferNameFromSeriesMeta {
 		labelKey, ok, err := inferDimensionLabelKey(metricName, meta)
 		if err != nil {
-			return "", false, err
+			return "", "", false, err
 		}
 		if !ok {
-			return "", false, nil
+			return "", "", false, nil
 		}
 		value, ok := labels.Get(labelKey)
 		if !ok || strings.TrimSpace(value) == "" {
-			return "", false, nil
+			return "", "", false, nil
 		}
-		return value, true, nil
+		return value, labelKey, true, nil
 	}
 
 	if dim.NameFromLabel != "" {
 		value, ok := labels.Get(dim.NameFromLabel)
 		if !ok || strings.TrimSpace(value) == "" {
-			return "", false, nil
+			return "", "", false, nil
 		}
-		return value, true, nil
+		return value, dim.NameFromLabel, true, nil
 	}
 
 	if dim.NameTemplate.Raw != "" {
 		// Full placeholder template rendering is added in a later planner step.
 		if dim.NameTemplate.IsDynamic() {
-			return "", false, fmt.Errorf("chartengine: dynamic name template rendering is not implemented yet")
+			return "", "", false, fmt.Errorf("chartengine: dynamic name template rendering is not implemented yet")
 		}
-		return dim.NameTemplate.Raw, true, nil
+		return dim.NameTemplate.Raw, "", true, nil
 	}
 
-	return "", false, nil
+	return "", "", false, nil
 }
 
 func inferDimensionLabelKey(metricName string, meta metrix.SeriesMeta) (string, bool, error) {
@@ -396,7 +437,14 @@ func enforceLifecycleCaps(
 	removeCharts := make([]RemoveChartAction, 0)
 	removeDims := make([]RemoveDimensionAction, 0)
 
-	for templateID, observedIDs := range observedByTemplate {
+	templateIDs := make([]string, 0, len(observedByTemplate))
+	for templateID := range observedByTemplate {
+		templateIDs = append(templateIDs, templateID)
+	}
+	sort.Strings(templateIDs)
+
+	for _, templateID := range templateIDs {
+		observedIDs := observedByTemplate[templateID]
 		var lifecycle program.LifecyclePolicy
 		if len(observedIDs) > 0 {
 			lifecycle = chartsByID[observedIDs[0]].lifecycle
@@ -673,4 +721,128 @@ func orderedDimensionNamesFromState(dimensions map[string]dimensionState, dynami
 	}
 	out = append(out, dynamicNames...)
 	return out
+}
+
+func newChartLabelAccumulator(chart program.Chart) *chartLabelAccumulator {
+	acc := &chartLabelAccumulator{
+		mode:        chart.Labels.Mode,
+		promoteKeys: make(map[string]struct{}, len(chart.Labels.PromoteKeys)),
+		excluded: make(map[string]struct{},
+			len(chart.Labels.Exclusions.SelectorConstrainedKeys)+len(chart.Labels.Exclusions.DimensionKeyLabels)),
+		instance: make(map[string]string),
+		selected: make(map[string]string),
+	}
+	for _, key := range chart.Labels.PromoteKeys {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		acc.promoteKeys[key] = struct{}{}
+	}
+	for _, key := range chart.Labels.Exclusions.SelectorConstrainedKeys {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		acc.excluded[key] = struct{}{}
+	}
+	for _, key := range chart.Labels.Exclusions.DimensionKeyLabels {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		acc.excluded[key] = struct{}{}
+	}
+	return acc
+}
+
+func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels map[string]string, dimensionKeyLabel string) error {
+	if a == nil || len(labels) == 0 {
+		return nil
+	}
+
+	if key := strings.TrimSpace(dimensionKeyLabel); key != "" {
+		a.excluded[key] = struct{}{}
+	}
+
+	instanceLabels, ok, err := resolveInstanceLabelValues(identity, labels)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+
+	instanceSet := make(map[string]struct{}, len(instanceLabels))
+	for _, label := range instanceLabels {
+		instanceSet[label.Key] = struct{}{}
+		if _, exists := a.instance[label.Key]; !exists {
+			a.instance[label.Key] = label.Value
+		}
+	}
+
+	eligible := make(map[string]string)
+	switch a.mode {
+	case program.PromotionModeExplicitIntersection:
+		for key := range a.promoteKeys {
+			if _, excluded := a.excluded[key]; excluded {
+				continue
+			}
+			if _, identityKey := instanceSet[key]; identityKey {
+				continue
+			}
+			value, ok := labels[key]
+			if !ok {
+				continue
+			}
+			eligible[key] = value
+		}
+	default:
+		for key, value := range labels {
+			if _, excluded := a.excluded[key]; excluded {
+				continue
+			}
+			if _, identityKey := instanceSet[key]; identityKey {
+				continue
+			}
+			eligible[key] = value
+		}
+	}
+
+	if !a.initialized {
+		for key, value := range eligible {
+			a.selected[key] = value
+		}
+		a.initialized = true
+		return nil
+	}
+
+	for key, value := range a.selected {
+		next, ok := eligible[key]
+		if !ok || next != value {
+			delete(a.selected, key)
+		}
+	}
+	return nil
+}
+
+func (a *chartLabelAccumulator) materialize() (map[string]string, error) {
+	if a == nil {
+		return nil, nil
+	}
+	out := make(map[string]string, len(a.instance)+len(a.selected))
+	for key, value := range a.instance {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		out[key] = value
+	}
+	for key, value := range a.selected {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		out[key] = value
+	}
+	delete(out, "_collect_job")
+	return out, nil
 }

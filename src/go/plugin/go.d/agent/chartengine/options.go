@@ -5,7 +5,7 @@ package chartengine
 import "fmt"
 
 type engineConfig struct {
-	// Reserved for phase-3 runtime knobs.
+	// Reserved for future engine-wide knobs.
 }
 
 // Option mutates engine configuration at construction time.

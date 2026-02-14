@@ -435,16 +435,20 @@ groups:
 	}, actionKinds(plan1.Actions))
 
 	createChartIDs := make([]string, 0, 2)
+	createChartLabels := make(map[string]map[string]string, 2)
 	updateChartIDs := make([]string, 0, 2)
 	for _, action := range plan1.Actions {
 		switch v := action.(type) {
 		case CreateChartAction:
 			createChartIDs = append(createChartIDs, v.ChartID)
+			createChartLabels[v.ChartID] = v.Labels
 		case UpdateChartAction:
 			updateChartIDs = append(updateChartIDs, v.ChartID)
 		}
 	}
 	assert.Equal(t, []string{"win_nic_traffic_eth0", "win_nic_traffic_eth1"}, createChartIDs)
+	assert.Equal(t, "eth0", createChartLabels["win_nic_traffic_eth0"]["nic"])
+	assert.Equal(t, "eth1", createChartLabels["win_nic_traffic_eth1"]["nic"])
 	assert.Equal(t, []string{"win_nic_traffic_eth0", "win_nic_traffic_eth1"}, updateChartIDs)
 
 	cc.BeginCycle()
@@ -593,6 +597,68 @@ groups:
 		ActionCreateDimension,
 		ActionUpdateChart,
 	}, actionKinds(plan3.Actions))
+}
+
+func TestBuildPlanComputesChartLabelsIntersectionAndExclusions(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Net
+    metrics:
+      - windows_net_bytes
+    charts:
+      - id: win_nic_traffic
+        title: NIC traffic
+        context: nic_traffic
+        units: bytes/s
+        instances:
+          by_labels: [nic]
+        dimensions:
+          - selector: windows_net_bytes{direction="in"}
+            name: received
+          - selector: windows_net_bytes{direction="out"}
+            name: sent
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("")
+	m := sm.Counter("windows_net_bytes")
+	in := sm.LabelSet(
+		metrix.Label{Key: "nic", Value: "eth0"},
+		metrix.Label{Key: "direction", Value: "in"},
+		metrix.Label{Key: "interface_type", Value: "ethernet"},
+	)
+	out := sm.LabelSet(
+		metrix.Label{Key: "nic", Value: "eth0"},
+		metrix.Label{Key: "direction", Value: "out"},
+		metrix.Label{Key: "interface_type", Value: "ethernet"},
+	)
+
+	cc.BeginCycle()
+	m.ObserveTotal(10, in)
+	m.ObserveTotal(20, out)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+
+	var create *CreateChartAction
+	for _, action := range plan.Actions {
+		if v, ok := action.(CreateChartAction); ok {
+			create = &v
+			break
+		}
+	}
+	require.NotNil(t, create)
+	assert.Equal(t, "eth0", create.Labels["nic"])
+	assert.Equal(t, "ethernet", create.Labels["interface_type"])
+	_, hasDirection := create.Labels["direction"]
+	assert.False(t, hasDirection)
 }
 
 func actionKinds(actions []EngineAction) []ActionKind {

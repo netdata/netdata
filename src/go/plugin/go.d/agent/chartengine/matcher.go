@@ -13,14 +13,15 @@ import (
 )
 
 type routeBinding struct {
-	ChartTemplateID string
-	ChartID         string
-	DimensionIndex  int
-	DimensionName   string
-	Algorithm       program.Algorithm
-	Hidden          bool
-	Static          bool
-	Inferred        bool
+	ChartTemplateID   string
+	ChartID           string
+	DimensionIndex    int
+	DimensionName     string
+	DimensionKeyLabel string
+	Algorithm         program.Algorithm
+	Hidden            bool
+	Static            bool
+	Inferred          bool
 }
 
 type routeCandidate struct {
@@ -70,6 +71,11 @@ type routeCacheEntry struct {
 }
 
 type routeCache struct {
+	// Intentionally unbounded:
+	// - cardinality/retention source-of-truth lives in metrix store ingress/retention,
+	// - chartengine must not introduce a second independent cap.
+	// Entries are pruned by retainSeries() each successful plan build using
+	// snapshot membership provided by planner.
 	mu      sync.RWMutex
 	buckets map[uint64][]routeCacheEntry
 }
@@ -119,6 +125,36 @@ func (c *routeCache) store(identity metrix.SeriesIdentity, revision uint64, bind
 	})
 }
 
+// retainSeries keeps cache entries only for series IDs currently present in the
+// metrics snapshot passed to planner. This makes cache lifecycle follow metrix
+// store retention/source-of-truth.
+func (c *routeCache) retainSeries(alive map[metrix.SeriesID]struct{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if len(alive) == 0 {
+		for hash := range c.buckets {
+			delete(c.buckets, hash)
+		}
+		return
+	}
+
+	for hash, bucket := range c.buckets {
+		kept := bucket[:0]
+		for i := range bucket {
+			if _, ok := alive[bucket[i].identity.ID]; !ok {
+				continue
+			}
+			kept = append(kept, bucket[i])
+		}
+		if len(kept) == 0 {
+			delete(c.buckets, hash)
+			continue
+		}
+		c.buckets[hash] = kept
+	}
+}
+
 func cloneRouteBindings(in []routeBinding) []routeBinding {
 	if len(in) == 0 {
 		return nil
@@ -166,7 +202,7 @@ func (e *Engine) resolveSeriesRoutes(
 		if !ok || strings.TrimSpace(chartID) == "" {
 			continue
 		}
-		dimName, ok, err := resolveDimensionName(candidate.dimension, name, labels, meta)
+		dimName, dimKeyLabel, ok, err := resolveDimensionName(candidate.dimension, name, labels, meta)
 		if err != nil {
 			return nil, false, err
 		}
@@ -174,14 +210,15 @@ func (e *Engine) resolveSeriesRoutes(
 			continue
 		}
 		routes = append(routes, routeBinding{
-			ChartTemplateID: candidate.chartTemplateID,
-			ChartID:         chartID,
-			DimensionIndex:  candidate.dimensionIndex,
-			DimensionName:   dimName,
-			Algorithm:       chart.Meta.Algorithm,
-			Hidden:          candidate.dimension.Hidden,
-			Static:          !candidate.dimension.Dynamic,
-			Inferred:        candidate.dimension.InferNameFromSeriesMeta,
+			ChartTemplateID:   candidate.chartTemplateID,
+			ChartID:           chartID,
+			DimensionIndex:    candidate.dimensionIndex,
+			DimensionName:     dimName,
+			DimensionKeyLabel: dimKeyLabel,
+			Algorithm:         chart.Meta.Algorithm,
+			Hidden:            candidate.dimension.Hidden,
+			Static:            !candidate.dimension.Dynamic,
+			Inferred:          candidate.dimension.InferNameFromSeriesMeta,
 		})
 	}
 
