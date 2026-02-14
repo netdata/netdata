@@ -91,7 +91,7 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 
 	metricKinds := make(map[string]bool)
 	for i := range chart.Dimensions {
-		compiledDim, err := compileDimension(chart.Dimensions[i])
+		compiledDim, err := compileDimension(chart.Dimensions[i], scope.metrics)
 		if err != nil {
 			return program.Chart{}, fmt.Errorf("dimension[%d]: %w", i, err)
 		}
@@ -192,13 +192,20 @@ type compiledDimension struct {
 	metricKinds      []string
 }
 
-func compileDimension(dim charttpl.Dimension) (compiledDimension, error) {
+func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}) (compiledDimension, error) {
 	compiledSel, err := selector.ParseCompiled(dim.Selector)
 	if err != nil {
 		return compiledDimension{}, fmt.Errorf("selector: %w", err)
 	}
 
 	meta := compiledSel.Meta()
+	if len(visibleMetrics) > 0 {
+		for _, metricName := range meta.MetricNames {
+			if _, ok := visibleMetrics[metricName]; !ok {
+				return compiledDimension{}, fmt.Errorf("selector: metric %q is not visible in current group scope", metricName)
+			}
+		}
+	}
 
 	name := strings.TrimSpace(dim.Name)
 	nameFromLabel := strings.TrimSpace(dim.NameFromLabel)

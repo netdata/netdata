@@ -110,6 +110,9 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 			continue
 		}
 		emitChart(api, env, chartID, dims[0].ChartMeta, false)
+		// Dimension-only chart creation path still needs chart labels and commit.
+		emitChartLabels(api, env, nil)
+		api.CLABELCOMMIT()
 		for _, dim := range dims {
 			emitDimension(api, dimensionEmission{
 				Name:       dim.Name,

@@ -166,3 +166,49 @@ func TestApplyPlanAutogenChartCreateUpdateRemove(t *testing.T) {
 	assert.Contains(t, out, "SET 'svc.errors_total' = 10")
 	assert.Contains(t, out, "obsolete")
 }
+
+func TestApplyPlanDimensionOnlyCreateEmitsLabelsAndCommit(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := chartengine.ChartMeta{
+		Title:     "Dimension-only chart",
+		Family:    "Runtime",
+		Context:   "runtime.dimension_only",
+		Units:     "1",
+		Algorithm: chartengine.AlgorithmAbsolute,
+		Type:      chartengine.ChartTypeLine,
+	}
+
+	plan := Plan{
+		Actions: []EngineAction{
+			chartengine.CreateDimensionAction{
+				ChartID:    "dimension_only_chart",
+				ChartMeta:  meta,
+				Name:       "value",
+				Algorithm:  chartengine.AlgorithmAbsolute,
+				Multiplier: 1,
+				Divisor:    1,
+			},
+		},
+	}
+
+	err := ApplyPlan(api, plan, EmitEnv{
+		TypeID:      "collector.job",
+		UpdateEvery: 1,
+		Plugin:      "go.d.plugin",
+		Module:      "runtime",
+		JobName:     "job01",
+		JobLabels: map[string]string{
+			"instance": "localhost",
+		},
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, out, "CHART 'collector.job.dimension_only_chart'")
+	assert.Contains(t, out, "CLABEL 'instance' 'localhost' '2'")
+	assert.Contains(t, out, "CLABEL '_collect_job' 'job01' '1'")
+	assert.Contains(t, out, "CLABEL_COMMIT")
+	assert.Contains(t, out, "DIMENSION 'value' 'value' 'absolute' '1' '1' ''")
+}
