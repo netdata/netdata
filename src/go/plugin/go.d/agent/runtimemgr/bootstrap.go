@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package jobmgr
+package runtimemgr
 
 import (
 	"fmt"
@@ -49,35 +49,35 @@ func (p *chartengineRuntimeProducer) Tick() error {
 	return err
 }
 
-func (m *Manager) bootstrapRuntimeComponents() {
-	if m == nil {
+func (s *Service) bootstrapDefaults() {
+	if s == nil {
 		return
 	}
-	if m.hasRuntimeProducer(chartengineInternalComponentName) {
+	if s.hasRuntimeProducer(chartengineInternalComponentName) {
 		return
 	}
 
-	engineLog := m.Logger.With(
+	engineLog := s.Logger.With(
 		slog.String("component", "runtime-producer"),
 		slog.String("runtime_component", chartengineInternalComponentName),
 	)
 	engine, err := chartengine.New(chartengine.WithLogger(engineLog))
 	if err != nil {
-		m.Warningf("bootstrap runtime component %q failed: %v", chartengineInternalComponentName, err)
+		s.Warningf("bootstrap runtime component %q failed: %v", chartengineInternalComponentName, err)
 		return
 	}
 	if err := engine.LoadYAML([]byte(internalRuntimeAutogenTemplateYAML), 1); err != nil {
-		m.Warningf("bootstrap runtime component %q template load failed: %v", chartengineInternalComponentName, err)
+		s.Warningf("bootstrap runtime component %q template load failed: %v", chartengineInternalComponentName, err)
 		return
 	}
 
-	pluginName := firstNotEmpty(m.PluginName, "go.d")
+	pluginName := firstNotEmpty(s.pluginName, "go.d")
 	typeID := fmt.Sprintf("%s.internal.%s", sanitizeName(pluginName), sanitizeName(chartengineInternalComponentName))
 	autogen := chartengine.AutogenPolicy{
 		Enabled: true,
 		TypeID:  typeID,
 	}
-	err = m.RegisterRuntimeComponent(RuntimeComponentConfig{
+	spec, err := normalizeComponent(ComponentConfig{
 		Name:         chartengineInternalComponentName,
 		Store:        engine.RuntimeStore(),
 		TemplateYAML: []byte(internalRuntimeAutogenTemplateYAML),
@@ -90,34 +90,21 @@ func (m *Manager) bootstrapRuntimeComponents() {
 		JobLabels: map[string]string{
 			"source": "chartengine",
 		},
-	})
+	}, pluginName)
 	if err != nil {
-		m.Warningf("bootstrap runtime component %q registration failed: %v", chartengineInternalComponentName, err)
+		s.Warningf("bootstrap runtime component %q registration failed: %v", chartengineInternalComponentName, err)
 		return
 	}
+	s.registry.upsert(spec)
 
-	m.runtimeProducers = append(m.runtimeProducers, &chartengineRuntimeProducer{
+	s.producers = append(s.producers, &chartengineRuntimeProducer{
 		name:   chartengineInternalComponentName,
 		engine: engine,
 	})
 }
 
-func (m *Manager) tickRuntimeProducers() {
-	if m == nil || len(m.runtimeProducers) == 0 {
-		return
-	}
-	for _, producer := range m.runtimeProducers {
-		if producer == nil {
-			continue
-		}
-		if err := producer.Tick(); err != nil {
-			m.Warningf("runtime producer %q tick failed: %v", producer.Name(), err)
-		}
-	}
-}
-
-func (m *Manager) hasRuntimeProducer(name string) bool {
-	for _, producer := range m.runtimeProducers {
+func (s *Service) hasRuntimeProducer(name string) bool {
+	for _, producer := range s.producers {
 		if producer == nil {
 			continue
 		}

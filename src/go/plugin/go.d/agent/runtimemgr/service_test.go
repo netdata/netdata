@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package jobmgr
+package runtimemgr
 
 import (
 	"bytes"
@@ -19,17 +19,18 @@ func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
 	}{
 		"registration applies defaults and stores normalized emit env": {
 			run: func(t *testing.T) {
-				m := New()
-				m.PluginName = "go.d"
+				svc := New(nil)
+				svc.pluginName = "go.d"
 				store := metrix.NewRuntimeStore()
-				err := m.RegisterRuntimeComponent(RuntimeComponentConfig{
+
+				err := svc.RegisterComponent(ComponentConfig{
 					Name:         "chartengine",
 					Store:        store,
 					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
 				})
 				require.NoError(t, err)
 
-				specs := m.runtimeComponents.snapshot()
+				specs := svc.registry.snapshot()
 				require.Len(t, specs, 1)
 
 				spec := specs[0]
@@ -54,12 +55,12 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 	}{
 		"runtime job respects component cadence and emits on scheduled tick": {
 			run: func(t *testing.T) {
-				reg := newRuntimeComponentRegistry()
+				reg := newComponentRegistry()
 				store := metrix.NewRuntimeStore()
 				g := store.Write().StatefulMeter("component").Gauge("load")
 				g.Set(5)
 
-				reg.upsert(runtimeComponentSpec{
+				reg.upsert(componentSpec{
 					Name:         "component",
 					Store:        store,
 					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
@@ -87,13 +88,13 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 		},
 		"runtime job observes all visible runtime series (not only latest seq)": {
 			run: func(t *testing.T) {
-				reg := newRuntimeComponentRegistry()
+				reg := newComponentRegistry()
 				store := metrix.NewRuntimeStore()
 				vec := store.Write().StatefulMeter("component").GaugeVec("load", []string{"id"})
 				vec.WithLabelValues("a").Set(1)
 				vec.WithLabelValues("b").Set(2)
 
-				reg.upsert(runtimeComponentSpec{
+				reg.upsert(componentSpec{
 					Name:         "component",
 					Store:        store,
 					TemplateYAML: []byte(runtimeDynamicDimTemplateYAML()),
@@ -118,11 +119,11 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 		},
 		"runtime job emits obsolete chart when component is removed": {
 			run: func(t *testing.T) {
-				reg := newRuntimeComponentRegistry()
+				reg := newComponentRegistry()
 				store := metrix.NewRuntimeStore()
 				store.Write().StatefulMeter("component").Gauge("load").Set(3)
 
-				reg.upsert(runtimeComponentSpec{
+				reg.upsert(componentSpec{
 					Name:         "component",
 					Store:        store,
 					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
@@ -162,23 +163,25 @@ func TestRuntimeBootstrapScenarios(t *testing.T) {
 	}{
 		"bootstrap registers chartengine producer component and ticking produces metrics": {
 			run: func(t *testing.T) {
-				m := New()
-				m.PluginName = "go.d"
+				svc := New(nil)
+				svc.Start("go.d", &bytes.Buffer{})
+				defer svc.Stop()
 
-				m.bootstrapRuntimeComponents()
-				specs := m.runtimeComponents.snapshot()
+				specs := svc.registry.snapshot()
 				require.Len(t, specs, 1)
 				assert.Equal(t, chartengineInternalComponentName, specs[0].Name)
 
-				m.tickRuntimeProducers()
+				svc.Tick(1)
 				value, ok := specs[0].Store.ReadRaw().Value("chartengine.build_calls_total", nil)
 				require.True(t, ok)
 				assert.GreaterOrEqual(t, value, float64(1))
 
 				// Idempotent bootstrap.
-				m.bootstrapRuntimeComponents()
-				assert.Len(t, m.runtimeProducers, 1)
-				assert.Len(t, m.runtimeComponents.snapshot(), 1)
+				svc.mu.Lock()
+				svc.bootstrapDefaults()
+				svc.mu.Unlock()
+				assert.Len(t, svc.producers, 1)
+				assert.Len(t, svc.registry.snapshot(), 1)
 			},
 		},
 	}
