@@ -115,8 +115,12 @@ func normalizeComponent(cfg ComponentConfig, pluginName string) (componentSpec, 
 	if cfg.Store == nil {
 		return componentSpec{}, fmt.Errorf("runtimemgr: runtime component %q store is required", name)
 	}
-	if len(cfg.TemplateYAML) == 0 {
-		return componentSpec{}, fmt.Errorf("runtimemgr: runtime component %q template is required", name)
+	templateYAML := cfg.TemplateYAML
+	if len(templateYAML) == 0 {
+		if !cfg.Autogen.Enabled {
+			return componentSpec{}, fmt.Errorf("runtimemgr: runtime component %q template is required when autogen is disabled", name)
+		}
+		templateYAML = []byte(internalRuntimeAutogenTemplateYAML)
 	}
 	updateEvery := cfg.UpdateEvery
 	if updateEvery <= 0 {
@@ -139,7 +143,7 @@ func normalizeComponent(cfg ComponentConfig, pluginName string) (componentSpec, 
 	return componentSpec{
 		Name:         name,
 		Store:        cfg.Store,
-		TemplateYAML: append([]byte(nil), cfg.TemplateYAML...),
+		TemplateYAML: append([]byte(nil), templateYAML...),
 		UpdateEvery:  updateEvery,
 		Autogen:      cfg.Autogen,
 		EmitEnv:      env,

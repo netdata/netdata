@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
 )
 
 func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
@@ -40,6 +41,40 @@ func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
 				assert.Equal(t, "go.d", spec.EmitEnv.Plugin)
 				assert.Equal(t, "internal", spec.EmitEnv.Module)
 				assert.Equal(t, "chartengine", spec.EmitEnv.JobName)
+			},
+		},
+		"registration allows empty template when autogen is enabled": {
+			run: func(t *testing.T) {
+				svc := New(nil)
+				svc.pluginName = "go.d"
+				store := metrix.NewRuntimeStore()
+
+				err := svc.RegisterComponent(ComponentConfig{
+					Name:  "component",
+					Store: store,
+					Autogen: chartengine.AutogenPolicy{
+						Enabled: true,
+					},
+				})
+				require.NoError(t, err)
+
+				specs := svc.registry.snapshot()
+				require.Len(t, specs, 1)
+				assert.NotEmpty(t, specs[0].TemplateYAML)
+			},
+		},
+		"registration rejects empty template when autogen is disabled": {
+			run: func(t *testing.T) {
+				svc := New(nil)
+				svc.pluginName = "go.d"
+				store := metrix.NewRuntimeStore()
+
+				err := svc.RegisterComponent(ComponentConfig{
+					Name:  "component",
+					Store: store,
+				})
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "template is required when autogen is disabled")
 			},
 		},
 	}

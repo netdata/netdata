@@ -138,6 +138,28 @@ func (r *storeReader) SeriesMeta(name string, labels Labels) (SeriesMeta, bool) 
 	return s.meta, true
 }
 
+func (r *storeReader) MetricMeta(name string) (MetricMeta, bool) {
+	index := r.byNameIndex()
+	series := index[name]
+	if len(series) == 0 {
+		return MetricMeta{}, false
+	}
+	for _, s := range series {
+		if s.desc == nil {
+			continue
+		}
+		if r.raw || r.visible(s) {
+			return s.desc.meta, true
+		}
+	}
+	for _, s := range series {
+		if s.desc != nil {
+			return s.desc.meta, true
+		}
+	}
+	return MetricMeta{}, false
+}
+
 func (r *storeReader) CollectMeta() CollectMeta {
 	return r.snap.collectMeta
 }
@@ -221,6 +243,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				mode:      src.desc.mode,
 				freshness: src.desc.freshness,
 				window:    src.desc.window,
+				meta:      src.desc.meta,
 			},
 			value: src.histogramCumulative[i],
 			meta: flattenedSeriesMeta(
@@ -254,6 +277,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				mode:      src.desc.mode,
 				freshness: src.desc.freshness,
 				window:    src.desc.window,
+				meta:      src.desc.meta,
 			},
 			value: src.histogramCount,
 			meta: flattenedSeriesMeta(
@@ -306,6 +330,7 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Lab
 			mode:      desc.mode,
 			freshness: desc.freshness,
 			window:    desc.window,
+			meta:      desc.meta,
 		},
 		value: value,
 		meta:  meta,
@@ -363,6 +388,7 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 				mode:      src.desc.mode,
 				freshness: src.desc.freshness,
 				window:    src.desc.window,
+				meta:      src.desc.meta,
 			},
 			value: src.summaryQuantiles[i],
 			meta: flattenedSeriesMeta(
@@ -412,6 +438,7 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 				mode:      src.desc.mode,
 				freshness: src.desc.freshness,
 				window:    src.desc.window,
+				meta:      src.desc.meta,
 			},
 			value: value,
 			meta: flattenedSeriesMeta(

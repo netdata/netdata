@@ -65,6 +65,7 @@ type chartLabelAccumulator struct {
 
 type planBuildContext struct {
 	out         *Plan
+	reader      metrix.Reader
 	collectMeta metrix.CollectMeta
 	prog        *program.Program
 	cache       *routeCache
@@ -198,6 +199,7 @@ func (e *Engine) preparePlanBuildContext(
 	}
 	return &planBuildContext{
 		out:         out,
+		reader:      reader,
 		collectMeta: collectMeta,
 		prog:        prog,
 		cache:       cache,
@@ -244,7 +246,7 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 			ctx.routeCacheMisses++
 		}
 		if len(routes) == 0 {
-			autoRoutes, ok, err := e.resolveAutogenRoute(name, labels, meta)
+			autoRoutes, ok, err := e.resolveAutogenRoute(ctx.reader, name, labels, meta)
 			if err != nil {
 				firstErr = err
 				return

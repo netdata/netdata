@@ -23,6 +23,13 @@ type instrumentConfig struct {
 	summaryReservoir    int
 	states              []string
 	stateSetMode        *StateSetMode
+
+	descriptionSet bool
+	description    string
+	chartFamilySet bool
+	chartFamily    string
+	unitSet        bool
+	unit           string
 }
 
 func WithFreshness(policy FreshnessPolicy) InstrumentOption {
@@ -70,5 +77,29 @@ func WithStateSetMode(mode StateSetMode) InstrumentOption {
 	return optionFunc(func(cfg *instrumentConfig) {
 		m := mode
 		cfg.stateSetMode = &m
+	})
+}
+
+// WithDescription sets optional metric-family description metadata.
+func WithDescription(description string) InstrumentOption {
+	return optionFunc(func(cfg *instrumentConfig) {
+		cfg.descriptionSet = true
+		cfg.description = description
+	})
+}
+
+// WithChartFamily sets optional metric-family chart grouping metadata.
+func WithChartFamily(chartFamily string) InstrumentOption {
+	return optionFunc(func(cfg *instrumentConfig) {
+		cfg.chartFamilySet = true
+		cfg.chartFamily = chartFamily
+	})
+}
+
+// WithUnit sets optional metric-family unit metadata.
+func WithUnit(unit string) InstrumentOption {
+	return optionFunc(func(cfg *instrumentConfig) {
+		cfg.unitSet = true
+		cfg.unit = unit
 	})
 }

@@ -18,6 +18,7 @@ const (
 type autogenRoute struct {
 	chartID           string
 	chartName         string
+	title             string
 	dimensionName     string
 	dimensionKeyLabel string
 	algorithm         program.Algorithm
@@ -60,6 +61,7 @@ var summaryRoleBuilders = map[metrix.FlattenRole]autogenRoleBuilder{
 }
 
 func (e *Engine) resolveAutogenRoute(
+	reader metrix.Reader,
 	metricName string,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
@@ -79,6 +81,13 @@ func (e *Engine) resolveAutogenRoute(
 	if !ok {
 		return nil, false, nil
 	}
+	if metricMeta, ok := autogenMetricMeta(reader, metricName, meta); ok {
+		route = applyAutogenMetricMeta(route, metricMeta, meta)
+	}
+	title := route.title
+	if title == "" {
+		title = getAutogenChartTitle(route.chartName)
+	}
 	return []routeBinding{
 		{
 			ChartTemplateID:   autogenTemplatePrefix + route.chartID,
@@ -92,7 +101,7 @@ func (e *Engine) resolveAutogenRoute(
 			Inferred:          false,
 			Autogen:           true,
 			Meta: program.ChartMeta{
-				Title:     getAutogenChartTitle(route.chartName),
+				Title:     title,
 				Family:    route.family,
 				Context:   getAutogenChartContext(route.contextName),
 				Units:     route.units,
@@ -119,6 +128,85 @@ func buildAutogenRoute(
 		builder = knownBuilder
 	}
 	return builder(metricName, labels, meta, policy)
+}
+
+func autogenMetricMeta(reader metrix.Reader, metricName string, meta metrix.SeriesMeta) (metrix.MetricMeta, bool) {
+	if reader == nil {
+		return metrix.MetricMeta{}, false
+	}
+	name := sourceMetricName(metricName, meta)
+	if name == "" {
+		return metrix.MetricMeta{}, false
+	}
+	return reader.MetricMeta(name)
+}
+
+func sourceMetricName(metricName string, meta metrix.SeriesMeta) string {
+	switch meta.SourceKind {
+	case metrix.MetricKindHistogram:
+		switch meta.FlattenRole {
+		case metrix.FlattenRoleHistogramBucket:
+			return strings.TrimSuffix(metricName, "_bucket")
+		case metrix.FlattenRoleHistogramCount:
+			return strings.TrimSuffix(metricName, "_count")
+		case metrix.FlattenRoleHistogramSum:
+			return strings.TrimSuffix(metricName, "_sum")
+		}
+	case metrix.MetricKindSummary:
+		switch meta.FlattenRole {
+		case metrix.FlattenRoleSummaryCount:
+			return strings.TrimSuffix(metricName, "_count")
+		case metrix.FlattenRoleSummarySum:
+			return strings.TrimSuffix(metricName, "_sum")
+		}
+	}
+	return metricName
+}
+
+func applyAutogenMetricMeta(route autogenRoute, meta metrix.MetricMeta, seriesMeta metrix.SeriesMeta) autogenRoute {
+	if title := strings.TrimSpace(meta.Description); title != "" {
+		route.title = title
+	}
+	if family := strings.TrimSpace(meta.ChartFamily); family != "" {
+		route.family = family
+	}
+	if unit := strings.TrimSpace(meta.Unit); unit != "" && allowAutogenUnitOverride(seriesMeta) {
+		route.units = normalizeAutogenUnitByAlgorithm(unit, route.algorithm)
+		route.chartType = chartTypeFromUnits(route.units)
+	}
+	return route
+}
+
+func allowAutogenUnitOverride(meta metrix.SeriesMeta) bool {
+	if meta.SourceKind == metrix.MetricKindStateSet {
+		return false
+	}
+	if meta.SourceKind == metrix.MetricKindHistogram {
+		return meta.FlattenRole != metrix.FlattenRoleHistogramBucket &&
+			meta.FlattenRole != metrix.FlattenRoleHistogramCount
+	}
+	if meta.SourceKind == metrix.MetricKindSummary {
+		return meta.FlattenRole != metrix.FlattenRoleSummaryCount
+	}
+	return true
+}
+
+func normalizeAutogenUnitByAlgorithm(unit string, alg program.Algorithm) string {
+	unit = strings.TrimSpace(unit)
+	if unit == "" {
+		return unit
+	}
+	if alg != program.AlgorithmIncremental {
+		return unit
+	}
+	switch unit {
+	case "seconds", "time":
+		return unit
+	}
+	if strings.HasSuffix(unit, "/s") {
+		return unit
+	}
+	return unit + "/s"
 }
 
 func buildHistogramAutogenRoute(

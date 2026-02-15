@@ -743,6 +743,49 @@ groups:
 	assert.Equal(t, float64(10), update.Values[0].Float64)
 }
 
+func TestBuildPlanAutogenUsesMetricMetadataForScalar(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	unmatched := store.Write().SnapshotMeter("svc").Counter(
+		"bytes_total",
+		metrix.WithDescription("HTTP traffic"),
+		metrix.WithChartFamily("Traffic"),
+		metrix.WithUnit("bytes"),
+	)
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "HTTP traffic", create.Meta.Title)
+	assert.Equal(t, "Traffic", create.Meta.Family)
+	assert.Equal(t, "bytes/s", create.Meta.Units)
+}
+
 func TestBuildPlanTemplatePrecedenceOverAutogen(t *testing.T) {
 	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
 	require.NoError(t, err)
@@ -998,6 +1041,49 @@ groups:
 	}
 	assert.Contains(t, dims, "maintenance")
 	assert.Contains(t, dims, "operational")
+}
+
+func TestBuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	ss := store.Write().SnapshotMeter("svc").StateSet(
+		"service_mode",
+		metrix.WithStateSetStates("maintenance", "operational"),
+		metrix.WithDescription("Service mode"),
+		metrix.WithChartFamily("Service"),
+		metrix.WithUnit("watts"),
+	)
+
+	cc.BeginCycle()
+	ss.Enable("operational")
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc.service_mode", create.ChartID)
+	assert.Equal(t, "state", create.Meta.Units)
 }
 
 func TestBuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries(t *testing.T) {

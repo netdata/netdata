@@ -41,6 +41,7 @@ type Reader interface {
 	Summary(name string, labels Labels) (SummaryPoint, bool)
 	StateSet(name string, labels Labels) (StateSetPoint, bool)
 	SeriesMeta(name string, labels Labels) (SeriesMeta, bool)
+	MetricMeta(name string) (MetricMeta, bool)
 	CollectMeta() CollectMeta
 	Flatten() Reader
 	// Family returns a scalar-only view. For non-scalar families use Histogram/Summary/StateSet,

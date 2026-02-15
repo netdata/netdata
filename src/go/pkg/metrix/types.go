@@ -48,6 +48,14 @@ type SeriesMeta struct {
 	FlattenRole FlattenRole
 }
 
+// MetricMeta stores optional family-level metadata for one metric name.
+// It is used by downstream consumers (e.g. chart autogen) as hints.
+type MetricMeta struct {
+	Description string
+	ChartFamily string
+	Unit        string
+}
+
 // MetricKind identifies the logical metric family type.
 // For flattened views, Kind can differ from SourceKind.
 type MetricKind uint8

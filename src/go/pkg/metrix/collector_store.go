@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -36,6 +37,7 @@ type instrumentDescriptor struct {
 	histogram *histogramSchema // set for kindHistogram only
 	summary   *summarySchema   // set for kindSummary only
 	stateSet  *stateSetSchema  // set for kindStateSet only
+	meta      MetricMeta
 }
 
 type histogramSchema struct {
@@ -547,6 +549,12 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		return nil, fmt.Errorf("metrix: snapshot instruments cannot use FreshnessCommitted")
 	}
 
+	metricMeta := MetricMeta{
+		Description: strings.TrimSpace(cfg.description),
+		ChartFamily: strings.TrimSpace(cfg.chartFamily),
+		Unit:        strings.TrimSpace(cfg.unit),
+	}
+
 	var histogram *histogramSchema
 	if kind == kindHistogram {
 		s, err := buildHistogramSchema(cfg, mode)
@@ -601,6 +609,15 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		if kind == kindStateSet && !equalStateSetSchema(d.stateSet, schema) {
 			return nil, fmt.Errorf("metrix: stateset schema mismatch for %s", name)
 		}
+		if cfg.descriptionSet && d.meta.Description != metricMeta.Description {
+			return nil, fmt.Errorf("metrix: metric description mismatch for %s", name)
+		}
+		if cfg.chartFamilySet && d.meta.ChartFamily != metricMeta.ChartFamily {
+			return nil, fmt.Errorf("metrix: metric chart family mismatch for %s", name)
+		}
+		if cfg.unitSet && d.meta.Unit != metricMeta.Unit {
+			return nil, fmt.Errorf("metrix: metric unit mismatch for %s", name)
+		}
 		return d, nil
 	}
 
@@ -613,6 +630,7 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		histogram: histogram,
 		summary:   summary,
 		stateSet:  schema,
+		meta:      metricMeta,
 	}
 	c.instruments[name] = d
 	return d, nil
