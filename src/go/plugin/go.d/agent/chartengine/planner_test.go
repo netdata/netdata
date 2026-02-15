@@ -786,6 +786,109 @@ groups:
 	assert.Equal(t, "bytes/s", create.Meta.Units)
 }
 
+func TestBuildPlanAutogenUsesMetricMetadataForHistogram(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	h := store.Write().SnapshotMeter("svc").Histogram(
+		"request_duration_ms",
+		metrix.WithHistogramBounds(1, 2),
+		metrix.WithDescription("Request duration"),
+		metrix.WithChartFamily("Latency"),
+		metrix.WithUnit("ms"),
+	)
+
+	cc.BeginCycle()
+	h.ObservePoint(metrix.HistogramPoint{
+		Count: 3,
+		Sum:   5,
+		Buckets: []metrix.BucketPoint{
+			{UpperBound: 1, CumulativeCount: 1},
+			{UpperBound: 2, CumulativeCount: 3},
+		},
+	})
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	buckets := findCreateChartActionByID(plan, "svc.request_duration_ms")
+	require.NotNil(t, buckets)
+	assert.Equal(t, "Request duration", buckets.Meta.Title)
+	assert.Equal(t, "Latency", buckets.Meta.Family)
+	assert.Equal(t, "observations/s", buckets.Meta.Units)
+
+	sum := findCreateChartActionByID(plan, "svc.request_duration_ms_sum")
+	require.NotNil(t, sum)
+	assert.Equal(t, "Request duration", sum.Meta.Title)
+	assert.Equal(t, "Latency", sum.Meta.Family)
+	assert.Equal(t, "ms/s", sum.Meta.Units)
+}
+
+func TestBuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	s := store.Write().SnapshotMeter("svc").Summary(
+		"query_duration_ms",
+		metrix.WithDescription("Query duration"),
+		metrix.WithChartFamily("Latency"),
+		metrix.WithUnit("ms"),
+	)
+
+	cc.BeginCycle()
+	s.ObservePoint(metrix.SummaryPoint{
+		Count: 4,
+		Sum:   8,
+	})
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	sum := findCreateChartActionByID(plan, "svc.query_duration_ms_sum")
+	require.NotNil(t, sum)
+	assert.Equal(t, "Query duration", sum.Meta.Title)
+	assert.Equal(t, "Latency", sum.Meta.Family)
+	assert.Equal(t, "ms/s", sum.Meta.Units)
+}
+
 func TestBuildPlanTemplatePrecedenceOverAutogen(t *testing.T) {
 	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
 	require.NoError(t, err)
@@ -1083,6 +1186,8 @@ groups:
 	create := findCreateChartAction(plan)
 	require.NotNil(t, create)
 	assert.Equal(t, "svc.service_mode", create.ChartID)
+	assert.Equal(t, "Service mode", create.Meta.Title)
+	assert.Equal(t, "Service", create.Meta.Family)
 	assert.Equal(t, "state", create.Meta.Units)
 }
 
@@ -1398,6 +1503,17 @@ func findCreateChartAction(plan Plan) *CreateChartAction {
 		if create, ok := action.(CreateChartAction); ok {
 			return &create
 		}
+	}
+	return nil
+}
+
+func findCreateChartActionByID(plan Plan, chartID string) *CreateChartAction {
+	for _, action := range plan.Actions {
+		create, ok := action.(CreateChartAction)
+		if !ok || create.ChartID != chartID {
+			continue
+		}
+		return &create
 	}
 	return nil
 }

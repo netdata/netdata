@@ -127,6 +127,18 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				assert.Equal(t, "Build plan calls", create.Meta.Title)
 				assert.Equal(t, "Planner", create.Meta.Family)
 				assert.Equal(t, "calls/s", create.Meta.Units)
+
+				duration := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_ms")
+				require.NotNil(t, duration)
+				assert.Equal(t, "Build plan duration", duration.Meta.Title)
+				assert.Equal(t, "Planner", duration.Meta.Family)
+				assert.Equal(t, "ms", duration.Meta.Units)
+
+				durationSum := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_ms_sum")
+				require.NotNil(t, durationSum)
+				assert.Equal(t, "Build plan duration", durationSum.Meta.Title)
+				assert.Equal(t, "Planner", durationSum.Meta.Family)
+				assert.Equal(t, "ms/s", durationSum.Meta.Units)
 			},
 		},
 	}

@@ -134,11 +134,23 @@ func autogenMetricMeta(reader metrix.Reader, metricName string, meta metrix.Seri
 	if reader == nil {
 		return metrix.MetricMeta{}, false
 	}
-	name := sourceMetricName(metricName, meta)
-	if name == "" {
-		return metrix.MetricMeta{}, false
+	for _, name := range sourceMetricNames(metricName, meta) {
+		if name == "" {
+			continue
+		}
+		if metricMeta, ok := reader.MetricMeta(name); ok {
+			return metricMeta, true
+		}
 	}
-	return reader.MetricMeta(name)
+	return metrix.MetricMeta{}, false
+}
+
+func sourceMetricNames(metricName string, meta metrix.SeriesMeta) []string {
+	source := sourceMetricName(metricName, meta)
+	if source == "" || source == metricName {
+		return []string{metricName}
+	}
+	return []string{source, metricName}
 }
 
 func sourceMetricName(metricName string, meta metrix.SeriesMeta) string {
