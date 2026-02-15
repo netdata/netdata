@@ -194,9 +194,8 @@ impl Cursor {
                 // Find the first file with head_realtime > since.
                 // The file just before it is the last one that could contain
                 // entries at or after `since` (its range may span past `since`).
-                let pos = files.partition_point(|f| {
-                    Self::head_realtime(f).is_some_and(|t| t <= since)
-                });
+                let pos =
+                    files.partition_point(|f| Self::head_realtime(f).is_some_and(|t| t <= since));
                 pos.saturating_sub(1)
             }
             Direction::Backward => {
@@ -209,9 +208,8 @@ impl Cursor {
                     return files.len() - 1;
                 }
                 // All files are archived. Find the last with head_realtime <= until.
-                let pos = files.partition_point(|f| {
-                    Self::head_realtime(f).is_some_and(|t| t <= until)
-                });
+                let pos =
+                    files.partition_point(|f| Self::head_realtime(f).is_some_and(|t| t <= until));
                 pos.saturating_sub(1)
             }
         }
