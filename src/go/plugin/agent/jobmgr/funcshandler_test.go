@@ -9,9 +9,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -121,7 +120,6 @@ func TestBuildParams(t *testing.T) {
 					{ID: "db"},
 					{ID: "extra"},
 				}
-
 				result := buildAcceptedParams(methodParams)
 				assert.Equal(t, []string{"__job", "__sort", "db", "extra"}, result)
 			},
@@ -182,6 +180,26 @@ func TestBuildParams(t *testing.T) {
 	}
 }
 
+func TestParseArgsParams(t *testing.T) {
+	args := []string{
+		"__job:snmp-a",
+		"view=detailed",
+		"labels:src_ip,dst_ip",
+		"info",
+		"invalid",
+		"empty:",
+		"=novalue",
+	}
+
+	got := parseArgsParams(args)
+
+	assert.Equal(t, []string{"snmp-a"}, got["__job"])
+	assert.Equal(t, []string{"detailed"}, got["view"])
+	assert.Equal(t, []string{"src_ip", "dst_ip"}, got["labels"])
+	assert.NotContains(t, got, "invalid")
+	assert.NotContains(t, got, "empty")
+}
+
 func newTestManagerWithCapture(t *testing.T) (*Manager, *map[string]any) {
 	t.Helper()
 
@@ -223,7 +241,7 @@ func TestRespondWithParams_MethodTypeFallback(t *testing.T) {
 func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
 	mgr, resp := newTestManagerWithCapture(t)
 
-	mgr.moduleFuncs.registerModule("snmp", module.Creator{
+	mgr.moduleFuncs.registerModule("snmp", collectorapi.Creator{
 		Methods: func() []funcapi.MethodConfig {
 			return []funcapi.MethodConfig{{ID: "topology:snmp", ResponseType: "topology"}}
 		},
@@ -237,7 +255,7 @@ func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
 func TestHandleJobMethodFuncInfo_UsesResponseType(t *testing.T) {
 	mgr, resp := newTestManagerWithCapture(t)
 
-	mgr.moduleFuncs.registerModule("netflow", module.Creator{})
+	mgr.moduleFuncs.registerModule("netflow", collectorapi.Creator{})
 	mgr.moduleFuncs.registerJobMethods("netflow", "job1", []funcapi.MethodConfig{
 		{ID: "flows:netflow", ResponseType: "flows"},
 	})
