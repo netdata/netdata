@@ -344,6 +344,26 @@ func TestDispatchHelpers(t *testing.T) {
 	}
 }
 
+func TestParseArgsParams(t *testing.T) {
+	args := []string{
+		"__job:snmp-a",
+		"view=detailed",
+		"labels:src_ip,dst_ip",
+		"info",
+		"invalid",
+		"empty:",
+		"=novalue",
+	}
+
+	got := parseArgsParams(args)
+
+	assert.Equal(t, []string{"snmp-a"}, got["__job"])
+	assert.Equal(t, []string{"detailed"}, got["view"])
+	assert.Equal(t, []string{"src_ip", "dst_ip"}, got["labels"])
+	assert.NotContains(t, got, "invalid")
+	assert.NotContains(t, got, "empty")
+}
+
 func TestControllerLifecycleHooks(t *testing.T) {
 	tests := map[string]struct{}{
 		"register modules does not register static methods yet":        {},

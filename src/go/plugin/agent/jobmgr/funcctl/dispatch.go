@@ -283,6 +283,9 @@ func parseArgsParams(args []string) map[string][]string {
 		}
 		parts := strings.SplitN(arg, ":", 2)
 		if len(parts) != 2 {
+			parts = strings.SplitN(arg, "=", 2)
+		}
+		if len(parts) != 2 {
 			continue
 		}
 		key, value := parts[0], parts[1]
