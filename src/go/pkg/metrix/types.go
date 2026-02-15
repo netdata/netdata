@@ -69,7 +69,7 @@ const (
 	MetricKindStateSet
 )
 
-// FlattenRole describes synthetic scalar roles produced by Reader.Flatten().
+// FlattenRole describes synthetic scalar roles produced by Read(ReadFlatten()).
 type FlattenRole uint8
 
 const (

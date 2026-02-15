@@ -176,24 +176,21 @@ func AsCycleManagedStore(s CollectorStore) (CycleManagedStore, bool) {
 	}
 }
 
-func (s *storeView) Read() Reader {
-	return &storeReader{snap: s.core.snapshot.Load(), raw: false}
-}
-
-func (s *storeView) ReadRaw() Reader {
-	return &storeReader{snap: s.core.snapshot.Load(), raw: true}
+func (s *storeView) Read(opts ...ReadOption) Reader {
+	cfg := resolveReadConfig(opts...)
+	snap := s.core.snapshot.Load()
+	if cfg.flatten {
+		snap = flattenSnapshot(snap)
+	}
+	return &storeReader{snap: snap, raw: cfg.raw, flattened: cfg.flatten}
 }
 
 func (s *storeView) Write() Writer {
 	return &writeView{backend: s.core}
 }
 
-func (s *managedStore) Read() Reader {
-	return (&storeView{core: s.core}).Read()
-}
-
-func (s *managedStore) ReadRaw() Reader {
-	return (&storeView{core: s.core}).ReadRaw()
+func (s *managedStore) Read(opts ...ReadOption) Reader {
+	return (&storeView{core: s.core}).Read(opts...)
 }
 
 func (s *managedStore) Write() Writer {

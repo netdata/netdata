@@ -42,7 +42,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				_, ok := s.Read().Value("svc.request_duration_seconds", nil)
 				require.False(t, ok, "expected non-scalar histogram unavailable via Value")
 
-				fr := s.Read().Flatten()
+				fr := s.Read(ReadFlatten())
 				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "0.1"}, 1)
 				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "0.5"}, 2)
 				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "1"}, 3)
@@ -178,7 +178,7 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 				_, ok := s.Read().Histogram("svc.latency", nil)
 				require.False(t, ok, "expected stale cycle-window histogram hidden from Read")
-				_, ok = s.ReadRaw().Histogram("svc.latency", nil)
+				_, ok = s.Read(ReadRaw()).Histogram("svc.latency", nil)
 				require.True(t, ok, "expected raw histogram to remain visible")
 			},
 		},
@@ -239,9 +239,9 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				cc.BeginCycle()
 				cc.CommitCycleSuccess()
 
-				_, ok := s.Read().Flatten().Value("svc.latency_bucket", Labels{"le": "1"})
-				require.False(t, ok, "expected stale snapshot flattened histogram hidden from Read().Flatten()")
-				mustValue(t, s.ReadRaw().Flatten(), "svc.latency_bucket", Labels{"le": "1"}, 1)
+				_, ok := s.Read(ReadFlatten()).Value("svc.latency_bucket", Labels{"le": "1"})
+				require.False(t, ok, "expected stale snapshot flattened histogram hidden from Read(ReadFlatten())")
+				mustValue(t, s.Read(ReadRaw(), ReadFlatten()), "svc.latency_bucket", Labels{"le": "1"}, 1)
 			},
 		},
 		"histogram flatten label collision panics": {

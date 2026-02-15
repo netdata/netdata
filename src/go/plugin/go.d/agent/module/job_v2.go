@@ -347,7 +347,7 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) bool {
 	j.cycle.CommitCycleSuccess()
 	cycleOpen = false
 
-	plan, err := j.engine.BuildPlan(j.store.ReadRaw())
+	plan, err := j.engine.BuildPlan(j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()))
 	if err != nil {
 		j.Warningf("build plan failed: %v", err)
 		return false

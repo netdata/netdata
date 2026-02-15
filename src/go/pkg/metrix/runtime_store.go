@@ -57,12 +57,13 @@ func NewRuntimeStore() RuntimeStore {
 	}
 }
 
-func (s *runtimeStoreView) Read() Reader {
-	return &storeReader{snap: s.core.snapshot.Load(), raw: false}
-}
-
-func (s *runtimeStoreView) ReadRaw() Reader {
-	return &storeReader{snap: s.core.snapshot.Load(), raw: true}
+func (s *runtimeStoreView) Read(opts ...ReadOption) Reader {
+	cfg := resolveReadConfig(opts...)
+	snap := s.core.snapshot.Load()
+	if cfg.flatten {
+		snap = flattenSnapshot(snap)
+	}
+	return &storeReader{snap: snap, raw: cfg.raw, flattened: cfg.flatten}
 }
 
 func (s *runtimeStoreView) Write() RuntimeWriter {

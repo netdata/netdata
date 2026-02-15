@@ -144,7 +144,7 @@ func TestCounterStoreScenarios(t *testing.T) {
 
 				_, ok := s.Read().Value("svc.requests_total", nil)
 				require.False(t, ok, "expected snapshot counter hidden after failed attempt")
-				mustValue(t, s.ReadRaw(), "svc.requests_total", nil, 9)
+				mustValue(t, s.Read(ReadRaw()), "svc.requests_total", nil, 9)
 			},
 		},
 	}

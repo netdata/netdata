@@ -30,7 +30,7 @@ func TestFlattenSeriesMetaCarriesOriginType(t *testing.T) {
 				})
 				cc.CommitCycleSuccess()
 
-				flat := s.Read().Flatten()
+				flat := s.Read(ReadFlatten())
 				metaBucket, ok := flat.SeriesMeta("svc.latency_bucket", Labels{"le": "1"})
 				require.True(t, ok)
 				assert.Equal(t, MetricKindCounter, metaBucket.Kind)
@@ -64,7 +64,7 @@ func TestFlattenSeriesMetaCarriesOriginType(t *testing.T) {
 				assert.Equal(t, MetricKindStateSet, rawMeta.SourceKind)
 				assert.Equal(t, FlattenRoleNone, rawMeta.FlattenRole)
 
-				flatMeta, ok := s.Read().Flatten().SeriesMeta("svc.mode", Labels{"svc.mode": "operational"})
+				flatMeta, ok := s.Read(ReadFlatten()).SeriesMeta("svc.mode", Labels{"svc.mode": "operational"})
 				require.True(t, ok)
 				assert.Equal(t, MetricKindGauge, flatMeta.Kind)
 				assert.Equal(t, MetricKindStateSet, flatMeta.SourceKind)

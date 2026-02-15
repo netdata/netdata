@@ -33,11 +33,11 @@ func TestCollectorStoreRetentionScenarios(t *testing.T) {
 
 				cc.BeginCycle()
 				cc.CommitCycleSuccess()
-				mustValue(t, s.ReadRaw(), "collector.g", nil, 11)
+				mustValue(t, s.Read(ReadRaw()), "collector.g", nil, 11)
 
 				cc.BeginCycle()
 				cc.CommitCycleSuccess()
-				mustNoValue(t, s.ReadRaw(), "collector.g", nil)
+				mustNoValue(t, s.Read(ReadRaw()), "collector.g", nil)
 			},
 		},
 		"max-series cap evicts oldest series deterministically": {
@@ -64,9 +64,9 @@ func TestCollectorStoreRetentionScenarios(t *testing.T) {
 				g.Observe(3, lsc)
 				cc.CommitCycleSuccess()
 
-				mustNoValue(t, s.ReadRaw(), "collector.g", Labels{"id": "a"})
-				mustValue(t, s.ReadRaw(), "collector.g", Labels{"id": "b"}, 2)
-				mustValue(t, s.ReadRaw(), "collector.g", Labels{"id": "c"}, 3)
+				mustNoValue(t, s.Read(ReadRaw()), "collector.g", Labels{"id": "a"})
+				mustValue(t, s.Read(ReadRaw()), "collector.g", Labels{"id": "b"}, 2)
+				mustValue(t, s.Read(ReadRaw()), "collector.g", Labels{"id": "c"}, 3)
 			},
 		},
 	}

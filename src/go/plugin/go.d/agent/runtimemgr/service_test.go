@@ -207,7 +207,7 @@ func TestRuntimeBootstrapScenarios(t *testing.T) {
 				assert.Equal(t, chartengineInternalComponentName, specs[0].Name)
 
 				svc.Tick(1)
-				value, ok := specs[0].Store.ReadRaw().Value("netdata.go.plugin.chartengine.build_calls_total", nil)
+				value, ok := specs[0].Store.Read(metrix.ReadRaw()).Value("netdata.go.plugin.chartengine.build_calls_total", nil)
 				require.True(t, ok)
 				assert.GreaterOrEqual(t, value, float64(1))
 

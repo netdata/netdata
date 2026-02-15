@@ -28,7 +28,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 				_, ok := s.Read().Value("svc.latency", nil)
 				require.False(t, ok, "expected non-scalar summary unavailable via Value")
 
-				fr := s.Read().Flatten()
+				fr := s.Read(ReadFlatten())
 				mustValue(t, fr, "svc.latency_count", nil, 3)
 				mustValue(t, fr, "svc.latency_sum", nil, 1.2)
 				_, ok = fr.Summary("svc.latency", nil)
@@ -61,7 +61,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 					},
 				})
 
-				fr := s.Read().Flatten()
+				fr := s.Read(ReadFlatten())
 				mustValue(t, fr, "svc.latency", Labels{"quantile": "0.5"}, 0.4)
 				mustValue(t, fr, "svc.latency", Labels{"quantile": "0.9"}, 0.8)
 				mustValue(t, fr, "svc.latency_count", nil, 2)
@@ -157,16 +157,16 @@ func TestSummaryStoreScenarios(t *testing.T) {
 				cc.CommitCycleSuccess()
 				_, ok := s.Read().Summary("svc.latency", nil)
 				require.False(t, ok, "expected stale cycle-window summary hidden from Read")
-				mustSummary(t, s.ReadRaw(), "svc.latency", nil, SummaryPoint{
+				mustSummary(t, s.Read(ReadRaw()), "svc.latency", nil, SummaryPoint{
 					Count: 1,
 					Sum:   1,
 					Quantiles: []QuantilePoint{
 						{Quantile: 0.5, Value: 1},
 					},
 				})
-				_, ok = s.Read().Flatten().Value("svc.latency_count", nil)
-				require.False(t, ok, "expected stale cycle-window summary flatten hidden from Read().Flatten()")
-				mustValue(t, s.ReadRaw().Flatten(), "svc.latency_count", nil, 1)
+				_, ok = s.Read(ReadFlatten()).Value("svc.latency_count", nil)
+				require.False(t, ok, "expected stale cycle-window summary flatten hidden from Read(ReadFlatten())")
+				mustValue(t, s.Read(ReadRaw(), ReadFlatten()), "svc.latency_count", nil, 1)
 			},
 		},
 		"window option on snapshot summary panics": {

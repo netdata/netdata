@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
@@ -136,7 +137,7 @@ func (j *runtimeMetricsJob) runOnce(clock int) {
 			continue
 		}
 
-		reader := spec.Store.ReadRaw()
+		reader := spec.Store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
 		plan, err := component.engine.BuildPlan(reader)
 		if err != nil {
 			j.Warningf("runtime metrics component %q build plan failed: %v", spec.Name, err)

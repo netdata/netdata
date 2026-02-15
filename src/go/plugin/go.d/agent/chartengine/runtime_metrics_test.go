@@ -28,18 +28,18 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				cc.BeginCycle()
 				c.ObserveTotal(10)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read())
+				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				cc.BeginCycle()
 				c.ObserveTotal(20)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read())
+				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				rs := e.RuntimeStore()
 				require.NotNil(t, rs)
-				r := rs.ReadRaw()
+				r := rs.Read(metrix.ReadRaw())
 
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.build_calls_total", nil, 2)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_misses_total", nil, 1)
@@ -84,7 +84,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, observer.LoadYAML([]byte(runtimeComponentTemplateYAML()), 1))
 
-				plan, err := observer.BuildPlan(rs.Read())
+				plan, err := observer.BuildPlan(rs.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 				assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
 
@@ -109,7 +109,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				cc.BeginCycle()
 				c.ObserveTotal(10)
 				cc.CommitCycleSuccess()
-				_, err = producer.BuildPlan(store.Read())
+				_, err = producer.BuildPlan(store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				observer, err := New(
@@ -120,7 +120,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, observer.LoadYAML([]byte(runtimeDummyTemplateYAML()), 1))
 
-				plan, err := observer.BuildPlan(producer.RuntimeStore().Read())
+				plan, err := observer.BuildPlan(producer.RuntimeStore().Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 				create := findCreateChartByTitle(plan.Actions, "Build plan calls")
 				require.NotNil(t, create)

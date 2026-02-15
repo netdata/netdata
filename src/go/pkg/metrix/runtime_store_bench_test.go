@@ -99,7 +99,7 @@ func BenchmarkRuntimeStoreMixedTypedWriteAndReadFlatten(b *testing.B) {
 		ss.Enable("operational")
 
 		// Simulate chart-engine scalar path over runtime metrics.
-		r := s.Read().Flatten()
+		r := s.Read(ReadFlatten())
 		r.ForEachSeries(func(_ string, _ LabelView, _ SampleValue) {})
 	}
 }

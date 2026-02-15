@@ -5,6 +5,7 @@ package runtimemgr
 import (
 	"log/slog"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
 )
 
@@ -44,7 +45,7 @@ func (p *chartengineRuntimeProducer) Tick() error {
 	if p == nil || p.engine == nil {
 		return nil
 	}
-	_, err := p.engine.BuildPlan(p.engine.RuntimeStore().ReadRaw())
+	_, err := p.engine.BuildPlan(p.engine.RuntimeStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
 	return err
 }
 

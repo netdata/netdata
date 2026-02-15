@@ -9,13 +9,11 @@ import (
 )
 
 type storeReader struct {
-	snap        *readSnapshot
-	raw         bool // true => ReadRaw semantics (no freshness filtering)
-	flattened   bool
-	flattenOnce sync.Once
-	flatten     Reader
-	indexOnce   sync.Once
-	index       map[string][]*committedSeries
+	snap      *readSnapshot
+	raw       bool // true => ReadRaw semantics (no freshness filtering)
+	flattened bool
+	indexOnce sync.Once
+	index     map[string][]*committedSeries
 }
 
 type familyView struct {
@@ -162,20 +160,6 @@ func (r *storeReader) MetricMeta(name string) (MetricMeta, bool) {
 
 func (r *storeReader) CollectMeta() CollectMeta {
 	return r.snap.collectMeta
-}
-
-func (r *storeReader) Flatten() Reader {
-	if r.flattened {
-		return r
-	}
-	r.flattenOnce.Do(func() {
-		r.flatten = &storeReader{
-			snap:      flattenSnapshot(r.snap),
-			raw:       r.raw,
-			flattened: true,
-		}
-	})
-	return r.flatten
 }
 
 func flattenSnapshot(src *readSnapshot) *readSnapshot {
@@ -539,7 +523,7 @@ func (r *storeReader) byNameIndex() map[string][]*committedSeries {
 	return r.index
 }
 
-// visible applies freshness policy for Read(); ReadRaw() bypasses it.
+// visible applies freshness policy for Read(); Read(ReadRaw()) bypasses it.
 func (r *storeReader) visible(s *committedSeries) bool {
 	if r.raw {
 		return true

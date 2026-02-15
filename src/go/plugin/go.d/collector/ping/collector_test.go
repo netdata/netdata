@@ -157,21 +157,21 @@ func TestCollector_Collect(t *testing.T) {
 
 			labels := metrix.Labels{"host": "192.0.2.1"}
 			if !test.wantValues {
-				_, ok := collr.MetricStore().ReadRaw().Value("min_rtt", labels)
+				_, ok := collr.MetricStore().Read(metrix.ReadRaw()).Value("min_rtt", labels)
 				assert.False(t, ok)
 				return
 			}
-			assertMetricValue(t, collr.MetricStore().ReadRaw(), "min_rtt", labels, 10)
-			assertMetricValue(t, collr.MetricStore().ReadRaw(), "max_rtt", labels, 20)
-			assertMetricValue(t, collr.MetricStore().ReadRaw(), "avg_rtt", labels, 15)
-			assertMetricValue(t, collr.MetricStore().ReadRaw(), "std_dev_rtt", labels, 5)
-			assertMetricValue(t, collr.MetricStore().ReadRaw(), "rtt_variance", labels, 25)
-			assertMetricValue(t, collr.MetricStore().ReadRaw(), "mean_jitter", labels, 2.5)
-			assertMetricValue(t, collr.MetricStore().ReadRaw(), "ewma_jitter", labels, 0.15625)
-			assertMetricValue(t, collr.MetricStore().ReadRaw(), "sma_jitter", labels, 2.5)
-			assertMetricValue(t, collr.MetricStore().ReadRaw(), "packets_recv", labels, 5)
-			assertMetricValue(t, collr.MetricStore().ReadRaw(), "packets_sent", labels, 5)
-			assertMetricValue(t, collr.MetricStore().ReadRaw(), "packet_loss", labels, 0)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "min_rtt", labels, 10)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "max_rtt", labels, 20)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "avg_rtt", labels, 15)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "std_dev_rtt", labels, 5)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "rtt_variance", labels, 25)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "mean_jitter", labels, 2.5)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "ewma_jitter", labels, 0.15625)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "sma_jitter", labels, 2.5)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "packets_recv", labels, 5)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "packets_sent", labels, 5)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "packet_loss", labels, 0)
 		})
 	}
 }

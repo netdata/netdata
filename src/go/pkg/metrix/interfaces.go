@@ -5,16 +5,14 @@ package metrix
 // CollectorStore is the collector-facing metrics container.
 // Writes are cycle-scoped and reads are snapshot-bound.
 type CollectorStore interface {
-	Read() Reader
-	ReadRaw() Reader
+	Read(opts ...ReadOption) Reader
 	Write() Writer
 }
 
 // RuntimeStore is reserved for out-of-cycle internal instrumentation.
 // It is intentionally stateful-only on the write side.
 type RuntimeStore interface {
-	Read() Reader
-	ReadRaw() Reader
+	Read(opts ...ReadOption) Reader
 	Write() RuntimeWriter
 }
 
@@ -33,7 +31,7 @@ type CycleManagedStore interface {
 }
 
 // Reader exposes immutable snapshot reads.
-// Read() and ReadRaw() differ only by freshness visibility policy.
+// Read() defaults to freshness-filtered visibility; raw visibility is enabled via read options.
 type Reader interface {
 	Value(name string, labels Labels) (SampleValue, bool)
 	Delta(name string, labels Labels) (SampleValue, bool)
@@ -43,21 +41,20 @@ type Reader interface {
 	SeriesMeta(name string, labels Labels) (SeriesMeta, bool)
 	MetricMeta(name string) (MetricMeta, bool)
 	CollectMeta() CollectMeta
-	Flatten() Reader
 	// Family returns a scalar-only view. For non-scalar families use Histogram/Summary/StateSet,
-	// or call Flatten() first and iterate flattened scalar series.
+	// or use Read(ReadFlatten()) at reader acquisition time.
 	Family(name string) (FamilyView, bool)
 	// ForEachByName iterates scalar series only. For non-scalar families use typed getters
-	// or Flatten() first.
+	// or Read(ReadFlatten()).
 	ForEachByName(name string, fn func(labels LabelView, v SampleValue))
 	// ForEachSeries iterates scalar series only. For non-scalar families use typed getters
-	// or Flatten() first.
+	// or Read(ReadFlatten()).
 	ForEachSeries(fn func(name string, labels LabelView, v SampleValue))
 	// ForEachSeriesIdentity iterates scalar series and includes stable identity/hash.
-	// For non-scalar families use typed getters or Flatten() first.
+	// For non-scalar families use typed getters or Read(ReadFlatten()).
 	ForEachSeriesIdentity(fn func(identity SeriesIdentity, meta SeriesMeta, name string, labels LabelView, v SampleValue))
 	// ForEachMatch iterates scalar series only. For non-scalar families use typed getters
-	// or Flatten() first.
+	// or Read(ReadFlatten()).
 	ForEachMatch(name string, match func(labels LabelView) bool, fn func(labels LabelView, v SampleValue))
 }
 

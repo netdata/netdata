@@ -204,7 +204,7 @@ func (e *Engine) preparePlanBuildContext(
 		prog:        prog,
 		cache:       cache,
 		index:       index,
-		flat:        reader.Flatten(),
+		flat:        reader,
 		aliveSeries: make(map[metrix.SeriesID]struct{}),
 		seenInfer:   make(map[string]struct{}),
 		chartsByID:  make(map[string]*chartState),

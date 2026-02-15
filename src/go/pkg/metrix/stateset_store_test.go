@@ -34,7 +34,7 @@ func TestStateSetStoreScenarios(t *testing.T) {
 				_, ok := s.Read().Value("svc.mode", nil)
 				require.False(t, ok, "expected non-scalar stateset to be unavailable via Value")
 
-				fr := s.Read().Flatten()
+				fr := s.Read(ReadFlatten())
 				mustValue(t, fr, "svc.mode", Labels{"svc.mode": "maintenance"}, 0)
 				mustValue(t, fr, "svc.mode", Labels{"svc.mode": "operational"}, 1)
 				mustValue(t, fr, "svc.mode", Labels{"svc.mode": "recovery"}, 0)
@@ -59,14 +59,14 @@ func TestStateSetStoreScenarios(t *testing.T) {
 
 				_, ok := s.Read().StateSet("svc.mode", nil)
 				require.False(t, ok, "expected stale snapshot stateset hidden from Read")
-				mustStateSet(t, s.ReadRaw(), "svc.mode", nil, map[string]bool{
+				mustStateSet(t, s.Read(ReadRaw()), "svc.mode", nil, map[string]bool{
 					"maintenance": false,
 					"operational": true,
 				})
 
-				_, ok = s.Read().Flatten().Value("svc.mode", Labels{"svc.mode": "operational"})
-				require.False(t, ok, "expected stale snapshot stateset flattened series hidden from Read().Flatten()")
-				mustValue(t, s.ReadRaw().Flatten(), "svc.mode", Labels{"svc.mode": "operational"}, 1)
+				_, ok = s.Read(ReadFlatten()).Value("svc.mode", Labels{"svc.mode": "operational"})
+				require.False(t, ok, "expected stale snapshot stateset flattened series hidden from Read(ReadFlatten())")
+				mustValue(t, s.Read(ReadRaw(), ReadFlatten()), "svc.mode", Labels{"svc.mode": "operational"}, 1)
 			},
 		},
 		"stateful stateset remains visible across cycles without writes": {
@@ -90,9 +90,9 @@ func TestStateSetStoreScenarios(t *testing.T) {
 					"b": true,
 					"c": false,
 				})
-				mustValue(t, s.Read().Flatten(), "svc.feature_flags", Labels{"svc.feature_flags": "a"}, 1)
-				mustValue(t, s.Read().Flatten(), "svc.feature_flags", Labels{"svc.feature_flags": "b"}, 1)
-				mustValue(t, s.Read().Flatten(), "svc.feature_flags", Labels{"svc.feature_flags": "c"}, 0)
+				mustValue(t, s.Read(ReadFlatten()), "svc.feature_flags", Labels{"svc.feature_flags": "a"}, 1)
+				mustValue(t, s.Read(ReadFlatten()), "svc.feature_flags", Labels{"svc.feature_flags": "b"}, 1)
+				mustValue(t, s.Read(ReadFlatten()), "svc.feature_flags", Labels{"svc.feature_flags": "c"}, 0)
 			},
 		},
 		"stateset enum mode validation panics on invalid active count": {

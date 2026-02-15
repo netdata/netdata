@@ -71,7 +71,7 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				require.Len(t, p.Quantiles, 2)
 				require.False(t, math.IsNaN(p.Quantiles[0].Value) || math.IsNaN(p.Quantiles[1].Value), "expected finite quantile values: %#v", p.Quantiles)
 
-				fr := s.Read().Flatten()
+				fr := s.Read(ReadFlatten())
 				mustValue(t, fr, "runtime.latency_count", nil, 2)
 				mustValue(t, fr, "runtime.latency_sum", nil, 4)
 				_, ok = fr.Summary("runtime.latency", nil)
@@ -101,7 +101,7 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 					"operational": true,
 				})
 
-				fr := s.Read().Flatten()
+				fr := s.Read(ReadFlatten())
 				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "1"}, 1)
 				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "2"}, 1)
 				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "+Inf"}, 2)
@@ -166,13 +166,13 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				g.Set(10, lsa)
 				now = now.Add(2 * time.Second)
 				g.Set(20, lsb)
-				mustValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "a"}, 10)
-				mustValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "b"}, 20)
+				mustValue(t, s.Read(ReadRaw()), "runtime.queue_depth", Labels{"id": "a"}, 10)
+				mustValue(t, s.Read(ReadRaw()), "runtime.queue_depth", Labels{"id": "b"}, 20)
 
 				now = now.Add(4 * time.Second)
 				g.Set(21, lsb) // triggers retention sweep
-				mustNoValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "a"})
-				mustValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "b"}, 21)
+				mustNoValue(t, s.Read(ReadRaw()), "runtime.queue_depth", Labels{"id": "a"})
+				mustValue(t, s.Read(ReadRaw()), "runtime.queue_depth", Labels{"id": "b"}, 21)
 			},
 		},
 		"runtime max-series cap evicts oldest series deterministically": {
@@ -196,9 +196,9 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				g.Set(20, lsb)
 				g.Set(30, lsc)
 
-				mustNoValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "a"})
-				mustValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "b"}, 20)
-				mustValue(t, s.ReadRaw(), "runtime.queue_depth", Labels{"id": "c"}, 30)
+				mustNoValue(t, s.Read(ReadRaw()), "runtime.queue_depth", Labels{"id": "a"})
+				mustValue(t, s.Read(ReadRaw()), "runtime.queue_depth", Labels{"id": "b"}, 20)
+				mustValue(t, s.Read(ReadRaw()), "runtime.queue_depth", Labels{"id": "c"}, 30)
 			},
 		},
 	}

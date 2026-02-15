@@ -204,7 +204,7 @@ func TestJobV2Scenarios(t *testing.T) {
 				job.runOnce()
 
 				assert.Equal(t, "", out.String())
-				assert.Equal(t, metrix.CollectStatusFailed, store.ReadRaw().CollectMeta().LastAttemptStatus)
+				assert.Equal(t, metrix.CollectStatusFailed, store.Read(metrix.ReadRaw()).CollectMeta().LastAttemptStatus)
 			},
 		},
 		"panic in collect aborts active cycle and next cycle still succeeds": {
@@ -230,12 +230,12 @@ func TestJobV2Scenarios(t *testing.T) {
 
 				job.runOnce()
 				assert.True(t, job.Panicked())
-				assert.Equal(t, metrix.CollectStatusFailed, store.ReadRaw().CollectMeta().LastAttemptStatus)
+				assert.Equal(t, metrix.CollectStatusFailed, store.Read(metrix.ReadRaw()).CollectMeta().LastAttemptStatus)
 				out.Reset()
 
 				job.runOnce()
 				assert.False(t, job.Panicked())
-				assert.Equal(t, metrix.CollectStatusSuccess, store.ReadRaw().CollectMeta().LastAttemptStatus)
+				assert.Equal(t, metrix.CollectStatusSuccess, store.Read(metrix.ReadRaw()).CollectMeta().LastAttemptStatus)
 				assert.Contains(t, out.String(), "SET 'busy' = 11")
 			},
 		},

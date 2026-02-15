@@ -28,7 +28,7 @@ func TestGaugeStoreScenarios(t *testing.T) {
 
 				_, ok := s.Read().Value("apache.workers_busy", nil)
 				require.False(t, ok, "expected snapshot gauge hidden after successful cycle with no sample")
-				mustValue(t, s.ReadRaw(), "apache.workers_busy", nil, 10)
+				mustValue(t, s.Read(ReadRaw()), "apache.workers_busy", nil, 10)
 			},
 		},
 		"stateful gauge set and add semantics": {
@@ -85,7 +85,7 @@ func TestGaugeStoreScenarios(t *testing.T) {
 				require.Equal(t, uint64(1), meta.LastSuccessSeq, "unexpected collect meta after abort: %#v", meta)
 				_, ok := s.Read().Value("svc.load", nil)
 				require.False(t, ok, "expected snapshot gauge hidden after failed attempt")
-				mustValue(t, s.ReadRaw(), "svc.load", nil, 11)
+				mustValue(t, s.Read(ReadRaw()), "svc.load", nil, 11)
 			},
 		},
 		"mode mixing snapshot and stateful panics": {
