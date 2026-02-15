@@ -356,6 +356,28 @@ set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 
 #
+# scripts.d.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-SCRIPTS_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-SCRIPTS_DESCRIPTION
+		"The scripts metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics using scripts
+that provide data in an extended version of the output format used by
+Nagios plugins. This provides compatibility with most Nagios plugins,
+as well as enabling simple active checks.")
+
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_NAME "netdata-plugin-scripts")
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_CONFLICTS "netdata (<< 2.8)")
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_PREDEPENDS "netdata-user")
+
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-scripts/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_DEBUGINFO_PACKAGE Off)
+
+#
 # ibm.plugin
 #
 
@@ -640,6 +662,9 @@ endif()
 if(ENABLE_PLUGIN_IBM)
   list(APPEND CPACK_COMPONENTS_ALL "plugin-ibm")
   list(APPEND CPACK_COMPONENTS_ALL "plugin-ibm-libs")
+endif()
+if(ENABLE_PLUGIN_SCRIPTS)
+  list(APPEND CPACK_COMPONENTS_ALL "plugin-scripts")
 endif()
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-network-viewer")

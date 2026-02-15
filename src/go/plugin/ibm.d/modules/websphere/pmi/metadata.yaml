@@ -8,7 +8,7 @@ modules:
         name: IBM WebSphere PMI
         link: https://www.ibm.com/docs/en/was
         categories:
-          - data-collection.application_servers
+          - data-collection.applications
         icon_filename: "ibm.svg"
       related_resources:
         integrations:
@@ -32,6 +32,13 @@ modules:
       multi_instance: true
       additional_permissions:
         description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
     setup:
       prerequisites:
         list:

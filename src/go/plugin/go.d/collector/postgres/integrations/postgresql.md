@@ -34,6 +34,11 @@ This collector is supported on all platforms.
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
 
+PostgreSQL can be monitored further using the following other integrations:
+
+- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
+- [Containers](/src/collectors/cgroups.plugin/integrations/containers.md)
+
 ### Default Behavior
 
 #### Auto-Detection

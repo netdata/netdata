@@ -16,7 +16,7 @@
       },
       "labels": {
         "title": "Labels",
-        "description": "Optional key-value pairs that help categorize and organize virtual nodes.",
+        "description": "Optional key-value pairs that help categorize and organize virtual nodes. Labels prefixed with `_` have special meaning for the scripts.d plugin: `_address` maps to $HOSTADDRESS$, `_alias` maps to $HOSTALIAS$, and other `_`-prefixed keys (e.g. `_DATACENTER`) map to $_HOST*$ custom variables.",
         "type": [
           "object",
           "null"

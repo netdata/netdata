@@ -7,7 +7,7 @@ modules:
         name: eBPF Filedescriptor
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -15,7 +15,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -231,7 +232,7 @@ modules:
         name: eBPF Processes
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -239,7 +240,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -486,7 +488,7 @@ modules:
         name: eBPF Disk
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -594,7 +596,7 @@ modules:
         name: eBPF Hardirq
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -700,7 +702,7 @@ modules:
         name: eBPF Cachestat
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -708,7 +710,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -932,7 +935,7 @@ modules:
         name: eBPF Sync
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1114,7 +1117,7 @@ modules:
         name: eBPF MDflush
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1218,7 +1221,7 @@ modules:
         name: eBPF SWAP
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1226,7 +1229,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1398,7 +1402,7 @@ modules:
         name: eBPF OOMkill
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1406,7 +1410,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1526,7 +1531,7 @@ modules:
         name: eBPF Socket
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.networking
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1534,7 +1539,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1885,7 +1891,7 @@ modules:
         name: eBPF DCstat
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1893,7 +1899,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -2107,7 +2114,7 @@ modules:
         name: eBPF Filesystem
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2269,7 +2276,7 @@ modules:
         name: eBPF SHM
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2277,7 +2284,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -2505,7 +2513,7 @@ modules:
         name: eBPF SoftIRQ
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2611,7 +2619,7 @@ modules:
         name: eBPF Mount
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2735,7 +2743,7 @@ modules:
         name: eBPF VFS
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2743,7 +2751,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -3170,7 +3179,7 @@ modules:
         name: eBPF Process
         link: "https://github.com/netdata/netdata/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:

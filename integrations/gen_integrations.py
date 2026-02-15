@@ -28,7 +28,12 @@ COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'charts.d.plugin', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'python.d.plugin', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'guides', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules' / 'websphere', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'scripts.d' / 'modules', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netdata-otel', True),
 ]
 
 DEPLOY_SOURCES = [
@@ -262,8 +267,8 @@ def load_categories():
 
     try:
         CATEGORY_VALIDATOR.validate(categories)
-    except ValidationError:
-        warn(f'Failed to validate {CATEGORIES_FILE} against the schema.', CATEGORIES_FILE)
+    except ValidationError as e:
+        warn(f'Failed to validate {CATEGORIES_FILE} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', CATEGORIES_FILE)
         sys.exit(1)
 
     return categories
@@ -283,8 +288,8 @@ def load_collectors():
 
         try:
             COLLECTOR_VALIDATOR.validate(data)
-        except ValidationError:
-            warn(f'Failed to validate {path} against the schema.', path)
+        except ValidationError as e:
+            warn(f'Failed to validate {path} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', path)
             continue
 
         for idx, item in enumerate(data['modules']):
@@ -308,8 +313,8 @@ def _load_deploy_file(file, repo):
 
     try:
         DEPLOY_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     for idx, item in enumerate(data):
@@ -344,8 +349,8 @@ def _load_exporter_file(file, repo):
 
     try:
         EXPORTER_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     if 'id' in data:
@@ -390,8 +395,8 @@ def _load_agent_notification_file(file, repo):
 
     try:
         AGENT_NOTIFICATION_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     if 'id' in data:
@@ -436,8 +441,8 @@ def _load_cloud_notification_file(file, repo):
 
     try:
         CLOUD_NOTIFICATION_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     if 'id' in data:
@@ -482,8 +487,8 @@ def _load_logs_file(file, repo):
 
     try:
         LOGS_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     if 'id' in data:
@@ -528,8 +533,8 @@ def _load_authentication_file(file, repo):
 
     try:
         AUTHENTICATION_VALIDATOR.validate(data)
-    except ValidationError:
-        warn(f'Failed to validate {file} against the schema.', file)
+    except ValidationError as e:
+        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
         return []
 
     if 'id' in data:
@@ -623,7 +628,47 @@ def render_collectors(categories, collectors, ids):
     collectors, ids = dedupe_integrations(collectors, ids)
     clean_collectors = []
 
-    idmap = {i['id']: i for i in collectors}
+    # Build hierarchical indexes for cascading related_resources lookup:
+    #   Level 1: plugin_name + module_name + monitored_instance_name (exact)
+    #   Level 2: plugin_name + module_name (all instances of that module)
+    #   Level 3: plugin_name (all modules of that plugin)
+    by_pm_instance = {}  # (plugin, module, instance) -> [items]
+    by_pm = {}           # (plugin, module) -> [items]
+    by_plugin = {}       # plugin -> [items]
+
+    for i in collectors:
+        m = i['meta']
+        pn = m['plugin_name']
+        mn = m['module_name']
+        inst = m['monitored_instance']['name']
+
+        by_pm_instance.setdefault((pn, mn, inst), []).append(i)
+        by_pm.setdefault((pn, mn), []).append(i)
+        by_plugin.setdefault(pn, []).append(i)
+
+    def find_related(res):
+        """Cascading lookup: try most specific first, relax until a match is found."""
+        pn = res['plugin_name']
+        mn = res.get('module_name')
+        inst = res.get('monitored_instance_name')
+
+        # Level 1: all three specified
+        if mn and inst:
+            matches = by_pm_instance.get((pn, mn, inst))
+            if matches:
+                return matches
+            debug(f'No exact related_resources match for plugin={pn!r}, '
+                  f'module={mn!r}, monitored_instance_name={inst!r}; '
+                  f'falling back to all instances of that module.')
+
+        # Level 2: plugin + module
+        if mn:
+            # When module_name is explicitly specified, don't fall back to
+            # plugin-only — that would mask typos in the reference.
+            return by_pm.get((pn, mn), [])
+
+        # Level 3: plugin only (no module specified)
+        return by_plugin.get(pn, [])
 
     for item in collectors:
         debug(f'Processing {item["id"]}.')
@@ -633,21 +678,30 @@ def render_collectors(categories, collectors, ids):
         clean_item = deepcopy(item)
 
         related = []
+        seen_ids = set()
 
         for res in item['meta']['related_resources']['integrations']['list']:
-            res_id = make_id(res)
+            matches = find_related(res)
 
-            if res_id not in idmap.keys():
-                warn(f'Could not find related integration {res_id}, ignoring it.', item['_src_path'])
+            if not matches:
+                warn(f'Could not find related integration for {res}, ignoring it.', item['_src_path'])
                 continue
 
-            related.append({
-                'plugin_name': res['plugin_name'],
-                'module_name': res['module_name'],
-                'id': res_id,
-                'name': idmap[res_id]['meta']['monitored_instance']['name'],
-                'info': idmap[res_id]['meta']['info_provided_to_referring_integrations'],
-            })
+            for match in matches:
+                mid = match['id']
+
+                # skip self-references and duplicates
+                if mid == item['id'] or mid in seen_ids:
+                    continue
+
+                seen_ids.add(mid)
+                related.append({
+                    'plugin_name': match['meta']['plugin_name'],
+                    'module_name': match['meta']['module_name'],
+                    'id': mid,
+                    'name': match['meta']['monitored_instance']['name'],
+                    'info': match['meta']['info_provided_to_referring_integrations'],
+                })
 
         item_cats = set(item['meta']['monitored_instance']['categories'])
         bogus_cats = item_cats - valid_cats

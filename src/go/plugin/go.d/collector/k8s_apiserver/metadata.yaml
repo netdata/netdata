@@ -9,7 +9,7 @@ modules:
         link: https://kubernetes.io/docs/concepts/overview/components/#kube-apiserver
         icon_filename: kubernetes.svg
         categories:
-          - data-collection.kubernetes
+          - data-collection.containers-and-vms
       keywords:
         - kubernetes
         - k8s
@@ -24,6 +24,11 @@ modules:
               module_name: k8s_kubeproxy
             - plugin_name: go.d.plugin
               module_name: k8s_state
+            - plugin_name: cgroups.plugin
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: "Kubernetes Containers"
+            - plugin_name: go.d.plugin
+              module_name: coredns
       info_provided_to_referring_integrations:
         description: ""
       most_popular: true

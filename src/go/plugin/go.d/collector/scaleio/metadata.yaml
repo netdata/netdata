@@ -9,7 +9,7 @@ modules:
         link: https://www.dell.com/en-ca/dt/storage/scaleio/scaleioreadynode.htm
         icon_filename: dell.svg
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords:
         - scaleio
       related_resources:

@@ -9,7 +9,7 @@ modules:
         link: "https://www.exim.org/"
         icon_filename: 'exim.jpg'
         categories:
-          - data-collection.mail-servers
+          - data-collection.applications
       keywords:
         - exim
         - mail

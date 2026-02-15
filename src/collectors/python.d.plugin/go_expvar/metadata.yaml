@@ -7,7 +7,7 @@ modules:
         name: Go applications (EXPVAR)
         link: "https://pkg.go.dev/expvar"
         categories:
-          - data-collection.apm
+          - data-collection.applications
         icon_filename: "go.png"
       related_resources:
         integrations:

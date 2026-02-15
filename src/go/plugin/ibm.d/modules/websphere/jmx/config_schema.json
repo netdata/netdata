@@ -4,278 +4,321 @@
     "properties": {
       "cell_name": {
         "default": "",
-        "title": "Cell name",
+        "description": "Cell name",
+        "title": "Cell Name",
         "type": "string"
       },
       "circuit_breaker_threshold": {
         "default": 5,
-        "title": "Circuit breaker threshold",
+        "description": "Circuit breaker threshold",
+        "title": "Circuit Breaker Threshold",
         "type": "integer"
       },
       "cluster_name": {
         "default": "",
-        "title": "Identity labels",
+        "description": "Identity labels",
+        "title": "Cluster Name",
         "type": "string"
       },
       "collect_apps_matching": {
         "default": "",
-        "title": "Enable collection of apps matching metrics",
+        "description": "Collect Apps matching",
+        "title": "Collect Apps Matching",
         "type": "string"
       },
       "collect_cluster_metrics": {
         "default": "enabled",
+        "description": "Collect Cluster metrics",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Enable collection of cluster metrics metrics",
+        "title": "Collect Cluster Metrics",
         "type": "string"
       },
       "collect_ejb_metrics": {
         "default": "enabled",
+        "description": "Collect E j b metrics",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Enable collection of e j b metrics metrics",
+        "title": "Collect Ejb Metrics",
         "type": "string"
       },
       "collect_ejbs_matching": {
         "default": "",
-        "title": "Enable collection of e j bs matching metrics",
+        "description": "Collect E j bs matching",
+        "title": "Collect Ejbs Matching",
         "type": "string"
       },
       "collect_jca_metrics": {
         "default": "enabled",
+        "description": "Collect J c a metrics",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Enable collection of j c a metrics metrics",
+        "title": "Collect Jca Metrics",
         "type": "string"
       },
       "collect_jdbc_advanced": {
         "default": "disabled",
+        "description": "Collect J d b c advanced",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Enable collection of j d b c advanced metrics",
+        "title": "Collect Jdbc Advanced",
         "type": "string"
       },
       "collect_jdbc_metrics": {
         "default": "enabled",
+        "description": "Collect J d b c metrics",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Enable collection of j d b c metrics metrics",
+        "title": "Collect Jdbc Metrics",
         "type": "string"
       },
       "collect_jms_matching": {
         "default": "",
-        "title": "Enable collection of j m s matching metrics",
+        "description": "Collect J m s matching",
+        "title": "Collect Jms Matching",
         "type": "string"
       },
       "collect_jms_metrics": {
         "default": "enabled",
+        "description": "Collect J m s metrics",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Enable collection of j m s metrics metrics",
+        "title": "Collect Jms Metrics",
         "type": "string"
       },
       "collect_jvm_metrics": {
         "default": "enabled",
+        "description": "Metric toggles",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Metric toggles",
+        "title": "Collect Jvm Metrics",
         "type": "string"
       },
       "collect_pools_matching": {
         "default": "",
-        "title": "Filters",
+        "description": "Filters",
+        "title": "Collect Pools Matching",
         "type": "string"
       },
       "collect_servlet_metrics": {
         "default": "enabled",
+        "description": "Collect Servlet metrics",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Enable collection of servlet metrics metrics",
+        "title": "Collect Servlet Metrics",
         "type": "string"
       },
       "collect_servlets_matching": {
         "default": "",
-        "title": "Enable collection of servlets matching metrics",
+        "description": "Collect Servlets matching",
+        "title": "Collect Servlets Matching",
         "type": "string"
       },
       "collect_session_metrics": {
         "default": "enabled",
+        "description": "Collect Session metrics",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Enable collection of session metrics metrics",
+        "title": "Collect Session Metrics",
         "type": "string"
       },
       "collect_threadpool_metrics": {
         "default": "enabled",
+        "description": "Collect Thread pool metrics",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Enable collection of thread pool metrics metrics",
+        "title": "Collect Threadpool Metrics",
         "type": "string"
       },
       "collect_transaction_metrics": {
         "default": "enabled",
+        "description": "Collect Transaction metrics",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Enable collection of transaction metrics metrics",
+        "title": "Collect Transaction Metrics",
         "type": "string"
       },
       "collect_webapp_metrics": {
         "default": "enabled",
+        "description": "Collect Web app metrics",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "Enable collection of web app metrics metrics",
+        "title": "Collect Webapp Metrics",
         "type": "string"
       },
       "helper_restart_max": {
         "default": 3,
-        "title": "Helper restart max",
+        "description": "Helper restart max",
+        "title": "Helper Restart Max",
         "type": "integer"
       },
       "init_timeout": {
         "default": 30000000000,
-        "title": "Connection timeout duration in seconds",
+        "description": "Timeout",
+        "title": "Init Timeout",
         "type": "integer"
       },
       "java_exec_path": {
         "default": "",
-        "title": "Java exec path",
+        "description": "Java exec path",
+        "title": "Java Exec Path",
         "type": "string"
       },
       "jmx_classpath": {
         "default": "",
-        "title": "J m x classpath",
+        "description": "J m x classpath",
+        "title": "Jmx Classpath",
         "type": "string"
       },
       "jmx_password": {
         "default": "",
+        "description": "Password",
         "format": "password",
-        "title": "Password for authentication",
+        "title": "Jmx Password",
         "type": "string"
       },
       "jmx_timeout": {
         "default": 5000000000,
-        "title": "Connection timeout duration in seconds",
+        "description": "Timeout",
+        "title": "Jmx Timeout",
         "type": "integer"
       },
       "jmx_url": {
         "default": "",
-        "title": "Connection settings",
+        "description": "Connection settings",
+        "title": "Jmx Url",
         "type": "string"
       },
       "jmx_username": {
         "default": "",
-        "title": "Username for authentication",
+        "description": "Username",
+        "title": "Jmx Username",
         "type": "string"
       },
       "max_applications": {
         "default": 100,
-        "title": "Maximum number of applications to monitor",
+        "description": "Max Applications",
+        "title": "Max Applications",
         "type": "integer"
       },
       "max_ejbs": {
         "default": 50,
-        "title": "Maximum number of e j bs to monitor",
+        "description": "Max E j bs",
+        "title": "Max Ejbs",
         "type": "integer"
       },
       "max_jca_pools": {
         "default": 50,
-        "title": "Maximum number of j c a pools to monitor",
+        "description": "Max J c a pools",
+        "title": "Max Jca Pools",
         "type": "integer"
       },
       "max_jdbc_pools": {
         "default": 50,
-        "title": "Maximum number of j d b c pools to monitor",
+        "description": "Max J d b c pools",
+        "title": "Max Jdbc Pools",
         "type": "integer"
       },
       "max_jms_destinations": {
         "default": 50,
-        "title": "Maximum number of j m s destinations to monitor",
+        "description": "Max J m s destinations",
+        "title": "Max Jms Destinations",
         "type": "integer"
       },
       "max_retries": {
         "default": 3,
-        "title": "Resilience tuning",
+        "description": "Resilience tuning",
+        "title": "Max Retries",
         "type": "integer"
       },
       "max_servlets": {
         "default": 50,
-        "title": "Maximum number of servlets to monitor",
+        "description": "Max Servlets",
+        "title": "Max Servlets",
         "type": "integer"
       },
       "max_threadpools": {
         "default": 50,
-        "title": "Cardinality guards",
+        "description": "Cardinality guards",
+        "title": "Max Threadpools",
         "type": "integer"
       },
       "node_name": {
         "default": "",
-        "title": "Node name",
+        "description": "Node name",
+        "title": "Node Name",
         "type": "string"
       },
       "retry_backoff_multiplier": {
         "default": 2,
-        "title": "Retry backoff multiplier",
+        "description": "Retry backoff multiplier",
+        "title": "Retry Backoff Multiplier",
         "type": "number"
       },
       "server_name": {
         "default": "",
-        "title": "Server name",
+        "description": "Server name",
+        "title": "Server Name",
         "type": "string"
       },
       "server_type": {
         "default": "",
-        "title": "Server type",
+        "description": "Server type",
+        "title": "Server Type",
         "type": "string"
       },
       "shutdown_delay": {
         "default": 100000000,
-        "title": "Shutdown delay",
+        "description": "Shutdown delay",
+        "title": "Shutdown Delay",
         "type": "integer"
       },
       "update_every": {
         "default": 5,
+        "description": "Data collection frequency",
         "minimum": 1,
-        "title": "Data collection frequency",
+        "title": "Update Every",
         "type": "integer"
       },
       "vnode": {
         "default": "",
+        "description": "Vnode",
         "title": "Vnode",
         "type": "string"
       }

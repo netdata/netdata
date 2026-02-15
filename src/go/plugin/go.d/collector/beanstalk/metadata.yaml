@@ -8,7 +8,7 @@ modules:
         name: Beanstalk
         link: https://beanstalkd.github.io/
         categories:
-          - data-collection.message-brokers
+          - data-collection.databases
         icon_filename: "beanstalk.svg"
       related_resources:
         integrations:

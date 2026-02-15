@@ -7,7 +7,7 @@ modules:
         name: Disk space
         link: ""
         categories:
-          - data-collection.linux-systems
+          - data-collection.storage
         icon_filename: "hard-drive.svg"
       related_resources:
         integrations:

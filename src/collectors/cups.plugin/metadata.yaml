@@ -7,7 +7,7 @@ modules:
         name: CUPS
         link: "https://www.cups.org/"
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.applications
         icon_filename: "cups.png"
       related_resources:
         integrations:

@@ -9,14 +9,16 @@ modules:
         link: https://www.nvidia.com/en-us/
         icon_filename: nvidia.svg
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.hardware-and-sensors
       keywords:
         - nvidia
         - gpu
         - hardware
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: go.d.plugin
+              module_name: dcgm
       info_provided_to_referring_integrations:
         description: ""
       most_popular: false

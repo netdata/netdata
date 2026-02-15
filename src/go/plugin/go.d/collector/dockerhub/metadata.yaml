@@ -9,7 +9,7 @@ modules:
         link: https://hub.docker.com/
         icon_filename: docker.svg
         categories:
-          - data-collection.containers-and-vms # FIXME
+          - data-collection.containers-and-vms
       keywords:
         - dockerhub
       related_resources:

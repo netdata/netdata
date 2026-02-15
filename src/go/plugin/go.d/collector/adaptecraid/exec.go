@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build linux || freebsd || openbsd || netbsd || dragonfly
-
 package adaptecraid
 
 import (
@@ -16,22 +14,47 @@ type arcconfCli interface {
 	physicalDevicesInfo() ([]byte, error)
 }
 
-func newArcconfCliExec(timeout time.Duration, log *logger.Logger) *arcconfCliExec {
-	return &arcconfCliExec{
+// ndsudoArcconfCliExec executes arcconf via ndsudo (Linux/BSD)
+type ndsudoArcconfCliExec struct {
+	*logger.Logger
+	timeout time.Duration
+}
+
+func newNdsudoArcconfCliExec(timeout time.Duration, log *logger.Logger) *ndsudoArcconfCliExec {
+	return &ndsudoArcconfCliExec{
 		Logger:  log,
 		timeout: timeout,
 	}
 }
 
-type arcconfCliExec struct {
-	*logger.Logger
-	timeout time.Duration
-}
-
-func (e *arcconfCliExec) logicalDevicesInfo() ([]byte, error) {
+func (e *ndsudoArcconfCliExec) logicalDevicesInfo() ([]byte, error) {
 	return ndexec.RunNDSudo(e.Logger, e.timeout, "arcconf-ld-info")
 }
 
-func (e *arcconfCliExec) physicalDevicesInfo() ([]byte, error) {
+func (e *ndsudoArcconfCliExec) physicalDevicesInfo() ([]byte, error) {
 	return ndexec.RunNDSudo(e.Logger, e.timeout, "arcconf-pd-info")
+}
+
+// directArcconfCliExec executes arcconf directly (Windows)
+type directArcconfCliExec struct {
+	*logger.Logger
+
+	arcconfPath string
+	timeout     time.Duration
+}
+
+func newDirectArcconfCliExec(arcconfPath string, timeout time.Duration, log *logger.Logger) *directArcconfCliExec {
+	return &directArcconfCliExec{
+		Logger:      log,
+		arcconfPath: arcconfPath,
+		timeout:     timeout,
+	}
+}
+
+func (e *directArcconfCliExec) logicalDevicesInfo() ([]byte, error) {
+	return ndexec.RunDirect(e.Logger, e.timeout, e.arcconfPath, "GETCONFIG", "1", "LD")
+}
+
+func (e *directArcconfCliExec) physicalDevicesInfo() ([]byte, error) {
+	return ndexec.RunDirect(e.Logger, e.timeout, e.arcconfPath, "GETCONFIG", "1", "PD")
 }

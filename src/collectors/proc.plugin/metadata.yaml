@@ -7,7 +7,7 @@ modules:
         name: System statistics
         link: ""
         categories:
-          - data-collection.linux-systems.system-metrics
+          - data-collection.operating-systems
         icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
@@ -206,7 +206,7 @@ modules:
         name: Entropy
         link: ""
         categories:
-          - data-collection.linux-systems.system-metrics
+          - data-collection.operating-systems
         icon_filename: "syslog.png"
       related_resources:
         integrations:
@@ -314,7 +314,7 @@ modules:
         name: System Uptime
         link: ""
         categories:
-          - data-collection.linux-systems.system-metrics
+          - data-collection.operating-systems
         icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
@@ -398,7 +398,7 @@ modules:
         name: Memory Statistics
         link: ""
         categories:
-          - data-collection.linux-systems.memory-metrics
+          - data-collection.operating-systems
         icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
@@ -617,7 +617,7 @@ modules:
         name: Interrupts
         link: ""
         categories:
-          - data-collection.linux-systems.cpu-metrics
+          - data-collection.operating-systems
         icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
@@ -732,7 +732,7 @@ modules:
         name: System Load Average
         link: ""
         categories:
-          - data-collection.linux-systems.system-metrics
+          - data-collection.operating-systems
         icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
@@ -861,7 +861,7 @@ modules:
         name: Pressure Stall Information
         link: ""
         categories:
-          - data-collection.linux-systems.pressure-metrics
+          - data-collection.operating-systems
         icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
@@ -1035,7 +1035,7 @@ modules:
         name: SoftIRQ statistics
         link: ""
         categories:
-          - data-collection.linux-systems.cpu-metrics
+          - data-collection.operating-systems
         icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
@@ -1143,7 +1143,7 @@ modules:
         name: Softnet Statistics
         link: ""
         categories:
-          - data-collection.linux-systems.network-metrics
+          - data-collection.networking
         icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
@@ -1268,7 +1268,7 @@ modules:
         name: Memory Usage
         link: ""
         categories:
-          - data-collection.linux-systems.memory-metrics
+          - data-collection.operating-systems
         icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
@@ -1510,7 +1510,7 @@ modules:
         name: Page types
         link: ""
         categories:
-          - data-collection.linux-systems.memory-metrics
+          - data-collection.operating-systems
         icon_filename: "microchip.svg"
       related_resources:
         integrations:
@@ -1599,7 +1599,7 @@ modules:
         name: Memory modules (DIMMs)
         link: ""
         categories:
-          - data-collection.linux-systems.memory-metrics
+          - data-collection.hardware-and-sensors
         icon_filename: "microchip.svg"
       related_resources:
         integrations:
@@ -1743,7 +1743,7 @@ modules:
         name: Non-Uniform Memory Access
         link: ""
         categories:
-          - data-collection.linux-systems.memory-metrics
+          - data-collection.operating-systems
         icon_filename: "linuxserver.svg"
       related_resources:
         integrations:
@@ -1835,7 +1835,7 @@ modules:
         name: Kernel Same-Page Merging
         link: ""
         categories:
-          - data-collection.linux-systems.memory-metrics
+          - data-collection.operating-systems
         icon_filename: "microchip.svg"
       related_resources:
         integrations:
@@ -1932,7 +1932,7 @@ modules:
         name: ZRAM
         link: ""
         categories:
-          - data-collection.linux-systems.memory-metrics
+          - data-collection.operating-systems
         icon_filename: "microchip.svg"
       related_resources:
         integrations:
@@ -2031,7 +2031,7 @@ modules:
         name: Inter Process Communication
         link: ""
         categories:
-          - data-collection.linux-systems.ipc-metrics
+          - data-collection.operating-systems
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:
@@ -2160,7 +2160,7 @@ modules:
         name: Disk Statistics
         link: ""
         categories:
-          - data-collection.linux-systems.disk-metrics
+          - data-collection.storage
         icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
@@ -2171,7 +2171,6 @@ modules:
         - disk
         - disks
         - io
-        - bcache
         - block devices
       most_popular: false
     overview:
@@ -2227,16 +2226,6 @@ modules:
         metric: disk.util
         info: average percentage of time ${label:device} disk was busy over the last 10 minutes
         os: "linux freebsd"
-      - name: bcache_cache_dirty
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf
-        metric: disk.bcache_cache_alloc
-        info: percentage of cache space used for dirty data and metadata (this usually means your SSD cache is too small)
-      - name: bcache_cache_errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf
-        metric: disk.bcache_cache_read_races
-        info:
-          number of times data was read from the cache, the bucket was reused and invalidated in the last 10 minutes (when this occurs the data is
-          reread from the backing device)
     metrics:
       folding:
         title: Metrics
@@ -2376,6 +2365,94 @@ modules:
               chart_type: line
               dimensions:
                 - name: svctm
+  - meta:
+      plugin_name: proc.plugin
+      module_name: /sys/fs/bcache
+      monitored_instance:
+        name: BCache
+        link: "https://bcache.evilpiepirate.org/"
+        categories:
+          - data-collection.storage
+        icon_filename: "hard-drive.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - bcache
+        - cache
+        - ssd
+        - block devices
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Statistics for BCache (block layer cache) devices, including cache hit ratios, I/O operations, cache allocations, and bypass activity.
+        method_description: ""
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            Automatically detects BCache devices by reading stats from `/sys/block/*/bcache/`.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: false
+          list: []
+        examples:
+          folding:
+            title: ""
+            enabled: false
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: bcache_cache_dirty
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf
+        metric: disk.bcache_cache_alloc
+        info: percentage of cache space used for dirty data and metadata (this usually means your SSD cache is too small)
+      - name: bcache_cache_errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf
+        metric: disk.bcache_cache_read_races
+        info: >
+          number of times data was read from the cache, the bucket was reused and invalidated in the last 10 minutes
+          (when this occurs the data is reread from the backing device)
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: disk
+          description: ""
+          labels:
+            - name: device
+              description: TBD
+            - name: mount_point
+              description: TBD
+            - name: device_type
+              description: TBD
+          metrics:
             - name: disk.bcache_cache_alloc
               description: BCache Cache Allocations
               unit: "percentage"
@@ -2444,7 +2521,7 @@ modules:
         name: MD RAID
         link: ""
         categories:
-          - data-collection.linux-systems.disk-metrics
+          - data-collection.storage
         icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
@@ -2585,7 +2662,7 @@ modules:
         name: Network interfaces
         link: ""
         categories:
-          - data-collection.linux-systems.network-metrics
+          - data-collection.networking
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:
@@ -2807,7 +2884,7 @@ modules:
         name: Wireless network interfaces
         link: ""
         categories:
-          - data-collection.linux-systems.network-metrics
+          - data-collection.networking
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:
@@ -2917,7 +2994,7 @@ modules:
         name: InfiniBand
         link: ""
         categories:
-          - data-collection.linux-systems.network-metrics
+          - data-collection.networking
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:
@@ -3060,7 +3137,7 @@ modules:
         name: Network statistics
         link: ""
         categories:
-          - data-collection.linux-systems.network-metrics
+          - data-collection.networking
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:
@@ -3645,7 +3722,7 @@ modules:
         name: Socket statistics
         link: ""
         categories:
-          - data-collection.linux-systems.network-metrics
+          - data-collection.networking
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:
@@ -3779,7 +3856,7 @@ modules:
         name: IPv6 Socket Statistics
         link: ""
         categories:
-          - data-collection.linux-systems.network-metrics
+          - data-collection.networking
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:
@@ -3876,7 +3953,7 @@ modules:
         name: IP Virtual Server
         link: ""
         categories:
-          - data-collection.linux-systems.network-metrics
+          - data-collection.networking
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:
@@ -3963,7 +4040,7 @@ modules:
         name: NFS Client
         link: ""
         categories:
-          - data-collection.linux-systems.filesystem-metrics.nfs
+          - data-collection.storage
         icon_filename: "nfs.png"
       related_resources:
         integrations:
@@ -4064,7 +4141,7 @@ modules:
         name: NFS Server
         link: ""
         categories:
-          - data-collection.linux-systems.filesystem-metrics.nfs
+          - data-collection.storage
         icon_filename: "nfs.png"
       related_resources:
         integrations:
@@ -4198,7 +4275,7 @@ modules:
         name: SCTP Statistics
         link: ""
         categories:
-          - data-collection.linux-systems.network-metrics
+          - data-collection.networking
         icon_filename: "network-wired.svg"
       related_resources:
         integrations:
@@ -4302,7 +4379,7 @@ modules:
         name: Conntrack
         link: ""
         categories:
-          - data-collection.linux-systems.firewall-metrics
+          - data-collection.networking
         icon_filename: "firewall.svg"
       related_resources:
         integrations:
@@ -4423,7 +4500,7 @@ modules:
         name: Synproxy
         link: ""
         categories:
-          - data-collection.linux-systems.firewall-metrics
+          - data-collection.networking
         icon_filename: "firewall.svg"
       related_resources:
         integrations:
@@ -4510,7 +4587,7 @@ modules:
         name: ZFS Adaptive Replacement Cache
         link: ""
         categories:
-          - data-collection.linux-systems.filesystem-metrics.zfs
+          - data-collection.storage
         icon_filename: "filesystem.svg"
       related_resources:
         integrations:
@@ -4776,7 +4853,7 @@ modules:
         name: BTRFS
         link: ""
         categories:
-          - data-collection.linux-systems.filesystem-metrics.btrfs
+          - data-collection.storage
         icon_filename: "filesystem.svg"
       related_resources:
         integrations:
@@ -4966,7 +5043,7 @@ modules:
         name: Power Supply
         link: ""
         categories:
-          - data-collection.linux-systems.power-supply-metrics
+          - data-collection.hardware-and-sensors
         icon_filename: "powersupply.svg"
       related_resources:
         integrations:
@@ -5082,7 +5159,7 @@ modules:
         name: AMD GPU
         link: "https://www.amd.com"
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.hardware-and-sensors
         icon_filename: amd.svg
       related_resources:
         integrations:

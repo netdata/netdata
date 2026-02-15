@@ -7,9 +7,9 @@ modules:
       monitored_instance:
         name: SNMP devices
         link: ""
-        icon_filename: snmp.png
+        icon_filename: SNMP.png
         categories:
-          - data-collection.generic-data-collection
+          - data-collection.networking
       keywords:
         # Protocol/generic
         - snmp
