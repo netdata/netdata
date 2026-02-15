@@ -15,7 +15,7 @@ use journal_engine::{
     batch_compute_file_indexes,
 };
 use journal_index::{Anchor, Direction, FieldName, Microseconds, Seconds};
-use journal_log_writer::{Config, Log, RetentionPolicy, RotationPolicy};
+use journal_log_writer::{Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy};
 use journal_registry::{Monitor, Origin, Registry, Source};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -427,7 +427,18 @@ impl IngestService {
                         let entry = entry_from_fields(&flow.fields);
                         let refs: Vec<&[u8]> = entry.iter().map(Vec::as_slice).collect();
 
-                        if let Err(err) = self.raw_journal.write_entry(&refs, flow.source_realtime_usec) {
+                        let timestamps = if let Some(source_realtime_usec) = flow.source_realtime_usec {
+                            EntryTimestamps::default()
+                                .with_source_realtime_usec(source_realtime_usec)
+                                .with_entry_realtime_usec(source_realtime_usec)
+                        } else {
+                            EntryTimestamps::default()
+                        };
+
+                        if let Err(err) = self
+                            .raw_journal
+                            .write_entry_with_timestamps(&refs, timestamps)
+                        {
                             self.metrics
                                 .journal_write_errors
                                 .fetch_add(1, Ordering::Relaxed);
@@ -602,7 +613,10 @@ impl IngestService {
             for row in rows {
                 let entry = entry_from_fields(&row.fields);
                 let refs: Vec<&[u8]> = entry.iter().map(Vec::as_slice).collect();
-                if let Err(err) = writer.write_entry(&refs, Some(row.timestamp_usec)) {
+                let timestamps = EntryTimestamps::default()
+                    .with_source_realtime_usec(row.timestamp_usec)
+                    .with_entry_realtime_usec(row.timestamp_usec);
+                if let Err(err) = writer.write_entry_with_timestamps(&refs, timestamps) {
                     self.metrics
                         .tier_write_errors
                         .fetch_add(1, Ordering::Relaxed);
