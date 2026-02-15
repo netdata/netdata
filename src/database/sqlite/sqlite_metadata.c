@@ -151,13 +151,17 @@ sqlite3 *db_meta = NULL;
 
 #define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid"
 
-#define STORE_HOST_LABEL                                                                                               \
+#define SQL_STORE_HOST_LABEL                                                                                           \
     "INSERT INTO host_label (host_id, source_type, label_key, label_value, date_created) VALUES "
 
-#define STORE_CHART_LABEL                                                                                              \
+#define SQL_STORE_HOST_LABEL_CONFLICT  " ON CONFLICT (host_id, label_key) "                                            \
+    "DO UPDATE SET source_type = excluded.source_type, label_value = excluded.label_value, date_created = UNIXEPOCH()"
+
+#define SQL_STORE_CHART_LABEL                                                                                          \
     "INSERT INTO chart_label (chart_id, source_type, label_key, label_value, date_created) VALUES "
 
-#define STORE_HOST_OR_CHART_LABEL_VALUE "(u2h('%s'), %d,'%s','%s', unixepoch())"
+#define SQL_STORE_CHART_LABEL_CONFLICT  " ON CONFLICT (chart_id, label_key) "                                          \
+    "DO UPDATE SET source_type = excluded.source_type, label_value = excluded.label_value, date_created = UNIXEPOCH()"
 
 #define DELETE_DIMENSION_UUID   "DELETE FROM dimension WHERE dim_id = @uuid"
 
@@ -816,32 +820,166 @@ close_database:
 
 // Metadata functions
 
-struct query_build {
-    BUFFER *sql;
-    int count;
-    char uuid_str[UUID_STR_LEN];
+// Label storage types
+typedef enum {
+    STORE_HOST_LABELS,
+    STORE_CHART_LABELS,
+} label_store_type_t;
+
+// Structure to hold a single label entry for collection
+struct label_entry {
+    char *name;
+    char *value;
+    RRDLABEL_SRC ls;
 };
 
-static int host_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
-    struct query_build *lb = data;
-    if (unlikely(!lb->count))
-        buffer_sprintf(lb->sql, STORE_HOST_LABEL);
-    else
-        buffer_strcat(lb->sql, ", ");
-    buffer_sprintf(lb->sql, STORE_HOST_OR_CHART_LABEL_VALUE, lb->uuid_str, (int) (ls & ~(RRDLABEL_FLAG_INTERNAL)), name, value);
-    lb->count++;
+// Context for label collection callback (no I/O, just data collection)
+struct label_collect_ctx {
+    struct label_entry *entries;
+    size_t count;
+    size_t capacity;
+};
+
+#define LABEL_COLLECT_INITIAL_CAPACITY 64
+
+// Max labels per batch: SQLite default SQLITE_MAX_VARIABLE_NUMBER is 32766 in the version we are using
+#define LABEL_BATCH_SIZE (1024)
+
+// Callback to collect labels into an array (no SQLite I/O while spinlock is held)
+static int collect_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data)
+{
+    struct label_collect_ctx *ctx = data;
+
+    if (unlikely(!name || !value))
+        return 1;
+
+    // Grow array if needed
+    if (ctx->count >= ctx->capacity) {
+        ctx->capacity *= 2;
+        ctx->entries = reallocz(ctx->entries, ctx->capacity * sizeof(*ctx->entries));
+    }
+
+    // Copy label data
+    ctx->entries[ctx->count].name = strdupz(name);
+    ctx->entries[ctx->count].value = strdupz(value);
+    ctx->entries[ctx->count].ls = ls;
+    ctx->count++;
+
     return 1;
 }
 
-static int chart_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
-    struct query_build *lb = data;
-    if (unlikely(!lb->count))
-        buffer_sprintf(lb->sql, STORE_CHART_LABEL);
+// Execute a batch of label inserts using a single multi-row INSERT statement
+// Returns number of errors
+static int store_label_batch(
+    nd_uuid_t *uuid,
+    struct label_entry *entries,
+    size_t count,
+    label_store_type_t type,
+    BUFFER *sql)
+{
+    if (count == 0)
+        return 0;
+
+    // Build SQL: INSERT INTO table (...) VALUES (?,?,?,?,UNIXEPOCH()), (?,?,?,?,UNIXEPOCH()), ... ON CONFLICT ...
+    buffer_flush(sql);
+
+    if (type == STORE_HOST_LABELS)
+        buffer_strcat(sql, SQL_STORE_HOST_LABEL);
     else
-        buffer_strcat(lb->sql, ", ");
-    buffer_sprintf(lb->sql, STORE_HOST_OR_CHART_LABEL_VALUE, lb->uuid_str, (int) (ls & ~(RRDLABEL_FLAG_INTERNAL)), name, value);
-    lb->count++;
-    return 1;
+        buffer_strcat(sql, SQL_STORE_CHART_LABEL);
+
+    for (size_t i = 0; i < count; i++) {
+        if (i > 0)
+            buffer_strcat(sql, ", ");
+        buffer_strcat(sql, "(?, ?, ?, ?, UNIXEPOCH())");
+    }
+
+    if (type == STORE_HOST_LABELS)
+        buffer_strcat(sql, SQL_STORE_HOST_LABEL_CONFLICT);
+    else
+        buffer_strcat(sql, SQL_STORE_CHART_LABEL_CONFLICT);
+
+    sqlite3_stmt *stmt = NULL;
+
+    if (!PREPARE_STATEMENT(db_meta, buffer_tostring(sql), &stmt))
+        return 1;
+
+    int errors = 0;
+
+    // Bind all parameters: 4 per label (uuid, source, key, value)
+    int param = 0;
+    for (size_t i = 0; i < count; i++) {
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(stmt, ++param, uuid, sizeof(*uuid), SQLITE_STATIC));
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(stmt, ++param, (int)(entries[i].ls & ~(RRDLABEL_FLAG_INTERNAL))));
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(stmt, ++param, entries[i].name, -1, SQLITE_STATIC));
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(stmt, ++param, entries[i].value, -1, SQLITE_STATIC));
+    }
+    param = 0;
+
+    int rc = sqlite3_step_monitored(stmt);
+    if (unlikely(rc != SQLITE_DONE)) {
+        errors = 1;
+        error_report("Failed to store label batch, rc = %d", rc);
+    }
+
+bind_fail:
+    if (param)
+        errors = 1;
+    REPORT_BIND_FAIL(stmt, param);
+    SQLITE_FINALIZE(stmt);
+
+    return errors;
+}
+
+// Store labels for a host or chart using batched prepared statements
+// Two-phase approach: collect labels first (while spinlock held), then execute SQLite (after spinlock released)
+static int store_labels(nd_uuid_t *uuid, RRDLABELS *labels, label_store_type_t type, BUFFER *work_buffer)
+{
+    if (unlikely(!uuid || !labels))
+        return 0;
+
+    // Phase 1: Collect labels while spinlock is held (fast, no I/O)
+    struct label_collect_ctx collect_ctx = {
+        .entries = mallocz(LABEL_COLLECT_INITIAL_CAPACITY * sizeof(*collect_ctx.entries)),
+        .count = 0,
+        .capacity = LABEL_COLLECT_INITIAL_CAPACITY,
+    };
+
+    rrdlabels_walkthrough_read(labels, collect_label_callback, &collect_ctx);
+    // Spinlock is now released
+
+    // Phase 2: Execute SQLite operations in batches (no spinlock held)
+    int errors = 0;
+
+    if (collect_ctx.count > 0) {
+        bool free_buffer = false;
+        if (!work_buffer) {
+            work_buffer = buffer_create(256 + collect_ctx.count * 30, NULL);
+            free_buffer = true;
+        }
+
+        size_t remaining = collect_ctx.count;
+        size_t offset = 0;
+
+        while (remaining > 0) {
+            size_t batch_count = (remaining > LABEL_BATCH_SIZE) ? LABEL_BATCH_SIZE : remaining;
+            errors += store_label_batch(uuid, &collect_ctx.entries[offset], batch_count, type, work_buffer);
+            offset += batch_count;
+            remaining -= batch_count;
+        }
+
+        if (free_buffer)
+            buffer_free(work_buffer);
+    }
+
+    // Cleanup collected labels
+    for (size_t i = 0; i < collect_ctx.count; i++) {
+        freez(collect_ctx.entries[i].name);
+        freez(collect_ctx.entries[i].value);
+    }
+    freez(collect_ctx.entries);
+
+    return errors ? 1 : 0;
 }
 
 static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer)
@@ -852,11 +990,7 @@ static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer)
     if (new_version == old_version)
         return 0;
 
-    struct query_build tmp = {.sql = work_buffer, .count = 0};
-    uuid_unparse_lower(st->chart_uuid, tmp.uuid_str);
-    rrdlabels_walkthrough_read(st->rrdlabels, chart_label_store_to_sql_callback, &tmp);
-    buffer_strcat(work_buffer, " ON CONFLICT (chart_id, label_key) DO UPDATE SET source_type = excluded.source_type, label_value=excluded.label_value, date_created=UNIXEPOCH()");
-    int rc = db_execute(db_meta, buffer_tostring(work_buffer), NULL);
+    int rc = store_labels(&st->chart_uuid, st->rrdlabels, STORE_CHART_LABELS, work_buffer);
     if (likely(!rc))
         st->rrdlabels_last_saved_version = new_version;
 
@@ -2028,7 +2162,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
 }
 #endif
 
-static void metadata_scan_host(struct meta_config_s *config, RRDHOST *host, BUFFER *work_buffer, bool is_worker)
+static void metadata_scan_host(struct meta_config_s *config, RRDHOST *host, bool is_worker, BUFFER *work_buffer)
 {
     static bool skip_models = false;
     RRDSET *st;
@@ -2051,8 +2185,6 @@ static void metadata_scan_host(struct meta_config_s *config, RRDHOST *host, BUFF
         if(rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE)) {
 
             rrdset_flag_clear(st, RRDSET_FLAG_METADATA_UPDATE);
-
-            buffer_flush(work_buffer);
 
             if (is_worker)
                 worker_is_busy(UV_EVENT_STORE_CHART);
@@ -2327,6 +2459,7 @@ static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer)
 {
     rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_LABELS);
 
+    // Delete existing labels first to handle label removal
     int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_id.uuid);
     if (unlikely(rc)) {
         error_report("METADATA: 'host:%s': failed to delete old host labels", rrdhost_hostname(host));
@@ -2334,18 +2467,10 @@ static void meta_store_host_labels(RRDHOST *host, BUFFER *work_buffer)
         return;
     }
 
-    buffer_flush(work_buffer);
-
-    struct query_build tmp = {.sql = work_buffer, .count = 0};
-    uuid_unparse_lower(host->host_id.uuid, tmp.uuid_str);
-    rrdlabels_walkthrough_read(host->rrdlabels, host_label_store_to_sql_callback, &tmp);
-    buffer_strcat(
-        work_buffer,
-        " ON CONFLICT (host_id, label_key) DO UPDATE SET source_type = excluded.source_type, label_value=excluded.label_value, date_created=UNIXEPOCH()");
-    rc = db_execute(db_meta, buffer_tostring(work_buffer), NULL);
-
+    // Store all current labels using prepared statements
+    rc = store_labels(&host->host_id.uuid, host->rrdlabels, STORE_HOST_LABELS, work_buffer);
     if (unlikely(rc)) {
-        error_report("METADATA: 'host:%s': failed to update metadata host labels", rrdhost_hostname(host));
+        error_report("METADATA: 'host:%s': failed to store host labels", rrdhost_hostname(host));
         rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
     }
 }
@@ -2364,7 +2489,7 @@ static void store_host_claim_id(RRDHOST *host)
         rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID | RRDHOST_FLAG_METADATA_UPDATE);
 }
 
-void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer)
+static void store_host_info_and_metadata_with_buffer(RRDHOST *host, BUFFER *work_buffer)
 {
     // Store labels (if needed)
     if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS)))
@@ -2379,7 +2504,13 @@ void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer)
         store_host_and_system_info(host);
 }
 
-static void store_hosts_metadata(struct meta_config_s *config, BUFFER *work_buffer, bool is_worker)
+// Public API - creates buffer internally if needed
+void store_host_info_and_metadata(RRDHOST *host)
+{
+    store_host_info_and_metadata_with_buffer(host, NULL);
+}
+
+static void store_hosts_metadata(struct meta_config_s *config, bool is_worker)
 {
     RRDHOST *host;
     size_t host_count = 0;
@@ -2392,6 +2523,9 @@ static void store_hosts_metadata(struct meta_config_s *config, BUFFER *work_buff
         if (!host_count)
             host_count = 1; // avoid division by zero
     }
+
+    // Reusable buffer for building SQL statements
+    BUFFER *work_buffer = buffer_create(1024, NULL);
 
     size_t count = 0;
     dfe_start_reentrant(rrdhost_root_index, host)
@@ -2409,17 +2543,19 @@ static void store_hosts_metadata(struct meta_config_s *config, BUFFER *work_buff
             worker_is_busy(UV_EVENT_STORE_HOST);
 
         // store labels, claim_id, host and system info (if needed)
-        store_host_info_and_metadata(host, work_buffer);
+        store_host_info_and_metadata_with_buffer(host, work_buffer);
 
         if (is_worker)
             worker_is_idle();
 
-        metadata_scan_host(config, host, work_buffer, is_worker);
+        metadata_scan_host(config, host, is_worker, work_buffer);
 
         if (!is_worker)
             nd_log_daemon(NDLP_INFO, "METADATA: Progress of metadata storage: %6.2f%% completed", (100.0 * count / host_count));
     }
     dfe_done(host);
+
+    buffer_free(work_buffer);
 
     if (!is_worker) {
         COMPUTE_DURATION(report_duration, "us", started_ut, now_monotonic_usec());
@@ -2449,7 +2585,6 @@ static void start_metadata_hosts(uv_work_t *req)
     worker_data_t *worker = req->data;
     struct meta_config_s *config = worker->config;
 
-    BUFFER *work_buffer = worker->work_buffer;
     usec_t all_started_ut = now_monotonic_usec();
 
     store_sql_statements((struct judy_list_t *)worker->pending_sql_statement, true, false);
@@ -2461,7 +2596,7 @@ static void start_metadata_hosts(uv_work_t *req)
 
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
-    store_hosts_metadata(config, work_buffer, true);
+    store_hosts_metadata(config, true);
 
     COMPUTE_DURATION(report_duration, "us", all_started_ut, now_monotonic_usec());
     nd_log_daemon(NDLP_DEBUG, "Checking all hosts completed in %s", report_duration);
@@ -2512,7 +2647,6 @@ static void metadata_event_loop(void *arg)
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Starting metadata sync thread");
     config->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_FIRST_CHECK;
 
-    BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     worker_data_t *worker;
     Pvoid_t *Pvalue;
     struct judy_list_t *pending_alert_list = NULL;
@@ -2598,8 +2732,6 @@ static void metadata_event_loop(void *arg)
                     worker->pending_ctx_cleanup_list = pending_ctx_cleanup_list;
                     worker->pending_uuid_deletion = pending_uuid_deletion;
                     worker->pending_sql_statement = pending_sql_statement;
-
-                    worker->work_buffer = work_buffer;
                     pending_alert_list = NULL;
                     pending_ctx_cleanup_list = NULL;
                     pending_uuid_deletion = NULL;
@@ -2734,7 +2866,6 @@ static void metadata_event_loop(void *arg)
         freez(pending_uuid_deletion);
     }
 
-    buffer_free(work_buffer);
     release_cmd_pool(&config->cmd_pool);
     worker_unregister();
     service_exits();
