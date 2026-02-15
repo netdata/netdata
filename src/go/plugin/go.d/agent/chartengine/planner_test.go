@@ -749,6 +749,126 @@ groups:
 	assert.Equal(t, float64(10), update.Values[0].Float64)
 }
 
+func TestBuildPlanTemplateEnginePolicyControlsSelectorAndAutogen(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+engine:
+  selector:
+    allow:
+      - svc.errors_total{method="GET"}
+  autogen:
+    enabled: true
+groups:
+  - family: Service
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	unmatched := sm.Counter("errors_total")
+	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+	methodPOST := sm.LabelSet(metrix.Label{Key: "method", Value: "POST"})
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10, methodGET)
+	unmatched.ObserveTotal(20, methodPOST)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc.errors_total-method=GET", create.ChartID)
+}
+
+func TestBuildPlanEnginePolicyOptionOverridesTemplatePolicy(t *testing.T) {
+	overrideSelector := promselector.Expr{
+		Allow: []string{`svc.errors_total{method="POST"}`},
+	}
+	e, err := New(WithEnginePolicy(EnginePolicy{
+		Selector: &overrideSelector,
+		Autogen:  AutogenPolicy{Enabled: true},
+	}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+engine:
+  selector:
+    allow:
+      - svc.errors_total{method="GET"}
+  autogen:
+    enabled: false
+groups:
+  - family: Service
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	unmatched := sm.Counter("errors_total")
+	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+	methodPOST := sm.LabelSet(metrix.Label{Key: "method", Value: "POST"})
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10, methodGET)
+	unmatched.ObserveTotal(20, methodPOST)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc.errors_total-method=POST", create.ChartID)
+}
+
+func TestBuildPlanAutogenOptionKeepsTemplateSelector(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+engine:
+  selector:
+    allow:
+      - svc.errors_total{method="GET"}
+  autogen:
+    enabled: false
+groups:
+  - family: Service
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	unmatched := sm.Counter("errors_total")
+	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+	methodPOST := sm.LabelSet(metrix.Label{Key: "method", Value: "POST"})
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10, methodGET)
+	unmatched.ObserveTotal(20, methodPOST)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc.errors_total-method=GET", create.ChartID)
+}
+
 func TestBuildPlanAutogenCreatesChartForUnmatchedScalar(t *testing.T) {
 	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
 	require.NoError(t, err)

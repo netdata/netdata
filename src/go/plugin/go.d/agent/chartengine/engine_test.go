@@ -82,6 +82,37 @@ groups:
 				assert.Equal(t, []string{"mysql_queries_total"}, p.MetricNames())
 			},
 		},
+		"invalid engine selector on reload is rejected and keeps previous program": {
+			initialYAML: validTemplateYAML(),
+			initialRev:  400,
+			reloadYAML: `
+version: v1
+engine:
+  selector:
+    allow:
+      - mysql_queries_total{db="main",}
+groups:
+  - family: Database
+    metrics:
+      - mysql_queries_total
+    charts:
+      - title: Queries
+        context: queries_total
+        units: queries/s
+        dimensions:
+          - selector: mysql_queries_total
+            name: total
+`,
+			reloadRev: 401,
+			reloadErr: true,
+			assert: func(t *testing.T, e *Engine) {
+				t.Helper()
+				p := e.Program()
+				require.NotNil(t, p)
+				assert.Equal(t, uint64(400), p.Revision())
+				assert.Equal(t, []string{"mysql_queries_total"}, p.MetricNames())
+			},
+		},
 	}
 
 	for name, tc := range tests {

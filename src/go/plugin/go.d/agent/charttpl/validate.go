@@ -30,6 +30,9 @@ func (s *Spec) Validate() error {
 			Reason: "groups[] is required",
 		})
 	}
+	if err := validateEngine(s.Engine); err != nil {
+		return err
+	}
 
 	for i := range s.Groups {
 		if err := validateGroup(s.Groups[i], fmt.Sprintf("groups[%d]", i), nil); err != nil {
@@ -163,6 +166,36 @@ func validateChart(chart Chart, path string, effectiveMetrics map[string]struct{
 				return semErr(fmt.Sprintf("%s.dimensions[%d].name", path, i), fmt.Sprintf("duplicate dimension name %q", name))
 			}
 			seenDimNames[name] = struct{}{}
+		}
+	}
+
+	return nil
+}
+
+func validateEngine(engine *Engine) error {
+	if engine == nil {
+		return nil
+	}
+
+	if engine.Selector != nil {
+		for i, expr := range engine.Selector.Allow {
+			if strings.TrimSpace(expr) == "" {
+				return semErr(fmt.Sprintf("engine.selector.allow[%d]", i), "must not be empty")
+			}
+		}
+		for i, expr := range engine.Selector.Deny {
+			if strings.TrimSpace(expr) == "" {
+				return semErr(fmt.Sprintf("engine.selector.deny[%d]", i), "must not be empty")
+			}
+		}
+	}
+
+	if engine.Autogen != nil {
+		if engine.Autogen.MaxTypeIDLen < 0 {
+			return semErr("engine.autogen.max_type_id_len", "must be >= 0")
+		}
+		if engine.Autogen.MaxTypeIDLen > 0 && engine.Autogen.MaxTypeIDLen < 4 {
+			return semErr("engine.autogen.max_type_id_len", "must be >= 4 when set")
 		}
 	}
 

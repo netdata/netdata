@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 )
 
 func TestSpecValidateScenarios(t *testing.T) {
@@ -107,6 +109,63 @@ func TestSpecValidateScenarios(t *testing.T) {
 			},
 			wantErr: true,
 			errLike: "duplicate token",
+		},
+		"fails on empty engine selector entry": {
+			spec: Spec{
+				Version: VersionV1,
+				Engine: &Engine{
+					Selector: &promselector.Expr{
+						Allow: []string{"  "},
+					},
+				},
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "engine.selector.allow[0]",
+		},
+		"fails on invalid engine autogen max_type_id_len": {
+			spec: Spec{
+				Version: VersionV1,
+				Engine: &Engine{
+					Autogen: &EngineAutogen{
+						Enabled:      true,
+						MaxTypeIDLen: 3,
+					},
+				},
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "engine.autogen.max_type_id_len",
 		},
 	}
 

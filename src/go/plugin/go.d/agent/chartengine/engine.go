@@ -59,7 +59,19 @@ func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 		return err
 	}
 
+	e.mu.RLock()
+	cfg := e.state.cfg
+	e.mu.RUnlock()
+
+	autogenPolicy, selectorPolicy, err := resolveEffectivePolicy(cfg, spec.Engine)
+	if err != nil {
+		e.logWarningf("chartengine load failed revision=%d: %v", revision, err)
+		return err
+	}
+
 	e.mu.Lock()
+	e.state.cfg.autogen = autogenPolicy
+	e.state.cfg.selector = selectorPolicy
 	e.state.program = compiled
 	e.state.matchIndex = buildMatchIndex(compiled.Charts())
 	// Template revision change resets routing/materialization internals.

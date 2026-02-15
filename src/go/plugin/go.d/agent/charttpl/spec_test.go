@@ -19,6 +19,15 @@ func TestDecodeYAMLScenarios(t *testing.T) {
 			input: `
 version: v1
 context_namespace: mysql
+engine:
+  selector:
+    allow:
+      - mysql_queries_total{db="main"}
+  autogen:
+    enabled: true
+    type_id: mysql.jobs
+    max_type_id_len: 512
+    expire_after_success_cycles: 9
 groups:
   - family: Database
     metrics:
@@ -37,6 +46,14 @@ groups:
 				require.Len(t, spec.Groups, 1)
 				require.Len(t, spec.Groups[0].Charts, 1)
 				assert.Equal(t, "line", spec.Groups[0].Charts[0].Type)
+				require.NotNil(t, spec.Engine)
+				require.NotNil(t, spec.Engine.Selector)
+				assert.Equal(t, []string{`mysql_queries_total{db="main"}`}, spec.Engine.Selector.Allow)
+				require.NotNil(t, spec.Engine.Autogen)
+				assert.True(t, spec.Engine.Autogen.Enabled)
+				assert.Equal(t, "mysql.jobs", spec.Engine.Autogen.TypeID)
+				assert.Equal(t, 512, spec.Engine.Autogen.MaxTypeIDLen)
+				assert.Equal(t, uint64(9), spec.Engine.Autogen.ExpireAfterSuccessCycles)
 			},
 		},
 		"rejects unknown yaml field via strict unmarshal": {

@@ -15,6 +15,9 @@
     "context_namespace": {
       "type": "string"
     },
+    "engine": {
+      "$ref": "#/$defs/engine"
+    },
     "groups": {
       "type": "array",
       "minItems": 1,
@@ -24,6 +27,58 @@
     }
   },
   "$defs": {
+    "selector_expr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "engine_autogen": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "type_id": {
+          "type": "string"
+        },
+        "max_type_id_len": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expire_after_success_cycles": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector_expr"
+        },
+        "autogen": {
+          "$ref": "#/$defs/engine_autogen"
+        }
+      }
+    },
     "group": {
       "type": "object",
       "additionalProperties": false,

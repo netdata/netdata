@@ -12,12 +12,19 @@ import (
 )
 
 type engineConfig struct {
-	autogen         AutogenPolicy
-	selector        metrixselector.Selector
-	runtimeStore    metrix.RuntimeStore
-	runtimeStoreSet bool
-	log             *logger.Logger
-	seriesSelection seriesSelectionMode
+	autogen          AutogenPolicy
+	selector         metrixselector.Selector
+	autogenOverride  policyOverride[AutogenPolicy]
+	selectorOverride policyOverride[metrixselector.Selector]
+	runtimeStore     metrix.RuntimeStore
+	runtimeStoreSet  bool
+	log              *logger.Logger
+	seriesSelection  seriesSelectionMode
+}
+
+type policyOverride[T any] struct {
+	set   bool
+	value T
 }
 
 // Option mutates engine configuration at construction time.
@@ -100,6 +107,8 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 		if err != nil {
 			return fmt.Errorf("invalid engine selector: %w", err)
 		}
+		cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: autogen}
+		cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: true, value: selector}
 		cfg.autogen = autogen
 		cfg.selector = selector
 		return nil
@@ -109,7 +118,15 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 // WithAutogenPolicy configures unmatched-series autogen behavior.
 // Deprecated: prefer WithEnginePolicy.
 func WithAutogenPolicy(policy AutogenPolicy) Option {
-	return WithEnginePolicy(EnginePolicy{Autogen: policy})
+	return func(cfg *engineConfig) error {
+		autogen, err := normalizeAutogenPolicy(policy)
+		if err != nil {
+			return err
+		}
+		cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: autogen}
+		cfg.autogen = autogen
+		return nil
+	}
 }
 
 // WithRuntimeStore configures internal chartengine runtime metrics store.
