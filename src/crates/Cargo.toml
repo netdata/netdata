@@ -155,7 +155,6 @@ otel-signal-viewer-plugin = { path = "netdata-log-viewer/otel-signal-viewer-plug
 otel-plugin = { path = "netdata-otel/otel-plugin" }
 flatten_otel = { path = "netdata-otel/flatten_otel" }
 
-reqwest = { version = "0.12", features = ["json"] }
 tempfile = { version = "3" }
 
 proptest = "1.9"
