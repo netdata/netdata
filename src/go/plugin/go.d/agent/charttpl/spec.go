@@ -27,7 +27,6 @@ type Chart struct {
 	ID               string   `yaml:"id,omitempty" json:"id,omitempty"`
 	Title            string   `yaml:"title" json:"title"`
 	Family           string   `yaml:"family,omitempty" json:"family,omitempty"`
-	ContextNamespace string   `yaml:"context_namespace,omitempty" json:"context_namespace,omitempty"`
 	Context          string   `yaml:"context" json:"context"`
 	Units            string   `yaml:"units" json:"units"`
 	Algorithm        string   `yaml:"algorithm,omitempty" json:"algorithm,omitempty"`

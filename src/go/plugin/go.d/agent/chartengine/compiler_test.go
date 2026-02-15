@@ -213,7 +213,6 @@ func TestCompileScenarios(t *testing.T) {
 								Context:          "osd_space_usage",
 								Units:            "bytes",
 								LabelPromoted:    []string{"cluster", "cluster", "host"},
-								ContextNamespace: "ceph",
 								Instances: &charttpl.Instances{
 									ByLabels: []string{"osd_uuid"},
 								},
@@ -236,7 +235,7 @@ func TestCompileScenarios(t *testing.T) {
 				require.Len(t, charts[0].Identity.InstanceByLabels, 1)
 				assert.Equal(t, "osd_uuid", charts[0].Identity.InstanceByLabels[0].Key)
 				assert.Equal(t, "Disk", charts[0].Meta.Family)
-				assert.Equal(t, "ceph.osd_space_usage", charts[0].Meta.Context)
+				assert.Equal(t, "osd_space_usage", charts[0].Meta.Context)
 
 				assert.Equal(t, program.PromotionModeExplicitIntersection, charts[0].Labels.Mode)
 				assert.Equal(t, []string{"cluster", "host"}, charts[0].Labels.PromoteKeys)

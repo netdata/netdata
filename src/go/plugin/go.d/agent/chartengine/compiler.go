@@ -118,8 +118,7 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 		return program.Chart{}, err
 	}
 
-	contextParts := append(append([]string(nil), scope.contextParts...), normalizeOptional(chart.ContextNamespace)...)
-	contextParts = append(contextParts, strings.TrimSpace(chart.Context))
+	contextParts := append(append([]string(nil), scope.contextParts...), strings.TrimSpace(chart.Context))
 	context := strings.Join(filterEmpty(contextParts), ".")
 
 	baseID := strings.TrimSpace(chart.ID)

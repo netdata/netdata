@@ -78,9 +78,6 @@
         "family": {
           "type": "string"
         },
-        "context_namespace": {
-          "type": "string"
-        },
         "context": {
           "type": "string",
           "minLength": 1
