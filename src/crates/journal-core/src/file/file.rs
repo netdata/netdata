@@ -9,7 +9,7 @@ use crate::file::object::*;
 use crate::file::offset_array;
 use std::fs::{File, OpenOptions};
 use std::marker::PhantomData;
-use std::num::NonZeroU64;
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::time::Duration;
 use zerocopy::{ByteSlice, FromBytes};
 
@@ -79,18 +79,17 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct JournalFileOptions {
+pub struct CreateJournalFile {
     machine_id: uuid::Uuid,
     boot_id: uuid::Uuid,
     seqnum_id: uuid::Uuid,
     file_id: uuid::Uuid,
     window_size: u64,
-    data_hash_table_buckets: usize,
-    field_hash_table_buckets: usize,
+    hash_tables: HashTableConfig,
     enable_keyed_hash: bool,
 }
 
-impl JournalFileOptions {
+impl CreateJournalFile {
     pub fn new(machine_id: uuid::Uuid, boot_id: uuid::Uuid, seqnum_id: uuid::Uuid) -> Self {
         let file_id = uuid::Uuid::new_v4();
 
@@ -100,52 +99,13 @@ impl JournalFileOptions {
             seqnum_id,
             file_id,
             window_size: 64 * 1024,
-            data_hash_table_buckets: 4096,
-            field_hash_table_buckets: 512,
+            hash_tables: HashTableConfig::None,
             enable_keyed_hash: true,
         }
     }
 
-    /// Creates options with bucket sizes optimized based on previous utilization
-    pub fn with_optimized_buckets(
-        mut self,
-        previous_utilization: Option<BucketUtilization>,
-        max_file_size: Option<u64>,
-    ) -> Self {
-        let (data_buckets, field_buckets) = if let Some(utilization) = previous_utilization {
-            let data_utilization = utilization.data_utilization();
-            let field_utilization = utilization.field_utilization();
-
-            let data_buckets = if data_utilization > 0.75 {
-                (utilization.data_total * 2).next_power_of_two()
-            } else if data_utilization < 0.25 && utilization.data_total > 4096 {
-                (utilization.data_total / 2).next_power_of_two()
-            } else {
-                utilization.data_total
-            };
-
-            let field_buckets = if field_utilization > 0.75 {
-                (utilization.field_total * 2).next_power_of_two()
-            } else if field_utilization < 0.25 && utilization.field_total > 512 {
-                (utilization.field_total / 2).next_power_of_two()
-            } else {
-                utilization.field_total
-            };
-
-            (data_buckets, field_buckets)
-        } else {
-            // Initial sizing based on rotation policy max file size
-            let max_file_size = max_file_size.unwrap_or(8 * 1024 * 1024);
-
-            // 16 MiB -> 4096 data buckets
-            let data_buckets = (max_file_size / 4096).max(1024).next_power_of_two() as usize;
-            let field_buckets = 128; // Assume ~8:1 data:field ratio
-
-            (data_buckets, field_buckets)
-        };
-
-        self.data_hash_table_buckets = data_buckets;
-        self.field_hash_table_buckets = field_buckets;
+    pub fn with_hash_tables(mut self, config: HashTableConfig) -> Self {
+        self.hash_tables = config;
         self
     }
 
@@ -153,24 +113,6 @@ impl JournalFileOptions {
         assert_eq!(size % OBJECT_ALIGNMENT, 0);
         assert_eq!(size % 4096, 0, "Window size must be page-aligned");
         self.window_size = size;
-        self
-    }
-
-    pub fn with_data_hash_table_buckets(mut self, buckets: usize) -> Self {
-        assert!(
-            buckets.is_power_of_two(),
-            "Hash table buckets should be a power of two"
-        );
-        self.data_hash_table_buckets = buckets;
-        self
-    }
-
-    pub fn with_field_hash_table_buckets(mut self, buckets: usize) -> Self {
-        assert!(
-            buckets.is_power_of_two(),
-            "Hash table buckets should be a power of two"
-        );
-        self.field_hash_table_buckets = buckets;
         self
     }
 
@@ -208,6 +150,101 @@ impl BucketUtilization {
         } else {
             self.field_occupied as f64 / self.field_total as f64
         }
+    }
+}
+
+/// Configuration for hash tables in a journal file.
+#[derive(Debug, Clone)]
+pub enum HashTableConfig {
+    /// No hash tables. Writing will fail with MissingHashTable.
+    None,
+    /// Compute bucket sizes from utilization stats and max file size.
+    Optimized {
+        previous_utilization: Option<BucketUtilization>,
+        max_file_size: Option<u64>,
+    },
+    /// Explicit bucket counts (must be non-zero powers of 2).
+    Explicit {
+        data_buckets: NonZeroUsize,
+        field_buckets: NonZeroUsize,
+    },
+}
+
+impl HashTableConfig {
+    /// Resolves the config into concrete bucket counts.
+    /// Returns `None` for `HashTableConfig::None`.
+    pub fn resolve(&self) -> Option<(usize, usize)> {
+        match self {
+            HashTableConfig::None => Option::None,
+            HashTableConfig::Optimized {
+                previous_utilization,
+                max_file_size,
+            } => {
+                let (data_buckets, field_buckets) = if let Some(utilization) = previous_utilization
+                {
+                    let data_utilization = utilization.data_utilization();
+                    let field_utilization = utilization.field_utilization();
+
+                    let data_buckets = if data_utilization > 0.75 {
+                        (utilization.data_total * 2).next_power_of_two()
+                    } else if data_utilization < 0.25 && utilization.data_total > 4096 {
+                        (utilization.data_total / 2).next_power_of_two()
+                    } else {
+                        utilization.data_total
+                    };
+
+                    let field_buckets = if field_utilization > 0.75 {
+                        (utilization.field_total * 2).next_power_of_two()
+                    } else if field_utilization < 0.25 && utilization.field_total > 512 {
+                        (utilization.field_total / 2).next_power_of_two()
+                    } else {
+                        utilization.field_total
+                    };
+
+                    (data_buckets, field_buckets)
+                } else {
+                    let max_file_size = max_file_size.unwrap_or(8 * 1024 * 1024);
+                    let data_buckets =
+                        (max_file_size / 4096).max(1024).next_power_of_two() as usize;
+                    let field_buckets = 128;
+                    (data_buckets, field_buckets)
+                };
+                Some((data_buckets, field_buckets))
+            }
+            HashTableConfig::Explicit {
+                data_buckets,
+                field_buckets,
+            } => {
+                debug_assert!(data_buckets.get().is_power_of_two());
+                debug_assert!(field_buckets.get().is_power_of_two());
+
+                Some((data_buckets.get(), field_buckets.get()))
+            }
+        }
+    }
+}
+
+/// Options for opening an existing journal file.
+pub struct OpenJournalFile {
+    window_size: u64,
+    load_hash_tables: bool,
+}
+
+impl OpenJournalFile {
+    pub fn new(window_size: u64) -> Self {
+        Self {
+            window_size,
+            load_hash_tables: false,
+        }
+    }
+
+    pub fn load_hash_tables(mut self) -> Self {
+        self.load_hash_tables = true;
+        self
+    }
+
+    pub fn open<M: MemoryMap>(self, file: &crate::repository::File) -> Result<JournalFile<M>> {
+        JournalFile::open(file, self)
     }
 }
 
@@ -294,8 +331,8 @@ impl<M: MemoryMap> JournalFile<M> {
         Ok(None)
     }
 
-    pub fn open(file: &crate::repository::File, window_size: u64) -> Result<Self> {
-        debug_assert_eq!(window_size % OBJECT_ALIGNMENT, 0);
+    pub(crate) fn open(file: &crate::repository::File, options: OpenJournalFile) -> Result<Self> {
+        debug_assert_eq!(options.window_size % OBJECT_ALIGNMENT, 0);
 
         // Open file and check its size
         let fd = OpenOptions::new()
@@ -311,20 +348,30 @@ impl<M: MemoryMap> JournalFile<M> {
             return Err(JournalError::InvalidMagicNumber);
         }
 
-        // Initialize the hash table maps if they exist
-        let data_hash_table_map = map_hash_table(
-            &fd,
-            header.data_hash_table_offset,
-            header.data_hash_table_size,
-        )?;
-        let field_hash_table_map = map_hash_table(
-            &fd,
-            header.field_hash_table_offset,
-            header.field_hash_table_size,
-        )?;
+        // Initialize the hash table maps if requested
+        let (data_hash_table_map, field_hash_table_map) = if options.load_hash_tables {
+            let data = map_hash_table(
+                &fd,
+                header.data_hash_table_offset,
+                header.data_hash_table_size,
+            )?;
+            let field = map_hash_table(
+                &fd,
+                header.field_hash_table_offset,
+                header.field_hash_table_size,
+            )?;
+
+            if data.is_none() || field.is_none() {
+                return Err(JournalError::MissingHashTable);
+            }
+
+            (data, field)
+        } else {
+            (None, None)
+        };
 
         // Create window manager for the rest of the objects
-        let window_manager = GuardedCell::new(WindowManager::new(fd, window_size, 16)?);
+        let window_manager = GuardedCell::new(WindowManager::new(fd, options.window_size, 16)?);
 
         Ok(JournalFile {
             file: file.clone(),
@@ -535,7 +582,7 @@ impl<M: MemoryMap> JournalFile<M> {
         iterator
     }
 
-    pub fn load_fields(&self) -> Result<HashMap<String, String>> {
+    pub fn load_fields(&self) -> Result<HashMap<Box<str>, Box<str>>> {
         let remapping_payload = b"ND_REMAPPING=1".as_slice();
         let hash = self.hash(remapping_payload);
 
@@ -562,6 +609,14 @@ impl<M: MemoryMap> JournalFile<M> {
                         let data_object = self.data_ref(data_offset)?;
                         let payload = data_object.raw_payload();
 
+                        // Only process ND-prefixed fields as remappings.
+                        // Remapping entries also contain non-remapping fields
+                        // (e.g. _BOOT_ID) that must be skipped to avoid
+                        // treating their values as otel field names.
+                        if !payload.starts_with(b"ND") {
+                            continue;
+                        }
+
                         if payload == remapping_payload {
                             continue;
                         }
@@ -572,8 +627,8 @@ impl<M: MemoryMap> JournalFile<M> {
                             return Err(JournalError::InvalidField);
                         };
 
-                        let systemd_name = String::from(field);
-                        let otel_name = String::from(value);
+                        let systemd_name: Box<str> = field.into();
+                        let otel_name: Box<str> = value.into();
 
                         field_map.insert(otel_name, systemd_name);
                     }
@@ -592,8 +647,8 @@ impl<M: MemoryMap> JournalFile<M> {
             if field.payload.starts_with(b"ND") {
                 continue;
             }
-            let s = String::from_utf8(field.raw_payload().to_vec()).expect("utf8 data");
-            field_map.insert(s.clone(), s);
+            let s = std::str::from_utf8(field.raw_payload()).expect("utf8 data");
+            field_map.insert(s.into(), s.into());
         }
 
         Ok(field_map)
@@ -708,26 +763,31 @@ impl<M: MemoryMapMut> JournalFile<M> {
 
     /// Creates a successor journal file with optimized bucket sizes based on this file's utilization
     pub fn create_successor(
-        &self,
+        self,
         file: &crate::repository::File,
         max_file_size: Option<u64>,
     ) -> Result<Self> {
         let header = self.journal_header_ref();
         let bucket_utilization = self.bucket_utilization();
 
-        let options = JournalFileOptions::new(
+        CreateJournalFile::new(
             uuid::Uuid::from_bytes(header.machine_id),
             uuid::Uuid::from_bytes(header.tail_entry_boot_id),
             uuid::Uuid::from_bytes(header.seqnum_id),
         )
         .with_window_size(8 * 1024 * 1024)
-        .with_optimized_buckets(bucket_utilization, max_file_size)
-        .with_keyed_hash(header.has_incompatible_flag(HeaderIncompatibleFlags::KeyedHash));
-
-        Self::create(file, options)
+        .with_hash_tables(HashTableConfig::Optimized {
+            previous_utilization: bucket_utilization,
+            max_file_size,
+        })
+        .with_keyed_hash(header.has_incompatible_flag(HeaderIncompatibleFlags::KeyedHash))
+        .create(file)
     }
 
-    pub fn create(file: &crate::repository::File, options: JournalFileOptions) -> Result<Self> {
+    pub(crate) fn create(
+        file: &crate::repository::File,
+        options: CreateJournalFile,
+    ) -> Result<Self> {
         let fd = OpenOptions::new()
             .create(true)
             .truncate(true)
@@ -735,41 +795,17 @@ impl<M: MemoryMapMut> JournalFile<M> {
             .write(true)
             .open(file.path())?;
 
-        // Calculate hash table sizes
-        let data_hash_table_size =
-            options.data_hash_table_buckets * std::mem::size_of::<HashItem>();
-        let field_hash_table_size =
-            options.field_hash_table_buckets * std::mem::size_of::<HashItem>();
-
-        // Calculate hash table offsets
-        let data_hash_table_offset = std::mem::size_of::<JournalHeader>() as u64
-            + std::mem::size_of::<ObjectHeader>() as u64;
-        let field_hash_table_offset = data_hash_table_offset
-            + data_hash_table_size as u64
-            + std::mem::size_of::<ObjectHeader>() as u64;
-
         // Create header with options configuration
         let mut header = JournalHeader::default();
         header.signature = *b"LPKSHHRH";
 
         // Set flags based on options configuration
+        header.incompatible_flags |= HeaderIncompatibleFlags::Compact as u32;
         if options.enable_keyed_hash {
             header.incompatible_flags |= HeaderIncompatibleFlags::KeyedHash as u32;
         }
 
-        // Set hash table configuration
-        header.data_hash_table_offset = NonZeroU64::new(data_hash_table_offset);
-        header.data_hash_table_size = NonZeroU64::new(data_hash_table_size as u64);
-        header.field_hash_table_offset = NonZeroU64::new(field_hash_table_offset);
-        header.field_hash_table_size = NonZeroU64::new(field_hash_table_size as u64);
-
-        // Set other header fields
-        header.tail_object_offset =
-            NonZeroU64::new(data_hash_table_offset + data_hash_table_size as u64);
         header.header_size = std::mem::size_of::<JournalHeader>() as u64;
-        header.n_objects = 2;
-        header.arena_size =
-            field_hash_table_offset + field_hash_table_size as u64 - header.header_size;
 
         // Set IDs from options
         header.machine_id = *options.machine_id.as_bytes();
@@ -777,17 +813,50 @@ impl<M: MemoryMapMut> JournalFile<M> {
         header.file_id = *options.file_id.as_bytes();
         header.seqnum_id = *options.seqnum_id.as_bytes();
 
-        // Create memory maps for hash tables
-        let data_hash_table_map = map_hash_table(
-            &fd,
-            header.data_hash_table_offset,
-            header.data_hash_table_size,
-        )?;
-        let field_hash_table_map = map_hash_table(
-            &fd,
-            header.field_hash_table_offset,
-            header.field_hash_table_size,
-        )?;
+        let (data_hash_table_map, field_hash_table_map) =
+            if let Some((data_buckets, field_buckets)) = options.hash_tables.resolve() {
+                // Calculate hash table sizes
+                let data_hash_table_size = data_buckets * std::mem::size_of::<HashItem>();
+                let field_hash_table_size = field_buckets * std::mem::size_of::<HashItem>();
+
+                // Calculate hash table offsets
+                let data_hash_table_offset = std::mem::size_of::<JournalHeader>() as u64
+                    + std::mem::size_of::<ObjectHeader>() as u64;
+                let field_hash_table_offset = data_hash_table_offset
+                    + data_hash_table_size as u64
+                    + std::mem::size_of::<ObjectHeader>() as u64;
+
+                // Set hash table configuration in header
+                header.data_hash_table_offset = NonZeroU64::new(data_hash_table_offset);
+                header.data_hash_table_size = NonZeroU64::new(data_hash_table_size as u64);
+                header.field_hash_table_offset = NonZeroU64::new(field_hash_table_offset);
+                header.field_hash_table_size = NonZeroU64::new(field_hash_table_size as u64);
+
+                header.tail_object_offset =
+                    NonZeroU64::new(data_hash_table_offset + data_hash_table_size as u64);
+                header.n_objects = 2;
+                header.arena_size =
+                    field_hash_table_offset + field_hash_table_size as u64 - header.header_size;
+
+                // Create memory maps for hash tables
+                let data_map = map_hash_table(
+                    &fd,
+                    header.data_hash_table_offset,
+                    header.data_hash_table_size,
+                )?;
+                let field_map = map_hash_table(
+                    &fd,
+                    header.field_hash_table_offset,
+                    header.field_hash_table_size,
+                )?;
+
+                (data_map, field_map)
+            } else {
+                // No hash tables
+                header.arena_size = 0;
+                header.n_objects = 0;
+                (None, None)
+            };
 
         // Create header memory map and write header
         let header_size = std::mem::size_of::<JournalHeader>() as u64;
@@ -810,30 +879,27 @@ impl<M: MemoryMapMut> JournalFile<M> {
             window_manager,
         };
 
-        // write data hash table object header info
+        // Write hash table object headers if hash tables were created
+        if let (Some(data_offset), Some(data_size)) =
+            (header.data_hash_table_offset, header.data_hash_table_size)
         {
-            let offset = NonZeroU64::new(
-                header.data_hash_table_offset.unwrap().get()
-                    - std::mem::size_of::<ObjectHeader>() as u64,
-            )
-            .unwrap();
-            let size = header.data_hash_table_size.unwrap().get()
-                + std::mem::size_of::<ObjectHeader>() as u64;
+            let offset =
+                NonZeroU64::new(data_offset.get() - std::mem::size_of::<ObjectHeader>() as u64)
+                    .unwrap();
+            let size = data_size.get() + std::mem::size_of::<ObjectHeader>() as u64;
 
             let object_header = jf.object_header_mut(offset)?;
             object_header.type_ = ObjectType::DataHashTable as u8;
             object_header.size = size
         }
 
-        // write field hash table object header info
+        if let (Some(field_offset), Some(field_size)) =
+            (header.field_hash_table_offset, header.field_hash_table_size)
         {
-            let offset = NonZeroU64::new(
-                header.field_hash_table_offset.unwrap().get()
-                    - std::mem::size_of::<ObjectHeader>() as u64,
-            )
-            .unwrap();
-            let size = header.field_hash_table_size.unwrap().get()
-                + std::mem::size_of::<ObjectHeader>() as u64;
+            let offset =
+                NonZeroU64::new(field_offset.get() - std::mem::size_of::<ObjectHeader>() as u64)
+                    .unwrap();
+            let size = field_size.get() + std::mem::size_of::<ObjectHeader>() as u64;
 
             let object_header = jf.object_header_mut(offset)?;
             object_header.type_ = ObjectType::FieldHashTable as u8;
@@ -979,7 +1045,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
         offset: NonZeroU64,
         size: Option<u64>,
     ) -> Result<ValueGuard<'_, EntryObject<&mut [u8]>>> {
-        let size = size.map(|n| std::mem::size_of::<DataObjectHeader>() as u64 + n);
+        let size = size.map(|n| std::mem::size_of::<EntryObjectHeader>() as u64 + n);
         self.journal_object_mut(ObjectType::Entry, offset, size)
     }
 
@@ -988,7 +1054,15 @@ impl<M: MemoryMapMut> JournalFile<M> {
         offset: NonZeroU64,
         size: Option<u64>,
     ) -> Result<ValueGuard<'_, DataObject<&mut [u8]>>> {
-        let size = size.map(|n| std::mem::size_of::<DataObjectHeader>() as u64 + n);
+        let is_compact = self
+            .journal_header_ref()
+            .has_incompatible_flag(HeaderIncompatibleFlags::Compact);
+        let compact_extra = if is_compact {
+            std::mem::size_of::<CompactDataFields>() as u64
+        } else {
+            0
+        };
+        let size = size.map(|n| std::mem::size_of::<DataObjectHeader>() as u64 + compact_extra + n);
         self.journal_object_mut(ObjectType::Data, offset, size)
     }
 

@@ -39,11 +39,19 @@ pub enum IndexError {
     #[error("missing required offset in journal file")]
     MissingOffset,
 
+    /// FST construction error
+    #[error("FST build error: {0}")]
+    FstBuildError(String),
+
+    /// Serialization or deserialization error
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+
     /// Underlying journal file error
     #[error("journal error: {0}")]
     Journal(#[from] journal_core::error::JournalError),
 }
 
-static_assertions::const_assert!(std::mem::size_of::<IndexError>() <= 32);
+static_assertions::const_assert!(std::mem::size_of::<IndexError>() <= 40);
 
 pub type Result<T> = std::result::Result<T, IndexError>;

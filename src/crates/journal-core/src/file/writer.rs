@@ -4,11 +4,11 @@ use super::mmap::MemoryMapMut;
 use super::mmap::MmapMut;
 use crate::error::{JournalError, Result};
 use crate::file::{
-    CompactEntryItem, DataHashTable, DataObject, DataObjectHeader, DataPayloadType, EntryObject,
-    EntryObjectHeader, FieldHashTable, FieldObject, FieldObjectHeader, HashItem, HashTable,
-    HashTableMut, HashableObject, HashableObjectMut, HeaderIncompatibleFlags, JournalFile,
-    JournalFileOptions, JournalHeader, JournalState, ObjectHeader, ObjectType, RegularEntryItem,
-    hash::jenkins_hash64, journal_hash_data,
+    CompactEntryItem, CreateJournalFile, DataHashTable, DataObject, DataObjectHeader,
+    DataPayloadType, EntryObject, EntryObjectHeader, FieldHashTable, FieldObject,
+    FieldObjectHeader, HashItem, HashTable, HashTableMut, HashableObject, HashableObjectMut,
+    HeaderIncompatibleFlags, JournalFile, JournalHeader, JournalState, ObjectHeader, ObjectType,
+    RegularEntryItem, hash::jenkins_hash64, journal_hash_data,
 };
 use rand::{Rng, seq::IndexedRandom};
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -96,7 +96,7 @@ impl JournalWriter {
         items: &[&[u8]],
         realtime: u64,
         monotonic: u64,
-    ) -> Result<()> {
+    ) -> Result<NonZeroU64> {
         let header = journal_file.journal_header_ref();
         assert!(header.has_incompatible_flag(HeaderIncompatibleFlags::KeyedHash));
 
@@ -127,8 +127,16 @@ impl JournalWriter {
 
         // write the entry itself
         let entry_offset = self.append_offset;
+        let is_compact = journal_file
+            .journal_header_ref()
+            .has_incompatible_flag(HeaderIncompatibleFlags::Compact);
         let entry_size = {
-            let size = Some(self.entry_items.len() as u64 * 16);
+            let entry_item_size: u64 = if is_compact {
+                std::mem::size_of::<CompactEntryItem>() as u64
+            } else {
+                std::mem::size_of::<RegularEntryItem>() as u64
+            };
+            let size = Some(self.entry_items.len() as u64 * entry_item_size);
             let mut entry_guard = journal_file.entry_mut(entry_offset, size)?;
 
             entry_guard.header.seqnum = self.next_seqnum;
@@ -139,9 +147,12 @@ impl JournalWriter {
 
             // set each entry item
             for (index, entry_item) in self.entry_items.iter().enumerate() {
-                entry_guard
-                    .items
-                    .set(index, entry_item.offset, Some(entry_item.hash));
+                let hash = if is_compact {
+                    None
+                } else {
+                    Some(entry_item.hash)
+                };
+                entry_guard.items.set(index, entry_item.offset, hash);
             }
 
             entry_guard.header.object_header.aligned_size()
@@ -155,7 +166,7 @@ impl JournalWriter {
 
         self.entry_added(journal_file.journal_header_mut(), realtime, monotonic);
 
-        Ok(())
+        Ok(entry_offset)
     }
 
     fn object_added(

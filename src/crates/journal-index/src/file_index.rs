@@ -1,13 +1,20 @@
-use crate::{
-    Bitmap, FieldName, FieldValuePair, Histogram, IndexError, Microseconds, Result, Seconds,
-};
+use crate::filter::FstLookup;
+use crate::{Bitmap, FieldName, Histogram, IndexError, Microseconds, Result, Seconds};
 use journal_core::collections::{HashMap, HashSet};
-use journal_core::file::{JournalFile, Mmap};
+use journal_core::file::{JournalFile, Mmap, OpenJournalFile};
 use journal_core::repository::File;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroU64;
 use tracing::{error, trace};
+
+/// FST-based index that maps `FieldValuePair` byte strings to `Bitmap`s.
+///
+/// This is a type alias over the generic `fst_index::FstIndex<Bitmap>`. The
+/// FST stores keys in sorted order and maps each to its position in a parallel
+/// `Vec<Bitmap>`, giving O(key_length) exact lookups and efficient prefix
+/// searches with significantly less memory overhead than a `HashMap` for keys.
+pub type FstIndex = fst_index::FstIndex<Bitmap>;
 
 /// Index for a single journal file, enabling efficient querying and filtering.
 ///
@@ -35,15 +42,13 @@ pub struct FileIndex {
     entry_offsets: Vec<u32>,
     // Set of fields in the file
     file_fields: HashSet<FieldName>,
-    // Set of fields that were requested to be indexed
-    indexed_fields: HashSet<FieldName>,
-    // Bitmap for each indexed field=value pair
-    bitmaps: HashMap<FieldValuePair, Bitmap>,
+    // FST index mapping FieldValuePair byte strings to Bitmaps
+    #[cfg_attr(feature = "allocative", allocative(skip))]
+    fst_index: FstIndex,
 }
 
 impl FileIndex {
     /// Create a new file index.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         file: File,
         indexed_at: Seconds,
@@ -51,8 +56,7 @@ impl FileIndex {
         histogram: Histogram,
         entry_offsets: Vec<u32>,
         fields: HashSet<FieldName>,
-        indexed_fields: HashSet<FieldName>,
-        bitmaps: HashMap<FieldValuePair, Bitmap>,
+        fst_index: FstIndex,
     ) -> Self {
         Self {
             file,
@@ -61,8 +65,7 @@ impl FileIndex {
             histogram,
             entry_offsets,
             file_fields: fields,
-            indexed_fields,
-            bitmaps,
+            fst_index,
         }
     }
 
@@ -122,19 +125,48 @@ impl FileIndex {
         self.histogram.total_entries()
     }
 
+    /// Get a reference to the histogram.
+    pub fn histogram(&self) -> &Histogram {
+        &self.histogram
+    }
+
+    /// Get a reference to the entry offsets vector.
+    pub fn entry_offsets(&self) -> &Vec<u32> {
+        &self.entry_offsets
+    }
+
     /// Get all field names present in this file.
     pub fn fields(&self) -> &HashSet<FieldName> {
         &self.file_fields
     }
 
-    /// Get all indexed field=value pairs with their bitmaps.
-    pub fn bitmaps(&self) -> &HashMap<FieldValuePair, Bitmap> {
-        &self.bitmaps
+    /// Get the FST index mapping field=value pairs to bitmaps.
+    pub fn fst_index(&self) -> &FstIndex {
+        &self.fst_index
+    }
+
+    /// Serialize to bincode + zstd compressed bytes.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let raw = bincode::serde::encode_to_vec(self, bincode::config::standard())
+            .map_err(|e| IndexError::Serialization(e.to_string()))?;
+        zstd::encode_all(&raw[..], 3).map_err(|e| IndexError::Serialization(e.to_string()))
+    }
+
+    /// Deserialize from bincode + zstd compressed bytes.
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        let decompressed =
+            zstd::decode_all(data).map_err(|e| IndexError::Serialization(e.to_string()))?;
+        bincode::serde::decode_from_slice(&decompressed, bincode::config::standard())
+            .map(|(val, _len)| val)
+            .map_err(|e| IndexError::Serialization(e.to_string()))
     }
 
     /// Check if a field is indexed.
+    ///
+    /// Since we now index all discovered fields, this is equivalent to
+    /// checking whether the field exists in the file.
     pub fn is_indexed(&self, field: &FieldName) -> bool {
-        self.indexed_fields.contains(field)
+        self.file_fields.contains(field)
     }
 
     /// Count entries (from a bitmap) that fall within a time range.
@@ -146,6 +178,16 @@ impl FileIndex {
     ) -> Option<usize> {
         self.histogram
             .count_entries_in_time_range(bitmap, start_time, end_time)
+    }
+}
+
+impl FstLookup for FileIndex {
+    fn fst_get(&self, key: &[u8]) -> Option<&Bitmap> {
+        self.fst_index.get(key)
+    }
+
+    fn fst_prefix_values(&self, prefix: &[u8]) -> Vec<&Bitmap> {
+        self.fst_index.prefix_values(prefix)
     }
 }
 
@@ -560,7 +602,7 @@ impl FileIndex {
         let bitmap = params
             .filter()
             .map(|f| f.evaluate(self))
-            .unwrap_or_else(|| Bitmap::insert_range(0..self.entry_offsets.len() as u32));
+            .unwrap_or_else(|| Bitmap::full(self.entry_offsets.len() as u32));
 
         if bitmap.is_empty() {
             // Nothing matches
@@ -568,7 +610,7 @@ impl FileIndex {
         }
 
         let window_size = 32 * 1024 * 1024;
-        let journal_file = JournalFile::open(file, window_size)?;
+        let journal_file = OpenJournalFile::new(window_size).open(file)?;
 
         // Collect the entry offsets in the bitmap
         // TODO: How should we handle zero offsets?
@@ -803,5 +845,81 @@ impl FileIndex {
         }
 
         Ok(log_entry_ids)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::FileIndexer;
+    use journal_core::file::{CreateJournalFile, HashTableConfig, JournalWriter};
+    use journal_core::repository::File;
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    /// Create a minimal test journal and index it.
+    fn make_test_index() -> (TempDir, FileIndex) {
+        let temp_dir = TempDir::new().unwrap();
+        let machine_id = Uuid::from_u128(0xAAAAAAAA_AAAA_AAAA_AAAA_AAAAAAAAAAAA);
+        let machine_dir = temp_dir.path().join(machine_id.to_string());
+        std::fs::create_dir_all(&machine_dir).unwrap();
+        let journal_path = machine_dir.join("system.journal");
+
+        let file = File::from_path(&journal_path).unwrap();
+        let boot_id = Uuid::from_u128(1);
+        let seqnum_id = Uuid::from_u128(2);
+
+        let mut jf = CreateJournalFile::new(machine_id, boot_id, seqnum_id)
+            .with_hash_tables(HashTableConfig::Optimized {
+                previous_utilization: None,
+                max_file_size: None,
+            })
+            .create(&file)
+            .unwrap();
+
+        let mut w = JournalWriter::new(&mut jf, 1, boot_id).unwrap();
+        let base_ts: u64 = 1_704_067_200_000_000; // 2024-01-01T00:00:00Z
+
+        for i in 0..5u64 {
+            let ts = base_ts + i * 3_600_000_000;
+            let ts_field = format!("_SOURCE_REALTIME_TIMESTAMP={ts}");
+            let prio = format!("PRIORITY={}", i % 3);
+            let fields: Vec<&[u8]> = vec![ts_field.as_bytes(), prio.as_bytes()];
+            w.add_entry(&mut jf, &fields, ts, ts).unwrap();
+        }
+
+        let mut indexer = FileIndexer::default();
+        let idx = indexer.index(&file, None).unwrap();
+
+        (temp_dir, idx)
+    }
+
+    #[test]
+    fn roundtrip_to_bytes_from_bytes() {
+        let (_td, original) = make_test_index();
+
+        let bytes = original.to_bytes().unwrap();
+        assert!(!bytes.is_empty());
+
+        let restored = FileIndex::from_bytes(&bytes).unwrap();
+
+        // Structural equality checks
+        assert_eq!(original.total_entries(), restored.total_entries());
+        assert_eq!(original.num_buckets(), restored.num_buckets());
+        assert_eq!(original.start_time(), restored.start_time());
+        assert_eq!(original.end_time(), restored.end_time());
+        assert_eq!(
+            original.entry_offsets().len(),
+            restored.entry_offsets().len()
+        );
+        assert_eq!(original.entry_offsets(), restored.entry_offsets());
+        assert_eq!(original.fields(), restored.fields());
+        assert_eq!(original.fst_index().len(), restored.fst_index().len());
+    }
+
+    #[test]
+    fn from_bytes_rejects_garbage() {
+        let result = FileIndex::from_bytes(b"not-valid-zstd");
+        assert!(result.is_err());
     }
 }

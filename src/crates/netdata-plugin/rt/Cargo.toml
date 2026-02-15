@@ -32,4 +32,4 @@ tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
 tracing-journald = { workspace = true }
 
 [dev-dependencies]
-console-subscriber = "0.4"
+console-subscriber = { workspace = true }

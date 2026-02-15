@@ -1,0 +1,33 @@
+[package]
+name = "wal-explore-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
+serde_json = "1.0"
+
+# Old path (reference)
+flatten_otel = { path = "../../flatten-otel" }
+
+# New path
+wal-explore = { path = ".." }
+
+# OTel protobuf types
+opentelemetry-proto = { version = "0.31", features = ["logs"] }
+
+# For base64 encoding in comparison
+base64 = "0.22"
+
+[[bin]]
+name = "compare_flatten"
+path = "fuzz_targets/compare_flatten.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

@@ -1,0 +1,40 @@
+[package]
+name = "otel-ingestor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "otel_ingestor"
+path = "src/lib.rs"
+
+[dependencies]
+bridge = { path = "../netdata-plugin/bridge" }
+ferryboat = { workspace = true }
+flatten_otel = { workspace = true }
+journal-common = { workspace = true }
+netdata-plugin-types = { path = "../netdata-plugin/types" }
+
+# WAL writing
+otel-flatten = { workspace = true }
+prost = { workspace = true }
+serde = { workspace = true, features = ["rc"] }
+wal = { workspace = true }
+
+# OTAP / Arrow
+otap-df-pdata = { git = "https://github.com/open-telemetry/otel-arrow.git", tag = "v0.46.0" }
+arrow = { version = "57" }
+
+anyhow = { workspace = true }
+opentelemetry-proto = { workspace = true }
+regex = { workspace = true }
+serde_json = { workspace = true, features = ["preserve_order"] }
+serde_regex = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true, features = ["gzip", "tls-ring"] }
+tracing = { workspace = true }
+twox-hash = { workspace = true, features = ["xxhash64"] }

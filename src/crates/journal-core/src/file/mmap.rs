@@ -26,6 +26,7 @@ impl MemoryMap for Mmap {
             MmapOptions::new()
                 .offset(offset)
                 .len(size as usize)
+                .populate()
                 .map(file)?
         };
 

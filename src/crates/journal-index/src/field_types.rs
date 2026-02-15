@@ -15,26 +15,26 @@ use std::fmt;
 /// This represents just the field name without any associated value.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
-pub struct FieldName(String);
+pub struct FieldName(Box<str>);
 
 impl FieldName {
     /// Create a new FieldName without validation.
     ///
     /// Use this when you know the string is a valid field name
     /// (e.g., from trusted sources like hardcoded constants).
-    pub fn new_unchecked(name: impl Into<String>) -> Self {
-        Self(name.into())
+    pub fn new_unchecked(name: impl AsRef<str>) -> Self {
+        Self(name.as_ref().into())
     }
 
     /// Create a FieldName with validation.
     ///
     /// Returns None if the name contains '=' or is empty.
-    pub fn new(name: impl Into<String>) -> Option<Self> {
-        let name = name.into();
+    pub fn new(name: impl AsRef<str>) -> Option<Self> {
+        let name = name.as_ref();
         if name.is_empty() || name.contains('=') {
             None
         } else {
-            Some(Self(name))
+            Some(Self(name.into()))
         }
     }
 
@@ -48,9 +48,9 @@ impl FieldName {
         self.0.as_bytes()
     }
 
-    /// Convert into the inner String.
+    /// Convert into an owned String.
     pub fn into_inner(self) -> String {
-        self.0
+        self.0.into()
     }
 
     /// Combine this field name with a value to create a FieldValuePair.
@@ -78,8 +78,8 @@ impl AsRef<str> for FieldName {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct FieldValuePair {
-    // Store the formatted string for efficient HashMap lookups
-    key: String,
+    // Store the formatted string for efficient lookups
+    key: Box<str>,
     // Cache the split position for fast field/value extraction
     split_pos: usize,
 }
@@ -90,7 +90,20 @@ impl FieldValuePair {
     /// This is unchecked - assumes field doesn't contain '='.
     pub fn new_unchecked(field: FieldName, value: String) -> Self {
         let split_pos = field.as_str().len();
-        let key = format!("{}={}", field.as_str(), value);
+        let key = format!("{}={}", field.as_str(), value).into_boxed_str();
+        Self { key, split_pos }
+    }
+
+    /// Create a new FieldValuePair from borrowed field name and value slices.
+    ///
+    /// This avoids intermediate allocations compared to `new_unchecked` — it
+    /// performs a single `format!` call without needing to clone the field name
+    /// or allocate a temporary value String.
+    ///
+    /// Assumes the field name doesn't contain '='.
+    pub fn from_parts(field: &str, value: &str) -> Self {
+        let split_pos = field.len();
+        let key = format!("{}={}", field, value).into_boxed_str();
         Self { key, split_pos }
     }
 
@@ -108,7 +121,7 @@ impl FieldValuePair {
         }
 
         Some(Self {
-            key: s.to_string(),
+            key: s.into(),
             split_pos,
         })
     }
@@ -133,9 +146,9 @@ impl FieldValuePair {
         self.key.as_bytes()
     }
 
-    /// Convert into the inner String.
+    /// Convert into an owned String.
     pub fn into_inner(self) -> String {
-        self.key
+        self.key.into()
     }
 
     /// Extract the field name as a FieldName.
@@ -197,6 +210,12 @@ impl fmt::Display for FieldValuePair {
 impl AsRef<str> for FieldValuePair {
     fn as_ref(&self) -> &str {
         &self.key
+    }
+}
+
+impl AsRef<[u8]> for FieldValuePair {
+    fn as_ref(&self) -> &[u8] {
+        self.key.as_bytes()
     }
 }
 

@@ -3,7 +3,7 @@
 //! This module provides types and services for computing histograms of journal log entries
 //! over time ranges, with support for filtering and faceted field indexing.
 
-use crate::{cache::FileIndexKey, error::Result, facets::Facets};
+use crate::{cache::FileIndexKey, error::Result};
 use journal_core::collections::HashSet;
 use journal_index::{Bitmap, FieldName, FieldValuePair, FileIndex, Filter, Seconds};
 use lru::LruCache;
@@ -80,8 +80,6 @@ pub struct BucketRequest {
     pub start: Seconds,
     /// End time of the bucket request
     pub end: Seconds,
-    /// Facets to use for file index
-    pub facets: Facets,
     /// Applied filter expression
     pub filter_expr: Filter,
 }
@@ -211,23 +209,24 @@ impl HistogramEngine {
     /// # Arguments
     /// * `indexed_files` - Pre-computed file indexes
     /// * `time_range` - Query time range with aligned boundaries and bucket duration
-    /// * `facets` - Fields to index
+    /// * `facets` - Fields to include as facets in the response. If empty, all
+    ///   indexed fields are returned. Non-facet fields are moved to
+    ///   `unindexed_fields` so that `discovered_fields()` still returns every
+    ///   field (needed for column schema generation).
     /// * `filter_expr` - Filter expression to apply
     pub fn compute_from_indexes(
         &self,
         indexed_files: &[(FileIndexKey, FileIndex)],
         time_range: &crate::QueryTimeRange,
-        facets: &[String],
+        facets: &[FieldName],
         filter_expr: &Filter,
     ) -> Result<Histogram> {
         // Generate bucket requests from time range
-        let facets = Facets::new(facets);
         let bucket_requests: Vec<BucketRequest> = time_range
             .buckets()
             .map(|(start, end)| BucketRequest {
                 start: Seconds(start),
                 end: Seconds(end),
-                facets: facets.clone(),
                 filter_expr: filter_expr.clone(),
             })
             .collect();
@@ -288,7 +287,7 @@ impl HistogramEngine {
                     };
 
                     // Count total entries in this file for this bucket's time range
-                    let all_entries = Bitmap::insert_range(0..file_index.total_entries() as u32);
+                    let all_entries = Bitmap::full(file_index.total_entries() as u32);
                     let unfiltered_total = file_index
                         .count_entries_in_time_range(
                             &all_entries,
@@ -322,7 +321,7 @@ impl HistogramEngine {
                     }
 
                     // Count field=value pairs in this file for this bucket's time range
-                    for (indexed_field, field_bitmap) in file_index.bitmaps() {
+                    file_index.fst_index().for_each(|key, field_bitmap| {
                         let unfiltered_count = file_index
                             .count_entries_in_time_range(
                                 field_bitmap,
@@ -345,12 +344,15 @@ impl HistogramEngine {
                         };
 
                         // Update counts
-                        if let Some(pair) = FieldValuePair::parse(indexed_field) {
+                        if let Some(pair) = std::str::from_utf8(key)
+                            .ok()
+                            .and_then(FieldValuePair::parse)
+                        {
                             let counts = response.fv_counts.entry(pair).or_insert((0, 0));
                             counts.0 += unfiltered_count;
                             counts.1 += filtered_count;
                         }
-                    }
+                    });
                 }
             }
 
@@ -382,7 +384,7 @@ impl HistogramEngine {
                 })
                 .collect();
 
-            Ok(Histogram { buckets })
+            Ok(Self::apply_facet_filter(Histogram { buckets }, facets))
         } else {
             // All buckets were cached, just build histogram from cache
             let mut responses = self.responses.write();
@@ -396,7 +398,39 @@ impl HistogramEngine {
                 })
                 .collect();
 
-            Ok(Histogram { buckets })
+            Ok(Self::apply_facet_filter(Histogram { buckets }, facets))
         }
+    }
+
+    /// Filter a histogram so that only the requested facet fields appear in
+    /// `fv_counts`. Non-facet fields are moved to `unindexed_fields` so that
+    /// `discovered_fields()` still returns every field.
+    ///
+    /// When `facets` is empty the histogram is returned unchanged.
+    fn apply_facet_filter(mut histogram: Histogram, facets: &[FieldName]) -> Histogram {
+        if facets.is_empty() {
+            return histogram;
+        }
+
+        let facet_set: HashSet<FieldName> = facets.iter().cloned().collect();
+
+        for (_request, response) in &mut histogram.buckets {
+            // Collect non-facet field names from fv_counts
+            let non_facet_fields: HashSet<FieldName> = response
+                .fv_counts
+                .keys()
+                .map(|pair| pair.extract_field())
+                .filter(|field| !facet_set.contains(field))
+                .collect();
+
+            // Move non-facet entries out of fv_counts and into unindexed_fields
+            response
+                .fv_counts
+                .retain(|pair, _| facet_set.contains(&pair.extract_field()));
+
+            response.unindexed_fields.extend(non_facet_fields);
+        }
+
+        histogram
     }
 }

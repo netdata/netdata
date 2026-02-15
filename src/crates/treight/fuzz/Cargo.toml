@@ -1,0 +1,22 @@
+[package]
+name = "treight-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
+treight = { path = "..", features = ["roaring"] }
+roaring = { path = "../../../../../../crates/roaring-rs/roaring" }
+
+[[bin]]
+name = "against_roaring"
+path = "fuzz_targets/against_roaring.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

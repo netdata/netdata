@@ -1,6 +1,16 @@
-use crate::{Bitmap, FieldName, FieldValuePair, FileIndex};
+use crate::{Bitmap, FieldName, FieldValuePair};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+
+/// Trait for types that can perform FST lookups (exact and prefix).
+///
+/// This allows [`Filter::evaluate()`] to work with different index
+/// implementations — both the in-memory `FileIndex` and the file-based
+/// split-FST index.
+pub trait FstLookup {
+    fn fst_get(&self, key: &[u8]) -> Option<&Bitmap>;
+    fn fst_prefix_values(&self, prefix: &[u8]) -> Vec<&Bitmap>;
+}
 
 /// Represents what a filter expression can match against.
 ///
@@ -76,9 +86,9 @@ impl Filter {
         matches!(self.inner.as_ref(), FilterExpr::None)
     }
 
-    /// Evaluate this filter against a file index to get matching entry indices.
-    pub fn evaluate(&self, file_index: &FileIndex) -> Bitmap {
-        self.inner.resolve(file_index).evaluate()
+    /// Evaluate this filter against an FST index to get matching entry indices.
+    pub fn evaluate(&self, fst: &impl FstLookup) -> Bitmap {
+        self.inner.resolve(fst).evaluate()
     }
 }
 
@@ -169,18 +179,18 @@ impl FilterExpr<FilterTarget> {
         }
     }
 
-    /// Convert a [`FilterExpr<FilterTarget>`] to [`FilterExpr<Bitmap>`] using the file index
-    fn resolve(&self, file_index: &FileIndex) -> FilterExpr<Bitmap> {
+    /// Convert a [`FilterExpr<FilterTarget>`] to [`FilterExpr<Bitmap>`] using an FST index.
+    fn resolve(&self, fst: &impl FstLookup) -> FilterExpr<Bitmap> {
         match self {
             FilterExpr::None => FilterExpr::None,
             FilterExpr::Match(target) => match target {
                 FilterTarget::Field(field_name) => {
-                    // Find all field=value pairs with matching field name
-                    let matches: Vec<_> = file_index
-                        .bitmaps()
-                        .iter()
-                        .filter(|(pair, _)| pair.field() == field_name.as_str())
-                        .map(|(_, bitmap)| FilterExpr::Match(bitmap.clone()))
+                    // Find all field=value pairs with matching field name via prefix search
+                    let prefix = format!("{}=", field_name.as_str());
+                    let matches: Vec<_> = fst
+                        .fst_prefix_values(prefix.as_bytes())
+                        .into_iter()
+                        .map(|bitmap| FilterExpr::Match(bitmap.clone()))
                         .collect();
 
                     match matches.len() {
@@ -191,7 +201,7 @@ impl FilterExpr<FilterTarget> {
                 }
                 FilterTarget::Pair(pair) => {
                     // Lookup specific field=value pair
-                    if let Some(bitmap) = file_index.bitmaps().get(pair) {
+                    if let Some(bitmap) = fst.fst_get(pair.as_bytes()) {
                         FilterExpr::Match(bitmap.clone())
                     } else {
                         FilterExpr::None
@@ -201,7 +211,7 @@ impl FilterExpr<FilterTarget> {
             FilterExpr::Conjunction(filters) => {
                 let mut resolved = Vec::with_capacity(filters.len());
                 for filter in filters {
-                    let r = filter.resolve(file_index);
+                    let r = filter.resolve(fst);
                     if matches!(r, FilterExpr::None) {
                         return FilterExpr::None;
                     }
@@ -217,7 +227,7 @@ impl FilterExpr<FilterTarget> {
             FilterExpr::Disjunction(filters) => {
                 let mut resolved = Vec::with_capacity(filters.len());
                 for filter in filters {
-                    let r = filter.resolve(file_index);
+                    let r = filter.resolve(fst);
                     if !matches!(r, FilterExpr::None) {
                         resolved.push(r);
                     }

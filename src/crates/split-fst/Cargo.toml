@@ -1,0 +1,17 @@
+[package]
+name = "split-fst"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Container format for split FST indexes with gix-chunk TOC"
+
+[lints]
+workspace = true
+
+[dependencies]
+fst-index = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+bincode = { workspace = true }
+zstd = { workspace = true }
+gix-chunk = { workspace = true }
+thiserror = { workspace = true }

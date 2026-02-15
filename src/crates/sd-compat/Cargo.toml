@@ -1,0 +1,20 @@
+[package]
+name = "sd-compat"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "sd_compat"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sd-compat"
+path = "src/main.rs"
+
+[dependencies]
+arrayvec = { workspace = true }
+md5 = { workspace = true }

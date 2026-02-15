@@ -1,0 +1,32 @@
+[package]
+name = "otel-plugin"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "otel-plugin"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+bridge = { path = "../netdata-plugin/bridge" }
+clap = { workspace = true }
+bytesize = { workspace = true }
+bytesize-serde = { workspace = true }
+ferryboat = { workspace = true }
+humantime = { workspace = true }
+humantime-serde = { workspace = true }
+netdata-plugin-protocol = { path = "../netdata-plugin/protocol" }
+netdata-plugin-types = { path = "../netdata-plugin/types" }
+otel-ledger = { workspace = true }
+otel-ingestor = { path = "../otel-ingestor" }
+rt = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }

@@ -8,12 +8,9 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-allocative = ["dep:allocative"]
+allocative = ["dep:allocative", "journal-index/allocative"]
 
 [dependencies]
-async-stream = { workspace = true }
-async-trait = { workspace = true }
-futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 static_assertions = { workspace = true }
@@ -21,7 +18,6 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-foyer = { workspace = true }
 parking_lot = { workspace = true, features = ["send_guard"] }
 rayon = { workspace = true }
 
@@ -35,7 +31,10 @@ allocative = { workspace = true, optional = true }
 
 [dev-dependencies]
 chrono = { workspace = true }
-tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+rand = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 tempfile = { workspace = true }
 uuid = { workspace = true }
 journal-common = { workspace = true }
+tikv-jemallocator = { workspace = true }

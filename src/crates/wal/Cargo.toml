@@ -1,0 +1,20 @@
+[package]
+name = "wal"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+crc32fast = { workspace = true }
+lz4_flex = { workspace = true }
+nix = { workspace = true, features = ["fs"] }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }

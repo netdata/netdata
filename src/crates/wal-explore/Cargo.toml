@@ -1,0 +1,37 @@
+[package]
+name = "wal-explore"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "wal-explore"
+path = "src/main.rs"
+
+[lib]
+name = "wal_explore"
+path = "src/lib.rs"
+
+[dependencies]
+bincode = { workspace = true }
+bumpalo = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+hashbrown = { workspace = true }
+log-index = { workspace = true }
+otel-flatten = { workspace = true }
+roaring = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+wal = { workspace = true }
+
+# OTAP / Arrow
+otap-df-pdata = { git = "https://github.com/open-telemetry/otel-arrow.git", tag = "v0.46.0" }
+arrow = { version = "57" }
+
+[dev-dependencies]
+base64 = { workspace = true }
+flatten_otel = { workspace = true }
+opentelemetry-proto = { workspace = true, features = ["logs"] }
+serde_json = { workspace = true }

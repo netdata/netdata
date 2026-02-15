@@ -1,3 +1,5 @@
+use arrayvec::ArrayString;
+
 use super::mmap::MemoryMap;
 use crate::error::Result;
 use crate::field_map::{FieldMap, REMAPPING_MARKER, extract_field_name};
@@ -262,7 +264,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
             let eq_pos = marker_str
                 .find('=')
                 .ok_or(crate::error::JournalError::InvalidField)?;
-            &marker_str.as_bytes()[..eq_pos]
+            &REMAPPING_MARKER[..eq_pos]
         };
 
         // Collect entry information first to avoid iterator conflicts
@@ -349,9 +351,11 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
                 if field_name.starts_with(b"ND_") && field_name.len() == 35 {
                     // This is a remapping field
                     let eq_pos = payload.iter().position(|&b| b == b'=').unwrap();
-                    let systemd_name = std::str::from_utf8(field_name)
-                        .map_err(|_| crate::error::JournalError::InvalidField)?
-                        .to_string();
+                    let systemd_name = ArrayString::<64>::from(
+                        std::str::from_utf8(field_name)
+                            .map_err(|_| crate::error::JournalError::InvalidField)?,
+                    )
+                    .map_err(|_| crate::error::JournalError::InvalidField)?;
                     let otel_name = payload[eq_pos + 1..].to_vec();
 
                     self.remapping_registry

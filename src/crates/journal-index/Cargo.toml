@@ -10,24 +10,32 @@ workspace = true
 [features]
 allocative = [
     "dep:allocative",
-    "roaring/allocative",
+    "treight/allocative",
     "journal-core/allocative",
-    "journal-common/allocative"
+    "journal-common/allocative",
+    "journal-registry/allocative"
 ]
 
 [dependencies]
 allocative = { workspace = true, optional = true }
+fst = { workspace = true }
+fst-index = { workspace = true, features = ["serde"] }
 regex = { workspace = true }
-roaring = { workspace = true , features = ["serde"] }
+treight = { path = "../treight", features = ["serde"] }
 serde = { workspace =  true, features = ["derive"] }
 static_assertions = { workspace = true }
+bincode = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+zstd = { workspace = true }
 
 journal-core = { path = "../journal-core" }
 journal-common = { workspace = true }
 journal-registry = { workspace = true }
 
 [dev-dependencies]
+allocative = { workspace = true }
+clap = { workspace = true }
 tempfile = { workspace = true }
+treight = { path = "../treight", features = ["allocative"] }
 uuid = { workspace = true }

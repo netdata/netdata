@@ -4,6 +4,7 @@ pub mod file;
 pub mod filter;
 mod guarded_cell;
 pub mod hash;
+pub mod metadata;
 pub mod mmap;
 mod object;
 pub mod offset_array;
@@ -13,7 +14,9 @@ mod value_guard;
 pub mod writer;
 
 // Core functionality
-pub use file::{BucketUtilization, JournalFile, JournalFileOptions};
+pub use file::{
+    BucketUtilization, CreateJournalFile, HashTableConfig, JournalFile, OpenJournalFile,
+};
 pub use reader::JournalReader;
 pub use writer::JournalWriter;
 
@@ -29,6 +32,7 @@ pub use filter::{FilterExpr, JournalFilter, LogicalOp};
 pub use object::{EntryItemsType, HashableObject, HeaderIncompatibleFlags, JournalState};
 
 // Re-export commonly needed external types
+pub use metadata::AfterArena;
 pub use mmap::{Mmap, MmapMut};
 
 // Internal utilities that might be needed

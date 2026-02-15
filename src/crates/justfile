@@ -1,0 +1,28 @@
+set fallback
+
+default:
+    @just --list
+
+certstream-server:
+    docker run --rm --name certstream-server -p 8080:8080 0rickyy0/certstream-server-go
+
+certstream-bridge:
+    cargo run --release -p certstream-otel-bridge -- \
+        --batch-size 1000 \
+        --certstream-url ws://127.0.0.1:8080/
+
+otel-plugin:
+    NETDATA_SYSTEMD_JOURNAL_PATH=/run/systemd/journal/socket \
+    NETDATA_LOG_LEVEL=debug \
+    NETDATA_STOCK_CONFIG_DIR=/home/vk/opt/sjr-tree8/netdata/usr/lib/netdata/conf.d \
+    cargo run -p otel-plugin
+
+demo:
+    tmux new-window -n demo 'journalctl -f --lines=0 --no-pager SYSLOG_IDENTIFIER=otel-plugin'
+    sleep 1
+    tmux split-window -t demo -v 'just otel-plugin'
+    sleep 1
+    tmux split-window -t demo -v 'just certstream-server'
+    sleep 1
+    tmux split-window -t demo -v 'just certstream-bridge'
+    tmux select-layout -t demo tiled

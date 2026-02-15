@@ -38,14 +38,6 @@ pub enum EngineError {
     #[error("Channel closed")]
     ChannelClosed,
 
-    /// Foyer cache error
-    #[error("Cache error: {0}")]
-    Foyer(#[from] foyer::Error),
-
-    /// Foyer IO engine error
-    #[error("Foyer IO error: {0}")]
-    FoyerIo(#[from] foyer::IoError),
-
     /// Operation was cancelled
     #[error("Operation cancelled")]
     Cancelled,

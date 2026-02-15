@@ -1,0 +1,21 @@
+[package]
+name = "fst-index"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Generic associative index backed by a finite state transducer"
+
+[lints]
+workspace = true
+
+[features]
+serde = ["dep:serde"]
+
+[dependencies]
+fst = { workspace = true }
+bumpalo = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }

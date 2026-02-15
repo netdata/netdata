@@ -5,14 +5,36 @@ mod config;
 pub use config::{Config, RetentionPolicy, RotationPolicy};
 
 use crate::{Result, WriterError};
-use journal_common::{RealtimeClock, load_boot_id, load_machine_id, monotonic_now};
+use cardinality_estimator::CardinalityEstimator;
+use journal_common::{RealtimeClock, load_boot_id, load_hostname, load_machine_id, monotonic_now};
+use journal_core::collections::HashMap;
 use journal_core::field_map::{
-    FieldMap, REMAPPING_MARKER, extract_field_name, is_systemd_compatible,
+    CARDINALITY_MARKER, FieldMap, REMAPPING_MARKER, extract_field_name, is_systemd_compatible,
 };
 use journal_core::file::mmap::MmapMut;
-use journal_core::file::{JournalFile, JournalFileOptions, JournalWriter};
+use journal_core::file::{CreateJournalFile, HashTableConfig, JournalFile, JournalWriter};
 use journal_registry::repository;
 use std::path::{Path, PathBuf};
+
+type FieldCardinality = CardinalityEstimator<[u8]>;
+
+/// Events produced by [`Log`] during writing, rotation, and shutdown.
+///
+/// Returned by [`Log::sync`] and [`Log::shutdown`] so the caller can
+/// forward them to other components (e.g. the ledger) without `Log`
+/// having any knowledge of IPC.
+#[derive(Debug, Clone)]
+pub enum LogEvent {
+    /// A batch of (timestamp, entry_offset) pairs written to a journal file.
+    EntryBatch {
+        file: repository::File,
+        entries: Vec<(u64, u64)>,
+    },
+    /// A new journal file has been created.
+    FileCreated { file: repository::File },
+    /// A journal file has been archived (rotation or shutdown).
+    FileArchived { file: repository::File },
+}
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, span, warn};
@@ -110,12 +132,14 @@ impl ActiveFile {
 
         let repository_file = chain.create_file(seqnum_id, head_seqnum, head_realtime)?;
 
-        let options = JournalFileOptions::new(chain.machine_id, boot_id, seqnum_id)
+        let mut journal_file = CreateJournalFile::new(chain.machine_id, boot_id, seqnum_id)
             .with_window_size(8 * 1024 * 1024)
-            .with_optimized_buckets(None, max_file_size)
-            .with_keyed_hash(true);
-
-        let mut journal_file = JournalFile::create(&repository_file, options)?;
+            .with_hash_tables(HashTableConfig::Optimized {
+                previous_utilization: None,
+                max_file_size,
+            })
+            .with_keyed_hash(true)
+            .create(&repository_file)?;
         let writer = JournalWriter::new(&mut journal_file, head_seqnum, boot_id)?;
 
         Ok(Self {
@@ -152,11 +176,17 @@ impl ActiveFile {
         })
     }
 
-    /// Writes a journal entry
-    fn write_entry(&mut self, items: &[&[u8]], realtime: u64, monotonic: u64) -> Result<()> {
-        self.writer
+    /// Writes a journal entry, returning the entry's file offset.
+    fn write_entry(
+        &mut self,
+        items: &[&[u8]],
+        realtime: u64,
+        monotonic: u64,
+    ) -> Result<std::num::NonZeroU64> {
+        let offset = self
+            .writer
             .add_entry(&mut self.journal_file, items, realtime, monotonic)?;
-        Ok(())
+        Ok(offset)
     }
 
     /// Gets the current file size
@@ -165,7 +195,7 @@ impl ActiveFile {
     }
 }
 
-pub struct Log {
+pub struct JournalLog {
     chain: OwnedChain,
     config: Config,
     active_file: Option<ActiveFile>,
@@ -174,10 +204,17 @@ pub struct Log {
     seqnum_id: uuid::Uuid,
     current_seqnum: u64,
     remapping_registry: FieldMap,
+    field_cardinality: HashMap<Vec<u8>, FieldCardinality>,
     clock: RealtimeClock,
+    boot_id_field: Vec<u8>,
+    machine_id_field: Vec<u8>,
+    hostname_field: Vec<u8>,
+    bump: bumpalo::Bump,
+    ts_pairs: Vec<(u64, u64)>,
+    pending_events: Vec<LogEvent>,
 }
 
-impl Log {
+impl JournalLog {
     /// Captures both realtime and monotonic timestamps, similar to systemd's dual_timestamp_now().
     ///
     /// Returns (realtime_usec, monotonic_usec) where:
@@ -195,6 +232,9 @@ impl Log {
 
         let current_seqnum = chain.tail_seqnum()?;
         let boot_id = load_boot_id()?;
+        let machine_id = load_machine_id()
+            .map_err(|e| WriterError::MachineId(format!("failed to load machine ID: {}", e)))?;
+        let hostname = load_hostname().map_err(|e| WriterError::Io(e))?;
         let seqnum_id = uuid::Uuid::new_v4();
         let rotation_state = RotationState::new(&config.rotation_policy);
 
@@ -205,7 +245,14 @@ impl Log {
             RealtimeClock::new()
         };
 
-        Ok(Log {
+        // Pre-format injected fields (cached for the lifetime of this Log)
+        let boot_id_field = format!("_BOOT_ID={}", boot_id.as_simple()).into_bytes();
+        let machine_id_field = format!("_MACHINE_ID={}", machine_id.as_simple()).into_bytes();
+        let hostname_field = format!("_HOSTNAME={}", hostname).into_bytes();
+
+        let ts_pairs_capacity = config.rotation_policy.number_of_entries.unwrap_or(0);
+
+        Ok(JournalLog {
             chain,
             config,
             active_file: None,
@@ -214,7 +261,14 @@ impl Log {
             seqnum_id,
             current_seqnum,
             remapping_registry: FieldMap::new(),
+            field_cardinality: HashMap::default(),
             clock,
+            boot_id_field,
+            machine_id_field,
+            hostname_field,
+            bump: bumpalo::Bump::new(),
+            ts_pairs: Vec::with_capacity(ts_pairs_capacity),
+            pending_events: Vec::new(),
         })
     }
 
@@ -235,10 +289,11 @@ impl Log {
         if self.should_rotate() {
             self.rotate()?;
             self.remapping_registry.clear();
+            self.field_cardinality.clear();
         }
 
         // Collect new incompatible field names that need remapping
-        let mut new_mappings: Vec<(Vec<u8>, String)> = Vec::new();
+        let mut new_mappings: Vec<(Vec<u8>, arrayvec::ArrayString<64>)> = Vec::new();
 
         for item in items {
             if let Some(field_name) = extract_field_name(item) {
@@ -253,7 +308,7 @@ impl Log {
                 }
 
                 // Generate remapped name and add to list
-                let remapped_name = rdp::encode_full(field_name);
+                let remapped_name = sd_compat::remap(field_name);
                 new_mappings.push((field_name.to_vec(), remapped_name));
             }
         }
@@ -262,58 +317,72 @@ impl Log {
         if !new_mappings.is_empty() {
             self.write_remapping_entry(&new_mappings)?;
 
-            // Update registry
-            for (otel_name, systemd_name) in new_mappings.iter() {
+            // Update registry (drain to avoid cloning)
+            for (otel_name, systemd_name) in new_mappings.drain(..) {
                 self.remapping_registry
-                    .add_otel_mapping(otel_name.clone(), systemd_name.clone());
+                    .add_otel_mapping(otel_name, systemd_name);
             }
-        }
-
-        // Inject _BOOT_ID field - this is required for journalctl boot filtering to work
-        let boot_id_field = format!("_BOOT_ID={}", self.boot_id.as_simple());
-
-        // Transform items to use remapped field names, prepending _BOOT_ID
-        let mut transformed_items: Vec<Vec<u8>> = Vec::with_capacity(items.len() + 2);
-        let mut items_refs: Vec<&[u8]> = Vec::with_capacity(items.len() + 2);
-
-        // Prepend _BOOT_ID field first
-        transformed_items.push(boot_id_field.into_bytes());
-
-        // Add _SOURCE_REALTIME_TIMESTAMP if provided
-        if let Some(timestamp_usec) = source_realtime_usec {
-            let source_timestamp_field = format!("_SOURCE_REALTIME_TIMESTAMP={}", timestamp_usec);
-            transformed_items.push(source_timestamp_field.into_bytes());
-        }
-
-        for item in items {
-            if let Some(field_name) = extract_field_name(item) {
-                if let Some(remapped_name) = self.remapping_registry.get_systemd_name(field_name) {
-                    // Need to remap: create new item with remapped field name
-                    let equals_pos = item.iter().position(|&b| b == b'=').unwrap();
-                    let value = &item[equals_pos..]; // includes '='
-                    let mut new_item = Vec::with_capacity(remapped_name.len() + value.len());
-                    new_item.extend_from_slice(remapped_name.as_bytes());
-                    new_item.extend_from_slice(value);
-                    transformed_items.push(new_item);
-                } else {
-                    // No remapping needed, use original
-                    transformed_items.push(item.to_vec());
-                }
-            } else {
-                // No field name (shouldn't happen with valid items)
-                transformed_items.push(item.to_vec());
-            }
-        }
-
-        // Build references for the underlying write
-        for item in &transformed_items {
-            items_refs.push(item.as_slice());
         }
 
         let (realtime, monotonic) = self.capture_dual_timestamp()?;
 
+        // Reset bump allocator — all per-entry temporaries are freed at once
+        self.bump.reset();
+
+        // Build items_refs borrowing directly from self fields and input
+        let mut items_refs =
+            bumpalo::collections::Vec::with_capacity_in(items.len() + 4, &self.bump);
+
+        // System fields — zero-copy references to cached fields
+        items_refs.push(self.boot_id_field.as_slice());
+        items_refs.push(self.machine_id_field.as_slice());
+        items_refs.push(self.hostname_field.as_slice());
+
+        // Optional timestamp — bump-allocated
+        if let Some(ts) = source_realtime_usec {
+            let ts_str = bumpalo::format!(in &self.bump, "_SOURCE_REALTIME_TIMESTAMP={}", ts);
+            items_refs.push(ts_str.into_bump_str().as_bytes());
+        }
+
+        // Items — zero-copy for passthrough, bump-allocated for remapped
+        for item in items {
+            if let Some(field_name) = extract_field_name(item) {
+                let eq_pos = item.iter().position(|&b| b == b'=').unwrap();
+                let value_bytes = &item[eq_pos + 1..];
+
+                if let Some(remapped_name) = self.remapping_registry.get_systemd_name(field_name) {
+                    // Update cardinality estimator with the as-written (remapped) field name
+                    self.field_cardinality
+                        .entry(remapped_name.as_bytes().to_vec())
+                        .or_default()
+                        .insert(value_bytes);
+
+                    let value = &item[eq_pos..]; // includes '='
+                    let mut new_item = bumpalo::collections::Vec::with_capacity_in(
+                        remapped_name.len() + value.len(),
+                        &self.bump,
+                    );
+                    new_item.extend_from_slice(remapped_name.as_bytes());
+                    new_item.extend_from_slice(value);
+                    items_refs.push(new_item.into_bump_slice());
+                } else {
+                    // Update cardinality estimator with the original field name
+                    self.field_cardinality
+                        .entry(field_name.to_vec())
+                        .or_default()
+                        .insert(value_bytes);
+
+                    items_refs.push(item);
+                }
+            } else {
+                items_refs.push(item);
+            }
+        }
+
         let active_file = self.active_file.as_mut().unwrap();
-        active_file.write_entry(&items_refs, realtime, monotonic)?;
+        let entry_offset = active_file.write_entry(&items_refs, realtime, monotonic)?;
+        let effective_ts = source_realtime_usec.unwrap_or(realtime);
+        self.ts_pairs.push((effective_ts, entry_offset.get()));
 
         self.rotation_state.update(&active_file.writer);
         self.current_seqnum += 1;
@@ -325,16 +394,22 @@ impl Log {
     ///
     /// Format:
     /// _BOOT_ID=<boot_id>
+    /// _MACHINE_ID=<machine_id>
+    /// _HOSTNAME=<hostname>
     /// ND_REMAPPING=1
     /// ND_<md5_1>=<otel_key_1>
     /// ND_<md5_2>=<otel_key_2>
     /// ...
-    fn write_remapping_entry(&mut self, mappings: &[(Vec<u8>, String)]) -> Result<()> {
-        let mut remapping_items: Vec<Vec<u8>> = Vec::with_capacity(mappings.len() + 2);
+    fn write_remapping_entry(
+        &mut self,
+        mappings: &[(Vec<u8>, arrayvec::ArrayString<64>)],
+    ) -> Result<()> {
+        let mut remapping_items: Vec<Vec<u8>> = Vec::with_capacity(mappings.len() + 4);
 
-        // Inject _BOOT_ID field first
-        let boot_id_field = format!("_BOOT_ID={}", self.boot_id.as_simple());
-        remapping_items.push(boot_id_field.into_bytes());
+        // Inject system fields first (matching systemd journald behavior)
+        remapping_items.push(self.boot_id_field.clone());
+        remapping_items.push(self.machine_id_field.clone());
+        remapping_items.push(self.hostname_field.clone());
 
         // Add marker field
         remapping_items.push(REMAPPING_MARKER.to_vec());
@@ -354,7 +429,8 @@ impl Log {
         let (realtime, monotonic) = self.capture_dual_timestamp()?;
 
         let active_file = self.active_file.as_mut().unwrap();
-        active_file.write_entry(&items_refs, realtime, monotonic)?;
+        let entry_offset = active_file.write_entry(&items_refs, realtime, monotonic)?;
+        self.ts_pairs.push((realtime, entry_offset.get()));
 
         self.rotation_state.update(&active_file.writer);
         self.current_seqnum += 1;
@@ -362,15 +438,78 @@ impl Log {
         Ok(())
     }
 
-    /// Syncs all written data to disk, ensuring durability.
+    /// Writes a cardinality summary entry containing per-field cardinality estimates.
+    ///
+    /// Format:
+    /// _BOOT_ID=<boot_id>
+    /// _MACHINE_ID=<machine_id>
+    /// _HOSTNAME=<hostname>
+    /// ND_CARDINALITY=1
+    /// ND_CARD_<FIELD1>=<estimate1>
+    /// ND_CARD_<FIELD2>=<estimate2>
+    /// ...
+    fn write_cardinality_entry(&mut self) -> Result<()> {
+        if self.field_cardinality.is_empty() {
+            return Ok(());
+        }
+
+        let mut items: Vec<Vec<u8>> = Vec::with_capacity(self.field_cardinality.len() + 4);
+
+        // Inject system fields
+        items.push(self.boot_id_field.clone());
+        items.push(self.machine_id_field.clone());
+        items.push(self.hostname_field.clone());
+
+        // Add marker field
+        items.push(CARDINALITY_MARKER.to_vec());
+
+        // Add per-field cardinality estimates using the field name directly.
+        // The ND_CARDINALITY=1 marker identifies this entry, so all other
+        // non-system fields are cardinality estimates: FIELD_NAME=<estimate>.
+        for (field_name, estimator) in &self.field_cardinality {
+            let estimate = estimator.estimate();
+            let mut item = Vec::with_capacity(field_name.len() + 12);
+            item.extend_from_slice(field_name);
+            item.push(b'=');
+            item.extend_from_slice(estimate.to_string().as_bytes());
+            items.push(item);
+        }
+
+        // Build references
+        let items_refs: Vec<&[u8]> = items.iter().map(|v| v.as_slice()).collect();
+
+        let (realtime, monotonic) = self.capture_dual_timestamp()?;
+
+        let active_file = self.active_file.as_mut().unwrap();
+        let entry_offset = active_file.write_entry(&items_refs, realtime, monotonic)?;
+        self.ts_pairs.push((realtime, entry_offset.get()));
+
+        self.rotation_state.update(&active_file.writer);
+        self.current_seqnum += 1;
+
+        Ok(())
+    }
+
+    /// Syncs all written data to disk and returns pending events.
     ///
     /// This should be called after writing a batch of log entries to ensure
     /// they are persisted to disk before acknowledging the request.
-    pub fn sync(&mut self) -> Result<()> {
+    /// The returned events describe what happened since the last sync
+    /// (entry batches, file creations, file archivals).
+    pub fn sync(&mut self) -> Result<Vec<LogEvent>> {
         if let Some(active_file) = &mut self.active_file {
             active_file.journal_file.sync()?;
         }
-        Ok(())
+        if !self.ts_pairs.is_empty() {
+            if let Some(ref active_file) = self.active_file {
+                self.pending_events.push(LogEvent::EntryBatch {
+                    file: active_file.repository_file.clone(),
+                    entries: self.ts_pairs.clone(),
+                });
+            }
+            self.ts_pairs.clear();
+        }
+        Ok(std::mem::take(&mut self.pending_events))
     }
 
     fn should_rotate(&self) -> bool {
@@ -380,6 +519,11 @@ impl Log {
     #[tracing::instrument(skip_all, fields(active_file))]
     fn rotate(&mut self) -> Result<()> {
         use journal_core::file::JournalState;
+
+        // Write cardinality summary before archiving
+        if self.active_file.is_some() {
+            self.write_cardinality_entry()?;
+        }
 
         // Update chain with current file size before rotating
         if let Some(active_file) = &self.active_file {
@@ -400,6 +544,17 @@ impl Log {
             old_file.journal_file.journal_header_mut().state = JournalState::Archived as u8;
             old_file.journal_file.sync()?;
 
+            // Flush remaining entries for the old file
+            if !self.ts_pairs.is_empty() {
+                self.pending_events.push(LogEvent::EntryBatch {
+                    file: old_file.repository_file.clone(),
+                    entries: self.ts_pairs.clone(),
+                });
+            }
+            self.pending_events.push(LogEvent::FileArchived {
+                file: old_file.repository_file.clone(),
+            });
+
             old_file.rotate(&mut self.chain, max_file_size, head_realtime)?
         } else {
             ActiveFile::create(
@@ -416,6 +571,13 @@ impl Log {
 
         self.active_file = Some(new_file);
         self.rotation_state.reset();
+        self.ts_pairs.clear();
+
+        if let Some(ref active_file) = self.active_file {
+            self.pending_events.push(LogEvent::FileCreated {
+                file: active_file.repository_file.clone(),
+            });
+        }
 
         Ok(())
     }
@@ -530,18 +692,42 @@ impl Log {
     }
 }
 
-impl Drop for Log {
+impl JournalLog {
+    /// Gracefully shuts down the log, archiving the active file and returning
+    /// all pending events. Call this before dropping if you need the final events.
+    pub fn shutdown(&mut self) -> Vec<LogEvent> {
+        use journal_core::file::JournalState;
+
+        // Write cardinality summary before archiving (best-effort)
+        let _ = self.write_cardinality_entry();
+
+        if let Some(ref mut active_file) = self.active_file {
+            active_file.journal_file.journal_header_mut().state = JournalState::Archived as u8;
+
+            if !self.ts_pairs.is_empty() {
+                self.pending_events.push(LogEvent::EntryBatch {
+                    file: active_file.repository_file.clone(),
+                    entries: self.ts_pairs.clone(),
+                });
+                self.ts_pairs.clear();
+            }
+            self.pending_events.push(LogEvent::FileArchived {
+                file: active_file.repository_file.clone(),
+            });
+
+            let _ = active_file.journal_file.sync();
+        }
+
+        std::mem::take(&mut self.pending_events)
+    }
+}
+
+impl Drop for JournalLog {
     fn drop(&mut self) {
         use journal_core::file::JournalState;
 
         if let Some(ref mut active_file) = self.active_file {
-            // A single file is opened for writing exactly once. Once closed, we
-            // treat them as immutable. We need a custom impl for `Drop` to keep
-            // this invariant true whenever the plugin receives a `SIGTERM` or
-            // a `SIGINT`.
             active_file.journal_file.journal_header_mut().state = JournalState::Archived as u8;
-
-            // Best/Last-effort sync just to be on the cautious side.
             let _ = active_file.journal_file.sync();
         }
     }

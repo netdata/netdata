@@ -12,7 +12,7 @@ use crate::{
     Seconds,
 };
 use journal_core::collections::{HashMap, HashSet};
-use journal_core::file::{JournalFile, Mmap, offset_array::InlinedCursor};
+use journal_core::file::{JournalFile, Mmap, OpenJournalFile, offset_array::InlinedCursor};
 use journal_registry::File;
 use std::num::NonZeroU64;
 use tracing::{error, trace, warn};
@@ -28,6 +28,7 @@ pub const DEFAULT_MAX_FIELD_PAYLOAD_SIZE: usize = 100;
 /// These limits protect against unbounded memory growth when indexing
 /// journal files with high-cardinality fields or large payloads.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct IndexingLimits {
     /// Maximum number of unique values to index per field.
     ///
@@ -127,17 +128,17 @@ impl FileIndexer {
 impl FileIndexer {
     /// Create a searchable index from a journal file.
     ///
+    /// The index always uses 1-second histogram granularity and indexes all
+    /// discovered fields. This makes the index query-independent and suitable
+    /// for disk persistence.
+    ///
     /// # Arguments
     /// * `file` - The journal file to index
     /// * `source_timestamp_field` - Optional field to use for timestamps
-    /// * `field_names` - Fields to create bitmap indexes for
-    /// * `bucket_duration` - Duration of histogram buckets
     pub fn index(
         &mut self,
         file: &File,
         source_timestamp_field: Option<&FieldName>,
-        field_names: &[FieldName],
-        bucket_duration: Seconds,
     ) -> Result<FileIndex> {
         self.source_timestamp_cursor_pairs = Vec::new();
         self.source_timestamp_entry_offset_pairs = Vec::new();
@@ -147,7 +148,9 @@ impl FileIndexer {
         self.entry_offset_index = HashMap::default();
 
         let window_size = 32 * 1024 * 1024;
-        let journal_file = JournalFile::<Mmap>::open(file, window_size)?;
+        let journal_file: JournalFile<Mmap> = OpenJournalFile::new(window_size)
+            .load_hash_tables()
+            .open(file)?;
 
         // NOTE: Capture the maximum valid entry offset at the start of
         // indexing.
@@ -186,13 +189,9 @@ impl FileIndexer {
 
         let field_map = journal_file.load_fields()?;
 
-        // Build the file histogram
-        let histogram = self.build_histogram(
-            &journal_file,
-            source_timestamp_field,
-            bucket_duration,
-            tail_object_offset,
-        )?;
+        // Build the file histogram with 1-second granularity
+        let histogram =
+            self.build_histogram(&journal_file, source_timestamp_field, tail_object_offset)?;
 
         // Use the (timestamp, entry-offset) pairs to construct a vector that
         // will contain entry offsets sorted by time
@@ -203,16 +202,16 @@ impl FileIndexer {
             .collect();
 
         // Create the bitmaps for field=value pairs
+        let universe_size = self.source_timestamp_entry_offset_pairs.len() as u32;
         let entries = self.build_entries_index(
             &journal_file,
             &field_map,
-            field_names,
             tail_object_offset,
+            universe_size,
             was_online,
         )?;
-
-        // Convert field_names to HashSet<FieldName> for indexed_fields
-        let indexed_fields: HashSet<FieldName> = field_names.iter().cloned().collect();
+        let fst_index = fst_index::FstIndex::build(entries)
+            .map_err(|e| IndexError::FstBuildError(e.to_string()))?;
 
         let mut file_fields = HashSet::default();
         for field in field_map.keys() {
@@ -226,38 +225,24 @@ impl FileIndexer {
             histogram,
             entry_offsets,
             file_fields,
-            indexed_fields,
-            entries,
+            fst_index,
         ))
     }
 
-    /// Build bitmap indexes for field=value pairs.
-    ///
-    /// For each field in `field_names`, this iterates through all data objects
-    /// for that field and creates a bitmap mapping each unique field=value pair
-    /// to the entry indices where it appears.
-    ///
-    /// Only entries with offsets <= `tail_object_offset` are included in the
-    /// bitmaps, ensuring a consistent snapshot.
-    ///
-    /// Fields with more than `self.limits.max_unique_values_per_field` unique values
-    /// will have their indexing truncated to prevent unbounded memory growth.
     fn build_entries_index(
         &mut self,
         journal_file: &JournalFile<Mmap>,
-        field_map: &HashMap<String, String>,
-        field_names: &[FieldName],
+        field_map: &HashMap<Box<str>, Box<str>>,
         tail_object_offset: NonZeroU64,
+        universe_size: u32,
         was_online: bool,
-    ) -> Result<HashMap<FieldValuePair, Bitmap>> {
-        let mut entries_index = HashMap::default();
-        let mut truncated_fields: Vec<&FieldName> = Vec::new();
-        let mut fields_with_large_payloads: Vec<&FieldName> = Vec::new();
+    ) -> Result<Vec<(FieldValuePair, Bitmap)>> {
+        let mut entries_index = Vec::new();
+        let mut truncated_fields: Vec<FieldName> = Vec::new();
+        let mut fields_with_large_payloads: Vec<FieldName> = Vec::new();
 
-        for field_name in field_names {
-            let Some(systemd_field) = field_map.get(field_name.as_str()) else {
-                continue;
-            };
+        for (otel_name, systemd_field) in field_map {
+            let field_name = FieldName::new_unchecked(otel_name);
 
             // Get the data object iterator for this field
             let field_data_iterator =
@@ -286,8 +271,11 @@ impl FileIndexer {
                     break;
                 }
 
-                // Get the payload and the inlined cursor for this data object
-                let (data_payload, inlined_cursor) = {
+                // Extract the key and inlined cursor from the data object.
+                // The data object must be dropped before continuing the loop
+                // body because its ValueGuard holds a reference to the mmap
+                // window.
+                let (key, inlined_cursor) = {
                     let Ok(data_object) = data_object else {
                         continue;
                     };
@@ -305,19 +293,24 @@ impl FileIndexer {
                         continue;
                     };
 
-                    let data_payload =
-                        String::from_utf8_lossy(data_object.raw_payload()).into_owned();
+                    let Ok(data_payload) = std::str::from_utf8(data_object.raw_payload()) else {
+                        continue;
+                    };
+
+                    // Extract the value from the "FIELD=value" payload and
+                    // construct the key using the otel field name.
+                    let Some(eq_pos) = data_payload.find('=') else {
+                        warn!("Invalid field=value format: {}", data_payload);
+                        continue;
+                    };
+                    let value = &data_payload[eq_pos + 1..];
+                    let key = FieldValuePair::from_parts(field_name.as_str(), value);
+
                     let Some(inlined_cursor) = data_object.inlined_cursor() else {
                         continue;
                     };
 
-                    (data_payload, inlined_cursor)
-                };
-
-                // Parse the payload into a FieldValuePair (format is "FIELD=value")
-                let Some(pair) = FieldValuePair::parse(&data_payload) else {
-                    warn!("Invalid field=value format: {}", data_payload);
-                    continue;
+                    (key, inlined_cursor)
                 };
 
                 // Collect the offset of entries where this data object appears
@@ -350,36 +343,45 @@ impl FileIndexer {
                 }
                 self.entry_indices.sort_unstable();
 
-                // Create the bitmap for the entry indices
-                let mut bitmap = Bitmap::from_sorted_iter(self.entry_indices.iter().copied())
-                    .expect("sorted entry indices");
+                // Create the bitmap for the entry indices, choosing normal
+                // or complement representation based on density.
+                let cardinality = self.entry_indices.len() as u64;
+                let half_universe = universe_size as u64 / 2;
+
+                let mut bitmap = if cardinality > half_universe {
+                    // Dense: store the complement (values NOT in the bitmap).
+                    let complement = SortedComplement::new(&self.entry_indices, universe_size);
+                    Bitmap::from_sorted_iter_complemented(complement, universe_size)
+                } else {
+                    Bitmap::from_sorted_iter(self.entry_indices.iter().copied(), universe_size)
+                };
                 bitmap.optimize();
 
-                let field_name = FieldName::new_unchecked(field_name);
-                let k = FieldValuePair::new_unchecked(field_name, String::from(pair.value()));
-                entries_index.insert(k, bitmap);
+                entries_index.push((key, bitmap));
 
                 unique_values_count += 1;
             }
 
             // Track fields that were truncated or had large payloads skipped
             if was_truncated {
+                if ignored_large_payloads > 0 {
+                    fields_with_large_payloads.push(field_name.clone());
+                }
                 truncated_fields.push(field_name);
-            }
-            if ignored_large_payloads > 0 {
+            } else if ignored_large_payloads > 0 {
                 fields_with_large_payloads.push(field_name);
             }
         }
 
         // Log summary of indexing issues.
         if !truncated_fields.is_empty() {
-            let field_names: Vec<&str> = truncated_fields.iter().map(|f| f.as_str()).collect();
+            let names: Vec<&str> = truncated_fields.iter().map(|f| f.as_str()).collect();
             let msg = format!(
                 "File '{}': {} field(s) truncated due to cardinality limit ({}): {:?}",
                 journal_file.file().path(),
                 truncated_fields.len(),
                 self.limits.max_unique_values_per_field,
-                field_names
+                names
             );
             if was_online {
                 trace!("{msg}");
@@ -388,7 +390,7 @@ impl FileIndexer {
             }
         }
         if !fields_with_large_payloads.is_empty() {
-            let field_names: Vec<&str> = fields_with_large_payloads
+            let names: Vec<&str> = fields_with_large_payloads
                 .iter()
                 .map(|f| f.as_str())
                 .collect();
@@ -396,7 +398,7 @@ impl FileIndexer {
                 "File '{}': {} field(s) had values skipped due to large payloads: {:?}",
                 journal_file.file().path(),
                 fields_with_large_payloads.len(),
-                field_names
+                names
             );
             if was_online {
                 trace!("{msg}");
@@ -507,9 +509,9 @@ impl FileIndexer {
         &mut self,
         journal_file: &JournalFile<Mmap>,
         source_timestamp_field_name: Option<&FieldName>,
-        bucket_duration: Seconds,
         tail_object_offset: NonZeroU64,
     ) -> Result<Histogram> {
+        let bucket_duration = Seconds(1);
         // Collect information from the source timestamp field
         if let Some(source_field_name) = source_timestamp_field_name {
             self.collect_source_field_info(journal_file, source_field_name.as_bytes())?;
@@ -599,5 +601,47 @@ impl FileIndexer {
             bucket_duration,
             self.source_timestamp_entry_offset_pairs.as_slice(),
         )
+    }
+}
+
+/// Iterator that yields values in `0..universe_size` that are NOT present in a
+/// sorted slice. Used to efficiently build complement bitmaps for dense entry sets.
+struct SortedComplement<'a> {
+    values: &'a [u32],
+    idx: usize,
+    current: u32,
+    universe_size: u32,
+}
+
+impl<'a> SortedComplement<'a> {
+    fn new(sorted_values: &'a [u32], universe_size: u32) -> Self {
+        Self {
+            values: sorted_values,
+            idx: 0,
+            current: 0,
+            universe_size,
+        }
+    }
+}
+
+impl Iterator for SortedComplement<'_> {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<u32> {
+        loop {
+            if self.current >= self.universe_size {
+                return None;
+            }
+
+            let val = self.current;
+            self.current += 1;
+
+            if self.idx < self.values.len() && self.values[self.idx] == val {
+                self.idx += 1;
+                continue;
+            }
+
+            return Some(val);
+        }
     }
 }

@@ -435,7 +435,7 @@ mod tests {
     fn test_count_entries_in_time_range_full_bucket() {
         let histogram = create_test_histogram();
         // Bitmap contains entries 5, 6, 7, 8, 9 (all in bucket starting at 60)
-        let bitmap = Bitmap::from_sorted_iter([5, 6, 7, 8, 9]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([5, 6, 7, 8, 9], 20);
 
         // Query for the full bucket from 60 to 120
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(60), Seconds(120));
@@ -446,7 +446,7 @@ mod tests {
     fn test_count_entries_in_time_range_partial_match() {
         let histogram = create_test_histogram();
         // Bitmap contains some entries in bucket 60-120 and some in 120-180
-        let bitmap = Bitmap::from_sorted_iter([7, 8, 9, 10, 11]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([7, 8, 9, 10, 11], 20);
 
         // Query for bucket 60-120 should only count entries 7, 8, 9
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(60), Seconds(120));
@@ -457,7 +457,7 @@ mod tests {
     fn test_count_entries_in_time_range_multiple_buckets() {
         let histogram = create_test_histogram();
         // Bitmap spans multiple buckets
-        let bitmap = Bitmap::from_sorted_iter([5, 6, 10, 11, 15, 16]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([5, 6, 10, 11, 15, 16], 20);
 
         // Query for buckets 60-180 (includes buckets at 60 and 120)
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(60), Seconds(180));
@@ -468,7 +468,7 @@ mod tests {
     fn test_count_entries_in_time_range_no_matches() {
         let histogram = create_test_histogram();
         // Bitmap contains entries in bucket 0-60
-        let bitmap = Bitmap::from_sorted_iter([0, 1, 2]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([0, 1, 2], 20);
 
         // Query for bucket 120-180 should find no matches
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(120), Seconds(180));
@@ -487,7 +487,7 @@ mod tests {
     #[test]
     fn test_count_entries_in_time_range_unaligned_start() {
         let histogram = create_test_histogram();
-        let bitmap = Bitmap::from_sorted_iter([5, 6, 7]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([5, 6, 7], 20);
 
         // Start time not aligned to bucket_duration (60)
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(30), Seconds(120));
@@ -497,7 +497,7 @@ mod tests {
     #[test]
     fn test_count_entries_in_time_range_unaligned_end() {
         let histogram = create_test_histogram();
-        let bitmap = Bitmap::from_sorted_iter([5, 6, 7]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([5, 6, 7], 20);
 
         // End time not aligned to bucket_duration (60)
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(60), Seconds(100));
@@ -507,7 +507,7 @@ mod tests {
     #[test]
     fn test_count_entries_in_time_range_invalid_range() {
         let histogram = create_test_histogram();
-        let bitmap = Bitmap::from_sorted_iter([5, 6, 7]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([5, 6, 7], 20);
 
         // start >= end
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(120), Seconds(60));
@@ -521,7 +521,7 @@ mod tests {
     #[test]
     fn test_count_entries_in_time_range_outside_histogram() {
         let histogram = create_test_histogram();
-        let bitmap = Bitmap::from_sorted_iter([5, 6, 7]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([5, 6, 7], 20);
 
         // Range completely before histogram
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(0), Seconds(60));
@@ -537,7 +537,7 @@ mod tests {
     fn test_count_entries_in_time_range_first_bucket() {
         let histogram = create_test_histogram();
         // Entries in first bucket (0-60)
-        let bitmap = Bitmap::from_sorted_iter([0, 1, 2, 3, 4]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([0, 1, 2, 3, 4], 20);
 
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(0), Seconds(60));
         assert_eq!(count, Some(5));
@@ -547,7 +547,7 @@ mod tests {
     fn test_count_entries_in_time_range_last_bucket() {
         let histogram = create_test_histogram();
         // Entries in last bucket (180-240)
-        let bitmap = Bitmap::from_sorted_iter([15, 16, 17, 18, 19]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([15, 16, 17, 18, 19], 20);
 
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(180), Seconds(240));
         assert_eq!(count, Some(5));
@@ -557,7 +557,7 @@ mod tests {
     fn test_count_entries_in_time_range_all_buckets() {
         let histogram = create_test_histogram();
         // Entries spanning all buckets
-        let bitmap = Bitmap::from_sorted_iter([0, 5, 10, 15]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([0, 5, 10, 15], 20);
 
         // Query for entire histogram range
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(0), Seconds(240));
@@ -582,7 +582,7 @@ mod tests {
     fn test_bitmap_with_indices_beyond_histogram_range() {
         let histogram = create_test_histogram();
         // Histogram has entries 0-19, bitmap has indices beyond that
-        let bitmap = Bitmap::from_sorted_iter([5, 6, 7, 25, 30, 100]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([5, 6, 7, 25, 30, 100], 101);
 
         // Query bucket 60-120 (entries 5-9)
         // Should only count the valid indices (5, 6, 7) that fall in range
@@ -594,7 +594,7 @@ mod tests {
     fn test_bitmap_all_indices_outside_queried_range() {
         let histogram = create_test_histogram();
         // Bitmap has valid indices but none in the queried range
-        let bitmap = Bitmap::from_sorted_iter([0, 1, 2, 3, 4]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([0, 1, 2, 3, 4], 20);
 
         // Query bucket 120-180 (entries 10-14)
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(120), Seconds(180));
@@ -605,7 +605,7 @@ mod tests {
     fn test_bitmap_with_sparse_scattered_indices() {
         let histogram = create_test_histogram();
         // Very sparse bitmap with indices scattered across all buckets
-        let bitmap = Bitmap::from_sorted_iter([1, 7, 11, 18]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([1, 7, 11, 18], 20);
 
         // Query middle buckets 60-180 (entries 5-14)
         // Should count indices 7 and 11
@@ -617,7 +617,7 @@ mod tests {
     fn test_bitmap_at_range_boundaries() {
         let histogram = create_test_histogram();
         // Bitmap with entries exactly at the boundaries of the queried range
-        let bitmap = Bitmap::from_sorted_iter([4, 5, 9, 10]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([4, 5, 9, 10], 20);
 
         // Query bucket 60-120 (entries 5-9)
         // Should include 5, 9 but not 4 (in previous bucket) or 10 (in next bucket)
@@ -629,7 +629,7 @@ mod tests {
     fn test_bitmap_with_only_out_of_range_indices() {
         let histogram = create_test_histogram();
         // Bitmap with indices all beyond the histogram's range
-        let bitmap = Bitmap::from_sorted_iter([25, 30, 50, 100]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([25, 30, 50, 100], 101);
 
         // Query any valid range
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(0), Seconds(60));
@@ -640,7 +640,7 @@ mod tests {
     fn test_bitmap_single_index_in_range() {
         let histogram = create_test_histogram();
         // Bitmap with many indices but only one in the queried range
-        let bitmap = Bitmap::from_sorted_iter([0, 1, 2, 7, 15, 16, 17]).unwrap();
+        let bitmap = Bitmap::from_sorted_iter([0, 1, 2, 7, 15, 16, 17], 20);
 
         // Query bucket 60-120 (entries 5-9), only index 7 matches
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(60), Seconds(120));

@@ -6,7 +6,7 @@
 //! - Retention policies
 
 use journal_common::load_machine_id;
-use journal_log_writer::{Config, Log, RetentionPolicy, RotationPolicy};
+use journal_log_writer::{Config, JournalLog, RetentionPolicy, RotationPolicy};
 use journal_registry::Origin;
 use std::fs;
 use tempfile::TempDir;
@@ -49,7 +49,7 @@ fn test_write_single_entry() {
     let dir = TempDir::new().unwrap();
     let config = test_config();
 
-    let mut log = Log::new(dir.path(), config).unwrap();
+    let mut log = JournalLog::new(dir.path(), config).unwrap();
 
     let entry = [b"MESSAGE=Hello, World!" as &[u8], b"PRIORITY=6"];
 
@@ -65,7 +65,7 @@ fn test_write_multiple_entries() {
     let dir = TempDir::new().unwrap();
     let config = test_config();
 
-    let mut log = Log::new(dir.path(), config).unwrap();
+    let mut log = JournalLog::new(dir.path(), config).unwrap();
 
     // Write 10 entries
     for i in 0..10 {
@@ -88,7 +88,7 @@ fn test_rotation_by_entry_count() {
     let rotation = RotationPolicy::default().with_number_of_entries(5);
     let config = test_config().with_rotation_policy(rotation);
 
-    let mut log = Log::new(dir.path(), config).unwrap();
+    let mut log = JournalLog::new(dir.path(), config).unwrap();
 
     // Write 12 entries (should create 3 files: 5 + 5 + 2)
     for i in 0..12 {
@@ -110,7 +110,7 @@ fn test_rotation_by_file_size() {
     let rotation = RotationPolicy::default().with_size_of_journal_file(50 * 1024);
     let config = test_config().with_rotation_policy(rotation);
 
-    let mut log = Log::new(dir.path(), config).unwrap();
+    let mut log = JournalLog::new(dir.path(), config).unwrap();
 
     // Write entries with large messages to trigger size-based rotation
     for i in 0..100 {
@@ -140,7 +140,7 @@ fn test_retention_by_file_count() {
         .with_rotation_policy(rotation)
         .with_retention_policy(retention);
 
-    let mut log = Log::new(dir.path(), config).unwrap();
+    let mut log = JournalLog::new(dir.path(), config).unwrap();
 
     // Write 10 entries (should create 4 files, but keep only 2)
     for i in 0..10 {
@@ -178,7 +178,7 @@ fn test_retention_by_total_size() {
         .with_rotation_policy(rotation)
         .with_retention_policy(retention);
 
-    let mut log = Log::new(dir.path(), config).unwrap();
+    let mut log = JournalLog::new(dir.path(), config).unwrap();
 
     // Write 20 entries (creates 4 files of 5 entries each)
     for i in 0..20 {
@@ -205,7 +205,7 @@ fn test_empty_entry() {
     let dir = TempDir::new().unwrap();
     let config = test_config();
 
-    let mut log = Log::new(dir.path(), config).unwrap();
+    let mut log = JournalLog::new(dir.path(), config).unwrap();
 
     // Write empty entry (should be no-op)
     let entry: [&[u8]; 0] = [];
@@ -223,7 +223,7 @@ fn test_boot_id_injection() {
     let dir = TempDir::new().unwrap();
     let config = test_config();
 
-    let mut log = Log::new(dir.path(), config).unwrap();
+    let mut log = JournalLog::new(dir.path(), config).unwrap();
 
     // Write a single entry
     let entry = [b"MESSAGE=Test entry" as &[u8], b"PRIORITY=6"];

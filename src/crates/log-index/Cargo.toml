@@ -1,0 +1,24 @@
+[package]
+name = "log-index"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+bincode = { workspace = true }
+bumpalo = { workspace = true }
+fst-index = { workspace = true, features = ["serde"] }
+hashbrown = { workspace = true }
+roaring = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+split-fst = { workspace = true }
+treight = { workspace = true, features = ["roaring", "serde"] }
+tracing = { workspace = true }
+twox-hash = { workspace = true, features = ["xxhash64"] }
+wal = { workspace = true }
+zstd = { workspace = true }
+
+# OTAP / Arrow
+otap-df-pdata = { git = "https://github.com/open-telemetry/otel-arrow.git", tag = "v0.46.0" }
+arrow = { version = "57" }

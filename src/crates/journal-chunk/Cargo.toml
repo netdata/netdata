@@ -1,0 +1,12 @@
+[package]
+name = "journal-chunk"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zerocopy = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }

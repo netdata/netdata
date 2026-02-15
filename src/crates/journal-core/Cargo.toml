@@ -12,7 +12,8 @@ allocative = ["dep:allocative"]
 [dependencies]
 journal-common = { workspace = true }
 journal-registry = { workspace = true }
-rdp = { workspace = true }
+sd-compat = { workspace = true }
+arrayvec = { workspace = true }
 
 # Core dependencies
 static_assertions = { workspace = true }
@@ -59,3 +60,12 @@ tempfile = { workspace = true }
 rayon = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 tracing-subscriber = { workspace = true }
+fst-index = { workspace = true, features = ["serde"] }
+treight = { path = "../treight", features = ["serde"] }
+split-fst = { workspace = true }
+arrayvec = { workspace = true }
+bincode = { workspace = true }
+zstd = { workspace = true }
+fsst-rs = { workspace = true }
+gix-chunk = { workspace = true }
+memmap2 = { workspace = true }

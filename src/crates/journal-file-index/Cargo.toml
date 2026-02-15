@@ -1,0 +1,30 @@
+[package]
+name = "journal-file-index"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "File-based split-FST index for journal files"
+
+[lints]
+workspace = true
+
+[dependencies]
+fst-index = { workspace = true, features = ["serde"] }
+split-fst = { workspace = true }
+treight = { path = "../treight", features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+zstd = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+journal-core = { path = "../journal-core" }
+journal-index = { workspace = true }
+journal-common = { workspace = true }
+journal-registry = { workspace = true }
+
+[dev-dependencies]
+clap = { workspace = true }
+tempfile = { workspace = true }
+tikv-jemallocator = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+uuid = { workspace = true }

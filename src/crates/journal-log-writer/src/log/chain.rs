@@ -3,7 +3,7 @@ use crate::log::RetentionPolicy;
 use journal_common::Microseconds;
 use journal_core::JournalFile;
 use journal_core::collections::HashMap;
-use journal_core::file::Mmap;
+use journal_core::file::{Mmap, OpenJournalFile};
 use journal_registry::repository;
 use journal_registry::repository::File;
 use std::path::PathBuf;
@@ -93,7 +93,7 @@ impl OwnedChain {
         };
 
         let window_size = 4096;
-        let jf = JournalFile::<Mmap>::open(file, window_size)?;
+        let jf: JournalFile<Mmap> = OpenJournalFile::new(window_size).open(file)?;
 
         Ok(jf.journal_header_ref().tail_entry_seqnum)
     }
@@ -104,7 +104,7 @@ impl OwnedChain {
         };
 
         let window_size = 4096;
-        let jf = JournalFile::<Mmap>::open(file, window_size)?;
+        let jf: JournalFile<Mmap> = OpenJournalFile::new(window_size).open(file)?;
 
         let realtime = jf.journal_header_ref().tail_entry_realtime;
         if realtime == 0 {

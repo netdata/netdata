@@ -1,7 +1,6 @@
 //! Integration tests for multi-file pagination with PaginationState.
 
-use journal_common::Seconds;
-use journal_core::file::{JournalFile, JournalFileOptions, JournalWriter};
+use journal_core::file::{CreateJournalFile, HashTableConfig, JournalWriter};
 use journal_core::repository::File;
 use journal_engine::logs::query::LogQuery;
 use journal_index::{
@@ -56,9 +55,12 @@ fn create_test_journal(
     let boot_id = Uuid::from_u128(0x11111111_1111_1111_1111_111111111111);
     let seqnum_id = Uuid::from_u128(0x22222222_2222_2222_2222_222222222222);
 
-    let options = JournalFileOptions::new(machine_id, boot_id, seqnum_id);
-
-    let mut journal_file = JournalFile::create(&file, options)?;
+    let mut journal_file = CreateJournalFile::new(machine_id, boot_id, seqnum_id)
+        .with_hash_tables(HashTableConfig::Optimized {
+            previous_utilization: None,
+            max_file_size: None,
+        })
+        .create(&file)?;
     let mut writer = JournalWriter::new(&mut journal_file, 1, boot_id)?;
 
     for entry in entries {
@@ -115,24 +117,13 @@ fn test_multi_file_pagination_forward_non_overlapping() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let file_field = FieldName::new("FILE").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[file_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[file_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -271,25 +262,13 @@ fn test_multi_file_pagination_same_timestamps() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let file_field = FieldName::new("FILE").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[file_field.clone(), entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[file_field, entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -433,25 +412,13 @@ fn test_multi_file_pagination_overlapping_timestamps() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let file_field = FieldName::new("FILE").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[file_field.clone(), entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[file_field, entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -640,34 +607,17 @@ fn test_multi_file_pagination_three_files() {
     // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let file_field = FieldName::new("FILE").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[file_field.clone(), entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[file_field.clone(), entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let index3 = indexer
-        .index(
-            &file3,
-            Some(&source_timestamp_field),
-            &[file_field, entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file3, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2, index3];
@@ -818,24 +768,13 @@ fn test_multi_file_pagination_small_limit() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -937,24 +876,13 @@ fn test_multi_file_pagination_limit_one() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -1062,27 +990,16 @@ fn test_multi_file_pagination_with_empty_file() {
     // In practice, the system would skip files with no entries
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     // Skip empty file - it cannot be indexed
     // let index2 = indexer.index(&file2, ...) would fail with EmptyHistogramInput
 
     let index3 = indexer
-        .index(
-            &file3,
-            Some(&source_timestamp_field),
-            &[entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file3, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index3];
@@ -1200,33 +1117,17 @@ fn test_multi_file_pagination_reverse_file_order() {
     // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let index3 = indexer
-        .index(
-            &file3,
-            Some(&source_timestamp_field),
-            &[entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file3, Some(&source_timestamp_field))
         .unwrap();
 
     // Pass files in REVERSE chronological order (newest first)
@@ -1339,24 +1240,13 @@ fn test_multi_file_pagination_backward_non_overlapping() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let file_field = FieldName::new("FILE").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[file_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[file_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -1495,25 +1385,13 @@ fn test_multi_file_pagination_backward_same_timestamps() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let file_field = FieldName::new("FILE").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[file_field.clone(), entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[file_field, entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -1655,24 +1533,13 @@ fn test_multi_file_pagination_backward_limit_one() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -1775,24 +1642,13 @@ fn test_multi_file_pagination_anchor_timestamp_forward() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -1922,24 +1778,13 @@ fn test_multi_file_pagination_anchor_timestamp_backward() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -2069,24 +1914,13 @@ fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -2231,33 +2065,17 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
     // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let index3 = indexer
-        .index(
-            &file3,
-            Some(&source_timestamp_field),
-            &[entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file3, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2, index3];
@@ -2443,25 +2261,13 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
     // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let file_field = FieldName::new("FILE").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[file_field.clone(), entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[file_field, entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2];
@@ -2650,34 +2456,17 @@ fn test_multi_file_pagination_backward_three_files() {
     // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let file_field = FieldName::new("FILE").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[file_field.clone(), entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[file_field.clone(), entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let index3 = indexer
-        .index(
-            &file3,
-            Some(&source_timestamp_field),
-            &[file_field, entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file3, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2, index3];
@@ -2890,34 +2679,17 @@ fn test_multi_file_pagination_with_filter() {
     // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
-    let level_field = FieldName::new("LEVEL").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone(), level_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone(), level_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let index3 = indexer
-        .index(
-            &file3,
-            Some(&source_timestamp_field),
-            &[entry_id_field, level_field],
-            Seconds(3600),
-        )
+        .index(&file3, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2, index3];
@@ -3110,33 +2882,17 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
     // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
-    let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
 
     let index1 = indexer
-        .index(
-            &file1,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file1, Some(&source_timestamp_field))
         .unwrap();
 
     let index2 = indexer
-        .index(
-            &file2,
-            Some(&source_timestamp_field),
-            &[entry_id_field.clone()],
-            Seconds(3600),
-        )
+        .index(&file2, Some(&source_timestamp_field))
         .unwrap();
 
     let index3 = indexer
-        .index(
-            &file3,
-            Some(&source_timestamp_field),
-            &[entry_id_field],
-            Seconds(3600),
-        )
+        .index(&file3, Some(&source_timestamp_field))
         .unwrap();
 
     let file_indexes = vec![index1, index2, index3];

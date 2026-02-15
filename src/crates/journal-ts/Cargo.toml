@@ -1,0 +1,25 @@
+[package]
+name = "journal-ts"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+bumpalo = { workspace = true }
+journal-chunk = { workspace = true }
+pco = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+journal-core = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+rand = { workspace = true }
+zstd = { workspace = true }
+
+[[example]]
+name = "journal-ts-generate"
+required-features = []

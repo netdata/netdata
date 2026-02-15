@@ -29,8 +29,8 @@ pub use error::{JournalError, Result};
 
 // File module re-exports
 pub use file::{
-    BucketUtilization, Direction, JournalCursor, JournalFile, JournalFileOptions, JournalReader,
-    JournalWriter, Location,
+    BucketUtilization, CreateJournalFile, Direction, HashTableConfig, JournalCursor, JournalFile,
+    JournalReader, JournalWriter, Location, OpenJournalFile,
 };
 
 // SIGBUS handler for memory-mapped file access

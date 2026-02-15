@@ -6,7 +6,7 @@
 
 use crate::error::Result;
 use journal_core::field_map::REMAPPING_MARKER;
-use journal_core::file::{JournalFile, Mmap};
+use journal_core::file::{JournalFile, Mmap, OpenJournalFile};
 use journal_index::{
     Anchor, Direction, FieldName, FieldValuePair, FileIndex, Filter, LogEntryId, LogQueryParams,
     LogQueryParamsBuilder, Microseconds,
@@ -533,12 +533,14 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
 
     // Process each file's entries
     for (file, file_entries) in entries_by_file {
-        let journal_file = JournalFile::<Mmap>::open(file, 8 * 1024 * 1024)?;
+        let journal_file: JournalFile<Mmap> = OpenJournalFile::new(8 * 1024 * 1024)
+            .load_hash_tables()
+            .open(file)?;
 
         // Load and reverse the field mapping (systemd -> OTEL)
         // This allows us to reverse-map systemd field names back to their original OTEL names
         let field_map = journal_file.load_fields()?;
-        let reverse_map: HashMap<String, String> = field_map
+        let reverse_map: HashMap<Box<str>, Box<str>> = field_map
             .into_iter()
             .map(|(otel, systemd)| (systemd, otel))
             .collect();

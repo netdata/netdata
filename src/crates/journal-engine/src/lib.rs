@@ -20,7 +20,6 @@
 // Public modules
 pub mod cache;
 pub mod error;
-pub mod facets;
 pub mod histogram;
 pub mod indexing;
 pub mod logs;
@@ -29,7 +28,6 @@ pub mod query_time_range;
 // Re-export key types for convenience
 pub use cache::{FileIndexCache, FileIndexKey};
 pub use error::{EngineError, Result};
-pub use facets::Facets;
 pub use histogram::{
     BucketRequest, BucketResponse, Histogram, HistogramEngine, calculate_bucket_duration,
 };
