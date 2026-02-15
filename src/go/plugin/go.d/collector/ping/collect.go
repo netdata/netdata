@@ -3,25 +3,10 @@
 package ping
 
 import (
+	"context"
 	"sync"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
-
-type v2Metrics struct {
-	minRTT      metrix.SnapshotGaugeVec
-	maxRTT      metrix.SnapshotGaugeVec
-	avgRTT      metrix.SnapshotGaugeVec
-	stdDevRTT   metrix.SnapshotGaugeVec
-	rttVariance metrix.SnapshotGaugeVec
-	meanJitter  metrix.SnapshotGaugeVec
-	ewmaJitter  metrix.SnapshotGaugeVec
-	smaJitter   metrix.SnapshotGaugeVec
-	packetLoss  metrix.SnapshotGaugeVec
-	packetsRecv metrix.SnapshotGaugeVec
-	packetsSent metrix.SnapshotGaugeVec
-}
 
 type hostSample struct {
 	host string
@@ -43,6 +28,48 @@ type hostSample struct {
 	smaJitterMS  float64
 }
 
+func (c *Collector) collect(context.Context) error {
+	samples := c.collectSamples(true)
+	if len(samples) == 0 {
+		return nil
+	}
+
+	meter := c.store.Write().SnapshotMeter("")
+	minRTT := meter.GaugeVec("min_rtt", []string{"host"})
+	maxRTT := meter.GaugeVec("max_rtt", []string{"host"})
+	avgRTT := meter.GaugeVec("avg_rtt", []string{"host"})
+	stdDevRTT := meter.GaugeVec("std_dev_rtt", []string{"host"})
+	rttVariance := meter.GaugeVec("rtt_variance", []string{"host"})
+	meanJitter := meter.GaugeVec("mean_jitter", []string{"host"})
+	ewmaJitter := meter.GaugeVec("ewma_jitter", []string{"host"})
+	smaJitter := meter.GaugeVec("sma_jitter", []string{"host"})
+	packetLoss := meter.GaugeVec("packet_loss", []string{"host"})
+	packetsRecv := meter.GaugeVec("packets_recv", []string{"host"})
+	packetsSent := meter.GaugeVec("packets_sent", []string{"host"})
+
+	for _, sample := range samples {
+		packetsRecv.WithLabelValues(sample.host).Observe(float64(sample.packetsRecv))
+		packetsSent.WithLabelValues(sample.host).Observe(float64(sample.packetsSent))
+		packetLoss.WithLabelValues(sample.host).Observe(sample.packetLossPercent)
+
+		if sample.hasRTT {
+			minRTT.WithLabelValues(sample.host).Observe(sample.minRTTMS)
+			maxRTT.WithLabelValues(sample.host).Observe(sample.maxRTTMS)
+			avgRTT.WithLabelValues(sample.host).Observe(sample.avgRTTMS)
+			stdDevRTT.WithLabelValues(sample.host).Observe(sample.stdDevRTTMS)
+			rttVariance.WithLabelValues(sample.host).Observe(sample.rttVarianceMS2)
+		}
+
+		if sample.hasJitter {
+			meanJitter.WithLabelValues(sample.host).Observe(sample.meanJitterMS)
+			ewmaJitter.WithLabelValues(sample.host).Observe(sample.ewmaJitterMS)
+			smaJitter.WithLabelValues(sample.host).Observe(sample.smaJitterMS)
+		}
+	}
+
+	return nil
+}
+
 func (c *Collector) collectSamples(updateJitterState bool) []hostSample {
 	var (
 		mu      sync.Mutex
@@ -51,10 +78,8 @@ func (c *Collector) collectSamples(updateJitterState bool) []hostSample {
 	)
 
 	for _, host := range c.Hosts {
-		wg.Add(1)
-		go func(host string) {
-			defer wg.Done()
-
+		host := host
+		wg.Go(func() {
 			stats, err := c.prober.Ping(host)
 			if err != nil {
 				c.Error(err)
@@ -94,7 +119,7 @@ func (c *Collector) collectSamples(updateJitterState bool) []hostSample {
 			mu.Lock()
 			samples = append(samples, sample)
 			mu.Unlock()
-		}(host)
+		})
 	}
 	wg.Wait()
 

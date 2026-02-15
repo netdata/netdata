@@ -34,7 +34,6 @@ func init() {
 
 func New() *Collector {
 	store := metrix.NewCollectorStore()
-	meter := store.Write().SnapshotMeter("")
 
 	return &Collector{
 		Config: Config{
@@ -52,19 +51,6 @@ func New() *Collector {
 		jitterEWMA: make(map[string]float64),
 		jitterSMA:  make(map[string][]float64),
 		store:      store,
-		metrics: v2Metrics{
-			minRTT:      meter.GaugeVec("min_rtt", []string{"host"}),
-			maxRTT:      meter.GaugeVec("max_rtt", []string{"host"}),
-			avgRTT:      meter.GaugeVec("avg_rtt", []string{"host"}),
-			stdDevRTT:   meter.GaugeVec("std_dev_rtt", []string{"host"}),
-			rttVariance: meter.GaugeVec("rtt_variance", []string{"host"}),
-			meanJitter:  meter.GaugeVec("mean_jitter", []string{"host"}),
-			ewmaJitter:  meter.GaugeVec("ewma_jitter", []string{"host"}),
-			smaJitter:   meter.GaugeVec("sma_jitter", []string{"host"}),
-			packetLoss:  meter.GaugeVec("packet_loss", []string{"host"}),
-			packetsRecv: meter.GaugeVec("packets_recv", []string{"host"}),
-			packetsSent: meter.GaugeVec("packets_sent", []string{"host"}),
-		},
 	}
 }
 
@@ -85,7 +71,6 @@ type Collector struct {
 	newProber func(ProberConfig, *logger.Logger) Prober
 
 	store      metrix.CollectorStore
-	metrics    v2Metrics
 	jitterEWMA map[string]float64   // EWMA jitter state per host
 	jitterSMA  map[string][]float64 // SMA jitter window per host
 }
@@ -117,34 +102,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Collect(context.Context) error {
-	samples := c.collectSamples(true)
-	if len(samples) == 0 {
-		return nil
-	}
-
-	for _, sample := range samples {
-		c.metrics.packetsRecv.WithLabelValues(sample.host).Observe(float64(sample.packetsRecv))
-		c.metrics.packetsSent.WithLabelValues(sample.host).Observe(float64(sample.packetsSent))
-		c.metrics.packetLoss.WithLabelValues(sample.host).Observe(sample.packetLossPercent)
-
-		if sample.hasRTT {
-			c.metrics.minRTT.WithLabelValues(sample.host).Observe(sample.minRTTMS)
-			c.metrics.maxRTT.WithLabelValues(sample.host).Observe(sample.maxRTTMS)
-			c.metrics.avgRTT.WithLabelValues(sample.host).Observe(sample.avgRTTMS)
-			c.metrics.stdDevRTT.WithLabelValues(sample.host).Observe(sample.stdDevRTTMS)
-			c.metrics.rttVariance.WithLabelValues(sample.host).Observe(sample.rttVarianceMS2)
-		}
-
-		if sample.hasJitter {
-			c.metrics.meanJitter.WithLabelValues(sample.host).Observe(sample.meanJitterMS)
-			c.metrics.ewmaJitter.WithLabelValues(sample.host).Observe(sample.ewmaJitterMS)
-			c.metrics.smaJitter.WithLabelValues(sample.host).Observe(sample.smaJitterMS)
-		}
-	}
-
-	return nil
-}
+func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }
 
 func (c *Collector) Cleanup(context.Context) {}
 
