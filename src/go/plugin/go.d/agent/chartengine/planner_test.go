@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 )
 
@@ -697,7 +697,7 @@ groups:
 }
 
 func TestBuildPlanEnginePolicySelectorFiltersSeriesBeforeRouting(t *testing.T) {
-	selectorExpr := promselector.Expr{
+	selectorExpr := metrixselector.Expr{
 		Allow: []string{`svc.errors_total{method="GET"}`},
 	}
 	e, err := New(WithEnginePolicy(EnginePolicy{
@@ -788,7 +788,7 @@ groups:
 }
 
 func TestBuildPlanEnginePolicyOptionOverridesTemplatePolicy(t *testing.T) {
-	overrideSelector := promselector.Expr{
+	overrideSelector := metrixselector.Expr{
 		Allow: []string{`svc.errors_total{method="POST"}`},
 	}
 	e, err := New(WithEnginePolicy(EnginePolicy{

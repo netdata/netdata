@@ -2,7 +2,7 @@
 
 package charttpl
 
-import promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+import metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 
 // VersionV1 is the supported chart-template schema version.
 const VersionV1 = "v1"
@@ -17,8 +17,8 @@ type Spec struct {
 
 // Engine declares template-level chartengine policy.
 type Engine struct {
-	Selector *promselector.Expr `yaml:"selector,omitempty" json:"selector,omitempty"`
-	Autogen  *EngineAutogen     `yaml:"autogen,omitempty" json:"autogen,omitempty"`
+	Selector *metrixselector.Expr `yaml:"selector,omitempty" json:"selector,omitempty"`
+	Autogen  *EngineAutogen       `yaml:"autogen,omitempty" json:"autogen,omitempty"`
 }
 
 // EngineAutogen controls unmatched-series fallback behavior.

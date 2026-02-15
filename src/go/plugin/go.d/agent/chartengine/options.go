@@ -8,7 +8,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
-	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 )
 
 type engineConfig struct {
@@ -61,7 +60,7 @@ type AutogenPolicy struct {
 type EnginePolicy struct {
 	// Selector filters input series globally before template/autogen routing.
 	// Nil or empty selector means "allow all".
-	Selector *promselector.Expr
+	Selector *metrixselector.Expr
 
 	// Autogen controls unmatched-series fallback behavior.
 	Autogen AutogenPolicy
@@ -86,14 +85,11 @@ func normalizeAutogenPolicy(policy AutogenPolicy) (AutogenPolicy, error) {
 	return policy, nil
 }
 
-func compileEngineSelector(expr *promselector.Expr) (metrixselector.Selector, error) {
+func compileEngineSelector(expr *metrixselector.Expr) (metrixselector.Selector, error) {
 	if expr == nil || expr.Empty() {
 		return nil, nil
 	}
-	return (metrixselector.Expr{
-		Allow: append([]string(nil), expr.Allow...),
-		Deny:  append([]string(nil), expr.Deny...),
-	}).Parse()
+	return expr.Parse()
 }
 
 // WithEnginePolicy configures chartengine matching/materialization policy.

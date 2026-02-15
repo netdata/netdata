@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 )
 
 func TestSpecValidateScenarios(t *testing.T) {
@@ -114,7 +114,7 @@ func TestSpecValidateScenarios(t *testing.T) {
 			spec: Spec{
 				Version: VersionV1,
 				Engine: &Engine{
-					Selector: &promselector.Expr{
+					Selector: &metrixselector.Expr{
 						Allow: []string{"  "},
 					},
 				},
