@@ -48,6 +48,26 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.actions_total", metrix.Labels{"kind": "update_chart"}, 2)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.plan_chart_instances", nil, 1)
 				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.chartengine.build_duration_ms", nil, 2)
+				assertMetricMeta(
+					t,
+					r,
+					"netdata.go.plugin.chartengine.build_calls_total",
+					metrix.MetricMeta{
+						Description: "Build plan calls",
+						ChartFamily: "Planner",
+						Unit:        "calls",
+					},
+				)
+				assertMetricMeta(
+					t,
+					r,
+					"netdata.go.plugin.chartengine.actions_total",
+					metrix.MetricMeta{
+						Description: "Planner actions by kind",
+						ChartFamily: "Actions",
+						Unit:        "actions",
+					},
+				)
 			},
 		},
 		"component runtime store metrics can be planned into charts": {
@@ -77,6 +97,38 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				assert.Equal(t, float64(7), update.Values[0].Float64)
 			},
 		},
+		"autogen planning uses runtime metric metadata": {
+			run: func(t *testing.T) {
+				producer, err := New()
+				require.NoError(t, err)
+				require.NoError(t, producer.LoadYAML([]byte(runtimeObservabilityTemplateYAML()), 1))
+
+				store := metrix.NewCollectorStore()
+				cc := mustCycleController(t, store)
+				c := store.Write().SnapshotMeter("mysql").Counter("queries_total")
+				cc.BeginCycle()
+				c.ObserveTotal(10)
+				cc.CommitCycleSuccess()
+				_, err = producer.BuildPlan(store.Read())
+				require.NoError(t, err)
+
+				observer, err := New(
+					WithRuntimeStore(nil),
+					WithAutogenPolicy(AutogenPolicy{Enabled: true}),
+					WithSeriesSelectionAllVisible(),
+				)
+				require.NoError(t, err)
+				require.NoError(t, observer.LoadYAML([]byte(runtimeDummyTemplateYAML()), 1))
+
+				plan, err := observer.BuildPlan(producer.RuntimeStore().Read())
+				require.NoError(t, err)
+				create := findCreateChartByTitle(plan.Actions, "Build plan calls")
+				require.NotNil(t, create)
+				assert.Equal(t, "Build plan calls", create.Meta.Title)
+				assert.Equal(t, "Planner", create.Meta.Family)
+				assert.Equal(t, "calls/s", create.Meta.Units)
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -96,6 +148,37 @@ func assertSummaryCountAtLeast(t *testing.T, reader metrix.Reader, name string, 
 	point, ok := reader.Summary(name, labels)
 	require.Truef(t, ok, "expected summary %s with labels %v", name, labels)
 	assert.GreaterOrEqualf(t, point.Count, min, "unexpected summary count for %s labels %v", name, labels)
+}
+
+func assertMetricMeta(t *testing.T, reader metrix.Reader, name string, want metrix.MetricMeta) {
+	t.Helper()
+	got, ok := reader.MetricMeta(name)
+	require.Truef(t, ok, "expected metric metadata for %s", name)
+	assert.Equal(t, want, got)
+}
+
+func findCreateChartByID(actions []EngineAction, chartID string) *CreateChartAction {
+	for _, action := range actions {
+		create, ok := action.(CreateChartAction)
+		if !ok || create.ChartID != chartID {
+			continue
+		}
+		c := create
+		return &c
+	}
+	return nil
+}
+
+func findCreateChartByTitle(actions []EngineAction, title string) *CreateChartAction {
+	for _, action := range actions {
+		create, ok := action.(CreateChartAction)
+		if !ok || create.Meta.Title != title {
+			continue
+		}
+		c := create
+		return &c
+	}
+	return nil
 }
 
 func runtimeComponentTemplateYAML() string {
@@ -129,5 +212,23 @@ groups:
         dimensions:
           - selector: mysql.queries_total
             name: total
+`
+}
+
+func runtimeDummyTemplateYAML() string {
+	return `
+version: v1
+groups:
+  - family: Runtime
+    metrics:
+      - __runtime_dummy_metric
+    charts:
+      - id: runtime_dummy
+        title: Runtime dummy
+        context: netdata.go.plugin.runtime_dummy
+        units: "1"
+        dimensions:
+          - selector: __runtime_dummy_metric
+            name: value
 `
 }

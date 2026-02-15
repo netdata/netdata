@@ -56,25 +56,91 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 		return nil
 	}
 	meter := store.Write().StatefulMeter("netdata.go.plugin.chartengine")
-	actions := meter.Vec("kind").Counter("actions_total")
+	actions := meter.Vec("kind").Counter(
+		"actions_total",
+		metrix.WithDescription("Planner actions by kind"),
+		metrix.WithChartFamily("Actions"),
+		metrix.WithUnit("actions"),
+	)
 	return &runtimeMetrics{
-		buildCalls:             meter.Counter("build_calls_total"),
-		buildErrors:            meter.Counter("build_errors_total"),
-		buildSkippedFailed:     meter.Counter("build_skipped_failed_collect_total"),
-		buildDurationMS:        meter.Summary("build_duration_ms", metrix.WithSummaryQuantiles(0.5, 0.9, 0.99)),
-		routeCacheHits:         meter.Counter("route_cache_hits_total"),
-		routeCacheMisses:       meter.Counter("route_cache_misses_total"),
-		seriesScanned:          meter.Counter("series_scanned_total"),
-		seriesMatched:          meter.Counter("series_matched_total"),
-		seriesUnmatched:        meter.Counter("series_unmatched_total"),
-		seriesAutogenMatched:   meter.Counter("series_autogen_matched_total"),
-		planChartInstances:     meter.Gauge("plan_chart_instances"),
-		planInferredDimensions: meter.Gauge("plan_inferred_dimensions"),
-		actionCreateChart:      actions.WithLabelValues("create_chart"),
-		actionCreateDimension:  actions.WithLabelValues("create_dimension"),
-		actionUpdateChart:      actions.WithLabelValues("update_chart"),
-		actionRemoveDimension:  actions.WithLabelValues("remove_dimension"),
-		actionRemoveChart:      actions.WithLabelValues("remove_chart"),
+		buildCalls: meter.Counter(
+			"build_calls_total",
+			metrix.WithDescription("Build plan calls"),
+			metrix.WithChartFamily("Planner"),
+			metrix.WithUnit("calls"),
+		),
+		buildErrors: meter.Counter(
+			"build_errors_total",
+			metrix.WithDescription("Build plan errors"),
+			metrix.WithChartFamily("Planner"),
+			metrix.WithUnit("errors"),
+		),
+		buildSkippedFailed: meter.Counter(
+			"build_skipped_failed_collect_total",
+			metrix.WithDescription("Builds skipped because collector cycle failed"),
+			metrix.WithChartFamily("Planner"),
+			metrix.WithUnit("skips"),
+		),
+		buildDurationMS: meter.Summary(
+			"build_duration_ms",
+			metrix.WithSummaryQuantiles(0.5, 0.9, 0.99),
+			metrix.WithDescription("Build plan duration"),
+			metrix.WithChartFamily("Planner"),
+			metrix.WithUnit("ms"),
+		),
+		routeCacheHits: meter.Counter(
+			"route_cache_hits_total",
+			metrix.WithDescription("Route cache hits"),
+			metrix.WithChartFamily("Route Cache"),
+			metrix.WithUnit("hits"),
+		),
+		routeCacheMisses: meter.Counter(
+			"route_cache_misses_total",
+			metrix.WithDescription("Route cache misses"),
+			metrix.WithChartFamily("Route Cache"),
+			metrix.WithUnit("misses"),
+		),
+		seriesScanned: meter.Counter(
+			"series_scanned_total",
+			metrix.WithDescription("Metric series scanned"),
+			metrix.WithChartFamily("Series"),
+			metrix.WithUnit("series"),
+		),
+		seriesMatched: meter.Counter(
+			"series_matched_total",
+			metrix.WithDescription("Metric series matched by templates or autogen"),
+			metrix.WithChartFamily("Series"),
+			metrix.WithUnit("series"),
+		),
+		seriesUnmatched: meter.Counter(
+			"series_unmatched_total",
+			metrix.WithDescription("Metric series left unmatched after routing"),
+			metrix.WithChartFamily("Series"),
+			metrix.WithUnit("series"),
+		),
+		seriesAutogenMatched: meter.Counter(
+			"series_autogen_matched_total",
+			metrix.WithDescription("Metric series matched by autogen fallback"),
+			metrix.WithChartFamily("Series"),
+			metrix.WithUnit("series"),
+		),
+		planChartInstances: meter.Gauge(
+			"plan_chart_instances",
+			metrix.WithDescription("Chart instances produced by latest build plan"),
+			metrix.WithChartFamily("Plan"),
+			metrix.WithUnit("charts"),
+		),
+		planInferredDimensions: meter.Gauge(
+			"plan_inferred_dimensions",
+			metrix.WithDescription("Inferred dimensions produced by latest build plan"),
+			metrix.WithChartFamily("Plan"),
+			metrix.WithUnit("dimensions"),
+		),
+		actionCreateChart:     actions.WithLabelValues("create_chart"),
+		actionCreateDimension: actions.WithLabelValues("create_dimension"),
+		actionUpdateChart:     actions.WithLabelValues("update_chart"),
+		actionRemoveDimension: actions.WithLabelValues("remove_dimension"),
+		actionRemoveChart:     actions.WithLabelValues("remove_chart"),
 	}
 }
 
