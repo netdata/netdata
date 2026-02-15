@@ -4,6 +4,7 @@ package selector
 
 import "github.com/netdata/netdata/go/plugins/pkg/selectorcore"
 
+// Expr is a selector expression with allow/deny selector lists.
 type Expr struct {
 	Allow []string `yaml:"allow,omitempty" json:"allow"`
 	Deny  []string `yaml:"deny,omitempty" json:"deny"`
@@ -11,7 +12,6 @@ type Expr struct {
 
 func (e Expr) Empty() bool {
 	return len(e.Allow) == 0 && len(e.Deny) == 0
-
 }
 
 func (e Expr) Parse() (Selector, error) {

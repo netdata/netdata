@@ -2,10 +2,9 @@
 
 package selector
 
-import (
-	"github.com/netdata/netdata/go/plugins/pkg/selectorcore"
-)
+import "github.com/netdata/netdata/go/plugins/pkg/selectorcore"
 
+// Parse parses one selector expression.
 func Parse(expr string) (Selector, error) {
 	sel, err := selectorcore.Parse(expr)
 	if err != nil {

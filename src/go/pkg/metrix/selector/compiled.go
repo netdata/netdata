@@ -2,9 +2,7 @@
 
 package selector
 
-import (
-	"github.com/netdata/netdata/go/plugins/pkg/selectorcore"
-)
+import "github.com/netdata/netdata/go/plugins/pkg/selectorcore"
 
 // Meta contains selector metadata needed by template compilers/engines.
 type Meta struct {

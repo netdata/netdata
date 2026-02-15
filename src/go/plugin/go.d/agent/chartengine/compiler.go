@@ -7,9 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/prometheus/prometheus/model/labels"
-
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/charttpl"
 )
@@ -192,7 +190,7 @@ type compiledDimension struct {
 }
 
 func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}) (compiledDimension, error) {
-	compiledSel, err := selector.ParseCompiled(dim.Selector)
+	compiledSel, err := metrixselector.ParseCompiled(dim.Selector)
 	if err != nil {
 		return compiledDimension{}, fmt.Errorf("selector: %w", err)
 	}
@@ -439,24 +437,46 @@ func mapKeysSorted(set map[string]struct{}) []string {
 
 // selectorMatcher adapts prometheus selector API to chartengine selector binding.
 type selectorMatcher struct {
-	compiled selector.Compiled
+	compiled metrixselector.Compiled
 }
 
 func (m selectorMatcher) Matches(metricName string, lbs program.SelectorLabels) bool {
-	promLabels := make(labels.Labels, 0, lbs.Len()+1)
-	promLabels = append(promLabels, labels.Label{
-		Name:  labels.MetricName,
-		Value: metricName,
-	})
-	lbs.Range(func(key, value string) bool {
-		if key == labels.MetricName {
-			return true
-		}
-		promLabels = append(promLabels, labels.Label{
-			Name:  key,
-			Value: value,
-		})
+	return m.compiled.Matches(metricName, selectorLabelView{labels: lbs})
+}
+
+type selectorLabelView struct {
+	labels program.SelectorLabels
+}
+
+func (v selectorLabelView) Len() int {
+	if v.labels == nil {
+		return 0
+	}
+	return v.labels.Len()
+}
+
+func (v selectorLabelView) Get(key string) (string, bool) {
+	if v.labels == nil {
+		return "", false
+	}
+	return v.labels.Get(key)
+}
+
+func (v selectorLabelView) Range(fn func(key, value string) bool) {
+	if v.labels == nil {
+		return
+	}
+	v.labels.Range(fn)
+}
+
+func (v selectorLabelView) CloneMap() map[string]string {
+	if v.labels == nil {
+		return nil
+	}
+	out := make(map[string]string, v.labels.Len())
+	v.labels.Range(func(key, value string) bool {
+		out[key] = value
 		return true
 	})
-	return m.compiled.Matches(promLabels)
+	return out
 }
