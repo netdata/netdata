@@ -16,7 +16,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
@@ -264,10 +263,7 @@ func (a *Agent) run(ctx context.Context) {
 	runtimeSvc := runtimemgr.New(a.Logger.With(slog.String("component", "runtime metrics service")))
 	runtimeSvc.Start(a.Name, a.Out)
 	defer runtimeSvc.Stop()
-
-	if err := chartengine.RegisterInternalRuntimeComponent(runtimeSvc, a.Logger); err != nil {
-		a.Warningf("runtime component %q registration failed: %v", chartengine.InternalRuntimeComponentName, err)
-	}
+	jobMgr.RuntimeService = runtimeSvc
 
 	// Store reference for dump mode and enable dump mode if configured
 	a.mgr = jobMgr

@@ -11,7 +11,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 )
 
@@ -193,28 +192,10 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 	}
 }
 
-func TestRuntimeExplicitChartengineInternalScenarios(t *testing.T) {
+func TestRuntimeProducerRegistrationScenarios(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T)
 	}{
-		"explicit registration via service APIs produces chartengine runtime metrics": {
-			run: func(t *testing.T) {
-				svc := New(nil)
-				svc.Start("go.d", &bytes.Buffer{})
-				defer svc.Stop()
-
-				require.NoError(t, chartengine.RegisterInternalRuntimeComponent(svc, nil))
-
-				specs := svc.registry.snapshot()
-				require.Len(t, specs, 1)
-				assert.Equal(t, chartengine.InternalRuntimeComponentName, specs[0].Name)
-
-				svc.Tick(1)
-				value, ok := specs[0].Store.Read(metrix.ReadRaw()).Value("netdata.go.plugin.chartengine.build_calls_total", nil)
-				require.True(t, ok)
-				assert.GreaterOrEqual(t, value, float64(1))
-			},
-		},
 		"register producer validates input and unregisters cleanly": {
 			run: func(t *testing.T) {
 				svc := New(nil)

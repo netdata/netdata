@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
 
@@ -33,6 +34,7 @@ type JobV2Config struct {
 	AutoDetectEvery int
 	Vnode           vnodes.VirtualNode
 	FunctionOnly    bool
+	RuntimeService  runtimecomp.Service
 }
 
 func NewJobV2(cfg JobV2Config) *JobV2 {
@@ -58,6 +60,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 		buf:             &buf,
 		api:             netdataapi.New(&buf),
 		vnode:           cfg.Vnode,
+		runtimeService:  cfg.RuntimeService,
 	}
 	if j.out == nil {
 		j.out = io.Discard
@@ -113,6 +116,10 @@ type JobV2 struct {
 	api  *netdataapi.API
 
 	stop chan struct{}
+
+	runtimeService             runtimecomp.Service
+	runtimeComponentName       string
+	runtimeComponentRegistered bool
 }
 
 func (j *JobV2) FullName() string   { return j.fullName }
@@ -151,6 +158,7 @@ func (j *JobV2) UpdateVnode(vnode *vnodes.VirtualNode) {
 	j.updVnode <- vnode
 }
 func (j *JobV2) Cleanup() {
+	j.unregisterRuntimeComponent()
 	if j.module != nil {
 		j.module.Cleanup(context.TODO())
 	}
@@ -166,8 +174,8 @@ func (j *JobV2) AutoDetection() (err error) {
 				j.Errorf("STACK: %s", debug.Stack())
 			}
 		}
-		if err != nil && j.module != nil {
-			j.module.Cleanup(context.TODO())
+		if err != nil {
+			j.Cleanup()
 		}
 	}()
 
@@ -270,6 +278,9 @@ func (j *JobV2) postCheck() error {
 	j.store = store
 	j.cycle = managed.CycleController()
 	j.engine = engine
+	if err := j.registerRuntimeComponent(); err != nil {
+		j.Warningf("runtime metrics registration failed: %v", err)
+	}
 	return nil
 }
 

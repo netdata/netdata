@@ -17,7 +17,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/internal/tickstate"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 )
 
 type runtimeComponentState struct {
@@ -189,7 +188,7 @@ func (j *runtimeMetricsJob) ensureComponent(spec componentSpec) (*runtimeCompone
 	engine, err := chartengine.New(
 		chartengine.WithRuntimeStore(nil), // Two-engine policy: observer engine has no self-metrics.
 		chartengine.WithSeriesSelectionAllVisible(),
-		chartengine.WithAutogenPolicy(toChartengineAutogenPolicy(spec.Autogen)),
+		chartengine.WithAutogenPolicy(spec.Autogen),
 		chartengine.WithLogger(engineLog),
 	)
 	if err != nil {
@@ -209,15 +208,6 @@ func (j *runtimeMetricsJob) ensureComponent(spec componentSpec) (*runtimeCompone
 	}
 	j.components[spec.Name] = state
 	return state, nil
-}
-
-func toChartengineAutogenPolicy(policy runtimecomp.AutogenPolicy) chartengine.AutogenPolicy {
-	return chartengine.AutogenPolicy{
-		Enabled:                  policy.Enabled,
-		TypeID:                   policy.TypeID,
-		MaxTypeIDLen:             policy.MaxTypeIDLen,
-		ExpireAfterSuccessCycles: policy.ExpireAfterSuccessCycles,
-	}
 }
 
 func (j *runtimeMetricsJob) emitComponentObsolete(state *runtimeComponentState) {

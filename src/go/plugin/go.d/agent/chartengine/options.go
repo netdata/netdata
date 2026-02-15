@@ -8,6 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 )
 
 type engineConfig struct {
@@ -41,20 +42,8 @@ const (
 )
 
 // AutogenPolicy controls unmatched-series fallback chart generation.
-type AutogenPolicy struct {
-	Enabled bool
-
-	// TypeID is the chart-type prefix used by Netdata runtime checks
-	// (`type.id` length guard). Typically this is `<plugin>.<job>`.
-	TypeID string
-	// MaxTypeIDLen is the max allowed full `type.id` length.
-	// Zero means default (1200).
-	MaxTypeIDLen int
-	// ExpireAfterSuccessCycles controls autogen chart/dimension expiry on
-	// successful collection cycles where the series is not seen.
-	// Zero disables expiry.
-	ExpireAfterSuccessCycles uint64
-}
+// It aliases runtime component policy to keep one policy contract.
+type AutogenPolicy = runtimecomp.AutogenPolicy
 
 // EnginePolicy controls chartengine matching/materialization behavior.
 type EnginePolicy struct {

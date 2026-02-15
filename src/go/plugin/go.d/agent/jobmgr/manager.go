@@ -24,6 +24,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 
 	"github.com/mattn/go-isatty"
@@ -135,6 +136,10 @@ type Manager struct {
 
 	// FunctionJSONWriter, when set, bypasses Netdata protocol output and writes raw JSON.
 	FunctionJSONWriter func(payload []byte, code int)
+
+	// RuntimeService is an optional runtime/internal metrics registration seam.
+	// When set, V2 jobs may register per-job runtime components.
+	RuntimeService runtimecomp.Service
 }
 
 func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
@@ -566,6 +571,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 			Out:             m.Out,
 			Module:          mod,
 			FunctionOnly:    functionOnly,
+			RuntimeService:  m.RuntimeService,
 		}
 		if vnode != nil {
 			jobCfg.Vnode = *vnode.Copy()

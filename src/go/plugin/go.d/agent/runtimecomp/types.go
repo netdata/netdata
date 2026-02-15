@@ -40,5 +40,6 @@ type ComponentConfig struct {
 // Service is the runtime component registration seam used by components.
 type Service interface {
 	RegisterComponent(cfg ComponentConfig) error
+	UnregisterComponent(name string)
 	RegisterProducer(name string, tickFn func() error) error
 }

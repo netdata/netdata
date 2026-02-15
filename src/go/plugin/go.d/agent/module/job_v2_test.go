@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
 
@@ -27,6 +28,28 @@ type mockModuleV2 struct {
 	template string
 	cleaned  bool
 	vnode    *vnodes.VirtualNode
+}
+
+type mockRuntimeComponentService struct {
+	registerErr  error
+	registered   []runtimecomp.ComponentConfig
+	unregistered []string
+}
+
+func (m *mockRuntimeComponentService) RegisterComponent(cfg runtimecomp.ComponentConfig) error {
+	if m.registerErr != nil {
+		return m.registerErr
+	}
+	m.registered = append(m.registered, cfg)
+	return nil
+}
+
+func (m *mockRuntimeComponentService) UnregisterComponent(name string) {
+	m.unregistered = append(m.unregistered, name)
+}
+
+func (m *mockRuntimeComponentService) RegisterProducer(_ string, _ func() error) error {
+	return nil
 }
 
 func (m *mockModuleV2) Init(ctx context.Context) error {
@@ -275,6 +298,93 @@ func TestJobV2Scenarios(t *testing.T) {
 				assert.Contains(t, wire, "BEGIN 'module_job.win_nic_traffic_eth1'")
 				assert.Contains(t, wire, "SET 'received' = 50")
 				assert.Contains(t, wire, "SET 'sent' = 40")
+			},
+		},
+		"runtime component registers on successful autodetection": {
+			run: func(t *testing.T) {
+				store := metrix.NewCollectorStore()
+				runtimeSvc := &mockRuntimeComponentService{}
+				mod := &mockModuleV2{
+					store:    store,
+					template: chartTemplateV2(),
+				}
+
+				job := NewJobV2(JobV2Config{
+					PluginName:     pluginName,
+					Name:           jobName,
+					ModuleName:     modName,
+					FullName:       modName + "_" + jobName,
+					Module:         mod,
+					Out:            &bytes.Buffer{},
+					UpdateEvery:    3,
+					RuntimeService: runtimeSvc,
+				})
+
+				require.NoError(t, job.AutoDetection())
+				require.Len(t, runtimeSvc.registered, 1)
+				cfg := runtimeSvc.registered[0]
+				assert.Equal(t, job.runtimeComponentName, cfg.Name)
+				assert.True(t, cfg.Autogen.Enabled)
+				assert.Equal(t, 3, cfg.UpdateEvery)
+				assert.Equal(t, pluginName, cfg.Plugin)
+				assert.Equal(t, "chartengine", cfg.Module)
+				assert.Equal(t, modName+"_"+jobName, cfg.JobName)
+				assert.Equal(t, "chartengine", cfg.JobLabels["source"])
+				assert.Equal(t, modName, cfg.JobLabels["collector_module"])
+				require.NotNil(t, cfg.Store)
+				assert.Equal(t, job.engine.RuntimeStore(), cfg.Store)
+			},
+		},
+		"runtime registration failure is non-fatal for autodetection": {
+			run: func(t *testing.T) {
+				store := metrix.NewCollectorStore()
+				runtimeSvc := &mockRuntimeComponentService{registerErr: errors.New("register failed")}
+				mod := &mockModuleV2{
+					store:    store,
+					template: chartTemplateV2(),
+				}
+				job := NewJobV2(JobV2Config{
+					PluginName:     pluginName,
+					Name:           jobName,
+					ModuleName:     modName,
+					FullName:       modName + "_" + jobName,
+					Module:         mod,
+					Out:            &bytes.Buffer{},
+					UpdateEvery:    1,
+					RuntimeService: runtimeSvc,
+				})
+
+				require.NoError(t, job.AutoDetection())
+				assert.False(t, job.runtimeComponentRegistered)
+				assert.Empty(t, runtimeSvc.registered)
+			},
+		},
+		"cleanup unregisters runtime component": {
+			run: func(t *testing.T) {
+				store := metrix.NewCollectorStore()
+				runtimeSvc := &mockRuntimeComponentService{}
+				mod := &mockModuleV2{
+					store:    store,
+					template: chartTemplateV2(),
+				}
+				job := NewJobV2(JobV2Config{
+					PluginName:     pluginName,
+					Name:           jobName,
+					ModuleName:     modName,
+					FullName:       modName + "_" + jobName,
+					Module:         mod,
+					Out:            &bytes.Buffer{},
+					UpdateEvery:    1,
+					RuntimeService: runtimeSvc,
+				})
+
+				require.NoError(t, job.AutoDetection())
+				require.True(t, job.runtimeComponentRegistered)
+				componentName := job.runtimeComponentName
+
+				job.Cleanup()
+				assert.False(t, job.runtimeComponentRegistered)
+				assert.Contains(t, runtimeSvc.unregistered, componentName)
 			},
 		},
 		"panic cycle drops buffered partial output": {
