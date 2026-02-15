@@ -12,7 +12,7 @@ use twox_hash::XxHash64;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
 use crate::chart_config::{ChartConfigManager, MetricConfig};
-use crate::otel::{DataPointIterExt, DataPointRef, MetricIdentityHash};
+use crate::otel::{self, DataPointIterExt, DataPointRef, MetricIdentityHash};
 
 /// Convert a JSON value to a string suitable for a Netdata label value.
 /// Returns `None` for null, arrays, and objects (which are not meaningful as labels).
@@ -249,7 +249,6 @@ pub struct DataPointIter<'a> {
     rm_idx: usize,
     sm_idx: usize,
     m_idx: usize,
-    dp_idx: usize,
     // Cached metric-level data (to avoid re-computing for each data point)
     current_metric: Option<CurrentMetricContext<'a>>,
     depth: u8,
@@ -259,6 +258,7 @@ pub struct DataPointIter<'a> {
 /// Cached context for the current metric being iterated.
 struct CurrentMetricContext<'a> {
     metric_ref: MetricRef<'a>,
+    dp_iter: otel::DataPointIter<'a>,
 }
 
 impl<'a> DataPointIter<'a> {
@@ -270,7 +270,6 @@ impl<'a> DataPointIter<'a> {
             rm_idx: 0,
             sm_idx: 0,
             m_idx: 0,
-            dp_idx: 0,
             current_metric: None,
             depth: 0,
             finished: false,
@@ -288,9 +287,8 @@ impl<'a> Iterator for DataPointIter<'a> {
 
         loop {
             // If we have a current metric, try to yield its next data point
-            if let Some(ref ctx) = self.current_metric {
-                if let Some(dp) = ctx.metric_ref.metric.data_points().nth(self.dp_idx) {
-                    self.dp_idx += 1;
+            if let Some(ref mut ctx) = self.current_metric {
+                if let Some(dp) = ctx.dp_iter.next() {
                     return Some(DataPointContext {
                         metric_ref: MetricRef {
                             resource_metrics: ctx.metric_ref.resource_metrics,
@@ -304,7 +302,6 @@ impl<'a> Iterator for DataPointIter<'a> {
                 } else {
                     // No more data points in this metric
                     self.current_metric = None;
-                    self.dp_idx = 0;
                     // Continue to find next metric
                 }
             }
@@ -363,13 +360,14 @@ impl<'a> Iterator for DataPointIter<'a> {
                         let config = self.ccm.find_matching_config(&metric_ref);
 
                         // Cache the metric context for data point iteration
+                        let dp_iter = m.data_points();
                         self.current_metric = Some(CurrentMetricContext {
                             metric_ref: MetricRef {
                                 config,
                                 ..metric_ref
                             },
+                            dp_iter,
                         });
-                        self.dp_idx = 0;
                         // Loop back to yield data points
                     } else {
                         // No more metrics in this scope
