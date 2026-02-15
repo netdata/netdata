@@ -131,6 +131,9 @@ func (e *Engine) observeBuildSample(sample planRuntimeSample) {
 	if e == nil {
 		return
 	}
+	if e.state.runtimeStats == nil {
+		return
+	}
 	e.state.runtimeStats.observeBuild(sample)
 }
 

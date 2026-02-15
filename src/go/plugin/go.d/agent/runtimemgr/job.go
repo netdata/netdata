@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -38,6 +39,11 @@ type runtimeMetricsJob struct {
 	api *netdataapi.API
 
 	components map[string]*runtimeComponentState
+
+	skipStateMu      sync.Mutex
+	consecutiveSkips int
+	collectStartTime time.Time
+	collectStopTime  time.Time
 }
 
 func newRuntimeMetricsJob(out io.Writer, reg *componentRegistry, log *logger.Logger) *runtimeMetricsJob {
@@ -53,7 +59,7 @@ func newRuntimeMetricsJob(out io.Writer, reg *componentRegistry, log *logger.Log
 		out:        out,
 		registry:   reg,
 		stop:       make(chan struct{}),
-		tick:       make(chan int),
+		tick:       make(chan int, 1),
 		buf:        &buf,
 		api:        netdataapi.New(&buf),
 		components: make(map[string]*runtimeComponentState),
@@ -64,7 +70,21 @@ func (j *runtimeMetricsJob) Tick(clock int) {
 	select {
 	case j.tick <- clock:
 	default:
-		j.Warning("skipping runtime metrics tick: previous run still in progress")
+		j.skipStateMu.Lock()
+		j.consecutiveSkips++
+		consecutiveSkips := j.consecutiveSkips
+		startTime := j.collectStartTime
+		j.skipStateMu.Unlock()
+
+		if startTime.IsZero() {
+			j.Warning("skipping runtime metrics tick: waiting for first run to start")
+			return
+		}
+		if consecutiveSkips == 1 {
+			j.Warningf("skipping runtime metrics tick: previous run still in progress for %s", time.Since(startTime))
+			return
+		}
+		j.Debugf("skipping runtime metrics tick: previous run still in progress for %s (skipped %d ticks)", time.Since(startTime), consecutiveSkips)
 	}
 }
 
@@ -82,7 +102,25 @@ LOOP:
 		case <-j.stop:
 			break LOOP
 		case clock := <-j.tick:
+			j.skipStateMu.Lock()
+			if j.consecutiveSkips > 0 {
+				if j.collectStopTime.IsZero() || j.collectStartTime.IsZero() {
+					j.Infof("runtime metrics tick resumed (skipped %d ticks)", j.consecutiveSkips)
+				} else {
+					j.Infof(
+						"runtime metrics tick resumed after %s (skipped %d ticks)",
+						j.collectStopTime.Sub(j.collectStartTime),
+						j.consecutiveSkips,
+					)
+				}
+				j.consecutiveSkips = 0
+			}
+			j.collectStartTime = time.Now()
+			j.skipStateMu.Unlock()
 			j.runOnce(clock)
+			j.skipStateMu.Lock()
+			j.collectStopTime = time.Now()
+			j.skipStateMu.Unlock()
 		}
 	}
 	j.stop <- struct{}{}
