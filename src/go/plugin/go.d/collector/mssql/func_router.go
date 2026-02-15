@@ -59,8 +59,8 @@ func mssqlMethods() []funcapi.MethodConfig {
 	}
 }
 
-func mssqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
+func mssqlFunctionHandler(job module.RuntimeJob) funcapi.MethodHandler {
+	c, ok := job.Collector().(*Collector)
 	if !ok {
 		return nil
 	}

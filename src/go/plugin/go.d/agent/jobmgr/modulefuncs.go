@@ -30,7 +30,7 @@ type moduleFunc struct {
 
 // jobEntry wraps a job with a generation number for race detection
 type jobEntry struct {
-	job        *module.Job
+	job        module.RuntimeJob
 	generation uint64 // Incremented each time this job name is replaced
 }
 
@@ -77,7 +77,7 @@ func indexMethods(methods []funcapi.MethodConfig) map[string]funcapi.MethodConfi
 // addJob is called when jobs start.
 // NOTE: Job names MUST be unique per module. If a job with the same name
 // already exists, it is replaced (this handles config reload scenarios)
-func (r *moduleFuncRegistry) addJob(moduleName, jobName string, job *module.Job) {
+func (r *moduleFuncRegistry) addJob(moduleName, jobName string, job module.RuntimeJob) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -109,7 +109,7 @@ func (r *moduleFuncRegistry) removeJob(moduleName, jobName string) {
 }
 
 // getJobWithGeneration returns the job and its generation for race detection
-func (r *moduleFuncRegistry) getJobWithGeneration(moduleName, jobName string) (*module.Job, uint64) {
+func (r *moduleFuncRegistry) getJobWithGeneration(moduleName, jobName string) (module.RuntimeJob, uint64) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -198,7 +198,7 @@ func (r *moduleFuncRegistry) getJobNames(moduleName string) []string {
 }
 
 // getJob returns the job by name for routing requests
-func (r *moduleFuncRegistry) getJob(moduleName, jobName string) (*module.Job, bool) {
+func (r *moduleFuncRegistry) getJob(moduleName, jobName string) (module.RuntimeJob, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

@@ -29,6 +29,7 @@ type (
 	Creator struct {
 		Defaults
 		Create          func() Module
+		CreateV2        func() ModuleV2
 		JobConfigSchema string
 		Config          func() any
 
@@ -41,13 +42,13 @@ type (
 		// - MethodParams(ctx, method) for dynamic params
 		// - Handle(ctx, method, params) for request handling
 		// When nil, methods are disabled for this module.
-		MethodHandler func(job *Job) funcapi.MethodHandler
+		MethodHandler func(job RuntimeJob) funcapi.MethodHandler
 
 		// Optional: JobMethods returns methods to register when a job starts.
 		// Each method is registered as "moduleName:methodID" and unregistered when the job stops.
 		// This enables per-job function registration instead of static module-level functions.
 		// If nil, no per-job methods are registered.
-		JobMethods func(job *Job) []funcapi.MethodConfig
+		JobMethods func(job RuntimeJob) []funcapi.MethodConfig
 
 		// FunctionOnly indicates this module provides only functions, no metrics.
 		// Jobs created from this module skip data collection and chart creation.

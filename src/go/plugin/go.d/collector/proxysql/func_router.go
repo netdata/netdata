@@ -55,8 +55,8 @@ func proxysqlMethods() []funcapi.MethodConfig {
 	}
 }
 
-func proxysqlFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
+func proxysqlFunctionHandler(job module.RuntimeJob) funcapi.MethodHandler {
+	c, ok := job.Collector().(*Collector)
 	if !ok {
 		return nil
 	}

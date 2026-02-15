@@ -121,8 +121,8 @@ func yugabyteMethods() []funcapi.MethodConfig {
 	}
 }
 
-func yugabyteFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
+func yugabyteFunctionHandler(job module.RuntimeJob) funcapi.MethodHandler {
+	c, ok := job.Collector().(*Collector)
 	if !ok {
 		return nil
 	}

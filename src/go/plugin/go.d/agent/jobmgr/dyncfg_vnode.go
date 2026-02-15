@@ -14,7 +14,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
 
@@ -181,7 +180,7 @@ func (m *Manager) dyncfgVnodeAdd(fn dyncfg.Function) {
 
 	m.Vnodes[name] = cfg
 
-	m.runningJobs.forEach(func(_ string, job *module.Job) {
+	m.runningJobs.forEach(func(_ string, job runtimeJob) {
 		if job.Vnode().Name == name {
 			job.UpdateVnode(cfg)
 		}
@@ -295,7 +294,7 @@ func (m *Manager) dyncfgVnodeUpdate(fn dyncfg.Function) {
 
 	m.Vnodes[name] = cfg
 
-	m.runningJobs.forEach(func(_ string, job *module.Job) {
+	m.runningJobs.forEach(func(_ string, job runtimeJob) {
 		if job.Vnode().Name == name {
 			job.UpdateVnode(cfg)
 		}

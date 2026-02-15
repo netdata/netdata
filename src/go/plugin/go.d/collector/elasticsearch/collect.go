@@ -12,7 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const (
@@ -82,9 +82,9 @@ func (c *Collector) collectClusterHealth(mx map[string]int64, ms *esMetrics) {
 
 	merge(mx, stm.ToMap(ms.ClusterHealth), "cluster")
 
-	mx["cluster_status_green"] = metrix.Bool(ms.ClusterHealth.Status == "green")
-	mx["cluster_status_yellow"] = metrix.Bool(ms.ClusterHealth.Status == "yellow")
-	mx["cluster_status_red"] = metrix.Bool(ms.ClusterHealth.Status == "red")
+	mx["cluster_status_green"] = oldmetrix.Bool(ms.ClusterHealth.Status == "green")
+	mx["cluster_status_yellow"] = oldmetrix.Bool(ms.ClusterHealth.Status == "yellow")
+	mx["cluster_status_red"] = oldmetrix.Bool(ms.ClusterHealth.Status == "red")
 }
 
 func (c *Collector) collectClusterStats(mx map[string]int64, ms *esMetrics) {
@@ -114,9 +114,9 @@ func (c *Collector) collectLocalIndicesStats(mx map[string]int64, ms *esMetrics)
 
 		px := fmt.Sprintf("node_index_%s_stats_", v.Index)
 
-		mx[px+"health_green"] = metrix.Bool(v.Health == "green")
-		mx[px+"health_yellow"] = metrix.Bool(v.Health == "yellow")
-		mx[px+"health_red"] = metrix.Bool(v.Health == "red")
+		mx[px+"health_green"] = oldmetrix.Bool(v.Health == "green")
+		mx[px+"health_yellow"] = oldmetrix.Bool(v.Health == "yellow")
+		mx[px+"health_red"] = oldmetrix.Bool(v.Health == "red")
 		mx[px+"shards_count"] = strToInt(v.Rep)
 		mx[px+"docs_count"] = strToInt(v.DocsCount)
 		mx[px+"store_size_in_bytes"] = convertIndexStoreSizeToBytes(v.StoreSize)

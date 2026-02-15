@@ -17,8 +17,9 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/internal/tickstate"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 var obsoleteLock = &sync.Mutex{}
@@ -183,10 +184,7 @@ type Job struct {
 	dumpMode     bool
 	dumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
 
-	skipStateMu      sync.Mutex
-	consecutiveSkips int
-	collectStartTime time.Time // when current collection started
-	collectStopTime  time.Time // when current collection finished
+	skipTracker tickstate.SkipTracker
 }
 
 type collectedMetrics struct {
@@ -313,18 +311,19 @@ func (j *Job) Tick(clock int) {
 	case j.tick <- clock:
 	default:
 		if !j.functionOnly && j.shouldCollect(clock) {
-			j.skipStateMu.Lock()
-			j.consecutiveSkips++
-			consecutiveSkips := j.consecutiveSkips
-			startTime := j.collectStartTime
-			j.skipStateMu.Unlock()
+			skip := j.skipTracker.MarkSkipped()
 
-			if startTime.IsZero() {
+			if skip.RunStarted.IsZero() {
 				j.Infof("skipping data collection: waiting for first collection to start (interval %ds)", j.updateEvery)
-			} else if consecutiveSkips >= 2 {
-				j.Warningf("skipping data collection: previous run is still in progress for %s (skipped %d times in a row, interval %ds)", time.Since(startTime), consecutiveSkips, j.updateEvery)
+			} else if skip.Count >= 2 {
+				j.Warningf(
+					"skipping data collection: previous run is still in progress for %s (skipped %d times in a row, interval %ds)",
+					time.Since(skip.RunStarted),
+					skip.Count,
+					j.updateEvery,
+				)
 			} else {
-				j.Infof("skipping data collection: previous run is still in progress for %s (interval %ds)", time.Since(startTime), j.updateEvery)
+				j.Infof("skipping data collection: previous run is still in progress for %s (interval %ds)", time.Since(skip.RunStarted), j.updateEvery)
 			}
 		}
 	}
@@ -339,6 +338,11 @@ func (j *Job) IsRunning() bool {
 // Module returns the underlying module instance.
 // This allows function handlers to access the collector for querying data.
 func (j *Job) Module() Module {
+	return j.module
+}
+
+// Collector returns the underlying collector instance bound to this job.
+func (j *Job) Collector() any {
 	return j.module
 }
 
@@ -367,23 +371,18 @@ LOOP:
 			break LOOP
 		case t := <-j.tick:
 			if !j.functionOnly && j.shouldCollect(t) {
-				j.skipStateMu.Lock()
-				if j.consecutiveSkips > 0 {
-					if j.collectStopTime.IsZero() {
-						j.Infof("data collection resumed (skipped %d times)", j.consecutiveSkips)
+				resume := j.skipTracker.MarkRunStart(time.Now())
+				if resume.Skipped > 0 {
+					if resume.RunStopped.IsZero() || resume.RunStarted.IsZero() {
+						j.Infof("data collection resumed (skipped %d times)", resume.Skipped)
 					} else {
-						j.Infof("data collection resumed after %s (skipped %d times)", j.collectStopTime.Sub(j.collectStartTime), j.consecutiveSkips)
+						j.Infof("data collection resumed after %s (skipped %d times)", resume.RunStopped.Sub(resume.RunStarted), resume.Skipped)
 					}
-					j.consecutiveSkips = 0
 				}
-				j.collectStartTime = time.Now()
-				j.skipStateMu.Unlock()
 
 				j.runOnce()
 
-				j.skipStateMu.Lock()
-				j.collectStopTime = time.Now()
-				j.skipStateMu.Unlock()
+				j.skipTracker.MarkRunStop(time.Now())
 			}
 		}
 	}
@@ -624,7 +623,7 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 		}
 	}
 
-	intMx := collectedMetrics{intMetrics: map[string]int64{"success": metrix.Bool(updated > 0), "failed": metrix.Bool(updated == 0)}}
+	intMx := collectedMetrics{intMetrics: map[string]int64{"success": oldmetrix.Bool(updated > 0), "failed": oldmetrix.Bool(updated == 0)}}
 	j.updateChart(j.collectStatusChart, intMx, sinceLastRun)
 
 	if updated == 0 {

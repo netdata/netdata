@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 func newDiscoveredConfigsCache() *discoveredConfigs {
@@ -19,7 +18,7 @@ func newDiscoveredConfigsCache() *discoveredConfigs {
 func newRunningJobsCache() *runningJobs {
 	return &runningJobs{
 		mux:   sync.Mutex{},
-		items: make(map[string]*module.Job),
+		items: make(map[string]runtimeJob),
 	}
 }
 
@@ -38,7 +37,7 @@ type (
 	runningJobs struct {
 		mux sync.Mutex
 		// [cfg.FullName()]
-		items map[string]*module.Job
+		items map[string]runtimeJob
 	}
 
 	retryingTasks struct {
@@ -94,17 +93,17 @@ func (c *runningJobs) lock() {
 func (c *runningJobs) unlock() {
 	c.mux.Unlock()
 }
-func (c *runningJobs) add(fullName string, job *module.Job) {
+func (c *runningJobs) add(fullName string, job runtimeJob) {
 	c.items[fullName] = job
 }
 func (c *runningJobs) remove(fullName string) {
 	delete(c.items, fullName)
 }
-func (c *runningJobs) lookup(fullName string) (*module.Job, bool) {
+func (c *runningJobs) lookup(fullName string) (runtimeJob, bool) {
 	j, ok := c.items[fullName]
 	return j, ok
 }
-func (c *runningJobs) forEach(fn func(fullName string, job *module.Job)) {
+func (c *runningJobs) forEach(fn func(fullName string, job runtimeJob)) {
 	for k, j := range c.items {
 		fn(k, j)
 	}

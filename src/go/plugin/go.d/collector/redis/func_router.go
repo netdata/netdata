@@ -55,8 +55,8 @@ func redisMethods() []funcapi.MethodConfig {
 	}
 }
 
-func redisFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
+func redisFunctionHandler(job module.RuntimeJob) funcapi.MethodHandler {
+	c, ok := job.Collector().(*Collector)
 	if !ok {
 		return nil
 	}
