@@ -192,31 +192,51 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 	}
 }
 
-func TestRuntimeBootstrapScenarios(t *testing.T) {
+func TestRuntimeExplicitChartengineInternalScenarios(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T)
 	}{
-		"bootstrap registers chartengine producer component and ticking produces metrics": {
+		"explicit registration via service APIs produces chartengine runtime metrics": {
 			run: func(t *testing.T) {
 				svc := New(nil)
 				svc.Start("go.d", &bytes.Buffer{})
 				defer svc.Stop()
 
+				cfg, tickFn, err := NewChartengineInternalComponent(nil)
+				require.NoError(t, err)
+				require.NoError(t, svc.RegisterComponent(cfg))
+				require.NoError(t, svc.RegisterProducer(cfg.Name, tickFn))
+
 				specs := svc.registry.snapshot()
 				require.Len(t, specs, 1)
-				assert.Equal(t, chartengineInternalComponentName, specs[0].Name)
+				assert.Equal(t, ChartengineInternalComponentName, specs[0].Name)
 
 				svc.Tick(1)
 				value, ok := specs[0].Store.Read(metrix.ReadRaw()).Value("netdata.go.plugin.chartengine.build_calls_total", nil)
 				require.True(t, ok)
 				assert.GreaterOrEqual(t, value, float64(1))
+			},
+		},
+		"register producer validates input and unregisters cleanly": {
+			run: func(t *testing.T) {
+				svc := New(nil)
+				svc.Start("go.d", &bytes.Buffer{})
+				defer svc.Stop()
 
-				// Idempotent bootstrap.
-				svc.mu.Lock()
-				svc.bootstrapDefaults()
-				svc.mu.Unlock()
-				assert.Len(t, svc.producers, 1)
-				assert.Len(t, svc.registry.snapshot(), 1)
+				require.Error(t, svc.RegisterProducer("", func() error { return nil }))
+				require.Error(t, svc.RegisterProducer("x", nil))
+
+				var calls int
+				require.NoError(t, svc.RegisterProducer("x", func() error {
+					calls++
+					return nil
+				}))
+				svc.Tick(1)
+				assert.Equal(t, 1, calls)
+
+				svc.UnregisterProducer("x")
+				svc.Tick(2)
+				assert.Equal(t, 1, calls)
 			},
 		},
 	}

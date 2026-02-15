@@ -264,6 +264,17 @@ func (a *Agent) run(ctx context.Context) {
 	runtimeSvc.Start(a.Name, a.Out)
 	defer runtimeSvc.Stop()
 
+	runtimeCfg, runtimeTick, err := runtimemgr.NewChartengineInternalComponent(a.Logger)
+	if err != nil {
+		a.Warningf("runtime component %q bootstrap failed: %v", runtimemgr.ChartengineInternalComponentName, err)
+	} else {
+		if err := runtimeSvc.RegisterComponent(runtimeCfg); err != nil {
+			a.Warningf("runtime component %q registration failed: %v", runtimeCfg.Name, err)
+		} else if err := runtimeSvc.RegisterProducer(runtimeCfg.Name, runtimeTick); err != nil {
+			a.Warningf("runtime producer %q registration failed: %v", runtimeCfg.Name, err)
+		}
+	}
+
 	// Store reference for dump mode and enable dump mode if configured
 	a.mgr = jobMgr
 	if a.dumpMode > 0 {

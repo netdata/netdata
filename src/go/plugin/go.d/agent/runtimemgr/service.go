@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -27,7 +28,7 @@ type Service struct {
 
 	registry  *componentRegistry
 	job       *runtimeMetricsJob
-	producers []runtimeProducer
+	producers map[string]runtimeProducer
 	tkStop    chan struct{}
 	tkDone    chan struct{}
 }
@@ -39,6 +40,7 @@ func New(log *logger.Logger) *Service {
 	return &Service{
 		Logger:    log,
 		registry:  newComponentRegistry(),
+		producers: make(map[string]runtimeProducer),
 		tickEvery: time.Second,
 	}
 }
@@ -76,8 +78,6 @@ func (s *Service) Start(pluginName string, out io.Writer) {
 		s.mu.Unlock()
 		return
 	}
-
-	s.bootstrapDefaults()
 
 	s.job = newRuntimeMetricsJob(
 		s.out,
@@ -142,7 +142,13 @@ func (s *Service) Tick(clock int) {
 		s.mu.Unlock()
 		return
 	}
-	producers := append([]runtimeProducer(nil), s.producers...)
+	producers := make([]runtimeProducer, 0, len(s.producers))
+	for _, producer := range s.producers {
+		producers = append(producers, producer)
+	}
+	sort.Slice(producers, func(i, j int) bool {
+		return producers[i].Name() < producers[j].Name()
+	})
 	job := s.job
 	s.mu.Unlock()
 
@@ -201,4 +207,42 @@ func (s *Service) UnregisterComponent(name string) {
 		return
 	}
 	s.registry.remove(name)
+}
+
+func (s *Service) RegisterProducer(name string, tickFn func() error) error {
+	if s == nil {
+		return fmt.Errorf("runtimemgr: nil service")
+	}
+
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("runtimemgr: runtime producer name is required")
+	}
+	if tickFn == nil {
+		return fmt.Errorf("runtimemgr: runtime producer %q tick function is required", name)
+	}
+
+	s.mu.Lock()
+	if s.producers == nil {
+		s.producers = make(map[string]runtimeProducer)
+	}
+	s.producers[name] = runtimeProducerFunc{
+		name: name,
+		tick: tickFn,
+	}
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *Service) UnregisterProducer(name string) {
+	if s == nil {
+		return
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	s.mu.Lock()
+	delete(s.producers, name)
+	s.mu.Unlock()
 }
