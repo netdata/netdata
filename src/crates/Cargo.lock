@@ -1868,7 +1868,7 @@ version = "0.1.3"
 dependencies = [
  "journal-core",
  "journal-registry",
- "thiserror",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -2282,6 +2282,7 @@ dependencies = [
  "journal-index",
  "journal-log-writer",
  "journal-registry",
+ "journal-session",
  "maxminddb",
  "netdata-plugin-error",
  "netdata-plugin-protocol",
