@@ -55,7 +55,7 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 	if store == nil {
 		return nil
 	}
-	meter := store.Write().StatefulMeter("chartengine")
+	meter := store.Write().StatefulMeter("netdata.go.plugin.chartengine")
 	actions := meter.Vec("kind").Counter("actions_total")
 	return &runtimeMetrics{
 		buildCalls:             meter.Counter("build_calls_total"),

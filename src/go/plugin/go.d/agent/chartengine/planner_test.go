@@ -732,7 +732,7 @@ groups:
 	create := findCreateChartAction(plan)
 	require.NotNil(t, create)
 	assert.Equal(t, "svc.errors_total-method=GET", create.ChartID)
-	assert.Equal(t, "autogen.svc.errors_total", create.Meta.Context)
+	assert.Equal(t, "svc.errors_total", create.Meta.Context)
 	assert.Equal(t, "events/s", create.Meta.Units)
 	assert.Equal(t, "GET", create.Labels["method"])
 	update := findUpdateAction(plan)
@@ -928,7 +928,7 @@ groups:
 	create := findCreateChartAction(plan)
 	require.NotNil(t, create)
 	assert.Equal(t, "svc.queue_depth-queue=main", create.ChartID)
-	assert.Equal(t, "autogen.svc.queue_depth", create.Meta.Context)
+	assert.Equal(t, "svc.queue_depth", create.Meta.Context)
 	assert.Equal(t, "depth", create.Meta.Units)
 	assert.Equal(t, program.AlgorithmAbsolute, create.Meta.Algorithm)
 
@@ -983,7 +983,7 @@ groups:
 	create := findCreateChartAction(plan)
 	require.NotNil(t, create)
 	assert.Equal(t, "svc.service_mode", create.ChartID)
-	assert.Equal(t, "autogen.svc.service_mode", create.Meta.Context)
+	assert.Equal(t, "svc.service_mode", create.Meta.Context)
 	assert.Equal(t, "state", create.Meta.Units)
 	_, hasStateLabel := create.Labels["svc.service_mode"]
 	assert.False(t, hasStateLabel)

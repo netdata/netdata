@@ -41,13 +41,13 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				require.NotNil(t, rs)
 				r := rs.ReadRaw()
 
-				assertMetricValueAtLeast(t, r, "chartengine.build_calls_total", nil, 2)
-				assertMetricValueAtLeast(t, r, "chartengine.route_cache_misses_total", nil, 1)
-				assertMetricValueAtLeast(t, r, "chartengine.route_cache_hits_total", nil, 1)
-				assertMetricValueAtLeast(t, r, "chartengine.series_scanned_total", nil, 2)
-				assertMetricValueAtLeast(t, r, "chartengine.actions_total", metrix.Labels{"kind": "update_chart"}, 2)
-				assertMetricValueAtLeast(t, r, "chartengine.plan_chart_instances", nil, 1)
-				assertSummaryCountAtLeast(t, r, "chartengine.build_duration_ms", nil, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.build_calls_total", nil, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_misses_total", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_hits_total", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.series_scanned_total", nil, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.actions_total", metrix.Labels{"kind": "update_chart"}, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.plan_chart_instances", nil, 1)
+				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.chartengine.build_duration_ms", nil, 2)
 			},
 		},
 		"component runtime store metrics can be planned into charts": {
@@ -70,7 +70,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 
 				update := findUpdateAction(plan)
 				require.NotNil(t, update)
-				require.Equal(t, "component_jobs", update.ChartID)
+				require.Equal(t, "netdata_go_plugin_component_component_jobs", update.ChartID)
 				require.Len(t, update.Values, 1)
 				assert.Equal(t, "total", update.Values[0].Name)
 				assert.True(t, update.Values[0].IsFloat)
@@ -107,7 +107,7 @@ groups:
       - component.jobs_total
     charts:
       - title: Component jobs
-        context: component_jobs
+        context: netdata.go.plugin.component.component_jobs
         units: jobs/s
         dimensions:
           - selector: component.jobs_total

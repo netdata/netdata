@@ -108,7 +108,7 @@ func TestApplyPlanAutogenChartCreateUpdateRemove(t *testing.T) {
 	meta := chartengine.ChartMeta{
 		Title:     `Metric "svc.errors_total"`,
 		Family:    "svc_errors",
-		Context:   "autogen.svc.errors_total",
+		Context:   "svc.errors_total",
 		Units:     "events/s",
 		Algorithm: chartengine.AlgorithmIncremental,
 		Type:      chartengine.ChartTypeLine,

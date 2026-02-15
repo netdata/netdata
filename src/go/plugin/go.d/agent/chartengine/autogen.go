@@ -13,7 +13,6 @@ import (
 
 const (
 	autogenTemplatePrefix = "__autogen__:"
-	autogenContextPrefix  = "autogen"
 )
 
 type autogenRoute struct {
@@ -409,9 +408,9 @@ func getAutogenChartTitle(metricName string) string {
 func getAutogenChartContext(metricName string) string {
 	metricName = strings.TrimSpace(metricName)
 	if metricName == "" {
-		return autogenContextPrefix
+		return "metric"
 	}
-	return autogenContextPrefix + "." + metricName
+	return metricName
 }
 
 func getAutogenChartFamily(metric string) string {

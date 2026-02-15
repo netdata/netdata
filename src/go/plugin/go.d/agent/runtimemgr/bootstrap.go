@@ -3,7 +3,6 @@
 package runtimemgr
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
@@ -22,7 +21,7 @@ groups:
     charts:
       - id: runtime_dummy
         title: Runtime Dummy
-        context: runtime_dummy
+        context: netdata.go.plugin.chartengine_internal.runtime_dummy
         units: "1"
         dimensions:
           - selector: __runtime_dummy_metric
@@ -72,7 +71,7 @@ func (s *Service) bootstrapDefaults() {
 	}
 
 	pluginName := firstNotEmpty(s.pluginName, "go.d")
-	typeID := fmt.Sprintf("%s.internal.%s", sanitizeName(pluginName), sanitizeName(chartengineInternalComponentName))
+	typeID := defaultInternalTypeID(pluginName, chartengineInternalComponentName)
 	autogen := chartengine.AutogenPolicy{
 		Enabled: true,
 		TypeID:  typeID,

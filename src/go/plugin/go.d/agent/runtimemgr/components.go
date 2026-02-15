@@ -125,7 +125,7 @@ func normalizeComponent(cfg ComponentConfig, pluginName string) (componentSpec, 
 
 	typeID := strings.TrimSpace(cfg.TypeID)
 	if typeID == "" {
-		typeID = fmt.Sprintf("%s.internal.%s", sanitizeName(pluginName), sanitizeName(name))
+		typeID = defaultInternalTypeID(pluginName, name)
 	}
 	env := chartemit.EmitEnv{
 		TypeID:      typeID,
@@ -169,4 +169,10 @@ func firstNotEmpty(items ...string) string {
 func sanitizeName(name string) string {
 	replacer := strings.NewReplacer("/", "_", "\\", "_", " ", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
 	return replacer.Replace(name)
+}
+
+func defaultInternalTypeID(pluginName, componentName string) string {
+	plugin := sanitizeName(firstNotEmpty(pluginName, "go.d"))
+	component := sanitizeName(componentName)
+	return fmt.Sprintf("netdata.%s.internal.%s", plugin, component)
 }

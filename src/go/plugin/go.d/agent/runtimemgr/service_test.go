@@ -36,7 +36,7 @@ func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
 				spec := specs[0]
 				assert.Equal(t, "chartengine", spec.Name)
 				assert.Equal(t, 1, spec.UpdateEvery)
-				assert.Equal(t, "go.d.internal.chartengine", spec.EmitEnv.TypeID)
+				assert.Equal(t, "netdata.go.d.internal.chartengine", spec.EmitEnv.TypeID)
 				assert.Equal(t, "go.d", spec.EmitEnv.Plugin)
 				assert.Equal(t, "internal", spec.EmitEnv.Module)
 				assert.Equal(t, "chartengine", spec.EmitEnv.JobName)
@@ -66,7 +66,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
 					UpdateEvery:  2,
 					EmitEnv: chartemit.EmitEnv{
-						TypeID:      "go.d.internal.component",
+						TypeID:      "netdata.go.d.internal.component",
 						UpdateEvery: 2,
 						Plugin:      "go.d",
 						Module:      "internal",
@@ -100,7 +100,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 					TemplateYAML: []byte(runtimeDynamicDimTemplateYAML()),
 					UpdateEvery:  1,
 					EmitEnv: chartemit.EmitEnv{
-						TypeID:      "go.d.internal.component",
+						TypeID:      "netdata.go.d.internal.component",
 						UpdateEvery: 1,
 						Plugin:      "go.d",
 						Module:      "internal",
@@ -129,7 +129,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 					TemplateYAML: []byte(runtimeGaugeTemplateYAML()),
 					UpdateEvery:  1,
 					EmitEnv: chartemit.EmitEnv{
-						TypeID:      "go.d.internal.component",
+						TypeID:      "netdata.go.d.internal.component",
 						UpdateEvery: 1,
 						Plugin:      "go.d",
 						Module:      "internal",
@@ -140,13 +140,13 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 				var out bytes.Buffer
 				job := newRuntimeMetricsJob(&out, reg, nil)
 				job.runOnce(1)
-				require.Contains(t, out.String(), "CHART 'go.d.internal.component.component_load'")
+				require.Contains(t, out.String(), "CHART 'netdata.go.d.internal.component.component_load'")
 
 				out.Reset()
 				reg.remove("component")
 				job.runOnce(2)
 				result := out.String()
-				assert.Contains(t, result, "CHART 'go.d.internal.component.component_load'")
+				assert.Contains(t, result, "CHART 'netdata.go.d.internal.component.component_load'")
 				assert.Contains(t, result, "'obsolete'")
 			},
 		},
@@ -172,7 +172,7 @@ func TestRuntimeBootstrapScenarios(t *testing.T) {
 				assert.Equal(t, chartengineInternalComponentName, specs[0].Name)
 
 				svc.Tick(1)
-				value, ok := specs[0].Store.ReadRaw().Value("chartengine.build_calls_total", nil)
+				value, ok := specs[0].Store.ReadRaw().Value("netdata.go.plugin.chartengine.build_calls_total", nil)
 				require.True(t, ok)
 				assert.GreaterOrEqual(t, value, float64(1))
 
@@ -201,7 +201,7 @@ groups:
     charts:
       - id: component_load
         title: Component Load
-        context: component_load
+        context: netdata.go.plugin.component.component_load
         units: load
         dimensions:
           - selector: component.load
@@ -219,7 +219,7 @@ groups:
     charts:
       - id: component_load
         title: Component Load
-        context: component_load
+        context: netdata.go.plugin.component.component_load
         units: load
         dimensions:
           - selector: component.load
