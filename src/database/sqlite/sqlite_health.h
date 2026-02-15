@@ -10,14 +10,17 @@
 #define ALERT_TRANSITION_DELAY_SHORT (10)
 #define ALERT_TRANSITION_DELAY_NONE  (0)
 
+// Forward declaration for statement set (defined in health_event_loop_uv.h)
+struct health_stmt_set;
+
 struct sql_alert_transition_data;
 struct sql_alert_config_data;
 struct rrd_alert_prototype;
 void sql_health_alarm_log_load(RRDHOST *host);
-void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
+void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, struct health_stmt_set *stmts);
 void sql_health_alarm_log_cleanup(RRDHOST *host);
 void sql_alert_store_config(struct rrd_alert_prototype *ap);
-int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status);
+int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status, struct health_stmt_set *stmts);
 void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const char *chart);
 int health_migrate_old_health_log_table(char *table);
 uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id);

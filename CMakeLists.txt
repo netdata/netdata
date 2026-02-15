@@ -1469,6 +1469,8 @@ set(HEALTH_PLUGIN_FILES
         src/health/health_internals.h
         src/health/health_notifications.c
         src/health/health_event_loop.c
+        src/health/health_event_loop_uv.c
+        src/health/health_event_loop_uv.h
         src/health/health_dyncfg.c
         src/health/health_variable.c
         src/health/rrdcalc.c
