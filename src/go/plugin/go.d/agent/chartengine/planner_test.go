@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 )
 
@@ -693,6 +694,59 @@ groups:
 	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Empty(t, plan.Actions)
+}
+
+func TestBuildPlanEnginePolicySelectorFiltersSeriesBeforeRouting(t *testing.T) {
+	selectorExpr := promselector.Expr{
+		Allow: []string{`svc.errors_total{method="GET"}`},
+	}
+	e, err := New(WithEnginePolicy(EnginePolicy{
+		Selector: &selectorExpr,
+		Autogen:  AutogenPolicy{Enabled: true},
+	}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	unmatched := sm.Counter("errors_total")
+	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
+	methodPOST := sm.LabelSet(metrix.Label{Key: "method", Value: "POST"})
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10, methodGET)
+	unmatched.ObserveTotal(20, methodPOST)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc.errors_total-method=GET", create.ChartID)
+	assert.Equal(t, "GET", create.Labels["method"])
+
+	update := findUpdateAction(plan)
+	require.NotNil(t, update)
+	require.Len(t, update.Values, 1)
+	assert.Equal(t, float64(10), update.Values[0].Float64)
 }
 
 func TestBuildPlanAutogenCreatesChartForUnmatchedScalar(t *testing.T) {

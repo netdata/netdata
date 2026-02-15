@@ -66,7 +66,14 @@ type ModuleV2 interface {
 	ChartTemplateYAML() string
 }
 
+// ModuleV2EnginePolicy allows a V2 collector to provide chartengine policy
+// (series selector + autogen behavior).
+type ModuleV2EnginePolicy interface {
+	EnginePolicy() chartengine.EnginePolicy
+}
+
 // ModuleV2Autogen allows a V2 collector to opt into unmatched-series fallback.
+// Deprecated: prefer ModuleV2EnginePolicy.
 type ModuleV2Autogen interface {
 	AutogenPolicy() chartengine.AutogenPolicy
 }

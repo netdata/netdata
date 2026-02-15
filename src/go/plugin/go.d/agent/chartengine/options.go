@@ -7,10 +7,13 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 )
 
 type engineConfig struct {
 	autogen         AutogenPolicy
+	selector        metrixselector.Selector
 	runtimeStore    metrix.RuntimeStore
 	runtimeStoreSet bool
 	log             *logger.Logger
@@ -47,6 +50,16 @@ type AutogenPolicy struct {
 	ExpireAfterSuccessCycles uint64
 }
 
+// EnginePolicy controls chartengine matching/materialization behavior.
+type EnginePolicy struct {
+	// Selector filters input series globally before template/autogen routing.
+	// Nil or empty selector means "allow all".
+	Selector *promselector.Expr
+
+	// Autogen controls unmatched-series fallback behavior.
+	Autogen AutogenPolicy
+}
+
 func defaultAutogenPolicy() AutogenPolicy {
 	return AutogenPolicy{
 		Enabled:      false,
@@ -54,20 +67,49 @@ func defaultAutogenPolicy() AutogenPolicy {
 	}
 }
 
-// WithAutogenPolicy configures unmatched-series autogen behavior.
-func WithAutogenPolicy(policy AutogenPolicy) Option {
+func normalizeAutogenPolicy(policy AutogenPolicy) (AutogenPolicy, error) {
+	maxLen := policy.MaxTypeIDLen
+	if maxLen <= 0 {
+		maxLen = defaultMaxTypeIDLen
+	}
+	if maxLen < 4 {
+		return AutogenPolicy{}, fmt.Errorf("autogen max type.id len must be >= 4, got %d", maxLen)
+	}
+	policy.MaxTypeIDLen = maxLen
+	return policy, nil
+}
+
+func compileEngineSelector(expr *promselector.Expr) (metrixselector.Selector, error) {
+	if expr == nil || expr.Empty() {
+		return nil, nil
+	}
+	return (metrixselector.Expr{
+		Allow: append([]string(nil), expr.Allow...),
+		Deny:  append([]string(nil), expr.Deny...),
+	}).Parse()
+}
+
+// WithEnginePolicy configures chartengine matching/materialization policy.
+func WithEnginePolicy(policy EnginePolicy) Option {
 	return func(cfg *engineConfig) error {
-		maxLen := policy.MaxTypeIDLen
-		if maxLen <= 0 {
-			maxLen = defaultMaxTypeIDLen
+		autogen, err := normalizeAutogenPolicy(policy.Autogen)
+		if err != nil {
+			return err
 		}
-		if maxLen < 4 {
-			return fmt.Errorf("autogen max type.id len must be >= 4, got %d", maxLen)
+		selector, err := compileEngineSelector(policy.Selector)
+		if err != nil {
+			return fmt.Errorf("invalid engine selector: %w", err)
 		}
-		policy.MaxTypeIDLen = maxLen
-		cfg.autogen = policy
+		cfg.autogen = autogen
+		cfg.selector = selector
 		return nil
 	}
+}
+
+// WithAutogenPolicy configures unmatched-series autogen behavior.
+// Deprecated: prefer WithEnginePolicy.
+func WithAutogenPolicy(policy AutogenPolicy) Option {
+	return WithEnginePolicy(EnginePolicy{Autogen: policy})
 }
 
 // WithRuntimeStore configures internal chartengine runtime metrics store.

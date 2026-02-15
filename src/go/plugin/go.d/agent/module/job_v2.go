@@ -253,7 +253,9 @@ func (j *JobV2) postCheck() error {
 	opts := []chartengine.Option{
 		chartengine.WithLogger(j.Logger.With(slog.String("component", "chartengine"))),
 	}
-	if v, ok := j.module.(ModuleV2Autogen); ok {
+	if v, ok := j.module.(ModuleV2EnginePolicy); ok {
+		opts = append(opts, chartengine.WithEnginePolicy(v.EnginePolicy()))
+	} else if v, ok := j.module.(ModuleV2Autogen); ok {
 		opts = append(opts, chartengine.WithAutogenPolicy(v.AutogenPolicy()))
 	}
 

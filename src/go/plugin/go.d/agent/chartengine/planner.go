@@ -224,6 +224,9 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 			meta.LastSeenSuccessSeq != ctx.collectMeta.LastSuccessSeq {
 			return
 		}
+		if selector := e.state.cfg.selector; selector != nil && !selector.Matches(name, labels) {
+			return
+		}
 
 		routes, hit, err := e.resolveSeriesRoutes(
 			ctx.cache,
