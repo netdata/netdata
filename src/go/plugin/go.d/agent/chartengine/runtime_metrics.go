@@ -56,7 +56,7 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 		return nil
 	}
 	meter := store.Write().StatefulMeter("chartengine")
-	actions := meter.CounterVec("actions_total", []string{"kind"})
+	actions := meter.Vec("kind").Counter("actions_total")
 	return &runtimeMetrics{
 		buildCalls:             meter.Counter("build_calls_total"),
 		buildErrors:            meter.Counter("build_errors_total"),

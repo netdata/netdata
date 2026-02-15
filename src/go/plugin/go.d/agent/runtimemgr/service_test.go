@@ -90,7 +90,7 @@ func TestRuntimeMetricsJobScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				reg := newComponentRegistry()
 				store := metrix.NewRuntimeStore()
-				vec := store.Write().StatefulMeter("component").GaugeVec("load", []string{"id"})
+				vec := store.Write().StatefulMeter("component").Vec("id").Gauge("load")
 				vec.WithLabelValues("a").Set(1)
 				vec.WithLabelValues("b").Set(2)
 

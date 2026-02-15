@@ -34,18 +34,18 @@ func (c *Collector) collect(context.Context) error {
 		return nil
 	}
 
-	meter := c.store.Write().SnapshotMeter("")
-	minRTT := meter.GaugeVec("min_rtt", []string{"host"})
-	maxRTT := meter.GaugeVec("max_rtt", []string{"host"})
-	avgRTT := meter.GaugeVec("avg_rtt", []string{"host"})
-	stdDevRTT := meter.GaugeVec("std_dev_rtt", []string{"host"})
-	rttVariance := meter.GaugeVec("rtt_variance", []string{"host"})
-	meanJitter := meter.GaugeVec("mean_jitter", []string{"host"})
-	ewmaJitter := meter.GaugeVec("ewma_jitter", []string{"host"})
-	smaJitter := meter.GaugeVec("sma_jitter", []string{"host"})
-	packetLoss := meter.GaugeVec("packet_loss", []string{"host"})
-	packetsRecv := meter.GaugeVec("packets_recv", []string{"host"})
-	packetsSent := meter.GaugeVec("packets_sent", []string{"host"})
+	vecMeter := c.store.Write().SnapshotMeter("").Vec("host")
+	minRTT := vecMeter.Gauge("min_rtt")
+	maxRTT := vecMeter.Gauge("max_rtt")
+	avgRTT := vecMeter.Gauge("avg_rtt")
+	stdDevRTT := vecMeter.Gauge("std_dev_rtt")
+	rttVariance := vecMeter.Gauge("rtt_variance")
+	meanJitter := vecMeter.Gauge("mean_jitter")
+	ewmaJitter := vecMeter.Gauge("ewma_jitter")
+	smaJitter := vecMeter.Gauge("sma_jitter")
+	packetLoss := vecMeter.Gauge("packet_loss")
+	packetsRecv := vecMeter.Gauge("packets_recv")
+	packetsSent := vecMeter.Gauge("packets_sent")
 
 	for _, sample := range samples {
 		packetsRecv.WithLabelValues(sample.host).Observe(float64(sample.packetsRecv))

@@ -76,34 +76,46 @@ type RuntimeWriter interface {
 type SnapshotMeter interface {
 	WithLabels(labels ...Label) SnapshotMeter
 	WithLabelSet(labels ...LabelSet) SnapshotMeter
+	// Vec binds a reusable vec label-key schema for multiple vector instruments.
+	Vec(labelKeys ...string) SnapshotVecMeter
 	Gauge(name string, opts ...InstrumentOption) SnapshotGauge
-	GaugeVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotGaugeVec
 	Counter(name string, opts ...InstrumentOption) SnapshotCounter
-	CounterVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotCounterVec
 	Histogram(name string, opts ...InstrumentOption) SnapshotHistogram
-	HistogramVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotHistogramVec
 	Summary(name string, opts ...InstrumentOption) SnapshotSummary
-	SummaryVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotSummaryVec
 	StateSet(name string, opts ...InstrumentOption) StateSetInstrument
-	StateSetVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotStateSetVec
 	LabelSet(labels ...Label) LabelSet
+}
+
+// SnapshotVecMeter declares snapshot vec instruments sharing one label-key schema.
+type SnapshotVecMeter interface {
+	Gauge(name string, opts ...InstrumentOption) SnapshotGaugeVec
+	Counter(name string, opts ...InstrumentOption) SnapshotCounterVec
+	Histogram(name string, opts ...InstrumentOption) SnapshotHistogramVec
+	Summary(name string, opts ...InstrumentOption) SnapshotSummaryVec
+	StateSet(name string, opts ...InstrumentOption) SnapshotStateSetVec
 }
 
 // StatefulMeter declares stateful-mode instruments under a metric-name prefix.
 type StatefulMeter interface {
 	WithLabels(labels ...Label) StatefulMeter
 	WithLabelSet(labels ...LabelSet) StatefulMeter
+	// Vec binds a reusable vec label-key schema for multiple vector instruments.
+	Vec(labelKeys ...string) StatefulVecMeter
 	Gauge(name string, opts ...InstrumentOption) StatefulGauge
-	GaugeVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulGaugeVec
 	Counter(name string, opts ...InstrumentOption) StatefulCounter
-	CounterVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulCounterVec
 	Histogram(name string, opts ...InstrumentOption) StatefulHistogram
-	HistogramVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulHistogramVec
 	Summary(name string, opts ...InstrumentOption) StatefulSummary
-	SummaryVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulSummaryVec
 	StateSet(name string, opts ...InstrumentOption) StateSetInstrument
-	StateSetVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulStateSetVec
 	LabelSet(labels ...Label) LabelSet
+}
+
+// StatefulVecMeter declares stateful vec instruments sharing one label-key schema.
+type StatefulVecMeter interface {
+	Gauge(name string, opts ...InstrumentOption) StatefulGaugeVec
+	Counter(name string, opts ...InstrumentOption) StatefulCounterVec
+	Histogram(name string, opts ...InstrumentOption) StatefulHistogramVec
+	Summary(name string, opts ...InstrumentOption) StatefulSummaryVec
+	StateSet(name string, opts ...InstrumentOption) StatefulStateSetVec
 }
 
 // SnapshotGauge writes sampled absolute values; last write wins in a cycle.

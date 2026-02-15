@@ -47,7 +47,7 @@ func BenchmarkVecVsWithLabelsSnapshotGauge(b *testing.B) {
 			cc := benchmarkCycleController(b, s)
 			states := benchmarkVecStates(tc.seriesCount)
 			if tc.useVec {
-				vec := s.Write().SnapshotMeter("bench.vec").GaugeVec("workers", []string{"instance", "state"})
+				vec := s.Write().SnapshotMeter("bench.vec").Vec("instance", "state").Gauge("workers")
 				b.ReportAllocs()
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {

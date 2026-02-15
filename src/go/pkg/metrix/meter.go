@@ -12,10 +12,20 @@ type snapshotMeter struct {
 	sets    []LabelSet
 }
 
+type snapshotVecMeter struct {
+	meter     *snapshotMeter
+	labelKeys []string
+}
+
 type statefulMeter struct {
 	backend meterBackend
 	prefix  string
 	sets    []LabelSet
+}
+
+type statefulVecMeter struct {
+	meter     *statefulMeter
+	labelKeys []string
 }
 
 // SnapshotMeter returns a snapshot-mode declaration/write scope.
@@ -42,6 +52,13 @@ func (m *snapshotMeter) WithLabelSet(labels ...LabelSet) SnapshotMeter {
 	return &snapshotMeter{backend: m.backend, prefix: m.prefix, sets: appendLabelSets(m.sets, labels)}
 }
 
+func (m *snapshotMeter) Vec(labelKeys ...string) SnapshotVecMeter {
+	return &snapshotVecMeter{
+		meter:     m,
+		labelKeys: append([]string(nil), labelKeys...),
+	}
+}
+
 func (m *snapshotMeter) LabelSet(labels ...Label) LabelSet {
 	return m.backend.compileLabelSet(labels...)
 }
@@ -60,8 +77,55 @@ func (m *statefulMeter) WithLabelSet(labels ...LabelSet) StatefulMeter {
 	return &statefulMeter{backend: m.backend, prefix: m.prefix, sets: appendLabelSets(m.sets, labels)}
 }
 
+func (m *statefulMeter) Vec(labelKeys ...string) StatefulVecMeter {
+	return &statefulVecMeter{
+		meter:     m,
+		labelKeys: append([]string(nil), labelKeys...),
+	}
+}
+
 func (m *statefulMeter) LabelSet(labels ...Label) LabelSet {
 	return m.backend.compileLabelSet(labels...)
+}
+
+func (m *snapshotVecMeter) Gauge(name string, opts ...InstrumentOption) SnapshotGaugeVec {
+	return m.meter.GaugeVec(name, m.labelKeys, opts...)
+}
+
+func (m *snapshotVecMeter) Counter(name string, opts ...InstrumentOption) SnapshotCounterVec {
+	return m.meter.CounterVec(name, m.labelKeys, opts...)
+}
+
+func (m *snapshotVecMeter) Histogram(name string, opts ...InstrumentOption) SnapshotHistogramVec {
+	return m.meter.HistogramVec(name, m.labelKeys, opts...)
+}
+
+func (m *snapshotVecMeter) Summary(name string, opts ...InstrumentOption) SnapshotSummaryVec {
+	return m.meter.SummaryVec(name, m.labelKeys, opts...)
+}
+
+func (m *snapshotVecMeter) StateSet(name string, opts ...InstrumentOption) SnapshotStateSetVec {
+	return m.meter.StateSetVec(name, m.labelKeys, opts...)
+}
+
+func (m *statefulVecMeter) Gauge(name string, opts ...InstrumentOption) StatefulGaugeVec {
+	return m.meter.GaugeVec(name, m.labelKeys, opts...)
+}
+
+func (m *statefulVecMeter) Counter(name string, opts ...InstrumentOption) StatefulCounterVec {
+	return m.meter.CounterVec(name, m.labelKeys, opts...)
+}
+
+func (m *statefulVecMeter) Histogram(name string, opts ...InstrumentOption) StatefulHistogramVec {
+	return m.meter.HistogramVec(name, m.labelKeys, opts...)
+}
+
+func (m *statefulVecMeter) Summary(name string, opts ...InstrumentOption) StatefulSummaryVec {
+	return m.meter.SummaryVec(name, m.labelKeys, opts...)
+}
+
+func (m *statefulVecMeter) StateSet(name string, opts ...InstrumentOption) StatefulStateSetVec {
+	return m.meter.StateSetVec(name, m.labelKeys, opts...)
 }
 
 // metricName composes meter prefix with instrument local name.

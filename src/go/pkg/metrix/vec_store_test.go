@@ -17,7 +17,7 @@ func TestVecStoreScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
-				vec := s.Write().SnapshotMeter("apache").GaugeVec("workers", []string{"state"})
+				vec := s.Write().SnapshotMeter("apache").Vec("state").Gauge("workers")
 
 				cc.BeginCycle()
 				vec.WithLabelValues("busy").Observe(7)
@@ -28,12 +28,29 @@ func TestVecStoreScenarios(t *testing.T) {
 				mustValue(t, s.Read(), "apache.workers", Labels{"state": "idle"}, 3)
 			},
 		},
+		"snapshot vec scope shares label keys across metric families": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				vm := s.Write().SnapshotMeter("apache").Vec("state")
+				workers := vm.Gauge("workers")
+				requests := vm.Counter("requests_total")
+
+				cc.BeginCycle()
+				workers.WithLabelValues("busy").Observe(7)
+				requests.WithLabelValues("200").ObserveTotal(11)
+				cc.CommitCycleSuccess()
+
+				mustValue(t, s.Read(), "apache.workers", Labels{"state": "busy"}, 7)
+				mustValue(t, s.Read(), "apache.requests_total", Labels{"state": "200"}, 11)
+			},
+		},
 		"snapshot counter vec merges meter labels and vec labels": {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				sm := s.Write().SnapshotMeter("http").WithLabels(Label{Key: "instance", Value: "job1"})
-				vec := sm.CounterVec("requests_total", []string{"code"})
+				vec := sm.Vec("code").Counter("requests_total")
 
 				cc.BeginCycle()
 				vec.WithLabelValues("200").ObserveTotal(11)
@@ -46,7 +63,7 @@ func TestVecStoreScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
-				vec := s.Write().StatefulMeter("runtime").CounterVec("jobs_total", []string{"queue"})
+				vec := s.Write().StatefulMeter("runtime").Vec("queue").Counter("jobs_total")
 
 				cc.BeginCycle()
 				vec.WithLabelValues("default").Add(5)
@@ -61,10 +78,20 @@ func TestVecStoreScenarios(t *testing.T) {
 				mustDelta(t, s.Read(), "runtime.jobs_total", Labels{"queue": "default"}, 2)
 			},
 		},
+		"vec scope validates label keys through family declaration": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				vm := s.Write().SnapshotMeter("svc").Vec("zone", "zone")
+
+				expectPanic(t, func() {
+					_ = vm.Gauge("load")
+				})
+			},
+		},
 		"vec returns cached handle for same label values": {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
-				vec := s.Write().SnapshotMeter("svc").GaugeVec("load", []string{"zone"})
+				vec := s.Write().SnapshotMeter("svc").Vec("zone").Gauge("load")
 
 				a := vec.WithLabelValues("a")
 				b := vec.WithLabelValues("a")
@@ -74,7 +101,7 @@ func TestVecStoreScenarios(t *testing.T) {
 		"GetWithLabelValues validates label value count": {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
-				vec := s.Write().SnapshotMeter("svc").GaugeVec("load", []string{"zone", "role"})
+				vec := s.Write().SnapshotMeter("svc").Vec("zone", "role").Gauge("load")
 
 				_, err := vec.GetWithLabelValues("only-one")
 				require.ErrorIs(t, err, errVecLabelValueCount)
@@ -87,7 +114,7 @@ func TestVecStoreScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
-				vec := s.Write().SnapshotMeter("svc").GaugeVec("load", nil)
+				vec := s.Write().SnapshotMeter("svc").Vec().Gauge("load")
 
 				cc.BeginCycle()
 				vec.WithLabelValues().Observe(9)
@@ -100,10 +127,10 @@ func TestVecStoreScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				expectPanic(t, func() {
-					_ = s.Write().SnapshotMeter("svc").GaugeVec("load", []string{"zone", "zone"})
+					_ = s.Write().SnapshotMeter("svc").Vec("zone", "zone").Gauge("load")
 				})
 				expectPanic(t, func() {
-					_ = s.Write().SnapshotMeter("svc").CounterVec("requests_total", []string{""})
+					_ = s.Write().SnapshotMeter("svc").Vec("").Counter("requests_total")
 				})
 			},
 		},
@@ -111,9 +138,8 @@ func TestVecStoreScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
-				vec := s.Write().SnapshotMeter("mysql").HistogramVec(
+				vec := s.Write().SnapshotMeter("mysql").Vec("database").Histogram(
 					"query_seconds",
-					[]string{"database"},
 					WithHistogramBounds(0.1, 0.5),
 				)
 
@@ -139,9 +165,8 @@ func TestVecStoreScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
-				vec := s.Write().StatefulMeter("mysql").HistogramVec(
+				vec := s.Write().StatefulMeter("mysql").Vec("database").Histogram(
 					"query_seconds",
-					[]string{"database"},
 					WithHistogramBounds(0.1, 0.5),
 				)
 
@@ -164,9 +189,8 @@ func TestVecStoreScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
-				vec := s.Write().SnapshotMeter("mysql").SummaryVec(
+				vec := s.Write().SnapshotMeter("mysql").Vec("database").Summary(
 					"query_seconds",
-					[]string{"database"},
 					WithSummaryQuantiles(0.5),
 				)
 
@@ -191,7 +215,7 @@ func TestVecStoreScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
-				vec := s.Write().StatefulMeter("mysql").SummaryVec("query_seconds", []string{"database"})
+				vec := s.Write().StatefulMeter("mysql").Vec("database").Summary("query_seconds")
 
 				cc.BeginCycle()
 				vec.WithLabelValues("db1").Observe(0.1)
@@ -211,9 +235,8 @@ func TestVecStoreScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
-				vec := s.Write().SnapshotMeter("net").StateSetVec(
+				vec := s.Write().SnapshotMeter("net").Vec("nic").StateSet(
 					"link_state",
-					[]string{"nic"},
 					WithStateSetStates("up", "down"),
 					WithStateSetMode(ModeEnum),
 				)
@@ -232,9 +255,8 @@ func TestVecStoreScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
-				vec := s.Write().StatefulMeter("net").StateSetVec(
+				vec := s.Write().StatefulMeter("net").Vec("nic").StateSet(
 					"link_state",
-					[]string{"nic"},
 					WithStateSetStates("up", "down"),
 					WithStateSetMode(ModeBitSet),
 				)
