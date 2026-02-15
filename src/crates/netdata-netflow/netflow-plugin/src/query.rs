@@ -2,34 +2,24 @@ use crate::plugin_config::PluginConfig;
 #[cfg(test)]
 use crate::tiering::dimensions_for_rollup;
 use crate::tiering::{OpenTierState, TierKind};
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use chrono::{TimeZone, Utc};
-use journal_common::load_machine_id;
-use journal_engine::{
-    Facets, FileIndexCache, FileIndexCacheBuilder, FileIndexKey, IndexingLimits, LogQuery,
-    QueryTimeRange, batch_compute_file_indexes,
-};
-use journal_index::{Anchor, Direction, FieldName, FieldValuePair, Filter, Microseconds, Seconds};
-use journal_registry::{Monitor, Registry};
+use journal_common::{Seconds, load_machine_id};
+use journal_registry::{Monitor, Registry, repository::File as RegistryFile};
+use journal_session::{Direction as SessionDirection, JournalSession};
 use notify::Event;
+use regex::Regex;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
 use tokio::sync::mpsc::UnboundedReceiver;
-use tokio_util::sync::CancellationToken;
 
 const DEFAULT_QUERY_WINDOW_SECONDS: u32 = 15 * 60;
 const DEFAULT_QUERY_LIMIT: usize = 1000;
 const MAX_QUERY_LIMIT: usize = 1000;
-const QUERY_TIMEOUT_SECONDS: u64 = 10;
-const CACHE_MEMORY_CAPACITY: usize = 128;
-const CACHE_DISK_CAPACITY: usize = 256 * 1024 * 1024;
-const CACHE_BLOCK_SIZE: usize = 4 * 1024 * 1024;
-const QUERY_PAGE_LIMIT: usize = 4096;
 #[cfg(test)]
 const DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS: usize = 50_000;
 const FACET_VALUE_LIMIT: usize = 100;
@@ -74,41 +64,6 @@ const FACET_EXCLUDED_FIELDS: &[&str] = &[
     "FLOWS",
     "RAW_BYTES",
     "RAW_PACKETS",
-];
-
-const INDEXED_FIELDS: &[&str] = &[
-    "FLOW_VERSION",
-    "EXPORTER_IP",
-    "EXPORTER_NAME",
-    "SAMPLING_RATE",
-    "SRC_ADDR",
-    "SRC_PREFIX",
-    "DST_ADDR",
-    "DST_PREFIX",
-    "SRC_PORT",
-    "DST_PORT",
-    "PROTOCOL",
-    "SRC_AS",
-    "DST_AS",
-    "SRC_NET_NAME",
-    "DST_NET_NAME",
-    "SRC_NET_ROLE",
-    "DST_NET_ROLE",
-    "SRC_NET_SITE",
-    "DST_NET_SITE",
-    "SRC_NET_REGION",
-    "DST_NET_REGION",
-    "SRC_NET_TENANT",
-    "DST_NET_TENANT",
-    "SRC_COUNTRY",
-    "DST_COUNTRY",
-    "SRC_GEO_CITY",
-    "DST_GEO_CITY",
-    "SRC_GEO_STATE",
-    "DST_GEO_STATE",
-    "IN_IF",
-    "OUT_IF",
-    "DIRECTION",
 ];
 
 #[derive(Debug, Deserialize, Default)]
@@ -206,7 +161,6 @@ impl SortBy {
 
 pub(crate) struct FlowQueryService {
     registry: Registry,
-    cache: FileIndexCache,
     agent_id: String,
     tier_dirs: HashMap<TierKind, PathBuf>,
     open_tiers: Arc<RwLock<OpenTierState>>,
@@ -243,16 +197,6 @@ impl FlowQueryService {
             })?;
         }
 
-        let cache_dir = cfg.journal.base_dir().join(".index-cache");
-        let cache = FileIndexCacheBuilder::new()
-            .with_cache_path(cache_dir)
-            .with_memory_capacity(CACHE_MEMORY_CAPACITY)
-            .with_disk_capacity(CACHE_DISK_CAPACITY)
-            .with_block_size(CACHE_BLOCK_SIZE)
-            .build()
-            .await
-            .context("failed to create file index cache")?;
-
         let agent_id = load_machine_id()
             .map(|id| id.as_simple().to_string())
             .context("failed to load machine id")?;
@@ -264,7 +208,6 @@ impl FlowQueryService {
         Ok((
             Self {
                 registry,
-                cache,
                 agent_id,
                 tier_dirs,
                 open_tiers,
@@ -330,8 +273,6 @@ impl FlowQueryService {
             .tier_dirs
             .get(&selected_tier)
             .context("missing selected tier directory")?;
-        let time_range =
-            QueryTimeRange::new(after, before).context("invalid netflow query time range")?;
 
         let files: Vec<_> = self
             .registry
@@ -402,73 +343,48 @@ impl FlowQueryService {
             });
         }
 
-        let facets = build_index_facets(&request.selections, &effective_group_by);
-        stats.insert("query_indexed_facets".to_string(), facets.len() as u64);
-        let projected_fields =
-            build_output_projection_fields(&effective_group_by, &request.selections);
-        stats.insert(
-            "query_projected_fields".to_string(),
-            projected_fields.len() as u64,
-        );
-
-        let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
-        let keys: Vec<FileIndexKey> = files
-            .iter()
-            .map(|file_info| {
-                FileIndexKey::new(
-                    &file_info.file,
-                    &facets,
-                    Some(source_timestamp_field.clone()),
-                )
-            })
-            .collect();
-
-        let indexing_cancellation = CancellationToken::new();
-        let indexed_files = tokio::select! {
-            result = batch_compute_file_indexes(
-                &self.cache,
-                &self.registry,
-                keys,
-                &time_range,
-                indexing_cancellation.clone(),
-                IndexingLimits::default(),
-                None,
-            ) => result.context("failed to index netflow journal files"),
-            _ = tokio::time::sleep(Duration::from_secs(QUERY_TIMEOUT_SECONDS)) => {
-                indexing_cancellation.cancel();
-                Err(anyhow!(
-                    "timed out indexing netflow journal files after {}s",
-                    QUERY_TIMEOUT_SECONDS
-                ))
-            }
-        }?;
-
-        let file_indexes: Vec<_> = indexed_files.into_iter().map(|(_, idx)| idx).collect();
-        if file_indexes.is_empty() {
-            return Ok(FlowQueryOutput {
-                agent_id: self.agent_id.clone(),
-                flows: Vec::new(),
-                stats,
-                metrics: HashMap::new(),
-                warnings: None,
-                facets: None,
-                histogram: None,
-                visualizations: Some(default_flows_visualizations()),
-                pagination: Some(json!({
-                    "limit": limit,
-                    "returned": 0,
-                    "matched_entries": 0,
-                    "truncated": false,
-                })),
-            });
-        }
-
         let after_usec = (after as u64).saturating_mul(1_000_000);
         let before_usec = (before as u64).saturating_mul(1_000_000);
-        let anchor_usec = before_usec.saturating_sub(1);
+        let until_usec = before_usec.saturating_sub(1);
+        let query_regex = if request.query.is_empty() {
+            None
+        } else {
+            Some(
+                Regex::new(&request.query)
+                    .with_context(|| format!("invalid regex query pattern: {}", request.query))?,
+            )
+        };
 
-        let filter = build_filter_from_selections(&request.selections);
-        let regex = (!request.query.is_empty()).then(|| request.query.clone());
+        let tier_files: Vec<RegistryFile> = files.into_iter().map(|f| f.file).collect();
+        let tier_paths: Vec<PathBuf> = tier_files
+            .iter()
+            .map(|file| PathBuf::from(file.path()))
+            .collect();
+
+        let session = JournalSession::builder()
+            .files(tier_paths)
+            .load_remappings(false)
+            .build()
+            .context("failed to open journal session for selected tier")?;
+
+        let mut cursor_builder = session
+            .cursor_builder()
+            .direction(SessionDirection::Forward)
+            .since(after_usec)
+            .until(until_usec);
+        for (field, values) in &request.selections {
+            let field = field.to_ascii_uppercase();
+            for value in values {
+                if value.is_empty() {
+                    continue;
+                }
+                let pair = format!("{}={}", field, value);
+                cursor_builder = cursor_builder.add_match(pair.as_bytes());
+            }
+        }
+        let mut cursor = cursor_builder
+            .build()
+            .context("failed to build journal session cursor")?;
 
         let mut grouped_aggregates: HashMap<GroupKey, AggregatedFlow> = HashMap::new();
         let mut group_overflow = GroupOverflow::default();
@@ -476,54 +392,76 @@ impl FlowQueryService {
         let (histogram_bucket_seconds, mut histogram_buckets) =
             init_histogram_buckets(after, before);
         let mut matched_entries = 0usize;
-        let mut page_state = None;
-        let mut query_pages = 0u64;
+        let mut streamed_entries = 0_u64;
         loop {
-            let mut query = LogQuery::new(
-                &file_indexes,
-                Anchor::Timestamp(Microseconds(anchor_usec)),
-                Direction::Backward,
-            )
-            .with_limit(QUERY_PAGE_LIMIT)
-            .with_after_usec(after_usec)
-            .with_before_usec(before_usec)
-            .with_output_fields(projected_fields.iter().cloned());
-
-            if !filter.is_none() {
-                query = query.with_filter(filter.clone());
-            }
-            if let Some(pattern) = regex.as_deref() {
-                query = query.with_regex(pattern);
-            }
-
-            let (entries, next_state) = query
-                .execute_page(page_state.as_ref())
-                .context("failed to execute netflow journal query page")?;
-            if entries.is_empty() {
+            let has_entry = cursor
+                .step()
+                .context("failed to step journal session cursor")?;
+            if !has_entry {
                 break;
             }
 
-            query_pages = query_pages.saturating_add(1);
-            for entry in entries {
-                let record = record_from_entry(entry);
-                accumulate_record(
-                    &record,
-                    &effective_group_by,
-                    &mut grouped_aggregates,
-                    &mut group_overflow,
-                    &mut facet_values,
-                    self.max_groups,
-                    self.facet_max_values_per_field,
-                    after,
-                    before,
-                    histogram_bucket_seconds,
-                    &mut histogram_buckets,
-                );
-                matched_entries = matched_entries.saturating_add(1);
+            streamed_entries = streamed_entries.saturating_add(1);
+            let timestamp_usec = cursor.realtime_usec();
+            if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+                continue;
             }
-            page_state = Some(next_state);
+
+            let mut fields = BTreeMap::new();
+            let mut regex_match = query_regex.is_none();
+            let mut payloads = cursor
+                .payloads()
+                .context("failed to open payload iterator for journal entry")?;
+            while let Some(payload) = payloads
+                .next()
+                .context("failed to read journal entry payload")?
+            {
+                if let Some(regex) = &query_regex {
+                    if !regex_match {
+                        if let Ok(text) = std::str::from_utf8(payload) {
+                            if regex.is_match(text) {
+                                regex_match = true;
+                            }
+                        } else if regex.is_match(&String::from_utf8_lossy(payload)) {
+                            regex_match = true;
+                        }
+                    }
+                }
+
+                if let Some(eq_pos) = payload.iter().position(|&b| b == b'=') {
+                    let key = &payload[..eq_pos];
+                    let value = &payload[eq_pos + 1..];
+                    if let Ok(key) = std::str::from_utf8(key) {
+                        fields.insert(key.to_string(), String::from_utf8_lossy(value).into_owned());
+                    }
+                }
+            }
+
+            if !regex_match {
+                continue;
+            }
+
+            let record = FlowRecord {
+                timestamp_usec,
+                fields,
+            };
+            accumulate_record(
+                &record,
+                &effective_group_by,
+                &mut grouped_aggregates,
+                &mut group_overflow,
+                &mut facet_values,
+                self.max_groups,
+                self.facet_max_values_per_field,
+                after,
+                before,
+                histogram_bucket_seconds,
+                &mut histogram_buckets,
+            );
+            matched_entries = matched_entries.saturating_add(1);
         }
-        stats.insert("query_pages".to_string(), query_pages);
+        stats.insert("query_streamed_entries".to_string(), streamed_entries);
+        stats.insert("query_reader_path".to_string(), 1);
 
         if selected_tier != TierKind::Raw {
             let open_rows = self.open_rows_for_tier(selected_tier, after, before);
@@ -1036,96 +974,6 @@ fn requires_raw_tier_for_fields(
         .any(|field| field_is_raw_only(field.as_str()))
 }
 
-fn build_output_projection_fields(
-    group_by: &[String],
-    selections: &HashMap<String, Vec<String>>,
-) -> Vec<String> {
-    let mut projected = HashSet::new();
-    projected.insert("_SOURCE_REALTIME_TIMESTAMP".to_string());
-
-    for metric in ["BYTES", "PACKETS", "FLOWS", "RAW_BYTES", "RAW_PACKETS"] {
-        projected.insert(metric.to_string());
-    }
-
-    // Fields required for endpoint/exporter framing in response rows.
-    for field in [
-        "SRC_ADDR",
-        "DST_ADDR",
-        "EXPORTER_IP",
-        "EXPORTER_NAME",
-        "FLOW_VERSION",
-        "SAMPLING_RATE",
-    ] {
-        projected.insert(field.to_string());
-    }
-
-    // Include all facet-eligible indexed fields so facet values remain useful.
-    for field in INDEXED_FIELDS {
-        if facet_field_allowed(field) {
-            projected.insert((*field).to_string());
-        }
-    }
-
-    for field in group_by {
-        projected.insert(field.to_ascii_uppercase());
-    }
-    for field in selections.keys() {
-        projected.insert(field.to_ascii_uppercase());
-    }
-
-    let mut out: Vec<String> = projected.into_iter().collect();
-    out.sort();
-    out
-}
-
-fn build_index_facets(selections: &HashMap<String, Vec<String>>, group_by: &[String]) -> Facets {
-    let mut names: Vec<String> = INDEXED_FIELDS.iter().map(|v| (*v).to_string()).collect();
-    for key in selections.keys() {
-        names.push(key.to_ascii_uppercase());
-    }
-    for key in group_by {
-        names.push(key.to_ascii_uppercase());
-    }
-    names.sort();
-    names.dedup();
-    Facets::new(&names)
-}
-
-fn build_filter_from_selections(selections: &HashMap<String, Vec<String>>) -> Filter {
-    if selections.is_empty() {
-        return Filter::none();
-    }
-
-    let mut field_filters = Vec::new();
-
-    for (field, values) in selections {
-        if values.is_empty() {
-            continue;
-        }
-        let field_name = field.to_ascii_uppercase();
-
-        let value_filters: Vec<_> = values
-            .iter()
-            .filter_map(|value| {
-                let pair_str = format!("{}={}", field_name, value);
-                FieldValuePair::parse(&pair_str).map(Filter::match_field_value_pair)
-            })
-            .collect();
-
-        if value_filters.is_empty() {
-            continue;
-        }
-
-        field_filters.push(Filter::or(value_filters));
-    }
-
-    if field_filters.is_empty() {
-        Filter::none()
-    } else {
-        Filter::and(field_filters)
-    }
-}
-
 #[cfg(test)]
 fn build_facets(
     records: &[FlowRecord],
@@ -1397,23 +1245,6 @@ fn default_flows_visualizations() -> Value {
             }
         }
     })
-}
-
-fn record_from_entry(entry: journal_engine::LogEntryData) -> FlowRecord {
-    let mut fields = BTreeMap::new();
-    for pair in entry.fields {
-        fields.insert(pair.field().to_string(), pair.value().to_string());
-    }
-
-    let timestamp_usec = fields
-        .get("_SOURCE_REALTIME_TIMESTAMP")
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(entry.timestamp);
-
-    FlowRecord {
-        timestamp_usec,
-        fields,
-    }
 }
 
 fn metrics_from_fields(fields: &BTreeMap<String, String>) -> FlowMetrics {

@@ -24,6 +24,7 @@ journal-engine = { workspace = true }
 journal-index = { workspace = true }
 journal-log-writer = { workspace = true }
 journal-registry = { workspace = true }
+journal-session = { workspace = true }
 humantime = { workspace = true }
 humantime-serde = { workspace = true }
 ipnet = { workspace = true }

@@ -423,6 +423,7 @@ mod tests {
     use chrono::Utc;
     use etherparse::{SlicedPacket, TransportSlice};
     use pcap_file::pcap::PcapReader;
+    use std::collections::HashMap;
     use std::fs;
     use std::net::UdpSocket as StdUdpSocket;
     use std::path::{Path, PathBuf};
@@ -590,6 +591,61 @@ mod tests {
         assert!(
             response.data.stats.get("query_tier").copied().unwrap_or(0) > 0,
             "expected function response to report non-raw query tier"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn e2e_selection_filter_uses_streaming_reader_path() {
+        let (cfg, _metrics, open_tiers, _tmp) = ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) =
+            query::FlowQueryService::new(&cfg, Arc::clone(&open_tiers))
+                .await
+                .expect("create query service");
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+
+        let request_match = query::FlowsRequest {
+            view: "detailed".to_string(),
+            after: Some(1),
+            before: Some(before),
+            last: Some(100),
+            selections: HashMap::from([("FLOW_VERSION".to_string(), vec!["v5".to_string()])]),
+            ..Default::default()
+        };
+        let matched = query_service
+            .query_flows(&request_match)
+            .await
+            .expect("query with matching FLOW_VERSION selection");
+        assert_eq!(
+            matched.stats.get("query_reader_path").copied().unwrap_or(0),
+            1,
+            "expected query to use journal-session reader path"
+        );
+        assert!(
+            matched
+                .stats
+                .get("query_matched_entries")
+                .copied()
+                .unwrap_or(0)
+                > 0,
+            "expected at least one matched entry for FLOW_VERSION=v5"
+        );
+
+        let request_miss = query::FlowsRequest {
+            selections: HashMap::from([("FLOW_VERSION".to_string(), vec!["999".to_string()])]),
+            ..request_match
+        };
+        let missed = query_service
+            .query_flows(&request_miss)
+            .await
+            .expect("query with non-matching FLOW_VERSION selection");
+        assert_eq!(
+            missed
+                .stats
+                .get("query_matched_entries")
+                .copied()
+                .unwrap_or(0),
+            0,
+            "expected no matched entries for FLOW_VERSION=999"
         );
     }
 
