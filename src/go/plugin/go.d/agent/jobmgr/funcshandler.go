@@ -44,6 +44,14 @@ func (m *Manager) makeMethodFuncHandler(moduleName, methodID string) func(functi
 		}
 		jobParam := buildJobParamConfig(jobs)
 		jobValues := paramValues(argValues, payload, paramJob)
+		if len(jobValues) > 1 {
+			m.respondError(fn, 400, "parameter '%s' expects a single value", paramJob)
+			return
+		}
+		if len(jobValues) == 1 && !slices.Contains(jobs, jobValues[0]) {
+			m.respondError(fn, 404, "unknown job '%s', available: %v", jobValues[0], jobs)
+			return
+		}
 		resolvedJob := funcapi.ResolveParam(jobParam, jobValues)
 		jobName := resolvedJob.GetOne()
 		if jobName == "" {
@@ -352,6 +360,9 @@ func parseArgsParams(args []string) map[string][]string {
 			continue
 		}
 		parts := strings.SplitN(arg, ":", 2)
+		if len(parts) != 2 {
+			parts = strings.SplitN(arg, "=", 2)
+		}
 		if len(parts) != 2 {
 			continue
 		}

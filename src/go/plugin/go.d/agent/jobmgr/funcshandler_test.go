@@ -119,6 +119,26 @@ func TestBuildAcceptedParams(t *testing.T) {
 	assert.Equal(t, []string{"__job", "__sort", "db", "extra"}, result)
 }
 
+func TestParseArgsParams(t *testing.T) {
+	args := []string{
+		"__job:snmp-a",
+		"view=detailed",
+		"labels:src_ip,dst_ip",
+		"info",
+		"invalid",
+		"empty:",
+		"=novalue",
+	}
+
+	got := parseArgsParams(args)
+
+	assert.Equal(t, []string{"snmp-a"}, got["__job"])
+	assert.Equal(t, []string{"detailed"}, got["view"])
+	assert.Equal(t, []string{"src_ip", "dst_ip"}, got["labels"])
+	assert.NotContains(t, got, "invalid")
+	assert.NotContains(t, got, "empty")
+}
+
 // TestBuildRequiredParams_TypeSelect verifies that all selectors use type "select" (single-select)
 // This is critical because type "multiselect" would show checkboxes instead of dropdowns
 func TestBuildRequiredParams_TypeSelect(t *testing.T) {
