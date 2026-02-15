@@ -261,7 +261,7 @@ func (j *JobV2) postCheck() error {
 	if err != nil {
 		return err
 	}
-	if err := engine.LoadYAML(j.module.ChartTemplateYAML(), 1); err != nil {
+	if err := engine.LoadYAML([]byte(j.module.ChartTemplateYAML()), 1); err != nil {
 		return err
 	}
 

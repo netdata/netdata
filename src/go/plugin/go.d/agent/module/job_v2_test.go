@@ -24,7 +24,7 @@ type mockModuleV2 struct {
 	cleanupFunc func(context.Context)
 
 	store    metrix.CollectorStore
-	template []byte
+	template string
 	cleaned  bool
 	vnode    *vnodes.VirtualNode
 }
@@ -60,7 +60,7 @@ func (m *mockModuleV2) Cleanup(ctx context.Context) {
 func (m *mockModuleV2) Configuration() any                 { return nil }
 func (m *mockModuleV2) VirtualNode() *vnodes.VirtualNode   { return m.vnode }
 func (m *mockModuleV2) MetricStore() metrix.CollectorStore { return m.store }
-func (m *mockModuleV2) ChartTemplateYAML() []byte          { return m.template }
+func (m *mockModuleV2) ChartTemplateYAML() string          { return m.template }
 
 func newTestJobV2(mod ModuleV2, out *bytes.Buffer) *JobV2 {
 	return NewJobV2(JobV2Config{
@@ -93,8 +93,8 @@ func newTestJobV2WithVnode(mod ModuleV2, out *bytes.Buffer, vnode vnodes.Virtual
 	})
 }
 
-func chartTemplateV2() []byte {
-	return []byte(`
+func chartTemplateV2() string {
+	return `
 version: v1
 groups:
   - family: Workers
@@ -108,11 +108,11 @@ groups:
         dimensions:
           - selector: apache.workers_busy
             name: busy
-`)
+`
 }
 
-func chartTemplateV2Dynamic() []byte {
-	return []byte(`
+func chartTemplateV2Dynamic() string {
+	return `
 version: v1
 groups:
   - family: Net
@@ -131,7 +131,7 @@ groups:
             name: received
           - selector: windows_net_bytes_sent_total
             name: sent
-`)
+`
 }
 
 func TestJobV2Scenarios(t *testing.T) {

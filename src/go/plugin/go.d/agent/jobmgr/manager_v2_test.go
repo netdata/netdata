@@ -39,8 +39,8 @@ func (m *testV2Module) Collect(context.Context) error      { return nil }
 func (m *testV2Module) Cleanup(context.Context)            {}
 func (m *testV2Module) VirtualNode() *vnodes.VirtualNode   { return nil }
 func (m *testV2Module) MetricStore() metrix.CollectorStore { return m.store }
-func (m *testV2Module) ChartTemplateYAML() []byte {
-	return []byte(`
+func (m *testV2Module) ChartTemplateYAML() string {
+	return `
 version: "1"
 groups:
   - family: "test"
@@ -50,7 +50,7 @@ groups:
         dimensions:
           - selector: 'test.value'
             name: "value"
-`)
+`
 }
 
 func TestManagerCreateCollectorJobV2Branching(t *testing.T) {

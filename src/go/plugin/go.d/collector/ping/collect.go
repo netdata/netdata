@@ -3,63 +3,106 @@
 package ping
 
 import (
-	"fmt"
 	"sync"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	mu := &sync.Mutex{}
-	mx := make(map[string]int64)
-	var wg sync.WaitGroup
+type v2Metrics struct {
+	minRTT      metrix.SnapshotGaugeVec
+	maxRTT      metrix.SnapshotGaugeVec
+	avgRTT      metrix.SnapshotGaugeVec
+	stdDevRTT   metrix.SnapshotGaugeVec
+	rttVariance metrix.SnapshotGaugeVec
+	meanJitter  metrix.SnapshotGaugeVec
+	ewmaJitter  metrix.SnapshotGaugeVec
+	smaJitter   metrix.SnapshotGaugeVec
+	packetLoss  metrix.SnapshotGaugeVec
+	packetsRecv metrix.SnapshotGaugeVec
+	packetsSent metrix.SnapshotGaugeVec
+}
 
-	for _, v := range c.Hosts {
+type hostSample struct {
+	host string
+
+	packetsRecv       int64
+	packetsSent       int64
+	packetLossPercent float64
+
+	hasRTT         bool
+	minRTTMS       float64
+	maxRTTMS       float64
+	avgRTTMS       float64
+	stdDevRTTMS    float64
+	rttVarianceMS2 float64
+
+	hasJitter    bool
+	meanJitterMS float64
+	ewmaJitterMS float64
+	smaJitterMS  float64
+}
+
+func (c *Collector) collectSamples(updateJitterState bool) []hostSample {
+	var (
+		mu      sync.Mutex
+		samples = make([]hostSample, 0, len(c.Hosts))
+		wg      sync.WaitGroup
+	)
+
+	for _, host := range c.Hosts {
 		wg.Add(1)
-		go func(v string) { defer wg.Done(); c.pingHost(v, mx, mu) }(v)
+		go func(host string) {
+			defer wg.Done()
+
+			stats, err := c.prober.Ping(host)
+			if err != nil {
+				c.Error(err)
+				return
+			}
+
+			sample := hostSample{
+				host:              host,
+				packetsRecv:       int64(stats.PacketsRecv),
+				packetsSent:       int64(stats.PacketsSent),
+				packetLossPercent: stats.PacketLoss,
+			}
+
+			if stats.PacketsRecv != 0 {
+				sample.hasRTT = true
+				sample.minRTTMS = durationToMS(stats.MinRtt)
+				sample.maxRTTMS = durationToMS(stats.MaxRtt)
+				sample.avgRTTMS = durationToMS(stats.AvgRtt)
+				sample.stdDevRTTMS = durationToMS(stats.StdDevRtt)
+				stdDevMS := sample.stdDevRTTMS
+				sample.rttVarianceMS2 = stdDevMS * stdDevMS
+			}
+
+			if len(stats.Rtts) >= 2 {
+				meanJitter := calcMeanJitter(stats.Rtts)
+				sample.hasJitter = true
+				sample.meanJitterMS = durationToMS(meanJitter)
+
+				if updateJitterState {
+					mu.Lock()
+					sample.ewmaJitterMS = durationToMS(c.updateEWMAJitter(host, meanJitter))
+					sample.smaJitterMS = durationToMS(c.updateSMAJitter(host, meanJitter))
+					mu.Unlock()
+				}
+			}
+
+			mu.Lock()
+			samples = append(samples, sample)
+			mu.Unlock()
+		}(host)
 	}
 	wg.Wait()
 
-	return mx, nil
+	return samples
 }
 
-func (c *Collector) pingHost(host string, mx map[string]int64, mu *sync.Mutex) {
-	stats, err := c.prober.Ping(host)
-	if err != nil {
-		c.Error(err)
-		return
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	if !c.hosts[host] {
-		c.hosts[host] = true
-		c.addHostCharts(host)
-	}
-
-	px := fmt.Sprintf("host_%s_", host)
-	if stats.PacketsRecv != 0 {
-		mx[px+"min_rtt"] = stats.MinRtt.Microseconds()
-		mx[px+"max_rtt"] = stats.MaxRtt.Microseconds()
-		mx[px+"avg_rtt"] = stats.AvgRtt.Microseconds()
-		mx[px+"std_dev_rtt"] = stats.StdDevRtt.Microseconds()
-
-		// variance = stddev² stored as μs² (chart Div: 1e6 converts to ms²)
-		stdDevUs := stats.StdDevRtt.Microseconds()
-		mx[px+"rtt_variance"] = stdDevUs * stdDevUs
-	}
-
-	// jitter requires at least 2 RTT samples
-	if len(stats.Rtts) >= 2 {
-		meanJitter := calcMeanJitter(stats.Rtts)
-		mx[px+"mean_jitter"] = meanJitter.Microseconds()
-		mx[px+"ewma_jitter"] = c.updateEWMAJitter(host, meanJitter).Microseconds()
-		mx[px+"sma_jitter"] = c.updateSMAJitter(host, meanJitter).Microseconds()
-	}
-
-	mx[px+"packets_recv"] = int64(stats.PacketsRecv)
-	mx[px+"packets_sent"] = int64(stats.PacketsSent)
-	mx[px+"packet_loss"] = int64(stats.PacketLoss * 1000)
+func durationToMS(v time.Duration) float64 {
+	return float64(v) / float64(time.Millisecond)
 }
 
 // calcMeanJitter calculates mean of absolute consecutive RTT differences

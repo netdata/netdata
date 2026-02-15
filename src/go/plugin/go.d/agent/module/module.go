@@ -63,7 +63,7 @@ type ModuleV2 interface {
 	VirtualNode() *vnodes.VirtualNode
 
 	MetricStore() metrix.CollectorStore
-	ChartTemplateYAML() []byte
+	ChartTemplateYAML() string
 }
 
 // ModuleV2Autogen allows a V2 collector to opt into unmatched-series fallback.
@@ -80,7 +80,11 @@ func (b *Base) GetBase() *Base { return b }
 
 func (b *Base) VirtualNode() *vnodes.VirtualNode { return nil }
 
-func TestConfigurationSerialize(t *testing.T, mod Module, cfgJSON, cfgYAML []byte) {
+type configurationProvider interface {
+	Configuration() any
+}
+
+func TestConfigurationSerialize(t *testing.T, mod configurationProvider, cfgJSON, cfgYAML []byte) {
 	t.Helper()
 	tests := map[string]struct {
 		config    []byte

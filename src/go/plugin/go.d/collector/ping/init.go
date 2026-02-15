@@ -11,6 +11,13 @@ func (c *Collector) validateConfig() error {
 	if len(c.Hosts) == 0 {
 		return errors.New("'hosts' can't be empty")
 	}
+	seenHosts := make(map[string]struct{}, len(c.Hosts))
+	for _, host := range c.Hosts {
+		if _, ok := seenHosts[host]; ok {
+			return errors.New("'hosts' contains duplicate entries")
+		}
+		seenHosts[host] = struct{}{}
+	}
 	if c.Packets <= 0 {
 		return errors.New("'send_packets' can't be <= 0")
 	}
