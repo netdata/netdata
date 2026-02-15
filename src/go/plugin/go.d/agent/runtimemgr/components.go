@@ -10,8 +10,26 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 )
+
+// Minimal valid template for runtime components that rely on autogen.
+// It intentionally matches no real metric; autogen handles real series.
+const defaultAutogenTemplateYAML = `
+version: v1
+groups:
+  - family: Internal
+    metrics:
+      - __runtime_dummy_metric
+    charts:
+      - id: runtime_dummy
+        title: Runtime Dummy
+        context: netdata.go.plugin.runtime_internal.runtime_dummy
+        units: "1"
+        dimensions:
+          - selector: __runtime_dummy_metric
+            name: value
+`
 
 // ComponentConfig registers one internal/runtime metrics component.
 //
@@ -21,20 +39,7 @@ import (
 //   - EmitEnv fields: chart emission metadata (TypeID, plugin/module/job labels).
 //
 // Emission cadence is owned by the dedicated runtime metrics job.
-type ComponentConfig struct {
-	Name string
-
-	Store        metrix.RuntimeStore
-	TemplateYAML []byte
-	UpdateEvery  int
-	Autogen      chartengine.AutogenPolicy
-
-	TypeID    string
-	Plugin    string
-	Module    string
-	JobName   string
-	JobLabels map[string]string
-}
+type ComponentConfig = runtimecomp.ComponentConfig
 
 type componentSpec struct {
 	Name       string
@@ -43,7 +48,7 @@ type componentSpec struct {
 	Store        metrix.RuntimeStore
 	TemplateYAML []byte
 	UpdateEvery  int
-	Autogen      chartengine.AutogenPolicy
+	Autogen      runtimecomp.AutogenPolicy
 	EmitEnv      chartemit.EmitEnv
 }
 
@@ -120,7 +125,7 @@ func normalizeComponent(cfg ComponentConfig, pluginName string) (componentSpec, 
 		if !cfg.Autogen.Enabled {
 			return componentSpec{}, fmt.Errorf("runtimemgr: runtime component %q template is required when autogen is disabled", name)
 		}
-		templateYAML = []byte(internalRuntimeAutogenTemplateYAML)
+		templateYAML = []byte(defaultAutogenTemplateYAML)
 	}
 	updateEvery := cfg.UpdateEvery
 	if updateEvery <= 0 {

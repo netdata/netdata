@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 )
 
 func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
@@ -52,7 +53,7 @@ func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
 				err := svc.RegisterComponent(ComponentConfig{
 					Name:  "component",
 					Store: store,
-					Autogen: chartengine.AutogenPolicy{
+					Autogen: runtimecomp.AutogenPolicy{
 						Enabled: true,
 					},
 				})
@@ -202,14 +203,11 @@ func TestRuntimeExplicitChartengineInternalScenarios(t *testing.T) {
 				svc.Start("go.d", &bytes.Buffer{})
 				defer svc.Stop()
 
-				cfg, tickFn, err := NewChartengineInternalComponent(nil)
-				require.NoError(t, err)
-				require.NoError(t, svc.RegisterComponent(cfg))
-				require.NoError(t, svc.RegisterProducer(cfg.Name, tickFn))
+				require.NoError(t, chartengine.RegisterInternalRuntimeComponent(svc, nil))
 
 				specs := svc.registry.snapshot()
 				require.Len(t, specs, 1)
-				assert.Equal(t, ChartengineInternalComponentName, specs[0].Name)
+				assert.Equal(t, chartengine.InternalRuntimeComponentName, specs[0].Name)
 
 				svc.Tick(1)
 				value, ok := specs[0].Store.Read(metrix.ReadRaw()).Value("netdata.go.plugin.chartengine.build_calls_total", nil)

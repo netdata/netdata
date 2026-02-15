@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
@@ -264,15 +265,8 @@ func (a *Agent) run(ctx context.Context) {
 	runtimeSvc.Start(a.Name, a.Out)
 	defer runtimeSvc.Stop()
 
-	runtimeCfg, runtimeTick, err := runtimemgr.NewChartengineInternalComponent(a.Logger)
-	if err != nil {
-		a.Warningf("runtime component %q bootstrap failed: %v", runtimemgr.ChartengineInternalComponentName, err)
-	} else {
-		if err := runtimeSvc.RegisterComponent(runtimeCfg); err != nil {
-			a.Warningf("runtime component %q registration failed: %v", runtimeCfg.Name, err)
-		} else if err := runtimeSvc.RegisterProducer(runtimeCfg.Name, runtimeTick); err != nil {
-			a.Warningf("runtime producer %q registration failed: %v", runtimeCfg.Name, err)
-		}
+	if err := chartengine.RegisterInternalRuntimeComponent(runtimeSvc, a.Logger); err != nil {
+		a.Warningf("runtime component %q registration failed: %v", chartengine.InternalRuntimeComponentName, err)
 	}
 
 	// Store reference for dump mode and enable dump mode if configured

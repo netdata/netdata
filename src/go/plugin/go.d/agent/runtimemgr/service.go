@@ -13,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 )
 
 // Service owns runtime/internal metrics components and their cadence-driven
@@ -181,7 +182,7 @@ func (s *Service) runTicker(interval time.Duration, stop <-chan struct{}, done c
 	}
 }
 
-func (s *Service) RegisterComponent(cfg ComponentConfig) error {
+func (s *Service) RegisterComponent(cfg runtimecomp.ComponentConfig) error {
 	if s == nil {
 		return fmt.Errorf("runtimemgr: nil service")
 	}
