@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"sort"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/internal/tickstate"
 )
 
 type runtimeComponentState struct {
@@ -38,12 +38,8 @@ type runtimeMetricsJob struct {
 	buf *bytes.Buffer
 	api *netdataapi.API
 
-	components map[string]*runtimeComponentState
-
-	skipStateMu      sync.Mutex
-	consecutiveSkips int
-	collectStartTime time.Time
-	collectStopTime  time.Time
+	components  map[string]*runtimeComponentState
+	skipTracker tickstate.SkipTracker
 }
 
 func newRuntimeMetricsJob(out io.Writer, reg *componentRegistry, log *logger.Logger) *runtimeMetricsJob {
@@ -70,21 +66,17 @@ func (j *runtimeMetricsJob) Tick(clock int) {
 	select {
 	case j.tick <- clock:
 	default:
-		j.skipStateMu.Lock()
-		j.consecutiveSkips++
-		consecutiveSkips := j.consecutiveSkips
-		startTime := j.collectStartTime
-		j.skipStateMu.Unlock()
+		skip := j.skipTracker.MarkSkipped()
 
-		if startTime.IsZero() {
+		if skip.RunStarted.IsZero() {
 			j.Warning("skipping runtime metrics tick: waiting for first run to start")
 			return
 		}
-		if consecutiveSkips == 1 {
-			j.Warningf("skipping runtime metrics tick: previous run still in progress for %s", time.Since(startTime))
+		if skip.Count == 1 {
+			j.Warningf("skipping runtime metrics tick: previous run still in progress for %s", time.Since(skip.RunStarted))
 			return
 		}
-		j.Debugf("skipping runtime metrics tick: previous run still in progress for %s (skipped %d ticks)", time.Since(startTime), consecutiveSkips)
+		j.Debugf("skipping runtime metrics tick: previous run still in progress for %s (skipped %d ticks)", time.Since(skip.RunStarted), skip.Count)
 	}
 }
 
@@ -102,25 +94,20 @@ LOOP:
 		case <-j.stop:
 			break LOOP
 		case clock := <-j.tick:
-			j.skipStateMu.Lock()
-			if j.consecutiveSkips > 0 {
-				if j.collectStopTime.IsZero() || j.collectStartTime.IsZero() {
-					j.Infof("runtime metrics tick resumed (skipped %d ticks)", j.consecutiveSkips)
+			resume := j.skipTracker.MarkRunStart(time.Now())
+			if resume.Skipped > 0 {
+				if resume.RunStopped.IsZero() || resume.RunStarted.IsZero() {
+					j.Infof("runtime metrics tick resumed (skipped %d ticks)", resume.Skipped)
 				} else {
 					j.Infof(
 						"runtime metrics tick resumed after %s (skipped %d ticks)",
-						j.collectStopTime.Sub(j.collectStartTime),
-						j.consecutiveSkips,
+						resume.RunStopped.Sub(resume.RunStarted),
+						resume.Skipped,
 					)
 				}
-				j.consecutiveSkips = 0
 			}
-			j.collectStartTime = time.Now()
-			j.skipStateMu.Unlock()
 			j.runOnce(clock)
-			j.skipStateMu.Lock()
-			j.collectStopTime = time.Now()
-			j.skipStateMu.Unlock()
+			j.skipTracker.MarkRunStop(time.Now())
 		}
 	}
 	j.stop <- struct{}{}
