@@ -90,7 +90,7 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 	assert.Contains(t, out, "CLABEL_COMMIT")
 	assert.Contains(t, out, "DIMENSION 'received' 'received' 'incremental' '1' '1' ''")
 	assert.Contains(t, out, "BEGIN 'collector.job.win_nic_traffic_eth0' 100")
-	assert.Contains(t, out, "SET 'received' = 123.5")
+	assert.Contains(t, out, "SET 'received' = 123")
 	assert.Contains(t, out, "DIMENSION 'received' 'received' 'incremental' '1' '1' 'obsolete'")
 	assert.Contains(t, out, "obsolete")
 

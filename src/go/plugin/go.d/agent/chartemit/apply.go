@@ -133,11 +133,13 @@ func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartActi
 				api.SETEMPTY(dim.Name)
 				continue
 			}
+			value := dim.Int64
 			if dim.IsFloat {
-				api.SETFLOAT(dim.Name, dim.Float64)
-				continue
+				// NOTE: V2 currently emits integer SET only.
+				// TODO(godv2): switch to SETFLOAT when Netdata float wire support is available.
+				value = int64(dim.Float64)
 			}
-			api.SET(dim.Name, dim.Int64)
+			api.SET(dim.Name, value)
 		}
 		api.END()
 	}
