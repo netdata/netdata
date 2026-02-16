@@ -339,47 +339,72 @@ async fn main() {
     }
 
     let mut exit_code = 0;
-
     let keepalive_required = !std::io::stdout().is_terminal();
-    if keepalive_required {
-        let writer = runtime.writer();
-        let keepalive = async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(60));
-            loop {
-                interval.tick().await;
-                if let Ok(mut w) = writer.try_lock() {
-                    let _ = w.write_raw(b"PLUGIN_KEEPALIVE\n").await;
-                }
-            }
-        };
+    let mut ingest_task = ingest_task;
+    let mut ingest_task_finished = false;
 
-        tokio::select! {
-            result = runtime.run() => {
-                if let Err(err) = result {
-                    tracing::error!("plugin runtime error: {err:#}");
+    tokio::select! {
+        result = async {
+            if keepalive_required {
+                let writer = runtime.writer();
+                let keepalive = async move {
+                    let mut interval = tokio::time::interval(Duration::from_secs(60));
+                    loop {
+                        interval.tick().await;
+                        if let Ok(mut w) = writer.try_lock() {
+                            let _ = w.write_raw(b"PLUGIN_KEEPALIVE\n").await;
+                        }
+                    }
+                };
+
+                tokio::select! {
+                    result = runtime.run() => result,
+                    _ = keepalive => Ok(()),
+                }
+            } else {
+                runtime.run().await
+            }
+        } => {
+            if let Err(err) = result {
+                tracing::error!("plugin runtime error: {err:#}");
+                exit_code = 1;
+            }
+        }
+        result = &mut ingest_task => {
+            ingest_task_finished = true;
+            match result {
+                Ok(Ok(())) => {
+                    tracing::error!("ingestion task exited unexpectedly");
                     exit_code = 1;
                 }
+                Ok(Err(err)) => {
+                    tracing::error!("ingestion task error: {err:#}");
+                    exit_code = 1;
+                }
+                Err(err) if !err.is_cancelled() => {
+                    tracing::error!("ingestion task join error: {err}");
+                    exit_code = 1;
+                }
+                Err(_) => {}
             }
-            _ = keepalive => {}
         }
-    } else if let Err(err) = runtime.run().await {
-        tracing::error!("plugin runtime error: {err:#}");
-        exit_code = 1;
     }
 
     shutdown.cancel();
 
-    match ingest_task.await {
-        Ok(Ok(())) => {}
-        Ok(Err(err)) => {
-            tracing::error!("ingestion task error: {err:#}");
-            exit_code = 1;
+    if !ingest_task_finished {
+        match ingest_task.await {
+            Ok(Ok(())) => {}
+            Ok(Err(err)) => {
+                tracing::error!("ingestion task error: {err:#}");
+                exit_code = 1;
+            }
+            Err(err) if !err.is_cancelled() => {
+                tracing::error!("ingestion task join error: {err}");
+                exit_code = 1;
+            }
+            Err(_) => {}
         }
-        Err(err) if !err.is_cancelled() => {
-            tracing::error!("ingestion task join error: {err}");
-            exit_code = 1;
-        }
-        Err(_) => {}
     }
     if let Some(task) = bmp_task {
         match task.await {
