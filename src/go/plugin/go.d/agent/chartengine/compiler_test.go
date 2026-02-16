@@ -43,6 +43,44 @@ func TestCompileScenarios(t *testing.T) {
 		errLike string
 		assert  func(t *testing.T, p *program.Program)
 	}{
+		"compiles dimension options under options block": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Service",
+						Metrics: []string{"svc_requests_total"},
+						Charts: []charttpl.Chart{
+							{
+								Title:   "Requests",
+								Context: "requests",
+								Units:   "requests/s",
+								Dimensions: []charttpl.Dimension{
+									{
+										Selector: "svc_requests_total",
+										Name:     "total",
+										Options: &charttpl.DimensionOptions{
+											Hidden:     true,
+											Multiplier: -8,
+											Divisor:    1000,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				require.Len(t, charts[0].Dimensions, 1)
+				assert.True(t, charts[0].Dimensions[0].Hidden)
+				assert.Equal(t, -8, charts[0].Dimensions[0].Multiplier)
+				assert.Equal(t, 1000, charts[0].Dimensions[0].Divisor)
+			},
+		},
 		"applies default lifecycle when omitted": {
 			spec: charttpl.Spec{
 				Version: charttpl.VersionV1,

@@ -245,6 +245,21 @@
         "name_from_label": {
           "type": "string"
         },
+        "options": {
+          "$ref": "#/$defs/dimension_options"
+        }
+      }
+    },
+    "dimension_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "multiplier": {
+          "type": "integer"
+        },
+        "divisor": {
+          "type": "integer"
+        },
         "hidden": {
           "type": "boolean"
         }

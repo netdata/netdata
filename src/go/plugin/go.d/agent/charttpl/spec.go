@@ -86,8 +86,15 @@ type DimensionLifecycle struct {
 
 // Dimension describes one dimension template.
 type Dimension struct {
-	Selector      string `yaml:"selector" json:"selector"`
-	Name          string `yaml:"name,omitempty" json:"name,omitempty"`
-	NameFromLabel string `yaml:"name_from_label,omitempty" json:"name_from_label,omitempty"`
-	Hidden        bool   `yaml:"hidden,omitempty" json:"hidden,omitempty"`
+	Selector      string            `yaml:"selector" json:"selector"`
+	Name          string            `yaml:"name,omitempty" json:"name,omitempty"`
+	NameFromLabel string            `yaml:"name_from_label,omitempty" json:"name_from_label,omitempty"`
+	Options       *DimensionOptions `yaml:"options,omitempty" json:"options,omitempty"`
+}
+
+// DimensionOptions controls emitted DIMENSION options.
+type DimensionOptions struct {
+	Multiplier int  `yaml:"multiplier,omitempty" json:"multiplier,omitempty"`
+	Divisor    int  `yaml:"divisor,omitempty" json:"divisor,omitempty"`
+	Hidden     bool `yaml:"hidden,omitempty" json:"hidden,omitempty"`
 }

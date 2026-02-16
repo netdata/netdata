@@ -20,6 +20,8 @@ type routeBinding struct {
 	DimensionKeyLabel string
 	Algorithm         program.Algorithm
 	Hidden            bool
+	Multiplier        int
+	Divisor           int
 	Static            bool
 	Inferred          bool
 	Autogen           bool
@@ -125,6 +127,8 @@ func (e *Engine) resolveSeriesRoutes(
 			DimensionKeyLabel: dimKeyLabel,
 			Algorithm:         chart.Meta.Algorithm,
 			Hidden:            candidate.dimension.Hidden,
+			Multiplier:        candidate.dimension.Multiplier,
+			Divisor:           candidate.dimension.Divisor,
 			Static:            !candidate.dimension.Dynamic,
 			Inferred:          candidate.dimension.InferNameFromSeriesMeta,
 			Autogen:           false,

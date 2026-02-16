@@ -226,6 +226,7 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 	}
 
 	metricKinds := metricKindsFromNames(meta.MetricNames)
+	options := compileDimensionOptions(dim.Options)
 
 	return compiledDimension{
 		dimension: program.Dimension{
@@ -238,13 +239,39 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 			NameTemplate:            nameTemplate,
 			NameFromLabel:           nameFromLabel,
 			InferNameFromSeriesMeta: inferFromSeriesMeta,
-			Hidden:                  dim.Hidden,
+			Hidden:                  options.hidden,
+			Multiplier:              options.multiplier,
+			Divisor:                 options.divisor,
 			Dynamic:                 inferFromSeriesMeta || nameFromLabel != "" || nameTemplate.IsDynamic(),
 		},
 		selectorKeys:     append([]string(nil), meta.ConstrainedLabelKeys...),
 		dynamicLabelKeys: normalizeUnique(dynamicLabelKeys),
 		metricKinds:      metricKinds,
 	}, nil
+}
+
+type compiledDimensionOptions struct {
+	hidden     bool
+	multiplier int
+	divisor    int
+}
+
+func compileDimensionOptions(in *charttpl.DimensionOptions) compiledDimensionOptions {
+	out := compiledDimensionOptions{
+		multiplier: 1,
+		divisor:    1,
+	}
+	if in == nil {
+		return out
+	}
+	out.hidden = in.Hidden
+	if in.Multiplier != 0 {
+		out.multiplier = in.Multiplier
+	}
+	if in.Divisor != 0 {
+		out.divisor = in.Divisor
+	}
+	return out
 }
 
 func resolveAlgorithm(raw string, metricKinds map[string]bool) (program.Algorithm, error) {

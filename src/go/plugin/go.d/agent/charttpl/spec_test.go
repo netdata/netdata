@@ -40,12 +40,21 @@ groups:
         dimensions:
           - selector: mysql_queries_total
             name: total
+            options:
+              multiplier: -8
+              divisor: 1000
+              hidden: true
 `,
 			assert: func(t *testing.T, spec *Spec) {
 				t.Helper()
 				require.Len(t, spec.Groups, 1)
 				require.Len(t, spec.Groups[0].Charts, 1)
 				assert.Equal(t, "line", spec.Groups[0].Charts[0].Type)
+				require.Len(t, spec.Groups[0].Charts[0].Dimensions, 1)
+				require.NotNil(t, spec.Groups[0].Charts[0].Dimensions[0].Options)
+				assert.Equal(t, -8, spec.Groups[0].Charts[0].Dimensions[0].Options.Multiplier)
+				assert.Equal(t, 1000, spec.Groups[0].Charts[0].Dimensions[0].Options.Divisor)
+				assert.True(t, spec.Groups[0].Charts[0].Dimensions[0].Options.Hidden)
 				require.NotNil(t, spec.Engine)
 				require.NotNil(t, spec.Engine.Selector)
 				assert.Equal(t, []string{`mysql_queries_total{db="main"}`}, spec.Engine.Selector.Allow)

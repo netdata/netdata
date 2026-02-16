@@ -45,6 +45,10 @@ type Dimension struct {
 
 	// Hidden maps to DIMENSION hidden option.
 	Hidden bool
+	// Multiplier maps to DIMENSION multiplier option.
+	Multiplier int
+	// Divisor maps to DIMENSION divisor option.
+	Divisor int
 	// Dynamic is compile-derived and true when rendering can fan out by labels.
 	Dynamic bool
 }

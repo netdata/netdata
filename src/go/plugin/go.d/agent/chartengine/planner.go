@@ -331,8 +331,8 @@ func (ctx *planBuildContext) accumulateRoute(
 			static:     route.Static,
 			order:      route.DimensionIndex,
 			algorithm:  route.Algorithm,
-			multiplier: 1,
-			divisor:    1,
+			multiplier: route.Multiplier,
+			divisor:    route.Divisor,
 		}
 		if !route.Static {
 			cs.dynamicSet[route.DimensionName] = struct{}{}

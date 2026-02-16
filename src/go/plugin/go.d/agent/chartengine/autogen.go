@@ -97,6 +97,8 @@ func (e *Engine) resolveAutogenRoute(
 			DimensionKeyLabel: route.dimensionKeyLabel,
 			Algorithm:         route.algorithm,
 			Hidden:            false,
+			Multiplier:        1,
+			Divisor:           1,
 			Static:            route.staticDimension,
 			Inferred:          false,
 			Autogen:           true,
