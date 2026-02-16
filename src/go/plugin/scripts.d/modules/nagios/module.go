@@ -294,7 +294,6 @@ func (c *Collector) registerPerfdataChart(job spec.JobSpec, datum output.PerfDat
 	labelID := ids.Sanitize(label)
 	scale := units.NewScale(datum.Unit)
 	key := fmt.Sprintf("%s|%s", meta.JobKey, labelID)
-	c.Infof("nagios: registering perfdata chart scheduler=%s job=%s label=%s unit=%s", meta.Scheduler, job.Name, label, datum.Unit)
 	c.chartMu.Lock()
 	defer c.chartMu.Unlock()
 	if existing, ok := c.perfCharts[key]; ok {
@@ -306,6 +305,7 @@ func (c *Collector) registerPerfdataChart(job spec.JobSpec, datum output.PerfDat
 			chart.MarkRemove()
 		}
 	}
+	c.Infof("nagios: registering perfdata chart scheduler=%s job=%s label=%s unit=%s", meta.Scheduler, job.Name, label, datum.Unit)
 	chart := charts.PerfdataChart(meta, label, scale, 200)
 	if err := c.charts.Add(chart); err != nil {
 		c.Errorf("failed to add perfdata chart for job %s label %s: %v", job.Name, label, err)
