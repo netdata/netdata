@@ -17,7 +17,7 @@ static uint32_t *ebpf_shm_find_index_unsafe(uint32_t pid)
     return NULL;
 }
 
-static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid)
+static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid, enum ebpf_pids_index shm_idx)
 {
     uint32_t *lpid = ebpf_shm_find_index_unsafe(pid);
     if (!lpid)
@@ -31,7 +31,8 @@ static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid)
     if (!ptr->threads)
         return false;
 
-    if (--ptr->threads)
+    ptr->threads &= ~(1UL << (shm_idx << 1));
+    if (ptr->threads)
         return true;
 
     (void)JudyLDel(&ebpf_ipc_JudyL, (Word_t)pid, PJE0);
@@ -75,7 +76,7 @@ bool netdata_ebpf_reset_shm_pointer_unsafe(int fd, uint32_t pid, enum ebpf_pids_
     if (idx != NETDATA_EBPF_PIDS_SOCKET_IDX)
         bpf_map_delete_elem(fd, &pid);
 
-    return ebpf_find_pid_shm_del_unsafe(pid);
+    return ebpf_find_pid_shm_del_unsafe(pid, idx);
 }
 
 netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum ebpf_pids_index idx)
@@ -88,10 +89,11 @@ netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum
         return NULL;
 
     netdata_ebpf_pid_stats_t *ptr = &integration_shm[shm_idx];
-    if (!ptr->threads)
+    if (!ptr->threads) {
         ebpf_stat_values.current++;
+        ptr->pid = pid;
+    }
 
-    ptr->pid = shm_idx;
     ptr->threads |= (idx << 1);
 
     return ptr;
