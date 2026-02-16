@@ -1,6 +1,6 @@
 module github.com/netdata/netdata/go/plugins
 
-go 1.24.0
+go 1.25.0
 
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
@@ -69,13 +69,9 @@ require (
 
 require (
 	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0
-	github.com/antchfx/xmlquery v1.5.0
-	github.com/antchfx/xpath v1.3.5
-	github.com/dop251/goja v0.0.0-20251121114222-56b1242a5f86
 	github.com/ibm-messaging/mq-golang/v5 v5.7.1
 	github.com/microsoft/go-mssqldb v1.9.6
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/theory/jsonpath v0.10.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -107,17 +103,14 @@ require (
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
-	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/certificate-transparency-go v1.1.7 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
