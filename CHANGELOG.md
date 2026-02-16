@@ -344,6 +344,11 @@
 - Regenerate integrations docs ([#21768](https://github.com/netdata/netdata/issues/21768))
 - Skip field remapping entries when querying logs. ([#21755](https://github.com/netdata/netdata/issues/21755))
 - Change title from 'Netdata MCP Server' to 'Netdata' ([#21772](https://github.com/netdata/netdata/issues/21772))
+- Build(deps): bump azure/artifact-signing-action from 1.0.0 to 1.1.0 ([#21773](https://github.com/netdata/netdata/issues/21773))
+- Fix(scripts.d): reduce nagios perfdata chart registration log spam ([#21774](https://github.com/netdata/netdata/issues/21774))
+- Bump go mod 1.25.0 ([#21775](https://github.com/netdata/netdata/issues/21775))
+- Rename function from otel-signal-viewer to otel-logs ([#21776](https://github.com/netdata/netdata/issues/21776))
+- Add readme for otel-signal-viewer plugin. ([#21734](https://github.com/netdata/netdata/issues/21734))
 
 ## [2.8.0] - 2025-11-19
 
