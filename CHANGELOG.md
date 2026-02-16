@@ -343,6 +343,7 @@
 - Icons ([#21767](https://github.com/netdata/netdata/issues/21767))
 - Regenerate integrations docs ([#21768](https://github.com/netdata/netdata/issues/21768))
 - Skip field remapping entries when querying logs. ([#21755](https://github.com/netdata/netdata/issues/21755))
+- Change title from 'Netdata MCP Server' to 'Netdata' ([#21772](https://github.com/netdata/netdata/issues/21772))
 
 ## [2.8.0] - 2025-11-19
 
