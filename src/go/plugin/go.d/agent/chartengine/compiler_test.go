@@ -43,6 +43,102 @@ func TestCompileScenarios(t *testing.T) {
 		errLike string
 		assert  func(t *testing.T, p *program.Program)
 	}{
+		"applies default lifecycle when omitted": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Service",
+						Metrics: []string{"svc_requests_total"},
+						Charts: []charttpl.Chart{
+							{
+								Title:   "Requests",
+								Context: "requests",
+								Units:   "requests/s",
+								Dimensions: []charttpl.Dimension{
+									{Selector: "svc_requests_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.Equal(t, 0, charts[0].Lifecycle.MaxInstances)
+				assert.Equal(t, 5, charts[0].Lifecycle.ExpireAfterCycles)
+				assert.Equal(t, 0, charts[0].Lifecycle.Dimensions.MaxDims)
+				assert.Equal(t, 0, charts[0].Lifecycle.Dimensions.ExpireAfterCycles)
+			},
+		},
+		"keeps default chart expiry when lifecycle is present without expire_after_cycles": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Service",
+						Metrics: []string{"svc_requests_total"},
+						Charts: []charttpl.Chart{
+							{
+								Title:   "Requests",
+								Context: "requests",
+								Units:   "requests/s",
+								Lifecycle: &charttpl.Lifecycle{
+									MaxInstances: 32,
+									Dimensions: &charttpl.DimensionLifecycle{
+										MaxDims: 16,
+									},
+								},
+								Dimensions: []charttpl.Dimension{
+									{Selector: "svc_requests_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.Equal(t, 32, charts[0].Lifecycle.MaxInstances)
+				assert.Equal(t, 5, charts[0].Lifecycle.ExpireAfterCycles)
+				assert.Equal(t, 16, charts[0].Lifecycle.Dimensions.MaxDims)
+				assert.Equal(t, 0, charts[0].Lifecycle.Dimensions.ExpireAfterCycles)
+			},
+		},
+		"overrides default chart expiry when expire_after_cycles is set": {
+			spec: charttpl.Spec{
+				Version: charttpl.VersionV1,
+				Groups: []charttpl.Group{
+					{
+						Family:  "Service",
+						Metrics: []string{"svc_requests_total"},
+						Charts: []charttpl.Chart{
+							{
+								Title:   "Requests",
+								Context: "requests",
+								Units:   "requests/s",
+								Lifecycle: &charttpl.Lifecycle{
+									ExpireAfterCycles: 9,
+								},
+								Dimensions: []charttpl.Dimension{
+									{Selector: "svc_requests_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.Equal(t, 9, charts[0].Lifecycle.ExpireAfterCycles)
+			},
+		},
 		"compiles nested groups with inherited metric visibility and inferred algorithm": {
 			rev: 42,
 			spec: charttpl.Spec{
@@ -208,11 +304,11 @@ func TestCompileScenarios(t *testing.T) {
 						Metrics: []string{"ceph_osd_space_bytes"},
 						Charts: []charttpl.Chart{
 							{
-								ID:               "osd_space_usage",
-								Title:            "OSD space usage",
-								Context:          "osd_space_usage",
-								Units:            "bytes",
-								LabelPromoted:    []string{"cluster", "cluster", "host"},
+								ID:            "osd_space_usage",
+								Title:         "OSD space usage",
+								Context:       "osd_space_usage",
+								Units:         "bytes",
+								LabelPromoted: []string{"cluster", "cluster", "host"},
 								Instances: &charttpl.Instances{
 									ByLabels: []string{"osd_uuid"},
 								},

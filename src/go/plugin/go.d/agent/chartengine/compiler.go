@@ -293,18 +293,17 @@ func resolveChartType(raw string) (program.ChartType, error) {
 }
 
 func compileLifecycle(in *charttpl.Lifecycle) program.LifecyclePolicy {
+	out := defaultChartLifecyclePolicyCopy()
 	if in == nil {
-		return program.LifecyclePolicy{}
+		return out
 	}
-	out := program.LifecyclePolicy{
-		MaxInstances:      in.MaxInstances,
-		ExpireAfterCycles: in.ExpireAfterCycles,
+	out.MaxInstances = in.MaxInstances
+	if in.ExpireAfterCycles > 0 {
+		out.ExpireAfterCycles = in.ExpireAfterCycles
 	}
 	if in.Dimensions != nil {
-		out.Dimensions = program.DimensionLifecyclePolicy{
-			MaxDims:           in.Dimensions.MaxDims,
-			ExpireAfterCycles: in.Dimensions.ExpireAfterCycles,
-		}
+		out.Dimensions.MaxDims = in.Dimensions.MaxDims
+		out.Dimensions.ExpireAfterCycles = in.Dimensions.ExpireAfterCycles
 	}
 	return out
 }
