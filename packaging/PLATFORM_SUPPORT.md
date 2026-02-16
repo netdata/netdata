@@ -124,7 +124,7 @@ This is a list of platforms that we have supported in the recent past but no lon
 | Fedora       | 41        | EOL as of 2025-12-15 |
 | Fedora       | 40        | EOL as of 2024-11-12 |
 | openSUSE     | Leap 15.5 | EOL as of 2024-12-31 |
-| Ubuntu       | 25.04     | EOL as of 2025-01-17 |
+| Ubuntu       | 25.04     | EOL as of 2026-01-17 |
 | Ubuntu       | 20.04     | EOL as of 2025-05-31 |
 | Ubuntu       | 18.04     | EOL as of 2023-04-02 |
 
