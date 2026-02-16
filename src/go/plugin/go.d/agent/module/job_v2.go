@@ -263,8 +263,6 @@ func (j *JobV2) postCheck() error {
 	}
 	if v, ok := j.module.(ModuleV2EnginePolicy); ok {
 		opts = append(opts, chartengine.WithEnginePolicy(v.EnginePolicy()))
-	} else if v, ok := j.module.(ModuleV2Autogen); ok {
-		opts = append(opts, chartengine.WithAutogenPolicy(v.AutogenPolicy()))
 	}
 
 	engine, err := chartengine.New(opts...)

@@ -72,12 +72,6 @@ type ModuleV2EnginePolicy interface {
 	EnginePolicy() chartengine.EnginePolicy
 }
 
-// ModuleV2Autogen allows a V2 collector to opt into unmatched-series fallback.
-// Deprecated: prefer ModuleV2EnginePolicy.
-type ModuleV2Autogen interface {
-	AutogenPolicy() chartengine.AutogenPolicy
-}
-
 // Base is a helper struct. All modules should embed this struct.
 type Base struct {
 	*logger.Logger
