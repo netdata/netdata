@@ -328,7 +328,7 @@ func TestJobV2Scenarios(t *testing.T) {
 				assert.Equal(t, 3, cfg.UpdateEvery)
 				assert.Equal(t, pluginName, cfg.Plugin)
 				assert.Equal(t, "chartengine", cfg.Module)
-				assert.Equal(t, modName+"_"+jobName, cfg.JobName)
+				assert.Equal(t, jobName, cfg.JobName)
 				assert.Equal(t, "chartengine", cfg.JobLabels["source"])
 				assert.Equal(t, modName, cfg.JobLabels["collector_module"])
 				require.NotNil(t, cfg.Store)

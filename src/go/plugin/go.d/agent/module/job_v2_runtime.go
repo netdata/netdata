@@ -40,7 +40,7 @@ func (j *JobV2) registerRuntimeComponent() error {
 		},
 		Plugin:    j.pluginName,
 		Module:    "chartengine",
-		JobName:   firstNonEmpty(strings.TrimSpace(j.fullName), strings.TrimSpace(j.name)),
+		JobName:   firstNonEmpty(strings.TrimSpace(j.name), strings.TrimSpace(j.fullName)),
 		JobLabels: j.runtimeComponentLabels(),
 	}
 	if err := j.runtimeService.RegisterComponent(cfg); err != nil {
