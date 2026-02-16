@@ -77,6 +77,9 @@ func unsugarExpr(expr string) string {
 	// name{label="value"} => __name__=*"name",label="value"
 	// {label="value"}     => label="value"
 	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return ""
+	}
 
 	switch idx := strings.IndexByte(expr, '{'); {
 	case idx == -1:

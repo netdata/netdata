@@ -74,3 +74,20 @@ func TestParse(t *testing.T) {
 		})
 	}
 }
+
+func TestParseEmptyExpressionReturnsNil(t *testing.T) {
+	tests := map[string]struct {
+		expr string
+	}{
+		"empty":      {expr: ""},
+		"whitespace": {expr: "  \n\t"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			sr, err := Parse(tc.expr)
+			require.NoError(t, err)
+			assert.Nil(t, sr)
+		})
+	}
+}

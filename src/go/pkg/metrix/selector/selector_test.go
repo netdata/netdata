@@ -82,6 +82,23 @@ func TestParseScenarios(t *testing.T) {
 	}
 }
 
+func TestParseEmptyExpressionReturnsNil(t *testing.T) {
+	tests := map[string]struct {
+		expr string
+	}{
+		"empty":      {expr: ""},
+		"whitespace": {expr: "  \t\n"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			sel, err := Parse(tc.expr)
+			require.NoError(t, err)
+			assert.Nil(t, sel)
+		})
+	}
+}
+
 func TestExprScenarios(t *testing.T) {
 	expr := Expr{
 		Allow: []string{"go_*"},
