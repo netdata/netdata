@@ -264,7 +264,7 @@ static inline void ebpf_fd_fill_address(ebpf_addresses_t *address, char **target
  *
  * @return It returns 0 on success and -1 otherwise.
  */
-static int ebpf_fd_set_target_values()
+static int ebpf_fd_set_target_values(void)
 {
     ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0};
     ebpf_fd_fill_address(&address, close_targets);
@@ -811,7 +811,7 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
 /**
  * Resume apps data
  */
-void ebpf_fd_resume_apps_data()
+void ebpf_fd_resume_apps_data(void)
 {
     struct ebpf_target *w;
 
@@ -832,7 +832,7 @@ void ebpf_fd_resume_apps_data()
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_fd_cgroup()
+static void ebpf_update_fd_cgroup(void)
 {
     ebpf_cgroup_target_t *ect;
 
@@ -899,10 +899,10 @@ void ebpf_read_fd_thread(void *ptr)
         counter = 0;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
+        else
+            running_time = update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
@@ -1215,9 +1215,12 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
         .suffix = NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
         .dimension = "calls"};
 
-    if (!data_open.update_every)
-        data_open.update_every = data_open_error.update_every = data_close.update_every =
-            data_close_error.update_every = em->update_every;
+    if (!data_open.update_every) {
+        data_open.update_every = em->update_every;
+        data_open_error.update_every = em->update_every;
+        data_close.update_every = em->update_every;
+        data_close_error.update_every = em->update_every;
+    }
 
     ebpf_cgroup_target_t *w;
     netdata_run_mode_t mode = em->mode;
@@ -1329,7 +1332,7 @@ static void fd_collector(ebpf_module_t *em)
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
-    memset(stats, 0, sizeof(em->hash_table_stats));
+    memset(stats, 0, sizeof(*stats));
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
@@ -1355,10 +1358,10 @@ static void fd_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
+        else
+            running_time = update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
@@ -1517,7 +1520,7 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
  */
-static inline void ebpf_fd_allocate_global_vectors()
+static inline void ebpf_fd_allocate_global_vectors(void)
 {
     fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
     fd_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));

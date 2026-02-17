@@ -261,7 +261,7 @@ static inline int ebpf_dc_load_and_attach(struct dc_bpf *obj, ebpf_module_t *em)
  */
 void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access, uint64_t not_found)
 {
-    NETDATA_DOUBLE successful_access = (NETDATA_DOUBLE)(((long long)cache_access) - ((long long)not_found));
+    NETDATA_DOUBLE successful_access = (NETDATA_DOUBLE)(cache_access - not_found);
     if (successful_access < 0)
         successful_access = 0;
     NETDATA_DOUBLE ratio = (cache_access) ? successful_access / (NETDATA_DOUBLE)cache_access : 0;
@@ -588,7 +588,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core)
             publish->curr.file_system = cv[0].file_system;
             publish->curr.cache_access = cv[0].cache_access;
         } else {
-            if (kill((pid_t)key, 0)) { // No PID found
+            if (kill((pid_t)key, 0) == -1 && errno == ESRCH) {
                 if (netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_DCSTAT_IDX))
                     memset(publish, 0, sizeof(*publish));
             }
@@ -628,7 +628,7 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
 /**
  * Resume apps data
  */
-void ebpf_dc_resume_apps_data()
+void ebpf_dc_resume_apps_data(void)
 {
     struct ebpf_target *w;
 
@@ -1098,7 +1098,7 @@ void ebpf_dc_sum_cgroup_pids(netdata_publish_dcstat_t *publish, struct pid_on_ta
  *
  * Do necessary math to plot charts.
  */
-void ebpf_dc_calc_chart_values()
+void ebpf_dc_calc_chart_values(void)
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
@@ -1179,9 +1179,12 @@ static void ebpf_create_systemd_dc_charts(int update_every)
         .suffix = NETDATA_DC_REQUEST_NOT_FOUND_CHART,
         .dimension = "files"};
 
-    if (!data_dc_not_cache.update_every)
-        data_dc_hit_ratio.update_every = data_dc_not_cache.update_every = data_dc_not_found.update_every =
-            data_dc_references.update_every = update_every;
+    if (!data_dc_not_cache.update_every) {
+        data_dc_hit_ratio.update_every = update_every;
+        data_dc_not_cache.update_every = update_every;
+        data_dc_not_found.update_every = update_every;
+        data_dc_references.update_every = update_every;
+    }
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w; w = w->next) {

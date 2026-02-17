@@ -155,11 +155,11 @@ static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *filename)
 static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *filename)
 {
     (void)w;
-    char content[FILENAME_MAX + 1];
-    ssize_t file_length = ebpf_read_file_to_str(filename, content, FILENAME_MAX);
-    if (file_length <= 0)
+    int fd = open(filename, O_RDONLY, 0);
+    if (fd < 0)
         return -1;
 
+    close(fd);
     return 0;
 }
 
@@ -336,7 +336,7 @@ static void update_disk_table(char *name, int major, int minor, time_t current_t
  *
  *  @return It returns 0 on success and -1 otherwise
  */
-static int read_local_disks()
+static int read_local_disks(void)
 {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, NETDATA_EBPF_PROC_PARTITIONS);
@@ -398,7 +398,7 @@ void ebpf_update_disks(ebpf_module_t *em)
  *
  * Disable tracepoints when the plugin was responsible to enable it.
  */
-static void ebpf_disk_disable_tracepoints()
+static void ebpf_disk_disable_tracepoints(void)
 {
     const char *default_message = "Cannot disable the tracepoint";
     int block_issue_enabled;
@@ -423,7 +423,7 @@ static void ebpf_disk_disable_tracepoints()
 /**
  * Cleanup Disk List
  */
-static void ebpf_cleanup_disk_list()
+static void ebpf_cleanup_disk_list(void)
 {
     netdata_ebpf_disks_t *move = disk_list;
     while (move) {
@@ -763,10 +763,10 @@ static void disk_collector(ebpf_module_t *em)
         ebpf_update_disks(em);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
+        else
+            running_time = update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);

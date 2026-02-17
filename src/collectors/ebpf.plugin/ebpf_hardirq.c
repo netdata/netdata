@@ -128,7 +128,7 @@ ARAL *ebpf_aral_hardirq = NULL;
  *
  * Initiallize array allocator that will be used when integration with apps is enabled.
  */
-static inline void ebpf_hardirq_aral_init()
+static inline void ebpf_hardirq_aral_init(void)
 {
     ebpf_aral_hardirq = ebpf_allocate_pid_aral(NETDATA_EBPF_HARDIRQ_ARAL_NAME, sizeof(hardirq_val_t));
 }
@@ -367,14 +367,14 @@ static int hardirq_read_latency_map(int mapfd)
 
 static void hardirq_read_latency_static_map(int mapfd)
 {
-    static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
-    if (!hardirq_ebpf_static_vals)
-        hardirq_ebpf_static_vals = callocz(ebpf_nprocs, sizeof(hardirq_ebpf_static_val_t));
+    static hardirq_ebpf_static_val_t *hardirq_per_cpu_vals = NULL;
+    if (!hardirq_per_cpu_vals)
+        hardirq_per_cpu_vals = callocz(ebpf_nprocs, sizeof(hardirq_ebpf_static_val_t));
 
     int end = (running_on_kernel < NETDATA_KERNEL_V4_15) ? 1 : ebpf_nprocs;
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
-        int test = bpf_map_lookup_elem(mapfd, &i, hardirq_ebpf_static_vals);
+        int test = bpf_map_lookup_elem(mapfd, &i, hardirq_per_cpu_vals);
         if (unlikely(test < 0)) {
             continue;
         }
@@ -382,7 +382,7 @@ static void hardirq_read_latency_static_map(int mapfd)
         uint64_t latency = 0;
         int cpu_i;
         for (cpu_i = 0; cpu_i < end; cpu_i++) {
-            latency += hardirq_ebpf_static_vals[cpu_i].latency / 1000;
+            latency += hardirq_per_cpu_vals[cpu_i].latency / 1000;
         }
 
         hardirq_static_vals[i].latency = latency;
@@ -394,7 +394,7 @@ static void hardirq_read_latency_static_map(int mapfd)
  *
  * @return When it is not possible to parse /proc, it returns -1, on success it returns 0;
  */
-static int hardirq_reader()
+static int hardirq_reader(void)
 {
     if (hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd))
         return -1;
@@ -424,7 +424,7 @@ static void hardirq_create_charts(int update_every)
     fflush(stdout);
 }
 
-static void hardirq_create_static_dims()
+static void hardirq_create_static_dims(void)
 {
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
@@ -451,7 +451,7 @@ static int hardirq_write_dims(void *entry, void *data)
     return 1;
 }
 
-static inline void hardirq_write_static_dims()
+static inline void hardirq_write_static_dims(void)
 {
     uint32_t i;
     for (i = 0; i < HARDIRQ_EBPF_STATIC_END; i++) {
@@ -506,10 +506,10 @@ static void hardirq_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
+        else
+            running_time = update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);

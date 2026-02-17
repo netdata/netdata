@@ -690,7 +690,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
  *
  * @return  the total of partitions that will be monitored
  */
-static int ebpf_read_local_partitions()
+static int ebpf_read_local_partitions(void)
 {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", netdata_configured_host_prefix);
@@ -776,7 +776,7 @@ static int ebpf_update_partitions(ebpf_module_t *em)
 /*
  * Cleanup eBPF data
  */
-void ebpf_filesystem_cleanup_ebpf_data()
+void ebpf_filesystem_cleanup_ebpf_data(void)
 {
     int i;
     for (i = 0; localfs[i].filesystem; i++) {
@@ -1026,7 +1026,7 @@ void ebpf_filesystem_read_hash(ebpf_module_t *em)
  *
  * Send hard disk information to Netdata.
  */
-static void ebpf_histogram_send_data()
+static void ebpf_histogram_send_data(void)
 {
     uint32_t i;
     uint32_t test = NETDATA_FILESYSTEM_FLAG_HAS_PARTITION | NETDATA_FILESYSTEM_REMOVE_CHARTS;
@@ -1093,10 +1093,10 @@ static void filesystem_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
+        else
+            running_time = update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
@@ -1114,7 +1114,7 @@ static void filesystem_collector(ebpf_module_t *em)
  *
  * Update file system structure using values read from configuration file.
  */
-static void ebpf_update_filesystem()
+static void ebpf_update_filesystem(void)
 {
     char dist[NETDATA_FS_MAX_DIST_NAME + 1];
     int i;
@@ -1131,7 +1131,7 @@ static void ebpf_update_filesystem()
  * When thread is initialized the variable fs_maps is set as null,
  * this function fills the variable before to use.
  */
-static void ebpf_set_maps()
+static void ebpf_set_maps(void)
 {
     localfs[NETDATA_FS_LOCALFS_EXT4].fs_maps = ext4_maps;
     localfs[NETDATA_FS_LOCALFS_XFS].fs_maps = xfs_maps;

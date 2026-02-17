@@ -76,7 +76,7 @@ int ebpf_filesystem_initialize_ebpf_data(struct ebpf_module *em);
  *
  * Frees allocated resources and cleans up filesystem partitions
  */
-void ebpf_filesystem_cleanup_ebpf_data();
+void ebpf_filesystem_cleanup_ebpf_data(void);
 
 /**
  * Read filesystem hash
