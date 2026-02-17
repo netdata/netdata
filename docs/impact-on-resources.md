@@ -39,11 +39,11 @@ When deployed on an empty VM, Netdata collects and visualizes critical system me
 
 #### **Data Retention**
 
-- **Efficient Storage:**
-    - Two weeks of high-resolution data (per-second).
-    - Three months of mid-resolution data (per-minute).
-    - Two years of low-resolution data (per-hour).
-    - Total storage required: **3 GiB**.
+- **Metrics storage is limited to 3 GiB by default** (configurable), using 1 GiB per tier × 3 tiers. In total, with SQLite databases, alert transitions, and other metadata, expect about **4 GiB** of disk usage under normal conditions.
+- Default retention limits: per-second data for 1 GiB or 14 days, per-minute data for 1 GiB or 3 months, per-hour data for 1 GiB or 2 years.
+- The number of metrics collected determines how far back in time retention extends within these limits.
+- In practice, with about 4,000 unique time-series, Netdata provides about 14 days of per-second data, 3 months of per-minute data, and more than 1 year of per-hour data.
+- These limits are [fully configurable](/src/database/CONFIGURATION.md#tiers).
 
 ### Resource Consumption
 
@@ -60,7 +60,7 @@ Netdata operates with an exceptionally low footprint, even under demanding condi
 - **Disk I/O:**
     - Reads: ~2 KiB/s without machine learning, ~9 KiB/s with machine learning.
     - Writes: ~5 KiB/s.
-- **Storage:** 3 GiB total.
+- **Storage:** ~4 GiB total (3 GiB metrics + metadata).
 
 ## Typical Netdata Resources Usage on Production Systems
 
@@ -69,7 +69,7 @@ In production systems with more data sources and features enabled, users can exp
 - **CPU Usage:** 5%-20% of a single core.
 - **Memory Usage:** 250–350 MB RAM.
 - **Disk I/O:** ~10 KiB/s reads and writes.
-- **Storage:** 3 GiB total.
+- **Storage:** ~4 GiB total (3 GiB metrics + metadata).
 
 ## Impact of Running Netdata on Cloud VMs
 
