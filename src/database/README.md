@@ -30,7 +30,7 @@ Netdata Agent metrics storage is limited to 3 GiB by default (configurable), usi
 
 In total, with SQLite databases, alert transitions, and other metadata, expect about 4 GiB of disk usage under normal conditions.
 
-In practice, with default settings and about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
+In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
 
 These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
