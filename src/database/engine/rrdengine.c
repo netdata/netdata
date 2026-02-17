@@ -1478,6 +1478,7 @@ void datafile_delete(
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
     bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
+    size_t attempts = 0;
 
     while (!datafile_got_for_deletion) {
         if(worker)
@@ -1486,6 +1487,20 @@ void datafile_delete(
         datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
 
         if (!datafile_got_for_deletion) {
+            if(++attempts >= 30) {
+                // pending_deletion is already set, blocking new acquires.
+                // Bail out and let the next rotation cycle retry - lockers
+                // will drain over time since no new ones can be added.
+                netdata_log_error("DBENGINE: datafile %u of tier %d could not be acquired for deletion "
+                                  "after %zu attempts (%u lockers remain) - will retry on next rotation",
+                                  datafile->fileno, ctx->config.tier, attempts, datafile->users.lockers);
+
+                if(worker)
+                    worker_is_idle();
+
+                return;
+            }
+
             netdata_log_info("DBENGINE: waiting for data file '%s/"
                          DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION
                          "' to be available for deletion, "

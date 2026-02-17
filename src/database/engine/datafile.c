@@ -47,6 +47,7 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     datafile->magic1 = datafile->magic2 = DATAFILE_MAGIC;
 
     datafile->users.available = true;
+    datafile->users.pending_deletion = false;
 
     spinlock_init(&datafile->users.spinlock);
     spinlock_init(&datafile->writers.spinlock);
@@ -60,12 +61,32 @@ ALWAYS_INLINE bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQU
 
     spinlock_lock(&df->users.spinlock);
 
-    if(df->users.available) {
-        ret = true;
-        df->users.lockers++;
-        df->users.lockers_by_reason[reason]++;
-    }
-    else
+    if(df->users.available && reason < DATAFILE_ACQUIRE_MAX) {
+        bool allow = true;
+
+        if(df->users.pending_deletion) {
+            if(reason == DATAFILE_ACQUIRE_OPEN_CACHE) {
+                // Hold writers.spinlock to read the writer counters, ensuring proper
+                // memory ordering on weakly-ordered architectures (ARM) - consistent
+                // with all other read sites in the codebase.
+                spinlock_lock(&df->writers.spinlock);
+                size_t writers_running = df->writers.running;
+                size_t flushed_to_open_running = df->writers.flushed_to_open_running;
+                spinlock_unlock(&df->writers.spinlock);
+                allow = (writers_running || flushed_to_open_running);
+            }
+            else
+                allow = false;
+        }
+
+        if(allow) {
+            ret = true;
+            df->users.lockers++;
+            df->users.lockers_by_reason[reason]++;
+        }
+        else
+            ret = false;
+    } else
         ret = false;
 
     spinlock_unlock(&df->users.spinlock);
@@ -87,95 +108,121 @@ void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdown)
 {
     bool can_be_deleted = false;
+    bool marked_pending = false;
+    bool should_evict_open_pages = false;
 
     spinlock_lock(&df->users.spinlock);
 
-    if(!df->users.lockers) {
+    if(!df->users.pending_deletion) {
+        df->users.pending_deletion = true;
+        marked_pending = true;
+    }
+
+    // Hold writers.spinlock to read the writer counters, ensuring proper memory ordering
+    // on weakly-ordered architectures (ARM). Without this, stale reads could cause premature
+    // deletion while a writer is still active - writers use these counters (not lockers) for
+    // their lifecycle, so lockers alone cannot protect against this race.
+    spinlock_lock(&df->writers.spinlock);
+    size_t writers_running = df->writers.running;
+    size_t flushed_to_open_running = df->writers.flushed_to_open_running;
+    spinlock_unlock(&df->writers.spinlock);
+
+    if(!writers_running && !flushed_to_open_running && !df->users.lockers) {
         can_be_deleted = true;
         df->users.available = false;
     }
-    else {
-        // there are lockers
+    else if(df->users.lockers)
+        should_evict_open_pages = true;
+    spinlock_unlock(&df->users.spinlock);
 
-        // evict any pages referencing this in the open cache
-        spinlock_unlock(&df->users.spinlock);
+    if(marked_pending)
+        netdata_log_info("DBENGINE: datafile %u of tier %d is pending deletion (%s)",
+                         df->fileno, datafile_ctx(df)->config.tier, is_shutdown ? "shutdown" : "runtime");
+
+    if(can_be_deleted)
+        return true;
+
+    if(should_evict_open_pages)
         pgc_open_evict_clean_pages_of_datafile(open_cache, df);
-        spinlock_lock(&df->users.spinlock);
 
-        if(!df->users.lockers) {
-            can_be_deleted = true;
+    usec_t time_to_scan_ut = now_monotonic_usec();
+    size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
+    size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
+    time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
+
+    spinlock_lock(&df->users.spinlock);
+
+    spinlock_lock(&df->writers.spinlock);
+    writers_running = df->writers.running;
+    flushed_to_open_running = df->writers.flushed_to_open_running;
+    spinlock_unlock(&df->writers.spinlock);
+
+    if(!writers_running && !flushed_to_open_running) {
+        if(df->users.available) {
             df->users.available = false;
+            netdata_log_info("DBENGINE: datafile %u of tier %d entered deletion phase-2 (new users blocked)",
+                             df->fileno, datafile_ctx(df)->config.tier);
         }
-        else {
-            // there are lockers still
 
-            // count the number of pages referencing this in the open cache
-            spinlock_unlock(&df->users.spinlock);
-            usec_t time_to_scan_ut = now_monotonic_usec();
-            size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
-            size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
-            time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
-            spinlock_lock(&df->users.spinlock);
+        if(!df->users.lockers)
+            can_be_deleted = true;
 
-            if(!df->users.lockers) {
-                can_be_deleted = true;
-                df->users.available = false;
-            }
+        else if(!clean_pages_in_open_cache && !hot_pages_in_open_cache) {
+            time_t now_s = now_monotonic_sec();
 
-            else if(!clean_pages_in_open_cache && !hot_pages_in_open_cache) {
-                // no pages in the open cache related to this datafile
-
-                time_t now_s = now_monotonic_sec();
-
-                if(!df->users.time_to_evict) {
-                    // first time we did the above
-                    df->users.time_to_evict = now_s + (is_shutdown ? DATAFILE_DELETE_TIMEOUT_SHORT : DATAFILE_DELETE_TIMEOUT_LONG);
-                    internal_error(true, "DBENGINE: datafile %u of tier %d is not used by any open cache pages, "
-                                         "but it has %u lockers (oc:%u, pd:%u), "
-                                         "%zu clean and %zu hot open cache pages "
-                                         "- will be deleted shortly "
-                                         "(scanned open cache in %"PRIu64" usecs)",
-                                   df->fileno, datafile_ctx(df)->config.tier,
-                                   df->users.lockers,
-                                   df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
-                                   df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
-                                   clean_pages_in_open_cache,
-                                   hot_pages_in_open_cache,
-                                   time_to_scan_ut);
-                }
-
-                else if(now_s > df->users.time_to_evict) {
-                    // time expired, lets remove it
-                    can_be_deleted = true;
-                    df->users.available = false;
-                    internal_error(true, "DBENGINE: datafile %u of tier %d is not used by any open cache pages, "
-                                         "but it has %u lockers (oc:%u, pd:%u), "
-                                         "%zu clean and %zu hot open cache pages "
-                                         "- will be deleted now "
-                                         "(scanned open cache in %"PRIu64" usecs)",
-                                   df->fileno, datafile_ctx(df)->config.tier,
-                                   df->users.lockers,
-                                   df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
-                                   df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
-                                   clean_pages_in_open_cache,
-                                   hot_pages_in_open_cache,
-                                   time_to_scan_ut);
-                }
-            }
-            else
-                internal_error(true, "DBENGINE: datafile %u of tier %d "
-                                     "has %u lockers (oc:%u, pd:%u), "
-                                     "%zu clean and %zu hot open cache pages "
-                                     "(scanned open cache in %"PRIu64" usecs)",
+            if(!df->users.time_to_evict) {
+                df->users.time_to_evict = now_s + (is_shutdown ? DATAFILE_DELETE_TIMEOUT_SHORT : DATAFILE_DELETE_TIMEOUT_LONG);
+                internal_error(true, "DBENGINE: datafile %u of tier %d pending deletion has %u lockers "
+                                     "(oc:%u, pd:%u, rt:%u, ix:%u), writers %zu/%zu, open-cache clean/hot %zu/%zu "
+                                     "- will force-delete shortly (scanned in %"PRIu64" usecs)",
                                df->fileno, datafile_ctx(df)->config.tier,
                                df->users.lockers,
                                df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
                                df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
+                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_RETENTION],
+                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_INDEXING],
+                               writers_running,
+                               flushed_to_open_running,
                                clean_pages_in_open_cache,
                                hot_pages_in_open_cache,
                                time_to_scan_ut);
+            }
+            else if(now_s > df->users.time_to_evict) {
+                can_be_deleted = true;
+                internal_error(true, "DBENGINE: datafile %u of tier %d pending deletion has %u lockers "
+                                     "(oc:%u, pd:%u, rt:%u, ix:%u), writers %zu/%zu, open-cache clean/hot %zu/%zu "
+                                     "- forcing delete now (scanned in %"PRIu64" usecs)",
+                               df->fileno, datafile_ctx(df)->config.tier,
+                               df->users.lockers,
+                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
+                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
+                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_RETENTION],
+                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_INDEXING],
+                               writers_running,
+                               flushed_to_open_running,
+                               clean_pages_in_open_cache,
+                               hot_pages_in_open_cache,
+                               time_to_scan_ut);
+            }
         }
     }
+
+    if(!can_be_deleted)
+        internal_error(true, "DBENGINE: datafile %u of tier %d pending deletion has %u lockers "
+                             "(oc:%u, pd:%u, rt:%u, ix:%u), writers %zu/%zu, open-cache clean/hot %zu/%zu "
+                             "(scanned in %"PRIu64" usecs)",
+                       df->fileno, datafile_ctx(df)->config.tier,
+                       df->users.lockers,
+                       df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
+                       df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
+                       df->users.lockers_by_reason[DATAFILE_ACQUIRE_RETENTION],
+                       df->users.lockers_by_reason[DATAFILE_ACQUIRE_INDEXING],
+                       writers_running,
+                       flushed_to_open_running,
+                       clean_pages_in_open_cache,
+                       hot_pages_in_open_cache,
+                       time_to_scan_ut);
+
     spinlock_unlock(&df->users.spinlock);
 
     return can_be_deleted;
