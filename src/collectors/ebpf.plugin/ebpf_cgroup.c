@@ -80,7 +80,7 @@ void ebpf_map_cgroup_shared_memory()
     // Map only header
     void *mapped = (netdata_ebpf_cgroup_shm_header_t *)ebpf_cgroup_map_shm_locally(
         shm_fd_ebpf_cgroup, sizeof(netdata_ebpf_cgroup_shm_header_t));
-    if (unlikely(mapped == SEM_FAILED)) {
+    if (unlikely(mapped == MAP_FAILED)) {
         return;
     }
     netdata_ebpf_cgroup_shm_header_t *header = mapped;

@@ -1252,7 +1252,6 @@ static void ebpf_parse_args(int argc, char **argv)
     if (!freq)
         freq = EBPF_DEFAULT_UPDATE_EVERY;
 
-    //rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
     if (ebpf_load_collector_config(ebpf_user_config_dir, &disable_cgroups, freq)) {
         netdata_log_info(
             "Does not have a configuration file inside `%s/ebpf.d.conf. It will try to load stock file.",
@@ -1263,7 +1262,6 @@ static void ebpf_parse_args(int argc, char **argv)
     }
 
     ebpf_load_thread_config();
-    //rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
 
     while (1) {
         int c = getopt_long_only(argc, argv, "", long_options, &option_index);
@@ -2114,9 +2112,7 @@ void ebpf_validate_data_sharing_selection()
         }
     }
 
-    // TODO: MODIFY IN NEXT PRs THE OPTION TO ALSO USE SOCKET
     if (enabled && integration_with_collectors != NETDATA_EBPF_INTEGRATION_SHM) {
-        //if (enabled && integration_with_collectors == NETDATA_EBPF_INTEGRATION_DISABLED) {
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_SHM;
     }
 }

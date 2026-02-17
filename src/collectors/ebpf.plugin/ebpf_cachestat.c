@@ -41,13 +41,13 @@ ebpf_local_maps_t cachestat_maps[] = {
      .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
     },
-    {
-        .name = NULL,
-        .internal_input = 0,
-        .user_input = 0,
-        .type = NETDATA_EBPF_MAP_CONTROLLER,
-        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+    {.name = NULL,
+     .internal_input = 0,
+     .user_input = 0,
+     .type = NETDATA_EBPF_MAP_CONTROLLER,
+     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
+     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
     }};
 
@@ -64,18 +64,30 @@ static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] = {
     "__set_page_dirty",
     "__folio_mark_dirty"};
 
-static inline int netdata_get_dirty_account_idx(void)
+static int cached_dirty_account_idx = -1;
+
+static inline void netdata_init_dirty_account_idx(void)
 {
+    if (cached_dirty_account_idx != -1)
+        return;
+
     if (!strcmp(
             cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
             account_page[NETDATA_CACHESTAT_FOLIO_DIRTY]))
-        return NETDATA_CACHESTAT_FOLIO_DIRTY;
+        cached_dirty_account_idx = NETDATA_CACHESTAT_FOLIO_DIRTY;
     else if (!strcmp(
                  cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
                  account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY]))
-        return NETDATA_CACHESTAT_SET_PAGE_DIRTY;
+        cached_dirty_account_idx = NETDATA_CACHESTAT_SET_PAGE_DIRTY;
     else
-        return NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY;
+        cached_dirty_account_idx = NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY;
+}
+
+static inline int netdata_get_dirty_account_idx(void)
+{
+    if (cached_dirty_account_idx == -1)
+        netdata_init_dirty_account_idx();
+    return cached_dirty_account_idx;
 }
 
 struct netdata_static_thread ebpf_read_cachestat = {
@@ -630,11 +642,11 @@ static void
 cachestat_update_publish(netdata_publish_cachestat_t *out, uint64_t mpa, uint64_t mbd, uint64_t apcl, uint64_t apd)
 {
     // Adapted algorithm from https://github.com/iovisor/bcc/blob/master/tools/cachestat.py#L126-L138
-    NETDATA_DOUBLE total = (NETDATA_DOUBLE)(((long long)mpa) - ((long long)mbd));
+    NETDATA_DOUBLE total = (NETDATA_DOUBLE)mpa - (NETDATA_DOUBLE)mbd;
     if (total < 0)
         total = 0;
 
-    NETDATA_DOUBLE misses = (NETDATA_DOUBLE)(((long long)apcl) - ((long long)apd));
+    NETDATA_DOUBLE misses = (NETDATA_DOUBLE)apcl - (NETDATA_DOUBLE)apd;
     if (misses < 0)
         misses = 0;
 

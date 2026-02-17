@@ -354,7 +354,6 @@ ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid)
     return pid_data;
 }
 
-//ebpf_pid_data_t *ebpf_pids = NULL;
 ebpf_pid_data_t *ebpf_pids_link_list = NULL; // global list of all processes running
 
 size_t ebpf_all_pids_count = 0;        // the number of processes running read from /proc
@@ -774,7 +773,6 @@ void ebpf_del_pid_entry(pid_t pid)
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
     freez(p);
-    //memset(p, 0, sizeof(ebpf_pid_data_t));
     ebpf_pid_del(pid);
 }
 
