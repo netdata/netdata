@@ -2,6 +2,13 @@
 
 ### Merged Pull Requests:
 
+- Increase minimum language standards to C17 and C++17, and update to the latest versions of Protobuf and Abseil. ([#21574](https://github.com/netdata/netdata/issues/21574))
+- Drop Ubuntu 20.04 from CI and package builds. ([#21647](https://github.com/netdata/netdata/issues/21647))
+
+## [2.9.0] - 2026-02-16
+
+### Merged Pull Requests:
+
 - Fix(cgroups): improve podman container name resolution ([#21317](https://github.com/netdata/netdata/issues/21317))
 - Build(deps): bump golang.org/x/crypto from 0.43.0 to 0.45.0 in /src/go ([#21322](https://github.com/netdata/netdata/issues/21322))
 - Remove log message ([#21325](https://github.com/netdata/netdata/issues/21325))
