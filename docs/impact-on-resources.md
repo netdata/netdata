@@ -42,7 +42,7 @@ When deployed on an empty VM, Netdata collects and visualizes critical system me
 - **Metrics storage is limited to 3 GiB by default** (configurable), using 1 GiB per tier × 3 tiers. In total, with SQLite databases, alert transitions, and other metadata, expect about **4 GiB** of disk usage under normal conditions.
 - Default retention limits: per-second data for 1 GiB or 14 days, per-minute data for 1 GiB or 3 months, per-hour data for 1 GiB or 2 years.
 - The number of metrics collected determines how far back in time retention extends within these limits.
-- In practice, with about 4,000 unique time-series, Netdata provides about 14 days of per-second data, 3 months of per-minute data, and more than 1 year of per-hour data.
+- In practice, with about 4,000 metrics per second, Netdata provides about 14 days of per-second data, 3 months of per-minute data, and more than 1 year of per-hour data.
 - These limits are [fully configurable](/src/database/CONFIGURATION.md#tiers).
 
 ### Resource Consumption
