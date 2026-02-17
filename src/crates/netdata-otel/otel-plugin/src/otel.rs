@@ -405,6 +405,23 @@ impl MetricIdentityHash for Metric {
         self.name.hash(state);
         self.description.hash(state);
         self.unit.hash(state);
+
+        if let Some(data) = &self.data {
+            std::mem::discriminant(data).hash(state);
+            match data {
+                metric::Data::Sum(s) => {
+                    state.write_i32(s.aggregation_temporality);
+                    state.write_u8(u8::from(s.is_monotonic));
+                }
+                metric::Data::Histogram(h) => {
+                    state.write_i32(h.aggregation_temporality);
+                }
+                metric::Data::ExponentialHistogram(eh) => {
+                    state.write_i32(eh.aggregation_temporality);
+                }
+                _ => {}
+            }
+        }
     }
 }
 
