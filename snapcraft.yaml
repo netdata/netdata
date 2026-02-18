@@ -28,6 +28,8 @@ parts:
   netdata:
     plugin: cmake
     source: .
+    build-snaps:
+      - go/latest/stable
     override-pull: |
       craftctl default
       version="$(tr -d '\n' < "${CRAFT_PART_SRC}/packaging/version")"
