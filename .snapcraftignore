@@ -1,3 +1,15 @@
 # Exclude VCS metadata from local source copies into managed build instances.
 # This avoids copying large git object packs into /root/parts/*/src.
 .git
+
+# Exclude documentation/CI assets that are not needed to compile/package.
+.github/
+docs/
+tests/
+integrations/
+
+# Exclude large Go collector docs and test fixtures not needed for release builds.
+src/go/plugin/go.d/collector/*/integrations/
+src/go/plugin/go.d/collector/*/testdata/
+src/go/plugin/go.d/config/go.d/snmp.profiles/metadata/
+src/go/plugin/ibm.d/samples.d/
