@@ -5,8 +5,7 @@
 #include "sqlite_db_migration.h"
 #include "health/health_internals.h"
 #include "health/health-alert-entry.h"
-
-extern __thread bool is_health_thread;
+#include "health/health_event_loop_uv.h"
 
 #define MAX_HEALTH_SQL_SIZE 2048
 #define SQLITE3_BIND_STRING_OR_NULL(res, param, key)                                                                   \
@@ -30,17 +29,17 @@ extern __thread bool is_health_thread;
     "UPDATE health_log_detail SET updated_by_id = @updated_by, flags = @flags, exec_run_timestamp = @exec_time, "      \
     "exec_code = @exec_code WHERE unique_id = @unique_id AND alarm_id = @alarm_id AND transition_id = @transaction"
 
-static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
+static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae, struct health_stmt_set *stmts)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
+    bool use_pool = (stmts != NULL);
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_HEALTH_LOG, &compiled_res))
+    if (use_pool) {
+        if (!stmts->stmt_health_log_update) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_HEALTH_LOG, &stmts->stmt_health_log_update))
                 return;
         }
-        res = compiled_res;
+        res = stmts->stmt_health_log_update;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_HEALTH_LOG, &res))
             return;
@@ -65,7 +64,7 @@ static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (use_pool)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
@@ -165,17 +164,18 @@ static void insert_alert_queue(
     uint32_t alarm_id,
     RRDCALC_STATUS old_status,
     RRDCALC_STATUS new_status,
-    time_t trigger_time)
+    time_t trigger_time,
+    struct health_stmt_set *stmts)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
+    bool use_pool = (stmts != NULL);
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &compiled_res))
+    if (use_pool) {
+        if (!stmts->stmt_alert_queue_insert) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &stmts->stmt_alert_queue_insert))
                 return;
         }
-        res = compiled_res;
+        res = stmts->stmt_alert_queue_insert;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &res))
             return;
@@ -205,7 +205,7 @@ static void insert_alert_queue(
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (use_pool)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
@@ -219,17 +219,17 @@ done:
     "@non_clear_duration,@flags,@exec_run_timestamp,@delay_up_to_timestamp, @info,@exec_code,@new_status,@old_status,"       \
     "@delay,@new_value,@old_value,@last_repeat,@transition_id,@global_id,@summary)"
 
-static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae)
+static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae, struct health_stmt_set *stmts)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
+    bool use_pool = (stmts != NULL);
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &compiled_res))
+    if (use_pool) {
+        if (!stmts->stmt_health_log_insert_detail) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &stmts->stmt_health_log_insert_detail))
                 return;
         }
-        res = compiled_res;
+        res = stmts->stmt_health_log_insert_detail;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &res))
             return;
@@ -272,7 +272,7 @@ static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (use_pool)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
@@ -286,19 +286,19 @@ done:
     "SET last_transition_id = excluded.last_transition_id, chart_name = excluded.chart_name, "                         \
     "config_hash_id=excluded.config_hash_id RETURNING health_log_id"
 
-static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
+static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae, struct health_stmt_set *stmts)
 {
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
     int rc;
     uint64_t health_log_id;
+    bool use_pool = (stmts != NULL);
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG, &compiled_res))
+    if (use_pool) {
+        if (!stmts->stmt_health_log_insert) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG, &stmts->stmt_health_log_insert))
                 return;
         }
-        res = compiled_res;
+        res = stmts->stmt_health_log_insert;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG, &res))
             return;
@@ -321,29 +321,29 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
     rc = sqlite3_step_monitored(res);
     if (rc == SQLITE_ROW) {
         health_log_id = (size_t)sqlite3_column_int64(res, 0);
-        sql_health_alarm_log_insert_detail(host, health_log_id, ae);
+        sql_health_alarm_log_insert_detail(host, health_log_id, ae, stmts);
         insert_alert_queue(
-            host, health_log_id, (int64_t)ae->unique_id, (int64_t)ae->alarm_id, ae->old_status, ae->new_status, ae->when);
+            host, health_log_id, (int64_t)ae->unique_id, (int64_t)ae->alarm_id, ae->old_status, ae->new_status, ae->when, stmts);
     } else
         error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", rrdhost_hostname(host), rc);
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (use_pool)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
 }
 
-void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
+void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae, struct health_stmt_set *stmts)
 {
     if (!REQUIRE_HEALTH_DB_OPEN())
         return;
 
     if (ae->flags & HEALTH_ENTRY_FLAG_SAVED)
-        sql_health_alarm_log_update(host, ae);
+        sql_health_alarm_log_update(host, ae, stmts);
     else
-        sql_health_alarm_log_insert(host, ae);
+        sql_health_alarm_log_insert(host, ae, stmts);
 }
 
 /*
@@ -491,7 +491,7 @@ static void sql_inject_removed_status(
         int64_t health_log_id = sqlite3_column_int64(res, 0);
         RRDCALC_STATUS old_status = (RRDCALC_STATUS)sqlite3_column_double(res, 1);
         insert_alert_queue(
-            host, health_log_id, (int64_t)max_unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED, now);
+            host, health_log_id, (int64_t)max_unique_id, (int64_t)alarm_id, old_status, RRDCALC_STATUS_REMOVED, now, NULL);
     }
 
 done:
@@ -558,7 +558,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
 
            sql_inject_removed_status(host, alarm_id, alarm_event_id, unique_id, ++max_unique_id, &transition_id);
         }
-        if (!service_running(SERVICE_HEALTH))
+        if (health_should_stop())
             break;
     }
 done:
@@ -716,6 +716,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
         }
 
         ae = health_alarm_entry_create();
+        ae->host = host;
 
         ae->unique_id = unique_id;
         ae->alarm_id = alarm_id;
@@ -946,21 +947,21 @@ done:
     "WHERE hl.host_id = @host_id AND hl.alarm_id = @alarm_id AND hld.unique_id != @unique_id AND hld.flags & @flags "  \
     "AND hl.health_log_id = hld.health_log_id ORDER BY hld.unique_id DESC LIMIT 1"
 
-int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status)
+int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status, struct health_stmt_set *stmts)
 {
     if (!REQUIRE_HEALTH_DB_OPEN())
         return -1;
 
     int ret = -1;
-    static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
+    bool use_pool = (stmts != NULL);
 
-    if (is_health_thread) {
-        if (!compiled_res) {
-            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, &compiled_res))
+    if (use_pool) {
+        if (!stmts->stmt_health_get_last_executed_event) {
+            if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, &stmts->stmt_health_get_last_executed_event))
                 return ret;
         }
-        res = compiled_res;
+        res = stmts->stmt_health_get_last_executed_event;
     } else {
         if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT, &res))
             return ret;
@@ -981,7 +982,7 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
 
 done:
     REPORT_BIND_FAIL(res, param);
-    if (is_health_thread)
+    if (use_pool)
         SQLITE_RESET(res);
     else
         SQLITE_FINALIZE(res);
