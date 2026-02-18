@@ -21,6 +21,15 @@ parts:
   netdata:
     plugin: cmake
     source: .
+    override-pull: |
+      craftctl default
+      aclk_proto_file="${CRAFT_PART_SRC}/src/aclk/aclk-schemas/proto/aclk/v1/lib.proto"
+      if [ ! -f "${aclk_proto_file}" ]; then
+        echo "aclk-schemas submodule missing in source tree, fetching pinned commit."
+        rm -rf "${CRAFT_PART_SRC}/src/aclk/aclk-schemas"
+        git clone https://github.com/netdata/aclk-schemas.git "${CRAFT_PART_SRC}/src/aclk/aclk-schemas"
+        git -C "${CRAFT_PART_SRC}/src/aclk/aclk-schemas" checkout --detach ec319a14394436f62663548d32eb320eeddd264a
+      fi
     cmake-generator: Ninja
     cmake-parameters:
       - -DCMAKE_BUILD_TYPE=RelWithDebInfo
