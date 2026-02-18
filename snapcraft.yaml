@@ -40,6 +40,13 @@ parts:
         git clone https://github.com/netdata/aclk-schemas.git "${CRAFT_PART_SRC}/src/aclk/aclk-schemas"
         git -C "${CRAFT_PART_SRC}/src/aclk/aclk-schemas" checkout --detach ec319a14394436f62663548d32eb320eeddd264a
       fi
+      libsensors_file="${CRAFT_PART_SRC}/src/collectors/debugfs.plugin/libsensors/vendored/lib/access.c"
+      if [ ! -f "${libsensors_file}" ]; then
+        echo "libsensors submodule missing in source tree, fetching pinned commit."
+        rm -rf "${CRAFT_PART_SRC}/src/collectors/debugfs.plugin/libsensors/vendored"
+        git clone https://github.com/lm-sensors/lm-sensors.git "${CRAFT_PART_SRC}/src/collectors/debugfs.plugin/libsensors/vendored"
+        git -C "${CRAFT_PART_SRC}/src/collectors/debugfs.plugin/libsensors/vendored" checkout --detach 42f240d2a457834bcbdf4dc8b57237f97b5f5854
+      fi
     cmake-generator: Ninja
     cmake-parameters:
       - -DCMAKE_BUILD_TYPE=RelWithDebInfo
