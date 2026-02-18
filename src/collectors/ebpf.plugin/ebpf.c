@@ -4,6 +4,7 @@
 #include <sys/resource.h>
 #include <ifaddrs.h>
 #include <errno.h>
+#include <stdint.h>
 
 #include "ebpf.h"
 #include "ebpf_socket.h"
@@ -1005,6 +1006,11 @@ void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe
     if (!probe_links || !objects)
         return;
 
+    if ((uintptr_t)objects < 4096) {
+        freez(probe_links);
+        return;
+    }
+
     struct bpf_program *prog;
     size_t j = 0;
     bpf_object__for_each_program(prog, objects)
@@ -1013,8 +1019,7 @@ void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe
         j++;
     }
     freez(probe_links);
-    if (objects)
-        bpf_object__close(objects);
+    bpf_object__close(objects);
 }
 
 /**
