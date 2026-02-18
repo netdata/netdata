@@ -1,0 +1,77 @@
+# NetFlow/IPFIX/sFlow plugin configuration.
+#
+# This file is loaded by netflow-plugin when running under Netdata from:
+# - /etc/netdata/netflow.yaml (user config, preferred)
+# - /usr/lib/netdata/conf.d/netflow.yaml (stock fallback)
+#
+# If listener/protocol/journal values are omitted here, they follow plugin defaults.
+
+# Global plugin switch for netflow-plugin itself.
+enabled: true
+
+listener:
+  # UDP socket for NetFlow/IPFIX/sFlow exporters.
+  listen: "0.0.0.0:2055"
+  max_packet_size: 9216
+  sync_every_entries: 1024
+  sync_interval: 1s
+
+protocols:
+  v5: true
+  v7: true
+  v9: true
+  ipfix: true
+  sflow: true
+  # one of: none, srv6, vxlan
+  decapsulation_mode: none
+  # one of: input, netflow_packet, netflow_first_switched
+  timestamp_source: input
+
+journal:
+  # Relative paths are resolved against NETDATA_CACHE_DIR.
+  # With the default Netdata cache dir this becomes /var/cache/netdata/flows.
+  journal_dir: flows
+
+  # Journal file rotation.
+  size_of_journal_file: 256MB
+  duration_of_journal_file: 1h
+
+  # Journal retention limits (applied on each tier writer).
+  number_of_journal_files: 64
+  size_of_journal_files: 10GB
+  duration_of_journal_files: 7d
+
+  # Optional per-tier retention overrides.
+  # If omitted, each tier inherits the retention values above.
+  tiers:
+    raw:
+      number_of_journal_files: 64
+      size_of_journal_files: 10GB
+      duration_of_journal_files: 7d
+    minute_1:
+      number_of_journal_files: 64
+      size_of_journal_files: 10GB
+      duration_of_journal_files: 7d
+    minute_5:
+      number_of_journal_files: 64
+      size_of_journal_files: 10GB
+      duration_of_journal_files: 7d
+    hour_1:
+      number_of_journal_files: 64
+      size_of_journal_files: 10GB
+      duration_of_journal_files: 7d
+
+  # Query tier selection guardrails.
+  query_1m_max_window: 6h
+  query_5m_max_window: 24h
+  query_max_groups: 50000
+  query_facet_max_values_per_field: 5000
+
+# Optional advanced enrichment modules.
+# Keep disabled unless explicitly configured.
+enrichment:
+  routing_dynamic:
+    bmp:
+      enabled: false
+    bioris:
+      enabled: false

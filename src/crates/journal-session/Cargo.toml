@@ -1,0 +1,12 @@
+[package]
+name = "journal-session"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+journal-core = { workspace = true }
+journal-registry = { workspace = true }
+thiserror = { workspace = true }

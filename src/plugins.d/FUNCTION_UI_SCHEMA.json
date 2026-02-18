@@ -11,6 +11,8 @@
   "oneOf": [
     { "$ref": "#/definitions/info_response" },
     { "$ref": "#/definitions/data_response" },
+    { "$ref": "#/definitions/topology_response" },
+    { "$ref": "#/definitions/flows_response" },
     { "$ref": "#/definitions/error_response" },
     { "$ref": "#/definitions/not_modified_response" }
   ],
@@ -226,6 +228,195 @@
         "histogram": { "type": "object" },
         "items": { "type": "object" },
         "pagination": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "topology_match": {
+      "type": "object",
+      "properties": {
+        "chassis_ids": { "type": "array", "items": { "type": "string" } },
+        "mac_addresses": { "type": "array", "items": { "type": "string" } },
+        "ip_addresses": { "type": "array", "items": { "type": "string" } },
+        "hostnames": { "type": "array", "items": { "type": "string" } },
+        "dns_names": { "type": "array", "items": { "type": "string" } },
+        "sys_object_id": { "type": "string" },
+        "sys_name": { "type": "string" },
+        "netdata_node_id": { "type": "string" },
+        "netdata_machine_guid": { "type": "string" },
+        "cloud_instance_id": { "type": "string" },
+        "cloud_account_id": { "type": "string" },
+        "container_ids": { "type": "array", "items": { "type": "string" } },
+        "pod_names": { "type": "array", "items": { "type": "string" } },
+        "namespace_ids": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "topology_actor": {
+      "type": "object",
+      "required": ["actor_type", "layer", "source", "match"],
+      "properties": {
+        "actor_type": { "type": "string" },
+        "layer": { "type": "string" },
+        "source": { "type": "string" },
+        "match": { "$ref": "#/definitions/topology_match" },
+        "parent_match": { "$ref": "#/definitions/topology_match" },
+        "attributes": { "type": "object" },
+        "derived": { "type": "object" },
+        "labels": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "topology_link_endpoint": {
+      "type": "object",
+      "properties": {
+        "match": { "$ref": "#/definitions/topology_match" },
+        "attributes": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "topology_link": {
+      "type": "object",
+      "required": ["layer", "protocol", "src", "dst"],
+      "properties": {
+        "layer": { "type": "string" },
+        "protocol": { "type": "string" },
+        "direction": { "type": "string" },
+        "state": { "type": "string" },
+        "src": { "$ref": "#/definitions/topology_link_endpoint" },
+        "dst": { "$ref": "#/definitions/topology_link_endpoint" },
+        "discovered_at": { "type": "string", "format": "date-time" },
+        "last_seen": { "type": "string", "format": "date-time" },
+        "metrics": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "topology_flow_exporter": {
+      "type": "object",
+      "properties": {
+        "ip": { "type": "string" },
+        "name": { "type": "string" },
+        "sampling_rate": { "type": "integer" },
+        "flow_version": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "topology_flow": {
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "duration_sec": { "type": "integer" },
+        "exporter": { "$ref": "#/definitions/topology_flow_exporter" },
+        "src": { "$ref": "#/definitions/topology_link_endpoint" },
+        "dst": { "$ref": "#/definitions/topology_link_endpoint" },
+        "key": { "type": "object" },
+        "metrics": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "topology_ip_policy": {
+      "type": "object",
+      "properties": {
+        "public_allowlist": { "type": "array", "items": { "type": "string" } },
+        "live_top_n": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "limit": { "type": "integer" },
+            "sort_by": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "topology_response": {
+      "type": "object",
+      "required": ["status", "type", "data"],
+      "properties": {
+        "status": { "type": "integer" },
+        "type": { "const": "topology" },
+        "data": {
+          "type": "object",
+          "required": ["schema_version", "agent_id", "collected_at", "actors", "links"],
+          "properties": {
+            "schema_version": { "type": "string" },
+            "source": { "type": "string" },
+            "layer": { "type": "string" },
+            "agent_id": { "type": "string" },
+            "collected_at": { "type": "string", "format": "date-time" },
+            "view": { "type": "string" },
+            "ip_policy": { "$ref": "#/definitions/topology_ip_policy" },
+            "actors": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/topology_actor" }
+            },
+            "links": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/topology_link" }
+            },
+            "flows": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/topology_flow" }
+            },
+            "stats": { "type": "object" },
+            "metrics": { "type": "object" }
+          },
+          "additionalProperties": true
+        },
+        "has_history": { "type": "boolean" },
+        "accepted_params": { "$ref": "#/definitions/accepted_params" },
+        "required_params": { "$ref": "#/definitions/required_params" },
+        "help": { "type": "string" },
+        "update_every": { "type": "integer" },
+        "expires": { "type": "integer" }
+      },
+      "additionalProperties": true
+    },
+    "flows_response": {
+      "type": "object",
+      "required": ["status", "type", "data"],
+      "properties": {
+        "status": { "type": "integer" },
+        "type": { "const": "flows" },
+        "data": {
+          "type": "object",
+          "required": ["schema_version", "agent_id", "collected_at"],
+          "properties": {
+            "schema_version": { "type": "string" },
+            "source": { "type": "string" },
+            "layer": { "type": "string" },
+            "agent_id": { "type": "string" },
+            "collected_at": { "type": "string", "format": "date-time" },
+            "view": { "type": "string" },
+            "ip_policy": { "$ref": "#/definitions/topology_ip_policy" },
+            "actors": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/topology_actor" }
+            },
+            "links": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/topology_link" }
+            },
+            "flows": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/topology_flow" }
+            },
+            "stats": { "type": "object" },
+            "metrics": { "type": "object" },
+            "warnings": { "type": ["array", "object"] },
+            "facets": { "type": ["array", "object"] },
+            "histogram": { "type": "object" },
+            "visualizations": { "type": "object" },
+            "pagination": { "type": "object" }
+          },
+          "additionalProperties": true
+        },
+        "has_history": { "type": "boolean" },
+        "accepted_params": { "$ref": "#/definitions/accepted_params" },
+        "required_params": { "$ref": "#/definitions/required_params" },
+        "help": { "type": "string" },
+        "update_every": { "type": "integer" },
+        "expires": { "type": "integer" }
       },
       "additionalProperties": true
     },

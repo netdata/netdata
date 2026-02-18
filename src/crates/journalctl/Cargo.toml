@@ -1,0 +1,22 @@
+[package]
+name = "journalctl"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "jctl"
+path = "src/main.rs"
+
+[dependencies]
+journal-core = { workspace = true }
+journal-session = { workspace = true }
+clap = { workspace = true }
+chrono = { workspace = true }
+regex = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

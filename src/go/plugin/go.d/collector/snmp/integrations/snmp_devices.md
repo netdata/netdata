@@ -188,6 +188,47 @@ Network interface metrics from cached SNMP data, including traffic rates, packet
 | Multicast In | float | packets/s | hidden | Rate of multicast packets (destined for a group) received per second. Common in video streaming, multicast applications, and routing protocols. |
 | Multicast Out | float | packets/s | hidden | Rate of multicast packets transmitted per second. |
 
+### Network Topology
+
+Provides LLDP/CDP neighbor discovery data for the monitored SNMP device.
+
+This function reads cached LLDP/CDP data collected during regular SNMP polling and returns a topology schema (devices, links, and stats). No additional SNMP requests are triggered when calling this function.
+
+Use cases:
+- Discover Layer 2 neighbors and link mapping
+- Validate cabling and port connections
+- Identify adjacent devices that are discovered but not monitored
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Snmp:topology` |
+| Require Cloud | no |
+| Performance | Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many discovered neighbors may return many rows |
+| Security | Exposes discovered device identifiers, interface/port identifiers, and management addresses only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed |
+| Availability | Available when:<br/>• The collector has completed at least one successful topology collection cycle<br/>• LLDP/CDP topology data is present in cache from the last successful SNMP collection<br/>• Returns HTTP 503 if topology cache is not ready yet |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Topology data for the monitored device in a JSON schema suitable for cross-agent aggregation.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| schema_version | integer |  |  | Topology schema version. |
+| agent_id | string |  |  | Netdata Agent or vnode identifier that collected the data. |
+| collected_at | string |  |  | Collection timestamp in RFC 3339 format. |
+| devices | array |  |  | List of devices (local and discovered). |
+| links | array |  |  | List of discovered links (LLDP/CDP). |
+| stats | object |  |  | Summary stats (device/link counts). |
+
 
 
 ## Alerts
@@ -258,6 +299,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
 |  | ping.interval | Interval between sending ping packets. | 100ms | no |
 | **Profiles** | manual_profiles | A list of profiles to force-apply when auto-detection cannot be used. | [] | no |
+| **Topology** | topology.autoprobe | When enabled, auto-append LLDP/CDP profiles in-memory for topology discovery even if the matched vendor profile does not include them. | true | no |
 | **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
 |  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
 |  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |

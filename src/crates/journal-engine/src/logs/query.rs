@@ -12,7 +12,7 @@ use journal_index::{
     LogQueryParamsBuilder, Microseconds,
 };
 use journal_registry::File;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU64;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -57,6 +57,7 @@ pub struct LogQuery<'a> {
     builder: LogQueryParamsBuilder,
     cancellation: Option<CancellationToken>,
     progress: Option<Arc<AtomicUsize>>,
+    output_fields: Option<HashSet<String>>,
 }
 
 impl<'a> LogQuery<'a> {
@@ -82,6 +83,7 @@ impl<'a> LogQuery<'a> {
             ),
             cancellation: None,
             progress: None,
+            output_fields: None,
         }
     }
 
@@ -158,6 +160,28 @@ impl<'a> LogQuery<'a> {
         self
     }
 
+    /// Restrict extracted output fields to a specific set.
+    ///
+    /// This does not affect query matching/filtering; it only controls which
+    /// fields are materialized in returned `LogEntryData`.
+    pub fn with_output_fields<I, S>(mut self, fields: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let mut output_fields = HashSet::new();
+        for field in fields {
+            let field = field.into();
+            if !field.is_empty() {
+                output_fields.insert(field);
+            }
+        }
+        if !output_fields.is_empty() {
+            self.output_fields = Some(output_fields);
+        }
+        self
+    }
+
     /// Execute the query and return log entries.
     ///
     /// This consumes the builder and returns a vector of log entries sorted by timestamp
@@ -168,6 +192,7 @@ impl<'a> LogQuery<'a> {
     /// Returns an error if anchor or direction were not set, or if time boundaries are invalid.
     pub fn execute(self) -> Result<Vec<LogEntryData>> {
         let params = self.builder.build()?;
+        let output_fields = self.output_fields;
         let (log_entry_ids, _state) = retrieve_log_entries(
             self.file_indexes.to_vec(),
             params,
@@ -176,7 +201,7 @@ impl<'a> LogQuery<'a> {
             self.progress.as_ref(),
         );
 
-        extract_entry_data(&log_entry_ids)
+        extract_entry_data(&log_entry_ids, output_fields.as_ref())
     }
 
     /// Execute the query with pagination support.
@@ -201,6 +226,7 @@ impl<'a> LogQuery<'a> {
         state: Option<&PaginationState>,
     ) -> Result<(Vec<LogEntryData>, PaginationState)> {
         let params = self.builder.build()?;
+        let output_fields = self.output_fields;
         let (log_entry_ids, new_state) = retrieve_log_entries(
             self.file_indexes.to_vec(),
             params,
@@ -209,7 +235,7 @@ impl<'a> LogQuery<'a> {
             self.progress.as_ref(),
         );
 
-        let data = extract_entry_data(&log_entry_ids)?;
+        let data = extract_entry_data(&log_entry_ids, output_fields.as_ref())?;
         Ok((data, new_state))
     }
 }
@@ -515,7 +541,10 @@ pub struct LogEntryData {
 /// # Returns
 ///
 /// A vector of `LogEntryData` in the same order as the input entries
-fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
+fn extract_entry_data(
+    log_entries: &[LogEntryId],
+    output_fields: Option<&HashSet<String>>,
+) -> Result<Vec<LogEntryData>> {
     // Group entries by file to minimize file open/close operations
     let mut entries_by_file: HashMap<&File, Vec<(usize, &LogEntryId)>> = HashMap::new();
     for (idx, entry) in log_entries.iter().enumerate() {
@@ -580,6 +609,8 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
                 let payload_str = String::from_utf8_lossy(payload_bytes);
 
                 if let Some(mut pair) = FieldValuePair::parse(&payload_str) {
+                    let stored_field_name = pair.field().to_string();
+
                     // Reverse-map systemd field name back to OTEL name if needed
                     if let Some(otel_name) = reverse_map.get(pair.field()) {
                         pair = FieldValuePair::new_unchecked(
@@ -587,7 +618,14 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
                             pair.value().to_string(),
                         );
                     }
-                    fields.push(pair);
+
+                    // Accept projection filters expressed with either OTEL field names (preferred)
+                    // or the raw systemd names present on disk.
+                    if output_fields.map_or(true, |projected| {
+                        projected.contains(pair.field()) || projected.contains(&stored_field_name)
+                    }) {
+                        fields.push(pair);
+                    }
                 }
             }
 

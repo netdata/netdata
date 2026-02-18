@@ -31,6 +31,9 @@
   "manual_profiles": [
     "ok"
   ],
+  "topology": {
+    "autoprobe": true
+  },
   "ping": {
     "enabled": true,
     "network": "ip",

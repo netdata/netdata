@@ -12,17 +12,20 @@ import (
 
 // funcRouter routes method calls to appropriate function handlers.
 type funcRouter struct {
-	ifaceCache *ifaceCache
+	ifaceCache    *ifaceCache
+	topologyCache *topologyCache
 
 	handlers map[string]funcapi.MethodHandler
 }
 
-func newFuncRouter(cache *ifaceCache) *funcRouter {
+func newFuncRouter(cache *ifaceCache, topoCache *topologyCache) *funcRouter {
 	r := &funcRouter{
-		ifaceCache: cache,
-		handlers:   make(map[string]funcapi.MethodHandler),
+		ifaceCache:    cache,
+		topologyCache: topoCache,
+		handlers:      make(map[string]funcapi.MethodHandler),
 	}
 	r.handlers[ifacesMethodID] = newFuncInterfaces(r)
+	r.handlers[topologyMethodID] = newFuncTopology(r)
 	return r
 }
 
@@ -52,6 +55,7 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 func snmpMethods() []funcapi.MethodConfig {
 	return []funcapi.MethodConfig{
 		ifacesMethodConfig(),
+		topologyMethodConfig(),
 	}
 }
 

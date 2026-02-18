@@ -6,9 +6,11 @@
 //! - Retention policies
 
 use journal_common::load_machine_id;
-use journal_log_writer::{Config, Log, RetentionPolicy, RotationPolicy};
+use journal_log_writer::{Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy};
 use journal_registry::Origin;
 use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use tempfile::TempDir;
 
 /// Helper to create a default test config
@@ -42,6 +44,71 @@ fn count_journal_files(dir: &TempDir) -> usize {
                 .unwrap_or(false)
         })
         .count()
+}
+
+fn journal_file_path(dir: &TempDir) -> PathBuf {
+    let machine_id = load_machine_id().unwrap();
+    let journal_dir = dir.path().join(machine_id.as_simple().to_string());
+
+    let journal_files: Vec<_> = fs::read_dir(&journal_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s == "journal")
+                .unwrap_or(false)
+        })
+        .collect();
+
+    assert_eq!(
+        journal_files.len(),
+        1,
+        "expected exactly one journal file in {:?}",
+        journal_dir
+    );
+    journal_files[0].path()
+}
+
+fn journal_file_paths(dir: &TempDir) -> Vec<PathBuf> {
+    let machine_id = load_machine_id().unwrap();
+    let journal_dir = dir.path().join(machine_id.as_simple().to_string());
+
+    let mut journal_files: Vec<_> = fs::read_dir(&journal_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s == "journal")
+                .unwrap_or(false)
+        })
+        .map(|e| e.path())
+        .collect();
+    journal_files.sort();
+    journal_files
+}
+
+fn read_journal_json(path: &Path) -> Vec<serde_json::Value> {
+    let output = Command::new("journalctl")
+        .arg("--output=json")
+        .arg("--file")
+        .arg(path)
+        .output()
+        .expect("failed to run journalctl");
+    assert!(output.status.success(), "journalctl should succeed");
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .collect()
+}
+
+fn parse_u64_field(row: &serde_json::Value, key: &str) -> Option<u64> {
+    row.get(key)?.as_str()?.parse::<u64>().ok()
 }
 
 #[test]
@@ -218,7 +285,6 @@ fn test_empty_entry() {
 #[test]
 fn test_boot_id_injection() {
     use journal_common::load_boot_id;
-    use std::process::Command;
 
     let dir = TempDir::new().unwrap();
     let config = test_config();
@@ -273,5 +339,193 @@ fn test_boot_id_injection() {
         output_str.contains(&boot_id_field),
         "_BOOT_ID field with value {} should be present in journal entry output",
         expected_boot_id
+    );
+}
+
+#[test]
+fn test_write_without_machine_id_suffix() {
+    let dir = TempDir::new().unwrap();
+    let target_dir = dir.path().join("flows_raw");
+    fs::create_dir_all(&target_dir).unwrap();
+    let config = test_config().with_machine_id_suffix(false);
+    let mut log = Log::new(&target_dir, config).unwrap();
+
+    let entry = [b"MESSAGE=no machine id suffix" as &[u8], b"PRIORITY=6"];
+    log.write_entry(&entry, None).unwrap();
+    log.sync().unwrap();
+
+    let root_files: Vec<_> = fs::read_dir(&target_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s == "journal")
+                .unwrap_or(false)
+        })
+        .collect();
+    assert_eq!(
+        root_files.len(),
+        1,
+        "expected one .journal file directly in configured directory"
+    );
+
+    let machine_id = load_machine_id().unwrap();
+    let machine_id_dir = target_dir.join(machine_id.as_simple().to_string());
+    assert!(
+        !machine_id_dir.exists(),
+        "machine-id subdirectory must not be created when suffix is disabled"
+    );
+}
+
+#[test]
+fn test_entry_realtime_override_is_clamped_monotonic() {
+    let dir = TempDir::new().unwrap();
+    let config = test_config();
+    let mut log = Log::new(dir.path(), config).unwrap();
+
+    let first_entry = [b"MESSAGE=first" as &[u8], b"PRIORITY=6"];
+    log.write_entry(&first_entry, None).unwrap();
+
+    let second_entry = [b"MESSAGE=second" as &[u8], b"PRIORITY=6"];
+    let ts = EntryTimestamps::default().with_entry_realtime_usec(1);
+    log.write_entry_with_timestamps(&second_entry, ts).unwrap();
+    log.sync().unwrap();
+
+    let rows = read_journal_json(&journal_file_path(&dir));
+
+    let mut first_rt = None;
+    let mut second_rt = None;
+    for row in rows {
+        match row.get("MESSAGE").and_then(|v| v.as_str()) {
+            Some("first") => first_rt = parse_u64_field(&row, "__REALTIME_TIMESTAMP"),
+            Some("second") => second_rt = parse_u64_field(&row, "__REALTIME_TIMESTAMP"),
+            _ => {}
+        }
+    }
+
+    let first_rt = first_rt.expect("missing first entry realtime timestamp");
+    let second_rt = second_rt.expect("missing second entry realtime timestamp");
+    assert!(
+        second_rt > first_rt,
+        "second realtime timestamp must be strictly greater ({} !> {})",
+        second_rt,
+        first_rt
+    );
+}
+
+#[test]
+fn test_entry_monotonic_override_is_clamped_monotonic() {
+    let dir = TempDir::new().unwrap();
+    let config = test_config();
+    let mut log = Log::new(dir.path(), config).unwrap();
+
+    let first_entry = [b"MESSAGE=mono-first" as &[u8], b"PRIORITY=6"];
+    log.write_entry(&first_entry, None).unwrap();
+
+    let second_entry = [b"MESSAGE=mono-second" as &[u8], b"PRIORITY=6"];
+    let ts = EntryTimestamps::default().with_entry_monotonic_usec(1);
+    log.write_entry_with_timestamps(&second_entry, ts).unwrap();
+    log.sync().unwrap();
+
+    let rows = read_journal_json(&journal_file_path(&dir));
+
+    let mut first_mono = None;
+    let mut second_mono = None;
+    for row in rows {
+        match row.get("MESSAGE").and_then(|v| v.as_str()) {
+            Some("mono-first") => first_mono = parse_u64_field(&row, "__MONOTONIC_TIMESTAMP"),
+            Some("mono-second") => second_mono = parse_u64_field(&row, "__MONOTONIC_TIMESTAMP"),
+            _ => {}
+        }
+    }
+
+    let first_mono = first_mono.expect("missing first entry monotonic timestamp");
+    let second_mono = second_mono.expect("missing second entry monotonic timestamp");
+    assert!(
+        second_mono > first_mono,
+        "second monotonic timestamp must be strictly greater ({} !> {})",
+        second_mono,
+        first_mono
+    );
+}
+
+#[test]
+fn test_source_timestamp_is_preserved_with_entry_override() {
+    let dir = TempDir::new().unwrap();
+    let config = test_config();
+    let mut log = Log::new(dir.path(), config).unwrap();
+
+    let source_ts = 123_456_u64;
+    let entry = [b"MESSAGE=source-ts" as &[u8], b"PRIORITY=6"];
+    let ts = EntryTimestamps::default()
+        .with_entry_realtime_usec(1)
+        .with_source_realtime_usec(source_ts);
+    log.write_entry_with_timestamps(&entry, ts).unwrap();
+    log.sync().unwrap();
+
+    let rows = read_journal_json(&journal_file_path(&dir));
+    let row = rows
+        .iter()
+        .find(|row| row.get("MESSAGE").and_then(|v| v.as_str()) == Some("source-ts"))
+        .expect("missing source-ts entry");
+
+    let stored_source_ts = parse_u64_field(row, "_SOURCE_REALTIME_TIMESTAMP")
+        .expect("missing _SOURCE_REALTIME_TIMESTAMP");
+    assert_eq!(stored_source_ts, source_ts);
+}
+
+#[test]
+fn test_monotonic_override_remains_strict_after_restart() {
+    let dir = TempDir::new().unwrap();
+    let config = test_config();
+
+    let first_monotonic = 1_000_000_u64;
+    {
+        let mut log = Log::new(dir.path(), config).unwrap();
+        let first = [b"MESSAGE=restart-first" as &[u8], b"PRIORITY=6"];
+        let ts = EntryTimestamps::default()
+            .with_entry_realtime_usec(first_monotonic)
+            .with_entry_monotonic_usec(first_monotonic);
+        log.write_entry_with_timestamps(&first, ts).unwrap();
+        log.sync().unwrap();
+    }
+
+    {
+        let mut log = Log::new(dir.path(), test_config()).unwrap();
+        let second = [b"MESSAGE=restart-second" as &[u8], b"PRIORITY=6"];
+        // Equal monotonic override must still be bumped above the persisted tail value.
+        let ts = EntryTimestamps::default()
+            .with_entry_realtime_usec(1)
+            .with_entry_monotonic_usec(first_monotonic);
+        log.write_entry_with_timestamps(&second, ts).unwrap();
+        log.sync().unwrap();
+    }
+
+    let mut first_seen = None;
+    let mut second_seen = None;
+
+    for file in journal_file_paths(&dir) {
+        for row in read_journal_json(&file) {
+            match row.get("MESSAGE").and_then(|v| v.as_str()) {
+                Some("restart-first") => {
+                    first_seen = parse_u64_field(&row, "__MONOTONIC_TIMESTAMP");
+                }
+                Some("restart-second") => {
+                    second_seen = parse_u64_field(&row, "__MONOTONIC_TIMESTAMP");
+                }
+                _ => {}
+            }
+        }
+    }
+
+    let first_seen = first_seen.expect("missing first entry monotonic timestamp");
+    let second_seen = second_seen.expect("missing second entry monotonic timestamp");
+    assert!(
+        second_seen > first_seen,
+        "second monotonic timestamp must be strictly greater after restart ({} !> {})",
+        second_seen,
+        first_seen
     );
 }

@@ -44,6 +44,14 @@ func (m *Manager) makeMethodFuncHandler(moduleName, methodID string) func(functi
 		}
 		jobParam := buildJobParamConfig(jobs)
 		jobValues := paramValues(argValues, payload, paramJob)
+		if len(jobValues) > 1 {
+			m.respondError(fn, 400, "parameter '%s' expects a single value", paramJob)
+			return
+		}
+		if len(jobValues) == 1 && !slices.Contains(jobs, jobValues[0]) {
+			m.respondError(fn, 404, "unknown job '%s', available: %v", jobValues[0], jobs)
+			return
+		}
 		resolvedJob := funcapi.ResolveParam(jobParam, jobValues)
 		jobName := resolvedJob.GetOne()
 		if jobName == "" {
@@ -127,7 +135,7 @@ func (m *Manager) makeMethodFuncHandler(moduleName, methodID string) func(functi
 		if methodCfg.UpdateEvery > 1 {
 			updateEvery = methodCfg.UpdateEvery
 		}
-		m.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery)
+		m.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery, methodCfg.ResponseType)
 	}
 }
 
@@ -155,7 +163,7 @@ func (m *Manager) handleMethodFuncInfo(moduleName, methodID string, fn functions
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          200,
-		"type":            "table",
+		"type":            resolveResponseType("", methodCfg.ResponseType),
 		"has_history":     false,
 		"help":            help,
 		"accepted_params": buildAcceptedParams(methodParams),
@@ -166,7 +174,7 @@ func (m *Manager) handleMethodFuncInfo(moduleName, methodID string, fn functions
 }
 
 // respondWithParams wraps the module's data response with current required_params
-func (m *Manager) respondWithParams(fn functions.Function, moduleName string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
+func (m *Manager) respondWithParams(fn functions.Function, moduleName string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string) {
 	// Nil guard: if module returns nil, treat as internal error
 	if dataResp == nil {
 		m.respondError(fn, 500, "internal error: module returned nil response")
@@ -189,7 +197,7 @@ func (m *Manager) respondWithParams(fn functions.Function, moduleName string, da
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          dataResp.Status,
-		"type":            "table",
+		"type":            resolveResponseType(dataResp.ResponseType, methodType),
 		"has_history":     false,
 		"help":            dataResp.Help,
 		"accepted_params": buildAcceptedParams(paramsForResponse),
@@ -228,6 +236,16 @@ func (m *Manager) respondError(fn functions.Function, status int, format string,
 		"errorMessage": fmt.Sprintf(format, args...),
 	}
 	m.respondJSON(fn, resp)
+}
+
+func resolveResponseType(dataType, methodType string) string {
+	if dataType != "" {
+		return dataType
+	}
+	if methodType != "" {
+		return methodType
+	}
+	return "table"
 }
 
 // buildRequiredParams creates the required_params array with current job list
@@ -342,6 +360,9 @@ func parseArgsParams(args []string) map[string][]string {
 			continue
 		}
 		parts := strings.SplitN(arg, ":", 2)
+		if len(parts) != 2 {
+			parts = strings.SplitN(arg, "=", 2)
+		}
 		if len(parts) != 2 {
 			continue
 		}
@@ -545,7 +566,7 @@ func (m *Manager) makeJobMethodFuncHandler(moduleName, jobName, methodID string)
 		if methodCfg.UpdateEvery > 1 {
 			updateEvery = methodCfg.UpdateEvery
 		}
-		m.respondJobMethodWithParams(fn, dataResp, methodParams, updateEvery)
+		m.respondJobMethodWithParams(fn, dataResp, methodParams, updateEvery, methodCfg.ResponseType)
 	}
 }
 
@@ -572,7 +593,7 @@ func (m *Manager) handleJobMethodFuncInfo(moduleName, jobName, methodID string, 
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          200,
-		"type":            "table",
+		"type":            resolveResponseType("", methodCfg.ResponseType),
 		"has_history":     false,
 		"help":            help,
 		"accepted_params": buildJobMethodAcceptedParams(methodParams),
@@ -598,7 +619,7 @@ func (m *Manager) resolveJobMethodParams(ctx context.Context, methodCfg *funcapi
 }
 
 // respondJobMethodWithParams wraps the module's data response for job-specific methods
-func (m *Manager) respondJobMethodWithParams(fn functions.Function, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
+func (m *Manager) respondJobMethodWithParams(fn functions.Function, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string) {
 	if dataResp == nil {
 		m.respondError(fn, 500, "internal error: module returned nil response")
 		return
@@ -618,7 +639,7 @@ func (m *Manager) respondJobMethodWithParams(fn functions.Function, dataResp *fu
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          dataResp.Status,
-		"type":            "table",
+		"type":            resolveResponseType(dataResp.ResponseType, methodType),
 		"has_history":     false,
 		"help":            dataResp.Help,
 		"accepted_params": buildJobMethodAcceptedParams(paramsForResponse),

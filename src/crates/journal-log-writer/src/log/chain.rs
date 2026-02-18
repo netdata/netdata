@@ -47,15 +47,17 @@ pub(super) struct OwnedChain {
 }
 
 impl OwnedChain {
-    pub(super) fn new(path: PathBuf, machine_id: Uuid) -> Result<Self> {
+    pub(super) fn new(path: PathBuf, machine_id: Uuid, machine_id_suffix: bool) -> Result<Self> {
         #[cfg(debug_assertions)]
         {
             use std::os::unix::ffi::OsStrExt;
 
             debug_assert!(path.exists() && path.is_dir());
 
-            let filename = path.file_name().unwrap().as_bytes();
-            debug_assert_eq!(Ok(machine_id), Uuid::try_parse_ascii(filename));
+            if machine_id_suffix {
+                let filename = path.file_name().unwrap().as_bytes();
+                debug_assert_eq!(Ok(machine_id), Uuid::try_parse_ascii(filename));
+            }
         }
 
         let mut chain = Self {
@@ -111,6 +113,28 @@ impl OwnedChain {
             Ok(None)
         } else {
             Ok(Some(Microseconds::new(realtime)))
+        }
+    }
+
+    pub(super) fn tail_monotonic_for_boot(&self, boot_id: Uuid) -> Result<Option<u64>> {
+        let Some(file) = self.inner.back() else {
+            return Ok(None);
+        };
+
+        let window_size = 4096;
+        let jf = JournalFile::<Mmap>::open(file, window_size)?;
+        let header = jf.journal_header_ref();
+
+        let tail_boot_id = Uuid::from_bytes(header.tail_entry_boot_id);
+        if tail_boot_id != boot_id {
+            return Ok(None);
+        }
+
+        let monotonic = header.tail_entry_monotonic;
+        if monotonic == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(monotonic))
         }
     }
 

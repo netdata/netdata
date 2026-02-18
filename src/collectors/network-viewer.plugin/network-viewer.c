@@ -28,6 +28,78 @@ static SPAWN_SERVER *spawn_srv = NULL;
 
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Shows active network connections with protocol details, states, addresses, ports, and performance metrics."
+#define NETWORK_TOPOLOGY_VIEWER_FUNCTION "topology:network-viewer"
+#define NETWORK_TOPOLOGY_VIEWER_HELP "Shows live L7 topology from observed local sockets, including process and endpoint relations."
+// Keep in sync with the topology schema contract used across topology producers.
+#define NETWORK_TOPOLOGY_SCHEMA_VERSION "2.0"
+#define NETWORK_TOPOLOGY_SOURCE "network-viewer"
+#define NETWORK_TOPOLOGY_LAYER "l7"
+
+#define NV_TOPOLOGY_USERNAME_MAX 128
+#define NV_TOPOLOGY_CMDLINE_MAX 512
+#define NV_TOPOLOGY_KEY_MAX 1024
+
+typedef struct {
+    pid_t pid;
+    uid_t uid;
+    uint64_t net_ns_inode;
+    uint64_t sockets;
+    char process[TASK_COMM_LEN + 1];
+    char username[NV_TOPOLOGY_USERNAME_MAX];
+    char namespace_type[16];
+    char local_ip[INET6_ADDRSTRLEN];
+    char local_address_space[16];
+    char cmdline[NV_TOPOLOGY_CMDLINE_MAX];
+} NV_PROCESS_ACTOR;
+
+typedef struct {
+    uint64_t sockets;
+    char ip[INET6_ADDRSTRLEN];
+    char address_space[16];
+} NV_REMOTE_ACTOR;
+
+typedef struct {
+    uint64_t sockets;
+    char ip[INET6_ADDRSTRLEN];
+    char address_space[16];
+} NV_LOCAL_IP;
+
+typedef struct {
+    uint64_t pid;
+    uint64_t uid;
+    uint64_t net_ns_inode;
+    uint64_t sockets;
+    uint64_t retransmissions;
+    uint32_t max_rtt_usec;
+    uint32_t max_rcv_rtt_usec;
+    uint16_t local_port;
+    uint16_t remote_port;
+    char process[TASK_COMM_LEN + 1];
+    char username[NV_TOPOLOGY_USERNAME_MAX];
+    char namespace_type[16];
+    char protocol[8];
+    char protocol_family[8];
+    char direction[16];
+    char state[32];
+    char local_ip[INET6_ADDRSTRLEN];
+    char remote_ip[INET6_ADDRSTRLEN];
+    char local_address_space[16];
+    char remote_address_space[16];
+    char port_name[64];
+    char cmdline[NV_TOPOLOGY_CMDLINE_MAX];
+} NV_TOPOLOGY_LINK;
+
+typedef struct {
+    DICTIONARY *process_actors;
+    DICTIONARY *remote_actors;
+    DICTIONARY *local_ips;
+    DICTIONARY *links;
+    usec_t now_ut;
+    uint64_t sockets_total;
+    uint64_t skipped_sockets;
+    char hostname[256];
+    char machine_guid[128];
+} NV_TOPOLOGY_CONTEXT;
 
 #define SIMPLE_HASHTABLE_VALUE_TYPE LOCAL_SOCKET *
 #define SIMPLE_HASHTABLE_NAME _AGGREGATED_SOCKETS
@@ -85,6 +157,98 @@ struct sockets_stats {
         uint32_t tcpi_total_retrans;
     } max;
 };
+
+static inline const char *network_viewer_machine_guid(void) {
+    const char *guid = getenv("NETDATA_REGISTRY_UNIQUE_ID");
+    return (guid && *guid) ? guid : NULL;
+}
+
+static inline const char *socket_protocol_name(uint16_t protocol) {
+    return (protocol == IPPROTO_UDP) ? "udp" : "tcp";
+}
+
+static inline const char *socket_protocol_family_name(const LOCAL_SOCKET *n) {
+    if(is_local_socket_ipv46(n))
+        return "ipv46";
+
+    if(n->local.family == AF_INET)
+        return "ipv4";
+
+    if(n->local.family == AF_INET6)
+        return "ipv6";
+
+    return "unknown";
+}
+
+static bool socket_endpoint_to_ip_text(const struct socket_endpoint *ep, char *dst) {
+    if(ep->family == AF_INET) {
+        ipv4_address_to_txt(ep->ip.ipv4, dst);
+        return true;
+    }
+
+    if(ep->family == AF_INET6) {
+        ipv6_address_to_txt(&ep->ip.ipv6, dst);
+        return true;
+    }
+
+    dst[0] = '\0';
+    return false;
+}
+
+static void topology_add_single_item_string_array(BUFFER *wb, const char *key, const char *value) {
+    if(!value || !*value)
+        return;
+
+    if(strcmp(key, "ip_addresses") == 0 && strcmp(value, "*") == 0)
+        return;
+
+    buffer_json_member_add_array(wb, key);
+    {
+        buffer_json_add_array_item_string(wb, value);
+    }
+    buffer_json_array_close(wb);
+}
+
+static void topology_add_process_match(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx, const NV_PROCESS_ACTOR *pa) {
+    buffer_json_member_add_object(wb, "match");
+    {
+        if(ctx->machine_guid[0])
+            buffer_json_member_add_string(wb, "netdata_machine_guid", ctx->machine_guid);
+
+        topology_add_single_item_string_array(wb, "hostnames", ctx->hostname);
+        topology_add_single_item_string_array(wb, "ip_addresses", pa->local_ip);
+    }
+    buffer_json_object_close(wb);
+}
+
+static void topology_add_host_match(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
+    buffer_json_member_add_object(wb, "match");
+    {
+        if(ctx->machine_guid[0])
+            buffer_json_member_add_string(wb, "netdata_machine_guid", ctx->machine_guid);
+
+        topology_add_single_item_string_array(wb, "hostnames", ctx->hostname);
+        buffer_json_member_add_array(wb, "ip_addresses");
+        {
+            NV_LOCAL_IP *lip;
+            dfe_start_read(ctx->local_ips, lip) {
+                if(!lip->ip[0]) continue;
+                buffer_json_add_array_item_string(wb, lip->ip);
+            }
+            dfe_done(lip);
+        }
+        buffer_json_array_close(wb);
+    }
+    buffer_json_object_close(wb);
+}
+
+static void topology_add_remote_match(BUFFER *wb, const char *ip) {
+    buffer_json_member_add_object(wb, "match");
+    {
+        topology_add_single_item_string_array(wb, "ip_addresses", ip);
+    }
+    buffer_json_object_close(wb);
+}
 
 static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOCKET *n, uint64_t proc_self_net_ns_inode, bool aggregated) {
     if(n->direction == SOCKET_DIRECTION_NONE)
@@ -404,6 +568,486 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
         t->cmdline = string_dup(t->cmdline);
         simple_hashtable_set_slot_AGGREGATED_SOCKETS(ht, sl, hash, t);
     }
+}
+
+static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, void *data) {
+    if(n->direction == SOCKET_DIRECTION_NONE)
+        return;
+
+    NV_TOPOLOGY_CONTEXT *ctx = data;
+    ctx->sockets_total++;
+
+    char local_ip[INET6_ADDRSTRLEN] = "";
+    char remote_ip[INET6_ADDRSTRLEN] = "";
+
+    if(is_local_socket_ipv46(n))
+        strncpyz(local_ip, "*", sizeof(local_ip) - 1);
+    else if(!socket_endpoint_to_ip_text(&n->local, local_ip))
+        return;
+
+    if(!local_sockets_is_zero_address(&n->remote))
+        socket_endpoint_to_ip_text(&n->remote, remote_ip);
+
+    const char *namespace_type;
+    if(n->net_ns_inode == ls->proc_self_net_ns_inode)
+        namespace_type = "system";
+    else if(n->net_ns_inode == 0)
+        namespace_type = "unknown";
+    else
+        namespace_type = "container";
+
+    const char *local_address_space = local_sockets_address_space(&n->local);
+    const char *remote_address_space = local_sockets_address_space(&n->remote);
+    const char *process_name = n->comm[0] ? n->comm : "[unknown]";
+    const char *cmdline = string2str(n->cmdline);
+
+    char username[NV_TOPOLOGY_USERNAME_MAX] = "[unknown]";
+    if(n->uid != UID_UNSET) {
+        CACHED_USERNAME cu = cached_username_get_by_uid(n->uid);
+        const char *cached_username = string2str(cu.username);
+        if(cached_username && *cached_username)
+            snprintf(username, sizeof(username), "%s", cached_username);
+        cached_username_release(cu);
+    }
+
+    if(local_ip[0] && strcmp(local_ip, "*") != 0) {
+        NV_LOCAL_IP *local_actor = dictionary_get(ctx->local_ips, local_ip);
+        if(!local_actor) {
+            NV_LOCAL_IP tmp = { 0 };
+            snprintf(tmp.ip, sizeof(tmp.ip), "%s", local_ip);
+            snprintf(tmp.address_space, sizeof(tmp.address_space), "%s", local_address_space);
+            local_actor = dictionary_set(ctx->local_ips, local_ip, &tmp, sizeof(tmp));
+        }
+        local_actor->sockets++;
+    }
+
+    char process_key[NV_TOPOLOGY_KEY_MAX];
+    snprintf(process_key, sizeof(process_key), "pid=%d|uid=%u|ns=%llu|comm=%s|local=%s",
+             n->pid,
+             (unsigned)n->uid,
+             (unsigned long long)n->net_ns_inode,
+             process_name,
+             local_ip);
+
+    NV_PROCESS_ACTOR *pa = dictionary_get(ctx->process_actors, process_key);
+    if(!pa) {
+        NV_PROCESS_ACTOR tmp = { 0 };
+        tmp.pid = n->pid;
+        tmp.uid = n->uid;
+        tmp.net_ns_inode = n->net_ns_inode;
+        snprintf(tmp.process, sizeof(tmp.process), "%s", process_name);
+        snprintf(tmp.username, sizeof(tmp.username), "%s", username);
+        snprintf(tmp.namespace_type, sizeof(tmp.namespace_type), "%s", namespace_type);
+        snprintf(tmp.local_ip, sizeof(tmp.local_ip), "%s", local_ip);
+        snprintf(tmp.local_address_space, sizeof(tmp.local_address_space), "%s", local_address_space);
+        if(cmdline && *cmdline)
+            snprintf(tmp.cmdline, sizeof(tmp.cmdline), "%s", cmdline);
+        pa = dictionary_set(ctx->process_actors, process_key, &tmp, sizeof(tmp));
+    }
+    pa->sockets++;
+
+    if(!remote_ip[0]) {
+        ctx->skipped_sockets++;
+        return;
+    }
+
+    NV_REMOTE_ACTOR *ra = dictionary_get(ctx->remote_actors, remote_ip);
+    if(!ra) {
+        NV_REMOTE_ACTOR tmp = { 0 };
+        snprintf(tmp.ip, sizeof(tmp.ip), "%s", remote_ip);
+        snprintf(tmp.address_space, sizeof(tmp.address_space), "%s", remote_address_space);
+        ra = dictionary_set(ctx->remote_actors, remote_ip, &tmp, sizeof(tmp));
+    }
+    ra->sockets++;
+
+    const struct socket_endpoint *server_endpoint = NULL;
+    switch(n->direction) {
+        case SOCKET_DIRECTION_LISTEN:
+        case SOCKET_DIRECTION_INBOUND:
+        case SOCKET_DIRECTION_LOCAL_INBOUND:
+            server_endpoint = &n->local;
+            break;
+
+        case SOCKET_DIRECTION_OUTBOUND:
+        case SOCKET_DIRECTION_LOCAL_OUTBOUND:
+            server_endpoint = &n->remote;
+            break;
+
+        default:
+            break;
+    }
+
+    char port_name[64] = "[unknown]";
+    if(server_endpoint) {
+        STRING *serv = system_servicenames_cache_lookup(sc, server_endpoint->port, server_endpoint->protocol);
+        const char *tmp_name = string2str(serv);
+        if(tmp_name && *tmp_name)
+            snprintf(port_name, sizeof(port_name), "%s", tmp_name);
+    }
+
+    char link_key[NV_TOPOLOGY_KEY_MAX];
+    snprintf(link_key, sizeof(link_key), "pid=%d|uid=%u|ns=%llu|local=%s|remote=%s|proto=%u|dir=%u|state=%u|lport=%u|rport=%u",
+             n->pid,
+             (unsigned)n->uid,
+             (unsigned long long)n->net_ns_inode,
+             local_ip,
+             remote_ip,
+             (unsigned)n->local.protocol,
+             (unsigned)n->direction,
+             (unsigned)n->state,
+             n->local.port,
+             n->remote.port);
+
+    NV_TOPOLOGY_LINK *link = dictionary_get(ctx->links, link_key);
+    if(!link) {
+        NV_TOPOLOGY_LINK tmp = { 0 };
+        tmp.pid = n->pid;
+        tmp.uid = n->uid;
+        tmp.net_ns_inode = n->net_ns_inode;
+        tmp.local_port = n->local.port;
+        tmp.remote_port = n->remote.port;
+        snprintf(tmp.process, sizeof(tmp.process), "%s", process_name);
+        snprintf(tmp.username, sizeof(tmp.username), "%s", username);
+        snprintf(tmp.namespace_type, sizeof(tmp.namespace_type), "%s", namespace_type);
+        snprintf(tmp.protocol, sizeof(tmp.protocol), "%s", socket_protocol_name(n->local.protocol));
+        snprintf(tmp.protocol_family, sizeof(tmp.protocol_family), "%s", socket_protocol_family_name(n));
+        snprintf(tmp.direction, sizeof(tmp.direction), "%s", SOCKET_DIRECTION_2str(n->direction));
+        snprintf(tmp.state, sizeof(tmp.state), "%s",
+                 n->local.protocol == IPPROTO_TCP ? TCP_STATE_2str(n->state) : "stateless");
+        snprintf(tmp.local_ip, sizeof(tmp.local_ip), "%s", local_ip);
+        snprintf(tmp.remote_ip, sizeof(tmp.remote_ip), "%s", remote_ip);
+        snprintf(tmp.local_address_space, sizeof(tmp.local_address_space), "%s", local_address_space);
+        snprintf(tmp.remote_address_space, sizeof(tmp.remote_address_space), "%s", remote_address_space);
+        snprintf(tmp.port_name, sizeof(tmp.port_name), "%s", port_name);
+        if(cmdline && *cmdline)
+            snprintf(tmp.cmdline, sizeof(tmp.cmdline), "%s", cmdline);
+        link = dictionary_set(ctx->links, link_key, &tmp, sizeof(tmp));
+    }
+
+    link->sockets++;
+    link->retransmissions += n->info.tcp.tcpi_total_retrans;
+    if(link->max_rtt_usec < n->info.tcp.tcpi_rtt)
+        link->max_rtt_usec = n->info.tcp.tcpi_rtt;
+    if(link->max_rcv_rtt_usec < n->info.tcp.tcpi_rcv_rtt)
+        link->max_rcv_rtt_usec = n->info.tcp.tcpi_rcv_rtt;
+}
+
+static void network_viewer_topology_function(
+    const char *transaction, char *function, usec_t *stop_monotonic_ut __maybe_unused,
+    bool *cancelled __maybe_unused, BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused) {
+
+    time_t now_s = now_realtime_sec();
+    usec_t now_ut = now_realtime_usec();
+    bool info_only = false;
+
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "topology");
+    buffer_json_member_add_time_t(wb, "update_every", 5);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", NETWORK_TOPOLOGY_VIEWER_HELP);
+    buffer_json_member_add_array(wb, "accepted_params");
+    buffer_json_array_close(wb);
+    buffer_json_member_add_array(wb, "required_params");
+    buffer_json_array_close(wb);
+
+    char function_copy[strlen(function) + 1];
+    memcpy(function_copy, function, sizeof(function_copy));
+    char *words[1024];
+    size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
+    for(size_t i = 1; i < num_words ;i++) {
+        char *param = get_word(words, num_words, i);
+        if(strcmp(param, "info") == 0) {
+            info_only = true;
+            break;
+        }
+    }
+
+    NV_TOPOLOGY_CONTEXT ctx = {
+        .now_ut = now_ut,
+    };
+
+    if(!info_only) {
+        ctx.process_actors = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_PROCESS_ACTOR));
+        ctx.remote_actors = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_REMOTE_ACTOR));
+        ctx.local_ips = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_LOCAL_IP));
+        ctx.links = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_TOPOLOGY_LINK));
+
+        if(ctx.process_actors && ctx.remote_actors && ctx.local_ips && ctx.links) {
+            if(!os_hostname(ctx.hostname, sizeof(ctx.hostname), netdata_configured_host_prefix))
+                snprintf(ctx.hostname, sizeof(ctx.hostname), "%s", "localhost");
+
+            const char *machine_guid = network_viewer_machine_guid();
+            if(machine_guid)
+                snprintf(ctx.machine_guid, sizeof(ctx.machine_guid), "%s", machine_guid);
+
+            LS_STATE ls = {
+                .config = {
+                    .listening = true,
+                    .inbound = true,
+                    .outbound = true,
+                    .local = true,
+                    .tcp4 = true,
+                    .tcp6 = true,
+                    .udp4 = true,
+                    .udp6 = true,
+                    .pid = true,
+                    .uid = true,
+                    .cmdline = true,
+                    .comm = true,
+                    .namespaces = true,
+                    .tcp_info = true,
+                    .max_errors = 10,
+                    .max_concurrent_namespaces = 5,
+                    .cb = local_sockets_cb_to_topology,
+                    .data = &ctx,
+                },
+#if defined(LOCAL_SOCKETS_USE_SETNS)
+                .spawn_server = spawn_srv,
+#endif
+                .stats = { 0 },
+                .sockets_hashtable = { 0 },
+                .local_ips_hashtable = { 0 },
+                .listening_ports_hashtable = { 0 },
+            };
+
+            local_sockets_process(&ls);
+
+            buffer_json_member_add_object(wb, "data");
+            {
+                size_t process_actor_count = dictionary_entries(ctx.process_actors);
+                size_t remote_actor_count = dictionary_entries(ctx.remote_actors);
+                size_t link_count = dictionary_entries(ctx.links);
+                size_t local_ip_count = dictionary_entries(ctx.local_ips);
+
+                buffer_json_member_add_string(wb, "schema_version", NETWORK_TOPOLOGY_SCHEMA_VERSION);
+                buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
+                buffer_json_member_add_string(wb, "layer", NETWORK_TOPOLOGY_LAYER);
+                buffer_json_member_add_string(wb, "agent_id", ctx.machine_guid[0] ? ctx.machine_guid : ctx.hostname);
+                buffer_json_member_add_datetime_rfc3339(wb, "collected_at", ctx.now_ut, true);
+
+                buffer_json_member_add_array(wb, "actors");
+                {
+                    buffer_json_add_array_item_object(wb);
+                    {
+                        buffer_json_member_add_string(wb, "actor_type", "host");
+                        buffer_json_member_add_string(wb, "layer", "l3");
+                        buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
+                        topology_add_host_match(wb, &ctx);
+
+                        buffer_json_member_add_object(wb, "attributes");
+                        {
+                            buffer_json_member_add_string(wb, "hostname", ctx.hostname);
+                            buffer_json_member_add_uint64(wb, "local_ip_count", local_ip_count);
+                            buffer_json_member_add_uint64(wb, "observed_sockets", ctx.sockets_total);
+                        }
+                        buffer_json_object_close(wb);
+
+                        buffer_json_member_add_object(wb, "labels");
+                        {
+                            buffer_json_member_add_string(wb, "hostname", ctx.hostname);
+                            if(ctx.machine_guid[0])
+                                buffer_json_member_add_string(wb, "machine_guid", ctx.machine_guid);
+                            buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
+                        }
+                        buffer_json_object_close(wb);
+                    }
+                    buffer_json_object_close(wb);
+
+                    NV_PROCESS_ACTOR *pa;
+                    dfe_start_read(ctx.process_actors, pa) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "actor_type", "process");
+                            buffer_json_member_add_string(wb, "layer", NETWORK_TOPOLOGY_LAYER);
+                            buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
+                            topology_add_process_match(wb, &ctx, pa);
+
+                            buffer_json_member_add_object(wb, "parent_match");
+                            {
+                                if(ctx.machine_guid[0])
+                                    buffer_json_member_add_string(wb, "netdata_machine_guid", ctx.machine_guid);
+                                topology_add_single_item_string_array(wb, "hostnames", ctx.hostname);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "attributes");
+                            {
+                                buffer_json_member_add_uint64(wb, "pid", pa->pid);
+                                buffer_json_member_add_uint64(wb, "uid", pa->uid);
+                                buffer_json_member_add_uint64(wb, "net_ns_inode", pa->net_ns_inode);
+                                buffer_json_member_add_uint64(wb, "socket_count", pa->sockets);
+                                buffer_json_member_add_string(wb, "local_ip", pa->local_ip);
+                                buffer_json_member_add_string(wb, "local_address_space", pa->local_address_space);
+                                if(pa->cmdline[0])
+                                    buffer_json_member_add_string(wb, "cmdline", pa->cmdline);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "labels");
+                            {
+                                buffer_json_member_add_string(wb, "process", pa->process);
+                                buffer_json_member_add_string(wb, "user", pa->username);
+                                buffer_json_member_add_string(wb, "namespace", pa->namespace_type);
+                                buffer_json_member_add_string(wb, "local_address_space", pa->local_address_space);
+                            }
+                            buffer_json_object_close(wb);
+                        }
+                        buffer_json_object_close(wb);
+                    }
+                    dfe_done(pa);
+
+                    NV_REMOTE_ACTOR *ra;
+                    dfe_start_read(ctx.remote_actors, ra) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "actor_type", "ip");
+                            buffer_json_member_add_string(wb, "layer", "l3");
+                            buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
+                            topology_add_remote_match(wb, ra->ip);
+
+                            buffer_json_member_add_object(wb, "attributes");
+                            {
+                                buffer_json_member_add_uint64(wb, "socket_count", ra->sockets);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "labels");
+                            {
+                                buffer_json_member_add_string(wb, "address_space", ra->address_space);
+                            }
+                            buffer_json_object_close(wb);
+                        }
+                        buffer_json_object_close(wb);
+                    }
+                    dfe_done(ra);
+                }
+                buffer_json_array_close(wb);
+
+                buffer_json_member_add_array(wb, "links");
+                {
+                    NV_TOPOLOGY_LINK *link;
+                    dfe_start_read(ctx.links, link) {
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "layer", NETWORK_TOPOLOGY_LAYER);
+                            buffer_json_member_add_string(wb, "protocol", link->protocol);
+                            buffer_json_member_add_string(wb, "direction", link->direction);
+                            buffer_json_member_add_string(wb, "state", link->state);
+                            buffer_json_member_add_datetime_rfc3339(wb, "discovered_at", ctx.now_ut, true);
+                            buffer_json_member_add_datetime_rfc3339(wb, "last_seen", ctx.now_ut, true);
+
+                            buffer_json_member_add_object(wb, "src");
+                            {
+                                buffer_json_member_add_object(wb, "match");
+                                {
+                                    if(ctx.machine_guid[0])
+                                        buffer_json_member_add_string(wb, "netdata_machine_guid", ctx.machine_guid);
+                                    topology_add_single_item_string_array(wb, "hostnames", ctx.hostname);
+                                    topology_add_single_item_string_array(wb, "ip_addresses", link->local_ip);
+                                }
+                                buffer_json_object_close(wb);
+
+                                buffer_json_member_add_object(wb, "attributes");
+                                {
+                                    buffer_json_member_add_string(wb, "actor_type", "process");
+                                    buffer_json_member_add_uint64(wb, "pid", link->pid);
+                                    buffer_json_member_add_uint64(wb, "uid", link->uid);
+                                    buffer_json_member_add_uint64(wb, "net_ns_inode", link->net_ns_inode);
+                                    buffer_json_member_add_string(wb, "process", link->process);
+                                    buffer_json_member_add_string(wb, "user", link->username);
+                                    buffer_json_member_add_string(wb, "namespace", link->namespace_type);
+                                    buffer_json_member_add_string(wb, "address_space", link->local_address_space);
+                                    buffer_json_member_add_uint64(wb, "port", link->local_port);
+                                    buffer_json_member_add_string(wb, "port_name", link->port_name);
+                                    buffer_json_member_add_string(wb, "protocol_family", link->protocol_family);
+                                    if(link->cmdline[0])
+                                        buffer_json_member_add_string(wb, "cmdline", link->cmdline);
+                                }
+                                buffer_json_object_close(wb);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "dst");
+                            {
+                                topology_add_remote_match(wb, link->remote_ip);
+
+                                buffer_json_member_add_object(wb, "attributes");
+                                {
+                                    buffer_json_member_add_string(wb, "address_space", link->remote_address_space);
+                                    buffer_json_member_add_uint64(wb, "port", link->remote_port);
+                                }
+                                buffer_json_object_close(wb);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "metrics");
+                            {
+                                buffer_json_member_add_uint64(wb, "socket_count", link->sockets);
+                                buffer_json_member_add_uint64(wb, "retransmissions", link->retransmissions);
+                                buffer_json_member_add_double(wb, "rtt_ms_max", (double)link->max_rtt_usec / (double)USEC_PER_MS);
+                                buffer_json_member_add_double(wb, "recv_rtt_ms_max", (double)link->max_rcv_rtt_usec / (double)USEC_PER_MS);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "labels");
+                            {
+                                buffer_json_member_add_string(wb, "protocol", link->protocol);
+                                buffer_json_member_add_string(wb, "direction", link->direction);
+                                buffer_json_member_add_string(wb, "state", link->state);
+                                buffer_json_member_add_string(wb, "process", link->process);
+                                buffer_json_member_add_string(wb, "user", link->username);
+                                buffer_json_member_add_string(wb, "namespace", link->namespace_type);
+                                buffer_json_member_add_string(wb, "protocol_family", link->protocol_family);
+                                buffer_json_member_add_string(wb, "local_address_space", link->local_address_space);
+                                buffer_json_member_add_string(wb, "remote_address_space", link->remote_address_space);
+                                buffer_json_member_add_string(wb, "port_name", link->port_name);
+                            }
+                            buffer_json_object_close(wb);
+                        }
+                        buffer_json_object_close(wb);
+                    }
+                    dfe_done(link);
+                }
+                buffer_json_array_close(wb);
+
+                buffer_json_member_add_object(wb, "stats");
+                {
+                    buffer_json_member_add_uint64(wb, "sockets_total", ctx.sockets_total);
+                    buffer_json_member_add_uint64(wb, "sockets_without_remote_endpoint", ctx.skipped_sockets);
+                    buffer_json_member_add_uint64(wb, "local_process_actors", process_actor_count);
+                    buffer_json_member_add_uint64(wb, "remote_ip_actors", remote_actor_count);
+                    buffer_json_member_add_uint64(wb, "links_total", link_count);
+                }
+                buffer_json_object_close(wb);
+            }
+            buffer_json_object_close(wb);
+        }
+    }
+
+    if(ctx.links)
+        dictionary_destroy(ctx.links);
+    if(ctx.local_ips)
+        dictionary_destroy(ctx.local_ips);
+    if(ctx.remote_actors)
+        dictionary_destroy(ctx.remote_actors);
+    if(ctx.process_actors)
+        dictionary_destroy(ctx.process_actors);
+
+    buffer_json_member_add_time_t(wb, "expires", now_s + 1);
+    buffer_json_finalize(wb);
+
+    netdata_mutex_lock(&stdout_mutex);
+    wb->response_code = HTTP_RESP_OK;
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->expires = now_s + 1;
+    pluginsd_function_result_to_stdout(transaction, wb);
+    netdata_mutex_unlock(&stdout_mutex);
 }
 
 static int local_sockets_compar(const void *a, const void *b) {
@@ -992,6 +1636,10 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 //        for(int i = 0; i < 100; i++) {
             bool cancelled = false;
             usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
+            char topo_buf[] = "topology:network-viewer";
+            network_viewer_topology_function("123", topo_buf, &stop_monotonic_ut, &cancelled,
+                                             NULL, HTTP_ACCESS_ALL, NULL, NULL);
+
             char buf[] = "network-connections sockets:aggregated";
             network_viewer_function("123", buf, &stop_monotonic_ut, &cancelled,
                                      NULL, HTTP_ACCESS_ALL, NULL, NULL);
@@ -1008,6 +1656,12 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ----------------------------------------------------------------------------------------------------------------
 
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
+            NETWORK_TOPOLOGY_VIEWER_FUNCTION, 60,
+            NETWORK_TOPOLOGY_VIEWER_HELP,
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
+            RRDFUNCTIONS_PRIORITY_DEFAULT);
+
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
         NETWORK_CONNECTIONS_VIEWER_FUNCTION, 60,
         NETWORK_CONNECTIONS_VIEWER_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
@@ -1020,6 +1674,11 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     functions_evloop_add_function(wg, NETWORK_CONNECTIONS_VIEWER_FUNCTION,
                                   network_viewer_function,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
+                                  NULL);
+
+    functions_evloop_add_function(wg, NETWORK_TOPOLOGY_VIEWER_FUNCTION,
+                                  network_viewer_topology_function,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
                                   NULL);
 

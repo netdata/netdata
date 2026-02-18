@@ -9,6 +9,7 @@ type MethodConfig struct {
 	UpdateEvery    int           // Default UI refresh interval
 	Help           string        // Description for UI
 	RequireCloud   bool          // Indicates whether the method requires cloud connection
+	ResponseType   string        // Response schema type (default "table")
 	RequiredParams []ParamConfig // Required parameters for this method (including __sort if used)
 }
 
@@ -17,6 +18,7 @@ type FunctionResponse struct {
 	Status            int            // HTTP-like status code (200, 400, 403, 500, 503)
 	Message           string         // Error message (if Status != 200)
 	Help              string         // Help text for this response
+	ResponseType      string         // Override response schema type (defaults to MethodConfig.ResponseType)
 	Columns           map[string]any // Column definitions for the table
 	Data              any            // Row data: [][]any (array of arrays, ordered by column index)
 	DefaultSortColumn string         // Default sort column ID
