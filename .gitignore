@@ -115,6 +115,7 @@ docs/diagrams/plantuml.jar
 
 # python virtual environment
 venv/
+virtualenv/
 .python-version
 
 # debugging / profiling
@@ -145,6 +146,10 @@ test-driver
 **/tests/*_testdriver
 **/tests/*_testdriver.trs
 python.d/python-modules-installer.sh
+
+# integration generated files
+integrations/integrations.js
+integrations/integrations.json
 
 # documentation generated files
 docs/generator/src

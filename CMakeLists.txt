@@ -4015,6 +4015,12 @@ if(OS_WINDOWS)
 endif()
 
 #
+# Optional: render integration docs from metadata.yaml
+#
+
+include(NetdataRenderDocs)
+
+#
 # Include packaging logic
 #
 
