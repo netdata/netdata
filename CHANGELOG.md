@@ -4,6 +4,7 @@
 
 - Increase minimum language standards to C17 and C++17, and update to the latest versions of Protobuf and Abseil. ([#21574](https://github.com/netdata/netdata/issues/21574))
 - Drop Ubuntu 20.04 from CI and package builds. ([#21647](https://github.com/netdata/netdata/issues/21647))
+- Clarify default storage retention limits in docs ([#21780](https://github.com/netdata/netdata/issues/21780))
 
 ## [2.9.0] - 2026-02-16
 
