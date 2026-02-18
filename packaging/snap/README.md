@@ -1,6 +1,6 @@
 # Snap packaging
 
-This repository includes Snap packaging under `snap/`.
+This repository includes Snap packaging with a top-level `snapcraft.yaml` and helper scripts under `snap/`.
 
 ## Preferred build path (Ubuntu, non-root): managed mode (LXD)
 
