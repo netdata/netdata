@@ -62,7 +62,7 @@ parts:
       - libcurl4
       - libjson-c5
       - liblz4-1
-      - libprotobuf23
+      - libprotobuf32
       - libssl3
       - libuv1
       - libyaml-0-2
