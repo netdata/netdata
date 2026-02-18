@@ -2826,8 +2826,13 @@ static int ebpf_vfs_load_bpf(ebpf_module_t *em)
         vfs_bpf_obj = vfs_bpf__open();
         if (!vfs_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_vfs_load_and_attach(vfs_bpf_obj, em);
+            if (ret) {
+                vfs_bpf__destroy(vfs_bpf_obj);
+                vfs_bpf_obj = NULL;
+            }
+        }
     }
 #endif
 

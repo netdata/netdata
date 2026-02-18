@@ -545,8 +545,12 @@ static int ebpf_hardirq_load_bpf(ebpf_module_t *em)
             ret = -1;
         else {
             ret = ebpf_hardirq_load_and_attach(hardirq_bpf_obj);
-            if (!ret)
+            if (ret) {
+                hardirq_bpf__destroy(hardirq_bpf_obj);
+                hardirq_bpf_obj = NULL;
+            } else {
                 ebpf_hardirq_set_hash_table(hardirq_bpf_obj);
+            }
         }
     }
 #endif

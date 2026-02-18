@@ -1148,8 +1148,13 @@ static int ebpf_swap_load_bpf(ebpf_module_t *em)
         swap_bpf_obj = swap_bpf__open();
         if (!swap_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_swap_load_and_attach(swap_bpf_obj, em);
+            if (ret) {
+                swap_bpf__destroy(swap_bpf_obj);
+                swap_bpf_obj = NULL;
+            }
+        }
     }
 #endif
 

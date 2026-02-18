@@ -1697,8 +1697,13 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
         cachestat_bpf_obj = cachestat_bpf__open();
         if (!cachestat_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_cachestat_load_and_attach(cachestat_bpf_obj, em);
+            if (ret) {
+                cachestat_bpf__destroy(cachestat_bpf_obj);
+                cachestat_bpf_obj = NULL;
+            }
+        }
     }
 #endif
 

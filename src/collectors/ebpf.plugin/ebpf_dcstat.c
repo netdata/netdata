@@ -1466,8 +1466,13 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
         dc_bpf_obj = dc_bpf__open();
         if (!dc_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_dc_load_and_attach(dc_bpf_obj, em);
+            if (ret) {
+                dc_bpf__destroy(dc_bpf_obj);
+                dc_bpf_obj = NULL;
+            }
+        }
     }
 #endif
 

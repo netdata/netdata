@@ -367,6 +367,8 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
                         errors++;
                     } else {
                         if (ebpf_sync_load_and_attach(w->sync_obj, em, syscall, i)) {
+                            sync_bpf__destroy(w->sync_obj);
+                            w->sync_obj = NULL;
                             w->enabled = false;
                             errors++;
                         }

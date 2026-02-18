@@ -840,8 +840,12 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
             ret = -1;
         else {
             ret = ebpf_disk_load_and_attach(disk_bpf_obj);
-            if (!ret)
+            if (ret) {
+                disk_bpf__destroy(disk_bpf_obj);
+                disk_bpf_obj = NULL;
+            } else {
                 ebpf_disk_set_hash_table(disk_bpf_obj);
+            }
         }
     }
 #endif

@@ -261,8 +261,13 @@ static int ebpf_process_load_bpf(ebpf_module_t *em)
         process_bpf_obj = process_bpf__open();
         if (!process_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_process_load_and_attach(process_bpf_obj, em);
+            if (ret) {
+                process_bpf__destroy(process_bpf_obj);
+                process_bpf_obj = NULL;
+            }
+        }
     }
 #endif
 

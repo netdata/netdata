@@ -965,11 +965,14 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     em->load |= EBPF_LOAD_LEGACY;
 
     *obj = bpf_object__open_file(lpath, NULL);
-    if (!*obj)
+    if (!*obj) {
+        *obj = NULL;
         return NULL;
+    }
 
     if (libbpf_get_error(*obj)) {
         bpf_object__close(*obj);
+        *obj = NULL;
         return NULL;
     }
 
@@ -978,6 +981,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     if (bpf_object__load(*obj)) {
         netdata_log_error("ERROR: loading BPF object file failed %s\n", lpath);
         bpf_object__close(*obj);
+        *obj = NULL;
         return NULL;
     }
 

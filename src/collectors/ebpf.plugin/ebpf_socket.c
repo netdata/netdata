@@ -2978,8 +2978,13 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
         socket_bpf_obj = socket_bpf__open();
         if (!socket_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_socket_load_and_attach(socket_bpf_obj, em);
+            if (ret) {
+                socket_bpf__destroy(socket_bpf_obj);
+                socket_bpf_obj = NULL;
+            }
+        }
     }
 #endif
 
