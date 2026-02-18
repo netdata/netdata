@@ -8,6 +8,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+base64 = { workspace = true }
 opentelemetry-proto = { workspace = true, features = ["logs", "metrics", "with-serde"] }
 flatten-serde-json = { workspace = true }
 serde_json = { workspace = true }

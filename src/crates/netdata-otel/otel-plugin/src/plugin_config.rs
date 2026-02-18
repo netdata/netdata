@@ -38,35 +38,32 @@ impl Default for EndpointConfig {
     }
 }
 
-#[derive(Parser, Debug, Clone, Serialize, Deserialize)]
+#[derive(Parser, Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetricsConfig {
-    /// Print flattened metrics to stdout for debugging
-    #[arg(long = "otel-metrics-print-flattened")]
-    pub print_flattened: bool,
-
-    /// Number of samples to buffer for collection interval detection
-    #[arg(long = "otel-metrics-buffer-samples", default_value = "10")]
-    pub buffer_samples: usize,
-
-    /// Maximum number of new charts to create per collection interval
-    #[arg(long = "otel-metrics-throttle-charts", default_value = "100")]
-    pub throttle_charts: usize,
-
     /// Directory with configuration files for mapping OTEL metrics to Netdata charts
     #[arg(long = "otel-metrics-charts-configs-dir")]
     pub chart_configs_dir: Option<String>,
-}
 
-impl Default for MetricsConfig {
-    fn default() -> Self {
-        Self {
-            print_flattened: false,
-            buffer_samples: 10,
-            throttle_charts: 100,
-            chart_configs_dir: None,
-        }
-    }
+    /// Collection interval in seconds (1–3600). Default: 10.
+    #[arg(long = "otel-metrics-interval")]
+    pub interval_secs: Option<u64>,
+
+    /// Grace period in seconds before gap-filling begins. Default: 5 * interval.
+    #[arg(long = "otel-metrics-grace-period")]
+    pub grace_period_secs: Option<u64>,
+
+    /// Expiry duration in seconds after which charts with no data are removed. Default: 900.
+    #[arg(long = "otel-metrics-expiry")]
+    pub expiry_duration_secs: Option<u64>,
+
+    /// Maximum number of new charts that can be created per gRPC request. Default: 100.
+    #[arg(
+        long = "otel-metrics-max-new-charts-per-request",
+        default_value = "100"
+    )]
+    #[serde(default = "default_max_new_charts_per_request")]
+    pub max_new_charts_per_request: usize,
 }
 
 /// Parse a duration string for clap (e.g., "7 days", "1 week", "168h")
@@ -92,6 +89,10 @@ fn parse_bytesize(s: &str) -> Result<ByteSize, String> {
 /// Default value for entries_of_journal_file
 fn default_entries_of_journal_file() -> usize {
     50000
+}
+
+fn default_max_new_charts_per_request() -> usize {
+    100
 }
 
 #[derive(Parser, Debug, Clone, Serialize, Deserialize)]
@@ -217,10 +218,16 @@ impl PluginConfig {
                 .user_config_dir
                 .as_ref()
                 .map(|path| path.join("otel.yaml"))
-                .and_then(|path| {
-                    Self::from_yaml_file(&path)
-                        .with_context(|| format!("Loading user config from {}", path.display()))
-                        .ok()
+                .and_then(|path| match Self::from_yaml_file(&path) {
+                    Ok(config) => Some(config),
+                    Err(e) => {
+                        tracing::error!(
+                            "failed to load user config from {}: {:#}. Falling back to stock config.",
+                            path.display(),
+                            e
+                        );
+                        None
+                    }
                 });
 
             if let Some(config) = user_config {
@@ -231,24 +238,15 @@ impl PluginConfig {
                 .map(|p| p.join("otel.yaml"))
             {
                 Self::from_yaml_file(&stock_path).with_context(|| {
-                    format!("Loading stock config from {}", stock_path.display())
+                    format!("loading stock config from {}", stock_path.display())
                 })?
             } else {
-                anyhow::bail!("No configuration directories available");
+                anyhow::bail!("no configuration directories available");
             }
         } else {
             // load from CLI args
             Self::parse()
         };
-
-        // Validate configuration
-        if config.metrics.buffer_samples == 0 {
-            anyhow::bail!("buffer_samples must be greater than 0");
-        }
-
-        if config.metrics.throttle_charts == 0 {
-            anyhow::bail!("throttle_charts must be greater than 0");
-        }
 
         // Validate endpoint format (basic check)
         if !config.endpoint.path.contains(':') {
@@ -292,9 +290,9 @@ impl PluginConfig {
     pub fn from_yaml_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
         let contents = fs::read_to_string(path)
-            .with_context(|| format!("Failed to read config file: {}", path.display()))?;
+            .with_context(|| format!("failed to read config file: {}", path.display()))?;
         let config: PluginConfig = serde_yaml::from_str(&contents)
-            .with_context(|| format!("Failed to parse YAML config file: {}", path.display()))?;
+            .with_context(|| format!("failed to parse YAML config file: {}", path.display()))?;
         Ok(config)
     }
 }

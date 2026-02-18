@@ -1,3 +1,4 @@
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
 use opentelemetry_proto::tonic::{
@@ -42,9 +43,7 @@ fn json_from_any_value(any_value: &AnyValue) -> JsonValue {
             JsonValue::Array(values)
         }
         Some(Value::KvlistValue(kvl)) => JsonValue::Object(json_from_key_value_list(&kvl.values)),
-        Some(Value::BytesValue(_bytes)) => {
-            todo!("Add support for byte values");
-        }
+        Some(Value::BytesValue(bytes)) => JsonValue::String(BASE64.encode(bytes)),
         None => JsonValue::Null,
     }
 }

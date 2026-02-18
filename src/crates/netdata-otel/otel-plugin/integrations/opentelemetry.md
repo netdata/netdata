@@ -22,17 +22,35 @@ Module: otel
 
 ## Overview
 
-This plugin ingests OpenTelemetry metrics and logs via the OTLP/gRPC protocol.
+This plugin enables the Netdata Agent to receive OpenTelemetry metrics and logs
+via the OTLP/gRPC protocol from any compatible source — collectors, SDKs, or
+instrumented applications.
 
-It receives OTLP-formatted data from any OpenTelemetry-compatible source (collectors, SDKs, instrumented applications)
-and automatically creates Netdata charts for visualization and alerting.
+Metrics are automatically visualized as Netdata charts with full alerting support.
+Logs are stored in systemd-compatible journal files and can be explored through
+the Netdata Logs tab.
 
-For logs, it stores them in systemd-compatible journal files with configurable rotation and retention policies.
 
+The plugin listens on a configurable gRPC endpoint for incoming OTLP data.
 
-The plugin listens on a gRPC endpoint (default `127.0.0.1:4317`) for incoming OTLP data.
-It supports both metrics and logs signals. Metrics are mapped to Netdata charts using configurable
-mapping rules. Logs are stored in journal files for querying via the Netdata Logs tab.
+Incoming metrics are mapped to Netdata charts using YAML mapping rules placed in the
+chart configs directory (default `/etc/netdata/otel.d/v1/metrics/`). Each file can
+contain entries that match metrics by instrumentation scope and metric name, and control
+how data point attributes translate to chart instances and dimensions. Per-metric
+overrides for the collection interval and grace period are also supported. Without a
+matching rule, the plugin creates charts using default settings. Charts with no incoming
+data are automatically expired and removed.
+
+| Mapping file option | Description |
+|:--------------------|:------------|
+| `instrumentation_scope.name` | Regex to match the instrumentation scope name |
+| `instrumentation_scope.version` | Regex to match the instrumentation scope version |
+| `dimension_attribute_key` | Data point attribute whose value becomes the dimension name |
+| `interval_secs` | Per-metric collection interval override (1–3600 seconds) |
+| `grace_period_secs` | Per-metric grace period override |
+
+Incoming logs are written to journal files with configurable rotation and retention
+policies.
 
 
 This collector is only supported on the following platforms:
@@ -98,9 +116,11 @@ The plugin is configured via `otel.yaml` in the Netdata configuration directory.
 | endpoint.tls_cert_path | Path to TLS certificate file. Enables TLS when provided. |  | no |
 | endpoint.tls_key_path | Path to TLS private key file. Required when TLS certificate is provided. |  | no |
 | endpoint.tls_ca_cert_path | Path to TLS CA certificate file for client authentication. |  | no |
-| metrics.chart_configs_dir | Directory with YAML files for mapping OTLP metrics to Netdata charts. | otel.d/v1/metrics/ | no |
-| metrics.buffer_samples | Number of samples to buffer for collection interval detection. | 10 | no |
-| metrics.throttle_charts | Maximum number of new charts to create per collection interval. | 100 | no |
+| metrics.chart_configs_dir | Directory containing YAML files that define how OTLP metrics are mapped to Netdata charts. Each file can match metrics by instrumentation scope and name, set the dimension attribute key, and override timing parameters. The plugin ships stock mappings; user files in this directory take priority. | /etc/netdata/otel.d/v1/metrics/ | no |
+| metrics.interval_secs | Collection interval in seconds (1–3600). Defines the Netdata chart update frequency. | 10 | no |
+| metrics.grace_period_secs | Grace period in seconds. After the last data point, the plugin waits this long before gap-filling. | 60 | no |
+| metrics.expiry_duration_secs | Expiry duration in seconds. Charts with no data for this long are removed. | 900 | no |
+| metrics.max_new_charts_per_request | Maximum number of new charts that can be created per gRPC request. Limits cardinality explosion from high-cardinality label combinations. | 100 | no |
 | logs.journal_dir | Directory to store journal files for ingested logs. |  | yes |
 | logs.size_of_journal_file | Maximum file size before rotating to a new journal file. | 100MB | no |
 | logs.entries_of_journal_file | Maximum log entries per journal file. | 50000 | no |
@@ -137,12 +157,45 @@ Listen on default endpoint with default settings.
 endpoint:
   path: "127.0.0.1:4317"
 metrics:
-  chart_configs_dir: otel.d/v1/metrics/
-  buffer_samples: 10
+  chart_configs_dir: /etc/netdata/otel.d/v1/metrics/
+  interval_secs: 10
+  grace_period_secs: 60
+  expiry_duration_secs: 900
+  max_new_charts_per_request: 100
 logs:
   journal_dir: /var/log/netdata/otel-journals
 
 ```
+###### Metric mapping file
+
+Place YAML files like this in `/etc/netdata/otel.d/v1/metrics/` to control how
+OTLP metrics are mapped to Netdata charts. This example maps metrics from the
+OpenTelemetry Collector hostmetrics receiver.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+metrics:
+  "system.network.connections":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*networkscraper$
+      dimension_attribute_key: state
+
+  "system.cpu.utilization":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*cpuscraper$
+      dimension_attribute_key: state
+
+  "system.memory.usage":
+    - instrumentation_scope:
+        name: .*hostmetricsreceiver.*memoryscraper$
+      dimension_attribute_key: state
+      interval_secs: 5
+
+```
+</details>
+
 ###### TLS-enabled configuration
 
 Listen with TLS enabled for secure connections.
@@ -155,8 +208,11 @@ endpoint:
   tls_cert_path: /etc/netdata/ssl/cert.pem
   tls_key_path: /etc/netdata/ssl/key.pem
 metrics:
-  chart_configs_dir: otel.d/v1/metrics/
-  buffer_samples: 10
+  chart_configs_dir: /etc/netdata/otel.d/v1/metrics/
+  interval_secs: 10
+  grace_period_secs: 60
+  expiry_duration_secs: 900
+  max_new_charts_per_request: 100
 logs:
   journal_dir: /var/log/netdata/otel-journals
 
