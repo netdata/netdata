@@ -140,14 +140,14 @@ static inline int
 ebpf_sync_load_and_attach(struct sync_bpf *obj, ebpf_module_t *em, char *target, sync_syscalls_index_t idx)
 {
     netdata_ebpf_targets_t *synct = em->targets;
-    netdata_ebpf_program_loaded_t test = synct[NETDATA_SYNC_SYNC_IDX].mode;
+    netdata_ebpf_program_loaded_t mode = synct[NETDATA_SYNC_SYNC_IDX].mode;
 
-    if (test == EBPF_LOAD_TRAMPOLINE) {
+    if (mode == EBPF_LOAD_TRAMPOLINE) {
         ebpf_sync_disable_probe(obj);
         ebpf_sync_disable_tracepoints(obj, NETDATA_SYNC_IDX_END);
 
         bpf_program__set_attach_target(obj->progs.netdata_sync_fentry, 0, target);
-    } else if (test == EBPF_LOAD_PROBE || test == EBPF_LOAD_RETPROBE) {
+    } else if (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) {
         ebpf_sync_disable_tracepoints(obj, NETDATA_SYNC_IDX_END);
         ebpf_sync_disable_trampoline(obj);
     } else {
@@ -161,7 +161,7 @@ ebpf_sync_load_and_attach(struct sync_bpf *obj, ebpf_module_t *em, char *target,
 
     int ret = sync_bpf__load(obj);
     if (!ret) {
-        if (test != EBPF_LOAD_PROBE && test != EBPF_LOAD_RETPROBE) {
+        if (mode != EBPF_LOAD_PROBE && mode != EBPF_LOAD_RETPROBE) {
             ret = sync_bpf__attach(obj);
         } else {
             obj->links.netdata_sync_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_sync_kprobe, false, target);
@@ -506,11 +506,7 @@ static void sync_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
-
+        running_time += update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }

@@ -1791,7 +1791,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
 
     netdata_socket_t *values = socket_values;
     size_t length = sizeof(netdata_socket_t);
-    int test, end;
+    int ret, end;
     if (maps_per_core) {
         length *= ebpf_nprocs;
         end = ebpf_nprocs;
@@ -1804,9 +1804,9 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     memset(values, 0, length);
     time_t update_time = time(NULL);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
-        test = bpf_map_lookup_elem(fd, &key, values);
+        ret = bpf_map_lookup_elem(fd, &key, values);
         bool deleted = true;
-        if (test < 0) {
+        if (ret < 0) {
             goto end_socket_loop;
         }
 
@@ -2081,8 +2081,8 @@ static void read_listen_table()
     int fd = socket_maps[NETDATA_SOCKET_LPORTS].map_fd;
     netdata_passive_connection_t value = {};
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
-        int test = bpf_map_lookup_elem(fd, &key, &value);
-        if (test < 0) {
+        int ret = bpf_map_lookup_elem(fd, &key, &value);
+        if (ret < 0) {
             key = next_key;
             continue;
         }
@@ -2815,11 +2815,7 @@ static void socket_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
-
+        running_time += update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
@@ -2867,8 +2863,8 @@ static void ebpf_socket_initialize_global_vectors()
  */
 static void ebpf_link_dimension_name(const char *port, uint32_t hash, const char *value)
 {
-    int test = str2i(port);
-    if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE) {
+    int port_val = str2i(port);
+    if (port_val < NETDATA_MINIMUM_PORT_VALUE || port_val > NETDATA_MAXIMUM_PORT_VALUE) {
         netdata_log_error("The dimension given (%s = %s) has an invalid value and it will be ignored.", port, value);
         return;
     }
@@ -2879,7 +2875,7 @@ static void ebpf_link_dimension_name(const char *port, uint32_t hash, const char
     w->name = strdupz(value);
     w->hash = hash;
 
-    w->port = (uint16_t)htons(test);
+    w->port = (uint16_t)htons(port_val);
 
     ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
     if (unlikely(!names)) {

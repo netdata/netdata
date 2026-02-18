@@ -381,7 +381,7 @@ static uint32_t oomkill_read_data(int32_t *keys)
     uint32_t i = 0;
 
     uint32_t curr_key = 0;
-    uint32_t key = 0;
+    uint32_t key;
     int mapfd = oomkill_maps[0].map_fd;
     while (bpf_map_get_next_key(mapfd, &curr_key, &key) == 0) {
         curr_key = key;
@@ -441,11 +441,7 @@ static void ebpf_update_oomkill_cgroup(int32_t *keys, uint32_t total)
 static int ebpf_update_oomkill_period(int running_time, ebpf_module_t *em)
 {
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    if (running_time && !em->running_time)
-        running_time = em->update_every;
-    else
-        running_time += em->update_every;
-
+    running_time += em->update_every;
     em->running_time = running_time;
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 

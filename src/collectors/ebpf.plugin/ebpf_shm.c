@@ -233,15 +233,15 @@ static void ebpf_shm_adjust_map(struct shm_bpf *obj, ebpf_module_t *em)
 static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *em)
 {
     netdata_ebpf_targets_t *shmt = em->targets;
-    netdata_ebpf_program_loaded_t test = shmt[NETDATA_KEY_SHMGET_CALL].mode;
+    netdata_ebpf_program_loaded_t mode = shmt[NETDATA_KEY_SHMGET_CALL].mode;
 
     // We are testing only one, because all will have the same behavior
-    if (test == EBPF_LOAD_TRAMPOLINE) {
+    if (mode == EBPF_LOAD_TRAMPOLINE) {
         ebpf_shm_disable_tracepoint(obj);
         ebpf_disable_probe(obj);
 
         ebpf_set_trampoline_target(obj);
-    } else if (test == EBPF_LOAD_PROBE || test == EBPF_LOAD_RETPROBE) {
+    } else if (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) {
         ebpf_shm_disable_tracepoint(obj);
         ebpf_disable_trampoline(obj);
     } else {
@@ -253,7 +253,7 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
 
     int ret = shm_bpf__load(obj);
     if (!ret) {
-        if (test != EBPF_LOAD_PROBE && test != EBPF_LOAD_RETPROBE)
+        if (mode != EBPF_LOAD_PROBE && mode != EBPF_LOAD_RETPROBE)
             shm_bpf__attach(obj);
         else
             ret = ebpf_shm_attach_probe(obj);
@@ -1056,7 +1056,7 @@ void ebpf_shm_send_cgroup_data(int update_every)
                 ebpf_send_specific_shm_data(ect->name, &ect->publish_shm);
             } else {
                 ebpf_obsolete_specific_shm_charts(ect->name, update_every);
-                ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_SWAP_CHART;
+                ect->flags &= ~NETDATA_EBPF_CGROUP_HAS_SHM_CHART;
             }
         }
     }
@@ -1123,11 +1123,7 @@ void ebpf_read_shm_thread(void *ptr)
         counter = 0;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
-
+        running_time += update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
@@ -1172,11 +1168,7 @@ static void shm_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
-
+        running_time += update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }

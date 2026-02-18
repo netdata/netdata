@@ -212,15 +212,15 @@ static void mdflush_read_count_map(int maps_per_core)
 {
     int mapfd = mdflush_maps[MDFLUSH_MAP_COUNT].map_fd;
     mdflush_ebpf_key_t curr_key = (uint32_t)-1;
-    mdflush_ebpf_key_t key = (uint32_t)-1;
+    mdflush_ebpf_key_t key;
 
     int end = maps_per_core ? ebpf_nprocs : 1;
 
     while (bpf_map_get_next_key(mapfd, &curr_key, &key) == 0) {
         curr_key = key;
 
-        int test = bpf_map_lookup_elem(mapfd, &key, mdflush_ebpf_vals);
-        if (unlikely(test < 0)) {
+        int ret = bpf_map_lookup_elem(mapfd, &key, mdflush_ebpf_vals);
+        if (unlikely(ret < 0)) {
             continue;
         }
 
@@ -229,7 +229,7 @@ static void mdflush_read_count_map(int maps_per_core)
         if (unlikely(v == NULL)) {
             v = callocz(1, sizeof(netdata_mdflush_t));
             v->unit = key;
-            sprintf(v->disk_name, "md%u", key);
+            snprintf(v->disk_name, sizeof(v->disk_name), "md%u", key);
             v->dim_exists = false;
 
             avl_t *check = avl_insert_lock(&mdflush_pub, (avl_t *)v);
@@ -321,11 +321,7 @@ static void mdflush_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
-
+        running_time += update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }

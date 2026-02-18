@@ -126,8 +126,8 @@ static void softirq_read_latency_map(int maps_per_core)
     int end = (maps_per_core) ? ebpf_nprocs : 1;
 
     for (i = 0; i < NETDATA_SOFTIRQ_MAX_IRQS; i++) {
-        int test = bpf_map_lookup_elem(fd, &i, softirq_ebpf_vals);
-        if (unlikely(test < 0)) {
+        int ret = bpf_map_lookup_elem(fd, &i, softirq_ebpf_vals);
+        if (unlikely(ret < 0)) {
             continue;
         }
 
@@ -220,11 +220,7 @@ static void softirq_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
-
+        running_time += update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }

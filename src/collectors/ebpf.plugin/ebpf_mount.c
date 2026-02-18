@@ -179,15 +179,15 @@ static void ebpf_mount_set_hash_tables(struct mount_bpf *obj)
  */
 static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_t *em)
 {
-    netdata_ebpf_program_loaded_t test = em->targets[NETDATA_MOUNT_SYSCALL].mode;
+    netdata_ebpf_program_loaded_t mode = em->targets[NETDATA_MOUNT_SYSCALL].mode;
 
     // We are testing only one, because all will have the same behavior
-    if (test == EBPF_LOAD_TRAMPOLINE) {
+    if (mode == EBPF_LOAD_TRAMPOLINE) {
         ebpf_mount_disable_probe(obj);
         ebpf_mount_disable_tracepoint(obj);
 
         netdata_set_trampoline_target(obj);
-    } else if (test == EBPF_LOAD_PROBE || test == EBPF_LOAD_RETPROBE) {
+    } else if (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) {
         ebpf_mount_disable_tracepoint(obj);
         ebpf_mount_disable_trampoline(obj);
     } else {
@@ -199,7 +199,7 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
 
     int ret = mount_bpf__load(obj);
     if (!ret) {
-        if (test != EBPF_LOAD_PROBE && test != EBPF_LOAD_RETPROBE)
+        if (mode != EBPF_LOAD_PROBE && mode != EBPF_LOAD_RETPROBE)
             ret = mount_bpf__attach(obj);
         else
             ret = ebpf_mount_attach_probe(obj);
@@ -340,11 +340,11 @@ static void ebpf_mount_read_global_table(int maps_per_core)
 */
 static void ebpf_mount_send_data()
 {
-    int i, j;
+    int i;
     int end = NETDATA_EBPF_MOUNT_SYSCALL;
-    for (i = NETDATA_KEY_MOUNT_CALL, j = NETDATA_KEY_MOUNT_ERROR; i < end; i++, j++) {
+    for (i = 0; i < end; i++) {
         mount_publish_aggregated[i].ncall = mount_hash_values[i];
-        mount_publish_aggregated[i].nerr = mount_hash_values[j];
+        mount_publish_aggregated[i].nerr = mount_hash_values[i + NETDATA_EBPF_MOUNT_SYSCALL];
     }
 
     write_count_chart(
@@ -388,11 +388,7 @@ static void mount_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
-
+        running_time += update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }

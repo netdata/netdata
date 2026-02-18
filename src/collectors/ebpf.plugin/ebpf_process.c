@@ -194,13 +194,13 @@ static void ebpf_process_set_hash_tables(struct process_bpf *obj)
  */
 static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_module_t *em)
 {
-    netdata_ebpf_program_loaded_t test = em->targets[PROCESS_RELEASE_TASK_NAME].mode;
-    if (test == EBPF_LOAD_TRAMPOLINE) {
+    netdata_ebpf_program_loaded_t mode = em->targets[PROCESS_RELEASE_TASK_NAME].mode;
+    if (mode == EBPF_LOAD_TRAMPOLINE) {
         ebpf_process_disable_probe(obj);
         ebpf_disable_tracepoints(obj);
 
         ebpf_set_trampoline_target(obj);
-    } else if (test == EBPF_LOAD_PROBE || test == EBPF_LOAD_RETPROBE) {
+    } else if (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) {
         ebpf_disable_tracepoints(obj);
         ebpf_disable_trampoline(obj);
 
@@ -224,7 +224,7 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
         return ret;
     }
 
-    ret = (test == EBPF_LOAD_TRAMPOLINE) ? process_bpf__attach(obj) : process_attach_kprobe_target(obj);
+    ret = (mode == EBPF_LOAD_TRAMPOLINE) ? process_bpf__attach(obj) : process_attach_kprobe_target(obj);
     if (!ret) {
         ebpf_process_set_hash_tables(obj);
 
@@ -1626,11 +1626,7 @@ static void process_collector(ebpf_module_t *em)
             netdata_mutex_unlock(&lock);
 
             netdata_mutex_lock(&ebpf_exit_cleanup);
-            if (running_time && !em->running_time)
-                running_time = update_every;
-            else
-                running_time += update_every;
-
+            running_time += update_every;
             em->running_time = running_time;
             netdata_mutex_unlock(&ebpf_exit_cleanup);
         }
@@ -1694,14 +1690,14 @@ static void set_local_pointers()
  */
 static int ebpf_enable_single_tracepoint(const char *event, int *was_enabled)
 {
-    int test = ebpf_is_tracepoint_enabled(tracepoint_sched_type, event);
-    if (test == -1)
+    int enabled = ebpf_is_tracepoint_enabled(tracepoint_sched_type, event);
+    if (enabled == -1)
         return -1;
-    if (!test) {
+    if (!enabled) {
         if (ebpf_enable_tracing_values(tracepoint_sched_type, event))
             return -1;
     }
-    *was_enabled = test;
+    *was_enabled = enabled;
     return 0;
 }
 
