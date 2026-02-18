@@ -1,12 +1,12 @@
 name: netdata
 base: core24
-version: git
+adopt-info: netdata
 summary: Real-time system and application monitoring
 description: |
   Netdata is distributed, real-time, performance and health monitoring
   for systems and applications.
 grade: devel
-confinement: devmode
+confinement: strict
 
 apps:
   netdata:
@@ -16,6 +16,13 @@ apps:
     plugs:
       - network
       - network-bind
+      - network-observe
+      - system-observe
+      - hardware-observe
+      - kernel-module-observe
+      - mount-observe
+      - log-observe
+      - process-control
 
 parts:
   netdata:
@@ -23,6 +30,9 @@ parts:
     source: .
     override-pull: |
       craftctl default
+      version="$(tr -d '\n' < "${CRAFT_PART_SRC}/packaging/version")"
+      version="${version#v}"
+      craftctl set version="${version}"
       aclk_proto_file="${CRAFT_PART_SRC}/src/aclk/aclk-schemas/proto/aclk/v1/lib.proto"
       if [ ! -f "${aclk_proto_file}" ]; then
         echo "aclk-schemas submodule missing in source tree, fetching pinned commit."
@@ -39,6 +49,7 @@ parts:
       - -DENABLE_DASHBOARD=ON
       - -DENABLE_DBENGINE=ON
       - -DENABLE_PLUGIN_APPS=ON
+      - -DENABLE_PLUGIN_GO=ON
       - -DENABLE_LIBBACKTRACE=OFF
       - -DENABLE_BUNDLED_PROTOBUF=OFF
       - -DENABLE_BUNDLED_JSONC=OFF
@@ -72,6 +83,7 @@ parts:
       - libcurl4
       - libjson-c5
       - liblz4-1
+      - lm-sensors
       - libprotobuf32
       - libssl3
       - libuv1

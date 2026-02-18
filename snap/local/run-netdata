@@ -2,6 +2,8 @@
 set -euo pipefail
 
 config_dir="${SNAP_DATA}/etc/netdata"
+go_config_dir="${config_dir}/go.d"
+sensors_config="${go_config_dir}/sensors.conf"
 cache_dir="${SNAP_COMMON}/var/cache/netdata"
 lib_dir="${SNAP_COMMON}/var/lib/netdata"
 log_dir="${SNAP_COMMON}/var/log/netdata"
@@ -13,6 +15,7 @@ mkdir -p \
   "${config_dir}/health.d" \
   "${config_dir}/statsd.d" \
   "${config_dir}/ssl" \
+  "${go_config_dir}" \
   "${cache_dir}" \
   "${lib_dir}" \
   "${lib_dir}/cloud.d" \
@@ -29,6 +32,13 @@ if [ ! -f "${user_config}" ]; then
   else
     : > "${user_config}"
   fi
+fi
+
+if [ ! -f "${sensors_config}" ]; then
+  cat > "${sensors_config}" <<'EOF'
+jobs:
+  - name: sensors
+EOF
 fi
 
 plugin_dirs="\"${SNAP}/usr/libexec/netdata/plugins.d\" \"${config_dir}/custom-plugins.d\""
