@@ -20,7 +20,7 @@ apps:
 parts:
   netdata:
     plugin: cmake
-    source: ..
+    source: .
     cmake-generator: Ninja
     cmake-parameters:
       - -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -72,6 +72,6 @@ parts:
 
   snap-local:
     plugin: dump
-    source: local
+    source: snap/local
     organize:
       run-netdata: bin/run-netdata

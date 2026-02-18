@@ -7,7 +7,7 @@ This repository now includes Snap packaging under `snap/`.
 From the repository root:
 
 ```bash
-snapcraft --destructive-mode
+sudo snapcraft --destructive-mode
 ```
 
 This produces a `netdata_*.snap` artifact in the current directory.
