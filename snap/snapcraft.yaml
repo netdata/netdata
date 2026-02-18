@@ -1,0 +1,77 @@
+name: netdata
+base: core24
+version: git
+summary: Real-time system and application monitoring
+description: |
+  Netdata is distributed, real-time, performance and health monitoring
+  for systems and applications.
+grade: devel
+confinement: devmode
+
+apps:
+  netdata:
+    command: bin/run-netdata
+    daemon: simple
+    restart-condition: always
+    plugs:
+      - network
+      - network-bind
+
+parts:
+  netdata:
+    plugin: cmake
+    source: ..
+    cmake-generator: Ninja
+    cmake-parameters:
+      - -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - -DCMAKE_INSTALL_PREFIX=/
+      - -DBUILD_FOR_PACKAGING=ON
+      - -DDEFAULT_FEATURE_STATE=OFF
+      - -DENABLE_DASHBOARD=ON
+      - -DENABLE_DBENGINE=ON
+      - -DENABLE_LIBBACKTRACE=OFF
+      - -DENABLE_BUNDLED_PROTOBUF=OFF
+      - -DENABLE_BUNDLED_JSONC=OFF
+      - -DENABLE_BUNDLED_YAML=OFF
+    build-packages:
+      - bison
+      - build-essential
+      - cmake
+      - flex
+      - git
+      - libcurl4-openssl-dev
+      - libjson-c-dev
+      - liblz4-dev
+      - libprotobuf-dev
+      - libssl-dev
+      - libuv1-dev
+      - libyaml-dev
+      - ninja-build
+      - pkg-config
+      - protobuf-compiler
+      - uuid-dev
+      - zlib1g-dev
+    stage-packages:
+      - bash
+      - ca-certificates
+      - coreutils
+      - curl
+      - iproute2
+      - jq
+      - libatomic1
+      - libcurl4
+      - libjson-c5
+      - liblz4-1
+      - libprotobuf23
+      - libssl3
+      - libuv1
+      - libyaml-0-2
+      - procps
+      - uuid-runtime
+      - zlib1g
+
+  snap-local:
+    plugin: dump
+    source: local
+    organize:
+      run-netdata: bin/run-netdata

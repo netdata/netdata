@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+config_dir="${SNAP_DATA}/etc/netdata"
+cache_dir="${SNAP_COMMON}/var/cache/netdata"
+lib_dir="${SNAP_COMMON}/var/lib/netdata"
+log_dir="${SNAP_COMMON}/var/log/netdata"
+run_dir="${SNAP_COMMON}/var/run/netdata"
+
+mkdir -p \
+  "${config_dir}" \
+  "${config_dir}/custom-plugins.d" \
+  "${config_dir}/health.d" \
+  "${config_dir}/statsd.d" \
+  "${config_dir}/ssl" \
+  "${cache_dir}" \
+  "${lib_dir}" \
+  "${lib_dir}/cloud.d" \
+  "${lib_dir}/registry" \
+  "${log_dir}" \
+  "${run_dir}"
+
+stock_config="${SNAP}/usr/lib/netdata/conf.d/netdata.conf"
+user_config="${config_dir}/netdata.conf"
+
+if [ ! -f "${user_config}" ]; then
+  if [ -f "${stock_config}" ]; then
+    cp "${stock_config}" "${user_config}"
+  else
+    : > "${user_config}"
+  fi
+fi
+
+plugin_dirs="\"${SNAP}/usr/libexec/netdata/plugins.d\" \"${config_dir}/custom-plugins.d\""
+
+export PATH="${SNAP}/usr/sbin:${SNAP}/usr/bin:${SNAP}/sbin:${SNAP}/bin:${PATH}"
+
+exec "${SNAP}/usr/sbin/netdata" \
+  -D \
+  -u root \
+  -P "${run_dir}/netdata.pid" \
+  -W set directories config "${config_dir}" \
+  -W set directories "stock config" "${SNAP}/usr/lib/netdata/conf.d" \
+  -W set directories plugins "${plugin_dirs}" \
+  -W set directories web "${SNAP}/usr/share/netdata/web" \
+  -W set directories cache "${cache_dir}" \
+  -W set directories lib "${lib_dir}" \
+  -W set directories log "${log_dir}" \
+  -W set directories home "${lib_dir}" \
+  -W set directories lock "${run_dir}" \
+  -W set directories "health config" "${config_dir}/health.d" \
+  -W set directories "stock health config" "${SNAP}/usr/lib/netdata/conf.d/health.d" \
+  -W set directories registry "${lib_dir}/registry" \
+  -W set web "default port" "${NETDATA_LISTENER_PORT:-19999}" \
+  -c "${user_config}" \
+  "$@"
