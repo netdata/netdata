@@ -899,10 +899,10 @@ void ebpf_read_fd_thread(void *ptr)
         counter = 0;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time)
-            running_time += update_every;
-        else
+        if (running_time && !em->running_time)
             running_time = update_every;
+        else
+            running_time += update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
@@ -1332,7 +1332,7 @@ static void fd_collector(ebpf_module_t *em)
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
-    memset(stats, 0, sizeof(*stats));
+    memset(stats, 0, sizeof(em->hash_table_stats));
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
@@ -1358,10 +1358,10 @@ static void fd_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time)
-            running_time += update_every;
-        else
+        if (running_time && !em->running_time)
             running_time = update_every;
+        else
+            running_time += update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
