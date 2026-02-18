@@ -1,0 +1,3 @@
+# Exclude VCS metadata from local source copies into managed build instances.
+# This avoids copying large git object packs into /root/parts/*/src.
+.git
