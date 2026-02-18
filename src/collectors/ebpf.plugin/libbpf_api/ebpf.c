@@ -968,7 +968,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     if (!*obj)
         return NULL;
 
-    if (libbpf_get_error(obj)) {
+    if (libbpf_get_error(*obj)) {
         bpf_object__close(*obj);
         return NULL;
     }
