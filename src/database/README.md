@@ -26,7 +26,13 @@ Netdata offers a granular approach to data retention, allowing you to manage sto
 >
 > If a user sets a disk space size less than 256 MB for a tier, Netdata will automatically adjust it to 256 MB.
 
-With these defaults, Netdata requires approximately 4 GiB of storage space (including metadata).
+Netdata Agent metrics storage is limited to 3 GiB by default (configurable), using 1 GiB per tier × 3 tiers. Data is deleted when it reaches **either** the size limit or the time limit, whichever comes first. The number of metrics collected determines how far back in time retention extends within the size limit.
+
+In total, with SQLite databases, alert transitions, and other metadata, expect about 4 GiB of disk usage under normal conditions.
+
+In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
+
+These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
 ### Monitoring Retention Utilization
 
