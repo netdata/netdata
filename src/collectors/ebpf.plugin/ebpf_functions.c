@@ -2,7 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_functions.h"
-#include "ebpf_library.h"
+#include "libbpf_api/ebpf_library.h"
 
 /*****************************************************************
  *  EBPF FUNCTION COMMON

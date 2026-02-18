@@ -5,10 +5,9 @@
 
 #include "libnetdata/libnetdata.h"
 #include "ebpf_library.h"
-#include "ebpf.h"
-#include "libbpf_api/ebpf.h"
-#include "ebpf_process.h"
-#include "ebpf_socket.h"
+#include "../ebpf.h"
+#include "../ebpf_process.h"
+#include "../ebpf_socket.h"
 #include <ifaddrs.h>
 
 extern char *ebpf_algorithms[];

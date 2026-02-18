@@ -2,7 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_oomkill.h"
-#include "ebpf_library.h"
+#include "libbpf_api/ebpf_library.h"
 
 struct config oomkill_config = APPCONFIG_INITIALIZER;
 

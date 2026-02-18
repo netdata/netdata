@@ -4,7 +4,7 @@
 #define NETDATA_COLLECTOR_EBPF_LIBRARY_H 1
 
 #include <stdint.h>
-#include "ebpf_socket_ipc.h"
+#include "../ebpf_socket_ipc.h"
 
 typedef struct netdata_publish_syscall netdata_publish_syscall_t;
 typedef struct netdata_syscall_stat netdata_syscall_stat_t;

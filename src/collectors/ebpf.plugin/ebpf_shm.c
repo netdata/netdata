@@ -2,7 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_shm.h"
-#include "ebpf_library.h"
+#include "libbpf_api/ebpf_library.h"
 
 static char *shm_dimension_name[NETDATA_SHM_END] = {"get", "at", "dt", "ctl"};
 static netdata_syscall_stat_t shm_aggregated_data[NETDATA_SHM_END];

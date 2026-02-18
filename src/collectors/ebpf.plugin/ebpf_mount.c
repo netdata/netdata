@@ -2,7 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_mount.h"
-#include "ebpf_library.h"
+#include "libbpf_api/ebpf_library.h"
 
 static ebpf_local_maps_t mount_maps[] = {
     {.name = "tbl_mount",

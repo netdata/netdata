@@ -6,7 +6,7 @@
 #include <dlfcn.h>
 #include <sys/utsname.h>
 
-#include "ebpf.h"
+#include "../ebpf.h"
 #include "libnetdata/libnetdata.h"
 
 char *ebpf_user_config_dir = CONFIG_DIR;
@@ -1595,7 +1595,8 @@ void ebpf_histogram_dimension_cleanup(char **ptr, size_t length)
  *
  * @return it returns a positive value on success and a negative otherwise.
  */
-static inline int ebpf_open_tracepoint_path(char *filename, size_t length, const char *subsys, const char *eventname, int flags)
+static inline int
+ebpf_open_tracepoint_path(char *filename, size_t length, const char *subsys, const char *eventname, int flags)
 {
     snprintfz(filename, length, "%s/events/%s/%s/enable", NETDATA_DEBUGFS, subsys, eventname);
     return open(filename, flags | O_CLOEXEC, 0);

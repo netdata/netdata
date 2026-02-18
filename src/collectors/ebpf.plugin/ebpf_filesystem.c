@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ebpf_filesystem.h"
-#include "ebpf_library.h"
+#include "libbpf_api/ebpf_library.h"
 
 struct config fs_config = APPCONFIG_INITIALIZER;
 

@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include "ebpf_library.h"
+#include "libbpf_api/ebpf_library.h"
 #include "ebpf.h"
 #include "ebpf_socket.h"
 

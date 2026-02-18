@@ -8,7 +8,7 @@
 #include "ebpf.h"
 #include "ebpf_socket.h"
 #include "ebpf_unittest.h"
-#include "ebpf_library.h"
+#include "libbpf_api/ebpf_library.h"
 #include "libnetdata/required_dummies.h"
 
 /*****************************************************************

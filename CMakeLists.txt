@@ -2897,8 +2897,8 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_functions.h
              src/collectors/ebpf.plugin/libbpf_api/ebpf.c
              src/collectors/ebpf.plugin/libbpf_api/ebpf.h
-             src/collectors/ebpf.plugin/ebpf_library.c
-             src/collectors/ebpf.plugin/ebpf_library.h
+             src/collectors/ebpf.plugin/libbpf_api/ebpf_library.c
+             src/collectors/ebpf.plugin/libbpf_api/ebpf_library.h
      )
 
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES} ${INTERCOMMUNICATION_COLLECTORS_FILES})
