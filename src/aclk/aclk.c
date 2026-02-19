@@ -1103,16 +1103,14 @@ char *aclk_state(void)
         if (proxy_type == PROXY_DISABLED || proxy_type == PROXY_NOT_SET || !proxy_str)
             snprintfz(proxy_display, sizeof(proxy_display), "none");
         else {
-            const char *at = strchr(proxy_str, '@');
-            const char *host_start = at ? at + 1 : proxy_str;
-            const char *sep = strstr(proxy_str, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
-            if (!at && sep)
-                host_start = sep + strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
             const char *source = aclk_get_proxy_source();
-            snprintfz(proxy_display, sizeof(proxy_display), "%s%s (%s, from %s)",
-                       aclk_proxy_type_to_url(proxy_type), host_start,
-                       at ? "with credentials" : "without credentials",
-                       source ? source : "unknown");
+            aclk_proxy_get_display(proxy_display, sizeof(proxy_display), proxy_str, proxy_type);
+            char full_display[512];
+            snprintfz(full_display, sizeof(full_display), "%s (%s, from %s)",
+                      proxy_display,
+                      strchr(proxy_str, '@') ? "with credentials" : "without credentials",
+                      source ? source : "unknown");
+            strcpy(proxy_display, full_display);
         }
 
         usec_t latency = __atomic_load_n(&publish_latency, __ATOMIC_RELAXED);
@@ -1269,19 +1267,17 @@ char *aclk_state_json(void)
         if (proxy_type == PROXY_DISABLED || proxy_type == PROXY_NOT_SET || !proxy_str)
             snprintfz(proxy_display, sizeof(proxy_display), "none");
         else {
-            const char *at = strchr(proxy_str, '@');
-            const char *host_start = at ? at + 1 : proxy_str;
-            const char *sep = strstr(proxy_str, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
-            if (!at && sep)
-                host_start = sep + strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
             const char *source = aclk_get_proxy_source();
-            snprintfz(proxy_display, sizeof(proxy_display), "%s%s (%s, from %s)",
-                       aclk_proxy_type_to_url(proxy_type), host_start,
-                       at ? "with credentials" : "without credentials",
-                       source ? source : "unknown");
+            aclk_proxy_get_display(proxy_display, sizeof(proxy_display), proxy_str, proxy_type);
+            char full_display[512];
+            snprintfz(full_display, sizeof(full_display), "%s (%s, from %s)",
+                      proxy_display,
+                      strchr(proxy_str, '@') ? "with credentials" : "without credentials",
+                      source ? source : "unknown");
+            strcpy(proxy_display, full_display);
         }
         tmp = json_object_new_string(proxy_display);
-        json_object_object_add(msg, "aclk-proxy", tmp);
+        json_object_object_add(msg, "aclk_proxy", tmp);
     }
 
     usec_t latency = __atomic_load_n(&publish_latency, __ATOMIC_RELAXED);

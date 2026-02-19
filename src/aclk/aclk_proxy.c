@@ -77,7 +77,7 @@ static inline void safe_log_proxy_error(char *str, const char *proxy)
 }
 
 // helper to extract "http://host:port" from a proxy URL, skipping credentials
-static void aclk_proxy_display(char *buf, size_t buflen, const char *proxy, ACLK_PROXY_TYPE type)
+void aclk_proxy_get_display(char *buf, size_t buflen, const char *proxy, ACLK_PROXY_TYPE type)
 {
     const char *at = strchr(proxy, '@');
     const char *host_start = at ? at + 1 : proxy;
@@ -104,9 +104,10 @@ static inline int check_http_environment(const char **proxy)
     if (aclk_verify_proxy(tmp) == PROXY_TYPE_HTTP) {
         *proxy = tmp;
         char display[512];
-        aclk_proxy_display(display, sizeof(display), tmp, PROXY_TYPE_HTTP);
+        aclk_proxy_get_display(display, sizeof(display), tmp, PROXY_TYPE_HTTP);
         char source_buf[256];
         snprintfz(source_buf, sizeof(source_buf), "environment variable '%s'", var);
+        freez((void *)proxy_source);
         proxy_source = strdupz(source_buf);
         nd_log(NDLS_DAEMON, NDLP_INFO,
                "ACLK: using HTTP proxy %s (%s, from %s)",
@@ -166,7 +167,7 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
     else {
         proxy_source = cloud_config_proxy_source_get();
         char display[512];
-        aclk_proxy_display(display, sizeof(display), proxy, *type);
+        aclk_proxy_get_display(display, sizeof(display), proxy, *type);
         nd_log(NDLS_DAEMON, NDLP_INFO,
                "ACLK: using %s proxy %s (%s, from %s)",
                *type == PROXY_TYPE_HTTP ? "HTTP" : "SOCKS5",
