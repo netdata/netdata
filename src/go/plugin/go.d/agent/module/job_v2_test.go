@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -468,6 +469,74 @@ func TestJobV2Scenarios(t *testing.T) {
 				job.runOnce()
 				assert.Equal(t, "new-guid", mod.vnode.GUID)
 				assert.Equal(t, "new-guid", job.Vnode().GUID)
+			},
+		},
+		"stop cancels in-flight collect context": {
+			run: func(t *testing.T) {
+				store := metrix.NewCollectorStore()
+				collectCtxCh := make(chan context.Context, 1)
+				mod := &mockModuleV2{
+					store:    store,
+					template: chartTemplateV2(),
+					collectFunc: func(ctx context.Context) error {
+						collectCtxCh <- ctx
+						<-ctx.Done()
+						return ctx.Err()
+					},
+				}
+
+				job := newTestJobV2(mod, &bytes.Buffer{})
+				require.NoError(t, job.AutoDetection())
+
+				startDone := make(chan struct{})
+				go func() {
+					job.Start()
+					close(startDone)
+				}()
+
+				var collectCtx context.Context
+				deadline := time.After(2 * time.Second)
+			WAIT_COLLECT:
+				for {
+					job.Tick(1)
+					select {
+					case collectCtx = <-collectCtxCh:
+						break WAIT_COLLECT
+					case <-time.After(10 * time.Millisecond):
+					case <-deadline:
+						t.Fatal("collect did not start")
+					}
+				}
+
+				select {
+				case <-collectCtx.Done():
+					t.Fatal("collect context canceled before stop")
+				default:
+				}
+
+				stopDone := make(chan struct{})
+				go func() {
+					job.Stop()
+					close(stopDone)
+				}()
+
+				select {
+				case <-collectCtx.Done():
+				case <-time.After(time.Second):
+					t.Fatal("collect context was not canceled on stop")
+				}
+
+				select {
+				case <-stopDone:
+				case <-time.After(time.Second):
+					t.Fatal("stop did not finish")
+				}
+
+				select {
+				case <-startDone:
+				case <-time.After(time.Second):
+					t.Fatal("job start loop did not exit")
+				}
 			},
 		},
 	}

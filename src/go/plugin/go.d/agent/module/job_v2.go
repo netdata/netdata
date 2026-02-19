@@ -110,6 +110,10 @@ type JobV2 struct {
 	vnode    vnodes.VirtualNode
 	updVnode chan *vnodes.VirtualNode
 
+	ctxMu     sync.RWMutex
+	runCtx    context.Context
+	cancelRun context.CancelFunc
+
 	tick chan int
 	out  io.Writer
 	buf  *bytes.Buffer
@@ -160,7 +164,7 @@ func (j *JobV2) UpdateVnode(vnode *vnodes.VirtualNode) {
 func (j *JobV2) Cleanup() {
 	j.unregisterRuntimeComponent()
 	if j.module != nil {
-		j.module.Cleanup(context.TODO())
+		j.module.Cleanup(context.Background())
 	}
 }
 
@@ -196,8 +200,12 @@ func (j *JobV2) AutoDetection() (err error) {
 
 func (j *JobV2) Start() {
 	j.running.Store(true)
+	runCtx, cancel := context.WithCancel(context.Background())
+	j.setRunContext(runCtx, cancel)
 	j.Infof("started (v2), data collection interval %ds", j.updateEvery)
 	defer func() {
+		cancel()
+		j.setRunContext(nil, nil)
 		j.running.Store(false)
 		j.Info("stopped")
 	}()
@@ -218,6 +226,7 @@ LOOP:
 }
 
 func (j *JobV2) Stop() {
+	j.cancelRunContext()
 	j.stop <- struct{}{}
 	<-j.stop
 }
@@ -237,7 +246,7 @@ func (j *JobV2) init() error {
 	if j.initialized {
 		return nil
 	}
-	if err := j.module.Init(context.TODO()); err != nil {
+	if err := j.module.Init(j.moduleContext()); err != nil {
 		return err
 	}
 	j.initialized = true
@@ -245,7 +254,7 @@ func (j *JobV2) init() error {
 }
 
 func (j *JobV2) check() error {
-	return j.module.Check(context.TODO())
+	return j.module.Check(j.moduleContext())
 }
 
 func (j *JobV2) postCheck() error {
@@ -349,7 +358,7 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) bool {
 
 	j.cycle.BeginCycle()
 	cycleOpen = true
-	if err := j.module.Collect(context.TODO()); err != nil {
+	if err := j.module.Collect(j.moduleContext()); err != nil {
 		j.cycle.AbortCycle()
 		cycleOpen = false
 		j.Warningf("collect failed: %v", err)
@@ -396,4 +405,30 @@ func cloneLabels(in map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+func (j *JobV2) moduleContext() context.Context {
+	j.ctxMu.RLock()
+	ctx := j.runCtx
+	j.ctxMu.RUnlock()
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
+}
+
+func (j *JobV2) cancelRunContext() {
+	j.ctxMu.RLock()
+	cancel := j.cancelRun
+	j.ctxMu.RUnlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (j *JobV2) setRunContext(ctx context.Context, cancel context.CancelFunc) {
+	j.ctxMu.Lock()
+	j.runCtx = ctx
+	j.cancelRun = cancel
+	j.ctxMu.Unlock()
 }
