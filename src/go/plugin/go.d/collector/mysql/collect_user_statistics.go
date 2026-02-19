@@ -11,6 +11,14 @@ import (
 
 const queryShowUserStatistics = "SHOW USER_STATISTICS;"
 
+func mustDivideMariaDBUserStatsCPUTime(version *semver.Version, isMariaDB bool) bool {
+	if !isMariaDB || version == nil {
+		return false
+	}
+	return version.EQ(semver.Version{Major: 10, Minor: 11, Patch: 11}) ||
+		version.EQ(semver.Version{Major: 11, Minor: 4, Patch: 5})
+}
+
 func (c *Collector) collectUserStatistics(ctx context.Context) error {
 	// https://mariadb.com/kb/en/user-statistics/
 	// https://mariadb.com/kb/en/information-schema-user_statistics-table/
@@ -24,9 +32,7 @@ func (c *Collector) collectUserStatistics(ctx context.Context) error {
 			user = value
 		case "Cpu_time":
 			// https://jira.mariadb.org/browse/MDEV-36586
-			needsDivision := c.isMariaDB &&
-				(c.version.EQ(semver.Version{Major: 10, Minor: 11, Patch: 11})) ||
-				c.version.EQ(semver.Version{Major: 11, Minor: 4, Patch: 5})
+			needsDivision := mustDivideMariaDBUserStatsCPUTime(c.version, c.isMariaDB)
 
 			if needsDivision {
 				c.mx.setUser("userstats_cpu_time", user, int64(parseFloat(value)/1e7*1000))

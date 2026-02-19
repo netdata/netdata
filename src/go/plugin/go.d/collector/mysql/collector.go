@@ -148,8 +148,6 @@ type Collector struct {
 	varInnoDBLogFilesInGroup int64
 	varMaxConns              int64
 	varTableOpenCache        int64
-	varDisabledStorageEngine string
-	varLogBin                string
 	varPerformanceSchema     string
 	varPerfSchemaMu          sync.RWMutex // protects varPerformanceSchema for concurrent access
 
@@ -187,7 +185,7 @@ func (c *Collector) Init(context.Context) error {
 	cfg.Passwd = strings.Repeat("x", len(cfg.Passwd))
 	c.safeDSN = cfg.FormatDSN()
 
-	c.Debugf("using DSN [%s]", c.DSN)
+	c.Debugf("using DSN [%s]", c.safeDSN)
 
 	c.funcRouter = newFuncRouter(c)
 
