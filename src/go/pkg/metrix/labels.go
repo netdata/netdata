@@ -82,6 +82,7 @@ func labelsFromSet(sets []LabelSet, owner meterBackend) ([]Label, string, error)
 		if err != nil {
 			return nil, "", err
 		}
+		// Reuse immutable precompiled labels directly on the single-set path.
 		return set.items, set.key, nil
 	}
 
@@ -126,9 +127,11 @@ func validatedLabelSet(ls LabelSet, owner meterBackend) (*compiledLabelSet, erro
 
 func mergeTwoCompiledLabelSets(left, right *compiledLabelSet) ([]Label, string, error) {
 	if len(left.items) == 0 {
+		// Reuse immutable precompiled labels directly.
 		return right.items, right.key, nil
 	}
 	if len(right.items) == 0 {
+		// Reuse immutable precompiled labels directly.
 		return left.items, left.key, nil
 	}
 

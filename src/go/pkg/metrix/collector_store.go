@@ -624,6 +624,8 @@ func makeSeriesKey(name, labelsKey string) string {
 func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	cp := *s
 	ensureSeriesMeta(cp.desc, &cp.meta)
+	// cp.labels intentionally reuses the original immutable label slice.
+	// Label identity is part of the series key and is never mutated after publish.
 	if s.stateSetValues != nil {
 		cp.stateSetValues = cloneStateMap(s.stateSetValues)
 	}

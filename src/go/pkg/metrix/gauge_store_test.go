@@ -172,6 +172,50 @@ func TestGaugeStoreScenarios(t *testing.T) {
 				cc.AbortCycle()
 			},
 		},
+		"published snapshot labels stay stable across later commits": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				sm := s.Write().SnapshotMeter("apache").WithLabels(Label{Key: "instance", Value: "a"})
+				g := sm.Gauge("workers")
+				role := sm.LabelSet(Label{Key: "role", Value: "primary"})
+
+				cc.BeginCycle()
+				g.Observe(10, role)
+				cc.CommitCycleSuccess()
+
+				oldReader := s.Read(ReadRaw())
+				assertSingleSeries := func(r Reader, wantValue SampleValue, wantLabels map[string]string) {
+					count := 0
+					r.ForEachByName("apache.workers", func(labels LabelView, v SampleValue) {
+						count++
+						require.Equal(t, wantValue, v)
+						require.Equal(t, wantLabels, labels.CloneMap())
+					})
+					require.Equal(t, 1, count, "unexpected series count")
+				}
+
+				assertSingleSeries(oldReader, 10, map[string]string{
+					"instance": "a",
+					"role":     "primary",
+				})
+
+				cc.BeginCycle()
+				g.Observe(20, role)
+				cc.CommitCycleSuccess()
+
+				// Old reader snapshot must stay immutable after later commits.
+				assertSingleSeries(oldReader, 10, map[string]string{
+					"instance": "a",
+					"role":     "primary",
+				})
+
+				assertSingleSeries(s.Read(ReadRaw()), 20, map[string]string{
+					"instance": "a",
+					"role":     "primary",
+				})
+			},
+		},
 	}
 
 	for name, tc := range tests {
