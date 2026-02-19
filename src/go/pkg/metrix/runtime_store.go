@@ -13,10 +13,12 @@ type runtimeStoreView struct {
 }
 
 type runtimeStoreBackend struct {
-	core            *storeCore
-	summarySketches map[string]*summaryQuantileSketch
-	retention       runtimeRetentionPolicy
-	now             func() time.Time
+	core                  *storeCore
+	summarySketches       map[string]*summaryQuantileSketch
+	retention             runtimeRetentionPolicy
+	compaction            runtimeCompactionPolicy
+	writesSinceCompaction uint64
+	now                   func() time.Time
 }
 
 type runtimeWriteView struct {
@@ -28,9 +30,16 @@ type runtimeRetentionPolicy struct {
 	maxSeries int
 }
 
+type runtimeCompactionPolicy struct {
+	maxOverlayDepth  int
+	maxOverlayWrites uint64
+}
+
 const (
 	defaultRuntimeRetentionTTL       = 30 * time.Minute
 	defaultRuntimeRetentionMaxSeries = 0 // disabled
+	defaultRuntimeCompactionDepth    = 64
+	defaultRuntimeCompactionWrites   = 64
 )
 
 // NewRuntimeStore creates a dedicated runtime/internal metrics store with
@@ -49,6 +58,10 @@ func NewRuntimeStore() RuntimeStore {
 	backend.retention = runtimeRetentionPolicy{
 		ttl:       defaultRuntimeRetentionTTL,
 		maxSeries: defaultRuntimeRetentionMaxSeries,
+	}
+	backend.compaction = runtimeCompactionPolicy{
+		maxOverlayDepth:  defaultRuntimeCompactionDepth,
+		maxOverlayWrites: defaultRuntimeCompactionWrites,
 	}
 	backend.now = time.Now
 	return &runtimeStoreView{
@@ -292,19 +305,24 @@ func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnaps
 	oldSnap := r.core.snapshot.Load()
 	next := &readSnapshot{
 		collectMeta: oldSnap.collectMeta,
-		series:      make(map[string]*committedSeries, len(oldSnap.series)),
+		series:      make(map[string]*committedSeries, 1),
 		// byName index is built lazily by readers for runtime snapshots.
-		byName: nil,
-	}
-	for k, s := range oldSnap.series {
-		next.series[k] = s
+		byName:       nil,
+		runtimeBase:  oldSnap,
+		runtimeDepth: oldSnap.runtimeDepth + 1,
 	}
 
 	nowUnixNano := r.now().UnixNano()
 	r.core.sequence++
 	seq := r.core.sequence
 	apply(oldSnap, next, seq, nowUnixNano)
-	evicted := applyRuntimeRetention(next.series, r.retention, nowUnixNano)
+
+	r.writesSinceCompaction++
+	var evicted []string
+	if r.shouldCompactRuntimeSnapshot(next) {
+		next, evicted = r.compactRuntimeSnapshot(next, nowUnixNano)
+		r.writesSinceCompaction = 0
+	}
 	for _, key := range evicted {
 		delete(r.summarySketches, key)
 	}
@@ -318,11 +336,13 @@ func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnaps
 func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name string, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
 	series := next.series[key]
 	if series != nil {
-		if oldSeries, ok := old.series[key]; ok && oldSeries == series {
-			series = cloneCommittedSeries(series)
-			next.series[key] = series
-		}
 		ensureSeriesMeta(series.desc, &series.meta)
+		return series
+	}
+	if existing, ok := lookupSnapshotSeries(old, key); ok {
+		series = cloneCommittedSeries(existing)
+		ensureSeriesMeta(series.desc, &series.meta)
+		next.series[key] = series
 		return series
 	}
 	series = &committedSeries{
@@ -339,8 +359,30 @@ func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name string, label
 	return series
 }
 
+func (r *runtimeStoreBackend) shouldCompactRuntimeSnapshot(next *readSnapshot) bool {
+	if r.compaction.maxOverlayDepth > 0 && next.runtimeDepth >= r.compaction.maxOverlayDepth {
+		return true
+	}
+	if r.compaction.maxOverlayWrites > 0 && r.writesSinceCompaction >= r.compaction.maxOverlayWrites {
+		return true
+	}
+	return false
+}
+
+func (r *runtimeStoreBackend) compactRuntimeSnapshot(snap *readSnapshot, nowUnixNano int64) (*readSnapshot, []string) {
+	series := snapshotSeriesView(snap)
+	evicted := applyRuntimeRetention(series, r.retention, nowUnixNano)
+	return &readSnapshot{
+		collectMeta:  snap.collectMeta,
+		series:       series,
+		byName:       nil,
+		runtimeBase:  nil,
+		runtimeDepth: 0,
+	}, evicted
+}
+
 func applyRuntimeRetention(series map[string]*committedSeries, policy runtimeRetentionPolicy, nowUnixNano int64) []string {
-	evicted := make([]string, 0)
+	var evicted []string
 
 	if policy.ttl > 0 {
 		cutoff := nowUnixNano - int64(policy.ttl)
@@ -379,6 +421,9 @@ func applyRuntimeRetention(series map[string]*committedSeries, policy runtimeRet
 		}
 	}
 
+	if len(evicted) == 0 {
+		return nil
+	}
 	return evicted
 }
 

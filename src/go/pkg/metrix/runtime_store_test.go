@@ -157,6 +157,10 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 					ttl:       5 * time.Second,
 					maxSeries: 0,
 				}
+				view.backend.compaction = runtimeCompactionPolicy{
+					maxOverlayDepth:  1,
+					maxOverlayWrites: 1,
+				}
 
 				m := s.Write().StatefulMeter("runtime")
 				g := m.Gauge("queue_depth")
@@ -184,6 +188,10 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				view.backend.retention = runtimeRetentionPolicy{
 					ttl:       0,
 					maxSeries: 2,
+				}
+				view.backend.compaction = runtimeCompactionPolicy{
+					maxOverlayDepth:  1,
+					maxOverlayWrites: 1,
 				}
 
 				m := s.Write().StatefulMeter("runtime")

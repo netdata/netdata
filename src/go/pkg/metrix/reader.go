@@ -9,11 +9,13 @@ import (
 )
 
 type storeReader struct {
-	snap      *readSnapshot
-	raw       bool // true => ReadRaw semantics (no freshness filtering)
-	flattened bool
-	indexOnce sync.Once
-	index     map[string][]*committedSeries
+	snap       *readSnapshot
+	raw        bool // true => ReadRaw semantics (no freshness filtering)
+	flattened  bool
+	seriesOnce sync.Once
+	series     map[string]*committedSeries
+	indexOnce  sync.Once
+	index      map[string][]*committedSeries
 }
 
 type familyView struct {
@@ -168,13 +170,14 @@ func (r *storeReader) CollectMeta() CollectMeta {
 }
 
 func flattenSnapshot(src *readSnapshot) *readSnapshot {
+	series := snapshotSeriesView(src)
 	dst := &readSnapshot{
 		collectMeta: src.collectMeta,
-		series:      make(map[string]*committedSeries, len(src.series)),
+		series:      make(map[string]*committedSeries, len(series)),
 		byName:      make(map[string][]*committedSeries),
 	}
 
-	for _, s := range src.series {
+	for _, s := range series {
 		if s.desc == nil {
 			continue
 		}
@@ -514,18 +517,61 @@ func (r *storeReader) lookup(name string, labels Labels) (*committedSeries, bool
 		return nil, false
 	}
 	key := makeSeriesKey(name, labelsKey)
-	s, ok := r.snap.series[key]
-	return s, ok
+	return lookupSnapshotSeries(r.snap, key)
 }
 
 func (r *storeReader) byNameIndex() map[string][]*committedSeries {
-	if r.snap.byName != nil {
+	if r.snap.runtimeBase == nil && r.snap.byName != nil {
 		return r.snap.byName
 	}
 	r.indexOnce.Do(func() {
-		r.index = buildByName(r.snap.series)
+		r.index = buildByName(r.seriesView())
 	})
 	return r.index
+}
+
+func (r *storeReader) seriesView() map[string]*committedSeries {
+	if r.snap.runtimeBase == nil {
+		return r.snap.series
+	}
+	r.seriesOnce.Do(func() {
+		r.series = materializeRuntimeSeries(r.snap)
+	})
+	return r.series
+}
+
+func lookupSnapshotSeries(snap *readSnapshot, key string) (*committedSeries, bool) {
+	for curr := snap; curr != nil; curr = curr.runtimeBase {
+		if s, ok := curr.series[key]; ok {
+			return s, true
+		}
+	}
+	return nil, false
+}
+
+func snapshotSeriesView(snap *readSnapshot) map[string]*committedSeries {
+	if snap.runtimeBase == nil {
+		return snap.series
+	}
+	return materializeRuntimeSeries(snap)
+}
+
+func materializeRuntimeSeries(snap *readSnapshot) map[string]*committedSeries {
+	chain := make([]*readSnapshot, 0, snap.runtimeDepth+1)
+	for curr := snap; curr != nil; curr = curr.runtimeBase {
+		chain = append(chain, curr)
+	}
+	if len(chain) == 0 {
+		return nil
+	}
+	// Chain is leaf->root; root map gives the best starting capacity hint.
+	series := make(map[string]*committedSeries, len(chain[len(chain)-1].series))
+	for i := len(chain) - 1; i >= 0; i-- {
+		for key, s := range chain[i].series {
+			series[key] = s
+		}
+	}
+	return series
 }
 
 // visible applies freshness policy for Read(); Read(ReadRaw()) bypasses it.

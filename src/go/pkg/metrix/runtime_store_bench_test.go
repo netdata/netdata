@@ -26,6 +26,16 @@ import "testing"
 // BenchmarkRuntimeStoreGaugeParallelSet/p4-14               3268348     372.4 ns/op    560 B/op     4 allocs/op
 // BenchmarkRuntimeStoreGaugeParallelSet/p16-14              2722263     436.0 ns/op    560 B/op     4 allocs/op
 // BenchmarkRuntimeStoreMixedTypedWriteAndReadFlatten-14       97585   10916   ns/op  13366 B/op   155 allocs/op
+//
+// After runtime overlay+compaction write path (2026-02-19):
+//
+// BenchmarkRuntimeStoreCounterParallelAdd/p1-14             3759434     308.4 ns/op    622 B/op     4 allocs/op
+// BenchmarkRuntimeStoreCounterParallelAdd/p4-14             3838068     312.3 ns/op    622 B/op     4 allocs/op
+// BenchmarkRuntimeStoreCounterParallelAdd/p16-14            3553308     374.8 ns/op    622 B/op     4 allocs/op
+// BenchmarkRuntimeStoreGaugeParallelSet/p1-14               3852787     309.8 ns/op    622 B/op     4 allocs/op
+// BenchmarkRuntimeStoreGaugeParallelSet/p4-14               3797656     314.0 ns/op    622 B/op     4 allocs/op
+// BenchmarkRuntimeStoreGaugeParallelSet/p16-14              3520359     341.7 ns/op    622 B/op     4 allocs/op
+// BenchmarkRuntimeStoreMixedTypedWriteAndReadFlatten-14       93160   12230   ns/op  15275 B/op   159 allocs/op
 func BenchmarkRuntimeStoreCounterParallelAdd(b *testing.B) {
 	tests := map[string]struct {
 		parallelism int

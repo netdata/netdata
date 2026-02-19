@@ -97,6 +97,10 @@ type readSnapshot struct {
 	collectMeta CollectMeta
 	series      map[string]*committedSeries   // key => series
 	byName      map[string][]*committedSeries // metric name => stable ordered series list
+	// runtimeBase links runtime snapshots in overlay mode (nil for materialized snapshots).
+	runtimeBase *readSnapshot
+	// runtimeDepth tracks overlay chain depth for runtime compaction heuristics.
+	runtimeDepth int
 }
 
 type cycleFrame struct {
@@ -239,46 +243,26 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for k, s := range oldSnap.series {
-		next.series[k] = cloneCommittedSeries(s)
+		next.series[k] = s
 	}
 
 	for key, staged := range c.core.active.gauges {
-		series := next.series[key]
+		series := ensureCommitSeriesMutable(oldSnap, next, key)
 		if series == nil {
-			series = &committedSeries{
-				id:        SeriesID(key),
-				hash64:    seriesIDHash(SeriesID(key)),
-				key:       key,
-				name:      staged.name,
-				labels:    append([]Label(nil), staged.labels...),
-				labelsKey: staged.labelsKey,
-				desc:      staged.desc,
-				meta:      baseSeriesMeta(staged.desc),
-			}
+			series = newCommittedSeries(key, staged.name, staged.labels, staged.labelsKey, staged.desc)
 			next.series[key] = series
 		}
-		ensureSeriesMeta(series.desc, &series.meta)
 		series.value = staged.value
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
 		series.lastSeenSuccessCycle = successSeq
 	}
 
 	for key, staged := range c.core.active.counters {
-		series := next.series[key]
+		series := ensureCommitSeriesMutable(oldSnap, next, key)
 		if series == nil {
-			series = &committedSeries{
-				id:        SeriesID(key),
-				hash64:    seriesIDHash(SeriesID(key)),
-				key:       key,
-				name:      staged.name,
-				labels:    append([]Label(nil), staged.labels...),
-				labelsKey: staged.labelsKey,
-				desc:      staged.desc,
-				meta:      baseSeriesMeta(staged.desc),
-			}
+			series = newCommittedSeries(key, staged.name, staged.labels, staged.labelsKey, staged.desc)
 			next.series[key] = series
 		}
-		ensureSeriesMeta(series.desc, &series.meta)
 
 		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentSeq > 0
 		if hadCurrent {
@@ -299,21 +283,11 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for key, staged := range c.core.active.histograms {
-		series := next.series[key]
+		series := ensureCommitSeriesMutable(oldSnap, next, key)
 		if series == nil {
-			series = &committedSeries{
-				id:        SeriesID(key),
-				hash64:    seriesIDHash(SeriesID(key)),
-				key:       key,
-				name:      staged.name,
-				labels:    append([]Label(nil), staged.labels...),
-				labelsKey: staged.labelsKey,
-				desc:      staged.desc,
-				meta:      baseSeriesMeta(staged.desc),
-			}
+			series = newCommittedSeries(key, staged.name, staged.labels, staged.labelsKey, staged.desc)
 			next.series[key] = series
 		}
-		ensureSeriesMeta(series.desc, &series.meta)
 
 		if series.desc == nil {
 			panic("metrix: missing histogram descriptor")
@@ -341,21 +315,11 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for key, staged := range c.core.active.summaries {
-		series := next.series[key]
+		series := ensureCommitSeriesMutable(oldSnap, next, key)
 		if series == nil {
-			series = &committedSeries{
-				id:        SeriesID(key),
-				hash64:    seriesIDHash(SeriesID(key)),
-				key:       key,
-				name:      staged.name,
-				labels:    append([]Label(nil), staged.labels...),
-				labelsKey: staged.labelsKey,
-				desc:      staged.desc,
-				meta:      baseSeriesMeta(staged.desc),
-			}
+			series = newCommittedSeries(key, staged.name, staged.labels, staged.labelsKey, staged.desc)
 			next.series[key] = series
 		}
-		ensureSeriesMeta(series.desc, &series.meta)
 
 		if staged.desc.mode == modeStateful && len(staged.desc.summaryQuantiles()) > 0 {
 			if staged.sketch != nil {
@@ -383,21 +347,11 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for key, staged := range c.core.active.stateSet {
-		series := next.series[key]
+		series := ensureCommitSeriesMutable(oldSnap, next, key)
 		if series == nil {
-			series = &committedSeries{
-				id:        SeriesID(key),
-				hash64:    seriesIDHash(SeriesID(key)),
-				key:       key,
-				name:      staged.name,
-				labels:    append([]Label(nil), staged.labels...),
-				labelsKey: staged.labelsKey,
-				desc:      staged.desc,
-				meta:      baseSeriesMeta(staged.desc),
-			}
+			series = newCommittedSeries(key, staged.name, staged.labels, staged.labelsKey, staged.desc)
 			next.series[key] = series
 		}
-		ensureSeriesMeta(series.desc, &series.meta)
 
 		series.stateSetValues = cloneStateMap(staged.states)
 		series.meta.LastSeenSuccessSeq = c.core.active.seq
@@ -413,6 +367,32 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	c.core.snapshot.Store(next)
 	c.core.successSeq = successSeq
 	c.core.active = nil
+}
+
+func newCommittedSeries(key, name string, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
+	return &committedSeries{
+		id:        SeriesID(key),
+		hash64:    seriesIDHash(SeriesID(key)),
+		key:       key,
+		name:      name,
+		labels:    append([]Label(nil), labels...),
+		labelsKey: labelsKey,
+		desc:      desc,
+		meta:      baseSeriesMeta(desc),
+	}
+}
+
+func ensureCommitSeriesMutable(old, next *readSnapshot, key string) *committedSeries {
+	series := next.series[key]
+	if series == nil {
+		return nil
+	}
+	if oldSeries, ok := old.series[key]; ok && oldSeries == series {
+		series = cloneCommittedSeries(series)
+		next.series[key] = series
+	}
+	ensureSeriesMeta(series.desc, &series.meta)
+	return series
 }
 
 // AbortCycle discards staged writes and publishes metadata-only failed-attempt status.
