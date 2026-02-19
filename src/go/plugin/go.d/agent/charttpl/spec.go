@@ -73,6 +73,8 @@ type Instances struct {
 
 // Lifecycle controls chart and dimension cardinality/expiry limits.
 type Lifecycle struct {
+	// MaxInstances is best-effort per chart template.
+	// Active instances in the current successful cycle are not evicted.
 	MaxInstances      int                 `yaml:"max_instances,omitempty" json:"max_instances,omitempty"`
 	ExpireAfterCycles int                 `yaml:"expire_after_cycles,omitempty" json:"expire_after_cycles,omitempty"`
 	Dimensions        *DimensionLifecycle `yaml:"dimensions,omitempty" json:"dimensions,omitempty"`

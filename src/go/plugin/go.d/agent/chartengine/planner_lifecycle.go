@@ -75,6 +75,8 @@ func enforceChartInstanceCaps(
 		if len(observedIDs) > 0 {
 			lifecycle = chartsByID[observedIDs[0]].lifecycle
 		}
+		// max_instances is a soft cap:
+		// currently active chart instances are never evicted in the same successful cycle.
 		maxInstances := lifecycle.MaxInstances
 		if maxInstances <= 0 {
 			continue
@@ -143,6 +145,8 @@ func enforceChartInstanceCaps(
 
 		if overflow > 0 {
 			// Drop new chart instances deterministically when no eviction candidates remain.
+			// If all existing instances are active and no new ones were observed, overflow remains
+			// and the soft cap may be temporarily exceeded.
 			for i := len(newObserved) - 1; i >= 0 && overflow > 0; i-- {
 				delete(chartsByID, newObserved[i])
 				overflow--
