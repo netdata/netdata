@@ -216,6 +216,95 @@ groups:
 	}
 }
 
+func TestCollectOnceAbortsCycleOnPanic(t *testing.T) {
+	store := metrix.NewCollectorStore()
+
+	require.Panics(t, func() {
+		_ = collectOnce(store, func(context.Context) error {
+			panic("boom")
+		})
+	})
+
+	err := collectOnce(store, func(_ context.Context) error {
+		store.Write().SnapshotMeter("").Gauge("metric").Observe(1)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func TestBuildChartCoverageDynamicDimensions(t *testing.T) {
+	tests := map[string]struct {
+		template string
+		store    metrix.CollectorStore
+		want     map[string][]string
+	}{
+		"name_from_label dimensions are asserted from selector matches": {
+			template: `
+version: v1
+context_namespace: test
+groups:
+  - family: Root
+    metrics: [metric_a]
+    charts:
+      - title: A
+        context: a
+        units: "1"
+        dimensions:
+          - selector: metric_a
+            name_from_label: state
+`,
+			store: newTestCollectorStore(t, func(m metrix.SnapshotMeter) {
+				g := m.Gauge("metric_a")
+				g.Observe(1, m.LabelSet(metrix.Label{Key: "state", Value: "up"}))
+				g.Observe(1, m.LabelSet(metrix.Label{Key: "state", Value: "down"}))
+			}),
+			want: map[string][]string{
+				"test.a": {"down", "up"},
+			},
+		},
+		"inferred stateset dimensions are asserted from flattened metadata": {
+			template: `
+version: v1
+context_namespace: test
+groups:
+  - family: Root
+    metrics: [system.status]
+    charts:
+      - title: System status
+        context: status
+        units: state
+        dimensions:
+          - selector: system.status
+`,
+			store: newTestCollectorStore(t, func(m metrix.SnapshotMeter) {
+				ss := m.StateSet(
+					"system.status",
+					metrix.WithStateSetStates("ok", "failed"),
+					metrix.WithStateSetMode(metrix.ModeEnum),
+				)
+				ss.Enable("ok")
+			}),
+			want: map[string][]string{
+				"test.status": {"failed", "ok"},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			coverage, err := buildChartCoverage(
+				tc.template,
+				1,
+				tc.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()),
+				nil,
+			)
+			require.NoError(t, err)
+			require.Equal(t, normalizeCoverageDimsList(tc.want), normalizeCoverageDimsList(coverage.ExpectedByContext))
+			require.Equal(t, normalizeCoverageDimsList(tc.want), normalizeCoverageDims(coverage.ActualByContext))
+		})
+	}
+}
+
 func TestCollectScalarSeries(t *testing.T) {
 	tests := map[string]struct {
 		collectFn func(ctx context.Context, store metrix.CollectorStore) error

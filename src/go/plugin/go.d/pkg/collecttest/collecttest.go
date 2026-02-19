@@ -24,12 +24,19 @@ func collectOnce(store metrix.CollectorStore, collectFn func(ctx context.Context
 	}
 
 	cc := managed.CycleController()
+	committed := false
 	cc.BeginCycle()
-	if err := collectFn(context.Background()); err != nil {
+	defer func() {
+		if committed {
+			return
+		}
 		cc.AbortCycle()
+	}()
+	if err := collectFn(context.Background()); err != nil {
 		return err
 	}
 	cc.CommitCycleSuccess()
+	committed = true
 	return nil
 }
 

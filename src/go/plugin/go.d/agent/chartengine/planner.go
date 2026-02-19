@@ -85,6 +85,10 @@ type planBuildContext struct {
 	seriesAutogenMatched uint64
 }
 
+type flattenedReadChecker interface {
+	FlattenedRead() bool
+}
+
 // BuildPlan builds a minimal plan snapshot from the provided reader.
 //
 // Current scope:
@@ -120,6 +124,11 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	if err != nil {
 		sample.buildErr = true
 		e.logWarningf("chartengine build prepare failed: %v", err)
+		return Plan{}, err
+	}
+	if err := validateBuildReaderForInferredDimensions(ctx.index, reader); err != nil {
+		sample.buildErr = true
+		e.logWarningf("chartengine build reader validation failed: %v", err)
 		return Plan{}, err
 	}
 	if err := e.scanPlanSeries(ctx); err != nil {
@@ -169,6 +178,42 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	sample.actionRemoveChart = actionCounts.actionRemoveChart
 
 	return out, nil
+}
+
+func validateBuildReaderForInferredDimensions(index matchIndex, reader metrix.Reader) error {
+	templateID, dimIndex, requiresFlatten := firstInferDimension(index)
+	if !requiresFlatten {
+		return nil
+	}
+	aware, ok := reader.(flattenedReadChecker)
+	if ok && aware.FlattenedRead() {
+		return nil
+	}
+	return fmt.Errorf(
+		"chartengine: inferred dimension requires flattened reader metadata (template_id=%q dim_index=%d); use store.Read(metrix.ReadFlatten())",
+		templateID,
+		dimIndex,
+	)
+}
+
+func firstInferDimension(index matchIndex) (string, int, bool) {
+	if len(index.chartsByID) == 0 {
+		return "", 0, false
+	}
+	templateIDs := make([]string, 0, len(index.chartsByID))
+	for templateID := range index.chartsByID {
+		templateIDs = append(templateIDs, templateID)
+	}
+	sort.Strings(templateIDs)
+	for _, templateID := range templateIDs {
+		chart := index.chartsByID[templateID]
+		for i := range chart.Dimensions {
+			if chart.Dimensions[i].InferNameFromSeriesMeta {
+				return templateID, i, true
+			}
+		}
+	}
+	return "", 0, false
 }
 
 func (e *Engine) preparePlanBuildContext(

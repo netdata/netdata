@@ -21,6 +21,11 @@ type familyView struct {
 	reader *storeReader
 }
 
+// FlattenedRead reports whether this reader was created with ReadFlatten().
+func (r *storeReader) FlattenedRead() bool {
+	return r.flattened
+}
+
 func (r *storeReader) Value(name string, labels Labels) (SampleValue, bool) {
 	s, ok := r.lookup(name, labels)
 	if !ok || !r.visible(s) {

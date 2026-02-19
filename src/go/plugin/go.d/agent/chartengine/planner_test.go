@@ -197,6 +197,45 @@ groups:
 	}
 }
 
+func TestBuildPlanRequiresFlattenedReaderForInference(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - system.status
+    charts:
+      - title: System status
+        context: system_status
+        units: state
+        dimensions:
+          - selector: system.status
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	ss := store.Write().SnapshotMeter("system").StateSet(
+		"status",
+		metrix.WithStateSetStates("ok", "failed"),
+		metrix.WithStateSetMode(metrix.ModeEnum),
+	)
+
+	cc.BeginCycle()
+	ss.Enable("ok")
+	cc.CommitCycleSuccess()
+
+	_, err = e.BuildPlan(store.Read())
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "Read(metrix.ReadFlatten())")
+
+	_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+}
+
 func TestBuildPlanUsesRouteCacheReuse(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)

@@ -15,6 +15,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/charttpl"
 )
 
+const (
+	histogramBucketLabel = "le"
+	summaryQuantileLabel = "quantile"
+)
+
 type chartCoverage struct {
 	ActualByContext   map[string]map[string]struct{}
 	ExpectedByContext map[string][]string
@@ -166,7 +171,7 @@ func expectedTemplateCoverage(
 	}
 
 	byContextSet := make(map[string]map[string]struct{})
-	selectorMatchCache := make(map[string]bool)
+	selectorParseCache := make(map[string]metrixselector.Selector)
 	rootContext := normalizeOptionalContextPart(spec.ContextNamespace)
 
 	for i := range spec.Groups {
@@ -176,7 +181,7 @@ func expectedTemplateCoverage(
 			rootContext,
 			reader,
 			contextMatchers,
-			selectorMatchCache,
+			selectorParseCache,
 		); err != nil {
 			return nil, err
 		}
@@ -200,7 +205,7 @@ func collectTemplateContexts(
 	parentContextParts []string,
 	reader metrix.Reader,
 	contextMatchers []matcher.Matcher,
-	selectorMatchCache map[string]bool,
+	selectorParseCache map[string]metrixselector.Selector,
 ) error {
 	scopeContext := append([]string(nil), parentContextParts...)
 	scopeContext = append(scopeContext, normalizeOptionalContextPart(group.ContextNamespace)...)
@@ -216,7 +221,7 @@ func collectTemplateContexts(
 		matchedAnyDimension := false
 		dims := make(map[string]struct{})
 		for _, dim := range chart.Dimensions {
-			matched, err := selectorMatchesReader(reader, strings.TrimSpace(dim.Selector), selectorMatchCache)
+			dimNames, matched, err := collectExpectedDimensionNames(reader, dim, selectorParseCache)
 			if err != nil {
 				return err
 			}
@@ -224,7 +229,7 @@ func collectTemplateContexts(
 				continue
 			}
 			matchedAnyDimension = true
-			if name := strings.TrimSpace(dim.Name); name != "" {
+			for _, name := range dimNames {
 				dims[name] = struct{}{}
 			}
 		}
@@ -249,7 +254,7 @@ func collectTemplateContexts(
 			scopeContext,
 			reader,
 			contextMatchers,
-			selectorMatchCache,
+			selectorParseCache,
 		); err != nil {
 			return err
 		}
@@ -257,31 +262,117 @@ func collectTemplateContexts(
 	return nil
 }
 
-func selectorMatchesReader(
+func collectExpectedDimensionNames(
 	reader metrix.Reader,
-	selectorExpr string,
-	cache map[string]bool,
-) (bool, error) {
-	if matched, ok := cache[selectorExpr]; ok {
-		return matched, nil
-	}
-
-	sel, err := metrixselector.Parse(selectorExpr)
+	dim charttpl.Dimension,
+	parseCache map[string]metrixselector.Selector,
+) ([]string, bool, error) {
+	selectorExpr := strings.TrimSpace(dim.Selector)
+	sel, err := parseSelectorCached(selectorExpr, parseCache)
 	if err != nil {
-		return false, fmt.Errorf("collecttest: invalid selector %q: %w", selectorExpr, err)
+		return nil, false, err
 	}
 
+	explicitName := strings.TrimSpace(dim.Name)
+	nameFromLabel := strings.TrimSpace(dim.NameFromLabel)
+	names := make(map[string]struct{})
 	matched := false
-	reader.ForEachSeries(func(name string, labels metrix.LabelView, _ metrix.SampleValue) {
-		if matched {
+
+	reader.ForEachSeriesIdentity(func(_ metrix.SeriesIdentity, meta metrix.SeriesMeta, metricName string, labels metrix.LabelView, _ metrix.SampleValue) {
+		if err != nil {
 			return
 		}
-		if sel.Matches(name, labels) {
-			matched = true
+		if !sel.Matches(metricName, labels) {
+			return
 		}
+		matched = true
+		name, ok, nameErr := resolveExpectedDimensionName(explicitName, nameFromLabel, metricName, labels, meta)
+		if nameErr != nil {
+			err = nameErr
+			return
+		}
+		if !ok {
+			return
+		}
+		names[name] = struct{}{}
 	})
-	cache[selectorExpr] = matched
-	return matched, nil
+	if err != nil {
+		return nil, false, err
+	}
+
+	out := make([]string, 0, len(names))
+	for name := range names {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out, matched, nil
+}
+
+func parseSelectorCached(selectorExpr string, cache map[string]metrixselector.Selector) (metrixselector.Selector, error) {
+	if sel, ok := cache[selectorExpr]; ok {
+		return sel, nil
+	}
+	sel, err := metrixselector.Parse(selectorExpr)
+	if err != nil {
+		return nil, fmt.Errorf("collecttest: invalid selector %q: %w", selectorExpr, err)
+	}
+	cache[selectorExpr] = sel
+	return sel, nil
+}
+
+func resolveExpectedDimensionName(
+	explicitName string,
+	nameFromLabel string,
+	metricName string,
+	labels metrix.LabelView,
+	meta metrix.SeriesMeta,
+) (string, bool, error) {
+	if explicitName != "" {
+		return explicitName, true, nil
+	}
+	if nameFromLabel != "" {
+		value, ok := labels.Get(nameFromLabel)
+		if !ok || strings.TrimSpace(value) == "" {
+			return "", false, nil
+		}
+		return value, true, nil
+	}
+
+	labelKey, ok, err := inferExpectedDimensionLabelKey(metricName, meta)
+	if err != nil {
+		return "", false, err
+	}
+	if !ok {
+		return "", false, nil
+	}
+	value, ok := labels.Get(labelKey)
+	if !ok || strings.TrimSpace(value) == "" {
+		return "", false, nil
+	}
+	return value, true, nil
+}
+
+func inferExpectedDimensionLabelKey(metricName string, meta metrix.SeriesMeta) (string, bool, error) {
+	switch meta.FlattenRole {
+	case metrix.FlattenRoleHistogramBucket:
+		return histogramBucketLabel, true, nil
+	case metrix.FlattenRoleSummaryQuantile:
+		return summaryQuantileLabel, true, nil
+	case metrix.FlattenRoleStateSetState:
+		if strings.TrimSpace(metricName) == "" {
+			return "", false, fmt.Errorf("collecttest: stateset inference requires metric family name")
+		}
+		return metricName, true, nil
+	case metrix.FlattenRoleHistogramCount,
+		metrix.FlattenRoleHistogramSum,
+		metrix.FlattenRoleSummaryCount,
+		metrix.FlattenRoleSummarySum:
+		return "", false, nil
+	case metrix.FlattenRoleNone:
+		return "", false, fmt.Errorf("collecttest: inferred dimension requires flattened reader metadata; use store.Read(metrix.ReadFlatten())")
+	default:
+		return "", false, fmt.Errorf("collecttest: unsupported flatten role %d for expected dimension inference", meta.FlattenRole)
+	}
 }
 
 func normalizeOptionalContextPart(value string) []string {
