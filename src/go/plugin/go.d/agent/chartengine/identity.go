@@ -144,8 +144,22 @@ func renderInstanceSuffix(identity program.ChartIdentity, labels labelAccessor) 
 	}
 
 	parts := make([]string, 0, len(values))
+	hasNonEmpty := false
 	for _, item := range values {
-		parts = append(parts, sanitizeIDComponent(item.Value))
+		part := sanitizeIDComponent(item.Value)
+		if strings.TrimSpace(part) != "" {
+			hasNonEmpty = true
+		}
+		parts = append(parts, part)
+	}
+	if !hasNonEmpty {
+		// Keep base chart ID when every instance label value is empty.
+		return "", true, nil
+	}
+	for i := range parts {
+		if strings.TrimSpace(parts[i]) == "" {
+			parts[i] = "empty"
+		}
 	}
 	return "_" + strings.Join(parts, "_"), true, nil
 }
@@ -216,7 +230,7 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAcce
 	out := make([]instanceLabelValue, 0, len(keys))
 	for _, key := range keys {
 		value, ok := labels.Get(key)
-		if !ok || strings.TrimSpace(value) == "" {
+		if !ok {
 			return nil, false, nil
 		}
 		out = append(out, instanceLabelValue{
