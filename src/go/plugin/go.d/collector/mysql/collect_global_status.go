@@ -3,21 +3,20 @@
 package mysql
 
 import (
+	"context"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const queryShowGlobalStatus = "SHOW GLOBAL STATUS;"
 
-func (c *Collector) collectGlobalStatus(mx map[string]int64) error {
+func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunState, writeMetrics bool) error {
 	// MariaDB: https://mariadb.com/kb/en/server-status-variables/
 	// MySQL: https://dev.mysql.com/doc/refman/8.0/en/server-status-variable-reference.html
 	q := queryShowGlobalStatus
 	c.Debugf("executing query: '%s'", q)
 
 	var name string
-	_, err := c.collectQuery(q, func(column, value string, _ bool) {
+	_, err := c.collectQuery(ctx, q, func(column, value string, _ bool) {
 		switch column {
 		case "Variable_name":
 			name = value
@@ -27,28 +26,34 @@ func (c *Collector) collectGlobalStatus(mx map[string]int64) error {
 			}
 			switch name {
 			case "wsrep_connected":
-				mx[name] = parseInt(convertWsrepConnected(value))
+				if writeMetrics {
+					c.mx.set(name, parseInt(convertWsrepConnected(value)))
+				}
 			case "wsrep_ready":
-				mx[name] = parseInt(convertWsrepReady(value))
+				if writeMetrics {
+					c.mx.set(name, parseInt(convertWsrepReady(value)))
+				}
 			case "wsrep_local_state":
-				// https://mariadb.com/kb/en/galera-cluster-status-variables/#wsrep_local_state
-				// https://github.com/codership/wsrep-API/blob/eab2d5d5a31672c0b7d116ef1629ff18392fd7d0/wsrep_api.h#L256
-				mx[name+"_undefined"] = oldmetrix.Bool(value == "0")
-				mx[name+"_joiner"] = oldmetrix.Bool(value == "1")
-				mx[name+"_donor"] = oldmetrix.Bool(value == "2")
-				mx[name+"_joined"] = oldmetrix.Bool(value == "3")
-				mx[name+"_synced"] = oldmetrix.Bool(value == "4")
-				mx[name+"_error"] = oldmetrix.Bool(parseInt(value) >= 5)
+				if writeMetrics {
+					c.mx.setWsrepLocalState(value)
+				}
 			case "wsrep_cluster_status":
-				// https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_cluster_status
-				// https://github.com/codership/wsrep-API/blob/eab2d5d5a31672c0b7d116ef1629ff18392fd7d0/wsrep_api.h
-				// https://github.com/codership/wsrep-API/blob/f71cd270414ee70dde839cfc59c1731eea4230ea/examples/node/wsrep.c#L80
-				value = strings.ToUpper(value)
-				mx[name+"_primary"] = oldmetrix.Bool(value == "PRIMARY")
-				mx[name+"_non_primary"] = oldmetrix.Bool(value == "NON-PRIMARY")
-				mx[name+"_disconnected"] = oldmetrix.Bool(value == "DISCONNECTED")
+				if writeMetrics {
+					c.mx.setWsrepClusterStatus(value)
+				}
 			default:
-				mx[strings.ToLower(name)] = parseInt(value)
+				metricName := strings.ToLower(name)
+				parsedValue := parseInt(value)
+				if writeMetrics {
+					c.mx.set(metricName, parsedValue)
+				}
+
+				switch metricName {
+				case "connections":
+					state.connections = parsedValue
+				case "threads_created":
+					state.threadsCreated = parsedValue
+				}
 			}
 		}
 	})

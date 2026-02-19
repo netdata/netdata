@@ -13,10 +13,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/blang/semver/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -170,8 +172,14 @@ func TestCollector_Cleanup(t *testing.T) {
 	}
 }
 
-func TestCollector_Charts(t *testing.T) {
-	assert.NotNil(t, New().Charts())
+func TestCollector_ChartTemplateYAML(t *testing.T) {
+	collr := New()
+
+	spec, err := charttpl.DecodeYAML([]byte(collr.ChartTemplateYAML()))
+	require.NoError(t, err)
+
+	_, err = chartengine.Compile(spec, 1)
+	require.NoError(t, err)
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -179,19 +187,12 @@ func TestCollector_Check(t *testing.T) {
 		prepareMock func(t *testing.T, m sqlmock.Sqlmock)
 		wantFail    bool
 	}{
-		"success on all queries": {
+		"success on mandatory queries": {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
-				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
-				mockExpect(t, m, queryDisableSessionQueryLog, nil)
-				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
-				mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
 				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
-				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
-				mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
-				mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 			},
 		},
 		"fails when error on querying version": {
@@ -204,9 +205,6 @@ func TestCollector_Check(t *testing.T) {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
-				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
-				mockExpect(t, m, queryDisableSessionQueryLog, nil)
-				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpectErr(m, queryShowGlobalStatus)
 			},
 		},
@@ -214,55 +212,8 @@ func TestCollector_Check(t *testing.T) {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
-				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
-				mockExpect(t, m, queryDisableSessionQueryLog, nil)
-				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
-				mockExpectErr(m, queryShowGlobalStatus)
-			},
-		},
-		"success when error on querying slave status": {
-			wantFail: false,
-			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
-				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
-				mockExpect(t, m, queryDisableSessionQueryLog, nil)
-				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
-				mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
-				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
-				mockExpectErr(m, queryShowAllSlavesStatus)
-				mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
-				mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
-			},
-		},
-		"success when error on querying user statistics": {
-			wantFail: false,
-			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
-				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
-				mockExpect(t, m, queryDisableSessionQueryLog, nil)
-				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
-				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
-				mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
-				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
-				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
-				mockExpectErr(m, queryShowUserStatistics)
-				mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
-			},
-		},
-		"success when error on querying process list": {
-			wantFail: false,
-			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
-				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
-				mockExpect(t, m, queryDisableSessionQueryLog, nil)
-				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
-				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
-				mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
-				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
-				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
-				mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
-				mockExpectErr(m, queryShowProcessList)
+				mockExpectErr(m, queryShowGlobalVariables)
 			},
 		},
 	}
@@ -312,7 +263,8 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect(context.Background())
+					mx, err := collectLegacyMetricsMap(collr)
+					require.NoError(t, err)
 
 					expected := map[string]int64{
 						"aborted_connects":                        2,
@@ -471,9 +423,6 @@ func TestCollector_Collect(t *testing.T) {
 						"userstats_root_total_connections":        1,
 						"userstats_root_update_commands":          0,
 						"wsrep_cluster_size":                      0,
-						"wsrep_cluster_status_disconnected":       1,
-						"wsrep_cluster_status_non_primary":        0,
-						"wsrep_cluster_status_primary":            0,
 						"wsrep_connected":                         0,
 						"wsrep_local_bf_aborts":                   0,
 						"wsrep_ready":                             0,
@@ -482,7 +431,6 @@ func TestCollector_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -500,7 +448,8 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaVer5564ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect(context.Background())
+					mx, err := collectLegacyMetricsMap(collr)
+					require.NoError(t, err)
 
 					expected := map[string]int64{
 						"aborted_connects":                      0,
@@ -624,7 +573,6 @@ func TestCollector_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -643,7 +591,8 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect(context.Background())
+					mx, err := collectLegacyMetricsMap(collr)
+					require.NoError(t, err)
 
 					expected := map[string]int64{
 
@@ -803,9 +752,6 @@ func TestCollector_Collect(t *testing.T) {
 						"userstats_root_total_connections":        1,
 						"userstats_root_update_commands":          0,
 						"wsrep_cluster_size":                      0,
-						"wsrep_cluster_status_disconnected":       1,
-						"wsrep_cluster_status_non_primary":        0,
-						"wsrep_cluster_status_primary":            0,
 						"wsrep_connected":                         0,
 						"wsrep_local_bf_aborts":                   0,
 						"wsrep_ready":                             0,
@@ -814,7 +760,6 @@ func TestCollector_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -833,7 +778,8 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect(context.Background())
+					mx, err := collectLegacyMetricsMap(collr)
+					require.NoError(t, err)
 
 					expected := map[string]int64{
 						"aborted_connects":                        2,
@@ -995,9 +941,6 @@ func TestCollector_Collect(t *testing.T) {
 						"userstats_root_total_connections":        1,
 						"userstats_root_update_commands":          0,
 						"wsrep_cluster_size":                      0,
-						"wsrep_cluster_status_disconnected":       1,
-						"wsrep_cluster_status_non_primary":        0,
-						"wsrep_cluster_status_primary":            0,
 						"wsrep_connected":                         0,
 						"wsrep_local_bf_aborts":                   0,
 						"wsrep_ready":                             0,
@@ -1006,7 +949,6 @@ func TestCollector_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -1025,7 +967,8 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect(context.Background())
+					mx, err := collectLegacyMetricsMap(collr)
+					require.NoError(t, err)
 
 					expected := map[string]int64{
 						"aborted_connects":                        2,
@@ -1190,9 +1133,6 @@ func TestCollector_Collect(t *testing.T) {
 						"userstats_root_total_connections":        1,
 						"userstats_root_update_commands":          0,
 						"wsrep_cluster_size":                      0,
-						"wsrep_cluster_status_disconnected":       1,
-						"wsrep_cluster_status_non_primary":        0,
-						"wsrep_cluster_status_primary":            0,
 						"wsrep_connected":                         0,
 						"wsrep_local_bf_aborts":                   0,
 						"wsrep_ready":                             0,
@@ -1201,7 +1141,6 @@ func TestCollector_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -1220,7 +1159,8 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect(context.Background())
+					mx, err := collectLegacyMetricsMap(collr)
+					require.NoError(t, err)
 
 					expected := map[string]int64{
 						"aborted_connects":                        2,
@@ -1379,9 +1319,6 @@ func TestCollector_Collect(t *testing.T) {
 						"userstats_root_total_connections":        1,
 						"userstats_root_update_commands":          0,
 						"wsrep_cluster_size":                      0,
-						"wsrep_cluster_status_disconnected":       1,
-						"wsrep_cluster_status_non_primary":        0,
-						"wsrep_cluster_status_primary":            0,
 						"wsrep_connected":                         0,
 						"wsrep_local_bf_aborts":                   0,
 						"wsrep_ready":                             0,
@@ -1390,7 +1327,6 @@ func TestCollector_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -1409,7 +1345,8 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessList, dataMariaGaleraClusterVer1084ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect(context.Background())
+					mx, err := collectLegacyMetricsMap(collr)
+					require.NoError(t, err)
 
 					expected := map[string]int64{
 						"aborted_connects":                        0,
@@ -1568,9 +1505,6 @@ func TestCollector_Collect(t *testing.T) {
 						"userstats_root_total_connections":        1,
 						"userstats_root_update_commands":          0,
 						"wsrep_cluster_size":                      3,
-						"wsrep_cluster_status_disconnected":       0,
-						"wsrep_cluster_status_non_primary":        0,
-						"wsrep_cluster_status_primary":            1,
 						"wsrep_cluster_weight":                    3,
 						"wsrep_connected":                         1,
 						"wsrep_flow_control_paused_ns":            0,
@@ -1578,12 +1512,6 @@ func TestCollector_Collect(t *testing.T) {
 						"wsrep_local_cert_failures":               0,
 						"wsrep_local_recv_queue":                  0,
 						"wsrep_local_send_queue":                  0,
-						"wsrep_local_state_donor":                 0,
-						"wsrep_local_state_error":                 0,
-						"wsrep_local_state_joined":                0,
-						"wsrep_local_state_joiner":                0,
-						"wsrep_local_state_synced":                1,
-						"wsrep_local_state_undefined":             0,
 						"wsrep_open_transactions":                 0,
 						"wsrep_ready":                             1,
 						"wsrep_received":                          11,
@@ -1595,7 +1523,6 @@ func TestCollector_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -1613,7 +1540,8 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessListPS, dataMySQLVer8030ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect(context.Background())
+					mx, err := collectLegacyMetricsMap(collr)
+					require.NoError(t, err)
 
 					expected := map[string]int64{
 						"aborted_connects":                      0,
@@ -1741,7 +1669,6 @@ func TestCollector_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -1760,7 +1687,8 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowProcessListPS, dataPerconaVer8029ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
-					mx := collr.Collect(context.Background())
+					mx, err := collectLegacyMetricsMap(collr)
+					require.NoError(t, err)
 
 					expected := map[string]int64{
 						"aborted_connects":                        1,
@@ -1910,7 +1838,6 @@ func TestCollector_Collect(t *testing.T) {
 
 					copyProcessListQueryDuration(mx, expected)
 					require.Equal(t, expected, mx)
-					ensureCollectedHasAllChartsDimsVarsIDs(t, collr, mx)
 				},
 			},
 		},
@@ -1939,17 +1866,54 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, collr *Collector, mx map[string]int64) {
-	module.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
-		if collr.isMariaDB {
-			// https://mariadb.com/kb/en/server-status-variables/#connection_errors_accept
-			if collr.version.LT(semver.Version{Major: 10, Minor: 0, Patch: 4}) && chart.ID == "connection_errors" {
-				return true
-			}
-		}
-		return false
+func collectLegacyMetricsMap(collr *Collector) (map[string]int64, error) {
+	store := collr.MetricStore()
+	if store == nil {
+		return nil, errors.New("nil metric store")
+	}
 
+	managed, ok := metrix.AsCycleManagedStore(store)
+	if !ok {
+		return nil, errors.New("metric store is not cycle-managed")
+	}
+
+	cycle := managed.CycleController()
+	cycle.BeginCycle()
+	if err := collr.Collect(context.Background()); err != nil {
+		cycle.AbortCycle()
+		return nil, err
+	}
+	cycle.CommitCycleSuccess()
+
+	out := make(map[string]int64)
+	store.Read().ForEachSeries(func(name string, labels metrix.LabelView, v metrix.SampleValue) {
+		out[legacyMetricKey(name, labels)] = int64(v)
 	})
+	return out, nil
+}
+
+func legacyMetricKey(name string, labels metrix.LabelView) string {
+	if labels.Len() == 0 {
+		return name
+	}
+
+	if connection, ok := labels.Get("connection"); ok {
+		return name + legacySlaveMetricSuffix(strings.ToLower(connection))
+	}
+
+	if user, ok := labels.Get("user"); ok && strings.HasPrefix(name, "userstats_") {
+		user = strings.ToLower(user)
+		return "userstats_" + user + "_" + strings.TrimPrefix(name, "userstats_")
+	}
+
+	return name
+}
+
+func legacySlaveMetricSuffix(conn string) string {
+	if conn == "" {
+		return ""
+	}
+	return "_" + conn
 }
 
 func copyProcessListQueryDuration(dst, src map[string]int64) {

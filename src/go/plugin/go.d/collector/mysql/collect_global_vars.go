@@ -2,6 +2,8 @@
 
 package mysql
 
+import "context"
+
 const (
 	queryShowGlobalVariables = `
 SHOW GLOBAL VARIABLES 
@@ -15,14 +17,14 @@ WHERE
   OR Variable_name LIKE 'performance_schema';`
 )
 
-func (c *Collector) collectGlobalVariables() error {
+func (c *Collector) collectGlobalVariables(ctx context.Context) error {
 	// MariaDB: https://mariadb.com/kb/en/server-system-variables/
 	// MySQL: https://dev.mysql.com/doc/refman/8.0/en/server-system-variable-reference.html
 	q := queryShowGlobalVariables
 	c.Debugf("executing query: '%s'", q)
 
 	var name string
-	_, err := c.collectQuery(q, func(column, value string, _ bool) {
+	_, err := c.collectQuery(ctx, q, func(column, value string, _ bool) {
 		switch column {
 		case "Variable_name":
 			name = value

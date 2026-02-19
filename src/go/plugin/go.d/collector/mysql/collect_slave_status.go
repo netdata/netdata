@@ -3,7 +3,7 @@
 package mysql
 
 import (
-	"strings"
+	"context"
 
 	"github.com/blang/semver/v4"
 )
@@ -14,7 +14,7 @@ const (
 	queryShowAllSlavesStatus = "SHOW ALL SLAVES STATUS;"
 )
 
-func (c *Collector) collectSlaveStatus(mx map[string]int64) error {
+func (c *Collector) collectSlaveStatus(ctx context.Context) error {
 	// https://mariadb.com/docs/reference/es/sql-statements/SHOW_ALL_SLAVES_STATUS/
 	mariaDBMinVer := semver.Version{Major: 10, Minor: 2, Patch: 0}
 	mysqlMinVer := semver.Version{Major: 8, Minor: 0, Patch: 22}
@@ -35,7 +35,7 @@ func (c *Collector) collectSlaveStatus(mx map[string]int64) error {
 		ioRunning    int64
 	}{}
 
-	_, err := c.collectQuery(q, func(column, value string, lineEnd bool) {
+	_, err := c.collectQuery(ctx, q, func(column, value string, lineEnd bool) {
 		switch column {
 		case "Connection_name", "Channel_Name":
 			v.name = value
@@ -47,14 +47,9 @@ func (c *Collector) collectSlaveStatus(mx map[string]int64) error {
 			v.ioRunning = parseInt(convertSlaveIORunning(value))
 		}
 		if lineEnd {
-			if !c.collectedReplConns[v.name] {
-				c.collectedReplConns[v.name] = true
-				c.addSlaveReplicationConnCharts(v.name)
-			}
-			s := strings.ToLower(slaveMetricSuffix(v.name))
-			mx["seconds_behind_master"+s] = v.behindMaster
-			mx["slave_sql_running"+s] = v.sqlRunning
-			mx["slave_io_running"+s] = v.ioRunning
+			c.mx.setReplication("seconds_behind_master", v.name, v.behindMaster)
+			c.mx.setReplication("slave_sql_running", v.name, v.sqlRunning)
+			c.mx.setReplication("slave_io_running", v.name, v.ioRunning)
 		}
 	})
 	return err
@@ -77,11 +72,4 @@ func convertSlaveIORunning(value string) string {
 	default:
 		return "0"
 	}
-}
-
-func slaveMetricSuffix(conn string) string {
-	if conn == "" {
-		return ""
-	}
-	return "_" + conn
 }

@@ -273,7 +273,7 @@ func (f *funcDeadlockInfo) MethodParams(ctx context.Context, method string) ([]f
 
 func (f *funcDeadlockInfo) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if f.router.collector.db == nil {
-		if err := f.router.collector.openConnection(); err != nil {
+		if err := f.router.collector.openConnection(ctx); err != nil {
 			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 		}
 	}

@@ -3,6 +3,7 @@
 package mysql
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -18,13 +19,13 @@ WHERE
 
 var reVersionCore = regexp.MustCompile(`^\d+\.\d+\.\d+`)
 
-func (c *Collector) collectVersion() error {
+func (c *Collector) collectVersion(ctx context.Context) error {
 	// https://mariadb.com/kb/en/version/
 	q := queryShowVersion
 	c.Debugf("executing query: '%s'", queryShowVersion)
 
 	var name, version, versionComment string
-	_, err := c.collectQuery(q, func(column, value string, _ bool) {
+	_, err := c.collectQuery(ctx, q, func(column, value string, _ bool) {
 		switch column {
 		case "Variable_name":
 			name = value

@@ -16,16 +16,20 @@ import (
 	"github.com/go-sql-driver/mysql"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
+//go:embed "charts.yaml"
+var mysqlChartTemplateV2 string
+
 func init() {
 	module.Register("mysql", module.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		CreateV2:        func() module.ModuleV2 { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         mysqlMethods,
 		MethodHandler:   mysqlFunctionHandler,
@@ -33,6 +37,9 @@ func init() {
 }
 
 func New() *Collector {
+	store := metrix.NewCollectorStore()
+	mx := newCollectorMetrics(store)
+
 	return &Collector{
 		Config: Config{
 			DSN:     "root@tcp(localhost:3306)/",
@@ -44,19 +51,9 @@ func New() *Collector {
 			},
 		},
 
-		charts:                         baseCharts.Copy(),
-		addInnoDBOSLogOnce:             &sync.Once{},
-		addBinlogOnce:                  &sync.Once{},
-		addMyISAMOnce:                  &sync.Once{},
-		addInnodbDeadlocksOnce:         &sync.Once{},
-		addGaleraOnce:                  &sync.Once{},
-		addQCacheOnce:                  &sync.Once{},
-		addTableOpenCacheOverflowsOnce: &sync.Once{},
-		doDisableSessionQueryLog:       true,
-		doSlaveStatus:                  true,
-		doUserStatistics:               true,
-		collectedReplConns:             make(map[string]bool),
-		collectedUsers:                 make(map[string]bool),
+		doDisableSessionQueryLog: true,
+		doSlaveStatus:            true,
+		doUserStatistics:         true,
 
 		recheckGlobalVarsEvery: time.Minute * 10,
 
@@ -64,6 +61,8 @@ func New() *Collector {
 		// otherwise it defaults to 1.
 		// see https://mariadb.com/kb/en/innodb-system-variables/#innodb_log_files_in_group
 		varInnoDBLogFilesInGroup: 1,
+		store:                    store,
+		mx:                       mx,
 	}
 }
 
@@ -131,15 +130,6 @@ type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
-	charts                         *module.Charts
-	addInnoDBOSLogOnce             *sync.Once
-	addBinlogOnce                  *sync.Once
-	addMyISAMOnce                  *sync.Once
-	addInnodbDeadlocksOnce         *sync.Once
-	addGaleraOnce                  *sync.Once
-	addQCacheOnce                  *sync.Once
-	addTableOpenCacheOverflowsOnce *sync.Once
-
 	db *sql.DB
 
 	safeDSN   string
@@ -149,10 +139,8 @@ type Collector struct {
 
 	doDisableSessionQueryLog bool
 
-	doSlaveStatus      bool
-	collectedReplConns map[string]bool
-	doUserStatistics   bool
-	collectedUsers     map[string]bool
+	doSlaveStatus    bool
+	doUserStatistics bool
 
 	recheckGlobalVarsTime    time.Time
 	recheckGlobalVarsEvery   time.Duration
@@ -169,6 +157,9 @@ type Collector struct {
 	stmtSummaryColsMu sync.RWMutex    // protects stmtSummaryCols for concurrent access
 
 	funcRouter *funcRouter
+
+	store metrix.CollectorStore
+	mx    *collectorMetrics
 }
 
 func (c *Collector) Configuration() any {
@@ -203,32 +194,17 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
-	if err != nil {
-		return err
-	}
-	if len(mx) == 0 {
-		return errors.New("no metrics collected")
-	}
-	return nil
+func (c *Collector) Check(ctx context.Context) error {
+	return c.checkMandatory(ctx)
 }
 
-func (c *Collector) Charts() *module.Charts {
-	return c.charts
+func (c *Collector) Collect(ctx context.Context) error {
+	return c.collect(ctx)
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
-	if err != nil {
-		c.Error(err)
-	}
+func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-	if len(mx) == 0 {
-		return nil
-	}
-	return mx
-}
+func (c *Collector) ChartTemplateYAML() string { return mysqlChartTemplateV2 }
 
 func (c *Collector) Cleanup(ctx context.Context) {
 	if c.funcRouter != nil {
