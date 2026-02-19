@@ -71,7 +71,6 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Ubuntu                   | 25.10          | x86\_64, AArch64, ARMv7       |                                                                                                                |
 | Ubuntu                   | 24.04          | x86\_64, AArch64, ARMv7       |                                                                                                                |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64       |                                                                                                                |
-| Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64       |                                                                                                                |
 
 ### Intermediate
 
@@ -121,16 +120,12 @@ This is a list of platforms that we have supported in the recent past but no lon
 
 | Platform     | Version   | Notes                |
 |--------------|-----------|----------------------|
-| Alpine Linux | 3.18      | EOL as of 2024-05-23 |
 | Debian       | 10.x      | EOL as of 2024-07-01 |
 | Fedora       | 41        | EOL as of 2025-12-15 |
 | Fedora       | 40        | EOL as of 2024-11-12 |
-| Fedora       | 39        | EOL as of 2024-05-14 |
-| Fedora       | 38        | EOL as of 2024-05-14 |
 | openSUSE     | Leap 15.5 | EOL as of 2024-12-31 |
-| Ubuntu       | 25.04     | EOL as of 2025-01-17 |
-| Ubuntu       | 24.10     | EOL as of 2024-07-01 |
-| Ubuntu       | 23.10     | EOL as of 2024-07-01 |
+| Ubuntu       | 25.04     | EOL as of 2026-01-17 |
+| Ubuntu       | 20.04     | EOL as of 2025-05-31 |
 | Ubuntu       | 18.04     | EOL as of 2023-04-02 |
 
 ## Static builds

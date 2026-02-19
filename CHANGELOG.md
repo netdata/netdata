@@ -2,6 +2,18 @@
 
 ### Merged Pull Requests:
 
+- Increase minimum language standards to C17 and C++17, and update to the latest versions of Protobuf and Abseil. ([#21574](https://github.com/netdata/netdata/issues/21574))
+- Drop Ubuntu 20.04 from CI and package builds. ([#21647](https://github.com/netdata/netdata/issues/21647))
+- Clarify default storage retention limits in docs ([#21780](https://github.com/netdata/netdata/issues/21780))
+- Build(deps): bump github.com/redis/go-redis/v9 from 9.17.3 to 9.18.0 in /src/go ([#21782](https://github.com/netdata/netdata/issues/21782))
+- Add cmake render-docs target for integration doc generation ([#21778](https://github.com/netdata/netdata/issues/21778))
+- Replace otel-plugin metrics pipeline with proper aggregation. ([#21771](https://github.com/netdata/netdata/issues/21771))
+- Regenerate integrations docs ([#21783](https://github.com/netdata/netdata/issues/21783))
+
+## [2.9.0] - 2026-02-16
+
+### Merged Pull Requests:
+
 - Fix(cgroups): improve podman container name resolution ([#21317](https://github.com/netdata/netdata/issues/21317))
 - Build(deps): bump golang.org/x/crypto from 0.43.0 to 0.45.0 in /src/go ([#21322](https://github.com/netdata/netdata/issues/21322))
 - Remove log message ([#21325](https://github.com/netdata/netdata/issues/21325))
@@ -343,6 +355,12 @@
 - Icons ([#21767](https://github.com/netdata/netdata/issues/21767))
 - Regenerate integrations docs ([#21768](https://github.com/netdata/netdata/issues/21768))
 - Skip field remapping entries when querying logs. ([#21755](https://github.com/netdata/netdata/issues/21755))
+- Change title from 'Netdata MCP Server' to 'Netdata' ([#21772](https://github.com/netdata/netdata/issues/21772))
+- Build(deps): bump azure/artifact-signing-action from 1.0.0 to 1.1.0 ([#21773](https://github.com/netdata/netdata/issues/21773))
+- Fix(scripts.d): reduce nagios perfdata chart registration log spam ([#21774](https://github.com/netdata/netdata/issues/21774))
+- Bump go mod 1.25.0 ([#21775](https://github.com/netdata/netdata/issues/21775))
+- Rename function from otel-signal-viewer to otel-logs ([#21776](https://github.com/netdata/netdata/issues/21776))
+- Add readme for otel-signal-viewer plugin. ([#21734](https://github.com/netdata/netdata/issues/21734))
 
 ## [2.8.0] - 2025-11-19
 

@@ -697,10 +697,8 @@ impl FunctionHandler for CatalogFunction {
         // calls in a consistent way. If you rename this function, you should
         // update the `rt` crate as well.
 
-        let mut func_decl = FunctionDeclaration::new(
-            "otel-signal-viewer",
-            "Query and visualize OpenTelemetry logs",
-        );
+        let mut func_decl =
+            FunctionDeclaration::new("otel-logs", "Query and visualize OpenTelemetry logs");
         func_decl.global = true;
         func_decl.tags = Some(String::from("logs"));
         func_decl.access =

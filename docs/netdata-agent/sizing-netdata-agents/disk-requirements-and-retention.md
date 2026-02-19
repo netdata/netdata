@@ -33,6 +33,22 @@ gantt
 | `tier1` | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     6 bytes     |
 | `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |    18 bytes     |
 
+### Default Disk Footprint
+
+Netdata Agent metrics storage is limited to 3 GiB by default (configurable), using 1 GiB per tier × 3 tiers. In total, with SQLite databases, alert transitions, and other metadata, expect about 4 GiB of disk usage under normal conditions. The default retention limits are:
+
+| Tier    | Resolution | Size Limit | Time Limit |
+|:-------:|:----------:|:----------:|:----------:|
+| `tier0` | per-second |   1 GiB    |   14 days  |
+| `tier1` | per-minute |   1 GiB    |  3 months  |
+| `tier2` | per-hour   |   1 GiB    |   2 years  |
+
+Data is deleted when it reaches **either** the size limit or the time limit, whichever comes first. The number of metrics collected determines how far back in time retention extends within the size limit.
+
+In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
+
+These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
+
 **Configuring dbengine mode and retention**:
 
 - Enable dbengine mode: The dbengine mode is already the default, so no configuration change is necessary. For reference, the dbengine mode can be configured by setting `[db].mode` to `dbengine` in `netdata.conf`.
