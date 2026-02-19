@@ -56,8 +56,9 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     return datafile;
 }
 
-ALWAYS_INLINE bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
-    bool ret;
+ALWAYS_INLINE bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason)
+{
+    bool ret = false;
 
     spinlock_lock(&df->users.spinlock);
 
@@ -84,10 +85,7 @@ ALWAYS_INLINE bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQU
             df->users.lockers++;
             df->users.lockers_by_reason[reason]++;
         }
-        else
-            ret = false;
-    } else
-        ret = false;
+    }
 
     spinlock_unlock(&df->users.spinlock);
 
