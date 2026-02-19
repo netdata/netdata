@@ -79,7 +79,7 @@ static inline void safe_log_proxy_error(char *str, const char *proxy)
 // helper to extract "http://host:port" from a proxy URL, skipping credentials
 void aclk_proxy_get_display(char *buf, size_t buflen, const char *proxy, ACLK_PROXY_TYPE type)
 {
-    const char *at = strchr(proxy, '@');
+    const char *at = strrchr(proxy, '@');
     const char *host_start = at ? at + 1 : proxy;
     const char *sep = strstr(proxy, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
     if (!at && sep)
