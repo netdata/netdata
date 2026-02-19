@@ -1484,7 +1484,7 @@ void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
         char *fcnt = procfile_lineword(ff, l, 2);
         uint32_t hash = simple_hash(fcnt);
         if (fa->hash == hash && !strcmp(fcnt, fa->function)) {
-            char *type = procfile_lineword(ff, l, 2);
+            char *type = procfile_lineword(ff, l, 1);
             fa->type = type[0];
             if (fd > 0) {
                 char addr[128];

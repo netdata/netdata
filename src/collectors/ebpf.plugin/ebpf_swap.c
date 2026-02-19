@@ -1180,12 +1180,12 @@ static int ebpf_swap_load_bpf(ebpf_module_t *em)
  */
 static int ebpf_swap_set_internal_value(void)
 {
-    ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0};
+    ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0, .type = 0};
     int i;
     for (i = 0; swap_functions[i]; i++) {
         address.function = swap_functions[i];
         ebpf_load_addresses(&address, -1);
-        if (address.addr) {
+        if (address.addr && address.type == 'T') {
             int key = (i < 2) ? NETDATA_KEY_SWAP_READPAGE_CALL : NETDATA_KEY_SWAP_WRITEPAGE_CALL;
             swap_targets[key].name = address.function;
             address.addr = 0;
