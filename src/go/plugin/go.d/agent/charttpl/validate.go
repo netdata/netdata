@@ -175,6 +175,12 @@ func validateDimensions(dimensions []Dimension, path string, effectiveMetrics ma
 
 		name := strings.TrimSpace(d.Name)
 		nameFrom := strings.TrimSpace(d.NameFromLabel)
+		if d.Name != "" && name == "" {
+			return semErr(fmt.Sprintf("%s.dimensions[%d].name", path, i), "must not be whitespace-only")
+		}
+		if d.NameFromLabel != "" && nameFrom == "" {
+			return semErr(fmt.Sprintf("%s.dimensions[%d].name_from_label", path, i), "must not be whitespace-only")
+		}
 		if name != "" && nameFrom != "" {
 			return semErr(fmt.Sprintf("%s.dimensions[%d]", path, i), "use either name or name_from_label, not both")
 		}

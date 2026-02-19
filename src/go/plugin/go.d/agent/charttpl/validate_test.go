@@ -156,6 +156,98 @@ func TestSpecValidateScenarios(t *testing.T) {
 			wantErr: true,
 			errLike: "duplicate metric",
 		},
+		"fails on empty group family": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family:  " ",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "groups[0].family",
+		},
+		"fails on empty chart title": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   " ",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: ".title",
+		},
+		"fails on empty chart context": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: " ",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: ".context",
+		},
+		"fails on empty chart units": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   " ",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: ".units",
+		},
 		"fails on invalid algorithm": {
 			spec: Spec{
 				Version: VersionV1,
@@ -229,6 +321,60 @@ func TestSpecValidateScenarios(t *testing.T) {
 			},
 			wantErr: true,
 			errLike: "lifecycle.max_instances",
+		},
+		"fails on negative lifecycle expire_after_cycles": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Lifecycle: &Lifecycle{
+									ExpireAfterCycles: -1,
+								},
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "lifecycle.expire_after_cycles",
+		},
+		"fails on negative lifecycle dimensions max_dims": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Lifecycle: &Lifecycle{
+									Dimensions: &DimensionLifecycle{
+										MaxDims: -1,
+									},
+								},
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "lifecycle.dimensions.max_dims",
 		},
 		"fails on negative lifecycle dimensions expire_after_cycles": {
 			spec: Spec{
@@ -423,6 +569,78 @@ func TestSpecValidateScenarios(t *testing.T) {
 			},
 			wantErr: true,
 			errLike: "exclude token must include label key",
+		},
+		"fails on instances with empty by_labels list": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Instances: &Instances{
+									ByLabels: []string{},
+								},
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "instances.by_labels",
+		},
+		"fails on whitespace-only dimension name": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: " "},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "name",
+		},
+		"fails on whitespace-only name_from_label": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", NameFromLabel: " "},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "name_from_label",
 		},
 		"fails on empty engine selector entry": {
 			spec: Spec{

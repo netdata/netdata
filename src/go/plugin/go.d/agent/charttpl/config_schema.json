@@ -58,8 +58,15 @@
           "type": "string"
         },
         "max_type_id_len": {
-          "type": "integer",
-          "minimum": 0
+          "oneOf": [
+            {
+              "const": 0
+            },
+            {
+              "type": "integer",
+              "minimum": 4
+            }
+          ]
         },
         "expire_after_success_cycles": {
           "type": "integer",
