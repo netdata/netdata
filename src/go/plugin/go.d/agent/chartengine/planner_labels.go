@@ -78,58 +78,86 @@ func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels m
 		return nil
 	}
 
-	instanceSet := make(map[string]struct{}, len(instanceLabels))
 	for _, label := range instanceLabels {
-		instanceSet[label.Key] = struct{}{}
 		if _, exists := a.instance[label.Key]; !exists {
 			a.instance[label.Key] = label.Value
 		}
 	}
 
-	eligible := make(map[string]string)
 	switch a.mode {
 	case program.PromotionModeExplicitIntersection:
-		for key := range a.promoteKeys {
-			if _, excluded := a.excluded[key]; excluded {
-				continue
+		if !a.initialized {
+			for key := range a.promoteKeys {
+				if _, excluded := a.excluded[key]; excluded {
+					continue
+				}
+				if isInstanceLabelKey(instanceLabels, key) {
+					continue
+				}
+				value, ok := labels.Get(key)
+				if !ok {
+					continue
+				}
+				a.selected[key] = value
 			}
-			if _, identityKey := instanceSet[key]; identityKey {
-				continue
-			}
-			value, ok := labels.Get(key)
-			if !ok {
-				continue
-			}
-			eligible[key] = value
+			a.initialized = true
+			return nil
 		}
+		for key, value := range a.selected {
+			if _, excluded := a.excluded[key]; excluded {
+				delete(a.selected, key)
+				continue
+			}
+			if isInstanceLabelKey(instanceLabels, key) {
+				delete(a.selected, key)
+				continue
+			}
+			next, ok := labels.Get(key)
+			if !ok || next != value {
+				delete(a.selected, key)
+			}
+		}
+		return nil
 	default:
-		labels.Range(func(key, value string) bool {
-			if _, excluded := a.excluded[key]; excluded {
+		if !a.initialized {
+			labels.Range(func(key, value string) bool {
+				if _, excluded := a.excluded[key]; excluded {
+					return true
+				}
+				if isInstanceLabelKey(instanceLabels, key) {
+					return true
+				}
+				a.selected[key] = value
 				return true
-			}
-			if _, identityKey := instanceSet[key]; identityKey {
-				return true
-			}
-			eligible[key] = value
-			return true
-		})
-	}
-
-	if !a.initialized {
-		for key, value := range eligible {
-			a.selected[key] = value
+			})
+			a.initialized = true
+			return nil
 		}
-		a.initialized = true
+		for key, value := range a.selected {
+			if _, excluded := a.excluded[key]; excluded {
+				delete(a.selected, key)
+				continue
+			}
+			if isInstanceLabelKey(instanceLabels, key) {
+				delete(a.selected, key)
+				continue
+			}
+			next, ok := labels.Get(key)
+			if !ok || next != value {
+				delete(a.selected, key)
+			}
+		}
 		return nil
 	}
+}
 
-	for key, value := range a.selected {
-		next, ok := eligible[key]
-		if !ok || next != value {
-			delete(a.selected, key)
+func isInstanceLabelKey(instanceLabels []instanceLabelValue, key string) bool {
+	for _, label := range instanceLabels {
+		if label.Key == key {
+			return true
 		}
 	}
-	return nil
+	return false
 }
 
 func (a *chartLabelAccumulator) materialize() (map[string]string, error) {

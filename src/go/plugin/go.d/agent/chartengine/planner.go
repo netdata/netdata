@@ -308,6 +308,17 @@ func (ctx *planBuildContext) accumulateRoute(
 	labels metrix.LabelView,
 	value metrix.SampleValue,
 ) error {
+	var chart program.Chart
+	identity := program.ChartIdentity{}
+	if !route.Autogen {
+		var ok bool
+		chart, ok = index.chartsByID[route.ChartTemplateID]
+		if !ok {
+			return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
+		}
+		identity = chart.Identity
+	}
+
 	ownerTemplateID, ownerExists := ctx.chartOwners[route.ChartID]
 	if ownerExists && ownerTemplateID != route.ChartTemplateID {
 		if !route.Autogen && isAutogenTemplateID(ownerTemplateID) {
@@ -324,19 +335,12 @@ func (ctx *planBuildContext) accumulateRoute(
 		ctx.chartOwners[route.ChartID] = route.ChartTemplateID
 	}
 
-	identity := program.ChartIdentity{}
-	labelsAcc := newAutogenChartLabelAccumulator()
-	if !route.Autogen {
-		chart, ok := index.chartsByID[route.ChartTemplateID]
-		if !ok {
-			return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
-		}
-		identity = chart.Identity
-		labelsAcc = newChartLabelAccumulator(chart)
-	}
-
 	cs, exists := ctx.chartsByID[route.ChartID]
 	if !exists {
+		labelsAcc := newAutogenChartLabelAccumulator()
+		if !route.Autogen {
+			labelsAcc = newChartLabelAccumulator(chart)
+		}
 		cs = &chartState{
 			templateID: route.ChartTemplateID,
 			chartID:    route.ChartID,
