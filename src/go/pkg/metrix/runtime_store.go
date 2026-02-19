@@ -3,7 +3,6 @@
 package metrix
 
 import (
-	"sort"
 	"time"
 )
 
@@ -394,32 +393,11 @@ func applyRuntimeRetention(series map[string]*committedSeries, policy runtimeRet
 		}
 	}
 
-	if policy.maxSeries > 0 && len(series) > policy.maxSeries {
-		type candidate struct {
-			key      string
-			lastSeen int64
-		}
-		candidates := make([]candidate, 0, len(series))
-		for key, s := range series {
-			candidates = append(candidates, candidate{
-				key:      key,
-				lastSeen: s.runtimeLastSeenUnixNano,
-			})
-		}
-		sort.Slice(candidates, func(i, j int) bool {
-			if candidates[i].lastSeen != candidates[j].lastSeen {
-				return candidates[i].lastSeen < candidates[j].lastSeen
-			}
-			return candidates[i].key < candidates[j].key
-		})
-
-		evictCount := len(series) - policy.maxSeries
-		for i := 0; i < evictCount; i++ {
-			key := candidates[i].key
-			delete(series, key)
-			evicted = append(evicted, key)
-		}
-	}
+	evictOldestSeries(series, policy.maxSeries, func(s *committedSeries) int64 {
+		return s.runtimeLastSeenUnixNano
+	}, func(key string) {
+		evicted = append(evicted, key)
+	})
 
 	if len(evicted) == 0 {
 		return nil

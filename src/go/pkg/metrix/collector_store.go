@@ -440,30 +440,9 @@ func applyCollectorRetention(series map[string]*committedSeries, policy collecto
 		}
 	}
 
-	if policy.maxSeries > 0 && len(series) > policy.maxSeries {
-		type candidate struct {
-			key      string
-			lastSeen uint64
-		}
-		candidates := make([]candidate, 0, len(series))
-		for key, s := range series {
-			candidates = append(candidates, candidate{
-				key:      key,
-				lastSeen: s.lastSeenSuccessCycle,
-			})
-		}
-		sort.Slice(candidates, func(i, j int) bool {
-			if candidates[i].lastSeen != candidates[j].lastSeen {
-				return candidates[i].lastSeen < candidates[j].lastSeen
-			}
-			return candidates[i].key < candidates[j].key
-		})
-
-		evictCount := len(series) - policy.maxSeries
-		for i := 0; i < evictCount; i++ {
-			delete(series, candidates[i].key)
-		}
-	}
+	evictOldestSeries(series, policy.maxSeries, func(s *committedSeries) uint64 {
+		return s.lastSeenSuccessCycle
+	}, nil)
 }
 
 func defaultFreshness(mode metricMode) FreshnessPolicy {
