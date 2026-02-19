@@ -777,10 +777,11 @@ bool alert_hash_has_transitioned(nd_uuid_t *hash_id)
     }
 
     int param = 0;
+    bool found = true;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, hash_id, sizeof(*hash_id), SQLITE_STATIC));
 
     param = 0;
-    bool found = (sqlite3_step_monitored(res) == SQLITE_ROW);
+    found = (sqlite3_step_monitored(res) == SQLITE_ROW);
 
 done:
     REPORT_BIND_FAIL(res, param);
