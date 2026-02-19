@@ -479,11 +479,16 @@ int mqtt_wss_connect(
     char port_str[16];
     snprintf(port_str, sizeof(port_str) -1, "%d", client->port);
 
-    bool proxy_used = (proxy && proxy->proxy_destination != NULL);
-
-    nd_log_daemon(NDLP_INFO, "ACLK: Connecting to %s:%d%s%s",
-                  client->target_host, client->target_port,
-                  proxy_used ? " via proxy " : " (no proxy)", proxy_used ? proxy->proxy_destination : "");
+    if (proxy && proxy->type != MQTT_WSS_DIRECT) {
+        const char *proxy_proto = (proxy->type == MQTT_WSS_PROXY_HTTP) ? "http://" : "socks5://";
+        nd_log_daemon(NDLP_INFO, "ACLK: connecting to %s:%d via proxy %s%s:%d%s",
+                      client->target_host, client->target_port,
+                      proxy_proto, client->host, client->port,
+                      client->proxy_uname ? " (with credentials)" : " (without credentials)");
+    }
+    else
+        nd_log_daemon(NDLP_INFO, "ACLK: connecting to %s:%d (no proxy)",
+                      client->target_host, client->target_port);
 
     struct timeval timeout = { .tv_sec = 10, .tv_usec = 0 };
     int fd = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, client->host, 0, port_str, &timeout, fallback_ipv4);

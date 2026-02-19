@@ -76,6 +76,19 @@ static inline void safe_log_proxy_error(char *str, const char *proxy)
     freez(log);
 }
 
+// helper to extract "http://host:port" from a proxy URL, skipping credentials
+static void aclk_proxy_display(char *buf, size_t buflen, const char *proxy, ACLK_PROXY_TYPE type)
+{
+    const char *at = strchr(proxy, '@');
+    const char *host_start = at ? at + 1 : proxy;
+    const char *sep = strstr(proxy, ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+    if (!at && sep)
+        host_start = sep + strlen(ACLK_PROXY_PROTO_ADDR_SEPARATOR);
+    snprintfz(buf, buflen, "%s%s", aclk_proxy_type_to_url(type), host_start);
+}
+
+static const char *proxy_source = NULL;
+
 static inline int check_http_environment(const char **proxy)
 {
     const char *var = "http_proxy";
@@ -90,6 +103,14 @@ static inline int check_http_environment(const char **proxy)
 
     if (aclk_verify_proxy(tmp) == PROXY_TYPE_HTTP) {
         *proxy = tmp;
+        char display[512];
+        aclk_proxy_display(display, sizeof(display), tmp, PROXY_TYPE_HTTP);
+        char source_buf[256];
+        snprintfz(source_buf, sizeof(source_buf), "environment variable '%s'", var);
+        proxy_source = strdupz(source_buf);
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "ACLK: using HTTP proxy %s (%s, from %s)",
+               display, strchr(tmp, '@') ? "with credentials" : "without credentials", proxy_source);
         return 0;
     }
 
@@ -109,14 +130,26 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
 
     *type = PROXY_DISABLED;
 
-    if (!proxy || !*proxy || strcmp(proxy, "none") == 0)
+    if (!proxy || !*proxy || strcmp(proxy, "none") == 0) {
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "ACLK: proxy is %s, will connect directly without proxy.",
+               (!proxy || !*proxy) ? "not configured" : "set to 'none'");
+        proxy_source = NULL;
         return proxy;
+    }
 
     if (strcmp(proxy, ACLK_PROXY_ENV) == 0) {
         if (check_http_environment(&proxy) == 0)
             *type = PROXY_TYPE_HTTP;
-        else
+        else {
+            if (cloud_config_proxy_is_explicitly_set())
+                nd_log(NDLS_DAEMON, NDLP_WARNING,
+                       "ACLK: proxy is explicitly set to 'env' but neither 'http_proxy' nor 'https_proxy'"
+                       " environment variables are set. Will connect directly without proxy.");
+
+            proxy_source = NULL;
             proxy = NULL;
+        }
         return proxy;
     }
 
@@ -128,6 +161,18 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
             "Config var \"" ACLK_PROXY_CONFIG_VAR
             "\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:ip\".",
             proxy);
+        proxy_source = NULL;
+    }
+    else {
+        proxy_source = cloud_config_proxy_source_get();
+        char display[512];
+        aclk_proxy_display(display, sizeof(display), proxy, *type);
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "ACLK: using %s proxy %s (%s, from %s)",
+               *type == PROXY_TYPE_HTTP ? "HTTP" : "SOCKS5",
+               display,
+               strchr(proxy, '@') ? "with credentials" : "without credentials",
+               proxy_source);
     }
 
     return proxy;
@@ -155,4 +200,8 @@ const char *aclk_get_proxy(ACLK_PROXY_TYPE *return_type, bool for_logging)
     if (return_type)
         *return_type = proxy_type;
     return for_logging ? safe_proxy : proxy;
+}
+
+const char *aclk_get_proxy_source(void) {
+    return proxy_source;
 }
