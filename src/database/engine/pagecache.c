@@ -1067,8 +1067,13 @@ void pgc_open_add_hot_page(
     unsigned extent_size)
 {
 
-    if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) // for open cache item
-        fatal("DBENGINE: cannot acquire datafile to put page in open cache");
+    if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) { // for open cache item
+        nd_log_limit_static_thread_var(erl, 10, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
+                     "DBENGINE: skipped adding open-cache page for datafile %u of tier %u (deletion in progress)",
+                     datafile->fileno, datafile->tier);
+        return;
+    }
 
     struct extent_io_data ext_io_data = {
             .fileno = datafile->fileno,
