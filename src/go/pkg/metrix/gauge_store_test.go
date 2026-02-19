@@ -88,6 +88,31 @@ func TestGaugeStoreScenarios(t *testing.T) {
 				mustValue(t, s.Read(ReadRaw()), "svc.load", nil, 11)
 			},
 		},
+		"commit updates collect metadata on successful cycles": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				g := s.Write().SnapshotMeter("svc").Gauge("load")
+
+				cc.BeginCycle()
+				g.Observe(3)
+				cc.CommitCycleSuccess()
+
+				meta := s.Read().CollectMeta()
+				require.Equal(t, CollectStatusSuccess, meta.LastAttemptStatus, "unexpected collect meta after first success: %#v", meta)
+				require.Equal(t, uint64(1), meta.LastAttemptSeq, "unexpected collect meta after first success: %#v", meta)
+				require.Equal(t, uint64(1), meta.LastSuccessSeq, "unexpected collect meta after first success: %#v", meta)
+
+				cc.BeginCycle()
+				g.Observe(4)
+				cc.CommitCycleSuccess()
+
+				meta = s.Read().CollectMeta()
+				require.Equal(t, CollectStatusSuccess, meta.LastAttemptStatus, "unexpected collect meta after second success: %#v", meta)
+				require.Equal(t, uint64(2), meta.LastAttemptSeq, "unexpected collect meta after second success: %#v", meta)
+				require.Equal(t, uint64(2), meta.LastSuccessSeq, "unexpected collect meta after second success: %#v", meta)
+			},
+		},
 		"mode mixing snapshot and stateful panics": {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
