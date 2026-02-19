@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,11 +17,17 @@ import (
 )
 
 const (
-	metricLldpLocPortEntry    = "lldpLocPortEntry"
-	metricLldpLocManAddrEntry = "lldpLocManAddrEntry"
-	metricLldpRemEntry        = "lldpRemEntry"
-	metricLldpRemManAddrEntry = "lldpRemManAddrEntry"
-	metricCdpCacheEntry       = "cdpCacheEntry"
+	metricLldpLocPortEntry     = "lldpLocPortEntry"
+	metricLldpLocManAddrEntry  = "lldpLocManAddrEntry"
+	metricLldpRemEntry         = "lldpRemEntry"
+	metricLldpRemManAddrEntry  = "lldpRemManAddrEntry"
+	metricLldpRemManAddrCompat = "lldpRemManAddrCompatEntry"
+	metricCdpCacheEntry        = "cdpCacheEntry"
+	metricTopologyIfNameEntry  = "topologyIfNameEntry"
+	metricBridgePortMapEntry   = "dot1dBasePortIfIndexEntry"
+	metricFdbEntry             = "dot1dTpFdbEntry"
+	metricArpEntry             = "ipNetToPhysicalEntry"
+	metricArpLegacyEntry       = "ipNetToMediaEntry"
 )
 
 const (
@@ -56,6 +63,8 @@ const (
 	tagLldpRemSysCapEnabled    = "lldp_rem_sys_cap_enabled"
 
 	tagLldpRemMgmtAddrSubtype   = "lldp_rem_mgmt_addr_subtype"
+	tagLldpRemMgmtAddrLen       = "lldp_rem_mgmt_addr_len"
+	tagLldpRemMgmtAddrOctetPref = "lldp_rem_mgmt_addr_octet_"
 	tagLldpRemMgmtAddrIfSubtype = "lldp_rem_mgmt_addr_if_subtype"
 	tagLldpRemMgmtAddrIfID      = "lldp_rem_mgmt_addr_if_id"
 	tagLldpRemMgmtAddrOID       = "lldp_rem_mgmt_addr_oid"
@@ -83,6 +92,24 @@ const (
 	tagCdpSecondaryMgmtAddr     = "cdp_secondary_mgmt_addr"
 	tagCdpPhysicalLocation      = "cdp_physical_location"
 	tagCdpLastChange            = "cdp_last_change"
+
+	tagTopoIfIndex = "topo_if_index"
+	tagTopoIfName  = "topo_if_name"
+
+	tagBridgeBasePort = "bridge_base_port"
+	tagBridgeIfIndex  = "bridge_if_index"
+
+	tagFdbMac        = "fdb_mac"
+	tagFdbBridgePort = "fdb_bridge_port"
+	tagFdbStatus     = "fdb_status"
+
+	tagArpIfIndex  = "arp_if_index"
+	tagArpIfName   = "arp_if_name"
+	tagArpIP       = "arp_ip"
+	tagArpMac      = "arp_mac"
+	tagArpType     = "arp_type"
+	tagArpState    = "arp_state"
+	tagArpAddrType = "arp_addr_type"
 )
 
 var lldpChassisIDSubtypeMap = map[string]string{
@@ -116,6 +143,11 @@ type topologyCache struct {
 	lldpLocPorts map[string]*lldpLocPort
 	lldpRemotes  map[string]*lldpRemote
 	cdpRemotes   map[string]*cdpRemote
+
+	ifNamesByIndex map[string]string
+	bridgePortToIf map[string]string
+	fdbEntries     map[string]*fdbEntry
+	arpEntries     map[string]*arpEntry
 }
 
 type lldpLocPort struct {
@@ -169,11 +201,38 @@ type cdpRemote struct {
 	managementAddrs       []topologyManagementAddress
 }
 
+type fdbEntry struct {
+	mac        string
+	bridgePort string
+	status     string
+}
+
+type arpEntry struct {
+	ifIndex  string
+	ifName   string
+	ip       string
+	mac      string
+	addrType string
+	state    string
+}
+
+type learnedEndpoint struct {
+	mac       string
+	ips       map[string]struct{}
+	ifIndexes map[string]struct{}
+	ifNames   map[string]struct{}
+	sources   map[string]struct{}
+}
+
 func newTopologyCache() *topologyCache {
 	return &topologyCache{
-		lldpLocPorts: make(map[string]*lldpLocPort),
-		lldpRemotes:  make(map[string]*lldpRemote),
-		cdpRemotes:   make(map[string]*cdpRemote),
+		lldpLocPorts:   make(map[string]*lldpLocPort),
+		lldpRemotes:    make(map[string]*lldpRemote),
+		cdpRemotes:     make(map[string]*cdpRemote),
+		ifNamesByIndex: make(map[string]string),
+		bridgePortToIf: make(map[string]string),
+		fdbEntries:     make(map[string]*fdbEntry),
+		arpEntries:     make(map[string]*arpEntry),
 	}
 }
 
@@ -193,6 +252,10 @@ func (c *Collector) resetTopologyCache() {
 	c.topologyCache.lldpLocPorts = make(map[string]*lldpLocPort)
 	c.topologyCache.lldpRemotes = make(map[string]*lldpRemote)
 	c.topologyCache.cdpRemotes = make(map[string]*cdpRemote)
+	c.topologyCache.ifNamesByIndex = make(map[string]string)
+	c.topologyCache.bridgePortToIf = make(map[string]string)
+	c.topologyCache.fdbEntries = make(map[string]*fdbEntry)
+	c.topologyCache.arpEntries = make(map[string]*arpEntry)
 }
 
 func (c *Collector) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
@@ -257,10 +320,18 @@ func (c *Collector) updateTopologyCacheEntry(m ddsnmp.Metric) {
 		c.topologyCache.updateLldpLocManAddr(m.Tags)
 	case metricLldpRemEntry:
 		c.topologyCache.updateLldpRemote(m.Tags)
-	case metricLldpRemManAddrEntry:
+	case metricLldpRemManAddrEntry, metricLldpRemManAddrCompat:
 		c.topologyCache.updateLldpRemManAddr(m.Tags)
 	case metricCdpCacheEntry:
 		c.topologyCache.updateCdpRemote(m.Tags)
+	case metricTopologyIfNameEntry:
+		c.topologyCache.updateIfNameByIndex(m.Tags)
+	case metricBridgePortMapEntry:
+		c.topologyCache.updateBridgePortMap(m.Tags)
+	case metricFdbEntry:
+		c.topologyCache.updateFdbEntry(m.Tags)
+	case metricArpEntry, metricArpLegacyEntry:
+		c.topologyCache.updateArpEntry(m.Tags)
 	}
 }
 
@@ -277,7 +348,8 @@ func (c *Collector) finalizeTopologyCache() {
 
 func isTopologyMetric(name string) bool {
 	switch name {
-	case metricLldpLocPortEntry, metricLldpLocManAddrEntry, metricLldpRemEntry, metricLldpRemManAddrEntry, metricCdpCacheEntry:
+	case metricLldpLocPortEntry, metricLldpLocManAddrEntry, metricLldpRemEntry, metricLldpRemManAddrEntry, metricLldpRemManAddrCompat, metricCdpCacheEntry,
+		metricTopologyIfNameEntry, metricBridgePortMapEntry, metricFdbEntry, metricArpEntry, metricArpLegacyEntry:
 		return true
 	default:
 		return false
@@ -448,6 +520,9 @@ func (c *topologyCache) updateLldpRemManAddr(tags map[string]string) {
 	}
 
 	addrHex := tags[tagLldpRemMgmtAddr]
+	if strings.TrimSpace(addrHex) == "" {
+		addrHex = reconstructLldpRemMgmtAddrHex(tags)
+	}
 	addr, addrType := normalizeManagementAddress(addrHex, tags[tagLldpRemMgmtAddrSubtype])
 	if addr == "" {
 		return
@@ -549,6 +624,100 @@ func (c *topologyCache) updateCdpRemote(tags map[string]string) {
 	entry.managementAddrs = appendCdpManagementAddresses(entry, entry.managementAddrs)
 }
 
+func (c *topologyCache) updateIfNameByIndex(tags map[string]string) {
+	ifIndex := strings.TrimSpace(tags[tagTopoIfIndex])
+	if ifIndex == "" {
+		return
+	}
+
+	ifName := strings.TrimSpace(tags[tagTopoIfName])
+	if ifName == "" {
+		return
+	}
+
+	c.ifNamesByIndex[ifIndex] = ifName
+}
+
+func (c *topologyCache) updateBridgePortMap(tags map[string]string) {
+	basePort := strings.TrimSpace(tags[tagBridgeBasePort])
+	if basePort == "" {
+		return
+	}
+
+	ifIndex := strings.TrimSpace(tags[tagBridgeIfIndex])
+	if ifIndex == "" {
+		return
+	}
+
+	c.bridgePortToIf[basePort] = ifIndex
+}
+
+func (c *topologyCache) updateFdbEntry(tags map[string]string) {
+	mac := normalizeMAC(tags[tagFdbMac])
+	if mac == "" {
+		return
+	}
+
+	bridgePort := strings.TrimSpace(tags[tagFdbBridgePort])
+	if bridgePort == "" || bridgePort == "0" {
+		return
+	}
+
+	key := mac + "|" + bridgePort
+	entry := c.fdbEntries[key]
+	if entry == nil {
+		entry = &fdbEntry{
+			mac:        mac,
+			bridgePort: bridgePort,
+		}
+		c.fdbEntries[key] = entry
+	}
+
+	if v := strings.TrimSpace(tags[tagFdbStatus]); v != "" {
+		entry.status = v
+	}
+}
+
+func (c *topologyCache) updateArpEntry(tags map[string]string) {
+	ip := normalizeIPAddress(tags[tagArpIP])
+	mac := normalizeMAC(tags[tagArpMac])
+	if ip == "" && mac == "" {
+		return
+	}
+
+	ifIndex := strings.TrimSpace(tags[tagArpIfIndex])
+	ifName := strings.TrimSpace(tags[tagArpIfName])
+	if ifName == "" && ifIndex != "" {
+		ifName = c.ifNamesByIndex[ifIndex]
+	}
+
+	if ifIndex != "" && ifName != "" {
+		c.ifNamesByIndex[ifIndex] = ifName
+	}
+
+	key := strings.Join([]string{ifIndex, ip, mac}, "|")
+	entry := c.arpEntries[key]
+	if entry == nil {
+		entry = &arpEntry{
+			ifIndex: ifIndex,
+			ifName:  ifName,
+			ip:      ip,
+			mac:     mac,
+		}
+		c.arpEntries[key] = entry
+	}
+
+	if v := strings.TrimSpace(tags[tagArpState]); v != "" {
+		entry.state = v
+	}
+	if v := strings.TrimSpace(tags[tagArpType]); v != "" && entry.state == "" {
+		entry.state = v
+	}
+	if v := strings.TrimSpace(tags[tagArpAddrType]); v != "" {
+		entry.addrType = v
+	}
+}
+
 func (c *topologyCache) snapshot() (topologyData, bool) {
 	if c.lastUpdate.IsZero() {
 		return topologyData{}, false
@@ -578,6 +747,34 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 	links := make([]topology.Link, 0, len(c.lldpRemotes)+len(c.cdpRemotes))
 	linksLLDP := 0
 	linksCDP := 0
+	linksFDB := 0
+	linksARP := 0
+
+	endpoints := make(map[string]*learnedEndpoint)
+	ensureEndpoint := func(key string) *learnedEndpoint {
+		ep := endpoints[key]
+		if ep == nil {
+			ep = &learnedEndpoint{
+				ips:       make(map[string]struct{}),
+				ifIndexes: make(map[string]struct{}),
+				ifNames:   make(map[string]struct{}),
+				sources:   make(map[string]struct{}),
+			}
+			endpoints[key] = ep
+		}
+		return ep
+	}
+
+	linkIndex := make(map[string]struct{})
+	addUniqueLink := func(link topology.Link) bool {
+		key := topologyLinkSortKey(link)
+		if _, ok := linkIndex[key]; ok {
+			return false
+		}
+		linkIndex[key] = struct{}{}
+		links = append(links, link)
+		return true
+	}
 
 	for _, rem := range c.lldpRemotes {
 		remoteDev := topologyDevice{
@@ -745,15 +942,131 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 		linksCDP++
 	}
 
+	for _, entry := range c.fdbEntries {
+		if entry == nil || entry.mac == "" {
+			continue
+		}
+
+		ifIndex := c.bridgePortToIf[entry.bridgePort]
+		ifName := c.ifNamesByIndex[ifIndex]
+
+		endpointKey := "mac:" + entry.mac
+		ep := ensureEndpoint(endpointKey)
+		ep.mac = entry.mac
+		ep.sources["fdb"] = struct{}{}
+		if ifIndex != "" {
+			ep.ifIndexes[ifIndex] = struct{}{}
+		}
+		if ifName != "" {
+			ep.ifNames[ifName] = struct{}{}
+		}
+
+		src := topologyEndpoint{
+			ChassisID:     local.ChassisID,
+			ChassisIDType: local.ChassisIDType,
+			IfName:        ifName,
+		}
+		if idx := parseIndex(ifIndex); idx > 0 {
+			src.IfIndex = idx
+		}
+
+		dst := topologyEndpoint{
+			ChassisID:     entry.mac,
+			ChassisIDType: "macAddress",
+		}
+
+		if addUniqueLink(topology.Link{
+			Layer:        "2",
+			Protocol:     "fdb",
+			Direction:    "unidirectional",
+			State:        entry.status,
+			Src:          endpointToLink(src),
+			Dst:          endpointToLink(dst),
+			DiscoveredAt: timePtr(c.lastUpdate),
+			LastSeen:     timePtr(c.lastUpdate),
+		}) {
+			linksFDB++
+		}
+	}
+
+	for _, entry := range c.arpEntries {
+		if entry == nil {
+			continue
+		}
+
+		if entry.ifName == "" && entry.ifIndex != "" {
+			entry.ifName = c.ifNamesByIndex[entry.ifIndex]
+		}
+
+		if entry.mac == "" && entry.ip == "" {
+			continue
+		}
+
+		endpointKey := ""
+		if entry.mac != "" {
+			endpointKey = "mac:" + entry.mac
+		} else {
+			endpointKey = "ip:" + entry.ip
+		}
+		ep := ensureEndpoint(endpointKey)
+		if entry.mac != "" {
+			ep.mac = entry.mac
+		}
+		if entry.ip != "" {
+			ep.ips[entry.ip] = struct{}{}
+		}
+		if entry.ifIndex != "" {
+			ep.ifIndexes[entry.ifIndex] = struct{}{}
+		}
+		if entry.ifName != "" {
+			ep.ifNames[entry.ifName] = struct{}{}
+		}
+		ep.sources["arp"] = struct{}{}
+
+		src := topologyEndpoint{
+			ChassisID:     local.ChassisID,
+			ChassisIDType: local.ChassisIDType,
+			IfName:        entry.ifName,
+		}
+		if idx := parseIndex(entry.ifIndex); idx > 0 {
+			src.IfIndex = idx
+		}
+
+		dst := topologyEndpoint{
+			ChassisID:     entry.mac,
+			ChassisIDType: "macAddress",
+			ManagementIP:  entry.ip,
+		}
+		if dst.ChassisID == "" {
+			dst.ChassisID = entry.ip
+			dst.ChassisIDType = "management_ip"
+		}
+
+		if addUniqueLink(topology.Link{
+			Layer:        "2",
+			Protocol:     "arp",
+			Direction:    "unidirectional",
+			State:        entry.state,
+			Src:          endpointToLink(src),
+			Dst:          endpointToLink(dst),
+			DiscoveredAt: timePtr(c.lastUpdate),
+			LastSeen:     timePtr(c.lastUpdate),
+		}) {
+			linksARP++
+		}
+	}
+
 	stats := map[string]any{
 		"devices_total":      len(devices),
 		"devices_discovered": maxInt(len(devices)-1, 0),
 		"links_total":        len(links),
 		"links_lldp":         linksLLDP,
 		"links_cdp":          linksCDP,
+		"links_fdb":          linksFDB,
+		"links_arp":          linksARP,
 	}
 
-	actors := make([]topology.Actor, 0, len(devices))
+	actors := make([]topology.Actor, 0, len(devices)+len(endpoints))
 	actorIndex := make(map[string]struct{})
 	for _, dev := range devices {
 		act := deviceToActor(dev, c.agentID)
@@ -767,6 +1080,36 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 		actorIndex[key] = struct{}{}
 		actors = append(actors, act)
 	}
+
+	endpointCount := 0
+	endpointKeys := make([]string, 0, len(endpoints))
+	for key := range endpoints {
+		endpointKeys = append(endpointKeys, key)
+	}
+	sort.Strings(endpointKeys)
+
+	for _, key := range endpointKeys {
+		ep := endpoints[key]
+		if ep == nil {
+			continue
+		}
+		act := endpointToActor(ep)
+		ak := actorKey(act.Match)
+		if ak == "" {
+			continue
+		}
+		if _, ok := actorIndex[ak]; ok {
+			continue
+		}
+		actorIndex[ak] = struct{}{}
+		actors = append(actors, act)
+		endpointCount++
+	}
+
+	stats["actors_total"] = len(actors)
+	stats["endpoints_total"] = endpointCount
+	sortTopologyActors(actors)
+	sortTopologyLinks(links)
 
 	return topologyData{
 		SchemaVersion: topologySchemaVersion,
@@ -829,6 +1172,30 @@ func deviceToActor(dev topologyDevice, agentID string) topology.Actor {
 	}
 }
 
+func endpointToActor(ep *learnedEndpoint) topology.Actor {
+	match := topology.Match{}
+	if ep.mac != "" {
+		match.ChassisIDs = []string{ep.mac}
+		match.MacAddresses = []string{ep.mac}
+	}
+	match.IPAddresses = sortedStringSet(ep.ips)
+
+	attrs := map[string]any{
+		"discovered":         true,
+		"learned_sources":    sortedStringSet(ep.sources),
+		"learned_if_indexes": sortedStringSet(ep.ifIndexes),
+		"learned_if_names":   sortedStringSet(ep.ifNames),
+	}
+
+	return topology.Actor{
+		ActorType:  "endpoint",
+		Layer:      "2",
+		Source:     "snmp",
+		Match:      match,
+		Attributes: pruneNilAttributes(attrs),
+	}
+}
+
 func endpointToLink(ep topologyEndpoint) topology.LinkEndpoint {
 	match := topology.Match{}
 	if ep.ChassisID != "" {
@@ -868,19 +1235,102 @@ func endpointToLink(ep topologyEndpoint) topology.LinkEndpoint {
 }
 
 func actorKey(match topology.Match) string {
+	return canonicalMatchKey(match)
+}
+
+func canonicalMatchKey(match topology.Match) string {
 	if len(match.ChassisIDs) > 0 {
-		return "chassis:" + strings.Join(match.ChassisIDs, ",")
+		return "chassis:" + canonicalListKey(match.ChassisIDs)
 	}
 	if len(match.MacAddresses) > 0 {
-		return "mac:" + strings.Join(match.MacAddresses, ",")
+		return "mac:" + canonicalListKey(match.MacAddresses)
 	}
 	if len(match.IPAddresses) > 0 {
-		return "ip:" + strings.Join(match.IPAddresses, ",")
+		return "ip:" + canonicalListKey(match.IPAddresses)
+	}
+	if len(match.Hostnames) > 0 {
+		return "hostname:" + canonicalListKey(match.Hostnames)
+	}
+	if len(match.DNSNames) > 0 {
+		return "dns:" + canonicalListKey(match.DNSNames)
 	}
 	if match.SysName != "" {
 		return "sysname:" + match.SysName
 	}
+	if match.SysObjectID != "" {
+		return "sysobjectid:" + match.SysObjectID
+	}
 	return ""
+}
+
+func canonicalListKey(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		out = append(out, v)
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	sort.Strings(out)
+	return strings.Join(out, ",")
+}
+
+func topologyLinkSortKey(link topology.Link) string {
+	return strings.Join([]string{
+		link.Protocol,
+		link.Direction,
+		canonicalMatchKey(link.Src.Match),
+		canonicalMatchKey(link.Dst.Match),
+		attrKey(link.Src.Attributes, "if_index"),
+		attrKey(link.Src.Attributes, "if_name"),
+		attrKey(link.Src.Attributes, "port_id"),
+		attrKey(link.Dst.Attributes, "if_index"),
+		attrKey(link.Dst.Attributes, "if_name"),
+		attrKey(link.Dst.Attributes, "port_id"),
+		link.State,
+	}, "|")
+}
+
+func attrKey(attrs map[string]any, key string) string {
+	if len(attrs) == 0 {
+		return ""
+	}
+	v, ok := attrs[key]
+	if !ok || v == nil {
+		return ""
+	}
+	return fmt.Sprint(v)
+}
+
+func sortTopologyActors(actors []topology.Actor) {
+	sort.SliceStable(actors, func(i, j int) bool {
+		a, b := actors[i], actors[j]
+		if a.ActorType != b.ActorType {
+			return a.ActorType < b.ActorType
+		}
+		ak := canonicalMatchKey(a.Match)
+		bk := canonicalMatchKey(b.Match)
+		if ak != bk {
+			return ak < bk
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		return a.Layer < b.Layer
+	})
+}
+
+func sortTopologyLinks(links []topology.Link) {
+	sort.SliceStable(links, func(i, j int) bool {
+		return topologyLinkSortKey(links[i]) < topologyLinkSortKey(links[j])
+	})
 }
 
 func uniqueStrings(values []string) []string {
@@ -899,6 +1349,22 @@ func uniqueStrings(values []string) []string {
 		seen[v] = struct{}{}
 		out = append(out, v)
 	}
+	return out
+}
+
+func sortedStringSet(values map[string]struct{}) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	out := make([]string, 0, len(values))
+	for v := range values {
+		if v == "" {
+			continue
+		}
+		out = append(out, v)
+	}
+	sort.Strings(out)
 	return out
 }
 
@@ -1039,6 +1505,30 @@ func pickManagementIP(addrs []topologyManagementAddress) string {
 	return ""
 }
 
+func reconstructLldpRemMgmtAddrHex(tags map[string]string) string {
+	lengthStr := strings.TrimSpace(tags[tagLldpRemMgmtAddrLen])
+	length, err := strconv.Atoi(lengthStr)
+	if err != nil || length <= 0 || length > net.IPv6len {
+		return ""
+	}
+
+	addr := make([]byte, 0, length)
+	for i := 1; i <= length; i++ {
+		tag := fmt.Sprintf("%s%d", tagLldpRemMgmtAddrOctetPref, i)
+		v := strings.TrimSpace(tags[tag])
+		if v == "" {
+			return ""
+		}
+		octet, err := strconv.Atoi(v)
+		if err != nil || octet < 0 || octet > 255 {
+			return ""
+		}
+		addr = append(addr, byte(octet))
+	}
+
+	return hex.EncodeToString(addr)
+}
+
 func normalizeManagementAddress(rawAddr, rawType string) (string, string) {
 	rawAddr = strings.TrimSpace(rawAddr)
 	if rawAddr == "" {
@@ -1050,8 +1540,7 @@ func normalizeManagementAddress(rawAddr, rawType string) (string, string) {
 	}
 
 	if bs, err := decodeHexString(rawAddr); err == nil {
-		if len(bs) == net.IPv4len || len(bs) == net.IPv6len {
-			ip := net.IP(bs)
+		if ip := parseIPFromDecodedBytes(bs); ip != nil {
 			return ip.String(), normalizeAddressType(rawType, ip.String())
 		}
 	}
@@ -1059,21 +1548,100 @@ func normalizeManagementAddress(rawAddr, rawType string) (string, string) {
 	return rawAddr, normalizeAddressType(rawType, rawAddr)
 }
 
-func normalizeAddressType(rawType, addr string) string {
-	switch rawType {
-	case "2":
-		return "ipv4"
-	case "3":
-		return "ipv6"
-	case "1":
-		if ip := net.ParseIP(addr); ip != nil && ip.To4() != nil {
-			return "ipv4"
+func normalizeIPAddress(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if ip := net.ParseIP(value); ip != nil {
+		return ip.String()
+	}
+
+	if bs, err := decodeHexString(value); err == nil {
+		if ip := parseIPFromDecodedBytes(bs); ip != nil {
+			return ip.String()
 		}
 	}
+
+	return ""
+}
+
+func parseIPFromDecodedBytes(bs []byte) net.IP {
+	if len(bs) == net.IPv4len || len(bs) == net.IPv6len {
+		ip := net.IP(bs)
+		if ip.To16() != nil {
+			return ip
+		}
+	}
+
+	ascii := decodePrintableASCII(bs)
+	if ascii == "" {
+		return nil
+	}
+
+	if ip := net.ParseIP(ascii); ip != nil {
+		return ip
+	}
+	return nil
+}
+
+func decodePrintableASCII(bs []byte) string {
+	if len(bs) == 0 {
+		return ""
+	}
+
+	for _, b := range bs {
+		if b == 0 {
+			continue
+		}
+		if b < 32 || b > 126 {
+			return ""
+		}
+	}
+
+	s := strings.TrimRight(string(bs), "\x00")
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	return s
+}
+
+func normalizeMAC(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+
+	if hw, err := net.ParseMAC(value); err == nil {
+		return strings.ToLower(hw.String())
+	}
+
+	clean := strings.NewReplacer(":", "", "-", "", ".", "", " ", "").Replace(strings.ToLower(value))
+	if clean == "" {
+		return ""
+	}
+
+	bs, err := decodeHexString(clean)
+	if err != nil || len(bs) != 6 {
+		return ""
+	}
+
+	return strings.ToLower(net.HardwareAddr(bs).String())
+}
+
+func normalizeAddressType(rawType, addr string) string {
 	if ip := net.ParseIP(addr); ip != nil {
 		if ip.To4() != nil {
 			return "ipv4"
 		}
+		return "ipv6"
+	}
+
+	switch rawType {
+	case "1":
+		return "ipv4"
+	case "2":
 		return "ipv6"
 	}
 	return rawType
@@ -1081,6 +1649,7 @@ func normalizeAddressType(rawType, addr string) string {
 
 func decodeHexString(value string) ([]byte, error) {
 	clean := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(value)), "0x")
+	clean = strings.NewReplacer(":", "", "-", "", ".", "", " ", "").Replace(clean)
 	if clean == "" {
 		return nil, fmt.Errorf("empty hex string")
 	}
