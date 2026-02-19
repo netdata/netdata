@@ -66,6 +66,7 @@ type planBuildContext struct {
 	seenInfer   map[string]struct{}
 	chartsByID  map[string]*chartState
 	chartOwners map[string]string
+	dimCapHints map[string]int
 
 	planRouteStats
 }
@@ -219,8 +220,12 @@ func (e *Engine) preparePlanBuildContext(
 		e.state.matchIndex = index
 	}
 	chartOwners := make(map[string]string, len(e.state.materialized.charts))
+	dimCapHints := make(map[string]int, len(e.state.materialized.charts))
 	for chartID, matChart := range e.state.materialized.charts {
 		chartOwners[chartID] = matChart.templateID
+		if n := len(matChart.dimensions); n > 0 {
+			dimCapHints[chartID] = n
+		}
 	}
 	return &planBuildContext{
 		out:         out,
@@ -234,6 +239,7 @@ func (e *Engine) preparePlanBuildContext(
 		seenInfer:   make(map[string]struct{}),
 		chartsByID:  make(map[string]*chartState),
 		chartOwners: chartOwners,
+		dimCapHints: dimCapHints,
 	}, nil
 }
 
@@ -336,6 +342,7 @@ func (ctx *planBuildContext) accumulateRoute(
 
 	cs, exists := ctx.chartsByID[route.ChartID]
 	if !exists {
+		dimCap := ctx.dimCapHints[route.ChartID]
 		labelsAcc := newAutogenChartLabelAccumulator()
 		if !route.Autogen {
 			labelsAcc = newChartLabelAccumulator(chart)
@@ -346,8 +353,8 @@ func (ctx *planBuildContext) accumulateRoute(
 			meta:       route.Meta,
 			lifecycle:  route.Lifecycle,
 			labels:     labelsAcc,
-			values:     make(map[string]metrix.SampleValue),
-			dimensions: make(map[string]dimensionState),
+			values:     make(map[string]metrix.SampleValue, dimCap),
+			dimensions: make(map[string]dimensionState, dimCap),
 		}
 		ctx.chartsByID[route.ChartID] = cs
 	}
