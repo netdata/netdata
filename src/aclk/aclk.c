@@ -1097,21 +1097,8 @@ char *aclk_state(void)
     else {
         const char *cloud_base_url = cloud_config_url_get();
 
-        ACLK_PROXY_TYPE proxy_type;
-        const char *proxy_str = aclk_get_proxy(&proxy_type, false);
         char proxy_display[512];
-        if (proxy_type == PROXY_DISABLED || proxy_type == PROXY_NOT_SET || !proxy_str)
-            snprintfz(proxy_display, sizeof(proxy_display), "none");
-        else {
-            const char *source = aclk_get_proxy_source();
-            aclk_proxy_get_display(proxy_display, sizeof(proxy_display), proxy_str, proxy_type);
-            char full_display[512];
-            snprintfz(full_display, sizeof(full_display), "%s (%s, from %s)",
-                      proxy_display,
-                      strchr(proxy_str, '@') ? "with credentials" : "without credentials",
-                      source ? source : "unknown");
-            strcpy(proxy_display, full_display);
-        }
+        aclk_proxy_get_full_display(proxy_display, sizeof(proxy_display));
 
         usec_t latency = __atomic_load_n(&publish_latency, __ATOMIC_RELAXED);
         char latency_str[64];
@@ -1261,21 +1248,8 @@ char *aclk_state_json(void)
     json_object_object_add(msg, "cloud-url", tmp);
 
     {
-        ACLK_PROXY_TYPE proxy_type;
-        const char *proxy_str = aclk_get_proxy(&proxy_type, false);
         char proxy_display[512];
-        if (proxy_type == PROXY_DISABLED || proxy_type == PROXY_NOT_SET || !proxy_str)
-            snprintfz(proxy_display, sizeof(proxy_display), "none");
-        else {
-            const char *source = aclk_get_proxy_source();
-            aclk_proxy_get_display(proxy_display, sizeof(proxy_display), proxy_str, proxy_type);
-            char full_display[512];
-            snprintfz(full_display, sizeof(full_display), "%s (%s, from %s)",
-                      proxy_display,
-                      strchr(proxy_str, '@') ? "with credentials" : "without credentials",
-                      source ? source : "unknown");
-            strcpy(proxy_display, full_display);
-        }
+        aclk_proxy_get_full_display(proxy_display, sizeof(proxy_display));
         tmp = json_object_new_string(proxy_display);
         json_object_object_add(msg, "aclk_proxy", tmp);
     }

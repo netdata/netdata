@@ -19,6 +19,7 @@ void safe_log_proxy_censor(char *proxy);
 const char *aclk_get_proxy(ACLK_PROXY_TYPE *type, bool for_logging);
 const char *aclk_get_proxy_source(void);
 void aclk_proxy_get_display(char *buf, size_t buflen, const char *proxy, ACLK_PROXY_TYPE type);
+void aclk_proxy_get_full_display(char *buf, size_t buflen);
 
 static inline const char *aclk_proxy_type_to_url(ACLK_PROXY_TYPE type) {
     switch (type) {

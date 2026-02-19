@@ -135,6 +135,7 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
         nd_log(NDLS_DAEMON, NDLP_INFO,
                "ACLK: proxy is %s, will connect directly without proxy.",
                (!proxy || !*proxy) ? "not configured" : "set to 'none'");
+        freez((void *)proxy_source);
         proxy_source = NULL;
         return proxy;
     }
@@ -148,6 +149,7 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
                        "ACLK: proxy is explicitly set to 'env' but neither 'http_proxy' nor 'https_proxy'"
                        " environment variables are set. Will connect directly without proxy.");
 
+            freez((void *)proxy_source);
             proxy_source = NULL;
             proxy = NULL;
         }
@@ -162,10 +164,13 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
             "Config var \"" ACLK_PROXY_CONFIG_VAR
             "\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:ip\".",
             proxy);
+        freez((void *)proxy_source);
         proxy_source = NULL;
     }
     else {
-        proxy_source = cloud_config_proxy_source_get();
+        const char *src = cloud_config_proxy_source_get();
+        freez((void *)proxy_source);
+        proxy_source = src ? strdupz(src) : NULL;
         char display[512];
         aclk_proxy_get_display(display, sizeof(display), proxy, *type);
         nd_log(NDLS_DAEMON, NDLP_INFO,
@@ -205,4 +210,23 @@ const char *aclk_get_proxy(ACLK_PROXY_TYPE *return_type, bool for_logging)
 
 const char *aclk_get_proxy_source(void) {
     return proxy_source;
+}
+
+void aclk_proxy_get_full_display(char *buf, size_t buflen) {
+    ACLK_PROXY_TYPE proxy_type;
+    const char *proxy_str = aclk_get_proxy(&proxy_type, false);
+
+    if (proxy_type == PROXY_DISABLED || proxy_type == PROXY_NOT_SET || !proxy_str) {
+        snprintfz(buf, buflen, "none");
+        return;
+    }
+
+    char host_display[256];
+    aclk_proxy_get_display(host_display, sizeof(host_display), proxy_str, proxy_type);
+
+    const char *source = aclk_get_proxy_source();
+    snprintfz(buf, buflen, "%s (%s, from %s)",
+              host_display,
+              strchr(proxy_str, '@') ? "with credentials" : "without credentials",
+              source ? source : "unknown");
 }

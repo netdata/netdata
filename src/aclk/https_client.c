@@ -765,10 +765,10 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
 
     // extract protocol prefix from proxy URL for logging
     const char *proxy_proto = "";
+    char proto_buf[16];
     if (proxy_used && request->proxy) {
         const char *sep = strstr(request->proxy, "://");
         if (sep) {
-            static __thread char proto_buf[16];
             size_t len = (size_t)(sep - request->proxy) + 3;
             if (len < sizeof(proto_buf)) {
                 memcpy(proto_buf, request->proxy, len);
