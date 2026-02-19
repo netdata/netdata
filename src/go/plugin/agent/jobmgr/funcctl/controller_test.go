@@ -368,6 +368,7 @@ func TestControllerLifecycleHooks(t *testing.T) {
 	tests := map[string]struct{}{
 		"register modules does not register static methods yet":        {},
 		"first job start registers static methods once":                {},
+		"topology methods register direct alias":                       {},
 		"job stop unregisters job methods":                             {},
 		"cleanup unregisters static methods":                           {},
 		"cleanup with api configured still unregisters static methods": {},
@@ -399,6 +400,23 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				controller.OnJobStart(newTestRuntimeJob("mod", "job2", true))
 
 				assert.Equal(t, []string{"mod:a"}, reg.registeredNames())
+
+			case "topology methods register direct alias":
+				controller.RegisterModules(collectorapi.Registry{
+					"snmp": collectorapi.Creator{
+						Methods: func() []funcapi.MethodConfig {
+							return []funcapi.MethodConfig{{ID: "topology:snmp", ResponseType: "topology"}}
+						},
+					},
+				})
+
+				controller.OnJobStart(newTestRuntimeJob("snmp", "edge-router", true))
+
+				assert.ElementsMatch(t, []string{"snmp:topology:snmp", "topology:snmp"}, reg.registeredNames())
+
+				controller.Cleanup()
+
+				assert.ElementsMatch(t, []string{"snmp:topology:snmp", "topology:snmp"}, reg.unregisteredNames())
 
 			case "job stop unregisters job methods":
 				controller.RegisterModules(collectorapi.Registry{

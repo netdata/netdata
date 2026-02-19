@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -135,6 +136,37 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 		},
 	})
 	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+		Name: metricLldpRemManAddrEntry,
+		Tags: map[string]string{
+			tagLldpLocPortNum:         "1",
+			tagLldpRemIndex:           "1",
+			tagLldpRemMgmtAddrSubtype: "1",
+			tagLldpRemMgmtAddr:        "31302e32302e342e3834", // "10.20.4.84" ASCII-hex
+		},
+	})
+	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+		Name: metricLldpRemManAddrEntry,
+		Tags: map[string]string{
+			tagLldpLocPortNum:         "1",
+			tagLldpRemIndex:           "1",
+			tagLldpRemMgmtAddrSubtype: "1",
+			tagLldpRemMgmtAddr:        "666330303a663835333a6363643a653739333a3a31", // "fc00:f853:ccd:e793::1" ASCII-hex
+		},
+	})
+	coll.updateTopologyCacheEntry(ddsnmp.Metric{
+		Name: metricLldpRemManAddrEntry,
+		Tags: map[string]string{
+			tagLldpLocPortNum:                 "1",
+			tagLldpRemIndex:                   "1",
+			tagLldpRemMgmtAddrSubtype:         "1",
+			tagLldpRemMgmtAddrLen:             "4",
+			tagLldpRemMgmtAddrOctetPref + "1": "10",
+			tagLldpRemMgmtAddrOctetPref + "2": "20",
+			tagLldpRemMgmtAddrOctetPref + "3": "4",
+			tagLldpRemMgmtAddrOctetPref + "4": "21",
+		},
+	})
+	coll.updateTopologyCacheEntry(ddsnmp.Metric{
 		Name: metricLldpRemEntry,
 		Tags: map[string]string{
 			tagLldpLocPortNum:          "1",
@@ -156,7 +188,12 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 	require.Greater(t, len(data.Actors), 1)
 	require.True(t, actorHasAttributeList(data, "management_addresses"))
 	require.True(t, actorHasAttributeList(data, "capabilities_enabled"))
-	require.True(t, containsMgmtAddr(data, map[string]struct{}{"10.0.0.2": {}}))
+	require.True(t, containsMgmtAddr(data, map[string]struct{}{
+		"10.0.0.2":              {},
+		"10.20.4.21":            {},
+		"10.20.4.84":            {},
+		"fc00:f853:ccd:e793::1": {},
+	}))
 }
 
 func TestTopologyCache_CDPManagementAddresses(t *testing.T) {
@@ -188,6 +225,114 @@ func TestTopologyCache_CDPManagementAddresses(t *testing.T) {
 	require.True(t, containsMgmtAddr(data, map[string]struct{}{"10.0.0.3": {}, "10.0.0.4": {}}))
 }
 
+func TestTopologyCache_FDBAndARPEnrichment(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		ManagementIP:  "10.0.0.1",
+	}
+
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "3",
+		tagTopoIfName:  "Port3",
+	})
+	cache.updateBridgePortMap(map[string]string{
+		tagBridgeBasePort: "3",
+		tagBridgeIfIndex:  "3",
+	})
+	cache.updateFdbEntry(map[string]string{
+		tagFdbMac:        "7049a26572cd",
+		tagFdbBridgePort: "3",
+		tagFdbStatus:     "learned",
+	})
+	cache.updateArpEntry(map[string]string{
+		tagArpIfIndex: "3",
+		tagArpIfName:  "Port3",
+		tagArpIP:      "10.20.4.84",
+		tagArpMac:     "70:49:a2:65:72:cd",
+		tagArpState:   "reachable",
+	})
+
+	cache.mu.RLock()
+	data, ok := cache.snapshot()
+	cache.mu.RUnlock()
+
+	require.True(t, ok)
+	require.GreaterOrEqual(t, len(data.Actors), 2)
+	require.GreaterOrEqual(t, len(data.Links), 2)
+
+	require.NotNil(t, findLinkByProtocol(data, "fdb"))
+	require.NotNil(t, findLinkByProtocol(data, "arp"))
+
+	ep := findActorByMAC(data, "70:49:a2:65:72:cd")
+	require.NotNil(t, ep)
+	assert.Equal(t, "endpoint", ep.ActorType)
+	assert.Contains(t, ep.Match.IPAddresses, "10.20.4.84")
+}
+
+func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		ManagementIP:  "10.0.0.1",
+	}
+	cache.lldpLocPorts["2"] = &lldpLocPort{portNum: "2", portID: "Gi0/2", portIDSubtype: "5"}
+	cache.lldpLocPorts["1"] = &lldpLocPort{portNum: "1", portID: "Gi0/1", portIDSubtype: "5"}
+	cache.lldpRemotes["2:1"] = &lldpRemote{
+		localPortNum:     "2",
+		remIndex:         "1",
+		chassisID:        "00:00:00:00:00:22",
+		chassisIDSubtype: "macAddress",
+		sysName:          "sw2",
+	}
+	cache.lldpRemotes["1:1"] = &lldpRemote{
+		localPortNum:     "1",
+		remIndex:         "1",
+		chassisID:        "00:00:00:00:00:11",
+		chassisIDSubtype: "macAddress",
+		sysName:          "sw1",
+	}
+	cache.cdpRemotes["3:1"] = &cdpRemote{
+		ifIndex:    "3",
+		ifName:     "Gi0/3",
+		deviceID:   "sw3",
+		devicePort: "Gi0/4",
+		address:    "10.0.0.3",
+	}
+
+	cache.mu.RLock()
+	data, ok := cache.snapshot()
+	cache.mu.RUnlock()
+
+	require.True(t, ok)
+	require.NotEmpty(t, data.Actors)
+	require.NotEmpty(t, data.Links)
+
+	actorOrder := make([]string, 0, len(data.Actors))
+	for _, actor := range data.Actors {
+		actorOrder = append(actorOrder, actor.ActorType+"|"+canonicalMatchKey(actor.Match))
+	}
+	expectedActorOrder := append([]string(nil), actorOrder...)
+	sort.Strings(expectedActorOrder)
+	assert.Equal(t, expectedActorOrder, actorOrder)
+
+	linkOrder := make([]string, 0, len(data.Links))
+	for _, link := range data.Links {
+		linkOrder = append(linkOrder, topologyLinkSortKey(link))
+	}
+	expectedLinkOrder := append([]string(nil), linkOrder...)
+	sort.Strings(expectedLinkOrder)
+	assert.Equal(t, expectedLinkOrder, linkOrder)
+}
+
 func actorHasAttributeList(snapshot topologyData, key string) bool {
 	for _, actor := range snapshot.Actors {
 		if actor.Attributes == nil {
@@ -215,4 +360,24 @@ func actorHasAttributeList(snapshot topologyData, key string) bool {
 		}
 	}
 	return false
+}
+
+func findLinkByProtocol(snapshot topologyData, protocol string) *topologyLink {
+	for i := range snapshot.Links {
+		if snapshot.Links[i].Protocol == protocol {
+			return &snapshot.Links[i]
+		}
+	}
+	return nil
+}
+
+func findActorByMAC(snapshot topologyData, mac string) *topologyActor {
+	for i := range snapshot.Actors {
+		for _, m := range snapshot.Actors[i].Match.MacAddresses {
+			if m == mac {
+				return &snapshot.Actors[i]
+			}
+		}
+	}
+	return nil
 }

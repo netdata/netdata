@@ -5,6 +5,7 @@ package funcctl
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -115,10 +116,11 @@ func (c *Controller) Cleanup() {
 			if method.ID == "" {
 				continue
 			}
-			funcName := fmt.Sprintf("%s:%s", name, method.ID)
-			c.fnReg.Unregister(funcName)
-			if c.api != nil {
-				c.api.FunctionRemove(funcName)
+			for _, funcName := range methodFunctionNames(name, method) {
+				c.fnReg.Unregister(funcName)
+				if c.api != nil {
+					c.api.FunctionRemove(funcName)
+				}
 			}
 		}
 	}
@@ -140,9 +142,6 @@ func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
 			continue
 		}
 
-		funcName := fmt.Sprintf("%s:%s", moduleName, method.ID)
-		c.fnReg.Register(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
-
 		if c.api != nil {
 			help := method.Help
 			if help == "" {
@@ -155,19 +154,35 @@ func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
 				access = cloudAccess
 			}
 
-			c.api.FunctionGlobal(netdataapi.FunctionGlobalOpts{
-				Name:     funcName,
-				Timeout:  60,
-				Help:     help,
-				Tags:     "top",
-				Access:   access,
-				Priority: 100,
-				Version:  3,
-			})
+			for _, funcName := range methodFunctionNames(moduleName, method) {
+				c.fnReg.Register(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
+				c.api.FunctionGlobal(netdataapi.FunctionGlobalOpts{
+					Name:     funcName,
+					Timeout:  60,
+					Help:     help,
+					Tags:     "top",
+					Access:   access,
+					Priority: 100,
+					Version:  3,
+				})
+			}
+			continue
+		}
+
+		for _, funcName := range methodFunctionNames(moduleName, method) {
+			c.fnReg.Register(funcName, c.makeMethodFuncHandler(moduleName, method.ID))
 		}
 	}
 
 	c.staticMethodsSeen[moduleName] = struct{}{}
+}
+
+func methodFunctionNames(moduleName string, method funcapi.MethodConfig) []string {
+	funcNames := []string{fmt.Sprintf("%s:%s", moduleName, method.ID)}
+	if method.ResponseType == "topology" && strings.HasPrefix(method.ID, "topology:") {
+		funcNames = append(funcNames, method.ID)
+	}
+	return funcNames
 }
 
 func (c *Controller) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) {
