@@ -3,7 +3,6 @@
 package mysql
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,65 +21,19 @@ func TestCollectorMetricsSetCoverage(t *testing.T) {
 		value int64
 	}{}
 
-	for key := range globalStatusKeys {
+	for key := range mx.globalStatus.gauges {
 		fixedCases["global_status_"+key] = struct {
 			name  string
 			value int64
-		}{name: strings.ToLower(key), value: 1}
+		}{name: key, value: 1}
 	}
 
-	fixedCases["extra_innodb_log_sequence_number"] = struct {
-		name  string
-		value int64
-	}{name: "innodb_log_sequence_number", value: 1}
-	fixedCases["extra_innodb_last_checkpoint_at"] = struct {
-		name  string
-		value int64
-	}{name: "innodb_last_checkpoint_at", value: 1}
-	fixedCases["extra_innodb_checkpoint_age"] = struct {
-		name  string
-		value int64
-	}{name: "innodb_checkpoint_age", value: 1}
-	fixedCases["extra_innodb_log_file_size"] = struct {
-		name  string
-		value int64
-	}{name: "innodb_log_file_size", value: 1}
-	fixedCases["extra_innodb_log_files_in_group"] = struct {
-		name  string
-		value int64
-	}{name: "innodb_log_files_in_group", value: 1}
-	fixedCases["extra_innodb_log_group_capacity"] = struct {
-		name  string
-		value int64
-	}{name: "innodb_log_group_capacity", value: 1}
-	fixedCases["extra_innodb_log_occupancy"] = struct {
-		name  string
-		value int64
-	}{name: "innodb_log_occupancy", value: 1}
-	fixedCases["extra_max_connections"] = struct {
-		name  string
-		value int64
-	}{name: "max_connections", value: 1}
-	fixedCases["extra_table_open_cache"] = struct {
-		name  string
-		value int64
-	}{name: "table_open_cache", value: 1}
-	fixedCases["extra_process_list_fetch_query_duration"] = struct {
-		name  string
-		value int64
-	}{name: "process_list_fetch_query_duration", value: 1}
-	fixedCases["extra_process_list_longest_query_duration"] = struct {
-		name  string
-		value int64
-	}{name: "process_list_longest_query_duration", value: 1}
-	fixedCases["extra_process_list_queries_count_system"] = struct {
-		name  string
-		value int64
-	}{name: "process_list_queries_count_system", value: 1}
-	fixedCases["extra_process_list_queries_count_user"] = struct {
-		name  string
-		value int64
-	}{name: "process_list_queries_count_user", value: 1}
+	for key := range mx.globalStatus.counters {
+		fixedCases["global_status_"+key] = struct {
+			name  string
+			value int64
+		}{name: key, value: 1}
+	}
 
 	for testName, tc := range fixedCases {
 		t.Run(testName, func(t *testing.T) {

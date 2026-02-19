@@ -28,28 +28,32 @@ func (c *Collector) collectSlaveStatus(ctx context.Context) error {
 	}
 	c.Debugf("executing query: '%s'", q)
 
-	v := struct {
+	type slaveStatusRow struct {
 		name         string
 		behindMaster int64
 		sqlRunning   int64
 		ioRunning    int64
-	}{}
+	}
+	row := slaveStatusRow{}
 
 	_, err := c.collectQuery(ctx, q, func(column, value string, lineEnd bool) {
 		switch column {
 		case "Connection_name", "Channel_Name":
-			v.name = value
+			row.name = value
 		case "Seconds_Behind_Master", "Seconds_Behind_Source":
-			v.behindMaster = parseInt(value)
+			row.behindMaster = parseInt(value)
 		case "Slave_SQL_Running", "Replica_SQL_Running":
-			v.sqlRunning = parseInt(convertSlaveSQLRunning(value))
+			row.sqlRunning = parseInt(convertSlaveSQLRunning(value))
 		case "Slave_IO_Running", "Replica_IO_Running":
-			v.ioRunning = parseInt(convertSlaveIORunning(value))
+			row.ioRunning = parseInt(convertSlaveIORunning(value))
 		}
 		if lineEnd {
-			c.mx.setReplication("seconds_behind_master", v.name, v.behindMaster)
-			c.mx.setReplication("slave_sql_running", v.name, v.sqlRunning)
-			c.mx.setReplication("slave_io_running", v.name, v.ioRunning)
+			c.mx.setReplication("seconds_behind_master", row.name, row.behindMaster)
+			c.mx.setReplication("slave_sql_running", row.name, row.sqlRunning)
+			c.mx.setReplication("slave_io_running", row.name, row.ioRunning)
+
+			// Explicit row reset keeps per-row lifecycle obvious in callback flow.
+			row = slaveStatusRow{}
 		}
 	})
 	return err
