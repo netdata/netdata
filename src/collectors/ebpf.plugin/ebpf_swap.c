@@ -449,7 +449,14 @@ static void ebpf_swap_exit(void *ptr)
     }
 #endif
     if (em->objects) {
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
+        if ((uintptr_t)em->objects < 4096) {
+            netdata_log_error(
+                "Invalid em->objects pointer (0x%lx) detected during swap cleanup, skipping bpf_object__close",
+                (unsigned long)em->objects);
+            freez(em->probe_links);
+        } else {
+            ebpf_unload_legacy_code(em->objects, em->probe_links);
+        }
         em->objects = NULL;
         em->probe_links = NULL;
     }

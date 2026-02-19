@@ -1006,7 +1006,7 @@ void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe
     if (!probe_links || !objects)
         return;
 
-    if ((uintptr_t)objects < 4096) {
+    if ((uintptr_t)objects < 4096 || (uintptr_t)objects == (uintptr_t)-1) {
         freez(probe_links);
         return;
     }
@@ -1019,6 +1019,7 @@ void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe
         j++;
     }
     freez(probe_links);
+
     bpf_object__close(objects);
 }
 
