@@ -209,6 +209,11 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 	// If dimension naming is omitted, runtime planner resolves dynamic key source
 	// from series origin metadata (metrix.Reader.SeriesMeta on flattened series).
 	inferFromSeriesMeta := name == "" && nameFromLabel == ""
+	if inferFromSeriesMeta && !supportsRuntimeInferredDimension(meta) {
+		return compiledDimension{}, fmt.Errorf(
+			"name inference requires inferable selector (histogram bucket/summary quantile/stateset-like metric); set name or name_from_label",
+		)
+	}
 
 	nameTemplate := program.Template{}
 	dynamicLabelKeys := make([]string, 0, 1)
@@ -375,6 +380,35 @@ func metricKindsFromNames(names []string) []string {
 		}
 	}
 	return mapKeysSorted(seen)
+}
+
+func supportsRuntimeInferredDimension(meta metrixselector.Meta) bool {
+	for _, key := range meta.ConstrainedLabelKeys {
+		switch key {
+		case histogramBucketLabel, summaryQuantileLabel:
+			return true
+		}
+	}
+	for _, name := range meta.MetricNames {
+		name = strings.TrimSpace(name)
+		switch {
+		case strings.HasSuffix(name, "_bucket"):
+			return true
+		case strings.HasSuffix(name, "_state"):
+			return true
+		case strings.HasSuffix(name, "_status"):
+			return true
+		case strings.HasSuffix(name, "_mode"):
+			return true
+		}
+		if idx := strings.LastIndexByte(name, '.'); idx >= 0 && idx < len(name)-1 {
+			name = name[idx+1:]
+		}
+		if name == "state" || name == "status" || name == "mode" {
+			return true
+		}
+	}
+	return false
 }
 
 func composeFamily(parts []string, leaf string) string {

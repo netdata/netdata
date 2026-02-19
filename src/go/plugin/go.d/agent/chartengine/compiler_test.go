@@ -303,7 +303,7 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, program.AlgorithmAbsolute, charts[0].Meta.Algorithm)
 			},
 		},
-		"allows runtime inference when dimension naming is omitted": {
+		"fails runtime inference for omitted naming on non-inferable selector": {
 			spec: charttpl.Spec{
 				Version: charttpl.VersionV1,
 				Groups: []charttpl.Group{
@@ -325,13 +325,8 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			assert: func(t *testing.T, p *program.Program) {
-				t.Helper()
-				charts := p.Charts()
-				require.Len(t, charts, 1)
-				assert.True(t, charts[0].Dimensions[0].InferNameFromSeriesMeta)
-				assert.True(t, charts[0].Dimensions[0].Dynamic)
-			},
+			wantErr: true,
+			errLike: "name inference requires inferable selector",
 		},
 		"compiles literal id with instances and label exclusion metadata": {
 			spec: charttpl.Spec{

@@ -15,6 +15,7 @@ const (
 	labelSourceAuto         = 1
 	labelSourceConf         = 2
 	collectJobReservedLabel = "_collect_job"
+	maxTypeIDLen            = 1200
 )
 
 type normalizedActions struct {
@@ -46,9 +47,42 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 		env.UpdateEvery = 1
 	}
 	normalized := normalizeActions(plan.Actions)
+	if err := validateTypeIDBudget(env.TypeID, normalized); err != nil {
+		return err
+	}
 	emitCreatePhase(api, env, normalized)
 	emitUpdatePhase(api, env, normalized.updateCharts)
 	emitRemovePhase(api, env, normalized)
+	return nil
+}
+
+func validateTypeIDBudget(typeID string, actions normalizedActions) error {
+	typeID = sanitizeWireID(typeID)
+	if typeID == "" {
+		return fmt.Errorf("chartemit: emit env type_id is required")
+	}
+	seen := make(map[string]struct{})
+	for chartID := range actions.createCharts {
+		seen[chartID] = struct{}{}
+	}
+	for chartID := range actions.createDimsByID {
+		seen[chartID] = struct{}{}
+	}
+	for _, update := range actions.updateCharts {
+		seen[update.ChartID] = struct{}{}
+	}
+	for _, removeDim := range actions.removeDimensions {
+		seen[removeDim.ChartID] = struct{}{}
+	}
+	for _, removeChart := range actions.removeCharts {
+		seen[removeChart.ChartID] = struct{}{}
+	}
+	for chartID := range seen {
+		id := sanitizeWireID(chartID)
+		if len(typeID)+1+len(id) > maxTypeIDLen {
+			return fmt.Errorf("chartemit: type.id exceeds max length (%d): %s.%s", maxTypeIDLen, typeID, id)
+		}
+	}
 	return nil
 }
 
@@ -127,10 +161,10 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 
 func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartAction) {
 	for _, update := range updates {
-		api.BEGIN(env.TypeID, update.ChartID, env.MSSinceLast)
+		api.BEGIN(sanitizeWireID(env.TypeID), sanitizeWireID(update.ChartID), env.MSSinceLast)
 		for _, dim := range update.Values {
 			if dim.IsEmpty {
-				api.SETEMPTY(dim.Name)
+				api.SETEMPTY(sanitizeWireID(dim.Name))
 				continue
 			}
 			value := dim.Int64
@@ -139,7 +173,7 @@ func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartActi
 				// TODO(godv2): switch to SETFLOAT when Netdata float wire support is available.
 				value = int64(dim.Float64)
 			}
-			api.SET(dim.Name, value)
+			api.SET(sanitizeWireID(dim.Name), value)
 		}
 		api.END()
 	}
@@ -163,9 +197,13 @@ func emitRemovePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 }
 
 func emitDimension(api *netdataapi.API, dim dimensionEmission) {
+	name := sanitizeWireID(dim.Name)
+	if name == "" {
+		return
+	}
 	api.DIMENSION(netdataapi.DimensionOpts{
-		ID:         dim.Name,
-		Name:       dim.Name,
+		ID:         name,
+		Name:       name,
 		Algorithm:  dim.Algorithm,
 		Multiplier: handleZero(dim.Multiplier),
 		Divisor:    handleZero(dim.Divisor),

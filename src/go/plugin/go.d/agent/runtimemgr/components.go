@@ -144,13 +144,16 @@ func normalizeComponent(cfg ComponentConfig, pluginName string) (componentSpec, 
 		JobName:     firstNotEmpty(strings.TrimSpace(cfg.JobName), name),
 		JobLabels:   cloneStringMap(cfg.JobLabels),
 	}
+	autogen := cfg.Autogen
+	// Chartengine autogen type.id budget must use the actual emitted type.id.
+	autogen.TypeID = typeID
 
 	return componentSpec{
 		Name:         name,
 		Store:        cfg.Store,
 		TemplateYAML: append([]byte(nil), templateYAML...),
 		UpdateEvery:  updateEvery,
-		Autogen:      cfg.Autogen,
+		Autogen:      autogen,
 		EmitEnv:      env,
 	}, nil
 }

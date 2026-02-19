@@ -10,25 +10,40 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
 )
 
+var wireValueReplacer = strings.NewReplacer(
+	"'", "",
+	"\n", " ",
+	"\r", " ",
+	"\x00", "",
+)
+
+func sanitizeWireValue(value string) string {
+	return wireValueReplacer.Replace(value)
+}
+
+func sanitizeWireID(value string) string {
+	return sanitizeWireValue(strings.TrimSpace(value))
+}
+
 func emitChart(api *netdataapi.API, env EmitEnv, chartID string, meta chartengine.ChartMeta, obsolete bool) {
 	opts := ""
 	if obsolete {
 		opts = "obsolete"
 	}
 	api.CHART(netdataapi.ChartOpts{
-		TypeID:      env.TypeID,
-		ID:          chartID,
+		TypeID:      sanitizeWireID(env.TypeID),
+		ID:          sanitizeWireID(chartID),
 		Name:        "",
-		Title:       meta.Title,
-		Units:       meta.Units,
-		Family:      meta.Family,
-		Context:     meta.Context,
+		Title:       sanitizeWireValue(meta.Title),
+		Units:       sanitizeWireValue(meta.Units),
+		Family:      sanitizeWireValue(meta.Family),
+		Context:     sanitizeWireValue(meta.Context),
 		ChartType:   string(meta.Type),
 		Priority:    meta.Priority,
 		UpdateEvery: env.UpdateEvery,
 		Options:     opts,
-		Plugin:      env.Plugin,
-		Module:      env.Module,
+		Plugin:      sanitizeWireValue(env.Plugin),
+		Module:      sanitizeWireValue(env.Module),
 	})
 }
 
@@ -54,12 +69,20 @@ func emitChartLabels(api *netdataapi.API, env EmitEnv, chartLabels map[string]st
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		api.CLABEL(key, env.JobLabels[key], labelSourceConf)
+		sKey := sanitizeWireID(key)
+		if sKey == "" {
+			continue
+		}
+		api.CLABEL(sKey, sanitizeWireValue(env.JobLabels[key]), labelSourceConf)
 	}
 	for _, key := range chartKeys {
-		api.CLABEL(key, chartLabels[key], labelSourceAuto)
+		sKey := sanitizeWireID(key)
+		if sKey == "" {
+			continue
+		}
+		api.CLABEL(sKey, sanitizeWireValue(chartLabels[key]), labelSourceAuto)
 	}
 	if strings.TrimSpace(env.JobName) != "" {
-		api.CLABEL(collectJobReservedLabel, env.JobName, labelSourceAuto)
+		api.CLABEL(collectJobReservedLabel, sanitizeWireValue(env.JobName), labelSourceAuto)
 	}
 }

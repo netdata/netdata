@@ -212,3 +212,70 @@ func TestApplyPlanDimensionOnlyCreateEmitsLabelsAndCommit(t *testing.T) {
 	assert.Contains(t, out, "CLABEL_COMMIT")
 	assert.Contains(t, out, "DIMENSION 'value' 'value' 'absolute' '1' '1' ''")
 }
+
+func TestApplyPlanSanitizesWireValues(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := chartengine.ChartMeta{
+		Title:     "Title'\n",
+		Family:    "Family'\n",
+		Context:   "Context'\n",
+		Units:     "units'\n",
+		Algorithm: chartengine.AlgorithmAbsolute,
+		Type:      chartengine.ChartTypeLine,
+	}
+
+	plan := Plan{
+		Actions: []EngineAction{
+			chartengine.CreateChartAction{
+				ChartTemplateID: "g0.c0",
+				ChartID:         "chart'id\n",
+				Meta:            meta,
+				Labels: map[string]string{
+					"la'bel\n": "va'lue\n",
+				},
+			},
+			chartengine.CreateDimensionAction{
+				ChartID:    "chart'id\n",
+				ChartMeta:  meta,
+				Name:       "dim'name\n",
+				Algorithm:  chartengine.AlgorithmAbsolute,
+				Multiplier: 1,
+				Divisor:    1,
+			},
+			chartengine.UpdateChartAction{
+				ChartID: "chart'id\n",
+				Values: []chartengine.UpdateDimensionValue{
+					{
+						Name:    "dim'name\n",
+						IsFloat: true,
+						Float64: 5,
+					},
+				},
+			},
+		},
+	}
+
+	err := ApplyPlan(api, plan, EmitEnv{
+		TypeID:      "collector.'job\n",
+		UpdateEvery: 1,
+		Plugin:      "go.d'plugin\n",
+		Module:      "mod'ule\n",
+		JobName:     "job'01\n",
+		JobLabels: map[string]string{
+			"inst'ance\n": "local'host\n",
+		},
+		MSSinceLast: 1,
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, out, "CHART 'collector.job.chartid'")
+	assert.Contains(t, out, "DIMENSION 'dimname' 'dimname' 'absolute' '1' '1' ''")
+	assert.Contains(t, out, "BEGIN 'collector.job.chartid' 1")
+	assert.Contains(t, out, "SET 'dimname' = 5")
+	assert.Contains(t, out, "CLABEL 'instance' 'localhost ' '2'")
+	assert.Contains(t, out, "CLABEL 'label' 'value ' '1'")
+	assert.Contains(t, out, "CLABEL '_collect_job' 'job01 ' '1'")
+}
