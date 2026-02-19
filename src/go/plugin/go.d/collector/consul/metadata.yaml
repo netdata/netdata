@@ -19,6 +19,8 @@ modules:
       keywords:
         - service networking platform
         - hashicorp
+        - autopilot
+        - operator
       most_popular: true
     overview:
       data_collection:
