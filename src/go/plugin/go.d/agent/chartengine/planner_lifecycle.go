@@ -246,7 +246,7 @@ func enforceDimensionCaps(
 					Multiplier: dim.multiplier,
 					Divisor:    dim.divisor,
 				})
-				delete(matChart.dimensions, name)
+				matChart.removeDimension(name)
 				overflow--
 			}
 		}
@@ -320,7 +320,7 @@ func collectExpiryRemovals(
 				Multiplier: dim.multiplier,
 				Divisor:    dim.divisor,
 			})
-			delete(matChart.dimensions, name)
+			matChart.removeDimension(name)
 		}
 	}
 

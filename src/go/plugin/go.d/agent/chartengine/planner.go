@@ -430,7 +430,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 			matDim.lastSeenSuccessSeq = ctx.collectMeta.LastSuccessSeq
 		}
 
-		updateNames := orderedMaterializedDimensionNames(matChart.dimensions)
+		updateNames := matChart.orderedDimensionNames()
 		values := make([]UpdateDimensionValue, 0, len(updateNames))
 		for _, name := range updateNames {
 			value, ok := cs.values[name]

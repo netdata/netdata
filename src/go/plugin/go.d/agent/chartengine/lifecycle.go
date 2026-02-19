@@ -16,6 +16,8 @@ type materializedChartState struct {
 	lifecycle          program.LifecyclePolicy
 	lastSeenSuccessSeq uint64
 	dimensions         map[string]*materializedDimensionState
+	orderedDims        []string
+	orderedDimsDirty   bool
 }
 
 // materializedDimensionState tracks one materialized dimension in a chart.
@@ -47,6 +49,8 @@ func (s *materializedState) ensureChart(
 		if chart.templateID != templateID {
 			chart.templateID = templateID
 			chart.dimensions = make(map[string]*materializedDimensionState)
+			chart.orderedDims = nil
+			chart.orderedDimsDirty = false
 		}
 		chart.meta = meta
 		chart.lifecycle = lifecycle
@@ -65,6 +69,9 @@ func (s *materializedState) ensureChart(
 func (c *materializedChartState) ensureDimension(name string, state dimensionState) (*materializedDimensionState, bool) {
 	dim, ok := c.dimensions[name]
 	if ok {
+		if dim.static != state.static || dim.order != state.order {
+			c.orderedDimsDirty = true
+		}
 		dim.hidden = state.hidden
 		dim.static = state.static
 		dim.order = state.order
@@ -83,7 +90,25 @@ func (c *materializedChartState) ensureDimension(name string, state dimensionSta
 		divisor:    state.divisor,
 	}
 	c.dimensions[name] = dim
+	c.orderedDimsDirty = true
 	return dim, true
+}
+
+func (c *materializedChartState) removeDimension(name string) {
+	if _, ok := c.dimensions[name]; !ok {
+		return
+	}
+	delete(c.dimensions, name)
+	c.orderedDimsDirty = true
+}
+
+func (c *materializedChartState) orderedDimensionNames() []string {
+	if !c.orderedDimsDirty && len(c.orderedDims) == len(c.dimensions) {
+		return c.orderedDims
+	}
+	c.orderedDims = orderedMaterializedDimensionNames(c.dimensions)
+	c.orderedDimsDirty = false
+	return c.orderedDims
 }
 
 func shouldExpire(lastSeenSuccessSeq, currentSuccessSeq uint64, expireAfterCycles int) bool {
