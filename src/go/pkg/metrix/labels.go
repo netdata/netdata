@@ -77,15 +77,33 @@ func labelsFromSet(sets []LabelSet, owner meterBackend) ([]Label, string, error)
 		return nil, "", nil
 	}
 
+	if len(sets) == 1 {
+		set, err := validatedLabelSet(sets[0], owner)
+		if err != nil {
+			return nil, "", err
+		}
+		return set.items, set.key, nil
+	}
+
+	if len(sets) == 2 {
+		left, err := validatedLabelSet(sets[0], owner)
+		if err != nil {
+			return nil, "", err
+		}
+		right, err := validatedLabelSet(sets[1], owner)
+		if err != nil {
+			return nil, "", err
+		}
+		return mergeTwoCompiledLabelSets(left, right)
+	}
+
 	merged := make(map[string]string)
 	for _, ls := range sets {
-		if ls.set == nil {
-			return nil, "", errInvalidLabelSet
+		set, err := validatedLabelSet(ls, owner)
+		if err != nil {
+			return nil, "", err
 		}
-		if ls.set.owner != owner {
-			return nil, "", errForeignLabelSet
-		}
-		for _, l := range ls.set.items {
+		for _, l := range set.items {
 			if _, ok := merged[l.Key]; ok {
 				return nil, "", errDuplicateLabelKey
 			}
@@ -94,6 +112,71 @@ func labelsFromSet(sets []LabelSet, owner meterBackend) ([]Label, string, error)
 	}
 
 	return canonicalizeLabels(merged)
+}
+
+func validatedLabelSet(ls LabelSet, owner meterBackend) (*compiledLabelSet, error) {
+	if ls.set == nil {
+		return nil, errInvalidLabelSet
+	}
+	if ls.set.owner != owner {
+		return nil, errForeignLabelSet
+	}
+	return ls.set, nil
+}
+
+func mergeTwoCompiledLabelSets(left, right *compiledLabelSet) ([]Label, string, error) {
+	if len(left.items) == 0 {
+		return right.items, right.key, nil
+	}
+	if len(right.items) == 0 {
+		return left.items, left.key, nil
+	}
+
+	out := make([]Label, 0, len(left.items)+len(right.items))
+	var b strings.Builder
+
+	i := 0
+	j := 0
+	for i < len(left.items) && j < len(right.items) {
+		li := left.items[i]
+		rj := right.items[j]
+		if li.Key == rj.Key {
+			return nil, "", errDuplicateLabelKey
+		}
+		if li.Key < rj.Key {
+			out = append(out, li)
+			b.WriteString(li.Key)
+			b.WriteByte('\xff')
+			b.WriteString(li.Value)
+			b.WriteByte('\xff')
+			i++
+			continue
+		}
+		out = append(out, rj)
+		b.WriteString(rj.Key)
+		b.WriteByte('\xff')
+		b.WriteString(rj.Value)
+		b.WriteByte('\xff')
+		j++
+	}
+
+	for ; i < len(left.items); i++ {
+		li := left.items[i]
+		out = append(out, li)
+		b.WriteString(li.Key)
+		b.WriteByte('\xff')
+		b.WriteString(li.Value)
+		b.WriteByte('\xff')
+	}
+	for ; j < len(right.items); j++ {
+		rj := right.items[j]
+		out = append(out, rj)
+		b.WriteString(rj.Key)
+		b.WriteByte('\xff')
+		b.WriteString(rj.Value)
+		b.WriteByte('\xff')
+	}
+	return out, b.String(), nil
 }
 
 func appendLabelSets(base []LabelSet, extra []LabelSet) []LabelSet {

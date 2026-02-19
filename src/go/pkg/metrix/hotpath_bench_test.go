@@ -29,6 +29,11 @@ import (
 // BenchmarkCollectorCommitSparseAtCardinality/series_100_touched_5-14    667111      1787 ns/op     3880 B/op  49 allocs/op
 // BenchmarkCollectorCommitSparseAtCardinality/series_1000_touched_5-14   615114      1858 ns/op     3881 B/op  49 allocs/op
 // BenchmarkCollectorCommitSparseAtCardinality/series_5000_touched_10-14  240637      4481 ns/op     7166 B/op  85 allocs/op
+//
+// After collector work-elimination slice (1A + 2B + 3B) (2026-02-19):
+//
+// BenchmarkCollectorCommitSparseAtCardinality/series_50000_touched_10-14  978680      2471 ns/op     5697 B/op  45 allocs/op
+// BenchmarkCollectorCommitSparseAtCardinality/series_100000_touched_20-14 511872      4346 ns/op    11316 B/op  77 allocs/op
 func BenchmarkRuntimeStoreSingleWriteAtCardinality(b *testing.B) {
 	tests := map[string]struct {
 		totalSeries int
@@ -71,9 +76,11 @@ func BenchmarkCollectorCommitSparseAtCardinality(b *testing.B) {
 		totalSeries int
 		touched     int
 	}{
-		"series_100_touched_5":   {totalSeries: 100, touched: 5},
-		"series_1000_touched_5":  {totalSeries: 1000, touched: 5},
-		"series_5000_touched_10": {totalSeries: 5000, touched: 10},
+		"series_100_touched_5":     {totalSeries: 100, touched: 5},
+		"series_1000_touched_5":    {totalSeries: 1000, touched: 5},
+		"series_5000_touched_10":   {totalSeries: 5000, touched: 10},
+		"series_50000_touched_10":  {totalSeries: 50000, touched: 10},
+		"series_100000_touched_20": {totalSeries: 100000, touched: 20},
 	}
 
 	for name, tc := range tests {

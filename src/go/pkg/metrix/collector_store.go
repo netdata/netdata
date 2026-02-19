@@ -56,10 +56,11 @@ type stateSetSchema struct {
 }
 
 type committedSeries struct {
-	id        SeriesID
-	hash64    uint64
-	key       string
-	name      string
+	id     SeriesID
+	hash64 uint64
+	key    string
+	name   string
+	// labels are immutable after series publish and can be safely shared across snapshots.
 	labels    []Label
 	labelsKey string
 	desc      *instrumentDescriptor
@@ -239,7 +240,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	next := &readSnapshot{
 		collectMeta: oldSnap.collectMeta,
 		series:      make(map[string]*committedSeries, len(oldSnap.series)),
-		byName:      make(map[string][]*committedSeries),
+		byName:      nil,
 	}
 
 	for k, s := range oldSnap.series {
@@ -362,7 +363,6 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	next.collectMeta.LastAttemptSeq = c.core.active.seq
 	next.collectMeta.LastAttemptStatus = CollectStatusSuccess
 	next.collectMeta.LastSuccessSeq = c.core.active.seq
-	next.byName = buildByName(next.series)
 
 	c.core.snapshot.Store(next)
 	c.core.successSeq = successSeq
@@ -624,9 +624,6 @@ func makeSeriesKey(name, labelsKey string) string {
 func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	cp := *s
 	ensureSeriesMeta(cp.desc, &cp.meta)
-	if len(s.labels) > 0 {
-		cp.labels = append([]Label(nil), s.labels...)
-	}
 	if s.stateSetValues != nil {
 		cp.stateSetValues = cloneStateMap(s.stateSetValues)
 	}
