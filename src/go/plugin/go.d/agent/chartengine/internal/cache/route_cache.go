@@ -42,7 +42,9 @@ func (c *RouteCache[T]) Lookup(identity metrix.SeriesIdentity, revision uint64) 
 		if entry.revision != revision {
 			return nil, false
 		}
-		return cloneSlice(entry.values), true
+		// Return immutable cached values directly to avoid per-lookup allocations.
+		// Callers must treat the returned slice as read-only.
+		return entry.values, true
 	}
 	return nil, false
 }

@@ -9,22 +9,35 @@ import (
 )
 
 func orderedMaterializedDimensionNames(dimensions map[string]*materializedDimensionState) []string {
-	dimState := make(map[string]dimensionState, len(dimensions))
-	dynamicSet := make(map[string]struct{})
-	for name, dim := range dimensions {
-		dimState[name] = dimensionState{
-			hidden:     dim.hidden,
-			static:     dim.static,
-			order:      dim.order,
-			algorithm:  dim.algorithm,
-			multiplier: dim.multiplier,
-			divisor:    dim.divisor,
-		}
-		if !dim.static {
-			dynamicSet[name] = struct{}{}
-		}
+	type staticEntry struct {
+		name  string
+		order int
 	}
-	return orderedDimensionNamesFromState(dimState, dynamicSet)
+	staticEntries := make([]staticEntry, 0, len(dimensions))
+	dynamicNames := make([]string, 0, len(dimensions))
+	for name, dim := range dimensions {
+		if dim.static {
+			staticEntries = append(staticEntries, staticEntry{
+				name:  name,
+				order: dim.order,
+			})
+			continue
+		}
+		dynamicNames = append(dynamicNames, name)
+	}
+	sort.Slice(staticEntries, func(i, j int) bool {
+		if staticEntries[i].order != staticEntries[j].order {
+			return staticEntries[i].order < staticEntries[j].order
+		}
+		return staticEntries[i].name < staticEntries[j].name
+	})
+	sort.Strings(dynamicNames)
+	out := make([]string, 0, len(staticEntries)+len(dynamicNames))
+	for _, item := range staticEntries {
+		out = append(out, item.name)
+	}
+	out = append(out, dynamicNames...)
+	return out
 }
 
 func enforceLifecycleCaps(
@@ -239,7 +252,7 @@ func enforceDimensionCaps(
 		}
 
 		if overflow > 0 {
-			orderedObserved := orderedDimensionNamesFromState(cs.dimensions, cs.dynamicSet)
+			orderedObserved := orderedDimensionNamesFromState(cs.dimensions)
 			// Drop newest/least-priority candidates first (end of deterministic order).
 			for i := len(orderedObserved) - 1; i >= 0 && overflow > 0; i-- {
 				name := orderedObserved[i]
@@ -248,7 +261,6 @@ func enforceDimensionCaps(
 				}
 				delete(cs.dimensions, name)
 				delete(cs.values, name)
-				delete(cs.dynamicSet, name)
 				overflow--
 			}
 		}
@@ -330,19 +342,22 @@ func collectExpiryRemovals(
 	return removeDims, removeCharts
 }
 
-func orderedDimensionNamesFromState(dimensions map[string]dimensionState, dynamicSet map[string]struct{}) []string {
+func orderedDimensionNamesFromState(dimensions map[string]dimensionState) []string {
 	type staticEntry struct {
 		name  string
 		order int
 	}
 	staticEntries := make([]staticEntry, 0, len(dimensions))
+	dynamicNames := make([]string, 0, len(dimensions))
 	for name, state := range dimensions {
 		if state.static {
 			staticEntries = append(staticEntries, staticEntry{
 				name:  name,
 				order: state.order,
 			})
+			continue
 		}
+		dynamicNames = append(dynamicNames, name)
 	}
 	sort.Slice(staticEntries, func(i, j int) bool {
 		if staticEntries[i].order != staticEntries[j].order {
@@ -351,7 +366,7 @@ func orderedDimensionNamesFromState(dimensions map[string]dimensionState, dynami
 		return staticEntries[i].name < staticEntries[j].name
 	})
 
-	dynamicNames := mapKeysSorted(dynamicSet)
+	sort.Strings(dynamicNames)
 	out := make([]string, 0, len(staticEntries)+len(dynamicNames))
 	for _, entry := range staticEntries {
 		out = append(out, entry.name)

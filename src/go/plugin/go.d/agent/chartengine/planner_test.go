@@ -1621,7 +1621,6 @@ groups:
 					lifecycle:  lifecycle,
 					values:     map[string]metrix.SampleValue{"total": 10},
 					dimensions: map[string]dimensionState{"total": {static: true, order: 0}},
-					dynamicSet: map[string]struct{}{},
 				},
 				"svc_b": {
 					templateID: "tpl.requests",
@@ -1630,7 +1629,6 @@ groups:
 					lifecycle:  lifecycle,
 					values:     map[string]metrix.SampleValue{"total": 20},
 					dimensions: map[string]dimensionState{"total": {static: true, order: 0}},
-					dynamicSet: map[string]struct{}{},
 				},
 			}
 

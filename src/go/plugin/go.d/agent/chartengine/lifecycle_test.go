@@ -38,14 +38,12 @@ func TestEnforceChartInstanceCapsSoftWhenAllExistingAreActive(t *testing.T) {
 			lifecycle:  lifecycle,
 			dimensions: make(map[string]dimensionState),
 			values:     make(map[string]metrix.SampleValue),
-			dynamicSet: make(map[string]struct{}),
 		},
 		"win_nic_traffic_eth1": {
 			templateID: templateID,
 			lifecycle:  lifecycle,
 			dimensions: make(map[string]dimensionState),
 			values:     make(map[string]metrix.SampleValue),
-			dynamicSet: make(map[string]struct{}),
 		},
 	}
 

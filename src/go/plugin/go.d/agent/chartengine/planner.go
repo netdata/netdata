@@ -51,7 +51,6 @@ type chartState struct {
 	labels     *chartLabelAccumulator
 	values     map[string]metrix.SampleValue
 	dimensions map[string]dimensionState
-	dynamicSet map[string]struct{}
 }
 
 type planBuildContext struct {
@@ -349,7 +348,6 @@ func (ctx *planBuildContext) accumulateRoute(
 			labels:     labelsAcc,
 			values:     make(map[string]metrix.SampleValue),
 			dimensions: make(map[string]dimensionState),
-			dynamicSet: make(map[string]struct{}),
 		}
 		ctx.chartsByID[route.ChartID] = cs
 	}
@@ -363,9 +361,6 @@ func (ctx *planBuildContext) accumulateRoute(
 			algorithm:  route.Algorithm,
 			multiplier: route.Multiplier,
 			divisor:    route.Divisor,
-		}
-		if !route.Static {
-			cs.dynamicSet[route.DimensionName] = struct{}{}
 		}
 	} else if prevState.hidden != route.Hidden {
 		// First-observed hidden flag wins; conflicting routes are ignored.
@@ -417,7 +412,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 		}
 		matChart.lastSeenSuccessSeq = ctx.collectMeta.LastSuccessSeq
 
-		observedNames := orderedDimensionNamesFromState(cs.dimensions, cs.dynamicSet)
+		observedNames := orderedDimensionNamesFromState(cs.dimensions)
 		for _, name := range observedNames {
 			d := cs.dimensions[name]
 			matDim, dimCreated := matChart.ensureDimension(name, d)
