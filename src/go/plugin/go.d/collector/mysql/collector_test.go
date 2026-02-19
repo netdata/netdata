@@ -192,7 +192,7 @@ func TestCollector_Check(t *testing.T) {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
-				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowGlobalStatusProbe, dataMariaVer1084GlobalStatus)
 				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 			},
 		},
@@ -206,14 +206,14 @@ func TestCollector_Check(t *testing.T) {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
-				mockExpectErr(m, queryShowGlobalStatus)
+				mockExpectErr(m, queryShowGlobalStatusProbe)
 			},
 		},
 		"fails when error on querying global variables": {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
-				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowGlobalStatusProbe, dataMariaVer1084GlobalStatus)
 				mockExpectErr(m, queryShowGlobalVariables)
 			},
 		},

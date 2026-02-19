@@ -36,7 +36,7 @@ func (c *Collector) checkMandatory(ctx context.Context) error {
 		return err
 	}
 
-	if err := c.collectGlobalStatus(ctx, &collectRunState{}, false); err != nil {
+	if err := c.probeGlobalStatus(ctx); err != nil {
 		return fmt.Errorf("error on collecting global status: %v", err)
 	}
 

@@ -836,3 +836,15 @@ Tests:
   - User requested a simpler path: remove `globalStatusKeys` whitelist and rely on `mx.set(...)` to ignore undeclared metrics.
 - Outcome:
   - `A` (user-selected on 2026-02-19): remove `globalStatusKeys` and use `mx.set` as the runtime filter.
+
+## 13) Implementation Progress Snapshot
+
+- 2026-02-19:
+  - Phase A completed and committed:
+    - `58b57d78cd` (`go.d/mysql: apply phase-a readability and safety fixes`)
+  - Phase B simplified variant completed and committed:
+    - `d4b3278460` (`go.d/mysql: simplify global-status filtering path`)
+  - Phase C step 1 (`36.B`) implemented (not committed yet):
+    - `Check()` now uses lightweight `probeGlobalStatus()` path instead of full `collectGlobalStatus(..., false)` parsing.
+    - Probe query: `SHOW GLOBAL STATUS LIKE 'Threads_connected';`.
+    - MySQL collector tests updated and passing with `-race`.

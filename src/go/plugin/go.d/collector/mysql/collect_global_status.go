@@ -4,10 +4,31 @@ package mysql
 
 import (
 	"context"
+	"errors"
 	"strings"
 )
 
 const queryShowGlobalStatus = "SHOW GLOBAL STATUS;"
+const queryShowGlobalStatusProbe = "SHOW GLOBAL STATUS LIKE 'Threads_connected';"
+
+func (c *Collector) probeGlobalStatus(ctx context.Context) error {
+	q := queryShowGlobalStatusProbe
+	c.Debugf("executing query: '%s'", q)
+
+	var hasRows bool
+	_, err := c.collectQuery(ctx, q, func(_, _ string, lineEnd bool) {
+		if lineEnd {
+			hasRows = true
+		}
+	})
+	if err != nil {
+		return err
+	}
+	if !hasRows {
+		return errors.New("global status probe returned no rows")
+	}
+	return nil
+}
 
 func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunState, writeMetrics bool) error {
 	// MariaDB: https://mariadb.com/kb/en/server-status-variables/
