@@ -419,7 +419,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 		}
 		matChart.lastSeenSuccessSeq = ctx.collectMeta.LastSuccessSeq
 
-		observedNames := orderedDimensionNamesFromState(cs.dimensions)
+		observedNames := observedDimensionNames(cs, matChart)
 		for _, name := range observedNames {
 			d := cs.dimensions[name]
 			matDim, dimCreated := matChart.ensureDimension(name, d)
@@ -460,6 +460,30 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 		})
 	}
 	return nil
+}
+
+func observedDimensionNames(cs *chartState, matChart *materializedChartState) []string {
+	if cs == nil {
+		return nil
+	}
+	if matChart == nil || len(matChart.dimensions) == 0 {
+		return orderedDimensionNamesFromState(cs.dimensions)
+	}
+	prev := matChart.orderedDimensionNames()
+	if len(prev) != len(cs.dimensions) {
+		return orderedDimensionNamesFromState(cs.dimensions)
+	}
+	for _, name := range prev {
+		observed, ok := cs.dimensions[name]
+		if !ok {
+			return orderedDimensionNamesFromState(cs.dimensions)
+		}
+		existing := matChart.dimensions[name]
+		if existing == nil || existing.static != observed.static || existing.order != observed.order {
+			return orderedDimensionNamesFromState(cs.dimensions)
+		}
+	}
+	return prev
 }
 
 func sortInferredDimensions(in []InferredDimension) {
