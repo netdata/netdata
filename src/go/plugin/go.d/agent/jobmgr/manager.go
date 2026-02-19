@@ -168,10 +168,13 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 					m.Warningf("skipping function registration for module '%s': empty method ID", name)
 					continue
 				}
-				funcName := fmt.Sprintf("%s:%s", name, method.ID)
-				m.FnReg.Register(funcName, m.makeMethodFuncHandler(name, method.ID))
+				// Register default module-scoped function name.
+				funcNames := []string{fmt.Sprintf("%s:%s", name, method.ID)}
+				// Topology methods may also be exposed with topology:* aliases for UI grouping.
+				if method.ResponseType == "topology" && strings.HasPrefix(method.ID, "topology:") {
+					funcNames = append(funcNames, method.ID)
+				}
 
-				// Notify Netdata about this function so it appears in the functions API
 				help := method.Help
 				if help == "" {
 					help = fmt.Sprintf("%s %s data function", name, method.ID)
@@ -183,15 +186,19 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 				if method.RequireCloud {
 					access = cloudAccess
 				}
-				m.dyncfgApi.FunctionGlobal(netdataapi.FunctionGlobalOpts{
-					Name:     funcName,
-					Timeout:  60,
-					Help:     help,
-					Tags:     "top",
-					Access:   access,
-					Priority: 100,
-					Version:  3,
-				})
+				for _, funcName := range funcNames {
+					m.FnReg.Register(funcName, m.makeMethodFuncHandler(name, method.ID))
+					// Notify Netdata about this function so it appears in the functions API.
+					m.dyncfgApi.FunctionGlobal(netdataapi.FunctionGlobalOpts{
+						Name:     funcName,
+						Timeout:  60,
+						Help:     help,
+						Tags:     "top",
+						Access:   access,
+						Priority: 100,
+						Version:  3,
+					})
+				}
 			}
 		}
 		// Note: Per-job methods (JobMethods) are registered in startRunningJob

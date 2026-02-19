@@ -1,0 +1,159 @@
+# Supplemental topology discovery profile for endpoint correlation.
+# Sources: BRIDGE-MIB FDB and IP-MIB neighbor tables.
+
+metrics:
+  # Interface index -> interface name map used to annotate topology links.
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.31.1.1
+      name: ifXTable
+    symbols:
+      # Use a numeric column to ensure row emission.
+      - OID: 1.3.6.1.2.1.31.1.1.1.15
+        name: topologyIfNameEntry
+    metric_tags:
+      - tag: topo_if_index
+        index: 1
+      - tag: topo_if_name
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+
+  # BRIDGE-MIB: maps bridge port number to ifIndex.
+  - MIB: BRIDGE-MIB
+    table:
+      OID: 1.3.6.1.2.1.17.1.4
+      name: dot1dBasePortTable
+    symbols:
+      - OID: 1.3.6.1.2.1.17.1.4.1.2
+        name: dot1dBasePortIfIndexEntry
+    metric_tags:
+      - tag: bridge_base_port
+        index: 1
+      - tag: bridge_if_index
+        symbol:
+          OID: 1.3.6.1.2.1.17.1.4.1.2
+          name: dot1dBasePortIfIndex
+
+  # BRIDGE-MIB: forwarding database (MAC -> bridge port).
+  - MIB: BRIDGE-MIB
+    table:
+      OID: 1.3.6.1.2.1.17.4.3
+      name: dot1dTpFdbTable
+    symbols:
+      # Use the port column so rows are emitted only for learned entries.
+      - OID: 1.3.6.1.2.1.17.4.3.1.2
+        name: dot1dTpFdbEntry
+    metric_tags:
+      - tag: fdb_mac
+        symbol:
+          OID: 1.3.6.1.2.1.17.4.3.1.1
+          name: dot1dTpFdbAddress
+          format: hex
+      - tag: fdb_bridge_port
+        symbol:
+          OID: 1.3.6.1.2.1.17.4.3.1.2
+          name: dot1dTpFdbPort
+      - tag: fdb_status
+        symbol:
+          OID: 1.3.6.1.2.1.17.4.3.1.3
+          name: dot1dTpFdbStatus
+          mapping:
+            1: other
+            2: invalid
+            3: learned
+            4: self
+            5: mgmt
+
+  # IP-MIB: modern ARP/ND cache (IPv4 + IPv6).
+  - MIB: IP-MIB
+    table:
+      OID: 1.3.6.1.2.1.4.35.1
+      name: ipNetToPhysicalTable
+    symbols:
+      # Use state column to emit rows only when neighbors exist.
+      - OID: 1.3.6.1.2.1.4.35.1.6
+        name: ipNetToPhysicalEntry
+    metric_tags:
+      - tag: arp_if_index
+        symbol:
+          OID: 1.3.6.1.2.1.4.35.1.1
+          name: ipNetToPhysicalIfIndex
+      - tag: arp_if_name
+        table: ifXTable
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+        index_transform:
+          - start: 0
+            end: 0
+      - tag: arp_addr_type
+        symbol:
+          OID: 1.3.6.1.2.1.4.35.1.2
+          name: ipNetToPhysicalNetAddressType
+          mapping:
+            0: unknown
+            1: ipv4
+            2: ipv6
+            16: dns
+      - tag: arp_ip
+        symbol:
+          OID: 1.3.6.1.2.1.4.35.1.3
+          name: ipNetToPhysicalNetAddress
+      - tag: arp_mac
+        symbol:
+          OID: 1.3.6.1.2.1.4.35.1.4
+          name: ipNetToPhysicalPhysAddress
+          format: hex
+      - tag: arp_state
+        symbol:
+          OID: 1.3.6.1.2.1.4.35.1.6
+          name: ipNetToPhysicalState
+          mapping:
+            1: reachable
+            2: stale
+            3: delay
+            4: probe
+            5: invalid
+            6: unknown
+            7: incomplete
+
+  # IP-MIB: legacy IPv4 ARP cache fallback.
+  - MIB: IP-MIB
+    table:
+      OID: 1.3.6.1.2.1.4.22
+      name: ipNetToMediaTable
+    symbols:
+      - OID: 1.3.6.1.2.1.4.22.1.4
+        name: ipNetToMediaEntry
+    metric_tags:
+      - tag: arp_if_index
+        symbol:
+          OID: 1.3.6.1.2.1.4.22.1.1
+          name: ipNetToMediaIfIndex
+      - tag: arp_if_name
+        table: ifXTable
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+        index_transform:
+          - start: 0
+            end: 0
+      - tag: arp_ip
+        symbol:
+          OID: 1.3.6.1.2.1.4.22.1.3
+          name: ipNetToMediaNetAddress
+      - tag: arp_mac
+        symbol:
+          OID: 1.3.6.1.2.1.4.22.1.2
+          name: ipNetToMediaPhysAddress
+          format: hex
+      - tag: arp_type
+        symbol:
+          OID: 1.3.6.1.2.1.4.22.1.4
+          name: ipNetToMediaType
+          mapping:
+            1: other
+            2: invalid
+            3: dynamic
+            4: static

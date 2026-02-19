@@ -322,10 +322,41 @@ func (tc *tableCollector) buildTableNameMap(walkResults []tableWalkResult) map[s
 
 // processTableResult processes a single table result
 func (tc *tableCollector) processTableResult(result tableWalkResult, walkedData map[string]map[string]gosnmp.SnmpPDU, tableNameToOID map[string]string, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+	// Auxiliary table configs used only for cross-table tag lookups do not define
+	// own symbols and should not trigger cache/fallback collection paths.
+	// We still cache their presence so they are not re-walked on every cycle.
+	if len(result.config.Symbols) == 0 {
+		if result.pdus != nil {
+			tc.tableCache.cacheData(result.config, nil, nil, nil)
+		} else if tc.tableCache.isConfigCached(result.config) {
+			stats.SNMP.TablesCached++
+		}
+		return nil, nil
+	}
+
 	// Try cache first
 	if metrics := tc.tryCollectFromCache(result.config, stats); metrics != nil {
 		stats.SNMP.TablesCached++
 		return metrics, nil
+	}
+
+	// Cache can become stale for dynamic tables. If we did not walk this table in
+	// the pre-pass (because it looked cached), fall back to a direct walk now.
+	if result.pdus == nil {
+		if pdus, ok := walkedData[result.tableOID]; ok {
+			result.pdus = pdus
+		} else {
+			pdus, err := tc.snmpWalk(result.tableOID, stats)
+			if err != nil {
+				stats.Errors.SNMP++
+				return nil, fmt.Errorf("fallback walk failed for table OID '%s': %w", result.tableOID, err)
+			}
+			if len(pdus) > 0 {
+				stats.SNMP.TablesWalked++
+				walkedData[result.tableOID] = pdus
+				result.pdus = pdus
+			}
+		}
 	}
 
 	// Process walked data if available
@@ -591,10 +622,6 @@ func (tc *tableCollector) snmpWalk(oid string, stats *ddsnmp.CollectionStats) (m
 		} else {
 			stats.Errors.MissingOIDs++
 		}
-	}
-
-	if len(pdus) == 0 {
-		tc.missingOIDs[trimOID(oid)] = true
 	}
 
 	return pdus, nil
