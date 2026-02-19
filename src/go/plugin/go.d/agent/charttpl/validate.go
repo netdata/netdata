@@ -16,19 +16,13 @@ var (
 // Validate performs semantic checks for one chart template spec.
 func (s *Spec) Validate() error {
 	if s == nil {
-		return fmt.Errorf("%w: nil spec", errSemanticCheck)
+		return semErr("", "nil spec")
 	}
 	if s.Version != VersionV1 {
-		return fmt.Errorf("%w: %v", errSemanticCheck, FieldError{
-			Path:   "version",
-			Reason: fmt.Sprintf("expected %q", VersionV1),
-		})
+		return semErr("version", fmt.Sprintf("expected %q", VersionV1))
 	}
 	if len(s.Groups) == 0 {
-		return fmt.Errorf("%w: %v", errSemanticCheck, FieldError{
-			Path:   "groups",
-			Reason: "groups[] is required",
-		})
+		return semErr("groups", "groups[] is required")
 	}
 	if err := validateEngine(s.Engine); err != nil {
 		return err
@@ -41,9 +35,6 @@ func (s *Spec) Validate() error {
 	}
 	return nil
 }
-
-// Validate is a compatibility wrapper that delegates to Spec.Validate.
-func Validate(spec *Spec) error { return spec.Validate() }
 
 func validateGroup(group Group, path string, inheritedMetrics map[string]struct{}) error {
 	if strings.TrimSpace(group.Family) == "" {
@@ -84,6 +75,19 @@ func validateGroup(group Group, path string, inheritedMetrics map[string]struct{
 }
 
 func validateChart(chart Chart, path string, effectiveMetrics map[string]struct{}) error {
+	if err := validateChartCore(chart, path); err != nil {
+		return err
+	}
+	if err := validateLifecycle(chart.Lifecycle, path); err != nil {
+		return err
+	}
+	if err := validateInstances(chart.Instances, path); err != nil {
+		return err
+	}
+	return validateDimensions(chart.Dimensions, path, effectiveMetrics)
+}
+
+func validateChartCore(chart Chart, path string) error {
 	if strings.TrimSpace(chart.Title) == "" {
 		return semErr(path+".title", "must not be empty")
 	}
@@ -99,50 +103,63 @@ func validateChart(chart Chart, path string, effectiveMetrics map[string]struct{
 	if chart.Type != "" && !slices.Contains(validChartTypes, chart.Type) {
 		return semErr(path+".type", fmt.Sprintf("must be one of %v", validChartTypes))
 	}
-	if chart.Lifecycle != nil {
-		if chart.Lifecycle.MaxInstances < 0 {
-			return semErr(path+".lifecycle.max_instances", "must be >= 0")
+	return nil
+}
+
+func validateLifecycle(lifecycle *Lifecycle, path string) error {
+	if lifecycle == nil {
+		return nil
+	}
+	if lifecycle.MaxInstances < 0 {
+		return semErr(path+".lifecycle.max_instances", "must be >= 0")
+	}
+	if lifecycle.ExpireAfterCycles < 0 {
+		return semErr(path+".lifecycle.expire_after_cycles", "must be >= 0")
+	}
+	if lifecycle.Dimensions != nil {
+		if lifecycle.Dimensions.MaxDims < 0 {
+			return semErr(path+".lifecycle.dimensions.max_dims", "must be >= 0")
 		}
-		if chart.Lifecycle.ExpireAfterCycles < 0 {
-			return semErr(path+".lifecycle.expire_after_cycles", "must be >= 0")
-		}
-		if chart.Lifecycle.Dimensions != nil {
-			if chart.Lifecycle.Dimensions.MaxDims < 0 {
-				return semErr(path+".lifecycle.dimensions.max_dims", "must be >= 0")
-			}
-			if chart.Lifecycle.Dimensions.ExpireAfterCycles < 0 {
-				return semErr(path+".lifecycle.dimensions.expire_after_cycles", "must be >= 0")
-			}
+		if lifecycle.Dimensions.ExpireAfterCycles < 0 {
+			return semErr(path+".lifecycle.dimensions.expire_after_cycles", "must be >= 0")
 		}
 	}
+	return nil
+}
 
-	if chart.Instances != nil {
-		if len(chart.Instances.ByLabels) == 0 {
-			return semErr(path+".instances.by_labels", "must contain at least one token when instances is set")
-		}
-		seen := make(map[string]struct{}, len(chart.Instances.ByLabels))
-		for i, token := range chart.Instances.ByLabels {
-			token = strings.TrimSpace(token)
-			if token == "" {
-				return semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "must not be empty")
-			}
-			if token != "*" && strings.HasPrefix(token, "!") && len(token) == 1 {
-				return semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "exclude token must include label key")
-			}
-			if _, ok := seen[token]; ok {
-				return semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), fmt.Sprintf("duplicate token %q", token))
-			}
-			seen[token] = struct{}{}
-		}
+func validateInstances(instances *Instances, path string) error {
+	if instances == nil {
+		return nil
+	}
+	if len(instances.ByLabels) == 0 {
+		return semErr(path+".instances.by_labels", "must contain at least one token when instances is set")
 	}
 
-	if len(chart.Dimensions) == 0 {
+	seen := make(map[string]struct{}, len(instances.ByLabels))
+	for i, token := range instances.ByLabels {
+		token = strings.TrimSpace(token)
+		if token == "" {
+			return semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "must not be empty")
+		}
+		if token != "*" && strings.HasPrefix(token, "!") && len(token) == 1 {
+			return semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "exclude token must include label key")
+		}
+		if _, ok := seen[token]; ok {
+			return semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), fmt.Sprintf("duplicate token %q", token))
+		}
+		seen[token] = struct{}{}
+	}
+	return nil
+}
+
+func validateDimensions(dimensions []Dimension, path string, effectiveMetrics map[string]struct{}) error {
+	if len(dimensions) == 0 {
 		return semErr(path+".dimensions", "at least one dimension is required")
 	}
 
-	seenDimNames := make(map[string]struct{}, len(chart.Dimensions))
-	for i := range chart.Dimensions {
-		d := chart.Dimensions[i]
+	seenDimNames := make(map[string]struct{}, len(dimensions))
+	for i := range dimensions {
+		d := dimensions[i]
 		selectorExpr := strings.TrimSpace(d.Selector)
 		if selectorExpr == "" {
 			return semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), "must not be empty")
@@ -168,7 +185,6 @@ func validateChart(chart Chart, path string, effectiveMetrics map[string]struct{
 			seenDimNames[name] = struct{}{}
 		}
 	}
-
 	return nil
 }
 
@@ -220,7 +236,7 @@ func selectorMetricName(expr string) (string, bool) {
 }
 
 func semErr(path, reason string) error {
-	return fmt.Errorf("%w: %v", errSemanticCheck, FieldError{
+	return fmt.Errorf("%w: %v", errSemanticCheck, fieldError{
 		Path:   path,
 		Reason: reason,
 	})

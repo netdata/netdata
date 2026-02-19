@@ -16,7 +16,7 @@ func DecodeYAML(data []byte) (*Spec, error) {
 		return nil, fmt.Errorf("%w: %v", errDecode, err)
 	}
 
-	ApplyDefaults(&spec)
+	applyDefaults(&spec)
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}

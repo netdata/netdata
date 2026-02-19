@@ -4,6 +4,8 @@ package charttpl
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -109,4 +111,54 @@ func TestConfigSchemaJSON(t *testing.T) {
 
 	var doc any
 	require.NoError(t, json.Unmarshal([]byte(schema), &doc))
+}
+
+func TestDecodeYAMLFileScenarios(t *testing.T) {
+	tests := map[string]struct {
+		prepare func(t *testing.T) string
+		wantErr bool
+	}{
+		"success": {
+			prepare: func(t *testing.T) string {
+				t.Helper()
+				dir := t.TempDir()
+				path := filepath.Join(dir, "charts.yaml")
+				data := []byte(`
+version: v1
+groups:
+  - family: Root
+    metrics: [metric_a]
+    charts:
+      - title: A
+        context: a
+        units: "1"
+        dimensions:
+          - selector: metric_a
+            name: x
+`)
+				require.NoError(t, os.WriteFile(path, data, 0o644))
+				return path
+			},
+		},
+		"read error": {
+			prepare: func(t *testing.T) string {
+				t.Helper()
+				return filepath.Join(t.TempDir(), "missing.yaml")
+			},
+			wantErr: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			path := tc.prepare(t)
+			spec, err := DecodeYAMLFile(path)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, spec)
+		})
+	}
 }

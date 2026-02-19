@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -184,6 +185,9 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 	spec, err := charttpl.DecodeYAML([]byte(templateYAML))
 	require.NoError(t, err)
 	require.NoError(t, spec.Validate())
+
+	_, err = chartengine.Compile(spec, 1)
+	require.NoError(t, err)
 }
 
 func casePingSuccess(t *testing.T) *Collector {

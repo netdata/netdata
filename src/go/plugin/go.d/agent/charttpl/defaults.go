@@ -6,8 +6,8 @@ const (
 	defaultChartType = "line"
 )
 
-// ApplyDefaults mutates the parsed template with phase-1 defaults.
-func ApplyDefaults(spec *Spec) {
+// applyDefaults mutates parsed template with phase-1 defaults.
+func applyDefaults(spec *Spec) {
 	if spec == nil {
 		return
 	}
