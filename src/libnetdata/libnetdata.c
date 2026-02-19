@@ -63,7 +63,12 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
 
 // vsnprintfz() returns the number of bytes actually written - after possible truncation
 int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
-    if(unlikely(!dst || !fmt || !n)) return 0;
+    if(unlikely(!dst || !n)) return 0;
+
+    if(unlikely(!fmt)) {
+        dst[0] = '\0';
+        return 0;
+    }
 
     int size = vsnprintf(dst, n, fmt, args);
     dst[n - 1] = '\0';
