@@ -248,22 +248,13 @@ func (c *storeCycleController) CommitCycleSuccess() {
 	}
 
 	for key, staged := range c.core.active.gauges {
-		series := ensureCommitSeriesMutable(oldSnap, next, key)
-		if series == nil {
-			series = newCommittedSeries(key, staged.name, staged.labels, staged.labelsKey, staged.desc)
-			next.series[key] = series
-		}
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
 		series.value = staged.value
-		series.meta.LastSeenSuccessSeq = c.core.active.seq
-		series.lastSeenSuccessCycle = successSeq
+		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
 	for key, staged := range c.core.active.counters {
-		series := ensureCommitSeriesMutable(oldSnap, next, key)
-		if series == nil {
-			series = newCommittedSeries(key, staged.name, staged.labels, staged.labelsKey, staged.desc)
-			next.series[key] = series
-		}
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
 
 		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentSeq > 0
 		if hadCurrent {
@@ -279,16 +270,11 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		series.counterCurrent = staged.current
 		series.counterCurrentSeq = c.core.active.seq
 		series.value = staged.current // Value() for counters returns current total.
-		series.meta.LastSeenSuccessSeq = c.core.active.seq
-		series.lastSeenSuccessCycle = successSeq
+		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
 	for key, staged := range c.core.active.histograms {
-		series := ensureCommitSeriesMutable(oldSnap, next, key)
-		if series == nil {
-			series = newCommittedSeries(key, staged.name, staged.labels, staged.labelsKey, staged.desc)
-			next.series[key] = series
-		}
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
 
 		if series.desc == nil {
 			panic("metrix: missing histogram descriptor")
@@ -311,16 +297,11 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		series.histogramCount = staged.count
 		series.histogramSum = staged.sum
 		series.histogramCumulative = append(series.histogramCumulative[:0], staged.cumulative...)
-		series.meta.LastSeenSuccessSeq = c.core.active.seq
-		series.lastSeenSuccessCycle = successSeq
+		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
 	for key, staged := range c.core.active.summaries {
-		series := ensureCommitSeriesMutable(oldSnap, next, key)
-		if series == nil {
-			series = newCommittedSeries(key, staged.name, staged.labels, staged.labelsKey, staged.desc)
-			next.series[key] = series
-		}
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
 
 		if staged.desc.mode == modeStateful && len(staged.desc.summaryQuantiles()) > 0 {
 			if staged.sketch != nil {
@@ -343,20 +324,14 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		} else {
 			series.summarySketch = nil
 		}
-		series.meta.LastSeenSuccessSeq = c.core.active.seq
-		series.lastSeenSuccessCycle = successSeq
+		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
 	for key, staged := range c.core.active.stateSet {
-		series := ensureCommitSeriesMutable(oldSnap, next, key)
-		if series == nil {
-			series = newCommittedSeries(key, staged.name, staged.labels, staged.labelsKey, staged.desc)
-			next.series[key] = series
-		}
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
 
 		series.stateSetValues = cloneStateMap(staged.states)
-		series.meta.LastSeenSuccessSeq = c.core.active.seq
-		series.lastSeenSuccessCycle = successSeq
+		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
 	applyCollectorRetention(next.series, c.core.retention, successSeq)
@@ -393,6 +368,21 @@ func ensureCommitSeriesMutable(old, next *readSnapshot, key string) *committedSe
 	}
 	ensureSeriesMeta(series.desc, &series.meta)
 	return series
+}
+
+func getOrCreateCommitSeries(old, next *readSnapshot, key, name string, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
+	series := ensureCommitSeriesMutable(old, next, key)
+	if series != nil {
+		return series
+	}
+	series = newCommittedSeries(key, name, labels, labelsKey, desc)
+	next.series[key] = series
+	return series
+}
+
+func markSeriesSeen(series *committedSeries, attemptSeq, successSeq uint64) {
+	series.meta.LastSeenSuccessSeq = attemptSeq
+	series.lastSeenSuccessCycle = successSeq
 }
 
 // AbortCycle discards staged writes and publishes metadata-only failed-attempt status.
