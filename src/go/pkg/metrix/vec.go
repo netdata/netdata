@@ -9,6 +9,10 @@ import (
 )
 
 // vecCache stores per-label-values instrument handles with a read-fast path.
+//
+// Contract: cache entries are intentionally unbounded for the lifetime of the
+// vec handle. Store-level retention evicts committed series state, but it does
+// not prune vecCache handles. Collectors must keep vec label cardinality bounded.
 type vecCache[T any] struct {
 	backend meterBackend
 	base    []LabelSet

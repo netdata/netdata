@@ -43,6 +43,53 @@ func TestMetricMetaScenarios(t *testing.T) {
 				assert.Equal(t, MetricMeta{}, meta)
 			},
 		},
+		"flattened reader resolves histogram metadata by flattened names": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				h := s.Write().SnapshotMeter("svc").Histogram(
+					"latency",
+					WithHistogramBounds(1, 2),
+					WithDescription("Latency"),
+					WithChartFamily("Service"),
+					WithUnit("ms"),
+				)
+
+				cc.BeginCycle()
+				h.ObservePoint(HistogramPoint{
+					Count: 2,
+					Sum:   3,
+					Buckets: []BucketPoint{
+						{UpperBound: 1, CumulativeCount: 1},
+						{UpperBound: 2, CumulativeCount: 2},
+					},
+				})
+				cc.CommitCycleSuccess()
+
+				flat := s.Read(ReadFlatten())
+
+				_, ok := flat.MetricMeta("svc.latency")
+				require.False(t, ok, "expected canonical histogram family name to be absent in flattened view")
+
+				meta, ok := flat.MetricMeta("svc.latency_bucket")
+				require.True(t, ok, "expected flattened histogram bucket metric metadata")
+				assert.Equal(t, "Latency", meta.Description)
+				assert.Equal(t, "Service", meta.ChartFamily)
+				assert.Equal(t, "ms", meta.Unit)
+
+				meta, ok = flat.MetricMeta("svc.latency_count")
+				require.True(t, ok, "expected flattened histogram count metric metadata")
+				assert.Equal(t, "Latency", meta.Description)
+				assert.Equal(t, "Service", meta.ChartFamily)
+				assert.Equal(t, "ms", meta.Unit)
+
+				meta, ok = flat.MetricMeta("svc.latency_sum")
+				require.True(t, ok, "expected flattened histogram sum metric metadata")
+				assert.Equal(t, "Latency", meta.Description)
+				assert.Equal(t, "Service", meta.ChartFamily)
+				assert.Equal(t, "ms", meta.Unit)
+			},
+		},
 		"metadata redeclaration conflict panics": {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()

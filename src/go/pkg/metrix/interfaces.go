@@ -39,6 +39,9 @@ type Reader interface {
 	Summary(name string, labels Labels) (SummaryPoint, bool)
 	StateSet(name string, labels Labels) (StateSetPoint, bool)
 	SeriesMeta(name string, labels Labels) (SeriesMeta, bool)
+	// MetricMeta resolves metadata by metric name in the active reader view.
+	// With Read(ReadFlatten()), lookups use flattened scalar series names.
+	// Example: histogram families resolve via *_bucket/*_count/*_sum names.
 	MetricMeta(name string) (MetricMeta, bool)
 	CollectMeta() CollectMeta
 	// Family returns a scalar-only view. For non-scalar families use Histogram/Summary/StateSet,

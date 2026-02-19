@@ -4,6 +4,8 @@ package metrix
 
 import (
 	"math"
+	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -96,6 +98,43 @@ func TestVecStoreScenarios(t *testing.T) {
 				a := vec.WithLabelValues("a")
 				b := vec.WithLabelValues("a")
 				require.Same(t, a, b, "expected same cached handle for repeated label values")
+			},
+		},
+		"vec handle cache remains race-safe under concurrent writes": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				vec := s.Write().SnapshotMeter("svc").Vec("zone").Gauge("load")
+
+				const (
+					workers    = 32
+					iterations = 200
+					distinct   = 64
+				)
+
+				cc.BeginCycle()
+				var wg sync.WaitGroup
+				wg.Add(workers)
+				for worker := 0; worker < workers; worker++ {
+					worker := worker
+					go func() {
+						defer wg.Done()
+						for i := 0; i < iterations; i++ {
+							label := strconv.Itoa((worker*iterations + i) % distinct)
+							vec.WithLabelValues(label).Observe(SampleValue(i))
+						}
+					}()
+				}
+				wg.Wait()
+				cc.CommitCycleSuccess()
+
+				seen := make(map[string]struct{}, distinct)
+				s.Read(ReadRaw()).ForEachByName("svc.load", func(labels LabelView, _ SampleValue) {
+					value, ok := labels.Get("zone")
+					require.True(t, ok, "expected zone label on vec series")
+					seen[value] = struct{}{}
+				})
+				require.Len(t, seen, distinct, "expected one committed scalar series per distinct vec label value")
 			},
 		},
 		"GetWithLabelValues validates label value count": {
