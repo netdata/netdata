@@ -5,6 +5,10 @@
 - Increase minimum language standards to C17 and C++17, and update to the latest versions of Protobuf and Abseil. ([#21574](https://github.com/netdata/netdata/issues/21574))
 - Drop Ubuntu 20.04 from CI and package builds. ([#21647](https://github.com/netdata/netdata/issues/21647))
 - Clarify default storage retention limits in docs ([#21780](https://github.com/netdata/netdata/issues/21780))
+- Build(deps): bump github.com/redis/go-redis/v9 from 9.17.3 to 9.18.0 in /src/go ([#21782](https://github.com/netdata/netdata/issues/21782))
+- Add cmake render-docs target for integration doc generation ([#21778](https://github.com/netdata/netdata/issues/21778))
+- Replace otel-plugin metrics pipeline with proper aggregation. ([#21771](https://github.com/netdata/netdata/issues/21771))
+- Regenerate integrations docs ([#21783](https://github.com/netdata/netdata/issues/21783))
 
 ## [2.9.0] - 2026-02-16
 
