@@ -175,6 +175,7 @@ func TestCollector_Cleanup(t *testing.T) {
 
 func TestCollector_ChartTemplateYAML(t *testing.T) {
 	collr := New()
+	collecttest.AssertChartTemplateSchema(t, collr.ChartTemplateYAML())
 
 	spec, err := charttpl.DecodeYAML([]byte(collr.ChartTemplateYAML()))
 	require.NoError(t, err)

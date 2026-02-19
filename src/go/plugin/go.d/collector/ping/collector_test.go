@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	probing "github.com/prometheus-community/pro-bing"
 	"github.com/stretchr/testify/assert"
@@ -177,7 +178,10 @@ func TestCollector_Collect(t *testing.T) {
 }
 
 func TestCollector_ChartTemplateYAML(t *testing.T) {
-	spec, err := charttpl.DecodeYAML([]byte(New().ChartTemplateYAML()))
+	templateYAML := New().ChartTemplateYAML()
+	collecttest.AssertChartTemplateSchema(t, templateYAML)
+
+	spec, err := charttpl.DecodeYAML([]byte(templateYAML))
 	require.NoError(t, err)
 	require.NoError(t, spec.Validate())
 }

@@ -133,6 +133,72 @@ groups:
 	}
 }
 
+func TestValidateChartTemplateSchema(t *testing.T) {
+	tests := map[string]struct {
+		template string
+		wantErr  bool
+	}{
+		"valid template": {
+			template: `
+version: v1
+groups:
+  - family: Root
+    metrics: [metric_a]
+    charts:
+      - title: A
+        context: a
+        units: "1"
+        dimensions:
+          - selector: metric_a
+            name: x
+`,
+		},
+		"schema rejects missing version": {
+			template: `
+groups:
+  - family: Root
+    metrics: [metric_a]
+    charts:
+      - title: A
+        context: a
+        units: "1"
+        dimensions:
+          - selector: metric_a
+            name: x
+`,
+			wantErr: true,
+		},
+		"schema rejects unknown field": {
+			template: `
+version: v1
+groups:
+  - family: Root
+    metrics: [metric_a]
+    charts:
+      - title: A
+        context: a
+        units: "1"
+        unknown_field: true
+        dimensions:
+          - selector: metric_a
+            name: x
+`,
+			wantErr: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateChartTemplateSchema(tc.template)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestCollectScalarSeries(t *testing.T) {
 	tests := map[string]struct {
 		collectFn func(ctx context.Context, store metrix.CollectorStore) error

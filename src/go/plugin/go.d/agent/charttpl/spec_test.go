@@ -3,6 +3,7 @@
 package charttpl
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -100,4 +101,12 @@ groups:
 			}
 		})
 	}
+}
+
+func TestConfigSchemaJSON(t *testing.T) {
+	schema := ConfigSchemaJSON
+	require.NotEmpty(t, schema)
+
+	var doc any
+	require.NoError(t, json.Unmarshal([]byte(schema), &doc))
 }
