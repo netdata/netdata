@@ -185,6 +185,23 @@ groups:
 `,
 			wantErr: true,
 		},
+		"schema rejects non-string YAML key": {
+			template: `
+version: v1
+groups:
+  - family: Root
+    metrics: [metric_a]
+    charts:
+      - title: A
+        context: a
+        units: "1"
+        1: invalid
+        dimensions:
+          - selector: metric_a
+            name: x
+`,
+			wantErr: true,
+		},
 	}
 
 	for name, tc := range tests {

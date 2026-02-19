@@ -75,34 +75,50 @@ func decodeYAMLToGenericJSONValue(rawYAML []byte) (any, error) {
 	if err := yaml.UnmarshalStrict(rawYAML, &doc); err != nil {
 		return nil, fmt.Errorf("decode template YAML: %w", err)
 	}
-	return normalizeYAML(doc), nil
+	normalized, err := normalizeYAML(doc, "$")
+	if err != nil {
+		return nil, err
+	}
+	return normalized, nil
 }
 
-func normalizeYAML(v any) any {
+func normalizeYAML(v any, path string) (any, error) {
 	switch tv := v.(type) {
 	case map[string]any:
 		out := make(map[string]any, len(tv))
 		for key, val := range tv {
-			out[key] = normalizeYAML(val)
+			norm, err := normalizeYAML(val, path+"."+key)
+			if err != nil {
+				return nil, err
+			}
+			out[key] = norm
 		}
-		return out
+		return out, nil
 	case map[any]any:
 		out := make(map[string]any, len(tv))
 		for key, val := range tv {
 			ks, ok := key.(string)
 			if !ok {
-				continue
+				return nil, fmt.Errorf("decode template YAML: non-string key at %s (key type %T)", path, key)
 			}
-			out[ks] = normalizeYAML(val)
+			norm, err := normalizeYAML(val, path+"."+ks)
+			if err != nil {
+				return nil, err
+			}
+			out[ks] = norm
 		}
-		return out
+		return out, nil
 	case []any:
 		out := make([]any, len(tv))
 		for i, val := range tv {
-			out[i] = normalizeYAML(val)
+			norm, err := normalizeYAML(val, fmt.Sprintf("%s[%d]", path, i))
+			if err != nil {
+				return nil, err
+			}
+			out[i] = norm
 		}
-		return out
+		return out, nil
 	default:
-		return v
+		return v, nil
 	}
 }
