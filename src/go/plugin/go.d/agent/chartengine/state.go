@@ -14,8 +14,15 @@ type engineState struct {
 	matchIndex   matchIndex
 	routeCache   *routeCache
 	materialized materializedState
+	hints        plannerSizingHints
 	stats        engineStats
 	runtimeStore metrix.RuntimeStore
 	runtimeStats *runtimeMetrics
 	log          *logger.Logger
+}
+
+type plannerSizingHints struct {
+	aliveSeries int
+	chartsByID  int
+	seenInfer   int
 }

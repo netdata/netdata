@@ -157,6 +157,9 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	sample.actionUpdateChart = actionCounts.actionUpdateChart
 	sample.actionRemoveDimension = actionCounts.actionRemoveDimension
 	sample.actionRemoveChart = actionCounts.actionRemoveChart
+	e.state.hints.aliveSeries = len(ctx.aliveSeries)
+	e.state.hints.chartsByID = len(ctx.chartsByID)
+	e.state.hints.seenInfer = len(ctx.seenInfer)
 
 	return out, nil
 }
@@ -227,6 +230,12 @@ func (e *Engine) preparePlanBuildContext(
 			dimCapHints[chartID] = n
 		}
 	}
+	aliveCap := e.state.hints.aliveSeries
+	chartsCap := e.state.hints.chartsByID
+	if chartsCap < len(e.state.materialized.charts) {
+		chartsCap = len(e.state.materialized.charts)
+	}
+	seenInferCap := e.state.hints.seenInfer
 	return &planBuildContext{
 		out:         out,
 		reader:      reader,
@@ -235,9 +244,9 @@ func (e *Engine) preparePlanBuildContext(
 		cache:       cache,
 		index:       index,
 		flat:        reader,
-		aliveSeries: make(map[metrix.SeriesID]struct{}),
-		seenInfer:   make(map[string]struct{}),
-		chartsByID:  make(map[string]*chartState),
+		aliveSeries: make(map[metrix.SeriesID]struct{}, aliveCap),
+		seenInfer:   make(map[string]struct{}, seenInferCap),
+		chartsByID:  make(map[string]*chartState, chartsCap),
 		chartOwners: chartOwners,
 		dimCapHints: dimCapHints,
 	}, nil
