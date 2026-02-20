@@ -9,18 +9,18 @@ type engineStats struct {
 	routeCacheMisses uint64
 }
 
-// Stats is a snapshot of planner/runtime counters.
-type Stats struct {
+// statsSnapshot is a lock-free snapshot of planner/runtime counters.
+type statsSnapshot struct {
 	RouteCacheHits   uint64
 	RouteCacheMisses uint64
 }
 
-// Stats returns a lock-free snapshot of engine counters.
-func (e *Engine) Stats() Stats {
+// stats returns a lock-free snapshot of engine counters.
+func (e *Engine) stats() statsSnapshot {
 	if e == nil {
-		return Stats{}
+		return statsSnapshot{}
 	}
-	return Stats{
+	return statsSnapshot{
 		RouteCacheHits:   atomic.LoadUint64(&e.state.stats.routeCacheHits),
 		RouteCacheMisses: atomic.LoadUint64(&e.state.stats.routeCacheMisses),
 	}

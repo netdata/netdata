@@ -23,8 +23,8 @@ func TestEngineLoadScenarios(t *testing.T) {
 			initialRev:  100,
 			assert: func(t *testing.T, e *Engine) {
 				t.Helper()
-				require.True(t, e.Ready())
-				p := e.Program()
+				require.True(t, e.ready())
+				p := e.program()
 				require.NotNil(t, p)
 				assert.Equal(t, uint64(100), p.Revision())
 				assert.Equal(t, "v1", p.Version())
@@ -49,7 +49,7 @@ groups:
 			reloadErr: true,
 			assert: func(t *testing.T, e *Engine) {
 				t.Helper()
-				p := e.Program()
+				p := e.program()
 				require.NotNil(t, p)
 				assert.Equal(t, uint64(200), p.Revision())
 				assert.Equal(t, []string{"mysql_queries_total"}, p.MetricNames())
@@ -76,7 +76,7 @@ groups:
 			reloadErr: true,
 			assert: func(t *testing.T, e *Engine) {
 				t.Helper()
-				p := e.Program()
+				p := e.program()
 				require.NotNil(t, p)
 				assert.Equal(t, uint64(300), p.Revision())
 				assert.Equal(t, []string{"mysql_queries_total"}, p.MetricNames())
@@ -107,7 +107,7 @@ groups:
 			reloadErr: true,
 			assert: func(t *testing.T, e *Engine) {
 				t.Helper()
-				p := e.Program()
+				p := e.program()
 				require.NotNil(t, p)
 				assert.Equal(t, uint64(400), p.Revision())
 				assert.Equal(t, []string{"mysql_queries_total"}, p.MetricNames())

@@ -173,7 +173,8 @@ func TestJobV2Scenarios(t *testing.T) {
 				require.NotNil(t, job.store)
 				require.NotNil(t, job.cycle)
 				require.NotNil(t, job.engine)
-				assert.True(t, job.engine.Ready())
+				_, err := job.engine.BuildPlan(job.store.Read(metrix.ReadFlatten()))
+				require.NoError(t, err)
 			},
 		},
 		"auto detection fails when metric store is nil": {

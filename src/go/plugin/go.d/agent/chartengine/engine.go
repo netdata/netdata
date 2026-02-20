@@ -91,8 +91,8 @@ func (e *Engine) LoadYAML(data []byte, revision uint64) error {
 	return e.Load(spec, revision)
 }
 
-// LoadYAMLFile reads chart-template YAML from file, compiles and publishes it.
-func (e *Engine) LoadYAMLFile(path string, revision uint64) error {
+// loadYAMLFile reads chart-template YAML from file, compiles and publishes it.
+func (e *Engine) loadYAMLFile(path string, revision uint64) error {
 	spec, err := charttpl.DecodeYAMLFile(path)
 	if err != nil {
 		return err
@@ -100,8 +100,8 @@ func (e *Engine) LoadYAMLFile(path string, revision uint64) error {
 	return e.Load(spec, revision)
 }
 
-// Program returns the latest compiled immutable program snapshot.
-func (e *Engine) Program() *program.Program {
+// program returns the latest compiled immutable program snapshot.
+func (e *Engine) program() *program.Program {
 	if e == nil {
 		return nil
 	}
@@ -111,7 +111,7 @@ func (e *Engine) Program() *program.Program {
 	return p
 }
 
-// Ready reports whether a compiled program is currently loaded.
-func (e *Engine) Ready() bool {
-	return e.Program() != nil
+// ready reports whether a compiled program is currently loaded.
+func (e *Engine) ready() bool {
+	return e.program() != nil
 }

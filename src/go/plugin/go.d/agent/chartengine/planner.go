@@ -619,8 +619,8 @@ func sortInferredDimensions(in []InferredDimension) {
 	})
 }
 
-// BuildPlan is a package-level convenience wrapper around Engine.BuildPlan.
-func BuildPlan(engine *Engine, reader metrix.Reader) (Plan, error) {
+// buildPlan is a package-level convenience wrapper around Engine.BuildPlan.
+func buildPlan(engine *Engine, reader metrix.Reader) (Plan, error) {
 	if engine == nil {
 		return Plan{}, fmt.Errorf("chartengine: nil engine")
 	}
