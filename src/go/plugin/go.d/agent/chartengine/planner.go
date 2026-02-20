@@ -52,7 +52,6 @@ type dimBuildEntry struct {
 type chartState struct {
 	templateID      string
 	chartID         string
-	identity        program.ChartIdentity
 	meta            program.ChartMeta
 	lifecycle       program.LifecyclePolicy
 	labels          *chartLabelAccumulator
@@ -384,19 +383,16 @@ func (ctx *planBuildContext) accumulateRoute(
 		}
 
 		labelsAcc := newAutogenChartLabelAccumulator()
-		identity := program.ChartIdentity{}
 		if !route.Autogen {
 			chart, ok := index.chartsByID[route.ChartTemplateID]
 			if !ok {
 				return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
 			}
 			labelsAcc = newChartLabelAccumulator(chart)
-			identity = chart.Identity
 		}
 		cs = &chartState{
 			templateID:      route.ChartTemplateID,
 			chartID:         route.ChartID,
-			identity:        identity,
 			meta:            route.Meta,
 			lifecycle:       route.Lifecycle,
 			labels:          labelsAcc,
@@ -430,7 +426,7 @@ func (ctx *planBuildContext) accumulateRoute(
 		entry.value += value
 	}
 
-	if err := cs.labels.observe(cs.identity, labels, route.DimensionKeyLabel); err != nil {
+	if err := cs.labels.observe(labels, route.DimensionKeyLabel); err != nil {
 		return err
 	}
 

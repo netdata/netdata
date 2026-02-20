@@ -3,11 +3,20 @@
 package chartengine
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 )
+
+type compiledInstanceLabelPlan struct {
+	explicitKeys   []string
+	explicitSet    map[string]struct{}
+	placeholderSet map[string]struct{}
+	excludeSet     map[string]struct{}
+	includeAll     bool
+}
 
 type chartLabelAccumulator struct {
 	mode        program.PromotionMode
@@ -16,16 +25,26 @@ type chartLabelAccumulator struct {
 	instance    map[string]string
 	selected    map[string]string
 	initialized bool
+
+	instancePlan      compiledInstanceLabelPlan
+	instanceKeys      map[string]struct{}
+	resolvedScratch   []instanceLabelValue
+	includeAllScratch []string
 }
 
 func newChartLabelAccumulator(chart program.Chart) *chartLabelAccumulator {
+	plan := compileInstanceLabelPlan(chart.Identity)
 	acc := &chartLabelAccumulator{
 		mode:        chart.Labels.Mode,
 		promoteKeys: make(map[string]struct{}, len(chart.Labels.PromoteKeys)),
 		excluded: make(map[string]struct{},
 			len(chart.Labels.Exclusions.SelectorConstrainedKeys)+len(chart.Labels.Exclusions.DimensionKeyLabels)),
-		instance: make(map[string]string),
-		selected: make(map[string]string),
+		instance:          make(map[string]string),
+		selected:          make(map[string]string),
+		instancePlan:      plan,
+		instanceKeys:      make(map[string]struct{}, len(plan.explicitKeys)),
+		resolvedScratch:   make([]instanceLabelValue, 0, len(plan.explicitKeys)),
+		includeAllScratch: make([]string, 0, len(plan.explicitKeys)),
 	}
 	for _, key := range chart.Labels.PromoteKeys {
 		key = strings.TrimSpace(key)
@@ -53,15 +72,58 @@ func newChartLabelAccumulator(chart program.Chart) *chartLabelAccumulator {
 
 func newAutogenChartLabelAccumulator() *chartLabelAccumulator {
 	return &chartLabelAccumulator{
-		mode:        program.PromotionModeAutoIntersection,
-		promoteKeys: make(map[string]struct{}),
-		excluded:    make(map[string]struct{}),
-		instance:    make(map[string]string),
-		selected:    make(map[string]string),
+		mode:              program.PromotionModeAutoIntersection,
+		promoteKeys:       make(map[string]struct{}),
+		excluded:          make(map[string]struct{}),
+		instance:          make(map[string]string),
+		selected:          make(map[string]string),
+		instancePlan:      compileInstanceLabelPlan(program.ChartIdentity{}),
+		instanceKeys:      make(map[string]struct{}),
+		resolvedScratch:   make([]instanceLabelValue, 0),
+		includeAllScratch: make([]string, 0),
 	}
 }
 
-func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels metrix.LabelView, dimensionKeyLabel string) error {
+func compileInstanceLabelPlan(identity program.ChartIdentity) compiledInstanceLabelPlan {
+	plan := compiledInstanceLabelPlan{
+		explicitKeys:   make([]string, 0, len(identity.InstanceByLabels)),
+		explicitSet:    make(map[string]struct{}, len(identity.InstanceByLabels)),
+		placeholderSet: make(map[string]struct{}, len(identity.IDPlaceholders)),
+		excludeSet:     make(map[string]struct{}),
+	}
+	for _, key := range identity.IDPlaceholders {
+		plan.placeholderSet[key] = struct{}{}
+	}
+
+	seenExplicit := make(map[string]struct{}, len(identity.InstanceByLabels))
+	for _, token := range identity.InstanceByLabels {
+		switch {
+		case token.Exclude:
+			if token.Key != "" {
+				plan.excludeSet[token.Key] = struct{}{}
+			}
+		case token.IncludeAll:
+			plan.includeAll = true
+		case token.Key != "":
+			key := token.Key
+			if _, skip := plan.placeholderSet[key]; skip {
+				continue
+			}
+			if _, excluded := plan.excludeSet[key]; excluded {
+				continue
+			}
+			if _, exists := seenExplicit[key]; exists {
+				continue
+			}
+			seenExplicit[key] = struct{}{}
+			plan.explicitKeys = append(plan.explicitKeys, key)
+			plan.explicitSet[key] = struct{}{}
+		}
+	}
+	return plan
+}
+
+func (a *chartLabelAccumulator) observe(labels metrix.LabelView, dimensionKeyLabel string) error {
 	if a == nil || labels.Len() == 0 {
 		return nil
 	}
@@ -70,18 +132,9 @@ func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels m
 		a.excluded[key] = struct{}{}
 	}
 
-	instanceLabels, ok, err := resolveInstanceLabelValues(identity, labelViewAccessor{view: labels})
-	if err != nil {
-		return err
-	}
+	ok := a.resolveInstanceLabelsForObserve(labels)
 	if !ok {
 		return nil
-	}
-
-	for _, label := range instanceLabels {
-		if _, exists := a.instance[label.Key]; !exists {
-			a.instance[label.Key] = label.Value
-		}
 	}
 
 	switch a.mode {
@@ -91,7 +144,7 @@ func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels m
 				if _, excluded := a.excluded[key]; excluded {
 					continue
 				}
-				if isInstanceLabelKey(instanceLabels, key) {
+				if a.isInstanceKey(key) {
 					continue
 				}
 				value, ok := labels.Get(key)
@@ -108,12 +161,16 @@ func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels m
 				delete(a.selected, key)
 				continue
 			}
-			if isInstanceLabelKey(instanceLabels, key) {
+			next, ok := labels.Get(key)
+			if !ok {
 				delete(a.selected, key)
 				continue
 			}
-			next, ok := labels.Get(key)
-			if !ok || next != value {
+			if a.isInstanceKey(key) {
+				delete(a.selected, key)
+				continue
+			}
+			if next != value {
 				delete(a.selected, key)
 			}
 		}
@@ -124,7 +181,7 @@ func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels m
 				if _, excluded := a.excluded[key]; excluded {
 					return true
 				}
-				if isInstanceLabelKey(instanceLabels, key) {
+				if a.isInstanceKey(key) {
 					return true
 				}
 				a.selected[key] = value
@@ -138,12 +195,16 @@ func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels m
 				delete(a.selected, key)
 				continue
 			}
-			if isInstanceLabelKey(instanceLabels, key) {
+			next, ok := labels.Get(key)
+			if !ok {
 				delete(a.selected, key)
 				continue
 			}
-			next, ok := labels.Get(key)
-			if !ok || next != value {
+			if a.isInstanceKey(key) {
+				delete(a.selected, key)
+				continue
+			}
+			if next != value {
 				delete(a.selected, key)
 			}
 		}
@@ -151,13 +212,70 @@ func (a *chartLabelAccumulator) observe(identity program.ChartIdentity, labels m
 	}
 }
 
-func isInstanceLabelKey(instanceLabels []instanceLabelValue, key string) bool {
-	for _, label := range instanceLabels {
-		if label.Key == key {
-			return true
-		}
+func (a *chartLabelAccumulator) resetInstanceKeys() {
+	clear(a.instanceKeys)
+}
+
+func (a *chartLabelAccumulator) addInstanceKey(key, value string) {
+	if _, exists := a.instanceKeys[key]; !exists {
+		a.instanceKeys[key] = struct{}{}
 	}
-	return false
+	if _, exists := a.instance[key]; !exists {
+		a.instance[key] = value
+	}
+}
+
+func (a *chartLabelAccumulator) resolveInstanceLabelsForObserve(labels metrix.LabelView) bool {
+	a.resetInstanceKeys()
+
+	resolved := a.resolvedScratch[:0]
+	for _, key := range a.instancePlan.explicitKeys {
+		value, ok := labels.Get(key)
+		if !ok {
+			a.resolvedScratch = resolved[:0]
+			return false
+		}
+		resolved = append(resolved, instanceLabelValue{Key: key, Value: value})
+	}
+
+	if a.instancePlan.includeAll {
+		extra := a.includeAllScratch[:0]
+		labels.Range(func(key, _ string) bool {
+			if _, skip := a.instancePlan.placeholderSet[key]; skip {
+				return true
+			}
+			if _, excluded := a.instancePlan.excludeSet[key]; excluded {
+				return true
+			}
+			if _, already := a.instancePlan.explicitSet[key]; already {
+				return true
+			}
+			extra = append(extra, key)
+			return true
+		})
+		sort.Strings(extra)
+		for _, key := range extra {
+			value, ok := labels.Get(key)
+			if !ok {
+				a.resolvedScratch = resolved[:0]
+				a.includeAllScratch = extra[:0]
+				return false
+			}
+			resolved = append(resolved, instanceLabelValue{Key: key, Value: value})
+		}
+		a.includeAllScratch = extra
+	}
+
+	for _, item := range resolved {
+		a.addInstanceKey(item.Key, item.Value)
+	}
+	a.resolvedScratch = resolved
+	return true
+}
+
+func (a *chartLabelAccumulator) isInstanceKey(key string) bool {
+	_, ok := a.instanceKeys[key]
+	return ok
 }
 
 func (a *chartLabelAccumulator) materialize() (map[string]string, error) {
