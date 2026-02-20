@@ -952,7 +952,7 @@ groups:
 	require.NotNil(t, update)
 	assert.Equal(t, "svc.errors_total-method=GET", update.ChartID)
 	require.Len(t, update.Values, 1)
-	assert.Equal(t, "svc.errors_total", update.Values[0].Name)
+	assert.Equal(t, "errors_total", update.Values[0].Name)
 	assert.Equal(t, float64(10), update.Values[0].Float64)
 }
 
@@ -1294,7 +1294,7 @@ groups:
 	update := findUpdateAction(plan)
 	require.NotNil(t, update)
 	require.Len(t, update.Values, 1)
-	assert.Equal(t, "svc.queue_depth", update.Values[0].Name)
+	assert.Equal(t, "queue_depth", update.Values[0].Name)
 	assert.Equal(t, float64(7), update.Values[0].Float64)
 }
 

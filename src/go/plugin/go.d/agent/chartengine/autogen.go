@@ -375,7 +375,7 @@ func buildCounterComponentAutogenRoute(
 	return autogenRoute{
 		chartID:         chartID,
 		chartName:       baseName,
-		dimensionName:   chartName,
+		dimensionName:   autogenDimensionName(chartName),
 		algorithm:       program.AlgorithmIncremental,
 		units:           units,
 		chartType:       chartTypeFromUnits(units),
@@ -437,7 +437,7 @@ func buildScalarAutogenRoute(
 	return autogenRoute{
 		chartID:         chartID,
 		chartName:       metricName,
-		dimensionName:   metricName,
+		dimensionName:   autogenDimensionName(metricName),
 		algorithm:       algorithm,
 		units:           units,
 		chartType:       chartTypeFromUnits(units),
@@ -513,6 +513,18 @@ func getAutogenChartContext(metricName string) string {
 		return "metric"
 	}
 	return metricName
+}
+
+func autogenDimensionName(metricName string) string {
+	metricName = strings.TrimSpace(metricName)
+	if metricName == "" {
+		return metricName
+	}
+	idx := strings.LastIndexByte(metricName, '.')
+	if idx == -1 || idx == len(metricName)-1 {
+		return metricName
+	}
+	return metricName[idx+1:]
 }
 
 func getAutogenChartFamily(metric string) string {
