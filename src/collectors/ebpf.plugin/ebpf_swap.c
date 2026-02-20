@@ -413,8 +413,11 @@ static void ebpf_obsolete_swap_global(ebpf_module_t *em)
  */
 static void ebpf_swap_exit(void *ptr)
 {
-    pids_fd[NETDATA_EBPF_PIDS_SWAP_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (!em)
+        return;
+
+    pids_fd[NETDATA_EBPF_PIDS_SWAP_IDX] = -1;
 
     netdata_mutex_lock(&lock);
     collect_pids &= ~(1 << EBPF_MODULE_SWAP_IDX);
@@ -442,12 +445,6 @@ static void ebpf_swap_exit(void *ptr)
 
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
 
-#ifdef LIBBPF_MAJOR_VERSION
-    if (swap_bpf_obj) {
-        swap_bpf__destroy(swap_bpf_obj);
-        swap_bpf_obj = NULL;
-    }
-#endif
     if (em->objects) {
         if ((uintptr_t)em->objects < 4096) {
             netdata_log_error(
@@ -455,11 +452,23 @@ static void ebpf_swap_exit(void *ptr)
                 (unsigned long)em->objects);
             freez(em->probe_links);
         } else {
-            ebpf_unload_legacy_code(em->objects, em->probe_links);
+            if (em->objects && em->probe_links)
+                ebpf_unload_legacy_code(em->objects, em->probe_links);
         }
         em->objects = NULL;
         em->probe_links = NULL;
     }
+#ifdef LIBBPF_MAJOR_VERSION
+    else if (swap_bpf_obj) {
+        swap_bpf__destroy(swap_bpf_obj);
+        swap_bpf_obj = NULL;
+    }
+#endif
+
+    freez(swap_vector);
+    swap_vector = NULL;
+    freez(swap_values);
+    swap_values = NULL;
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
@@ -1215,6 +1224,7 @@ static int ebpf_swap_set_internal_value(void)
  */
 void ebpf_swap_thread(void *ptr)
 {
+    pids_fd[NETDATA_EBPF_PIDS_SWAP_IDX] = -1;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_swap_exit) cleanup_ptr = em;
