@@ -149,14 +149,19 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	switch obs := e.observeBuildSuccessSeq(collectMeta.LastSuccessSeq); obs.transition {
+	obs := e.observeBuildSuccessSeq(collectMeta.LastSuccessSeq)
+	sample.buildSeqViolation = e.state.buildSeq.violating
+	sample.buildSeqObserved = true
+	switch obs.transition {
 	case buildSeqTransitionBroken:
+		sample.buildSeqBroken = true
 		e.logWarningf(
 			"chartengine build sequence is non-monotonic: current=%d previous=%d (suppressing repeats until recovery)",
 			collectMeta.LastSuccessSeq,
 			obs.previous,
 		)
 	case buildSeqTransitionRecovered:
+		sample.buildSeqRecovered = true
 		e.logInfof(
 			"chartengine build sequence monotonicity recovered: current=%d previous=%d",
 			collectMeta.LastSuccessSeq,
@@ -164,46 +169,73 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 		)
 	}
 
+	phaseStartedAt := time.Now()
 	ctx, err := e.preparePlanBuildContext(reader, &out, collectMeta)
+	sample.phasePrepareSeconds = time.Since(phaseStartedAt).Seconds()
 	if err != nil {
 		sample.buildErr = true
 		e.logWarningf("chartengine build prepare failed: %v", err)
 		return Plan{}, err
 	}
+	phaseStartedAt = time.Now()
 	if err := validateBuildReaderForInferredDimensions(ctx.index, reader); err != nil {
+		sample.phaseValidateSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build reader validation failed: %v", err)
 		return Plan{}, err
 	}
+	sample.phaseValidateSeconds = time.Since(phaseStartedAt).Seconds()
+	phaseStartedAt = time.Now()
 	if err := e.scanPlanSeries(ctx); err != nil {
+		sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build scan failed: %v", err)
 		return Plan{}, err
 	}
+	sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
 
 	// Route-cache lifecycle follows metrix snapshot membership.
-	ctx.cache.RetainSeen(ctx.collectMeta.LastSuccessSeq)
+	phaseStartedAt = time.Now()
+	retainStats := ctx.cache.RetainSeen(ctx.collectMeta.LastSuccessSeq)
+	sample.phaseRetainSeconds = time.Since(phaseStartedAt).Seconds()
+	sample.routeCacheEntries = retainStats.EntriesAfter
+	sample.routeCacheRetained = retainStats.EntriesAfter
+	sample.routeCachePruned = retainStats.Pruned
+	sample.routeCacheFullDrop = retainStats.FullDrop
 
+	phaseStartedAt = time.Now()
 	removeByCapDims, removeByCapCharts := enforceLifecycleCaps(ctx.collectMeta.LastSuccessSeq, ctx.chartsByID, &e.state.materialized)
+	sample.phaseLifecycleCapsSec = time.Since(phaseStartedAt).Seconds()
+	sample.lifecycleRemovedDimensionByCap = len(removeByCapDims)
+	sample.lifecycleRemovedChartByCap = len(removeByCapCharts)
 	for _, action := range removeByCapDims {
 		out.Actions = append(out.Actions, action)
 	}
 	for _, action := range removeByCapCharts {
 		out.Actions = append(out.Actions, action)
 	}
+	phaseStartedAt = time.Now()
 	if err := e.materializePlanCharts(ctx); err != nil {
+		sample.phaseMaterializeSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build materialization failed: %v", err)
 		return Plan{}, err
 	}
+	sample.phaseMaterializeSeconds = time.Since(phaseStartedAt).Seconds()
+	phaseStartedAt = time.Now()
 	removeDims, removeCharts := collectExpiryRemovals(ctx.collectMeta.LastSuccessSeq, &e.state.materialized)
+	sample.phaseExpirySeconds = time.Since(phaseStartedAt).Seconds()
+	sample.lifecycleRemovedDimensionByExpiry = len(removeDims)
+	sample.lifecycleRemovedChartByExpiry = len(removeCharts)
 	for _, action := range removeDims {
 		out.Actions = append(out.Actions, action)
 	}
 	for _, action := range removeCharts {
 		out.Actions = append(out.Actions, action)
 	}
+	phaseStartedAt = time.Now()
 	sortInferredDimensions(out.InferredDimensions)
+	sample.phaseSortSeconds = time.Since(phaseStartedAt).Seconds()
 
 	sample.planRouteStats = ctx.planRouteStats
 	sample.planChartInstances = len(ctx.chartsByID)
@@ -215,6 +247,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	sample.actionUpdateChart = actionCounts.actionUpdateChart
 	sample.actionRemoveDimension = actionCounts.actionRemoveDimension
 	sample.actionRemoveChart = actionCounts.actionRemoveChart
+	sample.buildSuccess = true
 	e.state.hints.chartsByID = len(ctx.chartsByID)
 	e.state.hints.seenInfer = len(ctx.seenInfer)
 
@@ -318,10 +351,12 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 		}
 		if e.state.cfg.seriesSelection == seriesSelectionLastSuccessOnly &&
 			meta.LastSeenSuccessSeq != ctx.collectMeta.LastSuccessSeq {
+			ctx.seriesFilteredBySeq++
 			ctx.cache.MarkSeenIfPresent(identity, buildSeq)
 			return
 		}
 		if selector := e.state.cfg.selector; selector != nil && !selector.Matches(name, labels) {
+			ctx.seriesFilteredBySel++
 			ctx.cache.MarkSeenIfPresent(identity, buildSeq)
 			return
 		}

@@ -9,4 +9,6 @@ type planRouteStats struct {
 	seriesMatched        uint64
 	seriesUnmatched      uint64
 	seriesAutogenMatched uint64
+	seriesFilteredBySeq  uint64
+	seriesFilteredBySel  uint64
 }

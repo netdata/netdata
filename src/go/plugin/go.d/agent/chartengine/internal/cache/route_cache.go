@@ -14,6 +14,13 @@ type routeCacheEntry[T any] struct {
 	lastSeenBuild uint64
 }
 
+type RetainSeenStats struct {
+	EntriesBefore int
+	EntriesAfter  int
+	Pruned        int
+	FullDrop      bool
+}
+
 // RouteCache stores resolved routes keyed by metrix series identity.
 //
 // The cache is intentionally unbounded and is pruned by RetainSeen(), so
@@ -94,9 +101,13 @@ func (c *RouteCache[T]) Store(identity metrix.SeriesIdentity, revision uint64, b
 }
 
 // RetainSeen keeps entries that were observed in current successful build sequence.
-func (c *RouteCache[T]) RetainSeen(buildSeq uint64) {
+func (c *RouteCache[T]) RetainSeen(buildSeq uint64) RetainSeenStats {
+	stats := RetainSeenStats{
+		EntriesBefore: c.entryCount,
+		EntriesAfter:  c.entryCount,
+	}
 	if c.entryCount == 0 {
-		return
+		return stats
 	}
 	if c.seenBuild != buildSeq {
 		// No cached entries were observed in this build; drop all.
@@ -104,11 +115,14 @@ func (c *RouteCache[T]) RetainSeen(buildSeq uint64) {
 		c.entryCount = 0
 		c.seenBuild = buildSeq
 		c.seenCount = 0
-		return
+		stats.EntriesAfter = 0
+		stats.Pruned = stats.EntriesBefore
+		stats.FullDrop = true
+		return stats
 	}
 	if c.seenCount == c.entryCount {
 		// Steady-state fast path: all cached entries were seen this build.
-		return
+		return stats
 	}
 
 	keptTotal := 0
@@ -123,6 +137,9 @@ func (c *RouteCache[T]) RetainSeen(buildSeq uint64) {
 	}
 	c.entryCount = keptTotal
 	c.seenCount = keptTotal
+	stats.EntriesAfter = keptTotal
+	stats.Pruned = stats.EntriesBefore - keptTotal
+	return stats
 }
 
 func (c *RouteCache[T]) markSeen(entry *routeCacheEntry[T], buildSeq uint64) {

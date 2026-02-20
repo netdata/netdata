@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 )
 
 func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
@@ -41,32 +42,129 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				require.NotNil(t, rs)
 				r := rs.Read(metrix.ReadRaw())
 
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.build_calls_total", nil, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.build_success_total", nil, 2)
+				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.chartengine.build_duration_seconds", nil, 2)
+				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.chartengine.build_phase_duration_seconds", metrix.Labels{"phase": "scan"}, 2)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_misses_total", nil, 1)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_hits_total", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_entries", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_retained_total", nil, 1)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.series_scanned_total", nil, 2)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.actions_total", metrix.Labels{"kind": "update_chart"}, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.planner_actions_total", metrix.Labels{"kind": "update_chart"}, 2)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.plan_chart_instances", nil, 1)
-				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.chartengine.build_duration_ms", nil, 2)
 				assertMetricMeta(
 					t,
 					r,
-					"netdata.go.plugin.chartengine.build_calls_total",
+					"netdata.go.plugin.chartengine.build_success_total",
 					metrix.MetricMeta{
-						Description: "Build plan calls",
-						ChartFamily: "Planner",
-						Unit:        "calls",
+						Description: "Successful BuildPlan calls",
+						ChartFamily: "Build",
+						Unit:        "builds",
 					},
 				)
 				assertMetricMeta(
 					t,
 					r,
-					"netdata.go.plugin.chartengine.actions_total",
+					"netdata.go.plugin.chartengine.planner_actions_total",
 					metrix.MetricMeta{
 						Description: "Planner actions by kind",
 						ChartFamily: "Actions",
 						Unit:        "actions",
 					},
+				)
+			},
+		},
+		"plan-size gauges keep last successful values on skipped build": {
+			run: func(t *testing.T) {
+				e, err := New()
+				require.NoError(t, err)
+				require.NoError(t, e.LoadYAML([]byte(runtimeObservabilityTemplateYAML()), 1))
+
+				store := metrix.NewCollectorStore()
+				cc := mustCycleController(t, store)
+				c := store.Write().SnapshotMeter("mysql").Counter("queries_total")
+
+				cc.BeginCycle()
+				c.ObserveTotal(10)
+				cc.CommitCycleSuccess()
+				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				require.NoError(t, err)
+
+				before := e.RuntimeStore().Read(metrix.ReadRaw())
+				beforeCharts, ok := before.Value("netdata.go.plugin.chartengine.plan_chart_instances", nil)
+				require.True(t, ok)
+				require.GreaterOrEqual(t, beforeCharts, float64(1))
+
+				cc.BeginCycle()
+				cc.AbortCycle()
+				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				require.NoError(t, err)
+
+				after := e.RuntimeStore().Read(metrix.ReadRaw())
+				assertMetricValueAtLeast(t, after, "netdata.go.plugin.chartengine.build_skipped_failed_collect_total", nil, 1)
+				assertMetricValueAtLeast(t, after, "netdata.go.plugin.chartengine.build_success_total", nil, 1)
+
+				afterCharts, ok := after.Value("netdata.go.plugin.chartengine.plan_chart_instances", nil)
+				require.True(t, ok)
+				assert.Equal(t, beforeCharts, afterCharts)
+			},
+		},
+		"selector-filtered series are counted by reason": {
+			run: func(t *testing.T) {
+				selectorExpr := metrixselector.Expr{
+					Allow: []string{`svc.errors_total`},
+				}
+				e, err := New(WithEnginePolicy(EnginePolicy{Selector: &selectorExpr}))
+				require.NoError(t, err)
+				require.NoError(t, e.LoadYAML([]byte(runtimeObservabilityTemplateYAML()), 1))
+
+				store := metrix.NewCollectorStore()
+				cc := mustCycleController(t, store)
+				c := store.Write().SnapshotMeter("mysql").Counter("queries_total")
+
+				cc.BeginCycle()
+				c.ObserveTotal(10)
+				cc.CommitCycleSuccess()
+				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				require.NoError(t, err)
+
+				r := e.RuntimeStore().Read(metrix.ReadRaw())
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.series_filtered_total", metrix.Labels{"reason": "by_selector"}, 1)
+			},
+		},
+		"expiry removals are counted by scope and reason": {
+			run: func(t *testing.T) {
+				e, err := New()
+				require.NoError(t, err)
+				require.NoError(t, e.LoadYAML([]byte(runtimeExpiryTemplateYAML()), 1))
+
+				store := metrix.NewCollectorStore()
+				cc := mustCycleController(t, store)
+				sm := store.Write().SnapshotMeter("svc")
+				total := sm.Gauge("total")
+				modeMetric := sm.Gauge("mode_metric")
+				modeOK := sm.LabelSet(metrix.Label{Key: "mode", Value: "ok"})
+
+				cc.BeginCycle()
+				total.Observe(100)
+				modeMetric.Observe(1, modeOK)
+				cc.CommitCycleSuccess()
+				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				require.NoError(t, err)
+
+				cc.BeginCycle()
+				total.Observe(101)
+				cc.CommitCycleSuccess()
+				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				require.NoError(t, err)
+
+				r := e.RuntimeStore().Read(metrix.ReadRaw())
+				assertMetricValueAtLeast(
+					t,
+					r,
+					"netdata.go.plugin.chartengine.lifecycle_removed_total",
+					metrix.Labels{"scope": "dimension", "reason": "expiry"},
+					1,
 				)
 			},
 		},
@@ -122,23 +220,23 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 
 				plan, err := observer.BuildPlan(producer.RuntimeStore().Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
-				create := findCreateChartByTitle(plan.Actions, "Build plan calls")
+				create := findCreateChartByTitle(plan.Actions, "Successful BuildPlan calls")
 				require.NotNil(t, create)
-				assert.Equal(t, "Build plan calls", create.Meta.Title)
-				assert.Equal(t, "Planner", create.Meta.Family)
-				assert.Equal(t, "calls/s", create.Meta.Units)
+				assert.Equal(t, "Successful BuildPlan calls", create.Meta.Title)
+				assert.Equal(t, "Build", create.Meta.Family)
+				assert.Equal(t, "builds/s", create.Meta.Units)
 
-				duration := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_ms")
+				duration := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_seconds")
 				require.NotNil(t, duration)
-				assert.Equal(t, "Build plan duration", duration.Meta.Title)
-				assert.Equal(t, "Planner", duration.Meta.Family)
-				assert.Equal(t, "ms", duration.Meta.Units)
+				assert.Equal(t, "BuildPlan duration in seconds", duration.Meta.Title)
+				assert.Equal(t, "Build", duration.Meta.Family)
+				assert.Equal(t, "seconds", duration.Meta.Units)
 
-				durationSum := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_ms_sum")
+				durationSum := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_seconds_sum")
 				require.NotNil(t, durationSum)
-				assert.Equal(t, "Build plan duration", durationSum.Meta.Title)
-				assert.Equal(t, "Planner", durationSum.Meta.Family)
-				assert.Equal(t, "ms/s", durationSum.Meta.Units)
+				assert.Equal(t, "BuildPlan duration in seconds", durationSum.Meta.Title)
+				assert.Equal(t, "Build", durationSum.Meta.Family)
+				assert.Equal(t, "seconds", durationSum.Meta.Units)
 			},
 		},
 	}
@@ -224,6 +322,29 @@ groups:
         dimensions:
           - selector: mysql.queries_total
             name: total
+`
+}
+
+func runtimeExpiryTemplateYAML() string {
+	return `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.total
+      - svc.mode_metric
+    charts:
+      - title: Service status
+        context: service_status
+        units: state
+        lifecycle:
+          dimensions:
+            expire_after_cycles: 1
+        dimensions:
+          - selector: svc.total
+            name: total
+          - selector: svc.mode_metric
+            name_from_label: mode
 `
 }
 

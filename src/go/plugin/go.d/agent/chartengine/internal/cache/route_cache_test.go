@@ -50,7 +50,11 @@ func TestRouteCache(t *testing.T) {
 
 		rc.MarkSeenIfPresent(a, 2)
 		rc.MarkSeenIfPresent(c, 2)
-		rc.RetainSeen(2)
+		stats := rc.RetainSeen(2)
+		assert.Equal(t, 3, stats.EntriesBefore)
+		assert.Equal(t, 2, stats.EntriesAfter)
+		assert.Equal(t, 1, stats.Pruned)
+		assert.False(t, stats.FullDrop)
 
 		_, ok := rc.Lookup(a, 1, 2)
 		assert.True(t, ok)
@@ -58,5 +62,24 @@ func TestRouteCache(t *testing.T) {
 		assert.False(t, ok)
 		_, ok = rc.Lookup(c, 1, 2)
 		assert.True(t, ok)
+	})
+
+	t.Run("retain full-drops when no entries seen in build", func(t *testing.T) {
+		rc := NewRouteCache[string]()
+		a := metrix.SeriesIdentity{ID: "a", Hash64: 20}
+		b := metrix.SeriesIdentity{ID: "b", Hash64: 21}
+		rc.Store(a, 1, 1, []string{"chart-a"})
+		rc.Store(b, 1, 1, []string{"chart-b"})
+
+		stats := rc.RetainSeen(2)
+		assert.Equal(t, 2, stats.EntriesBefore)
+		assert.Equal(t, 0, stats.EntriesAfter)
+		assert.Equal(t, 2, stats.Pruned)
+		assert.True(t, stats.FullDrop)
+
+		_, ok := rc.Lookup(a, 1, 2)
+		assert.False(t, ok)
+		_, ok = rc.Lookup(b, 1, 2)
+		assert.False(t, ok)
 	})
 }
