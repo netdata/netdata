@@ -84,12 +84,6 @@ type JobConfig struct {
 	FunctionOnly    bool
 }
 
-const (
-	penaltyStep = 5
-	maxPenalty  = 600
-	infTries    = -1
-)
-
 func NewJob(cfg JobConfig) *Job {
 	var buf bytes.Buffer
 
@@ -114,7 +108,7 @@ func NewJob(cfg JobConfig) *Job {
 		out:                  cfg.Out,
 		collectStatusChart:   newCollectStatusChart(cfg.PluginName),
 		collectDurationChart: newCollectDurationChart(cfg.PluginName),
-		stop:                 make(chan struct{}),
+		stopCtrl:             newStopController(),
 		tick:                 make(chan int),
 		buf:                  &buf,
 		api:                  netdataapi.New(&buf),
@@ -161,7 +155,7 @@ type Job struct {
 	running atomic.Bool
 
 	initialized bool
-	panicked    bool
+	panicked    atomic.Bool
 
 	collectStatusChart   *Chart
 	collectDurationChart *Chart
@@ -175,16 +169,15 @@ type Job struct {
 	vnode        vnodes.VirtualNode
 	updVnode     chan *vnodes.VirtualNode
 
-	retries int
+	retries atomic.Int64
 	prevRun time.Time
 
-	stop chan struct{}
+	stopCtrl stopController
 
 	// Dump mode support
 	dumpMode     bool
 	dumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
-
-	skipTracker tickstate.SkipTracker
+	skipTracker  tickstate.SkipTracker
 }
 
 type collectedMetrics struct {
@@ -220,7 +213,7 @@ func (j *Job) Name() string {
 
 // Panicked returns 'panicked' flag value.
 func (j *Job) Panicked() bool {
-	return j.panicked
+	return j.panicked.Load()
 }
 
 // AutoDetectionEvery returns value of AutoDetectEvery.
@@ -230,7 +223,7 @@ func (j *Job) AutoDetectionEvery() int {
 
 // RetryAutoDetection returns whether it is needed to retry autodetection.
 func (j *Job) RetryAutoDetection() bool {
-	return j.AutoDetectEvery > 0 && (j.AutoDetectTries == infTries || j.AutoDetectTries > 0)
+	return retryAutoDetection(j.AutoDetectEvery, j.AutoDetectTries)
 }
 
 func (j *Job) Configuration() any {
@@ -246,7 +239,7 @@ func (j *Job) AutoDetection() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic %v", r)
-			j.panicked = true
+			j.panicked.Store(true)
 			j.disableAutoDetection()
 
 			j.Errorf("PANIC %v", r)
@@ -307,26 +300,7 @@ func (j *Job) UpdateVnode(vnode *vnodes.VirtualNode) {
 
 // Tick Tick.
 func (j *Job) Tick(clock int) {
-	select {
-	case j.tick <- clock:
-	default:
-		if !j.functionOnly && j.shouldCollect(clock) {
-			skip := j.skipTracker.MarkSkipped()
-
-			if skip.RunStarted.IsZero() {
-				j.Infof("skipping data collection: waiting for first collection to start (interval %ds)", j.updateEvery)
-			} else if skip.Count >= 2 {
-				j.Warningf(
-					"skipping data collection: previous run is still in progress for %s (skipped %d times in a row, interval %ds)",
-					time.Since(skip.RunStarted),
-					skip.Count,
-					j.updateEvery,
-				)
-			} else {
-				j.Infof("skipping data collection: previous run is still in progress for %s (interval %ds)", time.Since(skip.RunStarted), j.updateEvery)
-			}
-		}
-	}
+	enqueueTickWithSkipLog(j.tick, clock, j.functionOnly, j.updateEvery, int(j.retries.Load()), &j.skipTracker, j.Logger)
 }
 
 // IsRunning returns true if the job's main loop is currently running.
@@ -353,6 +327,7 @@ func (j *Job) IsFunctionOnly() bool {
 
 // Start starts job main loop.
 func (j *Job) Start() {
+	j.stopCtrl.markStarted()
 	j.running.Store(true)
 	if j.functionOnly {
 		j.Info("started in function-only mode")
@@ -361,24 +336,18 @@ func (j *Job) Start() {
 	}
 	defer func() {
 		j.running.Store(false)
+		j.stopCtrl.markStopped()
 		j.Info("stopped")
 	}()
 
 LOOP:
 	for {
 		select {
-		case <-j.stop:
+		case <-j.stopCtrl.stopCh:
 			break LOOP
 		case t := <-j.tick:
 			if !j.functionOnly && j.shouldCollect(t) {
-				resume := j.skipTracker.MarkRunStart(time.Now())
-				if resume.Skipped > 0 {
-					if resume.RunStopped.IsZero() || resume.RunStarted.IsZero() {
-						j.Infof("data collection resumed (skipped %d times)", resume.Skipped)
-					} else {
-						j.Infof("data collection resumed after %s (skipped %d times)", resume.RunStopped.Sub(resume.RunStarted), resume.Skipped)
-					}
-				}
+				markRunStartWithResumeLog(&j.skipTracker, j.Logger)
 
 				j.runOnce()
 
@@ -388,22 +357,19 @@ LOOP:
 	}
 	j.module.Cleanup(context.TODO())
 	j.Cleanup()
-	j.stop <- struct{}{}
 }
 
 // Stop stops job main loop. It blocks until the job is stopped.
 func (j *Job) Stop() {
-	// TODO: should have blocking and non blocking stop
-	j.stop <- struct{}{}
-	<-j.stop
+	j.stopCtrl.stopAndWait()
 }
 
 func (j *Job) shouldCollect(clock int) bool {
-	return clock%(j.updateEvery+j.penalty()) == 0
+	return shouldCollectWithPenalty(clock, j.updateEvery, int(j.retries.Load()))
 }
 
 func (j *Job) disableAutoDetection() {
-	j.AutoDetectEvery = 0
+	disableAutoDetection(&j.AutoDetectEvery)
 }
 
 func (j *Job) Cleanup() {
@@ -466,9 +432,7 @@ func (j *Job) init() error {
 
 func (j *Job) check() error {
 	if err := j.module.Check(context.TODO()); err != nil {
-		if j.AutoDetectTries != infTries {
-			j.AutoDetectTries--
-		}
+		consumeAutoDetectTry(&j.AutoDetectTries)
 		return err
 	}
 	return nil
@@ -496,14 +460,14 @@ func (j *Job) runOnce() {
 
 	metrics := j.collect()
 
-	if j.panicked {
+	if j.panicked.Load() {
 		return
 	}
 
 	if j.processMetrics(metrics, curTime, sinceLastRun) {
-		j.retries = 0
+		j.retries.Store(0)
 	} else {
-		j.retries++
+		j.retries.Add(1)
 	}
 
 	_, _ = io.Copy(j.out, j.buf)
@@ -511,10 +475,10 @@ func (j *Job) runOnce() {
 }
 
 func (j *Job) collect() collectedMetrics {
-	j.panicked = false
+	j.panicked.Store(false)
 	defer func() {
 		if r := recover(); r != nil {
-			j.panicked = true
+			j.panicked.Store(true)
 			j.Errorf("PANIC: %v", r)
 			if logger.Level.Enabled(slog.LevelDebug) {
 				j.Errorf("STACK: %s", debug.Stack())
@@ -805,11 +769,7 @@ func (j *Job) updateChart(chart *Chart, mx collectedMetrics, sinceLastRun int) b
 }
 
 func (j *Job) penalty() int {
-	v := j.retries / penaltyStep * penaltyStep * j.updateEvery / 2
-	if v > maxPenalty {
-		return maxPenalty
-	}
-	return v
+	return penaltyFromRetries(int(j.retries.Load()), j.updateEvery)
 }
 
 func getChartType(chart *Chart, j *Job) string {

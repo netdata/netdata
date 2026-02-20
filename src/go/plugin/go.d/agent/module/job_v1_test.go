@@ -60,9 +60,9 @@ func TestJob_Name(t *testing.T) {
 func TestJob_Panicked(t *testing.T) {
 	job := newTestJob()
 
-	assert.Equal(t, job.Panicked(), job.panicked)
-	job.panicked = true
-	assert.Equal(t, job.Panicked(), job.panicked)
+	assert.Equal(t, job.Panicked(), job.panicked.Load())
+	job.panicked.Store(true)
+	assert.Equal(t, job.Panicked(), job.panicked.Load())
 }
 
 func TestJob_AutoDetectionEvery(t *testing.T) {
@@ -258,6 +258,22 @@ func TestJob_Start(t *testing.T) {
 	job.Start()
 
 	assert.True(t, m.CleanupDone)
+}
+
+func TestJob_StopBeforeStartDoesNotBlock(t *testing.T) {
+	job := newTestJob()
+
+	done := make(chan struct{})
+	go func() {
+		job.Stop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("stop blocked before start")
+	}
 }
 
 func TestJob_MainLoop_Panic(t *testing.T) {

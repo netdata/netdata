@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/internal/tickstate"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
@@ -32,6 +33,7 @@ type JobV2Config struct {
 	Out             io.Writer
 	UpdateEvery     int
 	AutoDetectEvery int
+	IsStock         bool
 	Vnode           vnodes.VirtualNode
 	FunctionOnly    bool
 	RuntimeService  runtimecomp.Service
@@ -50,11 +52,13 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 		fullName:        cfg.FullName,
 		updateEvery:     cfg.UpdateEvery,
 		autoDetectEvery: cfg.AutoDetectEvery,
+		autoDetectTries: infTries,
+		isStock:         cfg.IsStock,
 		functionOnly:    cfg.FunctionOnly,
 		module:          cfg.Module,
 		labels:          cloneLabels(cfg.Labels),
 		out:             cfg.Out,
-		stop:            make(chan struct{}),
+		stopCtrl:        newStopController(),
 		tick:            make(chan int),
 		updVnode:        make(chan *vnodes.VirtualNode, 1),
 		buf:             &buf,
@@ -87,6 +91,8 @@ type JobV2 struct {
 	fullName        string
 	updateEvery     int
 	autoDetectEvery int
+	autoDetectTries int
+	isStock         bool
 	functionOnly    bool
 	labels          map[string]string
 
@@ -97,14 +103,14 @@ type JobV2 struct {
 	running atomic.Bool
 
 	initialized bool
-	panicked    bool
+	panicked    atomic.Bool
 
 	store  metrix.CollectorStore
 	cycle  metrix.CycleController
 	engine *chartengine.Engine
 
 	prevRun time.Time
-	retries int
+	retries atomic.Int64
 
 	vnodeMu  sync.RWMutex
 	vnode    vnodes.VirtualNode
@@ -119,17 +125,19 @@ type JobV2 struct {
 	buf  *bytes.Buffer
 	api  *netdataapi.API
 
-	stop chan struct{}
+	stopCtrl stopController
 
 	runtimeService             runtimecomp.Service
 	runtimeComponentName       string
 	runtimeComponentRegistered bool
+
+	skipTracker tickstate.SkipTracker
 }
 
 func (j *JobV2) FullName() string   { return j.fullName }
 func (j *JobV2) ModuleName() string { return j.moduleName }
 func (j *JobV2) Name() string       { return j.name }
-func (j *JobV2) Panicked() bool     { return j.panicked }
+func (j *JobV2) Panicked() bool     { return j.panicked.Load() }
 func (j *JobV2) IsRunning() bool    { return j.running.Load() }
 func (j *JobV2) Module() ModuleV2   { return j.module }
 func (j *JobV2) Collector() any     { return j.module }
@@ -137,7 +145,7 @@ func (j *JobV2) AutoDetectionEvery() int {
 	return j.autoDetectEvery
 }
 func (j *JobV2) RetryAutoDetection() bool {
-	return j.autoDetectEvery > 0
+	return retryAutoDetection(j.autoDetectEvery, j.autoDetectTries)
 }
 func (j *JobV2) Configuration() any {
 	if j.module == nil {
@@ -172,7 +180,8 @@ func (j *JobV2) AutoDetection() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic %v", r)
-			j.panicked = true
+			j.panicked.Store(true)
+			j.disableAutoDetection()
 			j.Errorf("PANIC %v", r)
 			if logger.Level.Enabled(slog.LevelDebug) {
 				j.Errorf("STACK: %s", debug.Stack())
@@ -182,64 +191,76 @@ func (j *JobV2) AutoDetection() (err error) {
 			j.Cleanup()
 		}
 	}()
+	if j.isStock {
+		j.Mute()
+	}
 
 	if err = j.init(); err != nil {
 		j.Errorf("init failed: %v", err)
+		j.Unmute()
+		j.disableAutoDetection()
 		return err
 	}
 	if err = j.check(); err != nil {
 		j.Errorf("check failed: %v", err)
+		j.Unmute()
 		return err
 	}
+	j.Unmute()
+	j.Info("check success")
 	if err = j.postCheck(); err != nil {
 		j.Errorf("postCheck failed: %v", err)
+		j.disableAutoDetection()
 		return err
 	}
 	return nil
 }
 
 func (j *JobV2) Start() {
+	j.stopCtrl.markStarted()
 	j.running.Store(true)
 	runCtx, cancel := context.WithCancel(context.Background())
 	j.setRunContext(runCtx, cancel)
-	j.Infof("started (v2), data collection interval %ds", j.updateEvery)
+	if j.functionOnly {
+		j.Info("started in function-only mode")
+	} else {
+		j.Infof("started (v2), data collection interval %ds", j.updateEvery)
+	}
 	defer func() {
 		cancel()
 		j.setRunContext(nil, nil)
 		j.running.Store(false)
+		j.stopCtrl.markStopped()
 		j.Info("stopped")
 	}()
 
 LOOP:
 	for {
 		select {
-		case <-j.stop:
+		case <-j.stopCtrl.stopCh:
 			break LOOP
 		case t := <-j.tick:
-			if j.shouldCollect(t) {
+			if !j.functionOnly && j.shouldCollect(t) {
+				markRunStartWithResumeLog(&j.skipTracker, j.Logger)
 				j.runOnce()
+				j.skipTracker.MarkRunStop(time.Now())
 			}
 		}
 	}
 	j.Cleanup()
-	j.stop <- struct{}{}
 }
 
 func (j *JobV2) Stop() {
 	j.cancelRunContext()
-	j.stop <- struct{}{}
-	<-j.stop
+	j.stopCtrl.stopAndWait()
 }
 
 func (j *JobV2) Tick(clock int) {
-	select {
-	case j.tick <- clock:
-	default:
-	}
+	enqueueTickWithSkipLog(j.tick, clock, j.functionOnly, j.updateEvery, int(j.retries.Load()), &j.skipTracker, j.Logger)
 }
 
 func (j *JobV2) shouldCollect(clock int) bool {
-	return clock%(j.updateEvery+j.penalty()) == 0
+	return shouldCollectWithPenalty(clock, j.updateEvery, int(j.retries.Load()))
 }
 
 func (j *JobV2) init() error {
@@ -254,10 +275,19 @@ func (j *JobV2) init() error {
 }
 
 func (j *JobV2) check() error {
-	return j.module.Check(j.moduleContext())
+	if err := j.module.Check(j.moduleContext()); err != nil {
+		consumeAutoDetectTry(&j.autoDetectTries)
+		return err
+	}
+	return nil
 }
 
 func (j *JobV2) postCheck() error {
+	if j.functionOnly {
+		// Match v1 semantics: function-only jobs validate connectivity only.
+		return nil
+	}
+
 	store := j.module.MetricStore()
 	if store == nil {
 		return fmt.Errorf("nil metric store")
@@ -304,14 +334,14 @@ func (j *JobV2) runOnce() {
 
 	ok := j.collectAndEmit(sinceLastRun)
 	if ok {
-		j.retries = 0
+		j.retries.Store(0)
 	} else {
-		j.retries++
+		j.retries.Add(1)
 	}
 
 	// Never flush buffered output from failed or panicked cycles:
 	// a panic can leave partial protocol lines in the buffer.
-	if ok && !j.panicked {
+	if ok && !j.panicked.Load() {
 		_, _ = io.Copy(j.out, j.buf)
 	}
 	j.buf.Reset()
@@ -323,24 +353,22 @@ func (j *JobV2) applyPendingVnodeUpdate() {
 		if vnode == nil {
 			return
 		}
+		if j.module != nil && j.module.VirtualNode() != nil {
+			// Match v1 ownership model: do not override module-owned vnode state.
+			return
+		}
 
 		next := vnode.Copy()
 
 		j.vnodeMu.Lock()
 		j.vnode = *next
 		j.vnodeMu.Unlock()
-
-		if j.module != nil {
-			if mv := j.module.VirtualNode(); mv != nil {
-				*mv = *next
-			}
-		}
 	default:
 	}
 }
 
 func (j *JobV2) collectAndEmit(sinceLastRun int) bool {
-	j.panicked = false
+	j.panicked.Store(false)
 	cycleOpen := false
 
 	defer func() {
@@ -352,7 +380,7 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) bool {
 					j.cycle.AbortCycle()
 				}()
 			}
-			j.panicked = true
+			j.panicked.Store(true)
 			j.Errorf("PANIC: %v", r)
 			if logger.Level.Enabled(slog.LevelDebug) {
 				j.Errorf("STACK: %s", debug.Stack())
@@ -393,11 +421,11 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) bool {
 }
 
 func (j *JobV2) penalty() int {
-	v := j.retries / penaltyStep * penaltyStep * j.updateEvery / 2
-	if v > maxPenalty {
-		return maxPenalty
-	}
-	return v
+	return penaltyFromRetries(int(j.retries.Load()), j.updateEvery)
+}
+
+func (j *JobV2) disableAutoDetection() {
+	disableAutoDetection(&j.autoDetectEvery)
 }
 
 func cloneLabels(in map[string]string) map[string]string {

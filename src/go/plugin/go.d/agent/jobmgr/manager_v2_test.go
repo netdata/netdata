@@ -55,9 +55,10 @@ groups:
 
 func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 	tests := map[string]struct {
-		creator module.Creator
-		wantV2  bool
-		wantErr string
+		creator      module.Creator
+		functionOnly bool
+		wantV2       bool
+		wantErr      string
 	}{
 		"prefer v2 when hooks do not require legacy runtime": {
 			creator: module.Creator{
@@ -87,6 +88,16 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 			},
 			wantV2: true,
 		},
+		"allow function_only config for v2 when methods exist": {
+			creator: module.Creator{
+				CreateV2: func() module.ModuleV2 {
+					return &testV2Module{store: nil}
+				},
+				JobMethods: func(_ module.RuntimeJob) []funcapi.MethodConfig { return nil },
+			},
+			functionOnly: true,
+			wantV2:       true,
+		},
 	}
 
 	for name, tc := range tests {
@@ -96,6 +107,9 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 				"testmod": tc.creator,
 			}
 			cfg := prepareUserCfg("testmod", "job1")
+			if tc.functionOnly {
+				cfg.Set("function_only", true)
+			}
 
 			job, err := mgr.createCollectorJob(cfg)
 			if tc.wantErr != "" {

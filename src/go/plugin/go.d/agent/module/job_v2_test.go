@@ -414,7 +414,7 @@ func TestJobV2Scenarios(t *testing.T) {
 				assert.Zero(t, job.buf.Len())
 			},
 		},
-		"vnode update is deferred until next cycle and not written during in-flight collect": {
+		"module-owned vnode is not overridden by queued job vnode updates": {
 			run: func(t *testing.T) {
 				store := metrix.NewCollectorStore()
 				mod := &mockModuleV2{
@@ -440,7 +440,7 @@ func TestJobV2Scenarios(t *testing.T) {
 						assert.Equal(t, "old-guid", mod.vnode.GUID)
 						close(firstCollectDone)
 					} else {
-						assert.Equal(t, "new-guid", mod.vnode.GUID)
+						assert.Equal(t, "old-guid", mod.vnode.GUID)
 					}
 					store.Write().SnapshotMeter("apache").Gauge("workers_busy").Observe(1)
 					return nil
@@ -468,8 +468,8 @@ func TestJobV2Scenarios(t *testing.T) {
 				<-runDone
 
 				job.runOnce()
-				assert.Equal(t, "new-guid", mod.vnode.GUID)
-				assert.Equal(t, "new-guid", job.Vnode().GUID)
+				assert.Equal(t, "old-guid", mod.vnode.GUID)
+				assert.Equal(t, "old-guid", job.Vnode().GUID)
 			},
 		},
 		"stop cancels in-flight collect context": {
@@ -540,9 +540,117 @@ func TestJobV2Scenarios(t *testing.T) {
 				}
 			},
 		},
+		"autodetection init failure disables retry": {
+			run: func(t *testing.T) {
+				mod := &mockModuleV2{
+					initFunc: func(context.Context) error { return errors.New("init failed") },
+				}
+				job := NewJobV2(JobV2Config{
+					PluginName:      pluginName,
+					Name:            jobName,
+					ModuleName:      modName,
+					FullName:        modName + "_" + jobName,
+					Module:          mod,
+					Out:             &bytes.Buffer{},
+					UpdateEvery:     1,
+					AutoDetectEvery: 1,
+				})
+
+				require.Error(t, job.AutoDetection())
+				assert.False(t, job.RetryAutoDetection())
+			},
+		},
+		"autodetection panic disables retry": {
+			run: func(t *testing.T) {
+				mod := &mockModuleV2{
+					initFunc: func(context.Context) error { panic("boom") },
+				}
+				job := NewJobV2(JobV2Config{
+					PluginName:      pluginName,
+					Name:            jobName,
+					ModuleName:      modName,
+					FullName:        modName + "_" + jobName,
+					Module:          mod,
+					Out:             &bytes.Buffer{},
+					UpdateEvery:     1,
+					AutoDetectEvery: 1,
+				})
+
+				require.Error(t, job.AutoDetection())
+				assert.False(t, job.RetryAutoDetection())
+			},
+		},
+		"function-only mode skips collect loop": {
+			run: func(t *testing.T) {
+				collectCalls := 0
+				mod := &mockModuleV2{
+					collectFunc: func(context.Context) error {
+						collectCalls++
+						return nil
+					},
+				}
+				job := NewJobV2(JobV2Config{
+					PluginName:      pluginName,
+					Name:            jobName,
+					ModuleName:      modName,
+					FullName:        modName + "_" + jobName,
+					Module:          mod,
+					Out:             &bytes.Buffer{},
+					UpdateEvery:     1,
+					AutoDetectEvery: 1,
+					FunctionOnly:    true,
+				})
+
+				require.NoError(t, job.AutoDetection())
+
+				done := make(chan struct{})
+				go func() {
+					job.Start()
+					close(done)
+				}()
+
+				for i := 0; i < 3; i++ {
+					job.Tick(i + 1)
+					time.Sleep(10 * time.Millisecond)
+				}
+				job.Stop()
+
+				select {
+				case <-done:
+				case <-time.After(time.Second):
+					t.Fatal("job did not stop")
+				}
+
+				assert.Equal(t, 0, collectCalls)
+			},
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, tc.run)
+	}
+}
+
+func TestJobV2StopBeforeStartDoesNotBlock(t *testing.T) {
+	job := NewJobV2(JobV2Config{
+		PluginName:      pluginName,
+		Name:            jobName,
+		ModuleName:      modName,
+		FullName:        modName + "_" + jobName,
+		Out:             &bytes.Buffer{},
+		UpdateEvery:     1,
+		AutoDetectEvery: 1,
+	})
+
+	done := make(chan struct{})
+	go func() {
+		job.Stop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("stop blocked before start")
 	}
 }

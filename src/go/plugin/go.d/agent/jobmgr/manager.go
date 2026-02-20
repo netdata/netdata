@@ -543,10 +543,6 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 
 	useV2 := creator.CreateV2 != nil
 	if useV2 {
-		if functionOnly {
-			return nil, fmt.Errorf("function_only is not supported for V2 runtime jobs")
-		}
-
 		mod := creator.CreateV2()
 		if mod == nil {
 			return nil, fmt.Errorf("module %s CreateV2 returned nil", cfg.Module())
@@ -567,6 +563,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 			FullName:        cfg.FullName(),
 			UpdateEvery:     cfg.UpdateEvery(),
 			AutoDetectEvery: cfg.AutoDetectionRetry(),
+			IsStock:         cfg.SourceType() == "stock",
 			Labels:          makeLabels(cfg),
 			Out:             m.Out,
 			Module:          mod,
