@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine/internal/program"
 )
 
@@ -36,14 +35,12 @@ func TestEnforceChartInstanceCapsSoftWhenAllExistingAreActive(t *testing.T) {
 		"win_nic_traffic_eth0": {
 			templateID: templateID,
 			lifecycle:  lifecycle,
-			dimensions: make(map[string]dimensionState),
-			values:     make(map[string]metrix.SampleValue),
+			entries:    make(map[string]*dimBuildEntry),
 		},
 		"win_nic_traffic_eth1": {
 			templateID: templateID,
 			lifecycle:  lifecycle,
-			dimensions: make(map[string]dimensionState),
-			values:     make(map[string]metrix.SampleValue),
+			entries:    make(map[string]*dimBuildEntry),
 		},
 	}
 

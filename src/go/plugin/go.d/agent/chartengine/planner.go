@@ -43,15 +43,22 @@ type dimensionState struct {
 	divisor    int
 }
 
+type dimBuildEntry struct {
+	seenSeq uint64
+	value   metrix.SampleValue
+	dimensionState
+}
+
 type chartState struct {
-	templateID string
-	chartID    string
-	identity   program.ChartIdentity
-	meta       program.ChartMeta
-	lifecycle  program.LifecyclePolicy
-	labels     *chartLabelAccumulator
-	values     map[string]metrix.SampleValue
-	dimensions map[string]dimensionState
+	templateID      string
+	chartID         string
+	identity        program.ChartIdentity
+	meta            program.ChartMeta
+	lifecycle       program.LifecyclePolicy
+	labels          *chartLabelAccumulator
+	entries         map[string]*dimBuildEntry
+	observedCount   int
+	currentBuildSeq uint64
 }
 
 type planBuildContext struct {
@@ -63,10 +70,11 @@ type planBuildContext struct {
 	index       matchIndex
 	flat        metrix.Reader
 
-	seenInfer   map[string]struct{}
-	chartsByID  map[string]*chartState
-	chartOwners map[string]string
-	dimCapHints map[string]int
+	seenInfer        map[string]struct{}
+	chartsByID       map[string]*chartState
+	chartOwners      map[string]string
+	dimCapHints      map[string]int
+	materializedByID map[string]*materializedChartState
 
 	planRouteStats
 }
@@ -250,17 +258,18 @@ func (e *Engine) preparePlanBuildContext(
 	}
 	seenInferCap := e.state.hints.seenInfer
 	return &planBuildContext{
-		out:         out,
-		reader:      reader,
-		collectMeta: collectMeta,
-		prog:        prog,
-		cache:       cache,
-		index:       index,
-		flat:        reader,
-		seenInfer:   make(map[string]struct{}, seenInferCap),
-		chartsByID:  make(map[string]*chartState, chartsCap),
-		chartOwners: chartOwners,
-		dimCapHints: dimCapHints,
+		out:              out,
+		reader:           reader,
+		collectMeta:      collectMeta,
+		prog:             prog,
+		cache:            cache,
+		index:            index,
+		flat:             reader,
+		seenInfer:        make(map[string]struct{}, seenInferCap),
+		chartsByID:       make(map[string]*chartState, chartsCap),
+		chartOwners:      chartOwners,
+		dimCapHints:      dimCapHints,
+		materializedByID: e.state.materialized.charts,
 	}, nil
 }
 
@@ -369,6 +378,11 @@ func (ctx *planBuildContext) accumulateRoute(
 		}
 
 		dimCap := ctx.dimCapHints[route.ChartID]
+		entries := make(map[string]*dimBuildEntry, dimCap)
+		if matChart := ctx.materializedByID[route.ChartID]; matChart != nil {
+			entries = matChart.checkoutScratchEntries(dimCap)
+		}
+
 		labelsAcc := newAutogenChartLabelAccumulator()
 		identity := program.ChartIdentity{}
 		if !route.Autogen {
@@ -380,21 +394,27 @@ func (ctx *planBuildContext) accumulateRoute(
 			identity = chart.Identity
 		}
 		cs = &chartState{
-			templateID: route.ChartTemplateID,
-			chartID:    route.ChartID,
-			identity:   identity,
-			meta:       route.Meta,
-			lifecycle:  route.Lifecycle,
-			labels:     labelsAcc,
-			values:     make(map[string]metrix.SampleValue, dimCap),
-			dimensions: make(map[string]dimensionState, dimCap),
+			templateID:      route.ChartTemplateID,
+			chartID:         route.ChartID,
+			identity:        identity,
+			meta:            route.Meta,
+			lifecycle:       route.Lifecycle,
+			labels:          labelsAcc,
+			entries:         entries,
+			currentBuildSeq: ctx.collectMeta.LastSuccessSeq,
 		}
 		ctx.chartsByID[route.ChartID] = cs
 	}
 
-	prevState, exists := cs.dimensions[route.DimensionName]
+	entry, exists := cs.entries[route.DimensionName]
 	if !exists {
-		cs.dimensions[route.DimensionName] = dimensionState{
+		entry = &dimBuildEntry{}
+		cs.entries[route.DimensionName] = entry
+	}
+	if entry.seenSeq != cs.currentBuildSeq {
+		entry.seenSeq = cs.currentBuildSeq
+		entry.value = value
+		entry.dimensionState = dimensionState{
 			hidden:     route.Hidden,
 			static:     route.Static,
 			order:      route.DimensionIndex,
@@ -402,11 +422,14 @@ func (ctx *planBuildContext) accumulateRoute(
 			multiplier: route.Multiplier,
 			divisor:    route.Divisor,
 		}
-	} else if prevState.hidden != route.Hidden {
-		// First-observed hidden flag wins; conflicting routes are ignored.
+		cs.observedCount++
+	} else {
+		if entry.hidden != route.Hidden {
+			// First-observed hidden flag wins within one build; conflicting routes are ignored.
+		}
+		entry.value += value
 	}
 
-	cs.values[route.DimensionName] += value
 	if err := cs.labels.observe(cs.identity, labels, route.DimensionKeyLabel); err != nil {
 		return err
 	}
@@ -428,7 +451,7 @@ func (ctx *planBuildContext) accumulateRoute(
 func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 	chartIDs := make([]string, 0, len(ctx.chartsByID))
 	for chartID, cs := range ctx.chartsByID {
-		if len(cs.dimensions) == 0 {
+		if cs.observedCount == 0 {
 			continue
 		}
 		chartIDs = append(chartIDs, chartID)
@@ -454,17 +477,20 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 
 		observedNames := observedDimensionNames(cs, matChart)
 		for _, name := range observedNames {
-			d := cs.dimensions[name]
-			matDim, dimCreated := matChart.ensureDimension(name, d)
+			entry := cs.entries[name]
+			if entry == nil || entry.seenSeq != cs.currentBuildSeq {
+				continue
+			}
+			matDim, dimCreated := matChart.ensureDimension(name, entry.dimensionState)
 			if dimCreated {
 				ctx.out.Actions = append(ctx.out.Actions, CreateDimensionAction{
 					ChartID:    cs.chartID,
 					ChartMeta:  cs.meta,
 					Name:       name,
-					Hidden:     d.hidden,
-					Algorithm:  d.algorithm,
-					Multiplier: d.multiplier,
-					Divisor:    d.divisor,
+					Hidden:     entry.hidden,
+					Algorithm:  entry.algorithm,
+					Multiplier: entry.multiplier,
+					Divisor:    entry.divisor,
 				})
 			}
 			matDim.lastSeenSuccessSeq = ctx.collectMeta.LastSuccessSeq
@@ -473,12 +499,12 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 		updateNames := matChart.orderedDimensionNames()
 		values := make([]UpdateDimensionValue, 0, len(updateNames))
 		for _, name := range updateNames {
-			value, ok := cs.values[name]
-			if ok {
+			entry, ok := cs.entries[name]
+			if ok && entry != nil && entry.seenSeq == cs.currentBuildSeq {
 				values = append(values, UpdateDimensionValue{
 					Name:    name,
 					IsFloat: true,
-					Float64: value,
+					Float64: entry.value,
 				})
 				continue
 			}
@@ -491,6 +517,8 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 			ChartID: cs.chartID,
 			Values:  values,
 		})
+		matChart.storeScratchEntries(cs.entries)
+		matChart.pruneScratchEntries(cs.currentBuildSeq)
 	}
 	return nil
 }
@@ -499,21 +527,24 @@ func observedDimensionNames(cs *chartState, matChart *materializedChartState) []
 	if cs == nil {
 		return nil
 	}
+	if cs.observedCount == 0 {
+		return nil
+	}
 	if matChart == nil || len(matChart.dimensions) == 0 {
-		return orderedDimensionNamesFromState(cs.dimensions)
+		return orderedObservedDimensionNames(cs.entries, cs.currentBuildSeq)
 	}
 	prev := matChart.orderedDimensionNames()
-	if len(prev) != len(cs.dimensions) {
-		return orderedDimensionNamesFromState(cs.dimensions)
+	if len(prev) != cs.observedCount {
+		return orderedObservedDimensionNames(cs.entries, cs.currentBuildSeq)
 	}
 	for _, name := range prev {
-		observed, ok := cs.dimensions[name]
-		if !ok {
-			return orderedDimensionNamesFromState(cs.dimensions)
+		entry, ok := cs.entries[name]
+		if !ok || entry == nil || entry.seenSeq != cs.currentBuildSeq {
+			return orderedObservedDimensionNames(cs.entries, cs.currentBuildSeq)
 		}
 		existing := matChart.dimensions[name]
-		if existing == nil || existing.static != observed.static || existing.order != observed.order {
-			return orderedDimensionNamesFromState(cs.dimensions)
+		if existing == nil || existing.static != entry.static || existing.order != entry.order {
+			return orderedObservedDimensionNames(cs.entries, cs.currentBuildSeq)
 		}
 	}
 	return prev

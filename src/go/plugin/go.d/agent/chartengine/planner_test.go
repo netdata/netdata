@@ -1496,6 +1496,165 @@ groups:
 	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan2.Actions))
 }
 
+func TestBuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - m_a
+      - m_b
+    charts:
+      - id: conflict_total
+        title: Conflict total
+        context: conflict_total
+        units: value
+        dimensions:
+          - selector: m_a
+            name_from_label: mode
+            options:
+              hidden: true
+          - selector: m_b
+            name_from_label: mode
+            options:
+              hidden: false
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	m := store.Write().SnapshotMeter("")
+	a := m.Gauge("m_a")
+	b := m.Gauge("m_b")
+	total := m.LabelSet(metrix.Label{Key: "mode", Value: "total"})
+
+	cc.BeginCycle()
+	a.Observe(5, total)
+	b.Observe(3, total)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+
+	assert.Equal(t, []ActionKind{
+		ActionCreateChart,
+		ActionCreateDimension,
+		ActionUpdateChart,
+	}, actionKinds(plan.Actions))
+
+	var created *CreateDimensionAction
+	for _, action := range plan.Actions {
+		dim, ok := action.(CreateDimensionAction)
+		if !ok {
+			continue
+		}
+		created = &dim
+		break
+	}
+	require.NotNil(t, created)
+	assert.Equal(t, "total", created.Name)
+	assert.True(t, created.Hidden)
+
+	update := findUpdateAction(plan)
+	require.NotNil(t, update)
+	require.Len(t, update.Values, 1)
+	assert.Equal(t, "total", update.Values[0].Name)
+	assert.Equal(t, float64(8), update.Values[0].Float64)
+}
+
+func TestBuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc_mode
+    charts:
+      - id: service_mode
+        title: Service mode
+        context: service_mode
+        units: state
+        lifecycle:
+          dimensions:
+            expire_after_cycles: 1
+        dimensions:
+          - selector: svc_mode
+            name_from_label: mode
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	m := store.Write().SnapshotMeter("")
+	mode := m.Gauge("svc_mode")
+	okSet := m.LabelSet(metrix.Label{Key: "mode", Value: "ok"})
+	warnSet := m.LabelSet(metrix.Label{Key: "mode", Value: "warn"})
+
+	cc.BeginCycle()
+	mode.Observe(1, okSet)
+	mode.Observe(2, warnSet)
+	cc.CommitCycleSuccess()
+
+	plan1, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	require.NotNil(t, findUpdateAction(plan1))
+
+	matChart := e.state.materialized.charts["service_mode"]
+	require.NotNil(t, matChart)
+	require.Contains(t, matChart.scratchEntries, "ok")
+	require.Contains(t, matChart.scratchEntries, "warn")
+	okEntryPtr := matChart.scratchEntries["ok"]
+	require.NotNil(t, okEntryPtr)
+
+	cc.BeginCycle()
+	mode.Observe(3, okSet)
+	cc.CommitCycleSuccess()
+
+	plan2, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+
+	update2 := findUpdateAction(plan2)
+	require.NotNil(t, update2)
+	got := make(map[string]UpdateDimensionValue, len(update2.Values))
+	for _, v := range update2.Values {
+		got[v.Name] = v
+	}
+	require.Contains(t, got, "ok")
+	require.Contains(t, got, "warn")
+	assert.Equal(t, float64(3), got["ok"].Float64)
+	assert.True(t, got["warn"].IsEmpty)
+	require.NotNil(t, findRemoveDimensionAction(plan2))
+
+	matChart = e.state.materialized.charts["service_mode"]
+	require.NotNil(t, matChart)
+	assert.NotContains(t, matChart.dimensions, "warn")
+	require.Contains(t, matChart.scratchEntries, "warn")
+	require.Contains(t, matChart.scratchEntries, "ok")
+	assert.Equal(t, okEntryPtr, matChart.scratchEntries["ok"])
+
+	cc.BeginCycle()
+	mode.Observe(4, okSet)
+	cc.CommitCycleSuccess()
+
+	plan3, err := e.BuildPlan(store.Read())
+	require.NoError(t, err)
+	update3 := findUpdateAction(plan3)
+	require.NotNil(t, update3)
+	require.Len(t, update3.Values, 1)
+	assert.Equal(t, "ok", update3.Values[0].Name)
+
+	matChart = e.state.materialized.charts["service_mode"]
+	require.NotNil(t, matChart)
+	assert.NotContains(t, matChart.scratchEntries, "warn")
+	require.Contains(t, matChart.scratchEntries, "ok")
+}
+
 func TestPlannerStageBoundaries(t *testing.T) {
 	tests := map[string]func(t *testing.T){
 		"scan stage accumulates per-chart state": func(t *testing.T) {
@@ -1543,8 +1702,10 @@ groups:
 			require.Len(t, ctx.chartsByID, 1)
 			cs, ok := ctx.chartsByID["service_mode"]
 			require.True(t, ok)
-			assert.Equal(t, metrix.SampleValue(1), cs.values["a"])
-			assert.Equal(t, metrix.SampleValue(2), cs.values["b"])
+			require.NotNil(t, cs.entries["a"])
+			require.NotNil(t, cs.entries["b"])
+			assert.Equal(t, metrix.SampleValue(1), cs.entries["a"].value)
+			assert.Equal(t, metrix.SampleValue(2), cs.entries["b"].value)
 			assert.Empty(t, out.InferredDimensions)
 		},
 		"materialize stage emits create and update actions": func(t *testing.T) {
@@ -1614,20 +1775,40 @@ groups:
 			}
 			chartsByID := map[string]*chartState{
 				"svc_a": {
-					templateID: "tpl.requests",
-					chartID:    "svc_a",
-					meta:       meta,
-					lifecycle:  lifecycle,
-					values:     map[string]metrix.SampleValue{"total": 10},
-					dimensions: map[string]dimensionState{"total": {static: true, order: 0}},
+					templateID:      "tpl.requests",
+					chartID:         "svc_a",
+					meta:            meta,
+					lifecycle:       lifecycle,
+					currentBuildSeq: 2,
+					observedCount:   1,
+					entries: map[string]*dimBuildEntry{
+						"total": {
+							seenSeq: 2,
+							value:   10,
+							dimensionState: dimensionState{
+								static: true,
+								order:  0,
+							},
+						},
+					},
 				},
 				"svc_b": {
-					templateID: "tpl.requests",
-					chartID:    "svc_b",
-					meta:       meta,
-					lifecycle:  lifecycle,
-					values:     map[string]metrix.SampleValue{"total": 20},
-					dimensions: map[string]dimensionState{"total": {static: true, order: 0}},
+					templateID:      "tpl.requests",
+					chartID:         "svc_b",
+					meta:            meta,
+					lifecycle:       lifecycle,
+					currentBuildSeq: 2,
+					observedCount:   1,
+					entries: map[string]*dimBuildEntry{
+						"total": {
+							seenSeq: 2,
+							value:   20,
+							dimensionState: dimensionState{
+								static: true,
+								order:  0,
+							},
+						},
+					},
 				},
 			}
 

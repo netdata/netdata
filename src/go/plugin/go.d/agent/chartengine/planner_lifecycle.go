@@ -193,8 +193,11 @@ func enforceDimensionCaps(
 			existingCount = len(matChart.dimensions)
 		}
 
-		newNames := make([]string, 0, len(cs.dimensions))
-		for name := range cs.dimensions {
+		newNames := make([]string, 0, cs.observedCount)
+		for name, entry := range cs.entries {
+			if entry == nil || entry.seenSeq != cs.currentBuildSeq {
+				continue
+			}
 			if matChart == nil || matChart.dimensions[name] == nil {
 				newNames = append(newNames, name)
 			}
@@ -217,7 +220,7 @@ func enforceDimensionCaps(
 				if dim.lastSeenSuccessSeq == currentSuccessSeq {
 					continue
 				}
-				if _, seen := cs.dimensions[name]; seen {
+				if entry, seen := cs.entries[name]; seen && entry != nil && entry.seenSeq == cs.currentBuildSeq {
 					continue
 				}
 				candidates = append(candidates, dimCandidate{
@@ -252,15 +255,15 @@ func enforceDimensionCaps(
 		}
 
 		if overflow > 0 {
-			orderedObserved := orderedDimensionNamesFromState(cs.dimensions)
+			orderedObserved := orderedObservedDimensionNames(cs.entries, cs.currentBuildSeq)
 			// Drop newest/least-priority candidates first (end of deterministic order).
 			for i := len(orderedObserved) - 1; i >= 0 && overflow > 0; i-- {
 				name := orderedObserved[i]
 				if matChart != nil && matChart.dimensions[name] != nil {
 					continue
 				}
-				delete(cs.dimensions, name)
-				delete(cs.values, name)
+				delete(cs.entries, name)
+				cs.observedCount--
 				overflow--
 			}
 		}
@@ -366,6 +369,41 @@ func orderedDimensionNamesFromState(dimensions map[string]dimensionState) []stri
 		return staticEntries[i].name < staticEntries[j].name
 	})
 
+	sort.Strings(dynamicNames)
+	out := make([]string, 0, len(staticEntries)+len(dynamicNames))
+	for _, entry := range staticEntries {
+		out = append(out, entry.name)
+	}
+	out = append(out, dynamicNames...)
+	return out
+}
+
+func orderedObservedDimensionNames(entries map[string]*dimBuildEntry, seenSeq uint64) []string {
+	type staticEntry struct {
+		name  string
+		order int
+	}
+	staticEntries := make([]staticEntry, 0, len(entries))
+	dynamicNames := make([]string, 0, len(entries))
+	for name, entry := range entries {
+		if entry == nil || entry.seenSeq != seenSeq {
+			continue
+		}
+		if entry.static {
+			staticEntries = append(staticEntries, staticEntry{
+				name:  name,
+				order: entry.order,
+			})
+			continue
+		}
+		dynamicNames = append(dynamicNames, name)
+	}
+	sort.Slice(staticEntries, func(i, j int) bool {
+		if staticEntries[i].order != staticEntries[j].order {
+			return staticEntries[i].order < staticEntries[j].order
+		}
+		return staticEntries[i].name < staticEntries[j].name
+	})
 	sort.Strings(dynamicNames)
 	out := make([]string, 0, len(staticEntries)+len(dynamicNames))
 	for _, entry := range staticEntries {

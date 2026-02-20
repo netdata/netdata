@@ -18,6 +18,7 @@ type materializedChartState struct {
 	dimensions         map[string]*materializedDimensionState
 	orderedDims        []string
 	orderedDimsDirty   bool
+	scratchEntries     map[string]*dimBuildEntry
 }
 
 // materializedDimensionState tracks one materialized dimension in a chart.
@@ -51,6 +52,7 @@ func (s *materializedState) ensureChart(
 			chart.dimensions = make(map[string]*materializedDimensionState)
 			chart.orderedDims = nil
 			chart.orderedDimsDirty = false
+			chart.scratchEntries = nil
 		}
 		chart.meta = meta
 		chart.lifecycle = lifecycle
@@ -109,6 +111,37 @@ func (c *materializedChartState) orderedDimensionNames() []string {
 	c.orderedDims = orderedMaterializedDimensionNames(c.dimensions)
 	c.orderedDimsDirty = false
 	return c.orderedDims
+}
+
+func (c *materializedChartState) checkoutScratchEntries(dimCap int) map[string]*dimBuildEntry {
+	if c.scratchEntries != nil {
+		return c.scratchEntries
+	}
+	c.scratchEntries = make(map[string]*dimBuildEntry, dimCap)
+	return c.scratchEntries
+}
+
+func (c *materializedChartState) storeScratchEntries(entries map[string]*dimBuildEntry) {
+	c.scratchEntries = entries
+}
+
+func (c *materializedChartState) pruneScratchEntries(currentSeq uint64) {
+	if len(c.scratchEntries) == 0 {
+		return
+	}
+	for name, entry := range c.scratchEntries {
+		if entry == nil {
+			delete(c.scratchEntries, name)
+			continue
+		}
+		if entry.seenSeq == currentSeq {
+			continue
+		}
+		if _, keep := c.dimensions[name]; keep {
+			continue
+		}
+		delete(c.scratchEntries, name)
+	}
 }
 
 func shouldExpire(lastSeenSuccessSeq, currentSuccessSeq uint64, expireAfterCycles int) bool {
