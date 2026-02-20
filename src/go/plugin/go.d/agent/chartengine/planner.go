@@ -426,9 +426,11 @@ func (ctx *planBuildContext) accumulateRoute(
 		}
 
 		dimCap := ctx.dimCapHints[route.ChartID]
-		entries := make(map[string]*dimBuildEntry, dimCap)
+		var entries map[string]*dimBuildEntry
 		if matChart := ctx.materializedByID[route.ChartID]; matChart != nil {
 			entries = matChart.checkoutScratchEntries(dimCap)
+		} else {
+			entries = make(map[string]*dimBuildEntry, dimCap)
 		}
 
 		labelsAcc := newAutogenChartLabelAccumulator()
