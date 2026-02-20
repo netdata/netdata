@@ -38,6 +38,9 @@ typedef struct aclk_sync_cfg_t {
     RRDHOST *host;
     uv_timer_t timer;
     bool timer_initialized;
+    uint32_t context_checkpoint_deferred_count;
+    uint8_t context_checkpoint_deferred_reason;
+    time_t context_checkpoint_deferred_last_time_s;
     int8_t send_snapshot;
     bool stream_alerts;
     int alert_count;
@@ -47,6 +50,12 @@ typedef struct aclk_sync_cfg_t {
     time_t node_collectors_send;
     char node_id[UUID_STR_LEN];
 } aclk_sync_cfg_t;
+
+typedef enum {
+    ACLK_CTX_DEFER_REASON_NONE = 0,
+    ACLK_CTX_DEFER_REASON_PENDING_CONTEXT_LOAD = 1,
+    ACLK_CTX_DEFER_REASON_PENDING_POST_PROCESSING = 2,
+} ACLK_CTX_DEFER_REASON;
 
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid, nd_uuid_t *node_id);
 void destroy_aclk_config(RRDHOST *host);
