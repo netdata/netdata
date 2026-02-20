@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology"
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
@@ -214,14 +215,6 @@ type arpEntry struct {
 	mac      string
 	addrType string
 	state    string
-}
-
-type learnedEndpoint struct {
-	mac       string
-	ips       map[string]struct{}
-	ifIndexes map[string]struct{}
-	ifNames   map[string]struct{}
-	sources   map[string]struct{}
 }
 
 func newTopologyCache() *topologyCache {
@@ -726,516 +719,304 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 	local := c.localDevice
 	local = normalizeTopologyDevice(local)
 
-	devices := make([]topologyDevice, 0, 1+len(c.lldpRemotes)+len(c.cdpRemotes))
-	deviceIndex := make(map[string]struct{})
+	observation := c.buildEngineObservation(local)
 
-	addDevice := func(dev topologyDevice) {
-		dev = normalizeTopologyDevice(dev)
-		key := topologyDeviceKey(dev)
-		if key == "" {
-			return
-		}
-		if _, ok := deviceIndex[key]; ok {
-			return
-		}
-		deviceIndex[key] = struct{}{}
-		devices = append(devices, dev)
+	result, err := topologyengine.BuildL2ResultFromObservations([]topologyengine.L2Observation{observation}, topologyengine.DiscoverOptions{
+		EnableLLDP:   true,
+		EnableCDP:    true,
+		EnableBridge: true,
+		EnableARP:    true,
+	})
+	if err != nil {
+		return topologyData{}, false
 	}
 
-	addDevice(local)
-
-	links := make([]topology.Link, 0, len(c.lldpRemotes)+len(c.cdpRemotes))
-	linksLLDP := 0
-	linksCDP := 0
-	linksFDB := 0
-	linksARP := 0
-
-	endpoints := make(map[string]*learnedEndpoint)
-	ensureEndpoint := func(key string) *learnedEndpoint {
-		ep := endpoints[key]
-		if ep == nil {
-			ep = &learnedEndpoint{
-				ips:       make(map[string]struct{}),
-				ifIndexes: make(map[string]struct{}),
-				ifNames:   make(map[string]struct{}),
-				sources:   make(map[string]struct{}),
-			}
-			endpoints[key] = ep
-		}
-		return ep
-	}
-
-	linkIndex := make(map[string]struct{})
-	addUniqueLink := func(link topology.Link) bool {
-		key := topologyLinkSortKey(link)
-		if _, ok := linkIndex[key]; ok {
-			return false
-		}
-		linkIndex[key] = struct{}{}
-		links = append(links, link)
-		return true
-	}
-
-	for _, rem := range c.lldpRemotes {
-		remoteDev := topologyDevice{
-			ChassisID:             rem.chassisID,
-			ChassisIDType:         rem.chassisIDSubtype,
-			SysName:               rem.sysName,
-			SysDescr:              rem.sysDesc,
-			ManagementIP:          rem.managementAddr,
-			ManagementAddresses:   rem.managementAddrs,
-			CapabilitiesSupported: decodeLLDPCapabilities(rem.sysCapSupported),
-			CapabilitiesEnabled:   decodeLLDPCapabilities(rem.sysCapEnabled),
-			Discovered:            true,
-		}
-		if rem.sysCapSupported != "" || rem.sysCapEnabled != "" {
-			remoteDev.Labels = ensureLabels(remoteDev.Labels)
-			if rem.sysCapSupported != "" {
-				remoteDev.Labels[tagLldpRemSysCapSupported] = rem.sysCapSupported
-			}
-			if rem.sysCapEnabled != "" {
-				remoteDev.Labels[tagLldpRemSysCapEnabled] = rem.sysCapEnabled
-			}
-		}
-		remoteDev = normalizeTopologyDevice(remoteDev)
-		if topologyDeviceKey(remoteDev) == "" {
-			continue
-		}
-
-		addDevice(remoteDev)
-
-		localPort := c.lldpLocPorts[rem.localPortNum]
-		src := topologyEndpoint{
-			ChassisID:     local.ChassisID,
-			ChassisIDType: local.ChassisIDType,
-		}
-		if localPort != nil {
-			src.PortID = localPort.portID
-			src.PortIDType = localPort.portIDSubtype
-			src.PortDescr = localPort.portDesc
-		}
-		if idx := parseIndex(rem.localPortNum); idx > 0 {
-			src.IfIndex = idx
-		}
-
-		dst := topologyEndpoint{
-			ChassisID:           remoteDev.ChassisID,
-			ChassisIDType:       remoteDev.ChassisIDType,
-			PortID:              rem.portID,
-			PortIDType:          rem.portIDSubtype,
-			PortDescr:           rem.portDesc,
-			SysName:             rem.sysName,
-			ManagementIP:        rem.managementAddr,
-			ManagementAddresses: rem.managementAddrs,
-		}
-
-		links = append(links, topology.Link{
-			Layer:        "2",
-			Protocol:     "lldp",
-			Direction:    "unidirectional",
-			Src:          endpointToLink(src),
-			Dst:          endpointToLink(dst),
-			DiscoveredAt: timePtr(c.lastUpdate),
-			LastSeen:     timePtr(c.lastUpdate),
-		})
-		linksLLDP++
-	}
-
-	for _, rem := range c.cdpRemotes {
-		sysName := rem.deviceID
-		if rem.sysName != "" {
-			sysName = rem.sysName
-		}
-
-		remoteDev := topologyDevice{
-			ChassisID:           rem.deviceID,
-			ChassisIDType:       "cdp_device_id",
-			SysObjectID:         rem.sysObjectID,
-			SysName:             sysName,
-			ManagementIP:        rem.address,
-			ManagementAddresses: rem.managementAddrs,
-			Vendor:              "",
-			Model:               rem.platform,
-			Discovered:          true,
-		}
-		remoteDev.Labels = ensureLabels(remoteDev.Labels)
-		if rem.version != "" {
-			remoteDev.Labels[tagCdpVersion] = rem.version
-		}
-		if rem.vtpMgmtDomain != "" {
-			remoteDev.Labels[tagCdpVTPDomain] = rem.vtpMgmtDomain
-		}
-		if rem.physicalLocation != "" {
-			remoteDev.Labels[tagCdpPhysicalLocation] = rem.physicalLocation
-		}
-		if rem.lastChange != "" {
-			remoteDev.Labels[tagCdpLastChange] = rem.lastChange
-		}
-		if rem.addressType != "" {
-			remoteDev.Labels[tagCdpAddressType] = rem.addressType
-		}
-		if rem.capabilities != "" {
-			remoteDev.Labels[tagCdpCaps] = rem.capabilities
-		}
-		if rem.platform != "" {
-			remoteDev.Labels[tagCdpPlatform] = rem.platform
-		}
-		if rem.sysName != "" {
-			remoteDev.Labels[tagCdpSysName] = rem.sysName
-		}
-		if rem.sysObjectID != "" {
-			remoteDev.Labels[tagCdpSysObjectID] = rem.sysObjectID
-		}
-		if remoteDev.ChassisID == "" && rem.address != "" {
-			remoteDev.ChassisID = rem.address
-			remoteDev.ChassisIDType = "management_ip"
-		}
-		remoteDev = normalizeTopologyDevice(remoteDev)
-		if topologyDeviceKey(remoteDev) == "" {
-			continue
-		}
-
-		addDevice(remoteDev)
-
-		src := topologyEndpoint{
-			ChassisID:     local.ChassisID,
-			ChassisIDType: local.ChassisIDType,
-			IfName:        rem.ifName,
-		}
-		if idx := parseIndex(rem.ifIndex); idx > 0 {
-			src.IfIndex = idx
-		}
-
-		dst := topologyEndpoint{
-			ChassisID:     remoteDev.ChassisID,
-			ChassisIDType: remoteDev.ChassisIDType,
-			PortID:        rem.devicePort,
-			SysName:       sysName,
-			ManagementIP:  rem.address,
-		}
-		dst.ManagementAddresses = rem.managementAddrs
-		if rem.nativeVLAN != "" || rem.duplex != "" || rem.mtu != "" || rem.powerConsumption != "" {
-			dst.Labels = ensureLabels(dst.Labels)
-			if rem.nativeVLAN != "" {
-				dst.Labels[tagCdpNativeVLAN] = rem.nativeVLAN
-			}
-			if rem.duplex != "" {
-				dst.Labels[tagCdpDuplex] = rem.duplex
-			}
-			if rem.mtu != "" {
-				dst.Labels[tagCdpMTU] = rem.mtu
-			}
-			if rem.powerConsumption != "" {
-				dst.Labels[tagCdpPower] = rem.powerConsumption
-			}
-		}
-
-		links = append(links, topology.Link{
-			Layer:        "2",
-			Protocol:     "cdp",
-			Direction:    "unidirectional",
-			Src:          endpointToLink(src),
-			Dst:          endpointToLink(dst),
-			DiscoveredAt: timePtr(c.lastUpdate),
-			LastSeen:     timePtr(c.lastUpdate),
-		})
-		linksCDP++
-	}
-
-	for _, entry := range c.fdbEntries {
-		if entry == nil || entry.mac == "" {
-			continue
-		}
-
-		ifIndex := c.bridgePortToIf[entry.bridgePort]
-		ifName := c.ifNamesByIndex[ifIndex]
-
-		endpointKey := "mac:" + entry.mac
-		ep := ensureEndpoint(endpointKey)
-		ep.mac = entry.mac
-		ep.sources["fdb"] = struct{}{}
-		if ifIndex != "" {
-			ep.ifIndexes[ifIndex] = struct{}{}
-		}
-		if ifName != "" {
-			ep.ifNames[ifName] = struct{}{}
-		}
-
-		src := topologyEndpoint{
-			ChassisID:     local.ChassisID,
-			ChassisIDType: local.ChassisIDType,
-			IfName:        ifName,
-		}
-		if idx := parseIndex(ifIndex); idx > 0 {
-			src.IfIndex = idx
-		}
-
-		dst := topologyEndpoint{
-			ChassisID:     entry.mac,
-			ChassisIDType: "macAddress",
-		}
-
-		if addUniqueLink(topology.Link{
-			Layer:        "2",
-			Protocol:     "fdb",
-			Direction:    "unidirectional",
-			State:        entry.status,
-			Src:          endpointToLink(src),
-			Dst:          endpointToLink(dst),
-			DiscoveredAt: timePtr(c.lastUpdate),
-			LastSeen:     timePtr(c.lastUpdate),
-		}) {
-			linksFDB++
-		}
-	}
-
-	for _, entry := range c.arpEntries {
-		if entry == nil {
-			continue
-		}
-
-		if entry.ifName == "" && entry.ifIndex != "" {
-			entry.ifName = c.ifNamesByIndex[entry.ifIndex]
-		}
-
-		if entry.mac == "" && entry.ip == "" {
-			continue
-		}
-
-		endpointKey := ""
-		if entry.mac != "" {
-			endpointKey = "mac:" + entry.mac
-		} else {
-			endpointKey = "ip:" + entry.ip
-		}
-		ep := ensureEndpoint(endpointKey)
-		if entry.mac != "" {
-			ep.mac = entry.mac
-		}
-		if entry.ip != "" {
-			ep.ips[entry.ip] = struct{}{}
-		}
-		if entry.ifIndex != "" {
-			ep.ifIndexes[entry.ifIndex] = struct{}{}
-		}
-		if entry.ifName != "" {
-			ep.ifNames[entry.ifName] = struct{}{}
-		}
-		ep.sources["arp"] = struct{}{}
-
-		src := topologyEndpoint{
-			ChassisID:     local.ChassisID,
-			ChassisIDType: local.ChassisIDType,
-			IfName:        entry.ifName,
-		}
-		if idx := parseIndex(entry.ifIndex); idx > 0 {
-			src.IfIndex = idx
-		}
-
-		dst := topologyEndpoint{
-			ChassisID:     entry.mac,
-			ChassisIDType: "macAddress",
-			ManagementIP:  entry.ip,
-		}
-		if dst.ChassisID == "" {
-			dst.ChassisID = entry.ip
-			dst.ChassisIDType = "management_ip"
-		}
-
-		if addUniqueLink(topology.Link{
-			Layer:        "2",
-			Protocol:     "arp",
-			Direction:    "unidirectional",
-			State:        entry.state,
-			Src:          endpointToLink(src),
-			Dst:          endpointToLink(dst),
-			DiscoveredAt: timePtr(c.lastUpdate),
-			LastSeen:     timePtr(c.lastUpdate),
-		}) {
-			linksARP++
-		}
-	}
-
-	stats := map[string]any{
-		"devices_total":      len(devices),
-		"devices_discovered": maxInt(len(devices)-1, 0),
-		"links_total":        len(links),
-		"links_lldp":         linksLLDP,
-		"links_cdp":          linksCDP,
-		"links_fdb":          linksFDB,
-		"links_arp":          linksARP,
-	}
-
-	actors := make([]topology.Actor, 0, len(devices)+len(endpoints))
-	actorIndex := make(map[string]struct{})
-	for _, dev := range devices {
-		act := deviceToActor(dev, c.agentID)
-		key := actorKey(act.Match)
-		if key == "" {
-			continue
-		}
-		if _, ok := actorIndex[key]; ok {
-			continue
-		}
-		actorIndex[key] = struct{}{}
-		actors = append(actors, act)
-	}
-
-	endpointCount := 0
-	endpointKeys := make([]string, 0, len(endpoints))
-	for key := range endpoints {
-		endpointKeys = append(endpointKeys, key)
-	}
-	sort.Strings(endpointKeys)
-
-	for _, key := range endpointKeys {
-		ep := endpoints[key]
-		if ep == nil {
-			continue
-		}
-		act := endpointToActor(ep)
-		ak := actorKey(act.Match)
-		if ak == "" {
-			continue
-		}
-		if _, ok := actorIndex[ak]; ok {
-			continue
-		}
-		actorIndex[ak] = struct{}{}
-		actors = append(actors, act)
-		endpointCount++
-	}
-
-	stats["actors_total"] = len(actors)
-	stats["endpoints_total"] = endpointCount
-	sortTopologyActors(actors)
-	sortTopologyLinks(links)
-
-	return topologyData{
+	data := topologyengine.ToTopologyData(result, topologyengine.TopologyDataOptions{
 		SchemaVersion: topologySchemaVersion,
 		Source:        "snmp",
 		Layer:         "2",
-		AgentID:       c.agentID,
-		CollectedAt:   c.lastUpdate,
 		View:          "summary",
-		Actors:        actors,
-		Links:         links,
-		Stats:         stats,
-	}, true
+		AgentID:       c.agentID,
+		LocalDeviceID: observation.DeviceID,
+		CollectedAt:   c.lastUpdate,
+	})
+
+	augmentLocalActorFromCache(&data, local)
+	return data, true
 }
 
-func deviceToActor(dev topologyDevice, agentID string) topology.Actor {
-	match := topology.Match{
-		SysObjectID: dev.SysObjectID,
-		SysName:     dev.SysName,
+func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyengine.L2Observation {
+	localManagementIP := normalizeIPAddress(local.ManagementIP)
+	if localManagementIP == "" {
+		localManagementIP = pickManagementIP(local.ManagementAddresses)
 	}
-	if dev.ChassisID != "" {
-		match.ChassisIDs = []string{dev.ChassisID}
-		if strings.EqualFold(dev.ChassisIDType, "macAddress") {
-			match.MacAddresses = append(match.MacAddresses, dev.ChassisID)
+
+	observation := topologyengine.L2Observation{
+		DeviceID:     ensureTopologyObservationDeviceID(local),
+		Hostname:     strings.TrimSpace(local.SysName),
+		ManagementIP: localManagementIP,
+		SysObjectID:  strings.TrimSpace(local.SysObjectID),
+		ChassisID:    strings.TrimSpace(local.ChassisID),
+	}
+
+	ifNameKeys := make([]string, 0, len(c.ifNamesByIndex))
+	for key := range c.ifNamesByIndex {
+		ifNameKeys = append(ifNameKeys, key)
+	}
+	sort.Strings(ifNameKeys)
+	for _, ifIndex := range ifNameKeys {
+		ifName := strings.TrimSpace(c.ifNamesByIndex[ifIndex])
+		if ifName == "" {
+			continue
+		}
+		idx := parseIndex(ifIndex)
+		if idx <= 0 {
+			continue
+		}
+		observation.Interfaces = append(observation.Interfaces, topologyengine.ObservedInterface{
+			IfIndex: idx,
+			IfName:  ifName,
+			IfDescr: ifName,
+		})
+	}
+
+	bridgePortKeys := make([]string, 0, len(c.bridgePortToIf))
+	for key := range c.bridgePortToIf {
+		bridgePortKeys = append(bridgePortKeys, key)
+	}
+	sort.Strings(bridgePortKeys)
+	for _, basePort := range bridgePortKeys {
+		ifIndex := parseIndex(c.bridgePortToIf[basePort])
+		if ifIndex <= 0 {
+			continue
+		}
+		observation.BridgePorts = append(observation.BridgePorts, topologyengine.BridgePortObservation{
+			BasePort: strings.TrimSpace(basePort),
+			IfIndex:  ifIndex,
+		})
+	}
+
+	fdbKeys := make([]string, 0, len(c.fdbEntries))
+	for key := range c.fdbEntries {
+		fdbKeys = append(fdbKeys, key)
+	}
+	sort.Strings(fdbKeys)
+	for _, key := range fdbKeys {
+		entry := c.fdbEntries[key]
+		if entry == nil || strings.TrimSpace(entry.mac) == "" {
+			continue
+		}
+		ifIndex := parseIndex(c.bridgePortToIf[strings.TrimSpace(entry.bridgePort)])
+		observation.FDBEntries = append(observation.FDBEntries, topologyengine.FDBObservation{
+			MAC:        strings.TrimSpace(entry.mac),
+			BridgePort: strings.TrimSpace(entry.bridgePort),
+			IfIndex:    ifIndex,
+			Status:     strings.TrimSpace(entry.status),
+		})
+	}
+
+	arpKeys := make([]string, 0, len(c.arpEntries))
+	for key := range c.arpEntries {
+		arpKeys = append(arpKeys, key)
+	}
+	sort.Strings(arpKeys)
+	for _, key := range arpKeys {
+		entry := c.arpEntries[key]
+		if entry == nil {
+			continue
+		}
+		ifName := strings.TrimSpace(entry.ifName)
+		if ifName == "" && strings.TrimSpace(entry.ifIndex) != "" {
+			ifName = strings.TrimSpace(c.ifNamesByIndex[entry.ifIndex])
+		}
+		observation.ARPNDEntries = append(observation.ARPNDEntries, topologyengine.ARPNDObservation{
+			Protocol: "arp",
+			IfIndex:  parseIndex(entry.ifIndex),
+			IfName:   ifName,
+			IP:       strings.TrimSpace(entry.ip),
+			MAC:      strings.TrimSpace(entry.mac),
+			State:    strings.TrimSpace(entry.state),
+			AddrType: strings.TrimSpace(entry.addrType),
+		})
+	}
+
+	lldpKeys := make([]string, 0, len(c.lldpRemotes))
+	for key := range c.lldpRemotes {
+		lldpKeys = append(lldpKeys, key)
+	}
+	sort.Strings(lldpKeys)
+	for _, key := range lldpKeys {
+		remote := c.lldpRemotes[key]
+		if remote == nil {
+			continue
+		}
+
+		managementIP := normalizeIPAddress(remote.managementAddr)
+		if managementIP == "" {
+			managementIP = pickManagementIP(remote.managementAddrs)
+		}
+
+		localPort := c.lldpLocPorts[remote.localPortNum]
+		localPortID := ""
+		localPortDesc := ""
+		if localPort != nil {
+			localPortID = strings.TrimSpace(localPort.portID)
+			localPortDesc = strings.TrimSpace(localPort.portDesc)
+		}
+
+		observation.LLDPRemotes = append(observation.LLDPRemotes, topologyengine.LLDPRemoteObservation{
+			LocalPortNum:  strings.TrimSpace(remote.localPortNum),
+			RemoteIndex:   strings.TrimSpace(remote.remIndex),
+			LocalPortID:   localPortID,
+			LocalPortDesc: localPortDesc,
+			ChassisID:     strings.TrimSpace(remote.chassisID),
+			SysName:       strings.TrimSpace(remote.sysName),
+			PortID:        strings.TrimSpace(remote.portID),
+			PortDesc:      strings.TrimSpace(remote.portDesc),
+			ManagementIP:  managementIP,
+		})
+	}
+
+	cdpKeys := make([]string, 0, len(c.cdpRemotes))
+	for key := range c.cdpRemotes {
+		cdpKeys = append(cdpKeys, key)
+	}
+	sort.Strings(cdpKeys)
+	for _, key := range cdpKeys {
+		remote := c.cdpRemotes[key]
+		if remote == nil {
+			continue
+		}
+
+		deviceID := strings.TrimSpace(remote.deviceID)
+		sysName := strings.TrimSpace(remote.sysName)
+		if deviceID == "" {
+			deviceID = sysName
+		}
+		if deviceID == "" {
+			continue
+		}
+
+		ifName := strings.TrimSpace(remote.ifName)
+		if ifName == "" && strings.TrimSpace(remote.ifIndex) != "" {
+			ifName = strings.TrimSpace(c.ifNamesByIndex[remote.ifIndex])
+		}
+
+		address := strings.TrimSpace(remote.address)
+		if address == "" {
+			address = pickManagementIP(remote.managementAddrs)
+		}
+
+		observation.CDPRemotes = append(observation.CDPRemotes, topologyengine.CDPRemoteObservation{
+			LocalIfIndex: parseIndex(remote.ifIndex),
+			LocalIfName:  ifName,
+			DeviceIndex:  strings.TrimSpace(remote.deviceIndex),
+			DeviceID:     deviceID,
+			SysName:      sysName,
+			DevicePort:   strings.TrimSpace(remote.devicePort),
+			Address:      address,
+		})
+	}
+
+	return observation
+}
+
+func ensureTopologyObservationDeviceID(local topologyDevice) string {
+	if key := strings.TrimSpace(topologyDeviceKey(local)); key != "" {
+		return key
+	}
+	if sysName := strings.TrimSpace(local.SysName); sysName != "" {
+		return "sysname:" + strings.ToLower(sysName)
+	}
+	if ip := normalizeIPAddress(local.ManagementIP); ip != "" {
+		return "management_ip:" + ip
+	}
+	if managementIP := strings.TrimSpace(local.ManagementIP); managementIP != "" {
+		return "management_addr:" + strings.ToLower(managementIP)
+	}
+	return "local-device"
+}
+
+func augmentLocalActorFromCache(data *topologyData, local topologyDevice) {
+	if data == nil || len(data.Actors) == 0 {
+		return
+	}
+
+	for i := range data.Actors {
+		actor := &data.Actors[i]
+		if actor.ActorType != "device" {
+			continue
+		}
+		if !matchLocalTopologyActor(actor.Match, local) {
+			continue
+		}
+
+		attrs := actor.Attributes
+		if attrs == nil {
+			attrs = make(map[string]any)
+		}
+		if len(local.ManagementAddresses) > 0 {
+			attrs["management_addresses"] = local.ManagementAddresses
+		}
+		if len(local.Capabilities) > 0 {
+			attrs["capabilities"] = local.Capabilities
+		}
+		if len(local.CapabilitiesSupported) > 0 {
+			attrs["capabilities_supported"] = local.CapabilitiesSupported
+		}
+		if len(local.CapabilitiesEnabled) > 0 {
+			attrs["capabilities_enabled"] = local.CapabilitiesEnabled
+		}
+		if sysDescr := strings.TrimSpace(local.SysDescr); sysDescr != "" {
+			attrs["sys_descr"] = sysDescr
+		}
+		if sysLocation := strings.TrimSpace(local.SysLocation); sysLocation != "" {
+			attrs["sys_location"] = sysLocation
+		}
+		if managementIP := normalizeIPAddress(local.ManagementIP); managementIP != "" {
+			attrs["management_ip"] = managementIP
+		}
+
+		actor.Attributes = pruneNilAttributes(attrs)
+		if actor.Labels == nil {
+			actor.Labels = make(map[string]string)
+		}
+		for key, value := range local.Labels {
+			value = strings.TrimSpace(value)
+			if value == "" {
+				continue
+			}
+			actor.Labels[key] = value
+		}
+		return
+	}
+}
+
+func matchLocalTopologyActor(match topology.Match, local topologyDevice) bool {
+	localChassisID := strings.TrimSpace(local.ChassisID)
+	if localChassisID != "" {
+		for _, chassisID := range match.ChassisIDs {
+			if strings.EqualFold(strings.TrimSpace(chassisID), localChassisID) {
+				return true
+			}
 		}
 	}
 
-	if dev.ManagementIP != "" {
-		match.IPAddresses = append(match.IPAddresses, dev.ManagementIP)
+	localSysName := strings.TrimSpace(local.SysName)
+	if localSysName != "" && strings.EqualFold(strings.TrimSpace(match.SysName), localSysName) {
+		return true
 	}
-	for _, addr := range dev.ManagementAddresses {
-		if ip := net.ParseIP(addr.Address); ip != nil {
-			match.IPAddresses = append(match.IPAddresses, ip.String())
+
+	localIP := normalizeIPAddress(local.ManagementIP)
+	if localIP != "" {
+		for _, ip := range match.IPAddresses {
+			if normalizeIPAddress(ip) == localIP {
+				return true
+			}
 		}
 	}
-	match.IPAddresses = uniqueStrings(match.IPAddresses)
 
-	attrs := map[string]any{
-		"chassis_id_type":        dev.ChassisIDType,
-		"sys_descr":              dev.SysDescr,
-		"sys_location":           dev.SysLocation,
-		"management_ip":          dev.ManagementIP,
-		"management_addresses":   dev.ManagementAddresses,
-		"agent_id":               agentID,
-		"agent_job_id":           dev.AgentJobID,
-		"vendor":                 dev.Vendor,
-		"model":                  dev.Model,
-		"capabilities":           dev.Capabilities,
-		"capabilities_supported": dev.CapabilitiesSupported,
-		"capabilities_enabled":   dev.CapabilitiesEnabled,
-		"discovered":             dev.Discovered,
-	}
-
-	return topology.Actor{
-		ActorType:  "device",
-		Layer:      "2",
-		Source:     "snmp",
-		Match:      match,
-		Attributes: pruneNilAttributes(attrs),
-		Labels:     dev.Labels,
-	}
-}
-
-func endpointToActor(ep *learnedEndpoint) topology.Actor {
-	match := topology.Match{}
-	if ep.mac != "" {
-		match.ChassisIDs = []string{ep.mac}
-		match.MacAddresses = []string{ep.mac}
-	}
-	match.IPAddresses = sortedStringSet(ep.ips)
-
-	attrs := map[string]any{
-		"discovered":         true,
-		"learned_sources":    sortedStringSet(ep.sources),
-		"learned_if_indexes": sortedStringSet(ep.ifIndexes),
-		"learned_if_names":   sortedStringSet(ep.ifNames),
-	}
-
-	return topology.Actor{
-		ActorType:  "endpoint",
-		Layer:      "2",
-		Source:     "snmp",
-		Match:      match,
-		Attributes: pruneNilAttributes(attrs),
-	}
-}
-
-func endpointToLink(ep topologyEndpoint) topology.LinkEndpoint {
-	match := topology.Match{}
-	if ep.ChassisID != "" {
-		match.ChassisIDs = []string{ep.ChassisID}
-		if strings.EqualFold(ep.ChassisIDType, "macAddress") {
-			match.MacAddresses = append(match.MacAddresses, ep.ChassisID)
-		}
-	}
-	if ep.ManagementIP != "" {
-		match.IPAddresses = append(match.IPAddresses, ep.ManagementIP)
-	}
-	for _, addr := range ep.ManagementAddresses {
-		if ip := net.ParseIP(addr.Address); ip != nil {
-			match.IPAddresses = append(match.IPAddresses, ip.String())
-		}
-	}
-	match.IPAddresses = uniqueStrings(match.IPAddresses)
-
-	attrs := map[string]any{
-		"chassis_id_type":      ep.ChassisIDType,
-		"if_index":             ep.IfIndex,
-		"if_name":              ep.IfName,
-		"port_id":              ep.PortID,
-		"port_id_type":         ep.PortIDType,
-		"port_descr":           ep.PortDescr,
-		"sys_name":             ep.SysName,
-		"management_ip":        ep.ManagementIP,
-		"management_addresses": ep.ManagementAddresses,
-		"agent_id":             ep.AgentID,
-		"labels":               ep.Labels,
-	}
-
-	return topology.LinkEndpoint{
-		Match:      match,
-		Attributes: pruneNilAttributes(attrs),
-	}
-}
-
-func actorKey(match topology.Match) string {
-	return canonicalMatchKey(match)
+	return false
 }
 
 func canonicalMatchKey(match topology.Match) string {
@@ -1309,65 +1090,6 @@ func attrKey(attrs map[string]any, key string) string {
 	return fmt.Sprint(v)
 }
 
-func sortTopologyActors(actors []topology.Actor) {
-	sort.SliceStable(actors, func(i, j int) bool {
-		a, b := actors[i], actors[j]
-		if a.ActorType != b.ActorType {
-			return a.ActorType < b.ActorType
-		}
-		ak := canonicalMatchKey(a.Match)
-		bk := canonicalMatchKey(b.Match)
-		if ak != bk {
-			return ak < bk
-		}
-		if a.Source != b.Source {
-			return a.Source < b.Source
-		}
-		return a.Layer < b.Layer
-	})
-}
-
-func sortTopologyLinks(links []topology.Link) {
-	sort.SliceStable(links, func(i, j int) bool {
-		return topologyLinkSortKey(links[i]) < topologyLinkSortKey(links[j])
-	})
-}
-
-func uniqueStrings(values []string) []string {
-	if len(values) == 0 {
-		return values
-	}
-	seen := make(map[string]struct{}, len(values))
-	out := make([]string, 0, len(values))
-	for _, v := range values {
-		if v == "" {
-			continue
-		}
-		if _, ok := seen[v]; ok {
-			continue
-		}
-		seen[v] = struct{}{}
-		out = append(out, v)
-	}
-	return out
-}
-
-func sortedStringSet(values map[string]struct{}) []string {
-	if len(values) == 0 {
-		return nil
-	}
-
-	out := make([]string, 0, len(values))
-	for v := range values {
-		if v == "" {
-			continue
-		}
-		out = append(out, v)
-	}
-	sort.Strings(out)
-	return out
-}
-
 func pruneNilAttributes(attrs map[string]any) map[string]any {
 	for k, v := range attrs {
 		switch vv := v.(type) {
@@ -1391,13 +1113,6 @@ func pruneNilAttributes(attrs map[string]any) map[string]any {
 		return nil
 	}
 	return attrs
-}
-
-func timePtr(t time.Time) *time.Time {
-	if t.IsZero() {
-		return nil
-	}
-	return &t
 }
 
 func normalizeTopologyDevice(dev topologyDevice) topologyDevice {

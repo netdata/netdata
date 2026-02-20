@@ -263,10 +263,10 @@ func TestTopologyCache_FDBAndARPEnrichment(t *testing.T) {
 
 	require.True(t, ok)
 	require.GreaterOrEqual(t, len(data.Actors), 2)
-	require.GreaterOrEqual(t, len(data.Links), 2)
+	require.Empty(t, data.Links)
 
-	require.NotNil(t, findLinkByProtocol(data, "fdb"))
-	require.NotNil(t, findLinkByProtocol(data, "arp"))
+	require.Nil(t, findLinkByProtocol(data, "fdb"))
+	require.Nil(t, findLinkByProtocol(data, "arp"))
 
 	ep := findActorByMAC(data, "70:49:a2:65:72:cd")
 	require.NotNil(t, ep)
@@ -331,6 +331,22 @@ func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
 	expectedLinkOrder := append([]string(nil), linkOrder...)
 	sort.Strings(expectedLinkOrder)
 	assert.Equal(t, expectedLinkOrder, linkOrder)
+}
+
+func TestDecodePrintableASCII_HumanReadableHex(t *testing.T) {
+	bs, err := decodeHexString("766d7831")
+	require.NoError(t, err)
+
+	decoded := decodePrintableASCII(bs)
+	require.Equal(t, "vmx1", decoded)
+}
+
+func TestDecodePrintableASCII_HexValueIsNotNumeric(t *testing.T) {
+	bs, err := decodeHexString("766d7831")
+	require.NoError(t, err)
+
+	decoded := decodePrintableASCII(bs)
+	assert.NotRegexp(t, "^[0-9]+$", decoded)
 }
 
 func actorHasAttributeList(snapshot topologyData, key string) bool {
