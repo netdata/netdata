@@ -46,6 +46,7 @@ type dimensionState struct {
 type chartState struct {
 	templateID string
 	chartID    string
+	identity   program.ChartIdentity
 	meta       program.ChartMeta
 	lifecycle  program.LifecyclePolicy
 	labels     *chartLabelAccumulator
@@ -322,43 +323,52 @@ func (ctx *planBuildContext) accumulateRoute(
 	labels metrix.LabelView,
 	value metrix.SampleValue,
 ) error {
-	var chart program.Chart
-	identity := program.ChartIdentity{}
-	if !route.Autogen {
-		var ok bool
-		chart, ok = index.chartsByID[route.ChartTemplateID]
-		if !ok {
-			return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
-		}
-		identity = chart.Identity
-	}
-
-	ownerTemplateID, ownerExists := ctx.chartOwners[route.ChartID]
-	if ownerExists && ownerTemplateID != route.ChartTemplateID {
-		if !route.Autogen && isAutogenTemplateID(ownerTemplateID) {
+	cs, exists := ctx.chartsByID[route.ChartID]
+	if exists && cs.templateID != route.ChartTemplateID {
+		if !route.Autogen && isAutogenTemplateID(cs.templateID) {
 			// Template wins over autogen on chart-id collision.
 			ctx.chartOwners[route.ChartID] = route.ChartTemplateID
 			delete(ctx.chartsByID, route.ChartID)
+			cs = nil
+			exists = false
 		} else {
 			// Cross-template rendered-id collision.
 			// Existing owner keeps chart-id ownership.
 			return nil
 		}
 	}
-	if !ownerExists {
-		ctx.chartOwners[route.ChartID] = route.ChartTemplateID
-	}
-
-	cs, exists := ctx.chartsByID[route.ChartID]
 	if !exists {
+		ownerTemplateID, ownerExists := ctx.chartOwners[route.ChartID]
+		if ownerExists && ownerTemplateID != route.ChartTemplateID {
+			if !route.Autogen && isAutogenTemplateID(ownerTemplateID) {
+				// Template wins over autogen on chart-id collision.
+				ctx.chartOwners[route.ChartID] = route.ChartTemplateID
+				delete(ctx.chartsByID, route.ChartID)
+			} else {
+				// Cross-template rendered-id collision.
+				// Existing owner keeps chart-id ownership.
+				return nil
+			}
+		}
+		if !ownerExists {
+			ctx.chartOwners[route.ChartID] = route.ChartTemplateID
+		}
+
 		dimCap := ctx.dimCapHints[route.ChartID]
 		labelsAcc := newAutogenChartLabelAccumulator()
+		identity := program.ChartIdentity{}
 		if !route.Autogen {
+			chart, ok := index.chartsByID[route.ChartTemplateID]
+			if !ok {
+				return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
+			}
 			labelsAcc = newChartLabelAccumulator(chart)
+			identity = chart.Identity
 		}
 		cs = &chartState{
 			templateID: route.ChartTemplateID,
 			chartID:    route.ChartID,
+			identity:   identity,
 			meta:       route.Meta,
 			lifecycle:  route.Lifecycle,
 			labels:     labelsAcc,
@@ -383,7 +393,7 @@ func (ctx *planBuildContext) accumulateRoute(
 	}
 
 	cs.values[route.DimensionName] += value
-	if err := cs.labels.observe(identity, labels, route.DimensionKeyLabel); err != nil {
+	if err := cs.labels.observe(cs.identity, labels, route.DimensionKeyLabel); err != nil {
 		return err
 	}
 
