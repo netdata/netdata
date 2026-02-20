@@ -61,6 +61,16 @@ type Reader interface {
 	ForEachMatch(name string, match func(labels LabelView) bool, fn func(labels LabelView, v SampleValue))
 }
 
+// SeriesIdentityRawIterator is an optional reader fast path that exposes
+// raw canonical label slices to avoid per-series LabelView interface wrapping
+// in hot iteration paths.
+//
+// Labels are snapshot-owned and immutable for the lifetime of that reader.
+// Callers must not mutate returned label slices.
+type SeriesIdentityRawIterator interface {
+	ForEachSeriesIdentityRaw(fn func(identity SeriesIdentity, meta SeriesMeta, name string, labels []Label, v SampleValue))
+}
+
 // Writer is the declaration/write entrypoint for collection stores.
 // Metric mode is selected via SnapshotMeter or StatefulMeter.
 type Writer interface {

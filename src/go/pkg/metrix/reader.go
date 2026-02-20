@@ -467,6 +467,12 @@ func (r *storeReader) ForEachSeries(fn func(name string, labels LabelView, v Sam
 }
 
 func (r *storeReader) ForEachSeriesIdentity(fn func(identity SeriesIdentity, meta SeriesMeta, name string, labels LabelView, v SampleValue)) {
+	r.ForEachSeriesIdentityRaw(func(identity SeriesIdentity, meta SeriesMeta, name string, labels []Label, v SampleValue) {
+		fn(identity, meta, name, labelView{items: labels}, v)
+	})
+}
+
+func (r *storeReader) ForEachSeriesIdentityRaw(fn func(identity SeriesIdentity, meta SeriesMeta, name string, labels []Label, v SampleValue)) {
 	index := r.byNameIndex()
 	names := make([]string, 0, len(index))
 	for name := range index {
@@ -483,7 +489,7 @@ func (r *storeReader) ForEachSeriesIdentity(fn func(identity SeriesIdentity, met
 				fn(SeriesIdentity{
 					ID:     s.id,
 					Hash64: hash,
-				}, s.meta, name, labelView{items: s.labels}, s.value)
+				}, s.meta, name, s.labels, s.value)
 			}
 		}
 	}

@@ -17,6 +17,42 @@ const (
 	summaryQuantileLabel = "quantile"
 )
 
+type labelSliceView struct {
+	items []metrix.Label
+}
+
+func (v labelSliceView) Get(key string) (string, bool) {
+	for _, item := range v.items {
+		if item.Key == key {
+			return item.Value, true
+		}
+		if item.Key > key {
+			break
+		}
+	}
+	return "", false
+}
+
+func (v labelSliceView) Range(fn func(key, value string) bool) {
+	for _, item := range v.items {
+		if !fn(item.Key, item.Value) {
+			return
+		}
+	}
+}
+
+func (v labelSliceView) Len() int {
+	return len(v.items)
+}
+
+func (v labelSliceView) CloneMap() map[string]string {
+	out := make(map[string]string, len(v.items))
+	for _, item := range v.items {
+		out[item.Key] = item.Value
+	}
+	return out
+}
+
 // Plan is the deterministic planner output consumed by chartemit.
 //
 // Current scope:
@@ -275,7 +311,7 @@ func (e *Engine) preparePlanBuildContext(
 func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 	var firstErr error
 	buildSeq := ctx.collectMeta.LastSuccessSeq
-	ctx.flat.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, v metrix.SampleValue) {
+	process := func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, v metrix.SampleValue) {
 		ctx.seriesScanned++
 		if firstErr != nil {
 			return
@@ -335,6 +371,19 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 				return
 			}
 		}
+	}
+
+	if rawIter, ok := ctx.flat.(metrix.SeriesIdentityRawIterator); ok {
+		view := &labelSliceView{}
+		rawIter.ForEachSeriesIdentityRaw(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels []metrix.Label, v metrix.SampleValue) {
+			view.items = labels
+			process(identity, meta, name, view, v)
+		})
+		return firstErr
+	}
+
+	ctx.flat.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, v metrix.SampleValue) {
+		process(identity, meta, name, labels, v)
 	})
 	return firstErr
 }
