@@ -611,6 +611,8 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
     return rrddim_timed_set_by_pointer(st, rd, now, value);
 }
 
+// Sets the collected value for this dimension.
+// Returns the *previous* cycle's collected value (last_collected_value), not the current one.
 NETDATA_DOUBLE rrddim_set_by_pointer_double(RRDSET *st, RRDDIM *rd, NETDATA_DOUBLE value) {
     struct timeval now;
     now_realtime_timeval(&now);

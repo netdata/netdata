@@ -953,8 +953,10 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         }
 
         rd->collector.calculated_value = 0;
-        rrddim_set_collected_int(rd, 0);
-        rrddim_set_collected_float(rd, 0.0);
+        if(rrddim_is_float(rd))
+            rrddim_set_collected_float(rd, 0.0);
+        else
+            rrddim_set_collected_int(rd, 0);
         rrddim_clear_updated(rd);
 
         rrdset_debug(st, "%s: END "
