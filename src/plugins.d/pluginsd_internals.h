@@ -116,7 +116,8 @@ static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, c
     pluginsd_clear_scope_chart(parser, keyword);
 
     // NOW clear old_st's collector_tid - after all accesses to old_st are complete
-    if(old_st)
+    // Skip when old_st == st to avoid clearing the TID we just set on the active chart
+    if(old_st && old_st != st)
         __atomic_store_n(&old_st->pluginsd.collector_tid, 0, __ATOMIC_RELEASE);
 
     __atomic_store_n(&st->pluginsd.pos, 0, __ATOMIC_RELAXED);
