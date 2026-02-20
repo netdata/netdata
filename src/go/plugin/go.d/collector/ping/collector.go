@@ -108,10 +108,6 @@ func (c *Collector) Charts() *module.Charts {
 }
 
 func (c *Collector) Collect(context.Context) map[string]int64 {
-	return nil
-}
-
-func (c *Collector) CollectMetrics(context.Context) map[string]float64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -122,4 +118,5 @@ func (c *Collector) CollectMetrics(context.Context) map[string]float64 {
 	}
 	return mx
 }
+
 func (c *Collector) Cleanup(context.Context) {}
