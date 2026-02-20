@@ -765,10 +765,20 @@ static ALWAYS_INLINE void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
 
         if (flags & PGC_PAGE_CLEAN) {
             if(pgc_queue_trylock(cache, &cache->clean, PGC_QUEUE_LOCK_PRIO_EVICTORS)) {
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
-                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                // The status check above is lockless. Re-validate under the clean lock to avoid
+                // touching clean-list pointers after the page moved to another queue.
+                if(is_page_clean(page)) {
+                    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                    page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
+                }
+                else {
+                    // Expected concurrent transition: page may move clean -> dirty/hot
+                    // between lockless flag read and acquiring the clean queue lock.
+                    page_flag_set(page, PGC_PAGE_HAS_BEEN_ACCESSED);
+                }
+
                 pgc_queue_unlock(cache, &cache->clean);
-                page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
             }
             else
                 page_flag_set(page, PGC_PAGE_HAS_BEEN_ACCESSED);
