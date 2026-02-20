@@ -2,15 +2,13 @@
 
 package cache
 
-import "sync/atomic"
-
 func retainSeenEntries[T any](
 	bucket []routeCacheEntry[T],
 	buildSeq uint64,
 ) []routeCacheEntry[T] {
 	kept := bucket[:0]
 	for i := range bucket {
-		if atomic.LoadUint64(&bucket[i].lastSeenBuild) != buildSeq {
+		if bucket[i].lastSeenBuild != buildSeq {
 			continue
 		}
 		kept = append(kept, bucket[i])
