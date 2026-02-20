@@ -83,12 +83,13 @@ func (e *Engine) resolveSeriesRoutes(
 	meta metrix.SeriesMeta,
 	index matchIndex,
 	revision uint64,
+	buildSeq uint64,
 ) ([]routeBinding, bool, error) {
 	if cache == nil {
 		return nil, false, fmt.Errorf("chartengine: route cache is not initialized")
 	}
 
-	if cached, ok := cache.Lookup(identity, revision); ok {
+	if cached, ok := cache.Lookup(identity, revision, buildSeq); ok {
 		return cached, true, nil
 	}
 
@@ -150,6 +151,6 @@ func (e *Engine) resolveSeriesRoutes(
 		return routes[i].DimensionName < routes[j].DimensionName
 	})
 
-	cache.Store(identity, revision, routes)
+	cache.Store(identity, revision, buildSeq, routes)
 	return routes, false, nil
 }

@@ -4,6 +4,7 @@ package cache
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
@@ -12,11 +13,13 @@ type routeCacheEntry[T any] struct {
 	identity metrix.SeriesIdentity
 	revision uint64
 	values   []T
+	// lastSeenBuild tracks last successful build sequence that observed this series.
+	lastSeenBuild uint64
 }
 
 // RouteCache stores resolved routes keyed by metrix series identity.
 //
-// The cache is intentionally unbounded and is pruned by RetainSeries(), so
+// The cache is intentionally unbounded and is pruned by RetainSeen(), so
 // lifecycle remains aligned with metrix retention/source-of-truth.
 type RouteCache[T any] struct {
 	mu      sync.RWMutex
@@ -29,7 +32,7 @@ func NewRouteCache[T any]() *RouteCache[T] {
 	}
 }
 
-func (c *RouteCache[T]) Lookup(identity metrix.SeriesIdentity, revision uint64) ([]T, bool) {
+func (c *RouteCache[T]) Lookup(identity metrix.SeriesIdentity, revision uint64, buildSeq uint64) ([]T, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -39,6 +42,7 @@ func (c *RouteCache[T]) Lookup(identity metrix.SeriesIdentity, revision uint64) 
 		if entry.identity.ID != identity.ID {
 			continue
 		}
+		atomic.StoreUint64(&bucket[i].lastSeenBuild, buildSeq)
 		if entry.revision != revision {
 			return nil, false
 		}
@@ -49,7 +53,21 @@ func (c *RouteCache[T]) Lookup(identity metrix.SeriesIdentity, revision uint64) 
 	return nil, false
 }
 
-func (c *RouteCache[T]) Store(identity metrix.SeriesIdentity, revision uint64, values []T) {
+func (c *RouteCache[T]) MarkSeenIfPresent(identity metrix.SeriesIdentity, buildSeq uint64) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	bucket := c.buckets[identity.Hash64]
+	for i := range bucket {
+		if bucket[i].identity.ID != identity.ID {
+			continue
+		}
+		atomic.StoreUint64(&bucket[i].lastSeenBuild, buildSeq)
+		return
+	}
+}
+
+func (c *RouteCache[T]) Store(identity metrix.SeriesIdentity, revision uint64, buildSeq uint64, values []T) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -60,27 +78,25 @@ func (c *RouteCache[T]) Store(identity metrix.SeriesIdentity, revision uint64, v
 		}
 		bucket[i].revision = revision
 		bucket[i].values = cloneSlice(values)
+		bucket[i].lastSeenBuild = buildSeq
 		c.buckets[identity.Hash64] = bucket
 		return
 	}
 	c.buckets[identity.Hash64] = append(bucket, routeCacheEntry[T]{
-		identity: identity,
-		revision: revision,
-		values:   cloneSlice(values),
+		identity:      identity,
+		revision:      revision,
+		values:        cloneSlice(values),
+		lastSeenBuild: buildSeq,
 	})
 }
 
-// RetainSeries keeps entries only for currently retained series IDs.
-func (c *RouteCache[T]) RetainSeries(alive map[metrix.SeriesID]struct{}) {
+// RetainSeen keeps entries that were observed in current successful build sequence.
+func (c *RouteCache[T]) RetainSeen(buildSeq uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if len(alive) == 0 {
-		clear(c.buckets)
-		return
-	}
 	for hash, bucket := range c.buckets {
-		kept := retainAliveEntries(bucket, alive)
+		kept := retainSeenEntries(bucket, buildSeq)
 		if len(kept) == 0 {
 			delete(c.buckets, hash)
 			continue

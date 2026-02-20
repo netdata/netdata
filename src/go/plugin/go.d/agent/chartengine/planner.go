@@ -63,7 +63,6 @@ type planBuildContext struct {
 	index       matchIndex
 	flat        metrix.Reader
 
-	aliveSeries map[metrix.SeriesID]struct{}
 	seenInfer   map[string]struct{}
 	chartsByID  map[string]*chartState
 	chartOwners map[string]string
@@ -107,6 +106,21 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	switch obs := e.observeBuildSuccessSeq(collectMeta.LastSuccessSeq); obs.transition {
+	case buildSeqTransitionBroken:
+		e.logWarningf(
+			"chartengine build sequence is non-monotonic: current=%d previous=%d (suppressing repeats until recovery)",
+			collectMeta.LastSuccessSeq,
+			obs.previous,
+		)
+	case buildSeqTransitionRecovered:
+		e.logInfof(
+			"chartengine build sequence monotonicity recovered: current=%d previous=%d",
+			collectMeta.LastSuccessSeq,
+			obs.previous,
+		)
+	}
+
 	ctx, err := e.preparePlanBuildContext(reader, &out, collectMeta)
 	if err != nil {
 		sample.buildErr = true
@@ -125,7 +139,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	}
 
 	// Route-cache lifecycle follows metrix snapshot membership.
-	ctx.cache.RetainSeries(ctx.aliveSeries)
+	ctx.cache.RetainSeen(ctx.collectMeta.LastSuccessSeq)
 
 	removeByCapDims, removeByCapCharts := enforceLifecycleCaps(ctx.collectMeta.LastSuccessSeq, ctx.chartsByID, &e.state.materialized)
 	for _, action := range removeByCapDims {
@@ -158,7 +172,6 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	sample.actionUpdateChart = actionCounts.actionUpdateChart
 	sample.actionRemoveDimension = actionCounts.actionRemoveDimension
 	sample.actionRemoveChart = actionCounts.actionRemoveChart
-	e.state.hints.aliveSeries = len(ctx.aliveSeries)
 	e.state.hints.chartsByID = len(ctx.chartsByID)
 	e.state.hints.seenInfer = len(ctx.seenInfer)
 
@@ -231,7 +244,6 @@ func (e *Engine) preparePlanBuildContext(
 			dimCapHints[chartID] = n
 		}
 	}
-	aliveCap := e.state.hints.aliveSeries
 	chartsCap := e.state.hints.chartsByID
 	if chartsCap < len(e.state.materialized.charts) {
 		chartsCap = len(e.state.materialized.charts)
@@ -245,7 +257,6 @@ func (e *Engine) preparePlanBuildContext(
 		cache:       cache,
 		index:       index,
 		flat:        reader,
-		aliveSeries: make(map[metrix.SeriesID]struct{}, aliveCap),
 		seenInfer:   make(map[string]struct{}, seenInferCap),
 		chartsByID:  make(map[string]*chartState, chartsCap),
 		chartOwners: chartOwners,
@@ -255,17 +266,19 @@ func (e *Engine) preparePlanBuildContext(
 
 func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 	var firstErr error
+	buildSeq := ctx.collectMeta.LastSuccessSeq
 	ctx.flat.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, v metrix.SampleValue) {
-		ctx.aliveSeries[identity.ID] = struct{}{}
 		ctx.seriesScanned++
 		if firstErr != nil {
 			return
 		}
 		if e.state.cfg.seriesSelection == seriesSelectionLastSuccessOnly &&
 			meta.LastSeenSuccessSeq != ctx.collectMeta.LastSuccessSeq {
+			ctx.cache.MarkSeenIfPresent(identity, buildSeq)
 			return
 		}
 		if selector := e.state.cfg.selector; selector != nil && !selector.Matches(name, labels) {
+			ctx.cache.MarkSeenIfPresent(identity, buildSeq)
 			return
 		}
 
@@ -277,6 +290,7 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 			meta,
 			ctx.index,
 			ctx.prog.Revision(),
+			buildSeq,
 		)
 		if err != nil {
 			firstErr = err

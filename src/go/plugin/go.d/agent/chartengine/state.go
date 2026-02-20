@@ -15,6 +15,7 @@ type engineState struct {
 	routeCache   *routeCache
 	materialized materializedState
 	hints        plannerSizingHints
+	buildSeq     buildSeqState
 	stats        engineStats
 	runtimeStore metrix.RuntimeStore
 	runtimeStats *runtimeMetrics
@@ -22,7 +23,12 @@ type engineState struct {
 }
 
 type plannerSizingHints struct {
-	aliveSeries int
-	chartsByID  int
-	seenInfer   int
+	chartsByID int
+	seenInfer  int
+}
+
+type buildSeqState struct {
+	initialized bool
+	violating   bool
+	lastSuccess uint64
 }

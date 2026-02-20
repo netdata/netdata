@@ -1546,7 +1546,6 @@ groups:
 			assert.Equal(t, metrix.SampleValue(1), cs.values["a"])
 			assert.Equal(t, metrix.SampleValue(2), cs.values["b"])
 			assert.Empty(t, out.InferredDimensions)
-			assert.Len(t, ctx.aliveSeries, 2)
 		},
 		"materialize stage emits create and update actions": func(t *testing.T) {
 			e, err := New()

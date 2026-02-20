@@ -2,15 +2,15 @@
 
 package cache
 
-import "github.com/netdata/netdata/go/plugins/pkg/metrix"
+import "sync/atomic"
 
-func retainAliveEntries[T any](
+func retainSeenEntries[T any](
 	bucket []routeCacheEntry[T],
-	alive map[metrix.SeriesID]struct{},
+	buildSeq uint64,
 ) []routeCacheEntry[T] {
 	kept := bucket[:0]
 	for i := range bucket {
-		if _, ok := alive[bucket[i].identity.ID]; !ok {
+		if atomic.LoadUint64(&bucket[i].lastSeenBuild) != buildSeq {
 			continue
 		}
 		kept = append(kept, bucket[i])
