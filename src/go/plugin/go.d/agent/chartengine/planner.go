@@ -427,19 +427,21 @@ func (ctx *planBuildContext) accumulateRoute(
 
 		dimCap := ctx.dimCapHints[route.ChartID]
 		var entries map[string]*dimBuildEntry
+		var labelsAcc *chartLabelAccumulator
 		if matChart := ctx.materializedByID[route.ChartID]; matChart != nil {
 			entries = matChart.checkoutScratchEntries(dimCap)
+			// Labels are only emitted on chart creation, so skip observe work for existing charts.
+			labelsAcc = nil
 		} else {
 			entries = make(map[string]*dimBuildEntry, dimCap)
-		}
-
-		labelsAcc := newAutogenChartLabelAccumulator()
-		if !route.Autogen {
-			chart, ok := index.chartsByID[route.ChartTemplateID]
-			if !ok {
-				return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
+			labelsAcc = newAutogenChartLabelAccumulator()
+			if !route.Autogen {
+				chart, ok := index.chartsByID[route.ChartTemplateID]
+				if !ok {
+					return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
+				}
+				labelsAcc = newChartLabelAccumulator(chart)
 			}
-			labelsAcc = newChartLabelAccumulator(chart)
 		}
 		cs = &chartState{
 			templateID:      route.ChartTemplateID,
@@ -477,8 +479,10 @@ func (ctx *planBuildContext) accumulateRoute(
 		entry.value += value
 	}
 
-	if err := cs.labels.observe(labels, route.DimensionKeyLabel); err != nil {
-		return err
+	if cs.labels != nil {
+		if err := cs.labels.observe(labels, route.DimensionKeyLabel); err != nil {
+			return err
+		}
 	}
 
 	if route.Inferred {
@@ -509,9 +513,13 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 		cs := ctx.chartsByID[chartID]
 		matChart, chartCreated := e.state.materialized.ensureChart(cs.chartID, cs.templateID, cs.meta, cs.lifecycle)
 		if chartCreated {
-			chartLabels, err := cs.labels.materialize()
-			if err != nil {
-				return err
+			chartLabels := map[string]string(nil)
+			if cs.labels != nil {
+				labels, err := cs.labels.materialize()
+				if err != nil {
+					return err
+				}
+				chartLabels = labels
 			}
 			ctx.out.Actions = append(ctx.out.Actions, CreateChartAction{
 				ChartTemplateID: cs.templateID,
