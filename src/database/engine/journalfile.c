@@ -831,7 +831,7 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
         for (pos_i = 0; pos_i < size_bytes;) {
             unsigned max_size;
 
-            max_size = pos + size_bytes - pos_i;
+            max_size = size_bytes - pos_i;
             ret = journalfile_replay_transaction(ctx, journalfile, buf + pos_i, &id, max_size);
             if (!ret)
                 /* unknown transaction size, move on to the next block */
