@@ -4,6 +4,7 @@ package snmp
 
 import (
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -65,6 +66,7 @@ func TestTopologyCache_LldpSnapshot(t *testing.T) {
 
 	link := data.Links[0]
 	assert.Equal(t, "lldp", link.Protocol)
+	assert.Equal(t, "bidirectional", link.Direction)
 	assert.Equal(t, "Gi0/1", link.Src.Attributes["port_id"])
 	assert.Equal(t, "Gi0/2", link.Dst.Attributes["port_id"])
 	assert.Equal(t, "sw2", link.Dst.Attributes["sys_name"])
@@ -97,8 +99,178 @@ func TestTopologyCache_CdpSnapshot(t *testing.T) {
 	require.Len(t, data.Actors, 2)
 	require.Len(t, data.Links, 1)
 	assert.Equal(t, "cdp", data.Links[0].Protocol)
+	assert.Equal(t, "bidirectional", data.Links[0].Direction)
 	assert.Equal(t, "Gi0/2", data.Links[0].Src.Attributes["if_name"])
 	assert.Equal(t, "Gi0/3", data.Links[0].Dst.Attributes["port_id"])
+}
+
+func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "sw1",
+		ManagementIP:  "10.0.0.1",
+	}
+
+	cache.cdpRemotes["2:1"] = &cdpRemote{
+		ifIndex:    "2",
+		ifName:     "Gi0/2",
+		deviceID:   "sw3",
+		sysName:    "sw3",
+		devicePort: "Gi0/3",
+		address:    "0a000003",
+	}
+
+	cache.mu.RLock()
+	data, ok := cache.snapshot()
+	cache.mu.RUnlock()
+
+	require.True(t, ok)
+	require.Len(t, data.Links, 1)
+	assert.Equal(t, "cdp", data.Links[0].Protocol)
+	assert.Equal(t, "bidirectional", data.Links[0].Direction)
+	assert.True(t, linkHasRawAddressMetric(data.Links[0], "0a000003"))
+
+	remote := findDeviceActorBySysName(data, "sw3")
+	require.NotNil(t, remote)
+	assert.Contains(t, remote.Match.IPAddresses, "10.0.0.3")
+}
+
+func TestTopologyCache_CdpSnapshotRawAddressWithoutIP(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "sw1",
+		ManagementIP:  "10.0.0.1",
+	}
+
+	cache.cdpRemotes["2:1"] = &cdpRemote{
+		ifIndex:    "2",
+		ifName:     "Gi0/2",
+		deviceID:   "edge-sw3",
+		sysName:    "edge-sw3",
+		devicePort: "Gi0/3",
+		address:    "edge-sw3.mgmt.local",
+	}
+
+	cache.mu.RLock()
+	data, ok := cache.snapshot()
+	cache.mu.RUnlock()
+
+	require.True(t, ok)
+	require.Len(t, data.Links, 1)
+	assert.Equal(t, "cdp", data.Links[0].Protocol)
+	assert.Equal(t, "bidirectional", data.Links[0].Direction)
+	assert.True(t, linkHasRawAddressMetric(data.Links[0], "edge-sw3.mgmt.local"))
+}
+
+func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "sw1",
+		ManagementIP:  "10.0.0.1",
+	}
+	cache.lldpLocPorts["1"] = &lldpLocPort{
+		portNum:       "1",
+		portID:        "Gi0/1",
+		portIDSubtype: "interfaceName",
+		portDesc:      "uplink",
+	}
+	cache.lldpRemotes["1:1"] = &lldpRemote{
+		localPortNum:     "1",
+		remIndex:         "1",
+		chassisID:        "aa:bb:cc:dd:ee:ff",
+		chassisIDSubtype: "macAddress",
+		portID:           "Gi0/2",
+		portIDSubtype:    "interfaceName",
+		portDesc:         "downlink",
+		sysName:          "sw2",
+		managementAddr:   "10.0.0.2",
+	}
+
+	cache.mu.RLock()
+	data, ok := cache.snapshot()
+	cache.mu.RUnlock()
+
+	require.True(t, ok)
+	require.Len(t, data.Links, 1)
+	link := data.Links[0]
+	require.Equal(t, "lldp", link.Protocol)
+	require.Equal(t, "bidirectional", link.Direction)
+	require.Equal(t, true, link.Metrics["pair_consistent"])
+	require.Equal(t, 1, data.Stats["links_bidirectional"])
+	require.Equal(t, 0, data.Stats["links_unidirectional"])
+}
+
+func TestTopologyCache_SnapshotMergesRemoteIdentityAcrossProtocols(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "sw1",
+		ManagementIP:  "10.0.0.1",
+	}
+	cache.lldpLocPorts["1"] = &lldpLocPort{
+		portNum:       "1",
+		portID:        "Gi0/1",
+		portIDSubtype: "interfaceName",
+	}
+	cache.lldpRemotes["1:1"] = &lldpRemote{
+		localPortNum:     "1",
+		remIndex:         "1",
+		chassisID:        "aa:bb:cc:dd:ee:ff",
+		chassisIDSubtype: "macAddress",
+		portID:           "Gi0/2",
+		portIDSubtype:    "interfaceName",
+		sysName:          "sw2",
+		managementAddr:   "10.0.0.2",
+	}
+	cache.cdpRemotes["1:1"] = &cdpRemote{
+		ifIndex:    "1",
+		ifName:     "Gi0/1",
+		deviceID:   "sw2.domain.local",
+		sysName:    "sw2",
+		devicePort: "Gi0/2",
+		address:    "10.0.0.2",
+	}
+
+	cache.mu.RLock()
+	data, ok := cache.snapshot()
+	cache.mu.RUnlock()
+
+	require.True(t, ok)
+	require.Equal(t, 2, countDeviceActors(data))
+	require.NotNil(t, findLinkByProtocol(data, "lldp"))
+	require.NotNil(t, findLinkByProtocol(data, "cdp"))
+
+	remoteIdentityMatches := 0
+	for _, actor := range data.Actors {
+		if actor.ActorType != "device" {
+			continue
+		}
+		if actor.Match.SysName == "sw2" ||
+			containsString(actor.Match.ChassisIDs, "aa:bb:cc:dd:ee:ff") ||
+			containsString(actor.Match.IPAddresses, "10.0.0.2") {
+			remoteIdentityMatches++
+		}
+	}
+	require.Equal(t, 1, remoteIdentityMatches)
 }
 
 func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
@@ -274,6 +446,83 @@ func TestTopologyCache_FDBAndARPEnrichment(t *testing.T) {
 	assert.Contains(t, ep.Match.IPAddresses, "10.20.4.84")
 }
 
+func TestPickManagementIP_DeterministicAcrossInputOrder(t *testing.T) {
+	addrsA := []topologyManagementAddress{
+		{Address: "10.20.4.60", Source: "src-a"},
+		{Address: "10.20.4.205", Source: "src-b"},
+	}
+	addrsB := []topologyManagementAddress{
+		{Address: "10.20.4.205", Source: "src-b"},
+		{Address: "10.20.4.60", Source: "src-a"},
+	}
+
+	require.Equal(t, "10.20.4.205", pickManagementIP(addrsA))
+	require.Equal(t, pickManagementIP(addrsA), pickManagementIP(addrsB))
+
+	rawA := []topologyManagementAddress{
+		{Address: "zeta"},
+		{Address: "alpha"},
+	}
+	rawB := []topologyManagementAddress{
+		{Address: "alpha"},
+		{Address: "zeta"},
+	}
+	require.Equal(t, "alpha", pickManagementIP(rawA))
+	require.Equal(t, pickManagementIP(rawA), pickManagementIP(rawB))
+}
+
+func TestTopologyCache_SnapshotDeterministicEndpointIPSelection(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		ManagementIP:  "10.0.0.1",
+	}
+
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "3",
+		tagTopoIfName:  "Port3",
+	})
+	cache.updateBridgePortMap(map[string]string{
+		tagBridgeBasePort: "3",
+		tagBridgeIfIndex:  "3",
+	})
+	cache.updateFdbEntry(map[string]string{
+		tagFdbMac:        "d8:5e:d3:0e:c5:e6",
+		tagFdbBridgePort: "3",
+		tagFdbStatus:     "learned",
+	})
+	cache.updateArpEntry(map[string]string{
+		tagArpIfIndex: "3",
+		tagArpIfName:  "Port3",
+		tagArpIP:      "10.20.4.60",
+		tagArpMac:     "d8:5e:d3:0e:c5:e6",
+		tagArpState:   "reachable",
+	})
+	cache.updateArpEntry(map[string]string{
+		tagArpIfIndex: "3",
+		tagArpIfName:  "Port3",
+		tagArpIP:      "10.20.4.205",
+		tagArpMac:     "d8:5e:d3:0e:c5:e6",
+		tagArpState:   "reachable",
+	})
+
+	expectedIPs := []string{"10.20.4.205", "10.20.4.60"}
+	for i := 0; i < 25; i++ {
+		cache.mu.RLock()
+		data, ok := cache.snapshot()
+		cache.mu.RUnlock()
+
+		require.True(t, ok)
+		ep := findActorByMAC(data, "d8:5e:d3:0e:c5:e6")
+		require.NotNil(t, ep)
+		require.Equal(t, expectedIPs, ep.Match.IPAddresses)
+	}
+}
+
 func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()
@@ -393,6 +642,48 @@ func findActorByMAC(snapshot topologyData, mac string) *topologyActor {
 			if m == mac {
 				return &snapshot.Actors[i]
 			}
+		}
+	}
+	return nil
+}
+
+func countDeviceActors(snapshot topologyData) int {
+	total := 0
+	for _, actor := range snapshot.Actors {
+		if actor.ActorType == "device" {
+			total++
+		}
+	}
+	return total
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func linkHasRawAddressMetric(link topologyLink, raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || len(link.Metrics) == 0 {
+		return false
+	}
+	srcRaw, srcOK := link.Metrics["src_remote_address_raw"].(string)
+	dstRaw, dstOK := link.Metrics["dst_remote_address_raw"].(string)
+	return (srcOK && srcRaw == raw) || (dstOK && dstRaw == raw)
+}
+
+func findDeviceActorBySysName(snapshot topologyData, sysName string) *topologyActor {
+	for i := range snapshot.Actors {
+		actor := &snapshot.Actors[i]
+		if actor.ActorType != "device" {
+			continue
+		}
+		if actor.Match.SysName == sysName {
+			return actor
 		}
 	}
 	return nil

@@ -1,0 +1,102 @@
+{
+  "version": "v1",
+  "scenario_id": "nms0000_network_two_connected_lldp",
+  "description": "Enlinkd NMS-0000 LLDP two-node parity slice (ms07, ms08).",
+  "devices": [
+    {
+      "id": "axis-accc8eef756d",
+      "hostname": "axis-accc8eef756d"
+    },
+    {
+      "id": "axis-accc8eef78e4",
+      "hostname": "axis-accc8eef78e4"
+    },
+    {
+      "id": "axis-accc8eef78f9",
+      "hostname": "axis-accc8eef78f9"
+    },
+    {
+      "id": "axis-accc8eef7920",
+      "hostname": "axis-accc8eef7920"
+    },
+    {
+      "id": "axis-b8a44f502ddd",
+      "hostname": "axis-b8a44f502ddd"
+    },
+    {
+      "id": "microsens-g6-mac-00:60:a7:0a:7f:10",
+      "hostname": "MICROSENS-G6-MAC-00:60:A7:0A:7F:10"
+    },
+    {
+      "id": "ms07",
+      "hostname": "SW_A1_BDA_07_M"
+    },
+    {
+      "id": "ms08",
+      "hostname": "SW_A1_BDA_08_M"
+    }
+  ],
+  "adjacencies": [
+    {
+      "protocol": "lldp",
+      "source_device": "ms07",
+      "source_port": "2/4",
+      "target_device": "ms08",
+      "target_port": "2/5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "ms07",
+      "source_port": "2/6",
+      "target_device": "axis-accc8eef756d",
+      "target_port": "ac:cc:8e:ef:75:6d"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "ms07",
+      "source_port": "3/1",
+      "target_device": "axis-accc8eef7920",
+      "target_port": "ac:cc:8e:ef:79:20"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "ms08",
+      "source_port": "2/4",
+      "target_device": "ms07",
+      "target_port": "2/5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "ms08",
+      "source_port": "2/6",
+      "target_device": "axis-accc8eef78f9",
+      "target_port": "ac:cc:8e:ef:78:f9"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "ms08",
+      "source_port": "3/1",
+      "target_device": "axis-accc8eef78e4",
+      "target_port": "ac:cc:8e:ef:78:e4"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "ms08",
+      "source_port": "3/2",
+      "target_device": "axis-b8a44f502ddd",
+      "target_port": "b8:a4:4f:50:2d:dd"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "ms08",
+      "source_port": "3/4",
+      "target_device": "microsens-g6-mac-00:60:a7:0a:7f:10",
+      "target_port": "3/5"
+    }
+  ],
+  "expectations": {
+    "directional_adjacencies": 8,
+    "bidirectional_pairs": 0,
+    "devices": 8
+  }
+}

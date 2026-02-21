@@ -10,6 +10,7 @@ type MethodConfig struct {
 	Help           string        // Description for UI
 	RequireCloud   bool          // Indicates whether the method requires cloud connection
 	ResponseType   string        // Response schema type (default "table")
+	AgentWide      bool          // Method is agent-wide (does not require __job selector)
 	RequiredParams []ParamConfig // Required parameters for this method (including __sort if used)
 }
 

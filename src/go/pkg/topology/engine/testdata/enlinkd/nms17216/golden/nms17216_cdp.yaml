@@ -1,0 +1,157 @@
+version: v1
+scenario_id: nms17216_cdp
+description: Enlinkd NMS-17216 CDP parity scenario from OpenNMS integration test corpus.
+devices:
+  - id: Router1
+    hostname: Router1
+  - id: Router2
+    hostname: Router2
+  - id: Router3
+    hostname: Router3
+  - id: Router4
+    hostname: Router4
+  - id: Switch1
+    hostname: Switch1
+  - id: Switch2
+    hostname: Switch2
+  - id: Switch3
+    hostname: Switch3
+  - id: Switch4
+    hostname: Switch4
+  - id: Switch5
+    hostname: Switch5
+adjacencies:
+  - protocol: cdp
+    source_device: Router1
+    source_port: Fa0/0
+    target_device: Switch1
+    target_port: GigabitEthernet0/1
+  - protocol: cdp
+    source_device: Router1
+    source_port: Se0/0/0
+    target_device: Router2
+    target_port: Serial0/0/0
+  - protocol: cdp
+    source_device: Router2
+    source_port: Se0/0/0
+    target_device: Router1
+    target_port: Serial0/0/0
+  - protocol: cdp
+    source_device: Router2
+    source_port: Se0/0/1
+    target_device: Router3
+    target_port: Serial0/0/1
+  - protocol: cdp
+    source_device: Router3
+    source_port: Gi0/0
+    target_device: Router4
+    target_port: GigabitEthernet0/1
+  - protocol: cdp
+    source_device: Router3
+    source_port: Gi0/1
+    target_device: Switch4
+    target_port: FastEthernet0/1
+  - protocol: cdp
+    source_device: Router3
+    source_port: Se0/0/1
+    target_device: Router2
+    target_port: Serial0/0/1
+  - protocol: cdp
+    source_device: Router4
+    source_port: Gi0/1
+    target_device: Router3
+    target_port: GigabitEthernet0/0
+  - protocol: cdp
+    source_device: Switch1
+    source_port: Gi0/1
+    target_device: Router1
+    target_port: FastEthernet0/0
+  - protocol: cdp
+    source_device: Switch1
+    source_port: Gi0/10
+    target_device: Switch2
+    target_port: GigabitEthernet0/2
+  - protocol: cdp
+    source_device: Switch1
+    source_port: Gi0/11
+    target_device: Switch2
+    target_port: GigabitEthernet0/3
+  - protocol: cdp
+    source_device: Switch1
+    source_port: Gi0/12
+    target_device: Switch2
+    target_port: GigabitEthernet0/4
+  - protocol: cdp
+    source_device: Switch1
+    source_port: Gi0/9
+    target_device: Switch2
+    target_port: GigabitEthernet0/1
+  - protocol: cdp
+    source_device: Switch2
+    source_port: Gi0/1
+    target_device: Switch1
+    target_port: GigabitEthernet0/9
+  - protocol: cdp
+    source_device: Switch2
+    source_port: Gi0/19
+    target_device: Switch3
+    target_port: FastEthernet0/19
+  - protocol: cdp
+    source_device: Switch2
+    source_port: Gi0/2
+    target_device: Switch1
+    target_port: GigabitEthernet0/10
+  - protocol: cdp
+    source_device: Switch2
+    source_port: Gi0/20
+    target_device: Switch3
+    target_port: FastEthernet0/20
+  - protocol: cdp
+    source_device: Switch2
+    source_port: Gi0/3
+    target_device: Switch1
+    target_port: GigabitEthernet0/11
+  - protocol: cdp
+    source_device: Switch2
+    source_port: Gi0/4
+    target_device: Switch1
+    target_port: GigabitEthernet0/12
+  - protocol: cdp
+    source_device: Switch3
+    source_port: Fa0/19
+    target_device: Switch2
+    target_port: GigabitEthernet0/19
+  - protocol: cdp
+    source_device: Switch3
+    source_port: Fa0/20
+    target_device: Switch2
+    target_port: GigabitEthernet0/20
+  - protocol: cdp
+    source_device: Switch3
+    source_port: Fa0/23
+    target_device: Switch5
+    target_port: FastEthernet0/1
+  - protocol: cdp
+    source_device: Switch3
+    source_port: Fa0/24
+    target_device: Switch5
+    target_port: FastEthernet0/13
+  - protocol: cdp
+    source_device: Switch4
+    source_port: Fa0/1
+    target_device: Router3
+    target_port: GigabitEthernet0/1
+  - protocol: cdp
+    source_device: Switch5
+    source_port: Fa0/1
+    target_device: Switch3
+    target_port: FastEthernet0/23
+  - protocol: cdp
+    source_device: Switch5
+    source_port: Fa0/13
+    target_device: Switch3
+    target_port: FastEthernet0/24
+expectations:
+  directional_adjacencies: 26
+  bidirectional_pairs: 0
+  devices: 9

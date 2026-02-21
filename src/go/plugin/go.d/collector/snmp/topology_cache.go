@@ -719,9 +719,12 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 	local := c.localDevice
 	local = normalizeTopologyDevice(local)
 
-	observation := c.buildEngineObservation(local)
+	observations, localDeviceID := c.buildEngineObservations(local)
+	if len(observations) == 0 {
+		return topologyData{}, false
+	}
 
-	result, err := topologyengine.BuildL2ResultFromObservations([]topologyengine.L2Observation{observation}, topologyengine.DiscoverOptions{
+	result, err := topologyengine.BuildL2ResultFromObservations(observations, topologyengine.DiscoverOptions{
 		EnableLLDP:   true,
 		EnableCDP:    true,
 		EnableBridge: true,
@@ -737,12 +740,361 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 		Layer:         "2",
 		View:          "summary",
 		AgentID:       c.agentID,
-		LocalDeviceID: observation.DeviceID,
+		LocalDeviceID: localDeviceID,
 		CollectedAt:   c.lastUpdate,
 	})
 
 	augmentLocalActorFromCache(&data, local)
 	return data, true
+}
+
+func (c *topologyCache) buildEngineObservations(local topologyDevice) ([]topologyengine.L2Observation, string) {
+	localObservation := c.buildEngineObservation(local)
+	localObservation.DeviceID = strings.TrimSpace(localObservation.DeviceID)
+	if localObservation.DeviceID == "" {
+		return nil, ""
+	}
+
+	localManagementIP := normalizeIPAddress(local.ManagementIP)
+	if localManagementIP == "" {
+		localManagementIP = pickManagementIP(local.ManagementAddresses)
+	}
+	localSysName := strings.TrimSpace(local.SysName)
+	localGlobalID := strings.TrimSpace(localObservation.Hostname)
+	if localGlobalID == "" {
+		localGlobalID = localObservation.DeviceID
+	}
+
+	resolver := newTopologyObservationIdentityResolver(localObservation)
+	remoteObservations := make(map[string]*topologyengine.L2Observation)
+	remoteOrder := make([]string, 0, len(c.lldpRemotes)+len(c.cdpRemotes))
+	remoteManagementByID := make(map[string]string)
+	remoteChassisByID := make(map[string]string)
+
+	updateRemoteIdentity := func(deviceID, managementIP, chassisID string) {
+		deviceID = strings.TrimSpace(deviceID)
+		if deviceID == "" {
+			return
+		}
+		if managementIP = canonicalObservationIP(managementIP); managementIP != "" {
+			if _, ok := remoteManagementByID[deviceID]; !ok {
+				remoteManagementByID[deviceID] = managementIP
+			}
+		}
+		if chassisID = strings.TrimSpace(chassisID); chassisID != "" {
+			if _, ok := remoteChassisByID[deviceID]; !ok {
+				remoteChassisByID[deviceID] = chassisID
+			}
+		}
+	}
+
+	selectHostname := func(current, candidate, deviceID string) string {
+		current = strings.TrimSpace(current)
+		candidate = strings.TrimSpace(candidate)
+		deviceID = strings.TrimSpace(deviceID)
+		if candidate == "" {
+			if current != "" {
+				return current
+			}
+			return deviceID
+		}
+		if current == "" || current == deviceID {
+			return candidate
+		}
+		return current
+	}
+
+	ensureRemoteObservation := func(protocol, deviceID, hostname, managementIP, chassisID string) *topologyengine.L2Observation {
+		deviceID = strings.TrimSpace(deviceID)
+		if deviceID == "" {
+			return nil
+		}
+
+		key := strings.Join([]string{
+			protocol,
+			deviceID,
+		}, "|")
+
+		entry := remoteObservations[key]
+		if entry == nil {
+			entry = &topologyengine.L2Observation{
+				DeviceID: deviceID,
+			}
+			remoteObservations[key] = entry
+			remoteOrder = append(remoteOrder, key)
+		}
+		entry.Hostname = selectHostname(entry.Hostname, hostname, deviceID)
+
+		updateRemoteIdentity(deviceID, managementIP, chassisID)
+		if entry.ManagementIP == "" {
+			entry.ManagementIP = remoteManagementByID[deviceID]
+		}
+		if entry.ChassisID == "" {
+			entry.ChassisID = remoteChassisByID[deviceID]
+		}
+		resolver.register(deviceID, []string{entry.Hostname}, entry.ChassisID, entry.ManagementIP)
+		return entry
+	}
+
+	lldpKeys := make([]string, 0, len(c.lldpRemotes))
+	for key := range c.lldpRemotes {
+		lldpKeys = append(lldpKeys, key)
+	}
+	sort.Strings(lldpKeys)
+	for _, key := range lldpKeys {
+		remote := c.lldpRemotes[key]
+		if remote == nil {
+			continue
+		}
+
+		remoteSysName := strings.TrimSpace(remote.sysName)
+		remoteChassisID := strings.TrimSpace(remote.chassisID)
+		remoteManagementIP := normalizeIPAddress(remote.managementAddr)
+		if remoteManagementIP == "" {
+			remoteManagementIP = pickManagementIP(remote.managementAddrs)
+		}
+
+		remoteDeviceID := resolver.resolve(
+			[]string{remoteSysName},
+			remoteChassisID,
+			strings.TrimSpace(remote.chassisIDSubtype),
+			remoteManagementIP,
+		)
+		if remoteDeviceID == "" || remoteDeviceID == localObservation.DeviceID {
+			continue
+		}
+		updateRemoteIdentity(remoteDeviceID, remoteManagementIP, remoteChassisID)
+
+		remoteObservation := ensureRemoteObservation(
+			"lldp",
+			remoteDeviceID,
+			firstNonEmpty(remoteSysName, remoteDeviceID),
+			remoteManagementIP,
+			remoteChassisID,
+		)
+		if remoteObservation == nil {
+			continue
+		}
+
+		localPort := c.lldpLocPorts[remote.localPortNum]
+		localPortID := ""
+		localPortIDSubtype := ""
+		localPortDesc := ""
+		if localPort != nil {
+			localPortID = strings.TrimSpace(localPort.portID)
+			localPortIDSubtype = strings.TrimSpace(localPort.portIDSubtype)
+			localPortDesc = strings.TrimSpace(localPort.portDesc)
+		}
+
+		if strings.TrimSpace(remote.portID) == "" &&
+			strings.TrimSpace(remote.portDesc) == "" &&
+			localPortID == "" &&
+			localPortDesc == "" {
+			continue
+		}
+
+		remoteObservation.LLDPRemotes = append(remoteObservation.LLDPRemotes, topologyengine.LLDPRemoteObservation{
+			LocalPortNum:       strings.TrimSpace(remote.remIndex),
+			RemoteIndex:        strings.TrimSpace(remote.localPortNum),
+			LocalPortID:        strings.TrimSpace(remote.portID),
+			LocalPortIDSubtype: strings.TrimSpace(remote.portIDSubtype),
+			LocalPortDesc:      strings.TrimSpace(remote.portDesc),
+			ChassisID:          strings.TrimSpace(local.ChassisID),
+			SysName:            localSysName,
+			PortID:             localPortID,
+			PortIDSubtype:      localPortIDSubtype,
+			PortDesc:           localPortDesc,
+			ManagementIP:       localManagementIP,
+		})
+	}
+
+	cdpKeys := make([]string, 0, len(c.cdpRemotes))
+	for key := range c.cdpRemotes {
+		cdpKeys = append(cdpKeys, key)
+	}
+	sort.Strings(cdpKeys)
+	for _, key := range cdpKeys {
+		remote := c.cdpRemotes[key]
+		if remote == nil {
+			continue
+		}
+
+		remoteDeviceToken := strings.TrimSpace(remote.deviceID)
+		remoteSysName := strings.TrimSpace(remote.sysName)
+		remoteManagementIP := normalizeIPAddress(remote.address)
+		if remoteManagementIP == "" {
+			remoteManagementIP = pickManagementIP(remote.managementAddrs)
+		}
+		if remoteManagementIP == "" && remoteDeviceToken == "" && remoteSysName == "" {
+			continue
+		}
+
+		remoteDeviceID := resolver.resolve(
+			[]string{remoteDeviceToken, remoteSysName},
+			"",
+			"",
+			remoteManagementIP,
+		)
+		if remoteDeviceID == "" || remoteDeviceID == localObservation.DeviceID {
+			continue
+		}
+		updateRemoteIdentity(remoteDeviceID, remoteManagementIP, "")
+
+		remoteIfName := strings.TrimSpace(remote.devicePort)
+		localIfName := strings.TrimSpace(remote.ifName)
+		if localIfName == "" && strings.TrimSpace(remote.ifIndex) != "" {
+			localIfName = strings.TrimSpace(c.ifNamesByIndex[remote.ifIndex])
+		}
+		if remoteIfName == "" || localIfName == "" {
+			continue
+		}
+
+		remoteObservation := ensureRemoteObservation(
+			"cdp",
+			remoteDeviceID,
+			firstNonEmpty(remoteDeviceToken, remoteSysName, remoteDeviceID),
+			remoteManagementIP,
+			"",
+		)
+		if remoteObservation == nil {
+			continue
+		}
+
+		remoteObservation.CDPRemotes = append(remoteObservation.CDPRemotes, topologyengine.CDPRemoteObservation{
+			LocalIfName: remoteIfName,
+			DeviceID:    localGlobalID,
+			SysName:     localSysName,
+			DevicePort:  localIfName,
+			Address:     localManagementIP,
+		})
+	}
+
+	observations := make([]topologyengine.L2Observation, 0, 1+len(remoteObservations))
+	observations = append(observations, localObservation)
+	sort.Strings(remoteOrder)
+	for _, key := range remoteOrder {
+		entry := remoteObservations[key]
+		if entry == nil {
+			continue
+		}
+		if entry.ManagementIP == "" {
+			entry.ManagementIP = remoteManagementByID[entry.DeviceID]
+		}
+		if entry.ChassisID == "" {
+			entry.ChassisID = remoteChassisByID[entry.DeviceID]
+		}
+		if len(entry.LLDPRemotes) == 0 && len(entry.CDPRemotes) == 0 {
+			continue
+		}
+		if entry.Hostname == "" {
+			entry.Hostname = entry.DeviceID
+		}
+		observations = append(observations, *entry)
+	}
+
+	return observations, localObservation.DeviceID
+}
+
+type topologyObservationIdentityResolver struct {
+	hostToID    map[string]string
+	chassisToID map[string]string
+	ipToID      map[string]string
+	fallbackSeq int
+}
+
+func newTopologyObservationIdentityResolver(local topologyengine.L2Observation) *topologyObservationIdentityResolver {
+	resolver := &topologyObservationIdentityResolver{
+		hostToID:    make(map[string]string),
+		chassisToID: make(map[string]string),
+		ipToID:      make(map[string]string),
+	}
+	resolver.register(local.DeviceID, []string{local.Hostname}, local.ChassisID, local.ManagementIP)
+	return resolver
+}
+
+func (r *topologyObservationIdentityResolver) resolve(hostAliases []string, chassisID, chassisType, managementIP string) string {
+	for _, host := range hostAliases {
+		if id := r.hostToID[canonicalObservationHost(host)]; id != "" {
+			return id
+		}
+	}
+	if id := r.chassisToID[canonicalObservationChassis(chassisID)]; id != "" {
+		return id
+	}
+	if id := r.ipToID[canonicalObservationIP(managementIP)]; id != "" {
+		return id
+	}
+
+	candidate := normalizeTopologyDevice(topologyDevice{
+		ChassisID:     strings.TrimSpace(chassisID),
+		ChassisIDType: strings.TrimSpace(chassisType),
+		SysName:       firstNonEmpty(hostAliases...),
+		ManagementIP:  normalizeIPAddress(managementIP),
+	})
+	id := strings.TrimSpace(ensureTopologyObservationDeviceID(candidate))
+	if id == "" || id == "local-device" {
+		r.fallbackSeq++
+		id = fmt.Sprintf("remote-device-%d", r.fallbackSeq)
+	}
+	r.register(id, hostAliases, chassisID, managementIP)
+	return id
+}
+
+func (r *topologyObservationIdentityResolver) register(id string, hostAliases []string, chassisID, managementIP string) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return
+	}
+	for _, host := range hostAliases {
+		if key := canonicalObservationHost(host); key != "" {
+			if _, exists := r.hostToID[key]; !exists {
+				r.hostToID[key] = id
+			}
+		}
+	}
+	if key := canonicalObservationChassis(chassisID); key != "" {
+		if _, exists := r.chassisToID[key]; !exists {
+			r.chassisToID[key] = id
+		}
+	}
+	if key := canonicalObservationIP(managementIP); key != "" {
+		if _, exists := r.ipToID[key]; !exists {
+			r.ipToID[key] = id
+		}
+	}
+}
+
+func canonicalObservationHost(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func canonicalObservationChassis(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if mac := normalizeMAC(value); mac != "" {
+		return mac
+	}
+	return strings.ToLower(value)
+}
+
+func canonicalObservationIP(value string) string {
+	value = normalizeIPAddress(value)
+	if value != "" {
+		return strings.ToLower(value)
+	}
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyengine.L2Observation {
@@ -858,22 +1210,26 @@ func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyeng
 
 		localPort := c.lldpLocPorts[remote.localPortNum]
 		localPortID := ""
+		localPortIDSubtype := ""
 		localPortDesc := ""
 		if localPort != nil {
 			localPortID = strings.TrimSpace(localPort.portID)
+			localPortIDSubtype = strings.TrimSpace(localPort.portIDSubtype)
 			localPortDesc = strings.TrimSpace(localPort.portDesc)
 		}
 
 		observation.LLDPRemotes = append(observation.LLDPRemotes, topologyengine.LLDPRemoteObservation{
-			LocalPortNum:  strings.TrimSpace(remote.localPortNum),
-			RemoteIndex:   strings.TrimSpace(remote.remIndex),
-			LocalPortID:   localPortID,
-			LocalPortDesc: localPortDesc,
-			ChassisID:     strings.TrimSpace(remote.chassisID),
-			SysName:       strings.TrimSpace(remote.sysName),
-			PortID:        strings.TrimSpace(remote.portID),
-			PortDesc:      strings.TrimSpace(remote.portDesc),
-			ManagementIP:  managementIP,
+			LocalPortNum:       strings.TrimSpace(remote.localPortNum),
+			RemoteIndex:        strings.TrimSpace(remote.remIndex),
+			LocalPortID:        localPortID,
+			LocalPortIDSubtype: localPortIDSubtype,
+			LocalPortDesc:      localPortDesc,
+			ChassisID:          strings.TrimSpace(remote.chassisID),
+			SysName:            strings.TrimSpace(remote.sysName),
+			PortID:             strings.TrimSpace(remote.portID),
+			PortIDSubtype:      strings.TrimSpace(remote.portIDSubtype),
+			PortDesc:           strings.TrimSpace(remote.portDesc),
+			ManagementIP:       managementIP,
 		})
 	}
 
@@ -1207,15 +1563,42 @@ func appendCdpManagementAddresses(entry *cdpRemote, current []topologyManagement
 }
 
 func pickManagementIP(addrs []topologyManagementAddress) string {
-	for _, addr := range addrs {
-		if ip := net.ParseIP(addr.Address); ip != nil {
-			return ip.String()
-		}
+	if len(addrs) == 0 {
+		return ""
 	}
+
+	ipSet := make(map[string]struct{}, len(addrs))
+	ipValues := make([]string, 0, len(addrs))
+	rawSet := make(map[string]struct{}, len(addrs))
+	rawValues := make([]string, 0, len(addrs))
+
 	for _, addr := range addrs {
-		if addr.Address != "" {
-			return addr.Address
+		value := strings.TrimSpace(addr.Address)
+		if value == "" {
+			continue
 		}
+		if ip := normalizeIPAddress(value); ip != "" {
+			if _, exists := ipSet[ip]; exists {
+				continue
+			}
+			ipSet[ip] = struct{}{}
+			ipValues = append(ipValues, ip)
+			continue
+		}
+		if _, exists := rawSet[value]; exists {
+			continue
+		}
+		rawSet[value] = struct{}{}
+		rawValues = append(rawValues, value)
+	}
+
+	if len(ipValues) > 0 {
+		sort.Strings(ipValues)
+		return ipValues[0]
+	}
+	if len(rawValues) > 0 {
+		sort.Strings(rawValues)
+		return rawValues[0]
 	}
 	return ""
 }
