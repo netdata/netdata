@@ -58,3 +58,24 @@ Results:
 - Identity-split pathology is removed in office live captures (duplicate MAC/IP actors reduced to zero).
 - Topology output is deterministic across repeated refreshes.
 - Office reliability criteria for current office protocol visibility are satisfied.
+
+## Post-T5.3 Validation (2026-02-21)
+- Artifact directory: `/tmp/topology-office-20260221T203221Z-t53`
+- Stability directory: `/tmp/topology-office-stability-20260221T203349Z-t53`
+
+View summary:
+- `l2`: `status=200`, `actors=101`, `links=190`, `links_lldp=10`, `links_fdb=180`, `bidirectional=181`, `unidirectional=9`
+- `l3`: `status=200`, `actors=0`, `links=0`
+- `merged`: `status=200`, `actors=101`, `links=190`
+
+LLDP summary:
+- Bidirectional core edge present: `XS1930:8 <-> MikroTik-router:ether3`.
+- Remaining `9` LLDP edges are unidirectional due missing reciprocal remote rows on peers (for example GS1900 rem-table exposure).
+
+Stability sampling (`12` refreshes):
+- Structural hashes: `3` unique (`1 + 1 + 10` distribution).
+- Samples `3..12` converged to one stable hash with fixed counts:
+  - `actors=101`, `links=188`, `links_lldp=10`, `links_fdb=178`, `bidirectional=179`, `unidirectional=9`.
+- Interpretation:
+  - first two refreshes after restart reflected expected transient cache convergence;
+  - steady-state snapshots are stable after convergence.
