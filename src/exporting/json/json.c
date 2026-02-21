@@ -164,7 +164,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
 
         "\"id\":\"%s\","
         "\"name\":\"%s\","
-        "\"value\":" COLLECTED_NUMBER_FORMAT ","
+        "\"value\":" NETDATA_DOUBLE_FORMAT ","
 
         "\"timestamp\":%llu}",
 
@@ -180,7 +180,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         rrdset_units(st),
         rrddim_id(rd),
         rrddim_name(rd),
-        rd->collector.last_collected_value,
+        rrddim_last_collected_as_double(rd),
 
         (unsigned long long)rd->collector.last_collected_time.tv_sec);
 

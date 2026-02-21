@@ -75,7 +75,7 @@ static bool variable_lookup_in_chart(struct variable_lookup_job *vbd, RRDSET *st
                 variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_stored_value, st, "last stored value of dimension");
                 break;
             case DIM_SELECT_RAW:
-                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_value, st, "last collected value of dimension");
+                variable_lookup_add_result_with_score(vbd, rrddim_last_collected_as_double(rd), st, "last collected value of dimension");
                 break;
             case DIM_SELECT_LAST_COLLECTED:
                 variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_time.tv_sec, st, "last collected time of dimension");

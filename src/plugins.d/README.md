@@ -332,6 +332,15 @@ the template is:
 
     a space separated list of options, enclosed in quotes. The following options are currently supported: `obsolete` to mark a chart as obsolete (Netdata will hide it and delete it after some time), `store_first` to make Netdata store the first collected value, assuming there was an invisible previous value set to zero (this is used by statsd charts - if the first data collected value of incremental dimensions is not zero based, unrealistic spikes will appear with this option set) and `hidden` to perform all operations on a chart, but do not offer it on dashboards (the chart will be send to external databases). `CHART` options have been added in Netdata v1.7 and the `hidden` option was added in 1.10.
 
+    (for CHART options see above; DIMENSION-specific options are described below)
+
+#### DIMENSION options
+
+Additional option: `type=float` (default `type=int`).
+- `type=int` (default): values parsed as 64-bit integers; wrap/reset detection applies for incremental counters.
+- `type=float`: values parsed as double; incremental/delta-incremental allowed but wrap detection uses simple drop detection (no uint64 wrap math).
+  Older parents without `FLOATBASELINE` capability will truncate baselines to int when streaming/replicating.
+
 -   `plugin` and `module`
 
     both are just names that are used to let the user identify the plugin and the module that generated the chart. If `plugin` is unset or empty, Netdata will automatically set the filename of the plugin that generated the chart. `module` has not default.
@@ -897,5 +906,3 @@ There are a few rules for writing plugins properly:
 3.  If you are not sure of memory leaks, exit every one hour. Netdata will re-start your process.
 
 4.  If possible, try to autodetect if your plugin should be enabled, without any configuration.
-
-

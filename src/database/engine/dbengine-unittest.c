@@ -81,13 +81,13 @@ static inline void storage_point_check(size_t region, size_t chart, size_t dim, 
 static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number value, time_t now) {
     rd->collector.last_collected_time.tv_sec = now;
     rd->collector.last_collected_time.tv_usec = 0;
-    rd->collector.collected_value = value;
+    rrddim_set_collected_int(rd, value);
     rrddim_set_updated(rd);
 
     rd->collector.counter++;
 
     collected_number v = (value >= 0) ? value : -value;
-    if(unlikely(v > rd->collector.collected_value_max)) rd->collector.collected_value_max = v;
+    if(unlikely(v > rd->collector.collected.i.collected_value_max)) rrddim_set_collected_max_int(rd, v);
 }
 
 static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {

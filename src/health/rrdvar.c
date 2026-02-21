@@ -209,10 +209,16 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb) {
         RRDDIM *rd;
         dfe_start_read(st->rrddim_root_index, rd) {
             snprintfz(name, sizeof(name), "%s_raw", string2str(rd->id));
-            buffer_json_member_add_int64(wb, name, rd->collector.last_collected_value);
+            if(rrddim_is_float(rd))
+                buffer_json_member_add_double(wb, name, rrddim_last_collected_as_double(rd));
+            else
+                buffer_json_member_add_int64(wb, name, rd->collector.collected.i.last_collected_value);
             if(rd->name != rd->id) {
                 snprintfz(name, sizeof(name), "%s_raw", string2str(rd->name));
-                buffer_json_member_add_int64(wb, name, rd->collector.last_collected_value);
+                if(rrddim_is_float(rd))
+                    buffer_json_member_add_double(wb, name, rrddim_last_collected_as_double(rd));
+                else
+                    buffer_json_member_add_int64(wb, name, rd->collector.collected.i.last_collected_value);
             }
         }
         dfe_done(rd);
