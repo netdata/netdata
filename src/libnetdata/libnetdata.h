@@ -32,8 +32,6 @@ int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
 
 void json_escape_string(char *dst, const char *src, size_t size);
-void json_fix_string(char *s);
-
 
 extern struct rlimit rlimit_nofile;
 
