@@ -14,6 +14,8 @@
 - Docs: update consul keywords for discoverability ([#21787](https://github.com/netdata/netdata/issues/21787))
 - Regenerate integrations docs ([#21788](https://github.com/netdata/netdata/issues/21788))
 - Improve datafile deletion process ([#21781](https://github.com/netdata/netdata/issues/21781))
+- Build(deps): bump filippo.io/edwards25519 from 1.1.0 to 1.1.1 in /src/go ([#21791](https://github.com/netdata/netdata/issues/21791))
+- Improve print parsed ([#21790](https://github.com/netdata/netdata/issues/21790))
 
 ## [2.9.0] - 2026-02-16
 
