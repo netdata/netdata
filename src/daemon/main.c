@@ -154,6 +154,7 @@ int help(int exitcode) {
             "                           size of E MiB, an optional disk space limit\n"
             "                           of F MiB, G libuv workers (default 16) and exit.\n\n"
 #endif
+            "  -W prd-array-stress      Run PRD_ARRAY refcount stress test and exit.\n\n"
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W buildinfo             Print the version, the configure options,\n"
@@ -449,6 +450,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "rwlockstest") == 0) {
                             unittest_running = true;
                             return rwlocks_stress_test();
+                        }
+                        else if(strcmp(optarg, "prd-array-stress") == 0) {
+                            unittest_running = true;
+                            return prd_array_stress_test();
                         }
                         else if(strcmp(optarg, "stringtest") == 0)  {
                             unittest_running = true;

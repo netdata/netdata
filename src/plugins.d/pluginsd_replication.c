@@ -301,7 +301,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
 
     if(st->pluginsd.set) {
         // reset pos to reuse the same RDAs
-        st->pluginsd.pos = 0;
+        __atomic_store_n(&st->pluginsd.pos, 0, __ATOMIC_RELAXED);
         st->pluginsd.set = false;
     }
 

@@ -28,8 +28,23 @@ void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host) {
     spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
 
     if(host->stream.rcv.pluginsd_chart_slots.array) {
-        for (size_t s = 0; s < host->stream.rcv.pluginsd_chart_slots.size; s++)
-            rrdset_pluginsd_receive_unslot_and_cleanup(host->stream.rcv.pluginsd_chart_slots.array[s]);
+        for (size_t s = 0; s < host->stream.rcv.pluginsd_chart_slots.size; s++) {
+            RRDSET *st = host->stream.rcv.pluginsd_chart_slots.array[s];
+            if(st) {
+                // Clear collector_tid - the collector is already stopped
+                // (stream_receiver_signal_to_stop_and_wait was called before this)
+                // so it's safe to cleanup regardless of the previous collector_tid value
+                __atomic_store_n(&st->pluginsd.collector_tid, 0, __ATOMIC_RELEASE);
+
+                // Pre-clear last_slot so that rrdset_pluginsd_receive_unslot_and_cleanup
+                // won't try to re-acquire the host spinlock we already hold.
+                // We're freeing the entire host slots array below, so clearing individual
+                // slot entries is unnecessary.
+                st->pluginsd.last_slot = -1;
+
+                rrdset_pluginsd_receive_unslot_and_cleanup(st);
+            }
+        }
 
         freez(host->stream.rcv.pluginsd_chart_slots.array);
         host->stream.rcv.pluginsd_chart_slots.array = NULL;
