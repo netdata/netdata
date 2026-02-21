@@ -4,7 +4,6 @@ package mysqlfunc
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 	"sync"
@@ -498,75 +497,40 @@ LIMIT %d
 
 // scanDynamicRows scans rows dynamically based on column types
 func (f *funcTopQueries) scanDynamicRows(rows topQueriesRowScanner, cols []topQueriesColumn) ([][]any, error) {
-	data := make([][]any, 0, 500)
-
-	// Create value holders for scanning
-	valuePtrs := make([]any, len(cols))
-	values := make([]any, len(cols))
-
-	for rows.Next() {
-		// Reset value holders for each row
-		for i, col := range cols {
-			switch col.Type {
-			case funcapi.FieldTypeString:
-				var v sql.NullString
-				values[i] = &v
-			case funcapi.FieldTypeInteger:
-				var v sql.NullInt64
-				values[i] = &v
-			case funcapi.FieldTypeDuration:
-				var v sql.NullFloat64
-				values[i] = &v
-			default:
-				var v any
-				values[i] = &v
-			}
-			valuePtrs[i] = values[i]
-		}
-
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return nil, fmt.Errorf("row scan failed: %w", err)
-		}
-
-		// Convert scanned values to output format
-		row := make([]any, len(cols))
-		for i, col := range cols {
-			switch v := values[i].(type) {
-			case *sql.NullString:
-				if v.Valid {
-					s := v.String
-					// Truncate query text
-					if col.Name == "query" || col.Name == "sampleQuery" {
-						s = strmutil.TruncateText(s, topQueriesMaxTextLength)
-					}
-					row[i] = s
-				} else {
-					row[i] = ""
-				}
-			case *sql.NullInt64:
-				if v.Valid {
-					row[i] = v.Int64
-				} else {
-					row[i] = int64(0)
-				}
-			case *sql.NullFloat64:
-				if v.Valid {
-					row[i] = v.Float64
-				} else {
-					row[i] = float64(0)
-				}
-			default:
-				row[i] = nil
-			}
-		}
-		data = append(data, row)
+	specs := make([]sqlquery.ScanColumnSpec, len(cols))
+	for i, col := range cols {
+		specs[i] = topQueriesScanSpec(col)
 	}
 
+	data, err := sqlquery.ScanTypedRows(rows, specs)
+	if err != nil {
+		return nil, fmt.Errorf("row scan failed: %w", err)
+	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows iteration error: %w", err)
 	}
-
 	return data, nil
+}
+
+func topQueriesScanSpec(col topQueriesColumn) sqlquery.ScanColumnSpec {
+	spec := sqlquery.ScanColumnSpec{}
+	switch col.Type {
+	case funcapi.FieldTypeString:
+		spec.Type = sqlquery.ScanValueString
+		if col.Name == "query" || col.Name == "sampleQuery" {
+			spec.Transform = func(v any) any {
+				s, _ := v.(string)
+				return strmutil.TruncateText(s, topQueriesMaxTextLength)
+			}
+		}
+	case funcapi.FieldTypeInteger:
+		spec.Type = sqlquery.ScanValueInteger
+	case funcapi.FieldTypeDuration:
+		spec.Type = sqlquery.ScanValueFloat
+	default:
+		spec.Type = sqlquery.ScanValueDiscard
+	}
+	return spec
 }
 
 func (f *funcTopQueries) buildSortParam(cols []topQueriesColumn) funcapi.ParamConfig {
