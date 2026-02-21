@@ -42,6 +42,7 @@ const (
 	defaultSummaryFile        = "parity-summary.json"
 	defaultPhase2ReportFile   = "phase2-parity-report.json"
 	defaultPhase2GapFile      = "phase2-gap-report.md"
+	defaultOfficeReportFile   = "office-live-reliability-report.md"
 	defaultOracleDiffJSONFile = "behavior-oracle-diff.json"
 	defaultOracleDiffMDFile   = "behavior-oracle-diff.md"
 )
@@ -1081,14 +1082,7 @@ func runPhase2(opts options) error {
 		ReversePairQuality:   reversePairQuality,
 		IdentityMergeQuality: identityMergeQuality,
 		AssertionCoverage:    assertionCoverage,
-		DeferredGaps: []phase2DeferredGap{
-			{
-				ID:          "gap-live-office-validation",
-				Description: "Live office `topology:snmp` sanity validation is still pending.",
-				Reason:      "Repository test fixtures do not include the live office runtime environment.",
-				Evidence:    "TODO-topology-library-phase2-direct-port.md G3 runtime gate",
-			},
-		},
+		DeferredGaps:         deferredOfficeGaps(opts.evidencePath),
 	}
 
 	if !overallPass {
@@ -1398,6 +1392,22 @@ func readMappingStatusByAssertion(path string) (map[string]string, error) {
 	return out, nil
 }
 
+func deferredOfficeGaps(evidenceDir string) []phase2DeferredGap {
+	officeReportPath := filepath.Join(evidenceDir, defaultOfficeReportFile)
+	if _, err := os.Stat(officeReportPath); err == nil {
+		return []phase2DeferredGap{}
+	}
+
+	return []phase2DeferredGap{
+		{
+			ID:          "gap-live-office-validation",
+			Description: "Live office `topology:snmp` sanity validation is still pending.",
+			Reason:      "Repository test fixtures do not include the live office runtime environment.",
+			Evidence:    "TODO-topology-library-phase2-direct-port.md Track 3/T4 runtime gate",
+		},
+	}
+}
+
 func buildPhase2GapReportMarkdown(report phase2Report) string {
 	var b strings.Builder
 	b.WriteString("# Topology Library Phase 2 Gap Report\n\n")
@@ -1428,10 +1438,14 @@ func buildPhase2GapReportMarkdown(report phase2Report) string {
 		report.IdentityMergeQuality.Status))
 
 	b.WriteString("## Intentionally Deferred Gaps\n\n")
-	for _, gap := range report.DeferredGaps {
-		b.WriteString(fmt.Sprintf("- `%s`: %s\n", gap.ID, gap.Description))
-		b.WriteString(fmt.Sprintf("  - Reason: %s\n", gap.Reason))
-		b.WriteString(fmt.Sprintf("  - Evidence: %s\n", gap.Evidence))
+	if len(report.DeferredGaps) == 0 {
+		b.WriteString("- none\n")
+	} else {
+		for _, gap := range report.DeferredGaps {
+			b.WriteString(fmt.Sprintf("- `%s`: %s\n", gap.ID, gap.Description))
+			b.WriteString(fmt.Sprintf("  - Reason: %s\n", gap.Reason))
+			b.WriteString(fmt.Sprintf("  - Evidence: %s\n", gap.Evidence))
+		}
 	}
 	b.WriteString("\n")
 
