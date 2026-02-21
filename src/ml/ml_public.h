@@ -9,7 +9,7 @@ extern "C" {
 
 #include "database/rrd.h"
 #include "web/api/queries/rrdr.h"
-#include "database/sqlite/vendored/sqlite3.h"
+#include "sqlite3.h"
 
 bool ml_capable();
 bool ml_enabled(RRDHOST *rh);
