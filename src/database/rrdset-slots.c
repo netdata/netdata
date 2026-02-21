@@ -58,6 +58,19 @@ static void prd_array_release_entries(PRD_ARRAY *arr) {
     }
 }
 
+static inline void rrdset_clear_host_chart_slot_mapping(RRDSET *st, int32_t last_slot) {
+    if(last_slot < 0)
+        return;
+
+    RRDHOST *host = st->rrdhost;
+    spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
+    if((uint32_t)last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
+        host->stream.rcv.pluginsd_chart_slots.array[last_slot] == st) {
+        host->stream.rcv.pluginsd_chart_slots.array[last_slot] = NULL;
+    }
+    spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // Unslot a chart - releases dimension references but keeps the array for reuse
 // This is called when switching charts, marking them obsolete, or during cleanup.
@@ -75,50 +88,33 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
 
     // Check collector_tid inside spinlock
     pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
-    if(collector_tid != 0 && collector_tid != gettid_cached()) {
+    bool we_are_collector = (collector_tid == gettid_cached());
+    bool different_collector_active = (collector_tid != 0 && !we_are_collector);
+
+    int32_t last_slot = st->pluginsd.last_slot;
+    st->pluginsd.last_slot = -1;
+    st->pluginsd.dims_with_slots = false;
+
+    if(different_collector_active) {
         // Another thread is the active collector - we cannot safely touch the array.
-        // Just clear the slot mapping and bail out.
+        // Clear only the slot mapping and bail out.
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
                      "PLUGINSD: rrdset_pluginsd_receive_unslot called while collector (tid %d) is active, skipping",
                      collector_tid);
 
-        int32_t last_slot = st->pluginsd.last_slot;
-        st->pluginsd.last_slot = -1;
-        st->pluginsd.dims_with_slots = false;
-
         spinlock_unlock(&st->pluginsd.spinlock);
-
-        RRDHOST *host = st->rrdhost;
-        if(last_slot >= 0) {
-            spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
-            if((uint32_t)last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
-                host->stream.rcv.pluginsd_chart_slots.array[last_slot] == st) {
-                host->stream.rcv.pluginsd_chart_slots.array[last_slot] = NULL;
-            }
-            spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
-        }
-
+        rrdset_clear_host_chart_slot_mapping(st, last_slot);
         return;
     }
 
     // Either collector_tid == 0 (collector stopped) or collector_tid == our tid
     // (we ARE the collector). In both cases, it's safe to release dimension references.
+    PRD_ARRAY *arr = we_are_collector ?
+            prd_array_get_unsafe(&st->pluginsd.prd_array) :
+            prd_array_acquire_locked(&st->pluginsd.prd_array);
 
-    // When we are the collector (collector_tid == our tid), the array is protected by
-    // our collector_tid - no cleanup thread will touch it. Use get_unsafe directly.
-    // When collector is stopped (collector_tid == 0), acquire a reference to prevent
-    // races with other cleanup threads.
-    PRD_ARRAY *arr;
-    bool we_are_collector = (collector_tid == gettid_cached());
-
-    if(we_are_collector) {
-        arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
-        spinlock_unlock(&st->pluginsd.spinlock);
-    } else {
-        arr = prd_array_acquire_locked(&st->pluginsd.prd_array);
-        spinlock_unlock(&st->pluginsd.spinlock);
-    }
+    spinlock_unlock(&st->pluginsd.spinlock);
 
     if (arr) {
         if(!we_are_collector) {
@@ -138,18 +134,7 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
         }
     }
 
-    RRDHOST *host = st->rrdhost;
-
-    spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
-    if(st->pluginsd.last_slot >= 0 &&
-        (uint32_t)st->pluginsd.last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
-        host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] == st) {
-        host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] = NULL;
-    }
-    spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
-
-    st->pluginsd.last_slot = -1;
-    st->pluginsd.dims_with_slots = false;
+    rrdset_clear_host_chart_slot_mapping(st, last_slot);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -197,14 +182,7 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     spinlock_unlock(&st->pluginsd.spinlock);
 
     // Clear the chart slot mapping using the captured last_slot value
-    if(last_slot >= 0) {
-        spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
-        if((uint32_t)last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
-            host->stream.rcv.pluginsd_chart_slots.array[last_slot] == st) {
-            host->stream.rcv.pluginsd_chart_slots.array[last_slot] = NULL;
-        }
-        spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
-    }
+    rrdset_clear_host_chart_slot_mapping(st, last_slot);
 
     // Now handle the old array outside the lock
     if (old_arr) {
