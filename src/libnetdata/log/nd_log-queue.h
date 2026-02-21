@@ -98,4 +98,10 @@ void nd_log_queue_flush(void);
 // This is handled entirely in the logger thread, avoiding FILE* races
 void nd_log_queue_reopen(void);
 
+// Reset queue state after fork() in child process.
+// The logger thread doesn't exist in the child; this prevents
+// use of stale libuv handles. Does not free resources (they
+// belong to the parent's address space copy).
+void nd_log_queue_disown_after_fork(void);
+
 #endif // NETDATA_ND_LOG_QUEUE_H

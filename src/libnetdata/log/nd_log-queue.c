@@ -134,6 +134,10 @@ static inline void entry_free_allocated(struct nd_log_queue_entry *entry) {
 
 // ----------------------------------------------------------------------------
 // Internal: Write a single entry to its destination
+//
+// THREAD SAFETY: nd_log.sources[].fp is only modified by this thread (via
+// do_reopen_log_files/ND_LOG_OP_REOPEN) or during startup before this thread
+// exists. No lock is needed for the fp lookup here.
 
 static void write_entry(struct nd_log_queue_entry *entry) {
     if (!entry || entry->message_len == 0)
@@ -148,10 +152,10 @@ static void write_entry(struct nd_log_queue_entry *entry) {
     const char *message = entry_message(entry);
 
     switch (entry->method) {
-        case NDLM_FILE:
-        case NDLM_STDOUT:
-        case NDLM_STDERR: {
-            // Lookup FILE* at write time to handle log rotation correctly
+        case NDLM_FILE: {
+            // select_output() remaps NDLM_STDOUT/NDLM_STDERR to NDLM_FILE before
+            // the async path, so only NDLM_FILE arrives here for file-based output.
+            // Lookup FILE* at write time to handle log rotation correctly.
             FILE *fp = nd_log.sources[entry->source].fp;
             if (fp) {
                 fprintf(fp, "%s\n", message);
@@ -481,6 +485,17 @@ void nd_log_queue_flush(void) {
     }
 
     completion_destroy(&flush_complete);
+}
+
+void nd_log_queue_disown_after_fork(void) {
+    // After fork(), the logger thread does not exist in the child.
+    // Mark the queue as shut down so nd_log_queue_enabled() returns false.
+    // Do NOT call uv_close/uv_loop_close or free memory - the handles
+    // are stale copies and the parent process owns the real resources.
+    // Plain stores are safe here - we're single-threaded right after fork.
+    log_ev.initialized = false;
+    log_ev.shutdown_requested = true;
+    log_ev.thread = NULL;
 }
 
 void nd_log_queue_reopen(void) {

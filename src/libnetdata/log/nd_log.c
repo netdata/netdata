@@ -226,13 +226,10 @@ cleanup:
 }
 
 // Async logging - formats message and enqueues for background writing
-static bool nd_logger_log_fields_async(FILE *fp __maybe_unused, bool limit, ND_LOG_FIELD_PRIORITY priority,
+// Note: rate limiting must be checked by the caller before invoking this function
+static bool nd_logger_log_fields_async(FILE *fp __maybe_unused, ND_LOG_FIELD_PRIORITY priority,
                                        ND_LOG_METHOD output, struct nd_log_source *source,
                                        struct log_field *fields, size_t fields_max) {
-    // Check limits without holding spinlock - slightly racy but acceptable for logging
-    if(limit && nd_log_limit_reached(source))
-        return true;  // Rate limited, but successfully "handled"
-
     // Pre-format the message into a queue entry (no locks held)
     // Note: FILE* is looked up at write time from nd_log.sources[source] to handle log rotation
     struct nd_log_queue_entry entry = {
@@ -326,15 +323,26 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
             // SYSLOG is safe because write_entry() handles the fallback internally.
             bool use_async = !is_using_fallback_output(output, fp, source);
 
-            if(use_async && nd_logger_log_fields_async(fp, limit, priority, output, source, fields, fields_max))
-                return;  // Successfully queued
-            // Fall through to sync if queue failed (full) or fallback detected
+            if(use_async) {
+                // Check rate limits once here, before attempting async.
+                // This avoids double-counting if async fails and we fall through to sync.
+                if(limit && nd_log_limit_reached(source))
+                    return;
+
+                if(nd_logger_log_fields_async(fp, priority, output, source, fields, fields_max))
+                    return;  // Successfully queued
+
+                // Async enqueue failed (queue full) - fall through to sync with limit=false
+                // since we already checked limits above
+                nd_logger_log_fields_sync(spinlock, fp, false, priority, output, source, fields, fields_max);
+                return;
+            }
         }
         // Journal and Windows event log still use sync path for now
         // They require special handling that's harder to serialize
     }
 
-    // Fallback to synchronous logging
+    // Synchronous logging (no async attempted, or async not applicable)
     nd_logger_log_fields_sync(spinlock, fp, limit, priority, output, source, fields, fields_max);
 }
 
