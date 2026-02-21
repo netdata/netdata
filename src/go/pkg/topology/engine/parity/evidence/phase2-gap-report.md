@@ -1,6 +1,6 @@
 # Topology Library Phase 2 Gap Report
 
-- Generated at (UTC): `2026-02-21T02:54:16Z`
+- Generated at (UTC): `2026-02-21T03:05:05Z`
 - Overall status: `pass`
 - Scenario parity: `46/46` passed
 - Assertion parity: `3067/3067` mapped
@@ -20,9 +20,7 @@
 
 ## Intentionally Deferred Gaps
 
-- `gap-live-office-validation`: Live office `topology:snmp` sanity validation is still pending.
-  - Reason: Repository test fixtures do not include the live office runtime environment.
-  - Evidence: TODO-topology-library-phase2-direct-port.md G3 runtime gate
+- none
 
 ## Command Evidence
 
