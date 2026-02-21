@@ -763,16 +763,28 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
 
     bool proxy_used = (request->proxy_host != NULL);
 
+    // extract protocol prefix from proxy URL for logging
+    const char *proxy_proto = "";
+    char proto_buf[16];
+    if (proxy_used && request->proxy) {
+        const char *sep = strstr(request->proxy, "://");
+        if (sep) {
+            size_t len = (size_t)(sep - request->proxy) + 3;
+            if (len < sizeof(proto_buf)) {
+                memcpy(proto_buf, request->proxy, len);
+                proto_buf[len] = '\0';
+                proxy_proto = proto_buf;
+            }
+        }
+    }
+
     // assume no proxy
     const char *connect_host;
     int connect_port;
-    const char *proxy_used_str = " (no proxy)";
-
 
     if (unlikely(proxy_used)) {
         connect_host = request->proxy_host;
         connect_port = request->proxy_port;
-        proxy_used_str = request->proxy;
     } else {
         connect_host = request->host;
         connect_port = request->port;
@@ -790,9 +802,14 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
 
     snprintfz(connect_port_str, PORT_STR_MAX_BYTES, "%d", connect_port);
 
-    nd_log_daemon(NDLP_INFO, "ACLK: Connecting to %s:%d%s%s",
-                  request->host, request->port,
-                  proxy_used ? " via proxy " : "", proxy_used_str);
+    if (proxy_used)
+        nd_log_daemon(NDLP_INFO, "ACLK: connecting to %s:%d via proxy %s%s:%d%s",
+                      request->host, request->port,
+                      proxy_proto, request->proxy_host, request->proxy_port,
+                      request->proxy_username ? " (with credentials)" : " (without credentials)");
+    else
+        nd_log_daemon(NDLP_INFO, "ACLK: connecting to %s:%d (no proxy)",
+                      request->host, request->port);
 
     struct timeval timeout = { .tv_sec = 10, .tv_usec = 0 };
     ctx->sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, connect_host, 0, connect_port_str, &timeout, fallback_ipv4);
@@ -823,13 +840,18 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
         ctx->request = &req;
         rc = handle_http_request(ctx);
         if (rc != HTTPS_CLIENT_RESP_OK) {
-            netdata_log_error("ACLK: failed to CONNECT with proxy");
+            netdata_log_error("ACLK: failed to CONNECT via proxy %s%s:%d to %s:%d",
+                              proxy_proto, request->proxy_host, request->proxy_port,
+                              request->host, request->port);
             http_parse_ctx_destroy(&ctx->parse_ctx);
             goto exit_sock;
         }
         if (ctx->parse_ctx.http_code != 200) {
             rc = HTTPS_CLIENT_RESP_PROXY_NOT_200;
-            netdata_log_error("ACLK: proxy didn't return 200 OK (got %d)", ctx->parse_ctx.http_code);
+            netdata_log_error("ACLK: proxy %s%s:%d returned HTTP %d (expected 200) for CONNECT to %s:%d",
+                              proxy_proto, request->proxy_host, request->proxy_port,
+                              ctx->parse_ctx.http_code,
+                              request->host, request->port);
             http_parse_ctx_destroy(&ctx->parse_ctx);
             goto exit_sock;
         }

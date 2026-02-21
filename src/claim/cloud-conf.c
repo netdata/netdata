@@ -16,6 +16,9 @@ void cloud_config_url_set(const char *url) {
         inicfg_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", url);
 }
 
+static const char *cloud_config_proxy_source = NULL;
+static bool cloud_config_proxy_explicitly_set = false;
+
 const char *cloud_config_proxy_get(void) {
     // load cloud.conf or internal default
     const char *proxy = inicfg_get(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", "env");
@@ -28,13 +31,24 @@ const char *cloud_config_proxy_get(void) {
 
         // update cloud.conf
         proxy = inicfg_set(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy", proxy);
+        cloud_config_proxy_source = "netdata.conf [cloud]";
+        cloud_config_proxy_explicitly_set = true;
     }
     else {
         // set in netdata.conf the proxy of cloud.conf
         inicfg_set(&netdata_config, CONFIG_SECTION_CLOUD, "proxy", proxy);
+        cloud_config_proxy_source = "cloud.conf";
     }
 
     return proxy;
+}
+
+const char *cloud_config_proxy_source_get(void) {
+    return cloud_config_proxy_source;
+}
+
+bool cloud_config_proxy_is_explicitly_set(void) {
+    return cloud_config_proxy_explicitly_set;
 }
 
 bool cloud_config_insecure_get(void) {
@@ -69,6 +83,9 @@ void cloud_conf_load(int silent) {
     inicfg_move(&cloud_config,
                    CONFIG_SECTION_GLOBAL, "cloud base url",
                    CONFIG_SECTION_GLOBAL, "url");
+
+    // check if proxy was explicitly set in cloud.conf before defaults overwrite it
+    cloud_config_proxy_explicitly_set = inicfg_exists(&cloud_config, CONFIG_SECTION_GLOBAL, "proxy");
 
     cloud_conf_load_defaults();
 }
