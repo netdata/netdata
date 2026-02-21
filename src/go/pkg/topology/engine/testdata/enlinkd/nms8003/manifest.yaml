@@ -1,0 +1,38 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms8003
+scenarios:
+  - id: nms8003_lldp
+    description: >-
+      Enlinkd NMS-8003 LLDP parity seed scenario from OpenNMS integration test
+      corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: nmmr1
+        hostname: NMM-R1.informatik.hs-fulda.de
+        address: 192.168.3.1
+        walk_file: fixtures/NMM-R1.snmpwalk.txt
+      - device_id: nmmr2
+        hostname: NMM-R2.informatik.hs-fulda.de
+        address: 192.168.23.8
+        walk_file: fixtures/NMM-R2.snmpwalk.txt
+      - device_id: nmmr3
+        hostname: NMM-R3.informatik.hs-fulda.de
+        address: 192.168.3.2
+        walk_file: fixtures/NMM-R3.snmpwalk.txt
+      - device_id: nmmsw1
+        hostname: NMM-SW1.informatik.hs-fulda.de
+        address: 192.168.23.10
+        walk_file: fixtures/NMM-SW1.snmpwalk.txt
+      - device_id: nmmsw2
+        hostname: NMM-SW2.informatik.hs-fulda.de
+        address: 192.168.42.10
+        walk_file: fixtures/NMM-SW2.snmpwalk.txt
+    golden_yaml: golden/nms8003_lldp.yaml
+    golden_json: golden/nms8003_lldp.json

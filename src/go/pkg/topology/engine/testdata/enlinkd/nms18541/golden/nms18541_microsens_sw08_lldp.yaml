@@ -1,0 +1,32 @@
+version: v1
+scenario_id: nms18541_microsens_sw08_lldp
+description: Enlinkd NMS-18541 single-device LLDP parity slice for SW_D6_08_M.
+devices:
+    - id: SW_D6_08_M
+      hostname: SW_D6_08_M
+    - id: e0281l-scalbenga2-qfx
+      hostname: E0281L-ScALBENGA2-QFX
+    - id: i0506-su-tlc01
+      hostname: I0506-SU-TLC01
+    - id: i0506-su-tlc02
+      hostname: I0506-SU-TLC02
+adjacencies:
+    - protocol: lldp
+      source_device: SW_D6_08_M
+      source_port: "0"
+      target_device: e0281l-scalbenga2-qfx
+      target_port: ge-0/0/15
+    - protocol: lldp
+      source_device: SW_D6_08_M
+      source_port: "0"
+      target_device: i0506-su-tlc01
+      target_port: e8:27:25:07:96:63
+    - protocol: lldp
+      source_device: SW_D6_08_M
+      source_port: "0"
+      target_device: i0506-su-tlc02
+      target_port: e8:27:25:07:83:27
+expectations:
+    directional_adjacencies: 3
+    bidirectional_pairs: 0
+    devices: 4

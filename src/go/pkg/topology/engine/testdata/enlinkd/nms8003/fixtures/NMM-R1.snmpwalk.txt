@@ -1,0 +1,122 @@
+.1.0.8802.1.1.2.1.3.1.0 = INTEGER: 4
+.1.0.8802.1.1.2.1.3.2.0 = Hex-STRING: 2C 54 2D 33 7C 10 
+.1.0.8802.1.1.2.1.3.3.0 = STRING: "NMM-R1.informatik.hs-fulda.de"
+.1.0.8802.1.1.2.1.3.4.0 = STRING: "Cisco IOS Software, C2900 Software (C2900-UNIVERSALK9-M), Version 15.3(3)M2, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+Compiled Thu 30-Jan-14 00:50 by prod_rel_team"
+.1.0.8802.1.1.2.1.3.5.0 = Hex-STRING: 28 00 
+.1.0.8802.1.1.2.1.3.6.0 = Hex-STRING: 08 00 
+.1.0.8802.1.1.2.1.3.7.1.2.7 = INTEGER: 5
+.1.0.8802.1.1.2.1.3.7.1.2.8 = INTEGER: 5
+.1.0.8802.1.1.2.1.3.7.1.2.9 = INTEGER: 5
+.1.0.8802.1.1.2.1.3.7.1.2.10 = INTEGER: 5
+.1.0.8802.1.1.2.1.3.7.1.2.11 = INTEGER: 5
+.1.0.8802.1.1.2.1.3.7.1.3.7 = STRING: "Em0/0"
+.1.0.8802.1.1.2.1.3.7.1.3.8 = STRING: "Gi0/0"
+.1.0.8802.1.1.2.1.3.7.1.3.9 = STRING: "Gi0/1"
+.1.0.8802.1.1.2.1.3.7.1.3.10 = STRING: "Gi0/2"
+.1.0.8802.1.1.2.1.3.7.1.3.11 = STRING: "Gi0/3"
+.1.0.8802.1.1.2.1.3.7.1.4.7 = STRING: "Embedded-Service-Engine0/0"
+.1.0.8802.1.1.2.1.3.7.1.4.8 = STRING: "GigabitEthernet0/0"
+.1.0.8802.1.1.2.1.3.7.1.4.9 = STRING: "GigabitEthernet0/1"
+.1.0.8802.1.1.2.1.3.7.1.4.10 = STRING: "GigabitEthernet0/2"
+.1.0.8802.1.1.2.1.3.7.1.4.11 = STRING: "GigabitEthernet0/3"
+.1.0.8802.1.1.2.1.3.8.1.3.1.4.192.168.3.1 = INTEGER: 5
+.1.0.8802.1.1.2.1.3.8.1.3.1.4.192.168.23.9 = INTEGER: 5
+.1.0.8802.1.1.2.1.3.8.1.3.1.4.192.168.42.8 = INTEGER: 5
+.1.0.8802.1.1.2.1.3.8.1.4.1.4.192.168.3.1 = INTEGER: 2
+.1.0.8802.1.1.2.1.3.8.1.4.1.4.192.168.23.9 = INTEGER: 2
+.1.0.8802.1.1.2.1.3.8.1.4.1.4.192.168.42.8 = INTEGER: 2
+.1.0.8802.1.1.2.1.3.8.1.5.1.4.192.168.3.1 = INTEGER: 8
+.1.0.8802.1.1.2.1.3.8.1.5.1.4.192.168.23.9 = INTEGER: 9
+.1.0.8802.1.1.2.1.3.8.1.5.1.4.192.168.42.8 = INTEGER: 10
+.1.0.8802.1.1.2.1.4.1.1.4.0.8.3 = INTEGER: 4
+.1.0.8802.1.1.2.1.4.1.1.4.0.9.1 = INTEGER: 4
+.1.0.8802.1.1.2.1.4.1.1.4.0.10.2 = INTEGER: 4
+.1.0.8802.1.1.2.1.4.1.1.5.0.8.3 = STRING: ",T-3xP"
+.1.0.8802.1.1.2.1.4.1.1.5.0.9.1 = Hex-STRING: A4 18 75 0A CE 00 
+.1.0.8802.1.1.2.1.4.1.1.5.0.10.2 = Hex-STRING: F4 EA 67 6A 13 80 
+.1.0.8802.1.1.2.1.4.1.1.6.0.8.3 = INTEGER: 5
+.1.0.8802.1.1.2.1.4.1.1.6.0.9.1 = INTEGER: 5
+.1.0.8802.1.1.2.1.4.1.1.6.0.10.2 = INTEGER: 5
+.1.0.8802.1.1.2.1.4.1.1.7.0.8.3 = STRING: "Gi0/1"
+.1.0.8802.1.1.2.1.4.1.1.7.0.9.1 = STRING: "Fa0/1"
+.1.0.8802.1.1.2.1.4.1.1.7.0.10.2 = STRING: "Fa0/2"
+.1.0.8802.1.1.2.1.4.1.1.8.0.8.3 = STRING: "GigabitEthernet0/1"
+.1.0.8802.1.1.2.1.4.1.1.8.0.9.1 = STRING: "FastEthernet0/1"
+.1.0.8802.1.1.2.1.4.1.1.8.0.10.2 = STRING: "FastEthernet0/2"
+.1.0.8802.1.1.2.1.4.1.1.9.0.8.3 = STRING: "NMM-R3.informatik.hs-fulda.de"
+.1.0.8802.1.1.2.1.4.1.1.9.0.9.1 = STRING: "NMM-SW1.informatik.hs-fulda.de"
+.1.0.8802.1.1.2.1.4.1.1.9.0.10.2 = STRING: "NMM-SW2.informatik.hs-fulda.de"
+.1.0.8802.1.1.2.1.4.1.1.10.0.8.3 = STRING: "Cisco IOS Software, C2900 Software (C2900-UNIVERSALK9-M), Version 15.3(3)M2, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2014 by Cisco Systems, Inc.
+Compiled Thu 30-Jan-14 00:50 by prod_rel_team"
+.1.0.8802.1.1.2.1.4.1.1.10.0.9.1 = STRING: "Cisco IOS Software, C2960 Software (C2960-LANBASEK9-M), Version 15.0(2)SE5, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2013 by Cisco Systems, Inc.
+Compiled Fri 25-Oct-13 13:34 by prod_rel_team"
+.1.0.8802.1.1.2.1.4.1.1.10.0.10.2 = STRING: "Cisco IOS Software, C2960 Software (C2960-LANBASEK9-M), Version 15.0(2)SE5, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2013 by Cisco Systems, Inc.
+Compiled Fri 25-Oct-13 13:34 by prod_rel_team"
+.1.0.8802.1.1.2.1.4.1.1.11.0.8.3 = Hex-STRING: 28 00 
+.1.0.8802.1.1.2.1.4.1.1.11.0.9.1 = Hex-STRING: 20 00 
+.1.0.8802.1.1.2.1.4.1.1.11.0.10.2 = Hex-STRING: 20 00 
+.1.0.8802.1.1.2.1.4.1.1.12.0.8.3 = Hex-STRING: 08 00 
+.1.0.8802.1.1.2.1.4.1.1.12.0.9.1 = Hex-STRING: 20 00 
+.1.0.8802.1.1.2.1.4.1.1.12.0.10.2 = Hex-STRING: 20 00 
+.1.0.8802.1.1.2.1.4.2.1.3.0.8.3.1.4.192.168.3.2 = INTEGER: 2
+.1.0.8802.1.1.2.1.4.2.1.3.0.9.1.1.4.192.168.23.10 = INTEGER: 3
+.1.0.8802.1.1.2.1.4.2.1.3.0.10.2.1.4.192.168.42.10 = INTEGER: 3
+.1.0.8802.1.1.2.1.4.2.1.4.0.8.3.1.4.192.168.3.2 = INTEGER: 3
+.1.0.8802.1.1.2.1.4.2.1.4.0.9.1.1.4.192.168.23.10 = INTEGER: 1
+.1.0.8802.1.1.2.1.4.2.1.4.0.10.2.1.4.192.168.42.10 = INTEGER: 1
+.1.0.8802.1.1.2.1.4.2.1.5.0.8.3.1.4.192.168.3.2 = OID: .0.0
+.1.0.8802.1.1.2.1.4.2.1.5.0.9.1.1.4.192.168.23.10 = OID: .0.0
+.1.0.8802.1.1.2.1.4.2.1.5.0.10.2.1.4.192.168.42.10 = OID: .0.0
+.1.3.6.1.2.1.1.2.0 = OID: .1.3.6.1.4.1.9.1.1045
+.1.3.6.1.2.1.1.5.0 = STRING: NMM-R1.informatik.hs-fulda.de
+.1.3.6.1.2.1.2.2.1.2.1 = STRING: BRI0/2/0
+.1.3.6.1.2.1.2.2.1.2.4 = STRING: BRI0/2/1
+.1.3.6.1.2.1.2.2.1.2.7 = STRING: Embedded-Service-Engine0/0
+.1.3.6.1.2.1.2.2.1.2.8 = STRING: GigabitEthernet0/0
+.1.3.6.1.2.1.2.2.1.2.9 = STRING: GigabitEthernet0/1
+.1.3.6.1.2.1.2.2.1.2.10 = STRING: GigabitEthernet0/2
+.1.3.6.1.2.1.2.2.1.2.11 = STRING: GigabitEthernet0/3
+.1.3.6.1.2.1.2.2.1.2.12 = STRING: Serial0/0/0
+.1.3.6.1.2.1.2.2.1.2.13 = STRING: Serial0/0/1
+.1.3.6.1.2.1.2.2.1.2.14 = STRING: Serial0/1/0
+.1.3.6.1.2.1.2.2.1.2.15 = STRING: Serial0/1/1
+.1.3.6.1.2.1.2.2.1.2.16 = STRING: VoIP-Null0
+.1.3.6.1.2.1.2.2.1.2.17 = STRING: Null0
+.1.3.6.1.2.1.2.2.1.2.22 = STRING: BRI0/2/0-Physical
+.1.3.6.1.2.1.2.2.1.2.23 = STRING: BRI0/2/0-Signaling
+.1.3.6.1.2.1.2.2.1.2.24 = STRING: BRI0/2/0:1-Bearer Channel
+.1.3.6.1.2.1.2.2.1.2.25 = STRING: BRI0/2/0:2-Bearer Channel
+.1.3.6.1.2.1.2.2.1.2.26 = STRING: BRI0/2/1-Physical
+.1.3.6.1.2.1.2.2.1.2.27 = STRING: BRI0/2/1-Signaling
+.1.3.6.1.2.1.2.2.1.2.28 = STRING: BRI0/2/1:1-Bearer Channel
+.1.3.6.1.2.1.2.2.1.2.29 = STRING: BRI0/2/1:2-Bearer Channel
+.1.3.6.1.2.1.31.1.1.1.1.1 = STRING: BR0/2/0
+.1.3.6.1.2.1.31.1.1.1.1.4 = STRING: BR0/2/1
+.1.3.6.1.2.1.31.1.1.1.1.7 = STRING: Em0/0
+.1.3.6.1.2.1.31.1.1.1.1.8 = STRING: Gi0/0
+.1.3.6.1.2.1.31.1.1.1.1.9 = STRING: Gi0/1
+.1.3.6.1.2.1.31.1.1.1.1.10 = STRING: Gi0/2
+.1.3.6.1.2.1.31.1.1.1.1.11 = STRING: Gi0/3
+.1.3.6.1.2.1.31.1.1.1.1.12 = STRING: Se0/0/0
+.1.3.6.1.2.1.31.1.1.1.1.13 = STRING: Se0/0/1
+.1.3.6.1.2.1.31.1.1.1.1.14 = STRING: Se0/1/0
+.1.3.6.1.2.1.31.1.1.1.1.15 = STRING: Se0/1/1
+.1.3.6.1.2.1.31.1.1.1.1.16 = STRING: Vo0
+.1.3.6.1.2.1.31.1.1.1.1.17 = STRING: Nu0
+.1.3.6.1.2.1.31.1.1.1.1.22 = STRING: BR0/2/0
+.1.3.6.1.2.1.31.1.1.1.1.23 = STRING: BR0/2/0
+.1.3.6.1.2.1.31.1.1.1.1.24 = STRING: BR0/2/0:1
+.1.3.6.1.2.1.31.1.1.1.1.25 = STRING: BR0/2/0:2
+.1.3.6.1.2.1.31.1.1.1.1.26 = STRING: BR0/2/1
+.1.3.6.1.2.1.31.1.1.1.1.27 = STRING: BR0/2/1
+.1.3.6.1.2.1.31.1.1.1.1.28 = STRING: BR0/2/1:1
+.1.3.6.1.2.1.31.1.1.1.1.29 = STRING: BR0/2/1:2

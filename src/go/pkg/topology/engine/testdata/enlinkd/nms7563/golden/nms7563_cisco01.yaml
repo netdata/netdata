@@ -1,0 +1,18 @@
+version: v1
+scenario_id: nms7563_cisco01
+description: Enlinkd NMS-7563 Cisco01 mixed LLDP/CDP parity scenario from OpenNMS integration test corpus.
+devices:
+    - id: cisco01
+      hostname: cisco01
+    - id: procurve switch 2510b-24
+      hostname: ProCurve Switch 2510B-24
+adjacencies:
+    - protocol: lldp
+      source_device: cisco01
+      source_port: Fa0/8
+      target_device: procurve switch 2510b-24
+      target_port: "24"
+expectations:
+    directional_adjacencies: 1
+    bidirectional_pairs: 0
+    devices: 2

@@ -1,0 +1,11 @@
+version: v1
+scenario_id: nms7918_ospess01_arp
+description: Enlinkd NMS-7918 ARP/ND parity slice for OSPESS01 collection.
+devices:
+    - id: ospess01
+      hostname: osp.ess01
+adjacencies: []
+expectations:
+    directional_adjacencies: 0
+    bidirectional_pairs: 0
+    devices: 1

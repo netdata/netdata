@@ -1,0 +1,95 @@
+{
+  "version": "v1",
+  "scenario_id": "nms18541_microsens_sw09_lldp",
+  "description": "Enlinkd NMS-18541 single-device LLDP parity slice for SW_D6_09_M.",
+  "devices": [
+    {
+      "id": "SW_D6_09_M",
+      "hostname": "SW_D6_09_M"
+    },
+    {
+      "id": "axis camera",
+      "hostname": "Axis Camera"
+    },
+    {
+      "id": "axis-accc8e536f3c",
+      "hostname": "axis-accc8e536f3c"
+    },
+    {
+      "id": "axis-accc8e53f5fb",
+      "hostname": "axis-accc8e53f5fb"
+    },
+    {
+      "id": "axis-accc8eaaeb7f",
+      "hostname": "axis-accc8eaaeb7f"
+    },
+    {
+      "id": "axis-accc8ef9c09e",
+      "hostname": "axis-accc8ef9c09e"
+    },
+    {
+      "id": "axis-accc8ef9c0a3",
+      "hostname": "axis-accc8ef9c0a3"
+    },
+    {
+      "id": "e0281l-scalbenga2-qfx",
+      "hostname": "E0281L-ScALBENGA2-QFX"
+    }
+  ],
+  "adjacencies": [
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "1/1",
+      "target_device": "axis-accc8ef9c0a3",
+      "target_port": "ac:cc:8e:f9:c0:a3"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "2/1",
+      "target_device": "axis-accc8e53f5fb",
+      "target_port": "ac:cc:8e:53:f5:fb"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "2/2",
+      "target_device": "axis-accc8e536f3c",
+      "target_port": "ac:cc:8e:53:6f:3c"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "2/6",
+      "target_device": "axis-accc8eaaeb7f",
+      "target_port": "ac:cc:8e:aa:eb:7f"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "3/1",
+      "target_device": "axis-accc8ef9c09e",
+      "target_port": "ac:cc:8e:f9:c0:9e"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "3/2",
+      "target_device": "axis camera",
+      "target_port": "eth0"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "3/5",
+      "target_device": "e0281l-scalbenga2-qfx",
+      "target_port": "ge-0/0/16"
+    }
+  ],
+  "expectations": {
+    "directional_adjacencies": 7,
+    "bidirectional_pairs": 0,
+    "devices": 8
+  }
+}

@@ -1,0 +1,431 @@
+{
+  "version": "v1",
+  "fixture_scenarios": 28,
+  "fixture_files": 252,
+  "total_scenarios": 46,
+  "scenarios_passed": 46,
+  "scenarios_failed": 0,
+  "total_tests_mapped": 195,
+  "total_tests_inventory": 195,
+  "total_assertions_mapped": 3067,
+  "total_assertions_inventory": 3067,
+  "protocol_counts": [
+    {
+      "protocol": "lldp",
+      "total": 34,
+      "passed": 34,
+      "failed": 0
+    },
+    {
+      "protocol": "cdp",
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    {
+      "protocol": "bridge_fdb",
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    {
+      "protocol": "arp_nd",
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  ],
+  "scenario_results": [
+    {
+      "id": "nms0000_microsense_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms0000/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms0000_ms16_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms0000/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms0000_network_all_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms0000/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms0000_network_three_connected_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms0000/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms0000_network_two_connected_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms0000/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms0000_planet_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms0000/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms0002_cisco_alcatel_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms0002/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms0002_cisco_juniper_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms0002/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms0123_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms0123/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms10205b_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms10205b/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms13593_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms13593/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms13637_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms13637/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms13923_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms13923/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms17216_cdp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms17216/manifest.yaml",
+      "protocols": [
+        "cdp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms17216_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms17216/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_microsens_sw01_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_microsens_sw02_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_microsens_sw03_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_microsens_sw04_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_microsens_sw08_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_microsens_sw09_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_network_all_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_qfx_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_topoqfx_sw01_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_topoqfx_sw01_sw02_sw03_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_topoqfx_sw02_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_topoqfx_sw03_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_topoqfx_sw04_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_topoqfx_sw08_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms18541_topoqfx_sw09_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms18541/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms4930_dlink1_bridge_fdb",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms4930/manifest.yaml",
+      "protocols": [
+        "bridge_fdb"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms4930_dlink2_bridge_fdb",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms4930/manifest.yaml",
+      "protocols": [
+        "bridge_fdb"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms7467_cdp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms7467/manifest.yaml",
+      "protocols": [
+        "cdp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms7563_cisco01",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms7563/manifest.yaml",
+      "protocols": [
+        "lldp",
+        "cdp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms7563_homeserver_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms7563/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms7563_switch02_cdp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms7563/manifest.yaml",
+      "protocols": [
+        "cdp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms7777dw_lldp_no_links",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms7777dw/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms7918_asw01_bridge_fdb",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms7918/manifest.yaml",
+      "protocols": [
+        "bridge_fdb"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms7918_ospess01_arp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms7918/manifest.yaml",
+      "protocols": [
+        "arp_nd"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms7918_ospwl01_arp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms7918/manifest.yaml",
+      "protocols": [
+        "arp_nd"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms7918_pe01_arp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms7918/manifest.yaml",
+      "protocols": [
+        "arp_nd"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms7918_samasw01_bridge_fdb",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms7918/manifest.yaml",
+      "protocols": [
+        "bridge_fdb"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms7918_stcasw01_bridge_fdb",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms7918/manifest.yaml",
+      "protocols": [
+        "bridge_fdb"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms8000_cdp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms8000/manifest.yaml",
+      "protocols": [
+        "cdp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms8000_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms8000/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    },
+    {
+      "id": "nms8003_lldp",
+      "manifest": "pkg/topology/engine/testdata/enlinkd/nms8003/manifest.yaml",
+      "protocols": [
+        "lldp"
+      ],
+      "passed": true
+    }
+  ],
+  "go_tests": [
+    {
+      "package": "./pkg/topology/engine/parity",
+      "passed": true
+    },
+    {
+      "package": "./pkg/topology/engine",
+      "passed": true
+    },
+    {
+      "package": "./tools/topology-parity-evidence",
+      "passed": true
+    },
+    {
+      "package": "./plugin/go.d/collector/snmp -run ^TestTopology",
+      "passed": true
+    }
+  ],
+  "determinism": {
+    "runs": 2,
+    "byte_identical": true
+  }
+}

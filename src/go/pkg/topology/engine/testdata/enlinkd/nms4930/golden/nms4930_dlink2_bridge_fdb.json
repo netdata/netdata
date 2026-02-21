@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "scenario_id": "nms4930_dlink2_bridge_fdb",
+  "description": "Enlinkd NMS-4930 bridge/FDB parity slice for dlink2.",
+  "devices": [
+    {
+      "id": "dlink2",
+      "hostname": "dlink2"
+    }
+  ],
+  "adjacencies": null,
+  "expectations": {
+    "directional_adjacencies": 0,
+    "bidirectional_pairs": 0,
+    "devices": 1
+  }
+}

@@ -1,0 +1,20 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms7467
+scenarios:
+  - id: nms7467_cdp
+    description: >-
+      Enlinkd NMS-7467 CDP parity scenario from OpenNMS integration test
+      corpus.
+    protocols:
+      lldp: false
+      cdp: true
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: ciscoswitch
+        walk_file: ../upstream/linkd/nms7467/192.0.2.7-walk.txt
+    golden_yaml: golden/nms7467_cdp.yaml
+    golden_json: golden/nms7467_cdp.json

@@ -1,0 +1,118 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms0000
+scenarios:
+  - id: nms0000_network_all_lldp
+    description: >-
+      Enlinkd NMS-0000 LLDP full-network parity scenario from OpenNMS
+      integration test corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: ms01
+        walk_file: ../upstream/linkd/nms0000/10.114.20.1.txt
+      - device_id: ms02
+        walk_file: ../upstream/linkd/nms0000/10.114.20.2.txt
+      - device_id: ms03
+        walk_file: ../upstream/linkd/nms0000/10.114.20.3.txt
+      - device_id: ms04
+        walk_file: ../upstream/linkd/nms0000/10.114.20.4.txt
+      - device_id: ms05
+        walk_file: ../upstream/linkd/nms0000/10.114.20.5.txt
+      - device_id: ms06
+        walk_file: ../upstream/linkd/nms0000/10.114.20.6.txt
+      - device_id: ms07
+        walk_file: ../upstream/linkd/nms0000/10.114.20.7.txt
+      - device_id: ms08
+        walk_file: ../upstream/linkd/nms0000/10.114.20.8.txt
+      - device_id: ms09
+        walk_file: ../upstream/linkd/nms0000/10.114.20.9.txt
+      - device_id: ms10
+        walk_file: ../upstream/linkd/nms0000/10.114.20.10.txt
+      - device_id: ms11
+        walk_file: ../upstream/linkd/nms0000/10.114.20.11.txt
+      - device_id: ms12
+        walk_file: ../upstream/linkd/nms0000/10.114.20.12.txt
+      - device_id: ms14
+        walk_file: ../upstream/linkd/nms0000/10.114.20.14.txt
+      - device_id: ms15
+        walk_file: ../upstream/linkd/nms0000/10.114.20.15.txt
+      - device_id: ms16
+        walk_file: ../upstream/linkd/nms0000/10.114.20.16.txt
+      - device_id: ms17
+        walk_file: ../upstream/linkd/nms0000/10.114.20.17.txt
+      - device_id: ms18
+        walk_file: ../upstream/linkd/nms0000/10.114.20.18.txt
+      - device_id: ms19
+        walk_file: ../upstream/linkd/nms0000/10.114.20.19.txt
+    golden_yaml: golden/nms0000_network_all_lldp.yaml
+    golden_json: golden/nms0000_network_all_lldp.json
+  - id: nms0000_network_two_connected_lldp
+    description: Enlinkd NMS-0000 LLDP two-node parity slice (ms07, ms08).
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: ms07
+        walk_file: ../upstream/linkd/nms0000/10.114.20.7.txt
+      - device_id: ms08
+        walk_file: ../upstream/linkd/nms0000/10.114.20.8.txt
+    golden_yaml: golden/nms0000_network_two_connected_lldp.yaml
+    golden_json: golden/nms0000_network_two_connected_lldp.json
+  - id: nms0000_network_three_connected_lldp
+    description: Enlinkd NMS-0000 LLDP three-node parity slice (ms08/ms10 collection order).
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: ms08
+        walk_file: ../upstream/linkd/nms0000/10.114.20.8.txt
+      - device_id: ms10
+        walk_file: ../upstream/linkd/nms0000/10.114.20.10.txt
+    golden_yaml: golden/nms0000_network_three_connected_lldp.yaml
+    golden_json: golden/nms0000_network_three_connected_lldp.json
+  - id: nms0000_microsense_lldp
+    description: Enlinkd NMS-0000 LLDP microsense single-device parity slice (ms08).
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: ms08
+        walk_file: ../upstream/linkd/nms0000/10.114.20.8.txt
+    golden_yaml: golden/nms0000_microsense_lldp.yaml
+    golden_json: golden/nms0000_microsense_lldp.json
+  - id: nms0000_ms16_lldp
+    description: Enlinkd NMS-0000 LLDP single-device parity slice (ms16).
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: ms16
+        walk_file: ../upstream/linkd/nms0000/10.114.20.16.txt
+    golden_yaml: golden/nms0000_ms16_lldp.yaml
+    golden_json: golden/nms0000_ms16_lldp.json
+  - id: nms0000_planet_lldp
+    description: Enlinkd NMS-0000 LLDP single-device parity slice (planet).
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: planet
+        walk_file: ../upstream/linkd/nms0000/planet.txt
+    golden_yaml: golden/nms0000_planet_lldp.yaml
+    golden_json: golden/nms0000_planet_lldp.json

@@ -1,0 +1,45 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms0002ciscojuniper
+scenarios:
+  - id: nms0002_cisco_juniper_lldp
+    description: >-
+      Enlinkd NMS-0002 Cisco/Juniper LLDP parity scenario from OpenNMS
+      integration test corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: Rluck001
+        walk_file: ../upstream/linkd/nms0002ciscojuniper/r-de-juet-luck-001.txt
+      - device_id: Sluck001
+        walk_file: ../upstream/linkd/nms0002ciscojuniper/s-de-juet-luck-001.txt
+    golden_yaml: golden/nms0002_cisco_juniper_lldp.yaml
+    golden_json: golden/nms0002_cisco_juniper_lldp.json
+
+  - id: nms0002_cisco_alcatel_lldp
+    description: >-
+      Enlinkd NMS-0002 Cisco/Alcatel LLDP parity scenario from OpenNMS
+      integration test corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: RDeEssnBrue
+        walk_file: ../upstream/linkd/nms0002ciscoalcatel2/r-de-essn-brue-001.txt
+      - device_id: SDeEssnBrue081
+        walk_file: ../upstream/linkd/nms0002ciscoalcatel2/s-de-essn-brue-081.txt
+      - device_id: SDeEssnBrue121
+        walk_file: ../upstream/linkd/nms0002ciscoalcatel2/s-de-essn-brue-121.txt
+      - device_id: SDeEssnBrue142
+        walk_file: ../upstream/linkd/nms0002ciscoalcatel2/s-de-essn-brue-142.txt
+      - device_id: SDeEssnBrue165
+        walk_file: ../upstream/linkd/nms0002ciscoalcatel2/s-de-essn-brue-165.txt
+    golden_yaml: golden/nms0002_cisco_alcatel_lldp.yaml
+    golden_json: golden/nms0002_cisco_alcatel_lldp.json

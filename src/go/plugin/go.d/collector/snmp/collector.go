@@ -149,6 +149,8 @@ func (c *Collector) Init(context.Context) error {
 		c.prober = pr
 	}
 
+	snmpTopologyRegistry.register(c.topologyCache)
+
 	return nil
 }
 
@@ -189,6 +191,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.funcRouter != nil {
 		c.funcRouter.Cleanup(ctx)
 	}
+	snmpTopologyRegistry.unregister(c.topologyCache)
 	if c.snmpClient != nil {
 		_ = c.snmpClient.Close()
 	}

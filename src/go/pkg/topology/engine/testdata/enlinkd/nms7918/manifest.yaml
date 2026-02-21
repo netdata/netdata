@@ -1,0 +1,78 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms7918
+scenarios:
+  - id: nms7918_asw01_bridge_fdb
+    description: Enlinkd NMS-7918 bridge/FDB parity slice for ASW01 collection.
+    protocols:
+      lldp: false
+      cdp: false
+      bridge: true
+      arp_nd: false
+    fixtures:
+      - device_id: asw01
+        walk_file: ../upstream/linkd/nms7918/asw01.txt
+    golden_yaml: golden/nms7918_asw01_bridge_fdb.yaml
+    golden_json: golden/nms7918_asw01_bridge_fdb.json
+  - id: nms7918_stcasw01_bridge_fdb
+    description: Enlinkd NMS-7918 bridge/FDB parity slice for STCASW01 collection.
+    protocols:
+      lldp: false
+      cdp: false
+      bridge: true
+      arp_nd: false
+    fixtures:
+      - device_id: stcasw01
+        walk_file: ../upstream/linkd/nms7918/stc.asw01.txt
+    golden_yaml: golden/nms7918_stcasw01_bridge_fdb.yaml
+    golden_json: golden/nms7918_stcasw01_bridge_fdb.json
+  - id: nms7918_samasw01_bridge_fdb
+    description: Enlinkd NMS-7918 bridge/FDB parity slice for SAMASW01 collection.
+    protocols:
+      lldp: false
+      cdp: false
+      bridge: true
+      arp_nd: false
+    fixtures:
+      - device_id: samasw01
+        walk_file: ../upstream/linkd/nms7918/sam.asw01.txt
+    golden_yaml: golden/nms7918_samasw01_bridge_fdb.yaml
+    golden_json: golden/nms7918_samasw01_bridge_fdb.json
+  - id: nms7918_ospwl01_arp
+    description: Enlinkd NMS-7918 ARP/ND parity slice for OSPWL01 collection.
+    protocols:
+      lldp: false
+      cdp: false
+      bridge: false
+      arp_nd: true
+    fixtures:
+      - device_id: ospwl01
+        walk_file: ../upstream/linkd/nms7918/ospedale-wl1.txt
+    golden_yaml: golden/nms7918_ospwl01_arp.yaml
+    golden_json: golden/nms7918_ospwl01_arp.json
+  - id: nms7918_ospess01_arp
+    description: Enlinkd NMS-7918 ARP/ND parity slice for OSPESS01 collection.
+    protocols:
+      lldp: false
+      cdp: false
+      bridge: false
+      arp_nd: true
+    fixtures:
+      - device_id: ospess01
+        walk_file: ../upstream/linkd/nms7918/osp.ess01.txt
+    golden_yaml: golden/nms7918_ospess01_arp.yaml
+    golden_json: golden/nms7918_ospess01_arp.json
+  - id: nms7918_pe01_arp
+    description: Enlinkd NMS-7918 ARP/ND parity slice for PE01 collection.
+    protocols:
+      lldp: false
+      cdp: false
+      bridge: false
+      arp_nd: true
+    fixtures:
+      - device_id: pe01
+        walk_file: ../upstream/linkd/nms7918/pe01.txt
+    golden_yaml: golden/nms7918_pe01_arp.yaml
+    golden_json: golden/nms7918_pe01_arp.json

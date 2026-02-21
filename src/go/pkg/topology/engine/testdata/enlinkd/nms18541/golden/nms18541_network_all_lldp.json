@@ -1,0 +1,368 @@
+{
+  "version": "v1",
+  "scenario_id": "nms18541_network_all_lldp",
+  "description": "Enlinkd NMS-18541 LLDP network-all parity scenario from OpenNMS integration test corpus.",
+  "devices": [
+    {
+      "id": "E0281L-ScALBENGA2-QFX",
+      "hostname": "E0281L-ScALBENGA2-QFX"
+    },
+    {
+      "id": "SW_D6_01_M",
+      "hostname": "SW_D6_01_M"
+    },
+    {
+      "id": "SW_D6_02_M",
+      "hostname": "SW_D6_02_M"
+    },
+    {
+      "id": "SW_D6_03_M",
+      "hostname": "SW_D6_03_M"
+    },
+    {
+      "id": "SW_D6_04_M",
+      "hostname": "SW_D6_04_M"
+    },
+    {
+      "id": "SW_D6_08_M",
+      "hostname": "SW_D6_08_M"
+    },
+    {
+      "id": "SW_D6_09_M",
+      "hostname": "SW_D6_09_M"
+    },
+    {
+      "id": "arunarcangeli01",
+      "hostname": "arunArcangeli01"
+    },
+    {
+      "id": "arunbellaria01",
+      "hostname": "arunBellaria01"
+    },
+    {
+      "id": "axis camera",
+      "hostname": "Axis Camera"
+    },
+    {
+      "id": "axis-accc8e536f3c",
+      "hostname": "axis-accc8e536f3c"
+    },
+    {
+      "id": "axis-accc8e53f5fb",
+      "hostname": "axis-accc8e53f5fb"
+    },
+    {
+      "id": "axis-accc8eaaeb7f",
+      "hostname": "axis-accc8eaaeb7f"
+    },
+    {
+      "id": "axis-accc8ef9c09e",
+      "hostname": "axis-accc8ef9c09e"
+    },
+    {
+      "id": "axis-accc8ef9c0a3",
+      "hostname": "axis-accc8ef9c0a3"
+    },
+    {
+      "id": "e0281l-scalbenga2-r1",
+      "hostname": "E0281L-ScALBENGA2-R1"
+    },
+    {
+      "id": "e0281l-scalbenga2-r2",
+      "hostname": "E0281L-ScALBENGA2-R2"
+    },
+    {
+      "id": "i0504-su-tlc01",
+      "hostname": "I0504-SU-TLC01"
+    },
+    {
+      "id": "i0504-su-tlc02",
+      "hostname": "I0504-SU-TLC02"
+    },
+    {
+      "id": "i0504-su-tlc03",
+      "hostname": "I0504-SU-TLC03"
+    },
+    {
+      "id": "i0506-su-tlc01",
+      "hostname": "I0506-SU-TLC01"
+    },
+    {
+      "id": "i0506-su-tlc02",
+      "hostname": "I0506-SU-TLC02"
+    },
+    {
+      "id": "kje0406p0i_1mbaldo11",
+      "hostname": "KJE0406P0I_1MBALDO11"
+    },
+    {
+      "id": "kke0482p0i_1fleming15",
+      "hostname": "KKE0482P0I_1FLEMING15"
+    },
+    {
+      "id": "kwe0095p0i_1sgiusto65",
+      "hostname": "KWE0095P0I_1SGIUSTO65"
+    },
+    {
+      "id": "wje0588p0i_1marx2",
+      "hostname": "WJE0588P0I_1MARX2"
+    },
+    {
+      "id": "wke0564p0i_1gnocchi8",
+      "hostname": "WKE0564P0I_1GNOCCHI8"
+    },
+    {
+      "id": "wxe0729p0t_1pioii3",
+      "hostname": "WXE0729P0T_1PIOII3"
+    },
+    {
+      "id": "wye0596p0i_1mbaldo15",
+      "hostname": "WYE0596P0I_1MBALDO15"
+    }
+  ],
+  "adjacencies": [
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "et-0/0/48",
+      "target_device": "e0281l-scalbenga2-r1",
+      "target_port": "581"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "et-0/0/49",
+      "target_device": "e0281l-scalbenga2-r2",
+      "target_port": "581"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/0",
+      "target_device": "kwe0095p0i_1sgiusto65",
+      "target_port": "28"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/1",
+      "target_device": "kje0406p0i_1mbaldo11",
+      "target_port": "28"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/10",
+      "target_device": "arunarcangeli01",
+      "target_port": "EC FC C6 C8 3B 80"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/13",
+      "target_device": "SW_D6_04_M",
+      "target_port": "2/5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/15",
+      "target_device": "SW_D6_08_M",
+      "target_port": "2/5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/16",
+      "target_device": "SW_D6_09_M",
+      "target_port": "3/6"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/2",
+      "target_device": "kke0482p0i_1fleming15",
+      "target_port": "28"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/3",
+      "target_device": "wke0564p0i_1gnocchi8",
+      "target_port": "26"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/4",
+      "target_device": "wye0596p0i_1mbaldo15",
+      "target_port": "28"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/5",
+      "target_device": "wxe0729p0t_1pioii3",
+      "target_port": "28"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/6",
+      "target_device": "wje0588p0i_1marx2",
+      "target_port": "27"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/7",
+      "target_device": "SW_D6_02_M",
+      "target_port": "3/5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "E0281L-ScALBENGA2-QFX",
+      "source_port": "ge-0/0/9",
+      "target_device": "arunbellaria01",
+      "target_port": "50 E4 E0 CE 3B 8E"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_01_M",
+      "source_port": "2/4",
+      "target_device": "SW_D6_02_M",
+      "target_port": "2/5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_01_M",
+      "source_port": "3/4",
+      "target_device": "SW_D6_03_M",
+      "target_port": "2/5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_02_M",
+      "source_port": "2/4",
+      "target_device": "SW_D6_01_M",
+      "target_port": "2/5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_02_M",
+      "source_port": "3/4",
+      "target_device": "E0281L-ScALBENGA2-QFX",
+      "target_port": "ge-0/0/7"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_03_M",
+      "source_port": "2/4",
+      "target_device": "SW_D6_01_M",
+      "target_port": "3/5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_04_M",
+      "source_port": "0",
+      "target_device": "E0281L-ScALBENGA2-QFX",
+      "target_port": "ge-0/0/13"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_04_M",
+      "source_port": "0",
+      "target_device": "i0504-su-tlc01",
+      "target_port": "e8:27:25:07:83:43"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_04_M",
+      "source_port": "0",
+      "target_device": "i0504-su-tlc02",
+      "target_port": "b8:a4:4f:b2:bb:2b"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_04_M",
+      "source_port": "0",
+      "target_device": "i0504-su-tlc03",
+      "target_port": "e8:27:25:07:96:9a"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_08_M",
+      "source_port": "0",
+      "target_device": "E0281L-ScALBENGA2-QFX",
+      "target_port": "ge-0/0/15"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_08_M",
+      "source_port": "0",
+      "target_device": "i0506-su-tlc01",
+      "target_port": "e8:27:25:07:96:63"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_08_M",
+      "source_port": "0",
+      "target_device": "i0506-su-tlc02",
+      "target_port": "e8:27:25:07:83:27"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "1/1",
+      "target_device": "axis-accc8ef9c0a3",
+      "target_port": "ac:cc:8e:f9:c0:a3"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "2/1",
+      "target_device": "axis-accc8e53f5fb",
+      "target_port": "ac:cc:8e:53:f5:fb"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "2/2",
+      "target_device": "axis-accc8e536f3c",
+      "target_port": "ac:cc:8e:53:6f:3c"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "2/6",
+      "target_device": "axis-accc8eaaeb7f",
+      "target_port": "ac:cc:8e:aa:eb:7f"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "3/1",
+      "target_device": "axis-accc8ef9c09e",
+      "target_port": "ac:cc:8e:f9:c0:9e"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "3/2",
+      "target_device": "axis camera",
+      "target_port": "eth0"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_09_M",
+      "source_port": "3/5",
+      "target_device": "E0281L-ScALBENGA2-QFX",
+      "target_port": "ge-0/0/16"
+    }
+  ],
+  "expectations": {
+    "directional_adjacencies": 34,
+    "bidirectional_pairs": 0,
+    "devices": 29
+  }
+}

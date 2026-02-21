@@ -1,0 +1,144 @@
+version: v1
+scenario_id: nms0123_lldp
+description: Enlinkd NMS-0123 LLDP parity scenario from OpenNMS integration test corpus.
+devices:
+    - id: ITPN0111
+      hostname: ITPN0111
+    - id: ITPN0112
+      hostname: ITPN0112
+    - id: ITPN0113
+      hostname: ITPN0113
+    - id: ITPN0114
+      hostname: ITPN0114
+    - id: ITPN0121
+      hostname: ITPN0121
+    - id: ITPN0123
+      hostname: ITPN0123
+    - id: ITPN0201
+      hostname: ITPN0201
+    - id: ITPN0202
+      hostname: ITPN0202
+    - id: poe_tel_serwerownia
+      hostname: POE_TEL_Serwerownia
+    - id: vcex23c433100cw serial no:3c433100cw bay:2
+      hostname: VCEX23C433100CW SERIAL NO:3C433100CW BAY:2
+adjacencies:
+    - protocol: lldp
+      source_device: ITPN0111
+      source_port: "538"
+      target_device: ITPN0111
+      target_port: "617"
+    - protocol: lldp
+      source_device: ITPN0111
+      source_port: "617"
+      target_device: ITPN0111
+      target_port: "538"
+    - protocol: lldp
+      source_device: ITPN0111
+      source_port: "633"
+      target_device: ITPN0112
+      target_port: "622"
+    - protocol: lldp
+      source_device: ITPN0111
+      source_port: "639"
+      target_device: ITPN0201
+      target_port: "626"
+    - protocol: lldp
+      source_device: ITPN0112
+      source_port: "0"
+      target_device: ITPN0113
+      target_port: "623"
+    - protocol: lldp
+      source_device: ITPN0112
+      source_port: "622"
+      target_device: ITPN0111
+      target_port: "633"
+    - protocol: lldp
+      source_device: ITPN0113
+      source_port: "623"
+      target_device: ITPN0112
+      target_port: "624"
+    - protocol: lldp
+      source_device: ITPN0113
+      source_port: "625"
+      target_device: ITPN0202
+      target_port: "628"
+    - protocol: lldp
+      source_device: ITPN0114
+      source_port: "622"
+      target_device: ITPN0201
+      target_port: "630"
+    - protocol: lldp
+      source_device: ITPN0114
+      source_port: "624"
+      target_device: ITPN0121
+      target_port: "622"
+    - protocol: lldp
+      source_device: ITPN0121
+      source_port: "622"
+      target_device: ITPN0114
+      target_port: "624"
+    - protocol: lldp
+      source_device: ITPN0123
+      source_port: "0"
+      target_device: ITPN0202
+      target_port: "626"
+    - protocol: lldp
+      source_device: ITPN0123
+      source_port: "538"
+      target_device: ITPN0123
+      target_port: "604"
+    - protocol: lldp
+      source_device: ITPN0123
+      source_port: "604"
+      target_device: ITPN0123
+      target_port: "538"
+    - protocol: lldp
+      source_device: ITPN0201
+      source_port: "539"
+      target_device: poe_tel_serwerownia
+      target_port: 00 1E F7 FE 42 F2
+    - protocol: lldp
+      source_device: ITPN0201
+      source_port: "626"
+      target_device: ITPN0111
+      target_port: "639"
+    - protocol: lldp
+      source_device: ITPN0201
+      source_port: "628"
+      target_device: ITPN0202
+      target_port: "622"
+    - protocol: lldp
+      source_device: ITPN0201
+      source_port: "630"
+      target_device: ITPN0114
+      target_port: "622"
+    - protocol: lldp
+      source_device: ITPN0201
+      source_port: "657"
+      target_device: vcex23c433100cw serial no:3c433100cw bay:2
+      target_port: X2
+    - protocol: lldp
+      source_device: ITPN0201
+      source_port: "659"
+      target_device: vcex23c433100cw serial no:3c433100cw bay:2
+      target_port: X2
+    - protocol: lldp
+      source_device: ITPN0202
+      source_port: "0"
+      target_device: ITPN0113
+      target_port: "625"
+    - protocol: lldp
+      source_device: ITPN0202
+      source_port: "0"
+      target_device: ITPN0201
+      target_port: "628"
+    - protocol: lldp
+      source_device: ITPN0202
+      source_port: "626"
+      target_device: ITPN0123
+      target_port: "627"
+expectations:
+    directional_adjacencies: 23
+    bidirectional_pairs: 6
+    devices: 10

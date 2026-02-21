@@ -1,0 +1,29 @@
+{
+  "version": "v1",
+  "scenario_id": "nms18541_microsens_sw03_lldp",
+  "description": "Enlinkd NMS-18541 single-device LLDP parity slice for SW_D6_03_M.",
+  "devices": [
+    {
+      "id": "SW_D6_03_M",
+      "hostname": "SW_D6_03_M"
+    },
+    {
+      "id": "microsens-g6-mac-00:60:a7:0a:80:4e",
+      "hostname": "MICROSENS-G6-MAC-00:60:A7:0A:80:4E"
+    }
+  ],
+  "adjacencies": [
+    {
+      "protocol": "lldp",
+      "source_device": "SW_D6_03_M",
+      "source_port": "2/4",
+      "target_device": "microsens-g6-mac-00:60:a7:0a:80:4e",
+      "target_port": "3/5"
+    }
+  ],
+  "expectations": {
+    "directional_adjacencies": 1,
+    "bidirectional_pairs": 0,
+    "devices": 2
+  }
+}

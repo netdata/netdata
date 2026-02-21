@@ -115,8 +115,11 @@ func TestBuildAcceptedParams(t *testing.T) {
 		{ID: "extra"},
 	}
 
-	result := buildAcceptedParams(methodParams)
+	result := buildAcceptedParams(methodParams, true)
 	assert.Equal(t, []string{"__job", "__sort", "db", "extra"}, result)
+
+	result = buildAcceptedParams(methodParams, false)
+	assert.Equal(t, []string{"__sort", "db", "extra"}, result)
 }
 
 func TestParseArgsParams(t *testing.T) {
@@ -169,7 +172,7 @@ func TestBuildRequiredParams_TypeSelect(t *testing.T) {
 			},
 		},
 	}
-	params := mgr.buildRequiredParams("postgres", methodParams)
+	params := mgr.buildRequiredParams("postgres", methodParams, true)
 
 	// Verify structure
 	assert.Len(t, params, 2, "should have 2 required params: __job, __sort")
@@ -196,6 +199,37 @@ func TestBuildRequiredParams_TypeSelect(t *testing.T) {
 	assert.Equal(t, "__sort", params[1]["id"])
 }
 
+func TestBuildRequiredParams_AgentWideOmitsJobParam(t *testing.T) {
+	r := newModuleFuncRegistry()
+	r.registerModule("snmp", module.Creator{
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{
+				ID:        "topology:snmp",
+				Name:      "Topology (SNMP)",
+				AgentWide: true,
+			}}
+		},
+	})
+	r.addJob("snmp", "router", newTestModuleFuncsJob("router"))
+
+	mgr := &Manager{moduleFuncs: r}
+
+	methodParams := []funcapi.ParamConfig{
+		{
+			ID:        "topology_view",
+			Name:      "Topology View",
+			Selection: funcapi.ParamSelect,
+			Options: []funcapi.ParamOption{
+				{ID: "l2", Name: "L2", Default: true},
+			},
+		},
+	}
+	params := mgr.buildRequiredParams("snmp", methodParams, false)
+
+	assert.Len(t, params, 1, "agent-wide methods must not expose __job selector")
+	assert.Equal(t, "topology_view", params[0]["id"])
+}
+
 func newTestManagerWithCapture(t *testing.T) (*Manager, *map[string]any) {
 	t.Helper()
 
@@ -218,7 +252,7 @@ func TestRespondWithParams_ResponseType(t *testing.T) {
 		Status:       200,
 		ResponseType: "topology",
 	}
-	mgr.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "")
+	mgr.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "", true)
 
 	assert.Equal(t, "topology", (*resp)["type"])
 }
@@ -229,9 +263,39 @@ func TestRespondWithParams_MethodTypeFallback(t *testing.T) {
 	dataResp := &funcapi.FunctionResponse{
 		Status: 200,
 	}
-	mgr.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology")
+	mgr.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology", true)
 
 	assert.Equal(t, "topology", (*resp)["type"])
+}
+
+func TestRespondWithParams_AgentWideOmitsJobParam(t *testing.T) {
+	mgr, resp := newTestManagerWithCapture(t)
+
+	dataResp := &funcapi.FunctionResponse{
+		Status: 200,
+		RequiredParams: []funcapi.ParamConfig{
+			{
+				ID:        "topology_view",
+				Name:      "Topology View",
+				Selection: funcapi.ParamSelect,
+				Options: []funcapi.ParamOption{
+					{ID: "l2", Name: "L2", Default: true},
+				},
+			},
+		},
+	}
+	mgr.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology", false)
+
+	accepted, ok := (*resp)["accepted_params"].([]any)
+	assert.True(t, ok)
+	assert.Equal(t, []any{"topology_view"}, accepted)
+
+	required, ok := (*resp)["required_params"].([]any)
+	assert.True(t, ok)
+	assert.Len(t, required, 1)
+	req0, ok := required[0].(map[string]any)
+	assert.True(t, ok)
+	assert.Equal(t, "topology_view", req0["id"])
 }
 
 func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
@@ -246,6 +310,44 @@ func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
 	mgr.handleMethodFuncInfo("snmp", "topology:snmp", functions.Function{})
 
 	assert.Equal(t, "topology", (*resp)["type"])
+}
+
+func TestHandleMethodFuncInfo_AgentWideOmitsJobParam(t *testing.T) {
+	mgr, resp := newTestManagerWithCapture(t)
+
+	mgr.moduleFuncs.registerModule("snmp", module.Creator{
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{
+				ID:           "topology:snmp",
+				ResponseType: "topology",
+				AgentWide:    true,
+				RequiredParams: []funcapi.ParamConfig{
+					{
+						ID:        "topology_view",
+						Name:      "Topology View",
+						Selection: funcapi.ParamSelect,
+						Options: []funcapi.ParamOption{
+							{ID: "l2", Name: "L2", Default: true},
+						},
+					},
+				},
+			}}
+		},
+	})
+	mgr.moduleFuncs.addJob("snmp", "job-a", newTestModuleFuncsJob("job-a"))
+
+	mgr.handleMethodFuncInfo("snmp", "topology:snmp", functions.Function{})
+
+	accepted, ok := (*resp)["accepted_params"].([]any)
+	assert.True(t, ok)
+	assert.Equal(t, []any{"topology_view"}, accepted)
+
+	required, ok := (*resp)["required_params"].([]any)
+	assert.True(t, ok)
+	assert.Len(t, required, 1)
+	req0, ok := required[0].(map[string]any)
+	assert.True(t, ok)
+	assert.Equal(t, "topology_view", req0["id"])
 }
 
 func TestHandleJobMethodFuncInfo_UsesResponseType(t *testing.T) {

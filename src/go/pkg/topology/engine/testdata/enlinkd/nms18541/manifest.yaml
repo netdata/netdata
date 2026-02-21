@@ -1,0 +1,220 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms18541
+scenarios:
+  - id: nms18541_network_all_lldp
+    description: >-
+      Enlinkd NMS-18541 LLDP network-all parity scenario from OpenNMS
+      integration test corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: SW_D6_01_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.1-walk.txt
+      - device_id: SW_D6_02_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.2-walk.txt
+      - device_id: SW_D6_03_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.3-walk.txt
+      - device_id: SW_D6_04_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.4-walk.txt
+      - device_id: SW_D6_08_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.8-walk.txt
+      - device_id: SW_D6_09_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.9-walk.txt
+      - device_id: E0281L-ScALBENGA2-QFX
+        walk_file: ../upstream/linkd/nms18541/10.59.228.201-walk.txt
+    golden_yaml: golden/nms18541_network_all_lldp.yaml
+    golden_json: golden/nms18541_network_all_lldp.json
+  - id: nms18541_topoqfx_sw01_sw02_sw03_lldp
+    description: >-
+      Enlinkd NMS-18541 LLDP topology slice with QFX and microswitches
+      SW_D6_01_M, SW_D6_02_M, SW_D6_03_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: E0281L-ScALBENGA2-QFX
+        walk_file: ../upstream/linkd/nms18541/10.59.228.201-walk.txt
+      - device_id: SW_D6_01_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.1-walk.txt
+      - device_id: SW_D6_02_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.2-walk.txt
+      - device_id: SW_D6_03_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.3-walk.txt
+    golden_yaml: golden/nms18541_topoqfx_sw01_sw02_sw03_lldp.yaml
+    golden_json: golden/nms18541_topoqfx_sw01_sw02_sw03_lldp.json
+  - id: nms18541_topoqfx_sw01_lldp
+    description: Enlinkd NMS-18541 LLDP topology slice with QFX and SW_D6_01_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: E0281L-ScALBENGA2-QFX
+        walk_file: ../upstream/linkd/nms18541/10.59.228.201-walk.txt
+      - device_id: SW_D6_01_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.1-walk.txt
+    golden_yaml: golden/nms18541_topoqfx_sw01_lldp.yaml
+    golden_json: golden/nms18541_topoqfx_sw01_lldp.json
+  - id: nms18541_topoqfx_sw02_lldp
+    description: Enlinkd NMS-18541 LLDP topology slice with QFX and SW_D6_02_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: E0281L-ScALBENGA2-QFX
+        walk_file: ../upstream/linkd/nms18541/10.59.228.201-walk.txt
+      - device_id: SW_D6_02_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.2-walk.txt
+    golden_yaml: golden/nms18541_topoqfx_sw02_lldp.yaml
+    golden_json: golden/nms18541_topoqfx_sw02_lldp.json
+  - id: nms18541_topoqfx_sw03_lldp
+    description: Enlinkd NMS-18541 LLDP topology slice with QFX and SW_D6_03_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: E0281L-ScALBENGA2-QFX
+        walk_file: ../upstream/linkd/nms18541/10.59.228.201-walk.txt
+      - device_id: SW_D6_03_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.3-walk.txt
+    golden_yaml: golden/nms18541_topoqfx_sw03_lldp.yaml
+    golden_json: golden/nms18541_topoqfx_sw03_lldp.json
+  - id: nms18541_topoqfx_sw04_lldp
+    description: Enlinkd NMS-18541 LLDP topology slice with QFX and SW_D6_04_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: E0281L-ScALBENGA2-QFX
+        walk_file: ../upstream/linkd/nms18541/10.59.228.201-walk.txt
+      - device_id: SW_D6_04_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.4-walk.txt
+    golden_yaml: golden/nms18541_topoqfx_sw04_lldp.yaml
+    golden_json: golden/nms18541_topoqfx_sw04_lldp.json
+  - id: nms18541_topoqfx_sw08_lldp
+    description: Enlinkd NMS-18541 LLDP topology slice with QFX and SW_D6_08_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: E0281L-ScALBENGA2-QFX
+        walk_file: ../upstream/linkd/nms18541/10.59.228.201-walk.txt
+      - device_id: SW_D6_08_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.8-walk.txt
+    golden_yaml: golden/nms18541_topoqfx_sw08_lldp.yaml
+    golden_json: golden/nms18541_topoqfx_sw08_lldp.json
+  - id: nms18541_topoqfx_sw09_lldp
+    description: Enlinkd NMS-18541 LLDP topology slice with QFX and SW_D6_09_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: E0281L-ScALBENGA2-QFX
+        walk_file: ../upstream/linkd/nms18541/10.59.228.201-walk.txt
+      - device_id: SW_D6_09_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.9-walk.txt
+    golden_yaml: golden/nms18541_topoqfx_sw09_lldp.yaml
+    golden_json: golden/nms18541_topoqfx_sw09_lldp.json
+  - id: nms18541_qfx_lldp
+    description: Enlinkd NMS-18541 single-device LLDP parity slice for QFX.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: E0281L-ScALBENGA2-QFX
+        walk_file: ../upstream/linkd/nms18541/10.59.228.201-walk.txt
+    golden_yaml: golden/nms18541_qfx_lldp.yaml
+    golden_json: golden/nms18541_qfx_lldp.json
+  - id: nms18541_microsens_sw01_lldp
+    description: Enlinkd NMS-18541 single-device LLDP parity slice for SW_D6_01_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: SW_D6_01_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.1-walk.txt
+    golden_yaml: golden/nms18541_microsens_sw01_lldp.yaml
+    golden_json: golden/nms18541_microsens_sw01_lldp.json
+  - id: nms18541_microsens_sw02_lldp
+    description: Enlinkd NMS-18541 single-device LLDP parity slice for SW_D6_02_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: SW_D6_02_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.2-walk.txt
+    golden_yaml: golden/nms18541_microsens_sw02_lldp.yaml
+    golden_json: golden/nms18541_microsens_sw02_lldp.json
+  - id: nms18541_microsens_sw03_lldp
+    description: Enlinkd NMS-18541 single-device LLDP parity slice for SW_D6_03_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: SW_D6_03_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.3-walk.txt
+    golden_yaml: golden/nms18541_microsens_sw03_lldp.yaml
+    golden_json: golden/nms18541_microsens_sw03_lldp.json
+  - id: nms18541_microsens_sw04_lldp
+    description: Enlinkd NMS-18541 single-device LLDP parity slice for SW_D6_04_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: SW_D6_04_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.4-walk.txt
+    golden_yaml: golden/nms18541_microsens_sw04_lldp.yaml
+    golden_json: golden/nms18541_microsens_sw04_lldp.json
+  - id: nms18541_microsens_sw08_lldp
+    description: Enlinkd NMS-18541 single-device LLDP parity slice for SW_D6_08_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: SW_D6_08_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.8-walk.txt
+    golden_yaml: golden/nms18541_microsens_sw08_lldp.yaml
+    golden_json: golden/nms18541_microsens_sw08_lldp.json
+  - id: nms18541_microsens_sw09_lldp
+    description: Enlinkd NMS-18541 single-device LLDP parity slice for SW_D6_09_M.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: SW_D6_09_M
+        walk_file: ../upstream/linkd/nms18541/10.115.180.9-walk.txt
+    golden_yaml: golden/nms18541_microsens_sw09_lldp.yaml
+    golden_json: golden/nms18541_microsens_sw09_lldp.json

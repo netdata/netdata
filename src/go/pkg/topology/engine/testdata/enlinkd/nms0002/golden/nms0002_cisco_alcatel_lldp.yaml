@@ -1,0 +1,51 @@
+version: v1
+scenario_id: nms0002_cisco_alcatel_lldp
+description: Enlinkd NMS-0002 Cisco/Alcatel LLDP parity scenario from OpenNMS integration test corpus.
+devices:
+    - id: RDeEssnBrue
+      hostname: r-de-essn-brue-001.infra.u-ssi.net
+    - id: SDeEssnBrue081
+      hostname: s-de-essn-brue-081
+    - id: SDeEssnBrue121
+      hostname: s-de-essn-brue-121
+    - id: SDeEssnBrue142
+      hostname: s-de-essn-brue-142
+    - id: SDeEssnBrue165
+      hostname: s-de-essn-brue-165
+    - id: r-de-essn-brue-001
+      hostname: r-de-essn-brue-001
+adjacencies:
+    - protocol: lldp
+      source_device: SDeEssnBrue081
+      source_port: "1025"
+      target_device: r-de-essn-brue-001
+      target_port: Gi1/2/34
+    - protocol: lldp
+      source_device: SDeEssnBrue121
+      source_port: "1025"
+      target_device: r-de-essn-brue-001
+      target_port: Gi1/3/22
+    - protocol: lldp
+      source_device: SDeEssnBrue142
+      source_port: "1025"
+      target_device: r-de-essn-brue-001
+      target_port: Gi1/3/4
+    - protocol: lldp
+      source_device: SDeEssnBrue142
+      source_port: "2025"
+      target_device: r-de-essn-brue-001
+      target_port: Gi2/3/4
+    - protocol: lldp
+      source_device: SDeEssnBrue165
+      source_port: "1025"
+      target_device: r-de-essn-brue-001
+      target_port: Gi1/3/11
+    - protocol: lldp
+      source_device: SDeEssnBrue165
+      source_port: "2025"
+      target_device: r-de-essn-brue-001
+      target_port: Gi2/3/11
+expectations:
+    directional_adjacencies: 6
+    bidirectional_pairs: 0
+    devices: 6

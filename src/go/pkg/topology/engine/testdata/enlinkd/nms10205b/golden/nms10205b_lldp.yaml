@@ -1,0 +1,79 @@
+version: v1
+scenario_id: nms10205b_lldp
+description: Expected directed LLDP adjacencies for the NMS-10205b LLDP scenario from OpenNMS Enlinkd integration expectations.
+devices:
+    - id: Bagmane
+      hostname: Bagmane
+    - id: Bangalore
+      hostname: Bangalore
+    - id: Delhi
+      hostname: Delhi
+    - id: J6350-42
+      hostname: J6350-2
+    - id: Mumbai
+      hostname: Mumbai
+    - id: Mysore
+      hostname: Mysore
+    - id: SRX-100
+      hostname: SRX_56.23
+    - id: Space-EX-SW1
+      hostname: Space-EX-SW1
+    - id: Space-EX-SW2
+      hostname: Space-EX-SW2
+    - id: sw21
+      hostname: sw21
+adjacencies:
+    - protocol: lldp
+      source_device: Bagmane
+      source_port: "513"
+      target_device: Delhi
+      target_port: "28519"
+    - protocol: lldp
+      source_device: Bagmane
+      source_port: "514"
+      target_device: J6350-42
+      target_port: "549"
+    - protocol: lldp
+      source_device: Bagmane
+      source_port: "515"
+      target_device: sw21
+      target_port: "235"
+    - protocol: lldp
+      source_device: Delhi
+      source_port: "28519"
+      target_device: Bagmane
+      target_port: "513"
+    - protocol: lldp
+      source_device: Delhi
+      source_port: "28520"
+      target_device: Space-EX-SW1
+      target_port: "528"
+    - protocol: lldp
+      source_device: Space-EX-SW1
+      source_port: "1361"
+      target_device: Space-EX-SW2
+      target_port: "531"
+    - protocol: lldp
+      source_device: Space-EX-SW1
+      source_port: "524"
+      target_device: sw21
+      target_port: "417"
+    - protocol: lldp
+      source_device: Space-EX-SW1
+      source_port: "528"
+      target_device: Delhi
+      target_port: "28520"
+    - protocol: lldp
+      source_device: Space-EX-SW2
+      source_port: "34"
+      target_device: sw21
+      target_port: "157"
+    - protocol: lldp
+      source_device: Space-EX-SW2
+      source_port: "531"
+      target_device: Space-EX-SW1
+      target_port: "1361"
+expectations:
+    directional_adjacencies: 10
+    bidirectional_pairs: 3
+    devices: 10

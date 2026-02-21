@@ -1,0 +1,34 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms0123
+scenarios:
+  - id: nms0123_lldp
+    description: >-
+      Enlinkd NMS-0123 LLDP parity scenario from OpenNMS integration test
+      corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: ITPN0111
+        walk_file: ../upstream/linkd/nms0123/ITPN0111.txt
+      - device_id: ITPN0112
+        walk_file: ../upstream/linkd/nms0123/ITPN0112.txt
+      - device_id: ITPN0113
+        walk_file: ../upstream/linkd/nms0123/ITPN0113.txt
+      - device_id: ITPN0114
+        walk_file: ../upstream/linkd/nms0123/ITPN0114.txt
+      - device_id: ITPN0121
+        walk_file: ../upstream/linkd/nms0123/ITPN0121.txt
+      - device_id: ITPN0123
+        walk_file: ../upstream/linkd/nms0123/ITPN0123.txt
+      - device_id: ITPN0201
+        walk_file: ../upstream/linkd/nms0123/ITPN0201.txt
+      - device_id: ITPN0202
+        walk_file: ../upstream/linkd/nms0123/ITPN0202.txt
+    golden_yaml: golden/nms0123_lldp.yaml
+    golden_json: golden/nms0123_lldp.json

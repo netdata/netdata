@@ -1,0 +1,11 @@
+version: v1
+scenario_id: nms7918_pe01_arp
+description: Enlinkd NMS-7918 ARP/ND parity slice for PE01 collection.
+devices:
+    - id: pe01
+      hostname: PE01
+adjacencies: []
+expectations:
+    directional_adjacencies: 0
+    bidirectional_pairs: 0
+    devices: 1

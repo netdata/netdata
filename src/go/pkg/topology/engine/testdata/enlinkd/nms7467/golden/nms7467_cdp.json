@@ -1,0 +1,73 @@
+{
+  "version": "v1",
+  "scenario_id": "nms7467_cdp",
+  "description": "Enlinkd NMS-7467 CDP parity scenario from OpenNMS integration test corpus.",
+  "devices": [
+    {
+      "id": "ciscoswitch",
+      "hostname": "ciscoswitch"
+    },
+    {
+      "id": "mrgarrison.internal.opennms.com",
+      "hostname": "mrgarrison.internal.opennms.com"
+    },
+    {
+      "id": "mrmakay.internal.opennms.com",
+      "hostname": "mrmakay.internal.opennms.com"
+    },
+    {
+      "id": "sep0004f22ad83e",
+      "hostname": "SEP0004f22ad83e"
+    },
+    {
+      "id": "sip000628f0fb0a",
+      "hostname": "SIP000628F0FB0A"
+    },
+    {
+      "id": "sip000ccea217a7",
+      "hostname": "SIP000CCEA217A7"
+    }
+  ],
+  "adjacencies": [
+    {
+      "protocol": "cdp",
+      "source_device": "ciscoswitch",
+      "source_port": "2/1",
+      "target_device": "sep0004f22ad83e",
+      "target_port": "Port 1"
+    },
+    {
+      "protocol": "cdp",
+      "source_device": "ciscoswitch",
+      "source_port": "2/39",
+      "target_device": "mrgarrison.internal.opennms.com",
+      "target_port": "GigabitEthernet0"
+    },
+    {
+      "protocol": "cdp",
+      "source_device": "ciscoswitch",
+      "source_port": "2/4",
+      "target_device": "sip000628f0fb0a",
+      "target_port": "Port 1"
+    },
+    {
+      "protocol": "cdp",
+      "source_device": "ciscoswitch",
+      "source_port": "2/44",
+      "target_device": "mrmakay.internal.opennms.com",
+      "target_port": "FastEthernet2"
+    },
+    {
+      "protocol": "cdp",
+      "source_device": "ciscoswitch",
+      "source_port": "2/46",
+      "target_device": "sip000ccea217a7",
+      "target_port": "Port 1"
+    }
+  ],
+  "expectations": {
+    "directional_adjacencies": 5,
+    "bidirectional_pairs": 0,
+    "devices": 6
+  }
+}

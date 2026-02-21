@@ -1,0 +1,27 @@
+version: v1
+scenario_id: nms0002_cisco_juniper_lldp
+description: Enlinkd NMS-0002 Cisco/Juniper LLDP parity scenario from OpenNMS integration test corpus.
+devices:
+    - id: Rluck001
+      hostname: r-de-juet-luck-001
+    - id: Sluck001
+      hostname: s-de-juet-luck-001.infra.u-ssi.net
+    - id: r-de-pots-amka-001.infra.u-ssi.net
+      hostname: r-de-pots-amka-001.infra.u-ssi.net
+    - id: s-de-juet-luck-002.infra.u-ssi.net
+      hostname: s-de-juet-luck-002.infra.u-ssi.net
+adjacencies:
+    - protocol: lldp
+      source_device: Rluck001
+      source_port: "510"
+      target_device: r-de-pots-amka-001.infra.u-ssi.net
+      target_port: Fa6/0/0
+    - protocol: lldp
+      source_device: Sluck001
+      source_port: Gi0/1
+      target_device: s-de-juet-luck-002.infra.u-ssi.net
+      target_port: Gi0/1
+expectations:
+    directional_adjacencies: 2
+    bidirectional_pairs: 0
+    devices: 4

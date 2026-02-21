@@ -1,0 +1,51 @@
+{
+  "version": "v1",
+  "scenario_id": "nms0000_planet_lldp",
+  "description": "Enlinkd NMS-0000 LLDP single-device parity slice (planet).",
+  "devices": [
+    {
+      "id": "epmp1000_64aaec",
+      "hostname": "ePMP1000_64aaec"
+    },
+    {
+      "id": "microsens-g6-mac-00:60:a7:0c:8e:33",
+      "hostname": "MICROSENS-G6-MAC-00:60:A7:0C:8E:33"
+    },
+    {
+      "id": "planet",
+      "hostname": "V177"
+    },
+    {
+      "id": "switch area b - v178",
+      "hostname": "Switch Area B - v178"
+    }
+  ],
+  "adjacencies": [
+    {
+      "protocol": "lldp",
+      "source_device": "planet",
+      "source_port": "06",
+      "target_device": "epmp1000_64aaec",
+      "target_port": "00-04-56-6F-82-1E"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "planet",
+      "source_port": "09",
+      "target_device": "switch area b - v178",
+      "target_port": "9"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "planet",
+      "source_port": "10",
+      "target_device": "microsens-g6-mac-00:60:a7:0c:8e:33",
+      "target_port": "2/5"
+    }
+  ],
+  "expectations": {
+    "directional_adjacencies": 3,
+    "bidirectional_pairs": 0,
+    "devices": 4
+  }
+}

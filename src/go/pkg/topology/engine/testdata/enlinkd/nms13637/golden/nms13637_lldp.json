@@ -1,0 +1,183 @@
+{
+  "version": "v1",
+  "scenario_id": "nms13637_lldp",
+  "description": "Expected directed LLDP adjacencies for the NMS-13637 LLDP scenario from OpenNMS Enlinkd integration expectations.",
+  "devices": [
+    {
+      "id": "chassis-5835d994cdab",
+      "hostname": "chassis-5835d994cdab"
+    },
+    {
+      "id": "elastic-01",
+      "hostname": "elastic-01"
+    },
+    {
+      "id": "esx.labmonkeys.tech",
+      "hostname": "esx.labmonkeys.tech"
+    },
+    {
+      "id": "fritz.box",
+      "hostname": "fritz.box"
+    },
+    {
+      "id": "onms-hzn",
+      "hostname": "onms-hzn"
+    },
+    {
+      "id": "opn-fw-01.clab.labmonkeys.tech",
+      "hostname": "opn-fw-01.clab.labmonkeys.tech"
+    },
+    {
+      "id": "router-1",
+      "hostname": "router-1"
+    },
+    {
+      "id": "router-2",
+      "hostname": "router-2"
+    },
+    {
+      "id": "sw01-office",
+      "hostname": "sw01-office"
+    }
+  ],
+  "adjacencies": [
+    {
+      "protocol": "lldp",
+      "source_device": "router-1",
+      "source_port": "0",
+      "target_device": "elastic-01",
+      "target_port": "ens160"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "router-1",
+      "source_port": "0",
+      "target_device": "onms-hzn",
+      "target_port": "ens160"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "router-1",
+      "source_port": "0",
+      "target_device": "opn-fw-01.clab.labmonkeys.tech",
+      "target_port": "vmx1"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "router-1",
+      "source_port": "0",
+      "target_device": "router-2",
+      "target_port": "ether1"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "router-1",
+      "source_port": "0",
+      "target_device": "sw01-office",
+      "target_port": "gi5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "router-2",
+      "source_port": "0",
+      "target_device": "elastic-01",
+      "target_port": "ens160"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "router-2",
+      "source_port": "0",
+      "target_device": "onms-hzn",
+      "target_port": "ens160"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "router-2",
+      "source_port": "0",
+      "target_device": "opn-fw-01.clab.labmonkeys.tech",
+      "target_port": "vmx1"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "router-2",
+      "source_port": "0",
+      "target_device": "router-1",
+      "target_port": "ether1"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "router-2",
+      "source_port": "0",
+      "target_device": "sw01-office",
+      "target_port": "gi5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "sw01-office",
+      "source_port": "gi10",
+      "target_device": "chassis-5835d994cdab",
+      "target_port": "g8"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "sw01-office",
+      "source_port": "gi5",
+      "target_device": "elastic-01",
+      "target_port": "00 50 56 82 23 35"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "sw01-office",
+      "source_port": "gi5",
+      "target_device": "esx.labmonkeys.tech",
+      "target_port": "30 BF 01 12 10 02"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "sw01-office",
+      "source_port": "gi5",
+      "target_device": "onms-hzn",
+      "target_port": "00 50 56 82 62 AB"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "sw01-office",
+      "source_port": "gi5",
+      "target_device": "opn-fw-01.clab.labmonkeys.tech",
+      "target_port": "00 50 56 82 20 E2"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "sw01-office",
+      "source_port": "gi5",
+      "target_device": "opn-fw-01.clab.labmonkeys.tech",
+      "target_port": "00 50 56 82 8B A5"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "sw01-office",
+      "source_port": "gi5",
+      "target_device": "router-1",
+      "target_port": "ether1"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "sw01-office",
+      "source_port": "gi5",
+      "target_device": "router-2",
+      "target_port": "ether1"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "sw01-office",
+      "source_port": "gi8",
+      "target_device": "fritz.box",
+      "target_port": "3C A6 2F 63 8D CD"
+    }
+  ],
+  "expectations": {
+    "directional_adjacencies": 19,
+    "bidirectional_pairs": 0,
+    "devices": 9
+  }
+}

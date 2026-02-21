@@ -1,0 +1,50 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd
+scenarios:
+  - id: nms8000_cdp
+    description: >-
+      Enlinkd NMS-8000 CDP parity scenario from OpenNMS integration test
+      corpus.
+    protocols:
+      lldp: false
+      cdp: true
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: nmmr1
+        walk_file: ../upstream/linkd/nms8000/NMM-R1.snmpwalk.txt
+      - device_id: nmmr2
+        walk_file: ../upstream/linkd/nms8000/NMM-R2.snmpwalk.txt
+      - device_id: nmmr3
+        walk_file: ../upstream/linkd/nms8000/NMM-R3.snmpwalk.txt
+      - device_id: nmmsw1
+        walk_file: ../upstream/linkd/nms8000/NMM-SW1.snmpwalk.txt
+      - device_id: nmmsw2
+        walk_file: ../upstream/linkd/nms8000/NMM-SW2.snmpwalk.txt
+    golden_yaml: golden/nms8000_cdp.yaml
+    golden_json: golden/nms8000_cdp.json
+  - id: nms8000_lldp
+    description: >-
+      Enlinkd NMS-8000 LLDP parity scenario. Upstream test uses NMS-8003 LLDP
+      walk resources via Nms8000NetworkBuilder *_SNMP_RESOURCE_2.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: nmmr1
+        walk_file: ../upstream/linkd/nms8003/NMM-R1.snmpwalk.txt
+      - device_id: nmmr2
+        walk_file: ../upstream/linkd/nms8003/NMM-R2.snmpwalk.txt
+      - device_id: nmmr3
+        walk_file: ../upstream/linkd/nms8003/NMM-R3.snmpwalk.txt
+      - device_id: nmmsw1
+        walk_file: ../upstream/linkd/nms8003/NMM-SW1.snmpwalk.txt
+      - device_id: nmmsw2
+        walk_file: ../upstream/linkd/nms8003/NMM-SW2.snmpwalk.txt
+    golden_yaml: golden/nms8000_lldp.yaml
+    golden_json: golden/nms8000_lldp.json

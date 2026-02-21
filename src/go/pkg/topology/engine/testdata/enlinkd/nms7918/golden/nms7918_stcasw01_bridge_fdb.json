@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "scenario_id": "nms7918_stcasw01_bridge_fdb",
+  "description": "Enlinkd NMS-7918 bridge/FDB parity slice for STCASW01 collection.",
+  "devices": [
+    {
+      "id": "stcasw01",
+      "hostname": "stc.asw01"
+    }
+  ],
+  "adjacencies": null,
+  "expectations": {
+    "directional_adjacencies": 0,
+    "bidirectional_pairs": 0,
+    "devices": 1
+  }
+}
