@@ -10,7 +10,11 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	probing "github.com/prometheus-community/pro-bing"
 	"github.com/stretchr/testify/assert"
@@ -53,6 +57,15 @@ func TestCollector_Init(t *testing.T) {
 				Hosts: []string{"192.0.2.0"},
 			},
 		},
+		"fail when duplicate hosts are configured": {
+			wantFail: true,
+			config: Config{
+				ProberConfig: ProberConfig{
+					Packets: 1,
+				},
+				Hosts: []string{"192.0.2.0", "192.0.2.0"},
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -68,10 +81,6 @@ func TestCollector_Init(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestCollector_Charts(t *testing.T) {
-	assert.NotNil(t, New().Charts())
 }
 
 func TestCollector_Cleanup(t *testing.T) {
@@ -106,71 +115,79 @@ func TestCollector_Check(t *testing.T) {
 	}
 }
 
+func TestCollector_CheckDoesNotMutateJitterState(t *testing.T) {
+	collr := casePingSuccess(t)
+	require.Empty(t, collr.jitterEWMA)
+	require.Empty(t, collr.jitterSMA)
+
+	require.NoError(t, collr.Check(context.Background()))
+	assert.Empty(t, collr.jitterEWMA)
+	assert.Empty(t, collr.jitterSMA)
+}
+
 func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepare       func(t *testing.T) *Collector
-		wantMetrics   map[string]int64
-		wantNumCharts int
+		prepare    func(t *testing.T) *Collector
+		wantFail   bool
+		wantValues bool
 	}{
 		"success when Ping does not return an error": {
-			prepare: casePingSuccess,
-			wantMetrics: map[string]int64{
-				"host_192.0.2.1_avg_rtt":        15000,
-				"host_192.0.2.1_max_rtt":        20000,
-				"host_192.0.2.1_min_rtt":        10000,
-				"host_192.0.2.1_packet_loss":    0,
-				"host_192.0.2.1_packets_recv":   5,
-				"host_192.0.2.1_packets_sent":   5,
-				"host_192.0.2.1_std_dev_rtt":    5000,
-				"host_192.0.2.1_rtt_variance":   25000000,
-				"host_192.0.2.1_mean_jitter":    2500,
-				"host_192.0.2.1_ewma_jitter":    156,
-				"host_192.0.2.1_sma_jitter":     2500,
-				"host_192.0.2.2_avg_rtt":        15000,
-				"host_192.0.2.2_max_rtt":        20000,
-				"host_192.0.2.2_min_rtt":        10000,
-				"host_192.0.2.2_packet_loss":    0,
-				"host_192.0.2.2_packets_recv":   5,
-				"host_192.0.2.2_packets_sent":   5,
-				"host_192.0.2.2_std_dev_rtt":    5000,
-				"host_192.0.2.2_rtt_variance":   25000000,
-				"host_192.0.2.2_mean_jitter":    2500,
-				"host_192.0.2.2_ewma_jitter":    156,
-				"host_192.0.2.2_sma_jitter":     2500,
-				"host_example.com_avg_rtt":      15000,
-				"host_example.com_max_rtt":      20000,
-				"host_example.com_min_rtt":      10000,
-				"host_example.com_packet_loss":  0,
-				"host_example.com_packets_recv": 5,
-				"host_example.com_packets_sent": 5,
-				"host_example.com_std_dev_rtt":  5000,
-				"host_example.com_rtt_variance": 25000000,
-				"host_example.com_mean_jitter":  2500,
-				"host_example.com_ewma_jitter":  156,
-				"host_example.com_sma_jitter":   2500,
-			},
-			wantNumCharts: 3 * len(hostChartsTmpl),
+			prepare:    casePingSuccess,
+			wantFail:   false,
+			wantValues: true,
 		},
 		"fail when Ping returns an error": {
-			prepare:       casePingError,
-			wantMetrics:   nil,
-			wantNumCharts: 0,
+			prepare:    casePingError,
+			wantFail:   false,
+			wantValues: false,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare(t)
-
-			mx := collr.Collect(context.Background())
-
-			require.Equal(t, test.wantMetrics, mx)
-
-			if len(test.wantMetrics) > 0 {
-				assert.Len(t, *collr.Charts(), test.wantNumCharts)
+			cc := mustCycleController(t, collr.MetricStore())
+			cc.BeginCycle()
+			err := collr.Collect(context.Background())
+			if test.wantFail {
+				cc.AbortCycle()
+				assert.Error(t, err)
+				return
 			}
+			require.NoError(t, err)
+			cc.CommitCycleSuccess()
+
+			labels := metrix.Labels{"host": "192.0.2.1"}
+			if !test.wantValues {
+				_, ok := collr.MetricStore().Read(metrix.ReadRaw()).Value("min_rtt", labels)
+				assert.False(t, ok)
+				return
+			}
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "min_rtt", labels, 10)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "max_rtt", labels, 20)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "avg_rtt", labels, 15)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "std_dev_rtt", labels, 5)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "rtt_variance", labels, 25)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "mean_jitter", labels, 2.5)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "ewma_jitter", labels, 0.15625)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "sma_jitter", labels, 2.5)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "packets_recv", labels, 5)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "packets_sent", labels, 5)
+			assertMetricValue(t, collr.MetricStore().Read(metrix.ReadRaw()), "packet_loss", labels, 0)
 		})
 	}
+}
+
+func TestCollector_ChartTemplateYAML(t *testing.T) {
+	templateYAML := New().ChartTemplateYAML()
+	collecttest.AssertChartTemplateSchema(t, templateYAML)
+
+	spec, err := charttpl.DecodeYAML([]byte(templateYAML))
+	require.NoError(t, err)
+	require.NoError(t, spec.Validate())
+
+	_, err = chartengine.Compile(spec, 1)
+	require.NoError(t, err)
 }
 
 func casePingSuccess(t *testing.T) *Collector {
@@ -285,6 +302,20 @@ func TestCollector_UpdateSMAJitter(t *testing.T) {
 	// Fourth call: window slides [2000, 3000, 4000] -> sma = 3000
 	got = collr.updateSMAJitter("host1", time.Microsecond*4000)
 	assert.Equal(t, time.Microsecond*3000, got)
+}
+
+func mustCycleController(t *testing.T, store metrix.CollectorStore) metrix.CycleController {
+	t.Helper()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok, "store does not expose cycle control")
+	return managed.CycleController()
+}
+
+func assertMetricValue(t *testing.T, r metrix.Reader, name string, labels metrix.Labels, want float64) {
+	t.Helper()
+	got, ok := r.Value(name, labels)
+	require.Truef(t, ok, "expected metric %s labels=%v", name, labels)
+	assert.InDeltaf(t, want, got, 1e-9, "unexpected metric value for %s labels=%v", name, labels)
 }
 
 type mockProber struct {

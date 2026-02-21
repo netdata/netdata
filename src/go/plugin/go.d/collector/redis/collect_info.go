@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const (
@@ -82,8 +82,8 @@ func (c *Collector) collectInfo(mx map[string]int64, info string) {
 		case field == "aof_enabled" && value == "1":
 			c.addAOFChartsOnce.Do(c.addAOFCharts)
 		case field == "master_link_status":
-			mx["master_link_status_up"] = metrix.Bool(value == "up")
-			mx["master_link_status_down"] = metrix.Bool(value == "down")
+			mx["master_link_status_up"] = oldmetrix.Bool(value == "up")
+			mx["master_link_status_down"] = oldmetrix.Bool(value == "down")
 		default:
 			collectNumericValue(mx, field, value)
 		}

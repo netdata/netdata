@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -47,7 +47,7 @@ func (c *Collector) collectMntr() (map[string]int64, error) {
 		switch key {
 		case "server_state":
 			for _, v := range zkServerStates {
-				mx[key+"_"+v] = metrix.Bool(v == value)
+				mx[key+"_"+v] = oldmetrix.Bool(v == value)
 			}
 		case "min_latency", "avg_latency", "max_latency":
 			writeMetric(mx, key, value, 1000, 1)

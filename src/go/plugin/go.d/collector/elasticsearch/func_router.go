@@ -54,8 +54,8 @@ func elasticsearchMethods() []funcapi.MethodConfig {
 	}
 }
 
-func elasticsearchFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
+func elasticsearchFunctionHandler(job module.RuntimeJob) funcapi.MethodHandler {
+	c, ok := job.Collector().(*Collector)
 	if !ok {
 		return nil
 	}

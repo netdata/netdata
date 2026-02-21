@@ -5,7 +5,7 @@ package vcsa
 import (
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 var componentHealthStatuses = []string{"green", "red", "yellow", "orange", "gray"}
@@ -83,8 +83,8 @@ func writeStatus(mx map[string]int64, key string, statuses []string, status *str
 
 	var found bool
 	for _, s := range statuses {
-		mx[key+"_status_"+s] = metrix.Bool(s == *status)
+		mx[key+"_status_"+s] = oldmetrix.Bool(s == *status)
 		found = found || s == *status
 	}
-	mx[key+"_status_unknown"] = metrix.Bool(!found)
+	mx[key+"_status_unknown"] = oldmetrix.Bool(!found)
 }

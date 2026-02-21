@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 type statsResponse struct {
@@ -89,10 +89,10 @@ func (c *Collector) collectStats(mx map[string]int64, stats []byte) error {
 		mx[px+"memory_vsz"] = w.VSZ
 
 		for _, v := range []string{"idle", "busy", "cheap", "pause", "sig"} {
-			mx[px+"status_"+v] = metrix.Bool(w.Status == v)
+			mx[px+"status_"+v] = oldmetrix.Bool(w.Status == v)
 		}
-		mx[px+"request_handling_status_accepting"] = metrix.Bool(w.Accepting == 1)
-		mx[px+"request_handling_status_not_accepting"] = metrix.Bool(w.Accepting == 0)
+		mx[px+"request_handling_status_accepting"] = oldmetrix.Bool(w.Accepting == 1)
+		mx[px+"request_handling_status_not_accepting"] = oldmetrix.Bool(w.Accepting == 0)
 	}
 
 	for id := range c.seenWorkers {

@@ -55,8 +55,8 @@ func snmpMethods() []funcapi.MethodConfig {
 	}
 }
 
-func snmpFunctionHandler(job *module.Job) funcapi.MethodHandler {
-	c, ok := job.Module().(*Collector)
+func snmpFunctionHandler(job module.RuntimeJob) funcapi.MethodHandler {
+	c, ok := job.Collector().(*Collector)
 	if !ok {
 		return nil
 	}

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
@@ -83,7 +83,7 @@ func (c *Collector) collectMetricsModeColumns(mx map[string]int64, m ConfigMetri
 				if d.StatusWhen == nil {
 					mx[id] += toInt64(raw)
 				} else if v, ok := mx[id]; !ok || v == 0 {
-					mx[id] = metrix.Bool(c.evalStatusWhen(d.StatusWhen, raw))
+					mx[id] = oldmetrix.Bool(c.evalStatusWhen(d.StatusWhen, raw))
 				}
 			}
 		}
@@ -123,7 +123,7 @@ func (c *Collector) collectMetricsModeKV(mx map[string]int64, m ConfigMetricBloc
 				if d.StatusWhen == nil {
 					mx[id] += toInt64(vraw)
 				} else if v, ok := mx[id]; !ok || v == 0 {
-					mx[id] = metrix.Bool(c.evalStatusWhen(d.StatusWhen, vraw))
+					mx[id] = oldmetrix.Bool(c.evalStatusWhen(d.StatusWhen, vraw))
 				}
 			}
 		}

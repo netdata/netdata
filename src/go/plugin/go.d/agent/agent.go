@@ -21,6 +21,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimemgr"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 
 	"github.com/mattn/go-isatty"
@@ -258,6 +259,11 @@ func (a *Agent) run(ctx context.Context) {
 	}
 	jobMgr.ConfigDefaults = discCfg.Registry
 	jobMgr.FnReg = fnMgr
+
+	runtimeSvc := runtimemgr.New(a.Logger.With(slog.String("component", "runtime metrics service")))
+	runtimeSvc.Start(a.Name, a.Out)
+	defer runtimeSvc.Stop()
+	jobMgr.RuntimeService = runtimeSvc
 
 	// Store reference for dump mode and enable dump mode if configured
 	a.mgr = jobMgr

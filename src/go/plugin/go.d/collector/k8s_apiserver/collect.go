@@ -13,7 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const (

@@ -24,6 +24,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 
 	"github.com/mattn/go-isatty"
@@ -36,7 +37,6 @@ func New() *Manager {
 	seen := dyncfg.NewSeenCache[confgroup.Config]()
 	exposed := dyncfg.NewExposedCache[confgroup.Config]()
 	api := dyncfg.NewResponder(netdataapi.New(safewriter.Stdout))
-
 	mgr := &Manager{
 		Logger: logger.New().With(
 			slog.String("component", "job manager"),
@@ -136,6 +136,10 @@ type Manager struct {
 
 	// FunctionJSONWriter, when set, bypasses Netdata protocol output and writes raw JSON.
 	FunctionJSONWriter func(payload []byte, code int)
+
+	// RuntimeService is an optional runtime/internal metrics registration seam.
+	// When set, V2 jobs may register per-job runtime components.
+	RuntimeService runtimecomp.Service
 }
 
 func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
@@ -359,13 +363,13 @@ func (m *Manager) runNotifyRunningJobs() {
 			return
 		case clock := <-tk.C:
 			m.runningJobs.lock()
-			m.runningJobs.forEach(func(_ string, job *module.Job) { job.Tick(clock) })
+			m.runningJobs.forEach(func(_ string, job runtimeJob) { job.Tick(clock) })
 			m.runningJobs.unlock()
 		}
 	}
 }
 
-func (m *Manager) startRunningJob(job *module.Job) {
+func (m *Manager) startRunningJob(job runtimeJob) {
 	m.stopRunningJob(job.FullName())
 
 	m.runningJobs.lock()
@@ -374,16 +378,17 @@ func (m *Manager) startRunningJob(job *module.Job) {
 	go job.Start()
 	m.runningJobs.add(job.FullName(), job)
 
-	// Track job for module function routing
+	// Track job for module function routing.
 	m.moduleFuncs.addJob(job.ModuleName(), job.Name(), job)
 
 	// Register job-specific methods if module provides JobMethods callback
 	creator, ok := m.Modules.Lookup(job.ModuleName())
-	if ok && creator.JobMethods != nil {
-		methods := creator.JobMethods(job)
-		if len(methods) > 0 {
-			m.registerJobMethods(job, methods)
-		}
+	if !ok || creator.JobMethods == nil {
+		return
+	}
+	methods := creator.JobMethods(job)
+	if len(methods) > 0 {
+		m.registerJobMethods(job, methods)
 	}
 }
 
@@ -396,10 +401,9 @@ func (m *Manager) stopRunningJob(name string) {
 	m.runningJobs.unlock()
 
 	if ok {
-		// Unregister job-specific methods
+		// Unregister job-specific methods.
 		m.unregisterJobMethods(job)
-
-		// Remove job from module function registry
+		// Remove job from module function registry.
 		m.moduleFuncs.removeJob(job.ModuleName(), job.Name())
 		job.Stop()
 	}
@@ -425,13 +429,13 @@ func (m *Manager) cleanup() {
 	m.runningJobs.lock()
 	defer m.runningJobs.unlock()
 
-	m.runningJobs.forEach(func(key string, job *module.Job) {
+	m.runningJobs.forEach(func(_ string, job runtimeJob) {
 		job.Stop()
 	})
 }
 
 // registerJobMethods registers methods for a specific job with Netdata
-func (m *Manager) registerJobMethods(job *module.Job, methods []funcapi.MethodConfig) {
+func (m *Manager) registerJobMethods(job module.RuntimeJob, methods []funcapi.MethodConfig) {
 	for _, method := range methods {
 		if method.ID == "" {
 			m.Warningf("skipping job method registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
@@ -473,7 +477,7 @@ func (m *Manager) registerJobMethods(job *module.Job, methods []funcapi.MethodCo
 }
 
 // unregisterJobMethods unregisters methods for a specific job
-func (m *Manager) unregisterJobMethods(job *module.Job) {
+func (m *Manager) unregisterJobMethods(job module.RuntimeJob) {
 	methods := m.moduleFuncs.getJobMethods(job.ModuleName(), job.Name())
 	if len(methods) == 0 {
 		return
@@ -499,7 +503,7 @@ func (m *Manager) unregisterJobMethods(job *module.Job) {
 	m.moduleFuncs.unregisterJobMethods(job.ModuleName(), job.Name())
 }
 
-func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) {
+func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 	creator, ok := m.Modules[cfg.Module()]
 	if !ok {
 		return nil, fmt.Errorf("can not find %s module", cfg.Module())
@@ -526,12 +530,6 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) 
 
 	m.Debugf("creating %s[%s] job, config: %v", cfg.Module(), cfg.Name(), cfg)
 
-	mod := creator.Create()
-
-	if err := applyConfig(cfg, mod); err != nil {
-		return nil, err
-	}
-
 	var jobDumpDir string
 	if m.DumpDataDir != "" {
 		jobDumpDir = filepath.Join(m.DumpDataDir, sanitizeName(cfg.Module()), sanitizeName(cfg.Name()))
@@ -541,6 +539,54 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) 
 		if analyzer, ok := m.DumpAnalyzer.(interface{ RegisterJob(string, string, string) }); ok {
 			analyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
 		}
+	}
+
+	useV2 := creator.CreateV2 != nil
+	if useV2 {
+		mod := creator.CreateV2()
+		if mod == nil {
+			return nil, fmt.Errorf("module %s CreateV2 returned nil", cfg.Module())
+		}
+		if err := applyConfig(cfg, mod); err != nil {
+			return nil, err
+		}
+		if jobDumpDir != "" {
+			if dumpAware, ok := mod.(interface{ EnableDump(string) }); ok {
+				dumpAware.EnableDump(jobDumpDir)
+			}
+		}
+
+		jobCfg := module.JobV2Config{
+			PluginName:      m.PluginName,
+			Name:            cfg.Name(),
+			ModuleName:      cfg.Module(),
+			FullName:        cfg.FullName(),
+			UpdateEvery:     cfg.UpdateEvery(),
+			AutoDetectEvery: cfg.AutoDetectionRetry(),
+			IsStock:         cfg.SourceType() == "stock",
+			Labels:          makeLabels(cfg),
+			Out:             m.Out,
+			Module:          mod,
+			FunctionOnly:    functionOnly,
+			RuntimeService:  m.RuntimeService,
+		}
+		if vnode != nil {
+			jobCfg.Vnode = *vnode.Copy()
+		}
+		return module.NewJobV2(jobCfg), nil
+	}
+
+	if creator.Create == nil {
+		return nil, fmt.Errorf("module %s has no compatible creator", cfg.Module())
+	}
+
+	mod := creator.Create()
+
+	if err := applyConfig(cfg, mod); err != nil {
+		return nil, err
+	}
+
+	if jobDumpDir != "" {
 		if dumpAware, ok := mod.(interface{ EnableDump(string) }); ok {
 			dumpAware.EnableDump(jobDumpDir)
 		}
@@ -604,6 +650,24 @@ func isStock(cfg confgroup.Config) bool {
 
 func isDyncfg(cfg confgroup.Config) bool {
 	return cfg.SourceType() == confgroup.TypeDyncfg
+}
+
+func newConfigModule(creator module.Creator) (configModule, error) {
+	if creator.CreateV2 != nil {
+		mod := creator.CreateV2()
+		if mod == nil {
+			return nil, fmt.Errorf("CreateV2 returned nil")
+		}
+		return mod, nil
+	}
+	if creator.Create == nil {
+		return nil, fmt.Errorf("no module creator is defined")
+	}
+	mod := creator.Create()
+	if mod == nil {
+		return nil, fmt.Errorf("Create returned nil")
+	}
+	return mod, nil
 }
 
 func applyConfig(cfg confgroup.Config, module any) error {
