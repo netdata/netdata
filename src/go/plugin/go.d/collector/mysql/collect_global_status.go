@@ -10,6 +10,7 @@ import (
 
 const queryShowGlobalStatus = "SHOW GLOBAL STATUS;"
 const queryShowGlobalStatusProbe = "SHOW GLOBAL STATUS LIKE 'Threads_connected';"
+const queryShowGlobalStatusGaleraProbe = "SHOW GLOBAL STATUS LIKE 'wsrep_received';"
 
 func (c *Collector) probeGlobalStatus(ctx context.Context) error {
 	q := queryShowGlobalStatusProbe
@@ -30,6 +31,29 @@ func (c *Collector) probeGlobalStatus(ctx context.Context) error {
 	return nil
 }
 
+func (c *Collector) probeGaleraStatus(ctx context.Context) error {
+	if c.galeraProbeDone {
+		return nil
+	}
+
+	q := queryShowGlobalStatusGaleraProbe
+	c.Debugf("executing query: '%s'", q)
+
+	var hasRows bool
+	_, err := c.collectQuery(ctx, q, func(_, _ string, lineEnd bool) {
+		if lineEnd {
+			hasRows = true
+		}
+	})
+	if err != nil {
+		return err
+	}
+
+	c.galeraDetected = c.galeraDetected || hasRows
+	c.galeraProbeDone = true
+	return nil
+}
+
 func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunState, writeMetrics bool) error {
 	// MariaDB: https://mariadb.com/kb/en/server-status-variables/
 	// MySQL: https://dev.mysql.com/doc/refman/8.0/en/server-status-variable-reference.html
@@ -42,7 +66,12 @@ func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunSt
 		case "Variable_name":
 			name = value
 		case "Value":
-			switch name {
+			metricName := strings.ToLower(name)
+			if isGaleraMetric(metricName) && !c.galeraDetected {
+				return
+			}
+
+			switch metricName {
 			case "wsrep_connected":
 				parsedValue := parseInt(convertWsrepConnected(value))
 				if writeMetrics {
@@ -62,7 +91,6 @@ func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunSt
 					c.mx.setWsrepClusterStatus(value)
 				}
 			default:
-				metricName := strings.ToLower(name)
 				parsedValue := parseInt(value)
 				if writeMetrics {
 					c.mx.set(metricName, parsedValue)
@@ -78,6 +106,10 @@ func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunSt
 		}
 	})
 	return err
+}
+
+func isGaleraMetric(name string) bool {
+	return strings.HasPrefix(name, "wsrep_")
 }
 
 func convertWsrepConnected(val string) string {

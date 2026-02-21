@@ -28,7 +28,14 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataSessionVariables, _ = os.ReadFile("testdata/session_variables.txt")
+	dataSessionVariables, _            = os.ReadFile("testdata/session_variables.txt")
+	dataGlobalStatusProbeWsrepReceived = []byte(`
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| wsrep_received | 11   |
++---------------+-------+
+`)
 
 	dataMySQLVer8030Version, _                  = os.ReadFile("testdata/mysql/v8.0.30/version.txt")
 	dataMySQLVer8030GlobalStatus, _             = os.ReadFile("testdata/mysql/v8.0.30/global_status.txt")
@@ -75,6 +82,7 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataConfigJSON":                                  dataConfigJSON,
 		"dataConfigYAML":                                  dataConfigYAML,
 		"dataSessionVariables":                            dataSessionVariables,
+		"dataGlobalStatusProbeWsrepReceived":              dataGlobalStatusProbeWsrepReceived,
 		"dataMySQLVer8030Version":                         dataMySQLVer8030Version,
 		"dataMySQLVer8030GlobalStatus":                    dataMySQLVer8030GlobalStatus,
 		"dataMySQLVer8030GlobalVariables":                 dataMySQLVer8030GlobalVariables,
@@ -194,6 +202,7 @@ func TestCollector_Check(t *testing.T) {
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
 				mockExpect(t, m, queryShowGlobalStatusProbe, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowGlobalStatusGaleraProbe, nil)
 				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 			},
 		},
@@ -215,6 +224,7 @@ func TestCollector_Check(t *testing.T) {
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
 				mockExpect(t, m, queryShowGlobalStatusProbe, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowGlobalStatusGaleraProbe, nil)
 				mockExpectErr(m, queryShowGlobalVariables)
 			},
 		},
@@ -254,6 +264,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer1145Version)
+					mockExpect(t, m, queryShowGlobalStatusGaleraProbe, nil)
 					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
@@ -424,11 +435,6 @@ func TestCollector_Collect(t *testing.T) {
 						"userstats_select_commands{user=\"root\"}":          0,
 						"userstats_total_connections{user=\"root\"}":        1,
 						"userstats_update_commands{user=\"root\"}":          0,
-						"wsrep_cluster_size":                                0,
-						"wsrep_connected":                                   0,
-						"wsrep_local_bf_aborts":                             0,
-						"wsrep_ready":                                       0,
-						"wsrep_thread_count":                                0,
 					}
 
 					copyProcessListQueryDuration(mx, expected)
@@ -440,6 +446,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer5564Version)
+					mockExpect(t, m, queryShowGlobalStatusGaleraProbe, nil)
 					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
@@ -589,6 +596,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowGlobalStatusGaleraProbe, nil)
 					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
@@ -760,11 +768,6 @@ func TestCollector_Collect(t *testing.T) {
 						"userstats_select_commands{user=\"root\"}":          0,
 						"userstats_total_connections{user=\"root\"}":        1,
 						"userstats_update_commands{user=\"root\"}":          0,
-						"wsrep_cluster_size":                                0,
-						"wsrep_connected":                                   0,
-						"wsrep_local_bf_aborts":                             0,
-						"wsrep_ready":                                       0,
-						"wsrep_thread_count":                                0,
 					}
 
 					copyProcessListQueryDuration(mx, expected)
@@ -776,6 +779,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowGlobalStatusGaleraProbe, nil)
 					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
@@ -949,11 +953,6 @@ func TestCollector_Collect(t *testing.T) {
 						"userstats_select_commands{user=\"root\"}":          0,
 						"userstats_total_connections{user=\"root\"}":        1,
 						"userstats_update_commands{user=\"root\"}":          0,
-						"wsrep_cluster_size":                                0,
-						"wsrep_connected":                                   0,
-						"wsrep_local_bf_aborts":                             0,
-						"wsrep_ready":                                       0,
-						"wsrep_thread_count":                                0,
 					}
 
 					copyProcessListQueryDuration(mx, expected)
@@ -970,6 +969,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowGlobalStatusGaleraProbe, nil)
 					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
@@ -1146,11 +1146,6 @@ func TestCollector_Collect(t *testing.T) {
 						"userstats_select_commands{user=\"root\"}":          0,
 						"userstats_total_connections{user=\"root\"}":        1,
 						"userstats_update_commands{user=\"root\"}":          0,
-						"wsrep_cluster_size":                                0,
-						"wsrep_connected":                                   0,
-						"wsrep_local_bf_aborts":                             0,
-						"wsrep_ready":                                       0,
-						"wsrep_thread_count":                                0,
 					}
 
 					copyProcessListQueryDuration(mx, expected)
@@ -1162,6 +1157,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowGlobalStatusGaleraProbe, nil)
 					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
@@ -1332,11 +1328,6 @@ func TestCollector_Collect(t *testing.T) {
 						"userstats_select_commands{user=\"root\"}":          0,
 						"userstats_total_connections{user=\"root\"}":        1,
 						"userstats_update_commands{user=\"root\"}":          0,
-						"wsrep_cluster_size":                                0,
-						"wsrep_connected":                                   0,
-						"wsrep_local_bf_aborts":                             0,
-						"wsrep_ready":                                       0,
-						"wsrep_thread_count":                                0,
 					}
 
 					copyProcessListQueryDuration(mx, expected)
@@ -1348,6 +1339,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaGaleraClusterVer1084Version)
+					mockExpect(t, m, queryShowGlobalStatusGaleraProbe, dataGlobalStatusProbeWsrepReceived)
 					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
@@ -1553,6 +1545,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMySQLVer8030Version)
+					mockExpect(t, m, queryShowGlobalStatusGaleraProbe, nil)
 					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
@@ -1699,6 +1692,7 @@ func TestCollector_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataPerconaVer8029Version)
+					mockExpect(t, m, queryShowGlobalStatusGaleraProbe, nil)
 					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
