@@ -38,6 +38,7 @@ void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host) {
 
                 // Pre-clear last_slot so that rrdset_pluginsd_receive_unslot_and_cleanup
                 // won't try to re-acquire the host spinlock we already hold.
+                // This prevents recursive locking on pluginsd_chart_slots.spinlock.
                 // We're freeing the entire host slots array below, so clearing individual
                 // slot entries is unnecessary.
                 st->pluginsd.last_slot = -1;
