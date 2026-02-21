@@ -35,6 +35,13 @@ void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host) {
                 // (stream_receiver_signal_to_stop_and_wait was called before this)
                 // so it's safe to cleanup regardless of the previous collector_tid value
                 __atomic_store_n(&st->pluginsd.collector_tid, 0, __ATOMIC_RELEASE);
+
+                // Pre-clear last_slot so that rrdset_pluginsd_receive_unslot_and_cleanup
+                // won't try to re-acquire the host spinlock we already hold.
+                // We're freeing the entire host slots array below, so clearing individual
+                // slot entries is unnecessary.
+                st->pluginsd.last_slot = -1;
+
                 rrdset_pluginsd_receive_unslot_and_cleanup(st);
             }
         }
