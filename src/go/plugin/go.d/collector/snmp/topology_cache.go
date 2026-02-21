@@ -25,10 +25,17 @@ const (
 	metricLldpRemManAddrCompat = "lldpRemManAddrCompatEntry"
 	metricCdpCacheEntry        = "cdpCacheEntry"
 	metricTopologyIfNameEntry  = "topologyIfNameEntry"
+	metricTopologyIPIfEntry    = "topologyIpIfIndexEntry"
 	metricBridgePortMapEntry   = "dot1dBasePortIfIndexEntry"
 	metricFdbEntry             = "dot1dTpFdbEntry"
 	metricArpEntry             = "ipNetToPhysicalEntry"
 	metricArpLegacyEntry       = "ipNetToMediaEntry"
+	metricOspfGeneralEntry     = "ospfGeneralEntry"
+	metricOspfIfEntry          = "ospfIfTopologyEntry"
+	metricOspfNbrEntry         = "ospfNbrTopologyEntry"
+	metricIsisSysEntry         = "isisSysObjectEntry"
+	metricIsisCircEntry        = "isisCircEntry"
+	metricIsisAdjEntry         = "isisISAdjEntry"
 )
 
 const (
@@ -96,6 +103,8 @@ const (
 
 	tagTopoIfIndex = "topo_if_index"
 	tagTopoIfName  = "topo_if_name"
+	tagTopoIPAddr  = "topo_ip_addr"
+	tagTopoIPMask  = "topo_ip_netmask"
 
 	tagBridgeBasePort = "bridge_base_port"
 	tagBridgeIfIndex  = "bridge_if_index"
@@ -111,6 +120,32 @@ const (
 	tagArpType     = "arp_type"
 	tagArpState    = "arp_state"
 	tagArpAddrType = "arp_addr_type"
+
+	tagOspfRouterID           = "ospf_router_id"
+	tagOspfAdminState         = "ospf_admin_state"
+	tagOspfVersionNumber      = "ospf_version_number"
+	tagOspfAreaBdrStatus      = "ospf_area_bdr_rtr_status"
+	tagOspfASBdrStatus        = "ospf_as_bdr_rtr_status"
+	tagOspfIfIPAddr           = "ospf_if_ip_addr"
+	tagOspfIfAddressLessIndex = "ospf_if_address_less_index"
+	tagOspfIfAreaID           = "ospf_if_area_id"
+	tagOspfIfNetmask          = "ospf_if_netmask"
+	tagOspfNbrIPAddr          = "ospf_nbr_ip_addr"
+	tagOspfNbrAddressLess     = "ospf_nbr_address_less_index"
+	tagOspfNbrRouterID        = "ospf_nbr_router_id"
+
+	tagIsisSysID           = "isis_sys_id"
+	tagIsisSysAdminState   = "isis_sys_admin_state"
+	tagIsisCircIndex       = "isis_circ_index"
+	tagIsisCircIfIndex     = "isis_circ_if_index"
+	tagIsisCircAdminState  = "isis_circ_admin_state"
+	tagIsisAdjCircIndex    = "isis_adj_circ_index"
+	tagIsisAdjIndex        = "isis_adj_index"
+	tagIsisAdjState        = "isis_adj_state"
+	tagIsisAdjNeighSNPA    = "isis_adj_neigh_snpa"
+	tagIsisAdjNeighSysType = "isis_adj_neigh_sys_type"
+	tagIsisAdjNeighSysID   = "isis_adj_neigh_sys_id"
+	tagIsisAdjNeighExtCirc = "isis_adj_neigh_extended_circ_id"
 )
 
 var lldpChassisIDSubtypeMap = map[string]string{
@@ -146,9 +181,19 @@ type topologyCache struct {
 	cdpRemotes   map[string]*cdpRemote
 
 	ifNamesByIndex map[string]string
+	ifIndexByIP    map[string]string
+	ifNetmaskByIP  map[string]string
 	bridgePortToIf map[string]string
 	fdbEntries     map[string]*fdbEntry
 	arpEntries     map[string]*arpEntry
+
+	ospfElement *ospfElement
+	ospfIfRows  map[string]*ospfIfEntry
+	ospfNbrRows map[string]*ospfNbrEntry
+
+	isisElement *isisElement
+	isisCircs   map[string]*isisCircEntry
+	isisAdjs    map[string]*isisAdjEntry
 }
 
 type lldpLocPort struct {
@@ -217,15 +262,63 @@ type arpEntry struct {
 	state    string
 }
 
+type ospfElement struct {
+	routerID      string
+	adminState    string
+	versionNumber string
+	areaBdrStatus string
+	asBdrStatus   string
+}
+
+type ospfIfEntry struct {
+	ipAddress        string
+	addressLessIndex string
+	areaID           string
+	netmask          string
+}
+
+type ospfNbrEntry struct {
+	remoteIP         string
+	addressLessIndex string
+	remoteRouterID   string
+}
+
+type isisElement struct {
+	sysID      string
+	adminState string
+}
+
+type isisCircEntry struct {
+	circIndex  string
+	ifIndex    string
+	adminState string
+}
+
+type isisAdjEntry struct {
+	circIndex       string
+	adjIndex        string
+	state           string
+	neighborSNPA    string
+	neighborSysType string
+	neighborSysID   string
+	neighborExtCirc string
+}
+
 func newTopologyCache() *topologyCache {
 	return &topologyCache{
 		lldpLocPorts:   make(map[string]*lldpLocPort),
 		lldpRemotes:    make(map[string]*lldpRemote),
 		cdpRemotes:     make(map[string]*cdpRemote),
 		ifNamesByIndex: make(map[string]string),
+		ifIndexByIP:    make(map[string]string),
+		ifNetmaskByIP:  make(map[string]string),
 		bridgePortToIf: make(map[string]string),
 		fdbEntries:     make(map[string]*fdbEntry),
 		arpEntries:     make(map[string]*arpEntry),
+		ospfIfRows:     make(map[string]*ospfIfEntry),
+		ospfNbrRows:    make(map[string]*ospfNbrEntry),
+		isisCircs:      make(map[string]*isisCircEntry),
+		isisAdjs:       make(map[string]*isisAdjEntry),
 	}
 }
 
@@ -246,9 +339,17 @@ func (c *Collector) resetTopologyCache() {
 	c.topologyCache.lldpRemotes = make(map[string]*lldpRemote)
 	c.topologyCache.cdpRemotes = make(map[string]*cdpRemote)
 	c.topologyCache.ifNamesByIndex = make(map[string]string)
+	c.topologyCache.ifIndexByIP = make(map[string]string)
+	c.topologyCache.ifNetmaskByIP = make(map[string]string)
 	c.topologyCache.bridgePortToIf = make(map[string]string)
 	c.topologyCache.fdbEntries = make(map[string]*fdbEntry)
 	c.topologyCache.arpEntries = make(map[string]*arpEntry)
+	c.topologyCache.ospfElement = nil
+	c.topologyCache.ospfIfRows = make(map[string]*ospfIfEntry)
+	c.topologyCache.ospfNbrRows = make(map[string]*ospfNbrEntry)
+	c.topologyCache.isisElement = nil
+	c.topologyCache.isisCircs = make(map[string]*isisCircEntry)
+	c.topologyCache.isisAdjs = make(map[string]*isisAdjEntry)
 }
 
 func (c *Collector) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
@@ -319,12 +420,26 @@ func (c *Collector) updateTopologyCacheEntry(m ddsnmp.Metric) {
 		c.topologyCache.updateCdpRemote(m.Tags)
 	case metricTopologyIfNameEntry:
 		c.topologyCache.updateIfNameByIndex(m.Tags)
+	case metricTopologyIPIfEntry:
+		c.topologyCache.updateIfIndexByIP(m.Tags)
 	case metricBridgePortMapEntry:
 		c.topologyCache.updateBridgePortMap(m.Tags)
 	case metricFdbEntry:
 		c.topologyCache.updateFdbEntry(m.Tags)
 	case metricArpEntry, metricArpLegacyEntry:
 		c.topologyCache.updateArpEntry(m.Tags)
+	case metricOspfGeneralEntry:
+		c.topologyCache.updateOspfElement(m.Tags)
+	case metricOspfIfEntry:
+		c.topologyCache.updateOspfIfEntry(m.Tags)
+	case metricOspfNbrEntry:
+		c.topologyCache.updateOspfNbrEntry(m.Tags)
+	case metricIsisSysEntry:
+		c.topologyCache.updateIsisElement(m.Tags)
+	case metricIsisCircEntry:
+		c.topologyCache.updateIsisCircEntry(m.Tags)
+	case metricIsisAdjEntry:
+		c.topologyCache.updateIsisAdjEntry(m.Tags)
 	}
 }
 
@@ -342,7 +457,8 @@ func (c *Collector) finalizeTopologyCache() {
 func isTopologyMetric(name string) bool {
 	switch name {
 	case metricLldpLocPortEntry, metricLldpLocManAddrEntry, metricLldpRemEntry, metricLldpRemManAddrEntry, metricLldpRemManAddrCompat, metricCdpCacheEntry,
-		metricTopologyIfNameEntry, metricBridgePortMapEntry, metricFdbEntry, metricArpEntry, metricArpLegacyEntry:
+		metricTopologyIfNameEntry, metricTopologyIPIfEntry, metricBridgePortMapEntry, metricFdbEntry, metricArpEntry, metricArpLegacyEntry,
+		metricOspfGeneralEntry, metricOspfIfEntry, metricOspfNbrEntry, metricIsisSysEntry, metricIsisCircEntry, metricIsisAdjEntry:
 		return true
 	default:
 		return false
@@ -629,6 +745,150 @@ func (c *topologyCache) updateIfNameByIndex(tags map[string]string) {
 	}
 
 	c.ifNamesByIndex[ifIndex] = ifName
+}
+
+func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
+	ifIndex := strings.TrimSpace(tags[tagTopoIfIndex])
+	if ifIndex == "" {
+		return
+	}
+
+	ip := normalizeIPAddress(tags[tagTopoIPAddr])
+	if ip == "" {
+		return
+	}
+
+	c.ifIndexByIP[ip] = ifIndex
+	if mask := normalizeIPAddress(tags[tagTopoIPMask]); mask != "" {
+		c.ifNetmaskByIP[ip] = mask
+	}
+}
+
+func (c *topologyCache) updateOspfElement(tags map[string]string) {
+	if c.ospfElement == nil {
+		c.ospfElement = &ospfElement{}
+	}
+
+	if v := normalizeIPAddress(tags[tagOspfRouterID]); v != "" {
+		c.ospfElement.routerID = v
+	}
+	if v := strings.TrimSpace(tags[tagOspfAdminState]); v != "" {
+		c.ospfElement.adminState = v
+	}
+	if v := strings.TrimSpace(tags[tagOspfVersionNumber]); v != "" {
+		c.ospfElement.versionNumber = v
+	}
+	if v := strings.TrimSpace(tags[tagOspfAreaBdrStatus]); v != "" {
+		c.ospfElement.areaBdrStatus = v
+	}
+	if v := strings.TrimSpace(tags[tagOspfASBdrStatus]); v != "" {
+		c.ospfElement.asBdrStatus = v
+	}
+}
+
+func (c *topologyCache) updateOspfIfEntry(tags map[string]string) {
+	ip := normalizeIPAddress(tags[tagOspfIfIPAddr])
+	if ip == "" {
+		return
+	}
+
+	entry := c.ospfIfRows[ip]
+	if entry == nil {
+		entry = &ospfIfEntry{ipAddress: ip}
+		c.ospfIfRows[ip] = entry
+	}
+	if v := strings.TrimSpace(tags[tagOspfIfAddressLessIndex]); v != "" {
+		entry.addressLessIndex = v
+	}
+	if v := normalizeIPAddress(tags[tagOspfIfAreaID]); v != "" {
+		entry.areaID = v
+	}
+	if v := normalizeIPAddress(tags[tagOspfIfNetmask]); v != "" {
+		entry.netmask = v
+	}
+}
+
+func (c *topologyCache) updateOspfNbrEntry(tags map[string]string) {
+	remoteIP := normalizeIPAddress(tags[tagOspfNbrIPAddr])
+	addressLess := strings.TrimSpace(tags[tagOspfNbrAddressLess])
+	remoteRouterID := normalizeIPAddress(tags[tagOspfNbrRouterID])
+	if remoteIP == "" && addressLess == "" && remoteRouterID == "" {
+		return
+	}
+
+	key := remoteIP + "|" + remoteRouterID + "|" + addressLess
+	entry := c.ospfNbrRows[key]
+	if entry == nil {
+		entry = &ospfNbrEntry{}
+		c.ospfNbrRows[key] = entry
+	}
+	entry.remoteIP = remoteIP
+	entry.remoteRouterID = remoteRouterID
+	entry.addressLessIndex = addressLess
+}
+
+func (c *topologyCache) updateIsisElement(tags map[string]string) {
+	if c.isisElement == nil {
+		c.isisElement = &isisElement{}
+	}
+	if v := normalizeHexIdentifier(tags[tagIsisSysID]); v != "" {
+		c.isisElement.sysID = v
+	}
+	if v := strings.TrimSpace(tags[tagIsisSysAdminState]); v != "" {
+		c.isisElement.adminState = v
+	}
+}
+
+func (c *topologyCache) updateIsisCircEntry(tags map[string]string) {
+	circIndex := strings.TrimSpace(tags[tagIsisCircIndex])
+	if circIndex == "" {
+		return
+	}
+
+	entry := c.isisCircs[circIndex]
+	if entry == nil {
+		entry = &isisCircEntry{circIndex: circIndex}
+		c.isisCircs[circIndex] = entry
+	}
+	if v := strings.TrimSpace(tags[tagIsisCircIfIndex]); v != "" {
+		entry.ifIndex = v
+	}
+	if v := strings.TrimSpace(tags[tagIsisCircAdminState]); v != "" {
+		entry.adminState = v
+	}
+}
+
+func (c *topologyCache) updateIsisAdjEntry(tags map[string]string) {
+	circIndex := strings.TrimSpace(tags[tagIsisAdjCircIndex])
+	adjIndex := strings.TrimSpace(tags[tagIsisAdjIndex])
+	if circIndex == "" || adjIndex == "" {
+		return
+	}
+
+	key := circIndex + ":" + adjIndex
+	entry := c.isisAdjs[key]
+	if entry == nil {
+		entry = &isisAdjEntry{
+			circIndex: circIndex,
+			adjIndex:  adjIndex,
+		}
+		c.isisAdjs[key] = entry
+	}
+	if v := strings.TrimSpace(tags[tagIsisAdjState]); v != "" {
+		entry.state = v
+	}
+	if v := normalizeHexIdentifier(tags[tagIsisAdjNeighSNPA]); v != "" {
+		entry.neighborSNPA = v
+	}
+	if v := strings.TrimSpace(tags[tagIsisAdjNeighSysType]); v != "" {
+		entry.neighborSysType = v
+	}
+	if v := normalizeHexIdentifier(tags[tagIsisAdjNeighSysID]); v != "" {
+		entry.neighborSysID = v
+	}
+	if v := strings.TrimSpace(tags[tagIsisAdjNeighExtCirc]); v != "" {
+		entry.neighborExtCirc = v
+	}
 }
 
 func (c *topologyCache) updateBridgePortMap(tags map[string]string) {
@@ -1277,6 +1537,134 @@ func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyeng
 	return observation
 }
 
+func (c *topologyCache) buildEngineL3Observation(local topologyengine.L2Observation) topologyengine.L3Observation {
+	observation := topologyengine.L3Observation{
+		DeviceID:     strings.TrimSpace(local.DeviceID),
+		Hostname:     strings.TrimSpace(local.Hostname),
+		ManagementIP: normalizeIPAddress(local.ManagementIP),
+		SysObjectID:  strings.TrimSpace(local.SysObjectID),
+		ChassisID:    strings.TrimSpace(local.ChassisID),
+	}
+
+	if len(local.Interfaces) > 0 {
+		observation.Interfaces = append(observation.Interfaces, local.Interfaces...)
+	}
+
+	if c.ospfElement != nil && parseIndex(c.ospfElement.adminState) == 1 {
+		observation.OSPFElement = &topologyengine.OSPFElementObservation{
+			RouterID:         normalizeIPAddress(c.ospfElement.routerID),
+			AdminState:       parseIndex(c.ospfElement.adminState),
+			VersionNumber:    parseIndex(c.ospfElement.versionNumber),
+			AreaBorderRouter: parseIndex(c.ospfElement.areaBdrStatus),
+			ASBorderRouter:   parseIndex(c.ospfElement.asBdrStatus),
+		}
+	}
+
+	ospfIfKeys := make([]string, 0, len(c.ospfIfRows))
+	for key := range c.ospfIfRows {
+		ospfIfKeys = append(ospfIfKeys, key)
+	}
+	sort.Strings(ospfIfKeys)
+	for _, key := range ospfIfKeys {
+		entry := c.ospfIfRows[key]
+		if entry == nil {
+			continue
+		}
+
+		localIP := normalizeIPAddress(entry.ipAddress)
+		if localIP == "" {
+			continue
+		}
+
+		ifIndex := parseIndex(entry.addressLessIndex)
+		if ifIndex <= 0 {
+			ifIndex = parseIndex(c.ifIndexByIP[localIP])
+		}
+		ifName := ""
+		if ifIndex > 0 {
+			ifName = strings.TrimSpace(c.ifNamesByIndex[strconv.Itoa(ifIndex)])
+		}
+		netmask := normalizeIPAddress(entry.netmask)
+		if netmask == "" {
+			netmask = normalizeIPAddress(c.ifNetmaskByIP[localIP])
+		}
+
+		observation.OSPFIfTable = append(observation.OSPFIfTable, topologyengine.OSPFInterfaceObservation{
+			IP:             localIP,
+			AddressLessIdx: parseIndex(entry.addressLessIndex),
+			AreaID:         normalizeIPAddress(entry.areaID),
+			IfIndex:        ifIndex,
+			IfName:         ifName,
+			Netmask:        netmask,
+		})
+	}
+
+	ospfNbrKeys := make([]string, 0, len(c.ospfNbrRows))
+	for key := range c.ospfNbrRows {
+		ospfNbrKeys = append(ospfNbrKeys, key)
+	}
+	sort.Strings(ospfNbrKeys)
+	for _, key := range ospfNbrKeys {
+		entry := c.ospfNbrRows[key]
+		if entry == nil {
+			continue
+		}
+		observation.OSPFNbrTable = append(observation.OSPFNbrTable, topologyengine.OSPFNeighborObservation{
+			RemoteRouterID:       normalizeIPAddress(entry.remoteRouterID),
+			RemoteIP:             normalizeIPAddress(entry.remoteIP),
+			RemoteAddressLessIdx: parseIndex(entry.addressLessIndex),
+		})
+	}
+
+	if c.isisElement != nil {
+		observation.ISISElement = &topologyengine.ISISElementObservation{
+			DeviceID:   observation.DeviceID,
+			SysID:      normalizeHexIdentifier(c.isisElement.sysID),
+			AdminState: parseIndex(c.isisElement.adminState),
+		}
+	}
+
+	isisCircKeys := make([]string, 0, len(c.isisCircs))
+	for key := range c.isisCircs {
+		isisCircKeys = append(isisCircKeys, key)
+	}
+	sort.Strings(isisCircKeys)
+	for _, key := range isisCircKeys {
+		entry := c.isisCircs[key]
+		if entry == nil {
+			continue
+		}
+		observation.ISISCircTable = append(observation.ISISCircTable, topologyengine.ISISCircuitObservation{
+			CircIndex:  parseIndex(entry.circIndex),
+			IfIndex:    parseIndex(entry.ifIndex),
+			AdminState: parseIndex(entry.adminState),
+		})
+	}
+
+	isisAdjKeys := make([]string, 0, len(c.isisAdjs))
+	for key := range c.isisAdjs {
+		isisAdjKeys = append(isisAdjKeys, key)
+	}
+	sort.Strings(isisAdjKeys)
+	for _, key := range isisAdjKeys {
+		entry := c.isisAdjs[key]
+		if entry == nil {
+			continue
+		}
+		observation.ISISAdjTable = append(observation.ISISAdjTable, topologyengine.ISISAdjacencyObservation{
+			CircIndex:          parseIndex(entry.circIndex),
+			AdjIndex:           parseIndex(entry.adjIndex),
+			State:              parseIndex(entry.state),
+			NeighborSNPA:       normalizeHexIdentifier(entry.neighborSNPA),
+			NeighborSysType:    parseIndex(entry.neighborSysType),
+			NeighborSysID:      normalizeHexIdentifier(entry.neighborSysID),
+			NeighborExtendedID: parseIndex(entry.neighborExtCirc),
+		})
+	}
+
+	return observation
+}
+
 func ensureTopologyObservationDeviceID(local topologyDevice) string {
 	if key := strings.TrimSpace(topologyDeviceKey(local)); key != "" {
 		return key
@@ -1376,23 +1764,23 @@ func matchLocalTopologyActor(match topology.Match, local topologyDevice) bool {
 }
 
 func canonicalMatchKey(match topology.Match) string {
-	if len(match.ChassisIDs) > 0 {
-		return "chassis:" + canonicalListKey(match.ChassisIDs)
+	if key := canonicalHardwareListKey(match.ChassisIDs); key != "" {
+		return "chassis:" + key
 	}
-	if len(match.MacAddresses) > 0 {
-		return "mac:" + canonicalListKey(match.MacAddresses)
+	if key := canonicalMACListKey(match.MacAddresses); key != "" {
+		return "mac:" + key
 	}
-	if len(match.IPAddresses) > 0 {
-		return "ip:" + canonicalListKey(match.IPAddresses)
+	if key := canonicalIPListKey(match.IPAddresses); key != "" {
+		return "ip:" + key
 	}
-	if len(match.Hostnames) > 0 {
-		return "hostname:" + canonicalListKey(match.Hostnames)
+	if key := canonicalStringListKey(match.Hostnames); key != "" {
+		return "hostname:" + key
 	}
-	if len(match.DNSNames) > 0 {
-		return "dns:" + canonicalListKey(match.DNSNames)
+	if key := canonicalStringListKey(match.DNSNames); key != "" {
+		return "dns:" + key
 	}
-	if match.SysName != "" {
-		return "sysname:" + match.SysName
+	if sysName := strings.ToLower(strings.TrimSpace(match.SysName)); sysName != "" {
+		return "sysname:" + sysName
 	}
 	if match.SysObjectID != "" {
 		return "sysobjectid:" + match.SysObjectID
@@ -1400,23 +1788,168 @@ func canonicalMatchKey(match topology.Match) string {
 	return ""
 }
 
-func canonicalListKey(values []string) string {
+func topologyMatchIdentityKeys(match topology.Match) []string {
+	seen := make(map[string]struct{}, 8)
+	add := func(kind, value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		seen[kind+":"+value] = struct{}{}
+	}
+
+	for _, value := range match.ChassisIDs {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if mac := normalizeMAC(value); mac != "" {
+			add("hw", mac)
+			continue
+		}
+		if ip := normalizeIPAddress(value); ip != "" {
+			add("ip", ip)
+			continue
+		}
+		add("chassis", strings.ToLower(value))
+	}
+	for _, value := range match.MacAddresses {
+		if mac := normalizeMAC(value); mac != "" {
+			add("hw", mac)
+		}
+	}
+	for _, value := range match.IPAddresses {
+		if ip := normalizeIPAddress(value); ip != "" {
+			add("ip", ip)
+			continue
+		}
+		add("ipraw", strings.ToLower(strings.TrimSpace(value)))
+	}
+	for _, value := range match.Hostnames {
+		add("hostname", strings.ToLower(strings.TrimSpace(value)))
+	}
+	for _, value := range match.DNSNames {
+		add("dns", strings.ToLower(strings.TrimSpace(value)))
+	}
+	if sysName := strings.TrimSpace(match.SysName); sysName != "" {
+		add("sysname", strings.ToLower(sysName))
+	}
+
+	if len(seen) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(seen))
+	for key := range seen {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func canonicalHardwareListKey(values []string) string {
 	if len(values) == 0 {
 		return ""
 	}
 	out := make([]string, 0, len(values))
-	for _, v := range values {
-		v = strings.TrimSpace(v)
-		if v == "" {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
 			continue
 		}
-		out = append(out, v)
+		if mac := normalizeMAC(value); mac != "" {
+			out = append(out, mac)
+			continue
+		}
+		if ip := normalizeIPAddress(value); ip != "" {
+			out = append(out, ip)
+			continue
+		}
+		out = append(out, strings.ToLower(value))
 	}
 	if len(out) == 0 {
 		return ""
 	}
 	sort.Strings(out)
+	out = uniqueStrings(out)
 	return strings.Join(out, ",")
+}
+
+func canonicalMACListKey(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if mac := normalizeMAC(value); mac != "" {
+			out = append(out, mac)
+		}
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	sort.Strings(out)
+	out = uniqueStrings(out)
+	return strings.Join(out, ",")
+}
+
+func canonicalIPListKey(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if ip := normalizeIPAddress(value); ip != "" {
+			out = append(out, ip)
+			continue
+		}
+		out = append(out, strings.ToLower(value))
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	sort.Strings(out)
+	out = uniqueStrings(out)
+	return strings.Join(out, ",")
+}
+
+func canonicalStringListKey(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	sort.Strings(out)
+	out = uniqueStrings(out)
+	return strings.Join(out, ",")
+}
+
+func uniqueStrings(values []string) []string {
+	if len(values) <= 1 {
+		return values
+	}
+	out := values[:0]
+	var prev string
+	for i, value := range values {
+		if i == 0 || value != prev {
+			out = append(out, value)
+			prev = value
+		}
+	}
+	return out
 }
 
 func topologyLinkSortKey(link topology.Link) string {
@@ -1726,6 +2259,39 @@ func normalizeMAC(value string) string {
 	}
 
 	return strings.ToLower(net.HardwareAddr(bs).String())
+}
+
+func normalizeHexToken(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+
+	if mac := normalizeMAC(value); mac != "" {
+		return mac
+	}
+	if ip := normalizeIPAddress(value); ip != "" {
+		return ip
+	}
+	return strings.TrimSpace(value)
+}
+
+func normalizeHexIdentifier(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+
+	bs, err := decodeHexString(value)
+	if err == nil && len(bs) > 0 {
+		return strings.ToLower(hex.EncodeToString(bs))
+	}
+
+	clean := strings.NewReplacer(":", "", "-", "", ".", "", " ", "").Replace(strings.ToLower(value))
+	if clean == "" {
+		return ""
+	}
+	return clean
 }
 
 func normalizeAddressType(rawType, addr string) string {

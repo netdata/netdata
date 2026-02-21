@@ -115,6 +115,57 @@ func TestToTopologyData_DefaultDiscoveredCountWithoutLocalID(t *testing.T) {
 	require.Equal(t, 2, data.Stats["devices_discovered"])
 }
 
+func TestToTopologyData_DeduplicatesEndpointActorOverlappingManagedDevice(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "sw1",
+				Hostname:  "sw1",
+				ChassisID: "7049a26572cd",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.20.4.84")},
+			},
+		},
+		Attachments: []Attachment{
+			{
+				DeviceID:   "sw1",
+				IfIndex:    1,
+				EndpointID: "mac:70:49:a2:65:72:cd",
+				Method:     "fdb",
+			},
+		},
+		Enrichments: []Enrichment{
+			{
+				EndpointID: "mac:70:49:a2:65:72:cd",
+				MAC:        "70:49:a2:65:72:cd",
+				IPs:        []netip.Addr{netip.MustParseAddr("10.20.4.84")},
+			},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	require.Len(t, data.Actors, 1)
+	require.Equal(t, "device", data.Actors[0].ActorType)
+	require.Equal(t, 0, data.Stats["endpoints_total"])
+	require.Equal(t, 1, data.Stats["actors_total"])
+}
+
+func TestCanonicalTopologyMatchKey_NormalizesEquivalentMACRepresentations(t *testing.T) {
+	raw := topology.Match{
+		ChassisIDs: []string{"7049a26572cd"},
+	}
+	colon := topology.Match{
+		ChassisIDs: []string{"70:49:A2:65:72:CD"},
+	}
+
+	require.Equal(t, canonicalTopologyMatchKey(raw), canonicalTopologyMatchKey(colon))
+	require.Equal(t, "chassis:70:49:a2:65:72:cd", canonicalTopologyMatchKey(raw))
+}
+
 func TestToTopologyData_UsesDeterministicPrimaryManagementIP(t *testing.T) {
 	result := Result{
 		Devices: []Device{

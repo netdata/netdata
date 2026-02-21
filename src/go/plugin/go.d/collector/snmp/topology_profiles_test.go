@@ -23,6 +23,8 @@ func TestAppendTopologyProfiles_AutoprobeEnabled(t *testing.T) {
 	assert.True(t, profilesHaveExtension(profiles, topologyLldpProfileName))
 	assert.True(t, profilesHaveExtension(profiles, cdpProfileName))
 	assert.True(t, profilesHaveExtension(profiles, fdbArpProfileName))
+	assert.True(t, profilesHaveExtension(profiles, topologyOspfProfileName))
+	assert.True(t, profilesHaveExtension(profiles, topologyIsisProfileName))
 }
 
 func TestAppendTopologyProfiles_AutoprobeDisabled(t *testing.T) {

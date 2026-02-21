@@ -102,17 +102,17 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	}
 
 	actors := make([]topology.Actor, 0, len(result.Devices))
-	actorIndex := make(map[string]struct{}, len(result.Devices))
+	actorIndex := make(map[string]struct{}, len(result.Devices)*2)
 	for _, dev := range result.Devices {
 		actor := deviceToTopologyActor(dev, source, layer, opts.LocalDeviceID)
-		key := canonicalTopologyMatchKey(actor.Match)
-		if key == "" {
+		keys := topologyMatchIdentityKeys(actor.Match)
+		if len(keys) == 0 {
 			continue
 		}
-		if _, ok := actorIndex[key]; ok {
+		if topologyIdentityIndexOverlaps(actorIndex, keys) {
 			continue
 		}
-		actorIndex[key] = struct{}{}
+		addTopologyIdentityKeys(actorIndex, keys)
 		actors = append(actors, actor)
 	}
 
@@ -544,14 +544,14 @@ func buildEndpointActors(
 			Attributes: pruneTopologyAttributes(attrs),
 		}
 
-		key := canonicalTopologyMatchKey(actor.Match)
-		if key == "" {
+		keys := topologyMatchIdentityKeys(actor.Match)
+		if len(keys) == 0 {
 			continue
 		}
-		if _, ok := actorIndex[key]; ok {
+		if topologyIdentityIndexOverlaps(actorIndex, keys) {
 			continue
 		}
-		actorIndex[key] = struct{}{}
+		addTopologyIdentityKeys(actorIndex, keys)
 
 		actors = append(actors, actor)
 		endpointCount++
@@ -823,24 +823,118 @@ func deviceIfNameKey(deviceID, ifName string) string {
 	return fmt.Sprintf("%s|%s", strings.TrimSpace(deviceID), strings.ToLower(strings.TrimSpace(ifName)))
 }
 
+func topologyIdentityIndexOverlaps(index map[string]struct{}, keys []string) bool {
+	if len(index) == 0 || len(keys) == 0 {
+		return false
+	}
+	for _, key := range keys {
+		if _, ok := index[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func addTopologyIdentityKeys(index map[string]struct{}, keys []string) {
+	if index == nil || len(keys) == 0 {
+		return
+	}
+	for _, key := range keys {
+		index[key] = struct{}{}
+	}
+}
+
+func topologyMatchIdentityKeys(match topology.Match) []string {
+	seen := make(map[string]struct{}, 8)
+	add := func(kind, value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		key := kind + ":" + value
+		seen[key] = struct{}{}
+	}
+
+	for _, value := range match.ChassisIDs {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if mac := normalizeMAC(value); mac != "" {
+			add("hw", mac)
+			continue
+		}
+		if ip := normalizeTopologyIP(value); ip != "" {
+			add("ip", ip)
+			continue
+		}
+		add("chassis", strings.ToLower(value))
+	}
+
+	for _, value := range match.MacAddresses {
+		if mac := normalizeMAC(value); mac != "" {
+			add("hw", mac)
+		}
+	}
+	for _, value := range match.IPAddresses {
+		if ip := normalizeTopologyIP(value); ip != "" {
+			add("ip", ip)
+			continue
+		}
+		add("ipraw", strings.ToLower(strings.TrimSpace(value)))
+	}
+	for _, value := range match.Hostnames {
+		add("hostname", strings.ToLower(strings.TrimSpace(value)))
+	}
+	for _, value := range match.DNSNames {
+		add("dns", strings.ToLower(strings.TrimSpace(value)))
+	}
+	if sysName := strings.TrimSpace(match.SysName); sysName != "" {
+		add("sysname", strings.ToLower(sysName))
+	}
+
+	if len(seen) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(seen))
+	for key := range seen {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func normalizeTopologyIP(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	addr := parseAddr(value)
+	if !addr.IsValid() {
+		return ""
+	}
+	return addr.Unmap().String()
+}
+
 func canonicalTopologyMatchKey(match topology.Match) string {
-	if len(match.ChassisIDs) > 0 {
-		return "chassis:" + canonicalTopologyListKey(match.ChassisIDs)
+	if key := canonicalTopologyHardwareKey(match.ChassisIDs); key != "" {
+		return "chassis:" + key
 	}
-	if len(match.MacAddresses) > 0 {
-		return "mac:" + canonicalTopologyListKey(match.MacAddresses)
+	if key := canonicalTopologyMACListKey(match.MacAddresses); key != "" {
+		return "mac:" + key
 	}
-	if len(match.IPAddresses) > 0 {
-		return "ip:" + canonicalTopologyListKey(match.IPAddresses)
+	if key := canonicalTopologyIPListKey(match.IPAddresses); key != "" {
+		return "ip:" + key
 	}
-	if len(match.Hostnames) > 0 {
-		return "hostname:" + canonicalTopologyListKey(match.Hostnames)
+	if key := canonicalTopologyStringListKey(match.Hostnames); key != "" {
+		return "hostname:" + key
 	}
-	if len(match.DNSNames) > 0 {
-		return "dns:" + canonicalTopologyListKey(match.DNSNames)
+	if key := canonicalTopologyStringListKey(match.DNSNames); key != "" {
+		return "dns:" + key
 	}
-	if match.SysName != "" {
-		return "sysname:" + match.SysName
+	if sysName := strings.ToLower(strings.TrimSpace(match.SysName)); sysName != "" {
+		return "sysname:" + sysName
 	}
 	if match.SysObjectID != "" {
 		return "sysobjectid:" + match.SysObjectID
@@ -848,7 +942,7 @@ func canonicalTopologyMatchKey(match topology.Match) string {
 	return ""
 }
 
-func canonicalTopologyListKey(values []string) string {
+func canonicalTopologyHardwareKey(values []string) string {
 	if len(values) == 0 {
 		return ""
 	}
@@ -858,12 +952,83 @@ func canonicalTopologyListKey(values []string) string {
 		if value == "" {
 			continue
 		}
+		if mac := normalizeMAC(value); mac != "" {
+			out = append(out, mac)
+			continue
+		}
+		if ip := normalizeTopologyIP(value); ip != "" {
+			out = append(out, ip)
+			continue
+		}
+		out = append(out, strings.ToLower(value))
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	sort.Strings(out)
+	out = uniqueTopologyStrings(out)
+	return strings.Join(out, ",")
+}
+
+func canonicalTopologyMACListKey(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if mac := normalizeMAC(value); mac != "" {
+			out = append(out, mac)
+		}
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	sort.Strings(out)
+	out = uniqueTopologyStrings(out)
+	return strings.Join(out, ",")
+}
+
+func canonicalTopologyIPListKey(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if ip := normalizeTopologyIP(value); ip != "" {
+			out = append(out, ip)
+			continue
+		}
+		out = append(out, strings.ToLower(value))
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	sort.Strings(out)
+	out = uniqueTopologyStrings(out)
+	return strings.Join(out, ",")
+}
+
+func canonicalTopologyStringListKey(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "" {
+			continue
+		}
 		out = append(out, value)
 	}
 	if len(out) == 0 {
 		return ""
 	}
 	sort.Strings(out)
+	out = uniqueTopologyStrings(out)
 	return strings.Join(out, ",")
 }
 

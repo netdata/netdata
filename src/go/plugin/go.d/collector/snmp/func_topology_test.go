@@ -88,7 +88,42 @@ func TestFuncTopology_Handle_DefaultL2View(t *testing.T) {
 	assert.Equal(t, "summary", data.View)
 }
 
-func TestFuncTopology_Handle_L3AndMergedViewsUnavailable(t *testing.T) {
+func TestFuncTopology_Handle_L3AndMergedViews(t *testing.T) {
+	prev := snmpTopologyRegistry
+	t.Cleanup(func() {
+		snmpTopologyRegistry = prev
+	})
+
+	registry := newTopologyRegistry()
+	snmpTopologyRegistry = registry
+
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent-test"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "router-a",
+		ManagementIP:  "10.20.4.1",
+	}
+	cache.ifNamesByIndex["978"] = "ge-0/1/1.0"
+	cache.ifIndexByIP["192.168.5.21"] = "978"
+	cache.ospfElement = &ospfElement{
+		routerID:      "192.168.5.21",
+		adminState:    "1",
+		versionNumber: "2",
+	}
+	cache.ospfIfRows["192.168.5.21"] = &ospfIfEntry{
+		ipAddress: "192.168.5.21",
+		netmask:   "255.255.255.252",
+	}
+	cache.ospfNbrRows["192.168.5.22|192.168.5.22|"] = &ospfNbrEntry{
+		remoteIP:       "192.168.5.22",
+		remoteRouterID: "192.168.5.22",
+	}
+	registry.register(cache)
+
 	f := newFuncTopology(&funcRouter{})
 	cfg := []funcapi.ParamConfig{topologyViewParamConfig()}
 
@@ -97,16 +132,20 @@ func TestFuncTopology_Handle_L3AndMergedViewsUnavailable(t *testing.T) {
 	})
 	resp := f.Handle(context.Background(), topologyMethodID, l3Params)
 	require.NotNil(t, resp)
-	assert.Equal(t, 503, resp.Status)
-	assert.Contains(t, resp.Message, topologyViewL3)
+	assert.Equal(t, 200, resp.Status)
+	data, ok := resp.Data.(topologyData)
+	require.True(t, ok)
+	assert.Equal(t, "3", data.Layer)
 
 	mergedParams := funcapi.ResolveParams(cfg, map[string][]string{
 		topologyParamView: {topologyViewMerged},
 	})
 	resp = f.Handle(context.Background(), topologyMethodID, mergedParams)
 	require.NotNil(t, resp)
-	assert.Equal(t, 503, resp.Status)
-	assert.Contains(t, resp.Message, topologyViewMerged)
+	assert.Equal(t, 200, resp.Status)
+	data, ok = resp.Data.(topologyData)
+	require.True(t, ok)
+	assert.Equal(t, "2-3", data.Layer)
 }
 
 func TestFuncTopology_Handle_MultiJobAggregationAndSelectorBehavior(t *testing.T) {
@@ -185,16 +224,20 @@ func TestFuncTopology_Handle_MultiJobAggregationAndSelectorBehavior(t *testing.T
 	})
 	l3Resp := f.Handle(context.Background(), topologyMethodID, l3Params)
 	require.NotNil(t, l3Resp)
-	assert.Equal(t, 503, l3Resp.Status)
-	assert.Contains(t, l3Resp.Message, topologyViewL3)
+	assert.Equal(t, 200, l3Resp.Status)
+	l3Data, ok := l3Resp.Data.(topologyData)
+	require.True(t, ok)
+	assert.Equal(t, "3", l3Data.Layer)
 
 	mergedParams := funcapi.ResolveParams(cfg, map[string][]string{
 		topologyParamView: {topologyViewMerged},
 	})
 	mergedResp := f.Handle(context.Background(), topologyMethodID, mergedParams)
 	require.NotNil(t, mergedResp)
-	assert.Equal(t, 503, mergedResp.Status)
-	assert.Contains(t, mergedResp.Message, topologyViewMerged)
+	assert.Equal(t, 200, mergedResp.Status)
+	mergedData, ok := mergedResp.Data.(topologyData)
+	require.True(t, ok)
+	assert.Equal(t, "2-3", mergedData.Layer)
 }
 
 func newTestTopologyCacheLLDP(
