@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlquery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
@@ -238,7 +239,25 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 
 // collectData queries performance_schema for top queries using dynamic columns
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
-	// Check if performance_schema is enabled
+	if resp := f.checkPerformanceSchema(ctx); resp != nil {
+		return resp
+	}
+
+	cols, availableCols, resp := f.detectAndFilterColumns(ctx)
+	if resp != nil {
+		return resp
+	}
+
+	data, resp := f.executeTopQueriesSQL(ctx, cols, availableCols, sortColumn, f.router.cfg.topQueriesLimit())
+	if resp != nil {
+		return resp
+	}
+
+	data, cols = f.enrichWithErrorAttribution(ctx, data, cols)
+	return f.buildTopQueriesResponse(data, cols)
+}
+
+func (f *funcTopQueries) checkPerformanceSchema(ctx context.Context) *funcapi.FunctionResponse {
 	available, err := isPerformanceSchemaEnabled(ctx, f.router.deps)
 	if err != nil {
 		return &funcapi.FunctionResponse{
@@ -252,55 +271,57 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 			Message: "performance_schema is not enabled",
 		}
 	}
+	return nil
+}
 
-	// Detect available columns
+func (f *funcTopQueries) detectAndFilterColumns(ctx context.Context) ([]topQueriesColumn, map[string]bool, *funcapi.FunctionResponse) {
 	availableCols, err := f.detectStatementsColumns(ctx)
 	if err != nil {
-		return &funcapi.FunctionResponse{
+		return nil, nil, &funcapi.FunctionResponse{
 			Status:  500,
 			Message: fmt.Sprintf("failed to detect available columns: %v", err),
 		}
 	}
 
-	// Build list of available columns
 	cols := f.buildAvailableColumns(availableCols)
 	if len(cols) == 0 {
-		return &funcapi.FunctionResponse{
+		return nil, nil, &funcapi.FunctionResponse{
 			Status:  500,
 			Message: "no columns available in events_statements_summary_by_digest",
 		}
 	}
+	return cols, availableCols, nil
+}
 
-	// Validate and map sort column
+func (f *funcTopQueries) executeTopQueriesSQL(ctx context.Context, cols []topQueriesColumn, availableCols map[string]bool, sortColumn string, limit int) ([][]any, *funcapi.FunctionResponse) {
 	dbSortColumn := f.mapAndValidateSortColumn(sortColumn, availableCols)
-
-	limit := f.router.cfg.topQueriesLimit()
-
-	// Build and execute query
 	query := f.buildDynamicSQL(cols, dbSortColumn, limit)
 
 	db, err := f.router.deps.DB()
 	if err != nil {
-		return &funcapi.FunctionResponse{Status: 503, Message: "collector database is unavailable"}
+		return nil, &funcapi.FunctionResponse{Status: 503, Message: "collector database is unavailable"}
 	}
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
+			return nil, &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
 		}
-		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
+		return nil, &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("query failed: %v", err)}
 	}
 	defer rows.Close()
 
-	// Scan rows dynamically
 	data, err := f.scanDynamicRows(rows, cols)
 	if err != nil {
-		return &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
+		return nil, &funcapi.FunctionResponse{Status: 500, Message: err.Error()}
 	}
+	return data, nil
+}
 
+func (f *funcTopQueries) enrichWithErrorAttribution(ctx context.Context, data [][]any, cols []topQueriesColumn) ([][]any, []topQueriesColumn) {
 	errorCols := mysqlErrorAttributionColumns()
 	errorStatus := mysqlErrorAttrNotSupported
 	errorDetails := map[string]mysqlErrorRow{}
+
 	digestIdx := -1
 	for i, col := range cols {
 		if col.Name == "digest" {
@@ -308,6 +329,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 			break
 		}
 	}
+
 	if digestIdx >= 0 {
 		digests := make([]string, 0, len(data))
 		seen := make(map[string]bool)
@@ -316,10 +338,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 				continue
 			}
 			digest, ok := row[digestIdx].(string)
-			if !ok || digest == "" {
-				continue
-			}
-			if seen[digest] {
+			if !ok || digest == "" || seen[digest] {
 				continue
 			}
 			seen[digest] = true
@@ -332,40 +351,43 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 		}
 	}
 
-	if len(errorCols) > 0 {
-		for i := range data {
-			status := errorStatus
-			var errRow mysqlErrorRow
-			var errNo any
-			if digestIdx >= 0 && digestIdx < len(data[i]) {
-				if digest, ok := data[i][digestIdx].(string); ok && digest != "" {
-					if row, ok := errorDetails[digest]; ok {
-						status = mysqlErrorAttrEnabled
-						errRow = row
-						if errRow.ErrorNumber != nil {
-							errNo = *errRow.ErrorNumber
-						}
-					} else if status == mysqlErrorAttrEnabled {
-						status = mysqlErrorAttrNoData
-					}
-				}
-			}
-
-			data[i] = append(data[i],
-				status,
-				errNo,
-				nullableString(errRow.SQLState),
-				nullableString(errRow.Message),
-			)
-		}
-		cols = append(cols, errorCols...)
+	if len(errorCols) == 0 {
+		return data, cols
 	}
 
-	// Build dynamic sort options from available columns (only those actually detected)
+	for i := range data {
+		status := errorStatus
+		var errRow mysqlErrorRow
+		var errNo any
+		if digestIdx >= 0 && digestIdx < len(data[i]) {
+			if digest, ok := data[i][digestIdx].(string); ok && digest != "" {
+				if row, ok := errorDetails[digest]; ok {
+					status = mysqlErrorAttrEnabled
+					errRow = row
+					if errRow.ErrorNumber != nil {
+						errNo = *errRow.ErrorNumber
+					}
+				} else if status == mysqlErrorAttrEnabled {
+					status = mysqlErrorAttrNoData
+				}
+			}
+		}
+
+		data[i] = append(data[i],
+			status,
+			errNo,
+			nullableString(errRow.SQLState),
+			nullableString(errRow.Message),
+		)
+	}
+
+	return data, append(cols, errorCols...)
+}
+
+func (f *funcTopQueries) buildTopQueriesResponse(data [][]any, cols []topQueriesColumn) *funcapi.FunctionResponse {
 	sortParam := f.buildSortParam(cols)
 	sortOptions := sortParam.Options
 
-	// Find default sort column ID
 	defaultSort := ""
 	for _, col := range cols {
 		if col.IsDefaultSort() && col.IsSortOption() {
@@ -373,12 +395,10 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 			break
 		}
 	}
-	// Fallback to first sort option if no default
 	if defaultSort == "" && len(sortOptions) > 0 {
 		defaultSort = sortOptions[0].ID
 	}
 
-	// Decorate columns with chart/label metadata and create ColumnSet
 	annotatedCols := f.decorateColumns(cols)
 	cs := f.columnSet(annotatedCols)
 
@@ -413,28 +433,9 @@ func (f *funcTopQueries) detectStatementsColumns(ctx context.Context) (map[strin
 	if err != nil {
 		return nil, err
 	}
-
-	rows, err := db.QueryContext(ctx, `
-		SELECT COLUMN_NAME
-		FROM information_schema.COLUMNS
-		WHERE TABLE_SCHEMA = 'performance_schema'
-		AND TABLE_NAME = 'events_statements_summary_by_digest'
-	`)
+	cols, err := sqlquery.FetchTableColumns(ctx, db, "performance_schema", "events_statements_summary_by_digest", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query column information: %w", err)
-	}
-	defer rows.Close()
-
-	cols := make(map[string]bool)
-	for rows.Next() {
-		var colName string
-		if err := rows.Scan(&colName); err != nil {
-			return nil, fmt.Errorf("failed to scan column name: %w", err)
-		}
-		cols[colName] = true
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating columns: %w", err)
 	}
 
 	f.stmtSummaryCols = cols

@@ -13,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlquery"
 )
 
 const (
@@ -405,28 +406,7 @@ func fetchMySQLTableColumns(ctx context.Context, deps Deps, cfg FunctionsConfig,
 	if err != nil {
 		return nil, err
 	}
-	rows, err := db.QueryContext(qctx, `
-SELECT COLUMN_NAME
-FROM information_schema.COLUMNS
-WHERE TABLE_SCHEMA = 'performance_schema'
-  AND TABLE_NAME = ?;`, table)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	cols := make(map[string]bool)
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		cols[strings.ToUpper(name)] = true
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return cols, nil
+	return sqlquery.FetchTableColumns(qctx, db, "performance_schema", table, strings.ToUpper)
 }
 
 func fetchMySQLErrorRows(ctx context.Context, deps Deps, cfg FunctionsConfig, source mysqlErrorSource, digests []string, limit int) ([]mysqlErrorRow, error) {
@@ -434,11 +414,30 @@ func fetchMySQLErrorRows(ctx context.Context, deps Deps, cfg FunctionsConfig, so
 		return nil, fmt.Errorf("error history not enabled")
 	}
 
+	query, args, schemaCol := buildMySQLErrorQuery(source, digests, limit)
+
+	qctx, cancel := context.WithTimeout(ctx, cfg.collectorTimeout())
+	defer cancel()
+
+	db, err := deps.DB()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(qctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanMySQLErrorRows(rows, source, schemaCol)
+}
+
+func buildMySQLErrorQuery(source mysqlErrorSource, digests []string, limit int) (string, []any, string) {
 	selectCols := []string{"DIGEST", "MYSQL_ERRNO", "RETURNED_SQLSTATE", "MESSAGE_TEXT"}
 	if source.columns["DIGEST_TEXT"] {
 		selectCols = append(selectCols, "DIGEST_TEXT")
 	}
-	// MySQL uses SCHEMA_NAME, MariaDB uses CURRENT_SCHEMA
+
 	schemaCol := ""
 	if source.columns["SCHEMA_NAME"] {
 		schemaCol = "SCHEMA_NAME"
@@ -460,9 +459,8 @@ func fetchMySQLErrorRows(ctx context.Context, deps Deps, cfg FunctionsConfig, so
 		orderBy = "TIMER_END DESC"
 	}
 
-	var args []any
-	var filters []string
-	filters = append(filters, "MYSQL_ERRNO <> 0")
+	filters := []string{"MYSQL_ERRNO <> 0"}
+	args := make([]any, 0, len(digests))
 	if len(digests) > 0 {
 		placeholders := make([]string, 0, len(digests))
 		for _, digest := range digests {
@@ -483,20 +481,10 @@ func fetchMySQLErrorRows(ctx context.Context, deps Deps, cfg FunctionsConfig, so
 	if limit > 0 {
 		query = fmt.Sprintf("%s LIMIT %d", query, limit)
 	}
+	return query, args, schemaCol
+}
 
-	qctx, cancel := context.WithTimeout(ctx, cfg.collectorTimeout())
-	defer cancel()
-
-	db, err := deps.DB()
-	if err != nil {
-		return nil, err
-	}
-	rows, err := db.QueryContext(qctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+func scanMySQLErrorRows(rows *sql.Rows, source mysqlErrorSource, schemaCol string) ([]mysqlErrorRow, error) {
 	var results []mysqlErrorRow
 	seen := make(map[string]bool)
 
@@ -571,7 +559,6 @@ func fetchMySQLErrorRows(ctx context.Context, deps Deps, cfg FunctionsConfig, so
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-
 	return results, nil
 }
 
