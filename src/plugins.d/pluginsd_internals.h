@@ -79,11 +79,26 @@ static ALWAYS_INLINE void rrdset_previous_scope_chart_unlock(PARSER *parser, con
     }
 }
 
-static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keyword) {
+static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keyword, RRDSET *preserve_collector_tid) {
     rrdset_previous_scope_chart_unlock(parser, keyword, true);
 
-    if(parser->user.cleanup_slots && parser->user.st)
-        rrdset_pluginsd_receive_unslot(parser->user.st);
+    RRDSET *st = parser->user.st;
+
+    if(parser->user.cleanup_slots && st)
+        rrdset_pluginsd_receive_unslot(st);
+
+    // Clear collector ownership when scope ends, except when explicitly preserving
+    // it for the currently active chart during same-chart re-scope.
+    //
+    // Safety note:
+    // - Full cleanup (rrdset_pluginsd_receive_unslot_and_cleanup) runs on finalized/teardown paths.
+    // - Host teardown stops the receiver thread before slot/index cleanup.
+    // - During active parser execution, unslot paths are collector-aware and skip when another
+    //   collector tid is active.
+    // Therefore, eager clear here is an ownership handoff between protocol scopes, not a signal
+    // that teardown cleanup may run concurrently with an active collector loop.
+    if(st && st != preserve_collector_tid)
+        __atomic_store_n(&st->pluginsd.collector_tid, 0, __ATOMIC_RELEASE);
 
     parser->user.st = NULL;
     parser->user.cleanup_slots = false;
@@ -112,13 +127,9 @@ static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, c
     // Set new chart's collector_tid before any access
     __atomic_store_n(&st->pluginsd.collector_tid, my_collector_tid, __ATOMIC_RELEASE);
 
-    // Access old_st's array in pluginsd_clear_scope_chart while old_st->collector_tid is still set
-    pluginsd_clear_scope_chart(parser, keyword);
-
-    // NOW clear old_st's collector_tid - after all accesses to old_st are complete
-    // Skip when old_st == st to avoid clearing the TID we just set on the active chart
-    if(old_st && old_st != st)
-        __atomic_store_n(&old_st->pluginsd.collector_tid, 0, __ATOMIC_RELEASE);
+    // Access old_st's array in pluginsd_clear_scope_chart while old_st->collector_tid is still set.
+    // Preserve the new chart tid for the old_st == st re-scope case.
+    pluginsd_clear_scope_chart(parser, keyword, st);
 
     __atomic_store_n(&st->pluginsd.pos, 0, __ATOMIC_RELAXED);
     parser->user.st = st;

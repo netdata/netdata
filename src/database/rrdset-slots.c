@@ -150,21 +150,30 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
 
     spinlock_lock(&st->pluginsd.spinlock);
 
-    // Check if collector is still active - if so, we cannot safely cleanup.
-    // This indicates a lifecycle violation: the caller must ensure the collector is
-    // fully stopped before calling this function.
+    // Check if collector is still active.
     pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
     if(collector_tid != 0) {
-        internal_fatal(true,
-                       "PRD_ARRAY: cleanup called while collector (tid %d) is still active - lifecycle violation",
-                       collector_tid);
+        if(collector_tid != gettid_cached() &&
+           !rrdset_flag_check(st, RRDSET_FLAG_COLLECTION_FINISHED)) {
+            internal_fatal(true,
+                           "PRD_ARRAY: cleanup called while collector (tid %d) is still active - lifecycle violation",
+                           collector_tid);
 
-        nd_log_limit_static_global_var(erl, 1, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "PLUGINSD: attempted cleanup while collector (tid %d) is still active on chart, skipping",
+            nd_log_limit_static_global_var(erl, 1, 0);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                         "PLUGINSD: attempted cleanup while collector (tid %d) is still active on chart, skipping",
+                         collector_tid);
+            spinlock_unlock(&st->pluginsd.spinlock);
+            return;
+        }
+
+        // Finalization can hit stale collector_tid on charts that were not switched away.
+        // Treat this as cleanup ownership handoff and continue.
+        nd_log_limit_static_global_var(erl_finalize, 1, 0);
+        nd_log_limit(&erl_finalize, NDLS_DAEMON, NDLP_WARNING,
+                     "PLUGINSD: cleanup forcing stale collector_tid=%d to 0 for finalized chart",
                      collector_tid);
-        spinlock_unlock(&st->pluginsd.spinlock);
-        return;
+        __atomic_store_n(&st->pluginsd.collector_tid, 0, __ATOMIC_RELEASE);
     }
 
     // Replace the array with NULL - this prevents new references from being acquired

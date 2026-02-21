@@ -102,7 +102,7 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
         netdata_log_debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
 
-    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_END);
+    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_END, NULL);
     parser->user.data_collections_count++;
 
     struct timeval tv = {
@@ -249,7 +249,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     pluginsd_host_define_cleanup(parser);
 
     parser->user.host = host;
-    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END);
+    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, NULL);
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     rrdcontext_host_child_connected(host);
@@ -451,7 +451,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
         pluginsd_rrdset_cache_put_to_slot(parser, st, slot, obsolete);
     }
     else
-        pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART);
+        pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART, NULL);
 
     return PARSER_RC_OK;
 }
@@ -647,7 +647,7 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
 
 static inline PARSER_RC pluginsd_flush(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     netdata_log_debug(D_PLUGINSD, "requested a " PLUGINSD_KEYWORD_FLUSH);
-    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_FLUSH);
+    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_FLUSH, NULL);
     parser->user.replay.start_time = 0;
     parser->user.replay.end_time = 0;
     parser->user.replay.start_time_ut = 0;
@@ -1240,7 +1240,7 @@ PARSER_RC stream_receiver_pluginsd_claimed_id(char **words, size_t num_words, PA
 
 void pluginsd_cleanup_v2(PARSER *parser) {
     // this is called when the thread is stopped while processing
-    pluginsd_clear_scope_chart(parser, "THREAD CLEANUP");
+    pluginsd_clear_scope_chart(parser, "THREAD CLEANUP", NULL);
 }
 
 void pluginsd_process_cleanup(PARSER *parser) {
