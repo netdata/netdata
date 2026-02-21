@@ -52,6 +52,34 @@ type projectedLinks struct {
 	unidirectionalCount int
 }
 
+type segmentAttachment struct {
+	deviceID   string
+	ifIndex    int
+	ifName     string
+	bridgePort string
+	endpointID string
+	method     string
+	vlanID     string
+}
+
+type segmentAccumulator struct {
+	id          string
+	attachments []segmentAttachment
+	deviceIDs   map[string]struct{}
+	ifNames     map[string]struct{}
+	ifIndexes   map[string]struct{}
+	bridgePorts map[string]struct{}
+	vlanIDs     map[string]struct{}
+	methods     map[string]struct{}
+}
+
+type projectedSegments struct {
+	actors             []topology.Actor
+	links              []topology.Link
+	linksFdb           int
+	bidirectionalCount int
+}
+
 // ToTopologyData converts an engine result to the shared topology schema.
 func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	schemaVersion := strings.TrimSpace(opts.SchemaVersion)
@@ -117,13 +145,28 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	}
 
 	projected := projectAdjacencyLinks(result.Adjacencies, layer, collectedAt, deviceByID, ifIndexByDeviceName)
-	links := projected.links
-	linksLLDP := projected.lldp
-	linksCDP := projected.cdp
 
 	endpointActors := buildEndpointActors(result.Attachments, result.Enrichments, ifaceByDeviceIndex, source, layer, actorIndex)
 	actors = append(actors, endpointActors.actors...)
+
+	segmentProjection := projectSegmentTopology(
+		result.Attachments,
+		layer,
+		source,
+		collectedAt,
+		deviceByID,
+		ifaceByDeviceIndex,
+		ifIndexByDeviceName,
+		endpointActors.matchByEndpointID,
+		actorIndex,
+	)
+	actors = append(actors, segmentProjection.actors...)
 	sortTopologyActors(actors)
+
+	links := make([]topology.Link, 0, len(projected.links)+len(segmentProjection.links))
+	links = append(links, projected.links...)
+	links = append(links, segmentProjection.links...)
+	sortTopologyLinks(links)
 
 	stats := cloneAnyMap(result.Stats)
 	if stats == nil {
@@ -132,11 +175,11 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	stats["devices_total"] = len(result.Devices)
 	stats["devices_discovered"] = discoveredDeviceCount(result.Devices, opts.LocalDeviceID)
 	stats["links_total"] = len(links)
-	stats["links_lldp"] = linksLLDP
-	stats["links_cdp"] = linksCDP
-	stats["links_bidirectional"] = projected.bidirectionalCount
+	stats["links_lldp"] = projected.lldp
+	stats["links_cdp"] = projected.cdp
+	stats["links_bidirectional"] = projected.bidirectionalCount + segmentProjection.bidirectionalCount
 	stats["links_unidirectional"] = projected.unidirectionalCount
-	stats["links_fdb"] = 0
+	stats["links_fdb"] = segmentProjection.linksFdb
 	stats["links_arp"] = 0
 	stats["actors_total"] = len(actors)
 	stats["endpoints_total"] = endpointActors.count
@@ -237,6 +280,294 @@ func projectAdjacencyLinks(
 
 	sortTopologyLinks(out.links)
 	return out
+}
+
+func projectSegmentTopology(
+	attachments []Attachment,
+	layer string,
+	source string,
+	collectedAt time.Time,
+	deviceByID map[string]Device,
+	ifaceByDeviceIndex map[string]Interface,
+	ifIndexByDeviceName map[string]int,
+	endpointMatchByID map[string]topology.Match,
+	actorIndex map[string]struct{},
+) projectedSegments {
+	out := projectedSegments{
+		actors: make([]topology.Actor, 0),
+		links:  make([]topology.Link, 0),
+	}
+	if len(attachments) == 0 {
+		return out
+	}
+
+	segments := make(map[string]*segmentAccumulator)
+	for _, attachment := range attachments {
+		segmentID := segmentIDFromAttachment(attachment)
+		if segmentID == "" {
+			continue
+		}
+
+		acc := segments[segmentID]
+		if acc == nil {
+			acc = &segmentAccumulator{
+				id:          segmentID,
+				attachments: make([]segmentAttachment, 0, 1),
+				deviceIDs:   make(map[string]struct{}),
+				ifNames:     make(map[string]struct{}),
+				ifIndexes:   make(map[string]struct{}),
+				bridgePorts: make(map[string]struct{}),
+				vlanIDs:     make(map[string]struct{}),
+				methods:     make(map[string]struct{}),
+			}
+			segments[segmentID] = acc
+		}
+
+		deviceID := strings.TrimSpace(attachment.DeviceID)
+		ifName := strings.TrimSpace(attachment.Labels["if_name"])
+		if ifName == "" && attachment.IfIndex > 0 {
+			if iface, ok := ifaceByDeviceIndex[deviceIfIndexKey(deviceID, attachment.IfIndex)]; ok {
+				ifName = strings.TrimSpace(iface.IfName)
+			}
+		}
+		bridgePort := strings.TrimSpace(attachment.Labels["bridge_port"])
+		method := strings.ToLower(strings.TrimSpace(attachment.Method))
+		if method == "" {
+			method = "fdb"
+		}
+		vlanID := strings.TrimSpace(attachment.Labels["vlan"])
+		if vlanID == "" {
+			vlanID = strings.TrimSpace(attachment.Labels["vlan_id"])
+		}
+
+		entry := segmentAttachment{
+			deviceID:   deviceID,
+			ifIndex:    attachment.IfIndex,
+			ifName:     ifName,
+			bridgePort: bridgePort,
+			endpointID: strings.TrimSpace(attachment.EndpointID),
+			method:     method,
+			vlanID:     vlanID,
+		}
+		acc.attachments = append(acc.attachments, entry)
+		if deviceID != "" {
+			acc.deviceIDs[deviceID] = struct{}{}
+		}
+		if ifName != "" {
+			acc.ifNames[ifName] = struct{}{}
+		}
+		if attachment.IfIndex > 0 {
+			acc.ifIndexes[strconv.Itoa(attachment.IfIndex)] = struct{}{}
+		}
+		if bridgePort != "" {
+			acc.bridgePorts[bridgePort] = struct{}{}
+		}
+		if vlanID != "" {
+			acc.vlanIDs[vlanID] = struct{}{}
+		}
+		if method != "" {
+			acc.methods[method] = struct{}{}
+		}
+	}
+	if len(segments) == 0 {
+		return out
+	}
+
+	segmentIDs := make([]string, 0, len(segments))
+	for segmentID := range segments {
+		segmentIDs = append(segmentIDs, segmentID)
+	}
+	sort.Strings(segmentIDs)
+
+	segmentMatchByID := make(map[string]topology.Match, len(segmentIDs))
+	for _, segmentID := range segmentIDs {
+		acc := segments[segmentID]
+		if acc == nil {
+			continue
+		}
+
+		match := topology.Match{
+			Hostnames: []string{"segment:" + segmentID},
+		}
+		attrs := map[string]any{
+			"segment_id":      segmentID,
+			"segment_type":    "broadcast_domain",
+			"parent_devices":  sortedTopologySet(acc.deviceIDs),
+			"if_names":        sortedTopologySet(acc.ifNames),
+			"if_indexes":      sortedTopologySet(acc.ifIndexes),
+			"bridge_ports":    sortedTopologySet(acc.bridgePorts),
+			"vlan_ids":        sortedTopologySet(acc.vlanIDs),
+			"learned_sources": sortedTopologySet(acc.methods),
+		}
+
+		actor := topology.Actor{
+			ActorType:  "segment",
+			Layer:      layer,
+			Source:     source,
+			Match:      match,
+			Attributes: pruneTopologyAttributes(attrs),
+			Labels: map[string]string{
+				"segment_kind": "bridge_domain",
+			},
+		}
+
+		keys := topologyMatchIdentityKeys(actor.Match)
+		if len(keys) > 0 && !topologyIdentityIndexOverlaps(actorIndex, keys) {
+			addTopologyIdentityKeys(actorIndex, keys)
+		}
+		out.actors = append(out.actors, actor)
+		segmentMatchByID[segmentID] = match
+	}
+
+	deviceSegmentEdgeSeen := make(map[string]struct{})
+	endpointSegmentEdgeSeen := make(map[string]struct{})
+
+	for _, segmentID := range segmentIDs {
+		acc := segments[segmentID]
+		if acc == nil {
+			continue
+		}
+		segmentMatch := segmentMatchByID[segmentID]
+		segmentEndpoint := topology.LinkEndpoint{
+			Match: segmentMatch,
+			Attributes: map[string]any{
+				"segment_id": segmentID,
+			},
+		}
+
+		for _, attachment := range acc.attachments {
+			if attachment.deviceID == "" {
+				continue
+			}
+			device, ok := deviceByID[attachment.deviceID]
+			if !ok {
+				continue
+			}
+			port := strings.TrimSpace(attachment.ifName)
+			if port == "" && attachment.ifIndex > 0 {
+				port = strconv.Itoa(attachment.ifIndex)
+			}
+			if port == "" {
+				port = strings.TrimSpace(attachment.bridgePort)
+			}
+
+			deviceEdgeKey := strings.Join([]string{
+				segmentID,
+				attachment.deviceID,
+				strconv.Itoa(attachment.ifIndex),
+				port,
+			}, "|")
+			if _, seen := deviceSegmentEdgeSeen[deviceEdgeKey]; !seen {
+				deviceSegmentEdgeSeen[deviceEdgeKey] = struct{}{}
+				out.links = append(out.links, topology.Link{
+					Layer:        layer,
+					Protocol:     "bridge",
+					Direction:    "bidirectional",
+					Src:          adjacencySideToEndpoint(device, port, ifIndexByDeviceName),
+					Dst:          segmentEndpoint,
+					DiscoveredAt: topologyTimePtr(collectedAt),
+					LastSeen:     topologyTimePtr(collectedAt),
+					Metrics: map[string]any{
+						"bridge_domain": segmentID,
+					},
+				})
+				out.linksFdb++
+				out.bidirectionalCount++
+			}
+
+			endpointID := strings.TrimSpace(attachment.endpointID)
+			if endpointID == "" {
+				continue
+			}
+			endpointMatch, ok := endpointMatchByID[endpointID]
+			if !ok {
+				endpointMatch = endpointMatchFromID(endpointID)
+				if len(topologyMatchIdentityKeys(endpointMatch)) == 0 {
+					continue
+				}
+			}
+			endpointEdgeKey := segmentID + "|" + endpointID
+			if _, seen := endpointSegmentEdgeSeen[endpointEdgeKey]; seen {
+				continue
+			}
+			endpointSegmentEdgeSeen[endpointEdgeKey] = struct{}{}
+			out.links = append(out.links, topology.Link{
+				Layer:        layer,
+				Protocol:     "fdb",
+				Direction:    "bidirectional",
+				Src:          segmentEndpoint,
+				Dst:          topology.LinkEndpoint{Match: endpointMatch},
+				DiscoveredAt: topologyTimePtr(collectedAt),
+				LastSeen:     topologyTimePtr(collectedAt),
+				Metrics: map[string]any{
+					"bridge_domain": segmentID,
+				},
+			})
+			out.linksFdb++
+			out.bidirectionalCount++
+		}
+	}
+
+	sortTopologyLinks(out.links)
+	return out
+}
+
+func segmentIDFromAttachment(attachment Attachment) string {
+	deviceID := strings.TrimSpace(attachment.DeviceID)
+	if deviceID == "" {
+		return ""
+	}
+
+	base := strings.TrimSpace(attachment.Labels["bridge_domain"])
+	if base == "" {
+		if attachment.IfIndex > 0 {
+			base = deriveBridgeDomainFromIfIndex(deviceID, attachment.IfIndex)
+		} else {
+			bridgePort := strings.TrimSpace(attachment.Labels["bridge_port"])
+			if bridgePort != "" {
+				base = deriveBridgeDomainFromBridgePort(deviceID, bridgePort)
+			}
+		}
+	}
+	if base == "" {
+		return ""
+	}
+
+	vlanID := strings.TrimSpace(attachment.Labels["vlan"])
+	if vlanID == "" {
+		vlanID = strings.TrimSpace(attachment.Labels["vlan_id"])
+	}
+	if vlanID == "" {
+		return base
+	}
+	return base + "|vlan:" + vlanID
+}
+
+func endpointMatchFromID(endpointID string) topology.Match {
+	kind, value, ok := strings.Cut(strings.TrimSpace(endpointID), ":")
+	if !ok {
+		return topology.Match{}
+	}
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "mac":
+		mac := normalizeMAC(value)
+		if mac == "" {
+			return topology.Match{}
+		}
+		return topology.Match{
+			ChassisIDs:   []string{mac},
+			MacAddresses: []string{mac},
+		}
+	case "ip":
+		addr := normalizeTopologyIP(value)
+		if addr == "" {
+			return topology.Match{}
+		}
+		return topology.Match{
+			IPAddresses: []string{addr},
+		}
+	}
+	return topology.Match{}
 }
 
 func adjacencyToTopologyLink(
@@ -440,8 +771,10 @@ func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[st
 }
 
 type builtEndpointActors struct {
-	actors []topology.Actor
-	count  int
+	actors             []topology.Actor
+	count              int
+	matchByEndpointID  map[string]topology.Match
+	labelsByEndpointID map[string]map[string]string
 }
 
 func buildEndpointActors(
@@ -506,7 +839,10 @@ func buildEndpointActors(
 	}
 
 	if len(accumulators) == 0 {
-		return builtEndpointActors{}
+		return builtEndpointActors{
+			matchByEndpointID:  map[string]topology.Match{},
+			labelsByEndpointID: map[string]map[string]string{},
+		}
 	}
 
 	keys := make([]string, 0, len(accumulators))
@@ -517,6 +853,8 @@ func buildEndpointActors(
 
 	actors := make([]topology.Actor, 0, len(keys))
 	endpointCount := 0
+	matchByEndpointID := make(map[string]topology.Match, len(keys))
+	labelsByEndpointID := make(map[string]map[string]string, len(keys))
 	for _, endpointID := range keys {
 		acc := accumulators[endpointID]
 		if acc == nil {
@@ -529,6 +867,10 @@ func buildEndpointActors(
 			match.MacAddresses = []string{acc.mac}
 		}
 		match.IPAddresses = sortedEndpointIPs(acc.ips)
+		matchByEndpointID[endpointID] = match
+		labelsByEndpointID[endpointID] = map[string]string{
+			"learned_sources": strings.Join(sortedTopologySet(acc.sources), ","),
+		}
 
 		attrs := map[string]any{
 			"discovered":         true,
@@ -557,7 +899,12 @@ func buildEndpointActors(
 		endpointCount++
 	}
 
-	return builtEndpointActors{actors: actors, count: endpointCount}
+	return builtEndpointActors{
+		actors:             actors,
+		count:              endpointCount,
+		matchByEndpointID:  matchByEndpointID,
+		labelsByEndpointID: labelsByEndpointID,
+	}
 }
 
 func ensureEndpointActorAccumulator(accumulators map[string]*endpointActorAccumulator, endpointID string) *endpointActorAccumulator {
