@@ -473,7 +473,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
                 "with enable_streaming = true, but there was no replication in progress for this chart.",
                 rrdhost_hostname(host), rrdset_id(st));
 
-        pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END);
+        pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END, NULL);
 
         host->stream.rcv.status.replication.percent = 100.0;
         worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, host->stream.rcv.status.replication.percent);
@@ -573,7 +573,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
                     pulse_host_status(host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
             }
 
-            pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END);
+            pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END, NULL);
             host->stream.rcv.status.replication.percent = 100.0;
             worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, host->stream.rcv.status.replication.percent);
 
@@ -592,7 +592,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
     st->stream.rcv.who = REPLAY_WHO_ME;
 #endif
 
-    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END);
+    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END, NULL);
 
     rrdcontext_updated_retention_rrdset(st);
 
