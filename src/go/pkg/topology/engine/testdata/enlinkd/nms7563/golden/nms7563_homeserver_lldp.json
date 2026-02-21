@@ -1,0 +1,29 @@
+{
+  "version": "v1",
+  "scenario_id": "nms7563_homeserver_lldp",
+  "description": "Enlinkd NMS-7563 HomeServer LLDP parity scenario from OpenNMS integration test corpus.",
+  "devices": [
+    {
+      "id": "homeserver",
+      "hostname": "server.home.schwartzkopff.org"
+    },
+    {
+      "id": "procurve switch 2510b-24",
+      "hostname": "ProCurve Switch 2510B-24"
+    }
+  ],
+  "adjacencies": [
+    {
+      "protocol": "lldp",
+      "source_device": "homeserver",
+      "source_port": "00 1F F2 07 99 4F",
+      "target_device": "procurve switch 2510b-24",
+      "target_port": "7"
+    }
+  ],
+  "expectations": {
+    "directional_adjacencies": 1,
+    "bidirectional_pairs": 0,
+    "devices": 2
+  }
+}

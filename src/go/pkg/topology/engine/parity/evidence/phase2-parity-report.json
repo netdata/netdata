@@ -1,0 +1,116 @@
+{
+  "version": "v1",
+  "generated_at_utc": "2026-02-20T20:33:34Z",
+  "status": "pass",
+  "suite": {
+    "fixture_scenarios": 28,
+    "fixture_files": 252,
+    "total_scenarios": 46,
+    "scenarios_passed": 46,
+    "scenarios_failed": 0,
+    "total_tests_mapped": 195,
+    "total_tests_inventory": 195,
+    "total_assertions_mapped": 3067,
+    "total_assertions_inventory": 3067,
+    "protocol_counts": [
+      {
+        "protocol": "lldp",
+        "total": 34,
+        "passed": 34,
+        "failed": 0
+      },
+      {
+        "protocol": "cdp",
+        "total": 5,
+        "passed": 5,
+        "failed": 0
+      },
+      {
+        "protocol": "bridge_fdb",
+        "total": 5,
+        "passed": 5,
+        "failed": 0
+      },
+      {
+        "protocol": "arp_nd",
+        "total": 3,
+        "passed": 3,
+        "failed": 0
+      }
+    ]
+  },
+  "module_parity": [
+    {
+      "name": "lldp",
+      "status": "pass",
+      "checks_passed": 6,
+      "checks_total": 6,
+      "commands": [
+        "go test -json ./pkg/topology/engine -run ^(TestMatchLLDPLinksEnlinkdPassOrder_FallbackPasses|TestMatchLLDPLinksEnlinkdPassOrder_Precedence)$ -count=1"
+      ]
+    },
+    {
+      "name": "cdp",
+      "status": "pass",
+      "checks_passed": 2,
+      "checks_total": 2,
+      "commands": [
+        "go test -json ./pkg/topology/engine -run ^(TestMatchCDPLinksEnlinkdPassOrder_DefaultAndParsedTarget|TestMatchCDPLinksEnlinkdPassOrder_SkipsSelfTarget)$ -count=1"
+      ]
+    },
+    {
+      "name": "bridge_fdb_arp",
+      "status": "pass",
+      "checks_passed": 4,
+      "checks_total": 4,
+      "commands": [
+        "go test -json ./pkg/topology/engine -run ^(TestBuildL2ResultFromObservations_FDBAttachments|TestBuildL2ResultFromObservations_FDBBridgeDomainFallbackToBridgePort|TestBuildL2ResultFromObservations_FDBDropsDuplicateMACAcrossPorts|TestBuildL2ResultFromObservations_FDBSkipsSelfAndNonLearned)$ -count=1"
+      ]
+    },
+    {
+      "name": "updater",
+      "status": "pass",
+      "checks_passed": 2,
+      "checks_total": 2,
+      "commands": [
+        "go test -json ./pkg/topology/engine -run ^(TestBuildL2ResultFromObservations_AnnotatesPairMetadata)$ -count=1",
+        "go test -json ./pkg/topology/engine -run ^(TestToTopologyData_MergesPairedAdjacenciesIntoBidirectionalLink)$ -count=1"
+      ]
+    }
+  ],
+  "reverse_pair_quality": {
+    "name": "reverse_pair_quality",
+    "status": "pass",
+    "checks_passed": 5,
+    "checks_total": 5,
+    "commands": [
+      "go test -json ./plugin/go.d/collector/snmp -run ^(TestTopologyCache_CdpSnapshot|TestTopologyCache_CdpSnapshotHexAddress|TestTopologyCache_CdpSnapshotRawAddressWithoutIP|TestTopologyCache_LldpSnapshot|TestTopologyCache_SnapshotBidirectionalPairMetadata)$ -count=1"
+    ]
+  },
+  "identity_merge_quality": {
+    "name": "identity_merge_quality",
+    "status": "pass",
+    "checks_passed": 1,
+    "checks_total": 1,
+    "commands": [
+      "go test -json ./plugin/go.d/collector/snmp -run ^(TestTopologyCache_SnapshotMergesRemoteIdentityAcrossProtocols)$ -count=1"
+    ]
+  },
+  "assertion_coverage": {
+    "status": "pass",
+    "in_scope_total": 1240,
+    "in_scope_ported": 1240,
+    "in_scope_not_applicable_approved": 0,
+    "in_scope_unmapped": 0,
+    "out_of_scope_ported": 1593,
+    "out_of_scope_not_applicable_approved": 234
+  },
+  "deferred_gaps": [
+    {
+      "id": "gap-live-office-validation",
+      "description": "Live office `topology:snmp` sanity validation is still pending.",
+      "reason": "Repository test fixtures do not include the live office runtime environment.",
+      "evidence": "TODO-topology-library-phase2-direct-port.md G3 runtime gate"
+    }
+  ]
+}

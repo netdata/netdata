@@ -1,0 +1,30 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms4930
+scenarios:
+  - id: nms4930_dlink1_bridge_fdb
+    description: Enlinkd NMS-4930 bridge/FDB parity slice for dlink1.
+    protocols:
+      lldp: false
+      cdp: false
+      bridge: true
+      arp_nd: false
+    fixtures:
+      - device_id: dlink1
+        walk_file: ../upstream/linkd/nms4930/dlink_DES-3026.properties
+    golden_yaml: golden/nms4930_dlink1_bridge_fdb.yaml
+    golden_json: golden/nms4930_dlink1_bridge_fdb.json
+  - id: nms4930_dlink2_bridge_fdb
+    description: Enlinkd NMS-4930 bridge/FDB parity slice for dlink2.
+    protocols:
+      lldp: false
+      cdp: false
+      bridge: true
+      arp_nd: false
+    fixtures:
+      - device_id: dlink2
+        walk_file: ../upstream/linkd/nms4930/dlink_DGS-3612G.properties
+    golden_yaml: golden/nms4930_dlink2_bridge_fdb.yaml
+    golden_json: golden/nms4930_dlink2_bridge_fdb.json

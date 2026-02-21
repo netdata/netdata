@@ -35,7 +35,7 @@ func TestRespondWithParams_ResponseType(t *testing.T) {
 		ResponseType: "topology",
 	}
 
-	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "")
+	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "", true)
 
 	assert.Equal(t, "topology", (*resp)["type"])
 }
@@ -47,9 +47,38 @@ func TestRespondWithParams_MethodTypeFallback(t *testing.T) {
 		Status: 200,
 	}
 
-	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology")
+	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology", true)
 
 	assert.Equal(t, "topology", (*resp)["type"])
+}
+
+func TestRespondWithParams_AgentWideOmitsJobParam(t *testing.T) {
+	controller, resp := newTestControllerWithCapture(t)
+
+	dataResp := &funcapi.FunctionResponse{
+		Status: 200,
+		RequiredParams: []funcapi.ParamConfig{{
+			ID:        "topology_view",
+			Name:      "Topology View",
+			Selection: funcapi.ParamSelect,
+			Options: []funcapi.ParamOption{
+				{ID: "l2", Name: "L2", Default: true},
+			},
+		}},
+	}
+
+	controller.respondWithParams(functions.Function{}, "snmp", dataResp, nil, 1, "topology", false)
+
+	accepted, ok := (*resp)["accepted_params"].([]any)
+	assert.True(t, ok)
+	assert.Equal(t, []any{"topology_view"}, accepted)
+
+	required, ok := (*resp)["required_params"].([]any)
+	assert.True(t, ok)
+	assert.Len(t, required, 1)
+	req0, ok := required[0].(map[string]any)
+	assert.True(t, ok)
+	assert.Equal(t, "topology_view", req0["id"])
 }
 
 func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
@@ -64,6 +93,42 @@ func TestHandleMethodFuncInfo_UsesResponseType(t *testing.T) {
 	controller.handleMethodFuncInfo("snmp", "topology:snmp", functions.Function{})
 
 	assert.Equal(t, "topology", (*resp)["type"])
+}
+
+func TestHandleMethodFuncInfo_AgentWideOmitsJobParam(t *testing.T) {
+	controller, resp := newTestControllerWithCapture(t)
+
+	controller.registry.registerModule("snmp", collectorapi.Creator{
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{
+				ID:           "topology:snmp",
+				ResponseType: "topology",
+				AgentWide:    true,
+				RequiredParams: []funcapi.ParamConfig{{
+					ID:        "topology_view",
+					Name:      "Topology View",
+					Selection: funcapi.ParamSelect,
+					Options: []funcapi.ParamOption{
+						{ID: "l2", Name: "L2", Default: true},
+					},
+				}},
+			}}
+		},
+	})
+	controller.registry.addJob("snmp", "job-a", newTestRuntimeJob("snmp", "job-a", true))
+
+	controller.handleMethodFuncInfo("snmp", "topology:snmp", functions.Function{})
+
+	accepted, ok := (*resp)["accepted_params"].([]any)
+	assert.True(t, ok)
+	assert.Equal(t, []any{"topology_view"}, accepted)
+
+	required, ok := (*resp)["required_params"].([]any)
+	assert.True(t, ok)
+	assert.Len(t, required, 1)
+	req0, ok := required[0].(map[string]any)
+	assert.True(t, ok)
+	assert.Equal(t, "topology_view", req0["id"])
 }
 
 func TestHandleJobMethodFuncInfo_UsesResponseType(t *testing.T) {

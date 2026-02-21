@@ -119,27 +119,33 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) func(fun
 
 		payload := parsePayload(fn.Payload)
 		argValues := parseArgsParams(fn.Args)
+		includeJobParam := methodRequiresJobParam(methodCfg)
 
 		jobs := c.registry.getJobNames(moduleName)
 		if len(jobs) == 0 {
 			c.respondError(fn, 422, "no %s instances configured", moduleName)
 			return
 		}
-		jobParam := buildJobParamConfig(jobs)
-		jobValues := paramValues(argValues, payload, paramJob)
-		if len(jobValues) > 1 {
-			c.respondError(fn, 400, "parameter '%s' expects a single value", paramJob)
-			return
-		}
-		resolvedJob := funcapi.ResolveParam(jobParam, jobValues)
-		jobName := resolvedJob.GetOne()
-		if len(jobValues) > 0 && jobValues[0] != jobName {
-			c.respondError(fn, 404, "unknown job '%s', available: %v", jobValues[0], jobs)
-			return
-		}
-		if jobName == "" {
-			c.respondError(fn, 404, "no %s instances configured", moduleName)
-			return
+
+		jobName := jobs[0]
+		var resolvedJob funcapi.ResolvedParam
+		if includeJobParam {
+			jobParam := buildJobParamConfig(jobs)
+			jobValues := paramValues(argValues, payload, paramJob)
+			if len(jobValues) > 1 {
+				c.respondError(fn, 400, "parameter '%s' expects a single value", paramJob)
+				return
+			}
+			resolvedJob = funcapi.ResolveParam(jobParam, jobValues)
+			jobName = resolvedJob.GetOne()
+			if len(jobValues) > 0 && jobValues[0] != jobName {
+				c.respondError(fn, 404, "unknown job '%s', available: %v", jobValues[0], jobs)
+				return
+			}
+			if jobName == "" {
+				c.respondError(fn, 404, "no %s instances configured", moduleName)
+				return
+			}
 		}
 
 		job, jobGen := c.registry.getJobWithGeneration(moduleName, jobName)
@@ -166,7 +172,7 @@ func (c *Controller) makeMethodFuncHandler(moduleName, methodID string) func(fun
 				resolvedParams[paramJob] = resolvedJob
 			},
 			respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
-				c.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery, methodCfg.ResponseType)
+				c.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery, methodCfg.ResponseType, includeJobParam)
 			},
 		})
 	}
@@ -180,6 +186,7 @@ func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functi
 	}
 
 	methodParams := methodCfg.RequiredParams
+	includeJobParam := methodRequiresJobParam(methodCfg)
 	help := methodCfg.Help
 	if help == "" {
 		help = fmt.Sprintf("%s %s data function", moduleName, methodID)
@@ -197,15 +204,17 @@ func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functi
 		"type":            resolveResponseType("", methodCfg.ResponseType),
 		"has_history":     false,
 		"help":            help,
-		"accepted_params": buildAcceptedParams(methodParams),
-		"required_params": c.buildRequiredParams(moduleName, methodParams),
+		"accepted_params": buildAcceptedParams(methodParams, includeJobParam),
+		"required_params": c.buildRequiredParams(moduleName, methodParams, includeJobParam),
 	})
 }
 
-func (c *Controller) buildRequiredParams(moduleName string, methodParams []funcapi.ParamConfig) []map[string]any {
-	jobs := c.registry.getJobNames(moduleName)
-
-	paramConfigs := []funcapi.ParamConfig{buildJobParamConfig(jobs)}
+func (c *Controller) buildRequiredParams(moduleName string, methodParams []funcapi.ParamConfig, includeJobParam bool) []map[string]any {
+	paramConfigs := make([]funcapi.ParamConfig, 0, len(methodParams)+1)
+	if includeJobParam {
+		jobs := c.registry.getJobNames(moduleName)
+		paramConfigs = append(paramConfigs, buildJobParamConfig(jobs))
+	}
 	paramConfigs = append(paramConfigs, methodParams...)
 
 	required := make([]map[string]any, 0, len(paramConfigs))
@@ -393,14 +402,21 @@ func buildJobParamConfig(jobs []string) funcapi.ParamConfig {
 	}
 }
 
-func buildAcceptedParams(methodParams []funcapi.ParamConfig) []string {
-	accepted := []string{paramJob}
+func buildAcceptedParams(methodParams []funcapi.ParamConfig, includeJobParam bool) []string {
+	accepted := make([]string, 0, len(methodParams)+1)
+	if includeJobParam {
+		accepted = append(accepted, paramJob)
+	}
 	for _, param := range methodParams {
 		if !slices.Contains(accepted, param.ID) {
 			accepted = append(accepted, param.ID)
 		}
 	}
 	return accepted
+}
+
+func methodRequiresJobParam(cfg *funcapi.MethodConfig) bool {
+	return cfg == nil || !cfg.AgentWide
 }
 
 func (c *Controller) makeJobMethodFuncHandler(moduleName, jobName, methodID string) func(functions.Function) {

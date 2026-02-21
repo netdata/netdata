@@ -1,0 +1,24 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms13637
+scenarios:
+  - id: nms13637_lldp
+    description: >-
+      Enlinkd NMS-13637 LLDP parity scenario from OpenNMS integration test
+      corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: router-1
+        walk_file: ../upstream/linkd/nms13637/router-1-walk.txt
+      - device_id: router-2
+        walk_file: ../upstream/linkd/nms13637/router-2-walk.txt
+      - device_id: sw01-office
+        walk_file: ../upstream/linkd/nms13637/sw01-office-walk.txt
+    golden_yaml: golden/nms13637_lldp.yaml
+    golden_json: golden/nms13637_lldp.json

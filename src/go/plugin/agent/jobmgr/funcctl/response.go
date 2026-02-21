@@ -13,16 +13,18 @@ import (
 
 type methodResponseWriter func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int)
 
-func (c *Controller) respondWithParams(fn functions.Function, moduleName string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string) {
+func (c *Controller) respondWithParams(fn functions.Function, moduleName string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string, includeJobParam bool) {
 	c.respondMethodDataWithParams(
 		fn,
 		dataResp,
 		methodParams,
 		updateEvery,
 		methodType,
-		buildAcceptedParams,
+		func(params []funcapi.ParamConfig) []string {
+			return buildAcceptedParams(params, includeJobParam)
+		},
 		func(params []funcapi.ParamConfig) []map[string]any {
-			return c.buildRequiredParams(moduleName, params)
+			return c.buildRequiredParams(moduleName, params, includeJobParam)
 		},
 	)
 }
