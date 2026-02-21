@@ -406,7 +406,14 @@ func fetchMySQLTableColumns(ctx context.Context, deps Deps, cfg FunctionsConfig,
 	if err != nil {
 		return nil, err
 	}
-	return sqlquery.FetchTableColumns(qctx, db, "performance_schema", table, strings.ToUpper)
+	return sqlquery.FetchTableColumns(
+		qctx,
+		db,
+		"performance_schema",
+		table,
+		sqlquery.PlaceholderQuestion,
+		strings.ToUpper,
+	)
 }
 
 func fetchMySQLErrorRows(ctx context.Context, deps Deps, cfg FunctionsConfig, source mysqlErrorSource, digests []string, limit int) ([]mysqlErrorRow, error) {

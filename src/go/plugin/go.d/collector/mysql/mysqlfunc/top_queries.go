@@ -432,7 +432,14 @@ func (f *funcTopQueries) detectStatementsColumns(ctx context.Context) (map[strin
 	if err != nil {
 		return nil, err
 	}
-	cols, err := sqlquery.FetchTableColumns(ctx, db, "performance_schema", "events_statements_summary_by_digest", nil)
+	cols, err := sqlquery.FetchTableColumns(
+		ctx,
+		db,
+		"performance_schema",
+		"events_statements_summary_by_digest",
+		sqlquery.PlaceholderQuestion,
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query column information: %w", err)
 	}

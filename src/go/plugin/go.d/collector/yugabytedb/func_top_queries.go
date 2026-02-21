@@ -201,32 +201,19 @@ func (f *funcTopQueries) detectPgStatStatementsColumns(ctx context.Context) (map
 		return f.router.pgStatStatementsColumns, nil
 	}
 
-	query := `
-		SELECT column_name
-		FROM information_schema.columns
-		WHERE table_name = 'pg_stat_statements'
-		AND table_schema = 'public'
-	`
 	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
 	defer cancel()
 
-	rows, err := f.router.db.QueryContext(queryCtx, query)
+	cols, err := sqlquery.FetchTableColumns(
+		queryCtx,
+		f.router.db,
+		"public",
+		"pg_stat_statements",
+		sqlquery.PlaceholderDollar,
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query columns: %v", err)
-	}
-	defer rows.Close()
-
-	cols := make(map[string]bool)
-	for rows.Next() {
-		var colName string
-		if err := rows.Scan(&colName); err != nil {
-			return nil, fmt.Errorf("failed to scan column name: %v", err)
-		}
-		cols[colName] = true
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows iteration error: %v", err)
 	}
 
 	f.router.pgStatStatementsColumns = cols

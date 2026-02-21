@@ -2,20 +2,45 @@
 
 package sqlquery
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
-const queryFetchTableColumns = `
+type PlaceholderStyle int
+
+const (
+	PlaceholderQuestion PlaceholderStyle = iota
+	PlaceholderDollar
+)
+
+func tableColumnsQuery(style PlaceholderStyle) (string, error) {
+	switch style {
+	case PlaceholderQuestion:
+		return `
 SELECT COLUMN_NAME
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = ?
-  AND TABLE_NAME = ?`
+  AND TABLE_NAME = ?`, nil
+	case PlaceholderDollar:
+		return `
+SELECT COLUMN_NAME
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = $1
+  AND TABLE_NAME = $2`, nil
+	default:
+		return "", fmt.Errorf("unsupported placeholder style: %d", style)
+	}
+}
 
 // FetchTableColumns returns the set of column names for schema.table.
 // If transform is non-nil, it is applied to each column name before insertion.
-// Note: this helper currently uses MySQL-style '?' placeholders and is intended
-// for MySQL-family collectors in its current form.
-func FetchTableColumns(ctx context.Context, q Queryer, schema, table string, transform func(string) string) (map[string]bool, error) {
-	rows, err := q.QueryContext(ctx, queryFetchTableColumns, schema, table)
+func FetchTableColumns(ctx context.Context, q Queryer, schema, table string, style PlaceholderStyle, transform func(string) string) (map[string]bool, error) {
+	query, err := tableColumnsQuery(style)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := q.QueryContext(ctx, query, schema, table)
 	if err != nil {
 		return nil, err
 	}

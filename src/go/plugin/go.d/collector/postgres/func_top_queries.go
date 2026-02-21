@@ -99,30 +99,16 @@ func (f *funcTopQueries) detectPgStatStatementsColumns(ctx context.Context) (map
 		return c.pgStatStatementsColumns, nil
 	}
 
-	// Query available columns from pg_stat_statements
-	query := `
-		SELECT column_name
-		FROM information_schema.columns
-		WHERE table_name = 'pg_stat_statements'
-		AND table_schema = 'public'
-	`
-	rows, err := c.db.QueryContext(ctx, query)
+	cols, err := sqlquery.FetchTableColumns(
+		ctx,
+		c.db,
+		"public",
+		"pg_stat_statements",
+		sqlquery.PlaceholderDollar,
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query columns: %v", err)
-	}
-	defer rows.Close()
-
-	cols := make(map[string]bool)
-	for rows.Next() {
-		var colName string
-		if err := rows.Scan(&colName); err != nil {
-			return nil, fmt.Errorf("failed to scan column name: %v", err)
-		}
-		cols[colName] = true
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows iteration error: %v", err)
 	}
 
 	// Cache the result
@@ -152,30 +138,16 @@ func (f *funcTopQueries) detectPgStatMonitorColumns(ctx context.Context) (map[st
 		return c.pgStatMonitorColumns, nil
 	}
 
-	// Query available columns from pg_stat_monitor
-	query := `
-		SELECT column_name
-		FROM information_schema.columns
-		WHERE table_name = 'pg_stat_monitor'
-		AND table_schema = 'public'
-	`
-	rows, err := c.db.QueryContext(ctx, query)
+	cols, err := sqlquery.FetchTableColumns(
+		ctx,
+		c.db,
+		"public",
+		"pg_stat_monitor",
+		sqlquery.PlaceholderDollar,
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query columns: %v", err)
-	}
-	defer rows.Close()
-
-	cols := make(map[string]bool)
-	for rows.Next() {
-		var colName string
-		if err := rows.Scan(&colName); err != nil {
-			return nil, fmt.Errorf("failed to scan column name: %v", err)
-		}
-		cols[colName] = true
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows iteration error: %v", err)
 	}
 
 	// Cache the result
