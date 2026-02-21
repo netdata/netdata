@@ -52,25 +52,26 @@ type projectedLinks struct {
 	unidirectionalCount int
 }
 
-type segmentAttachment struct {
+type bridgePortRef struct {
 	deviceID   string
 	ifIndex    int
 	ifName     string
 	bridgePort string
-	endpointID string
-	method     string
 	vlanID     string
 }
 
 type segmentAccumulator struct {
-	id          string
-	attachments []segmentAttachment
-	deviceIDs   map[string]struct{}
-	ifNames     map[string]struct{}
-	ifIndexes   map[string]struct{}
-	bridgePorts map[string]struct{}
-	vlanIDs     map[string]struct{}
-	methods     map[string]struct{}
+	id               string
+	designatedPortID string
+	ports            map[string]bridgePortRef
+	portByLooseKey   map[string]string
+	endpointIDs      map[string]struct{}
+	deviceIDs        map[string]struct{}
+	ifNames          map[string]struct{}
+	ifIndexes        map[string]struct{}
+	bridgePorts      map[string]struct{}
+	vlanIDs          map[string]struct{}
+	methods          map[string]struct{}
 }
 
 type projectedSegments struct {
@@ -151,6 +152,7 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 
 	segmentProjection := projectSegmentTopology(
 		result.Attachments,
+		result.Adjacencies,
 		layer,
 		source,
 		collectedAt,
@@ -284,6 +286,7 @@ func projectAdjacencyLinks(
 
 func projectSegmentTopology(
 	attachments []Attachment,
+	adjacencies []Adjacency,
 	layer string,
 	source string,
 	collectedAt time.Time,
@@ -297,107 +300,92 @@ func projectSegmentTopology(
 		actors: make([]topology.Actor, 0),
 		links:  make([]topology.Link, 0),
 	}
-	if len(attachments) == 0 {
+	if len(attachments) == 0 && len(adjacencies) == 0 {
 		return out
 	}
 
-	segments := make(map[string]*segmentAccumulator)
-	for _, attachment := range attachments {
-		segmentID := segmentIDFromAttachment(attachment)
-		if segmentID == "" {
+	bridgeLinks := collectBridgeLinkRecords(adjacencies, ifIndexByDeviceName)
+	macLinks := collectBridgeMacLinkRecords(attachments, ifaceByDeviceIndex)
+	model := buildBridgeDomainModel(bridgeLinks, macLinks)
+	if len(model.domains) == 0 {
+		return out
+	}
+
+	segmentIDs := make([]string, 0)
+	segmentMatchByID := make(map[string]topology.Match)
+	segmentByID := make(map[string]*bridgeDomainSegment)
+
+	for _, domain := range model.domains {
+		if domain == nil {
 			continue
 		}
-
-		acc := segments[segmentID]
-		if acc == nil {
-			acc = &segmentAccumulator{
-				id:          segmentID,
-				attachments: make([]segmentAttachment, 0, 1),
-				deviceIDs:   make(map[string]struct{}),
-				ifNames:     make(map[string]struct{}),
-				ifIndexes:   make(map[string]struct{}),
-				bridgePorts: make(map[string]struct{}),
-				vlanIDs:     make(map[string]struct{}),
-				methods:     make(map[string]struct{}),
+		for _, segment := range domain.segments {
+			if segment == nil {
+				continue
 			}
-			segments[segmentID] = acc
-		}
-
-		deviceID := strings.TrimSpace(attachment.DeviceID)
-		ifName := strings.TrimSpace(attachment.Labels["if_name"])
-		if ifName == "" && attachment.IfIndex > 0 {
-			if iface, ok := ifaceByDeviceIndex[deviceIfIndexKey(deviceID, attachment.IfIndex)]; ok {
-				ifName = strings.TrimSpace(iface.IfName)
+			if len(segment.endpointIDs) == 0 {
+				continue
 			}
+			segmentID := bridgeDomainSegmentID(segment)
+			if _, exists := segmentByID[segmentID]; exists {
+				continue
+			}
+			segmentByID[segmentID] = segment
+			segmentIDs = append(segmentIDs, segmentID)
 		}
-		bridgePort := strings.TrimSpace(attachment.Labels["bridge_port"])
-		method := strings.ToLower(strings.TrimSpace(attachment.Method))
-		if method == "" {
-			method = "fdb"
-		}
-		vlanID := strings.TrimSpace(attachment.Labels["vlan"])
-		if vlanID == "" {
-			vlanID = strings.TrimSpace(attachment.Labels["vlan_id"])
-		}
-
-		entry := segmentAttachment{
-			deviceID:   deviceID,
-			ifIndex:    attachment.IfIndex,
-			ifName:     ifName,
-			bridgePort: bridgePort,
-			endpointID: strings.TrimSpace(attachment.EndpointID),
-			method:     method,
-			vlanID:     vlanID,
-		}
-		acc.attachments = append(acc.attachments, entry)
-		if deviceID != "" {
-			acc.deviceIDs[deviceID] = struct{}{}
-		}
-		if ifName != "" {
-			acc.ifNames[ifName] = struct{}{}
-		}
-		if attachment.IfIndex > 0 {
-			acc.ifIndexes[strconv.Itoa(attachment.IfIndex)] = struct{}{}
-		}
-		if bridgePort != "" {
-			acc.bridgePorts[bridgePort] = struct{}{}
-		}
-		if vlanID != "" {
-			acc.vlanIDs[vlanID] = struct{}{}
-		}
-		if method != "" {
-			acc.methods[method] = struct{}{}
-		}
-	}
-	if len(segments) == 0 {
-		return out
-	}
-
-	segmentIDs := make([]string, 0, len(segments))
-	for segmentID := range segments {
-		segmentIDs = append(segmentIDs, segmentID)
 	}
 	sort.Strings(segmentIDs)
+	if len(segmentIDs) == 0 {
+		return out
+	}
 
-	segmentMatchByID := make(map[string]topology.Match, len(segmentIDs))
 	for _, segmentID := range segmentIDs {
-		acc := segments[segmentID]
-		if acc == nil {
+		segment := segmentByID[segmentID]
+		if segment == nil {
 			continue
+		}
+
+		parentDevices := make(map[string]struct{})
+		ifNames := make(map[string]struct{})
+		ifIndexes := make(map[string]struct{})
+		bridgePorts := make(map[string]struct{})
+		vlanIDs := make(map[string]struct{})
+		for _, port := range segment.ports {
+			if strings.TrimSpace(port.deviceID) != "" {
+				parentDevices[port.deviceID] = struct{}{}
+			}
+			if strings.TrimSpace(port.ifName) != "" {
+				ifNames[port.ifName] = struct{}{}
+			}
+			if port.ifIndex > 0 {
+				ifIndexes[strconv.Itoa(port.ifIndex)] = struct{}{}
+			}
+			if strings.TrimSpace(port.bridgePort) != "" {
+				bridgePorts[port.bridgePort] = struct{}{}
+			}
+			if strings.TrimSpace(port.vlanID) != "" {
+				vlanIDs[port.vlanID] = struct{}{}
+			}
 		}
 
 		match := topology.Match{
 			Hostnames: []string{"segment:" + segmentID},
 		}
+
 		attrs := map[string]any{
 			"segment_id":      segmentID,
 			"segment_type":    "broadcast_domain",
-			"parent_devices":  sortedTopologySet(acc.deviceIDs),
-			"if_names":        sortedTopologySet(acc.ifNames),
-			"if_indexes":      sortedTopologySet(acc.ifIndexes),
-			"bridge_ports":    sortedTopologySet(acc.bridgePorts),
-			"vlan_ids":        sortedTopologySet(acc.vlanIDs),
-			"learned_sources": sortedTopologySet(acc.methods),
+			"parent_devices":  sortedTopologySet(parentDevices),
+			"if_names":        sortedTopologySet(ifNames),
+			"if_indexes":      sortedTopologySet(ifIndexes),
+			"bridge_ports":    sortedTopologySet(bridgePorts),
+			"vlan_ids":        sortedTopologySet(vlanIDs),
+			"learned_sources": sortedTopologySet(segment.methods),
+			"ports_total":     len(segment.ports),
+			"endpoints_total": len(segment.endpointIDs),
+		}
+		if bridgePortRefKey(segment.designatedPort, false, false) != "" {
+			attrs["designated_port"] = bridgePortRefSortKey(segment.designatedPort)
 		}
 
 		actor := topology.Actor{
@@ -407,10 +395,9 @@ func projectSegmentTopology(
 			Match:      match,
 			Attributes: pruneTopologyAttributes(attrs),
 			Labels: map[string]string{
-				"segment_kind": "bridge_domain",
+				"segment_kind": "broadcast_domain",
 			},
 		}
-
 		keys := topologyMatchIdentityKeys(actor.Match)
 		if len(keys) > 0 && !topologyIdentityIndexOverlaps(actorIndex, keys) {
 			addTopologyIdentityKeys(actorIndex, keys)
@@ -421,64 +408,65 @@ func projectSegmentTopology(
 
 	deviceSegmentEdgeSeen := make(map[string]struct{})
 	endpointSegmentEdgeSeen := make(map[string]struct{})
-
 	for _, segmentID := range segmentIDs {
-		acc := segments[segmentID]
-		if acc == nil {
+		segment := segmentByID[segmentID]
+		if segment == nil {
 			continue
 		}
-		segmentMatch := segmentMatchByID[segmentID]
 		segmentEndpoint := topology.LinkEndpoint{
-			Match: segmentMatch,
+			Match: segmentMatchByID[segmentID],
 			Attributes: map[string]any{
 				"segment_id": segmentID,
 			},
 		}
 
-		for _, attachment := range acc.attachments {
-			if attachment.deviceID == "" {
-				continue
-			}
-			device, ok := deviceByID[attachment.deviceID]
+		portIDs := make([]string, 0, len(segment.ports))
+		for portID := range segment.ports {
+			portIDs = append(portIDs, portID)
+		}
+		sort.Strings(portIDs)
+		for _, portID := range portIDs {
+			port := segment.ports[portID]
+			device, ok := deviceByID[port.deviceID]
 			if !ok {
 				continue
 			}
-			port := strings.TrimSpace(attachment.ifName)
-			if port == "" && attachment.ifIndex > 0 {
-				port = strconv.Itoa(attachment.ifIndex)
-			}
-			if port == "" {
-				port = strings.TrimSpace(attachment.bridgePort)
-			}
-
-			deviceEdgeKey := strings.Join([]string{
-				segmentID,
-				attachment.deviceID,
-				strconv.Itoa(attachment.ifIndex),
-				port,
-			}, "|")
-			if _, seen := deviceSegmentEdgeSeen[deviceEdgeKey]; !seen {
-				deviceSegmentEdgeSeen[deviceEdgeKey] = struct{}{}
-				out.links = append(out.links, topology.Link{
-					Layer:        layer,
-					Protocol:     "bridge",
-					Direction:    "bidirectional",
-					Src:          adjacencySideToEndpoint(device, port, ifIndexByDeviceName),
-					Dst:          segmentEndpoint,
-					DiscoveredAt: topologyTimePtr(collectedAt),
-					LastSeen:     topologyTimePtr(collectedAt),
-					Metrics: map[string]any{
-						"bridge_domain": segmentID,
-					},
-				})
-				out.linksFdb++
-				out.bidirectionalCount++
-			}
-
-			endpointID := strings.TrimSpace(attachment.endpointID)
-			if endpointID == "" {
+			localPort := bridgePortDisplay(port)
+			if localPort == "" {
 				continue
 			}
+			edgeKey := segmentID + "|" + portID
+			if _, seen := deviceSegmentEdgeSeen[edgeKey]; seen {
+				continue
+			}
+			deviceSegmentEdgeSeen[edgeKey] = struct{}{}
+
+			metrics := map[string]any{
+				"bridge_domain": segmentID,
+			}
+			if segment.portIdentityKey(port) == segment.portIdentityKey(segment.designatedPort) {
+				metrics["designated"] = true
+			}
+			out.links = append(out.links, topology.Link{
+				Layer:        layer,
+				Protocol:     "bridge",
+				Direction:    "bidirectional",
+				Src:          adjacencySideToEndpoint(device, localPort, ifIndexByDeviceName),
+				Dst:          segmentEndpoint,
+				DiscoveredAt: topologyTimePtr(collectedAt),
+				LastSeen:     topologyTimePtr(collectedAt),
+				Metrics:      metrics,
+			})
+			out.linksFdb++
+			out.bidirectionalCount++
+		}
+
+		endpointIDs := make([]string, 0, len(segment.endpointIDs))
+		for endpointID := range segment.endpointIDs {
+			endpointIDs = append(endpointIDs, endpointID)
+		}
+		sort.Strings(endpointIDs)
+		for _, endpointID := range endpointIDs {
 			endpointMatch, ok := endpointMatchByID[endpointID]
 			if !ok {
 				endpointMatch = endpointMatchFromID(endpointID)
@@ -486,11 +474,12 @@ func projectSegmentTopology(
 					continue
 				}
 			}
-			endpointEdgeKey := segmentID + "|" + endpointID
-			if _, seen := endpointSegmentEdgeSeen[endpointEdgeKey]; seen {
+			edgeKey := segmentID + "|" + endpointID
+			if _, seen := endpointSegmentEdgeSeen[edgeKey]; seen {
 				continue
 			}
-			endpointSegmentEdgeSeen[endpointEdgeKey] = struct{}{}
+			endpointSegmentEdgeSeen[edgeKey] = struct{}{}
+
 			out.links = append(out.links, topology.Link{
 				Layer:        layer,
 				Protocol:     "fdb",
@@ -510,37 +499,6 @@ func projectSegmentTopology(
 
 	sortTopologyLinks(out.links)
 	return out
-}
-
-func segmentIDFromAttachment(attachment Attachment) string {
-	deviceID := strings.TrimSpace(attachment.DeviceID)
-	if deviceID == "" {
-		return ""
-	}
-
-	base := strings.TrimSpace(attachment.Labels["bridge_domain"])
-	if base == "" {
-		if attachment.IfIndex > 0 {
-			base = deriveBridgeDomainFromIfIndex(deviceID, attachment.IfIndex)
-		} else {
-			bridgePort := strings.TrimSpace(attachment.Labels["bridge_port"])
-			if bridgePort != "" {
-				base = deriveBridgeDomainFromBridgePort(deviceID, bridgePort)
-			}
-		}
-	}
-	if base == "" {
-		return ""
-	}
-
-	vlanID := strings.TrimSpace(attachment.Labels["vlan"])
-	if vlanID == "" {
-		vlanID = strings.TrimSpace(attachment.Labels["vlan_id"])
-	}
-	if vlanID == "" {
-		return base
-	}
-	return base + "|vlan:" + vlanID
 }
 
 func endpointMatchFromID(endpointID string) topology.Match {
@@ -568,6 +526,217 @@ func endpointMatchFromID(endpointID string) topology.Match {
 		}
 	}
 	return topology.Match{}
+}
+
+func collectBridgeLinkRecords(adjacencies []Adjacency, ifIndexByDeviceName map[string]int) []bridgeBridgeLinkRecord {
+	records := make([]bridgeBridgeLinkRecord, 0)
+	seen := make(map[string]struct{})
+
+	for _, adj := range adjacencies {
+		protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
+		if protocol != "lldp" && protocol != "cdp" {
+			continue
+		}
+
+		src := bridgePortFromAdjacencySide(adj.SourceID, adj.SourcePort, ifIndexByDeviceName)
+		dst := bridgePortFromAdjacencySide(adj.TargetID, adj.TargetPort, ifIndexByDeviceName)
+		srcKey := bridgePortRefKey(src, false, false)
+		dstKey := bridgePortRefKey(dst, false, false)
+		if srcKey == "" || dstKey == "" {
+			continue
+		}
+
+		pairKey := bridgePairKey(src, dst)
+		if pairKey == "" {
+			continue
+		}
+		if _, ok := seen[pairKey]; ok {
+			continue
+		}
+		seen[pairKey] = struct{}{}
+
+		designated := src
+		other := dst
+		if bridgePortRefSortKey(src) > bridgePortRefSortKey(dst) {
+			designated = dst
+			other = src
+		}
+		records = append(records, bridgeBridgeLinkRecord{
+			port:           other,
+			designatedPort: designated,
+		})
+	}
+
+	sort.SliceStable(records, func(i, j int) bool {
+		li := portSortKey(records[i].designatedPort) + "|" + portSortKey(records[i].port)
+		lj := portSortKey(records[j].designatedPort) + "|" + portSortKey(records[j].port)
+		return li < lj
+	})
+	return records
+}
+
+func collectBridgeMacLinkRecords(attachments []Attachment, ifaceByDeviceIndex map[string]Interface) []bridgeMacLinkRecord {
+	records := make([]bridgeMacLinkRecord, 0, len(attachments))
+	seen := make(map[string]struct{}, len(attachments))
+
+	attachmentsSorted := append([]Attachment(nil), attachments...)
+	sort.SliceStable(attachmentsSorted, func(i, j int) bool {
+		return bridgeAttachmentSortKey(attachmentsSorted[i]) < bridgeAttachmentSortKey(attachmentsSorted[j])
+	})
+
+	for _, attachment := range attachmentsSorted {
+		port := bridgePortFromAttachment(attachment, ifaceByDeviceIndex)
+		portKey := bridgePortRefKey(port, false, false)
+		endpointID := strings.TrimSpace(attachment.EndpointID)
+		if portKey == "" || endpointID == "" {
+			continue
+		}
+		method := strings.ToLower(strings.TrimSpace(attachment.Method))
+		if method == "" {
+			method = "fdb"
+		}
+
+		key := portKey + "|" + endpointID + "|" + method
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		records = append(records, bridgeMacLinkRecord{
+			port:       port,
+			endpointID: endpointID,
+			method:     method,
+		})
+	}
+
+	return records
+}
+
+func bridgeDomainSegmentID(segment *bridgeDomainSegment) string {
+	if segment == nil {
+		return ""
+	}
+	portKeys := sortedBridgePortSet(segment.ports)
+	sig := strings.Join(portKeys, "<->")
+	if sig == "" {
+		sig = portSortKey(segment.designatedPort)
+	}
+	return "bridge-domain:" + sig
+}
+
+func bridgePortFromAdjacencySide(deviceID, port string, ifIndexByDeviceName map[string]int) bridgePortRef {
+	deviceID = strings.TrimSpace(deviceID)
+	port = strings.TrimSpace(port)
+	if deviceID == "" || port == "" {
+		return bridgePortRef{}
+	}
+	ifIndex := ifIndexByDeviceName[deviceIfNameKey(deviceID, port)]
+	if ifIndex == 0 {
+		if n, err := strconv.Atoi(port); err == nil && n > 0 {
+			ifIndex = n
+		}
+	}
+	return bridgePortRef{
+		deviceID:   deviceID,
+		ifIndex:    ifIndex,
+		ifName:     port,
+		bridgePort: port,
+	}
+}
+
+func bridgePortFromAttachment(attachment Attachment, ifaceByDeviceIndex map[string]Interface) bridgePortRef {
+	deviceID := strings.TrimSpace(attachment.DeviceID)
+	if deviceID == "" {
+		return bridgePortRef{}
+	}
+	ifIndex := attachment.IfIndex
+	ifName := strings.TrimSpace(attachment.Labels["if_name"])
+	if ifName == "" && ifIndex > 0 {
+		if iface, ok := ifaceByDeviceIndex[deviceIfIndexKey(deviceID, ifIndex)]; ok {
+			ifName = strings.TrimSpace(iface.IfName)
+		}
+	}
+	bridgePort := strings.TrimSpace(attachment.Labels["bridge_port"])
+	if bridgePort == "" {
+		if ifIndex > 0 {
+			bridgePort = strconv.Itoa(ifIndex)
+		} else {
+			bridgePort = ifName
+		}
+	}
+	vlanID := strings.TrimSpace(attachment.Labels["vlan"])
+	if vlanID == "" {
+		vlanID = strings.TrimSpace(attachment.Labels["vlan_id"])
+	}
+	return bridgePortRef{
+		deviceID:   deviceID,
+		ifIndex:    ifIndex,
+		ifName:     ifName,
+		bridgePort: bridgePort,
+		vlanID:     vlanID,
+	}
+}
+
+func bridgeAttachmentSortKey(attachment Attachment) string {
+	parts := []string{
+		strings.TrimSpace(attachment.DeviceID),
+		strconv.Itoa(attachment.IfIndex),
+		strings.TrimSpace(attachment.Labels["if_name"]),
+		strings.TrimSpace(attachment.Labels["bridge_port"]),
+		strings.TrimSpace(attachment.EndpointID),
+	}
+	return strings.Join(parts, "|")
+}
+
+func bridgePairKey(left, right bridgePortRef) string {
+	leftKey := bridgePortRefKey(left, false, false)
+	rightKey := bridgePortRefKey(right, false, false)
+	if leftKey == "" || rightKey == "" {
+		return ""
+	}
+	if leftKey > rightKey {
+		leftKey, rightKey = rightKey, leftKey
+	}
+	return leftKey + "<->" + rightKey
+}
+
+func bridgePortRefKey(port bridgePortRef, includeBridgePort bool, includeVLAN bool) string {
+	deviceID := strings.TrimSpace(port.deviceID)
+	if deviceID == "" {
+		return ""
+	}
+	bridgePort := strings.TrimSpace(port.bridgePort)
+	if bridgePort == "" && port.ifIndex > 0 {
+		bridgePort = strconv.Itoa(port.ifIndex)
+	}
+	ifName := strings.TrimSpace(port.ifName)
+	vlanID := strings.TrimSpace(port.vlanID)
+	if !includeVLAN {
+		vlanID = ""
+	}
+	parts := []string{
+		deviceID,
+		"if:" + strconv.Itoa(port.ifIndex),
+		"name:" + strings.ToLower(ifName),
+	}
+	if includeBridgePort {
+		parts = append(parts, "bp:"+strings.ToLower(bridgePort))
+	}
+	parts = append(parts, "vlan:"+strings.ToLower(vlanID))
+	return strings.Join(parts, "|")
+}
+
+func bridgePortRefSortKey(port bridgePortRef) string {
+	return bridgePortRefKey(port, true, true)
+}
+
+func bridgePortDisplay(port bridgePortRef) string {
+	if name := strings.TrimSpace(port.ifName); name != "" {
+		return name
+	}
+	if port.ifIndex > 0 {
+		return strconv.Itoa(port.ifIndex)
+	}
+	return strings.TrimSpace(port.bridgePort)
 }
 
 func adjacencyToTopologyLink(
