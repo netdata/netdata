@@ -25,6 +25,7 @@ void stream_sender_clear_parent_claim_id(RRDHOST *host);
 void stream_sender_send_claimed_id(RRDHOST *host);
 
 void stream_send_global_functions(RRDHOST *host);
+void stream_send_function_del(RRDHOST *host, const char *function_name);
 void stream_send_host_labels(RRDHOST *host);
 
 void stream_sender_send_custom_host_variables(RRDHOST *host);
