@@ -4,7 +4,6 @@ package snmp
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -81,16 +80,11 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 		view = fView
 	}
 
-	switch view {
-	case topologyViewL3, topologyViewMerged:
-		return funcapi.UnavailableResponse(fmt.Sprintf("snmp topology view %q is not available yet", view))
-	}
-
 	if snmpTopologyRegistry == nil {
 		return funcapi.UnavailableResponse("topology data not available yet, please retry after data collection")
 	}
 
-	data, ok := snmpTopologyRegistry.snapshot()
+	data, ok := snmpTopologyRegistry.snapshotForView(view)
 
 	if !ok {
 		return funcapi.UnavailableResponse("topology data not available yet, please retry after data collection")
