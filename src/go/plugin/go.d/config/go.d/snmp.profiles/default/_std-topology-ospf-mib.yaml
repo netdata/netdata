@@ -1,0 +1,101 @@
+# Topology-focused OSPF profile.
+#
+# Required contract:
+# - ospfGeneralGroup
+# - ospfIfTable
+# - ospfNbrTable
+# - ipAddrTable (IP -> ifIndex mapping)
+
+metrics:
+  - MIB: OSPF-MIB
+    symbols:
+      - OID: 1.3.6.1.2.1.14.1.2
+        name: ospfGeneralEntry
+    metric_tags:
+      - tag: ospf_router_id
+        symbol:
+          OID: 1.3.6.1.2.1.14.1.1
+          name: ospfRouterId
+      - tag: ospf_admin_state
+        symbol:
+          OID: 1.3.6.1.2.1.14.1.2
+          name: ospfAdminStat
+      - tag: ospf_version_number
+        symbol:
+          OID: 1.3.6.1.2.1.14.1.3
+          name: ospfVersionNumber
+      - tag: ospf_area_bdr_rtr_status
+        symbol:
+          OID: 1.3.6.1.2.1.14.1.4
+          name: ospfAreaBdrRtrStatus
+      - tag: ospf_as_bdr_rtr_status
+        symbol:
+          OID: 1.3.6.1.2.1.14.1.5
+          name: ospfAreaASBdrRtrStatus
+
+  - MIB: OSPF-MIB
+    table:
+      OID: 1.3.6.1.2.1.14.7
+      name: ospfIfTable
+    symbols:
+      - OID: 1.3.6.1.2.1.14.7.1.2
+        name: ospfIfTopologyEntry
+    metric_tags:
+      - tag: ospf_if_ip_addr
+        symbol:
+          OID: 1.3.6.1.2.1.14.7.1.1
+          name: ospfIfIpAddress
+      - tag: ospf_if_address_less_index
+        symbol:
+          OID: 1.3.6.1.2.1.14.7.1.2
+          name: ospfAddressLessIf
+      - tag: ospf_if_area_id
+        symbol:
+          OID: 1.3.6.1.2.1.14.7.1.3
+          name: ospfIfAreaId
+      - tag: ospf_if_netmask
+        symbol:
+          OID: 1.3.6.1.2.1.14.7.1.4
+          name: ospfIfNetMask
+
+  - MIB: OSPF-MIB
+    table:
+      OID: 1.3.6.1.2.1.14.10
+      name: ospfNbrTable
+    symbols:
+      - OID: 1.3.6.1.2.1.14.10.1.2
+        name: ospfNbrTopologyEntry
+    metric_tags:
+      - tag: ospf_nbr_ip_addr
+        symbol:
+          OID: 1.3.6.1.2.1.14.10.1.1
+          name: ospfNbrIpAddr
+      - tag: ospf_nbr_address_less_index
+        symbol:
+          OID: 1.3.6.1.2.1.14.10.1.2
+          name: ospfNbrAddressLessIndex
+      - tag: ospf_nbr_router_id
+        symbol:
+          OID: 1.3.6.1.2.1.14.10.1.3
+          name: ospfNbrRtrId
+
+  - MIB: IP-MIB
+    table:
+      OID: 1.3.6.1.2.1.4.20
+      name: ipAddrTable
+    symbols:
+      - OID: 1.3.6.1.2.1.4.20.1.2
+        name: topologyIpIfIndexEntry
+    metric_tags:
+      - tag: topo_ip_addr
+        symbol:
+          OID: 1.3.6.1.2.1.4.20.1.1
+          name: ipAdEntAddr
+      - tag: topo_if_index
+        symbol:
+          OID: 1.3.6.1.2.1.4.20.1.2
+          name: ipAdEntIfIndex
+      - tag: topo_ip_netmask
+        symbol:
+          OID: 1.3.6.1.2.1.4.20.1.3
+          name: ipAdEntNetMask

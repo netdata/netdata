@@ -1,6 +1,6 @@
 {
   "version": "v1",
-  "generated_at_utc": "2026-02-20T20:33:34Z",
+  "generated_at_utc": "2026-02-21T02:54:16Z",
   "status": "pass",
   "suite": {
     "fixture_scenarios": 28,
@@ -102,8 +102,8 @@
     "in_scope_ported": 1240,
     "in_scope_not_applicable_approved": 0,
     "in_scope_unmapped": 0,
-    "out_of_scope_ported": 1593,
-    "out_of_scope_not_applicable_approved": 234
+    "out_of_scope_ported": 1827,
+    "out_of_scope_not_applicable_approved": 0
   },
   "deferred_gaps": [
     {

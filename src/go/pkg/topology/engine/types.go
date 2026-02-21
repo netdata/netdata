@@ -185,3 +185,46 @@ type ARPNDObservation struct {
 	State    string
 	AddrType string
 }
+
+// L3Observation contains one device's normalized layer-3 routing observations.
+type L3Observation struct {
+	DeviceID      string
+	Hostname      string
+	ManagementIP  string
+	SysObjectID   string
+	ChassisID     string
+	Interfaces    []ObservedInterface
+	OSPFElement   *OSPFElementObservation
+	OSPFIfTable   []OSPFInterfaceObservation
+	OSPFNbrTable  []OSPFNeighborObservation
+	ISISElement   *ISISElementObservation
+	ISISCircTable []ISISCircuitObservation
+	ISISAdjTable  []ISISAdjacencyObservation
+}
+
+// OSPFElementObservation captures OSPF global node attributes.
+type OSPFElementObservation struct {
+	RouterID         string
+	AdminState       int
+	VersionNumber    int
+	AreaBorderRouter int
+	ASBorderRouter   int
+}
+
+// ISISCircuitObservation captures one ISIS circuit row.
+type ISISCircuitObservation struct {
+	CircIndex  int
+	IfIndex    int
+	AdminState int
+}
+
+// ISISAdjacencyObservation captures one ISIS adjacency row.
+type ISISAdjacencyObservation struct {
+	CircIndex          int
+	AdjIndex           int
+	State              int
+	NeighborSNPA       string
+	NeighborSysType    int
+	NeighborSysID      string
+	NeighborExtendedID int
+}

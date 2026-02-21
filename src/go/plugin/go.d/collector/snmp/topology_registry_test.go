@@ -157,10 +157,10 @@ func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *t
 
 	snapshot, ok := cache.snapshotEngineObservations()
 	require.True(t, ok)
-	require.Len(t, snapshot.observations, 1)
-	require.Equal(t, snapshot.localDeviceID, snapshot.observations[0].DeviceID)
-	require.Len(t, snapshot.observations[0].LLDPRemotes, 1)
-	require.Len(t, snapshot.observations[0].CDPRemotes, 1)
+	require.Len(t, snapshot.l2Observations, 1)
+	require.Equal(t, snapshot.localDeviceID, snapshot.l2Observations[0].DeviceID)
+	require.Len(t, snapshot.l2Observations[0].LLDPRemotes, 1)
+	require.Len(t, snapshot.l2Observations[0].CDPRemotes, 1)
 }
 
 func TestTopologyRegistry_SnapshotReturnsFalseWithoutCollectedCaches(t *testing.T) {
@@ -288,6 +288,64 @@ func TestTopologyRegistry_SnapshotDeduplicatesDuplicateDeviceObservations(t *tes
 	require.Len(t, data.Links, 1)
 	require.Equal(t, 1, data.Stats["links_total"])
 	require.Equal(t, 2, countActorsByType(data, "device"))
+}
+
+func TestMergeSNMPTopologyData_DeduplicatesActorsByOverlappingIdentity(t *testing.T) {
+	collectedAt := time.Now().UTC()
+	l2 := topologyData{
+		SchemaVersion: topologySchemaVersion,
+		Source:        "snmp",
+		Layer:         "2",
+		View:          "summary",
+		AgentID:       "agent-test",
+		CollectedAt:   collectedAt,
+		Actors: []topologyActor{
+			{
+				ActorType: "device",
+				Layer:     "2",
+				Source:    "snmp",
+				Match: topologyMatch{
+					ChassisIDs:  []string{"10.20.4.2"},
+					IPAddresses: []string{"10.20.4.2"},
+					SysName:     "sw-a",
+				},
+			},
+		},
+	}
+	l3 := topologyData{
+		SchemaVersion: topologySchemaVersion,
+		Source:        "snmp",
+		Layer:         "3",
+		View:          "summary",
+		AgentID:       "agent-test",
+		CollectedAt:   collectedAt,
+		Actors: []topologyActor{
+			{
+				ActorType: "device",
+				Layer:     "3",
+				Source:    "snmp",
+				Match: topologyMatch{
+					ChassisIDs:   []string{"18:fd:74:33:1a:9c"},
+					MacAddresses: []string{"18FD74331A9C"},
+					IPAddresses:  []string{"10.20.4.2"},
+					SysName:      "sw-a-routing",
+				},
+			},
+		},
+	}
+
+	merged, ok := mergeSNMPTopologyData(l2, true, l3, true, "agent-test", collectedAt)
+	require.True(t, ok)
+	require.Len(t, merged.Actors, 1)
+}
+
+func TestCanonicalMatchKey_NormalizesEquivalentMACRepresentations(t *testing.T) {
+	raw := topologyMatch{ChassisIDs: []string{"7049a26572cd"}}
+	colon := topologyMatch{MacAddresses: []string{"70:49:A2:65:72:CD"}}
+	require.Equal(t, "chassis:70:49:a2:65:72:cd", canonicalMatchKey(raw))
+	require.Equal(t, "mac:70:49:a2:65:72:cd", canonicalMatchKey(colon))
+	require.Contains(t, topologyMatchIdentityKeys(raw), "hw:70:49:a2:65:72:cd")
+	require.Contains(t, topologyMatchIdentityKeys(colon), "hw:70:49:a2:65:72:cd")
 }
 
 func countActorsByType(data topologyData, actorType string) int {

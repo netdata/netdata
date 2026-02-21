@@ -13,6 +13,8 @@ const (
 	topologyLldpProfileName = "_std-topology-lldp-mib.yaml"
 	cdpProfileName          = "_std-cdp-mib.yaml"
 	fdbArpProfileName       = "_std-topology-fdb-arp-mib.yaml"
+	topologyOspfProfileName = "_std-topology-ospf-mib.yaml"
+	topologyIsisProfileName = "_std-topology-isis-mib.yaml"
 )
 
 func (c *Collector) appendTopologyProfiles(profiles []*ddsnmp.Profile) []*ddsnmp.Profile {
@@ -49,6 +51,26 @@ func (c *Collector) appendTopologyProfiles(profiles []*ddsnmp.Profile) []*ddsnmp
 			c.Infof("topology autoprobe enabled: appended profile %s", fdbArpProfileName)
 		} else {
 			c.Warningf("topology autoprobe: failed to load profile %s: %v", fdbArpProfileName, err)
+		}
+	}
+
+	if !profilesHaveExtension(profiles, topologyOspfProfileName) {
+		if prof, err := ddsnmp.LoadProfileByName(topologyOspfProfileName); err == nil {
+			profiles = append(profiles, prof)
+			added = true
+			c.Infof("topology autoprobe enabled: appended profile %s", topologyOspfProfileName)
+		} else {
+			c.Warningf("topology autoprobe: failed to load profile %s: %v", topologyOspfProfileName, err)
+		}
+	}
+
+	if !profilesHaveExtension(profiles, topologyIsisProfileName) {
+		if prof, err := ddsnmp.LoadProfileByName(topologyIsisProfileName); err == nil {
+			profiles = append(profiles, prof)
+			added = true
+			c.Infof("topology autoprobe enabled: appended profile %s", topologyIsisProfileName)
+		} else {
+			c.Warningf("topology autoprobe: failed to load profile %s: %v", topologyIsisProfileName, err)
 		}
 	}
 
