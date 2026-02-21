@@ -60,12 +60,12 @@ static void prd_array_release_entries(PRD_ARRAY *arr) {
 
 // --------------------------------------------------------------------------------------------------------------------
 // Unslot a chart - releases dimension references but keeps the array for reuse
-// This is called when switching charts or marking them obsolete
+// This is called when switching charts, marking them obsolete, or during cleanup.
 //
-// IMPORTANT: This function must only be called when the collector is STOPPED, not just
-// when collector_tid happens to be 0. The collector_tid check inside the spinlock is a
-// safety mechanism, but the real protection comes from the caller ensuring the collector
-// is fully stopped before calling this function.
+// Safe to call from:
+// - The collector thread itself (collector_tid == gettid_cached()): uses lock-free access
+// - Any thread when the collector is fully stopped (collector_tid == 0): uses refcount
+// Skips with a warning if a DIFFERENT thread's collector is active.
 
 void rrdset_pluginsd_receive_unslot(RRDSET *st) {
     if(!st)
@@ -73,47 +73,80 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
 
     spinlock_lock(&st->pluginsd.spinlock);
 
-    // Check collector_tid inside spinlock - if set, collector is active, skip
+    // Check collector_tid inside spinlock
     pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
-    if(collector_tid != 0) {
+    if(collector_tid != 0 && collector_tid != gettid_cached()) {
+        // Another thread is the active collector - we cannot safely touch the array.
+        // Just clear the slot mapping and bail out.
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
                      "PLUGINSD: rrdset_pluginsd_receive_unslot called while collector (tid %d) is active, skipping",
                      collector_tid);
 
-        RRDHOST *host = st->rrdhost;
-        if(st->pluginsd.last_slot >= 0 &&
-            (uint32_t)st->pluginsd.last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
-            host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] == st) {
-            host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] = NULL;
-        }
-
+        int32_t last_slot = st->pluginsd.last_slot;
         st->pluginsd.last_slot = -1;
         st->pluginsd.dims_with_slots = false;
 
         spinlock_unlock(&st->pluginsd.spinlock);
+
+        RRDHOST *host = st->rrdhost;
+        if(last_slot >= 0) {
+            spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
+            if((uint32_t)last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
+                host->stream.rcv.pluginsd_chart_slots.array[last_slot] == st) {
+                host->stream.rcv.pluginsd_chart_slots.array[last_slot] = NULL;
+            }
+            spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
+        }
+
         return;
     }
 
-    // Acquire array while holding spinlock (prevents TOCTOU with other cleanup)
-    PRD_ARRAY *arr = prd_array_acquire_locked(&st->pluginsd.prd_array);
+    // Either collector_tid == 0 (collector stopped) or collector_tid == our tid
+    // (we ARE the collector). In both cases, it's safe to release dimension references.
 
-    spinlock_unlock(&st->pluginsd.spinlock);
+    // When we are the collector (collector_tid == our tid), the array is protected by
+    // our collector_tid - no cleanup thread will touch it. Use get_unsafe directly.
+    // When collector is stopped (collector_tid == 0), acquire a reference to prevent
+    // races with other cleanup threads.
+    PRD_ARRAY *arr;
+    bool we_are_collector = (collector_tid == gettid_cached());
+
+    if(we_are_collector) {
+        arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
+        spinlock_unlock(&st->pluginsd.spinlock);
+    } else {
+        arr = prd_array_acquire_locked(&st->pluginsd.prd_array);
+        spinlock_unlock(&st->pluginsd.spinlock);
+    }
 
     if (arr) {
+        if(!we_are_collector) {
+            // Verify no other thread holds an extra reference before clearing entries.
+            // After acquire_locked, refcount should be 2 (original + ours).
+            int32_t rc = __atomic_load_n(&arr->refcount, __ATOMIC_ACQUIRE);
+            internal_fatal(rc != 2,
+                           "PRD_ARRAY: expected refcount 2 after acquire, got %d - concurrent reference leak", rc);
+        }
+
         // Release all dimension references
         prd_array_release_entries(arr);
-        // Release our reference to the array
-        prd_array_release(arr);
+
+        if(!we_are_collector) {
+            // Release our acquired reference (keeps the struct's reference alive for reuse)
+            prd_array_release(arr);
+        }
     }
 
     RRDHOST *host = st->rrdhost;
 
+    spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
     if(st->pluginsd.last_slot >= 0 &&
         (uint32_t)st->pluginsd.last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
         host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] == st) {
         host->stream.rcv.pluginsd_chart_slots.array[st->pluginsd.last_slot] = NULL;
     }
+    spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
 
     st->pluginsd.last_slot = -1;
     st->pluginsd.dims_with_slots = false;
@@ -132,12 +165,15 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
 
     spinlock_lock(&st->pluginsd.spinlock);
 
-    // Check if collector is still active - if so, we cannot safely cleanup
-    // The collector will clear collector_tid after it's done accessing the array
+    // Check if collector is still active - if so, we cannot safely cleanup.
+    // This indicates a lifecycle violation: the caller must ensure the collector is
+    // fully stopped before calling this function.
     pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
     if(collector_tid != 0) {
-        // Collector is still active, cannot cleanup now
-        // This shouldn't happen during normal operation - log a warning (rate limited)
+        internal_fatal(true,
+                       "PRD_ARRAY: cleanup called while collector (tid %d) is still active - lifecycle violation",
+                       collector_tid);
+
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
                      "PLUGINSD: attempted cleanup while collector (tid %d) is still active on chart, skipping",
@@ -161,10 +197,13 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     spinlock_unlock(&st->pluginsd.spinlock);
 
     // Clear the chart slot mapping using the captured last_slot value
-    if(last_slot >= 0 &&
-        (uint32_t)last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
-        host->stream.rcv.pluginsd_chart_slots.array[last_slot] == st) {
-        host->stream.rcv.pluginsd_chart_slots.array[last_slot] = NULL;
+    if(last_slot >= 0) {
+        spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
+        if((uint32_t)last_slot < host->stream.rcv.pluginsd_chart_slots.size &&
+            host->stream.rcv.pluginsd_chart_slots.array[last_slot] == st) {
+            host->stream.rcv.pluginsd_chart_slots.array[last_slot] = NULL;
+        }
+        spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
     }
 
     // Now handle the old array outside the lock
@@ -172,12 +211,17 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
         // Track memory being freed
         rrd_slot_memory_removed(sizeof(PRD_ARRAY) + old_arr->size * sizeof(struct pluginsd_rrddim));
 
-        // Release all dimension references
+        // After prd_array_replace, we hold the only reference (refcount should be 1).
+        // It's safe to release entries only when we're the sole owner, to avoid clearing
+        // entries that another thread might still be reading through its own reference.
+        int32_t rc = __atomic_load_n(&old_arr->refcount, __ATOMIC_ACQUIRE);
+        internal_fatal(rc != 1,
+                       "PRD_ARRAY: expected refcount 1 after replace, got %d - concurrent reference leak", rc);
+
+        // Release all dimension references (safe - we're the sole owner)
         prd_array_release_entries(old_arr);
 
-        // Release our reference - array will be freed when refcount reaches 0
-        // If another thread still has a reference (unlikely but possible during races),
-        // the array will be freed when that thread releases its reference
+        // Release our reference - this will free the array (refcount 1 -> 0)
         prd_array_release(old_arr);
     }
 }
@@ -288,10 +332,9 @@ static void prd_stress_writer_thread(void *arg __maybe_unused) {
         // Signal that writer phase is complete
         __atomic_store_n(&prd_stress_state.writer_is_running, false, __ATOMIC_RELEASE);
 
-        // Wait for permission to stop (let cleanup run)
+        // Wait until controller signals us to run again
         while (__atomic_load_n(&prd_stress_state.test_running, __ATOMIC_ACQUIRE) &&
-               !__atomic_load_n(&prd_stress_state.writer_should_run, __ATOMIC_ACQUIRE) &&
-               !__atomic_load_n(&prd_stress_state.writer_is_running, __ATOMIC_ACQUIRE)) {
+               !__atomic_load_n(&prd_stress_state.writer_should_run, __ATOMIC_ACQUIRE)) {
             tinysleep();
         }
     }

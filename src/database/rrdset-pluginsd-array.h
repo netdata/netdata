@@ -89,6 +89,9 @@ static inline void prd_array_release(PRD_ARRAY *arr) {
 
     int32_t old_refcount = __atomic_fetch_sub(&arr->refcount, 1, __ATOMIC_ACQ_REL);
 
+    internal_fatal(old_refcount <= 0,
+                   "PRD_ARRAY: refcount underflow (was %d) - double release detected", old_refcount);
+
     if (old_refcount == 1) {
         // We were the last reference - free the array
         // Note: The caller is responsible for releasing any RRDDIM_ACQUIRED references
