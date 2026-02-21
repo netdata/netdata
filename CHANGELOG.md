@@ -9,6 +9,11 @@
 - Add cmake render-docs target for integration doc generation ([#21778](https://github.com/netdata/netdata/issues/21778))
 - Replace otel-plugin metrics pipeline with proper aggregation. ([#21771](https://github.com/netdata/netdata/issues/21771))
 - Regenerate integrations docs ([#21783](https://github.com/netdata/netdata/issues/21783))
+- Fix coverity issue ([#21777](https://github.com/netdata/netdata/issues/21777))
+- Improve metadata storage of chart and host labels ([#21492](https://github.com/netdata/netdata/issues/21492))
+- Docs: update consul keywords for discoverability ([#21787](https://github.com/netdata/netdata/issues/21787))
+- Regenerate integrations docs ([#21788](https://github.com/netdata/netdata/issues/21788))
+- Improve datafile deletion process ([#21781](https://github.com/netdata/netdata/issues/21781))
 
 ## [2.9.0] - 2026-02-16
 
