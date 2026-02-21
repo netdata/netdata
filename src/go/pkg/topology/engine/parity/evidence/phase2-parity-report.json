@@ -1,6 +1,6 @@
 {
   "version": "v1",
-  "generated_at_utc": "2026-02-21T02:54:16Z",
+  "generated_at_utc": "2026-02-21T03:05:05Z",
   "status": "pass",
   "suite": {
     "fixture_scenarios": 28,
@@ -105,12 +105,5 @@
     "out_of_scope_ported": 1827,
     "out_of_scope_not_applicable_approved": 0
   },
-  "deferred_gaps": [
-    {
-      "id": "gap-live-office-validation",
-      "description": "Live office `topology:snmp` sanity validation is still pending.",
-      "reason": "Repository test fixtures do not include the live office runtime environment.",
-      "evidence": "TODO-topology-library-phase2-direct-port.md G3 runtime gate"
-    }
-  ]
+  "deferred_gaps": []
 }
