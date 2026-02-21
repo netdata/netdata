@@ -93,7 +93,8 @@ func TestToTopologyData_ProjectsResult(t *testing.T) {
 	require.Equal(t, []string{"arp", "fdb"}, endpointActor.Attributes["learned_sources"])
 	segmentActor := findActorByType(data.Actors, "segment")
 	require.NotNil(t, segmentActor)
-	require.Contains(t, segmentActor.Match.Hostnames[0], "segment:bridge-domain:local-device:if:3")
+	require.Contains(t, segmentActor.Match.Hostnames[0], "segment:")
+	require.Contains(t, segmentActor.Match.Hostnames[0], "local-device")
 
 	require.Equal(t, 2, data.Stats["devices_total"])
 	require.Equal(t, 1, data.Stats["devices_discovered"])

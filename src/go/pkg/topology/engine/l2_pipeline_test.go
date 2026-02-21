@@ -659,6 +659,115 @@ func TestMatchLLDPLinksEnlinkdPassOrder_FallbackPasses(t *testing.T) {
 	}
 }
 
+func TestBuildL2ResultFromObservations_LLDPPairsAcrossChassisRepresentations(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID:     "router-a",
+			Hostname:     "MikroTik-router",
+			ManagementIP: "10.20.4.1",
+			ChassisID:    "18:FD:74:7E:C5:80",
+			LLDPRemotes: []LLDPRemoteObservation{
+				{
+					LocalPortNum:       "3",
+					LocalPortID:        "ether3",
+					LocalPortIDSubtype: "interfaceName",
+					ChassisID:          "7049A26572CD",
+					PortID:             "",
+					PortIDSubtype:      "interfaceName",
+					SysName:            "XS1930",
+					ManagementIP:       "10.20.4.84",
+				},
+			},
+		},
+		{
+			DeviceID:     "switch-b",
+			Hostname:     "XS1930",
+			ManagementIP: "10.20.4.84",
+			ChassisID:    "70:49:a2:65:72:cd",
+			LLDPRemotes: []LLDPRemoteObservation{
+				{
+					LocalPortNum:       "8",
+					LocalPortID:        "8",
+					LocalPortIDSubtype: "local",
+					ChassisID:          "18fd747ec580",
+					PortID:             "ether3",
+					PortIDSubtype:      "interfaceName",
+					SysName:            "MikroTik-router",
+					ManagementIP:       "10.20.4.1",
+				},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 2)
+
+	var pairID string
+	for _, adj := range result.Adjacencies {
+		require.Equal(t, "lldp", adj.Protocol)
+		require.NotEmpty(t, adj.Labels[adjacencyLabelPairID])
+		require.NotEmpty(t, adj.Labels[adjacencyLabelPairSide])
+		require.NotEmpty(t, adj.Labels[adjacencyLabelPairPass])
+		if pairID == "" {
+			pairID = adj.Labels[adjacencyLabelPairID]
+		}
+		require.Equal(t, pairID, adj.Labels[adjacencyLabelPairID])
+	}
+}
+
+func TestBuildL2ResultFromObservations_LLDPPairsAcrossKnownDeviceIdentityDespiteChassisMismatch(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID:     "mikrotik-router",
+			Hostname:     "MikroTik-router",
+			ManagementIP: "10.20.4.1",
+			ChassisID:    "18:FD:74:7E:C5:80",
+			LLDPRemotes: []LLDPRemoteObservation{
+				{
+					LocalPortNum:       "3",
+					LocalPortID:        "ether3",
+					LocalPortIDSubtype: "interfaceName",
+					ChassisID:          "70:49:A2:65:72:D5",
+					PortID:             "",
+					PortIDSubtype:      "interfaceName",
+					SysName:            "XS1930",
+					ManagementIP:       "10.20.4.84",
+				},
+			},
+		},
+		{
+			DeviceID:     "xs1930",
+			Hostname:     "XS1930",
+			ManagementIP: "10.20.4.84",
+			ChassisID:    "70:49:A2:65:72:CD",
+			LLDPRemotes: []LLDPRemoteObservation{
+				{
+					LocalPortNum:       "8",
+					LocalPortID:        "8",
+					LocalPortIDSubtype: "local",
+					ChassisID:          "18:FD:74:7E:C5:80",
+					PortID:             "ether3",
+					PortIDSubtype:      "interfaceName",
+					SysName:            "MikroTik-router",
+					ManagementIP:       "10.20.4.1",
+				},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 2)
+
+	for _, adj := range result.Adjacencies {
+		require.Equal(t, "lldp", adj.Protocol)
+		require.NotEmpty(t, adj.Labels[adjacencyLabelPairID])
+		require.NotEmpty(t, adj.Labels[adjacencyLabelPairSide])
+		require.NotEmpty(t, adj.Labels[adjacencyLabelPairPass])
+	}
+}
+
 func TestMatchCDPLinksEnlinkdPassOrder_DefaultAndParsedTarget(t *testing.T) {
 	links := []cdpMatchLink{
 		{

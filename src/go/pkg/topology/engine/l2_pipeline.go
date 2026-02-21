@@ -59,6 +59,7 @@ type lldpMatchLink struct {
 	sourceDeviceID string
 	localChassisID string
 	localSysName   string
+	localMatchID   string
 
 	localPortID        string
 	localPortIDSubtype string
@@ -66,6 +67,7 @@ type lldpMatchLink struct {
 
 	remoteChassisID     string
 	remoteSysName       string
+	remoteMatchID       string
 	remotePortID        string
 	remotePortIDSubtype string
 	remotePortDescr     string
@@ -229,6 +231,7 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 
 	if opts.EnableLLDP {
 		lldpLinks := buildLLDPMatchLinks(observations)
+		annotateLLDPLinkMatchIdentities(lldpLinks, hostToID, chassisToID, ipToID)
 		lldpPairs := matchLLDPLinksEnlinkdPassOrder(lldpLinks)
 		lldpTargetOverrides := buildLLDPTargetOverrides(lldpLinks, lldpPairs)
 		lldpPairMetadata := buildLLDPPairMetadata(lldpLinks, lldpPairs)
@@ -474,6 +477,7 @@ func buildLLDPMatchLinks(observations []L2Observation) []lldpMatchLink {
 				sourceDeviceID: sourceID,
 				localChassisID: localChassisID,
 				localSysName:   localSysName,
+				localMatchID:   sourceID,
 
 				localPortID:        localPortID,
 				localPortIDSubtype: strings.TrimSpace(remote.LocalPortIDSubtype),
@@ -481,6 +485,7 @@ func buildLLDPMatchLinks(observations []L2Observation) []lldpMatchLink {
 
 				remoteChassisID:     strings.TrimSpace(remote.ChassisID),
 				remoteSysName:       strings.TrimSpace(remote.SysName),
+				remoteMatchID:       "",
 				remotePortID:        strings.TrimSpace(remote.PortID),
 				remotePortIDSubtype: strings.TrimSpace(remote.PortIDSubtype),
 				remotePortDescr:     strings.TrimSpace(remote.PortDesc),
@@ -495,22 +500,66 @@ func buildLLDPMatchLinks(observations []L2Observation) []lldpMatchLink {
 	return links
 }
 
+func annotateLLDPLinkMatchIdentities(
+	links []lldpMatchLink,
+	hostToID map[string]string,
+	chassisToID map[string]string,
+	ipToID map[string]string,
+) {
+	for i := range links {
+		link := &links[i]
+		if strings.TrimSpace(link.localMatchID) == "" {
+			link.localMatchID = strings.TrimSpace(link.sourceDeviceID)
+		}
+		if strings.TrimSpace(link.remoteMatchID) != "" {
+			continue
+		}
+		link.remoteMatchID = resolveKnownDeviceID(hostToID, chassisToID, ipToID, link.remoteSysName, link.remoteChassisID, link.remoteManagement)
+	}
+}
+
+func resolveKnownDeviceID(
+	hostToID map[string]string,
+	chassisToID map[string]string,
+	ipToID map[string]string,
+	hostname, chassisID, managementIP string,
+) string {
+	if id := hostToID[canonicalHost(hostname)]; strings.TrimSpace(id) != "" {
+		return strings.TrimSpace(id)
+	}
+	if id := chassisToID[canonicalToken(chassisID)]; strings.TrimSpace(id) != "" {
+		return strings.TrimSpace(id)
+	}
+	if id := ipToID[canonicalIP(managementIP)]; strings.TrimSpace(id) != "" {
+		return strings.TrimSpace(id)
+	}
+	return ""
+}
+
+func lldpIdentityTokenForMatch(matchID, chassisID string) string {
+	matchID = strings.TrimSpace(matchID)
+	if matchID != "" {
+		return "device:" + matchID
+	}
+	return normalizeLLDPChassisForMatch(chassisID)
+}
+
 func buildLLDPLookupMap(links []lldpMatchLink) map[string]int {
 	lookup := make(map[string]int, len(links)*6)
 	for _, link := range links {
 		defaultKey := lldpCompositeKey(
-			link.remoteChassisID,
-			link.localChassisID,
-			link.localPortID,
-			link.localPortIDSubtype,
-			link.remotePortID,
-			link.remotePortIDSubtype,
+			lldpIdentityTokenForMatch(link.remoteMatchID, link.remoteChassisID),
+			lldpIdentityTokenForMatch(link.localMatchID, link.localChassisID),
+			normalizeLLDPPortIDForMatch(link.localPortID, link.localPortIDSubtype),
+			normalizeLLDPPortSubtypeForMatch(link.localPortIDSubtype),
+			normalizeLLDPPortIDForMatch(link.remotePortID, link.remotePortIDSubtype),
+			normalizeLLDPPortSubtypeForMatch(link.remotePortIDSubtype),
 		)
 		lookup[defaultKey] = link.index
 
 		descrKey := lldpCompositeKey(
-			link.remoteChassisID,
-			link.localChassisID,
+			lldpIdentityTokenForMatch(link.remoteMatchID, link.remoteChassisID),
+			lldpIdentityTokenForMatch(link.localMatchID, link.localChassisID),
 			link.localPortDescr,
 			link.remotePortDescr,
 		)
@@ -519,31 +568,31 @@ func buildLLDPLookupMap(links []lldpMatchLink) map[string]int {
 		sysNameKey := lldpCompositeKey(
 			link.remoteSysName,
 			link.localSysName,
-			link.localPortID,
-			link.localPortIDSubtype,
-			link.remotePortID,
-			link.remotePortIDSubtype,
+			normalizeLLDPPortIDForMatch(link.localPortID, link.localPortIDSubtype),
+			normalizeLLDPPortSubtypeForMatch(link.localPortIDSubtype),
+			normalizeLLDPPortIDForMatch(link.remotePortID, link.remotePortIDSubtype),
+			normalizeLLDPPortSubtypeForMatch(link.remotePortIDSubtype),
 		)
 		lookup[sysNameKey] = link.index
 
 		elementaryAKey := lldpCompositeKey(
-			link.remoteChassisID,
-			link.localChassisID,
-			link.remotePortID,
-			link.remotePortIDSubtype,
+			lldpIdentityTokenForMatch(link.remoteMatchID, link.remoteChassisID),
+			lldpIdentityTokenForMatch(link.localMatchID, link.localChassisID),
+			normalizeLLDPPortIDForMatch(link.remotePortID, link.remotePortIDSubtype),
+			normalizeLLDPPortSubtypeForMatch(link.remotePortIDSubtype),
 		)
 		lookup[elementaryAKey] = link.index
 
 		elementaryBKey := lldpCompositeKey(
-			link.remoteChassisID,
-			link.localChassisID,
+			lldpIdentityTokenForMatch(link.remoteMatchID, link.remoteChassisID),
+			lldpIdentityTokenForMatch(link.localMatchID, link.localChassisID),
 			link.remotePortDescr,
 		)
 		lookup[elementaryBKey] = link.index
 
 		elementaryCKey := lldpCompositeKey(
-			link.remoteChassisID,
-			link.localChassisID,
+			lldpIdentityTokenForMatch(link.remoteMatchID, link.remoteChassisID),
+			lldpIdentityTokenForMatch(link.localMatchID, link.localChassisID),
 		)
 		lookup[elementaryCKey] = link.index
 	}
@@ -589,18 +638,19 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 		if _, ok := parsed[source.index]; ok {
 			continue
 		}
-		if source.localChassisID == source.remoteChassisID || source.localSysName == source.remoteSysName {
+		if lldpIdentityTokenForMatch(source.localMatchID, source.localChassisID) == lldpIdentityTokenForMatch(source.remoteMatchID, source.remoteChassisID) ||
+			source.localSysName == source.remoteSysName {
 			parsed[source.index] = struct{}{}
 			continue
 		}
 
 		key := lldpCompositeKey(
-			source.localChassisID,
-			source.remoteChassisID,
-			source.remotePortID,
-			source.remotePortIDSubtype,
-			source.localPortID,
-			source.localPortIDSubtype,
+			lldpIdentityTokenForMatch(source.localMatchID, source.localChassisID),
+			lldpIdentityTokenForMatch(source.remoteMatchID, source.remoteChassisID),
+			normalizeLLDPPortIDForMatch(source.remotePortID, source.remotePortIDSubtype),
+			normalizeLLDPPortSubtypeForMatch(source.remotePortIDSubtype),
+			normalizeLLDPPortIDForMatch(source.localPortID, source.localPortIDSubtype),
+			normalizeLLDPPortSubtypeForMatch(source.localPortIDSubtype),
 		)
 		targetIndex, ok := lookup[key]
 		if !ok {
@@ -614,8 +664,8 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 			continue
 		}
 		key := lldpCompositeKey(
-			source.localChassisID,
-			source.remoteChassisID,
+			lldpIdentityTokenForMatch(source.localMatchID, source.localChassisID),
+			lldpIdentityTokenForMatch(source.remoteMatchID, source.remoteChassisID),
 			source.remotePortDescr,
 			source.localPortDescr,
 		)
@@ -633,10 +683,10 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 		key := lldpCompositeKey(
 			source.localSysName,
 			source.remoteSysName,
-			source.remotePortID,
-			source.remotePortIDSubtype,
-			source.localPortID,
-			source.localPortIDSubtype,
+			normalizeLLDPPortIDForMatch(source.remotePortID, source.remotePortIDSubtype),
+			normalizeLLDPPortSubtypeForMatch(source.remotePortIDSubtype),
+			normalizeLLDPPortIDForMatch(source.localPortID, source.localPortIDSubtype),
+			normalizeLLDPPortSubtypeForMatch(source.localPortIDSubtype),
 		)
 		targetIndex, ok := lookup[key]
 		if !ok {
@@ -650,10 +700,10 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 			continue
 		}
 		key := lldpCompositeKey(
-			source.localChassisID,
-			source.remoteChassisID,
-			source.localPortID,
-			source.localPortIDSubtype,
+			lldpIdentityTokenForMatch(source.localMatchID, source.localChassisID),
+			lldpIdentityTokenForMatch(source.remoteMatchID, source.remoteChassisID),
+			normalizeLLDPPortIDForMatch(source.localPortID, source.localPortIDSubtype),
+			normalizeLLDPPortSubtypeForMatch(source.localPortIDSubtype),
 		)
 		targetIndex, ok := lookup[key]
 		if !ok {
@@ -667,8 +717,8 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 			continue
 		}
 		key := lldpCompositeKey(
-			source.localChassisID,
-			source.remoteChassisID,
+			lldpIdentityTokenForMatch(source.localMatchID, source.localChassisID),
+			lldpIdentityTokenForMatch(source.remoteMatchID, source.remoteChassisID),
 			source.localPortDescr,
 		)
 		targetIndex, ok := lookup[key]
@@ -683,8 +733,8 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 			continue
 		}
 		key := lldpCompositeKey(
-			source.localChassisID,
-			source.remoteChassisID,
+			lldpIdentityTokenForMatch(source.localMatchID, source.localChassisID),
+			lldpIdentityTokenForMatch(source.remoteMatchID, source.remoteChassisID),
 		)
 		targetIndex, ok := lookup[key]
 		if !ok {
@@ -1596,6 +1646,68 @@ func canonicalHost(v string) string {
 	v = strings.TrimSpace(strings.ToLower(v))
 	v = strings.TrimSuffix(v, ".")
 	return v
+}
+
+func normalizeLLDPPortIDForMatch(portID, subtype string) string {
+	portID = strings.TrimSpace(portID)
+	if portID == "" {
+		return ""
+	}
+
+	switch normalizeLLDPPortSubtypeForMatch(subtype) {
+	case "mac":
+		if mac := canonicalLLDPMACToken(portID); mac != "" {
+			return mac
+		}
+	case "network":
+		if ip := canonicalIP(portID); ip != "" {
+			return ip
+		}
+	}
+
+	return portID
+}
+
+func normalizeLLDPPortSubtypeForMatch(subtype string) string {
+	switch strings.ToLower(strings.TrimSpace(subtype)) {
+	case "3", "macaddress":
+		return "mac"
+	case "4", "networkaddress":
+		return "network"
+	default:
+		return strings.ToLower(strings.TrimSpace(subtype))
+	}
+}
+
+func normalizeLLDPChassisForMatch(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return ""
+	}
+	if ip := canonicalIP(v); ip != "" {
+		return ip
+	}
+	if mac := canonicalLLDPMACToken(v); mac != "" {
+		return mac
+	}
+	return v
+}
+
+func canonicalLLDPMACToken(v string) string {
+	v = strings.TrimSpace(strings.ToLower(v))
+	if v == "" {
+		return ""
+	}
+
+	clean := strings.TrimPrefix(v, "0x")
+	clean = strings.NewReplacer(":", "", "-", "", ".", "", " ", "").Replace(clean)
+	if len(clean) != 12 {
+		return ""
+	}
+	if _, err := hex.DecodeString(clean); err != nil {
+		return ""
+	}
+	return clean
 }
 
 func canonicalToken(v string) string {
