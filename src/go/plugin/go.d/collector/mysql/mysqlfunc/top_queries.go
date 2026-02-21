@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mysql
+package mysqlfunc
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
@@ -162,10 +163,13 @@ type topQueriesRowScanner interface {
 // funcTopQueries implements funcapi.MethodHandler for MySQL top-queries.
 // All function-related logic is encapsulated here, keeping Collector focused on metrics collection.
 type funcTopQueries struct {
-	router *funcRouter
+	router *router
+
+	stmtSummaryCols   map[string]bool
+	stmtSummaryColsMu sync.RWMutex
 }
 
-func newFuncTopQueries(r *funcRouter) *funcTopQueries {
+func newFuncTopQueries(r *router) *funcTopQueries {
 	return &funcTopQueries{router: r}
 }
 
@@ -174,10 +178,10 @@ var _ funcapi.MethodHandler = (*funcTopQueries)(nil)
 
 // MethodParams implements funcapi.MethodHandler.
 func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.router.collector.Functions.TopQueries.Disabled {
+	if f.router.cfg.topQueriesDisabled() {
 		return nil, fmt.Errorf("top-queries function disabled in configuration")
 	}
-	if f.router.collector.db == nil {
+	if _, err := f.router.deps.DB(); err != nil {
 		return nil, fmt.Errorf("collector is still initializing")
 	}
 	switch method {
@@ -190,16 +194,16 @@ func (f *funcTopQueries) MethodParams(ctx context.Context, method string) ([]fun
 
 // Handle implements funcapi.MethodHandler.
 func (f *funcTopQueries) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.router.collector.Functions.TopQueries.Disabled {
+	if f.router.cfg.topQueriesDisabled() {
 		return funcapi.UnavailableResponse("top-queries function has been disabled in configuration")
 	}
-	if f.router.collector.db == nil {
+	if _, err := f.router.deps.DB(); err != nil {
 		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
 
 	switch method {
 	case topQueriesMethodID:
-		queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.topQueriesTimeout())
+		queryCtx, cancel := context.WithTimeout(ctx, f.router.cfg.topQueriesTimeout())
 		defer cancel()
 		return f.collectData(queryCtx, params.Column(topQueriesParamSort))
 	default:
@@ -211,7 +215,7 @@ func (f *funcTopQueries) Handle(ctx context.Context, method string, params funca
 func (f *funcTopQueries) Cleanup(ctx context.Context) {}
 
 func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfig, error) {
-	available, err := f.checkPerformanceSchema(ctx)
+	available, err := isPerformanceSchemaEnabled(ctx, f.router.deps)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +239,7 @@ func (f *funcTopQueries) methodParams(ctx context.Context) ([]funcapi.ParamConfi
 // collectData queries performance_schema for top queries using dynamic columns
 func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *funcapi.FunctionResponse {
 	// Check if performance_schema is enabled
-	available, err := f.checkPerformanceSchema(ctx)
+	available, err := isPerformanceSchemaEnabled(ctx, f.router.deps)
 	if err != nil {
 		return &funcapi.FunctionResponse{
 			Status:  500,
@@ -270,12 +274,16 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	// Validate and map sort column
 	dbSortColumn := f.mapAndValidateSortColumn(sortColumn, availableCols)
 
-	limit := f.router.collector.topQueriesLimit()
+	limit := f.router.cfg.topQueriesLimit()
 
 	// Build and execute query
 	query := f.buildDynamicSQL(cols, dbSortColumn, limit)
 
-	rows, err := f.router.collector.db.QueryContext(ctx, query)
+	db, err := f.router.deps.DB()
+	if err != nil {
+		return &funcapi.FunctionResponse{Status: 503, Message: "collector database is unavailable"}
+	}
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return &funcapi.FunctionResponse{Status: 504, Message: "query timed out"}
@@ -318,7 +326,7 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 			digests = append(digests, digest)
 		}
 		if len(digests) > 0 {
-			errorStatus, errorDetails = f.router.collector.collectMySQLErrorDetailsForDigests(ctx, digests)
+			errorStatus, errorDetails = collectMySQLErrorDetailsForDigests(ctx, f.router.deps, f.router.cfg, f.router.log, digests)
 		} else {
 			errorStatus = mysqlErrorAttrNoData
 		}
@@ -385,70 +393,33 @@ func (f *funcTopQueries) collectData(ctx context.Context, sortColumn string) *fu
 	}
 }
 
-func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[topQueriesColumn] {
-	return funcapi.Columns(cols, func(c topQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
-}
-
-// checkPerformanceSchema checks if performance_schema is enabled (cached)
-func (f *funcTopQueries) checkPerformanceSchema(ctx context.Context) (bool, error) {
-	// Fast path: return cached result if already checked
-	f.router.collector.varPerfSchemaMu.RLock()
-	cached := f.router.collector.varPerformanceSchema
-	f.router.collector.varPerfSchemaMu.RUnlock()
-	if cached != "" {
-		return cached == "ON" || cached == "1", nil
-	}
-
-	// Slow path: query and cache the result
-	// Use write lock for the entire operation to prevent duplicate queries
-	f.router.collector.varPerfSchemaMu.Lock()
-	defer f.router.collector.varPerfSchemaMu.Unlock()
-
-	// Double-check after acquiring write lock (another goroutine may have set it)
-	if f.router.collector.varPerformanceSchema != "" {
-		return f.router.collector.varPerformanceSchema == "ON" || f.router.collector.varPerformanceSchema == "1", nil
-	}
-
-	var value string
-	query := "SELECT @@performance_schema"
-	err := f.router.collector.db.QueryRowContext(ctx, query).Scan(&value)
-	if err != nil {
-		return false, err
-	}
-
-	// Cache the result
-	f.router.collector.varPerformanceSchema = value
-	return value == "ON" || value == "1", nil
-}
-
-// detectStatementsColumns queries the database to discover available columns
 func (f *funcTopQueries) detectStatementsColumns(ctx context.Context) (map[string]bool, error) {
-	// Fast path: return cached result
-	f.router.collector.stmtSummaryColsMu.RLock()
-	if f.router.collector.stmtSummaryCols != nil {
-		cols := f.router.collector.stmtSummaryCols
-		f.router.collector.stmtSummaryColsMu.RUnlock()
+	f.stmtSummaryColsMu.RLock()
+	if f.stmtSummaryCols != nil {
+		cols := f.stmtSummaryCols
+		f.stmtSummaryColsMu.RUnlock()
 		return cols, nil
 	}
-	f.router.collector.stmtSummaryColsMu.RUnlock()
+	f.stmtSummaryColsMu.RUnlock()
 
-	// Slow path: query and cache
-	f.router.collector.stmtSummaryColsMu.Lock()
-	defer f.router.collector.stmtSummaryColsMu.Unlock()
+	f.stmtSummaryColsMu.Lock()
+	defer f.stmtSummaryColsMu.Unlock()
 
-	// Double-check after acquiring write lock
-	if f.router.collector.stmtSummaryCols != nil {
-		return f.router.collector.stmtSummaryCols, nil
+	if f.stmtSummaryCols != nil {
+		return f.stmtSummaryCols, nil
 	}
 
-	// Query information_schema to get available columns
-	query := `
+	db, err := f.router.deps.DB()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := db.QueryContext(ctx, `
 		SELECT COLUMN_NAME
 		FROM information_schema.COLUMNS
 		WHERE TABLE_SCHEMA = 'performance_schema'
 		AND TABLE_NAME = 'events_statements_summary_by_digest'
-	`
-	rows, err := f.router.collector.db.QueryContext(ctx, query)
+	`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query column information: %w", err)
 	}
@@ -462,15 +433,16 @@ func (f *funcTopQueries) detectStatementsColumns(ctx context.Context) (map[strin
 		}
 		cols[colName] = true
 	}
-
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating columns: %w", err)
 	}
 
-	// Cache the result
-	f.router.collector.stmtSummaryCols = cols
-
+	f.stmtSummaryCols = cols
 	return cols, nil
+}
+
+func (f *funcTopQueries) columnSet(cols []topQueriesColumn) funcapi.ColumnSet[topQueriesColumn] {
+	return funcapi.Columns(cols, func(c topQueriesColumn) funcapi.ColumnMeta { return c.ColumnMeta })
 }
 
 // buildAvailableColumns filters columns based on what's available in the database

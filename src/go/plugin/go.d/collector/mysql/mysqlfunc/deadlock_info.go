@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mysql
+package mysqlfunc
 
 import (
 	"bufio"
@@ -21,6 +21,7 @@ import (
 )
 
 const deadlockInfoMethodID = "deadlock-info"
+const queryShowEngineInnoDBStatus = "SHOW ENGINE INNODB STATUS;"
 
 const (
 	deadlockSectionWaiting = "waiting"
@@ -254,10 +255,10 @@ func deadlockInfoMethodConfig() funcapi.MethodConfig {
 
 // funcDeadlockInfo handles the deadlock-info function.
 type funcDeadlockInfo struct {
-	router *funcRouter
+	router *router
 }
 
-func newFuncDeadlockInfo(r *funcRouter) *funcDeadlockInfo {
+func newFuncDeadlockInfo(r *router) *funcDeadlockInfo {
 	return &funcDeadlockInfo{router: r}
 }
 
@@ -265,19 +266,17 @@ func newFuncDeadlockInfo(r *funcRouter) *funcDeadlockInfo {
 var _ funcapi.MethodHandler = (*funcDeadlockInfo)(nil)
 
 func (f *funcDeadlockInfo) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.router.collector.Functions.DeadlockInfo.Disabled {
+	if f.router.cfg.deadlockInfoDisabled() {
 		return nil, fmt.Errorf("deadlock-info function disabled in configuration")
 	}
 	return []funcapi.ParamConfig{}, nil
 }
 
 func (f *funcDeadlockInfo) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.router.collector.db == nil {
-		if err := f.router.collector.openConnection(ctx); err != nil {
-			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
-		}
+	if _, err := f.router.deps.DB(); err != nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
-	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.deadlockInfoTimeout())
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.cfg.deadlockInfoTimeout())
 	defer cancel()
 	return f.collectData(queryCtx)
 }
@@ -285,7 +284,7 @@ func (f *funcDeadlockInfo) Handle(ctx context.Context, method string, params fun
 func (f *funcDeadlockInfo) Cleanup(ctx context.Context) {}
 
 func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionResponse {
-	if f.router.collector.Functions.DeadlockInfo.Disabled {
+	if f.router.cfg.deadlockInfoDisabled() {
 		return funcapi.UnavailableResponse("deadlock-info function has been disabled in configuration")
 	}
 
@@ -302,13 +301,13 @@ func (f *funcDeadlockInfo) collectData(ctx context.Context) *funcapi.FunctionRes
 				nil,
 			)
 		}
-		f.router.collector.Warningf("deadlock-info: query failed: %v", err)
+		f.router.log.Warningf("deadlock-info: query failed: %v", err)
 		return f.buildResponse(500, fmt.Sprintf("deadlock query failed: %v", err), nil)
 	}
 
 	parseRes := parseInnoDBDeadlock(statusText, time.Now().UTC())
 	if parseRes.parseErr != nil {
-		f.router.collector.Warningf("deadlock-info: parse failed: %v", parseRes.parseErr)
+		f.router.log.Warningf("deadlock-info: parse failed: %v", parseRes.parseErr)
 		return f.buildResponse(deadlockParseErrorStatus, "deadlock section could not be parsed", nil)
 	}
 	if !parseRes.found {
@@ -347,11 +346,17 @@ func (f *funcDeadlockInfo) buildResponse(status int, message string, rowsData []
 }
 
 func (f *funcDeadlockInfo) queryInnoDBStatus(ctx context.Context) (string, error) {
-	qctx, cancel := context.WithTimeout(ctx, f.router.collector.Timeout.Duration())
+	qctx, cancel := context.WithTimeout(ctx, f.router.cfg.collectorTimeout())
 	defer cancel()
 
+	db, err := f.router.deps.DB()
+	if err != nil {
+		return "", err
+	}
+
 	var typ, name, status sql.NullString
-	if err := f.router.collector.db.QueryRowContext(qctx, queryShowEngineInnoDBStatus).Scan(&typ, &name, &status); err != nil {
+	row := db.QueryRowContext(qctx, queryShowEngineInnoDBStatus)
+	if err := row.Scan(&typ, &name, &status); err != nil {
 		return "", err
 	}
 	if !status.Valid {

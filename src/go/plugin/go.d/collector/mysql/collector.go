@@ -16,8 +16,10 @@ import (
 	"github.com/go-sql-driver/mysql"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mysql/mysqlfunc"
 )
 
 //go:embed "config_schema.json"
@@ -31,8 +33,14 @@ func init() {
 		JobConfigSchema: configSchema,
 		CreateV2:        func() module.ModuleV2 { return New() },
 		Config:          func() any { return &Config{} },
-		Methods:         mysqlMethods,
-		MethodHandler:   mysqlFunctionHandler,
+		Methods:         mysqlfunc.Methods,
+		MethodHandler: func(job module.RuntimeJob) funcapi.MethodHandler {
+			c, ok := job.Collector().(*Collector)
+			if !ok {
+				return nil
+			}
+			return c.funcRouter
+		},
 	})
 }
 
@@ -44,8 +52,8 @@ func New() *Collector {
 		Config: Config{
 			DSN:     "root@tcp(localhost:3306)/",
 			Timeout: confopt.Duration(time.Second),
-			Functions: FunctionsConfig{
-				TopQueries: TopQueriesConfig{
+			Functions: mysqlfunc.FunctionsConfig{
+				TopQueries: mysqlfunc.TopQueriesConfig{
 					Limit: 500,
 				},
 			},
@@ -67,70 +75,21 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	DSN                string           `yaml:"dsn" json:"dsn"`
-	MyCNF              string           `yaml:"my.cnf,omitempty" json:"my.cnf"`
-	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Functions          FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
-}
-
-type FunctionsConfig struct {
-	TopQueries   TopQueriesConfig   `yaml:"top_queries,omitempty" json:"top_queries"`
-	DeadlockInfo DeadlockInfoConfig `yaml:"deadlock_info,omitempty" json:"deadlock_info"`
-	ErrorInfo    ErrorInfoConfig    `yaml:"error_info,omitempty" json:"error_info"`
-}
-
-type TopQueriesConfig struct {
-	Disabled bool             `yaml:"disabled" json:"disabled"`
-	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Limit    int              `yaml:"limit,omitempty" json:"limit"`
-}
-
-type DeadlockInfoConfig struct {
-	Disabled bool             `yaml:"disabled" json:"disabled"`
-	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-}
-
-type ErrorInfoConfig struct {
-	Disabled bool             `yaml:"disabled" json:"disabled"`
-	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-}
-
-func (c Config) topQueriesTimeout() time.Duration {
-	if c.Functions.TopQueries.Timeout == 0 {
-		return c.Timeout.Duration()
-	}
-	return c.Functions.TopQueries.Timeout.Duration()
-}
-
-func (c Config) topQueriesLimit() int {
-	if c.Functions.TopQueries.Limit <= 0 {
-		return 500
-	}
-	return c.Functions.TopQueries.Limit
-}
-
-func (c Config) deadlockInfoTimeout() time.Duration {
-	if c.Functions.DeadlockInfo.Timeout == 0 {
-		return c.Timeout.Duration()
-	}
-	return c.Functions.DeadlockInfo.Timeout.Duration()
-}
-
-func (c Config) errorInfoTimeout() time.Duration {
-	if c.Functions.ErrorInfo.Timeout == 0 {
-		return c.Timeout.Duration()
-	}
-	return c.Functions.ErrorInfo.Timeout.Duration()
+	Vnode              string                    `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int                       `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int                       `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	DSN                string                    `yaml:"dsn" json:"dsn"`
+	MyCNF              string                    `yaml:"my.cnf,omitempty" json:"my.cnf"`
+	Timeout            confopt.Duration          `yaml:"timeout,omitempty" json:"timeout"`
+	Functions          mysqlfunc.FunctionsConfig `yaml:"functions,omitempty" json:"functions"`
 }
 
 type Collector struct {
 	module.Base
 	Config `yaml:",inline" json:""`
 
-	db *sql.DB
+	dbMu sync.RWMutex // protects db pointer lifecycle across collect/functions/cleanup
+	db   *sql.DB
 
 	safeDSN   string
 	version   *semver.Version
@@ -149,12 +108,8 @@ type Collector struct {
 	varMaxConns              int64
 	varTableOpenCache        int64
 	varPerformanceSchema     string
-	varPerfSchemaMu          sync.RWMutex // protects varPerformanceSchema for concurrent access
 
-	stmtSummaryCols   map[string]bool // cached column names from events_statements_summary_by_digest
-	stmtSummaryColsMu sync.RWMutex    // protects stmtSummaryCols for concurrent access
-
-	funcRouter *funcRouter
+	funcRouter funcapi.MethodHandler
 
 	store metrix.CollectorStore
 	mx    *collectorMetrics
@@ -187,7 +142,9 @@ func (c *Collector) Init(context.Context) error {
 
 	c.Debugf("using DSN [%s]", c.safeDSN)
 
-	c.funcRouter = newFuncRouter(c)
+	funcCfg := c.Functions
+	funcCfg.Timeout = c.Timeout
+	c.funcRouter = mysqlfunc.NewRouter(funcDepsAdapter{collector: c}, c.Logger, funcCfg)
 
 	return nil
 }
@@ -208,11 +165,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.funcRouter != nil {
 		c.funcRouter.Cleanup(ctx)
 	}
-	if c.db == nil {
-		return
-	}
-	if err := c.db.Close(); err != nil {
+	if err := c.closeDB(); err != nil {
 		c.Errorf("cleanup: error on closing the mysql database [%s]: %v", c.safeDSN, err)
 	}
-	c.db = nil
 }

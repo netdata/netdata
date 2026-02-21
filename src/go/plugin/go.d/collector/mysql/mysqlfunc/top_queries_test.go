@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mysql
+package mysqlfunc
 
 import (
 	"testing"
@@ -11,7 +11,7 @@ import (
 )
 
 func TestMySQLMethods(t *testing.T) {
-	methods := mysqlMethods()
+	methods := Methods()
 
 	req := require.New(t)
 	req.Len(methods, 3)

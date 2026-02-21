@@ -1,26 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mysql
+package mysqlfunc
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 // funcRouter routes method calls to appropriate function handlers.
-type funcRouter struct {
-	collector *Collector
+type router struct {
+	deps Deps
+	cfg  FunctionsConfig
+	log  *logger.Logger
 
 	handlers map[string]funcapi.MethodHandler
 }
 
-func newFuncRouter(c *Collector) *funcRouter {
-	r := &funcRouter{
-		collector: c,
-		handlers:  make(map[string]funcapi.MethodHandler),
+func newRouter(deps Deps, log *logger.Logger, cfg FunctionsConfig) *router {
+	r := &router{
+		deps:     deps,
+		cfg:      cfg,
+		log:      log,
+		handlers: make(map[string]funcapi.MethodHandler),
 	}
 	r.handlers[topQueriesMethodID] = newFuncTopQueries(r)
 	r.handlers[deadlockInfoMethodID] = newFuncDeadlockInfo(r)
@@ -29,29 +33,29 @@ func newFuncRouter(c *Collector) *funcRouter {
 }
 
 // Compile-time interface check.
-var _ funcapi.MethodHandler = (*funcRouter)(nil)
+var _ funcapi.MethodHandler = (*router)(nil)
 
-func (r *funcRouter) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
+func (r *router) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
 	if h, ok := r.handlers[method]; ok {
 		return h.MethodParams(ctx, method)
 	}
 	return nil, fmt.Errorf("unknown method: %s", method)
 }
 
-func (r *funcRouter) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
+func (r *router) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	if h, ok := r.handlers[method]; ok {
 		return h.Handle(ctx, method, params)
 	}
 	return funcapi.NotFoundResponse(method)
 }
 
-func (r *funcRouter) Cleanup(ctx context.Context) {
+func (r *router) Cleanup(ctx context.Context) {
 	for _, h := range r.handlers {
 		h.Cleanup(ctx)
 	}
 }
 
-func mysqlMethods() []funcapi.MethodConfig {
+func Methods() []funcapi.MethodConfig {
 	return []funcapi.MethodConfig{
 		topQueriesMethodConfig(),
 		deadlockInfoMethodConfig(),
@@ -59,10 +63,6 @@ func mysqlMethods() []funcapi.MethodConfig {
 	}
 }
 
-func mysqlFunctionHandler(job module.RuntimeJob) funcapi.MethodHandler {
-	c, ok := job.Collector().(*Collector)
-	if !ok {
-		return nil
-	}
-	return c.funcRouter
+func NewRouter(deps Deps, log *logger.Logger, cfg FunctionsConfig) funcapi.MethodHandler {
+	return newRouter(deps, log, cfg)
 }

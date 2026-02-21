@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mysql
+package mysqlfunc
 
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,13 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestConfig_FunctionsDisabledDefaults(t *testing.T) {
-	cfg := Config{}
-	assert.False(t, cfg.Functions.DeadlockInfo.Disabled, "deadlock_info should be enabled by default")
-	assert.False(t, cfg.Functions.ErrorInfo.Disabled, "error_info should be enabled by default")
-	assert.False(t, cfg.Functions.TopQueries.Disabled, "top_queries should be enabled by default")
-}
 
 func TestParseInnoDBDeadlock_WithDeadlock(t *testing.T) {
 	now := time.Date(2026, time.January, 25, 12, 0, 0, 123456000, time.UTC)
@@ -199,8 +193,12 @@ func TestParseInnoDBDeadlock_MalformedSection(t *testing.T) {
 }
 
 // newTestDeadlockHandler creates a funcDeadlockInfo handler for testing.
-func newTestDeadlockHandler(c *Collector) *funcDeadlockInfo {
-	router := &funcRouter{collector: c}
+func newTestDeadlockHandler(deps Deps) *funcDeadlockInfo {
+	td, _ := deps.(*testDeps)
+	router := &router{deps: deps}
+	if td != nil {
+		router.cfg = td.cfg
+	}
 	return newFuncDeadlockInfo(router)
 }
 
@@ -213,9 +211,9 @@ func TestFuncDeadlockInfo_collectData_ParseError(t *testing.T) {
 		AddRow("InnoDB", "Status", sampleDeadlockStatusMalformed)
 	mock.ExpectQuery(queryShowEngineInnoDBStatus).WillReturnRows(rows)
 
-	collr := New()
-	collr.db = db
-	handler := newTestDeadlockHandler(collr)
+	deps := newTestDeps()
+	deps.setDB(db)
+	handler := newTestDeadlockHandler(deps)
 
 	resp := handler.collectData(context.Background())
 	require.NotNil(t, resp)
@@ -232,9 +230,9 @@ func TestFuncDeadlockInfo_collectData_QueryError(t *testing.T) {
 	mock.ExpectQuery(queryShowEngineInnoDBStatus).
 		WillReturnError(errors.New("boom"))
 
-	collr := New()
-	collr.db = db
-	handler := newTestDeadlockHandler(collr)
+	deps := newTestDeps()
+	deps.setDB(db)
+	handler := newTestDeadlockHandler(deps)
 
 	resp := handler.collectData(context.Background())
 	require.NotNil(t, resp)
@@ -251,9 +249,9 @@ func TestFuncDeadlockInfo_collectData_Timeout(t *testing.T) {
 	mock.ExpectQuery(queryShowEngineInnoDBStatus).
 		WillReturnError(context.DeadlineExceeded)
 
-	collr := New()
-	collr.db = db
-	handler := newTestDeadlockHandler(collr)
+	deps := newTestDeps()
+	deps.setDB(db)
+	handler := newTestDeadlockHandler(deps)
 
 	resp := handler.collectData(context.Background())
 	require.NotNil(t, resp)
@@ -267,9 +265,9 @@ func TestFuncDeadlockInfo_collectData_PermissionDenied(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = db.Close() }()
 
-	collr := New()
-	collr.db = db
-	handler := newTestDeadlockHandler(collr)
+	deps := newTestDeps()
+	deps.setDB(db)
+	handler := newTestDeadlockHandler(deps)
 
 	permErr := &mysqlDriver.MySQLError{
 		Number:  1227,
@@ -285,13 +283,49 @@ func TestFuncDeadlockInfo_collectData_PermissionDenied(t *testing.T) {
 }
 
 func TestFuncDeadlockInfo_collectData_Disabled(t *testing.T) {
-	c := New()
-	c.Config.Functions.DeadlockInfo.Disabled = true
-	handler := newTestDeadlockHandler(c)
+	deps := newTestDeps()
+	deps.cfg.DeadlockInfo.Disabled = true
+	handler := newTestDeadlockHandler(deps)
 
 	resp := handler.collectData(context.Background())
 	require.Equal(t, 503, resp.Status)
 	assert.Contains(t, resp.Message, "disabled")
+}
+
+func TestFuncDeadlockInfo_Handle_DBUnavailable(t *testing.T) {
+	deps := newTestDeps()
+	handler := newTestDeadlockHandler(deps)
+
+	resp := handler.Handle(context.Background(), deadlockInfoMethodID, nil)
+	require.NotNil(t, resp)
+	assert.Equal(t, 503, resp.Status)
+	assert.Contains(t, resp.Message, "collector is still initializing")
+}
+
+func TestFuncDeadlockInfo_Handle_CleanupConcurrent(t *testing.T) {
+	deps := newTestDeps()
+	handler := newTestDeadlockHandler(deps)
+
+	const iterations = 200
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			resp := handler.Handle(context.Background(), deadlockInfoMethodID, nil)
+			require.NotNil(t, resp)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			deps.cleanup()
+		}
+	}()
+
+	wg.Wait()
 }
 
 func TestBuildDeadlockRows(t *testing.T) {

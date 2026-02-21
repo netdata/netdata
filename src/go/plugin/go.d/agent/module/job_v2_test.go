@@ -631,6 +631,71 @@ func TestJobV2Scenarios(t *testing.T) {
 	}
 }
 
+func TestJobV2_StartMarksNotRunningBeforeCleanup(t *testing.T) {
+	cleanupStarted := make(chan struct{})
+	cleanupRelease := make(chan struct{})
+	cleanupEntered := make(chan struct{}, 1)
+
+	mod := &mockModuleV2{
+		store:    metrix.NewCollectorStore(),
+		template: chartTemplateV2(),
+		cleanupFunc: func(context.Context) {
+			select {
+			case cleanupEntered <- struct{}{}:
+			default:
+			}
+			close(cleanupStarted)
+			<-cleanupRelease
+		},
+	}
+
+	var out bytes.Buffer
+	job := newTestJobV2(mod, &out)
+	require.NoError(t, job.AutoDetection())
+
+	startDone := make(chan struct{})
+	go func() {
+		job.Start()
+		close(startDone)
+	}()
+
+	require.Eventually(t, job.IsRunning, time.Second, 10*time.Millisecond)
+
+	stopDone := make(chan struct{})
+	go func() {
+		job.Stop()
+		close(stopDone)
+	}()
+
+	select {
+	case <-cleanupStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for cleanup to start")
+	}
+
+	assert.False(t, job.IsRunning(), "job must report not running while cleanup is in progress")
+
+	close(cleanupRelease)
+
+	select {
+	case <-stopDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for stop to finish")
+	}
+
+	select {
+	case <-startDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for start loop to exit")
+	}
+
+	select {
+	case <-cleanupEntered:
+	default:
+		t.Fatal("cleanup function was not entered")
+	}
+}
+
 func TestJobV2StopBeforeStartDoesNotBlock(t *testing.T) {
 	job := NewJobV2(JobV2Config{
 		PluginName:      pluginName,

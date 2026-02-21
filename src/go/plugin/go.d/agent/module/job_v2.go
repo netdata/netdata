@@ -229,7 +229,6 @@ func (j *JobV2) Start() {
 	defer func() {
 		cancel()
 		j.setRunContext(nil, nil)
-		j.running.Store(false)
 		j.stopCtrl.markStopped()
 		j.Info("stopped")
 	}()
@@ -247,6 +246,9 @@ LOOP:
 			}
 		}
 	}
+	// Mark not-running before cleanup so external function dispatch can reject requests
+	// while module resources are being torn down.
+	j.running.Store(false)
 	j.Cleanup()
 }
 

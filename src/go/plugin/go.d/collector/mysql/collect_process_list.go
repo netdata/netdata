@@ -44,9 +44,7 @@ ORDER BY
 func (c *Collector) collectProcessListStatistics(ctx context.Context) error {
 	var q string
 	mysqlMinVer := semver.Version{Major: 8, Minor: 0, Patch: 22}
-	c.varPerfSchemaMu.RLock()
 	perfSchema := c.varPerformanceSchema
-	c.varPerfSchemaMu.RUnlock()
 	if !c.isMariaDB && c.version.GTE(mysqlMinVer) && perfSchema == "ON" {
 		q = queryShowProcessListPS
 	} else {

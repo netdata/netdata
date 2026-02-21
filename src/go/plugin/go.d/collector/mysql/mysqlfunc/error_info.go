@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package mysql
+package mysqlfunc
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 )
 
@@ -119,10 +120,10 @@ func errorInfoMethodConfig() funcapi.MethodConfig {
 
 // funcErrorInfo handles the error-info function.
 type funcErrorInfo struct {
-	router *funcRouter
+	router *router
 }
 
-func newFuncErrorInfo(r *funcRouter) *funcErrorInfo {
+func newFuncErrorInfo(r *router) *funcErrorInfo {
 	return &funcErrorInfo{router: r}
 }
 
@@ -130,19 +131,17 @@ func newFuncErrorInfo(r *funcRouter) *funcErrorInfo {
 var _ funcapi.MethodHandler = (*funcErrorInfo)(nil)
 
 func (f *funcErrorInfo) MethodParams(ctx context.Context, method string) ([]funcapi.ParamConfig, error) {
-	if f.router.collector.Functions.ErrorInfo.Disabled {
+	if f.router.cfg.errorInfoDisabled() {
 		return nil, fmt.Errorf("error-info function disabled in configuration")
 	}
 	return []funcapi.ParamConfig{}, nil
 }
 
 func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	if f.router.collector.db == nil {
-		if err := f.router.collector.openConnection(ctx); err != nil {
-			return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
-		}
+	if _, err := f.router.deps.DB(); err != nil {
+		return funcapi.UnavailableResponse("collector is still initializing, please retry in a few seconds")
 	}
-	queryCtx, cancel := context.WithTimeout(ctx, f.router.collector.errorInfoTimeout())
+	queryCtx, cancel := context.WithTimeout(ctx, f.router.cfg.errorInfoTimeout())
 	defer cancel()
 	return f.collectData(queryCtx)
 }
@@ -150,11 +149,11 @@ func (f *funcErrorInfo) Handle(ctx context.Context, method string, params funcap
 func (f *funcErrorInfo) Cleanup(ctx context.Context) {}
 
 func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionResponse {
-	if f.router.collector.Functions.ErrorInfo.Disabled {
+	if f.router.cfg.errorInfoDisabled() {
 		return funcapi.UnavailableResponse("error-info function has been disabled in configuration")
 	}
 
-	available, err := f.checkPerformanceSchema(ctx)
+	available, err := isPerformanceSchemaEnabled(ctx, f.router.deps)
 	if err != nil {
 		return &funcapi.FunctionResponse{
 			Status:  500,
@@ -165,7 +164,7 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 		return &funcapi.FunctionResponse{Status: 503, Message: "performance_schema is not enabled"}
 	}
 
-	source, err := f.router.collector.detectMySQLErrorHistorySource(ctx)
+	source, err := detectMySQLErrorHistorySource(ctx, f.router.deps, f.router.cfg)
 	if err != nil {
 		return &funcapi.FunctionResponse{Status: 503, Message: fmt.Sprintf("error-info not enabled: %v", err)}
 	}
@@ -177,16 +176,16 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 		return &funcapi.FunctionResponse{Status: 503, Message: msg}
 	}
 
-	limit := f.router.collector.topQueriesLimit()
+	limit := f.router.cfg.topQueriesLimit()
 
-	rows, err := f.router.collector.fetchMySQLErrorRows(ctx, source, nil, limit)
+	rows, err := fetchMySQLErrorRows(ctx, f.router.deps, f.router.cfg, source, nil, limit)
 	if err != nil {
 		return &funcapi.FunctionResponse{Status: 500, Message: fmt.Sprintf("error-info query failed: %v", err)}
 	}
 	if len(rows) == 0 && source.fallbackTable != "" {
-		fallback, ferr := f.router.collector.buildMySQLErrorSource(ctx, source.fallbackTable)
+		fallback, ferr := buildMySQLErrorSource(ctx, f.router.deps, f.router.cfg, source.fallbackTable)
 		if ferr == nil && fallback.status == mysqlErrorAttrEnabled {
-			fallbackRows, ferr := f.router.collector.fetchMySQLErrorRows(ctx, fallback, nil, limit)
+			fallbackRows, ferr := fetchMySQLErrorRows(ctx, f.router.deps, f.router.cfg, fallback, nil, limit)
 			if ferr == nil && len(fallbackRows) > 0 {
 				rows = fallbackRows
 			}
@@ -211,33 +210,6 @@ func (f *funcErrorInfo) collectData(ctx context.Context) *funcapi.FunctionRespon
 		Data:              data,
 		DefaultSortColumn: "errorNumber",
 	}
-}
-
-func (f *funcErrorInfo) checkPerformanceSchema(ctx context.Context) (bool, error) {
-	c := f.router.collector
-
-	c.varPerfSchemaMu.RLock()
-	cached := c.varPerformanceSchema
-	c.varPerfSchemaMu.RUnlock()
-	if cached != "" {
-		return cached == "ON" || cached == "1", nil
-	}
-
-	c.varPerfSchemaMu.Lock()
-	defer c.varPerfSchemaMu.Unlock()
-
-	if c.varPerformanceSchema != "" {
-		return c.varPerformanceSchema == "ON" || c.varPerformanceSchema == "1", nil
-	}
-
-	var value string
-	query := "SELECT @@performance_schema"
-	if err := c.db.QueryRowContext(ctx, query).Scan(&value); err != nil {
-		return false, err
-	}
-
-	c.varPerformanceSchema = value
-	return value == "ON" || value == "1", nil
 }
 
 type mysqlErrorSource struct {
@@ -311,31 +283,25 @@ func mysqlErrorAttributionColumns() []topQueriesColumn {
 	}
 }
 
-// TODO: Refactor error data access into a shared mysqlErrorData type.
-// Currently these methods live on Collector because they're used by both:
-// - funcErrorInfo (for error-info function)
-// - funcTopQueries (for error attribution columns)
-// A cleaner design would be a mysqlErrorData type on funcRouter that both handlers use.
-
-func (c *Collector) collectMySQLErrorDetailsForDigests(ctx context.Context, digests []string) (string, map[string]mysqlErrorRow) {
-	source, err := c.detectMySQLErrorHistorySource(ctx)
+func collectMySQLErrorDetailsForDigests(ctx context.Context, deps Deps, cfg FunctionsConfig, log *logger.Logger, digests []string) (string, map[string]mysqlErrorRow) {
+	source, err := detectMySQLErrorHistorySource(ctx, deps, cfg)
 	if err != nil {
-		c.Debugf("error attribution: %v", err)
+		log.Debugf("error attribution: %v", err)
 		return mysqlErrorAttrNotEnabled, nil
 	}
 	if source.status != mysqlErrorAttrEnabled {
 		return source.status, nil
 	}
 
-	rows, err := c.fetchMySQLErrorRows(ctx, source, digests, len(digests))
+	rows, err := fetchMySQLErrorRows(ctx, deps, cfg, source, digests, len(digests))
 	if err != nil {
-		c.Debugf("error attribution query failed: %v", err)
+		log.Debugf("error attribution query failed: %v", err)
 		return mysqlErrorAttrNotEnabled, nil
 	}
 	if len(rows) == 0 && source.fallbackTable != "" {
-		fallback, ferr := c.buildMySQLErrorSource(ctx, source.fallbackTable)
+		fallback, ferr := buildMySQLErrorSource(ctx, deps, cfg, source.fallbackTable)
 		if ferr == nil && fallback.status == mysqlErrorAttrEnabled {
-			fallbackRows, ferr := c.fetchMySQLErrorRows(ctx, fallback, digests, len(digests))
+			fallbackRows, ferr := fetchMySQLErrorRows(ctx, deps, cfg, fallback, digests, len(digests))
 			if ferr == nil && len(fallbackRows) > 0 {
 				rows = fallbackRows
 			}
@@ -355,11 +321,15 @@ func (c *Collector) collectMySQLErrorDetailsForDigests(ctx context.Context, dige
 	return mysqlErrorAttrEnabled, out
 }
 
-func (c *Collector) detectMySQLErrorHistorySource(ctx context.Context) (mysqlErrorSource, error) {
-	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
+func detectMySQLErrorHistorySource(ctx context.Context, deps Deps, cfg FunctionsConfig) (mysqlErrorSource, error) {
+	qctx, cancel := context.WithTimeout(ctx, cfg.collectorTimeout())
 	defer cancel()
 
-	rows, err := c.db.QueryContext(qctx, `
+	db, err := deps.DB()
+	if err != nil {
+		return mysqlErrorSource{status: mysqlErrorAttrNotEnabled, reason: "collector database is not ready"}, err
+	}
+	rows, err := db.QueryContext(qctx, `
 SELECT NAME, ENABLED
 FROM performance_schema.setup_consumers
 WHERE NAME IN ('events_statements_history_long','events_statements_history','events_statements_current');
@@ -396,7 +366,7 @@ WHERE NAME IN ('events_statements_history_long','events_statements_history','eve
 		return mysqlErrorSource{status: mysqlErrorAttrNotEnabled, reason: "statement history consumers are disabled"}, nil
 	}
 
-	source, err := c.buildMySQLErrorSource(ctx, table)
+	source, err := buildMySQLErrorSource(ctx, deps, cfg, table)
 	if err != nil {
 		return source, err
 	}
@@ -407,8 +377,8 @@ WHERE NAME IN ('events_statements_history_long','events_statements_history','eve
 	return source, nil
 }
 
-func (c *Collector) buildMySQLErrorSource(ctx context.Context, table string) (mysqlErrorSource, error) {
-	cols, err := c.fetchMySQLTableColumns(ctx, table)
+func buildMySQLErrorSource(ctx context.Context, deps Deps, cfg FunctionsConfig, table string) (mysqlErrorSource, error) {
+	cols, err := fetchMySQLTableColumns(ctx, deps, cfg, table)
 	if err != nil {
 		return mysqlErrorSource{status: mysqlErrorAttrNotSupported, reason: "unable to read history table columns"}, err
 	}
@@ -427,11 +397,15 @@ func (c *Collector) buildMySQLErrorSource(ctx context.Context, table string) (my
 	}, nil
 }
 
-func (c *Collector) fetchMySQLTableColumns(ctx context.Context, table string) (map[string]bool, error) {
-	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
+func fetchMySQLTableColumns(ctx context.Context, deps Deps, cfg FunctionsConfig, table string) (map[string]bool, error) {
+	qctx, cancel := context.WithTimeout(ctx, cfg.collectorTimeout())
 	defer cancel()
 
-	rows, err := c.db.QueryContext(qctx, `
+	db, err := deps.DB()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(qctx, `
 SELECT COLUMN_NAME
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = 'performance_schema'
@@ -455,7 +429,7 @@ WHERE TABLE_SCHEMA = 'performance_schema'
 	return cols, nil
 }
 
-func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSource, digests []string, limit int) ([]mysqlErrorRow, error) {
+func fetchMySQLErrorRows(ctx context.Context, deps Deps, cfg FunctionsConfig, source mysqlErrorSource, digests []string, limit int) ([]mysqlErrorRow, error) {
 	if source.status != mysqlErrorAttrEnabled {
 		return nil, fmt.Errorf("error history not enabled")
 	}
@@ -510,10 +484,14 @@ func (c *Collector) fetchMySQLErrorRows(ctx context.Context, source mysqlErrorSo
 		query = fmt.Sprintf("%s LIMIT %d", query, limit)
 	}
 
-	qctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
+	qctx, cancel := context.WithTimeout(ctx, cfg.collectorTimeout())
 	defer cancel()
 
-	rows, err := c.db.QueryContext(qctx, query, args...)
+	db, err := deps.DB()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(qctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

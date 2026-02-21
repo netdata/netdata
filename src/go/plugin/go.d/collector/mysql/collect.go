@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlquery"
 )
 
 func (c *Collector) ensureVersionAndCapabilities(ctx context.Context) error {
@@ -26,7 +28,7 @@ func (c *Collector) ensureVersionAndCapabilities(ctx context.Context) error {
 }
 
 func (c *Collector) checkMandatory(ctx context.Context) error {
-	if c.db == nil {
+	if !c.dbReady() {
 		if err := c.openConnection(ctx); err != nil {
 			return err
 		}
@@ -48,7 +50,7 @@ func (c *Collector) checkMandatory(ctx context.Context) error {
 }
 
 func (c *Collector) collect(ctx context.Context) error {
-	if c.db == nil {
+	if !c.dbReady() {
 		if err := c.openConnection(ctx); err != nil {
 			return err
 		}
@@ -134,7 +136,7 @@ func (c *Collector) openConnection(ctx context.Context) error {
 		return fmt.Errorf("error on pinging the mysql database [%s]: %v", c.safeDSN, err)
 	}
 
-	c.db = db
+	c.setDB(db)
 	return nil
 }
 
@@ -153,45 +155,16 @@ func (c *Collector) collectQuery(ctx context.Context, query string, assign func(
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
 
-	s := time.Now()
-	rows, err := c.db.QueryContext(ctx, query)
+	db, err := c.currentDB()
 	if err != nil {
 		return 0, err
 	}
-	duration = time.Since(s).Milliseconds()
-	defer func() { _ = rows.Close() }()
 
-	columns, err := rows.Columns()
+	queryDuration, err := sqlquery.QueryRows(ctx, db, query, assign)
 	if err != nil {
-		return duration, err
+		return 0, err
 	}
-
-	vs := makeValues(len(columns))
-	for rows.Next() {
-		if err := rows.Scan(vs...); err != nil {
-			return duration, err
-		}
-		for i, l := 0, len(vs); i < l; i++ {
-			assign(columns[i], valueToString(vs[i]), i == l-1)
-		}
-	}
-	return duration, rows.Err()
-}
-
-func makeValues(size int) []any {
-	vs := make([]any, size)
-	for i := range vs {
-		vs[i] = &sql.NullString{}
-	}
-	return vs
-}
-
-func valueToString(value any) string {
-	v, ok := value.(*sql.NullString)
-	if !ok || !v.Valid {
-		return ""
-	}
-	return v.String
+	return queryDuration.Milliseconds(), nil
 }
 
 func parseInt(s string) int64 {
