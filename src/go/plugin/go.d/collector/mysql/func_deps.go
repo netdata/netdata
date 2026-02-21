@@ -9,23 +9,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mysql/mysqlfunc"
 )
 
-var errMySQLDBUnavailable = errors.New("collector database is not ready")
-
 type funcDepsAdapter struct {
 	collector *Collector
 }
 
-var _ mysqlfunc.Deps = (*funcDepsAdapter)(nil)
-
 func (a funcDepsAdapter) DB() (mysqlfunc.Queryer, error) {
-	db, err := a.collector.currentDB()
-	if err != nil {
-		return nil, err
-	}
-	if db == nil {
-		return nil, errMySQLDBUnavailable
-	}
-	return db, nil
+	return a.collector.currentDB()
 }
 
 func (c *Collector) dbReady() bool {
@@ -40,7 +29,7 @@ func (c *Collector) currentDB() (*sql.DB, error) {
 	db := c.db
 	c.dbMu.RUnlock()
 	if db == nil {
-		return nil, errMySQLDBUnavailable
+		return nil, errors.New("collector database is not ready")
 	}
 	return db, nil
 }
