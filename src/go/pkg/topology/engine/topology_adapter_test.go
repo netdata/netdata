@@ -74,12 +74,13 @@ func TestToTopologyData_ProjectsResult(t *testing.T) {
 	require.Equal(t, "agent-1", data.AgentID)
 	require.Equal(t, collectedAt, data.CollectedAt)
 
-	require.Len(t, data.Actors, 3)
-	require.Len(t, data.Links, 1)
-	require.Equal(t, "lldp", data.Links[0].Protocol)
-	require.Equal(t, "Gi0/3", data.Links[0].Src.Attributes["if_name"])
-	require.Equal(t, "Gi0/3", data.Links[0].Src.Attributes["port_id"])
-	require.Equal(t, "sw2", data.Links[0].Dst.Attributes["sys_name"])
+	require.Len(t, data.Actors, 4)
+	require.Len(t, data.Links, 3)
+	lldpLink := findLinkByProtocol(data.Links, "lldp")
+	require.NotNil(t, lldpLink)
+	require.Equal(t, "Gi0/3", lldpLink.Src.Attributes["if_name"])
+	require.Equal(t, "Gi0/3", lldpLink.Src.Attributes["port_id"])
+	require.Equal(t, "sw2", lldpLink.Dst.Attributes["sys_name"])
 
 	localActor := findActorBySysName(data.Actors, "sw1")
 	require.NotNil(t, localActor)
@@ -90,15 +91,20 @@ func TestToTopologyData_ProjectsResult(t *testing.T) {
 	require.Equal(t, "endpoint", endpointActor.ActorType)
 	require.Equal(t, []string{"10.20.4.84"}, endpointActor.Match.IPAddresses)
 	require.Equal(t, []string{"arp", "fdb"}, endpointActor.Attributes["learned_sources"])
+	segmentActor := findActorByType(data.Actors, "segment")
+	require.NotNil(t, segmentActor)
+	require.Contains(t, segmentActor.Match.Hostnames[0], "segment:bridge-domain:local-device:if:3")
 
 	require.Equal(t, 2, data.Stats["devices_total"])
 	require.Equal(t, 1, data.Stats["devices_discovered"])
-	require.Equal(t, 1, data.Stats["links_total"])
+	require.Equal(t, 3, data.Stats["links_total"])
 	require.Equal(t, 1, data.Stats["links_lldp"])
 	require.Equal(t, 0, data.Stats["links_cdp"])
-	require.Equal(t, 0, data.Stats["links_fdb"])
+	require.Equal(t, 2, data.Stats["links_fdb"])
 	require.Equal(t, 0, data.Stats["links_arp"])
-	require.Equal(t, 3, data.Stats["actors_total"])
+	require.Equal(t, 2, data.Stats["links_bidirectional"])
+	require.Equal(t, 1, data.Stats["links_unidirectional"])
+	require.Equal(t, 4, data.Stats["actors_total"])
 	require.Equal(t, 1, data.Stats["endpoints_total"])
 }
 
@@ -148,10 +154,13 @@ func TestToTopologyData_DeduplicatesEndpointActorOverlappingManagedDevice(t *tes
 		View:   "summary",
 	})
 
-	require.Len(t, data.Actors, 1)
+	require.Len(t, data.Actors, 2)
 	require.Equal(t, "device", data.Actors[0].ActorType)
+	require.Equal(t, "segment", data.Actors[1].ActorType)
 	require.Equal(t, 0, data.Stats["endpoints_total"])
-	require.Equal(t, 1, data.Stats["actors_total"])
+	require.Equal(t, 2, data.Stats["actors_total"])
+	require.Equal(t, 2, data.Stats["links_total"])
+	require.Equal(t, 2, data.Stats["links_fdb"])
 }
 
 func TestCanonicalTopologyMatchKey_NormalizesEquivalentMACRepresentations(t *testing.T) {
@@ -344,6 +353,24 @@ func findActorByMAC(actors []topology.Actor, mac string) *topology.Actor {
 			if candidate == mac {
 				return &actors[i]
 			}
+		}
+	}
+	return nil
+}
+
+func findActorByType(actors []topology.Actor, actorType string) *topology.Actor {
+	for i := range actors {
+		if actors[i].ActorType == actorType {
+			return &actors[i]
+		}
+	}
+	return nil
+}
+
+func findLinkByProtocol(links []topology.Link, protocol string) *topology.Link {
+	for i := range links {
+		if links[i].Protocol == protocol {
+			return &links[i]
 		}
 	}
 	return nil

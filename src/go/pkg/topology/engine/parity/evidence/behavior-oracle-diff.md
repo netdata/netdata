@@ -1,6 +1,6 @@
 # Behavior Oracle Diff Report
 
-- Generated at (UTC): `2026-02-20T21:10:47Z`
+- Generated at (UTC): `2026-02-21T04:11:38Z`
 - Status: `pass`
 - In-scope protocols: `lldp, cdp, bridge_fdb, arp_nd`
 - Scenarios: total `46`, in-scope `46`, skipped `0`

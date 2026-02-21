@@ -435,9 +435,10 @@ func TestTopologyCache_FDBAndARPEnrichment(t *testing.T) {
 
 	require.True(t, ok)
 	require.GreaterOrEqual(t, len(data.Actors), 2)
-	require.Empty(t, data.Links)
+	require.Len(t, data.Links, 2)
 
-	require.Nil(t, findLinkByProtocol(data, "fdb"))
+	require.NotNil(t, findLinkByProtocol(data, "fdb"))
+	require.NotNil(t, findLinkByProtocol(data, "bridge"))
 	require.Nil(t, findLinkByProtocol(data, "arp"))
 
 	ep := findActorByMAC(data, "70:49:a2:65:72:cd")
