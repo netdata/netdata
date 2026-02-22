@@ -16,16 +16,16 @@ type hostSample struct {
 	packetLossPercent float64
 
 	hasRTT         bool
-	minRTTMS       float64
-	maxRTTMS       float64
-	avgRTTMS       float64
-	stdDevRTTMS    float64
+	minRTTUs       float64
+	maxRTTUs       float64
+	avgRTTUs       float64
+	stdDevRTTUs    float64
 	rttVarianceMS2 float64
 
 	hasJitter    bool
-	meanJitterMS float64
-	ewmaJitterMS float64
-	smaJitterMS  float64
+	meanJitterUs float64
+	ewmaJitterUs float64
+	smaJitterUs  float64
 }
 
 func (c *Collector) collect(context.Context) error {
@@ -53,17 +53,17 @@ func (c *Collector) collect(context.Context) error {
 		packetLoss.WithLabelValues(sample.host).Observe(sample.packetLossPercent)
 
 		if sample.hasRTT {
-			minRTT.WithLabelValues(sample.host).Observe(sample.minRTTMS)
-			maxRTT.WithLabelValues(sample.host).Observe(sample.maxRTTMS)
-			avgRTT.WithLabelValues(sample.host).Observe(sample.avgRTTMS)
-			stdDevRTT.WithLabelValues(sample.host).Observe(sample.stdDevRTTMS)
+			minRTT.WithLabelValues(sample.host).Observe(sample.minRTTUs)
+			maxRTT.WithLabelValues(sample.host).Observe(sample.maxRTTUs)
+			avgRTT.WithLabelValues(sample.host).Observe(sample.avgRTTUs)
+			stdDevRTT.WithLabelValues(sample.host).Observe(sample.stdDevRTTUs)
 			rttVariance.WithLabelValues(sample.host).Observe(sample.rttVarianceMS2)
 		}
 
 		if sample.hasJitter {
-			meanJitter.WithLabelValues(sample.host).Observe(sample.meanJitterMS)
-			ewmaJitter.WithLabelValues(sample.host).Observe(sample.ewmaJitterMS)
-			smaJitter.WithLabelValues(sample.host).Observe(sample.smaJitterMS)
+			meanJitter.WithLabelValues(sample.host).Observe(sample.meanJitterUs)
+			ewmaJitter.WithLabelValues(sample.host).Observe(sample.ewmaJitterUs)
+			smaJitter.WithLabelValues(sample.host).Observe(sample.smaJitterUs)
 		}
 	}
 
@@ -90,28 +90,28 @@ func (c *Collector) collectSamples(updateJitterState bool) []hostSample {
 				host:              host,
 				packetsRecv:       int64(stats.PacketsRecv),
 				packetsSent:       int64(stats.PacketsSent),
-				packetLossPercent: stats.PacketLoss,
+				packetLossPercent: stats.PacketLoss * 1000,
 			}
 
 			if stats.PacketsRecv != 0 {
 				sample.hasRTT = true
-				sample.minRTTMS = durationToMS(stats.MinRtt)
-				sample.maxRTTMS = durationToMS(stats.MaxRtt)
-				sample.avgRTTMS = durationToMS(stats.AvgRtt)
-				sample.stdDevRTTMS = durationToMS(stats.StdDevRtt)
-				stdDevMS := sample.stdDevRTTMS
-				sample.rttVarianceMS2 = stdDevMS * stdDevMS
+				sample.minRTTUs = durToMicros(stats.MinRtt)
+				sample.maxRTTUs = durToMicros(stats.MaxRtt)
+				sample.avgRTTUs = durToMicros(stats.AvgRtt)
+				sample.stdDevRTTUs = durToMicros(stats.StdDevRtt)
+				stdDevUs := sample.stdDevRTTUs
+				sample.rttVarianceMS2 = stdDevUs * stdDevUs
 			}
 
 			if len(stats.Rtts) >= 2 {
 				meanJitter := calcMeanJitter(stats.Rtts)
 				sample.hasJitter = true
-				sample.meanJitterMS = durationToMS(meanJitter)
+				sample.meanJitterUs = durToMicros(meanJitter)
 
 				if updateJitterState {
 					mu.Lock()
-					sample.ewmaJitterMS = durationToMS(c.updateEWMAJitter(host, meanJitter))
-					sample.smaJitterMS = durationToMS(c.updateSMAJitter(host, meanJitter))
+					sample.ewmaJitterUs = durToMicros(c.updateEWMAJitter(host, meanJitter))
+					sample.smaJitterUs = durToMicros(c.updateSMAJitter(host, meanJitter))
 					mu.Unlock()
 				}
 			}
@@ -126,8 +126,8 @@ func (c *Collector) collectSamples(updateJitterState bool) []hostSample {
 	return samples
 }
 
-func durationToMS(v time.Duration) float64 {
-	return float64(v) / float64(time.Millisecond)
+func durToMicros(v time.Duration) float64 {
+	return float64(v.Microseconds())
 }
 
 // calcMeanJitter calculates mean of absolute consecutive RTT differences
