@@ -134,14 +134,14 @@ If inferred dimensions are present without flattened reader metadata, `BuildPlan
 Each metric series is routed to a chart and dimension based on template selectors.
 The following rules apply when routing conflicts arise:
 
-| Rule                                   | Behavior                                                                                       |
-|----------------------------------------|------------------------------------------------------------------------------------------------|
-| Template vs autogen chart ID collision | Template wins; autogen chart is replaced                                                       |
-| Cross-template chart ID collision      | Existing owner keeps ownership; subsequent series are **silently ignored** (see warning below) |
+| Rule                                          | Behavior                                                                                       |
+|-----------------------------------------------|------------------------------------------------------------------------------------------------|
+| Template vs autogen chart ID collision        | Template wins; autogen chart is replaced                                                       |
+| Cross-template chart ID collision             | Existing owner keeps ownership; subsequent series are **silently ignored** (see warning below) |
+| Duplicate dimension observations within build | First observed dimension metadata wins; values are reduced (summed)                            |
 
 > [!WARNING]
 > Cross-template chart ID collisions cause silent data loss — conflicting series are dropped with no error and no log entry. If metrics are missing, check for duplicate rendered chart IDs across template groups.
-> | Duplicate dimension observations within build | First observed dimension metadata wins; values are reduced (summed) |
 
 ## Lifecycle Defaults and Policy
 
