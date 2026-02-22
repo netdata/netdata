@@ -41,9 +41,6 @@ func (c *Collector) checkMandatory(ctx context.Context) error {
 	if err := c.probeGlobalStatus(ctx); err != nil {
 		return fmt.Errorf("error on collecting global status: %v", err)
 	}
-	if err := c.probeGaleraStatus(ctx); err != nil {
-		return fmt.Errorf("error on probing galera status: %v", err)
-	}
 
 	if err := c.collectGlobalVariables(ctx); err != nil {
 		return fmt.Errorf("error on collecting global variables: %v", err)
@@ -61,15 +58,12 @@ func (c *Collector) collect(ctx context.Context) error {
 	if err := c.ensureVersionAndCapabilities(ctx); err != nil {
 		return err
 	}
-	if err := c.probeGaleraStatus(ctx); err != nil {
-		return fmt.Errorf("error on probing galera status: %v", err)
-	}
 
 	c.disableSessionQueryLog(ctx)
 
 	state := &collectRunState{}
 
-	if err := c.collectGlobalStatus(ctx, state, true); err != nil {
+	if err := c.collectGlobalStatus(ctx, state); err != nil {
 		return fmt.Errorf("error on collecting global status: %v", err)
 	}
 

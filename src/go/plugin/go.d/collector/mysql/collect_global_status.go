@@ -8,53 +8,13 @@ import (
 	"strings"
 )
 
-const queryShowGlobalStatus = "SHOW GLOBAL STATUS;"
-const queryShowGlobalStatusProbe = "SHOW GLOBAL STATUS LIKE 'Threads_connected';"
-const queryShowGlobalStatusGaleraProbe = "SHOW GLOBAL STATUS LIKE 'wsrep_received';"
+const (
+	queryShowGlobalStatus      = "SHOW GLOBAL STATUS;"
+	queryShowGlobalStatusProbe = `SHOW GLOBAL STATUS 
+WHERE VARIABLE_NAME IN ('Threads_connected', 'wsrep_received');`
+)
 
-func (c *Collector) probeGlobalStatus(ctx context.Context) error {
-	q := queryShowGlobalStatusProbe
-	c.Debugf("executing query: '%s'", q)
-
-	var hasRows bool
-	_, err := c.collectQuery(ctx, q, func(_, _ string, lineEnd bool) {
-		if lineEnd {
-			hasRows = true
-		}
-	})
-	if err != nil {
-		return err
-	}
-	if !hasRows {
-		return errors.New("global status probe returned no rows")
-	}
-	return nil
-}
-
-func (c *Collector) probeGaleraStatus(ctx context.Context) error {
-	if c.galeraProbeDone {
-		return nil
-	}
-
-	q := queryShowGlobalStatusGaleraProbe
-	c.Debugf("executing query: '%s'", q)
-
-	var hasRows bool
-	_, err := c.collectQuery(ctx, q, func(_, _ string, lineEnd bool) {
-		if lineEnd {
-			hasRows = true
-		}
-	})
-	if err != nil {
-		return err
-	}
-
-	c.galeraDetected = c.galeraDetected || hasRows
-	c.galeraProbeDone = true
-	return nil
-}
-
-func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunState, writeMetrics bool) error {
+func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunState) error {
 	// MariaDB: https://mariadb.com/kb/en/server-status-variables/
 	// MySQL: https://dev.mysql.com/doc/refman/8.0/en/server-status-variable-reference.html
 	q := queryShowGlobalStatus
@@ -74,27 +34,17 @@ func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunSt
 			switch metricName {
 			case "wsrep_connected":
 				parsedValue := parseInt(convertWsrepConnected(value))
-				if writeMetrics {
-					c.mx.set("wsrep_connected", parsedValue)
-				}
+				c.mx.set("wsrep_connected", parsedValue)
 			case "wsrep_ready":
 				parsedValue := parseInt(convertWsrepReady(value))
-				if writeMetrics {
-					c.mx.set("wsrep_ready", parsedValue)
-				}
+				c.mx.set("wsrep_ready", parsedValue)
 			case "wsrep_local_state":
-				if writeMetrics {
-					c.mx.setWsrepLocalState(value)
-				}
+				c.mx.setWsrepLocalState(value)
 			case "wsrep_cluster_status":
-				if writeMetrics {
-					c.mx.setWsrepClusterStatus(value)
-				}
+				c.mx.setWsrepClusterStatus(value)
 			default:
 				parsedValue := parseInt(value)
-				if writeMetrics {
-					c.mx.set(metricName, parsedValue)
-				}
+				c.mx.set(metricName, parsedValue)
 
 				switch metricName {
 				case "connections":
@@ -106,6 +56,29 @@ func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunSt
 		}
 	})
 	return err
+}
+
+func (c *Collector) probeGlobalStatus(ctx context.Context) error {
+	q := queryShowGlobalStatusProbe
+	c.Debugf("executing query: '%s'", q)
+
+	var hasRows bool
+	_, err := c.collectQuery(ctx, q, func(column, value string, lineEnd bool) {
+		if column == "Variable_name" {
+			switch value {
+			case "wsrep_received":
+				c.galeraDetected = true
+			}
+		}
+		hasRows = hasRows || lineEnd
+	})
+	if err != nil {
+		return err
+	}
+	if !hasRows {
+		return errors.New("global status probe returned no rows")
+	}
+	return nil
 }
 
 func isGaleraMetric(name string) bool {

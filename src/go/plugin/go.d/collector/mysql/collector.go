@@ -91,12 +91,11 @@ type Collector struct {
 	dbMu sync.RWMutex // protects db pointer lifecycle across collect/functions/cleanup
 	db   *sql.DB
 
-	safeDSN         string
-	version         *semver.Version
-	isMariaDB       bool
-	isPercona       bool
-	galeraDetected  bool
-	galeraProbeDone bool
+	safeDSN        string
+	version        *semver.Version
+	isMariaDB      bool
+	isPercona      bool
+	galeraDetected bool
 
 	doDisableSessionQueryLog bool
 
