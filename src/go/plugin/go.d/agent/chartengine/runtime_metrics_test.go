@@ -52,26 +52,26 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.series_scanned_total", nil, 2)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.planner_actions_total", metrix.Labels{"kind": "update_chart"}, 2)
 				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.plan_chart_instances", nil, 1)
-					assertMetricMeta(
-						t,
-						r,
-						"netdata.go.plugin.chartengine.build_success_total",
-						metrix.MetricMeta{
-							Description: "Successful BuildPlan calls",
-							ChartFamily: "ChartEngine/Build",
-							Unit:        "builds",
-						},
-					)
-					assertMetricMeta(
-						t,
-						r,
-						"netdata.go.plugin.chartengine.planner_actions_total",
-						metrix.MetricMeta{
-							Description: "Planner actions by kind",
-							ChartFamily: "ChartEngine/Actions",
-							Unit:        "actions",
-						},
-					)
+				assertMetricMeta(
+					t,
+					r,
+					"netdata.go.plugin.chartengine.build_success_total",
+					metrix.MetricMeta{
+						Description: "Successful BuildPlan calls",
+						ChartFamily: "ChartEngine/Build",
+						Unit:        "builds",
+					},
+				)
+				assertMetricMeta(
+					t,
+					r,
+					"netdata.go.plugin.chartengine.planner_actions_total",
+					metrix.MetricMeta{
+						Description: "Planner actions by kind",
+						ChartFamily: "ChartEngine/Actions",
+						Unit:        "actions",
+					},
+				)
 			},
 		},
 		"plan-size gauges keep last successful values on skipped build": {
@@ -220,23 +220,23 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 
 				plan, err := observer.BuildPlan(producer.RuntimeStore().Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
-					create := findCreateChartByTitle(plan.Actions, "Successful BuildPlan calls")
-					require.NotNil(t, create)
-					assert.Equal(t, "Successful BuildPlan calls", create.Meta.Title)
-					assert.Equal(t, "ChartEngine/Build", create.Meta.Family)
-					assert.Equal(t, "builds/s", create.Meta.Units)
+				create := findCreateChartByTitle(plan.Actions, "Successful BuildPlan calls")
+				require.NotNil(t, create)
+				assert.Equal(t, "Successful BuildPlan calls", create.Meta.Title)
+				assert.Equal(t, "ChartEngine/Build", create.Meta.Family)
+				assert.Equal(t, "builds/s", create.Meta.Units)
 
-					duration := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_seconds")
-					require.NotNil(t, duration)
-					assert.Equal(t, "BuildPlan duration in seconds", duration.Meta.Title)
-					assert.Equal(t, "ChartEngine/Build", duration.Meta.Family)
-					assert.Equal(t, "seconds", duration.Meta.Units)
+				duration := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_seconds")
+				require.NotNil(t, duration)
+				assert.Equal(t, "BuildPlan duration in seconds", duration.Meta.Title)
+				assert.Equal(t, "ChartEngine/Build", duration.Meta.Family)
+				assert.Equal(t, "seconds", duration.Meta.Units)
 
-					durationSum := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_seconds_sum")
-					require.NotNil(t, durationSum)
-					assert.Equal(t, "BuildPlan duration in seconds", durationSum.Meta.Title)
-					assert.Equal(t, "ChartEngine/Build", durationSum.Meta.Family)
-					assert.Equal(t, "seconds", durationSum.Meta.Units)
+				durationSum := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_seconds_sum")
+				require.NotNil(t, durationSum)
+				assert.Equal(t, "BuildPlan duration in seconds", durationSum.Meta.Title)
+				assert.Equal(t, "ChartEngine/Build", durationSum.Meta.Family)
+				assert.Equal(t, "seconds", durationSum.Meta.Units)
 			},
 		},
 	}
