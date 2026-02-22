@@ -254,7 +254,10 @@ func (m *Manager) runProcessConfGroups(in chan []*confgroup.Group) {
 		select {
 		case <-m.ctx.Done():
 			return
-		case groups := <-in:
+		case groups, ok := <-in:
+			if !ok {
+				return
+			}
 			for _, gr := range groups {
 				a, r := m.discoveredConfigs.add(gr)
 				m.Debugf("received configs: %d/+%d/-%d ('%s')", len(gr.Configs), len(a), len(r), gr.Source)

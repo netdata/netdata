@@ -291,6 +291,9 @@ func (j *Job) AutoDetection() (err error) {
 }
 
 func (j *Job) UpdateVnode(vnode *vnodes.VirtualNode) {
+	if vnode == nil {
+		return
+	}
 	select {
 	case <-j.updVnode:
 	default:

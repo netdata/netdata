@@ -160,6 +160,7 @@ func (m *Manager) dyncfgConfigUserconfig(fn dyncfg.Function) {
 	if err != nil {
 		m.Warningf("dyncfg: %s: module %s: failed to create config from payload: %v", cmd, mn, err)
 		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
+		return
 	}
 
 	m.dyncfgApi.SendYAML(fn, string(bs))

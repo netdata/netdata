@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
 
 const (
@@ -304,6 +306,37 @@ func TestJob_Tick(t *testing.T) {
 	job := newTestJob()
 	for i := 0; i < 3; i++ {
 		job.Tick(i)
+	}
+}
+
+func TestJob_UpdateVnode_NilIgnored(t *testing.T) {
+	tests := map[string]struct {
+		update *vnodes.VirtualNode
+	}{
+		"nil vnode update is ignored": {
+			update: nil,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			job := newTestJob()
+			job.module = &MockModule{}
+			job.charts = &Charts{}
+
+			job.UpdateVnode(tc.update)
+
+			assert.NotPanics(t, func() {
+				_ = job.processMetrics(
+					collectedMetrics{
+						intMetrics:   map[string]int64{},
+						floatMetrics: map[string]float64{},
+					},
+					time.Now(),
+					1,
+				)
+			})
+		})
 	}
 }
 

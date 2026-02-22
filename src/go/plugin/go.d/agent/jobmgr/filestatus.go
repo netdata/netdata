@@ -83,9 +83,6 @@ func (s *fileStatus) Updated() <-chan struct{} {
 }
 
 func (s *fileStatus) contains(cfg confgroup.Config, statuses ...string) bool {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-
 	status, ok := s.lookup(cfg)
 	if !ok {
 		return false

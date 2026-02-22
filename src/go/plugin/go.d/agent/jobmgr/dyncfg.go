@@ -25,6 +25,7 @@ func (m *Manager) dyncfgConfig(fn dyncfg.Function) {
 	select {
 	case <-m.ctx.Done():
 		m.dyncfgApi.SendCodef(fn, 503, "Job manager is shutting down.")
+		return
 	default:
 	}
 
