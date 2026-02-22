@@ -61,8 +61,7 @@ func (j *JobV2) unregisterRuntimeComponent() {
 
 func (j *JobV2) runtimeComponentLabels() map[string]string {
 	labels := map[string]string{
-		"source":           "chartengine",
-		"collector_module": j.moduleName,
+		"_collect_module": j.moduleName,
 	}
 	if v, ok := j.labels["instance"]; ok && strings.TrimSpace(v) != "" {
 		labels["collector_instance"] = v
