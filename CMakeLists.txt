@@ -1065,6 +1065,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log-format-json.c
         src/libnetdata/log/nd_log-to-file.c
         src/libnetdata/log/nd_log-to-windows-events.c
+        src/libnetdata/log/nd_log-queue.c
+        src/libnetdata/log/nd_log-queue.h
         src/libnetdata/string/utf8.c
         src/libnetdata/spawn_server/log-forwarder.c
         src/libnetdata/spawn_server/log-forwarder.h

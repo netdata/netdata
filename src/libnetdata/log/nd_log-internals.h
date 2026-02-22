@@ -230,6 +230,7 @@ bool nd_logger_syslog(int priority, ND_LOG_FORMAT format, struct log_field *fiel
 
 bool nd_log_journal_systemd_init(void);
 bool nd_log_journal_direct_init(const char *path);
+void nd_logger_journal_format(BUFFER *wb, struct log_field *fields, size_t fields_max);
 bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max);
 bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields_max);
 

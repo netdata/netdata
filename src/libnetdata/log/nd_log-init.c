@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "nd_log-internals.h"
+#include "nd_log-queue.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -271,13 +272,30 @@ void nd_log_initialize(void) {
 #if defined(HAVE_LIBBACKTRACE)
     stacktrace_init();
 #endif
+
+    // Initialize async logging queue
+    // This starts the background logger thread
+    nd_log_queue_init();
+}
+
+void nd_log_shutdown(void) {
+    // Shutdown async logging queue, flushing pending messages
+    nd_log_queue_shutdown();
 }
 
 void nd_log_reopen_log_files(bool log) {
     if(log)
         netdata_log_info("Reopening all log files.");
 
-    nd_log_initialize();
+    if (nd_log_queue_enabled()) {
+        // Async logging is active - use REOPEN opcode
+        // This is handled entirely in the logger thread, so no FILE* races
+        nd_log_queue_reopen();
+    } else {
+        // Async logging not active - reopen directly
+        for(size_t i = 0 ; i < _NDLS_MAX ; i++)
+            nd_log_open(&nd_log.sources[i], i);
+    }
 
     if(log)
         netdata_log_info("Log files re-opened.");
@@ -288,6 +306,10 @@ int nd_log_systemd_journal_fd(void) {
 }
 
 void nd_log_reopen_log_files_for_spawn_server(const char *name) {
+    // After fork, the logger thread doesn't exist. Disable async queue
+    // before anything else to prevent stale uv_async_send calls.
+    nd_log_queue_disown_after_fork();
+
     nd_log.fatal_hook_cb = NULL;
     nd_log.fatal_final_cb = NULL;
 
