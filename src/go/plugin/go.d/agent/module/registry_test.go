@@ -5,6 +5,7 @@ package module
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,4 +43,35 @@ func TestRegister_FunctionOnlyWithoutMethods(t *testing.T) {
 		func() {
 			registry.Register("funcOnly", Creator{FunctionOnly: true})
 		})
+}
+
+func TestRegisterPanicOnMethodsAndJobMethodsConflict(t *testing.T) {
+	tests := map[string]struct {
+		name    string
+		creator Creator
+	}{
+		"panic when both methods and job methods are set": {
+			name: "conflict",
+			creator: Creator{
+				Methods: func() []funcapi.MethodConfig {
+					return nil
+				},
+				JobMethods: func(RuntimeJob) []funcapi.MethodConfig {
+					return nil
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			registry := make(Registry)
+
+			assert.PanicsWithValue(
+				t,
+				"conflict has both Methods and JobMethods defined (mutually exclusive)",
+				func() { registry.Register(tc.name, tc.creator) },
+			)
+		})
+	}
 }
