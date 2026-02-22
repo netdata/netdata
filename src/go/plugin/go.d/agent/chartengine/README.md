@@ -49,9 +49,9 @@ meter.Counter("requests_total").ObserveTotal(100)
 
 // 2) Engine loads chart template.
 engine, err := chartengine.New(
-chartengine.WithEnginePolicy(chartengine.EnginePolicy{
-Autogen: chartengine.AutogenPolicy{Enabled: false},
-}),
+    chartengine.WithEnginePolicy(chartengine.EnginePolicy{
+        Autogen: chartengine.AutogenPolicy{Enabled: false},
+    }),
 )
 // handle err
 
