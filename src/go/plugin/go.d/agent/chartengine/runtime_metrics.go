@@ -107,57 +107,57 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 		"build_phase_duration_seconds",
 		metrix.WithSummaryQuantiles(0.5, 0.9, 0.99),
 		metrix.WithDescription("Build phase duration in seconds"),
-		metrix.WithChartFamily("Build"),
+		metrix.WithChartFamily("ChartEngine/Build"),
 		metrix.WithUnit("seconds"),
 	)
 	actions := meter.Vec("kind").Counter(
 		"planner_actions_total",
 		metrix.WithDescription("Planner actions by kind"),
-		metrix.WithChartFamily("Actions"),
+		metrix.WithChartFamily("ChartEngine/Actions"),
 		metrix.WithUnit("actions"),
 	)
 	lifecycleRemoved := meter.Vec("scope", "reason").Counter(
 		"lifecycle_removed_total",
 		metrix.WithDescription("Lifecycle removals by scope and reason"),
-		metrix.WithChartFamily("Lifecycle"),
+		metrix.WithChartFamily("ChartEngine/Lifecycle"),
 		metrix.WithUnit("removals"),
 	)
 	seriesFiltered := meter.Vec("reason").Counter(
 		"series_filtered_total",
 		metrix.WithDescription("Series filtered before routing by reason"),
-		metrix.WithChartFamily("Series"),
+		metrix.WithChartFamily("ChartEngine/Series"),
 		metrix.WithUnit("series"),
 	)
 	buildSeqTransitions := meter.Vec("transition").Counter(
 		"build_seq_transitions_total",
 		metrix.WithDescription("Build sequence monotonicity transitions"),
-		metrix.WithChartFamily("Build"),
+		metrix.WithChartFamily("ChartEngine/Build"),
 		metrix.WithUnit("transitions"),
 	)
 	return &runtimeMetrics{
 		buildSuccessTotal: meter.Counter(
 			"build_success_total",
 			metrix.WithDescription("Successful BuildPlan calls"),
-			metrix.WithChartFamily("Build"),
+			metrix.WithChartFamily("ChartEngine/Build"),
 			metrix.WithUnit("builds"),
 		),
 		buildErrorTotal: meter.Counter(
 			"build_error_total",
 			metrix.WithDescription("Failed BuildPlan calls"),
-			metrix.WithChartFamily("Build"),
+			metrix.WithChartFamily("ChartEngine/Build"),
 			metrix.WithUnit("builds"),
 		),
 		buildSkippedFailedTotal: meter.Counter(
 			"build_skipped_failed_collect_total",
 			metrix.WithDescription("BuildPlan calls skipped due failed collect cycle"),
-			metrix.WithChartFamily("Build"),
+			metrix.WithChartFamily("ChartEngine/Build"),
 			metrix.WithUnit("builds"),
 		),
 		buildDurationSeconds: meter.Summary(
 			"build_duration_seconds",
 			metrix.WithSummaryQuantiles(0.5, 0.9, 0.99),
 			metrix.WithDescription("BuildPlan duration in seconds"),
-			metrix.WithChartFamily("Build"),
+			metrix.WithChartFamily("ChartEngine/Build"),
 			metrix.WithUnit("seconds"),
 		),
 		buildPhasePrepareSec:     phaseDuration.WithLabelValues("prepare"),
@@ -174,69 +174,69 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 		buildSeqViolation: meter.Gauge(
 			"build_seq_violation_active",
 			metrix.WithDescription("1 when build sequence monotonicity is currently violated"),
-			metrix.WithChartFamily("Build"),
+			metrix.WithChartFamily("ChartEngine/Build"),
 			metrix.WithUnit("state"),
 		),
 
 		routeCacheHitsTotal: meter.Counter(
 			"route_cache_hits_total",
 			metrix.WithDescription("Route cache lookup hits"),
-			metrix.WithChartFamily("Route Cache"),
+			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("hits"),
 		),
 		routeCacheMissesTotal: meter.Counter(
 			"route_cache_misses_total",
 			metrix.WithDescription("Route cache lookup misses"),
-			metrix.WithChartFamily("Route Cache"),
+			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("misses"),
 		),
 		routeCacheEntries: meter.Gauge(
 			"route_cache_entries",
 			metrix.WithDescription("Current number of route cache entries"),
-			metrix.WithChartFamily("Route Cache"),
+			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("entries"),
 		),
 		routeCacheRetainedTotal: meter.Counter(
 			"route_cache_retained_total",
 			metrix.WithDescription("Route cache entries retained after prune"),
-			metrix.WithChartFamily("Route Cache"),
+			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("entries"),
 		),
 		routeCachePrunedTotal: meter.Counter(
 			"route_cache_pruned_total",
 			metrix.WithDescription("Route cache entries pruned"),
-			metrix.WithChartFamily("Route Cache"),
+			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("entries"),
 		),
 		routeCacheFullDropsTotal: meter.Counter(
 			"route_cache_full_drops_total",
 			metrix.WithDescription("Route cache full-drop prune events"),
-			metrix.WithChartFamily("Route Cache"),
+			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("events"),
 		),
 
 		seriesScannedTotal: meter.Counter(
 			"series_scanned_total",
 			metrix.WithDescription("Series scanned by planner"),
-			metrix.WithChartFamily("Series"),
+			metrix.WithChartFamily("ChartEngine/Series"),
 			metrix.WithUnit("series"),
 		),
 		seriesMatchedTotal: meter.Counter(
 			"series_matched_total",
 			metrix.WithDescription("Series matched by template or autogen"),
-			metrix.WithChartFamily("Series"),
+			metrix.WithChartFamily("ChartEngine/Series"),
 			metrix.WithUnit("series"),
 		),
 		seriesUnmatchedTotal: meter.Counter(
 			"series_unmatched_total",
 			metrix.WithDescription("Series left unmatched after routing"),
-			metrix.WithChartFamily("Series"),
+			metrix.WithChartFamily("ChartEngine/Series"),
 			metrix.WithUnit("series"),
 		),
 		seriesAutogenMatchedTotal: meter.Counter(
 			"series_autogen_matched_total",
 			metrix.WithDescription("Series matched by autogen fallback"),
-			metrix.WithChartFamily("Series"),
+			metrix.WithChartFamily("ChartEngine/Series"),
 			metrix.WithUnit("series"),
 		),
 		seriesFilteredBySeq:      seriesFiltered.WithLabelValues("by_seq"),
@@ -245,13 +245,13 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 		planChartInstances: meter.Gauge(
 			"plan_chart_instances",
 			metrix.WithDescription("Chart instances in last successful build plan"),
-			metrix.WithChartFamily("Plan"),
+			metrix.WithChartFamily("ChartEngine/Plan"),
 			metrix.WithUnit("charts"),
 		),
 		planInferredDimensions: meter.Gauge(
 			"plan_inferred_dimensions",
 			metrix.WithDescription("Inferred dimensions in last successful build plan"),
-			metrix.WithChartFamily("Plan"),
+			metrix.WithChartFamily("ChartEngine/Plan"),
 			metrix.WithUnit("dimensions"),
 		),
 
