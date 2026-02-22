@@ -143,13 +143,30 @@ Add your own labels to categorize systems by any criteria you need.
     - Values cannot contain: `!` ` ` `'` `"` `*`
       :::
 
-3. Enable your labels without restarting Netdata:
+3. You can use environment variables in label values:
+
+    ```text
+    [host labels]
+        region = ${REGION}
+        rack = ${RACK:-unknown}
+        env = ${DEPLOYMENT_ENV:-production}
+        location = ${DC}-${RACK:-default}
+    ```
+
+    | Syntax | Behavior |
+    |--------|----------|
+    | `${VAR}` | Replaced with the value of `VAR`. If unset or empty, the label value becomes `[none]` |
+    | `${VAR:-default}` | Replaced with the value of `VAR`. If unset or empty, uses `default` |
+
+    Environment variables are resolved when labels are loaded or reloaded. You can mix them with literal text (e.g., `${DC}-${RACK}`).
+
+4. Enable your labels without restarting Netdata:
 
     ```bash
     netdatacli reload-labels
     ```
 
-4. Verify your labels at `http://HOST-IP:19999/api/v1/info`
+5. Verify your labels at `http://HOST-IP:19999/api/v1/info`
 
 ### Stream labels from Child to Parent
 

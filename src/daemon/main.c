@@ -403,6 +403,7 @@ int netdata_main(int argc, char **argv) {
                             if (dictionary_unittest(10000)) return 1;
                             if (aral_unittest(10000)) return 1;
                             if (rrdlabels_unittest()) return 1;
+                            if (rrdhost_labels_unittest()) return 1;
                             if (ctx_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
