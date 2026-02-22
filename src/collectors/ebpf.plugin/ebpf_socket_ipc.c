@@ -31,7 +31,7 @@ static int ebpf_ipc_snd_callback(POLLINFO *pi __maybe_unused, nd_poll_event_t *e
 
 static bool ebpf_ipc_should_stop(void)
 {
-    return false;
+    return ebpf_plugin_stop();
 }
 
 void ebpf_socket_thread_ipc(void *ptr)

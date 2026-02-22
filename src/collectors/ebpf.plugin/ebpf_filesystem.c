@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ebpf_filesystem.h"
+#include "libbpf_api/ebpf_library.h"
 
 struct config fs_config = APPCONFIG_INITIALIZER;
 
@@ -15,8 +16,8 @@ ebpf_local_maps_t ext4_maps[] = {
 #endif
     },
     {.name = "tmp_ext4",
-     .internal_input = 4192,
-     .user_input = 4192,
+     .internal_input = NETDATA_FS_TEMP_MAP_SIZE,
+     .user_input = NETDATA_FS_TEMP_MAP_SIZE,
      .type = NETDATA_EBPF_MAP_CONTROLLER,
      .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
@@ -44,8 +45,8 @@ ebpf_local_maps_t xfs_maps[] = {
 #endif
     },
     {.name = "tmp_xfs",
-     .internal_input = 4192,
-     .user_input = 4192,
+     .internal_input = NETDATA_FS_TEMP_MAP_SIZE,
+     .user_input = NETDATA_FS_TEMP_MAP_SIZE,
      .type = NETDATA_EBPF_MAP_CONTROLLER,
      .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
@@ -73,8 +74,8 @@ ebpf_local_maps_t nfs_maps[] = {
 #endif
     },
     {.name = "tmp_nfs",
-     .internal_input = 4192,
-     .user_input = 4192,
+     .internal_input = NETDATA_FS_TEMP_MAP_SIZE,
+     .user_input = NETDATA_FS_TEMP_MAP_SIZE,
      .type = NETDATA_EBPF_MAP_CONTROLLER,
      .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
@@ -102,8 +103,8 @@ ebpf_local_maps_t zfs_maps[] = {
 #endif
     },
     {.name = "tmp_zfs",
-     .internal_input = 4192,
-     .user_input = 4192,
+     .internal_input = NETDATA_FS_TEMP_MAP_SIZE,
+     .user_input = NETDATA_FS_TEMP_MAP_SIZE,
      .type = NETDATA_EBPF_MAP_CONTROLLER,
      .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
@@ -140,8 +141,8 @@ ebpf_local_maps_t btrfs_maps[] = {
 #endif
     },
     {.name = "tmp_btrfs",
-     .internal_input = 4192,
-     .user_input = 4192,
+     .internal_input = NETDATA_FS_TEMP_MAP_SIZE,
+     .user_input = NETDATA_FS_TEMP_MAP_SIZE,
      .type = NETDATA_EBPF_MAP_CONTROLLER,
      .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
@@ -264,52 +265,90 @@ static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functi
     obj->links.netdata_fs_file_write_probe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_probe, false, functions[NETDATA_KEY_BTF_WRITE]);
     if (libbpf_get_error(obj->links.netdata_fs_file_write_probe))
-        return -1;
+        goto cleanup_file_read;
 
     obj->links.netdata_fs_file_open_probe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_probe, false, functions[NETDATA_KEY_BTF_OPEN]);
     if (libbpf_get_error(obj->links.netdata_fs_file_open_probe))
-        return -1;
+        goto cleanup_file_write;
 
     obj->links.netdata_fs_getattr_probe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_probe, false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
     if (libbpf_get_error(obj->links.netdata_fs_getattr_probe))
-        return -1;
+        goto cleanup_file_open;
 
     // kretprobe
     obj->links.netdata_fs_file_read_retprobe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_retprobe, false, functions[NETDATA_KEY_BTF_READ]);
     if (libbpf_get_error(obj->links.netdata_fs_file_read_retprobe))
-        return -1;
+        goto cleanup_getattr;
 
     obj->links.netdata_fs_file_write_retprobe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_retprobe, false, functions[NETDATA_KEY_BTF_WRITE]);
     if (libbpf_get_error(obj->links.netdata_fs_file_write_retprobe))
-        return -1;
+        goto cleanup_file_read_ret;
 
     obj->links.netdata_fs_file_open_retprobe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_retprobe, false, functions[NETDATA_KEY_BTF_OPEN]);
     if (libbpf_get_error(obj->links.netdata_fs_file_open_retprobe))
-        return -1;
+        goto cleanup_file_write_ret;
 
     obj->links.netdata_fs_getattr_retprobe =
         bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_retprobe, false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
     if (libbpf_get_error(obj->links.netdata_fs_getattr_retprobe))
-        return -1;
+        goto cleanup_file_open_ret;
 
     if (functions[NETDATA_KEY_BTF_OPEN2]) {
         obj->links.netdata_fs_2nd_file_open_probe = bpf_program__attach_kprobe(
             obj->progs.netdata_fs_2nd_file_open_probe, false, functions[NETDATA_KEY_BTF_OPEN2]);
         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_probe))
-            return -1;
+            goto cleanup_getattr_ret;
 
         obj->links.netdata_fs_2nd_file_open_retprobe = bpf_program__attach_kprobe(
             obj->progs.netdata_fs_2nd_file_open_retprobe, false, functions[NETDATA_KEY_BTF_OPEN2]);
         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_retprobe))
-            return -1;
+            goto cleanup_2nd_open_probe;
     }
 
     return 0;
+
+cleanup_2nd_open_probe:
+    if (obj->links.netdata_fs_2nd_file_open_probe)
+        bpf_link__destroy(obj->links.netdata_fs_2nd_file_open_probe);
+
+cleanup_getattr_ret:
+    if (obj->links.netdata_fs_getattr_retprobe)
+        bpf_link__destroy(obj->links.netdata_fs_getattr_retprobe);
+
+cleanup_file_open_ret:
+    if (obj->links.netdata_fs_file_open_retprobe)
+        bpf_link__destroy(obj->links.netdata_fs_file_open_retprobe);
+
+cleanup_file_write_ret:
+    if (obj->links.netdata_fs_file_write_retprobe)
+        bpf_link__destroy(obj->links.netdata_fs_file_write_retprobe);
+
+cleanup_file_read_ret:
+    if (obj->links.netdata_fs_file_read_retprobe)
+        bpf_link__destroy(obj->links.netdata_fs_file_read_retprobe);
+
+cleanup_getattr:
+    if (obj->links.netdata_fs_getattr_probe)
+        bpf_link__destroy(obj->links.netdata_fs_getattr_probe);
+
+cleanup_file_open:
+    if (obj->links.netdata_fs_file_open_probe)
+        bpf_link__destroy(obj->links.netdata_fs_file_open_probe);
+
+cleanup_file_write:
+    if (obj->links.netdata_fs_file_write_probe)
+        bpf_link__destroy(obj->links.netdata_fs_file_write_probe);
+
+cleanup_file_read:
+    if (obj->links.netdata_fs_file_read_probe)
+        bpf_link__destroy(obj->links.netdata_fs_file_read_probe);
+
+    return -1;
 }
 
 /**
@@ -356,43 +395,22 @@ ebpf_fs_load_and_attach(ebpf_local_maps_t *map, struct filesystem_bpf *obj, cons
  *
  *****************************************************************/
 
-/**
- * Obsolete Cleanup Struct
- *
- * Clean allocatged data durinc obsolete steps
- *
- * @param efp
- */
-static void ebpf_obsolete_cleanup_struct(ebpf_filesystem_partitions_t *efp)
+static void ebpf_cleanup_fs_histogram(netdata_ebpf_histogram_t *hist)
 {
-    freez(efp->hread.name);
-    efp->hread.name = NULL;
-    freez(efp->hread.title);
-    efp->hread.title = NULL;
-    freez(efp->hread.ctx);
-    efp->hread.ctx = NULL;
+    freez(hist->name);
+    hist->name = NULL;
+    freez(hist->title);
+    hist->title = NULL;
+    freez(hist->ctx);
+    hist->ctx = NULL;
+}
 
-    freez(efp->hwrite.name);
-    efp->hwrite.name = NULL;
-    freez(efp->hwrite.title);
-    efp->hwrite.title = NULL;
-    freez(efp->hwrite.ctx);
-    efp->hwrite.ctx = NULL;
-
-    freez(efp->hopen.name);
-    efp->hopen.name = NULL;
-    freez(efp->hopen.title);
-    efp->hopen.title = NULL;
-    freez(efp->hopen.ctx);
-    efp->hopen.ctx = NULL;
-
-    freez(efp->hadditional.name);
-    efp->hadditional.name = NULL;
-    freez(efp->hadditional.title);
-    efp->hadditional.title = NULL;
-    freez(efp->hadditional.ctx);
-    efp->hadditional.ctx = NULL;
-
+static void ebpf_cleanup_fs_partition(ebpf_filesystem_partitions_t *efp)
+{
+    ebpf_cleanup_fs_histogram(&efp->hread);
+    ebpf_cleanup_fs_histogram(&efp->hwrite);
+    ebpf_cleanup_fs_histogram(&efp->hopen);
+    ebpf_cleanup_fs_histogram(&efp->hadditional);
     freez(efp->family_name);
     efp->family_name = NULL;
 }
@@ -462,7 +480,7 @@ static void ebpf_obsolete_fs_charts(int update_every)
                 efp->hadditional.order,
                 update_every);
 
-            ebpf_obsolete_cleanup_struct(efp);
+            ebpf_cleanup_fs_partition(efp);
         }
         efp->flags = flags;
     }
@@ -625,11 +643,15 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                 if (!efp->fs_obj) {
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
+                    em->maps = NULL;
                     netdata_mutex_unlock(&lock);
                     return -1;
                 } else if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj, efp->functions, NULL)) {
+                    filesystem_bpf__destroy(efp->fs_obj);
+                    efp->fs_obj = NULL;
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
+                    em->maps = NULL;
                     netdata_mutex_unlock(&lock);
                     return -1;
                 }
@@ -638,9 +660,10 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
             efp->flags |= NETDATA_FILESYSTEM_FLAG_HAS_PARTITION;
             ebpf_update_kernel_memory(&plugin_statistics, efp->fs_maps, EBPF_ACTION_STAT_ADD);
 
-            // Nedeed for filesystems like btrfs
+            // Needed for filesystems like btrfs
             if ((efp->flags & NETDATA_FILESYSTEM_FILL_ADDRESS_TABLE) && (efp->addresses.function)) {
-                ebpf_load_addresses(&efp->addresses, efp->fs_maps[NETDATA_ADDR_FS_TABLE].map_fd);
+                if (efp->fs_maps && efp->fs_maps[NETDATA_ADDR_FS_TABLE].map_fd >= 0)
+                    ebpf_load_addresses(&efp->addresses, efp->fs_maps[NETDATA_ADDR_FS_TABLE].map_fd);
             }
         }
         efp->flags &= ~NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM;
@@ -667,7 +690,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
  *
  * @return  the total of partitions that will be monitored
  */
-static int ebpf_read_local_partitions()
+static int ebpf_read_local_partitions(void)
 {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/self/mountinfo", netdata_configured_host_prefix);
@@ -731,7 +754,7 @@ static int ebpf_update_partitions(ebpf_module_t *em)
     if (curr < update_every)
         return 0;
 
-    update_every = curr + 5 * em->update_every;
+    update_every = curr + (NETDATA_PARTITION_UPDATE_INTERVAL_MULTIPLIER * em->update_every);
     if (!ebpf_read_local_partitions()) {
         em->optional = -1;
         return -1;
@@ -753,55 +776,14 @@ static int ebpf_update_partitions(ebpf_module_t *em)
 /*
  * Cleanup eBPF data
  */
-void ebpf_filesystem_cleanup_ebpf_data()
+void ebpf_filesystem_cleanup_ebpf_data(void)
 {
     int i;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
-        if (efp->probe_links) {
-            freez(efp->family_name);
-            efp->family_name = NULL;
-
-            freez(efp->hread.name);
-            efp->hread.name = NULL;
-            freez(efp->hread.title);
-            efp->hread.title = NULL;
-
-            freez(efp->hwrite.name);
-            efp->hwrite.name = NULL;
-            freez(efp->hwrite.title);
-            efp->hwrite.title = NULL;
-
-            freez(efp->hopen.name);
-            efp->hopen.name = NULL;
-            freez(efp->hopen.title);
-            efp->hopen.title = NULL;
-
-            freez(efp->hadditional.name);
-            efp->hadditional.name = NULL;
-            freez(efp->hadditional.title);
-            efp->hadditional.title = NULL;
-            freez(efp->hadditional.ctx);
-            efp->hadditional.ctx = NULL;
-        }
+        if (efp->probe_links)
+            ebpf_cleanup_fs_partition(efp);
     }
-}
-
-/**
- * Cleanup FS Histograms
- *
- * @param ptr pointer to structure to be cleaned
- */
-static void ebpf_cleanup_fs_histograms(netdata_ebpf_histogram_t *ptr)
-{
-    freez(ptr->name);
-    ptr->name = NULL;
-
-    freez(ptr->title);
-    ptr->title = NULL;
-
-    freez(ptr->ctx);
-    ptr->ctx = NULL;
 }
 
 /**
@@ -830,7 +812,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
             "filesystem.read_latency",
             efp->hread.order,
             em->update_every);
-        ebpf_cleanup_fs_histograms(&efp->hread);
+        ebpf_cleanup_fs_histogram(&efp->hread);
 
         ebpf_write_chart_obsolete(
             NETDATA_FILESYSTEM_FAMILY,
@@ -843,7 +825,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
             "filesystem.write_latency",
             efp->hwrite.order,
             em->update_every);
-        ebpf_cleanup_fs_histograms(&efp->hwrite);
+        ebpf_cleanup_fs_histogram(&efp->hwrite);
 
         ebpf_write_chart_obsolete(
             NETDATA_FILESYSTEM_FAMILY,
@@ -856,7 +838,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
             "filesystem.open_latency",
             efp->hopen.order,
             em->update_every);
-        ebpf_cleanup_fs_histograms(&efp->hopen);
+        ebpf_cleanup_fs_histogram(&efp->hopen);
 
         ebpf_write_chart_obsolete(
             NETDATA_FILESYSTEM_FAMILY,
@@ -869,7 +851,7 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
             efp->hadditional.ctx,
             efp->hadditional.order,
             em->update_every);
-        ebpf_cleanup_fs_histograms(&efp->hadditional);
+        ebpf_cleanup_fs_histogram(&efp->hadditional);
 
         efp->flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION;
     }
@@ -929,36 +911,37 @@ static void ebpf_filesystem_exit(void *pptr)
  *****************************************************************/
 
 /**
- * Select hist
+ * Select histogram
  *
- * Select a histogram to store data.
+ * Select histogram based on operation type
  *
- * @param efp pointer for the structure with pointers.
+ * @param efp pointer to filesystem partition
  * @param id  histogram selector
  *
- * @return It returns a pointer for the histogram
+ * @return pointer to histogram and sets idx
  */
 static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t *efp, uint32_t *idx, uint32_t id)
 {
-    if (id < NETDATA_KEY_CALLS_READ) {
-        *idx = id;
-        return &efp->hread;
-    } else if (id < NETDATA_KEY_CALLS_WRITE) {
-        *idx = id - NETDATA_KEY_CALLS_READ;
-        return &efp->hwrite;
-    } else if (id < NETDATA_KEY_CALLS_OPEN) {
-        *idx = id - NETDATA_KEY_CALLS_WRITE;
-        return &efp->hopen;
-    } else if (id < NETDATA_KEY_CALLS_SYNC) {
-        *idx = id - NETDATA_KEY_CALLS_OPEN;
-        return &efp->hadditional;
-    }
+    uint32_t hist_idx = id / NETDATA_FS_HISTOGRAM_BINS;
+    if (hist_idx >= 4)
+        return NULL;
 
-    return NULL;
+    *idx = id % NETDATA_FS_HISTOGRAM_BINS;
+
+    switch (hist_idx) {
+        case 0:
+            return &efp->hread;
+        case 1:
+            return &efp->hwrite;
+        case 2:
+            return &efp->hopen;
+        default:
+            return &efp->hadditional;
+    }
 }
 
 /**
- * Read hard disk table
+ * Read filesystem table
  *
  * @param efp           structure with filesystem monitored
  * @param fd            file descriptor to get data.
@@ -968,6 +951,9 @@ static inline netdata_ebpf_histogram_t *select_hist(ebpf_filesystem_partitions_t
  */
 static void read_filesystem_table(ebpf_filesystem_partitions_t *efp, int fd, int maps_per_core)
 {
+    if (!efp || !efp->fs_maps)
+        return;
+
     netdata_idx_t *values = filesystem_hash_values;
     uint32_t key;
     uint32_t idx;
@@ -996,7 +982,7 @@ static void read_filesystem_table(ebpf_filesystem_partitions_t *efp, int fd, int
 }
 
 /**
- * Read hard disk table
+ * Read filesystem table
  *
  * Read the table with number of calls for all functions
  *
@@ -1007,17 +993,17 @@ static void read_filesystem_tables(int maps_per_core)
     int i;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
-        if (efp->flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION) {
+        if (efp->flags & NETDATA_FILESYSTEM_FLAG_HAS_PARTITION && efp->fs_maps) {
             read_filesystem_table(efp, efp->fs_maps[NETDATA_MAIN_FS_TABLE].map_fd, maps_per_core);
         }
     }
 }
 
 /**
- * Socket read hash
+ * Filesystem read hash
  *
  * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
+ * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy filesystem.
  *
  * @param ptr It is a NULL value for this thread.
  *
@@ -1040,7 +1026,7 @@ void ebpf_filesystem_read_hash(ebpf_module_t *em)
  *
  * Send hard disk information to Netdata.
  */
-static void ebpf_histogram_send_data()
+static void ebpf_histogram_send_data(void)
 {
     uint32_t i;
     uint32_t test = NETDATA_FILESYSTEM_FLAG_HAS_PARTITION | NETDATA_FILESYSTEM_REMOVE_CHARTS;
@@ -1107,10 +1093,10 @@ static void filesystem_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
+        if (running_time)
             running_time += update_every;
+        else
+            running_time = update_every;
 
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
@@ -1128,15 +1114,14 @@ static void filesystem_collector(ebpf_module_t *em)
  *
  * Update file system structure using values read from configuration file.
  */
-static void ebpf_update_filesystem()
+static void ebpf_update_filesystem(void)
 {
     char dist[NETDATA_FS_MAX_DIST_NAME + 1];
     int i;
     for (i = 0; localfs[i].filesystem; i++) {
         snprintfz(dist, NETDATA_FS_MAX_DIST_NAME, "%sdist", localfs[i].filesystem);
 
-        localfs[i].enabled = inicfg_get_boolean(&fs_config, NETDATA_FILESYSTEM_CONFIG_NAME, dist,
-                                                   CONFIG_BOOLEAN_YES);
+        localfs[i].enabled = inicfg_get_boolean(&fs_config, NETDATA_FILESYSTEM_CONFIG_NAME, dist, CONFIG_BOOLEAN_YES);
     }
 }
 
@@ -1146,7 +1131,7 @@ static void ebpf_update_filesystem()
  * When thread is initialized the variable fs_maps is set as null,
  * this function fills the variable before to use.
  */
-static void ebpf_set_maps()
+static void ebpf_set_maps(void)
 {
     localfs[NETDATA_FS_LOCALFS_EXT4].fs_maps = ext4_maps;
     localfs[NETDATA_FS_LOCALFS_XFS].fs_maps = xfs_maps;
@@ -1158,7 +1143,7 @@ static void ebpf_set_maps()
 /**
  * Filesystem thread
  *
- * Thread used to generate socket charts.
+ * Thread used to generate filesystem charts.
  *
  * @param ptr a pointer to `struct ebpf_module`
  *
@@ -1169,6 +1154,10 @@ void ebpf_filesystem_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_filesystem_exit) cleanup_ptr = em;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endfilesystem;
+    }
 
     ebpf_set_maps();
     ebpf_update_filesystem();

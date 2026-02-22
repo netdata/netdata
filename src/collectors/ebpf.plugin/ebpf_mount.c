@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_mount.h"
+#include "libbpf_api/ebpf_library.h"
 
 static ebpf_local_maps_t mount_maps[] = {
     {.name = "tbl_mount",
@@ -178,16 +179,15 @@ static void ebpf_mount_set_hash_tables(struct mount_bpf *obj)
  */
 static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_t *em)
 {
-    netdata_ebpf_targets_t *mt = em->targets;
-    netdata_ebpf_program_loaded_t test = mt[NETDATA_MOUNT_SYSCALL].mode;
+    netdata_ebpf_program_loaded_t mode = em->targets[NETDATA_MOUNT_SYSCALL].mode;
 
     // We are testing only one, because all will have the same behavior
-    if (test == EBPF_LOAD_TRAMPOLINE) {
+    if (mode == EBPF_LOAD_TRAMPOLINE) {
         ebpf_mount_disable_probe(obj);
         ebpf_mount_disable_tracepoint(obj);
 
         netdata_set_trampoline_target(obj);
-    } else if (test == EBPF_LOAD_PROBE || test == EBPF_LOAD_RETPROBE) {
+    } else if (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) {
         ebpf_mount_disable_tracepoint(obj);
         ebpf_mount_disable_trampoline(obj);
     } else {
@@ -199,7 +199,7 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
 
     int ret = mount_bpf__load(obj);
     if (!ret) {
-        if (test != EBPF_LOAD_PROBE && test != EBPF_LOAD_RETPROBE)
+        if (mode != EBPF_LOAD_PROBE && mode != EBPF_LOAD_RETPROBE)
             ret = mount_bpf__attach(obj);
         else
             ret = ebpf_mount_attach_probe(obj);
@@ -322,7 +322,7 @@ static void ebpf_mount_read_global_table(int maps_per_core)
     int fd = mount_maps[NETDATA_KEY_MOUNT_TABLE].map_fd;
 
     for (idx = NETDATA_KEY_MOUNT_CALL; idx < NETDATA_MOUNT_END; idx++) {
-        if (!bpf_map_lookup_elem(fd, &idx, stored)) {
+        if (bpf_map_lookup_elem(fd, &idx, stored) == 0) {
             int i;
             int end = (maps_per_core) ? ebpf_nprocs : 1;
             netdata_idx_t total = 0;
@@ -340,11 +340,11 @@ static void ebpf_mount_read_global_table(int maps_per_core)
 */
 static void ebpf_mount_send_data()
 {
-    int i, j;
+    int i;
     int end = NETDATA_EBPF_MOUNT_SYSCALL;
-    for (i = NETDATA_KEY_MOUNT_CALL, j = NETDATA_KEY_MOUNT_ERROR; i < end; i++, j++) {
+    for (i = 0; i < end; i++) {
         mount_publish_aggregated[i].ncall = mount_hash_values[i];
-        mount_publish_aggregated[i].nerr = mount_hash_values[j];
+        mount_publish_aggregated[i].nerr = mount_hash_values[i + NETDATA_EBPF_MOUNT_SYSCALL];
     }
 
     write_count_chart(
@@ -388,11 +388,7 @@ static void mount_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
-
+        running_time += update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
@@ -477,8 +473,13 @@ static int ebpf_mount_load_bpf(ebpf_module_t *em)
         mount_bpf_obj = mount_bpf__open();
         if (!mount_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_mount_load_and_attach(mount_bpf_obj, em);
+            if (ret) {
+                mount_bpf__destroy(mount_bpf_obj);
+                mount_bpf_obj = NULL;
+            }
+        }
     }
 #endif
 
@@ -501,6 +502,10 @@ void ebpf_mount_thread(void *ptr)
 {
     ebpf_module_t *em = ptr;
     CLEANUP_FUNCTION_REGISTER(ebpf_mount_exit) cleanup_ptr = em;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endmount;
+    }
 
     em->maps = mount_maps;
 

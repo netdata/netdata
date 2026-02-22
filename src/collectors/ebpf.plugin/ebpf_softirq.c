@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_softirq.h"
+#include "libbpf_api/ebpf_library.h"
 
 struct config softirq_config = APPCONFIG_INITIALIZER;
 
@@ -16,16 +17,7 @@ static ebpf_local_maps_t softirq_maps[] = {
      .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
     },
-    /* end */
-    {.name = NULL,
-     .internal_input = 0,
-     .user_input = 0,
-     .type = NETDATA_EBPF_MAP_CONTROLLER,
-     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
-#ifdef LIBBPF_MAJOR_VERSION
-     .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
-#endif
-    }};
+    {.name = NULL, .internal_input = 0, .user_input = 0}};
 
 #define SOFTIRQ_TP_CLASS_IRQ "irq"
 static ebpf_tracepoint_t softirq_tracepoints[] = {
@@ -131,25 +123,22 @@ static void softirq_read_latency_map(int maps_per_core)
 {
     int fd = softirq_maps[SOFTIRQ_MAP_LATENCY].map_fd;
     int i;
-    size_t length = sizeof(softirq_ebpf_val_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
+    int end = (maps_per_core) ? ebpf_nprocs : 1;
 
     for (i = 0; i < NETDATA_SOFTIRQ_MAX_IRQS; i++) {
-        int test = bpf_map_lookup_elem(fd, &i, softirq_ebpf_vals);
-        if (unlikely(test < 0)) {
+        int ret = bpf_map_lookup_elem(fd, &i, softirq_ebpf_vals);
+        if (unlikely(ret < 0)) {
             continue;
         }
 
         uint64_t total_latency = 0;
         int cpu_i;
-        int end = (maps_per_core) ? ebpf_nprocs : 1;
         for (cpu_i = 0; cpu_i < end; cpu_i++) {
             total_latency += softirq_ebpf_vals[cpu_i].latency / 1000;
         }
 
         softirq_vals[i].latency = total_latency;
-        memset(softirq_ebpf_vals, 0, length);
+        memset(softirq_ebpf_vals, 0, end * sizeof(softirq_ebpf_val_t));
     }
 }
 
@@ -231,11 +220,7 @@ static void softirq_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
-
+        running_time += update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
@@ -256,6 +241,10 @@ void ebpf_softirq_thread(void *ptr)
     ebpf_module_t *em = ptr;
 
     CLEANUP_FUNCTION_REGISTER(softirq_cleanup) cleanup_ptr = em;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endsoftirq;
+    }
 
     em->maps = softirq_maps;
 

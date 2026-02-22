@@ -4,6 +4,7 @@
 
 #include "ebpf.h"
 #include "ebpf_cgroup.h"
+#include "libbpf_api/ebpf_library.h"
 
 ebpf_cgroup_target_t *ebpf_cgroup_pids = NULL;
 static void *ebpf_mapped_memory = NULL;
@@ -24,10 +25,8 @@ int send_cgroup_chart = 0;
  */
 static inline void *ebpf_cgroup_map_shm_locally(int fd, size_t length)
 {
-    void *value;
-
-    value = nd_mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (!value) {
+    void *value = nd_mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (value == MAP_FAILED) {
         netdata_log_error(
             "Cannot map shared memory used between eBPF and cgroup, integration between processes won't happen");
         close(shm_fd_ebpf_cgroup);
@@ -81,7 +80,7 @@ void ebpf_map_cgroup_shared_memory()
     // Map only header
     void *mapped = (netdata_ebpf_cgroup_shm_header_t *)ebpf_cgroup_map_shm_locally(
         shm_fd_ebpf_cgroup, sizeof(netdata_ebpf_cgroup_shm_header_t));
-    if (unlikely(mapped == SEM_FAILED)) {
+    if (unlikely(mapped == MAP_FAILED)) {
         return;
     }
     netdata_ebpf_cgroup_shm_header_t *header = mapped;
@@ -194,22 +193,17 @@ static inline void ebpf_cgroup_set_target_data(ebpf_cgroup_target_t *out, netdat
  */
 static ebpf_cgroup_target_t *ebpf_cgroup_find_or_create(netdata_ebpf_cgroup_shm_body_t *ptr)
 {
-    ebpf_cgroup_target_t *ect, *prev;
-    for (ect = ebpf_cgroup_pids, prev = ebpf_cgroup_pids; ect; prev = ect, ect = ect->next) {
+    for (ebpf_cgroup_target_t *ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         if (ect->hash == ptr->hash && !strcmp(ect->name, ptr->name)) {
             ect->updated = 1;
             return ect;
         }
     }
 
-    ebpf_cgroup_target_t *new_ect = callocz(1, sizeof(ebpf_cgroup_target_t));
-
+    ebpf_cgroup_target_t *new_ect = callocz(1, sizeof(*new_ect));
     ebpf_cgroup_set_target_data(new_ect, ptr);
-    if (!ebpf_cgroup_pids) {
-        ebpf_cgroup_pids = new_ect;
-    } else {
-        prev->next = new_ect;
-    }
+    new_ect->next = ebpf_cgroup_pids;
+    ebpf_cgroup_pids = new_ect;
 
     return new_ect;
 }
@@ -232,24 +226,38 @@ static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, char *path)
     if (!ff)
         return;
 
-    size_t lines = procfile_lines(ff), l;
-    for (l = 0; l < lines; l++) {
+    for (size_t l = 0; l < procfile_lines(ff); l++) {
         int pid = (int)str2l(procfile_lineword(ff, l, 0));
-        if (pid) {
-            struct pid_on_target2 *pt, *prev;
-            for (pt = ect->pids, prev = ect->pids; pt; prev = pt, pt = pt->next) {
-                if (pt->pid == pid)
-                    break;
-            }
+        if (!pid)
+            continue;
 
-            if (!pt) {
-                struct pid_on_target2 *w = callocz(1, sizeof(struct pid_on_target2));
-                w->pid = pid;
-                if (!ect->pids)
-                    ect->pids = w;
-                else
-                    prev->next = w;
+        int found = 0;
+        for (struct pid_on_target2 *pt = ect->pids; pt; pt = pt->next) {
+            if (pt->pid == pid) {
+                pt->updated = 1;
+                found = 1;
+                break;
             }
+        }
+
+        if (!found) {
+            struct pid_on_target2 *w = callocz(1, sizeof(*w));
+            w->pid = pid;
+            w->updated = 1;
+            w->next = ect->pids;
+            ect->pids = w;
+        }
+    }
+
+    struct pid_on_target2 **pt = &ect->pids;
+    while (*pt) {
+        if (!(*pt)->updated) {
+            struct pid_on_target2 *tmp = *pt;
+            *pt = tmp->next;
+            freez(tmp);
+        } else {
+            (*pt)->updated = 0;
+            pt = &(*pt)->next;
         }
     }
 
@@ -349,15 +357,16 @@ void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart)
     ebpf_commit_label();
     // Let us keep original string that can be used in another place. Chart creation does not happen frequently.
     char *move = strdupz(chart->dimension);
-    while (move) {
-        char *next_dim = strchr(move, ',');
+    char *ptr = move;
+    while (ptr) {
+        char *next_dim = strchr(ptr, ',');
         if (next_dim) {
             *next_dim = '\0';
             next_dim++;
         }
 
-        fprintf(stdout, "DIMENSION %s '' %s 1 1\n", move, chart->algorithm);
-        move = next_dim;
+        fprintf(stdout, "DIMENSION %s '' %s 1 1\n", ptr, chart->algorithm);
+        ptr = next_dim;
     }
     freez(move);
 }
@@ -366,7 +375,7 @@ void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart)
 // Cgroup main thread
 
 /**
- * Cgroup integratin
+ * Cgroup integration
  *
  * Thread responsible to call functions responsible to sync data between plugins.
  *

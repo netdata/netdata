@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_mdflush.h"
+#include "libbpf_api/ebpf_library.h"
 
 struct config mdflush_config = APPCONFIG_INITIALIZER;
 
@@ -195,9 +196,9 @@ static int mdflush_val_cmp(void *a, void *b)
         return 1;
     } else if (ptr1->unit < ptr2->unit) {
         return -1;
-    } else {
-        return 0;
     }
+
+    return 0;
 }
 
 /**
@@ -211,64 +212,38 @@ static void mdflush_read_count_map(int maps_per_core)
 {
     int mapfd = mdflush_maps[MDFLUSH_MAP_COUNT].map_fd;
     mdflush_ebpf_key_t curr_key = (uint32_t)-1;
-    mdflush_ebpf_key_t key = (uint32_t)-1;
-    netdata_mdflush_t search_v;
-    netdata_mdflush_t *v = NULL;
+    mdflush_ebpf_key_t key;
+
+    int end = maps_per_core ? ebpf_nprocs : 1;
 
     while (bpf_map_get_next_key(mapfd, &curr_key, &key) == 0) {
         curr_key = key;
 
-        // get val for this key.
-        int test = bpf_map_lookup_elem(mapfd, &key, mdflush_ebpf_vals);
-        if (unlikely(test < 0)) {
+        int ret = bpf_map_lookup_elem(mapfd, &key, mdflush_ebpf_vals);
+        if (unlikely(ret < 0)) {
             continue;
         }
 
-        // is this record saved yet?
-        //
-        // if not, make a new one, mark it as unsaved for now, and continue; we
-        // will insert it at the end after all of its values are correctly set,
-        // so that we can safely publish it to the collector within a single,
-        // short locked operation.
-        //
-        // otherwise simply continue; we will only update the flush count,
-        // which can be republished safely without a lock.
-        //
-        // NOTE: lock isn't strictly necessary for this initial search, as only
-        // this thread does writing, but the AVL is using a read-write lock so
-        // there is no congestion.
-        bool v_is_new = false;
-        search_v.unit = key;
-        v = (netdata_mdflush_t *)avl_search_lock(&mdflush_pub, (avl_t *)&search_v);
+        netdata_mdflush_t search_v = {.unit = key};
+        netdata_mdflush_t *v = (netdata_mdflush_t *)avl_search_lock(&mdflush_pub, (avl_t *)&search_v);
         if (unlikely(v == NULL)) {
-            // flush count can only be added reliably at a later time.
-            // when they're added, only then will we AVL insert.
             v = callocz(1, sizeof(netdata_mdflush_t));
             v->unit = key;
-            sprintf(v->disk_name, "md%u", key);
+            snprintf(v->disk_name, sizeof(v->disk_name), "md%u", key);
             v->dim_exists = false;
 
-            v_is_new = true;
-        }
-
-        // we must add up count value for this record across all CPUs.
-        uint64_t total_cnt = 0;
-        int i;
-        int end = (!maps_per_core) ? 1 : ebpf_nprocs;
-        for (i = 0; i < end; i++) {
-            total_cnt += mdflush_ebpf_vals[i];
-        }
-
-        // can now safely publish count for existing records.
-        v->cnt = total_cnt;
-
-        // can now safely publish new record.
-        if (v_is_new) {
             avl_t *check = avl_insert_lock(&mdflush_pub, (avl_t *)v);
             if (check != (avl_t *)v) {
                 netdata_log_error("Internal error, cannot insert the AVL tree.");
             }
         }
+
+        uint64_t total_cnt = 0;
+        int i;
+        for (i = 0; i < end; i++) {
+            total_cnt += mdflush_ebpf_vals[i];
+        }
+        v->cnt = total_cnt;
     }
 }
 
@@ -293,13 +268,10 @@ static void mdflush_create_charts(int update_every)
 }
 
 // callback for avl tree traversal on `mdflush_pub`.
-static int mdflush_write_dims(void *entry, void *data)
+static int mdflush_write_dims(void *entry, void *data __maybe_unused)
 {
-    UNUSED(data);
-
     netdata_mdflush_t *v = entry;
 
-    // records get dynamically added in, so add the dim if we haven't yet.
     if (!v->dim_exists) {
         ebpf_write_global_dimension(v->disk_name, v->disk_name, ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
         v->dim_exists = true;
@@ -327,9 +299,7 @@ static void mdflush_collector(ebpf_module_t *em)
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     netdata_mutex_unlock(&lock);
 
-    // loop and read from published data until ebpf plugin is closed.
     int counter = update_every - 1;
-    int maps_per_core = em->maps_per_core;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     heartbeat_t hb;
@@ -341,7 +311,7 @@ static void mdflush_collector(ebpf_module_t *em)
             continue;
 
         counter = 0;
-        mdflush_read_count_map(maps_per_core);
+        mdflush_read_count_map(em->maps_per_core);
         netdata_mutex_lock(&lock);
         // write dims now for all hitherto discovered devices.
         ebpf_write_begin_chart("mdstat", "mdstat_flush", "");
@@ -351,11 +321,7 @@ static void mdflush_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
-
+        running_time += update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
@@ -414,9 +380,15 @@ void ebpf_mdflush_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     CLEANUP_FUNCTION_REGISTER(mdflush_exit) cleanup_ptr = em;
 
+    char *md_flush_request = NULL;
+
+    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+        goto endmdflush;
+    }
+
     em->maps = mdflush_maps;
 
-    char *md_flush_request = ebpf_find_symbol("md_flush_request");
+    md_flush_request = ebpf_find_symbol("md_flush_request");
     if (!md_flush_request) {
         netdata_log_error("Cannot monitor MD devices, because md is not loaded.");
         goto endmdflush;
