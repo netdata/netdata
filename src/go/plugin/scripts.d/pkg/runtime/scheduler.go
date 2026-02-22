@@ -276,16 +276,20 @@ func (s *Scheduler) Stop() {
 	if s.cancel != nil {
 		s.cancel()
 	}
+	s.jobMu.Lock()
 	for _, js := range s.jobs {
 		if js.timer != nil {
 			js.timer.Stop()
 			js.timer = nil
 		}
 	}
+	s.jobMu.Unlock()
 	s.executor.Stop()
 	s.wg.Wait()
+	s.jobMu.Lock()
 	s.ctx = nil
 	s.cancel = nil
+	s.jobMu.Unlock()
 }
 
 func (s *Scheduler) run() {
@@ -410,7 +414,10 @@ func (s *Scheduler) handleResult(res ExecutionResult) {
 }
 
 func (s *Scheduler) armTimer(js *jobState) {
-	if s.ctx == nil {
+	s.jobMu.Lock()
+	ctx := s.ctx
+	if ctx == nil {
+		s.jobMu.Unlock()
 		return
 	}
 	delay := time.Until(js.nextRun)
@@ -418,8 +425,6 @@ func (s *Scheduler) armTimer(js *jobState) {
 		delay = 0
 	}
 	jobID := js.runtime.ID
-	ctx := s.ctx // capture to avoid racing with Stop() nilling s.ctx
-
 	if js.timer == nil {
 		js.timer = time.AfterFunc(delay, func() {
 			select {
@@ -430,6 +435,7 @@ func (s *Scheduler) armTimer(js *jobState) {
 	} else {
 		js.timer.Reset(delay)
 	}
+	s.jobMu.Unlock()
 }
 
 func (s *Scheduler) runJob(ctx context.Context, job JobRuntime) ExecutionResult {
