@@ -91,19 +91,24 @@ type Collector struct {
 	dbMu sync.RWMutex // protects db pointer lifecycle across collect/functions/cleanup
 	db   *sql.DB
 
-	safeDSN        string
-	version        *semver.Version
-	isMariaDB      bool
-	isPercona      bool
-	galeraDetected bool
+	safeDSN string
+	version *semver.Version
 
 	doDisableSessionQueryLog bool
+	doSlaveStatus            bool
+	doUserStatistics         bool
 
-	doSlaveStatus    bool
-	doUserStatistics bool
+	isMariaDB bool
+	isPercona bool
 
-	recheckGlobalVarsTime    time.Time
-	recheckGlobalVarsEvery   time.Duration
+	galeraDetected bool
+	qcacheDetected bool
+
+	recheckGlobalVarsTime  time.Time
+	recheckGlobalVarsEvery time.Duration
+
+	varDisabledStorageEngine string
+	varLogBin                string
 	varInnoDBLogFileSize     int64
 	varInnoDBLogFilesInGroup int64
 	varMaxConns              int64
@@ -151,7 +156,7 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(ctx context.Context) error {
-	return c.checkMandatory(ctx)
+	return c.check(ctx)
 }
 
 func (c *Collector) Collect(ctx context.Context) error {

@@ -1853,6 +1853,9 @@ func TestCollector_Collect(t *testing.T) {
 			defer func() { _ = db.Close() }()
 
 			require.NoError(t, collr.Init(context.Background()))
+			// Collect tests bypass Check(); enable qcache feature flag so
+			// expected MariaDB qcache metrics remain validated in this suite.
+			collr.qcacheDetected = true
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {

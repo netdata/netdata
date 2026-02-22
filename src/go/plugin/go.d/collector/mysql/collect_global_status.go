@@ -11,7 +11,7 @@ import (
 const (
 	queryShowGlobalStatus      = "SHOW GLOBAL STATUS;"
 	queryShowGlobalStatusProbe = `SHOW GLOBAL STATUS 
-WHERE VARIABLE_NAME IN ('Threads_connected', 'wsrep_received');`
+WHERE VARIABLE_NAME IN ('Threads_connected', 'wsrep_received', 'qcache_hits');`
 )
 
 func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunState) error {
@@ -27,7 +27,17 @@ func (c *Collector) collectGlobalStatus(ctx context.Context, state *collectRunSt
 			name = value
 		case "Value":
 			metricName := strings.ToLower(name)
+
 			if isGaleraMetric(metricName) && !c.galeraDetected {
+				return
+			}
+			if isQCacheMetric(metricName) && !c.qcacheDetected {
+				return
+			}
+			if isBinLogMetric(metricName) && c.varLogBin == "OFF" {
+				return
+			}
+			if isMyISAMKeyMetric(metricName) && strings.Contains(c.varDisabledStorageEngine, "MyISAM") {
 				return
 			}
 
@@ -68,6 +78,8 @@ func (c *Collector) probeGlobalStatus(ctx context.Context) error {
 			switch value {
 			case "wsrep_received":
 				c.galeraDetected = true
+			case "qcache_hits":
+				c.qcacheDetected = true
 			}
 		}
 		hasRows = hasRows || lineEnd
@@ -83,6 +95,18 @@ func (c *Collector) probeGlobalStatus(ctx context.Context) error {
 
 func isGaleraMetric(name string) bool {
 	return strings.HasPrefix(name, "wsrep_")
+}
+
+func isBinLogMetric(name string) bool {
+	return strings.HasPrefix(name, "binlog_")
+}
+
+func isMyISAMKeyMetric(name string) bool {
+	return strings.HasPrefix(name, "key_")
+}
+
+func isQCacheMetric(name string) bool {
+	return strings.HasPrefix(name, "qcache_")
 }
 
 func convertWsrepConnected(val string) string {

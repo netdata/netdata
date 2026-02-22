@@ -27,28 +27,6 @@ func (c *Collector) ensureVersionAndCapabilities(ctx context.Context) error {
 	return nil
 }
 
-func (c *Collector) checkMandatory(ctx context.Context) error {
-	if !c.dbReady() {
-		if err := c.openConnection(ctx); err != nil {
-			return err
-		}
-	}
-
-	if err := c.ensureVersionAndCapabilities(ctx); err != nil {
-		return err
-	}
-
-	if err := c.probeGlobalStatus(ctx); err != nil {
-		return fmt.Errorf("error on collecting global status: %v", err)
-	}
-
-	if err := c.collectGlobalVariables(ctx); err != nil {
-		return fmt.Errorf("error on collecting global variables: %v", err)
-	}
-
-	return nil
-}
-
 func (c *Collector) collect(ctx context.Context) error {
 	if !c.dbReady() {
 		if err := c.openConnection(ctx); err != nil {
@@ -113,6 +91,28 @@ func (c *Collector) collect(ctx context.Context) error {
 	}
 
 	c.mx.set("thread_cache_misses", calcThreadCacheMisses(state.threadsCreated, state.connections))
+	return nil
+}
+
+func (c *Collector) check(ctx context.Context) error {
+	if !c.dbReady() {
+		if err := c.openConnection(ctx); err != nil {
+			return err
+		}
+	}
+
+	if err := c.ensureVersionAndCapabilities(ctx); err != nil {
+		return err
+	}
+
+	if err := c.probeGlobalStatus(ctx); err != nil {
+		return fmt.Errorf("error on collecting global status: %v", err)
+	}
+
+	if err := c.collectGlobalVariables(ctx); err != nil {
+		return fmt.Errorf("error on collecting global variables: %v", err)
+	}
+
 	return nil
 }
 
