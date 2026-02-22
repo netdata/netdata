@@ -38,6 +38,21 @@ func TestRouteCache(t *testing.T) {
 		assert.False(t, ok)
 	})
 
+	t.Run("revision mismatch does not retain stale entry in same build", func(t *testing.T) {
+		rc := NewRouteCache[string]()
+		id := metrix.SeriesIdentity{ID: "a", Hash64: 2}
+		rc.Store(id, 1, 1, []string{"chart-a"})
+
+		_, ok := rc.Lookup(id, 2, 2)
+		assert.False(t, ok)
+
+		stats := rc.RetainSeen(2)
+		assert.Equal(t, 1, stats.EntriesBefore)
+		assert.Equal(t, 0, stats.EntriesAfter)
+		assert.Equal(t, 1, stats.Pruned)
+		assert.True(t, stats.FullDrop)
+	})
+
 	t.Run("retain prunes by seen build sequence", func(t *testing.T) {
 		rc := NewRouteCache[string]()
 		a := metrix.SeriesIdentity{ID: "a", Hash64: 10}

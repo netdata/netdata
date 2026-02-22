@@ -360,7 +360,6 @@ func TestCompileScenarios(t *testing.T) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
-				assert.Empty(t, charts[0].Identity.IDPlaceholders)
 				require.Len(t, charts[0].Identity.InstanceByLabels, 1)
 				assert.Equal(t, "osd_uuid", charts[0].Identity.InstanceByLabels[0].Key)
 				assert.Equal(t, "Disk", charts[0].Meta.Family)
@@ -399,7 +398,7 @@ func TestCompileScenarios(t *testing.T) {
 			wantErr: true,
 			errLike: "algorithm inference is ambiguous",
 		},
-		"fails on placeholder chart id in phase-1 syntax": {
+		"treats braces as literal characters in chart id": {
 			spec: charttpl.Spec{
 				Version: charttpl.VersionV1,
 				Groups: []charttpl.Group{
@@ -420,10 +419,14 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
-			errLike: "id: placeholders are not allowed",
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				assert.Equal(t, "osd_{osd_uuid}_space_usage", charts[0].Identity.IDTemplate.Raw)
+			},
 		},
-		"fails on placeholder dimension name in phase-1 syntax": {
+		"treats braces as literal characters in dimension name": {
 			spec: charttpl.Spec{
 				Version: charttpl.VersionV1,
 				Groups: []charttpl.Group{
@@ -444,8 +447,13 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
-			errLike: "name: placeholders are not allowed",
+			assert: func(t *testing.T, p *program.Program) {
+				t.Helper()
+				charts := p.Charts()
+				require.Len(t, charts, 1)
+				require.Len(t, charts[0].Dimensions, 1)
+				assert.Equal(t, "{state}", charts[0].Dimensions[0].NameTemplate.Raw)
+			},
 		},
 		"fails on invalid selector syntax via compiler parse": {
 			spec: charttpl.Spec{

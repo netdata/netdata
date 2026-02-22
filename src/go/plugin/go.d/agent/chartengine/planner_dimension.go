@@ -35,10 +35,6 @@ func resolveDimensionName(dim program.Dimension, metricName string, labels metri
 	}
 
 	if dim.NameTemplate.Raw != "" {
-		// Dynamic name templates are not supported in phase-1 syntax.
-		if dim.NameTemplate.IsDynamic() {
-			return "", "", false, fmt.Errorf("chartengine: dynamic name template rendering is not implemented yet")
-		}
 		return dim.NameTemplate.Raw, "", true, nil
 	}
 

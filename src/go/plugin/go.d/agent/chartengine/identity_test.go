@@ -22,8 +22,7 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 		"static id without instances": {
 			identity: program.ChartIdentity{
 				IDTemplate: program.Template{
-					Raw:   "mysql_queries",
-					Parts: []program.TemplatePart{{Literal: "mysql_queries"}},
+					Raw: "mysql_queries",
 				},
 			},
 			labels: map[string]string{
@@ -32,11 +31,10 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 			wantID: "mysql_queries",
 			wantOK: true,
 		},
-		"placeholder id renders from labels": {
+		"literal id is independent of labels": {
 			identity: program.ChartIdentity{
 				IDTemplate: program.Template{
-					Raw:   "win_nic_traffic",
-					Parts: []program.TemplatePart{{Literal: "win_nic_traffic"}},
+					Raw: "win_nic_traffic",
 				},
 			},
 			labels: map[string]string{
@@ -48,8 +46,7 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 		"instances explicit appends stable suffix": {
 			identity: program.ChartIdentity{
 				IDTemplate: program.Template{
-					Raw:   "win_nic_traffic",
-					Parts: []program.TemplatePart{{Literal: "win_nic_traffic"}},
+					Raw: "win_nic_traffic",
 				},
 				InstanceByLabels: []program.InstanceLabelSelector{
 					{Key: "nic"},
@@ -64,8 +61,7 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 		"instances wildcard excludes key": {
 			identity: program.ChartIdentity{
 				IDTemplate: program.Template{
-					Raw:   "latency_bucket",
-					Parts: []program.TemplatePart{{Literal: "latency_bucket"}},
+					Raw: "latency_bucket",
 				},
 				InstanceByLabels: []program.InstanceLabelSelector{
 					{IncludeAll: true},
@@ -83,8 +79,7 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 		"instances explicit missing key drops series": {
 			identity: program.ChartIdentity{
 				IDTemplate: program.Template{
-					Raw:   "win_nic_traffic",
-					Parts: []program.TemplatePart{{Literal: "win_nic_traffic"}},
+					Raw: "win_nic_traffic",
 				},
 				InstanceByLabels: []program.InstanceLabelSelector{
 					{Key: "nic"},

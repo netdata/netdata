@@ -50,10 +50,10 @@ func (c *RouteCache[T]) Lookup(identity metrix.SeriesIdentity, revision uint64, 
 		if bucket[i].identity.ID != identity.ID {
 			continue
 		}
-		c.markSeen(&bucket[i], buildSeq)
 		if bucket[i].revision != revision {
 			return nil, false
 		}
+		c.markSeen(&bucket[i], buildSeq)
 		// Return immutable cached values directly to avoid per-lookup allocations.
 		// Callers must treat the returned slice as read-only.
 		return bucket[i].values, true

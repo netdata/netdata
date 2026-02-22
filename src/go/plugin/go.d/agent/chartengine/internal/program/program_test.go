@@ -127,8 +127,7 @@ func sampleChart(templateID string) Chart {
 			Priority:  1000,
 		},
 		Identity: ChartIdentity{
-			IDTemplate:     Template{Raw: "win_nic_{nic}_traffic", Keys: []string{"nic"}},
-			IDPlaceholders: []string{"nic"},
+			IDTemplate: Template{Raw: "win_nic_{nic}_traffic"},
 			InstanceByLabels: []InstanceLabelSelector{
 				{Key: "nic"},
 			},

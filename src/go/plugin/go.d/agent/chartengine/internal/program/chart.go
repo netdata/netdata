@@ -62,14 +62,11 @@ type ChartMeta struct {
 
 // ChartIdentity describes how chart instances are derived.
 //
-// Both modes are supported in IR to keep compiler choices flexible:
-//   - IDTemplate + IDPlaceholders: template-driven identity (placeholder mode).
-//   - InstanceByLabels: explicit label-driven identity (placeholder-free mode).
+// Phase-1 uses literal chart IDs and optional instance suffix derivation from
+// configured labels.
 type ChartIdentity struct {
-	// IDTemplate is raw template or literal chart ID.
+	// IDTemplate is a normalized literal chart ID.
 	IDTemplate Template
-	// IDPlaceholders are extracted placeholder keys from IDTemplate, in order.
-	IDPlaceholders []string
 
 	// InstanceByLabels contains resolved explicit identity selectors (if used).
 	InstanceByLabels []InstanceLabelSelector
@@ -126,7 +123,6 @@ func (c Chart) clone() Chart {
 func (i ChartIdentity) clone() ChartIdentity {
 	out := i
 	out.IDTemplate = i.IDTemplate.clone()
-	out.IDPlaceholders = append([]string(nil), i.IDPlaceholders...)
 
 	out.InstanceByLabels = make([]InstanceLabelSelector, 0, len(i.InstanceByLabels))
 	for _, selector := range i.InstanceByLabels {

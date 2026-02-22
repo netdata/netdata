@@ -3,7 +3,6 @@
 package chartengine
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -78,57 +77,8 @@ func renderChartInstanceIDWithAccessor(identity program.ChartIdentity, labels la
 	return baseID + suffix, true, nil
 }
 
-func renderTemplate(tpl program.Template, labels labelAccessor) (string, bool, error) {
-	if len(tpl.Parts) == 0 {
-		return tpl.Raw, true, nil
-	}
-
-	var b strings.Builder
-	for _, part := range tpl.Parts {
-		if part.PlaceholderKey == "" {
-			b.WriteString(part.Literal)
-			continue
-		}
-
-		value, ok := labels.Get(part.PlaceholderKey)
-		if !ok || strings.TrimSpace(value) == "" {
-			return "", false, nil
-		}
-
-		for _, transform := range part.Transforms {
-			var err error
-			value, err = applyTemplateTransform(value, transform)
-			if err != nil {
-				return "", false, err
-			}
-		}
-
-		if strings.TrimSpace(value) == "" {
-			return "", false, nil
-		}
-		b.WriteString(value)
-	}
-	return b.String(), true, nil
-}
-
-func applyTemplateTransform(value string, transform program.TemplateTransform) (string, error) {
-	switch transform.Name {
-	case "":
-		return value, nil
-	case "lower":
-		return strings.ToLower(value), nil
-	case "upper":
-		return strings.ToUpper(value), nil
-	case "trim":
-		return strings.TrimSpace(value), nil
-	case "replace":
-		if len(transform.Args) != 2 {
-			return "", fmt.Errorf("chartengine: replace transform expects 2 args, got %d", len(transform.Args))
-		}
-		return strings.ReplaceAll(value, transform.Args[0], transform.Args[1]), nil
-	default:
-		return "", fmt.Errorf("chartengine: unsupported template transform %q", transform.Name)
-	}
+func renderTemplate(tpl program.Template, _ labelAccessor) (string, bool, error) {
+	return tpl.Raw, true, nil
 }
 
 func renderInstanceSuffix(identity program.ChartIdentity, labels labelAccessor) (string, bool, error) {
@@ -169,11 +119,6 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAcce
 		return nil, true, nil
 	}
 
-	placeholderSet := make(map[string]struct{}, len(identity.IDPlaceholders))
-	for _, key := range identity.IDPlaceholders {
-		placeholderSet[key] = struct{}{}
-	}
-
 	excludeSet := make(map[string]struct{})
 	seenKeys := make(map[string]struct{})
 	keys := make([]string, 0, len(identity.InstanceByLabels))
@@ -187,9 +132,6 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAcce
 		case token.IncludeAll:
 			includeAll = true
 		case token.Key != "":
-			if _, skip := placeholderSet[token.Key]; skip {
-				continue
-			}
 			if _, excluded := excludeSet[token.Key]; excluded {
 				continue
 			}
@@ -208,9 +150,6 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAcce
 	if includeAll {
 		all := make([]string, 0)
 		labels.Range(func(key, _ string) bool {
-			if _, skip := placeholderSet[key]; skip {
-				return true
-			}
 			if _, excluded := excludeSet[key]; excluded {
 				return true
 			}

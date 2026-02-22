@@ -129,9 +129,6 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 	if err != nil {
 		return program.Chart{}, fmt.Errorf("id: %w", err)
 	}
-	if len(idTemplate.Keys) > 0 {
-		return program.Chart{}, fmt.Errorf("id: placeholders are not allowed in phase-1 syntax; use instances.by_labels")
-	}
 
 	instanceByLabels, err := compileInstanceByLabels(chart.Instances)
 	if err != nil {
@@ -146,7 +143,6 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 
 	identity := program.ChartIdentity{
 		IDTemplate:       idTemplate,
-		IDPlaceholders:   append([]string(nil), idTemplate.Keys...),
 		InstanceByLabels: instanceByLabels,
 		ContextNamespace: append([]string(nil), scope.contextParts...),
 		Static:           len(instanceByLabels) == 0,
@@ -222,10 +218,6 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 		if err != nil {
 			return compiledDimension{}, fmt.Errorf("name: %w", err)
 		}
-		if len(nameTemplate.Keys) > 0 {
-			return compiledDimension{}, fmt.Errorf("name: placeholders are not allowed in phase-1 syntax; use name_from_label")
-		}
-		dynamicLabelKeys = append(dynamicLabelKeys, nameTemplate.Keys...)
 	} else if nameFromLabel != "" {
 		dynamicLabelKeys = append(dynamicLabelKeys, nameFromLabel)
 	}
@@ -247,7 +239,7 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 			Hidden:                  options.hidden,
 			Multiplier:              options.multiplier,
 			Divisor:                 options.divisor,
-			Dynamic:                 inferFromSeriesMeta || nameFromLabel != "" || nameTemplate.IsDynamic(),
+			Dynamic:                 inferFromSeriesMeta || nameFromLabel != "",
 		},
 		selectorKeys:     append([]string(nil), meta.ConstrainedLabelKeys...),
 		dynamicLabelKeys: normalizeUnique(dynamicLabelKeys),

@@ -11,11 +11,10 @@ import (
 )
 
 type compiledInstanceLabelPlan struct {
-	explicitKeys   []string
-	explicitSet    map[string]struct{}
-	placeholderSet map[string]struct{}
-	excludeSet     map[string]struct{}
-	includeAll     bool
+	explicitKeys []string
+	explicitSet  map[string]struct{}
+	excludeSet   map[string]struct{}
+	includeAll   bool
 }
 
 type chartLabelAccumulator struct {
@@ -86,13 +85,9 @@ func newAutogenChartLabelAccumulator() *chartLabelAccumulator {
 
 func compileInstanceLabelPlan(identity program.ChartIdentity) compiledInstanceLabelPlan {
 	plan := compiledInstanceLabelPlan{
-		explicitKeys:   make([]string, 0, len(identity.InstanceByLabels)),
-		explicitSet:    make(map[string]struct{}, len(identity.InstanceByLabels)),
-		placeholderSet: make(map[string]struct{}, len(identity.IDPlaceholders)),
-		excludeSet:     make(map[string]struct{}),
-	}
-	for _, key := range identity.IDPlaceholders {
-		plan.placeholderSet[key] = struct{}{}
+		explicitKeys: make([]string, 0, len(identity.InstanceByLabels)),
+		explicitSet:  make(map[string]struct{}, len(identity.InstanceByLabels)),
+		excludeSet:   make(map[string]struct{}),
 	}
 
 	seenExplicit := make(map[string]struct{}, len(identity.InstanceByLabels))
@@ -106,9 +101,6 @@ func compileInstanceLabelPlan(identity program.ChartIdentity) compiledInstanceLa
 			plan.includeAll = true
 		case token.Key != "":
 			key := token.Key
-			if _, skip := plan.placeholderSet[key]; skip {
-				continue
-			}
 			if _, excluded := plan.excludeSet[key]; excluded {
 				continue
 			}
@@ -241,9 +233,6 @@ func (a *chartLabelAccumulator) resolveInstanceLabelsForObserve(labels metrix.La
 	if a.instancePlan.includeAll {
 		extra := a.includeAllScratch[:0]
 		labels.Range(func(key, _ string) bool {
-			if _, skip := a.instancePlan.placeholderSet[key]; skip {
-				return true
-			}
 			if _, excluded := a.instancePlan.excludeSet[key]; excluded {
 				return true
 			}
