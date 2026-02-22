@@ -16,6 +16,10 @@
 - Improve datafile deletion process ([#21781](https://github.com/netdata/netdata/issues/21781))
 - Build(deps): bump filippo.io/edwards25519 from 1.1.0 to 1.1.1 in /src/go ([#21791](https://github.com/netdata/netdata/issues/21791))
 - Improve print parsed ([#21790](https://github.com/netdata/netdata/issues/21790))
+- Add revalidation for clean pages under lock to ensure queue integrity ([#21793](https://github.com/netdata/netdata/issues/21793))
+- ML: Reserve cluster centers ([#21795](https://github.com/netdata/netdata/issues/21795))
+- Fix crash when processing a corrupted journalfile ([#21794](https://github.com/netdata/netdata/issues/21794))
+- Fix dcgm exporter discovery ([#21800](https://github.com/netdata/netdata/issues/21800))
 
 ## [2.9.0] - 2026-02-16
 
