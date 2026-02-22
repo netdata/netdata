@@ -328,15 +328,16 @@ func TestJobV2Scenarios(t *testing.T) {
 				assert.Equal(t, job.runtimeComponentName, cfg.Name)
 				assert.True(t, cfg.Autogen.Enabled)
 				assert.Equal(t, 3, cfg.UpdateEvery)
-				assert.Equal(t, pluginName, cfg.Plugin)
-				assert.Equal(t, "chartengine", cfg.Module)
-				assert.Equal(t, jobName, cfg.JobName)
-				assert.Equal(t, "chartengine", cfg.JobLabels["source"])
-				assert.Equal(t, modName, cfg.JobLabels["collector_module"])
-				require.NotNil(t, cfg.Store)
-				assert.Equal(t, job.engine.RuntimeStore(), cfg.Store)
+					assert.Equal(t, pluginName, cfg.Plugin)
+					assert.Equal(t, "chartengine", cfg.Module)
+					assert.Equal(t, jobName, cfg.JobName)
+					assert.Equal(t, modName, cfg.JobLabels["_collect_module"])
+					assert.NotContains(t, cfg.JobLabels, "source")
+					assert.NotContains(t, cfg.JobLabels, "collector_module")
+					require.NotNil(t, cfg.Store)
+					assert.Equal(t, job.engine.RuntimeStore(), cfg.Store)
+				},
 			},
-		},
 		"runtime registration failure is non-fatal for autodetection": {
 			run: func(t *testing.T) {
 				store := metrix.NewCollectorStore()
