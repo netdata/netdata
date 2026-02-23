@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	frameworkmodule "github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/assert"
 )
@@ -74,13 +75,13 @@ func TestJob_AutoDetectionEvery(t *testing.T) {
 
 func TestJob_RetryAutoDetection(t *testing.T) {
 	job := newTestJob()
-	m := &MockModule{
+	m := &frameworkmodule.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
 		CheckFunc: func(context.Context) error { return errors.New("check error") },
-		ChartsFunc: func() *Charts {
-			return &Charts{}
+		ChartsFunc: func() *frameworkmodule.Charts {
+			return &frameworkmodule.Charts{}
 		},
 	}
 	job.module = m
@@ -105,7 +106,7 @@ func TestJob_RetryAutoDetection(t *testing.T) {
 func TestJob_AutoDetection(t *testing.T) {
 	job := newTestJob()
 	var v int
-	m := &MockModule{
+	m := &frameworkmodule.MockModule{
 		InitFunc: func(context.Context) error {
 			v++
 			return nil
@@ -114,9 +115,9 @@ func TestJob_AutoDetection(t *testing.T) {
 			v++
 			return nil
 		},
-		ChartsFunc: func() *Charts {
+		ChartsFunc: func() *frameworkmodule.Charts {
 			v++
-			return &Charts{}
+			return &frameworkmodule.Charts{}
 		},
 	}
 	job.module = m
@@ -127,7 +128,7 @@ func TestJob_AutoDetection(t *testing.T) {
 
 func TestJob_AutoDetection_FailInit(t *testing.T) {
 	job := newTestJob()
-	m := &MockModule{
+	m := &frameworkmodule.MockModule{
 		InitFunc: func(context.Context) error {
 			return errors.New("init error")
 		},
@@ -140,7 +141,7 @@ func TestJob_AutoDetection_FailInit(t *testing.T) {
 
 func TestJob_AutoDetection_FailCheck(t *testing.T) {
 	job := newTestJob()
-	m := &MockModule{
+	m := &frameworkmodule.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
@@ -156,14 +157,14 @@ func TestJob_AutoDetection_FailCheck(t *testing.T) {
 
 func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 	job := newTestJob()
-	m := &MockModule{
+	m := &frameworkmodule.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
 		CheckFunc: func(context.Context) error {
 			return nil
 		},
-		ChartsFunc: func() *Charts {
+		ChartsFunc: func() *frameworkmodule.Charts {
 			return nil
 		},
 	}
@@ -175,7 +176,7 @@ func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 
 func TestJob_AutoDetection_PanicInit(t *testing.T) {
 	job := newTestJob()
-	m := &MockModule{
+	m := &frameworkmodule.MockModule{
 		InitFunc: func(context.Context) error {
 			panic("panic in Init")
 		},
@@ -188,7 +189,7 @@ func TestJob_AutoDetection_PanicInit(t *testing.T) {
 
 func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 	job := newTestJob()
-	m := &MockModule{
+	m := &frameworkmodule.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
@@ -204,14 +205,14 @@ func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 
 func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 	job := newTestJob()
-	m := &MockModule{
+	m := &frameworkmodule.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
 		CheckFunc: func(context.Context) error {
 			return nil
 		},
-		ChartsFunc: func() *Charts {
+		ChartsFunc: func() *frameworkmodule.Charts {
 			panic("panic in PostCheck")
 		},
 	}
@@ -222,14 +223,14 @@ func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 }
 
 func TestJob_Start(t *testing.T) {
-	m := &MockModule{
-		ChartsFunc: func() *Charts {
-			return &Charts{
-				&Chart{
+	m := &frameworkmodule.MockModule{
+		ChartsFunc: func() *frameworkmodule.Charts {
+			return &frameworkmodule.Charts{
+				&frameworkmodule.Chart{
 					ID:    "id",
 					Title: "title",
 					Units: "units",
-					Dims: Dims{
+					Dims: frameworkmodule.Dims{
 						{ID: "id1"},
 						{ID: "id2"},
 					},
@@ -278,7 +279,7 @@ func TestJob_StopBeforeStartDoesNotBlock(t *testing.T) {
 }
 
 func TestJob_MainLoop_Panic(t *testing.T) {
-	m := &MockModule{
+	m := &frameworkmodule.MockModule{
 		CollectFunc: func(context.Context) map[string]int64 {
 			panic("panic in Collect")
 		},
@@ -320,8 +321,8 @@ func TestJob_UpdateVnode_NilIgnored(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			job := newTestJob()
-			job.module = &MockModule{}
-			job.charts = &Charts{}
+			job.module = &frameworkmodule.MockModule{}
+			job.charts = &frameworkmodule.Charts{}
 
 			job.UpdateVnode(tc.update)
 
@@ -366,14 +367,14 @@ func TestJob_IsFunctionOnly(t *testing.T) {
 
 func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 	job := newTestFunctionOnlyJob()
-	m := &MockModule{
+	m := &frameworkmodule.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
 		CheckFunc: func(context.Context) error {
 			return nil
 		},
-		ChartsFunc: func() *Charts {
+		ChartsFunc: func() *frameworkmodule.Charts {
 			return nil
 		},
 	}
@@ -384,8 +385,8 @@ func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 
 func TestJob_Start_FunctionOnly(t *testing.T) {
 	collectCalled := false
-	m := &MockModule{
-		ChartsFunc: func() *Charts {
+	m := &frameworkmodule.MockModule{
+		ChartsFunc: func() *frameworkmodule.Charts {
 			return nil
 		},
 		CollectFunc: func(context.Context) map[string]int64 {
