@@ -59,6 +59,8 @@ func parseStaticFormat(reg confgroup.Registry, path string, bs []byte) (*confgro
 		return nil, err
 	}
 
+	applyModuleWideConfigDefaults(name, modCfg.Jobs, modCfg.Extra)
+
 	for _, cfg := range modCfg.Jobs {
 		cfg.SetModule(name)
 		def := mergeDef(modCfg.Default, modDef)
@@ -71,6 +73,119 @@ func parseStaticFormat(reg confgroup.Registry, path string, bs []byte) (*confgro
 	}
 
 	return group, nil
+}
+
+func applyModuleWideConfigDefaults(module string, jobs []confgroup.Config, extra confgroup.Config) {
+	if module != "snmp" || len(jobs) == 0 || len(extra) == 0 {
+		return
+	}
+
+	globalTopology, ok := extra["topology"]
+	if !ok || globalTopology == nil {
+		return
+	}
+
+	for _, job := range jobs {
+		if job == nil {
+			continue
+		}
+		jobTopology, hasJobTopology := job["topology"]
+		switch {
+		case !hasJobTopology || jobTopology == nil:
+			job["topology"] = deepCopyConfigValue(globalTopology)
+		default:
+			merged, ok := mergeConfigValueWithDefaults(jobTopology, globalTopology)
+			if ok {
+				job["topology"] = merged
+			}
+		}
+	}
+}
+
+func mergeConfigValueWithDefaults(value, defaults any) (any, bool) {
+	valueMap, ok := configMapToStringMap(value)
+	if !ok {
+		return value, false
+	}
+	defaultsMap, ok := configMapToStringMap(defaults)
+	if !ok {
+		return valueMap, false
+	}
+	mergeMapDefaults(valueMap, defaultsMap)
+	return valueMap, true
+}
+
+func mergeMapDefaults(dst, defaults map[string]any) {
+	for key, defVal := range defaults {
+		current, exists := dst[key]
+		if !exists || current == nil {
+			dst[key] = deepCopyConfigValue(defVal)
+			continue
+		}
+
+		currentMap, currentIsMap := configMapToStringMap(current)
+		if !currentIsMap {
+			continue
+		}
+		defMap, defIsMap := configMapToStringMap(defVal)
+		if !defIsMap {
+			continue
+		}
+		mergeMapDefaults(currentMap, defMap)
+		dst[key] = currentMap
+	}
+}
+
+func configMapToStringMap(value any) (map[string]any, bool) {
+	switch v := value.(type) {
+	case map[string]any:
+		return v, true
+	case confgroup.Config:
+		return map[string]any(v), true
+	case map[any]any:
+		m := make(map[string]any, len(v))
+		for k, raw := range v {
+			key, ok := k.(string)
+			if !ok {
+				continue
+			}
+			m[key] = raw
+		}
+		return m, true
+	default:
+		return nil, false
+	}
+}
+
+func deepCopyConfigValue(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for key, item := range v {
+			out[key] = deepCopyConfigValue(item)
+		}
+		return out
+	case confgroup.Config:
+		return deepCopyConfigValue(map[string]any(v))
+	case map[any]any:
+		out := make(map[string]any, len(v))
+		for key, item := range v {
+			stringKey, ok := key.(string)
+			if !ok {
+				continue
+			}
+			out[stringKey] = deepCopyConfigValue(item)
+		}
+		return out
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = deepCopyConfigValue(item)
+		}
+		return out
+	default:
+		return value
+	}
 }
 
 func parseSDFormat(reg confgroup.Registry, path string, bs []byte) (*confgroup.Group, error) {

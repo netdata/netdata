@@ -207,18 +207,20 @@ func buildSNMPL2TopologyData(
 		EnableCDP:    true,
 		EnableBridge: true,
 		EnableARP:    true,
+		EnableSTP:    true,
 	})
 	if err != nil {
 		return topologyData{}, false
 	}
 	return topologyengine.ToTopologyData(result, topologyengine.TopologyDataOptions{
-		SchemaVersion: topologySchemaVersion,
-		Source:        "snmp",
-		Layer:         "2",
-		View:          "summary",
-		AgentID:       agentID,
-		LocalDeviceID: localDeviceID,
-		CollectedAt:   collectedAt,
+		SchemaVersion:  topologySchemaVersion,
+		Source:         "snmp",
+		Layer:          "2",
+		View:           "summary",
+		AgentID:        agentID,
+		LocalDeviceID:  localDeviceID,
+		CollectedAt:    collectedAt,
+		ResolveDNSName: resolveTopologyReverseDNSName,
 	}), true
 }
 
@@ -232,13 +234,14 @@ func buildSNMPL3TopologyData(
 		return topologyData{}, false
 	}
 	return topologyengine.ToTopologyData(result, topologyengine.TopologyDataOptions{
-		SchemaVersion: topologySchemaVersion,
-		Source:        "snmp",
-		Layer:         "3",
-		View:          "summary",
-		AgentID:       agentID,
-		LocalDeviceID: localDeviceID,
-		CollectedAt:   collectedAt,
+		SchemaVersion:  topologySchemaVersion,
+		Source:         "snmp",
+		Layer:          "3",
+		View:           "summary",
+		AgentID:        agentID,
+		LocalDeviceID:  localDeviceID,
+		CollectedAt:    collectedAt,
+		ResolveDNSName: resolveTopologyReverseDNSName,
 	}), true
 }
 

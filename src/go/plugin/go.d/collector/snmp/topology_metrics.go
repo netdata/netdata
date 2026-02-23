@@ -28,13 +28,15 @@ func (c *Collector) collectTopologyMetrics(mx map[string]int64) {
 	}
 	totalLinks := len(data.Links)
 
-	var lldpLinks, cdpLinks int64
+	var lldpLinks, cdpLinks, stpLinks int64
 	for _, link := range data.Links {
 		switch link.Protocol {
 		case "lldp":
 			lldpLinks++
 		case "cdp":
 			cdpLinks++
+		case "stp":
+			stpLinks++
 		}
 	}
 
@@ -43,4 +45,5 @@ func (c *Collector) collectTopologyMetrics(mx map[string]int64) {
 	mx["snmp_topology_links_total"] = int64(totalLinks)
 	mx["snmp_topology_links_lldp"] = lldpLinks
 	mx["snmp_topology_links_cdp"] = cdpLinks
+	mx["snmp_topology_links_stp"] = stpLinks
 }

@@ -52,5 +52,6 @@ func TestCollectTopologyMetrics(t *testing.T) {
 	assert.Equal(t, int64(2), mx["snmp_topology_links_total"])
 	assert.Equal(t, int64(1), mx["snmp_topology_links_lldp"])
 	assert.Equal(t, int64(1), mx["snmp_topology_links_cdp"])
+	assert.Equal(t, int64(0), mx["snmp_topology_links_stp"])
 	assert.True(t, c.topologyChartsAdded)
 }

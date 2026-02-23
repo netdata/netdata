@@ -342,7 +342,7 @@ func TestMergeSNMPTopologyData_DeduplicatesActorsByOverlappingIdentity(t *testin
 func TestCanonicalMatchKey_NormalizesEquivalentMACRepresentations(t *testing.T) {
 	raw := topologyMatch{ChassisIDs: []string{"7049a26572cd"}}
 	colon := topologyMatch{MacAddresses: []string{"70:49:A2:65:72:CD"}}
-	require.Equal(t, "chassis:70:49:a2:65:72:cd", canonicalMatchKey(raw))
+	require.Equal(t, "mac:70:49:a2:65:72:cd", canonicalMatchKey(raw))
 	require.Equal(t, "mac:70:49:a2:65:72:cd", canonicalMatchKey(colon))
 	require.Contains(t, topologyMatchIdentityKeys(raw), "hw:70:49:a2:65:72:cd")
 	require.Contains(t, topologyMatchIdentityKeys(colon), "hw:70:49:a2:65:72:cd")

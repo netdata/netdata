@@ -28,6 +28,7 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	c.collectProfileScalarMetrics(mx, pms)
 	c.collectProfileTableMetrics(mx, pms)
 	c.collectProfileStats(mx, pms)
+	c.collectTopologyVTPVLANContexts()
 
 	c.finalizeIfaceCache()
 	c.finalizeTopologyCache()

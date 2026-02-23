@@ -22,6 +22,7 @@ type Match struct {
 }
 
 type Actor struct {
+	ActorID     string            `json:"actor_id,omitempty"`
 	ActorType   string            `json:"actor_type"`
 	Layer       string            `json:"layer"`
 	Source      string            `json:"source"`
@@ -42,6 +43,8 @@ type Link struct {
 	Protocol     string         `json:"protocol"`
 	Direction    string         `json:"direction,omitempty"`
 	State        string         `json:"state,omitempty"`
+	SrcActorID   string         `json:"src_actor_id,omitempty"`
+	DstActorID   string         `json:"dst_actor_id,omitempty"`
 	Src          LinkEndpoint   `json:"src"`
 	Dst          LinkEndpoint   `json:"dst"`
 	DiscoveredAt *time.Time     `json:"discovered_at,omitempty"`

@@ -435,16 +435,276 @@ func TestTopologyCache_FDBAndARPEnrichment(t *testing.T) {
 
 	require.True(t, ok)
 	require.GreaterOrEqual(t, len(data.Actors), 2)
-	require.Len(t, data.Links, 2)
+	require.Len(t, data.Links, 1)
 
 	require.NotNil(t, findLinkByProtocol(data, "fdb"))
-	require.NotNil(t, findLinkByProtocol(data, "bridge"))
+	require.Nil(t, findLinkByProtocol(data, "bridge"))
 	require.Nil(t, findLinkByProtocol(data, "arp"))
 
 	ep := findActorByMAC(data, "70:49:a2:65:72:cd")
 	require.NotNil(t, ep)
 	assert.Equal(t, "endpoint", ep.ActorType)
 	assert.Contains(t, ep.Match.IPAddresses, "10.20.4.84")
+	assert.Equal(t, "single_port_mac", ep.Attributes["attachment_source"])
+	assert.Equal(t, "Port3", ep.Attributes["attached_port"])
+}
+
+func TestTopologyCache_Dot1qVLANEnrichment(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		ManagementIP:  "10.0.0.1",
+	}
+
+	cache.updateBridgePortMap(map[string]string{
+		tagBridgeBasePort: "7",
+		tagBridgeIfIndex:  "3",
+	})
+	cache.updateFdbEntry(map[string]string{
+		tagDot1qFdbID:     "100",
+		tagDot1qFdbMac:    "7049a26572cd",
+		tagDot1qFdbPort:   "7",
+		tagDot1qFdbStatus: "learned",
+	})
+	cache.updateDot1qVlanMap(map[string]string{
+		tagDot1qVlanID:    "200",
+		tagDot1qVlanFdbID: "100",
+	})
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.FDBEntries, 1)
+	require.Equal(t, "200", obs.FDBEntries[0].VLANID)
+	require.Equal(t, "70:49:a2:65:72:cd", obs.FDBEntries[0].MAC)
+}
+
+func TestTopologyCache_VTPVLANNameEnrichment(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		ManagementIP:  "10.0.0.1",
+	}
+
+	cache.updateBridgePortMap(map[string]string{
+		tagBridgeBasePort: "7",
+		tagBridgeIfIndex:  "3",
+	})
+	cache.updateDot1qVlanMap(map[string]string{
+		tagDot1qVlanID:    "200",
+		tagDot1qVlanFdbID: "100",
+	})
+	cache.updateVtpVlanEntry(map[string]string{
+		tagVtpVlanIndex: "200",
+		tagVtpVlanState: "operational",
+		tagVtpVlanType:  "1",
+		tagVtpVlanName:  "servers",
+	})
+	cache.updateFdbEntry(map[string]string{
+		tagDot1qFdbID:     "100",
+		tagDot1qFdbMac:    "7049a26572cd",
+		tagDot1qFdbPort:   "7",
+		tagDot1qFdbStatus: "learned",
+	})
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.FDBEntries, 1)
+	require.Equal(t, "200", obs.FDBEntries[0].VLANID)
+	require.Equal(t, "servers", obs.FDBEntries[0].VLANName)
+}
+
+func TestTopologyCache_STPObservation(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		ManagementIP:  "10.0.0.1",
+	}
+	cache.stpBaseBridgeAddress = "00:11:22:33:44:55"
+	cache.updateBridgePortMap(map[string]string{
+		tagBridgeBasePort: "3",
+		tagBridgeIfIndex:  "3",
+	})
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "3",
+		tagTopoIfName:  "Port3",
+	})
+	cache.updateStpPortEntry(map[string]string{
+		tagStpPort:                 "3",
+		tagStpPortState:            "forwarding",
+		tagStpPortEnable:           "enabled",
+		tagStpPortPathCost:         "4",
+		tagStpPortDesignatedBridge: "800066778899aabb",
+		tagStpPortDesignatedPort:   "8001",
+	})
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Equal(t, "00:11:22:33:44:55", obs.BaseBridgeAddress)
+	require.Len(t, obs.STPPorts, 1)
+	require.Equal(t, "3", obs.STPPorts[0].Port)
+	require.Equal(t, 3, obs.STPPorts[0].IfIndex)
+	require.Equal(t, "Port3", obs.STPPorts[0].IfName)
+	require.Equal(t, "66:77:88:99:aa:bb", obs.STPPorts[0].DesignatedBridge)
+}
+
+func TestTopologyCache_InterfaceStatusObservation(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		ManagementIP:  "10.0.0.1",
+	}
+
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "3",
+		tagTopoIfName:  "Port3",
+		tagTopoIfAdmin: "up",
+		tagTopoIfOper:  "lowerLayerDown",
+	})
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.Interfaces, 1)
+	require.Equal(t, "Port3", obs.Interfaces[0].IfName)
+	require.Equal(t, "up", obs.Interfaces[0].AdminStatus)
+	require.Equal(t, "lowerLayerDown", obs.Interfaces[0].OperStatus)
+}
+
+func TestTopologyCache_InterfaceStatusObservation_FallsBackToIfIndexWhenIfNameMissing(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		ManagementIP:  "10.0.0.1",
+	}
+
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIfType:  "ethernetCsmacd(6)",
+		tagTopoIfAdmin: "up(1)",
+		tagTopoIfOper:  "up(1)",
+	})
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.Interfaces, 1)
+	require.Equal(t, 7, obs.Interfaces[0].IfIndex)
+	require.Equal(t, "7", obs.Interfaces[0].IfName)
+	require.Equal(t, "7", obs.Interfaces[0].IfDescr)
+	require.Equal(t, "ethernetcsmacd", obs.Interfaces[0].InterfaceType)
+	require.Equal(t, "up", obs.Interfaces[0].AdminStatus)
+	require.Equal(t, "up", obs.Interfaces[0].OperStatus)
+}
+
+func TestStpBridgeAddressToMAC_ParsesAndRejectsSentinels(t *testing.T) {
+	tests := []struct {
+		name   string
+		in     string
+		status stpBridgeIDStatus
+		mac    string
+	}{
+		{
+			name:   "bridge-id-hex",
+			in:     "800066778899aabb",
+			status: stpBridgeIDValid,
+			mac:    "66:77:88:99:aa:bb",
+		},
+		{
+			name:   "priority-bridge-id",
+			in:     "32768-66.77.88.99.aa.bb",
+			status: stpBridgeIDValid,
+			mac:    "66:77:88:99:aa:bb",
+		},
+		{
+			name:   "sentinel-text-empty",
+			in:     "0-00.00.00.00.00.00",
+			status: stpBridgeIDEmpty,
+			mac:    "",
+		},
+		{
+			name:   "sentinel-hex-empty",
+			in:     "302d30302e30302e30302e30302e30302e3030",
+			status: stpBridgeIDEmpty,
+			mac:    "",
+		},
+		{
+			name:   "invalid",
+			in:     "not-a-bridge-id",
+			status: stpBridgeIDInvalid,
+			mac:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mac, status := parseSTPBridgeID(tt.in, 0)
+			require.Equal(t, tt.status, status)
+			require.Equal(t, tt.mac, mac)
+			require.Equal(t, tt.mac, stpBridgeAddressToMAC(tt.in))
+		})
+	}
+}
+
+func TestTopologyCache_VTPVLANContexts_SortedAndValidated(t *testing.T) {
+	cache := newTopologyCache()
+	cache.vlanIDToName["200"] = "servers"
+	cache.vlanIDToName["10"] = "users"
+	cache.vlanIDToName["abc"] = "invalid"
+	cache.vlanIDToName[""] = "invalid-empty"
+
+	contexts := cache.vtpVLANContexts()
+	require.Len(t, contexts, 2)
+	require.Equal(t, "10", contexts[0].vlanID)
+	require.Equal(t, "users", contexts[0].vlanName)
+	require.Equal(t, "200", contexts[1].vlanID)
+	require.Equal(t, "servers", contexts[1].vlanName)
+}
+
+func TestTopologyCache_VLANContextFDBEntriesRemainDistinct(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateBridgePortMap(map[string]string{
+		tagBridgeBasePort: "7",
+		tagBridgeIfIndex:  "3",
+	})
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "3",
+		tagTopoIfName:  "Port3",
+	})
+
+	cache.updateFdbEntry(map[string]string{
+		tagFdbMac:                  "70:49:a2:65:72:cd",
+		tagFdbBridgePort:           "7",
+		tagFdbStatus:               "learned",
+		tagTopologyContextVLANID:   "10",
+		tagTopologyContextVLANName: "users",
+	})
+	cache.updateFdbEntry(map[string]string{
+		tagFdbMac:                  "70:49:a2:65:72:cd",
+		tagFdbBridgePort:           "7",
+		tagFdbStatus:               "learned",
+		tagTopologyContextVLANID:   "200",
+		tagTopologyContextVLANName: "servers",
+	})
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Len(t, obs.FDBEntries, 2)
+	require.Equal(t, "10", obs.FDBEntries[0].VLANID)
+	require.Equal(t, "users", obs.FDBEntries[0].VLANName)
+	require.Equal(t, "200", obs.FDBEntries[1].VLANID)
+	require.Equal(t, "servers", obs.FDBEntries[1].VLANName)
 }
 
 func TestPickManagementIP_DeterministicAcrossInputOrder(t *testing.T) {
@@ -597,6 +857,81 @@ func TestDecodePrintableASCII_HexValueIsNotNumeric(t *testing.T) {
 
 	decoded := decodePrintableASCII(bs)
 	assert.NotRegexp(t, "^[0-9]+$", decoded)
+}
+
+func TestNormalizeInterfaceAdminStatusAcceptsEnumStrings(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{in: "up(1)", want: "up"},
+		{in: "down(2)", want: "down"},
+		{in: "testing(3)", want: "testing"},
+		{in: "UP (1)", want: "up"},
+		{in: "invalid(9)", want: ""},
+	}
+
+	for _, tc := range tests {
+		assert.Equal(t, tc.want, normalizeInterfaceAdminStatus(tc.in), tc.in)
+	}
+}
+
+func TestNormalizeInterfaceOperStatusAcceptsEnumStrings(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{in: "up(1)", want: "up"},
+		{in: "down(2)", want: "down"},
+		{in: "testing(3)", want: "testing"},
+		{in: "unknown(4)", want: "unknown"},
+		{in: "dormant(5)", want: "dormant"},
+		{in: "notPresent(6)", want: "notPresent"},
+		{in: "lowerLayerDown(7)", want: "lowerLayerDown"},
+		{in: "LOWERLAYERDOWN (7)", want: "lowerLayerDown"},
+		{in: "invalid(9)", want: ""},
+	}
+
+	for _, tc := range tests {
+		assert.Equal(t, tc.want, normalizeInterfaceOperStatus(tc.in), tc.in)
+	}
+}
+
+func TestNormalizeInterfaceTypeAcceptsEnumStrings(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{in: "ethernetCsmacd(6)", want: "ethernetcsmacd"},
+		{in: "6", want: "ethernetcsmacd"},
+		{in: "ieee8023adLag(161)", want: "ieee8023adlag"},
+		{in: "161", want: "ieee8023adlag"},
+		{in: "l2vlan(135)", want: "l2vlan"},
+		{in: "", want: ""},
+	}
+
+	for _, tc := range tests {
+		assert.Equal(t, tc.want, normalizeInterfaceType(tc.in), tc.in)
+	}
+}
+
+func TestTopologyCache_UpdateIfNameByIndex_StoresStatusWithoutIfName(t *testing.T) {
+	cache := newTopologyCache()
+
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIfName:  "swp07",
+	})
+
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "7",
+		tagTopoIfAdmin: "up(1)",
+		tagTopoIfOper:  "down(2)",
+	})
+
+	require.Equal(t, "swp07", cache.ifNamesByIndex["7"])
+	require.Equal(t, "up", cache.ifStatusByIndex["7"].admin)
+	require.Equal(t, "down", cache.ifStatusByIndex["7"].oper)
 }
 
 func actorHasAttributeList(snapshot topologyData, key string) bool {

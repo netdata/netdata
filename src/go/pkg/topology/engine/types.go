@@ -28,6 +28,7 @@ type DiscoverOptions struct {
 	EnableCDP    bool
 	EnableBridge bool
 	EnableARP    bool
+	EnableSTP    bool
 	MaxDepth     int
 	Concurrency  int
 }
@@ -115,24 +116,32 @@ type Enrichment struct {
 
 // L2Observation contains one device's normalized layer-2 SNMP observations.
 type L2Observation struct {
-	DeviceID     string
-	Hostname     string
-	ManagementIP string
-	SysObjectID  string
-	ChassisID    string
-	Interfaces   []ObservedInterface
-	BridgePorts  []BridgePortObservation
-	FDBEntries   []FDBObservation
-	ARPNDEntries []ARPNDObservation
-	LLDPRemotes  []LLDPRemoteObservation
-	CDPRemotes   []CDPRemoteObservation
+	DeviceID string
+	// Inferred marks observations synthesized from neighbor advertisements
+	// (for example LLDP/CDP remotes), not directly polled SNMP targets.
+	Inferred          bool
+	Hostname          string
+	ManagementIP      string
+	SysObjectID       string
+	ChassisID         string
+	BaseBridgeAddress string
+	Interfaces        []ObservedInterface
+	BridgePorts       []BridgePortObservation
+	STPPorts          []STPPortObservation
+	FDBEntries        []FDBObservation
+	ARPNDEntries      []ARPNDObservation
+	LLDPRemotes       []LLDPRemoteObservation
+	CDPRemotes        []CDPRemoteObservation
 }
 
 // ObservedInterface describes one local interface seen on a device.
 type ObservedInterface struct {
-	IfIndex int
-	IfName  string
-	IfDescr string
+	IfIndex     int
+	IfName      string
+	IfDescr     string
+	InterfaceType string
+	AdminStatus string
+	OperStatus  string
 }
 
 // LLDPRemoteObservation captures one remote LLDP neighbor advertised by a device.
@@ -173,6 +182,23 @@ type FDBObservation struct {
 	BridgePort string
 	IfIndex    int
 	Status     string
+	VLANID     string
+	VLANName   string
+}
+
+// STPPortObservation captures one spanning-tree port row.
+type STPPortObservation struct {
+	Port             string
+	IfIndex          int
+	IfName           string
+	VLANID           string
+	VLANName         string
+	State            string
+	Enable           string
+	PathCost         string
+	DesignatedRoot   string
+	DesignatedBridge string
+	DesignatedPort   string
 }
 
 // ARPNDObservation captures one ARP or ND neighbor-table observation.

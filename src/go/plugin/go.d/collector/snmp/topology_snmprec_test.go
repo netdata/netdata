@@ -703,36 +703,78 @@ func hasLinkableCDP(data snmprecTopology) bool {
 }
 
 func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
+	exact := make(map[string]struct{}, len(ids))
+	macs := make(map[string]struct{}, len(ids))
+	ips := make(map[string]struct{}, len(ids))
+	hosts := make(map[string]struct{}, len(ids))
+	for id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		exact[strings.ToLower(id)] = struct{}{}
+		if mac := normalizeMAC(id); mac != "" {
+			macs[mac] = struct{}{}
+		}
+		if ip := normalizeIPAddress(id); ip != "" {
+			ips[ip] = struct{}{}
+		}
+		hosts[strings.ToLower(strings.TrimSuffix(id, "."))] = struct{}{}
+	}
+	matches := func(value string) bool {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return false
+		}
+		if _, ok := exact[strings.ToLower(value)]; ok {
+			return true
+		}
+		if mac := normalizeMAC(value); mac != "" {
+			if _, ok := macs[mac]; ok {
+				return true
+			}
+		}
+		if ip := normalizeIPAddress(value); ip != "" {
+			if _, ok := ips[ip]; ok {
+				return true
+			}
+		}
+		if _, ok := hosts[strings.ToLower(strings.TrimSuffix(value, "."))]; ok {
+			return true
+		}
+		return false
+	}
+
 	for _, link := range snapshot.Links {
 		if sysName, _ := link.Dst.Attributes["sys_name"].(string); sysName != "" {
-			if _, ok := ids[sysName]; ok {
+			if matches(sysName) {
 				return true
 			}
 		}
 		for _, id := range link.Dst.Match.ChassisIDs {
-			if _, ok := ids[id]; ok {
+			if matches(id) {
 				return true
 			}
 		}
 		for _, ip := range link.Dst.Match.IPAddresses {
-			if _, ok := ids[ip]; ok {
+			if matches(ip) {
 				return true
 			}
 		}
 	}
 	for _, actor := range snapshot.Actors {
 		if actor.Match.SysName != "" {
-			if _, ok := ids[actor.Match.SysName]; ok {
+			if matches(actor.Match.SysName) {
 				return true
 			}
 		}
 		for _, id := range actor.Match.ChassisIDs {
-			if _, ok := ids[id]; ok {
+			if matches(id) {
 				return true
 			}
 		}
 		for _, ip := range actor.Match.IPAddresses {
-			if _, ok := ids[ip]; ok {
+			if matches(ip) {
 				return true
 			}
 		}

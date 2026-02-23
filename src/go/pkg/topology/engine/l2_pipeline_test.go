@@ -96,6 +96,32 @@ func TestBuildL2ResultFromObservations_DefaultProtocols(t *testing.T) {
 	require.Equal(t, 1, result.Stats["links_cdp"])
 }
 
+func TestBuildL2ResultFromObservations_InterfaceStatusLabels(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID: "switch-a",
+			Hostname: "switch-a",
+			Interfaces: []ObservedInterface{
+				{
+					IfIndex:       8,
+					IfName:        "Gi0/0",
+					IfDescr:       "Gi0/0",
+					InterfaceType: "ethernetcsmacd",
+					AdminStatus:   "up",
+					OperStatus:    "lowerLayerDown",
+				},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{})
+	require.NoError(t, err)
+	require.Len(t, result.Interfaces, 1)
+	require.Equal(t, "ethernetcsmacd", result.Interfaces[0].Labels["if_type"])
+	require.Equal(t, "up", result.Interfaces[0].Labels["admin_status"])
+	require.Equal(t, "lowerLayerDown", result.Interfaces[0].Labels["oper_status"])
+}
+
 func TestBuildL2ResultFromObservations_SkipsSelfAdjacencies(t *testing.T) {
 	observations := []L2Observation{
 		{
@@ -162,16 +188,21 @@ func TestBuildL2ResultFromObservations_CDPSysNameAndDeviceID(t *testing.T) {
 	require.Equal(t, "distribution-sw", result.Adjacencies[0].TargetID)
 
 	var remote Device
+	var local Device
 	for _, dev := range result.Devices {
 		if dev.ID == "distribution-sw" {
 			remote = dev
-			break
+		}
+		if dev.ID == "switch-a" {
+			local = dev
 		}
 	}
 	require.Equal(t, "distribution-sw", remote.ID)
 	require.Equal(t, "distribution-sw", remote.Hostname)
 	require.Equal(t, "SEP001122334455", remote.ChassisID)
 	require.Equal(t, "10.0.0.2", remote.Addresses[0].String())
+	require.Equal(t, "true", remote.Labels["inferred"])
+	require.Equal(t, "false", local.Labels["inferred"])
 }
 
 func TestBuildL2ResultFromObservations_FDBAttachments(t *testing.T) {
@@ -237,6 +268,34 @@ func TestBuildL2ResultFromObservations_FDBDropsDuplicateMACAcrossPorts(t *testin
 	require.Equal(t, 1, result.Stats["attachments_fdb"])
 }
 
+func TestBuildL2ResultFromObservations_FDBKeepsSameMACAcrossPortsWhenVLANDiffers(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID: "switch-a",
+			Hostname: "switch-a",
+			BridgePorts: []BridgePortObservation{
+				{BasePort: "1", IfIndex: 1},
+				{BasePort: "2", IfIndex: 2},
+			},
+			FDBEntries: []FDBObservation{
+				{MAC: "70:49:a2:65:72:cd", BridgePort: "1", Status: "learned", VLANID: "10"},
+				{MAC: "70:49:a2:65:72:cd", BridgePort: "2", Status: "learned", VLANID: "20"},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true})
+	require.NoError(t, err)
+	require.Len(t, result.Attachments, 2)
+
+	first := result.Attachments[0]
+	second := result.Attachments[1]
+	require.Equal(t, "mac:70:49:a2:65:72:cd", first.EndpointID)
+	require.Equal(t, "mac:70:49:a2:65:72:cd", second.EndpointID)
+	require.NotEqual(t, first.Labels["vlan_id"], second.Labels["vlan_id"])
+	require.Equal(t, 2, result.Stats["attachments_fdb"])
+}
+
 func TestBuildL2ResultFromObservations_FDBSkipsSelfAndNonLearned(t *testing.T) {
 	observations := []L2Observation{
 		{
@@ -263,6 +322,78 @@ func TestBuildL2ResultFromObservations_FDBSkipsSelfAndNonLearned(t *testing.T) {
 	require.Equal(t, "3", result.Attachments[0].Labels["bridge_port"])
 }
 
+func TestBuildL2ResultFromObservations_STPAdjacency(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			BaseBridgeAddress: "00:11:22:33:44:55",
+			Interfaces: []ObservedInterface{
+				{IfIndex: 3, IfName: "Port3", IfDescr: "Port3"},
+			},
+			BridgePorts: []BridgePortObservation{
+				{BasePort: "3", IfIndex: 3},
+			},
+			STPPorts: []STPPortObservation{
+				{
+					Port:             "3",
+					VLANID:           "200",
+					VLANName:         "servers",
+					DesignatedBridge: "66:77:88:99:aa:bb",
+					DesignatedPort:   "8001",
+					State:            "forwarding",
+				},
+			},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			BaseBridgeAddress: "66:77:88:99:aa:bb",
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableSTP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Adjacencies, 1)
+	require.Equal(t, "stp", result.Adjacencies[0].Protocol)
+	require.Equal(t, "switch-a", result.Adjacencies[0].SourceID)
+	require.Equal(t, "switch-b", result.Adjacencies[0].TargetID)
+	require.Equal(t, "Port3", result.Adjacencies[0].SourcePort)
+	require.Equal(t, "200", result.Adjacencies[0].Labels["vlan_id"])
+	require.Equal(t, "servers", result.Adjacencies[0].Labels["vlan_name"])
+	require.Equal(t, 1, result.Stats["links_stp"])
+}
+
+func TestBuildL2ResultFromObservations_STPDoesNotCreateSyntheticActors(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			BaseBridgeAddress: "00:11:22:33:44:55",
+			Interfaces: []ObservedInterface{
+				{IfIndex: 3, IfName: "Port3", IfDescr: "Port3"},
+			},
+			BridgePorts: []BridgePortObservation{
+				{BasePort: "3", IfIndex: 3},
+			},
+			STPPorts: []STPPortObservation{
+				{
+					Port:             "3",
+					DesignatedBridge: "66:77:88:99:aa:bb",
+					DesignatedPort:   "8001",
+					State:            "forwarding",
+				},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableSTP: true})
+	require.NoError(t, err)
+	require.Len(t, result.Devices, 1)
+	require.Empty(t, result.Adjacencies)
+	require.Equal(t, 0, result.Stats["links_stp"])
+}
+
 func TestBuildL2ResultFromObservations_FDBBridgeDomainFallbackToBridgePort(t *testing.T) {
 	observations := []L2Observation{
 		{
@@ -279,6 +410,26 @@ func TestBuildL2ResultFromObservations_FDBBridgeDomainFallbackToBridgePort(t *te
 	require.Len(t, result.Attachments, 1)
 	require.Equal(t, 0, result.Attachments[0].IfIndex)
 	require.Equal(t, "bridge-domain:switch-a:bp:77", result.Attachments[0].Labels["bridge_domain"])
+}
+
+func TestBuildL2ResultFromObservations_FDBVLANNameLabel(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID: "switch-a",
+			Hostname: "switch-a",
+			BridgePorts: []BridgePortObservation{
+				{BasePort: "7", IfIndex: 3},
+			},
+			FDBEntries: []FDBObservation{
+				{MAC: "70:49:a2:65:72:cd", BridgePort: "7", Status: "learned", VLANID: "200", VLANName: "servers"},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableBridge: true})
+	require.NoError(t, err)
+	require.Len(t, result.Attachments, 1)
+	require.Equal(t, "servers", result.Attachments[0].Labels["vlan_name"])
 }
 
 func TestBuildL2ResultFromObservations_BridgeOnlyDoesNotAutoEnableDiscoveryProtocols(t *testing.T) {
@@ -766,6 +917,58 @@ func TestBuildL2ResultFromObservations_LLDPPairsAcrossKnownDeviceIdentityDespite
 		require.NotEmpty(t, adj.Labels[adjacencyLabelPairSide])
 		require.NotEmpty(t, adj.Labels[adjacencyLabelPairPass])
 	}
+}
+
+func TestBuildL2ResultFromObservations_KeepsDistinctRemotesWhenMACDiffersDespiteSameSecondaryIdentity(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID:     "local-a",
+			Hostname:     "local-a",
+			ManagementIP: "10.0.0.1",
+			ChassisID:    "00:00:00:00:10:01",
+			LLDPRemotes: []LLDPRemoteObservation{
+				{
+					LocalPortNum:       "1",
+					LocalPortID:        "eth1",
+					LocalPortIDSubtype: "interfaceName",
+					ChassisID:          "00:11:22:33:44:55",
+					SysName:            "shared-secondary-id",
+					ManagementIP:       "10.20.30.40",
+				},
+			},
+		},
+		{
+			DeviceID:     "local-b",
+			Hostname:     "local-b",
+			ManagementIP: "10.0.0.2",
+			ChassisID:    "00:00:00:00:10:02",
+			LLDPRemotes: []LLDPRemoteObservation{
+				{
+					LocalPortNum:       "1",
+					LocalPortID:        "eth1",
+					LocalPortIDSubtype: "interfaceName",
+					ChassisID:          "00:11:22:33:44:66",
+					SysName:            "shared-secondary-id",
+					ManagementIP:       "10.20.30.40",
+				},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true})
+	require.NoError(t, err)
+
+	var remoteCount int
+	remoteIDs := make(map[string]struct{})
+	for _, device := range result.Devices {
+		if device.Hostname != "shared-secondary-id" {
+			continue
+		}
+		remoteCount++
+		remoteIDs[device.ID] = struct{}{}
+	}
+	require.Equal(t, 2, remoteCount)
+	require.Len(t, remoteIDs, 2)
 }
 
 func TestMatchCDPLinksEnlinkdPassOrder_DefaultAndParsedTarget(t *testing.T) {

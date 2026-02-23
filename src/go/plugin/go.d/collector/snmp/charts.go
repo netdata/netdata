@@ -88,6 +88,7 @@ var (
 			{ID: "snmp_topology_links_total", Name: "total"},
 			{ID: "snmp_topology_links_lldp", Name: "lldp"},
 			{ID: "snmp_topology_links_cdp", Name: "cdp"},
+			{ID: "snmp_topology_links_stp", Name: "stp"},
 		},
 	}
 )
