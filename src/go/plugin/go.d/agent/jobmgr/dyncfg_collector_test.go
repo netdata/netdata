@@ -11,8 +11,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
 
 func TestDyncfgConfigUserconfig_InvalidPayload_Returns400Only(t *testing.T) {

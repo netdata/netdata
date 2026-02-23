@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
 
 func (j *JobV2) registerRuntimeComponent() error {

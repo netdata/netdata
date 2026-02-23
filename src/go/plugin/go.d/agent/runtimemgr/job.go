@@ -14,16 +14,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/internal/tickstate"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
+	chartengine2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 )
 
 type runtimeComponentState struct {
 	spec        componentSpec
-	engine      *chartengine.Engine
+	engine      *chartengine2.Engine
 	prev        time.Time
-	knownCharts map[string]chartengine.ChartMeta
+	knownCharts map[string]chartengine2.ChartMeta
 }
 
 type runtimeMetricsJob struct {
@@ -185,11 +185,11 @@ func (j *runtimeMetricsJob) ensureComponent(spec componentSpec) (*runtimeCompone
 	}
 
 	engineLog := j.Logger.With(slog.String("runtime_component", spec.Name))
-	engine, err := chartengine.New(
-		chartengine.WithRuntimeStore(nil), // Two-engine policy: observer engine has no self-metrics.
-		chartengine.WithSeriesSelectionAllVisible(),
-		chartengine.WithAutogenPolicy(spec.Autogen),
-		chartengine.WithLogger(engineLog),
+	engine, err := chartengine2.New(
+		chartengine2.WithRuntimeStore(nil), // Two-engine policy: observer engine has no self-metrics.
+		chartengine2.WithSeriesSelectionAllVisible(),
+		chartengine2.WithAutogenPolicy(spec.Autogen),
+		chartengine2.WithLogger(engineLog),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create engine: %w", err)
@@ -201,7 +201,7 @@ func (j *runtimeMetricsJob) ensureComponent(spec componentSpec) (*runtimeCompone
 	state := &runtimeComponentState{
 		spec:        spec,
 		engine:      engine,
-		knownCharts: make(map[string]chartengine.ChartMeta),
+		knownCharts: make(map[string]chartengine2.ChartMeta),
 	}
 	if ok && current != nil && current.spec.Generation != spec.Generation {
 		j.emitComponentObsolete(current)
@@ -221,10 +221,10 @@ func (j *runtimeMetricsJob) emitComponentObsolete(state *runtimeComponentState) 
 	}
 	sort.Strings(chartIDs)
 
-	actions := make([]chartengine.EngineAction, 0, len(chartIDs))
+	actions := make([]chartengine2.EngineAction, 0, len(chartIDs))
 	for _, chartID := range chartIDs {
 		meta := state.knownCharts[chartID]
-		actions = append(actions, chartengine.RemoveChartAction{
+		actions = append(actions, chartengine2.RemoveChartAction{
 			ChartID: chartID,
 			Meta:    meta,
 		})
@@ -232,25 +232,25 @@ func (j *runtimeMetricsJob) emitComponentObsolete(state *runtimeComponentState) 
 
 	env := cloneEmitEnv(state.spec.EmitEnv)
 	env.MSSinceLast = 0
-	if err := chartemit.ApplyPlan(j.api, chartengine.Plan{Actions: actions}, env); err != nil {
+	if err := chartemit.ApplyPlan(j.api, chartengine2.Plan{Actions: actions}, env); err != nil {
 		j.Warningf("runtime metrics component %q obsolete emit failed: %v", state.spec.Name, err)
 		return
 	}
 	clear(state.knownCharts)
 }
 
-func (s *runtimeComponentState) trackPlan(plan chartengine.Plan) {
+func (s *runtimeComponentState) trackPlan(plan chartengine2.Plan) {
 	if s == nil {
 		return
 	}
 	if s.knownCharts == nil {
-		s.knownCharts = make(map[string]chartengine.ChartMeta)
+		s.knownCharts = make(map[string]chartengine2.ChartMeta)
 	}
 	for _, action := range plan.Actions {
 		switch v := action.(type) {
-		case chartengine.CreateChartAction:
+		case chartengine2.CreateChartAction:
 			s.knownCharts[v.ChartID] = v.Meta
-		case chartengine.RemoveChartAction:
+		case chartengine2.RemoveChartAction:
 			delete(s.knownCharts, v.ChartID)
 		}
 	}

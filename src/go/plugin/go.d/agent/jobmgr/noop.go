@@ -3,9 +3,8 @@
 package jobmgr
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
 type noop struct{}

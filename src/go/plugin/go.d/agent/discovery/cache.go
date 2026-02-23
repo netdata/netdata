@@ -3,7 +3,7 @@
 package discovery
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
 type cache map[string]*confgroup.Group // [Source]

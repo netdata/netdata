@@ -9,10 +9,9 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	chartengine2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
 )
 
 func TestScalarKeyFromLabelsMap(t *testing.T) {
@@ -41,14 +40,14 @@ func TestScalarKeyFromLabelsMap(t *testing.T) {
 }
 
 func TestMaterializedChartsFiltersByContextAndID(t *testing.T) {
-	plan := chartengine.Plan{
-		Actions: []chartengine.EngineAction{
-			chartengine.CreateChartAction{ChartID: "keep", Meta: chartengine.ChartMeta{Context: "ctx.keep"}},
-			chartengine.CreateDimensionAction{ChartID: "keep", ChartMeta: chartengine.ChartMeta{Context: "ctx.keep"}, Name: "dimA"},
-			chartengine.CreateChartAction{ChartID: "drop-by-context", Meta: chartengine.ChartMeta{Context: "ctx.drop"}},
-			chartengine.CreateDimensionAction{ChartID: "drop-by-context", ChartMeta: chartengine.ChartMeta{Context: "ctx.drop"}, Name: "dimB"},
-			chartengine.CreateChartAction{ChartID: "drop-by-id", Meta: chartengine.ChartMeta{Context: "ctx.keep2"}},
-			chartengine.CreateDimensionAction{ChartID: "drop-by-id", ChartMeta: chartengine.ChartMeta{Context: "ctx.keep2"}, Name: "dimC"},
+	plan := chartengine2.Plan{
+		Actions: []chartengine2.EngineAction{
+			chartengine2.CreateChartAction{ChartID: "keep", Meta: chartengine2.ChartMeta{Context: "ctx.keep"}},
+			chartengine2.CreateDimensionAction{ChartID: "keep", ChartMeta: chartengine2.ChartMeta{Context: "ctx.keep"}, Name: "dimA"},
+			chartengine2.CreateChartAction{ChartID: "drop-by-context", Meta: chartengine2.ChartMeta{Context: "ctx.drop"}},
+			chartengine2.CreateDimensionAction{ChartID: "drop-by-context", ChartMeta: chartengine2.ChartMeta{Context: "ctx.drop"}, Name: "dimB"},
+			chartengine2.CreateChartAction{ChartID: "drop-by-id", Meta: chartengine2.ChartMeta{Context: "ctx.keep2"}},
+			chartengine2.CreateDimensionAction{ChartID: "drop-by-id", ChartMeta: chartengine2.ChartMeta{Context: "ctx.keep2"}, Name: "dimC"},
 		},
 	}
 

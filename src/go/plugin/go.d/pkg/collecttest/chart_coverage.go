@@ -11,8 +11,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/charttpl"
+	chartengine2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	charttpl2 "github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 const (
@@ -134,18 +134,18 @@ func matchesAny(value string, matchers []matcher.Matcher) bool {
 	return false
 }
 
-func materializedContextsByPattern(plan chartengine.Plan, contextMatchers []matcher.Matcher) map[string]map[string]struct{} {
+func materializedContextsByPattern(plan chartengine2.Plan, contextMatchers []matcher.Matcher) map[string]map[string]struct{} {
 	out := make(map[string]map[string]struct{})
 	for _, action := range plan.Actions {
 		switch v := action.(type) {
-		case chartengine.CreateChartAction:
+		case chartengine2.CreateChartAction:
 			if matchesAny(v.Meta.Context, contextMatchers) {
 				continue
 			}
 			if _, ok := out[v.Meta.Context]; !ok {
 				out[v.Meta.Context] = make(map[string]struct{})
 			}
-		case chartengine.CreateDimensionAction:
+		case chartengine2.CreateDimensionAction:
 			if matchesAny(v.ChartMeta.Context, contextMatchers) {
 				continue
 			}
@@ -165,7 +165,7 @@ func expectedTemplateCoverage(
 	reader metrix.Reader,
 	contextMatchers []matcher.Matcher,
 ) (map[string][]string, error) {
-	spec, err := charttpl.DecodeYAML([]byte(templateYAML))
+	spec, err := charttpl2.DecodeYAML([]byte(templateYAML))
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func expectedTemplateCoverage(
 
 func collectTemplateContexts(
 	out map[string]map[string]struct{},
-	group charttpl.Group,
+	group charttpl2.Group,
 	parentContextParts []string,
 	reader metrix.Reader,
 	contextMatchers []matcher.Matcher,
@@ -264,7 +264,7 @@ func collectTemplateContexts(
 
 func collectExpectedDimensionNames(
 	reader metrix.Reader,
-	dim charttpl.Dimension,
+	dim charttpl2.Dimension,
 	parseCache map[string]metrixselector.Selector,
 ) ([]string, bool, error) {
 	selectorExpr := strings.TrimSpace(dim.Selector)

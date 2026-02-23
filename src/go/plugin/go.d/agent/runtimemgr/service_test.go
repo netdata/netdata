@@ -6,12 +6,12 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
 )
 
 func TestRuntimeComponentRegistrationScenarios(t *testing.T) {

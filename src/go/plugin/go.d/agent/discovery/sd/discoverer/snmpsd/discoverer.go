@@ -10,11 +10,11 @@ import (
 
 	"github.com/gohugoio/hashstructure"
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/filepersister"
 	"github.com/sourcegraph/conc/pool"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/filepersister"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )

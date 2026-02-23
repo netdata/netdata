@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartengine"
+	chartengine2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 )
 
 func collectOnce(store metrix.CollectorStore, collectFn func(ctx context.Context) error) error {
@@ -126,13 +126,13 @@ func CollectScalarSeries(
 	return readScalarSeries(collector.MetricStore().Read(readOpts...)), nil
 }
 
-func buildPlanFromTemplate(templateYAML string, revision uint64, reader metrix.Reader) (chartengine.Plan, error) {
-	engine, err := chartengine.New()
+func buildPlanFromTemplate(templateYAML string, revision uint64, reader metrix.Reader) (chartengine2.Plan, error) {
+	engine, err := chartengine2.New()
 	if err != nil {
-		return chartengine.Plan{}, err
+		return chartengine2.Plan{}, err
 	}
 	if err := engine.LoadYAML([]byte(templateYAML), revision); err != nil {
-		return chartengine.Plan{}, err
+		return chartengine2.Plan{}, err
 	}
 	return engine.BuildPlan(reader)
 }
@@ -148,7 +148,7 @@ type materializedChart struct {
 	Dimensions map[string]struct{}
 }
 
-func materializedCharts(plan chartengine.Plan, filter planFilter) map[string]materializedChart {
+func materializedCharts(plan chartengine2.Plan, filter planFilter) map[string]materializedChart {
 	out := make(map[string]materializedChart)
 
 	include := func(chartID, context string) bool {
@@ -163,7 +163,7 @@ func materializedCharts(plan chartengine.Plan, filter planFilter) map[string]mat
 
 	for _, action := range plan.Actions {
 		switch v := action.(type) {
-		case chartengine.CreateChartAction:
+		case chartengine2.CreateChartAction:
 			if !include(v.ChartID, v.Meta.Context) {
 				continue
 			}
@@ -174,7 +174,7 @@ func materializedCharts(plan chartengine.Plan, filter planFilter) map[string]mat
 				mc.Dimensions = make(map[string]struct{})
 			}
 			out[v.ChartID] = mc
-		case chartengine.CreateDimensionAction:
+		case chartengine2.CreateDimensionAction:
 			if !include(v.ChartID, v.ChartMeta.Context) {
 				continue
 			}

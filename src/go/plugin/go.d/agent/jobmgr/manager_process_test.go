@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
 func TestRunProcessConfGroups_ChannelCloseDoesNotSpin(t *testing.T) {

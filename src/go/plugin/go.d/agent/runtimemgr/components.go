@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/chartemit"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
 
 // Minimal valid template for runtime components that rely on autogen.

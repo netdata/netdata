@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"gopkg.in/yaml.v2"
 )

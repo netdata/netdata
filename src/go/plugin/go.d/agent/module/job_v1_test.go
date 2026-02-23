@@ -10,9 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 )
 
 const (

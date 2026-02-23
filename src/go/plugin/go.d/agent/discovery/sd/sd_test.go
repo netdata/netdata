@@ -5,10 +5,10 @@ package sd
 import (
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/discoverer/netlistensd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/pipeline"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 
 	"gopkg.in/yaml.v2"
 )

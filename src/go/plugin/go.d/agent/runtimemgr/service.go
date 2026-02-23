@@ -13,7 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimecomp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
 
 // Service owns runtime/internal metrics components and their cadence-driven
