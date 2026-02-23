@@ -5,8 +5,8 @@ package jobmgr
 import (
 	"context"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 // runtimeJob is the minimal job runner contract needed by jobmgr orchestration.

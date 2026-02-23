@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package module
+package modruntime
 
 import (
 	"bytes"
@@ -11,35 +11,19 @@ import (
 	"log/slog"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	frameworkmodule "github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
-var obsoleteLock = &sync.Mutex{}
-var obsoleteCharts = true
-
-func ObsoleteCharts(b bool) {
-	obsoleteLock.Lock()
-	obsoleteCharts = b
-	obsoleteLock.Unlock()
-}
-
-func shouldObsoleteCharts() bool {
-	obsoleteLock.Lock()
-	defer obsoleteLock.Unlock()
-	return obsoleteCharts
-}
-
 func newCollectStatusChart(pluginName string) *Chart {
-	return &Chart{
-		typ:      "netdata",
+	chart := &Chart{
 		Title:    "Data Collection Status",
 		Units:    "status",
 		Fam:      pluginName,
@@ -50,11 +34,12 @@ func newCollectStatusChart(pluginName string) *Chart {
 			{ID: "failed"},
 		},
 	}
+	chart.SetCachedType("netdata")
+	return chart
 }
 
 func newCollectDurationChart(pluginName string) *Chart {
-	return &Chart{
-		typ:      "netdata",
+	chart := &Chart{
 		Title:    "Data Collection Duration",
 		Units:    "ms",
 		Fam:      pluginName,
@@ -64,6 +49,8 @@ func newCollectDurationChart(pluginName string) *Chart {
 			{ID: "duration"},
 		},
 	}
+	chart.SetCachedType("netdata")
+	return chart
 }
 
 type JobConfig struct {
@@ -377,7 +364,7 @@ func (j *Job) disableAutoDetection() {
 
 func (j *Job) Cleanup() {
 	j.buf.Reset()
-	if !shouldObsoleteCharts() {
+	if !frameworkmodule.ShouldObsoleteCharts() {
 		return
 	}
 
@@ -395,7 +382,7 @@ func (j *Job) Cleanup() {
 
 		if j.charts != nil {
 			for _, chart := range *j.charts {
-				if chart.created {
+				if chart.IsCreated() {
 					chart.MarkRemove()
 					j.createChart(chart)
 				}
@@ -405,11 +392,11 @@ func (j *Job) Cleanup() {
 
 	j.api.HOST("")
 
-	if j.collectStatusChart.created {
+	if j.collectStatusChart.IsCreated() {
 		j.collectStatusChart.MarkRemove()
 		j.createChart(j.collectStatusChart)
 	}
-	if j.collectDurationChart.created {
+	if j.collectDurationChart.IsCreated() {
 		j.collectDurationChart.MarkRemove()
 		j.createChart(j.collectDurationChart)
 	}
@@ -448,7 +435,7 @@ func (j *Job) postCheck() error {
 		return errors.New("nil charts")
 	}
 	if j.charts != nil {
-		if err := checkCharts(*j.charts...); err != nil {
+		if err := frameworkmodule.CheckCharts(*j.charts...); err != nil {
 			j.Errorf("charts check: %v", err)
 			return err
 		}
@@ -541,17 +528,17 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 
 	var i, updated, created int
 	for _, chart := range *j.charts {
-		if !chart.created || createChart {
+		if !chart.IsCreated() || createChart {
 			typeID := fmt.Sprintf("%s.%s", getChartType(chart, j), getChartID(chart))
 			if len(typeID) >= NetdataChartIDMaxLength {
 				j.Warningf("chart 'type.id' length (%d) >= max allowed (%d), the chart is ignored (%s)",
 					len(typeID), NetdataChartIDMaxLength, typeID)
-				chart.ignore = true
+				chart.SetIgnored(true)
 			}
 			j.createChart(chart)
 			created++
 		}
-		if chart.remove {
+		if chart.IsRemoved() {
 			continue
 		}
 		(*j.charts)[i] = chart
@@ -571,12 +558,12 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 
 	j.api.HOST("")
 
-	if !j.collectStatusChart.created || createChart {
+	if !j.collectStatusChart.IsCreated() || createChart {
 		j.collectStatusChart.ID = fmt.Sprintf("%s_%s_data_collection_status", cleanPluginName(j.pluginName), j.FullName())
 		j.createChart(j.collectStatusChart)
 	}
 
-	if !j.collectDurationChart.created || createChart {
+	if !j.collectDurationChart.IsCreated() || createChart {
 		j.collectDurationChart.ID = fmt.Sprintf("%s_%s_data_collection_duration", cleanPluginName(j.pluginName), j.FullName())
 		j.createChart(j.collectDurationChart)
 	}
@@ -622,8 +609,8 @@ func (j *Job) sendVnodeHostInfo() {
 }
 
 func (j *Job) createChart(chart *Chart) {
-	defer func() { chart.created = true }()
-	if chart.ignore {
+	defer func() { chart.SetCreated(true) }()
+	if chart.IsIgnored() {
 		return
 	}
 
@@ -696,10 +683,10 @@ func (j *Job) createChart(chart *Chart) {
 }
 
 func (j *Job) updateChart(chart *Chart, mx collectedMetrics, sinceLastRun int) bool {
-	if chart.ignore {
+	if chart.IsIgnored() {
 		dims := chart.Dims[:0]
 		for _, dim := range chart.Dims {
-			if !dim.remove {
+			if !dim.IsRemoved() {
 				dims = append(dims, dim)
 			}
 		}
@@ -711,7 +698,7 @@ func (j *Job) updateChart(chart *Chart, mx collectedMetrics, sinceLastRun int) b
 	if chart.SkipGaps {
 		hasData := false
 		for _, dim := range chart.Dims {
-			if dim.remove {
+			if dim.IsRemoved() {
 				continue
 			}
 			if _, hasData = mx.getValue(dim.ID); hasData {
@@ -724,7 +711,7 @@ func (j *Job) updateChart(chart *Chart, mx collectedMetrics, sinceLastRun int) b
 		}
 		// At least one dimension has data - proceed with deltaTime=0
 		sinceLastRun = 0
-	} else if !chart.updated {
+	} else if !chart.IsUpdated() {
 		sinceLastRun = 0
 	}
 
@@ -732,7 +719,7 @@ func (j *Job) updateChart(chart *Chart, mx collectedMetrics, sinceLastRun int) b
 
 	var i, updated int
 	for _, dim := range chart.Dims {
-		if dim.remove {
+		if dim.IsRemoved() {
 			continue
 		}
 		chart.Dims[i] = dim
@@ -763,12 +750,13 @@ func (j *Job) updateChart(chart *Chart, mx collectedMetrics, sinceLastRun int) b
 
 	j.api.END()
 
-	if chart.updated = updated > 0; chart.updated {
+	chart.SetUpdated(updated > 0)
+	if chart.IsUpdated() {
 		chart.Retries = 0
 	} else {
 		chart.Retries++
 	}
-	return chart.updated
+	return chart.IsUpdated()
 }
 
 func (j *Job) penalty() int {
@@ -776,37 +764,38 @@ func (j *Job) penalty() int {
 }
 
 func getChartType(chart *Chart, j *Job) string {
-	if chart.typ != "" {
-		return chart.typ
+	if chart.CachedType() != "" {
+		return chart.CachedType()
 	}
 	if !chart.IDSep {
-		chart.typ = j.FullName()
+		chart.SetCachedType(j.FullName())
 	} else if i := strings.IndexByte(chart.ID, '.'); i != -1 {
-		chart.typ = j.FullName() + "_" + chart.ID[:i]
+		chart.SetCachedType(j.FullName() + "_" + chart.ID[:i])
 	} else {
-		chart.typ = j.FullName()
+		chart.SetCachedType(j.FullName())
 	}
 	if chart.OverModule != "" {
-		if v := strings.TrimPrefix(chart.typ, j.ModuleName()); v != chart.typ {
-			chart.typ = chart.OverModule + v
+		cachedType := chart.CachedType()
+		if v := strings.TrimPrefix(cachedType, j.ModuleName()); v != cachedType {
+			chart.SetCachedType(chart.OverModule + v)
 		}
 	}
-	return chart.typ
+	return chart.CachedType()
 }
 
 func getChartID(chart *Chart) string {
-	if chart.id != "" {
-		return chart.id
+	if chart.CachedID() != "" {
+		return chart.CachedID()
 	}
 	if !chart.IDSep {
 		return chart.ID
 	}
 	if i := strings.IndexByte(chart.ID, '.'); i != -1 {
-		chart.id = chart.ID[i+1:]
+		chart.SetCachedID(chart.ID[i+1:])
 	} else {
-		chart.id = chart.ID
+		chart.SetCachedID(chart.ID)
 	}
-	return chart.id
+	return chart.CachedID()
 }
 
 func calcSinceLastRun(curTime, prevRun time.Time) int {

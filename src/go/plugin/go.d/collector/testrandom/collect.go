@@ -5,7 +5,7 @@ package testrandom
 import (
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {

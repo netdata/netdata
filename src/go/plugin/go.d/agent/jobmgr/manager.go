@@ -24,9 +24,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/modruntime"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"gopkg.in/yaml.v2"
 )
 
@@ -558,7 +559,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 			}
 		}
 
-		jobCfg := module.JobV2Config{
+		jobCfg := modruntime.JobV2Config{
 			PluginName:      m.PluginName,
 			Name:            cfg.Name(),
 			ModuleName:      cfg.Module(),
@@ -575,7 +576,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		if vnode != nil {
 			jobCfg.Vnode = *vnode.Copy()
 		}
-		return module.NewJobV2(jobCfg), nil
+		return modruntime.NewJobV2(jobCfg), nil
 	}
 
 	if creator.Create == nil {
@@ -594,7 +595,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		}
 	}
 
-	jobCfg := module.JobConfig{
+	jobCfg := modruntime.JobConfig{
 		PluginName:      m.PluginName,
 		Name:            cfg.Name(),
 		ModuleName:      cfg.Module(),
@@ -615,7 +616,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		jobCfg.Vnode = *vnode.Copy()
 	}
 
-	job := module.NewJob(jobCfg)
+	job := modruntime.NewJob(jobCfg)
 
 	return job, nil
 }

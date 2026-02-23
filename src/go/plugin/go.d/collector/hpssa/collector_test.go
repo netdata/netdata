@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/modtest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -392,13 +392,13 @@ func TestCollector_Collect(t *testing.T) {
 
 			assert.Len(t, *collr.Charts(), test.wantCharts, "wantCharts")
 
-			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+			modtest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	modtest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func prepareMockOkP212andP410i() *mockSsacliExec {

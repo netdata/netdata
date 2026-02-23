@@ -3,7 +3,7 @@ package mq
 import (
 	_ "embed"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 

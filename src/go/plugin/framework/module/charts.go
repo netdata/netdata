@@ -6,10 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"testing"
 	"unicode"
-
-	"github.com/stretchr/testify/assert"
 )
 
 type (
@@ -399,6 +396,11 @@ func checkCharts(charts ...*Chart) error {
 	return nil
 }
 
+// CheckCharts validates chart definitions.
+func CheckCharts(charts ...*Chart) error {
+	return checkCharts(charts...)
+}
+
 func checkChart(chart *Chart) error {
 	if chart.ID == "" {
 		return errors.New("empty ID")
@@ -470,28 +472,4 @@ func checkID(id string) int {
 		}
 	}
 	return -1
-}
-
-func TestMetricsHasAllChartsDims(t *testing.T, charts *Charts, mx map[string]int64) {
-	TestMetricsHasAllChartsDimsSkip(t, charts, mx, nil)
-}
-
-func TestMetricsHasAllChartsDimsSkip(t *testing.T, charts *Charts, mx map[string]int64, skip func(chart *Chart, dim *Dim) bool) {
-	for _, chart := range *charts {
-		if chart.Obsolete {
-			continue
-		}
-		for _, dim := range chart.Dims {
-			if skip != nil && skip(chart, dim) {
-				continue
-			}
-
-			_, ok := mx[dim.ID]
-			assert.Truef(t, ok, "missing data for dimension '%s' in chart '%s'", dim.ID, chart.ID)
-		}
-		for _, v := range chart.Vars {
-			_, ok := mx[v.ID]
-			assert.Truef(t, ok, "missing data for variable '%s' in chart '%s'", v.ID, chart.ID)
-		}
-	}
 }

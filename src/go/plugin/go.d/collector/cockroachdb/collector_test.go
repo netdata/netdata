@@ -9,7 +9,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/modtest"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +36,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	modtest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
@@ -226,7 +227,7 @@ func TestCollector_Collect(t *testing.T) {
 
 	assert.Equal(t, expected, mx)
 
-	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+	modtest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
 func TestCollector_Collect_ReturnsNilIfNotCockroachDBMetrics(t *testing.T) {

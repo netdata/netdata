@@ -4,7 +4,7 @@
 
 package litespeed
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/module"
 
 const (
 	prioRequests = module.Priority + iota

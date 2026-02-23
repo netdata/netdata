@@ -16,8 +16,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 var version = "v0.0.1-example"

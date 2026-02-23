@@ -7,7 +7,7 @@ import (
 	"reflect"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 )
 
 // collectServerStatus creates the map[string]int64 for the available dims.

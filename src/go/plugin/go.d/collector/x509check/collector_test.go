@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/modtest"
 )
 
 var (
@@ -31,7 +31,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	modtest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Cleanup(t *testing.T) {
@@ -134,7 +134,7 @@ func TestCollector_Collect(t *testing.T) {
 	mx := collr.Collect(context.Background())
 
 	assert.NotZero(t, mx)
-	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+	modtest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
 func TestCollector_Collect_ReturnsNilOnProviderError(t *testing.T) {

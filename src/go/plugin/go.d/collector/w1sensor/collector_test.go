@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/modtest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +30,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_Configuration(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	modtest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -158,7 +158,7 @@ func TestW1Sensors_Collect(t *testing.T) {
 
 			assert.Equal(t, test.wantCharts, len(*collr.Charts()), "wantCharts")
 
-			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+			modtest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }

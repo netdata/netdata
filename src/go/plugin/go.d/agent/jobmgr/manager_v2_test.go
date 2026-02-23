@@ -6,13 +6,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/modruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 )
 
 type testV1Module struct {
@@ -119,7 +120,7 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			_, isV2 := job.(*module.JobV2)
+			_, isV2 := job.(*modruntime.JobV2)
 			assert.Equal(t, tc.wantV2, isV2)
 		})
 	}

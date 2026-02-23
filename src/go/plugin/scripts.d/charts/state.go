@@ -5,7 +5,7 @@ package charts
 import (
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/units"
 )

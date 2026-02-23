@@ -3,7 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"strings"
 )
 

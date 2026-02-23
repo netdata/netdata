@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/modtest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/freeradius/api"
 
 	"github.com/stretchr/testify/assert"
@@ -30,7 +30,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	modtest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -121,7 +121,7 @@ func TestCollector_Collect(t *testing.T) {
 	mx := collr.Collect(context.Background())
 
 	assert.Equal(t, expected, mx)
-	module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+	modtest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
 func TestCollector_Collect_ReturnsNilIfClientStatusReturnsError(t *testing.T) {

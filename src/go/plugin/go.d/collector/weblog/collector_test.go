@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/modtest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 
@@ -46,7 +46,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	modtest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -738,7 +738,7 @@ func testCharts(t *testing.T, c *Collector, mx map[string]int64) {
 	testCustomTimeFieldCharts(t, c)
 	testCustomNumericFieldCharts(t, c)
 
-	module.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
+	modtest.TestMetricsHasAllChartsDims(t, c.Charts(), mx)
 }
 
 func testVhostChart(t *testing.T, c *Collector) {

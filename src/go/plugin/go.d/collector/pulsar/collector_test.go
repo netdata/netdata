@@ -16,7 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/modtest"
 )
 
 var (
@@ -43,7 +43,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	modtest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -176,7 +176,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			require.NotNil(t, mx)
 			require.Equal(t, test.expected, mx)
-			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+			modtest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }

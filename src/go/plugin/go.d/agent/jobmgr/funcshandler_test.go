@@ -7,13 +7,14 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/modruntime"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/stretchr/testify/assert"
 )
 
 // mockMethodHandler implements funcapi.MethodHandler for testing.
 type mockMethodHandler struct {
-	job        *module.Job
+	job        *modruntime.Job
 	paramsFunc func(ctx context.Context, method string) ([]funcapi.ParamConfig, error)
 	handleFunc func(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse
 }

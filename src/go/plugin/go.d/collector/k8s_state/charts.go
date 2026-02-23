@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 )
 
 // NETDATA_CHART_PRIO_CGROUPS_CONTAINERS 40000

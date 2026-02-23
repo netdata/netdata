@@ -8,7 +8,8 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/modruntime"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -190,8 +191,8 @@ func TestModuleFuncRegistry_GetCreator(t *testing.T) {
 }
 
 // newTestModuleFuncsJob creates a minimal job for testing modulefuncs
-func newTestModuleFuncsJob(name string) *module.Job {
-	return module.NewJob(module.JobConfig{
+func newTestModuleFuncsJob(name string) *modruntime.Job {
+	return modruntime.NewJob(modruntime.JobConfig{
 		PluginName:      "test",
 		Name:            name,
 		ModuleName:      "test",
@@ -244,7 +245,7 @@ func TestModuleFuncRegistry_VerifyJobGeneration_JobStopped(t *testing.T) {
 	r := newModuleFuncRegistry()
 	r.registerModule("postgres", module.Creator{})
 
-	job := module.NewJob(module.JobConfig{
+	job := modruntime.NewJob(modruntime.JobConfig{
 		PluginName: "test",
 		Name:       "master",
 		ModuleName: "postgres",
