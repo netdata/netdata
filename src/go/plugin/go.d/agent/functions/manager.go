@@ -28,7 +28,7 @@ func NewManager() *Manager {
 			slog.String("component", "functions manager"),
 		),
 		api:              netdataapi.New(safewriter.Stdout),
-		input:            stdinInput,
+		input:            newStdinInput(),
 		mux:              &sync.Mutex{},
 		FunctionRegistry: make(map[string]*functionSet),
 	}

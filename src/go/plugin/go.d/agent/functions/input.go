@@ -5,23 +5,19 @@ package functions
 import (
 	"bufio"
 	"os"
+	"sync"
 )
 
 type input interface {
 	lines() chan string
 }
 
-var stdinInput = func() input {
-	r := &stdinReader{
-		linesCh: make(chan string),
-	}
-
-	go r.run()
-
-	return r
-}()
+func newStdinInput() input {
+	return &stdinReader{}
+}
 
 type stdinReader struct {
+	once    sync.Once
 	linesCh chan string
 }
 
@@ -34,5 +30,10 @@ func (in *stdinReader) run() {
 }
 
 func (in *stdinReader) lines() chan string {
+	in.once.Do(func() {
+		in.linesCh = make(chan string)
+		go in.run()
+	})
+
 	return in.linesCh
 }
