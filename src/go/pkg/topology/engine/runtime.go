@@ -100,6 +100,7 @@ func emptyResult() Result {
 			"links_total":          0,
 			"links_lldp":           0,
 			"links_cdp":            0,
+			"links_stp":            0,
 			"attachments_total":    0,
 			"attachments_fdb":      0,
 			"enrichments_total":    0,

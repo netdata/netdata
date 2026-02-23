@@ -222,6 +222,137 @@ func TestParse(t *testing.T) {
 				assert.Equal(t, expected, group)
 			},
 		},
+		"static, snmp: inherit top-level topology into jobs": {
+			test: func(t *testing.T, tmp *tmpDir) {
+				reg := confgroup.Registry{
+					"snmp": {},
+				}
+				cfg := staticConfig{
+					Jobs: []confgroup.Config{
+						{
+							"name":      "edge-sw",
+							"hostname":  "10.20.4.84",
+							"community": "atadteN",
+						},
+					},
+					Extra: confgroup.Config{
+						"topology": confgroup.Config{
+							"autoprobe": false,
+						},
+					},
+				}
+				filename := tmp.join("snmp.conf")
+				tmp.writeYAML(filename, cfg)
+
+				expected := &confgroup.Group{
+					Source: filename,
+					Configs: []confgroup.Config{
+						{
+							"name":                "edge-sw",
+							"module":              "snmp",
+							"hostname":            "10.20.4.84",
+							"community":           "atadteN",
+							"topology":            map[string]any{"autoprobe": false},
+							"autodetection_retry": module.AutoDetectionRetry,
+							"priority":            module.Priority,
+							"update_every":        module.UpdateEvery,
+						},
+					},
+				}
+
+				group, err := parse(reg, filename)
+
+				require.NoError(t, err)
+				assert.Equal(t, expected, group)
+			},
+		},
+		"static, snmp: per-job topology overrides global and keeps missing defaults": {
+			test: func(t *testing.T, tmp *tmpDir) {
+				reg := confgroup.Registry{
+					"snmp": {},
+				}
+				cfg := staticConfig{
+					Jobs: []confgroup.Config{
+						{
+							"name":      "core-router",
+							"hostname":  "10.20.4.1",
+							"community": "atadteN",
+							"topology": confgroup.Config{
+								"autoprobe": true,
+							},
+						},
+					},
+					Extra: confgroup.Config{
+						"topology": confgroup.Config{
+							"autoprobe": false,
+							"protocols": []any{"lldp", "cdp", "fdb"},
+						},
+					},
+				}
+				filename := tmp.join("snmp.conf")
+				tmp.writeYAML(filename, cfg)
+
+				expected := &confgroup.Group{
+					Source: filename,
+					Configs: []confgroup.Config{
+						{
+							"name":                "core-router",
+							"module":              "snmp",
+							"hostname":            "10.20.4.1",
+							"community":           "atadteN",
+							"topology":            map[string]any{"autoprobe": true, "protocols": []any{"lldp", "cdp", "fdb"}},
+							"update_every":        module.UpdateEvery,
+							"autodetection_retry": module.AutoDetectionRetry,
+							"priority":            module.Priority,
+						},
+					},
+				}
+
+				group, err := parse(reg, filename)
+
+				require.NoError(t, err)
+				assert.Equal(t, expected, group)
+			},
+		},
+		"static, non-snmp ignores top-level topology": {
+			test: func(t *testing.T, tmp *tmpDir) {
+				reg := confgroup.Registry{
+					"module": {},
+				}
+				cfg := staticConfig{
+					Jobs: []confgroup.Config{
+						{
+							"name": "name",
+						},
+					},
+					Extra: confgroup.Config{
+						"topology": confgroup.Config{
+							"autoprobe": false,
+						},
+					},
+				}
+				filename := tmp.join("module.conf")
+				tmp.writeYAML(filename, cfg)
+
+				expected := &confgroup.Group{
+					Source: filename,
+					Configs: []confgroup.Config{
+						{
+							"name":                "name",
+							"module":              "module",
+							"autodetection_retry": module.AutoDetectionRetry,
+							"priority":            module.Priority,
+							"update_every":        module.UpdateEvery,
+						},
+					},
+				}
+
+				group, err := parse(reg, filename)
+
+				require.NoError(t, err)
+				assert.Equal(t, expected, group)
+			},
+		},
 		"sd, default: +job +module": {
 			test: func(t *testing.T, tmp *tmpDir) {
 				reg := confgroup.Registry{

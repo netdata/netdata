@@ -19,6 +19,44 @@ metrics:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
 
+  # IF-MIB ifTable: explicit interface status collection for topology port states.
+  # Some vendors do not support stable cross-table joins from ifXTable to ifTable.
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.2.2
+      name: ifTable
+    symbols:
+      # Use oper status symbol to guarantee row emission for interfaces.
+      - OID: 1.3.6.1.2.1.2.2.1.8
+        name: topologyIfStatusEntry
+    metric_tags:
+      - tag: topo_if_index
+        index: 1
+      - tag: topo_if_type
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.3
+          name: ifType
+      - tag: topo_if_admin_status
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.7
+          name: ifAdminStatus
+          mapping:
+            1: up
+            2: down
+            3: testing
+      - tag: topo_if_oper_status
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.8
+          name: ifOperStatus
+          mapping:
+            1: up
+            2: down
+            3: testing
+            4: unknown
+            5: dormant
+            6: notPresent
+            7: lowerLayerDown
+
   # BRIDGE-MIB: maps bridge port number to ifIndex.
   - MIB: BRIDGE-MIB
     table:

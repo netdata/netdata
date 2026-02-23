@@ -18,24 +18,29 @@ import (
 )
 
 const (
-	metricLldpLocPortEntry     = "lldpLocPortEntry"
-	metricLldpLocManAddrEntry  = "lldpLocManAddrEntry"
-	metricLldpRemEntry         = "lldpRemEntry"
-	metricLldpRemManAddrEntry  = "lldpRemManAddrEntry"
-	metricLldpRemManAddrCompat = "lldpRemManAddrCompatEntry"
-	metricCdpCacheEntry        = "cdpCacheEntry"
-	metricTopologyIfNameEntry  = "topologyIfNameEntry"
-	metricTopologyIPIfEntry    = "topologyIpIfIndexEntry"
-	metricBridgePortMapEntry   = "dot1dBasePortIfIndexEntry"
-	metricFdbEntry             = "dot1dTpFdbEntry"
-	metricArpEntry             = "ipNetToPhysicalEntry"
-	metricArpLegacyEntry       = "ipNetToMediaEntry"
-	metricOspfGeneralEntry     = "ospfGeneralEntry"
-	metricOspfIfEntry          = "ospfIfTopologyEntry"
-	metricOspfNbrEntry         = "ospfNbrTopologyEntry"
-	metricIsisSysEntry         = "isisSysObjectEntry"
-	metricIsisCircEntry        = "isisCircEntry"
-	metricIsisAdjEntry         = "isisISAdjEntry"
+	metricLldpLocPortEntry      = "lldpLocPortEntry"
+	metricLldpLocManAddrEntry   = "lldpLocManAddrEntry"
+	metricLldpRemEntry          = "lldpRemEntry"
+	metricLldpRemManAddrEntry   = "lldpRemManAddrEntry"
+	metricLldpRemManAddrCompat  = "lldpRemManAddrCompatEntry"
+	metricCdpCacheEntry         = "cdpCacheEntry"
+	metricTopologyIfNameEntry   = "topologyIfNameEntry"
+	metricTopologyIfStatusEntry = "topologyIfStatusEntry"
+	metricTopologyIPIfEntry     = "topologyIpIfIndexEntry"
+	metricBridgePortMapEntry    = "dot1dBasePortIfIndexEntry"
+	metricFdbEntry              = "dot1dTpFdbEntry"
+	metricDot1qFdbEntry         = "dot1qTpFdbEntry"
+	metricDot1qVlanEntry        = "dot1qVlanCurrentEntry"
+	metricStpPortEntry          = "dot1dStpPortEntry"
+	metricVtpVlanEntry          = "vtpVlanEntry"
+	metricArpEntry              = "ipNetToPhysicalEntry"
+	metricArpLegacyEntry        = "ipNetToMediaEntry"
+	metricOspfGeneralEntry      = "ospfGeneralEntry"
+	metricOspfIfEntry           = "ospfIfTopologyEntry"
+	metricOspfNbrEntry          = "ospfNbrTopologyEntry"
+	metricIsisSysEntry          = "isisSysObjectEntry"
+	metricIsisCircEntry         = "isisCircEntry"
+	metricIsisAdjEntry          = "isisISAdjEntry"
 )
 
 const (
@@ -103,15 +108,41 @@ const (
 
 	tagTopoIfIndex = "topo_if_index"
 	tagTopoIfName  = "topo_if_name"
+	tagTopoIfType  = "topo_if_type"
+	tagTopoIfAdmin = "topo_if_admin_status"
+	tagTopoIfOper  = "topo_if_oper_status"
 	tagTopoIPAddr  = "topo_ip_addr"
 	tagTopoIPMask  = "topo_ip_netmask"
 
 	tagBridgeBasePort = "bridge_base_port"
 	tagBridgeIfIndex  = "bridge_if_index"
 
-	tagFdbMac        = "fdb_mac"
-	tagFdbBridgePort = "fdb_bridge_port"
-	tagFdbStatus     = "fdb_status"
+	tagFdbMac                  = "fdb_mac"
+	tagFdbBridgePort           = "fdb_bridge_port"
+	tagFdbStatus               = "fdb_status"
+	tagDot1qFdbID              = "dot1q_fdb_id"
+	tagDot1qFdbMac             = "dot1q_fdb_mac"
+	tagDot1qFdbPort            = "dot1q_fdb_bridge_port"
+	tagDot1qFdbStatus          = "dot1q_fdb_status"
+	tagDot1qVlanID             = "dot1q_vlan_id"
+	tagDot1qVlanID1            = "dot1q_vlan_id_idx1"
+	tagDot1qVlanFdbID          = "dot1q_vlan_fdb_id"
+	tagStpBaseBridgeAddress    = "stp_base_bridge_address"
+	tagStpDesignatedRoot       = "stp_designated_root"
+	tagStpPort                 = "stp_port"
+	tagStpPortPriority         = "stp_port_priority"
+	tagStpPortState            = "stp_port_state"
+	tagStpPortEnable           = "stp_port_enable"
+	tagStpPortPathCost         = "stp_port_path_cost"
+	tagStpPortDesignatedRoot   = "stp_port_designated_root"
+	tagStpPortDesignatedCost   = "stp_port_designated_cost"
+	tagStpPortDesignatedBridge = "stp_port_designated_bridge"
+	tagStpPortDesignatedPort   = "stp_port_designated_port"
+	tagVtpVersion              = "vtp_version"
+	tagVtpVlanIndex            = "vtp_vlan_index"
+	tagVtpVlanState            = "vtp_vlan_state"
+	tagVtpVlanType             = "vtp_vlan_type"
+	tagVtpVlanName             = "vtp_vlan_name"
 
 	tagArpIfIndex  = "arp_if_index"
 	tagArpIfName   = "arp_if_name"
@@ -146,6 +177,10 @@ const (
 	tagIsisAdjNeighSysType = "isis_adj_neigh_sys_type"
 	tagIsisAdjNeighSysID   = "isis_adj_neigh_sys_id"
 	tagIsisAdjNeighExtCirc = "isis_adj_neigh_extended_circ_id"
+
+	// Internal collector tags used when ingesting additional VLAN-context snapshots.
+	tagTopologyContextVLANID   = "_topology_context_vlan_id"
+	tagTopologyContextVLANName = "_topology_context_vlan_name"
 )
 
 var lldpChassisIDSubtypeMap = map[string]string{
@@ -180,12 +215,19 @@ type topologyCache struct {
 	lldpRemotes  map[string]*lldpRemote
 	cdpRemotes   map[string]*cdpRemote
 
-	ifNamesByIndex map[string]string
-	ifIndexByIP    map[string]string
-	ifNetmaskByIP  map[string]string
-	bridgePortToIf map[string]string
-	fdbEntries     map[string]*fdbEntry
-	arpEntries     map[string]*arpEntry
+	ifNamesByIndex       map[string]string
+	ifStatusByIndex      map[string]ifStatus
+	ifIndexByIP          map[string]string
+	ifNetmaskByIP        map[string]string
+	bridgePortToIf       map[string]string
+	fdbEntries           map[string]*fdbEntry
+	fdbIDToVlanID        map[string]string
+	vlanIDToName         map[string]string
+	vtpVersion           string
+	stpBaseBridgeAddress string
+	stpDesignatedRoot    string
+	stpPorts             map[string]*stpPortEntry
+	arpEntries           map[string]*arpEntry
 
 	ospfElement *ospfElement
 	ospfIfRows  map[string]*ospfIfEntry
@@ -194,6 +236,12 @@ type topologyCache struct {
 	isisElement *isisElement
 	isisCircs   map[string]*isisCircEntry
 	isisAdjs    map[string]*isisAdjEntry
+}
+
+type ifStatus struct {
+	admin  string
+	oper   string
+	ifType string
 }
 
 type lldpLocPort struct {
@@ -251,6 +299,28 @@ type fdbEntry struct {
 	mac        string
 	bridgePort string
 	status     string
+	fdbID      string
+	vlanID     string
+	vlanName   string
+}
+
+type stpPortEntry struct {
+	port             string
+	vlanID           string
+	vlanName         string
+	priority         string
+	state            string
+	enable           string
+	pathCost         string
+	designatedRoot   string
+	designatedCost   string
+	designatedBridge string
+	designatedPort   string
+}
+
+type topologyVLANContext struct {
+	vlanID   string
+	vlanName string
 }
 
 type arpEntry struct {
@@ -306,19 +376,23 @@ type isisAdjEntry struct {
 
 func newTopologyCache() *topologyCache {
 	return &topologyCache{
-		lldpLocPorts:   make(map[string]*lldpLocPort),
-		lldpRemotes:    make(map[string]*lldpRemote),
-		cdpRemotes:     make(map[string]*cdpRemote),
-		ifNamesByIndex: make(map[string]string),
-		ifIndexByIP:    make(map[string]string),
-		ifNetmaskByIP:  make(map[string]string),
-		bridgePortToIf: make(map[string]string),
-		fdbEntries:     make(map[string]*fdbEntry),
-		arpEntries:     make(map[string]*arpEntry),
-		ospfIfRows:     make(map[string]*ospfIfEntry),
-		ospfNbrRows:    make(map[string]*ospfNbrEntry),
-		isisCircs:      make(map[string]*isisCircEntry),
-		isisAdjs:       make(map[string]*isisAdjEntry),
+		lldpLocPorts:    make(map[string]*lldpLocPort),
+		lldpRemotes:     make(map[string]*lldpRemote),
+		cdpRemotes:      make(map[string]*cdpRemote),
+		ifNamesByIndex:  make(map[string]string),
+		ifStatusByIndex: make(map[string]ifStatus),
+		ifIndexByIP:     make(map[string]string),
+		ifNetmaskByIP:   make(map[string]string),
+		bridgePortToIf:  make(map[string]string),
+		fdbEntries:      make(map[string]*fdbEntry),
+		fdbIDToVlanID:   make(map[string]string),
+		vlanIDToName:    make(map[string]string),
+		stpPorts:        make(map[string]*stpPortEntry),
+		arpEntries:      make(map[string]*arpEntry),
+		ospfIfRows:      make(map[string]*ospfIfEntry),
+		ospfNbrRows:     make(map[string]*ospfNbrEntry),
+		isisCircs:       make(map[string]*isisCircEntry),
+		isisAdjs:        make(map[string]*isisAdjEntry),
 	}
 }
 
@@ -339,10 +413,17 @@ func (c *Collector) resetTopologyCache() {
 	c.topologyCache.lldpRemotes = make(map[string]*lldpRemote)
 	c.topologyCache.cdpRemotes = make(map[string]*cdpRemote)
 	c.topologyCache.ifNamesByIndex = make(map[string]string)
+	c.topologyCache.ifStatusByIndex = make(map[string]ifStatus)
 	c.topologyCache.ifIndexByIP = make(map[string]string)
 	c.topologyCache.ifNetmaskByIP = make(map[string]string)
 	c.topologyCache.bridgePortToIf = make(map[string]string)
 	c.topologyCache.fdbEntries = make(map[string]*fdbEntry)
+	c.topologyCache.fdbIDToVlanID = make(map[string]string)
+	c.topologyCache.vlanIDToName = make(map[string]string)
+	c.topologyCache.vtpVersion = ""
+	c.topologyCache.stpBaseBridgeAddress = ""
+	c.topologyCache.stpDesignatedRoot = ""
+	c.topologyCache.stpPorts = make(map[string]*stpPortEntry)
 	c.topologyCache.arpEntries = make(map[string]*arpEntry)
 	c.topologyCache.ospfElement = nil
 	c.topologyCache.ospfIfRows = make(map[string]*ospfIfEntry)
@@ -396,6 +477,15 @@ func (c *Collector) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
 				}
 			}
 		}
+		if v := stpBridgeAddressToMAC(pm.Tags[tagStpBaseBridgeAddress]); v != "" {
+			c.topologyCache.stpBaseBridgeAddress = v
+		}
+		if v := stpBridgeAddressToMAC(pm.Tags[tagStpDesignatedRoot]); v != "" {
+			c.topologyCache.stpDesignatedRoot = v
+		}
+		if v := strings.TrimSpace(pm.Tags[tagVtpVersion]); v != "" {
+			c.topologyCache.vtpVersion = v
+		}
 	}
 }
 
@@ -420,12 +510,20 @@ func (c *Collector) updateTopologyCacheEntry(m ddsnmp.Metric) {
 		c.topologyCache.updateCdpRemote(m.Tags)
 	case metricTopologyIfNameEntry:
 		c.topologyCache.updateIfNameByIndex(m.Tags)
+	case metricTopologyIfStatusEntry:
+		c.topologyCache.updateIfNameByIndex(m.Tags)
 	case metricTopologyIPIfEntry:
 		c.topologyCache.updateIfIndexByIP(m.Tags)
 	case metricBridgePortMapEntry:
 		c.topologyCache.updateBridgePortMap(m.Tags)
-	case metricFdbEntry:
+	case metricFdbEntry, metricDot1qFdbEntry:
 		c.topologyCache.updateFdbEntry(m.Tags)
+	case metricDot1qVlanEntry:
+		c.topologyCache.updateDot1qVlanMap(m.Tags)
+	case metricStpPortEntry:
+		c.topologyCache.updateStpPortEntry(m.Tags)
+	case metricVtpVlanEntry:
+		c.topologyCache.updateVtpVlanEntry(m.Tags)
 	case metricArpEntry, metricArpLegacyEntry:
 		c.topologyCache.updateArpEntry(m.Tags)
 	case metricOspfGeneralEntry:
@@ -457,7 +555,7 @@ func (c *Collector) finalizeTopologyCache() {
 func isTopologyMetric(name string) bool {
 	switch name {
 	case metricLldpLocPortEntry, metricLldpLocManAddrEntry, metricLldpRemEntry, metricLldpRemManAddrEntry, metricLldpRemManAddrCompat, metricCdpCacheEntry,
-		metricTopologyIfNameEntry, metricTopologyIPIfEntry, metricBridgePortMapEntry, metricFdbEntry, metricArpEntry, metricArpLegacyEntry,
+		metricTopologyIfNameEntry, metricTopologyIfStatusEntry, metricTopologyIPIfEntry, metricBridgePortMapEntry, metricFdbEntry, metricDot1qFdbEntry, metricDot1qVlanEntry, metricStpPortEntry, metricVtpVlanEntry, metricArpEntry, metricArpLegacyEntry,
 		metricOspfGeneralEntry, metricOspfIfEntry, metricOspfNbrEntry, metricIsisSysEntry, metricIsisCircEntry, metricIsisAdjEntry:
 		return true
 	default:
@@ -740,11 +838,23 @@ func (c *topologyCache) updateIfNameByIndex(tags map[string]string) {
 	}
 
 	ifName := strings.TrimSpace(tags[tagTopoIfName])
-	if ifName == "" {
-		return
+	if ifName != "" {
+		c.ifNamesByIndex[ifIndex] = ifName
 	}
 
-	c.ifNamesByIndex[ifIndex] = ifName
+	status := c.ifStatusByIndex[ifIndex]
+	if ifType := normalizeInterfaceType(tags[tagTopoIfType]); ifType != "" {
+		status.ifType = ifType
+	}
+	if admin := normalizeInterfaceAdminStatus(tags[tagTopoIfAdmin]); admin != "" {
+		status.admin = admin
+	}
+	if oper := normalizeInterfaceOperStatus(tags[tagTopoIfOper]); oper != "" {
+		status.oper = oper
+	}
+	if status.ifType != "" || status.admin != "" || status.oper != "" {
+		c.ifStatusByIndex[ifIndex] = status
+	}
 }
 
 func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
@@ -906,28 +1016,199 @@ func (c *topologyCache) updateBridgePortMap(tags map[string]string) {
 }
 
 func (c *topologyCache) updateFdbEntry(tags map[string]string) {
-	mac := normalizeMAC(tags[tagFdbMac])
+	mac := normalizeMAC(firstNonEmpty(tags[tagFdbMac], tags[tagDot1qFdbMac]))
 	if mac == "" {
 		return
 	}
 
-	bridgePort := strings.TrimSpace(tags[tagFdbBridgePort])
+	bridgePort := strings.TrimSpace(firstNonEmpty(tags[tagFdbBridgePort], tags[tagDot1qFdbPort]))
 	if bridgePort == "" || bridgePort == "0" {
 		return
 	}
 
-	key := mac + "|" + bridgePort
+	fdbID := strings.TrimSpace(tags[tagDot1qFdbID])
+	contextVLANID := strings.TrimSpace(tags[tagTopologyContextVLANID])
+	contextVLANName := strings.TrimSpace(tags[tagTopologyContextVLANName])
+	key := strings.Join([]string{mac, bridgePort, strings.ToLower(fdbID), strings.ToLower(contextVLANID)}, "|")
 	entry := c.fdbEntries[key]
 	if entry == nil {
 		entry = &fdbEntry{
 			mac:        mac,
 			bridgePort: bridgePort,
+			fdbID:      fdbID,
 		}
 		c.fdbEntries[key] = entry
 	}
 
-	if v := strings.TrimSpace(tags[tagFdbStatus]); v != "" {
+	if v := strings.TrimSpace(firstNonEmpty(tags[tagFdbStatus], tags[tagDot1qFdbStatus])); v != "" {
 		entry.status = v
+	}
+	if entry.vlanID == "" && contextVLANID != "" {
+		entry.vlanID = contextVLANID
+	}
+	if entry.vlanName == "" && contextVLANName != "" {
+		entry.vlanName = contextVLANName
+	}
+	if entry.fdbID == "" && fdbID != "" {
+		entry.fdbID = fdbID
+	}
+	if entry.vlanID == "" && entry.fdbID != "" {
+		if vlanID := strings.TrimSpace(c.fdbIDToVlanID[entry.fdbID]); vlanID != "" {
+			entry.vlanID = vlanID
+		}
+	}
+	if entry.vlanName == "" && entry.vlanID != "" {
+		if vlanName := strings.TrimSpace(c.vlanIDToName[entry.vlanID]); vlanName != "" {
+			entry.vlanName = vlanName
+		}
+	}
+}
+
+func (c *topologyCache) updateDot1qVlanMap(tags map[string]string) {
+	fdbID := strings.TrimSpace(tags[tagDot1qVlanFdbID])
+	if fdbID == "" {
+		return
+	}
+
+	vlanID := strings.TrimSpace(tags[tagDot1qVlanID])
+	if vlanID == "" {
+		vlanID = strings.TrimSpace(tags[tagDot1qVlanID1])
+	}
+	if vlanID == "" {
+		return
+	}
+
+	c.fdbIDToVlanID[fdbID] = vlanID
+	if vlanName := strings.TrimSpace(c.vlanIDToName[vlanID]); vlanName != "" {
+		for _, entry := range c.fdbEntries {
+			if entry == nil || strings.TrimSpace(entry.fdbID) != fdbID {
+				continue
+			}
+			if strings.TrimSpace(entry.vlanName) == "" {
+				entry.vlanName = vlanName
+			}
+		}
+	}
+	for _, entry := range c.fdbEntries {
+		if entry == nil || strings.TrimSpace(entry.fdbID) != fdbID {
+			continue
+		}
+		if strings.TrimSpace(entry.vlanID) == "" {
+			entry.vlanID = vlanID
+		}
+		if strings.TrimSpace(entry.vlanName) == "" {
+			entry.vlanName = strings.TrimSpace(c.vlanIDToName[vlanID])
+		}
+	}
+}
+
+func (c *topologyCache) updateVtpVlanEntry(tags map[string]string) {
+	vlanID := strings.TrimSpace(tags[tagVtpVlanIndex])
+	vlanName := strings.TrimSpace(tags[tagVtpVlanName])
+	if vlanID == "" || vlanName == "" {
+		return
+	}
+
+	vlanType := strings.TrimSpace(tags[tagVtpVlanType])
+	vlanState := strings.ToLower(strings.TrimSpace(tags[tagVtpVlanState]))
+	if vlanState != "" && vlanState != "1" && vlanState != "operational" {
+		return
+	}
+	if vlanType != "" && vlanType != "1" && strings.ToLower(vlanType) != "ethernet" {
+		// Keep parity with Enlinkd collector behavior: keep Ethernet VLANs only.
+		return
+	}
+
+	c.vlanIDToName[vlanID] = vlanName
+	for _, entry := range c.fdbEntries {
+		if entry == nil || strings.TrimSpace(entry.vlanID) != vlanID {
+			continue
+		}
+		if strings.TrimSpace(entry.vlanName) == "" {
+			entry.vlanName = vlanName
+		}
+	}
+}
+
+func (c *topologyCache) vtpVLANContexts() []topologyVLANContext {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	contexts := make([]topologyVLANContext, 0, len(c.vlanIDToName))
+	for vlanID, vlanName := range c.vlanIDToName {
+		id := strings.TrimSpace(vlanID)
+		if id == "" {
+			continue
+		}
+		if _, err := strconv.Atoi(id); err != nil {
+			continue
+		}
+		contexts = append(contexts, topologyVLANContext{
+			vlanID:   id,
+			vlanName: strings.TrimSpace(vlanName),
+		})
+	}
+
+	sort.Slice(contexts, func(i, j int) bool {
+		left, leftErr := strconv.Atoi(contexts[i].vlanID)
+		right, rightErr := strconv.Atoi(contexts[j].vlanID)
+		if leftErr == nil && rightErr == nil && left != right {
+			return left < right
+		}
+		if contexts[i].vlanID != contexts[j].vlanID {
+			return contexts[i].vlanID < contexts[j].vlanID
+		}
+		return contexts[i].vlanName < contexts[j].vlanName
+	})
+
+	return contexts
+}
+
+func (c *topologyCache) updateStpPortEntry(tags map[string]string) {
+	port := strings.TrimSpace(tags[tagStpPort])
+	if port == "" {
+		return
+	}
+
+	contextVLANID := strings.TrimSpace(tags[tagTopologyContextVLANID])
+	stpPortKey := port
+	if contextVLANID != "" {
+		stpPortKey = port + "|vlan:" + strings.ToLower(contextVLANID)
+	}
+	entry := c.stpPorts[stpPortKey]
+	if entry == nil {
+		entry = &stpPortEntry{port: port}
+		c.stpPorts[stpPortKey] = entry
+	}
+	if contextVLANID != "" {
+		entry.vlanID = contextVLANID
+	}
+	if v := strings.TrimSpace(tags[tagTopologyContextVLANName]); v != "" {
+		entry.vlanName = v
+	}
+	if v := strings.TrimSpace(tags[tagStpPortPriority]); v != "" {
+		entry.priority = v
+	}
+	if v := strings.TrimSpace(tags[tagStpPortState]); v != "" {
+		entry.state = v
+	}
+	if v := strings.TrimSpace(tags[tagStpPortEnable]); v != "" {
+		entry.enable = v
+	}
+	if v := strings.TrimSpace(tags[tagStpPortPathCost]); v != "" {
+		entry.pathCost = v
+	}
+	if v := stpBridgeAddressToMAC(tags[tagStpPortDesignatedRoot]); v != "" {
+		entry.designatedRoot = v
+	}
+	if v := strings.TrimSpace(tags[tagStpPortDesignatedCost]); v != "" {
+		entry.designatedCost = v
+	}
+	if v := stpBridgeAddressToMAC(tags[tagStpPortDesignatedBridge]); v != "" {
+		entry.designatedBridge = v
+	}
+	if v := stpDesignatedPortString(tags[tagStpPortDesignatedPort]); v != "" {
+		entry.designatedPort = v
 	}
 }
 
@@ -995,13 +1276,14 @@ func (c *topologyCache) snapshot() (topologyData, bool) {
 	}
 
 	data := topologyengine.ToTopologyData(result, topologyengine.TopologyDataOptions{
-		SchemaVersion: topologySchemaVersion,
-		Source:        "snmp",
-		Layer:         "2",
-		View:          "summary",
-		AgentID:       c.agentID,
-		LocalDeviceID: localDeviceID,
-		CollectedAt:   c.lastUpdate,
+		SchemaVersion:  topologySchemaVersion,
+		Source:         "snmp",
+		Layer:          "2",
+		View:           "summary",
+		AgentID:        c.agentID,
+		LocalDeviceID:  localDeviceID,
+		CollectedAt:    c.lastUpdate,
+		ResolveDNSName: resolveTopologyReverseDNSName,
 	})
 
 	augmentLocalActorFromCache(&data, local)
@@ -1079,6 +1361,7 @@ func (c *topologyCache) buildEngineObservations(local topologyDevice) ([]topolog
 		if entry == nil {
 			entry = &topologyengine.L2Observation{
 				DeviceID: deviceID,
+				Inferred: true,
 			}
 			remoteObservations[key] = entry
 			remoteOrder = append(remoteOrder, key)
@@ -1258,6 +1541,7 @@ func (c *topologyCache) buildEngineObservations(local topologyDevice) ([]topolog
 type topologyObservationIdentityResolver struct {
 	hostToID    map[string]string
 	chassisToID map[string]string
+	macToID     map[string]string
 	ipToID      map[string]string
 	fallbackSeq int
 }
@@ -1266,6 +1550,7 @@ func newTopologyObservationIdentityResolver(local topologyengine.L2Observation) 
 	resolver := &topologyObservationIdentityResolver{
 		hostToID:    make(map[string]string),
 		chassisToID: make(map[string]string),
+		macToID:     make(map[string]string),
 		ipToID:      make(map[string]string),
 	}
 	resolver.register(local.DeviceID, []string{local.Hostname}, local.ChassisID, local.ManagementIP)
@@ -1273,6 +1558,26 @@ func newTopologyObservationIdentityResolver(local topologyengine.L2Observation) 
 }
 
 func (r *topologyObservationIdentityResolver) resolve(hostAliases []string, chassisID, chassisType, managementIP string) string {
+	if mac := canonicalObservationMAC(chassisID); mac != "" {
+		if id := r.macToID[mac]; id != "" {
+			return id
+		}
+
+		candidate := normalizeTopologyDevice(topologyDevice{
+			ChassisID:     mac,
+			ChassisIDType: "macAddress",
+			SysName:       firstNonEmpty(hostAliases...),
+			ManagementIP:  normalizeIPAddress(managementIP),
+		})
+		id := strings.TrimSpace(ensureTopologyObservationDeviceID(candidate, ""))
+		if id == "" || id == "local-device" {
+			r.fallbackSeq++
+			id = fmt.Sprintf("remote-device-%d", r.fallbackSeq)
+		}
+		r.register(id, hostAliases, mac, managementIP)
+		return id
+	}
+
 	for _, host := range hostAliases {
 		if id := r.hostToID[canonicalObservationHost(host)]; id != "" {
 			return id
@@ -1291,7 +1596,7 @@ func (r *topologyObservationIdentityResolver) resolve(hostAliases []string, chas
 		SysName:       firstNonEmpty(hostAliases...),
 		ManagementIP:  normalizeIPAddress(managementIP),
 	})
-	id := strings.TrimSpace(ensureTopologyObservationDeviceID(candidate))
+	id := strings.TrimSpace(ensureTopologyObservationDeviceID(candidate, ""))
 	if id == "" || id == "local-device" {
 		r.fallbackSeq++
 		id = fmt.Sprintf("remote-device-%d", r.fallbackSeq)
@@ -1317,6 +1622,11 @@ func (r *topologyObservationIdentityResolver) register(id string, hostAliases []
 			r.chassisToID[key] = id
 		}
 	}
+	if mac := canonicalObservationMAC(chassisID); mac != "" {
+		if _, exists := r.macToID[mac]; !exists {
+			r.macToID[mac] = id
+		}
+	}
 	if key := canonicalObservationIP(managementIP); key != "" {
 		if _, exists := r.ipToID[key]; !exists {
 			r.ipToID[key] = id
@@ -1337,6 +1647,13 @@ func canonicalObservationChassis(value string) string {
 		return mac
 	}
 	return strings.ToLower(value)
+}
+
+func canonicalObservationMAC(value string) string {
+	if mac := normalizeMAC(value); mac != "" {
+		return mac
+	}
+	return ""
 }
 
 func canonicalObservationIP(value string) string {
@@ -1364,31 +1681,47 @@ func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyeng
 	}
 
 	observation := topologyengine.L2Observation{
-		DeviceID:     ensureTopologyObservationDeviceID(local),
-		Hostname:     strings.TrimSpace(local.SysName),
-		ManagementIP: localManagementIP,
-		SysObjectID:  strings.TrimSpace(local.SysObjectID),
-		ChassisID:    strings.TrimSpace(local.ChassisID),
+		DeviceID:          ensureTopologyObservationDeviceID(local, c.stpBaseBridgeAddress),
+		Hostname:          strings.TrimSpace(local.SysName),
+		ManagementIP:      localManagementIP,
+		SysObjectID:       strings.TrimSpace(local.SysObjectID),
+		ChassisID:         strings.TrimSpace(local.ChassisID),
+		BaseBridgeAddress: strings.TrimSpace(c.stpBaseBridgeAddress),
+	}
+	if observation.BaseBridgeAddress == "" {
+		observation.BaseBridgeAddress = stpBridgeAddressToMAC(observation.ChassisID)
 	}
 
-	ifNameKeys := make([]string, 0, len(c.ifNamesByIndex))
+	ifaceKeys := make(map[string]struct{}, len(c.ifNamesByIndex)+len(c.ifStatusByIndex))
 	for key := range c.ifNamesByIndex {
-		ifNameKeys = append(ifNameKeys, key)
+		ifaceKeys[key] = struct{}{}
 	}
-	sort.Strings(ifNameKeys)
-	for _, ifIndex := range ifNameKeys {
-		ifName := strings.TrimSpace(c.ifNamesByIndex[ifIndex])
-		if ifName == "" {
-			continue
-		}
+	for key := range c.ifStatusByIndex {
+		ifaceKeys[key] = struct{}{}
+	}
+	ifaceKeyList := make([]string, 0, len(ifaceKeys))
+	for key := range ifaceKeys {
+		ifaceKeyList = append(ifaceKeyList, key)
+	}
+	sort.Strings(ifaceKeyList)
+	for _, ifIndex := range ifaceKeyList {
 		idx := parseIndex(ifIndex)
 		if idx <= 0 {
 			continue
 		}
+		ifName := strings.TrimSpace(c.ifNamesByIndex[ifIndex])
+		if ifName == "" {
+			// `ifIndex` is the minimum required identity for interface inventory.
+			ifName = ifIndex
+		}
+		status := c.ifStatusByIndex[ifIndex]
 		observation.Interfaces = append(observation.Interfaces, topologyengine.ObservedInterface{
-			IfIndex: idx,
-			IfName:  ifName,
-			IfDescr: ifName,
+			IfIndex:       idx,
+			IfName:        ifName,
+			IfDescr:       ifName,
+			InterfaceType: strings.TrimSpace(status.ifType),
+			AdminStatus:   strings.TrimSpace(status.admin),
+			OperStatus:    strings.TrimSpace(status.oper),
 		})
 	}
 
@@ -1419,11 +1752,51 @@ func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyeng
 			continue
 		}
 		ifIndex := parseIndex(c.bridgePortToIf[strings.TrimSpace(entry.bridgePort)])
+		vlanID := strings.TrimSpace(entry.vlanID)
+		if vlanID == "" && strings.TrimSpace(entry.fdbID) != "" {
+			vlanID = strings.TrimSpace(c.fdbIDToVlanID[strings.TrimSpace(entry.fdbID)])
+		}
 		observation.FDBEntries = append(observation.FDBEntries, topologyengine.FDBObservation{
 			MAC:        strings.TrimSpace(entry.mac),
 			BridgePort: strings.TrimSpace(entry.bridgePort),
 			IfIndex:    ifIndex,
 			Status:     strings.TrimSpace(entry.status),
+			VLANID:     vlanID,
+			VLANName:   strings.TrimSpace(entry.vlanName),
+		})
+	}
+
+	stpKeys := make([]string, 0, len(c.stpPorts))
+	for key := range c.stpPorts {
+		stpKeys = append(stpKeys, key)
+	}
+	sort.Strings(stpKeys)
+	for _, key := range stpKeys {
+		entry := c.stpPorts[key]
+		if entry == nil {
+			continue
+		}
+		port := strings.TrimSpace(entry.port)
+		if port == "" {
+			continue
+		}
+		ifIndex := parseIndex(c.bridgePortToIf[port])
+		ifName := ""
+		if ifIndex > 0 {
+			ifName = strings.TrimSpace(c.ifNamesByIndex[strconv.Itoa(ifIndex)])
+		}
+		observation.STPPorts = append(observation.STPPorts, topologyengine.STPPortObservation{
+			Port:             port,
+			IfIndex:          ifIndex,
+			IfName:           ifName,
+			VLANID:           strings.TrimSpace(entry.vlanID),
+			VLANName:         strings.TrimSpace(entry.vlanName),
+			State:            strings.TrimSpace(entry.state),
+			Enable:           strings.TrimSpace(entry.enable),
+			PathCost:         strings.TrimSpace(entry.pathCost),
+			DesignatedRoot:   strings.TrimSpace(entry.designatedRoot),
+			DesignatedBridge: strings.TrimSpace(entry.designatedBridge),
+			DesignatedPort:   strings.TrimSpace(entry.designatedPort),
 		})
 	}
 
@@ -1665,7 +2038,10 @@ func (c *topologyCache) buildEngineL3Observation(local topologyengine.L2Observat
 	return observation
 }
 
-func ensureTopologyObservationDeviceID(local topologyDevice) string {
+func ensureTopologyObservationDeviceID(local topologyDevice, baseBridgeAddress string) string {
+	if mac := topologyPrimaryIdentityMAC(local.ChassisID, baseBridgeAddress); mac != "" {
+		return "macAddress:" + mac
+	}
 	if key := strings.TrimSpace(topologyDeviceKey(local)); key != "" {
 		return key
 	}
@@ -1679,6 +2055,15 @@ func ensureTopologyObservationDeviceID(local topologyDevice) string {
 		return "management_addr:" + strings.ToLower(managementIP)
 	}
 	return "local-device"
+}
+
+func topologyPrimaryIdentityMAC(chassisID, baseBridgeAddress string) string {
+	for _, candidate := range []string{chassisID, baseBridgeAddress} {
+		if mac := normalizeMAC(candidate); mac != "" && mac != "00:00:00:00:00:00" {
+			return mac
+		}
+	}
+	return ""
 }
 
 func augmentLocalActorFromCache(data *topologyData, local topologyDevice) {
@@ -1764,11 +2149,11 @@ func matchLocalTopologyActor(match topology.Match, local topologyDevice) bool {
 }
 
 func canonicalMatchKey(match topology.Match) string {
+	if key := canonicalPrimaryMACListKey(match); key != "" {
+		return "mac:" + key
+	}
 	if key := canonicalHardwareListKey(match.ChassisIDs); key != "" {
 		return "chassis:" + key
-	}
-	if key := canonicalMACListKey(match.MacAddresses); key != "" {
-		return "mac:" + key
 	}
 	if key := canonicalIPListKey(match.IPAddresses); key != "" {
 		return "ip:" + key
@@ -1786,6 +2171,29 @@ func canonicalMatchKey(match topology.Match) string {
 		return "sysobjectid:" + match.SysObjectID
 	}
 	return ""
+}
+
+func canonicalPrimaryMACListKey(match topology.Match) string {
+	seen := make(map[string]struct{}, len(match.MacAddresses)+len(match.ChassisIDs))
+	for _, value := range match.MacAddresses {
+		if mac := normalizeMAC(value); mac != "" {
+			seen[mac] = struct{}{}
+		}
+	}
+	for _, value := range match.ChassisIDs {
+		if mac := normalizeMAC(value); mac != "" {
+			seen[mac] = struct{}{}
+		}
+	}
+	if len(seen) == 0 {
+		return ""
+	}
+	values := make([]string, 0, len(seen))
+	for value := range seen {
+		values = append(values, value)
+	}
+	sort.Strings(values)
+	return strings.Join(values, ",")
 }
 
 func topologyMatchIdentityKeys(match topology.Match) []string {
@@ -2294,6 +2702,130 @@ func normalizeHexIdentifier(value string) string {
 	return clean
 }
 
+type stpBridgeIDStatus uint8
+
+const (
+	stpBridgeIDInvalid stpBridgeIDStatus = iota
+	stpBridgeIDEmpty
+	stpBridgeIDValid
+)
+
+func stpBridgeAddressToMAC(value string) string {
+	mac, status := parseSTPBridgeID(value, 0)
+	if status != stpBridgeIDValid {
+		return ""
+	}
+	return mac
+}
+
+func parseSTPBridgeID(value string, depth int) (string, stpBridgeIDStatus) {
+	if depth > 2 {
+		return "", stpBridgeIDInvalid
+	}
+
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", stpBridgeIDEmpty
+	}
+
+	if mac := normalizeMAC(value); mac != "" {
+		if mac == "00:00:00:00:00:00" {
+			return "", stpBridgeIDEmpty
+		}
+		return mac, stpBridgeIDValid
+	}
+
+	if priority, bridgeID, ok := splitSTPBridgeIDWithPriority(value); ok {
+		if priority == "0" && isSTPAllZeroBridgeID(bridgeID) {
+			return "", stpBridgeIDEmpty
+		}
+		return parseSTPBridgeID(bridgeID, depth+1)
+	}
+
+	bs, err := decodeHexString(value)
+	if err != nil || len(bs) == 0 {
+		return "", stpBridgeIDInvalid
+	}
+	if allBytesZero(bs) {
+		return "", stpBridgeIDEmpty
+	}
+	if ascii := decodePrintableASCII(bs); ascii != "" && depth < 2 {
+		return parseSTPBridgeID(ascii, depth+1)
+	}
+	switch len(bs) {
+	case 6:
+		mac := strings.ToLower(net.HardwareAddr(bs).String())
+		if mac == "00:00:00:00:00:00" {
+			return "", stpBridgeIDEmpty
+		}
+		return mac, stpBridgeIDValid
+	case 8:
+		mac := strings.ToLower(net.HardwareAddr(bs[len(bs)-6:]).String())
+		if mac == "00:00:00:00:00:00" {
+			return "", stpBridgeIDEmpty
+		}
+		return mac, stpBridgeIDValid
+	default:
+		return "", stpBridgeIDInvalid
+	}
+}
+
+func splitSTPBridgeIDWithPriority(value string) (string, string, bool) {
+	parts := strings.SplitN(value, "-", 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	priority := strings.TrimSpace(parts[0])
+	bridgeID := strings.TrimSpace(parts[1])
+	if priority == "" || bridgeID == "" {
+		return "", "", false
+	}
+	if _, err := strconv.Atoi(priority); err != nil {
+		return "", "", false
+	}
+	return priority, bridgeID, true
+}
+
+func isSTPAllZeroBridgeID(value string) bool {
+	mac := normalizeMAC(value)
+	if mac == "00:00:00:00:00:00" {
+		return true
+	}
+	if mac != "" {
+		return false
+	}
+	clean := normalizeHexIdentifier(value)
+	if clean == "" {
+		return false
+	}
+	for _, r := range clean {
+		if r != '0' {
+			return false
+		}
+	}
+	return true
+}
+
+func allBytesZero(bs []byte) bool {
+	for _, b := range bs {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func stpDesignatedPortString(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if _, err := strconv.Atoi(value); err == nil {
+		return value
+	}
+	return normalizeHexIdentifier(value)
+}
+
 func normalizeAddressType(rawType, addr string) string {
 	if ip := net.ParseIP(addr); ip != nil {
 		if ip.To4() != nil {
@@ -2309,6 +2841,81 @@ func normalizeAddressType(rawType, addr string) string {
 		return "ipv6"
 	}
 	return rawType
+}
+
+func normalizeInterfaceAdminStatus(value string) string {
+	value = canonicalSNMPEnumValue(value)
+	switch value {
+	case "1":
+		return "up"
+	case "2":
+		return "down"
+	case "3":
+		return "testing"
+	case "up", "down", "testing":
+		return value
+	default:
+		return ""
+	}
+}
+
+func normalizeInterfaceOperStatus(value string) string {
+	value = canonicalSNMPEnumValue(value)
+	switch value {
+	case "1":
+		return "up"
+	case "2":
+		return "down"
+	case "3":
+		return "testing"
+	case "4":
+		return "unknown"
+	case "5":
+		return "dormant"
+	case "6":
+		return "notPresent"
+	case "7":
+		return "lowerLayerDown"
+	case "up", "down", "testing", "unknown", "dormant":
+		return value
+	case "notpresent":
+		return "notPresent"
+	case "not_present":
+		return "notPresent"
+	case "lowerlayerdown":
+		return "lowerLayerDown"
+	case "lower_layer_down":
+		return "lowerLayerDown"
+	default:
+		return ""
+	}
+}
+
+func normalizeInterfaceType(value string) string {
+	value = canonicalSNMPEnumValue(value)
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if value == "6" {
+		return "ethernetcsmacd"
+	}
+	if value == "161" {
+		return "ieee8023adlag"
+	}
+	return strings.ToLower(strings.NewReplacer("_", "", "-", "", " ", "").Replace(value))
+}
+
+func canonicalSNMPEnumValue(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return ""
+	}
+	// gosnmp often formats enums as "up(1)" / "down(2)"; keep only the symbolic token.
+	if open := strings.IndexByte(value, '('); open > 0 && strings.HasSuffix(value, ")") {
+		value = strings.TrimSpace(value[:open])
+	}
+	return value
 }
 
 func decodeHexString(value string) ([]byte, error) {

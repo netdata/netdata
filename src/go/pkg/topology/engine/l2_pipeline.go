@@ -29,6 +29,8 @@ type fdbCandidate struct {
 	bridgePort string
 	ifIndex    int
 	statusRaw  string
+	vlanID     string
+	vlanName   string
 }
 
 const (
@@ -116,12 +118,13 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 	if len(observations) == 0 {
 		return Result{}, fmt.Errorf("at least one observation is required")
 	}
-	if !opts.EnableLLDP && !opts.EnableCDP && !opts.EnableBridge && !opts.EnableARP {
+	if !opts.EnableLLDP && !opts.EnableCDP && !opts.EnableBridge && !opts.EnableARP && !opts.EnableSTP {
 		opts.EnableLLDP = true
 		opts.EnableCDP = true
 	}
 
 	devices := make(map[string]Device, len(observations))
+	managedObservationByDeviceID := make(map[string]bool, len(observations))
 	interfaces := make(map[string]Interface)
 	adjacencies := make(map[string]Adjacency)
 	attachments := make(map[string]Attachment)
@@ -131,6 +134,8 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 	hostToID := make(map[string]string, len(observations))
 	ipToID := make(map[string]string, len(observations))
 	chassisToID := make(map[string]string, len(observations))
+	macToID := make(map[string]string, len(observations))
+	bridgeAddrToID := make(map[string]string, len(observations))
 
 	for _, obs := range observations {
 		deviceID := strings.TrimSpace(obs.DeviceID)
@@ -143,6 +148,12 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 			Hostname:  strings.TrimSpace(obs.Hostname),
 			SysObject: strings.TrimSpace(obs.SysObjectID),
 			ChassisID: strings.TrimSpace(obs.ChassisID),
+		}
+		if primaryMAC := primaryL2MACIdentity(obs.ChassisID, obs.BaseBridgeAddress); primaryMAC != "" {
+			device.ChassisID = primaryMAC
+		}
+		if !obs.Inferred {
+			managedObservationByDeviceID[deviceID] = true
 		}
 		if device.Hostname == "" {
 			device.Hostname = device.ID
@@ -158,8 +169,18 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 		if ip := canonicalIP(obs.ManagementIP); ip != "" {
 			ipToID[ip] = device.ID
 		}
-		if chassis := canonicalToken(device.ChassisID); chassis != "" {
+		if mac := primaryL2MACIdentity(device.ChassisID, ""); mac != "" {
+			if _, exists := macToID[mac]; !exists {
+				macToID[mac] = device.ID
+			}
+			chassisToID[canonicalToken(mac)] = device.ID
+		} else if chassis := canonicalToken(device.ChassisID); chassis != "" {
 			chassisToID[chassis] = device.ID
+		}
+		if bridgeAddr := canonicalBridgeAddr(obs.BaseBridgeAddress, device.ChassisID); bridgeAddr != "" {
+			if _, exists := bridgeAddrToID[bridgeAddr]; !exists {
+				bridgeAddrToID[bridgeAddr] = device.ID
+			}
 		}
 
 		for _, iface := range obs.Interfaces {
@@ -178,6 +199,24 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 				continue
 			}
 			engIface := Interface{DeviceID: device.ID, IfIndex: iface.IfIndex, IfName: ifName, IfDescr: ifDescr}
+			if ifType := strings.TrimSpace(iface.InterfaceType); ifType != "" {
+				if engIface.Labels == nil {
+					engIface.Labels = make(map[string]string)
+				}
+				engIface.Labels["if_type"] = ifType
+			}
+			if admin := strings.TrimSpace(iface.AdminStatus); admin != "" {
+				if engIface.Labels == nil {
+					engIface.Labels = make(map[string]string)
+				}
+				engIface.Labels["admin_status"] = admin
+			}
+			if oper := strings.TrimSpace(iface.OperStatus); oper != "" {
+				if engIface.Labels == nil {
+					engIface.Labels = make(map[string]string)
+				}
+				engIface.Labels["oper_status"] = oper
+			}
 			interfaces[ifaceKey(engIface)] = engIface
 			ifNameByDeviceIfIndex[deviceIfIndexKey(device.ID, iface.IfIndex)] = ifName
 		}
@@ -185,12 +224,104 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 
 	linksLLDP := 0
 	linksCDP := 0
+	linksSTP := 0
 	attachmentsFDB := 0
 	enrichmentsARPND := 0
 	bridgeDomains := make(map[string]struct{})
 	endpointIDs := make(map[string]struct{})
 
+	isMACCompatibleWithDevice := func(deviceID, remoteMAC string) bool {
+		deviceID = strings.TrimSpace(deviceID)
+		remoteMAC = strings.TrimSpace(remoteMAC)
+		if deviceID == "" || remoteMAC == "" {
+			return true
+		}
+		device, ok := devices[deviceID]
+		if !ok {
+			return true
+		}
+		deviceMAC := primaryL2MACIdentity(device.ChassisID, "")
+		if deviceMAC == "" {
+			return true
+		}
+		return deviceMAC == remoteMAC
+	}
+
+	resolveKnownRemote := func(hostname, chassisID, mgmtIP, remoteMAC string) string {
+		remoteIP := canonicalIP(mgmtIP)
+		enforceMACGuard := remoteMAC != "" && remoteIP != ""
+		candidates := []string{
+			hostToID[canonicalHost(hostname)],
+			chassisToID[canonicalToken(chassisID)],
+			ipToID[remoteIP],
+		}
+		for _, candidateID := range candidates {
+			candidateID = strings.TrimSpace(candidateID)
+			if candidateID == "" {
+				continue
+			}
+			if enforceMACGuard && !isMACCompatibleWithDevice(candidateID, remoteMAC) {
+				continue
+			}
+			return candidateID
+		}
+		return ""
+	}
+
 	resolveRemote := func(hostname, chassisID, mgmtIP, fallbackID string) string {
+		remoteMAC := primaryL2MACIdentity(chassisID, "")
+		if knownID := resolveKnownRemote(hostname, chassisID, mgmtIP, remoteMAC); knownID != "" {
+			if remoteMAC != "" {
+				macToID[remoteMAC] = knownID
+				chassisToID[canonicalToken(remoteMAC)] = knownID
+				if device, ok := devices[knownID]; ok && primaryL2MACIdentity(device.ChassisID, "") == "" {
+					device.ChassisID = remoteMAC
+					devices[knownID] = device
+				}
+			}
+			return knownID
+		}
+
+		if remoteMAC != "" {
+			if id := macToID[remoteMAC]; id != "" {
+				return id
+			}
+
+			generatedID := deriveRemoteDeviceID(hostname, remoteMAC, mgmtIP, fallbackID)
+			if existingID := hostToID[canonicalHost(hostname)]; existingID != "" && canonicalIP(mgmtIP) != "" && !isMACCompatibleWithDevice(existingID, remoteMAC) {
+				generatedID = deriveRemoteDeviceID("", remoteMAC, mgmtIP, fallbackID)
+			}
+			if _, ok := devices[generatedID]; !ok {
+				device := Device{
+					ID:        generatedID,
+					Hostname:  strings.TrimSpace(hostname),
+					SysObject: "",
+					ChassisID: remoteMAC,
+				}
+				if device.Hostname == "" {
+					device.Hostname = generatedID
+				}
+				if ip := parseAddr(mgmtIP); ip.IsValid() {
+					device.Addresses = []netip.Addr{ip}
+				}
+				devices[generatedID] = device
+			}
+
+			macToID[remoteMAC] = generatedID
+			chassisToID[canonicalToken(remoteMAC)] = generatedID
+			if host := canonicalHost(hostname); host != "" {
+				if existingID := strings.TrimSpace(hostToID[host]); existingID == "" || canonicalIP(mgmtIP) == "" || isMACCompatibleWithDevice(existingID, remoteMAC) {
+					hostToID[host] = generatedID
+				}
+			}
+			if ip := canonicalIP(mgmtIP); ip != "" {
+				if existingID := strings.TrimSpace(ipToID[ip]); existingID == "" || isMACCompatibleWithDevice(existingID, remoteMAC) {
+					ipToID[ip] = generatedID
+				}
+			}
+			return generatedID
+		}
+
 		if id := hostToID[canonicalHost(hostname)]; id != "" {
 			return id
 		}
@@ -218,13 +349,19 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 			devices[generatedID] = device
 		}
 		if host := canonicalHost(hostname); host != "" {
-			hostToID[host] = generatedID
+			if _, exists := hostToID[host]; !exists {
+				hostToID[host] = generatedID
+			}
 		}
 		if chassis := canonicalToken(chassisID); chassis != "" {
-			chassisToID[chassis] = generatedID
+			if _, exists := chassisToID[chassis]; !exists {
+				chassisToID[chassis] = generatedID
+			}
 		}
 		if ip := canonicalIP(mgmtIP); ip != "" {
-			ipToID[ip] = generatedID
+			if _, exists := ipToID[ip]; !exists {
+				ipToID[ip] = generatedID
+			}
 		}
 		return generatedID
 	}
@@ -289,6 +426,94 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 		}
 	}
 
+	if opts.EnableSTP {
+		for _, obs := range observations {
+			sourceID := strings.TrimSpace(obs.DeviceID)
+			if sourceID == "" {
+				continue
+			}
+
+			localBridgeAddr := canonicalBridgeAddr(obs.BaseBridgeAddress, obs.ChassisID)
+
+			bridgePortToIfIndex := make(map[string]int, len(obs.BridgePorts))
+			for _, bridgePort := range sortedBridgePorts(obs.BridgePorts) {
+				basePort := strings.TrimSpace(bridgePort.BasePort)
+				if basePort == "" || bridgePort.IfIndex <= 0 {
+					continue
+				}
+				bridgePortToIfIndex[basePort] = bridgePort.IfIndex
+			}
+
+			for _, entry := range sortedSTPPortEntries(obs.STPPorts) {
+				remoteBridgeAddr := canonicalBridgeAddr(entry.DesignatedBridge, "")
+				if remoteBridgeAddr == "" {
+					continue
+				}
+				if localBridgeAddr != "" && localBridgeAddr == remoteBridgeAddr {
+					continue
+				}
+
+				targetID := strings.TrimSpace(bridgeAddrToID[remoteBridgeAddr])
+				if targetID == "" {
+					// STP is enrichment/correlation only: never create synthetic actors from STP rows.
+					continue
+				}
+				if targetID == sourceID {
+					continue
+				}
+
+				ifIndex := entry.IfIndex
+				if ifIndex <= 0 {
+					ifIndex = bridgePortToIfIndex[strings.TrimSpace(entry.Port)]
+				}
+				sourcePort := strings.TrimSpace(entry.IfName)
+				if sourcePort == "" && ifIndex > 0 {
+					sourcePort = strings.TrimSpace(ifNameByDeviceIfIndex[deviceIfIndexKey(sourceID, ifIndex)])
+				}
+				if sourcePort == "" {
+					sourcePort = strings.TrimSpace(entry.Port)
+				}
+
+				adj := Adjacency{
+					Protocol:   "stp",
+					SourceID:   sourceID,
+					SourcePort: sourcePort,
+					TargetID:   targetID,
+					TargetPort: strings.TrimSpace(entry.DesignatedPort),
+				}
+				labels := make(map[string]string)
+				if v := strings.TrimSpace(entry.Port); v != "" {
+					labels["stp_port"] = v
+				}
+				if v := strings.TrimSpace(entry.State); v != "" {
+					labels["stp_state"] = v
+				}
+				if v := strings.TrimSpace(entry.Enable); v != "" {
+					labels["stp_enable"] = v
+				}
+				if v := strings.TrimSpace(entry.PathCost); v != "" {
+					labels["stp_path_cost"] = v
+				}
+				if v := strings.TrimSpace(entry.DesignatedRoot); v != "" {
+					labels["stp_designated_root"] = v
+				}
+				if v := strings.TrimSpace(entry.VLANID); v != "" {
+					labels["vlan_id"] = v
+					labels["vlan"] = v
+				}
+				if v := strings.TrimSpace(entry.VLANName); v != "" {
+					labels["vlan_name"] = v
+				}
+				if len(labels) > 0 {
+					adj.Labels = labels
+				}
+				if addAdjacency(adjacencies, adj) {
+					linksSTP++
+				}
+			}
+		}
+	}
+
 	if opts.EnableBridge {
 		for _, obs := range observations {
 			sourceID := strings.TrimSpace(obs.DeviceID)
@@ -329,6 +554,13 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 					labels["bridge_domain"] = deriveBridgeDomainFromIfIndex(sourceID, candidate.ifIndex)
 				} else if candidate.bridgePort != "" {
 					labels["bridge_domain"] = deriveBridgeDomainFromBridgePort(sourceID, candidate.bridgePort)
+				}
+				if candidate.vlanID != "" {
+					labels["vlan_id"] = candidate.vlanID
+					labels["vlan"] = candidate.vlanID
+				}
+				if candidate.vlanName != "" {
+					labels["vlan_name"] = candidate.vlanName
 				}
 				if len(labels) > 0 {
 					attachment.Labels = labels
@@ -421,6 +653,18 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 		enrichmentsARPND = len(enrichments)
 	}
 
+	for id, dev := range devices {
+		if dev.Labels == nil {
+			dev.Labels = make(map[string]string)
+		}
+		if managedObservationByDeviceID[id] {
+			dev.Labels["inferred"] = "false"
+		} else {
+			dev.Labels["inferred"] = "true"
+		}
+		devices[id] = dev
+	}
+
 	result := Result{
 		CollectedAt: time.Now().UTC(),
 		Devices:     sortedDevices(devices),
@@ -433,6 +677,7 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 			"links_total":          len(adjacencies),
 			"links_lldp":           linksLLDP,
 			"links_cdp":            linksCDP,
+			"links_stp":            linksSTP,
 			"attachments_total":    len(attachments),
 			"attachments_fdb":      attachmentsFDB,
 			"enrichments_total":    len(enrichments),
@@ -1140,6 +1385,33 @@ func sortedBridgePorts(in []BridgePortObservation) []BridgePortObservation {
 	return out
 }
 
+func sortedSTPPortEntries(in []STPPortObservation) []STPPortObservation {
+	out := make([]STPPortObservation, 0, len(in))
+	for _, entry := range in {
+		if strings.TrimSpace(entry.Port) == "" {
+			continue
+		}
+		out = append(out, entry)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Port != b.Port {
+			return a.Port < b.Port
+		}
+		if a.VLANID != b.VLANID {
+			return a.VLANID < b.VLANID
+		}
+		if a.IfIndex != b.IfIndex {
+			return a.IfIndex < b.IfIndex
+		}
+		if a.IfName != b.IfName {
+			return a.IfName < b.IfName
+		}
+		return a.DesignatedBridge < b.DesignatedBridge
+	})
+	return out
+}
+
 func sortedFDBEntries(in []FDBObservation) []FDBObservation {
 	out := make([]FDBObservation, 0, len(in))
 	for _, entry := range in {
@@ -1152,6 +1424,9 @@ func sortedFDBEntries(in []FDBObservation) []FDBObservation {
 		a, b := out[i], out[j]
 		if a.BridgePort != b.BridgePort {
 			return a.BridgePort < b.BridgePort
+		}
+		if a.VLANID != b.VLANID {
+			return a.VLANID < b.VLANID
 		}
 		if a.IfIndex != b.IfIndex {
 			return a.IfIndex < b.IfIndex
@@ -1343,7 +1618,7 @@ func buildFDBCandidates(entries []FDBObservation, bridgePortToIfIndex map[string
 		selfMACs[mac] = struct{}{}
 	}
 
-	candidatesByMAC := make(map[string]fdbCandidate, len(sorted))
+	candidatesByEndpoint := make(map[string]fdbCandidate, len(sorted))
 	duplicates := make(map[string]struct{})
 	for _, entry := range sorted {
 		mac := normalizeMAC(entry.MAC)
@@ -1370,11 +1645,17 @@ func buildFDBCandidates(entries []FDBObservation, bridgePortToIfIndex map[string
 			bridgePort: bridgePort,
 			ifIndex:    ifIndex,
 			statusRaw:  strings.TrimSpace(entry.Status),
+			vlanID:     strings.TrimSpace(entry.VLANID),
+			vlanName:   strings.TrimSpace(entry.VLANName),
+		}
+		candidateKey := mac
+		if candidate.vlanID != "" {
+			candidateKey = mac + "|vlan:" + strings.ToLower(candidate.vlanID)
 		}
 
-		existing, exists := candidatesByMAC[mac]
+		existing, exists := candidatesByEndpoint[candidateKey]
 		if !exists {
-			candidatesByMAC[mac] = candidate
+			candidatesByEndpoint[candidateKey] = candidate
 			continue
 		}
 
@@ -1383,17 +1664,20 @@ func buildFDBCandidates(entries []FDBObservation, bridgePortToIfIndex map[string
 			if candidate.statusRaw != "" {
 				updated.statusRaw = candidate.statusRaw
 			}
-			candidatesByMAC[mac] = updated
+			if updated.vlanName == "" && candidate.vlanName != "" {
+				updated.vlanName = candidate.vlanName
+			}
+			candidatesByEndpoint[candidateKey] = updated
 			continue
 		}
 
-		delete(candidatesByMAC, mac)
-		duplicates[mac] = struct{}{}
+		delete(candidatesByEndpoint, candidateKey)
+		duplicates[candidateKey] = struct{}{}
 	}
 
-	out := make([]fdbCandidate, 0, len(candidatesByMAC))
-	for mac, candidate := range candidatesByMAC {
-		if _, duplicated := duplicates[mac]; duplicated {
+	out := make([]fdbCandidate, 0, len(candidatesByEndpoint))
+	for candidateKey, candidate := range candidatesByEndpoint {
+		if _, duplicated := duplicates[candidateKey]; duplicated {
 			continue
 		}
 		out = append(out, candidate)
@@ -1401,6 +1685,9 @@ func buildFDBCandidates(entries []FDBObservation, bridgePortToIfIndex map[string
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].mac != out[j].mac {
 			return out[i].mac < out[j].mac
+		}
+		if out[i].vlanID != out[j].vlanID {
+			return out[i].vlanID < out[j].vlanID
 		}
 		if out[i].ifIndex != out[j].ifIndex {
 			return out[i].ifIndex < out[j].ifIndex
@@ -1429,6 +1716,9 @@ func canonicalFDBStatus(status string) string {
 }
 
 func sameFDBDestination(left, right fdbCandidate) bool {
+	if strings.TrimSpace(left.vlanID) != strings.TrimSpace(right.vlanID) {
+		return false
+	}
 	if left.ifIndex > 0 && right.ifIndex > 0 {
 		return left.ifIndex == right.ifIndex
 	}
@@ -1528,11 +1818,19 @@ func adjacencyKey(adj Adjacency) string {
 }
 
 func attachmentKey(attachment Attachment) string {
+	vlanID := ""
+	if len(attachment.Labels) > 0 {
+		vlanID = strings.TrimSpace(attachment.Labels["vlan_id"])
+		if vlanID == "" {
+			vlanID = strings.TrimSpace(attachment.Labels["vlan"])
+		}
+	}
 	return strings.Join([]string{
 		attachment.DeviceID,
 		strconv.Itoa(attachment.IfIndex),
 		attachment.EndpointID,
 		attachment.Method,
+		strings.ToLower(vlanID),
 	}, "|")
 }
 
@@ -1717,6 +2015,25 @@ func canonicalToken(v string) string {
 	v = strings.ReplaceAll(v, ".", "")
 	v = strings.ReplaceAll(v, " ", "")
 	return v
+}
+
+func canonicalBridgeAddr(value, fallback string) string {
+	if mac := normalizeMAC(value); mac != "" {
+		return mac
+	}
+	if mac := normalizeMAC(fallback); mac != "" {
+		return mac
+	}
+	return ""
+}
+
+func primaryL2MACIdentity(chassisID, baseBridgeAddress string) string {
+	for _, candidate := range []string{chassisID, baseBridgeAddress} {
+		if mac := normalizeMAC(candidate); mac != "" && mac != "00:00:00:00:00:00" {
+			return mac
+		}
+	}
+	return ""
 }
 
 func canonicalIP(v string) string {

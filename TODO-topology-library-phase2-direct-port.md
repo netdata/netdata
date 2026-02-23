@@ -41,6 +41,221 @@
 - 2026-02-21: **Costa directive accepted (continue parity closure)**.
   - Continue immediately with `T5.3` until bridge-domain service object model parity gap is closed.
   - Keep focus strictly on Enlinkd topology parity and office reliability evidence.
+- 2026-02-22: **Costa directive accepted (naming + phantom segments)**.
+  - Actor/segment display naming must be finalized in a final pass (not discovery-order dependent).
+  - Naming preference order for entities with identity candidates:
+    1. reverse-DNS name (if available),
+    2. IP address (IPv4 or IPv6),
+    3. MAC address.
+  - For phantom segments/links, first step is strict behavior mirroring of Enlinkd bridge semantics before adding any Netdata-specific heuristics.
+- 2026-02-22: **Costa directive accepted (LLDP precedence for FDB ownership)**.
+  - If a MAC is learned on a local port that has an LLDP neighbor, that MAC is considered transit/remote for this side and should be attributed to the LLDP neighbor side (not kept as a local endpoint under this actor/segment when deduplicating).
+  - Goal: eliminate duplicate inferred segments/endpoints propagated across LLDP inter-switch links.
+- 2026-02-22: **Open technical question recorded (non-LLDP endpoint dedup)**.
+  - Scenario: endpoints without LLDP on both sides of an LLDP core (`A-B-C-D`, only `B<->C` LLDP), with symmetric FDB visibility.
+  - Status: resolved by the next decision entry (`FDB-only owner inference rule`), now implemented under gate `T6.4`.
+- 2026-02-22: **Costa directive accepted (FDB-only owner inference rule)**.
+  - Rule definition (must be implemented as stated):
+    - For endpoint/MAC `X`, take all actors/devices that report `X` in FDB.
+    - Consider only these reporter actors (all-to-all matrix among reporters + `X`):
+      - for each reporter `R`, compare `port(R, X)` with `port(R, O)` for every other reporter `O`.
+    - `X` belongs to reporter `R*` that sees **all other reporters on interfaces different from** `port(R*, X)`.
+  - This rule is explicitly **not** based on generic “extra MAC set” scoring.
+  - If no unique reporter satisfies the rule, ownership remains ambiguous/suppressed.
+- 2026-02-22: **Costa validation feedback accepted (new blocking issues)**.
+  - Reported issues on current live topology:
+    1. unlinked actor count remains too high,
+    2. LLDP-linked hosts (`mega`, `nova`, `beast`) still show derived segment artifacts that should not exist,
+    3. DNS labeling is perceived as not working.
+  - Priority is to address these before moving to any other workstream.
+- 2026-02-22: **Costa decision recorded (DNS fallback policy) — `1.B` selected.**
+  - When reverse DNS is unresolved, display naming must fall back to SNMP identity names before IP:
+    1. DNS
+    2. `sys_name` / hostname
+    3. IP
+    4. MAC
+  - Identity keys and correlation/matching logic remain unchanged (display-only policy update).
+- 2026-02-22: **Costa decision recorded (unlinked pruning scope) — `1.B` selected.**
+  - Keep discovered `device` actors even when currently unlinked.
+  - Prune only unlinked `endpoint` actors.
+  - Reason from user feedback: strict all-actor pruning hides valid SNMP devices (example observed: Epson), which makes topology inventory incomplete.
+- 2026-02-22: **Costa requirement recorded (customer-facing explainability dump).**
+  - Trace/explain functionality must be available to customers, not only internal development.
+  - A customer must be able to export a dump and report expectations like:
+    - `X` should be linked to `Y`,
+    - actor `A` is missing,
+    - actor `B` should not exist.
+  - The dump alone must be sufficient for engineering to reconstruct decision paths and identify concrete fixes.
+- 2026-02-22: **Costa decision recorded (trace architecture, no runtime overhead).**
+  - Trace capture must be **CLI-only/offline**, not enabled in normal runtime collection paths.
+  - Runtime topology path remains unchanged and must have **zero trace overhead** (no ring buffers, no extra in-memory history).
+  - CLI trace flow must be:
+    1. collect raw data,
+    2. append raw as-collected inputs to trace artifact,
+    3. run normal processing pipeline,
+    4. emit final topology.
+  - Trace artifact must include all as-collected inputs for all relevant layers/protocols used by topology, including DNS resolution inputs/results.
+  - Trace artifact must be replayable to reproduce exactly the same topology output that was observed.
+  - Sanitized trace artifacts must be reusable as regression fixtures/tests (after anonymizing names/IPs/MACs).
+- 2026-02-22: **Costa decision recorded (trace capture level) — `1.A` selected, deferred implementation.**
+  - Use **ProfileMetrics/Metric.Tags level** as the trace raw-input baseline.
+  - Implement later as a standalone CLI trace/replay workflow:
+    - `capture`: collect raw profile-metric inputs + DNS inputs/results + final `l2|l3|merged` outputs,
+    - `replay`: rebuild topology from captured inputs and verify deterministic output equivalence.
+  - This is intentionally deferred and not part of immediate runtime-path changes.
+- 2026-02-22: **Costa requirements recorded (Discovery + Topology Collection redesign, pre-implementation discussion).**
+  - R1: Normal SNMP metrics collection must not be affected by topology collection.
+  - R2: SNMP discovery should discover targets used for both SNMP metrics and SNMP topology.
+  - R3: SNMP topology should have independent collection scheduling/frequency, reusing discovery target inventory.
+  - R4: Topology protocols must be user-configurable (default all enabled; per-protocol enable/disable).
+  - R5: Topology function output must be gapless across updates (atomic swap of completed snapshots).
+  - R6: Users must be able to provide a manual topology target list (even with discovery disabled), similar to SNMP metrics manual target workflows.
+  - Open discussion item: avoid duplicate parallel polling of the same device for metrics and topology paths while preserving R1 separation and operational efficiency.
+- 2026-02-22: **Costa decision recorded (parser hardening model).**
+  - For each distinct SNMP field semantic type, implement a dedicated parser (no generic best-effort parser for identity fields).
+  - Parser outputs must be explicit and side-effect safe:
+    - `valid` (usable),
+    - `empty/sentinel` (accepted as no-value),
+    - `invalid` (unusable; no actor/link side effects).
+  - Topology identity/correlation/link creation must use only `valid` values.
+  - Invalid/sentinel values must be traceable (reason-tagged), but must never generate synthetic topology artifacts by parser fallback.
+  - Terminology/contract clarification:
+    - Parsing and semantic interpretation are separate phases.
+    - A field parser error should only occur for corruption/decoder defects/implementation bugs.
+    - Semantically empty placeholder values are successful parses with `empty/sentinel` semantic classification, not parser failures.
+- 2026-02-22: **Costa directive recorded (non-negotiable parser accuracy and testing).**
+  - SNMP field parsing must be 100% accurate against declared SNMP/MIB field types; parsing inaccuracies are bugs.
+  - No exceptions allowed for parser correctness.
+  - Full test coverage is required for parser layer:
+    - positive fixtures for all supported topology-related SNMP field types,
+    - negative/corruption fixtures to validate parser error boundaries,
+    - sentinel/empty fixtures to validate semantic classification without parser failure,
+    - regression fixtures for office-reproduced failures (including STP placeholder values),
+    - deterministic replay tests proving no parser-driven synthetic actor/link side effects.
+- 2026-02-22: **Costa directive recorded (STP role constraint).**
+  - STP must never create topology actors.
+  - STP is enrichment/correlation-only signal.
+  - STP-derived values may update metadata/confidence/association for existing actors/links, but cannot introduce new actor identities.
+- 2026-02-22: **Costa directive recorded (port state must be collected, not inferred).**
+  - Topology must expose interface port status from SNMP collection data.
+  - Port state used by topology/UI must come from explicit SNMP status fields (not inferred from link presence).
+  - Required immediate implementation:
+    - collect `ifAdminStatus` + `ifOperStatus` in topology collection path,
+    - propagate per-port status to topology output for device actors and link endpoints.
+- 2026-02-22: **Costa directive recorded (separation of concerns, immediate).**
+  - Topology correlation/deduplication/pruning/reclassification logic must live in backend topology shaping.
+  - Frontend must remain a pure visualizer and must not perform topology semantics decisions.
+  - Execution order is mandatory:
+    1. move semantics to backend,
+    2. then remove semantics from frontend.
+- 2026-02-22: **Costa decision recorded (device provenance visibility).**
+  - Keep LLDP/CDP-inferred remote devices in topology output.
+  - Add explicit backend provenance flag on device actors: `inferred=true|false`.
+    - `false`: actor originates from an SNMP job/managed target.
+    - `true`: actor exists from LLDP/CDP inference only (not directly managed/polled as SNMP target).
+  - UI must provide a display toggle to include/exclude inferred actors.
+  - Default UI behavior: inferred actors are hidden (`show_inferred=false` by default).
+- 2026-02-22: **Implementation update (separation of concerns applied).**
+  - Backend (`topology_adapter`) now performs:
+    - chassis-only placeholder device downgrade to `endpoint`,
+    - segment artifact suppression:
+      - segments with fewer than 2 non-segment neighbors,
+      - segment paths that duplicate direct LLDP adjacency.
+  - Frontend normalization removed these semantics and now keeps backend actor/link semantics for rendering.
+  - Validation:
+    - `cd src/go && go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp -count=1` ✅
+- 2026-02-22: **Costa decision recorded (duplicate polling strategy) — `A` selected.**
+  - Implement independent metrics/topology collection planes with a per-target poll coordinator (lease/serialization) to prevent parallel duplicate polling of the same SNMP target.
+  - This decision is binding for discovery + collection redesign.
+- 2026-02-22: **Costa proposal recorded (single source config for target definition).**
+  - Prefer reusing the same SNMP target/job definition for both metrics and topology, avoiding duplicate target configuration blocks.
+  - Candidate shape under discussion:
+    - `topology: true|false`
+    - `topology_protocols: ["*"]` (default all enabled)
+  - Pending finalization in discovery+collection design decisions before implementation.
+- 2026-02-22: **Costa decision recorded (topology config scope and protocol precedence).**
+  - Topology frequency is controlled by **topology collection config** (global/topology-plane level), not per target.
+  - Global enabled topology protocols are controlled by topology collection config.
+  - Each target only has:
+    - join switch (`topology: true|false`),
+    - optional allow-list of protocols.
+  - Effective protocols for each target follow precedence:
+    - `effective = global_topology_protocols ∩ target_topology_allow_list`
+    - if target allow-list includes protocols not globally enabled, they remain disabled for that target.
+- 2026-02-22: **Costa decision recorded (out-of-global protocols handling).**
+  - If a target/job allow-list contains protocols not globally enabled, this is **not** an error and **not** a warning.
+  - Such protocols are silently ignored by effective protocol intersection.
+- 2026-02-22: **Costa decision recorded (target allow-list default) — `1.A` selected.**
+  - If target topology allow-list is missing, default to `"*"` (all globally enabled topology protocols).
+  - Target-level restrictions remain optional and only narrow the global protocol set.
+- 2026-02-22: **Costa decision recorded (VLAN representation model).**
+  - VLANs are treated as observed data dimensions, not default physical graph actors.
+  - Topology visualization policy:
+    - physical topology remains primary (devices/endpoints/inferred segments),
+    - VLAN is rendered as an overlay/slice that marks participating links/ports.
+  - Segment semantics remain inferred:
+    - segment represents inferred L2 broadcast-domain structure where direct physical neighbor identity is not fully observed.
+- 2026-02-22: **Costa decision recorded (port-anchored topology links).**
+  - Topology links in visualization are port-to-port links, anchored on device port bullets.
+  - Device-center links are not acceptable for SNMP topology rendering.
+- 2026-02-22: **Implemented (config parser): global `topology:` block support in `go.d/snmp.conf`.**
+  - `agent/discovery/file` static parser now captures top-level extra keys and applies `topology` defaults only for module `snmp`.
+  - Merge behavior:
+    - if job has no `topology`, copy module-wide `topology`,
+    - if job has `topology`, keep job values and fill only missing nested keys from module-wide defaults.
+  - Added parser tests covering inheritance, merge override, and non-snmp no-op behavior.
+- 2026-02-22: **Costa decision recorded (topology scope simplification).**
+  - Remove L3 from SNMP topology scope completely for this workstream:
+    - no ISIS processing,
+    - no OSPF processing,
+    - no `topology_view=l3`,
+    - no `topology_view=merged` (L2/L3 merge removed).
+  - SNMP topology scope becomes: **L2 + enrichment only**.
+- 2026-02-22: **Costa direction recorded (future protocol expansion, not now).**
+  - Current immediate discovery protocol focus is LLDP.
+  - Future work should support additional discovery protocols beyond LLDP (examples: MikroTik Discovery Protocol, D-Link discovery protocol, others).
+  - These additions are explicitly future scope, not part of immediate implementation.
+- 2026-02-22: **Costa decision recorded (Q-BRIDGE VLAN support) — accepted.**
+  - Add `Q-BRIDGE-MIB` collection for topology enrichment now.
+  - Use VLAN/FDB-domain signals to reduce cross-VLAN false correlations in FDB-derived topology.
+  - Keep fallback behavior for devices that do not expose Q-BRIDGE data.
+  - Implementation update:
+    - added `_std-topology-q-bridge-mib.yaml` profile (dot1q FDB + FDB-domain-to-VLAN map),
+    - wired collector/autoprobe + topology cache to ingest dot1q rows,
+    - propagated `vlan_id` into FDB observations and attachment labels for bridge-domain segmentation.
+- 2026-02-22: **Costa directive recorded (protocol coverage expansion).**
+  - Add all remaining Enlinkd topology protocol coverage on the SNMP topology path.
+  - Immediate delta (vs current Netdata implementation): STP bridge topology and Cisco VTP VLAN context semantics.
+  - L3 scope remains removed unless Costa explicitly re-enables it.
+  - Implementation update:
+    - added `_std-topology-stp-mib.yaml` (dot1d STP base + port-table observations),
+    - added `_std-topology-cisco-vtp-mib.yaml` (VTP VLAN metadata observations),
+    - wired collector cache/parsing for `dot1dStpPortEntry` and `vtpVlanEntry`,
+    - wired engine L2 pipeline to emit `protocol=stp` adjacencies,
+    - wired VLAN name enrichment (`vlan_name`) from VTP into FDB-derived attachments when VLAN IDs match.
+- 2026-02-22: **Costa decision recorded (proceed with Enlinkd VTP multi-context parity).**
+  - Proceed with strict parity implementation of Enlinkd VTP-driven per-VLAN bridge polling:
+    - SNMPv2c: poll bridge data using `community@<vlan-id>`.
+    - SNMPv3: poll bridge data using context `vlan-<vlan-id>`.
+  - Merge all VLAN-context observations into one topology snapshot and preserve atomic snapshot swap/no-gap behavior.
+  - Keep this as current highest-priority open delta for topology parity closure.
+- 2026-02-22: **Implementation update (VTP multi-context parity in collector path).**
+  - Added VLAN-context polling loop in SNMP collection:
+    - discovers operational VLAN IDs from VTP rows,
+    - polls bridge/STP data per VLAN context,
+    - SNMPv2c uses `community@<vlan-id>`,
+    - SNMPv3 uses context name `vlan-<vlan-id>`.
+  - Merges VLAN-context observations into the same topology cache snapshot before finalize.
+  - Added VLAN-context tags to preserve per-VLAN distinction in:
+    - FDB entries (`vlan_id`, `vlan_name`),
+    - STP adjacencies (`vlan_id`, `vlan_name` labels).
+  - Verification:
+    - `go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp -count=1` passed.
+    - `go run ./tools/topology-parity-evidence --mode phase2` passed (`1240/1240`).
+    - `go run ./tools/topology-parity-evidence --mode suite` passed (`3067/3067`).
+- 2026-02-22: **Costa directive accepted (run live office validation now).**
+  - Build and install latest Netdata from current branch.
+  - Execute live SNMP topology validation against office LAN and capture fresh evidence artifacts.
 
 ## 1) TL;DR
 - Phase 1 proved scoped engine parity gates.
@@ -218,9 +433,9 @@
 - Active execution control is only sections `5`, `6`, and `7`.
 
 ## 10) Current Status (Canonical)
-- State: **READY FOR USER VERIFICATION**
-- Active phase: **post-T5.3 validation complete**
-- Blocking gate: **none**
+- State: **ACTIVE (post-T6.4 live corrections)**
+- Active phase: **LLDP-host phantom cleanup + DNS diagnostics**
+- Blocking gate: **T6.5**
 - Canonical counts source:
   - `src/go/pkg/topology/engine/parity/evidence/parity-summary.json`
   - `src/go/pkg/topology/engine/parity/evidence/phase2-parity-report.json`
@@ -232,6 +447,111 @@
   - Current canonical counts are only those in section `2.3` and in:
     - `src/go/pkg/topology/engine/parity/evidence/parity-summary.json`
     - `src/go/pkg/topology/engine/parity/evidence/phase2-parity-report.json`
+- Timestamp (UTC): `2026-02-22 01:14:34Z`
+- Gate ID:
+  - `T6.4`
+- Objective:
+  - Implement LLDP-precedence endpoint ownership and Costa FDB-only reporter-matrix owner rule for ambiguous endpoint-to-segment assignment.
+- Files Changed:
+  - `src/go/pkg/topology/engine/topology_adapter.go`
+  - `src/go/pkg/topology/engine/topology_adapter_test.go`
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `gofmt -w src/go/pkg/topology/engine/topology_adapter.go src/go/pkg/topology/engine/topology_adapter_test.go`
+  - `cd src/go && go test ./pkg/topology/engine/... -count=1`
+  - `cd src/go && go test ./plugin/go.d/collector/snmp -count=1`
+  - `cd src/go && go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp ./tools/topology-parity-evidence -count=1`
+  - `./install.sh > /tmp/install-topology-t64.log 2>&1`
+  - `curl ... function=topology:snmp topology_view:l2 > /tmp/topology-snmp-l2-after-t64.json`
+  - `jq` check for endpoints with `>1` emitted FDB segment links
+- Results:
+  - Implemented LLDP-port precedence for FDB ownership candidates.
+  - Implemented reporter-only all-to-all owner inference:
+    - candidate owner reporter `R` for endpoint `X` is valid only when `port(R, X)` differs from `port(R, O)` for every other reporter `O` and all such observations exist.
+  - Added regression tests:
+    - `TestToTopologyData_FDBOwnerInferencePrefersNonLLDPSide`
+    - `TestToTopologyData_FDBOwnerInferenceUsesReporterMatrixRule`
+  - Office snapshot after install (`/tmp/topology-snmp-l2-after-t64.json`):
+    - `status=200`, `actors=72`, `links=66`
+    - `links_fdb_endpoint_candidates=98`
+    - `links_fdb_endpoint_emitted=37`
+    - `links_fdb_endpoint_suppressed=34`
+    - `endpoints_ambiguous_segments=17`
+  - Endpoint-link duplication check:
+    - endpoints with `>1` emitted FDB segment links: `0`.
+- Counts Before -> After:
+  - scenarios passed: `46` -> `46`
+  - assertions ported: `3067` -> `3067`
+  - not-applicable (routing/non-routing): `0/0` -> `0/0`
+- Open Risks:
+  - Owner inference remains intentionally strict; if reporter alias observations are missing in source SNMP data, endpoint ownership is suppressed rather than guessed.
+- Next Unchecked Gate:
+  - `NONE`
+- Timestamp (UTC): `2026-02-22 00:05:39Z`
+- Gate ID:
+  - `T6.3`
+- Objective:
+  - Revalidate office topology output after T6.2 naming pass and confirm ambiguous endpoint-to-segment links are still suppressed.
+- Files Changed:
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `./install.sh > /tmp/install-topology-t62.log 2>&1`
+  - `curl ... function=topology:snmp topology_view:l2 > /tmp/topology-snmp-l2-after-t62.json`
+  - `jq` summaries over `/tmp/topology-snmp-l2-after-t61.json` and `/tmp/topology-snmp-l2-after-t62.json`
+  - repeated sampling (`8` runs) into `/tmp/topology-snmp-t63-20260222T000512Z/`
+  - `jq` check for `endpoints-with-gt1-fdb-links.json`
+- Results:
+  - Live office snapshot after T6.2:
+    - `status=200`, `actors=100`, `links=41`
+    - `links_fdb_endpoint_candidates=150`
+    - `links_fdb_endpoint_emitted=7`
+    - `links_fdb_endpoint_suppressed=143`
+    - `endpoints_ambiguous_segments=50`
+  - Ambiguity suppression check:
+    - `/tmp/topology-snmp-t63-20260222T000512Z/endpoints-with-gt1-fdb-links.json` is `[]` (no endpoint has >1 emitted FDB segment link).
+  - Naming pass evidence:
+    - device and segment display names emitted (`display_name`, `display_source`) and present on link endpoints.
+- Counts Before -> After:
+  - scenarios passed: `46` -> `46`
+  - assertions ported: `3067` -> `3067`
+  - not-applicable (routing/non-routing): `0/0` -> `0/0`
+- Open Risks:
+  - Repeated raw snapshots show natural live drift while SNMP tables refresh; no structural hash guarantee is claimed for this gate.
+- Next Unchecked Gate:
+  - `NONE`
+- Timestamp (UTC): `2026-02-22 00:01:48Z`
+- Gate ID:
+  - `T6.2`
+- Objective:
+  - Add deterministic final-pass display naming to topology output without changing identity keys.
+- Files Changed:
+  - `src/go/pkg/topology/engine/topology_adapter.go`
+  - `src/go/pkg/topology/engine/topology_adapter_test.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_dns.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_cache.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_registry.go`
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `gofmt -w src/go/pkg/topology/engine/topology_adapter.go src/go/pkg/topology/engine/topology_adapter_test.go src/go/plugin/go.d/collector/snmp/topology_dns.go src/go/plugin/go.d/collector/snmp/topology_cache.go src/go/plugin/go.d/collector/snmp/topology_registry.go`
+  - `go test ./pkg/topology/engine/... -count=1`
+  - `go test ./plugin/go.d/collector/snmp -count=1`
+  - `go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp ./tools/topology-parity-evidence -count=1`
+- Results:
+  - Added a post-assembly display-name pass for actors and link endpoints.
+  - Display-name preference chain implemented as `dns -> ip -> mac`, with deterministic fallback for segment actors (`parent.port.segment`) and fallback compaction for long segment IDs.
+  - Stable identity fields (`match`) remain unchanged; display information is emitted in labels/attributes (`display_name`, `display_source`).
+  - Added bounded reverse-DNS resolver with cache for SNMP topology runtime path and wired it into `ToTopologyData` options.
+  - Added regression tests:
+    - `TestToTopologyData_DisplayNamesPreferDNSThenIPThenMAC`
+    - `TestToTopologyData_SegmentDisplayNameUsesParentPortPattern`
+- Counts Before -> After:
+  - scenarios passed: `46` -> `46`
+  - assertions ported: `3067` -> `3067`
+  - not-applicable (routing/non-routing): `0/0` -> `0/0`
+- Open Risks:
+  - Live office validation artifact for this gate chain still pending (`T6.3`).
+- Next Unchecked Gate:
+  - `T6.3`
 - Timestamp (UTC): `2026-02-21 03:05:16Z`
 - Gate ID:
   - `post-T4 cleanup`
@@ -258,7 +578,64 @@
 - Open Risks:
   - Remaining practical runtime limitation unchanged: office links remain unidirectional in current LLDP/CDP visibility.
 - Next Unchecked Gate:
-  - `NONE` (ready for user verification).
+- `T6.2`
+
+- Timestamp (UTC): `2026-02-22 01:56:00Z`
+- Gate ID:
+  - `T6.1`
+- Objective:
+  - Mirror Enlinkd bridge ambiguity behavior by suppressing inferred endpoint-to-segment links when one endpoint maps to multiple candidate segments.
+- Files Changed:
+  - `src/go/pkg/topology/engine/topology_adapter.go`
+  - `src/go/pkg/topology/engine/topology_adapter_test.go`
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `gofmt -w src/go/pkg/topology/engine/topology_adapter.go`
+  - `gofmt -w src/go/pkg/topology/engine/topology_adapter_test.go`
+  - `go test ./pkg/topology/engine/...`
+  - `go test ./plugin/go.d/collector/snmp`
+  - `./install.sh > /tmp/install-topology-fix-20260222.log 2>&1`
+  - `curl ... function=topology:snmp (topology_view=l2)` and persisted snapshot `/tmp/topology-snmp-l2-after-t61.json`
+- Results:
+  - Added deterministic endpoint-segment ambiguity filter:
+    - endpoint linked to segment only when exactly one candidate segment exists.
+    - ambiguous endpoints now emit no inferred segment edge.
+  - Added regression test `TestToTopologyData_DropsAmbiguousEndpointSegmentLinks`.
+  - Added debug stats for endpoint-segment candidate/emitted/suppressed counts.
+  - Live office snapshot after install:
+    - `links_total=40` (down from `184` pre-fix snapshot),
+    - `links_fdb_endpoint_candidates=97`,
+    - `links_fdb_endpoint_emitted=11`,
+    - `links_fdb_endpoint_suppressed=86`,
+    - `endpoints_ambiguous_segments=43`.
+- Counts Before -> After:
+  - engine tests passed: `ok` -> `ok`
+  - snmp collector tests passed: `ok` -> `ok`
+- Open Risks:
+  - Live office validation rerun still pending for this gate chain (`T6.3`).
+- Next Unchecked Gate:
+  - `T6.2`
+
+## 12) Post-Validation Correction Gates (Active)
+
+### Track 6: Parity corrections requested after office validation
+- [x] T6.1 Bridge ambiguity parity pass:
+  - mirror Enlinkd ambiguity handling for endpoint-to-segment mapping (no inferred endpoint edge when segment is ambiguous).
+- [x] T6.2 Final naming pass:
+  - deterministic display naming pass after topology graph assembly (not discovery-order dependent),
+  - include reverse-DNS -> IP -> MAC preference chain,
+  - preserve stable IDs while improving labels/display fields.
+- [x] T6.3 Office revalidation artifact:
+  - rerun office topology capture (`10.20.4.0/24`, `atadteN`) and verify phantom segment links reduced/removed with evidence.
+  - completed with artifacts under `/tmp/topology-snmp-l2-after-t62.json` and `/tmp/topology-snmp-t63-20260222T000512Z/`.
+- [x] T6.4 LLDP-precedence endpoint ownership:
+  - implement LLDP-aware FDB dedup so MACs seen on LLDP inter-switch ports are not retained as local endpoint ownership on both sides.
+  - implement Costa FDB-only owner inference rule (reporters-only all-to-all port comparison) for non-LLDP ownership decisions.
+  - produce live office evidence that duplicate endpoint placement across LLDP-linked devices is reduced.
+- [ ] T6.5 LLDP host-port endpoint suppression + DNS diagnostics:
+  - enforce LLDP-port suppression for FDB endpoint candidates globally in segment projection path,
+  - validate reduced phantom segment presence under LLDP-linked hosts (`mega`, `nova`, `beast`) with office artifact,
+  - produce deterministic DNS-source diagnostics from live payload (`dns/ip/mac` display-source distribution and unresolved causes).
 
 - Timestamp (UTC): `2026-02-21 04:01:04Z`
 - Gate ID:
@@ -371,6 +748,37 @@
 - Open Risks:
   - Office links remain `11/11` unidirectional due currently observed LLDP/CDP dataset properties; no unexplained structural instability detected.
   - `l3` remains empty in office environment because no OSPF/ISIS data is observed there (runtime path is active and tested by fixture parity suite).
+- Next Unchecked Gate:
+  - `NONE` (ready for user verification).
+- Timestamp (UTC): `2026-02-22 03:19:10Z`
+- Gate ID:
+  - `T6.7`
+- Objective:
+  - Apply Costa decision `1.B` for pruning scope and fix incorrect segment retention coupling.
+- Files Changed:
+  - `src/go/pkg/topology/engine/topology_adapter.go`
+  - `src/go/pkg/topology/engine/topology_adapter_test.go`
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `cd src/go && go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp -count=1`
+  - `./install.sh > /tmp/install-topology-b2.log 2>&1`
+  - `curl ... function=topology:snmp topology_view:l2 > /tmp/topology-snmp-l2-after-b-actors.json`
+  - `python/jq` checks for actor classes, Epson presence, and LLDP-host segment artifacts.
+- Results:
+  - Global actor prune changed from `all actor types` to `endpoint-only`.
+  - Segment retention decoupled from endpoint-link emission:
+    - segments are now retained when they have any emitted segment link evidence (bridge or fdb), not only endpoint links.
+  - Live office result after deploy:
+    - `status=200`, `actors=33`, `links=40`, `actors_unlinked_suppressed=67`
+    - actor classes: `devices=11`, `segments=15`, `endpoints=7`
+    - Epson device restored: `epson47c9ad.plaka`
+    - `mega/nova` phantom segment names absent in this snapshot.
+- Counts Before -> After:
+  - scenarios passed: `46` -> `46`
+  - assertions ported: `3067` -> `3067`
+  - not-applicable (routing/non-routing): `0/0` -> `0/0`
+- Open Risks:
+  - Some segment labels may still appear suspicious in specific live snapshots (example previously seen around `beast`), requiring follow-up evidence if reproduced.
 - Next Unchecked Gate:
   - `NONE` (ready for user verification).
 - Timestamp (UTC): `2026-02-21 02:24:02Z`
@@ -2274,3 +2682,462 @@
   - Initial post-restart convergence window can transiently change total link counts for 1-2 refresh cycles.
 - Next Unchecked Gate:
   - `NONE` (ready for user verification/commit).
+- Timestamp (UTC): `2026-02-22 02:14:32Z`
+- Gate ID:
+  - `T6.5`
+- Objective:
+  - Fix live office regressions reported by Costa:
+    1. high unlinked actor count,
+    2. LLDP-host phantom segment artifacts,
+    3. DNS behavior diagnostics.
+- Files Changed:
+  - `src/go/pkg/topology/engine/topology_adapter.go`
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `cd src/go && go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp -count=1`
+  - `./install.sh > /tmp/install-topology-l2-prune2.log 2>&1`
+  - `curl ... function=topology:snmp topology_view:l2 > /tmp/topology-snmp-l2-latest.json`
+  - `python/jq` diagnostics for:
+    - linked vs unlinked actor overlap,
+    - LLDP-host (`mega`,`nova`,`beast`) segment presence,
+    - DNS display-source distribution.
+  - DNS evidence:
+    - `python socket.gethostbyaddr(...)`
+    - `CGO_ENABLED=0 go run /tmp/lookup_pure_go.go`
+- Results:
+  - Added post-projection actor pruning to remove actors not represented by any emitted link identity.
+  - Live office output now has zero unlinked actors in emitted topology payload.
+  - LLDP-host phantom segments for `mega`, `nova`, `beast` are absent in live output.
+  - DNS diagnostics confirm mixed behavior:
+    - reverse DNS works for some IPs (`10.20.4.2`, `10.20.4.84`, `10.20.4.200`, `10.20.4.202`),
+    - unresolved for some (`10.20.4.1`, `10.20.4.22`) under pure-Go resolver path.
+  - Current live snapshot (`/tmp/topology-snmp-l2-latest.json`):
+    - `status=200`, `actors=16`, `links=16`, `actors_unlinked_suppressed=69`,
+    - `display_source`: `dns=6`, `ip=3`, `mac=5`, `segment=2`.
+- Counts Before -> After:
+  - scenarios passed: `46` -> `46`
+  - assertions ported: `3067` -> `3067`
+  - not-applicable (routing/non-routing): `0/0` -> `0/0`
+- Open Risks:
+  - DNS parity gap remains for names resolved via NSS/non-DNS providers (e.g., `_gateway`), which are not available from pure-Go reverse DNS lookup path.
+- Next Unchecked Gate:
+  - `T6.6`
+- Timestamp (UTC): `2026-02-22 02:32:40Z`
+- Gate ID:
+  - `T6.6`
+- Objective:
+  - Implement Costa decision `1.B`: on reverse-DNS miss, fallback to SNMP identity names (`sys_name` / hostname) before IP/MAC.
+- Files Changed:
+  - `src/go/pkg/topology/engine/topology_adapter.go`
+  - `src/go/pkg/topology/engine/topology_adapter_test.go`
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `cd src/go && go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp -count=1`
+  - `./install.sh > /tmp/install-topology-dns-b.log 2>&1`
+  - `curl ... function=topology:snmp topology_view:l2 > /tmp/topology-snmp-l2-after-b.json`
+  - `python/jq` diagnostics for display-source distribution and key device names.
+- Results:
+  - Display-name priority updated to:
+    1. DNS
+    2. `sys_name`
+    3. `hostname`
+    4. IP
+    5. MAC
+  - Added regression tests for name-priority behavior:
+    - `TestTopologyDisplayNameFromMatch_PrefersSysNameBeforeIP`
+    - `TestTopologyDisplayNameFromMatch_PrefersHostnameBeforeIPWhenSysNameMissing`
+  - Live office verification (`/tmp/topology-snmp-l2-after-b.json`):
+    - `status=200`, `actors=16`, `links=16`, `unlinked=0`
+    - `display_source` counts: `dns=6`, `sys_name=5`, `mac=3`, `segment=2`
+    - `10.20.4.1 -> MikroTik-router (sys_name)`
+    - `10.20.4.22 -> nova (sys_name)`
+    - `mega/nova/beast` phantom segments absent.
+- Counts Before -> After:
+  - scenarios passed: `46` -> `46`
+  - assertions ported: `3067` -> `3067`
+  - not-applicable (routing/non-routing): `0/0` -> `0/0`
+- Open Risks:
+  - Names sourced from SNMP `sys_name`/hostname are device-reported and may vary from DNS naming conventions.
+- Next Unchecked Gate:
+  - `NONE` (ready for user verification).
+- Timestamp (UTC): `2026-02-22 16:34:00Z`
+- Gate ID:
+  - `T14`
+- Objective:
+  - Close remaining Enlinkd bridge parity delta: VTP-driven per-VLAN SNMP context/community polling on collector path.
+- Files Changed:
+  - `src/go/plugin/go.d/collector/snmp/topology_vlan_context.go` (new)
+  - `src/go/plugin/go.d/collector/snmp/collect_snmp.go`
+  - `src/go/plugin/go.d/collector/snmp/init.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_cache.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_cache_test.go`
+  - `src/go/pkg/topology/engine/types.go`
+  - `src/go/pkg/topology/engine/l2_pipeline.go`
+  - `src/go/pkg/topology/engine/l2_pipeline_test.go`
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `cd src/go && gofmt -w plugin/go.d/collector/snmp/topology_cache.go plugin/go.d/collector/snmp/topology_cache_test.go plugin/go.d/collector/snmp/topology_vlan_context.go plugin/go.d/collector/snmp/init.go plugin/go.d/collector/snmp/collect_snmp.go pkg/topology/engine/types.go pkg/topology/engine/l2_pipeline.go pkg/topology/engine/l2_pipeline_test.go`
+  - `cd src/go && go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp -count=1`
+  - `cd src/go && go run ./tools/topology-parity-evidence --mode phase2`
+  - `cd src/go && go run ./tools/topology-parity-evidence --mode suite`
+  - `cd src/go && go run ./tools/topology-parity-evidence --mode verify`
+- Results:
+  - Added VTP VLAN-context polling loop:
+    - VLAN IDs sourced from collected operational VTP rows.
+    - SNMPv2c contexts polled as `community@<vlan-id>`.
+    - SNMPv3 contexts polled with context `vlan-<vlan-id>`.
+  - Added ingestion path for VLAN-context bridge metrics into the same topology cache snapshot.
+  - Added internal VLAN-context tags so per-VLAN rows remain distinct:
+    - FDB entries preserve VLAN identity (`vlan_id`, `vlan_name`).
+    - STP adjacencies include VLAN labels.
+  - Verification:
+    - engine + collector tests: `PASS`
+    - phase2 parity: `1240/1240` in-scope assertions
+    - suite parity: `3067/3067` assertions
+    - verify fixtures: `28` scenarios, `252` files
+- Open Risks:
+  - Large VLAN domains increase per-cycle SNMP polling volume due per-VLAN bridge-context walks.
+- Next Unchecked Gate:
+  - Live office validation on latest build (confirm expected topology quality and no regression in link stability).
+- Timestamp (UTC): `2026-02-22 14:44:55Z`
+- Gate ID:
+  - `T14-live`
+- Objective:
+  - Build/install latest branch and execute fresh office live topology validation after VLAN-context parity changes.
+- Files Changed:
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `./install.sh > /tmp/install-topology-live-20260222T143940Z.log 2>&1`
+  - `systemctl is-active netdata`
+  - `curl /api/v3/functions` (verify `topology:snmp`, `topology:streaming`, `topology:network-viewer`)
+  - `curl /api/v3/function?function=topology:snmp topology_view:l2|l3|merged` (artifacts)
+  - two 6-sample stability runs for `topology:snmp topology_view:l2`:
+    - `/tmp/topology-office-live-20260222T144253Z/`
+    - `/tmp/topology-office-live-20260222T144428Z/`
+- Results:
+  - Install succeeded: `/tmp/install-topology-live-20260222T143940Z.log`
+  - Netdata service active; plugins running including `go.d.plugin`.
+  - Function availability confirmed:
+    - `topology:snmp` (`status=200`)
+    - `topology:streaming` (`status=200`)
+    - `topology:network-viewer` (`status=200`)
+  - SNMP topology L2 snapshot (post-install):
+    - `actors=40`, `links=86`
+    - protocol counts: `lldp=10`, `stp=42`, `bridge=27`, `fdb=7`
+    - direction counts: `bidirectional=36`, `unidirectional=50`
+  - L2 stability:
+    - Both 6-sample runs stable on structural topology (`actors=40`, `links=86` each sample).
+    - Inter-sample full-hash drift is only due timestamp fields (`discovered_at`, `last_seen`).
+    - Cross-run drift observed in one actor display label (`10.20.4.69`): DNS vs sys_name source change; topology structure unchanged.
+  - LLDP core links in validated snapshot:
+    - `MikroTik-router ether3 <-> xs1930.plaka 8` (`bidirectional`)
+    - `MikroTik-router ether4 <-> gs1900.plaka 2` (`bidirectional`)
+    - `MikroTik-router ether5 -> costa-desktop enp6s0` (`unidirectional`)
+- Open Risks:
+  - Reverse-DNS result source can vary between queries (DNS hit vs sys_name fallback), causing non-structural display-name drift.
+- Next Unchecked Gate:
+  - Costa validation on UI rendering quality with this latest backend state.
+
+- Timestamp (UTC): `2026-02-22 18:20:59Z`
+- Gate ID:
+  - `T15-stp-parser-safety`
+- Objective:
+  - Enforce parser-safe STP handling and prevent STP from creating synthetic topology actors.
+- Files Changed:
+  - `src/go/pkg/topology/engine/l2_pipeline.go`
+  - `src/go/pkg/topology/engine/l2_pipeline_test.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_cache.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_cache_test.go`
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `cd src/go && gofmt -w pkg/topology/engine/l2_pipeline.go pkg/topology/engine/l2_pipeline_test.go plugin/go.d/collector/snmp/topology_cache.go plugin/go.d/collector/snmp/topology_cache_test.go`
+  - `cd src/go && go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp/... -count=1`
+  - `curl /api/v1/function?function=topology:snmp topology_view:l2` (artifact: `/tmp/topology-snmp-l2-current.json`)
+- Results:
+  - STP correlation logic in engine now uses only known actor identities:
+    - if designated bridge does not map to an existing discovered actor, STP row is ignored,
+    - STP no longer synthesizes remote actor IDs.
+  - Bridge-address canonicalization for STP matching is now strict MAC-only.
+  - Added parser-typed STP bridge-ID handling in collector:
+    - explicit states: `valid`, `empty/sentinel`, `invalid`,
+    - sentinel/placeholder values (including `0-00.00.00.00.00.00` and its hex-ascii representation) resolve to empty and cannot create side effects.
+  - Added regression tests:
+    - `TestBuildL2ResultFromObservations_STPDoesNotCreateSyntheticActors`
+    - `TestStpBridgeAddressToMAC_ParsesAndRejectsSentinels`
+  - Test status:
+    - topology engine package: `PASS`
+    - SNMP collector package: `PASS`
+- Open Risks:
+  - Existing snapshots built before this change may still show previously synthesized STP artifacts until refreshed.
+- Next Unchecked Gate:
+  - Rebuild/install agent and capture a fresh office `topology:snmp topology_view:l2` snapshot to verify STP artifact cleanup in live output.
+
+- Timestamp (UTC): `2026-02-22 18:23:56Z`
+- Gate ID:
+  - `T15-live-check`
+- Objective:
+  - Validate STP parser/actor-safety changes against a fresh installed agent snapshot.
+- Files Changed:
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `./install.sh > /tmp/install-topology-stp-parser-20260222.log 2>&1`
+  - `systemctl is-active netdata`
+  - `curl /api/v1/function?function=topology:snmp topology_view:l2 > /tmp/topology-snmp-l2-after-stp-parser.json`
+  - `jq` summary checks over `/tmp/topology-snmp-l2-after-stp-parser.json`
+- Results:
+  - Install completed successfully (`/tmp/install-topology-stp-parser-20260222.log`).
+  - Netdata service state: `active`.
+  - Fresh office L2 snapshot:
+    - `actors=25`, `links=23`,
+    - protocol counts: `lldp=3`, `bridge=11`, `stp=0`.
+  - Synthetic STP artifact checks:
+    - no actor with chassis placeholder `2e:30:30:2e:30:30`,
+    - no actor display names with `chassis-*` synthetic pattern from STP fallback.
+- Open Risks:
+  - STP links are now emitted only when designated bridge resolves to existing discovered actors; current office dataset resolves to `0` STP links in this snapshot.
+- Next Unchecked Gate:
+  - Costa validation on whether strict STP-no-actor behavior and zero-STP-links snapshot aligns with expected office topology behavior.
+
+- Timestamp (UTC): `2026-02-22 18:48:15Z`
+- Gate ID:
+  - `T16-port-status-collection`
+- Objective:
+  - Collect interface status for topology from SNMP and expose explicit per-port status in topology output (no inference).
+- Files Changed:
+  - `src/go/plugin/go.d/config/go.d/snmp.profiles/default/_std-topology-fdb-arp-mib.yaml`
+  - `src/go/plugin/go.d/collector/snmp/topology_cache.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_cache_test.go`
+  - `src/go/pkg/topology/engine/types.go`
+  - `src/go/pkg/topology/engine/l2_pipeline.go`
+  - `src/go/pkg/topology/engine/l2_pipeline_test.go`
+  - `src/go/pkg/topology/engine/topology_adapter.go`
+  - `src/go/pkg/topology/engine/topology_adapter_test.go`
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `cd src/go && gofmt -w pkg/topology/engine/types.go pkg/topology/engine/l2_pipeline.go pkg/topology/engine/l2_pipeline_test.go pkg/topology/engine/topology_adapter.go pkg/topology/engine/topology_adapter_test.go plugin/go.d/collector/snmp/topology_cache.go plugin/go.d/collector/snmp/topology_cache_test.go`
+  - `cd src/go && go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp/... -count=1`
+  - `./install.sh > /tmp/install-topology-port-status-20260222.log 2>&1`
+  - `curl /api/v1/function?function=topology:snmp topology_view:l2 > /tmp/topology-snmp-l2-port-status.json`
+  - `jq` validation over `/tmp/topology-snmp-l2-port-status.json`
+- Results:
+  - Topology SNMP collection now fetches interface status fields:
+    - `ifAdminStatus` (`topo_if_admin_status`)
+    - `ifOperStatus` (`topo_if_oper_status`)
+  - Topology cache now stores per-ifIndex status and emits it to engine observations.
+  - Engine now preserves per-interface status labels (`admin_status`, `oper_status`).
+  - Topology output now exposes explicit port-status data:
+    - actor attributes: `ports_total`, `if_names`, `if_indexes`, `if_admin_status_counts`, `if_oper_status_counts`, `if_statuses`,
+    - link endpoint attributes: `if_admin_status`, `if_oper_status` when available.
+  - Live snapshot evidence (`/tmp/topology-snmp-l2-port-status.json`):
+    - `mikrotik-switch.plaka` reports `ports_total=26`, `if_statuses_count=26`,
+    - `if_admin_status_counts={"up":26}`,
+    - `if_oper_status_counts={"down":17,"up":9}`.
+- Open Risks:
+  - Some interfaces may still miss status when devices expose incomplete IF-MIB rows for specific ifIndex/ifName combinations.
+- Next Unchecked Gate:
+  - Costa validation in UI for port bullets/state rendering using explicit `if_statuses` + status-count attributes.
+
+- Timestamp (UTC): `2026-02-22 19:01:05Z`
+- Gate ID:
+  - `T16-verify-mikrotik-port-counts`
+- Objective:
+  - Verify topology-exposed port counts for office MikroTik switch/router against device-reported SNMP counts.
+- Files Changed:
+  - `TODO-topology-library-phase2-direct-port.md`
+- Commands Run:
+  - `snmpget -v2c -c atadteN 10.20.4.2 1.3.6.1.2.1.2.1.0`
+  - `snmpget -v2c -c atadteN 10.20.4.1 1.3.6.1.2.1.2.1.0`
+  - repeated topology snapshots (`8` samples): `/tmp/topo-check-{1..8}.json`
+  - `snmpwalk` over `ifName`/`ifType` for physical-vs-logical sanity split.
+- Results:
+  - Topology payload (`topology:snmp topology_view:l2`) consistently exposes:
+    - `mikrotik-switch.plaka`: `ports_total=26`
+    - `MikroTik-router`: `ports_total=25`
+  - Direct SNMP `ifNumber` reports:
+    - `10.20.4.2` (MikroTik-Switch): `26`
+    - `10.20.4.1` (MikroTik-router): `25`
+  - Physical-vs-logical sanity check (`ifType`):
+    - Switch (`10.20.4.2`): `26` interfaces, all `ethernetCsmacd(6)` (physical-like).
+    - Router (`10.20.4.1`): `25` interfaces total; `18` are `ethernetCsmacd(6)` and `7` are logical/virtual (`bridge/vlan/ppp/lag/loopback` classes).
+- Open Risks:
+  - If UI expects physical-port capacity only, router should use `18` (ifType-filtered), not `25` (all interfaces).
+- Next Unchecked Gate:
+  - Costa decision on port-capacity semantics for visualization:
+    - `all interfaces` (current behavior) vs `physical-only` for device port bullets/capacity.
+
+- Timestamp (UTC): `2026-02-22 23:25:00Z`
+- Gate ID:
+  - `T17-status-accuracy-xs1930-ui`
+- User Decision (Costa):
+  - Apply three fixes together:
+    1. Frontend port alias mapping: when `if_names` are present, also map `if_indexes` aliases so numeric link ports resolve to named inventory ports.
+    2. Frontend port ON/OFF semantics: treat ON as `oper_status == up` (do not elevate ON from `admin_status == up`).
+    3. Backend status parsing: accept SNMP enum text formats like `up(1)`, `down(2)`, `notPresent(6)`, `lowerLayerDown(7)` in topology interface status normalization.
+- Timestamp (UTC): `2026-02-22 23:59:00Z`
+- Gate ID:
+  - `T17-status-accuracy-xs1930-ui-applied`
+- Implementation:
+  - Backend parser accepts enum-formatted SNMP status values (`up(1)`, `down(2)`, `notPresent(6)`, `lowerLayerDown(7)`) via `canonicalSNMPEnumValue` in `topology_cache.go`.
+  - `updateIfNameByIndex()` no longer drops status updates when `topo_if_name` is empty in the same row.
+  - Added explicit collector test coverage in `topology_cache_test.go` for enum parsing and status-without-ifname ingestion path.
+  - Topology profile `_std-topology-fdb-arp-mib.yaml` now includes explicit IF-MIB `ifTable` status metric block (independent of ifXTable joins).
+- Validation:
+  - `go test ./plugin/go.d/collector/snmp -count=1` passed.
+  - Reinstalled netdata (`./install.sh`).
+- Timestamp (UTC): `2026-02-23 00:10:00Z`
+- Gate ID:
+  - `T18-port-state-policy-C`
+- User Decision (Costa):
+  - Port bullets should follow policy C:
+    - green only for LLDP/CDP discovery links,
+    - white only for non-discovery topology links,
+    - gray otherwise,
+    - consider only physical interfaces in port-bullet rendering.
+- Implementation note:
+  - expose interface type (`ifType`) in topology port-status payload to allow physical-interface filtering in UI.
+
+- Timestamp (UTC): `2026-02-23 01:20:00Z`
+- Gate ID:
+  - `T19-ifindex-minimum-interface-identity`
+- User Decision (Costa):
+  - Minimum required interface identity for topology port inventory is `ifIndex`.
+  - Lack of `ifName` must not suppress port/interface emission.
+  - If `ifName` is missing, use `ifIndex` as fallback display/interface key.
+- Timestamp (UTC): `2026-02-23 01:29:00Z`
+- Gate ID:
+  - `T19-ifindex-minimum-interface-identity-applied`
+- Implementation:
+  - Topology collector observation build now emits interfaces from the union of:
+    - `ifNamesByIndex` and
+    - `ifStatusByIndex`.
+  - If `ifName` is missing for a valid interface index, `ifIndex` string is used as `IfName`/`IfDescr` fallback.
+  - This preserves interface inventory for devices that expose IF-MIB status/type but no IF-MIB::ifName rows.
+- Files Changed:
+  - `src/go/plugin/go.d/collector/snmp/topology_cache.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_cache_test.go`
+  - `TODO-topology-library-phase2-direct-port.md`
+- Validation:
+  - `cd src/go && go test ./plugin/go.d/collector/snmp -count=1` ✅
+  - `cd src/go && go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp -count=1` ✅
+  - Reinstalled netdata (`./install.sh`) ✅
+
+- Timestamp (UTC): `2026-02-23 01:40:00Z`
+- Gate ID:
+  - `T20-root-cause-inferred-chassis-gs1900`
+- User Directive (Costa):
+  - Investigate root cause for duplicated inferred `chassis-*` actors (example: `chassis-788cb595dfc8`) without UI/backend hacks.
+  - Use direct SNMP evidence from `gs1900` to identify exact source table/field and explain why these actors are inferred as devices.
+- Timestamp (UTC): `2026-02-23 09:50:00Z`
+- Gate ID:
+  - `T20-root-cause-inferred-chassis-gs1900-evidence`
+- Evidence Collected:
+  - Direct GS1900 local identity:
+    - `lldpLocChassisId` (`1.0.8802.1.1.2.1.3.2.0`) = `FC:22:F4:FB:8D:52`
+    - `dot1dBaseBridgeAddress` (`1.3.6.1.2.1.17.1.1.0`) = `FC:22:F4:FB:8D:52`
+  - Direct GS1900 LLDP remote row on index `0.4.1`:
+    - `lldpRemChassisId` (`...1.4.1.1.5.0.4.1`) = `78:8C:B5:95:DF:C8`
+    - `lldpRemPortId` (`...1.4.1.1.7.0.4.1`) = `78:8C:B5:95:DF:C8`
+    - `lldpRemSysName` (`...1.4.1.1.9.0.4.1`) = empty
+  - Topology function output confirms this actor is inferred from SNMP LLDP:
+    - actor: `match.mac_addresses=["78:8c:b5:95:df:c8"]`
+    - `actor_type="endpoint"`, `attributes.inferred=true`, `attributes.device_id="chassis-788cb595dfc8"`
+    - LLDP link source is GS1900 (`fc:22:f4:fb:8d:52`) -> destination `78:8c:b5:95:df:c8`.
+- Conclusion:
+  - `78:8c:b5:95:df:c8` is not GS1900 self identity.
+  - It is a remote LLDP neighbor emitted by GS1900 with missing hostname/management data, causing fallback ID generation via `deriveRemoteDeviceID()` to `chassis-788cb595dfc8`.
+- Timestamp (UTC): `2026-02-23 10:05:00Z`
+- Gate ID:
+  - `T21-fix-inferred-classification-consistency`
+- User Directive (Costa):
+  - Fix both identified issues:
+    1. backend must keep LLDP-inferred neighbors as inferred `device` actors (no downgrade to `endpoint` placeholders),
+    2. frontend must not style inferred endpoints as managed/SNMP-collected nodes.
+- Implementation target:
+  - Backend: remove/disable chassis-placeholder device->endpoint downgrade path.
+  - Frontend: node-kind resolution treats `inferred=true` as inferred style regardless of `actorType` (segment remains segment).
+- Timestamp (UTC): `2026-02-23 10:20:00Z`
+- Gate ID:
+  - `T21-fix-inferred-classification-consistency-applied`
+- Implementation:
+  - Backend:
+    - removed chassis-placeholder device->endpoint downgrade in topology adapter.
+    - inferred LLDP placeholders now remain `actor_type=device` with `inferred=true`.
+  - Tests:
+    - renamed/updated topology adapter test to assert placeholder stays `device`.
+- Files Changed:
+  - `src/go/pkg/topology/engine/topology_adapter.go`
+  - `src/go/pkg/topology/engine/topology_adapter_test.go`
+  - `TODO-topology-library-phase2-direct-port.md`
+- Validation:
+  - `cd src/go && go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp -count=1` ✅
+  - Live function check:
+    - `topology:snmp` actor for `78:8c:b5:95:df:c8` now reports:
+      - `actor_type=device`
+      - `attributes.inferred=true`
+- Timestamp (UTC): `2026-02-23 10:40:00Z`
+- Gate ID:
+  - `T22-investigate-duplicate-chassis-c8-vs-cc`
+- User question:
+  - Why two `chassis-788cb595dfc8`-like inferred actors appear (GS1900 and XS1930 side), and whether this is SNMP parsing bug.
+- Evidence:
+  - Function output contains distinct inferred actors:
+    - `chassis-788cb595dfc8` (`mac=78:8c:b5:95:df:c8`) -> LLDP link from `gs1900`.
+    - `chassis-788cb595dfcc` (`mac=78:8c:b5:95:df:cc`) -> LLDP link from `xs1930`.
+  - Direct SNMP LLDP remote confirms raw values are different:
+    - GS1900 (`10.20.4.4`): `lldpRemChassisId ...0.4.1 = 78 8C B5 95 DF C8`.
+    - XS1930 (`10.20.4.3`, `-Cc` due non-increasing OID): `lldpRemChassisId ...180.7.893433152 = 78 8C B5 95 DF CC`.
+  - Normalization path preserves byte identity:
+    - collector `normalizeMAC()` and engine `canonicalToken()` keep full 12-hex token; no observed truncation/substitution of last byte.
+- Conclusion:
+  - No evidence of SNMP parsing bug for this case.
+  - These are two distinct chassis IDs reported by devices (`...c8` vs `...cc`), plus one related segment actor (`chassis-788cb595dfcc.788cb595dfcc.segment`) that can look visually similar.
+- Timestamp (UTC): `2026-02-23 10:55:00Z`
+- Gate ID:
+  - `T23-why-enlinkd-does-not-show-c8-cc`
+- User question:
+  - Explain why Enlinkd/OpenNMS does not show these inferred `chassis-*` neighbors.
+- Evidence from Enlinkd source:
+  - LLDP topology updater builds edges only from matched LLDP link pairs returned by `LldpTopologyService.match()`:
+    - `features/enlinkd/adapters/updaters/lldp/.../LldpOnmsTopologyUpdater.java:103-121`.
+  - `match()` skips unmatched one-way neighbors (`targetLink == null -> continue` in every match pass):
+    - `features/enlinkd/service/impl/.../LldpTopologyServiceImpl.java:251-254`
+    - `...:270-273`, `...:290-293`, `...:308-311`, `...:326-329`, `...:342-345`.
+  - Vertices are created from LLDP elements tied to known node IDs (`LldpElementTopologyEntity`), not ad-hoc inferred remote placeholders:
+    - `LldpOnmsTopologyUpdater.java` iterates `findAllLldpElements()` for vertices before adding edges.
+- Implication:
+  - One-sided LLDP neighbors like `...c8`/`...cc` (without reverse-matched peer links from another managed SNMP node) are not emitted as standalone topology nodes in Enlinkd.
+
+- Timestamp (UTC): `2026-02-23 22:45:00Z`
+- Gate ID:
+  - `T24-investigate-fdb-stp-mikrotik-switch-duplicate`
+- User questions:
+  1. Why `xs1930` and `mikrotik-router` appear without FDB.
+  2. Why STP does not appear on any device.
+  3. Why there are two `mikrotik-switch.plaka` actors (derived endpoint with MAC+IP, SNMP actor with IP but no MAC) and why they are not linked.
+- Evidence (live + direct SNMP):
+  - Direct SNMP confirms FDB tables exist:
+    - `10.20.4.1`: `dot1dTpFdbPort` rows = `55`
+    - `10.20.4.3`: `dot1dTpFdbPort` rows = `50`
+  - Function snapshot (`/tmp/topology-snmp-live-l2.json`, `collected_at=2026-02-24T00:34:30+02:00`) shows:
+    - `attachments_fdb=194`
+    - `links_fdb=27`
+    - `links_fdb_endpoint_candidates=165`
+    - `links_fdb_endpoint_suppressed=132`
+  - For `MikroTik-router` and `xs1930.plaka`, emitted links are `bridge` + `lldp` only (no direct `fdb` links).
+  - STP SNMP facts:
+    - `10.20.4.1`: STP port table OID returns `No Such Object`.
+    - `10.20.4.3`: STP port table OID returns `No Such Instance`.
+    - `10.20.4.2`: STP designated bridge rows resolve to self bridge ID (`18:FD:74:33:1A:9C`).
+    - `10.20.4.4`: STP designated bridge rows are `0-00.00.00.00.00.00` (sentinel/empty remote).
+    - Function snapshot stats: `links_stp=0`.
+  - Duplicate `mikrotik-switch.plaka` actors in snapshot:
+    - device actor: `actor_id=chassis:10.20.4.2`, match has `ip=10.20.4.2`, no `mac_addresses`.
+    - endpoint actor: `actor_id=mac:18:fd:74:33:1a:9c`, match has `ip=10.20.4.2` + MAC.
+  - Overlap suppression currently prefers hardware-only endpoint keys when endpoint has MAC:
+    - `topology_adapter.go`: `endpointMatchOverlapsKnownDevice()` (`1395+`) uses `topologyMatchHardwareIdentityKeys()` first.
+    - IP identity is considered only when endpoint has no hardware keys.
+- Context from implementation:
+  - FDB attachments are collected per observation (`l2_pipeline.go:533+`).
+  - FDB endpoint links are projected only when ownership is deterministic; ambiguous candidates are suppressed (`topology_adapter.go:521+`, `543+`, `570+`).
+  - LLDP transit ports are excluded in FDB owner inference (`topology_adapter.go:1199-1203`).
+  - STP emits links only when designated bridge resolves to a known target actor and is not local/self (`l2_pipeline.go:447-460`, `452-454`).
