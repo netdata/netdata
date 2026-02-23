@@ -5,7 +5,7 @@ package chartengine
 import (
 	"testing"
 
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,15 +51,15 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			chart := program2.Chart{
-				Identity: program2.ChartIdentity{
-					InstanceByLabels: []program2.InstanceLabelSelector{
+			chart := program.Chart{
+				Identity: program.ChartIdentity{
+					InstanceByLabels: []program.InstanceLabelSelector{
 						{Key: "instance"},
 					},
 				},
-				Labels: program2.LabelPolicy{
-					Mode: program2.PromotionModeAutoIntersection,
-					Exclusions: program2.LabelExclusions{
+				Labels: program.LabelPolicy{
+					Mode: program.PromotionModeAutoIntersection,
+					Exclusions: program.LabelExclusions{
 						SelectorConstrainedKeys: []string{"selector_fixed"},
 					},
 				},

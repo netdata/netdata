@@ -8,7 +8,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
-	charttpl2 "github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 // Engine is the chartengine runtime scaffold.
@@ -48,7 +48,7 @@ func New(opts ...Option) (*Engine, error) {
 }
 
 // Load compiles and publishes a new immutable program revision.
-func (e *Engine) Load(spec *charttpl2.Spec, revision uint64) error {
+func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 	if e == nil {
 		return fmt.Errorf("chartengine: nil engine")
 	}
@@ -84,7 +84,7 @@ func (e *Engine) Load(spec *charttpl2.Spec, revision uint64) error {
 
 // LoadYAML decodes chart-template YAML, compiles it, and publishes the program.
 func (e *Engine) LoadYAML(data []byte, revision uint64) error {
-	spec, err := charttpl2.DecodeYAML(data)
+	spec, err := charttpl.DecodeYAML(data)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (e *Engine) LoadYAML(data []byte, revision uint64) error {
 
 // loadYAMLFile reads chart-template YAML from file, compiles and publishes it.
 func (e *Engine) loadYAMLFile(path string, revision uint64) error {
-	spec, err := charttpl2.DecodeYAMLFile(path)
+	spec, err := charttpl.DecodeYAMLFile(path)
 	if err != nil {
 		return err
 	}

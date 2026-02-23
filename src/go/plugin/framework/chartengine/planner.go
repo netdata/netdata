@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 )
 
 const (
@@ -74,7 +74,7 @@ type dimensionState struct {
 	hidden     bool
 	static     bool
 	order      int
-	algorithm  program2.Algorithm
+	algorithm  program.Algorithm
 	multiplier int
 	divisor    int
 }
@@ -88,8 +88,8 @@ type dimBuildEntry struct {
 type chartState struct {
 	templateID      string
 	chartID         string
-	meta            program2.ChartMeta
-	lifecycle       program2.LifecyclePolicy
+	meta            program.ChartMeta
+	lifecycle       program.LifecyclePolicy
 	labels          *chartLabelAccumulator
 	entries         map[string]*dimBuildEntry
 	observedCount   int
@@ -100,7 +100,7 @@ type planBuildContext struct {
 	out         *Plan
 	reader      metrix.Reader
 	collectMeta metrix.CollectMeta
-	prog        *program2.Program
+	prog        *program.Program
 	cache       *routeCache
 	index       matchIndex
 	flat        metrix.Reader

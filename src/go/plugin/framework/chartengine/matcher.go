@@ -9,7 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	routecache "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/cache"
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 )
 
 type routeBinding struct {
@@ -18,32 +18,32 @@ type routeBinding struct {
 	DimensionIndex    int
 	DimensionName     string
 	DimensionKeyLabel string
-	Algorithm         program2.Algorithm
+	Algorithm         program.Algorithm
 	Hidden            bool
 	Multiplier        int
 	Divisor           int
 	Static            bool
 	Inferred          bool
 	Autogen           bool
-	Meta              program2.ChartMeta
-	Lifecycle         program2.LifecyclePolicy
+	Meta              program.ChartMeta
+	Lifecycle         program.LifecyclePolicy
 }
 
 type routeCandidate struct {
 	chartTemplateID string
 	dimensionIndex  int
-	dimension       program2.Dimension
+	dimension       program.Dimension
 }
 
 type matchIndex struct {
-	chartsByID       map[string]program2.Chart
+	chartsByID       map[string]program.Chart
 	byMetricName     map[string][]routeCandidate
 	wildcardMatchers []routeCandidate
 }
 
-func buildMatchIndex(charts []program2.Chart) matchIndex {
+func buildMatchIndex(charts []program.Chart) matchIndex {
 	index := matchIndex{
-		chartsByID:       make(map[string]program2.Chart, len(charts)),
+		chartsByID:       make(map[string]program.Chart, len(charts)),
 		byMetricName:     make(map[string][]routeCandidate),
 		wildcardMatchers: make([]routeCandidate, 0),
 	}

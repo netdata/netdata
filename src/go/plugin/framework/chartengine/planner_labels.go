@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 )
 
 type compiledInstanceLabelPlan struct {
@@ -18,7 +18,7 @@ type compiledInstanceLabelPlan struct {
 }
 
 type chartLabelAccumulator struct {
-	mode        program2.PromotionMode
+	mode        program.PromotionMode
 	promoteKeys map[string]struct{}
 	excluded    map[string]struct{}
 	instance    map[string]string
@@ -31,7 +31,7 @@ type chartLabelAccumulator struct {
 	includeAllScratch []string
 }
 
-func newChartLabelAccumulator(chart program2.Chart) *chartLabelAccumulator {
+func newChartLabelAccumulator(chart program.Chart) *chartLabelAccumulator {
 	plan := compileInstanceLabelPlan(chart.Identity)
 	acc := &chartLabelAccumulator{
 		mode:        chart.Labels.Mode,
@@ -71,19 +71,19 @@ func newChartLabelAccumulator(chart program2.Chart) *chartLabelAccumulator {
 
 func newAutogenChartLabelAccumulator() *chartLabelAccumulator {
 	return &chartLabelAccumulator{
-		mode:              program2.PromotionModeAutoIntersection,
+		mode:              program.PromotionModeAutoIntersection,
 		promoteKeys:       make(map[string]struct{}),
 		excluded:          make(map[string]struct{}),
 		instance:          make(map[string]string),
 		selected:          make(map[string]string),
-		instancePlan:      compileInstanceLabelPlan(program2.ChartIdentity{}),
+		instancePlan:      compileInstanceLabelPlan(program.ChartIdentity{}),
 		instanceKeys:      make(map[string]struct{}),
 		resolvedScratch:   make([]instanceLabelValue, 0),
 		includeAllScratch: make([]string, 0),
 	}
 }
 
-func compileInstanceLabelPlan(identity program2.ChartIdentity) compiledInstanceLabelPlan {
+func compileInstanceLabelPlan(identity program.ChartIdentity) compiledInstanceLabelPlan {
 	plan := compiledInstanceLabelPlan{
 		explicitKeys: make([]string, 0, len(identity.InstanceByLabels)),
 		explicitSet:  make(map[string]struct{}, len(identity.InstanceByLabels)),
@@ -130,7 +130,7 @@ func (a *chartLabelAccumulator) observe(labels metrix.LabelView, dimensionKeyLab
 	}
 
 	switch a.mode {
-	case program2.PromotionModeExplicitIntersection:
+	case program.PromotionModeExplicitIntersection:
 		if !a.initialized {
 			for key := range a.promoteKeys {
 				if _, excluded := a.excluded[key]; excluded {

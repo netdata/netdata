@@ -6,7 +6,7 @@ import (
 	"sort"
 	"testing"
 
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,7 +40,7 @@ func TestCompileScenarios(t *testing.T) {
 		rev     uint64
 		wantErr bool
 		errLike string
-		assert  func(t *testing.T, p *program2.Program)
+		assert  func(t *testing.T, p *program.Program)
 	}{
 		"compiles dimension options under options block": {
 			spec: charttpl.Spec{
@@ -70,7 +70,7 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			assert: func(t *testing.T, p *program2.Program) {
+			assert: func(t *testing.T, p *program.Program) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
@@ -100,7 +100,7 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			assert: func(t *testing.T, p *program2.Program) {
+			assert: func(t *testing.T, p *program.Program) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
@@ -136,7 +136,7 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			assert: func(t *testing.T, p *program2.Program) {
+			assert: func(t *testing.T, p *program.Program) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
@@ -169,7 +169,7 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			assert: func(t *testing.T, p *program2.Program) {
+			assert: func(t *testing.T, p *program.Program) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
@@ -207,7 +207,7 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			assert: func(t *testing.T, p *program2.Program) {
+			assert: func(t *testing.T, p *program.Program) {
 				t.Helper()
 				assert.Equal(t, charttpl.VersionV1, p.Version())
 				assert.Equal(t, uint64(42), p.Revision())
@@ -217,8 +217,8 @@ func TestCompileScenarios(t *testing.T) {
 				require.Len(t, charts, 1)
 				assert.Equal(t, "Database/Throughput", charts[0].Meta.Family)
 				assert.Equal(t, "mysql.database.queries_total", charts[0].Meta.Context)
-				assert.Equal(t, program2.AlgorithmIncremental, charts[0].Meta.Algorithm)
-				assert.Equal(t, program2.ChartTypeLine, charts[0].Meta.Type)
+				assert.Equal(t, program.AlgorithmIncremental, charts[0].Meta.Algorithm)
+				assert.Equal(t, program.ChartTypeLine, charts[0].Meta.Type)
 				assert.True(t, charts[0].Identity.Static)
 
 				assert.True(t, charts[0].Dimensions[0].Selector.Matcher.Matches("mysql_queries_total", mapLabelView{}))
@@ -252,7 +252,7 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			assert: func(t *testing.T, p *program2.Program) {
+			assert: func(t *testing.T, p *program.Program) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
@@ -266,7 +266,7 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, "", charts[0].Dimensions[0].NameFromLabel)
 				assert.True(t, charts[0].Dimensions[0].InferNameFromSeriesMeta)
 				assert.True(t, charts[0].Dimensions[0].Dynamic)
-				assert.Equal(t, program2.AlgorithmIncremental, charts[0].Meta.Algorithm)
+				assert.Equal(t, program.AlgorithmIncremental, charts[0].Meta.Algorithm)
 			},
 		},
 		"infer stateset dimension naming from runtime series metadata": {
@@ -292,14 +292,14 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			assert: func(t *testing.T, p *program2.Program) {
+			assert: func(t *testing.T, p *program.Program) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
 				require.Len(t, charts[0].Dimensions, 1)
 				assert.Equal(t, "", charts[0].Dimensions[0].NameFromLabel)
 				assert.True(t, charts[0].Dimensions[0].InferNameFromSeriesMeta)
-				assert.Equal(t, program2.AlgorithmAbsolute, charts[0].Meta.Algorithm)
+				assert.Equal(t, program.AlgorithmAbsolute, charts[0].Meta.Algorithm)
 			},
 		},
 		"fails runtime inference for omitted naming on non-inferable selector": {
@@ -355,7 +355,7 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			assert: func(t *testing.T, p *program2.Program) {
+			assert: func(t *testing.T, p *program.Program) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
@@ -364,7 +364,7 @@ func TestCompileScenarios(t *testing.T) {
 				assert.Equal(t, "Disk", charts[0].Meta.Family)
 				assert.Equal(t, "osd_space_usage", charts[0].Meta.Context)
 
-				assert.Equal(t, program2.PromotionModeExplicitIntersection, charts[0].Labels.Mode)
+				assert.Equal(t, program.PromotionModeExplicitIntersection, charts[0].Labels.Mode)
 				assert.Equal(t, []string{"cluster", "host"}, charts[0].Labels.PromoteKeys)
 				assert.Equal(t, []string{"state"}, charts[0].Labels.Exclusions.SelectorConstrainedKeys)
 				assert.Equal(t, []string{"state"}, charts[0].Labels.Exclusions.DimensionKeyLabels)
@@ -418,7 +418,7 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			assert: func(t *testing.T, p *program2.Program) {
+			assert: func(t *testing.T, p *program.Program) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)
@@ -446,7 +446,7 @@ func TestCompileScenarios(t *testing.T) {
 					},
 				},
 			},
-			assert: func(t *testing.T, p *program2.Program) {
+			assert: func(t *testing.T, p *program.Program) {
 				t.Helper()
 				charts := p.Charts()
 				require.Len(t, charts, 1)

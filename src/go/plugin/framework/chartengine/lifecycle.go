@@ -3,7 +3,7 @@
 package chartengine
 
 import (
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 )
 
 // materializedState tracks engine-owned chart lifecycle across successful cycles.
@@ -14,8 +14,8 @@ type materializedState struct {
 // materializedChartState tracks one materialized chart instance.
 type materializedChartState struct {
 	templateID         string
-	meta               program2.ChartMeta
-	lifecycle          program2.LifecyclePolicy
+	meta               program.ChartMeta
+	lifecycle          program.LifecyclePolicy
 	lastSeenSuccessSeq uint64
 	dimensions         map[string]*materializedDimensionState
 	orderedDims        []string
@@ -29,7 +29,7 @@ type materializedDimensionState struct {
 	hidden             bool
 	static             bool
 	order              int
-	algorithm          program2.Algorithm
+	algorithm          program.Algorithm
 	multiplier         int
 	divisor            int
 	lastSeenSuccessSeq uint64
@@ -44,8 +44,8 @@ func newMaterializedState() materializedState {
 func (s *materializedState) ensureChart(
 	chartID string,
 	templateID string,
-	meta program2.ChartMeta,
-	lifecycle program2.LifecyclePolicy,
+	meta program.ChartMeta,
+	lifecycle program.LifecyclePolicy,
 ) (*materializedChartState, bool) {
 	chart, ok := s.charts[chartID]
 	if ok {

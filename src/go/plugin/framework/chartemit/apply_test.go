@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	chartengine2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,35 +18,35 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 	var buf bytes.Buffer
 	api := netdataapi.New(&buf)
 
-	meta := chartengine2.ChartMeta{
+	meta := chartengine.ChartMeta{
 		Title:     "NIC traffic",
 		Family:    "Net",
 		Context:   "nic_traffic",
 		Units:     "bytes/s",
-		Algorithm: chartengine2.AlgorithmIncremental,
-		Type:      chartengine2.ChartTypeLine,
+		Algorithm: chartengine.AlgorithmIncremental,
+		Type:      chartengine.ChartTypeLine,
 		Priority:  1,
 	}
 
 	plan := Plan{
 		Actions: []EngineAction{
-			chartengine2.CreateChartAction{
+			chartengine.CreateChartAction{
 				ChartTemplateID: "g0c0",
 				ChartID:         "win_nic_traffic_eth0",
 				Meta:            meta,
 			},
-			chartengine2.CreateDimensionAction{
+			chartengine.CreateDimensionAction{
 				ChartID:    "win_nic_traffic_eth0",
 				ChartMeta:  meta,
 				Name:       "received",
 				Hidden:     false,
-				Algorithm:  chartengine2.AlgorithmIncremental,
+				Algorithm:  chartengine.AlgorithmIncremental,
 				Multiplier: 1,
 				Divisor:    1,
 			},
-			chartengine2.UpdateChartAction{
+			chartengine.UpdateChartAction{
 				ChartID: "win_nic_traffic_eth0",
-				Values: []chartengine2.UpdateDimensionValue{
+				Values: []chartengine.UpdateDimensionValue{
 					{
 						Name:    "received",
 						IsFloat: true,
@@ -54,16 +54,16 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 					},
 				},
 			},
-			chartengine2.RemoveDimensionAction{
+			chartengine.RemoveDimensionAction{
 				ChartID:    "win_nic_traffic_eth0",
 				ChartMeta:  meta,
 				Name:       "received",
 				Hidden:     false,
-				Algorithm:  chartengine2.AlgorithmIncremental,
+				Algorithm:  chartengine.AlgorithmIncremental,
 				Multiplier: 1,
 				Divisor:    1,
 			},
-			chartengine2.RemoveChartAction{
+			chartengine.RemoveChartAction{
 				ChartID: "win_nic_traffic_eth0",
 				Meta:    meta,
 			},
@@ -105,18 +105,18 @@ func TestApplyPlanAutogenChartCreateUpdateRemove(t *testing.T) {
 	var buf bytes.Buffer
 	api := netdataapi.New(&buf)
 
-	meta := chartengine2.ChartMeta{
+	meta := chartengine.ChartMeta{
 		Title:     `Metric "svc.errors_total"`,
 		Family:    "svc_errors",
 		Context:   "svc.errors_total",
 		Units:     "events/s",
-		Algorithm: chartengine2.AlgorithmIncremental,
-		Type:      chartengine2.ChartTypeLine,
+		Algorithm: chartengine.AlgorithmIncremental,
+		Type:      chartengine.ChartTypeLine,
 	}
 
 	plan := Plan{
 		Actions: []EngineAction{
-			chartengine2.CreateChartAction{
+			chartengine.CreateChartAction{
 				ChartTemplateID: "__autogen__:svc.errors_total-method=GET",
 				ChartID:         "svc.errors_total-method=GET",
 				Meta:            meta,
@@ -124,17 +124,17 @@ func TestApplyPlanAutogenChartCreateUpdateRemove(t *testing.T) {
 					"method": "GET",
 				},
 			},
-			chartengine2.CreateDimensionAction{
+			chartengine.CreateDimensionAction{
 				ChartID:    "svc.errors_total-method=GET",
 				ChartMeta:  meta,
 				Name:       "svc.errors_total",
-				Algorithm:  chartengine2.AlgorithmIncremental,
+				Algorithm:  chartengine.AlgorithmIncremental,
 				Multiplier: 1,
 				Divisor:    1,
 			},
-			chartengine2.UpdateChartAction{
+			chartengine.UpdateChartAction{
 				ChartID: "svc.errors_total-method=GET",
-				Values: []chartengine2.UpdateDimensionValue{
+				Values: []chartengine.UpdateDimensionValue{
 					{
 						Name:    "svc.errors_total",
 						IsFloat: true,
@@ -142,7 +142,7 @@ func TestApplyPlanAutogenChartCreateUpdateRemove(t *testing.T) {
 					},
 				},
 			},
-			chartengine2.RemoveChartAction{
+			chartengine.RemoveChartAction{
 				ChartID: "svc.errors_total-method=GET",
 				Meta:    meta,
 			},
@@ -171,22 +171,22 @@ func TestApplyPlanDimensionOnlyCreateEmitsLabelsAndCommit(t *testing.T) {
 	var buf bytes.Buffer
 	api := netdataapi.New(&buf)
 
-	meta := chartengine2.ChartMeta{
+	meta := chartengine.ChartMeta{
 		Title:     "Dimension-only chart",
 		Family:    "Runtime",
 		Context:   "runtime.dimension_only",
 		Units:     "1",
-		Algorithm: chartengine2.AlgorithmAbsolute,
-		Type:      chartengine2.ChartTypeLine,
+		Algorithm: chartengine.AlgorithmAbsolute,
+		Type:      chartengine.ChartTypeLine,
 	}
 
 	plan := Plan{
 		Actions: []EngineAction{
-			chartengine2.CreateDimensionAction{
+			chartengine.CreateDimensionAction{
 				ChartID:    "dimension_only_chart",
 				ChartMeta:  meta,
 				Name:       "value",
-				Algorithm:  chartengine2.AlgorithmAbsolute,
+				Algorithm:  chartengine.AlgorithmAbsolute,
 				Multiplier: 1,
 				Divisor:    1,
 			},
@@ -217,18 +217,18 @@ func TestApplyPlanSanitizesWireValues(t *testing.T) {
 	var buf bytes.Buffer
 	api := netdataapi.New(&buf)
 
-	meta := chartengine2.ChartMeta{
+	meta := chartengine.ChartMeta{
 		Title:     "Title'\n",
 		Family:    "Family'\n",
 		Context:   "Context'\n",
 		Units:     "units'\n",
-		Algorithm: chartengine2.AlgorithmAbsolute,
-		Type:      chartengine2.ChartTypeLine,
+		Algorithm: chartengine.AlgorithmAbsolute,
+		Type:      chartengine.ChartTypeLine,
 	}
 
 	plan := Plan{
 		Actions: []EngineAction{
-			chartengine2.CreateChartAction{
+			chartengine.CreateChartAction{
 				ChartTemplateID: "g0.c0",
 				ChartID:         "chart'id\n",
 				Meta:            meta,
@@ -236,17 +236,17 @@ func TestApplyPlanSanitizesWireValues(t *testing.T) {
 					"la'bel\n": "va'lue\n",
 				},
 			},
-			chartengine2.CreateDimensionAction{
+			chartengine.CreateDimensionAction{
 				ChartID:    "chart'id\n",
 				ChartMeta:  meta,
 				Name:       "dim'name\n",
-				Algorithm:  chartengine2.AlgorithmAbsolute,
+				Algorithm:  chartengine.AlgorithmAbsolute,
 				Multiplier: 1,
 				Divisor:    1,
 			},
-			chartengine2.UpdateChartAction{
+			chartengine.UpdateChartAction{
 				ChartID: "chart'id\n",
-				Values: []chartengine2.UpdateDimensionValue{
+				Values: []chartengine.UpdateDimensionValue{
 					{
 						Name:    "dim'name\n",
 						IsFloat: true,
@@ -310,13 +310,13 @@ func TestApplyPlanRejectsEmptyTypeID(t *testing.T) {
 }
 
 func TestNormalizeActionsOrderingDeterminism(t *testing.T) {
-	meta := chartengine2.ChartMeta{
+	meta := chartengine.ChartMeta{
 		Title:     "Requests",
 		Family:    "Service",
 		Context:   "requests",
 		Units:     "requests/s",
-		Algorithm: chartengine2.AlgorithmIncremental,
-		Type:      chartengine2.ChartTypeLine,
+		Algorithm: chartengine.AlgorithmIncremental,
+		Type:      chartengine.ChartTypeLine,
 	}
 
 	tests := map[string]struct {
@@ -324,16 +324,16 @@ func TestNormalizeActionsOrderingDeterminism(t *testing.T) {
 	}{
 		"preserves update/remove order and groups create actions by chart id": {
 			actions: []EngineAction{
-				chartengine2.UpdateChartAction{ChartID: "chart_b"},
-				chartengine2.UpdateChartAction{ChartID: "chart_a"},
-				chartengine2.RemoveDimensionAction{ChartID: "chart_b", Name: "dim_b", ChartMeta: meta},
-				chartengine2.RemoveDimensionAction{ChartID: "chart_a", Name: "dim_a", ChartMeta: meta},
-				chartengine2.RemoveChartAction{ChartID: "chart_b", Meta: meta},
-				chartengine2.RemoveChartAction{ChartID: "chart_a", Meta: meta},
-				chartengine2.CreateDimensionAction{ChartID: "chart_b", Name: "dim_b", ChartMeta: meta},
-				chartengine2.CreateChartAction{ChartID: "chart_b", Meta: meta},
-				chartengine2.CreateDimensionAction{ChartID: "chart_a", Name: "dim_a", ChartMeta: meta},
-				chartengine2.CreateChartAction{ChartID: "chart_a", Meta: meta},
+				chartengine.UpdateChartAction{ChartID: "chart_b"},
+				chartengine.UpdateChartAction{ChartID: "chart_a"},
+				chartengine.RemoveDimensionAction{ChartID: "chart_b", Name: "dim_b", ChartMeta: meta},
+				chartengine.RemoveDimensionAction{ChartID: "chart_a", Name: "dim_a", ChartMeta: meta},
+				chartengine.RemoveChartAction{ChartID: "chart_b", Meta: meta},
+				chartengine.RemoveChartAction{ChartID: "chart_a", Meta: meta},
+				chartengine.CreateDimensionAction{ChartID: "chart_b", Name: "dim_b", ChartMeta: meta},
+				chartengine.CreateChartAction{ChartID: "chart_b", Meta: meta},
+				chartengine.CreateDimensionAction{ChartID: "chart_a", Name: "dim_a", ChartMeta: meta},
+				chartengine.CreateChartAction{ChartID: "chart_a", Meta: meta},
 			},
 		},
 	}

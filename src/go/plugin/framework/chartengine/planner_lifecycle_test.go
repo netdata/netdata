@@ -5,7 +5,7 @@ package chartengine
 import (
 	"testing"
 
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,9 +21,9 @@ func TestEnforceLifecycleCaps_DimensionCapEvictsLRU(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			meta := program2.ChartMeta{Title: "Requests", Context: "requests", Units: "requests/s"}
-			lifecycle := program2.LifecyclePolicy{
-				Dimensions: program2.DimensionLifecyclePolicy{MaxDims: 2},
+			meta := program.ChartMeta{Title: "Requests", Context: "requests", Units: "requests/s"}
+			lifecycle := program.LifecyclePolicy{
+				Dimensions: program.DimensionLifecyclePolicy{MaxDims: 2},
 			}
 
 			state := newMaterializedState()
@@ -31,7 +31,7 @@ func TestEnforceLifecycleCaps_DimensionCapEvictsLRU(t *testing.T) {
 			require.True(t, created)
 
 			oldA, created := matChart.ensureDimension("old_a", dimensionState{
-				algorithm:  program2.AlgorithmAbsolute,
+				algorithm:  program.AlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
 			})
@@ -39,7 +39,7 @@ func TestEnforceLifecycleCaps_DimensionCapEvictsLRU(t *testing.T) {
 			oldA.lastSeenSuccessSeq = 1
 
 			oldB, created := matChart.ensureDimension("old_b", dimensionState{
-				algorithm:  program2.AlgorithmAbsolute,
+				algorithm:  program.AlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
 			})
@@ -60,7 +60,7 @@ func TestEnforceLifecycleCaps_DimensionCapEvictsLRU(t *testing.T) {
 							dimensionState: dimensionState{
 								static:     false,
 								order:      0,
-								algorithm:  program2.AlgorithmAbsolute,
+								algorithm:  program.AlgorithmAbsolute,
 								multiplier: 1,
 								divisor:    1,
 							},
@@ -96,22 +96,22 @@ func TestCollectExpiryRemovals_DimensionAndChartExpiry(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			state := newMaterializedState()
 
-			expiredMeta := program2.ChartMeta{Title: "Expired", Context: "expired"}
-			expiredChart, created := state.ensureChart("chart_expired", "tpl.expired", expiredMeta, program2.LifecyclePolicy{
+			expiredMeta := program.ChartMeta{Title: "Expired", Context: "expired"}
+			expiredChart, created := state.ensureChart("chart_expired", "tpl.expired", expiredMeta, program.LifecyclePolicy{
 				ExpireAfterCycles: 2,
 			})
 			require.True(t, created)
 			expiredChart.lastSeenSuccessSeq = 3
 
-			liveMeta := program2.ChartMeta{Title: "Live", Context: "live"}
-			liveChart, created := state.ensureChart("chart_live", "tpl.live", liveMeta, program2.LifecyclePolicy{
-				Dimensions: program2.DimensionLifecyclePolicy{ExpireAfterCycles: 2},
+			liveMeta := program.ChartMeta{Title: "Live", Context: "live"}
+			liveChart, created := state.ensureChart("chart_live", "tpl.live", liveMeta, program.LifecyclePolicy{
+				Dimensions: program.DimensionLifecyclePolicy{ExpireAfterCycles: 2},
 			})
 			require.True(t, created)
 			liveChart.lastSeenSuccessSeq = tc.currentSeq
 
 			staleDim, created := liveChart.ensureDimension("stale_dim", dimensionState{
-				algorithm:  program2.AlgorithmAbsolute,
+				algorithm:  program.AlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
 			})
@@ -119,7 +119,7 @@ func TestCollectExpiryRemovals_DimensionAndChartExpiry(t *testing.T) {
 			staleDim.lastSeenSuccessSeq = 2
 
 			freshDim, created := liveChart.ensureDimension("fresh_dim", dimensionState{
-				algorithm:  program2.AlgorithmAbsolute,
+				algorithm:  program.AlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
 			})

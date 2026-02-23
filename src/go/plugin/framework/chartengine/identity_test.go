@@ -5,22 +5,22 @@ package chartengine
 import (
 	"testing"
 
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRenderChartInstanceIDScenarios(t *testing.T) {
 	tests := map[string]struct {
-		identity program2.ChartIdentity
+		identity program.ChartIdentity
 		labels   map[string]string
 		wantID   string
 		wantOK   bool
 		wantErr  bool
 	}{
 		"static id without instances": {
-			identity: program2.ChartIdentity{
-				IDTemplate: program2.Template{
+			identity: program.ChartIdentity{
+				IDTemplate: program.Template{
 					Raw: "mysql_queries",
 				},
 			},
@@ -31,8 +31,8 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 			wantOK: true,
 		},
 		"literal id is independent of labels": {
-			identity: program2.ChartIdentity{
-				IDTemplate: program2.Template{
+			identity: program.ChartIdentity{
+				IDTemplate: program.Template{
 					Raw: "win_nic_traffic",
 				},
 			},
@@ -43,11 +43,11 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 			wantOK: true,
 		},
 		"instances explicit appends stable suffix": {
-			identity: program2.ChartIdentity{
-				IDTemplate: program2.Template{
+			identity: program.ChartIdentity{
+				IDTemplate: program.Template{
 					Raw: "win_nic_traffic",
 				},
-				InstanceByLabels: []program2.InstanceLabelSelector{
+				InstanceByLabels: []program.InstanceLabelSelector{
 					{Key: "nic"},
 				},
 			},
@@ -58,11 +58,11 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 			wantOK: true,
 		},
 		"instances wildcard excludes key": {
-			identity: program2.ChartIdentity{
-				IDTemplate: program2.Template{
+			identity: program.ChartIdentity{
+				IDTemplate: program.Template{
 					Raw: "latency_bucket",
 				},
-				InstanceByLabels: []program2.InstanceLabelSelector{
+				InstanceByLabels: []program.InstanceLabelSelector{
 					{IncludeAll: true},
 					{Exclude: true, Key: "le"},
 				},
@@ -76,11 +76,11 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 			wantOK: true,
 		},
 		"instances explicit missing key drops series": {
-			identity: program2.ChartIdentity{
-				IDTemplate: program2.Template{
+			identity: program.ChartIdentity{
+				IDTemplate: program.Template{
 					Raw: "win_nic_traffic",
 				},
-				InstanceByLabels: []program2.InstanceLabelSelector{
+				InstanceByLabels: []program.InstanceLabelSelector{
 					{Key: "nic"},
 				},
 			},

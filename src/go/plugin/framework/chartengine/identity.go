@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 )
 
 type instanceLabelValue struct {
@@ -47,15 +47,15 @@ func (l labelViewAccessor) Range(fn func(key, value string) bool) {
 	l.view.Range(fn)
 }
 
-func renderChartInstanceID(identity program2.ChartIdentity, labels map[string]string) (string, bool, error) {
+func renderChartInstanceID(identity program.ChartIdentity, labels map[string]string) (string, bool, error) {
 	return renderChartInstanceIDWithAccessor(identity, mapLabelAccessor(labels))
 }
 
-func renderChartInstanceIDFromView(identity program2.ChartIdentity, labels metrix.LabelView) (string, bool, error) {
+func renderChartInstanceIDFromView(identity program.ChartIdentity, labels metrix.LabelView) (string, bool, error) {
 	return renderChartInstanceIDWithAccessor(identity, labelViewAccessor{view: labels})
 }
 
-func renderChartInstanceIDWithAccessor(identity program2.ChartIdentity, labels labelAccessor) (string, bool, error) {
+func renderChartInstanceIDWithAccessor(identity program.ChartIdentity, labels labelAccessor) (string, bool, error) {
 	baseID, ok, err := renderTemplate(identity.IDTemplate, labels)
 	if err != nil {
 		return "", false, err
@@ -77,11 +77,11 @@ func renderChartInstanceIDWithAccessor(identity program2.ChartIdentity, labels l
 	return baseID + suffix, true, nil
 }
 
-func renderTemplate(tpl program2.Template, _ labelAccessor) (string, bool, error) {
+func renderTemplate(tpl program.Template, _ labelAccessor) (string, bool, error) {
 	return tpl.Raw, true, nil
 }
 
-func renderInstanceSuffix(identity program2.ChartIdentity, labels labelAccessor) (string, bool, error) {
+func renderInstanceSuffix(identity program.ChartIdentity, labels labelAccessor) (string, bool, error) {
 	values, ok, err := resolveInstanceLabelValues(identity, labels)
 	if err != nil {
 		return "", false, err
@@ -114,7 +114,7 @@ func renderInstanceSuffix(identity program2.ChartIdentity, labels labelAccessor)
 	return "_" + strings.Join(parts, "_"), true, nil
 }
 
-func resolveInstanceLabelValues(identity program2.ChartIdentity, labels labelAccessor) ([]instanceLabelValue, bool, error) {
+func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAccessor) ([]instanceLabelValue, bool, error) {
 	if len(identity.InstanceByLabels) == 0 {
 		return nil, true, nil
 	}

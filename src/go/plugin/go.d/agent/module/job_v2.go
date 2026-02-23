@@ -16,8 +16,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	chartemit2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
-	chartengine2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -107,7 +107,7 @@ type JobV2 struct {
 
 	store  metrix.CollectorStore
 	cycle  metrix.CycleController
-	engine *chartengine2.Engine
+	engine *chartengine.Engine
 
 	prevRun time.Time
 	retries atomic.Int64
@@ -299,18 +299,18 @@ func (j *JobV2) postCheck() error {
 		return fmt.Errorf("metric store is not cycle-managed")
 	}
 
-	opts := []chartengine2.Option{
-		chartengine2.WithLogger(j.Logger.With(slog.String("component", "chartengine"))),
+	opts := []chartengine.Option{
+		chartengine.WithLogger(j.Logger.With(slog.String("component", "chartengine"))),
 	}
 	if v, ok := j.module.(ModuleV2EnginePolicy); ok {
 		policy := v.EnginePolicy()
 		// Chartengine autogen type.id budget must use the actual emitted type.id.
 		// JobV2 always emits with fullName as TypeID.
 		policy.Autogen.TypeID = j.fullName
-		opts = append(opts, chartengine2.WithEnginePolicy(policy))
+		opts = append(opts, chartengine.WithEnginePolicy(policy))
 	}
 
-	engine, err := chartengine2.New(opts...)
+	engine, err := chartengine.New(opts...)
 	if err != nil {
 		return err
 	}
@@ -407,7 +407,7 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) bool {
 		return false
 	}
 
-	if err := chartemit2.ApplyPlan(j.api, plan, chartemit2.EmitEnv{
+	if err := chartemit.ApplyPlan(j.api, plan, chartemit.EmitEnv{
 		TypeID:      j.fullName,
 		UpdateEvery: j.updateEvery,
 		Plugin:      j.pluginName,

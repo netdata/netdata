@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 )
 
 const (
@@ -21,9 +21,9 @@ type autogenRoute struct {
 	title             string
 	dimensionName     string
 	dimensionKeyLabel string
-	algorithm         program2.Algorithm
+	algorithm         program.Algorithm
 	units             string
-	chartType         program2.ChartType
+	chartType         program.ChartType
 	family            string
 	contextName       string
 	staticDimension   bool
@@ -102,7 +102,7 @@ func (e *Engine) resolveAutogenRoute(
 			Static:            route.staticDimension,
 			Inferred:          false,
 			Autogen:           true,
-			Meta: program2.ChartMeta{
+			Meta: program.ChartMeta{
 				Title:     title,
 				Family:    route.family,
 				Context:   getAutogenChartContext(route.contextName),
@@ -205,12 +205,12 @@ func allowAutogenUnitOverride(meta metrix.SeriesMeta) bool {
 	return true
 }
 
-func normalizeAutogenUnitByAlgorithm(unit string, alg program2.Algorithm) string {
+func normalizeAutogenUnitByAlgorithm(unit string, alg program.Algorithm) string {
 	unit = strings.TrimSpace(unit)
 	if unit == "" {
 		return unit
 	}
-	if alg != program2.AlgorithmIncremental {
+	if alg != program.AlgorithmIncremental {
 		return unit
 	}
 	switch unit {
@@ -273,9 +273,9 @@ func buildHistogramBucketAutogenRoute(
 		chartName:         baseName,
 		dimensionName:     "bucket_" + upperBound,
 		dimensionKeyLabel: histogramBucketLabel,
-		algorithm:         program2.AlgorithmIncremental,
+		algorithm:         program.AlgorithmIncremental,
 		units:             "observations/s",
-		chartType:         program2.ChartTypeLine,
+		chartType:         program.ChartTypeLine,
 		family:            getAutogenChartFamily(baseName),
 		contextName:       baseName,
 		staticDimension:   false,
@@ -327,7 +327,7 @@ func buildSummaryQuantileAutogenRoute(
 		chartName:         metricName,
 		dimensionName:     "quantile_" + quantile,
 		dimensionKeyLabel: summaryQuantileLabel,
-		algorithm:         program2.AlgorithmAbsolute,
+		algorithm:         program.AlgorithmAbsolute,
 		units:             units,
 		chartType:         chartTypeFromUnits(units),
 		family:            getAutogenChartFamily(metricName),
@@ -376,7 +376,7 @@ func buildCounterComponentAutogenRoute(
 		chartID:         chartID,
 		chartName:       baseName,
 		dimensionName:   autogenDimensionName(chartName),
-		algorithm:       program2.AlgorithmIncremental,
+		algorithm:       program.AlgorithmIncremental,
 		units:           units,
 		chartType:       chartTypeFromUnits(units),
 		family:          getAutogenChartFamily(baseName),
@@ -409,9 +409,9 @@ func buildStateSetAutogenRoute(
 		chartName:         metricName,
 		dimensionName:     state,
 		dimensionKeyLabel: metricName,
-		algorithm:         program2.AlgorithmAbsolute,
+		algorithm:         program.AlgorithmAbsolute,
 		units:             "state",
-		chartType:         program2.ChartTypeLine,
+		chartType:         program.ChartTypeLine,
 		family:            getAutogenChartFamily(metricName),
 		contextName:       metricName,
 		staticDimension:   false,
@@ -428,10 +428,10 @@ func buildScalarAutogenRoute(
 	if !fitsTypeIDBudget(policy, chartID) {
 		return autogenRoute{}, false, nil
 	}
-	algorithm := program2.AlgorithmAbsolute
+	algorithm := program.AlgorithmAbsolute
 	units := getAutogenGaugeUnits(metricName)
 	if meta.Kind == metrix.MetricKindCounter {
-		algorithm = program2.AlgorithmIncremental
+		algorithm = program.AlgorithmIncremental
 		units = getAutogenCounterUnits(metricName)
 	}
 	return autogenRoute{
@@ -584,21 +584,21 @@ func getAutogenMetricUnits(metric string) string {
 	}
 }
 
-func chartTypeFromUnits(units string) program2.ChartType {
+func chartTypeFromUnits(units string) program.ChartType {
 	if strings.HasSuffix(units, "bytes") || strings.HasSuffix(units, "bytes/s") {
-		return program2.ChartTypeArea
+		return program.ChartTypeArea
 	}
-	return program2.ChartTypeLine
+	return program.ChartTypeLine
 }
 
-func autogenLifecyclePolicy(policy AutogenPolicy) program2.LifecyclePolicy {
+func autogenLifecyclePolicy(policy AutogenPolicy) program.LifecyclePolicy {
 	expire := 0
 	if policy.ExpireAfterSuccessCycles > 0 {
 		expire = int(policy.ExpireAfterSuccessCycles)
 	}
-	return program2.LifecyclePolicy{
+	return program.LifecyclePolicy{
 		ExpireAfterCycles: expire,
-		Dimensions: program2.DimensionLifecyclePolicy{
+		Dimensions: program.DimensionLifecyclePolicy{
 			ExpireAfterCycles: expire,
 		},
 	}

@@ -5,12 +5,12 @@ package chartengine
 import (
 	"testing"
 
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 )
 
 func TestInferDimensionLabelKeyScenarios(t *testing.T) {
@@ -1289,7 +1289,7 @@ groups:
 	assert.Equal(t, "svc.queue_depth-queue=main", create.ChartID)
 	assert.Equal(t, "svc.queue_depth", create.Meta.Context)
 	assert.Equal(t, "depth", create.Meta.Units)
-	assert.Equal(t, program2.AlgorithmAbsolute, create.Meta.Algorithm)
+	assert.Equal(t, program.AlgorithmAbsolute, create.Meta.Algorithm)
 
 	update := findUpdateAction(plan)
 	require.NotNil(t, update)
@@ -1762,16 +1762,16 @@ groups:
 			assert.Equal(t, float64(1), update.Values[0].Float64)
 		},
 		"caps stage evicts deterministically": func(t *testing.T) {
-			lifecycle := program2.LifecyclePolicy{
+			lifecycle := program.LifecyclePolicy{
 				MaxInstances: 1,
 			}
-			meta := program2.ChartMeta{
+			meta := program.ChartMeta{
 				Title:     "Requests",
 				Context:   "requests",
 				Family:    "Service",
 				Units:     "requests/s",
-				Algorithm: program2.AlgorithmIncremental,
-				Type:      program2.ChartTypeLine,
+				Algorithm: program.AlgorithmIncremental,
+				Type:      program.ChartTypeLine,
 			}
 			chartsByID := map[string]*chartState{
 				"svc_a": {
@@ -1828,30 +1828,30 @@ groups:
 		"expiry stage removes stale dimensions and charts": func(t *testing.T) {
 			state := newMaterializedState()
 
-			liveMeta := program2.ChartMeta{
+			liveMeta := program.ChartMeta{
 				Title:   "Service mode",
 				Context: "service_mode",
 			}
-			liveChart, created := state.ensureChart("svc_mode", "tpl.mode", liveMeta, program2.LifecyclePolicy{
-				Dimensions: program2.DimensionLifecyclePolicy{ExpireAfterCycles: 1},
+			liveChart, created := state.ensureChart("svc_mode", "tpl.mode", liveMeta, program.LifecyclePolicy{
+				Dimensions: program.DimensionLifecyclePolicy{ExpireAfterCycles: 1},
 			})
 			require.True(t, created)
 			liveChart.lastSeenSuccessSeq = 3
 			liveDim, dimCreated := liveChart.ensureDimension("stale_mode", dimensionState{
 				static:     false,
 				order:      1,
-				algorithm:  program2.AlgorithmAbsolute,
+				algorithm:  program.AlgorithmAbsolute,
 				multiplier: 1,
 				divisor:    1,
 			})
 			require.True(t, dimCreated)
 			liveDim.lastSeenSuccessSeq = 1
 
-			oldMeta := program2.ChartMeta{
+			oldMeta := program.ChartMeta{
 				Title:   "Old chart",
 				Context: "old_chart",
 			}
-			oldChart, oldCreated := state.ensureChart("old_chart", "tpl.old", oldMeta, program2.LifecyclePolicy{
+			oldChart, oldCreated := state.ensureChart("old_chart", "tpl.old", oldMeta, program.LifecyclePolicy{
 				ExpireAfterCycles: 1,
 			})
 			require.True(t, oldCreated)

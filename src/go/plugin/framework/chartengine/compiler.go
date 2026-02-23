@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
-	program2 "github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 // Compile converts a validated chart template spec into immutable chartengine IR.
-func Compile(spec *charttpl.Spec, revision uint64) (*program2.Program, error) {
+func Compile(spec *charttpl.Spec, revision uint64) (*program.Program, error) {
 	if spec == nil {
 		return nil, fmt.Errorf("chartengine: nil template spec")
 	}
@@ -37,11 +37,11 @@ func Compile(spec *charttpl.Spec, revision uint64) (*program2.Program, error) {
 		}
 	}
 
-	return program2.New(spec.Version, revision, c.metricNames(), c.charts)
+	return program.New(spec.Version, revision, c.metricNames(), c.charts)
 }
 
 type compiler struct {
-	charts     []program2.Chart
+	charts     []program.Chart
 	metricsSet map[string]struct{}
 }
 
@@ -82,8 +82,8 @@ func (c *compiler) compileGroup(group charttpl.Group, parent compileScope, group
 	return nil
 }
 
-func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templateID string) (program2.Chart, error) {
-	dimensions := make([]program2.Dimension, 0, len(chart.Dimensions))
+func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templateID string) (program.Chart, error) {
+	dimensions := make([]program.Dimension, 0, len(chart.Dimensions))
 	selectorKeySet := make(map[string]struct{})
 	dynamicDimensionKeys := make(map[string]struct{})
 
@@ -91,7 +91,7 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 	for i := range chart.Dimensions {
 		compiledDim, err := compileDimension(chart.Dimensions[i], scope.metrics)
 		if err != nil {
-			return program2.Chart{}, fmt.Errorf("dimension[%d]: %w", i, err)
+			return program.Chart{}, fmt.Errorf("dimension[%d]: %w", i, err)
 		}
 		dimensions = append(dimensions, compiledDim.dimension)
 
@@ -108,12 +108,12 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 
 	algorithm, err := resolveAlgorithm(chart.Algorithm, metricKinds)
 	if err != nil {
-		return program2.Chart{}, err
+		return program.Chart{}, err
 	}
 
 	chartType, err := resolveChartType(chart.Type)
 	if err != nil {
-		return program2.Chart{}, err
+		return program.Chart{}, err
 	}
 
 	contextParts := append(append([]string(nil), scope.contextParts...), strings.TrimSpace(chart.Context))
@@ -127,21 +127,21 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 
 	idTemplate, err := parseTemplate(baseID)
 	if err != nil {
-		return program2.Chart{}, fmt.Errorf("id: %w", err)
+		return program.Chart{}, fmt.Errorf("id: %w", err)
 	}
 
 	instanceByLabels, err := compileInstanceByLabels(chart.Instances)
 	if err != nil {
-		return program2.Chart{}, fmt.Errorf("instances.by_labels: %w", err)
+		return program.Chart{}, fmt.Errorf("instances.by_labels: %w", err)
 	}
 
-	labelMode := program2.PromotionModeAutoIntersection
+	labelMode := program.PromotionModeAutoIntersection
 	promote := normalizeUnique(chart.LabelPromoted)
 	if len(promote) > 0 {
-		labelMode = program2.PromotionModeExplicitIntersection
+		labelMode = program.PromotionModeExplicitIntersection
 	}
 
-	identity := program2.ChartIdentity{
+	identity := program.ChartIdentity{
 		IDTemplate:       idTemplate,
 		InstanceByLabels: instanceByLabels,
 		ContextNamespace: append([]string(nil), scope.contextParts...),
@@ -149,9 +149,9 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 	}
 	metaFamily := composeFamily(scope.familyParts, chart.Family)
 
-	out := program2.Chart{
+	out := program.Chart{
 		TemplateID: templateID,
-		Meta: program2.ChartMeta{
+		Meta: program.ChartMeta{
 			Title:     strings.TrimSpace(chart.Title),
 			Family:    metaFamily,
 			Context:   context,
@@ -161,25 +161,25 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 			Priority:  chart.Priority,
 		},
 		Identity: identity,
-		Labels: program2.LabelPolicy{
+		Labels: program.LabelPolicy{
 			Mode:        labelMode,
 			PromoteKeys: promote,
-			Exclusions: program2.LabelExclusions{
+			Exclusions: program.LabelExclusions{
 				SelectorConstrainedKeys: mapKeysSorted(selectorKeySet),
 				DimensionKeyLabels:      mapKeysSorted(dynamicDimensionKeys),
 			},
-			Precedence: program2.DefaultLabelPrecedence(),
+			Precedence: program.DefaultLabelPrecedence(),
 		},
 		Lifecycle:       compileLifecycle(chart.Lifecycle),
 		Dimensions:      dimensions,
-		CollisionReduce: program2.ReduceSum,
+		CollisionReduce: program.ReduceSum,
 	}
 
 	return out, nil
 }
 
 type compiledDimension struct {
-	dimension        program2.Dimension
+	dimension        program.Dimension
 	selectorKeys     []string
 	dynamicLabelKeys []string
 	metricKinds      []string
@@ -211,7 +211,7 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 		)
 	}
 
-	nameTemplate := program2.Template{}
+	nameTemplate := program.Template{}
 	dynamicLabelKeys := make([]string, 0, 1)
 	if name != "" {
 		nameTemplate, err = parseTemplate(name)
@@ -226,8 +226,8 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 	options := compileDimensionOptions(dim.Options)
 
 	return compiledDimension{
-		dimension: program2.Dimension{
-			Selector: program2.SelectorBinding{
+		dimension: program.Dimension{
+			Selector: program.SelectorBinding{
 				Expression:           strings.TrimSpace(dim.Selector),
 				Matcher:              selectorMatcher{compiled: compiledSel},
 				MetricNames:          append([]string(nil), meta.MetricNames...),
@@ -271,14 +271,14 @@ func compileDimensionOptions(in *charttpl.DimensionOptions) compiledDimensionOpt
 	return out
 }
 
-func resolveAlgorithm(raw string, metricKinds map[string]bool) (program2.Algorithm, error) {
+func resolveAlgorithm(raw string, metricKinds map[string]bool) (program.Algorithm, error) {
 	normalized := strings.TrimSpace(raw)
 	if normalized != "" {
 		switch normalized {
-		case string(program2.AlgorithmAbsolute):
-			return program2.AlgorithmAbsolute, nil
-		case string(program2.AlgorithmIncremental):
-			return program2.AlgorithmIncremental, nil
+		case string(program.AlgorithmAbsolute):
+			return program.AlgorithmAbsolute, nil
+		case string(program.AlgorithmIncremental):
+			return program.AlgorithmIncremental, nil
 		default:
 			return "", fmt.Errorf("invalid algorithm %q", raw)
 		}
@@ -292,31 +292,31 @@ func resolveAlgorithm(raw string, metricKinds map[string]bool) (program2.Algorit
 		return "", fmt.Errorf("algorithm inference is ambiguous for mixed metric kinds; set algorithm explicitly")
 	}
 	if metricKinds["counter_like"] {
-		return program2.AlgorithmIncremental, nil
+		return program.AlgorithmIncremental, nil
 	}
-	return program2.AlgorithmAbsolute, nil
+	return program.AlgorithmAbsolute, nil
 }
 
-func resolveChartType(raw string) (program2.ChartType, error) {
+func resolveChartType(raw string) (program.ChartType, error) {
 	normalized := strings.TrimSpace(raw)
 	if normalized == "" {
-		return program2.ChartTypeLine, nil
+		return program.ChartTypeLine, nil
 	}
 	switch normalized {
-	case string(program2.ChartTypeLine):
-		return program2.ChartTypeLine, nil
-	case string(program2.ChartTypeArea):
-		return program2.ChartTypeArea, nil
-	case string(program2.ChartTypeStacked):
-		return program2.ChartTypeStacked, nil
-	case string(program2.ChartTypeHeatmap):
-		return program2.ChartTypeHeatmap, nil
+	case string(program.ChartTypeLine):
+		return program.ChartTypeLine, nil
+	case string(program.ChartTypeArea):
+		return program.ChartTypeArea, nil
+	case string(program.ChartTypeStacked):
+		return program.ChartTypeStacked, nil
+	case string(program.ChartTypeHeatmap):
+		return program.ChartTypeHeatmap, nil
 	default:
 		return "", fmt.Errorf("invalid chart type %q", raw)
 	}
 }
 
-func compileLifecycle(in *charttpl.Lifecycle) program2.LifecyclePolicy {
+func compileLifecycle(in *charttpl.Lifecycle) program.LifecyclePolicy {
 	out := defaultChartLifecyclePolicyCopy()
 	if in == nil {
 		return out
@@ -332,24 +332,24 @@ func compileLifecycle(in *charttpl.Lifecycle) program2.LifecyclePolicy {
 	return out
 }
 
-func compileInstanceByLabels(instances *charttpl.Instances) ([]program2.InstanceLabelSelector, error) {
+func compileInstanceByLabels(instances *charttpl.Instances) ([]program.InstanceLabelSelector, error) {
 	if instances == nil {
 		return nil, nil
 	}
-	out := make([]program2.InstanceLabelSelector, 0, len(instances.ByLabels))
+	out := make([]program.InstanceLabelSelector, 0, len(instances.ByLabels))
 	for _, token := range instances.ByLabels {
 		t := strings.TrimSpace(token)
 		switch {
 		case t == "*":
-			out = append(out, program2.InstanceLabelSelector{IncludeAll: true})
+			out = append(out, program.InstanceLabelSelector{IncludeAll: true})
 		case strings.HasPrefix(t, "!"):
 			key := strings.TrimSpace(strings.TrimPrefix(t, "!"))
 			if key == "" {
 				return nil, fmt.Errorf("exclude token must include label key")
 			}
-			out = append(out, program2.InstanceLabelSelector{Exclude: true, Key: key})
+			out = append(out, program.InstanceLabelSelector{Exclude: true, Key: key})
 		default:
-			out = append(out, program2.InstanceLabelSelector{Key: t})
+			out = append(out, program.InstanceLabelSelector{Key: t})
 		}
 	}
 	return out, nil
@@ -492,12 +492,12 @@ type selectorMatcher struct {
 	compiled metrixselector.Compiled
 }
 
-func (m selectorMatcher) Matches(metricName string, lbs program2.SelectorLabels) bool {
+func (m selectorMatcher) Matches(metricName string, lbs program.SelectorLabels) bool {
 	return m.compiled.Matches(metricName, selectorLabelView{labels: lbs})
 }
 
 type selectorLabelView struct {
-	labels program2.SelectorLabels
+	labels program.SelectorLabels
 }
 
 func (v selectorLabelView) Len() int {
