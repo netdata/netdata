@@ -70,13 +70,13 @@ func (m *Manager) exposedLookupByName(module, job string) (*dyncfg.Entry[confgro
 func (m *Manager) dyncfgCollectorExec(fn dyncfg.Function) {
 	switch fn.Command() {
 	case dyncfg.CommandUserconfig:
-		m.dyncfgConfigUserconfig(fn)
+		m.dyncfgCmdUserconfig(fn)
 		return
 	case dyncfg.CommandTest:
-		m.dyncfgConfigTest(fn)
+		m.dyncfgCmdTest(fn)
 		return
 	case dyncfg.CommandSchema:
-		m.dyncfgConfigSchema(fn)
+		m.dyncfgCmdSchema(fn)
 		return
 	}
 
@@ -105,18 +105,18 @@ func (m *Manager) dyncfgCollectorSeqExec(fn dyncfg.Function) {
 	case dyncfg.CommandRestart:
 		m.handler.CmdRestart(fn)
 	case dyncfg.CommandTest:
-		m.dyncfgConfigTest(fn)
+		m.dyncfgCmdTest(fn)
 	case dyncfg.CommandSchema:
-		m.dyncfgConfigSchema(fn)
+		m.dyncfgCmdSchema(fn)
 	case dyncfg.CommandGet:
-		m.dyncfgConfigGet(fn)
+		m.dyncfgCmdGet(fn)
 	default:
 		m.Warningf("dyncfg: function '%s' command '%s' not implemented", fn.Fn().Name, cmd)
 		m.dyncfgApi.SendCodef(fn, 501, "Function '%s' command '%s' is not implemented.", fn.Fn().Name, cmd)
 	}
 }
 
-func (m *Manager) dyncfgConfigUserconfig(fn dyncfg.Function) {
+func (m *Manager) dyncfgCmdUserconfig(fn dyncfg.Function) {
 	cmd := fn.Command()
 
 	id := fn.ID()
@@ -155,7 +155,7 @@ func (m *Manager) dyncfgConfigUserconfig(fn dyncfg.Function) {
 	m.dyncfgApi.SendYAML(fn, string(bs))
 }
 
-func (m *Manager) dyncfgConfigTest(fn dyncfg.Function) {
+func (m *Manager) dyncfgCmdTest(fn dyncfg.Function) {
 	cmd := fn.Command()
 
 	id := fn.ID()
@@ -235,7 +235,7 @@ func (m *Manager) dyncfgConfigTest(fn dyncfg.Function) {
 	m.dyncfgApi.SendCodef(fn, 200, "")
 }
 
-func (m *Manager) dyncfgConfigSchema(fn dyncfg.Function) {
+func (m *Manager) dyncfgCmdSchema(fn dyncfg.Function) {
 	cmd := fn.Command()
 
 	id := fn.ID()
@@ -264,7 +264,7 @@ func (m *Manager) dyncfgConfigSchema(fn dyncfg.Function) {
 	m.dyncfgApi.SendJSON(fn, mod.JobConfigSchema)
 }
 
-func (m *Manager) dyncfgConfigGet(fn dyncfg.Function) {
+func (m *Manager) dyncfgCmdGet(fn dyncfg.Function) {
 	cmd := fn.Command()
 
 	id := fn.ID()

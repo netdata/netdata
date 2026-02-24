@@ -45,7 +45,7 @@ func TestDyncfgConfigUserconfig_InvalidPayload_Returns400Only(t *testing.T) {
 				},
 			})
 
-			mgr.dyncfgConfigUserconfig(fn)
+			mgr.dyncfgCmdUserconfig(fn)
 
 			out := buf.String()
 			assert.Equal(t, 1, strings.Count(out, "FUNCTION_RESULT_BEGIN bad-userconfig"))
