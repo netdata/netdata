@@ -21,8 +21,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 )
 
-var isTerminal = terminal.IsTerminal()
-
 type Config struct {
 	ConfigDefaults confgroup.Registry
 	ConfDir        multipath.MultiPath
@@ -273,7 +271,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 		d.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: scfg, Status: dyncfg.StatusAccepted})
 
 		d.handler.NotifyJobCreate(scfg, dyncfg.StatusAccepted)
-		if isTerminal || d.fnReg == nil || d.dyncfgCh == nil {
+		if terminal.IsTerminal() || d.fnReg == nil || d.dyncfgCh == nil {
 			// Auto-enable in terminal mode and tests.
 			// Also auto-enable when no function registry is attached, because
 			// no external enable/disable commands can be delivered.
@@ -309,7 +307,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	d.handler.NotifyJobRemove(entry.Cfg)
 	d.handler.NotifyJobCreate(scfg, dyncfg.StatusAccepted)
 
-	if isTerminal || d.fnReg == nil || d.dyncfgCh == nil {
+	if terminal.IsTerminal() || d.fnReg == nil || d.dyncfgCh == nil {
 		d.autoEnableConfig(scfg)
 	} else {
 		d.handler.WaitForDecision(scfg)

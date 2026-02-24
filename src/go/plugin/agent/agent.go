@@ -25,8 +25,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
 
-var isTerminal = terminal.IsTerminal()
-
 // Config is an Agent configuration.
 type Config struct {
 	Name            string
@@ -217,7 +215,7 @@ func (a *Agent) run(ctx context.Context) {
 
 	if !cfg.Enabled {
 		a.Info("plugin is disabled in the configuration file, exiting...")
-		if isTerminal {
+		if terminal.IsTerminal() {
 			os.Exit(0)
 		}
 		a.api.DISABLE()
@@ -227,7 +225,7 @@ func (a *Agent) run(ctx context.Context) {
 	enabledModules := a.loadEnabledModules(cfg)
 	if len(enabledModules) == 0 {
 		a.Info("no modules to run")
-		if isTerminal {
+		if terminal.IsTerminal() {
 			os.Exit(0)
 		}
 		a.api.DISABLE()
@@ -241,7 +239,7 @@ func (a *Agent) run(ctx context.Context) {
 	discMgr, err := discovery.NewManager(discCfg)
 	if err != nil {
 		a.Error(err)
-		if isTerminal {
+		if terminal.IsTerminal() {
 			os.Exit(0)
 		}
 		return
@@ -291,7 +289,7 @@ func (a *Agent) run(ctx context.Context) {
 }
 
 func (a *Agent) keepAlive() {
-	if isTerminal {
+	if terminal.IsTerminal() {
 		return
 	}
 

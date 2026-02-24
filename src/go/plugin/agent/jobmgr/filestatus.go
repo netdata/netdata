@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/filepersister"
 )
@@ -24,7 +25,7 @@ func statusFileName(dir string) string {
 func (m *Manager) loadFileStatus() {
 	m.fileStatus = newFileStatus()
 
-	if isTerminal || m.varLibDir == "" {
+	if terminal.IsTerminal() || m.varLibDir == "" {
 		return
 	}
 

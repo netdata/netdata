@@ -31,8 +31,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var isTerminal = terminal.IsTerminal()
-
 type Config struct {
 	PluginName         string
 	Out                io.Writer
@@ -364,7 +362,7 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 
 	m.handler.NotifyJobCreate(entry.Cfg, entry.Status)
 
-	if isTerminal || m.pluginName == "nodyncfg" { // FIXME: quick fix of TestAgent_Run (agent_test.go)
+	if terminal.IsTerminal() || m.pluginName == "nodyncfg" { // FIXME: quick fix of TestAgent_Run (agent_test.go)
 		m.handler.CmdEnable(dyncfg.NewFunction(functions.Function{Args: []string{m.dyncfgJobID(entry.Cfg), "enable"}}))
 	} else {
 		m.handler.WaitForDecision(entry.Cfg)
