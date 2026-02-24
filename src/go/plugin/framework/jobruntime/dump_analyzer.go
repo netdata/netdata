@@ -12,4 +12,3 @@ type DumpAnalyzer interface {
 	UpdateJobStructure(jobName string, charts *collectorapi.Charts)
 	RecordCollection(jobName string, mx map[string]int64)
 }
-
