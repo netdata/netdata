@@ -8,11 +8,12 @@ const char *cloud_config_url_get(void) {
     return inicfg_get(&cloud_config, CONFIG_SECTION_GLOBAL, "url", DEFAULT_CLOUD_BASE_URL);
 }
 
-void cloud_config_url_set(const char *url) {
-    if(!url || *url) return;
+void cloud_config_url_set(const char *url)
+{
+    if (!url || !*url) return;
 
     const char *existing = cloud_config_url_get();
-    if(strcmp(existing, url) != 0)
+    if (strcmp(existing, url) != 0)
         inicfg_set(&cloud_config, CONFIG_SECTION_GLOBAL, "url", url);
 }
 
