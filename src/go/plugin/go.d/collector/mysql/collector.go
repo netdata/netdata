@@ -31,7 +31,7 @@ var mysqlChartTemplateV2 string
 func init() {
 	collectorapi.Register("mysql", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		CreateV2:        func() collectorapi.ModuleV2 { return New() },
+		CreateV2:        func() collectorapi.CollectorV2 { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         mysqlfunc.Methods,
 		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {

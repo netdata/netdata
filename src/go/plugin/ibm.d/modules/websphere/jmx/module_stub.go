@@ -35,7 +35,7 @@ func (c *Collector) Cleanup(context.Context) {}
 func init() {
 	collectorapi.Register("websphere_jmx", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() collectorapi.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return nil },
 	})
 }

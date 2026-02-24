@@ -138,8 +138,8 @@ func prepareMockRegistry() collectorapi.Registry {
 
 	reg.Register("success", collectorapi.Creator{
 		JobConfigSchema: collectorapi.MockConfigSchema,
-		Create: func() collectorapi.Module {
-			return &collectorapi.MockModule{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
 				ChartsFunc: func() *collectorapi.Charts {
 					return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "title", Units: "units", Dims: collectorapi.Dims{{ID: "id1"}}}}
 				},
@@ -151,17 +151,17 @@ func prepareMockRegistry() collectorapi.Registry {
 		},
 	})
 	reg.Register("fail", collectorapi.Creator{
-		Create: func() collectorapi.Module {
-			return &collectorapi.MockModule{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
 				InitFunc: func(context.Context) error { return errors.New("mock failed init") },
 			}
 		},
 	})
 
-	// Module without Methods - for testing function_only config rejection
+	// CollectorV1 without Methods - for testing function_only config rejection
 	reg.Register("nofuncs", collectorapi.Creator{
-		Create: func() collectorapi.Module {
-			return &collectorapi.MockModule{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
 				ChartsFunc: func() *collectorapi.Charts {
 					return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "title", Units: "units", Dims: collectorapi.Dims{{ID: "id1"}}}}
 				},
@@ -170,10 +170,10 @@ func prepareMockRegistry() collectorapi.Registry {
 		},
 	})
 
-	// Module with Methods - for testing config-level function_only
+	// CollectorV1 with Methods - for testing config-level function_only
 	reg.Register("withfuncs", collectorapi.Creator{
-		Create: func() collectorapi.Module {
-			return &collectorapi.MockModule{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
 				ChartsFunc: func() *collectorapi.Charts {
 					return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "title", Units: "units", Dims: collectorapi.Dims{{ID: "id1"}}}}
 				},
@@ -188,8 +188,8 @@ func prepareMockRegistry() collectorapi.Registry {
 	// FunctionOnly module - for testing module-level function-only
 	reg.Register("funconly", collectorapi.Creator{
 		FunctionOnly: true,
-		Create: func() collectorapi.Module {
-			return &collectorapi.MockModule{
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
 				ChartsFunc:  func() *collectorapi.Charts { return nil },
 				CollectFunc: func(context.Context) map[string]int64 { return nil },
 			}

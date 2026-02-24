@@ -22,7 +22,7 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create: func() collectorapi.Module { return New() },
+		Create: func() collectorapi.CollectorV1 { return New() },
 		Config: func() any { return &Config{} },
 	})
 }

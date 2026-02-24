@@ -38,7 +38,7 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	assert.Implements(t, (*collectorapi.Module)(nil), New())
+	assert.Implements(t, (*collectorapi.CollectorV1)(nil), New())
 }
 
 func TestCollector_Init(t *testing.T) {

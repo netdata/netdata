@@ -21,7 +21,7 @@ var configSchema string
 
 func init() {
 	collectorapi.Register("riakkv", collectorapi.Creator{
-		Create: func() collectorapi.Module { return New() },
+		Create: func() collectorapi.CollectorV1 { return New() },
 		// Riak updates the metrics on the /stats endpoint every 1 second.
 		// If we use 1 here, it means we might get weird jitter in the graph,
 		// so the default is set to 2 seconds to prevent that.

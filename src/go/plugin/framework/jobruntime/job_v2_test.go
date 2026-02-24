@@ -87,7 +87,7 @@ func (m *mockModuleV2) VirtualNode() *vnodes.VirtualNode   { return m.vnode }
 func (m *mockModuleV2) MetricStore() metrix.CollectorStore { return m.store }
 func (m *mockModuleV2) ChartTemplateYAML() string          { return m.template }
 
-func newTestJobV2(mod collectorapi.ModuleV2, out *bytes.Buffer) *JobV2 {
+func newTestJobV2(mod collectorapi.CollectorV2, out *bytes.Buffer) *JobV2 {
 	return NewJobV2(JobV2Config{
 		PluginName:  pluginName,
 		Name:        jobName,
@@ -102,7 +102,7 @@ func newTestJobV2(mod collectorapi.ModuleV2, out *bytes.Buffer) *JobV2 {
 	})
 }
 
-func newTestJobV2WithVnode(mod collectorapi.ModuleV2, out *bytes.Buffer, vnode vnodes.VirtualNode) *JobV2 {
+func newTestJobV2WithVnode(mod collectorapi.CollectorV2, out *bytes.Buffer, vnode vnodes.VirtualNode) *JobV2 {
 	return NewJobV2(JobV2Config{
 		PluginName:  pluginName,
 		Name:        jobName,

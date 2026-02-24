@@ -21,7 +21,7 @@ var configSchema string
 
 func init() {
 	collectorapi.Register("apache", collectorapi.Creator{
-		Create:          func() collectorapi.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		JobConfigSchema: configSchema,
 		Config:          func() any { return &Config{} },
 	})

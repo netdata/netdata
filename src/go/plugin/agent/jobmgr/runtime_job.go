@@ -34,7 +34,7 @@ type runtimeJob interface {
 }
 
 // configModule is the shared Init/Check/config contract for dyncfg config test/get
-// flows. Both legacy Module and ModuleV2 satisfy it.
+// flows. Both legacy CollectorV1 and CollectorV2 satisfy it.
 type configModule interface {
 	GetBase() *collectorapi.Base
 	Init(ctx context.Context) error

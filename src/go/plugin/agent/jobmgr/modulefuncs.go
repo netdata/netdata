@@ -83,7 +83,7 @@ func (r *moduleFuncRegistry) addJob(moduleName, jobName string, job collectorapi
 
 	mf, ok := r.modules[moduleName]
 	if !ok {
-		return // Module not registered (doesn't implement FunctionProvider)
+		return // CollectorV1 not registered (doesn't implement FunctionProvider)
 	}
 
 	// Replace any existing job with the same name

@@ -27,7 +27,7 @@ var ifaceModuleEepromCharts = collectorapi.Charts{
 var (
 	ifaceModuleReceiverPowerDbmChartTmpl = collectorapi.Chart{
 		ID:       "iface_%s_module_receiver_power_dbm",
-		Title:    "Module Receiver Signal Average Optical Power",
+		Title:    "CollectorV1 Receiver Signal Average Optical Power",
 		Units:    "dBm",
 		Fam:      "optical module",
 		Ctx:      "ethtool.optical_module_receiver_signal_power",
@@ -38,7 +38,7 @@ var (
 	}
 	ifaceModuleLaserPowerDbmChartTmpl = collectorapi.Chart{
 		ID:       "iface_%s_module_laser_output_power_dbm",
-		Title:    "Module Laser Output Power",
+		Title:    "CollectorV1 Laser Output Power",
 		Units:    "dBm",
 		Fam:      "optical module",
 		Ctx:      "ethtool.optical_module_laser_output_power",
@@ -49,7 +49,7 @@ var (
 	}
 	ifaceModuleLaserBiasCurrentChartTmpl = collectorapi.Chart{
 		ID:       "iface_%s_module_laser_bias_current",
-		Title:    "Module Laser Bias Current",
+		Title:    "CollectorV1 Laser Bias Current",
 		Units:    "mA",
 		Fam:      "optical module",
 		Ctx:      "ethtool.optical_module_laser_bias_current",
@@ -60,7 +60,7 @@ var (
 	}
 	ifaceModuleTempCelsiusChartTmpl = collectorapi.Chart{
 		ID:       "iface_%s_module_temperature_c",
-		Title:    "Module Temperature",
+		Title:    "CollectorV1 Temperature",
 		Units:    "Celsius",
 		Fam:      "optical module",
 		Ctx:      "ethtool.optical_module_temperature",
@@ -71,7 +71,7 @@ var (
 	}
 	ifaceModuleVoltageChartTmpl = collectorapi.Chart{
 		ID:       "iface_%s_module_voltage",
-		Title:    "Module Voltage",
+		Title:    "CollectorV1 Voltage",
 		Units:    "Volts",
 		Fam:      "optical module",
 		Ctx:      "ethtool.optical_module_voltage",

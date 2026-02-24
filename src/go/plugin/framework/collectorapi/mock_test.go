@@ -11,7 +11,7 @@ import (
 )
 
 func TestMockModule_Init(t *testing.T) {
-	m := &MockModule{}
+	m := &MockCollectorV1{}
 	ctx := context.Background()
 
 	assert.NoError(t, m.Init(ctx))
@@ -20,7 +20,7 @@ func TestMockModule_Init(t *testing.T) {
 }
 
 func TestMockModule_Check(t *testing.T) {
-	m := &MockModule{}
+	m := &MockCollectorV1{}
 	ctx := context.Background()
 
 	assert.NoError(t, m.Check(ctx))
@@ -29,7 +29,7 @@ func TestMockModule_Check(t *testing.T) {
 }
 
 func TestMockModule_Charts(t *testing.T) {
-	m := &MockModule{}
+	m := &MockCollectorV1{}
 	c := &Charts{}
 
 	assert.Nil(t, m.Charts())
@@ -38,7 +38,7 @@ func TestMockModule_Charts(t *testing.T) {
 }
 
 func TestMockModule_Collect(t *testing.T) {
-	m := &MockModule{}
+	m := &MockCollectorV1{}
 	d := map[string]int64{
 		"1": 1,
 	}
@@ -50,7 +50,7 @@ func TestMockModule_Collect(t *testing.T) {
 }
 
 func TestMockModule_Cleanup(t *testing.T) {
-	m := &MockModule{}
+	m := &MockCollectorV1{}
 	ctx := context.Background()
 
 	require.False(t, m.CleanupDone)

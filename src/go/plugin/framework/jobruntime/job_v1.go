@@ -58,7 +58,7 @@ type JobConfig struct {
 	Name            string
 	ModuleName      string
 	FullName        string
-	Module          collectorapi.Module
+	Module          collectorapi.CollectorV1
 	Labels          map[string]string
 	Out             io.Writer
 	UpdateEvery     int
@@ -136,7 +136,7 @@ type Job struct {
 	isStock      bool
 	functionOnly bool
 
-	module collectorapi.Module
+	module collectorapi.CollectorV1
 
 	// running tracks whether the job's main loop is active (set in Start, cleared in Start's defer)
 	running atomic.Bool
@@ -301,7 +301,7 @@ func (j *Job) IsRunning() bool {
 
 // Module returns the underlying module instance.
 // This allows function handlers to access the collector for querying data.
-func (j *Job) Module() collectorapi.Module {
+func (j *Job) Module() collectorapi.CollectorV1 {
 	return j.module
 }
 

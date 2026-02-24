@@ -29,7 +29,7 @@ type JobV2Config struct {
 	Name            string
 	ModuleName      string
 	FullName        string
-	Module          collectorapi.ModuleV2
+	Module          collectorapi.CollectorV2
 	Labels          map[string]string
 	Out             io.Writer
 	UpdateEvery     int
@@ -99,7 +99,7 @@ type JobV2 struct {
 
 	*logger.Logger
 
-	module collectorapi.ModuleV2
+	module collectorapi.CollectorV2
 
 	running atomic.Bool
 
@@ -135,13 +135,13 @@ type JobV2 struct {
 	skipTracker tickstate.SkipTracker
 }
 
-func (j *JobV2) FullName() string              { return j.fullName }
-func (j *JobV2) ModuleName() string            { return j.moduleName }
-func (j *JobV2) Name() string                  { return j.name }
-func (j *JobV2) Panicked() bool                { return j.panicked.Load() }
-func (j *JobV2) IsRunning() bool               { return j.running.Load() }
-func (j *JobV2) Module() collectorapi.ModuleV2 { return j.module }
-func (j *JobV2) Collector() any                { return j.module }
+func (j *JobV2) FullName() string                 { return j.fullName }
+func (j *JobV2) ModuleName() string               { return j.moduleName }
+func (j *JobV2) Name() string                     { return j.name }
+func (j *JobV2) Panicked() bool                   { return j.panicked.Load() }
+func (j *JobV2) IsRunning() bool                  { return j.running.Load() }
+func (j *JobV2) Module() collectorapi.CollectorV2 { return j.module }
+func (j *JobV2) Collector() any                   { return j.module }
 func (j *JobV2) AutoDetectionEvery() int {
 	return j.autoDetectEvery
 }
@@ -303,7 +303,7 @@ func (j *JobV2) postCheck() error {
 	opts := []chartengine.Option{
 		chartengine.WithLogger(j.Logger.With(slog.String("component", "chartengine"))),
 	}
-	if v, ok := j.module.(collectorapi.ModuleV2EnginePolicy); ok {
+	if v, ok := j.module.(collectorapi.CollectorV2EnginePolicy); ok {
 		policy := v.EnginePolicy()
 		// Chartengine autogen type.id budget must use the actual emitted type.id.
 		// JobV2 always emits with fullName as TypeID.

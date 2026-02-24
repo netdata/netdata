@@ -27,7 +27,7 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10, // gathering systemd units can be a CPU intensive op
 		},
-		Create: func() collectorapi.Module { return New() },
+		Create: func() collectorapi.CollectorV1 { return New() },
 		Config: func() any { return &Config{} },
 	})
 }

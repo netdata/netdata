@@ -33,8 +33,8 @@ type MockConfiguration struct {
 	OptionInt int    `yaml:"option_int" json:"option_int"`
 }
 
-// MockModule MockModule.
-type MockModule struct {
+// MockCollectorV1 MockCollectorV1.
+type MockCollectorV1 struct {
 	Base
 
 	Config MockConfiguration `yaml:",inline" json:""`
@@ -50,7 +50,7 @@ type MockModule struct {
 }
 
 // Init invokes InitFunc.
-func (m *MockModule) Init(ctx context.Context) error {
+func (m *MockCollectorV1) Init(ctx context.Context) error {
 	if m.FailOnInit {
 		return errors.New("mock init error")
 	}
@@ -61,7 +61,7 @@ func (m *MockModule) Init(ctx context.Context) error {
 }
 
 // Check invokes CheckFunc.
-func (m *MockModule) Check(ctx context.Context) error {
+func (m *MockCollectorV1) Check(ctx context.Context) error {
 	if m.CheckFunc == nil {
 		return nil
 	}
@@ -69,7 +69,7 @@ func (m *MockModule) Check(ctx context.Context) error {
 }
 
 // Charts invokes ChartsFunc.
-func (m *MockModule) Charts() *Charts {
+func (m *MockCollectorV1) Charts() *Charts {
 	if m.ChartsFunc == nil {
 		return nil
 	}
@@ -77,7 +77,7 @@ func (m *MockModule) Charts() *Charts {
 }
 
 // Collect invokes CollectDunc.
-func (m *MockModule) Collect(ctx context.Context) map[string]int64 {
+func (m *MockCollectorV1) Collect(ctx context.Context) map[string]int64 {
 	if m.CollectFunc == nil {
 		return nil
 	}
@@ -85,13 +85,13 @@ func (m *MockModule) Collect(ctx context.Context) map[string]int64 {
 }
 
 // Cleanup sets CleanupDone to true.
-func (m *MockModule) Cleanup(ctx context.Context) {
+func (m *MockCollectorV1) Cleanup(ctx context.Context) {
 	if m.CleanupFunc != nil {
 		m.CleanupFunc(ctx)
 	}
 	m.CleanupDone = true
 }
 
-func (m *MockModule) Configuration() any {
+func (m *MockCollectorV1) Configuration() any {
 	return m.Config
 }

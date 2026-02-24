@@ -75,7 +75,7 @@ func TestJob_AutoDetectionEvery(t *testing.T) {
 
 func TestJob_RetryAutoDetection(t *testing.T) {
 	job := newTestJob()
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
@@ -106,7 +106,7 @@ func TestJob_RetryAutoDetection(t *testing.T) {
 func TestJob_AutoDetection(t *testing.T) {
 	job := newTestJob()
 	var v int
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			v++
 			return nil
@@ -128,7 +128,7 @@ func TestJob_AutoDetection(t *testing.T) {
 
 func TestJob_AutoDetection_FailInit(t *testing.T) {
 	job := newTestJob()
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			return errors.New("init error")
 		},
@@ -141,7 +141,7 @@ func TestJob_AutoDetection_FailInit(t *testing.T) {
 
 func TestJob_AutoDetection_FailCheck(t *testing.T) {
 	job := newTestJob()
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
@@ -157,7 +157,7 @@ func TestJob_AutoDetection_FailCheck(t *testing.T) {
 
 func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 	job := newTestJob()
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
@@ -176,7 +176,7 @@ func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 
 func TestJob_AutoDetection_PanicInit(t *testing.T) {
 	job := newTestJob()
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			panic("panic in Init")
 		},
@@ -189,7 +189,7 @@ func TestJob_AutoDetection_PanicInit(t *testing.T) {
 
 func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 	job := newTestJob()
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
@@ -205,7 +205,7 @@ func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 
 func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 	job := newTestJob()
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
@@ -223,7 +223,7 @@ func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 }
 
 func TestJob_Start(t *testing.T) {
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		ChartsFunc: func() *collectorapi.Charts {
 			return &collectorapi.Charts{
 				&collectorapi.Chart{
@@ -279,7 +279,7 @@ func TestJob_StopBeforeStartDoesNotBlock(t *testing.T) {
 }
 
 func TestJob_MainLoop_Panic(t *testing.T) {
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		CollectFunc: func(context.Context) map[string]int64 {
 			panic("panic in Collect")
 		},
@@ -321,7 +321,7 @@ func TestJob_UpdateVnode_NilIgnored(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			job := newTestJob()
-			job.module = &collectorapi.MockModule{}
+			job.module = &collectorapi.MockCollectorV1{}
 			job.charts = &collectorapi.Charts{}
 
 			job.UpdateVnode(tc.update)
@@ -367,7 +367,7 @@ func TestJob_IsFunctionOnly(t *testing.T) {
 
 func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 	job := newTestFunctionOnlyJob()
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
@@ -385,7 +385,7 @@ func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 
 func TestJob_Start_FunctionOnly(t *testing.T) {
 	collectCalled := false
-	m := &collectorapi.MockModule{
+	m := &collectorapi.MockCollectorV1{
 		ChartsFunc: func() *collectorapi.Charts {
 			return nil
 		},

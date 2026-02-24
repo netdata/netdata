@@ -28,8 +28,8 @@ type (
 	// modules that set these fields can expose data functions to the UI.
 	Creator struct {
 		Defaults
-		Create          func() Module
-		CreateV2        func() ModuleV2
+		Create          func() CollectorV1
+		CreateV2        func() CollectorV2
 		JobConfigSchema string
 		Config          func() any
 

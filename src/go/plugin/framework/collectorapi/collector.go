@@ -11,8 +11,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
-// Module is an interface that represents a module.
-type Module interface {
+// CollectorV1 is an interface that represents a module.
+type CollectorV1 interface {
 	// Init does initialization.
 	// If it returns error, the job will be disabled.
 	Init(context.Context) error
@@ -41,12 +41,12 @@ type MetricCollector interface {
 	CollectMetrics(context.Context) map[string]float64
 }
 
-// ModuleV2 is the collector contract for the new metrics+template runtime.
+// CollectorV2 is the collector contract for the new metrics+template runtime.
 //
 // Collectors implementing this interface:
 //   - write metrics into CollectorStore during Collect(),
 //   - provide chart template YAML consumed by chartengine.
-type ModuleV2 interface {
+type CollectorV2 interface {
 	Init(context.Context) error
 	Check(context.Context) error
 	Collect(context.Context) error
@@ -60,9 +60,9 @@ type ModuleV2 interface {
 	ChartTemplateYAML() string
 }
 
-// ModuleV2EnginePolicy allows a V2 collector to provide chartengine policy
+// CollectorV2EnginePolicy allows a V2 collector to provide chartengine policy
 // (series selector + autogen behavior).
-type ModuleV2EnginePolicy interface {
+type CollectorV2EnginePolicy interface {
 	EnginePolicy() chartengine.EnginePolicy
 }
 

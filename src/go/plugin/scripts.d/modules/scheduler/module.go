@@ -26,7 +26,7 @@ func init() {
 	collectorapi.Register("scheduler", collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults:        collectorapi.Defaults{AutoDetectionRetry: 60},
-		Create:          func() collectorapi.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
 	})
 }

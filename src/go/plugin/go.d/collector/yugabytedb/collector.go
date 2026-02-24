@@ -27,7 +27,7 @@ func init() {
 		},
 		Methods:       yugabyteMethods,
 		MethodHandler: yugabyteFunctionHandler,
-		Create:        func() collectorapi.Module { return New() },
+		Create:        func() collectorapi.CollectorV1 { return New() },
 		Config:        func() any { return &Config{} },
 	})
 }

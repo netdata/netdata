@@ -27,7 +27,7 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 5,
 		},
-		CreateV2: func() collectorapi.ModuleV2 { return New() },
+		CreateV2: func() collectorapi.CollectorV2 { return New() },
 		Config:   func() any { return &Config{} },
 	})
 }

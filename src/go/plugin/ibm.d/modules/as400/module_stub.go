@@ -43,7 +43,7 @@ func (c *Collector) Cleanup(context.Context) {}
 func init() {
 	collectorapi.Register("as400", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() collectorapi.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return nil },
 	})
 }

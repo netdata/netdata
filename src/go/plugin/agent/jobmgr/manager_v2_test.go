@@ -63,8 +63,8 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 	}{
 		"prefer v2 when hooks do not require legacy runtime": {
 			creator: collectorapi.Creator{
-				Create: func() collectorapi.Module { return &testV1Module{} },
-				CreateV2: func() collectorapi.ModuleV2 {
+				Create: func() collectorapi.CollectorV1 { return &testV1Module{} },
+				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: metrix.NewCollectorStore()}
 				},
 			},
@@ -72,8 +72,8 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 		},
 		"prefer v2 when job methods are configured": {
 			creator: collectorapi.Creator{
-				Create: func() collectorapi.Module { return &testV1Module{} },
-				CreateV2: func() collectorapi.ModuleV2 {
+				Create: func() collectorapi.CollectorV1 { return &testV1Module{} },
+				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: metrix.NewCollectorStore()}
 				},
 				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
@@ -82,7 +82,7 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 		},
 		"allow v2 only creator when job methods are configured": {
 			creator: collectorapi.Creator{
-				CreateV2: func() collectorapi.ModuleV2 {
+				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: metrix.NewCollectorStore()}
 				},
 				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },
@@ -91,7 +91,7 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 		},
 		"allow function_only config for v2 when methods exist": {
 			creator: collectorapi.Creator{
-				CreateV2: func() collectorapi.ModuleV2 {
+				CreateV2: func() collectorapi.CollectorV2 {
 					return &testV2Module{store: nil}
 				},
 				JobMethods: func(_ collectorapi.RuntimeJob) []funcapi.MethodConfig { return nil },

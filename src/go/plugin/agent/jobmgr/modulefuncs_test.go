@@ -197,7 +197,7 @@ func newTestModuleFuncsJob(name string) *jobruntime.Job {
 		Name:            name,
 		ModuleName:      "test",
 		FullName:        "test_" + name,
-		Module:          &collectorapi.MockModule{},
+		Module:          &collectorapi.MockCollectorV1{},
 		Out:             io.Discard,
 		UpdateEvery:     1,
 		AutoDetectEvery: 0,
@@ -250,7 +250,7 @@ func TestModuleFuncRegistry_VerifyJobGeneration_JobStopped(t *testing.T) {
 		Name:       "master",
 		ModuleName: "postgres",
 		FullName:   "postgres_master",
-		Module: &collectorapi.MockModule{
+		Module: &collectorapi.MockCollectorV1{
 			InitFunc:    func(context.Context) error { return nil },
 			CheckFunc:   func(context.Context) error { return nil },
 			ChartsFunc:  func() *collectorapi.Charts { return &collectorapi.Charts{} },

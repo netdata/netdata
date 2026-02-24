@@ -23,7 +23,7 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			Priority: 59999, // copied from the python collector
 		},
-		Create: func() collectorapi.Module { return New() },
+		Create: func() collectorapi.CollectorV1 { return New() },
 		Config: func() any { return &Config{} },
 	})
 }

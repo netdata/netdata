@@ -32,7 +32,7 @@ func (c *Collector) Configuration() any {
 func init() {
 	collectorapi.Register("db2", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create: func() collectorapi.Module {
+		Create: func() collectorapi.CollectorV1 {
 			return New()
 		},
 		Config: func() any {

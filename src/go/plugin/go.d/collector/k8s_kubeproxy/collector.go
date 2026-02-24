@@ -25,7 +25,7 @@ func init() {
 			// NETDATA_CHART_PRIO_CGROUPS_CONTAINERS        40000
 			Priority: 50000,
 		},
-		Create: func() collectorapi.Module { return New() },
+		Create: func() collectorapi.CollectorV1 { return New() },
 		Config: func() any { return &Config{} },
 	})
 }

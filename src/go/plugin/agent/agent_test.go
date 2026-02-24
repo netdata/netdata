@@ -58,7 +58,7 @@ func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) col
 	for _, name := range names {
 		name := name
 		reg.Register(name, collectorapi.Creator{
-			Create: func() collectorapi.Module {
+			Create: func() collectorapi.CollectorV1 {
 				return prepareMockModule(name, mux, stats)
 			},
 		})
@@ -66,8 +66,8 @@ func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) col
 	return reg
 }
 
-func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) collectorapi.Module {
-	return &collectorapi.MockModule{
+func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) collectorapi.CollectorV1 {
+	return &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			mux.Lock()
 			defer mux.Unlock()
