@@ -2,13 +2,19 @@
 
 `go.d.plugin` is a [Netdata](https://github.com/netdata/netdata) external plugin:
 
-- **Independent Operation**: Runs as a separate process from Netdata core, visible in system process lists (`ps fax`).
-- **Automated Management**: Integrated with Netdata's lifecycle management, managed automatically by Netdata (start/stop operations).
-- **Efficient Communication**: Uses a unidirectional pipe for optimal data transfer to Netdata.
-- **Modular Architecture**:
-    - Supports an unlimited number of data collectors.
-    - Each collector can run multiple collection jobs simultaneously.
-    - Easy to extend with new collectors.
+- **What it does**: collects metrics from databases, middleware, services, APIs, and infrastructure components using built-in collectors.
+- **How you use it**:
+    - enable a collector in `go.d.conf`,
+    - set collector-specific jobs in `config/go.d/*.conf`,
+    - restart Netdata and the collector jobs start automatically.
+- **Operational behavior**:
+    - runs as a separate process from Netdata core (visible in `ps fax`),
+    - lifecycle is managed by Netdata (start/stop/restart),
+    - communicates through the external plugin pipe.
+- **Scale model**:
+    - supports many collectors,
+    - each collector can run multiple jobs,
+    - collectors can be added/extended independently.
 
 ### Required Linux capabilities
 
