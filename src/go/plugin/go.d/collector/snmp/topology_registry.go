@@ -38,6 +38,12 @@ func (c *topologyCache) snapshotEngineObservations() (topologyObservationSnapsho
 	if localObservation.DeviceID == "" {
 		return topologyObservationSnapshot{}, false
 	}
+	if normalizeMAC(local.ChassisID) == "" {
+		if mac := normalizeMAC(localObservation.BaseBridgeAddress); mac != "" {
+			local.ChassisID = mac
+			local.ChassisIDType = "macAddress"
+		}
+	}
 
 	return topologyObservationSnapshot{
 		l2Observations: []topologyengine.L2Observation{localObservation},

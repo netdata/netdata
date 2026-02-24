@@ -111,6 +111,7 @@ const (
 	tagTopoIfType  = "topo_if_type"
 	tagTopoIfAdmin = "topo_if_admin_status"
 	tagTopoIfOper  = "topo_if_oper_status"
+	tagTopoIfPhys  = "topo_if_phys_address"
 	tagTopoIPAddr  = "topo_ip_addr"
 	tagTopoIPMask  = "topo_ip_netmask"
 
@@ -127,7 +128,10 @@ const (
 	tagDot1qVlanID             = "dot1q_vlan_id"
 	tagDot1qVlanID1            = "dot1q_vlan_id_idx1"
 	tagDot1qVlanFdbID          = "dot1q_vlan_fdb_id"
-	tagStpBaseBridgeAddress    = "stp_base_bridge_address"
+	tagBridgeBaseAddress       = "bridge_base_address"
+	tagLegacyStpBaseBridgeAddr = "stp_base_bridge_address"
+	// Backward-compatibility alias for tests/older in-memory tag references.
+	tagStpBaseBridgeAddress    = tagLegacyStpBaseBridgeAddr
 	tagStpDesignatedRoot       = "stp_designated_root"
 	tagStpPort                 = "stp_port"
 	tagStpPortPriority         = "stp_port_priority"
@@ -242,6 +246,7 @@ type ifStatus struct {
 	admin  string
 	oper   string
 	ifType string
+	mac    string
 }
 
 type lldpLocPort struct {
@@ -446,16 +451,16 @@ func (c *Collector) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
 			continue
 		}
 
-		if v := pm.Tags[tagLldpLocChassisID]; v != "" {
+		if v := pm.Tags[tagLldpLocChassisID]; v != "" && strings.TrimSpace(c.topologyCache.localDevice.ChassisID) == "" {
 			c.topologyCache.localDevice.ChassisID = v
 		}
-		if v := pm.Tags[tagLldpLocChassisIDSubtype]; v != "" {
+		if v := pm.Tags[tagLldpLocChassisIDSubtype]; v != "" && strings.TrimSpace(c.topologyCache.localDevice.ChassisIDType) == "" {
 			c.topologyCache.localDevice.ChassisIDType = normalizeLLDPSubtype(v, lldpChassisIDSubtypeMap)
 		}
-		if v := pm.Tags[tagLldpLocSysName]; v != "" {
+		if v := pm.Tags[tagLldpLocSysName]; v != "" && strings.TrimSpace(c.topologyCache.localDevice.SysName) == "" {
 			c.topologyCache.localDevice.SysName = v
 		}
-		if v := pm.Tags[tagLldpLocSysDesc]; v != "" {
+		if v := pm.Tags[tagLldpLocSysDesc]; v != "" && strings.TrimSpace(c.topologyCache.localDevice.SysDescr) == "" {
 			c.topologyCache.localDevice.SysDescr = v
 		}
 		if v := pm.Tags[tagLldpLocSysCapSupported]; v != "" {
@@ -477,15 +482,33 @@ func (c *Collector) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
 				}
 			}
 		}
-		if v := stpBridgeAddressToMAC(pm.Tags[tagStpBaseBridgeAddress]); v != "" {
-			c.topologyCache.stpBaseBridgeAddress = v
-		}
+		c.topologyCache.updateLocalBridgeIdentityFromTags(pm.Tags)
 		if v := stpBridgeAddressToMAC(pm.Tags[tagStpDesignatedRoot]); v != "" {
 			c.topologyCache.stpDesignatedRoot = v
 		}
 		if v := strings.TrimSpace(pm.Tags[tagVtpVersion]); v != "" {
 			c.topologyCache.vtpVersion = v
 		}
+	}
+}
+
+func (c *topologyCache) applyAuthoritativeBridgeIdentity(mac string) {
+	mac = normalizeMAC(mac)
+	if mac == "" || mac == "00:00:00:00:00:00" {
+		return
+	}
+	c.stpBaseBridgeAddress = mac
+	// SNMP bridge identity is authoritative for managed device identity.
+	c.localDevice.ChassisID = mac
+	c.localDevice.ChassisIDType = "macAddress"
+}
+
+func (c *topologyCache) updateLocalBridgeIdentityFromTags(tags map[string]string) {
+	if c == nil || len(tags) == 0 {
+		return
+	}
+	if v := stpBridgeAddressToMAC(firstNonEmpty(tags[tagBridgeBaseAddress], tags[tagLegacyStpBaseBridgeAddr])); v != "" {
+		c.applyAuthoritativeBridgeIdentity(v)
 	}
 }
 
@@ -852,7 +875,10 @@ func (c *topologyCache) updateIfNameByIndex(tags map[string]string) {
 	if oper := normalizeInterfaceOperStatus(tags[tagTopoIfOper]); oper != "" {
 		status.oper = oper
 	}
-	if status.ifType != "" || status.admin != "" || status.oper != "" {
+	if mac := normalizeMAC(tags[tagTopoIfPhys]); mac != "" && mac != "00:00:00:00:00:00" {
+		status.mac = mac
+	}
+	if status.ifType != "" || status.admin != "" || status.oper != "" || status.mac != "" {
 		c.ifStatusByIndex[ifIndex] = status
 	}
 }
@@ -869,6 +895,11 @@ func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
 	}
 
 	c.ifIndexByIP[ip] = ifIndex
+	c.localDevice.ManagementAddresses = appendManagementAddress(c.localDevice.ManagementAddresses, topologyManagementAddress{
+		Address:     ip,
+		AddressType: managementAddressTypeFromIP(ip),
+		Source:      "ip_mib",
+	})
 	if mask := normalizeIPAddress(tags[tagTopoIPMask]); mask != "" {
 		c.ifNetmaskByIP[ip] = mask
 	}
@@ -1002,6 +1033,8 @@ func (c *topologyCache) updateIsisAdjEntry(tags map[string]string) {
 }
 
 func (c *topologyCache) updateBridgePortMap(tags map[string]string) {
+	c.updateLocalBridgeIdentityFromTags(tags)
+
 	basePort := strings.TrimSpace(tags[tagBridgeBasePort])
 	if basePort == "" {
 		return
@@ -1016,6 +1049,8 @@ func (c *topologyCache) updateBridgePortMap(tags map[string]string) {
 }
 
 func (c *topologyCache) updateFdbEntry(tags map[string]string) {
+	c.updateLocalBridgeIdentityFromTags(tags)
+
 	mac := normalizeMAC(firstNonEmpty(tags[tagFdbMac], tags[tagDot1qFdbMac]))
 	if mac == "" {
 		return
@@ -1679,14 +1714,29 @@ func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyeng
 	if localManagementIP == "" {
 		localManagementIP = pickManagementIP(local.ManagementAddresses)
 	}
+	baseBridgeAddress := strings.TrimSpace(c.stpBaseBridgeAddress)
+	if baseBridgeAddress == "" {
+		// Some devices do not expose LLDP local chassis identity or STP base tags
+		// through profile-level tags. Derive stable bridge MAC from explicit FDB self rows.
+		baseBridgeAddress = c.deriveLocalBridgeMACFromFDBSelfEntries()
+	}
+	if baseBridgeAddress == "" {
+		// Last-resort fallback for managed devices without bridge-base/STP/FDB-self:
+		// infer a stable chassis MAC from IF-MIB physical interface addresses.
+		baseBridgeAddress = c.deriveLocalBridgeMACFromInterfacePhysAddress(localManagementIP)
+	}
+	if baseBridgeAddress != "" && normalizeMAC(local.ChassisID) == "" {
+		local.ChassisID = baseBridgeAddress
+		local.ChassisIDType = "macAddress"
+	}
 
 	observation := topologyengine.L2Observation{
-		DeviceID:          ensureTopologyObservationDeviceID(local, c.stpBaseBridgeAddress),
+		DeviceID:          ensureTopologyObservationDeviceID(local, baseBridgeAddress),
 		Hostname:          strings.TrimSpace(local.SysName),
 		ManagementIP:      localManagementIP,
 		SysObjectID:       strings.TrimSpace(local.SysObjectID),
 		ChassisID:         strings.TrimSpace(local.ChassisID),
-		BaseBridgeAddress: strings.TrimSpace(c.stpBaseBridgeAddress),
+		BaseBridgeAddress: baseBridgeAddress,
 	}
 	if observation.BaseBridgeAddress == "" {
 		observation.BaseBridgeAddress = stpBridgeAddressToMAC(observation.ChassisID)
@@ -1908,6 +1958,83 @@ func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyeng
 	}
 
 	return observation
+}
+
+func (c *topologyCache) deriveLocalBridgeMACFromFDBSelfEntries() string {
+	if len(c.fdbEntries) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(c.fdbEntries))
+	for key := range c.fdbEntries {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		entry := c.fdbEntries[key]
+		if entry == nil || !isFDBSelfStatus(entry.status) {
+			continue
+		}
+		mac := normalizeMAC(entry.mac)
+		if mac == "" || mac == "00:00:00:00:00:00" {
+			continue
+		}
+		return mac
+	}
+	return ""
+}
+
+func (c *topologyCache) deriveLocalBridgeMACFromInterfacePhysAddress(localManagementIP string) string {
+	if len(c.ifStatusByIndex) == 0 {
+		return ""
+	}
+
+	localManagementIP = normalizeIPAddress(localManagementIP)
+	if localManagementIP != "" {
+		ifIndex := strings.TrimSpace(c.ifIndexByIP[localManagementIP])
+		if ifIndex != "" {
+			if status, ok := c.ifStatusByIndex[ifIndex]; ok {
+				if mac := normalizeMAC(status.mac); mac != "" && mac != "00:00:00:00:00:00" {
+					return mac
+				}
+			}
+		}
+	}
+
+	keys := make([]string, 0, len(c.ifStatusByIndex))
+	for key := range c.ifStatusByIndex {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		left := parseIndex(keys[i])
+		right := parseIndex(keys[j])
+		if left > 0 && right > 0 && left != right {
+			return left < right
+		}
+		if left > 0 && right <= 0 {
+			return true
+		}
+		if left <= 0 && right > 0 {
+			return false
+		}
+		return keys[i] < keys[j]
+	})
+	for _, key := range keys {
+		mac := normalizeMAC(c.ifStatusByIndex[key].mac)
+		if mac == "" || mac == "00:00:00:00:00:00" {
+			continue
+		}
+		return mac
+	}
+	return ""
+}
+
+func isFDBSelfStatus(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "4", "self", "dot1d_tp_fdb_status_self", "dot1dtpfdbstatusself", "dot1q_tp_fdb_status_self", "dot1qtpfdbstatusself":
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *topologyCache) buildEngineL3Observation(local topologyengine.L2Observation) topologyengine.L3Observation {
@@ -2647,7 +2774,7 @@ func decodePrintableASCII(bs []byte) string {
 }
 
 func normalizeMAC(value string) string {
-	value = strings.TrimSpace(value)
+	value = normalizeSNMPHexText(value)
 	if value == "" {
 		return ""
 	}
@@ -2685,7 +2812,7 @@ func normalizeHexToken(value string) string {
 }
 
 func normalizeHexIdentifier(value string) string {
-	value = strings.TrimSpace(value)
+	value = normalizeSNMPHexText(value)
 	if value == "" {
 		return ""
 	}
@@ -2843,6 +2970,17 @@ func normalizeAddressType(rawType, addr string) string {
 	return rawType
 }
 
+func managementAddressTypeFromIP(ip string) string {
+	parsed := net.ParseIP(strings.TrimSpace(ip))
+	if parsed == nil {
+		return ""
+	}
+	if parsed.To4() != nil {
+		return "ipv4"
+	}
+	return "ipv6"
+}
+
 func normalizeInterfaceAdminStatus(value string) string {
 	value = canonicalSNMPEnumValue(value)
 	switch value {
@@ -2919,7 +3057,7 @@ func canonicalSNMPEnumValue(value string) string {
 }
 
 func decodeHexString(value string) ([]byte, error) {
-	clean := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(value)), "0x")
+	clean := strings.TrimPrefix(strings.ToLower(normalizeSNMPHexText(value)), "0x")
 	clean = strings.NewReplacer(":", "", "-", "", ".", "", " ", "").Replace(clean)
 	if clean == "" {
 		return nil, fmt.Errorf("empty hex string")
@@ -2928,6 +3066,31 @@ func decodeHexString(value string) ([]byte, error) {
 		clean = "0" + clean
 	}
 	return hex.DecodeString(clean)
+}
+
+func normalizeSNMPHexText(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	trimQuotes := func(v string) string {
+		return strings.TrimSpace(strings.Trim(v, "\"'"))
+	}
+	value = trimQuotes(value)
+	lower := strings.ToLower(value)
+	for _, prefix := range []string{
+		"hex-string:",
+		"hex string:",
+		"octet-string:",
+		"octet string:",
+		"string:",
+	} {
+		if strings.HasPrefix(lower, prefix) {
+			value = trimQuotes(value[len(prefix):])
+			lower = strings.ToLower(value)
+		}
+	}
+	return value
 }
 
 func decodeLLDPCapabilities(value string) []string {

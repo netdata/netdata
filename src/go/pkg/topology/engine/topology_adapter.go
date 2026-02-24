@@ -220,9 +220,6 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	actors, links, segmentSuppressed = pruneSegmentArtifacts(actors, links)
 	sortTopologyActors(actors)
 	sortTopologyLinks(links)
-	originalActorsTotal := len(actors)
-	actors = pruneUnlinkedEndpointActors(actors, links)
-	sortTopologyActors(actors)
 	applyTopologyDisplayNames(actors, links, opts.ResolveDNSName)
 	assignTopologyActorIDsAndLinkEndpoints(actors, links)
 	linkCounts := summarizeTopologyLinks(links)
@@ -246,7 +243,7 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	stats["links_arp"] = linkCounts.arp
 	stats["segments_suppressed"] = segmentSuppressed
 	stats["actors_total"] = len(actors)
-	stats["actors_unlinked_suppressed"] = originalActorsTotal - len(actors)
+	stats["actors_unlinked_suppressed"] = 0
 	stats["endpoints_total"] = endpointActors.count
 
 	return topology.Data{
@@ -516,7 +513,7 @@ func projectSegmentTopology(
 		}
 		out.endpointDirectOwners[endpointID] = owner
 	}
-	deviceIdentityByID := buildDeviceIdentityKeySetByID(deviceByID, adjacencies)
+	deviceIdentityByID := buildDeviceIdentityKeySetByID(deviceByID, adjacencies, ifaceByDeviceIndex)
 	allowedEndpointBySegment := make(map[string]map[string]struct{})
 	for endpointID, candidates := range endpointSegmentCandidates {
 		candidateSet := make(map[string]struct{}, len(candidates))
@@ -649,7 +646,39 @@ func projectSegmentTopology(
 					continue
 				}
 			}
-			if endpointMatchOverlapsKnownDevice(endpointMatch, deviceIdentityByID) {
+			overlappingDeviceIDs := endpointMatchOverlappingKnownDeviceIDs(endpointMatch, deviceIdentityByID)
+			if len(overlappingDeviceIDs) > 0 {
+				if len(overlappingDeviceIDs) == 1 {
+					matchedDeviceID := overlappingDeviceIDs[0]
+					if segmentContainsDevice(segment, matchedDeviceID) {
+						out.endpointLinksSuppressed++
+						continue
+					}
+					if matchedDevice, ok := deviceByID[matchedDeviceID]; ok {
+						edgeKey := segmentID + "|managed-device|" + matchedDeviceID
+						if _, seen := endpointSegmentEdgeSeen[edgeKey]; !seen {
+							endpointSegmentEdgeSeen[edgeKey] = struct{}{}
+							out.links = append(out.links, topology.Link{
+								Layer:        layer,
+								Protocol:     "fdb",
+								Direction:    "bidirectional",
+								Src:          segmentEndpoint,
+								Dst:          adjacencySideToEndpoint(matchedDevice, "", ifIndexByDeviceName, ifaceByDeviceIndex),
+								DiscoveredAt: topologyTimePtr(collectedAt),
+								LastSeen:     topologyTimePtr(collectedAt),
+								Metrics: map[string]any{
+									"bridge_domain":   segmentID,
+									"attachment_mode": "managed_device_overlap",
+								},
+							})
+							out.linksFdb++
+							out.bidirectionalCount++
+							out.endpointLinksEmitted++
+							segmentsWithAnyLinks[segmentID] = struct{}{}
+						}
+						continue
+					}
+				}
 				out.endpointLinksSuppressed++
 				continue
 			}
@@ -1026,6 +1055,7 @@ func buildFDBReporterAliases(
 func buildDeviceIdentityKeySetByID(
 	deviceByID map[string]Device,
 	adjacencies []Adjacency,
+	ifaceByDeviceIndex map[string]Interface,
 ) map[string]topologyIdentityKeySet {
 	if len(deviceByID) == 0 {
 		return nil
@@ -1076,6 +1106,20 @@ func buildDeviceIdentityKeySetByID(
 				out[deviceID]["hw:"+mac] = struct{}{}
 			}
 		}
+	}
+	for _, iface := range ifaceByDeviceIndex {
+		deviceID := strings.TrimSpace(iface.DeviceID)
+		if deviceID == "" {
+			continue
+		}
+		ifaceMAC := normalizeMAC(iface.MAC)
+		if ifaceMAC == "" {
+			continue
+		}
+		if out[deviceID] == nil {
+			out[deviceID] = make(topologyIdentityKeySet)
+		}
+		out[deviceID]["hw:"+ifaceMAC] = struct{}{}
 	}
 	if len(out) == 0 {
 		return nil
@@ -1392,12 +1436,12 @@ func inferSinglePortEndpointOwners(
 	return owners
 }
 
-func endpointMatchOverlapsKnownDevice(
+func endpointMatchOverlappingKnownDeviceIDs(
 	endpointMatch topology.Match,
 	deviceIdentityByID map[string]topologyIdentityKeySet,
-) bool {
+) []string {
 	if len(deviceIdentityByID) == 0 {
-		return false
+		return nil
 	}
 
 	endpointKeys := topologyMatchHardwareIdentityKeys(endpointMatch)
@@ -1405,17 +1449,52 @@ func endpointMatchOverlapsKnownDevice(
 		endpointKeys = topologyMatchIdentityKeys(endpointMatch)
 	}
 	if len(endpointKeys) == 0 {
-		return false
+		return nil
 	}
 
-	for _, deviceKeys := range deviceIdentityByID {
+	deviceIDs := make([]string, 0, len(deviceIdentityByID))
+	for deviceID := range deviceIdentityByID {
+		deviceID = strings.TrimSpace(deviceID)
+		if deviceID == "" {
+			continue
+		}
+		deviceIDs = append(deviceIDs, deviceID)
+	}
+	sort.Strings(deviceIDs)
+	if len(deviceIDs) == 0 {
+		return nil
+	}
+
+	matches := make([]string, 0, 2)
+	for _, deviceID := range deviceIDs {
+		deviceKeys := deviceIdentityByID[deviceID]
 		if len(deviceKeys) == 0 {
 			continue
 		}
 		for _, endpointKey := range endpointKeys {
 			if _, ok := deviceKeys[endpointKey]; ok {
-				return true
+				matches = append(matches, deviceID)
+				break
 			}
+		}
+	}
+	if len(matches) == 0 {
+		return nil
+	}
+	return matches
+}
+
+func segmentContainsDevice(segment *bridgeDomainSegment, deviceID string) bool {
+	if segment == nil {
+		return false
+	}
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return false
+	}
+	for _, port := range segment.ports {
+		if strings.EqualFold(strings.TrimSpace(port.deviceID), deviceID) {
+			return true
 		}
 	}
 	return false
@@ -1640,10 +1719,14 @@ func pruneUnlinkedEndpointActors(actors []topology.Actor, links []topology.Link)
 	if len(actors) == 0 {
 		return actors
 	}
-	linked := make(map[string]struct{}, len(links)*8)
+	linkedByActorID := make(map[string]struct{}, len(links)*2)
 	for _, link := range links {
-		addTopologyIdentityKeys(linked, topologyMatchIdentityKeys(link.Src.Match))
-		addTopologyIdentityKeys(linked, topologyMatchIdentityKeys(link.Dst.Match))
+		if srcActorID := strings.TrimSpace(link.SrcActorID); srcActorID != "" {
+			linkedByActorID[srcActorID] = struct{}{}
+		}
+		if dstActorID := strings.TrimSpace(link.DstActorID); dstActorID != "" {
+			linkedByActorID[dstActorID] = struct{}{}
+		}
 	}
 	filtered := make([]topology.Actor, 0, len(actors))
 	for _, actor := range actors {
@@ -1651,11 +1734,11 @@ func pruneUnlinkedEndpointActors(actors []topology.Actor, links []topology.Link)
 			filtered = append(filtered, actor)
 			continue
 		}
-		keys := topologyMatchIdentityKeys(actor.Match)
-		if len(keys) == 0 {
+		actorID := strings.TrimSpace(actor.ActorID)
+		if actorID == "" {
 			continue
 		}
-		if !topologyIdentityIndexOverlaps(linked, keys) {
+		if _, ok := linkedByActorID[actorID]; !ok {
 			continue
 		}
 		filtered = append(filtered, actor)
@@ -2068,6 +2151,8 @@ func deviceToTopologyActor(dev Device, source, layer, localDeviceID string, ifac
 		"inferred":               topologyDeviceInferred(dev),
 		"management_ip":          firstAddress(dev.Addresses),
 		"management_addresses":   addressStrings(dev.Addresses),
+		"protocols":              labelsCSVToSlice(dev.Labels, "protocols_observed"),
+		"protocols_collected":    labelsCSVToSlice(dev.Labels, "protocols_observed"),
 		"capabilities":           labelsCSVToSlice(dev.Labels, "capabilities"),
 		"capabilities_supported": labelsCSVToSlice(dev.Labels, "capabilities_supported"),
 		"capabilities_enabled":   labelsCSVToSlice(dev.Labels, "capabilities_enabled"),

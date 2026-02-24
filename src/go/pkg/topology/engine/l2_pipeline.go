@@ -161,6 +161,18 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 		if addr := parseAddr(obs.ManagementIP); addr.IsValid() {
 			device.Addresses = []netip.Addr{addr}
 		}
+		if len(device.Labels) == 0 {
+			device.Labels = make(map[string]string)
+		}
+		observedProtocols := observationProtocolsUsed(obs)
+		if existing, ok := devices[device.ID]; ok {
+			for protocol := range csvToTopologySet(existing.Labels["protocols_observed"]) {
+				observedProtocols[protocol] = struct{}{}
+			}
+		}
+		if len(observedProtocols) > 0 {
+			device.Labels["protocols_observed"] = setToCSV(observedProtocols)
+		}
 		devices[device.ID] = device
 
 		if host := canonicalHost(device.Hostname); host != "" {
@@ -1914,6 +1926,41 @@ func setToCSV(in map[string]struct{}) string {
 	}
 	sort.Strings(out)
 	return strings.Join(out, ",")
+}
+
+func csvToTopologySet(value string) map[string]struct{} {
+	out := make(map[string]struct{})
+	for _, token := range strings.Split(strings.TrimSpace(value), ",") {
+		token = strings.TrimSpace(strings.ToLower(token))
+		if token == "" {
+			continue
+		}
+		out[token] = struct{}{}
+	}
+	return out
+}
+
+func observationProtocolsUsed(obs L2Observation) map[string]struct{} {
+	out := make(map[string]struct{}, 6)
+	if len(obs.LLDPRemotes) > 0 {
+		out["lldp"] = struct{}{}
+	}
+	if len(obs.CDPRemotes) > 0 {
+		out["cdp"] = struct{}{}
+	}
+	if len(obs.BridgePorts) > 0 {
+		out["bridge"] = struct{}{}
+	}
+	if len(obs.FDBEntries) > 0 {
+		out["fdb"] = struct{}{}
+	}
+	if len(obs.STPPorts) > 0 {
+		out["stp"] = struct{}{}
+	}
+	if len(obs.ARPNDEntries) > 0 {
+		out["arp"] = struct{}{}
+	}
+	return out
 }
 
 func pruneEmptyLabels(labels map[string]string) {

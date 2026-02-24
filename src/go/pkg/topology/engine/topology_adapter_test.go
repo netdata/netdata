@@ -22,6 +22,7 @@ func TestToTopologyData_ProjectsResult(t *testing.T) {
 				Hostname:  "sw1",
 				ChassisID: "00:11:22:33:44:55",
 				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+				Labels:    map[string]string{"protocols_observed": "bridge,fdb,stp"},
 			},
 			{
 				ID:        "remote-device",
@@ -90,6 +91,8 @@ func TestToTopologyData_ProjectsResult(t *testing.T) {
 	require.NotNil(t, localActor)
 	require.Equal(t, false, localActor.Attributes["discovered"])
 	require.Equal(t, false, localActor.Attributes["inferred"])
+	require.Equal(t, []string{"bridge", "fdb", "stp"}, localActor.Attributes["protocols"])
+	require.Equal(t, []string{"bridge", "fdb", "stp"}, localActor.Attributes["protocols_collected"])
 	require.Equal(t, 2, localActor.Attributes["ports_total"])
 	require.NotNil(t, localActor.Attributes["if_admin_status_counts"])
 	require.NotNil(t, localActor.Attributes["if_oper_status_counts"])
@@ -222,7 +225,6 @@ func TestToTopologyData_DeduplicatesEndpointActorOverlappingManagedDevice(t *tes
 	require.Equal(t, 0, data.Stats["endpoints_total"])
 	require.Equal(t, 1, data.Stats["actors_total"])
 	require.Equal(t, 0, data.Stats["links_total"])
-	require.Equal(t, 0, data.Stats["links_fdb"])
 	require.Equal(t, 0, data.Stats["links_fdb_endpoint_emitted"])
 	require.Equal(t, 1, data.Stats["segments_suppressed"])
 }
@@ -491,7 +493,91 @@ func TestToTopologyData_DropsAmbiguousEndpointSegmentLinks(t *testing.T) {
 	require.Equal(t, 2, data.Stats["segments_suppressed"])
 }
 
-func TestToTopologyData_PrunesOnlyUnlinkedEndpointsKeepsDevices(t *testing.T) {
+func TestToTopologyData_ReplacesKnownDeviceEndpointWithManagedDeviceEdge(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "router-a",
+				Hostname:  "router-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "switch-b",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "router-a", IfIndex: 1, IfName: "ether1"},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "router-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb"},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	fdbLinks := findFDBLinksByDstSysName(data.Links, "switch-b")
+	require.Len(t, fdbLinks, 1)
+	require.Equal(t, "managed_device_overlap", fdbLinks[0].Metrics["attachment_mode"])
+	require.Equal(t, 1, data.Stats["links_fdb_endpoint_emitted"])
+	require.Equal(t, 0, data.Stats["links_fdb_endpoint_suppressed"])
+
+	for _, actor := range data.Actors {
+		if actor.ActorType != "endpoint" {
+			continue
+		}
+		for _, mac := range actor.Match.MacAddresses {
+			require.NotEqual(t, "bb:bb:bb:bb:bb:bb", mac)
+		}
+	}
+}
+
+func TestToTopologyData_KnownDeviceOverlapUsesInterfaceMACAlias(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "router-a",
+				Hostname:  "router-a",
+				ChassisID: "aa:aa:aa:aa:aa:80",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "switch-b",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "router-a", IfIndex: 1, IfName: "ether1", MAC: "aa:aa:aa:aa:aa:8c"},
+			{DeviceID: "switch-b", IfIndex: 1, IfName: "ether1"},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-b", IfIndex: 1, EndpointID: "mac:aa:aa:aa:aa:aa:8c", Method: "fdb"},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	fdbLinks := findFDBLinksByDstSysName(data.Links, "router-a")
+	require.Len(t, fdbLinks, 1)
+	require.Equal(t, "managed_device_overlap", fdbLinks[0].Metrics["attachment_mode"])
+	require.Equal(t, 1, data.Stats["links_fdb_endpoint_emitted"])
+	require.Equal(t, 0, data.Stats["links_fdb_endpoint_suppressed"])
+}
+
+func TestToTopologyData_KeepsUnlinkedEndpointsAndDevices(t *testing.T) {
 	result := Result{
 		Devices: []Device{
 			{
@@ -515,10 +601,70 @@ func TestToTopologyData_PrunesOnlyUnlinkedEndpointsKeepsDevices(t *testing.T) {
 		View:   "summary",
 	})
 
-	require.Len(t, data.Actors, 1)
-	require.Equal(t, "device", data.Actors[0].ActorType)
+	require.Len(t, data.Actors, 2)
+	deviceCount := 0
+	endpointCount := 0
+	for _, actor := range data.Actors {
+		switch actor.ActorType {
+		case "device":
+			deviceCount++
+		case "endpoint":
+			endpointCount++
+		}
+	}
+	require.Equal(t, 1, deviceCount)
+	require.Equal(t, 1, endpointCount)
 	require.Equal(t, 0, data.Stats["links_total"])
-	require.Equal(t, 1, data.Stats["actors_unlinked_suppressed"])
+	require.Equal(t, 0, data.Stats["actors_unlinked_suppressed"])
+}
+
+func TestToTopologyData_KeepsUnlinkedEndpointWhenIdentityOverlapsLinkedDevice(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+			{
+				ID:        "mega",
+				Hostname:  "mega",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1"},
+			{DeviceID: "mega", IfIndex: 1, IfName: "eth0"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "switch-a",
+				SourcePort: "Gi0/1",
+				TargetID:   "mega",
+				TargetPort: "eth0",
+			},
+		},
+		Enrichments: []Enrichment{
+			{
+				EndpointID: "mac:cc:cc:cc:cc:cc:cc",
+				IPs:        []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+			},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	require.NotNil(t, findActorByMAC(data.Actors, "cc:cc:cc:cc:cc:cc"))
+	require.Equal(t, 3, data.Stats["actors_total"])
+	require.Equal(t, 1, data.Stats["links_total"])
+	require.Equal(t, 0, data.Stats["actors_unlinked_suppressed"])
 }
 
 func TestToTopologyData_DisplayNamesPreferDNSThenIPThenMAC(t *testing.T) {
@@ -984,6 +1130,20 @@ func findFDBLinksByEndpointMAC(links []topology.Link, mac string) []topology.Lin
 				break
 			}
 		}
+	}
+	return out
+}
+
+func findFDBLinksByDstSysName(links []topology.Link, sysName string) []topology.Link {
+	out := make([]topology.Link, 0)
+	for _, link := range links {
+		if link.Protocol != "fdb" {
+			continue
+		}
+		if link.Dst.Match.SysName != sysName {
+			continue
+		}
+		out = append(out, link)
 	}
 	return out
 }
