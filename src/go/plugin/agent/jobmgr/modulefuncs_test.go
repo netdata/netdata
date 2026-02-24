@@ -53,141 +53,128 @@ func TestModuleFuncRegistry_RegisterModule(t *testing.T) {
 	}
 }
 
-func TestModuleFuncRegistry_AddRemoveJob(t *testing.T) {
-	r := newModuleFuncRegistry()
-	r.registerModule("postgres", collectorapi.Creator{})
+func TestModuleFuncRegistry_Operations(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T, r *moduleFuncRegistry)
+	}{
+		"add/remove job": {
+			run: func(t *testing.T, r *moduleFuncRegistry) {
+				r.registerModule("postgres", collectorapi.Creator{})
 
-	// Create test jobs
-	job1 := newTestModuleFuncsJob("job1")
-	job2 := newTestModuleFuncsJob("job2")
+				job1 := newTestModuleFuncsJob("job1")
+				job2 := newTestModuleFuncsJob("job2")
 
-	// Add jobs
-	r.addJob("postgres", "job1", job1)
-	r.addJob("postgres", "job2", job2)
+				r.addJob("postgres", "job1", job1)
+				r.addJob("postgres", "job2", job2)
 
-	// Verify jobs are retrievable
-	names := r.getJobNames("postgres")
-	assert.ElementsMatch(t, []string{"job1", "job2"}, names)
+				names := r.getJobNames("postgres")
+				assert.ElementsMatch(t, []string{"job1", "job2"}, names)
 
-	got1, ok := r.getJob("postgres", "job1")
-	assert.True(t, ok)
-	assert.Equal(t, job1, got1)
+				got1, ok := r.getJob("postgres", "job1")
+				assert.True(t, ok)
+				assert.Equal(t, job1, got1)
 
-	// Remove job
-	r.removeJob("postgres", "job1")
+				r.removeJob("postgres", "job1")
 
-	names = r.getJobNames("postgres")
-	assert.ElementsMatch(t, []string{"job2"}, names)
+				names = r.getJobNames("postgres")
+				assert.ElementsMatch(t, []string{"job2"}, names)
 
-	_, ok = r.getJob("postgres", "job1")
-	assert.False(t, ok)
-}
-
-func TestModuleFuncRegistry_JobReplacement(t *testing.T) {
-	r := newModuleFuncRegistry()
-	r.registerModule("postgres", collectorapi.Creator{})
-
-	job1 := newTestModuleFuncsJob("master")
-	job2 := newTestModuleFuncsJob("master") // Same name, different instance
-
-	// Add first job
-	r.addJob("postgres", "master", job1)
-	_, gen1 := r.getJobWithGeneration("postgres", "master")
-	assert.Equal(t, uint64(1), gen1)
-
-	// Replace with second job
-	r.addJob("postgres", "master", job2)
-	got, gen2 := r.getJobWithGeneration("postgres", "master")
-	assert.Equal(t, uint64(2), gen2) // Generation incremented
-	assert.Equal(t, job2, got)       // New job returned
-}
-
-func TestModuleFuncRegistry_GenerationVerification(t *testing.T) {
-	r := newModuleFuncRegistry()
-	r.registerModule("postgres", collectorapi.Creator{})
-
-	job := newTestModuleFuncsJob("master")
-
-	r.addJob("postgres", "master", job)
-	_, gen := r.getJobWithGeneration("postgres", "master")
-
-	// Note: verifyJobGeneration checks BOTH generation AND IsRunning()
-	// Since our test job isn't running, verification should fail
-	// This is actually correct behavior - it catches stopped jobs
-
-	// Verify with wrong generation - should fail
-	assert.False(t, r.verifyJobGeneration("postgres", "master", gen+1))
-
-	// Remove job and verify - should fail
-	r.removeJob("postgres", "master")
-	assert.False(t, r.verifyJobGeneration("postgres", "master", gen))
-}
-
-func TestModuleFuncRegistry_GetMethods(t *testing.T) {
-	r := newModuleFuncRegistry()
-
-	expectedMethods := []funcapi.MethodConfig{
-		{ID: "top-queries", Name: "Top Queries"},
-	}
-
-	r.registerModule("postgres", collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return expectedMethods
+				_, ok = r.getJob("postgres", "job1")
+				assert.False(t, ok)
+			},
 		},
-	})
+		"job replacement increments generation": {
+			run: func(t *testing.T, r *moduleFuncRegistry) {
+				r.registerModule("postgres", collectorapi.Creator{})
 
-	methods := r.getMethods("postgres")
-	assert.Equal(t, expectedMethods, methods)
+				job1 := newTestModuleFuncsJob("master")
+				job2 := newTestModuleFuncsJob("master")
 
-	// Non-existent module
-	assert.Nil(t, r.getMethods("nonexistent"))
-}
+				r.addJob("postgres", "master", job1)
+				_, gen1 := r.getJobWithGeneration("postgres", "master")
+				assert.Equal(t, uint64(1), gen1)
 
-func TestModuleFuncRegistry_GetJobNames_Sorted(t *testing.T) {
-	r := newModuleFuncRegistry()
-	r.registerModule("postgres", collectorapi.Creator{})
+				r.addJob("postgres", "master", job2)
+				got, gen2 := r.getJobWithGeneration("postgres", "master")
+				assert.Equal(t, uint64(2), gen2)
+				assert.Equal(t, job2, got)
+			},
+		},
+		"generation verification fails on wrong generation and missing job": {
+			run: func(t *testing.T, r *moduleFuncRegistry) {
+				r.registerModule("postgres", collectorapi.Creator{})
 
-	// Add jobs in random order
-	r.addJob("postgres", "zebra-db", newTestModuleFuncsJob("zebra"))
-	r.addJob("postgres", "alpha-db", newTestModuleFuncsJob("alpha"))
-	r.addJob("postgres", "middle-db", newTestModuleFuncsJob("middle"))
+				job := newTestModuleFuncsJob("master")
+				r.addJob("postgres", "master", job)
+				_, gen := r.getJobWithGeneration("postgres", "master")
 
-	names := r.getJobNames("postgres")
+				assert.False(t, r.verifyJobGeneration("postgres", "master", gen+1))
+				r.removeJob("postgres", "master")
+				assert.False(t, r.verifyJobGeneration("postgres", "master", gen))
+			},
+		},
+		"get methods": {
+			run: func(t *testing.T, r *moduleFuncRegistry) {
+				expectedMethods := []funcapi.MethodConfig{
+					{ID: "top-queries", Name: "Top Queries"},
+				}
 
-	// Should be sorted alphabetically
-	assert.Equal(t, []string{"alpha-db", "middle-db", "zebra-db"}, names)
-}
+				r.registerModule("postgres", collectorapi.Creator{
+					Methods: func() []funcapi.MethodConfig {
+						return expectedMethods
+					},
+				})
 
-func TestModuleFuncRegistry_UnregisteredModule(t *testing.T) {
-	r := newModuleFuncRegistry()
+				assert.Equal(t, expectedMethods, r.getMethods("postgres"))
+				assert.Nil(t, r.getMethods("nonexistent"))
+			},
+		},
+		"get job names sorted": {
+			run: func(t *testing.T, r *moduleFuncRegistry) {
+				r.registerModule("postgres", collectorapi.Creator{})
 
-	// Operations on unregistered module should be no-ops
-	r.addJob("nonexistent", "job1", newTestModuleFuncsJob("job1"))
-	r.removeJob("nonexistent", "job1")
+				r.addJob("postgres", "zebra-db", newTestModuleFuncsJob("zebra"))
+				r.addJob("postgres", "alpha-db", newTestModuleFuncsJob("alpha"))
+				r.addJob("postgres", "middle-db", newTestModuleFuncsJob("middle"))
 
-	assert.False(t, r.isModuleRegistered("nonexistent"))
-	assert.Nil(t, r.getJobNames("nonexistent"))
-	assert.Nil(t, r.getMethods("nonexistent"))
+				assert.Equal(t, []string{"alpha-db", "middle-db", "zebra-db"}, r.getJobNames("postgres"))
+			},
+		},
+		"operations on unregistered module are no-op": {
+			run: func(t *testing.T, r *moduleFuncRegistry) {
+				r.addJob("nonexistent", "job1", newTestModuleFuncsJob("job1"))
+				r.removeJob("nonexistent", "job1")
 
-	_, ok := r.getJob("nonexistent", "job1")
-	assert.False(t, ok)
-}
+				assert.False(t, r.isModuleRegistered("nonexistent"))
+				assert.Nil(t, r.getJobNames("nonexistent"))
+				assert.Nil(t, r.getMethods("nonexistent"))
 
-func TestModuleFuncRegistry_GetCreator(t *testing.T) {
-	r := newModuleFuncRegistry()
+				_, ok := r.getJob("nonexistent", "job1")
+				assert.False(t, ok)
+			},
+		},
+		"get creator": {
+			run: func(t *testing.T, r *moduleFuncRegistry) {
+				creator := collectorapi.Creator{
+					JobConfigSchema: "test-schema",
+				}
+				r.registerModule("postgres", creator)
 
-	creator := collectorapi.Creator{
-		JobConfigSchema: "test-schema",
+				got, ok := r.getCreator("postgres")
+				require.True(t, ok)
+				assert.Equal(t, "test-schema", got.JobConfigSchema)
+
+				_, ok = r.getCreator("nonexistent")
+				assert.False(t, ok)
+			},
+		},
 	}
-	r.registerModule("postgres", creator)
 
-	got, ok := r.getCreator("postgres")
-	require.True(t, ok)
-	assert.Equal(t, "test-schema", got.JobConfigSchema)
-
-	// Non-existent module
-	_, ok = r.getCreator("nonexistent")
-	assert.False(t, ok)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc.run(t, newModuleFuncRegistry())
+		})
+	}
 }
 
 // newTestModuleFuncsJob creates a minimal job for testing modulefuncs

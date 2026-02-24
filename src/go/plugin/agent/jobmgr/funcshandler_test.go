@@ -106,71 +106,75 @@ func TestExtractParamValues(t *testing.T) {
 	}
 }
 
-func TestBuildAcceptedParams(t *testing.T) {
-	sortDir := funcapi.FieldSortDescending
-	methodParams := []funcapi.ParamConfig{
-		{ID: "__sort", Selection: funcapi.ParamSelect, Options: []funcapi.ParamOption{{ID: "calls", Name: "Calls", Sort: &sortDir}}},
-		{ID: "db"},
-		{ID: "extra"},
-	}
+func TestBuildParams(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"build accepted params": {
+			run: func(t *testing.T) {
+				sortDir := funcapi.FieldSortDescending
+				methodParams := []funcapi.ParamConfig{
+					{ID: "__sort", Selection: funcapi.ParamSelect, Options: []funcapi.ParamOption{{ID: "calls", Name: "Calls", Sort: &sortDir}}},
+					{ID: "db"},
+					{ID: "extra"},
+				}
 
-	result := buildAcceptedParams(methodParams)
-	assert.Equal(t, []string{"__job", "__sort", "db", "extra"}, result)
-}
-
-// TestBuildRequiredParams_TypeSelect verifies that all selectors use type "select" (single-select)
-// This is critical because type "multiselect" would show checkboxes instead of dropdowns
-func TestBuildRequiredParams_TypeSelect(t *testing.T) {
-	// Setup a minimal manager with test data
-	r := newModuleFuncRegistry()
-	r.registerModule("postgres", collectorapi.Creator{
-		Methods: func() []funcapi.MethodConfig {
-			return []funcapi.MethodConfig{{
-				ID:   "top-queries",
-				Name: "Top Queries",
-			}}
+				result := buildAcceptedParams(methodParams)
+				assert.Equal(t, []string{"__job", "__sort", "db", "extra"}, result)
+			},
 		},
-	})
-	r.addJob("postgres", "master-db", newTestModuleFuncsJob("master-db"))
+		"build required params uses select type": {
+			run: func(t *testing.T) {
+				// Setup a minimal manager with test data.
+				r := newModuleFuncRegistry()
+				r.registerModule("postgres", collectorapi.Creator{
+					Methods: func() []funcapi.MethodConfig {
+						return []funcapi.MethodConfig{{
+							ID:   "top-queries",
+							Name: "Top Queries",
+						}}
+					},
+				})
+				r.addJob("postgres", "master-db", newTestModuleFuncsJob("master-db"))
 
-	// Create a manager with the registry
-	mgr := &Manager{moduleFuncs: r}
+				mgr := &Manager{moduleFuncs: r}
+				methodParams := []funcapi.ParamConfig{
+					{
+						ID:         "__sort",
+						Name:       "Filter By",
+						Selection:  funcapi.ParamSelect,
+						UniqueView: true,
+						Options: []funcapi.ParamOption{
+							{ID: "total_time", Name: "By Total Time", Default: true},
+						},
+					},
+				}
+				params := mgr.buildRequiredParams("postgres", methodParams)
 
-	// Get required_params through the public method
-	methodParams := []funcapi.ParamConfig{
-		{
-			ID:         "__sort",
-			Name:       "Filter By",
-			Selection:  funcapi.ParamSelect,
-			UniqueView: true,
-			Options: []funcapi.ParamOption{
-				{ID: "total_time", Name: "By Total Time", Default: true},
+				assert.Len(t, params, 2, "should have 2 required params: __job, __sort")
+				for _, param := range params {
+					paramType, ok := param["type"]
+					assert.True(t, ok, "param should have type field")
+					assert.Equal(t, "select", paramType, "param type must be 'select' for single-select, not 'multiselect'")
+
+					assert.Contains(t, param, "id", "param should have id")
+					assert.Contains(t, param, "name", "param should have name")
+					assert.Contains(t, param, "options", "param should have options")
+					assert.Contains(t, param, "unique_view", "param should have unique_view")
+
+					uniqueView, _ := param["unique_view"].(bool)
+					assert.True(t, uniqueView, "unique_view should be true")
+				}
+
+				assert.Equal(t, "__job", params[0]["id"])
+				assert.Equal(t, "__sort", params[1]["id"])
 			},
 		},
 	}
-	params := mgr.buildRequiredParams("postgres", methodParams)
 
-	// Verify structure
-	assert.Len(t, params, 2, "should have 2 required params: __job, __sort")
-
-	// All params should have type: "select" (NOT "multiselect")
-	for _, param := range params {
-		paramType, ok := param["type"]
-		assert.True(t, ok, "param should have type field")
-		assert.Equal(t, "select", paramType, "param type must be 'select' for single-select, not 'multiselect'")
-
-		// Verify required fields exist
-		assert.Contains(t, param, "id", "param should have id")
-		assert.Contains(t, param, "name", "param should have name")
-		assert.Contains(t, param, "options", "param should have options")
-		assert.Contains(t, param, "unique_view", "param should have unique_view")
-
-		// Verify unique_view is true
-		uniqueView, _ := param["unique_view"].(bool)
-		assert.True(t, uniqueView, "unique_view should be true")
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc.run(t)
+		})
 	}
-
-	// Verify specific param IDs
-	assert.Equal(t, "__job", params[0]["id"])
-	assert.Equal(t, "__sort", params[1]["id"])
 }

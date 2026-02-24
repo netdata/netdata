@@ -13,24 +13,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWatcher_String(t *testing.T) {
-	assert.NotEmpty(t, NewWatcher(confgroup.Registry{}, nil))
-}
-
-func TestNewWatcher(t *testing.T) {
+func TestWatcher_New(t *testing.T) {
 	tests := map[string]struct {
-		reg   confgroup.Registry
-		paths []string
+		run func(t *testing.T)
 	}{
-		"empty inputs": {
-			reg:   confgroup.Registry{},
-			paths: []string{},
+		"string is not empty": {
+			run: func(t *testing.T) {
+				assert.NotEmpty(t, NewWatcher(confgroup.Registry{}, nil))
+			},
+		},
+		"empty inputs create watcher": {
+			run: func(t *testing.T) {
+				assert.NotNil(t, NewWatcher(confgroup.Registry{}, []string{}))
+			},
 		},
 	}
 
-	for name, test := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.NotNil(t, NewWatcher(test.reg, test.paths))
+			tc.run(t)
 		})
 	}
 }

@@ -12,24 +12,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestReader_String(t *testing.T) {
-	assert.NotEmpty(t, NewReader(confgroup.Registry{}, nil))
-}
-
-func TestNewReader(t *testing.T) {
+func TestReader_New(t *testing.T) {
 	tests := map[string]struct {
-		reg   confgroup.Registry
-		paths []string
+		run func(t *testing.T)
 	}{
-		"empty inputs": {
-			reg:   confgroup.Registry{},
-			paths: []string{},
+		"string is not empty": {
+			run: func(t *testing.T) {
+				assert.NotEmpty(t, NewReader(confgroup.Registry{}, nil))
+			},
+		},
+		"empty inputs create reader": {
+			run: func(t *testing.T) {
+				assert.NotNil(t, NewReader(confgroup.Registry{}, []string{}))
+			},
 		},
 	}
 
-	for name, test := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.NotNil(t, NewReader(test.reg, test.paths))
+			tc.run(t)
 		})
 	}
 }

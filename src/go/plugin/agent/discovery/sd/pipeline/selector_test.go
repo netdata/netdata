@@ -3,6 +3,7 @@
 package pipeline
 
 import (
+	"fmt"
 	"regexp"
 	"testing"
 
@@ -13,183 +14,141 @@ import (
 
 var reSrString = regexp.MustCompile(`^{[^{}]+}$`)
 
-func TestTrueSelector_String(t *testing.T) {
-	var sr trueSelector
-	assert.Equal(t, "{*}", sr.String())
-}
-
-func TestExactSelector_String(t *testing.T) {
-	sr := exactSelector("selector")
-
-	assert.True(t, reSrString.MatchString(sr.String()))
-}
-
-func TestNegSelector_String(t *testing.T) {
-	srs := []selector{
-		exactSelector("selector"),
-		negSelector{exactSelector("selector")},
-		orSelector{
-			lhs: exactSelector("selector"),
-			rhs: exactSelector("selector")},
-		orSelector{
-			lhs: orSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
-			rhs: orSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
-		},
-		andSelector{
-			lhs: andSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
-			rhs: andSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
-		},
-	}
-
-	for i, sr := range srs {
-		neg := negSelector{sr}
-		assert.True(t, reSrString.MatchString(neg.String()), "selector num %d", i+1)
-	}
-}
-
-func TestOrSelector_String(t *testing.T) {
-	sr := orSelector{
-		lhs: orSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
-		rhs: orSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
-	}
-
-	assert.True(t, reSrString.MatchString(sr.String()))
-}
-
-func TestAndSelector_String(t *testing.T) {
-	sr := andSelector{
-		lhs: andSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
-		rhs: andSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
-	}
-
-	assert.True(t, reSrString.MatchString(sr.String()))
-}
-
-func TestExactSelector_Matches(t *testing.T) {
-	matchTests := struct {
-		tags model.Tags
-		srs  []exactSelector
+func TestSelector_String(t *testing.T) {
+	tests := map[string]struct {
+		sr            selector
+		want          string
+		wantRegexForm bool
 	}{
-		tags: model.Tags{"a": {}, "b": {}},
-		srs: []exactSelector{
-			"a",
-			"b",
+		"true selector": {
+			sr:   trueSelector{},
+			want: "{*}",
 		},
-	}
-	notMatchTests := struct {
-		tags model.Tags
-		srs  []exactSelector
-	}{
-		tags: model.Tags{"a": {}, "b": {}},
-		srs: []exactSelector{
-			"c",
-			"d",
+		"exact selector": {
+			sr:            exactSelector("selector"),
+			wantRegexForm: true,
+		},
+		"neg selector from exact": {
+			sr:            negSelector{exactSelector("selector")},
+			wantRegexForm: true,
+		},
+		"neg selector from neg": {
+			sr:            negSelector{negSelector{exactSelector("selector")}},
+			wantRegexForm: true,
+		},
+		"neg selector from or": {
+			sr: negSelector{orSelector{
+				lhs: exactSelector("selector"),
+				rhs: exactSelector("selector"),
+			}},
+			wantRegexForm: true,
+		},
+		"neg selector from nested or": {
+			sr: negSelector{orSelector{
+				lhs: orSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
+				rhs: orSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
+			}},
+			wantRegexForm: true,
+		},
+		"neg selector from nested and": {
+			sr: negSelector{andSelector{
+				lhs: andSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
+				rhs: andSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
+			}},
+			wantRegexForm: true,
+		},
+		"or selector": {
+			sr: orSelector{
+				lhs: orSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
+				rhs: orSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
+			},
+			wantRegexForm: true,
+		},
+		"and selector": {
+			sr: andSelector{
+				lhs: andSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
+				rhs: andSelector{lhs: exactSelector("selector"), rhs: negSelector{exactSelector("selector")}},
+			},
+			wantRegexForm: true,
 		},
 	}
 
-	for i, sr := range matchTests.srs {
-		assert.Truef(t, sr.matches(matchTests.tags), "match selector num %d", i+1)
-	}
-	for i, sr := range notMatchTests.srs {
-		assert.Falsef(t, sr.matches(notMatchTests.tags), "not match selector num %d", i+1)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := fmt.Sprintf("%s", tc.sr)
+			if tc.wantRegexForm {
+				assert.True(t, reSrString.MatchString(got))
+				return
+			}
+			assert.Equal(t, tc.want, got)
+		})
 	}
 }
 
-func TestNegSelector_Matches(t *testing.T) {
-	matchTests := struct {
+func TestSelector_Matches(t *testing.T) {
+	tests := map[string]struct {
+		sr   selector
 		tags model.Tags
-		srs  []negSelector
+		want bool
 	}{
-		tags: model.Tags{"a": {}, "b": {}},
-		srs: []negSelector{
-			{exactSelector("c")},
-			{exactSelector("d")},
+		"exact selector matches": {
+			sr:   exactSelector("a"),
+			tags: model.Tags{"a": {}, "b": {}},
+			want: true,
 		},
-	}
-	notMatchTests := struct {
-		tags model.Tags
-		srs  []negSelector
-	}{
-		tags: model.Tags{"a": {}, "b": {}},
-		srs: []negSelector{
-			{exactSelector("a")},
-			{exactSelector("b")},
+		"exact selector does not match": {
+			sr:   exactSelector("c"),
+			tags: model.Tags{"a": {}, "b": {}},
+			want: false,
 		},
-	}
-
-	for i, sr := range matchTests.srs {
-		assert.Truef(t, sr.matches(matchTests.tags), "match selector num %d", i+1)
-	}
-	for i, sr := range notMatchTests.srs {
-		assert.Falsef(t, sr.matches(notMatchTests.tags), "not match selector num %d", i+1)
-	}
-}
-
-func TestOrSelector_Matches(t *testing.T) {
-	matchTests := struct {
-		tags model.Tags
-		srs  []orSelector
-	}{
-		tags: model.Tags{"a": {}, "b": {}},
-		srs: []orSelector{
-			{
+		"neg selector matches": {
+			sr:   negSelector{exactSelector("c")},
+			tags: model.Tags{"a": {}, "b": {}},
+			want: true,
+		},
+		"neg selector does not match": {
+			sr:   negSelector{exactSelector("a")},
+			tags: model.Tags{"a": {}, "b": {}},
+			want: false,
+		},
+		"or selector matches": {
+			sr: orSelector{
 				lhs: orSelector{lhs: exactSelector("c"), rhs: exactSelector("d")},
 				rhs: orSelector{lhs: exactSelector("e"), rhs: exactSelector("b")},
 			},
+			tags: model.Tags{"a": {}, "b": {}},
+			want: true,
 		},
-	}
-	notMatchTests := struct {
-		tags model.Tags
-		srs  []orSelector
-	}{
-		tags: model.Tags{"a": {}, "b": {}},
-		srs: []orSelector{
-			{
+		"or selector does not match": {
+			sr: orSelector{
 				lhs: orSelector{lhs: exactSelector("c"), rhs: exactSelector("d")},
 				rhs: orSelector{lhs: exactSelector("e"), rhs: exactSelector("f")},
 			},
+			tags: model.Tags{"a": {}, "b": {}},
+			want: false,
 		},
-	}
-
-	for i, sr := range matchTests.srs {
-		assert.Truef(t, sr.matches(matchTests.tags), "match selector num %d", i+1)
-	}
-	for i, sr := range notMatchTests.srs {
-		assert.Falsef(t, sr.matches(notMatchTests.tags), "not match selector num %d", i+1)
-	}
-}
-
-func TestAndSelector_Matches(t *testing.T) {
-	matchTests := struct {
-		tags model.Tags
-		srs  []andSelector
-	}{
-		tags: model.Tags{"a": {}, "b": {}, "c": {}, "d": {}},
-		srs: []andSelector{
-			{
+		"and selector matches": {
+			sr: andSelector{
 				lhs: andSelector{lhs: exactSelector("a"), rhs: exactSelector("b")},
 				rhs: andSelector{lhs: exactSelector("c"), rhs: exactSelector("d")},
 			},
+			tags: model.Tags{"a": {}, "b": {}, "c": {}, "d": {}},
+			want: true,
 		},
-	}
-	notMatchTests := struct {
-		tags model.Tags
-		srs  []andSelector
-	}{
-		tags: model.Tags{"a": {}, "b": {}, "c": {}, "d": {}},
-		srs: []andSelector{
-			{
+		"and selector does not match": {
+			sr: andSelector{
 				lhs: andSelector{lhs: exactSelector("a"), rhs: exactSelector("b")},
 				rhs: andSelector{lhs: exactSelector("c"), rhs: exactSelector("z")},
 			},
+			tags: model.Tags{"a": {}, "b": {}, "c": {}, "d": {}},
+			want: false,
 		},
 	}
 
-	for i, sr := range matchTests.srs {
-		assert.Truef(t, sr.matches(matchTests.tags), "match selector num %d", i+1)
-	}
-	for i, sr := range notMatchTests.srs {
-		assert.Falsef(t, sr.matches(notMatchTests.tags), "not match selector num %d", i+1)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.sr.matches(tc.tags))
+		})
 	}
 }
 

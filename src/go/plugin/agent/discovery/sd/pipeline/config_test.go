@@ -11,48 +11,95 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func TestDiscovererPayload_JSONRoundTrip(t *testing.T) {
-	input := `{"docker":{"address":"unix:///var/run/docker.sock","timeout":"5s"}}`
+func TestDiscovererPayload_RoundTrip(t *testing.T) {
+	tests := map[string]struct {
+		input     string
+		unmarshal func([]byte, *DiscovererPayload) error
+		marshal   func(DiscovererPayload) ([]byte, error)
+		assertOut func(*testing.T, string)
+		wantType  string
+	}{
+		"json": {
+			input: `{"docker":{"address":"unix:///var/run/docker.sock","timeout":"5s"}}`,
+			unmarshal: func(data []byte, p *DiscovererPayload) error {
+				return json.Unmarshal(data, p)
+			},
+			marshal: func(p DiscovererPayload) ([]byte, error) {
+				return json.Marshal(p)
+			},
+			wantType: "docker",
+			assertOut: func(t *testing.T, out string) {
+				assert.JSONEq(t, `{"docker":{"address":"unix:///var/run/docker.sock","timeout":"5s"}}`, out)
+			},
+		},
+		"yaml": {
+			input: "docker:\n  address: unix:///var/run/docker.sock\n  timeout: 5s\n",
+			unmarshal: func(data []byte, p *DiscovererPayload) error {
+				return yaml.Unmarshal(data, p)
+			},
+			marshal: func(p DiscovererPayload) ([]byte, error) {
+				return yaml.Marshal(p)
+			},
+			wantType: "docker",
+			assertOut: func(t *testing.T, out string) {
+				assert.Contains(t, out, "docker:")
+				assert.Contains(t, out, "address: unix:///var/run/docker.sock")
+				assert.Contains(t, out, "timeout: 5s")
+			},
+		},
+	}
 
-	var p DiscovererPayload
-	require.NoError(t, json.Unmarshal([]byte(input), &p))
-	require.Equal(t, "docker", p.Type())
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var p DiscovererPayload
+			require.NoError(t, tc.unmarshal([]byte(tc.input), &p))
+			require.Equal(t, tc.wantType, p.Type())
 
-	out, err := json.Marshal(p)
-	require.NoError(t, err)
-	assert.JSONEq(t, input, string(out))
+			out, err := tc.marshal(p)
+			require.NoError(t, err)
+			tc.assertOut(t, string(out))
+		})
+	}
 }
 
-func TestDiscovererPayload_YAMLRoundTrip(t *testing.T) {
-	input := "docker:\n  address: unix:///var/run/docker.sock\n  timeout: 5s\n"
+func TestDiscovererPayload_RejectsMultipleDiscoverers(t *testing.T) {
+	tests := map[string]struct {
+		input     string
+		unmarshal func([]byte, *DiscovererPayload) error
+	}{
+		"json": {
+			input: `{"docker":{},"snmp":{}}`,
+			unmarshal: func(data []byte, p *DiscovererPayload) error {
+				return json.Unmarshal(data, p)
+			},
+		},
+		"yaml": {
+			input: "docker: {}\nsnmp: {}\n",
+			unmarshal: func(data []byte, p *DiscovererPayload) error {
+				return yaml.Unmarshal(data, p)
+			},
+		},
+	}
 
-	var p DiscovererPayload
-	require.NoError(t, yaml.Unmarshal([]byte(input), &p))
-	require.Equal(t, "docker", p.Type())
-
-	out, err := yaml.Marshal(p)
-	require.NoError(t, err)
-	assert.Contains(t, string(out), "docker:")
-	assert.Contains(t, string(out), "address: unix:///var/run/docker.sock")
-	assert.Contains(t, string(out), "timeout: 5s")
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var p DiscovererPayload
+			err := tc.unmarshal([]byte(tc.input), &p)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "multiple discoverers configured")
+		})
+	}
 }
 
-func TestDiscovererPayload_RejectsMultipleDiscoverersJSON(t *testing.T) {
-	var p DiscovererPayload
-	err := json.Unmarshal([]byte(`{"docker":{},"snmp":{}}`), &p)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "multiple discoverers configured")
-}
-
-func TestDiscovererPayload_RejectsMultipleDiscoverersYAML(t *testing.T) {
-	var p DiscovererPayload
-	err := yaml.Unmarshal([]byte("docker: {}\nsnmp: {}\n"), &p)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "multiple discoverers configured")
-}
-
-func TestConfig_UnmarshalYAMLLegacyDiscoverK8sMerge(t *testing.T) {
-	input := `
+func TestConfig_UnmarshalYAMLLegacyDiscover(t *testing.T) {
+	tests := map[string]struct {
+		input          string
+		wantErr        bool
+		wantErrContain []string
+		assertCfg      func(*testing.T, Config)
+	}{
+		"k8s merge": {
+			input: `
 name: test-k8s
 discover:
   - discoverer: k8s
@@ -66,21 +113,19 @@ discover:
 services:
   - id: "test-rule"
     match: "true"
-`
+`,
+			assertCfg: func(t *testing.T, cfg Config) {
+				require.Equal(t, "k8s", cfg.Discoverer.Type())
 
-	var cfg Config
-	require.NoError(t, yaml.Unmarshal([]byte(input), &cfg))
-	require.Equal(t, "k8s", cfg.Discoverer.Type())
-
-	var got []map[string]any
-	require.NoError(t, json.Unmarshal(cfg.Discoverer.Config, &got))
-	require.Len(t, got, 2)
-	assert.Equal(t, "pod", got[0]["role"])
-	assert.Equal(t, "service", got[1]["role"])
-}
-
-func TestConfig_UnmarshalYAMLLegacyDiscoverMissingConfigFails(t *testing.T) {
-	input := `
+				var got []map[string]any
+				require.NoError(t, json.Unmarshal(cfg.Discoverer.Config, &got))
+				require.Len(t, got, 2)
+				assert.Equal(t, "pod", got[0]["role"])
+				assert.Equal(t, "service", got[1]["role"])
+			},
+		},
+		"missing discoverer config fails": {
+			input: `
 name: test-invalid
 discover:
   - discoverer: docker
@@ -88,11 +133,29 @@ discover:
 services:
   - id: "test-rule"
     match: "true"
-`
+`,
+			wantErr:        true,
+			wantErrContain: []string{"missing config for discoverer", "docker"},
+		},
+	}
 
-	var cfg Config
-	err := yaml.Unmarshal([]byte(input), &cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "missing config for discoverer")
-	assert.Contains(t, err.Error(), "docker")
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var cfg Config
+			err := yaml.Unmarshal([]byte(tc.input), &cfg)
+
+			if tc.wantErr {
+				require.Error(t, err)
+				for _, s := range tc.wantErrContain {
+					assert.Contains(t, err.Error(), s)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			if tc.assertCfg != nil {
+				tc.assertCfg(t, cfg)
+			}
+		})
+	}
 }
