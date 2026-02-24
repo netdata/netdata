@@ -14,13 +14,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mattn/go-isatty"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -31,7 +31,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdin.Fd())
+var isTerminal = terminal.IsTerminal()
 
 func New() *Manager {
 	seen := dyncfg.NewSeenCache[confgroup.Config]()
@@ -534,15 +534,15 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 	m.Debugf("creating %s[%s] job, config: %v", cfg.Module(), cfg.Name(), cfg)
 
 	var jobDumpDir string
-		if m.DumpDataDir != "" {
-			jobDumpDir = filepath.Join(m.DumpDataDir, sanitizeName(cfg.Module()), sanitizeName(cfg.Name()))
-			if err := os.MkdirAll(jobDumpDir, 0o755); err != nil {
-				return nil, fmt.Errorf("creating dump directory: %w", err)
-			}
-			if m.DumpAnalyzer != nil {
-				m.DumpAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
-			}
+	if m.DumpDataDir != "" {
+		jobDumpDir = filepath.Join(m.DumpDataDir, sanitizeName(cfg.Module()), sanitizeName(cfg.Name()))
+		if err := os.MkdirAll(jobDumpDir, 0o755); err != nil {
+			return nil, fmt.Errorf("creating dump directory: %w", err)
 		}
+		if m.DumpAnalyzer != nil {
+			m.DumpAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
+		}
+	}
 
 	useV2 := creator.CreateV2 != nil
 	if useV2 {

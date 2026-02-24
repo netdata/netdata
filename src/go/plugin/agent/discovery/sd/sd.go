@@ -6,23 +6,22 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"sync"
+
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/terminal"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
-
-	"github.com/mattn/go-isatty"
 )
 
-var isTerminal = isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdin.Fd())
+var isTerminal = terminal.IsTerminal()
 
 // disableDyncfg controls whether SD dyncfg integration is active.
 // When true (default): templates are not registered, file configs auto-start without dyncfg.

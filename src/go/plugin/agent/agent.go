@@ -12,12 +12,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mattn/go-isatty"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimemgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -25,7 +25,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
 
-var isTerminal = isatty.IsTerminal(os.Stdout.Fd())
+var isTerminal = terminal.IsTerminal()
 
 // Config is an Agent configuration.
 type Config struct {
