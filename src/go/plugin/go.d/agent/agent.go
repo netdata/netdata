@@ -12,18 +12,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mattn/go-isatty"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimemgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/jobmgr"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/runtimemgr"
-
-	"github.com/mattn/go-isatty"
 )
 
 var isTerminal = isatty.IsTerminal(os.Stdout.Fd())
