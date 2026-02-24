@@ -448,7 +448,18 @@ if(ENABLE_SENTRY)
 endif()
 
 if(ENABLE_ML)
-  netdata_bundle_dlib()
+  option(USE_SYSTEM_DLIB "Use system-installed dlib instead of downloading" OFF)
+
+  if(USE_SYSTEM_DLIB)
+    find_package(dlib REQUIRED)
+    message(STATUS "Using system-installed dlib")
+    
+    if(TARGET dlib::dlib AND NOT TARGET dlib)
+      add_library(dlib ALIAS dlib::dlib)
+    endif()
+  else()
+    netdata_bundle_dlib()
+  endif()
 endif()
 
 #
