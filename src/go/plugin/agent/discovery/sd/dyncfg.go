@@ -117,12 +117,6 @@ func (cb *sdCallbacks) ConfigID(cfg sdConfig) string {
 	return cb.sd.dyncfgJobID(cfg.DiscovererType(), cfg.Name())
 }
 
-// dyncfgConfigHandler wraps dyncfgConfig to convert functions.Function to dyncfg.Function.
-// This is needed because functions.Registry expects func(functions.Function).
-func (d *ServiceDiscovery) dyncfgConfigHandler(fn functions.Function) {
-	d.dyncfgConfig(dyncfg.NewFunction(fn))
-}
-
 // dyncfgConfig is the handler for dyncfg config commands.
 // Read-only commands (schema, get, userconfig) are executed directly.
 // State-changing commands are queued for serial execution.
@@ -346,7 +340,7 @@ func (d *ServiceDiscovery) registerDyncfgTemplates(ctx context.Context) {
 
 	// Register prefix handler for config commands
 	// Wrap to convert functions.Function to dyncfg.Function
-	d.fnReg.RegisterPrefix("config", d.dyncfgSDPrefixValue(), d.dyncfgConfigHandler)
+	d.fnReg.RegisterPrefix("config", d.dyncfgSDPrefixValue(), dyncfg.WrapHandler(d.dyncfgConfig))
 
 	// Register templates for each discoverer type
 	for _, dt := range d.discovererRegistry().Types() {

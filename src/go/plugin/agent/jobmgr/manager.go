@@ -128,10 +128,7 @@ func New(cfg Config) *Manager {
 
 // SetDyncfgResponder allows overriding the default responder (e.g., to silence output in CLI mode).
 func (m *Manager) SetDyncfgResponder(responder *dyncfg.Responder) {
-	if responder != nil {
-		m.dyncfgApi = responder
-		m.handler.SetAPI(responder)
-	}
+	dyncfg.BindResponder(&m.dyncfgApi, m.handler, responder)
 }
 
 type Manager struct {
@@ -187,8 +184,8 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	defer func() { m.cleanup(); m.Info("instance is stopped") }()
 	m.ctx = ctx
 
-	m.FnReg.RegisterPrefix("config", m.dyncfgCollectorPrefixValue(), m.dyncfgConfigHandler)
-	m.FnReg.RegisterPrefix("config", m.dyncfgVnodePrefixValue(), m.dyncfgConfigHandler)
+	m.FnReg.RegisterPrefix("config", m.dyncfgCollectorPrefixValue(), dyncfg.WrapHandler(m.dyncfgConfig))
+	m.FnReg.RegisterPrefix("config", m.dyncfgVnodePrefixValue(), dyncfg.WrapHandler(m.dyncfgConfig))
 
 	m.dyncfgVnodeModuleCreate()
 

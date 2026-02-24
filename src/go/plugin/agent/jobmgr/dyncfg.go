@@ -6,14 +6,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
-
-// dyncfgConfigHandler wraps dyncfgConfig to convert functions.Function to dyncfg.Function.
-// This is needed because functions.Registry expects func(functions.Function).
-func (m *Manager) dyncfgConfigHandler(fn functions.Function) {
-	m.dyncfgConfig(dyncfg.NewFunction(fn))
-}
 
 func (m *Manager) dyncfgConfig(fn dyncfg.Function) {
 	if err := fn.ValidateArgs(2); err != nil {
