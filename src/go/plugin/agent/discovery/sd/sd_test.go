@@ -12,11 +12,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func init() {
-	// Enable dyncfg integration for tests (disabled by default in production)
-	disableDyncfg = false
-}
-
 func TestServiceDiscovery_Run(t *testing.T) {
 	tests := map[string]discoverySim{
 		"add pipeline": {

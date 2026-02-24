@@ -325,7 +325,7 @@ func (d *ServiceDiscovery) extractDiscovererAndName(id string) (discovererType, 
 
 // registerDyncfgTemplates registers dyncfg templates for each discoverer type
 func (d *ServiceDiscovery) registerDyncfgTemplates(ctx context.Context) {
-	if d.fnReg == nil || disableDyncfg {
+	if d.fnReg == nil {
 		return
 	}
 
@@ -342,7 +342,7 @@ func (d *ServiceDiscovery) registerDyncfgTemplates(ctx context.Context) {
 
 // unregisterDyncfgTemplates unregisters dyncfg templates
 func (d *ServiceDiscovery) unregisterDyncfgTemplates() {
-	if d.fnReg == nil || disableDyncfg {
+	if d.fnReg == nil {
 		return
 	}
 
