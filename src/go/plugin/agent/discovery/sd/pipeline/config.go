@@ -212,7 +212,9 @@ func (c *Config) UnmarshalYAML(unmarshal func(any) error) error {
 
 	// Convert legacy discover[] to new discoverer{} format
 	if len(c.LegacyDiscover) > 0 && c.Discoverer.Empty() {
-		c.convertLegacyDiscover()
+		if err := c.convertLegacyDiscover(); err != nil {
+			return fmt.Errorf("failed to convert legacy discover config: %w", err)
+		}
 	}
 
 	// Convert legacy classify/compose to canonical services format
@@ -234,8 +236,10 @@ func (c *Config) UnmarshalYAML(unmarshal func(any) error) error {
 
 // convertLegacyDiscover converts legacy discover[] array to new discoverer{} struct.
 // For non-k8s discoverers, first value wins; for k8s, arrays are merged.
-func (c *Config) convertLegacyDiscover() {
-	for _, d := range c.LegacyDiscover {
+func (c *Config) convertLegacyDiscover() error {
+	var converted bool
+
+	for i, d := range c.LegacyDiscover {
 		typ := strings.TrimSpace(d.Discoverer)
 		if typ == "" {
 			continue
@@ -243,21 +247,22 @@ func (c *Config) convertLegacyDiscover() {
 
 		rawCfg, ok := d.Config[typ]
 		if !ok {
-			continue
+			return fmt.Errorf("legacy discover[%d]: missing config for discoverer %q", i, typ)
 		}
 
 		norm, err := normalizeYAMLValue(rawCfg)
 		if err != nil {
-			continue
+			return fmt.Errorf("legacy discover[%d]: normalize %q config: %w", i, typ, err)
 		}
 
 		cfgJSON, err := json.Marshal(norm)
 		if err != nil {
-			continue
+			return fmt.Errorf("legacy discover[%d]: marshal %q config: %w", i, typ, err)
 		}
 
 		if c.Discoverer.Empty() {
 			c.Discoverer = DiscovererPayload{Kind: typ, Config: cfgJSON}
+			converted = true
 			continue
 		}
 
@@ -267,10 +272,17 @@ func (c *Config) convertLegacyDiscover() {
 
 		merged, err := mergeJSONArrays(c.Discoverer.Config, cfgJSON)
 		if err != nil {
-			continue
+			return fmt.Errorf("legacy discover[%d]: merge %q configs: %w", i, typ, err)
 		}
 		c.Discoverer.Config = merged
+		converted = true
 	}
+
+	if !converted {
+		return errors.New("legacy discover[] did not provide a usable discoverer config")
+	}
+
+	return nil
 }
 
 func mergeJSONArrays(aRaw, bRaw json.RawMessage) (json.RawMessage, error) {

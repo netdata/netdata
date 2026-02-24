@@ -900,6 +900,97 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 				}
 			},
 		},
+		"userconfig for docker template": {
+			createSim: func() *dyncfgSim {
+				cfg := newTestDockerConfig("docker-test", "unix:///var/run/docker.sock", confopt.Duration(5*time.Second), defaultTestServices())
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-userconfig",
+							[]string{sd.dyncfgTemplateID(testDiscovererTypeDocker), "userconfig"},
+							payload, "")
+					},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-userconfig 200 application/yaml")
+						assert.Contains(t, got, "name: docker-test")
+						assert.Contains(t, got, "discoverer:")
+						assert.Contains(t, got, "docker:")
+						assert.Contains(t, got, "address: unix:///var/run/docker.sock")
+					},
+				}
+			},
+		},
+		"userconfig for k8s template": {
+			createSim: func() *dyncfgSim {
+				cfg := newTestK8sConfig("k8s-test", []testK8sConfig{{
+					Role:       "pod",
+					Namespaces: []string{"default"},
+				}}, defaultTestServices())
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-userconfig",
+							[]string{sd.dyncfgTemplateID(testDiscovererTypeK8s), "userconfig"},
+							payload, "")
+					},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-userconfig 200 application/yaml")
+						assert.Contains(t, got, "name: k8s-test")
+						assert.Contains(t, got, "discoverer:")
+						assert.Contains(t, got, "k8s:")
+						assert.Contains(t, got, "role: pod")
+						assert.Contains(t, got, "- default")
+					},
+				}
+			},
+		},
+		"userconfig for snmp template": {
+			createSim: func() *dyncfgSim {
+				cfg := newTestSNMPConfig("snmp-test", testSNMPConfig{
+					RescanInterval: confopt.LongDuration(1 * time.Hour),
+					Credentials:    []testSNMPCredentialConfig{{Name: "public-v2", Version: "2c", Community: "public"}},
+					Networks:       []testSNMPNetworkConfig{{Subnet: "192.168.1.0/24", Credential: "public-v2"}},
+				}, defaultTestServices())
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-userconfig",
+							[]string{sd.dyncfgTemplateID(testDiscovererTypeSNMP), "userconfig"},
+							payload, "")
+					},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-userconfig 200 application/yaml")
+						assert.Contains(t, got, "name: snmp-test")
+						assert.Contains(t, got, "discoverer:")
+						assert.Contains(t, got, "snmp:")
+						assert.Contains(t, got, "rescan_interval: 1h")
+						assert.Contains(t, got, "subnet: 192.168.1.0/24")
+					},
+				}
+			},
+		},
+		"userconfig fails on mismatched discoverer type": {
+			createSim: func() *dyncfgSim {
+				cfg := newTestDockerConfig("docker-test", "unix:///var/run/docker.sock", confopt.Duration(5*time.Second), defaultTestServices())
+				payload, _ := json.Marshal(cfg)
+
+				return &dyncfgSim{
+					do: func(sd *ServiceDiscovery) {
+						sendDyncfgCmd(sd, "1-userconfig",
+							[]string{sd.dyncfgTemplateID(testDiscovererTypeNetListeners), "userconfig"},
+							payload, "")
+					},
+					wantDyncfgFunc: func(t *testing.T, got string) {
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-userconfig 400 application/json")
+						assert.Contains(t, got, "Failed to parse config")
+						assert.Contains(t, got, "expected")
+					},
+				}
+			},
+		},
 	}
 
 	for name, tc := range tests {

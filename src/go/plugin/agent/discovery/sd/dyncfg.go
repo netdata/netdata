@@ -295,6 +295,12 @@ func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn dyncfg.Function) {
 		return
 	}
 
+	if _, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults, d.discovererRegistry()); err != nil {
+		d.Warningf("dyncfg: userconfig: failed to parse config for '%s': %v", id, err)
+		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
+		return
+	}
+
 	jobName := fn.JobName() // May be empty - userConfigFromPayload will use name from payload or default
 
 	bs, err := userConfigFromPayload(fn.Payload(), dt, jobName)
