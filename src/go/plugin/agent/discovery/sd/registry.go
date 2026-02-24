@@ -13,7 +13,6 @@ type Descriptor struct {
 	Type            string
 	Schema          string
 	ParseJSONConfig func(raw json.RawMessage) (any, error)
-	ParseYAMLConfig func(raw []byte) (any, error)
 	NewDiscoverers  func(cfg any, source string) ([]model.Discoverer, error)
 }
 
@@ -56,7 +55,6 @@ func (r *mapRegistry) Get(typ string) (Descriptor, bool) {
 func NewDescriptor[T any](
 	typ, schema string,
 	parseJSON func(raw json.RawMessage) (T, error),
-	parseYAML func(raw []byte) (T, error),
 	newDiscs func(cfg T, source string) ([]model.Discoverer, error),
 ) Descriptor {
 	return Descriptor{
@@ -64,9 +62,6 @@ func NewDescriptor[T any](
 		Schema: schema,
 		ParseJSONConfig: func(raw json.RawMessage) (any, error) {
 			return parseJSON(raw)
-		},
-		ParseYAMLConfig: func(raw []byte) (any, error) {
-			return parseYAML(raw)
 		},
 		NewDiscoverers: func(cfg any, source string) ([]model.Discoverer, error) {
 			v, ok := cfg.(T)

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
-	"gopkg.in/yaml.v2"
 )
 
 const testDiscovererSchema = `{"jsonSchema":{"type":"object"}}`
@@ -17,28 +16,24 @@ func testDiscovererRegistry() Registry {
 			testDiscovererTypeNetListeners,
 			testDiscovererSchema,
 			parseJSONTestConfig[testNetListenersConfig],
-			parseYAMLTestConfig[testNetListenersConfig],
 			newTestDiscoverers[testNetListenersConfig],
 		),
 		NewDescriptor(
 			testDiscovererTypeDocker,
 			testDiscovererSchema,
 			parseJSONTestConfig[testDockerConfig],
-			parseYAMLTestConfig[testDockerConfig],
 			newTestDiscoverers[testDockerConfig],
 		),
 		NewDescriptor(
 			testDiscovererTypeK8s,
 			testDiscovererSchema,
 			parseJSONTestConfig[[]testK8sConfig],
-			parseYAMLTestConfig[[]testK8sConfig],
 			newTestDiscoverers[[]testK8sConfig],
 		),
 		NewDescriptor(
 			testDiscovererTypeSNMP,
 			testDiscovererSchema,
 			parseJSONTestConfig[testSNMPConfig],
-			parseYAMLTestConfig[testSNMPConfig],
 			newTestDiscoverers[testSNMPConfig],
 		),
 	)
@@ -47,14 +42,6 @@ func testDiscovererRegistry() Registry {
 func parseJSONTestConfig[T any](raw json.RawMessage) (T, error) {
 	var cfg T
 	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return cfg, err
-	}
-	return cfg, nil
-}
-
-func parseYAMLTestConfig[T any](raw []byte) (T, error) {
-	var cfg T
-	if err := yaml.Unmarshal(raw, &cfg); err != nil {
 		return cfg, err
 	}
 	return cfg, nil

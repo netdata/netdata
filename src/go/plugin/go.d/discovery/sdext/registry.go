@@ -13,7 +13,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/k8ssd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/netlistensd"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/snmpsd"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -29,21 +28,18 @@ func Registry() sd.Registry {
 			discovererNetListeners,
 			schemaNetListeners,
 			parseJSONConfig[netlistensd.Config],
-			parseYAMLConfig[netlistensd.Config],
 			newNetListenersDiscoverers,
 		),
 		sd.NewDescriptor(
 			discovererK8s,
 			schemaK8s,
 			parseJSONConfig[[]k8ssd.Config],
-			parseYAMLConfig[[]k8ssd.Config],
 			newK8sDiscoverers,
 		),
 		sd.NewDescriptor(
 			discovererSNMP,
 			schemaSNMP,
 			parseJSONConfig[snmpsd.Config],
-			parseYAMLConfig[snmpsd.Config],
 			newSNMPDiscoverers,
 		),
 	}
@@ -52,7 +48,6 @@ func Registry() sd.Registry {
 			discovererDocker,
 			schemaDocker,
 			parseJSONConfig[dockersd.Config],
-			parseYAMLConfig[dockersd.Config],
 			newDockerDiscoverers,
 		))
 	}
@@ -62,14 +57,6 @@ func Registry() sd.Registry {
 func parseJSONConfig[T any](raw json.RawMessage) (T, error) {
 	var cfg T
 	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return cfg, err
-	}
-	return cfg, nil
-}
-
-func parseYAMLConfig[T any](raw []byte) (T, error) {
-	var cfg T
-	if err := yaml.Unmarshal(raw, &cfg); err != nil {
 		return cfg, err
 	}
 	return cfg, nil
