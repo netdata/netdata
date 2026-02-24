@@ -247,33 +247,32 @@ func (a *Agent) run(ctx context.Context) {
 		return
 	}
 
-	jobMgr := jobmgr.New()
-	jobMgr.PluginName = a.Name
-	jobMgr.Out = a.Out
-	jobMgr.VarLibDir = a.VarLibDir
-	jobMgr.Modules = enabledModules
-	if a.RunModule != "" && a.RunModule != "all" {
-		jobMgr.RunJob = a.RunJob
-	}
-	jobMgr.ConfigDefaults = discCfg.Registry
-	jobMgr.FnReg = fnMgr
-
 	runtimeSvc := runtimemgr.New(a.Logger.With(slog.String("component", "runtime metrics service")))
 	runtimeSvc.Start(a.Name, a.Out)
 	defer runtimeSvc.Stop()
-	jobMgr.RuntimeService = runtimeSvc
+
+	var runJob []string
+	if a.RunModule != "" && a.RunModule != "all" {
+		runJob = a.RunJob
+	}
+
+	jobMgr := jobmgr.New(jobmgr.Config{
+		PluginName:     a.Name,
+		Out:            a.Out,
+		Modules:        enabledModules,
+		RunJob:         runJob,
+		ConfigDefaults: discCfg.Registry,
+		VarLibDir:      a.VarLibDir,
+		FnReg:          fnMgr,
+		Vnodes:         a.setupVnodeRegistry(),
+		DumpMode:       a.dumpMode > 0,
+		DumpAnalyzer:   a.dumpAnalyzer,
+		DumpDataDir:    a.dumpDataDir,
+		RuntimeService: runtimeSvc,
+	})
 
 	// Store reference for dump mode and enable dump mode if configured
 	a.mgr = jobMgr
-	if a.dumpMode > 0 {
-		jobMgr.DumpMode = true
-		jobMgr.DumpAnalyzer = a.dumpAnalyzer
-	}
-	jobMgr.DumpDataDir = a.dumpDataDir
-
-	if reg := a.setupVnodeRegistry(); len(reg) > 0 {
-		jobMgr.Vnodes = reg
-	}
 
 	in := make(chan []*confgroup.Group)
 	var wg sync.WaitGroup

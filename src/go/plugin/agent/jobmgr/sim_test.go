@@ -42,7 +42,7 @@ func (s *runSim) run(t *testing.T) {
 	require.NotNil(t, s.do, "s.do is nil")
 
 	var buf bytes.Buffer
-	mgr := New()
+	mgr := New(Config{})
 	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
 	mgr.Modules = prepareMockRegistry()
 

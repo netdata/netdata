@@ -30,7 +30,7 @@ func TestRunProcessConfGroups_ChannelCloseDoesNotSpin(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			mgr := New()
+			mgr := New(Config{})
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 			mgr.ctx = ctx

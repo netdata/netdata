@@ -33,18 +33,58 @@ import (
 
 var isTerminal = terminal.IsTerminal()
 
-func New() *Manager {
+type Config struct {
+	PluginName         string
+	Out                io.Writer
+	Modules            collectorapi.Registry
+	RunJob             []string
+	ConfigDefaults     confgroup.Registry
+	VarLibDir          string
+	FnReg              FunctionRegistry
+	Vnodes             map[string]*vnodes.VirtualNode
+	DumpMode           bool
+	DumpAnalyzer       jobruntime.DumpAnalyzer
+	DumpDataDir        string
+	FunctionJSONWriter func(payload []byte, code int)
+	RuntimeService     runtimecomp.Service
+}
+
+func New(cfg Config) *Manager {
 	seen := dyncfg.NewSeenCache[confgroup.Config]()
 	exposed := dyncfg.NewExposedCache[confgroup.Config]()
 	api := dyncfg.NewResponder(netdataapi.New(safewriter.Stdout))
+
+	out := cfg.Out
+	if out == nil {
+		out = io.Discard
+	}
+	fnReg := cfg.FnReg
+	if fnReg == nil {
+		fnReg = noop{}
+	}
+	vnodesReg := cfg.Vnodes
+	if vnodesReg == nil {
+		vnodesReg = make(map[string]*vnodes.VirtualNode)
+	}
+
 	mgr := &Manager{
 		Logger: logger.New().With(
 			slog.String("component", "job manager"),
 		),
-		Out:   io.Discard,
-		FnReg: noop{},
+		PluginName:     cfg.PluginName,
+		Out:            out,
+		Modules:        cfg.Modules,
+		RunJob:         cfg.RunJob,
+		ConfigDefaults: cfg.ConfigDefaults,
+		VarLibDir:      cfg.VarLibDir,
+		FnReg:          fnReg,
+		Vnodes:         vnodesReg,
 
-		Vnodes: make(map[string]*vnodes.VirtualNode),
+		DumpMode:           cfg.DumpMode,
+		DumpAnalyzer:       cfg.DumpAnalyzer,
+		DumpDataDir:        cfg.DumpDataDir,
+		FunctionJSONWriter: cfg.FunctionJSONWriter,
+		RuntimeService:     cfg.RuntimeService,
 
 		moduleFuncs:       newModuleFuncRegistry(),
 		discoveredConfigs: newDiscoveredConfigsCache(),
