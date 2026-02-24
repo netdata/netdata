@@ -96,6 +96,8 @@ func TestToTopologyData_ProjectsResult(t *testing.T) {
 	require.Equal(t, 2, localActor.Attributes["ports_total"])
 	require.NotNil(t, localActor.Attributes["if_admin_status_counts"])
 	require.NotNil(t, localActor.Attributes["if_oper_status_counts"])
+	require.NotNil(t, localActor.Attributes["if_link_mode_counts"])
+	require.NotNil(t, localActor.Attributes["if_topology_role_counts"])
 	require.NotNil(t, localActor.Attributes["if_statuses"])
 	remoteActor := findActorBySysName(data.Actors, "sw2")
 	require.NotNil(t, remoteActor)
@@ -121,6 +123,278 @@ func TestToTopologyData_ProjectsResult(t *testing.T) {
 	require.Equal(t, 1, data.Stats["links_unidirectional"])
 	require.Equal(t, 3, data.Stats["actors_total"])
 	require.Equal(t, 1, data.Stats["endpoints_total"])
+}
+
+func TestToTopologyData_ClassifiesPortLinkModesFromFDBAndSTPEvidence(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "sw1",
+				Hostname:  "sw1",
+				ChassisID: "00:11:22:33:44:55",
+			},
+			{
+				ID:        "sw2",
+				Hostname:  "sw2",
+				ChassisID: "00:11:22:33:44:66",
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "sw1", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+			{DeviceID: "sw1", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
+			{DeviceID: "sw1", IfIndex: 3, IfName: "Gi0/3", IfDescr: "Gi0/3"},
+			{DeviceID: "sw1", IfIndex: 4, IfName: "Gi0/4", IfDescr: "Gi0/4"},
+			{DeviceID: "sw2", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "sw1",
+				SourcePort: "Gi0/3",
+				TargetID:   "sw2",
+				TargetPort: "Gi0/1",
+			},
+			{
+				Protocol:   "stp",
+				SourceID:   "sw1",
+				SourcePort: "Gi0/1",
+				TargetID:   "sw2",
+				TargetPort: "Gi0/1",
+				Labels: map[string]string{
+					"vlan_id": "20",
+				},
+			},
+		},
+		Attachments: []Attachment{
+			{
+				DeviceID:   "sw1",
+				IfIndex:    1,
+				EndpointID: "mac:00:00:00:00:10:01",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"fdb_status": "learned",
+					"vlan_id":    "10",
+				},
+			},
+			{
+				DeviceID:   "sw1",
+				IfIndex:    1,
+				EndpointID: "mac:00:00:00:00:20:01",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"fdb_status": "learned",
+					"vlan_id":    "20",
+				},
+			},
+			{
+				DeviceID:   "sw1",
+				IfIndex:    2,
+				EndpointID: "mac:00:00:00:00:30:01",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"fdb_status": "learned",
+					"vlan_id":    "30",
+				},
+			},
+			{
+				DeviceID:   "sw1",
+				IfIndex:    3,
+				EndpointID: "mac:00:00:00:00:40:01",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"fdb_status": "learned",
+					"vlan_id":    "40",
+				},
+			},
+			{
+				DeviceID:   "sw1",
+				IfIndex:    4,
+				EndpointID: "mac:00:00:00:00:50:01",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"fdb_status": "learned",
+				},
+			},
+			{
+				DeviceID:   "sw1",
+				IfIndex:    4,
+				EndpointID: "mac:00:00:00:00:50:02",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"fdb_status": "learned",
+				},
+			},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	actor := findActorBySysName(data.Actors, "sw1")
+	require.NotNil(t, actor)
+
+	modeCounts, ok := actor.Attributes["if_link_mode_counts"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, 1, modeCounts["trunk"])
+	require.Equal(t, 1, modeCounts["access"])
+	require.Equal(t, 2, modeCounts["unknown"])
+
+	roleCounts, ok := actor.Attributes["if_topology_role_counts"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, 1, roleCounts["switch_facing"])
+	require.Equal(t, 1, roleCounts["host_facing"])
+	require.Equal(t, 1, roleCounts["host_candidate"])
+	require.Equal(t, 1, roleCounts["unknown"])
+
+	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
+	require.True(t, ok)
+
+	port1 := findInterfaceStatusByIndex(statuses, 1)
+	require.Equal(t, "trunk", port1["link_mode"])
+	require.Equal(t, "high", port1["link_mode_confidence"])
+	require.Equal(t, []string{"fdb", "stp"}, port1["link_mode_sources"])
+	require.Equal(t, []string{"10", "20"}, port1["vlan_ids"])
+	require.Equal(t, "unknown", port1["topology_role"])
+	require.Equal(t, "low", port1["topology_role_confidence"])
+	require.Equal(t, []string{"stp", "fdb"}, port1["topology_role_sources"])
+
+	port2 := findInterfaceStatusByIndex(statuses, 2)
+	require.Equal(t, "access", port2["link_mode"])
+	require.Equal(t, "medium", port2["link_mode_confidence"])
+	require.Equal(t, []string{"fdb"}, port2["link_mode_sources"])
+	require.Equal(t, []string{"30"}, port2["vlan_ids"])
+	require.Equal(t, "host_facing", port2["topology_role"])
+	require.Equal(t, "medium", port2["topology_role_confidence"])
+	require.Equal(t, []string{"fdb"}, port2["topology_role_sources"])
+
+	port3 := findInterfaceStatusByIndex(statuses, 3)
+	require.Equal(t, "unknown", port3["link_mode"])
+	require.Equal(t, "low", port3["link_mode_confidence"])
+	require.Equal(t, []string{"fdb", "peer_link"}, port3["link_mode_sources"])
+	require.Equal(t, []string{"40"}, port3["vlan_ids"])
+	require.Equal(t, "switch_facing", port3["topology_role"])
+	require.Equal(t, "high", port3["topology_role_confidence"])
+	require.Equal(t, []string{"peer_link", "bridge_link", "fdb"}, port3["topology_role_sources"])
+
+	port4 := findInterfaceStatusByIndex(statuses, 4)
+	require.Equal(t, "unknown", port4["link_mode"])
+	require.Equal(t, "low", port4["link_mode_confidence"])
+	require.Equal(t, []string{"fdb"}, port4["link_mode_sources"])
+	_, hasVLANs := port4["vlan_ids"]
+	require.False(t, hasVLANs)
+	require.Equal(t, "host_candidate", port4["topology_role"])
+	require.Equal(t, "low", port4["topology_role_confidence"])
+	require.Equal(t, []string{"fdb"}, port4["topology_role_sources"])
+}
+
+func TestToTopologyData_IgnoresIgnoredFDBStatusForLinkModeClassification(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:       "sw1",
+				Hostname: "sw1",
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "sw1", IfIndex: 10, IfName: "Gi0/10", IfDescr: "Gi0/10"},
+		},
+		Attachments: []Attachment{
+			{
+				DeviceID:   "sw1",
+				IfIndex:    10,
+				EndpointID: "mac:00:00:00:00:50:01",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"fdb_status": "ignored",
+					"vlan_id":    "50",
+				},
+			},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	actor := findActorBySysName(data.Actors, "sw1")
+	require.NotNil(t, actor)
+	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
+	require.True(t, ok)
+	port := findInterfaceStatusByIndex(statuses, 10)
+	require.Equal(t, "unknown", port["link_mode"])
+	require.Equal(t, "low", port["link_mode_confidence"])
+	_, hasSources := port["link_mode_sources"]
+	require.False(t, hasSources)
+	_, hasVLANs := port["vlan_ids"]
+	require.False(t, hasVLANs)
+	require.Equal(t, "unknown", port["topology_role"])
+	require.Equal(t, "low", port["topology_role_confidence"])
+	_, hasRoleSources := port["topology_role_sources"]
+	require.False(t, hasRoleSources)
+}
+
+func TestToTopologyData_ClassifiesSTPCorroboratedManagedAliasAsSwitchFacing(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "sw1",
+				Hostname:  "sw1",
+				ChassisID: "00:11:22:33:44:55",
+			},
+			{
+				ID:        "sw2",
+				Hostname:  "sw2",
+				ChassisID: "00:11:22:33:44:66",
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "sw1", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "stp",
+				SourceID:   "sw1",
+				SourcePort: "Gi0/1",
+				TargetID:   "stp-root",
+				Labels: map[string]string{
+					"vlan_id": "10",
+				},
+			},
+		},
+		Attachments: []Attachment{
+			{
+				DeviceID:   "sw1",
+				IfIndex:    1,
+				EndpointID: "mac:00:11:22:33:44:66",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"fdb_status": "learned",
+					"vlan_id":    "10",
+				},
+			},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	actor := findActorBySysName(data.Actors, "sw1")
+	require.NotNil(t, actor)
+
+	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
+	require.True(t, ok)
+	port1 := findInterfaceStatusByIndex(statuses, 1)
+	require.Equal(t, "switch_facing", port1["topology_role"])
+	require.Equal(t, "medium", port1["topology_role_confidence"])
+	require.Equal(t, []string{"stp", "fdb", "fdb_managed_alias"}, port1["topology_role_sources"])
 }
 
 func TestToTopologyData_DefaultDiscoveredCountWithoutLocalID(t *testing.T) {
@@ -577,6 +851,38 @@ func TestToTopologyData_KnownDeviceOverlapUsesInterfaceMACAlias(t *testing.T) {
 	require.Equal(t, 0, data.Stats["links_fdb_endpoint_suppressed"])
 }
 
+func TestToTopologyData_DeviceActorIncludesInterfaceMACAliases(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:01",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", MAC: "aa:aa:aa:aa:aa:11"},
+			{DeviceID: "switch-a", IfIndex: 2, IfName: "Gi0/2", MAC: "aa:aa:aa:aa:aa:12"},
+			{DeviceID: "switch-a", IfIndex: 3, IfName: "Gi0/3", MAC: "AA-AA-AA-AA-AA-12"},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	actor := findActorBySysName(data.Actors, "switch-a")
+	require.NotNil(t, actor)
+	require.ElementsMatch(
+		t,
+		[]string{"aa:aa:aa:aa:aa:01", "aa:aa:aa:aa:aa:11", "aa:aa:aa:aa:aa:12"},
+		actor.Match.MacAddresses,
+	)
+}
+
 func TestToTopologyData_KeepsUnlinkedEndpointsAndDevices(t *testing.T) {
 	result := Result{
 		Devices: []Device{
@@ -891,6 +1197,62 @@ func TestToTopologyData_FDBOwnerInferenceUsesSingleMACPortRule(t *testing.T) {
 	require.Equal(t, "single_port_mac", endpointActor.Labels["attached_by"])
 }
 
+func TestToTopologyData_FDBOwnerInferenceSuppressesManagedAliasSwitchFacingPorts(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "switch-b",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1"},
+			{DeviceID: "switch-a", IfIndex: 2, IfName: "Gi0/2"},
+			{DeviceID: "switch-b", IfIndex: 1, IfName: "Gi0/1"},
+		},
+		Attachments: []Attachment{
+			// Managed-device aliases learned on the same port mark it as switch-facing.
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb"},
+			{DeviceID: "switch-b", IfIndex: 1, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb"},
+
+			// Candidate endpoint appears behind the managed-link port and must be suppressed.
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:dd:dd:dd:dd:dd:dd", Method: "fdb"},
+			{DeviceID: "switch-b", IfIndex: 1, EndpointID: "mac:dd:dd:dd:dd:dd:dd", Method: "fdb"},
+
+			// Control endpoint on non-switch-facing port remains directly attachable.
+			{DeviceID: "switch-a", IfIndex: 2, EndpointID: "mac:ee:ee:ee:ee:ee:ee", Method: "fdb"},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	ddLinks := findFDBLinksByEndpointMAC(data.Links, "dd:dd:dd:dd:dd:dd")
+	require.Len(t, ddLinks, 0)
+	ddActor := findActorByMAC(data.Actors, "dd:dd:dd:dd:dd:dd")
+	require.NotNil(t, ddActor)
+	_, hasAttachmentSource := ddActor.Attributes["attachment_source"]
+	require.False(t, hasAttachmentSource)
+	_, hasAttachedDevice := ddActor.Attributes["attached_device"]
+	require.False(t, hasAttachedDevice)
+
+	eeLinks := findFDBLinksByEndpointMAC(data.Links, "ee:ee:ee:ee:ee:ee")
+	require.Len(t, eeLinks, 1)
+	eeSrc := findActorByMatch(data.Actors, eeLinks[0].Src.Match)
+	require.NotNil(t, eeSrc)
+	require.Equal(t, "device", eeSrc.ActorType)
+	require.Equal(t, "switch-a", eeSrc.Match.SysName)
+}
+
 func TestToTopologyData_SuppressesFDBEndpointsOnLLDPPorts(t *testing.T) {
 	result := Result{
 		Devices: []Device{
@@ -1116,6 +1478,16 @@ func TestToTopologyData_FDBOwnerInferenceUsesReporterMatrixRule(t *testing.T) {
 	require.NotNil(t, segmentActor)
 	require.Equal(t, []string{"switch-c"}, segmentActor.Attributes["parent_devices"])
 	require.Equal(t, []string{"Gi0/2"}, segmentActor.Attributes["if_names"])
+}
+
+func findInterfaceStatusByIndex(statuses []map[string]any, ifIndex int) map[string]any {
+	for _, status := range statuses {
+		value, ok := status["if_index"].(int)
+		if ok && value == ifIndex {
+			return status
+		}
+	}
+	return nil
 }
 
 func findFDBLinksByEndpointMAC(links []topology.Link, mac string) []topology.Link {
