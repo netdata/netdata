@@ -102,6 +102,39 @@ func (h *Handler[C]) Exposed() *ExposedCache[C] { return h.exposed }
 // SetAPI replaces the responder (e.g. to silence output in CLI mode).
 func (h *Handler[C]) SetAPI(api *Responder) { h.api = api }
 
+// RememberDiscoveredConfig ensures a discovered config is present in Seen cache.
+func (h *Handler[C]) RememberDiscoveredConfig(cfg C) {
+	if _, ok := h.seen.Lookup(cfg); ok {
+		return
+	}
+	h.seen.Add(cfg)
+}
+
+// AddDiscoveredConfig upserts a discovered config into Seen and Exposed caches.
+func (h *Handler[C]) AddDiscoveredConfig(cfg C, status Status) *Entry[C] {
+	h.RememberDiscoveredConfig(cfg)
+	entry := &Entry[C]{Cfg: cfg, Status: status}
+	h.exposed.Add(entry)
+	return entry
+}
+
+// RemoveDiscoveredConfig removes a discovered config from Seen and Exposed caches.
+// Returns the removed Exposed entry when the removed seen config was also exposed.
+func (h *Handler[C]) RemoveDiscoveredConfig(cfg C) (*Entry[C], bool) {
+	if _, ok := h.seen.Lookup(cfg); !ok {
+		return nil, false
+	}
+	h.seen.Remove(cfg)
+
+	entry, ok := h.exposed.LookupByKey(cfg.ExposedKey())
+	if !ok || entry.Cfg.UID() != cfg.UID() {
+		return nil, false
+	}
+
+	h.exposed.Remove(cfg)
+	return entry, true
+}
+
 // WaitForDecision blocks non-dyncfg config processing until a matching
 // enable/disable command is observed for the provided config.
 func (h *Handler[C]) WaitForDecision(cfg C) {

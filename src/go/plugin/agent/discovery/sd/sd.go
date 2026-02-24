@@ -201,12 +201,9 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 	d.Infof("removing %d config(s) from source '%s'", len(seenCfgs), conf.source)
 
 	for _, scfg := range seenCfgs {
-		// Remove from seen cache
-		d.seen.Remove(scfg)
-
-		// Check if this was the exposed config
-		entry, ok := d.exposed.LookupByKey(scfg.ExposedKey())
-		if !ok || entry.Cfg.UID() != scfg.UID() {
+		// Remove from seen/exposed caches if this config is currently tracked.
+		_, ok := d.handler.RemoveDiscoveredConfig(scfg)
+		if !ok {
 			// Not exposed or different config is exposed - skip dyncfg remove
 			continue
 		}
@@ -216,7 +213,6 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 			d.mgr.Stop(scfg.PipelineKey())
 		}
 
-		d.exposed.Remove(scfg)
 		d.handler.NotifyJobRemove(scfg)
 	}
 }
@@ -260,15 +256,15 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 		d.removeOldConfigsFromSource(scfg.Source(), scfg.ExposedKey())
 	}
 
-	// Always add to seen cache
-	d.seen.Add(scfg)
+	// Always remember discovered configs, even if they are not exposed.
+	d.handler.RememberDiscoveredConfig(scfg)
 
 	// Check if there's an existing exposed config with the same key
 	entry, exists := d.exposed.LookupByKey(scfg.ExposedKey())
 
 	if !exists {
 		// No existing config - expose this one
-		d.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: scfg, Status: dyncfg.StatusAccepted})
+		d.handler.AddDiscoveredConfig(scfg, dyncfg.StatusAccepted)
 
 		d.handler.NotifyJobCreate(scfg, dyncfg.StatusAccepted)
 		if terminal.IsTerminal() || d.fnReg == nil || d.dyncfgCh == nil {
@@ -301,7 +297,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	}
 
 	// Replace in exposed cache
-	d.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: scfg, Status: dyncfg.StatusAccepted})
+	d.handler.AddDiscoveredConfig(scfg, dyncfg.StatusAccepted)
 
 	// Update dyncfg (remove old, create new with new source)
 	d.handler.NotifyJobRemove(entry.Cfg)
@@ -335,12 +331,9 @@ func (d *ServiceDiscovery) removeOldConfigsFromSource(source, newKey string) {
 		}
 
 		// Different config from same source - remove from caches
-		d.seen.Remove(oldCfg)
-
-		// If it was exposed, remove from exposed cache and dyncfg
+		// If it was exposed, remove from exposed cache and dyncfg.
 		// But DON'T stop the pipeline - let the new config's enable handle that
-		if entry, ok := d.exposed.LookupByKey(oldCfg.ExposedKey()); ok && entry.Cfg.UID() == oldCfg.UID() {
-			d.exposed.Remove(oldCfg)
+		if _, ok := d.handler.RemoveDiscoveredConfig(oldCfg); ok {
 			d.handler.NotifyJobRemove(oldCfg)
 		}
 	}

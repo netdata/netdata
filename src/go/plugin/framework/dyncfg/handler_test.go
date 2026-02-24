@@ -203,6 +203,63 @@ func TestHandler_WaitForDecision_MismatchedCommandKeepsWait(t *testing.T) {
 	assert.False(t, h.WaitingForDecision())
 }
 
+func TestHandler_AddDiscoveredConfig_TracksSeenAndExposed(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{
+		uid:        "uid-job1",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "file=/tmp/job1.conf",
+	}
+
+	h.RememberDiscoveredConfig(cfg)
+	_, ok := h.seen.Lookup(cfg)
+	require.True(t, ok, "config should be remembered in seen cache")
+
+	entry := h.AddDiscoveredConfig(cfg, StatusAccepted)
+	require.NotNil(t, entry)
+	assert.Equal(t, StatusAccepted, entry.Status)
+	assert.Equal(t, cfg.UID(), entry.Cfg.UID())
+
+	exposed, ok := h.exposed.LookupByKey(cfg.ExposedKey())
+	require.True(t, ok, "config should be exposed")
+	assert.Equal(t, cfg.UID(), exposed.Cfg.UID())
+	assert.Equal(t, StatusAccepted, exposed.Status)
+}
+
+func TestHandler_RemoveDiscoveredConfig_MismatchedExposedUID(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{
+		uid:        "uid-stock",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "file=/tmp/job1.conf",
+	}
+	other := testConfig{
+		uid:        "uid-dyncfg",
+		key:        "job1",
+		sourceType: "dyncfg",
+		source:     "dyncfg=user",
+	}
+
+	h.seen.Add(cfg)
+	h.exposed.Add(&Entry[testConfig]{Cfg: other, Status: StatusRunning})
+
+	entry, ok := h.RemoveDiscoveredConfig(cfg)
+	require.False(t, ok, "mismatched exposed uid should not return an exposed entry")
+	require.Nil(t, entry)
+
+	_, stillSeen := h.seen.Lookup(cfg)
+	assert.False(t, stillSeen, "seen config should be removed")
+	exposed, stillExposed := h.exposed.LookupByKey(cfg.ExposedKey())
+	require.True(t, stillExposed, "exposed entry with different uid should be preserved")
+	assert.Equal(t, other.UID(), exposed.Cfg.UID())
+}
+
 // --- ExtractKey Failure Tests ---
 
 func TestCmdAdd_ExtractKeyFailure(t *testing.T) {

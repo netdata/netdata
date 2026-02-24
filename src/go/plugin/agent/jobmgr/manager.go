@@ -339,14 +339,11 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 
 	m.retryingTasks.remove(cfg)
 
-	if _, ok := m.seen.Lookup(cfg); !ok {
-		m.seen.Add(cfg)
-	}
+	m.handler.RememberDiscoveredConfig(cfg)
 
 	entry, ok := m.exposed.LookupByKey(cfg.ExposedKey())
 	if !ok {
-		entry = &dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusAccepted}
-		m.exposed.Add(entry)
+		entry = m.handler.AddDiscoveredConfig(cfg, dyncfg.StatusAccepted)
 	} else {
 		sp, ep := cfg.SourceTypePriority(), entry.Cfg.SourceTypePriority()
 		if ep > sp || (ep == sp && entry.Status == dyncfg.StatusRunning) {
@@ -356,8 +353,7 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 			m.stopRunningJob(entry.Cfg.FullName())
 			m.fileStatus.remove(entry.Cfg)
 		}
-		entry = &dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusAccepted}
-		m.exposed.Add(entry) // replace existing exposed
+		entry = m.handler.AddDiscoveredConfig(cfg, dyncfg.StatusAccepted) // replace existing exposed
 	}
 
 	m.handler.NotifyJobCreate(entry.Cfg, entry.Status)
@@ -372,17 +368,10 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 func (m *Manager) removeConfig(cfg confgroup.Config) {
 	m.retryingTasks.remove(cfg)
 
-	if _, ok := m.seen.Lookup(cfg); !ok {
+	entry, ok := m.handler.RemoveDiscoveredConfig(cfg)
+	if !ok {
 		return
 	}
-	m.seen.Remove(cfg)
-
-	entry, ok := m.exposed.LookupByKey(cfg.ExposedKey())
-	if !ok || cfg.UID() != entry.Cfg.UID() {
-		return
-	}
-
-	m.exposed.Remove(cfg)
 	m.stopRunningJob(cfg.FullName())
 	m.fileStatus.remove(cfg)
 
