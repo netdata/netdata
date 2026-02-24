@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package module
+package collectorapi
 
 func (c *Chart) CachedType() string {
 	return c.typ

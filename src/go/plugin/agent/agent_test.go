@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -53,12 +53,12 @@ func TestAgent_Run(t *testing.T) {
 	assert.True(t, buf.String() != "")
 }
 
-func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) module.Registry {
-	reg := module.Registry{}
+func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) collectorapi.Registry {
+	reg := collectorapi.Registry{}
 	for _, name := range names {
 		name := name
-		reg.Register(name, module.Creator{
-			Create: func() module.Module {
+		reg.Register(name, collectorapi.Creator{
+			Create: func() collectorapi.Module {
 				return prepareMockModule(name, mux, stats)
 			},
 		})
@@ -66,8 +66,8 @@ func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) mod
 	return reg
 }
 
-func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) module.Module {
-	return &module.MockModule{
+func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) collectorapi.Module {
+	return &collectorapi.MockModule{
 		InitFunc: func(context.Context) error {
 			mux.Lock()
 			defer mux.Unlock()
@@ -80,12 +80,12 @@ func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) modul
 			stats[name+"_check"]++
 			return nil
 		},
-		ChartsFunc: func() *module.Charts {
+		ChartsFunc: func() *collectorapi.Charts {
 			mux.Lock()
 			defer mux.Unlock()
 			stats[name+"_charts"]++
-			return &module.Charts{
-				&module.Chart{ID: "id", Title: "title", Units: "units", Dims: module.Dims{{ID: "id1"}}},
+			return &collectorapi.Charts{
+				&collectorapi.Chart{ID: "id", Title: "title", Units: "units", Dims: collectorapi.Dims{{ID: "id1"}}},
 			}
 		},
 		CollectFunc: func(context.Context) map[string]int64 {

@@ -14,7 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -243,7 +243,7 @@ func prepareNginxVTSEndpoint() *httptest.Server {
 		}))
 }
 
-func numOfCharts(charts ...module.Charts) (num int) {
+func numOfCharts(charts ...collectorapi.Charts) (num int) {
 	for _, v := range charts {
 		num += len(v)
 	}

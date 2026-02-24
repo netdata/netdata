@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"github.com/gohugoio/hashstructure"
 	"gopkg.in/yaml.v2"
@@ -101,15 +101,15 @@ func (c Config) Clone() (Config, error) {
 
 func (c Config) ApplyDefaults(def Default) {
 	if c.UpdateEvery() <= 0 {
-		v := firstPositive(def.UpdateEvery, module.UpdateEvery)
+		v := firstPositive(def.UpdateEvery, collectorapi.UpdateEvery)
 		c.Set("update_every", v)
 	}
 	if c.AutoDetectionRetry() <= 0 {
-		v := firstPositive(def.AutoDetectionRetry, module.AutoDetectionRetry)
+		v := firstPositive(def.AutoDetectionRetry, collectorapi.AutoDetectionRetry)
 		c.Set("autodetection_retry", v)
 	}
 	if c.Priority() <= 0 {
-		v := firstPositive(def.Priority, module.Priority)
+		v := firstPositive(def.Priority, collectorapi.Priority)
 		c.Set("priority", v)
 	}
 	if c.UpdateEvery() < def.MinUpdateEvery && def.MinUpdateEvery > 0 {

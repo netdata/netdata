@@ -13,7 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 
 	"github.com/jackc/pgx/v5/stdlib"
@@ -23,9 +23,9 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("postgres", module.Creator{
+	collectorapi.Register("postgres", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         pgMethods,
 		MethodHandler:   pgFunctionHandler,
@@ -105,10 +105,10 @@ func (c Config) topQueriesLimit() int {
 
 type (
 	Collector struct {
-		module.Base
+		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts                            *module.Charts
+		charts                            *collectorapi.Charts
 		addXactQueryRunningTimeChartsOnce *sync.Once
 		addWALFilesChartsOnce             *sync.Once
 
@@ -176,7 +176,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

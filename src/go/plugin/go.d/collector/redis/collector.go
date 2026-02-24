@@ -15,7 +15,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
@@ -29,9 +29,9 @@ func (noopLogger) Printf(context.Context, string, ...any) {}
 func init() {
 	redis.SetLogger(noopLogger{})
 
-	module.Register("redis", module.Creator{
+	collectorapi.Register("redis", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.Module { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         redisMethods,
 		MethodHandler:   redisFunctionHandler,
@@ -100,10 +100,10 @@ func (c Config) topQueriesLimit() int {
 
 type (
 	Collector struct {
-		module.Base
+		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts                 *module.Charts
+		charts                 *collectorapi.Charts
 		addAOFChartsOnce       *sync.Once
 		addReplSlaveChartsOnce *sync.Once
 
@@ -161,7 +161,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

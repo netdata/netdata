@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 // moduleFuncRegistry tracks module-level functions and their running jobs
@@ -20,7 +20,7 @@ type moduleFuncRegistry struct {
 }
 
 type moduleFunc struct {
-	creator        module.Creator         // The module creator (has Methods())
+	creator        collectorapi.Creator   // The module creator (has Methods())
 	methods        []funcapi.MethodConfig // Static methods from creator (ordered)
 	methodsByID    map[string]funcapi.MethodConfig
 	jobs           map[string]*jobEntry              // jobName → job entry with generation
@@ -30,7 +30,7 @@ type moduleFunc struct {
 
 // jobEntry wraps a job with a generation number for race detection
 type jobEntry struct {
-	job        module.RuntimeJob
+	job        collectorapi.RuntimeJob
 	generation uint64 // Incremented each time this job name is replaced
 }
 
@@ -41,7 +41,7 @@ func newModuleFuncRegistry() *moduleFuncRegistry {
 }
 
 // registerModule is called at startup for each module that implements FunctionProvider
-func (r *moduleFuncRegistry) registerModule(name string, creator module.Creator) {
+func (r *moduleFuncRegistry) registerModule(name string, creator collectorapi.Creator) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -77,7 +77,7 @@ func indexMethods(methods []funcapi.MethodConfig) map[string]funcapi.MethodConfi
 // addJob is called when jobs start.
 // NOTE: Job names MUST be unique per module. If a job with the same name
 // already exists, it is replaced (this handles config reload scenarios)
-func (r *moduleFuncRegistry) addJob(moduleName, jobName string, job module.RuntimeJob) {
+func (r *moduleFuncRegistry) addJob(moduleName, jobName string, job collectorapi.RuntimeJob) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -109,7 +109,7 @@ func (r *moduleFuncRegistry) removeJob(moduleName, jobName string) {
 }
 
 // getJobWithGeneration returns the job and its generation for race detection
-func (r *moduleFuncRegistry) getJobWithGeneration(moduleName, jobName string) (module.RuntimeJob, uint64) {
+func (r *moduleFuncRegistry) getJobWithGeneration(moduleName, jobName string) (collectorapi.RuntimeJob, uint64) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -198,7 +198,7 @@ func (r *moduleFuncRegistry) getJobNames(moduleName string) []string {
 }
 
 // getJob returns the job by name for routing requests
-func (r *moduleFuncRegistry) getJob(moduleName, jobName string) (module.RuntimeJob, bool) {
+func (r *moduleFuncRegistry) getJob(moduleName, jobName string) (collectorapi.RuntimeJob, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -214,13 +214,13 @@ func (r *moduleFuncRegistry) getJob(moduleName, jobName string) (module.RuntimeJ
 }
 
 // getCreator returns the module creator for a registered module
-func (r *moduleFuncRegistry) getCreator(moduleName string) (module.Creator, bool) {
+func (r *moduleFuncRegistry) getCreator(moduleName string) (collectorapi.Creator, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	mf, ok := r.modules[moduleName]
 	if !ok {
-		return module.Creator{}, false
+		return collectorapi.Creator{}, false
 	}
 	return mf.creator, true
 }

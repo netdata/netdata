@@ -21,11 +21,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/modruntime"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"gopkg.in/yaml.v2"
@@ -99,7 +99,7 @@ type Manager struct {
 
 	PluginName     string
 	Out            io.Writer
-	Modules        module.Registry
+	Modules        collectorapi.Registry
 	RunJob         []string
 	ConfigDefaults confgroup.Registry
 	VarLibDir      string
@@ -438,7 +438,7 @@ func (m *Manager) cleanup() {
 }
 
 // registerJobMethods registers methods for a specific job with Netdata
-func (m *Manager) registerJobMethods(job module.RuntimeJob, methods []funcapi.MethodConfig) {
+func (m *Manager) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) {
 	for _, method := range methods {
 		if method.ID == "" {
 			m.Warningf("skipping job method registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
@@ -480,7 +480,7 @@ func (m *Manager) registerJobMethods(job module.RuntimeJob, methods []funcapi.Me
 }
 
 // unregisterJobMethods unregisters methods for a specific job
-func (m *Manager) unregisterJobMethods(job module.RuntimeJob) {
+func (m *Manager) unregisterJobMethods(job collectorapi.RuntimeJob) {
 	methods := m.moduleFuncs.getJobMethods(job.ModuleName(), job.Name())
 	if len(methods) == 0 {
 		return
@@ -559,7 +559,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 			}
 		}
 
-		jobCfg := modruntime.JobV2Config{
+		jobCfg := jobruntime.JobV2Config{
 			PluginName:      m.PluginName,
 			Name:            cfg.Name(),
 			ModuleName:      cfg.Module(),
@@ -576,7 +576,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		if vnode != nil {
 			jobCfg.Vnode = *vnode.Copy()
 		}
-		return modruntime.NewJobV2(jobCfg), nil
+		return jobruntime.NewJobV2(jobCfg), nil
 	}
 
 	if creator.Create == nil {
@@ -595,7 +595,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		}
 	}
 
-	jobCfg := modruntime.JobConfig{
+	jobCfg := jobruntime.JobConfig{
 		PluginName:      m.PluginName,
 		Name:            cfg.Name(),
 		ModuleName:      cfg.Module(),
@@ -616,7 +616,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		jobCfg.Vnode = *vnode.Copy()
 	}
 
-	job := modruntime.NewJob(jobCfg)
+	job := jobruntime.NewJob(jobCfg)
 
 	return job, nil
 }
@@ -655,7 +655,7 @@ func isDyncfg(cfg confgroup.Config) bool {
 	return cfg.SourceType() == confgroup.TypeDyncfg
 }
 
-func newConfigModule(creator module.Creator) (configModule, error) {
+func newConfigModule(creator collectorapi.Creator) (configModule, error) {
 	if creator.CreateV2 != nil {
 		mod := creator.CreateV2()
 		if mod == nil {

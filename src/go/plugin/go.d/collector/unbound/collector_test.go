@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
 )
@@ -275,7 +275,7 @@ func testCharts(t *testing.T, collr *Collector, mx map[string]int64) {
 	t.Helper()
 	ensureChartsCreatedForEveryThread(t, collr)
 	ensureExtendedChartsCreated(t, collr)
-	collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(_ *module.Chart, dim *module.Dim) bool {
+	collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(_ *collectorapi.Chart, dim *collectorapi.Dim) bool {
 		return dim.ID == "mem.mod.ipsecmod"
 	})
 }

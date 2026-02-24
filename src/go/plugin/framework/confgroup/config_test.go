@@ -5,7 +5,7 @@ package confgroup
 import (
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -246,9 +246,9 @@ func TestConfig_Apply(t *testing.T) {
 			expectedCfg: Config{
 				"name":                "name",
 				"module":              "module",
-				"update_every":        module.UpdateEvery,
-				"autodetection_retry": module.AutoDetectionRetry,
-				"priority":            module.Priority,
+				"update_every":        collectorapi.UpdateEvery,
+				"autodetection_retry": collectorapi.AutoDetectionRetry,
+				"priority":            collectorapi.Priority,
 			},
 		},
 		"adjust update_every (update_every < min update every)": {
@@ -264,8 +264,8 @@ func TestConfig_Apply(t *testing.T) {
 				"name":                "name",
 				"module":              "module",
 				"update_every":        jobDef + 10,
-				"autodetection_retry": module.AutoDetectionRetry,
-				"priority":            module.Priority,
+				"autodetection_retry": collectorapi.AutoDetectionRetry,
+				"priority":            collectorapi.Priority,
 			},
 		},
 		"do not adjust update_every (update_every > min update every)": {
@@ -281,8 +281,8 @@ func TestConfig_Apply(t *testing.T) {
 				"name":                "name",
 				"module":              "module",
 				"update_every":        jobDef,
-				"autodetection_retry": module.AutoDetectionRetry,
-				"priority":            module.Priority,
+				"autodetection_retry": collectorapi.AutoDetectionRetry,
+				"priority":            collectorapi.Priority,
 			},
 		},
 		"set name to module name if name not set": {
@@ -293,9 +293,9 @@ func TestConfig_Apply(t *testing.T) {
 			expectedCfg: Config{
 				"name":                "module",
 				"module":              "module",
-				"update_every":        module.UpdateEvery,
-				"autodetection_retry": module.AutoDetectionRetry,
-				"priority":            module.Priority,
+				"update_every":        collectorapi.UpdateEvery,
+				"autodetection_retry": collectorapi.AutoDetectionRetry,
+				"priority":            collectorapi.Priority,
 			},
 		},
 		"clean name": {
@@ -307,9 +307,9 @@ func TestConfig_Apply(t *testing.T) {
 			expectedCfg: Config{
 				"name":                "na_me",
 				"module":              "module",
-				"update_every":        module.UpdateEvery,
-				"autodetection_retry": module.AutoDetectionRetry,
-				"priority":            module.Priority,
+				"update_every":        collectorapi.UpdateEvery,
+				"autodetection_retry": collectorapi.AutoDetectionRetry,
+				"priority":            collectorapi.Priority,
 			},
 		},
 	}

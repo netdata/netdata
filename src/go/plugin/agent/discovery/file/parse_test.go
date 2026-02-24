@@ -5,8 +5,8 @@ package file
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -209,9 +209,9 @@ func TestParse(t *testing.T) {
 						{
 							"name":                "name",
 							"module":              "module",
-							"autodetection_retry": module.AutoDetectionRetry,
-							"priority":            module.Priority,
-							"update_every":        module.UpdateEvery,
+							"autodetection_retry": collectorapi.AutoDetectionRetry,
+							"priority":            collectorapi.Priority,
+							"update_every":        collectorapi.UpdateEvery,
 						},
 					},
 				}
@@ -319,9 +319,9 @@ func TestParse(t *testing.T) {
 						{
 							"name":                "name",
 							"module":              "sd_module",
-							"update_every":        module.UpdateEvery,
-							"autodetection_retry": module.AutoDetectionRetry,
-							"priority":            module.Priority,
+							"update_every":        collectorapi.UpdateEvery,
+							"autodetection_retry": collectorapi.AutoDetectionRetry,
+							"priority":            collectorapi.Priority,
 						},
 					},
 				}

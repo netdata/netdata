@@ -12,9 +12,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext"
 	"gopkg.in/yaml.v2"
@@ -47,11 +47,11 @@ func (a *Agent) loadPluginConfig() config {
 	return cfg
 }
 
-func (a *Agent) loadEnabledModules(cfg config) module.Registry {
+func (a *Agent) loadEnabledModules(cfg config) collectorapi.Registry {
 	a.Info("loading modules")
 
 	all := a.RunModule == "all" || a.RunModule == ""
-	enabled := module.Registry{}
+	enabled := collectorapi.Registry{}
 
 	for name, creator := range a.ModuleRegistry {
 		if !all && a.RunModule != name {
@@ -76,7 +76,7 @@ func (a *Agent) loadEnabledModules(cfg config) module.Registry {
 	return enabled
 }
 
-func (a *Agent) buildDiscoveryConf(enabled module.Registry, fnReg functions.Registry) discovery.Config {
+func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg functions.Registry) discovery.Config {
 	a.Info("building discovery config")
 
 	reg := confgroup.Registry{}

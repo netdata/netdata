@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 // funcRouter routes method calls to appropriate function handlers.
@@ -59,7 +59,7 @@ func rethinkdbMethods() []funcapi.MethodConfig {
 	}
 }
 
-func rethinkdbFunctionHandler(job module.RuntimeJob) funcapi.MethodHandler {
+func rethinkdbFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 	c, ok := job.Collector().(*Collector)
 	if !ok {
 		return nil

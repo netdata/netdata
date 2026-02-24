@@ -14,7 +14,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -578,7 +578,7 @@ func TestCollector_Collect(t *testing.T) {
 							len(baseCharts),
 						len(*collr.Charts()),
 					)
-					collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, dim *module.Dim) bool {
+					collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *collectorapi.Chart, dim *collectorapi.Dim) bool {
 						return strings.Contains(chart.ID, cjSuspended.Name) && strings.HasSuffix(chart.ID, "last_completion_duration")
 					})
 				}
@@ -1184,7 +1184,7 @@ func (d *brokenInfoDiscovery) ServerVersion() (*version.Info, error) {
 	return nil, errors.New("brokenInfoDiscovery.ServerVersion() error")
 }
 
-func calcObsoleteCharts(charts module.Charts) (num int) {
+func calcObsoleteCharts(charts collectorapi.Charts) (num int) {
 	for _, c := range charts {
 		if c.Obsolete {
 			num++
@@ -1217,7 +1217,7 @@ func copyAge(dst, src map[string]int64) {
 	copyIfSuffix(dst, src, "_age")
 }
 
-func isLabelValueSet(c *module.Chart, name string) bool {
+func isLabelValueSet(c *collectorapi.Chart, name string) bool {
 	for _, l := range c.Labels {
 		if l.Key == name {
 			return l.Value != ""

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
@@ -182,17 +182,17 @@ func calcKeyspaceHitRate(ms map[string]int64) float64 {
 }
 
 func (c *Collector) addCmdToCommandsCharts(cmd string) {
-	c.addDimToChart(chartCommandsCalls.ID, &module.Dim{
+	c.addDimToChart(chartCommandsCalls.ID, &collectorapi.Dim{
 		ID:   "cmd_" + cmd + "_calls",
 		Name: strings.ToUpper(cmd),
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	})
-	c.addDimToChart(chartCommandsUsec.ID, &module.Dim{
+	c.addDimToChart(chartCommandsUsec.ID, &collectorapi.Dim{
 		ID:   "cmd_" + cmd + "_usec",
 		Name: strings.ToUpper(cmd),
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	})
-	c.addDimToChart(chartCommandsUsecPerSec.ID, &module.Dim{
+	c.addDimToChart(chartCommandsUsecPerSec.ID, &collectorapi.Dim{
 		ID:   "cmd_" + cmd + "_usec_per_call",
 		Name: strings.ToUpper(cmd),
 		Div:  precision,
@@ -200,17 +200,17 @@ func (c *Collector) addCmdToCommandsCharts(cmd string) {
 }
 
 func (c *Collector) addDbToKeyspaceCharts(db string) {
-	c.addDimToChart(chartKeys.ID, &module.Dim{
+	c.addDimToChart(chartKeys.ID, &collectorapi.Dim{
 		ID:   db + "_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartExpiresKeys.ID, &module.Dim{
+	c.addDimToChart(chartExpiresKeys.ID, &collectorapi.Dim{
 		ID:   db + "_expires_keys",
 		Name: db,
 	})
 }
 
-func (c *Collector) addDimToChart(chartID string, dim *module.Dim) {
+func (c *Collector) addDimToChart(chartID string, dim *collectorapi.Dim) {
 	chart := c.Charts().Get(chartID)
 	if chart == nil {
 		c.Warningf("error on adding '%s' dimension: can not find '%s' chart", dim.ID, chartID)

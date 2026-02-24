@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
@@ -89,7 +89,7 @@ func (c *Collector) addReplSetMemberCharts(v documentReplSetMember) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, v.Name)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "repl_set_member", Value: v.Name},
 		}
 		for _, dim := range chart.Dims {

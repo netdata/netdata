@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/modruntime"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,7 +38,7 @@ func TestModuleFuncRegistry_RegisterModule(t *testing.T) {
 			r := newModuleFuncRegistry()
 
 			for _, m := range tc.modules {
-				r.registerModule(m, module.Creator{
+				r.registerModule(m, collectorapi.Creator{
 					Methods: func() []funcapi.MethodConfig {
 						return []funcapi.MethodConfig{{ID: "test"}}
 					},
@@ -55,7 +55,7 @@ func TestModuleFuncRegistry_RegisterModule(t *testing.T) {
 
 func TestModuleFuncRegistry_AddRemoveJob(t *testing.T) {
 	r := newModuleFuncRegistry()
-	r.registerModule("postgres", module.Creator{})
+	r.registerModule("postgres", collectorapi.Creator{})
 
 	// Create test jobs
 	job1 := newTestModuleFuncsJob("job1")
@@ -85,7 +85,7 @@ func TestModuleFuncRegistry_AddRemoveJob(t *testing.T) {
 
 func TestModuleFuncRegistry_JobReplacement(t *testing.T) {
 	r := newModuleFuncRegistry()
-	r.registerModule("postgres", module.Creator{})
+	r.registerModule("postgres", collectorapi.Creator{})
 
 	job1 := newTestModuleFuncsJob("master")
 	job2 := newTestModuleFuncsJob("master") // Same name, different instance
@@ -104,7 +104,7 @@ func TestModuleFuncRegistry_JobReplacement(t *testing.T) {
 
 func TestModuleFuncRegistry_GenerationVerification(t *testing.T) {
 	r := newModuleFuncRegistry()
-	r.registerModule("postgres", module.Creator{})
+	r.registerModule("postgres", collectorapi.Creator{})
 
 	job := newTestModuleFuncsJob("master")
 
@@ -130,7 +130,7 @@ func TestModuleFuncRegistry_GetMethods(t *testing.T) {
 		{ID: "top-queries", Name: "Top Queries"},
 	}
 
-	r.registerModule("postgres", module.Creator{
+	r.registerModule("postgres", collectorapi.Creator{
 		Methods: func() []funcapi.MethodConfig {
 			return expectedMethods
 		},
@@ -145,7 +145,7 @@ func TestModuleFuncRegistry_GetMethods(t *testing.T) {
 
 func TestModuleFuncRegistry_GetJobNames_Sorted(t *testing.T) {
 	r := newModuleFuncRegistry()
-	r.registerModule("postgres", module.Creator{})
+	r.registerModule("postgres", collectorapi.Creator{})
 
 	// Add jobs in random order
 	r.addJob("postgres", "zebra-db", newTestModuleFuncsJob("zebra"))
@@ -176,7 +176,7 @@ func TestModuleFuncRegistry_UnregisteredModule(t *testing.T) {
 func TestModuleFuncRegistry_GetCreator(t *testing.T) {
 	r := newModuleFuncRegistry()
 
-	creator := module.Creator{
+	creator := collectorapi.Creator{
 		JobConfigSchema: "test-schema",
 	}
 	r.registerModule("postgres", creator)
@@ -191,13 +191,13 @@ func TestModuleFuncRegistry_GetCreator(t *testing.T) {
 }
 
 // newTestModuleFuncsJob creates a minimal job for testing modulefuncs
-func newTestModuleFuncsJob(name string) *modruntime.Job {
-	return modruntime.NewJob(modruntime.JobConfig{
+func newTestModuleFuncsJob(name string) *jobruntime.Job {
+	return jobruntime.NewJob(jobruntime.JobConfig{
 		PluginName:      "test",
 		Name:            name,
 		ModuleName:      "test",
 		FullName:        "test_" + name,
-		Module:          &module.MockModule{},
+		Module:          &collectorapi.MockModule{},
 		Out:             io.Discard,
 		UpdateEvery:     1,
 		AutoDetectEvery: 0,
@@ -208,7 +208,7 @@ func newTestModuleFuncsJob(name string) *modruntime.Job {
 // TestModuleFuncRegistry_Concurrency tests thread safety
 func TestModuleFuncRegistry_Concurrency(t *testing.T) {
 	r := newModuleFuncRegistry()
-	r.registerModule("postgres", module.Creator{
+	r.registerModule("postgres", collectorapi.Creator{
 		Methods: func() []funcapi.MethodConfig {
 			return []funcapi.MethodConfig{{ID: "test"}}
 		},
@@ -243,17 +243,17 @@ func TestModuleFuncRegistry_Concurrency(t *testing.T) {
 // TestModuleFuncRegistry_VerifyJobGeneration_JobStopped tests race detection when job stops
 func TestModuleFuncRegistry_VerifyJobGeneration_JobStopped(t *testing.T) {
 	r := newModuleFuncRegistry()
-	r.registerModule("postgres", module.Creator{})
+	r.registerModule("postgres", collectorapi.Creator{})
 
-	job := modruntime.NewJob(modruntime.JobConfig{
+	job := jobruntime.NewJob(jobruntime.JobConfig{
 		PluginName: "test",
 		Name:       "master",
 		ModuleName: "postgres",
 		FullName:   "postgres_master",
-		Module: &module.MockModule{
+		Module: &collectorapi.MockModule{
 			InitFunc:    func(context.Context) error { return nil },
 			CheckFunc:   func(context.Context) error { return nil },
-			ChartsFunc:  func() *module.Charts { return &module.Charts{} },
+			ChartsFunc:  func() *collectorapi.Charts { return &collectorapi.Charts{} },
 			CollectFunc: func(context.Context) map[string]int64 { return nil },
 		},
 		Out:             io.Discard,

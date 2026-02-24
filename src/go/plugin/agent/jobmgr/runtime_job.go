@@ -5,7 +5,7 @@ package jobmgr
 import (
 	"context"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -36,7 +36,7 @@ type runtimeJob interface {
 // configModule is the shared Init/Check/config contract for dyncfg config test/get
 // flows. Both legacy Module and ModuleV2 satisfy it.
 type configModule interface {
-	GetBase() *module.Base
+	GetBase() *collectorapi.Base
 	Init(ctx context.Context) error
 	Check(ctx context.Context) error
 	Cleanup(ctx context.Context)

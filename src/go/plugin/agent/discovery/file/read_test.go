@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -68,9 +68,9 @@ func TestReader_Run(t *testing.T) {
 							{
 								"name":                "name",
 								"module":              "module1",
-								"update_every":        module.UpdateEvery,
-								"autodetection_retry": module.AutoDetectionRetry,
-								"priority":            module.Priority,
+								"update_every":        collectorapi.UpdateEvery,
+								"autodetection_retry": collectorapi.AutoDetectionRetry,
+								"priority":            collectorapi.Priority,
 								"__provider__":        "file reader",
 								"__source_type__":     confgroup.TypeStock,
 								"__source__":          fmt.Sprintf("discoverer=file_reader,file=%s", module1),
@@ -83,9 +83,9 @@ func TestReader_Run(t *testing.T) {
 							{
 								"name":                "name",
 								"module":              "module2",
-								"update_every":        module.UpdateEvery,
-								"autodetection_retry": module.AutoDetectionRetry,
-								"priority":            module.Priority,
+								"update_every":        collectorapi.UpdateEvery,
+								"autodetection_retry": collectorapi.AutoDetectionRetry,
+								"priority":            collectorapi.Priority,
 								"__provider__":        "file reader",
 								"__source_type__":     confgroup.TypeStock,
 								"__source__":          fmt.Sprintf("discoverer=file_reader,file=%s", module2),

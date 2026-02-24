@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package module
+package collectorapi
 
 // RuntimeJob is the runtime-facing job contract used by function hooks.
 // It is implemented by both legacy Job and JobV2.

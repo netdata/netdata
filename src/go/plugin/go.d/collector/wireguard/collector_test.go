@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -500,7 +500,7 @@ func copyLatestHandshake(dst, src map[string]int64) {
 	}
 }
 
-func calcObsoleteCharts(charts *module.Charts) int {
+func calcObsoleteCharts(charts *collectorapi.Charts) int {
 	var num int
 	for _, c := range *charts {
 		if c.Obsolete {

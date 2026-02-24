@@ -13,9 +13,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -129,19 +129,19 @@ func (s *runSim) run(t *testing.T) {
 	}
 }
 
-func prepareMockRegistry() module.Registry {
-	reg := module.Registry{}
+func prepareMockRegistry() collectorapi.Registry {
+	reg := collectorapi.Registry{}
 	type config struct {
 		OptionOne string `yaml:"option_one" json:"option_one"`
 		OptionTwo int64  `yaml:"option_two" json:"option_two"`
 	}
 
-	reg.Register("success", module.Creator{
-		JobConfigSchema: module.MockConfigSchema,
-		Create: func() module.Module {
-			return &module.MockModule{
-				ChartsFunc: func() *module.Charts {
-					return &module.Charts{&module.Chart{ID: "id", Title: "title", Units: "units", Dims: module.Dims{{ID: "id1"}}}}
+	reg.Register("success", collectorapi.Creator{
+		JobConfigSchema: collectorapi.MockConfigSchema,
+		Create: func() collectorapi.Module {
+			return &collectorapi.MockModule{
+				ChartsFunc: func() *collectorapi.Charts {
+					return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "title", Units: "units", Dims: collectorapi.Dims{{ID: "id1"}}}}
 				},
 				CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"id1": 1} },
 			}
@@ -150,20 +150,20 @@ func prepareMockRegistry() module.Registry {
 			return &config{OptionOne: "one", OptionTwo: 2}
 		},
 	})
-	reg.Register("fail", module.Creator{
-		Create: func() module.Module {
-			return &module.MockModule{
+	reg.Register("fail", collectorapi.Creator{
+		Create: func() collectorapi.Module {
+			return &collectorapi.MockModule{
 				InitFunc: func(context.Context) error { return errors.New("mock failed init") },
 			}
 		},
 	})
 
 	// Module without Methods - for testing function_only config rejection
-	reg.Register("nofuncs", module.Creator{
-		Create: func() module.Module {
-			return &module.MockModule{
-				ChartsFunc: func() *module.Charts {
-					return &module.Charts{&module.Chart{ID: "id", Title: "title", Units: "units", Dims: module.Dims{{ID: "id1"}}}}
+	reg.Register("nofuncs", collectorapi.Creator{
+		Create: func() collectorapi.Module {
+			return &collectorapi.MockModule{
+				ChartsFunc: func() *collectorapi.Charts {
+					return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "title", Units: "units", Dims: collectorapi.Dims{{ID: "id1"}}}}
 				},
 				CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"id1": 1} },
 			}
@@ -171,11 +171,11 @@ func prepareMockRegistry() module.Registry {
 	})
 
 	// Module with Methods - for testing config-level function_only
-	reg.Register("withfuncs", module.Creator{
-		Create: func() module.Module {
-			return &module.MockModule{
-				ChartsFunc: func() *module.Charts {
-					return &module.Charts{&module.Chart{ID: "id", Title: "title", Units: "units", Dims: module.Dims{{ID: "id1"}}}}
+	reg.Register("withfuncs", collectorapi.Creator{
+		Create: func() collectorapi.Module {
+			return &collectorapi.MockModule{
+				ChartsFunc: func() *collectorapi.Charts {
+					return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "title", Units: "units", Dims: collectorapi.Dims{{ID: "id1"}}}}
 				},
 				CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"id1": 1} },
 			}
@@ -186,11 +186,11 @@ func prepareMockRegistry() module.Registry {
 	})
 
 	// FunctionOnly module - for testing module-level function-only
-	reg.Register("funconly", module.Creator{
+	reg.Register("funconly", collectorapi.Creator{
 		FunctionOnly: true,
-		Create: func() module.Module {
-			return &module.MockModule{
-				ChartsFunc:  func() *module.Charts { return nil },
+		Create: func() collectorapi.Module {
+			return &collectorapi.MockModule{
+				ChartsFunc:  func() *collectorapi.Charts { return nil },
 				CollectFunc: func(context.Context) map[string]int64 { return nil },
 			}
 		},

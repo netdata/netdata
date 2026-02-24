@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package modruntime
+package jobruntime
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	frameworkmodule "github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/assert"
 )
@@ -75,13 +75,13 @@ func TestJob_AutoDetectionEvery(t *testing.T) {
 
 func TestJob_RetryAutoDetection(t *testing.T) {
 	job := newTestJob()
-	m := &frameworkmodule.MockModule{
+	m := &collectorapi.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
 		CheckFunc: func(context.Context) error { return errors.New("check error") },
-		ChartsFunc: func() *frameworkmodule.Charts {
-			return &frameworkmodule.Charts{}
+		ChartsFunc: func() *collectorapi.Charts {
+			return &collectorapi.Charts{}
 		},
 	}
 	job.module = m
@@ -106,7 +106,7 @@ func TestJob_RetryAutoDetection(t *testing.T) {
 func TestJob_AutoDetection(t *testing.T) {
 	job := newTestJob()
 	var v int
-	m := &frameworkmodule.MockModule{
+	m := &collectorapi.MockModule{
 		InitFunc: func(context.Context) error {
 			v++
 			return nil
@@ -115,9 +115,9 @@ func TestJob_AutoDetection(t *testing.T) {
 			v++
 			return nil
 		},
-		ChartsFunc: func() *frameworkmodule.Charts {
+		ChartsFunc: func() *collectorapi.Charts {
 			v++
-			return &frameworkmodule.Charts{}
+			return &collectorapi.Charts{}
 		},
 	}
 	job.module = m
@@ -128,7 +128,7 @@ func TestJob_AutoDetection(t *testing.T) {
 
 func TestJob_AutoDetection_FailInit(t *testing.T) {
 	job := newTestJob()
-	m := &frameworkmodule.MockModule{
+	m := &collectorapi.MockModule{
 		InitFunc: func(context.Context) error {
 			return errors.New("init error")
 		},
@@ -141,7 +141,7 @@ func TestJob_AutoDetection_FailInit(t *testing.T) {
 
 func TestJob_AutoDetection_FailCheck(t *testing.T) {
 	job := newTestJob()
-	m := &frameworkmodule.MockModule{
+	m := &collectorapi.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
@@ -157,14 +157,14 @@ func TestJob_AutoDetection_FailCheck(t *testing.T) {
 
 func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 	job := newTestJob()
-	m := &frameworkmodule.MockModule{
+	m := &collectorapi.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
 		CheckFunc: func(context.Context) error {
 			return nil
 		},
-		ChartsFunc: func() *frameworkmodule.Charts {
+		ChartsFunc: func() *collectorapi.Charts {
 			return nil
 		},
 	}
@@ -176,7 +176,7 @@ func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 
 func TestJob_AutoDetection_PanicInit(t *testing.T) {
 	job := newTestJob()
-	m := &frameworkmodule.MockModule{
+	m := &collectorapi.MockModule{
 		InitFunc: func(context.Context) error {
 			panic("panic in Init")
 		},
@@ -189,7 +189,7 @@ func TestJob_AutoDetection_PanicInit(t *testing.T) {
 
 func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 	job := newTestJob()
-	m := &frameworkmodule.MockModule{
+	m := &collectorapi.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
@@ -205,14 +205,14 @@ func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 
 func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 	job := newTestJob()
-	m := &frameworkmodule.MockModule{
+	m := &collectorapi.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
 		CheckFunc: func(context.Context) error {
 			return nil
 		},
-		ChartsFunc: func() *frameworkmodule.Charts {
+		ChartsFunc: func() *collectorapi.Charts {
 			panic("panic in PostCheck")
 		},
 	}
@@ -223,14 +223,14 @@ func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 }
 
 func TestJob_Start(t *testing.T) {
-	m := &frameworkmodule.MockModule{
-		ChartsFunc: func() *frameworkmodule.Charts {
-			return &frameworkmodule.Charts{
-				&frameworkmodule.Chart{
+	m := &collectorapi.MockModule{
+		ChartsFunc: func() *collectorapi.Charts {
+			return &collectorapi.Charts{
+				&collectorapi.Chart{
 					ID:    "id",
 					Title: "title",
 					Units: "units",
-					Dims: frameworkmodule.Dims{
+					Dims: collectorapi.Dims{
 						{ID: "id1"},
 						{ID: "id2"},
 					},
@@ -279,7 +279,7 @@ func TestJob_StopBeforeStartDoesNotBlock(t *testing.T) {
 }
 
 func TestJob_MainLoop_Panic(t *testing.T) {
-	m := &frameworkmodule.MockModule{
+	m := &collectorapi.MockModule{
 		CollectFunc: func(context.Context) map[string]int64 {
 			panic("panic in Collect")
 		},
@@ -321,8 +321,8 @@ func TestJob_UpdateVnode_NilIgnored(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			job := newTestJob()
-			job.module = &frameworkmodule.MockModule{}
-			job.charts = &frameworkmodule.Charts{}
+			job.module = &collectorapi.MockModule{}
+			job.charts = &collectorapi.Charts{}
 
 			job.UpdateVnode(tc.update)
 
@@ -367,14 +367,14 @@ func TestJob_IsFunctionOnly(t *testing.T) {
 
 func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 	job := newTestFunctionOnlyJob()
-	m := &frameworkmodule.MockModule{
+	m := &collectorapi.MockModule{
 		InitFunc: func(context.Context) error {
 			return nil
 		},
 		CheckFunc: func(context.Context) error {
 			return nil
 		},
-		ChartsFunc: func() *frameworkmodule.Charts {
+		ChartsFunc: func() *collectorapi.Charts {
 			return nil
 		},
 	}
@@ -385,8 +385,8 @@ func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 
 func TestJob_Start_FunctionOnly(t *testing.T) {
 	collectCalled := false
-	m := &frameworkmodule.MockModule{
-		ChartsFunc: func() *frameworkmodule.Charts {
+	m := &collectorapi.MockModule{
+		ChartsFunc: func() *collectorapi.Charts {
 			return nil
 		},
 		CollectFunc: func(context.Context) map[string]int64 {

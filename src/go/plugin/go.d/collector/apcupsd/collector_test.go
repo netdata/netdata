@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -222,7 +222,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			if len(test.wantCollected) > 0 {
 				if strings.Contains(name, "commlost") {
-					collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
+					collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *collectorapi.Chart, _ *collectorapi.Dim) bool {
 						return chart.ID != statusChart.ID
 					})
 				} else {

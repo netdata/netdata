@@ -5,15 +5,15 @@ package collecttest
 import (
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMetricsHasAllChartsDims(t *testing.T, charts *module.Charts, mx map[string]int64) {
+func TestMetricsHasAllChartsDims(t *testing.T, charts *collectorapi.Charts, mx map[string]int64) {
 	TestMetricsHasAllChartsDimsSkip(t, charts, mx, nil)
 }
 
-func TestMetricsHasAllChartsDimsSkip(t *testing.T, charts *module.Charts, mx map[string]int64, skip func(chart *module.Chart, dim *module.Dim) bool) {
+func TestMetricsHasAllChartsDimsSkip(t *testing.T, charts *collectorapi.Charts, mx map[string]int64, skip func(chart *collectorapi.Chart, dim *collectorapi.Dim) bool) {
 	for _, chart := range *charts {
 		if chart.Obsolete {
 			continue

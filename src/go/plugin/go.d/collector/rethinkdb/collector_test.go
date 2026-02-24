@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -156,12 +156,12 @@ func TestCollector_Collect(t *testing.T) {
 		prepare     func() *Collector
 		wantMetrics map[string]int64
 		wantCharts  int
-		skipChart   func(chart *module.Chart, dim *module.Dim) bool
+		skipChart   func(chart *collectorapi.Chart, dim *collectorapi.Dim) bool
 	}{
 		"success on valid response": {
 			prepare:    prepareCaseOk,
 			wantCharts: len(clusterCharts) + len(serverChartsTmpl)*3,
-			skipChart: func(chart *module.Chart, dim *module.Dim) bool {
+			skipChart: func(chart *collectorapi.Chart, dim *collectorapi.Dim) bool {
 				return strings.HasPrefix(chart.ID, "server_0f74c641-af5f-48d6-a005-35b8983c576a") &&
 					!strings.Contains(chart.ID, "stats_request_status")
 			},

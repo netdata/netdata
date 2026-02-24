@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type funcTable struct {
@@ -26,7 +26,7 @@ var _ funcapi.MethodHandler = (*funcTable)(nil)
 // sqlJobMethods returns method configs for a specific SQL job.
 // Each configured function becomes a separate method: "jobName:functionID"
 // This results in functions like "sql:postgres_test:active-queries"
-func sqlJobMethods(job module.RuntimeJob) []funcapi.MethodConfig {
+func sqlJobMethods(job collectorapi.RuntimeJob) []funcapi.MethodConfig {
 	c, ok := job.Collector().(*Collector)
 	if !ok || len(c.Config.Functions) == 0 {
 		return nil
@@ -56,7 +56,7 @@ func sqlJobMethods(job module.RuntimeJob) []funcapi.MethodConfig {
 	return methods
 }
 
-func sqlMethodHandler(job module.RuntimeJob) funcapi.MethodHandler {
+func sqlMethodHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 	c, ok := job.Collector().(*Collector)
 	if !ok {
 		return nil

@@ -12,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
@@ -22,12 +22,12 @@ var configSchema string
 var pingChartTemplateV2 string
 
 func init() {
-	module.Register("ping", module.Creator{
+	collectorapi.Register("ping", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			UpdateEvery: 5,
 		},
-		CreateV2: func() module.ModuleV2 { return New() },
+		CreateV2: func() collectorapi.ModuleV2 { return New() },
 		Config:   func() any { return &Config{} },
 	})
 }
@@ -64,7 +64,7 @@ type Config struct {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
 	prober    Prober

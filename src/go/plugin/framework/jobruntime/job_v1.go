@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package modruntime
+package jobruntime
 
 import (
 	"bytes"
@@ -16,20 +16,20 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	frameworkmodule "github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
-func newCollectStatusChart(pluginName string) *frameworkmodule.Chart {
-	chart := &frameworkmodule.Chart{
+func newCollectStatusChart(pluginName string) *collectorapi.Chart {
+	chart := &collectorapi.Chart{
 		Title:    "Data Collection Status",
 		Units:    "status",
 		Fam:      pluginName,
 		Ctx:      "netdata.plugin_data_collection_status",
 		Priority: 144000,
-		Dims: frameworkmodule.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "success"},
 			{ID: "failed"},
 		},
@@ -38,14 +38,14 @@ func newCollectStatusChart(pluginName string) *frameworkmodule.Chart {
 	return chart
 }
 
-func newCollectDurationChart(pluginName string) *frameworkmodule.Chart {
-	chart := &frameworkmodule.Chart{
+func newCollectDurationChart(pluginName string) *collectorapi.Chart {
+	chart := &collectorapi.Chart{
 		Title:    "Data Collection Duration",
 		Units:    "ms",
 		Fam:      pluginName,
 		Ctx:      "netdata.plugin_data_collection_duration",
 		Priority: 145000,
-		Dims: frameworkmodule.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "duration"},
 		},
 	}
@@ -58,7 +58,7 @@ type JobConfig struct {
 	Name            string
 	ModuleName      string
 	FullName        string
-	Module          frameworkmodule.Module
+	Module          collectorapi.Module
 	Labels          map[string]string
 	Out             io.Writer
 	UpdateEvery     int
@@ -136,7 +136,7 @@ type Job struct {
 	isStock      bool
 	functionOnly bool
 
-	module frameworkmodule.Module
+	module collectorapi.Module
 
 	// running tracks whether the job's main loop is active (set in Start, cleared in Start's defer)
 	running atomic.Bool
@@ -144,9 +144,9 @@ type Job struct {
 	initialized bool
 	panicked    atomic.Bool
 
-	collectStatusChart   *frameworkmodule.Chart
-	collectDurationChart *frameworkmodule.Chart
-	charts               *frameworkmodule.Charts
+	collectStatusChart   *collectorapi.Chart
+	collectDurationChart *collectorapi.Chart
+	charts               *collectorapi.Charts
 	tick                 chan int
 	out                  io.Writer
 	buf                  *bytes.Buffer
@@ -268,7 +268,7 @@ func (j *Job) AutoDetection() (err error) {
 	// Record job structure for dump mode after successful detection
 	if j.dumpMode && j.dumpAnalyzer != nil && j.charts != nil {
 		if analyzer, ok := j.dumpAnalyzer.(interface {
-			RecordJobStructure(string, string, *frameworkmodule.Charts)
+			RecordJobStructure(string, string, *collectorapi.Charts)
 		}); ok {
 			analyzer.RecordJobStructure(j.name, j.moduleName, j.charts)
 		}
@@ -301,7 +301,7 @@ func (j *Job) IsRunning() bool {
 
 // Module returns the underlying module instance.
 // This allows function handlers to access the collector for querying data.
-func (j *Job) Module() frameworkmodule.Module {
+func (j *Job) Module() collectorapi.Module {
 	return j.module
 }
 
@@ -364,7 +364,7 @@ func (j *Job) disableAutoDetection() {
 
 func (j *Job) Cleanup() {
 	j.buf.Reset()
-	if !frameworkmodule.ShouldObsoleteCharts() {
+	if !collectorapi.ShouldObsoleteCharts() {
 		return
 	}
 
@@ -435,7 +435,7 @@ func (j *Job) postCheck() error {
 		return errors.New("nil charts")
 	}
 	if j.charts != nil {
-		if err := frameworkmodule.CheckCharts(*j.charts...); err != nil {
+		if err := collectorapi.CheckCharts(*j.charts...); err != nil {
 			j.Errorf("charts check: %v", err)
 			return err
 		}
@@ -478,7 +478,7 @@ func (j *Job) collect() collectedMetrics {
 
 	var mx collectedMetrics
 
-	if v, ok := j.module.(frameworkmodule.MetricCollector); ok {
+	if v, ok := j.module.(collectorapi.MetricCollector); ok {
 		mx.floatMetrics = v.CollectMetrics(context.TODO())
 	} else {
 		mx.intMetrics = j.module.Collect(context.TODO())
@@ -571,7 +571,7 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 	// Update dump analyzer with current chart structure for dynamic collectors
 	if j.dumpMode && j.dumpAnalyzer != nil {
 		if analyzer, ok := j.dumpAnalyzer.(interface {
-			UpdateJobStructure(string, *frameworkmodule.Charts)
+			UpdateJobStructure(string, *collectorapi.Charts)
 		}); ok {
 			analyzer.UpdateJobStructure(j.name, j.charts)
 		}
@@ -608,7 +608,7 @@ func (j *Job) sendVnodeHostInfo() {
 	})
 }
 
-func (j *Job) createChart(chart *frameworkmodule.Chart) {
+func (j *Job) createChart(chart *collectorapi.Chart) {
 	defer func() { chart.SetCreated(true) }()
 	if chart.IsIgnored() {
 		return
@@ -652,17 +652,17 @@ func (j *Job) createChart(chart *frameworkmodule.Chart) {
 			// the default should be auto
 			// https://github.com/netdata/netdata/blob/cc2586de697702f86a3c34e60e23652dd4ddcb42/database/rrd.h#L205
 			if ls == 0 {
-				ls = frameworkmodule.LabelSourceAuto
+				ls = collectorapi.LabelSourceAuto
 			}
 			j.api.CLABEL(l.Key, lblValueReplacer.Replace(l.Value), ls)
 		}
 	}
 	for k, v := range j.labels {
 		if !seen[k] {
-			j.api.CLABEL(k, lblValueReplacer.Replace(v), frameworkmodule.LabelSourceConf)
+			j.api.CLABEL(k, lblValueReplacer.Replace(v), collectorapi.LabelSourceConf)
 		}
 	}
-	j.api.CLABEL("_collect_job", lblValueReplacer.Replace(j.Name()), frameworkmodule.LabelSourceAuto)
+	j.api.CLABEL("_collect_job", lblValueReplacer.Replace(j.Name()), collectorapi.LabelSourceAuto)
 	j.api.CLABELCOMMIT()
 
 	for _, dim := range chart.Dims {
@@ -682,7 +682,7 @@ func (j *Job) createChart(chart *frameworkmodule.Chart) {
 	_ = j.api.EMPTYLINE()
 }
 
-func (j *Job) updateChart(chart *frameworkmodule.Chart, mx collectedMetrics, sinceLastRun int) bool {
+func (j *Job) updateChart(chart *collectorapi.Chart, mx collectedMetrics, sinceLastRun int) bool {
 	if chart.IsIgnored() {
 		dims := chart.Dims[:0]
 		for _, dim := range chart.Dims {
@@ -763,7 +763,7 @@ func (j *Job) penalty() int {
 	return penaltyFromRetries(int(j.retries.Load()), j.updateEvery)
 }
 
-func getChartType(chart *frameworkmodule.Chart, j *Job) string {
+func getChartType(chart *collectorapi.Chart, j *Job) string {
 	if chart.CachedType() != "" {
 		return chart.CachedType()
 	}
@@ -783,7 +783,7 @@ func getChartType(chart *frameworkmodule.Chart, j *Job) string {
 	return chart.CachedType()
 }
 
-func getChartID(chart *frameworkmodule.Chart) string {
+func getChartID(chart *collectorapi.Chart) string {
 	if chart.CachedID() != "" {
 		return chart.CachedID()
 	}

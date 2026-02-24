@@ -18,7 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mysql/mysqlfunc"
 )
 
@@ -29,12 +29,12 @@ var configSchema string
 var mysqlChartTemplateV2 string
 
 func init() {
-	module.Register("mysql", module.Creator{
+	collectorapi.Register("mysql", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		CreateV2:        func() module.ModuleV2 { return New() },
+		CreateV2:        func() collectorapi.ModuleV2 { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         mysqlfunc.Methods,
-		MethodHandler: func(job module.RuntimeJob) funcapi.MethodHandler {
+		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 			c, ok := job.Collector().(*Collector)
 			if !ok {
 				return nil
@@ -85,7 +85,7 @@ type Config struct {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
 	dbMu sync.RWMutex // protects db pointer lifecycle across collect/functions/cleanup

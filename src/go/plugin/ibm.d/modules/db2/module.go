@@ -6,7 +6,7 @@ package db2
 import (
 	_ "embed"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 
@@ -30,9 +30,9 @@ func (c *Collector) Configuration() any {
 }
 
 func init() {
-	module.Register("db2", module.Creator{
+	collectorapi.Register("db2", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create: func() module.Module {
+		Create: func() collectorapi.Module {
 			return New()
 		},
 		Config: func() any {

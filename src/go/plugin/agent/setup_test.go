@@ -5,7 +5,7 @@ package agent
 import (
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -109,90 +109,90 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 	tests := map[string]struct {
 		agent       *Agent
 		cfg         config
-		wantModules module.Registry
+		wantModules collectorapi.Registry
 	}{
 		"load all, module disabled by default but explicitly enabled": {
 			agent: &Agent{
-				ModuleRegistry: module.Registry{
-					"module1": module.Creator{Defaults: module.Defaults{Disabled: true}},
+				ModuleRegistry: collectorapi.Registry{
+					"module1": collectorapi.Creator{Defaults: collectorapi.Defaults{Disabled: true}},
 				},
 			},
 			cfg: config{
 				Modules: map[string]bool{"module1": true},
 			},
-			wantModules: module.Registry{
-				"module1": module.Creator{Defaults: module.Defaults{Disabled: true}},
+			wantModules: collectorapi.Registry{
+				"module1": collectorapi.Creator{Defaults: collectorapi.Defaults{Disabled: true}},
 			},
 		},
 		"load all, module disabled by default and not explicitly enabled": {
 			agent: &Agent{
-				ModuleRegistry: module.Registry{
-					"module1": module.Creator{Defaults: module.Defaults{Disabled: true}},
+				ModuleRegistry: collectorapi.Registry{
+					"module1": collectorapi.Creator{Defaults: collectorapi.Defaults{Disabled: true}},
 				},
 			},
-			wantModules: module.Registry{},
+			wantModules: collectorapi.Registry{},
 		},
 		"load all, module in config modules (default_run=true)": {
 			agent: &Agent{
-				ModuleRegistry: module.Registry{
-					"module1": module.Creator{},
+				ModuleRegistry: collectorapi.Registry{
+					"module1": collectorapi.Creator{},
 				},
 			},
 			cfg: config{
 				Modules:    map[string]bool{"module1": true},
 				DefaultRun: true,
 			},
-			wantModules: module.Registry{
-				"module1": module.Creator{},
+			wantModules: collectorapi.Registry{
+				"module1": collectorapi.Creator{},
 			},
 		},
 		"load all, module not in config modules (default_run=true)": {
 			agent: &Agent{
-				ModuleRegistry: module.Registry{"module1": module.Creator{}},
+				ModuleRegistry: collectorapi.Registry{"module1": collectorapi.Creator{}},
 			},
 			cfg: config{
 				DefaultRun: true,
 			},
-			wantModules: module.Registry{"module1": module.Creator{}},
+			wantModules: collectorapi.Registry{"module1": collectorapi.Creator{}},
 		},
 		"load all, module in config modules (default_run=false)": {
 			agent: &Agent{
-				ModuleRegistry: module.Registry{
-					"module1": module.Creator{},
+				ModuleRegistry: collectorapi.Registry{
+					"module1": collectorapi.Creator{},
 				},
 			},
 			cfg: config{
 				Modules: map[string]bool{"module1": true},
 			},
-			wantModules: module.Registry{
-				"module1": module.Creator{},
+			wantModules: collectorapi.Registry{
+				"module1": collectorapi.Creator{},
 			},
 		},
 		"load all, module not in config modules (default_run=false)": {
 			agent: &Agent{
-				ModuleRegistry: module.Registry{
-					"module1": module.Creator{},
+				ModuleRegistry: collectorapi.Registry{
+					"module1": collectorapi.Creator{},
 				},
 			},
-			wantModules: module.Registry{},
+			wantModules: collectorapi.Registry{},
 		},
 		"load specific, module exist in registry": {
 			agent: &Agent{
 				RunModule: "module1",
-				ModuleRegistry: module.Registry{
-					"module1": module.Creator{},
+				ModuleRegistry: collectorapi.Registry{
+					"module1": collectorapi.Creator{},
 				},
 			},
-			wantModules: module.Registry{
-				"module1": module.Creator{},
+			wantModules: collectorapi.Registry{
+				"module1": collectorapi.Creator{},
 			},
 		},
 		"load specific, module doesnt exist in registry": {
 			agent: &Agent{
 				RunModule:      "module3",
-				ModuleRegistry: module.Registry{},
+				ModuleRegistry: collectorapi.Registry{},
 			},
-			wantModules: module.Registry{},
+			wantModules: collectorapi.Registry{},
 		},
 	}
 

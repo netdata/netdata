@@ -20,9 +20,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimemgr"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 )
 
 var isTerminal = isatty.IsTerminal(os.Stdout.Fd())
@@ -37,7 +37,7 @@ type Config struct {
 	ServiceDiscoveryConfigDir []string
 	VarLibDir                 string
 
-	ModuleRegistry module.Registry
+	ModuleRegistry collectorapi.Registry
 	RunModule      string
 	RunJob         []string
 	MinUpdateEvery int
@@ -68,7 +68,7 @@ type Agent struct {
 
 	DisableServiceDiscovery bool
 
-	ModuleRegistry module.Registry
+	ModuleRegistry collectorapi.Registry
 	Out            io.Writer
 
 	api *netdataapi.API
@@ -100,7 +100,7 @@ func New(cfg Config) *Agent {
 		RunModule:                 cfg.RunModule,
 		RunJob:                    cfg.RunJob,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
-		ModuleRegistry:            module.DefaultRegistry,
+		ModuleRegistry:            collectorapi.DefaultRegistry,
 		Out:                       safewriter.Stdout,
 		api:                       netdataapi.New(safewriter.Stdout),
 		quitCh:                    make(chan struct{}, 1),
@@ -153,7 +153,7 @@ func serve(a *Agent) {
 	}
 
 	for {
-		module.ObsoleteCharts(true)
+		collectorapi.ObsoleteCharts(true)
 
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -179,7 +179,7 @@ func serve(a *Agent) {
 		}
 
 		if exit {
-			module.ObsoleteCharts(false)
+			collectorapi.ObsoleteCharts(false)
 		}
 
 		cancel()

@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 )
 
 const (
@@ -246,7 +246,7 @@ func (m *Manager) buildRequiredParams(moduleName string, methodParams []funcapi.
 	return required
 }
 
-func (m *Manager) resolveMethodParamsForJob(ctx context.Context, moduleName, methodID string, methodCfg *funcapi.MethodConfig, job module.RuntimeJob, handler funcapi.MethodHandler) ([]funcapi.ParamConfig, bool, error) {
+func (m *Manager) resolveMethodParamsForJob(ctx context.Context, moduleName, methodID string, methodCfg *funcapi.MethodConfig, job collectorapi.RuntimeJob, handler funcapi.MethodHandler) ([]funcapi.ParamConfig, bool, error) {
 	methodParams := methodCfg.RequiredParams
 
 	jobParams, err := handler.MethodParams(ctx, methodID)

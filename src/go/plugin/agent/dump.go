@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 // DumpAnalyzer collects and analyzes metric structure from dump mode
@@ -39,7 +39,7 @@ type JobAnalysis struct {
 
 // ChartAnalysis holds analysis for a single chart
 type ChartAnalysis struct {
-	Chart           *module.Chart
+	Chart           *collectorapi.Chart
 	CollectedValues map[string][]int64 // dimension ID -> collected values
 	SeenDimensions  map[string]bool    // track which dimensions received data
 }
@@ -85,7 +85,7 @@ func (da *DumpAnalyzer) RegisterJob(jobName, moduleName, dir string) {
 }
 
 // RecordJobStructure records the initial chart structure for a job
-func (da *DumpAnalyzer) RecordJobStructure(jobName, moduleName string, charts *module.Charts) {
+func (da *DumpAnalyzer) RecordJobStructure(jobName, moduleName string, charts *collectorapi.Charts) {
 	da.mu.Lock()
 	defer da.mu.Unlock()
 
@@ -119,7 +119,7 @@ func (da *DumpAnalyzer) RecordJobStructure(jobName, moduleName string, charts *m
 
 // UpdateJobStructure updates the chart structure for a job with current charts
 // This is needed for collectors that create charts dynamically during collection
-func (da *DumpAnalyzer) UpdateJobStructure(jobName string, charts *module.Charts) {
+func (da *DumpAnalyzer) UpdateJobStructure(jobName string, charts *collectorapi.Charts) {
 	da.mu.Lock()
 	defer da.mu.Unlock()
 
@@ -830,10 +830,10 @@ func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) 
 	}
 
 	// Analyze dimensions
-	dimsByChart := make(map[string]map[string]*module.Dim) // chartID -> dimID -> dim
+	dimsByChart := make(map[string]map[string]*collectorapi.Dim) // chartID -> dimID -> dim
 	allDimIDs := make(map[string]bool)
 	for _, ca := range charts {
-		dimsByChart[ca.Chart.ID] = make(map[string]*module.Dim)
+		dimsByChart[ca.Chart.ID] = make(map[string]*collectorapi.Dim)
 		for _, dim := range ca.Chart.Dims {
 			dimsByChart[ca.Chart.ID][dim.ID] = dim
 			allDimIDs[dim.ID] = true

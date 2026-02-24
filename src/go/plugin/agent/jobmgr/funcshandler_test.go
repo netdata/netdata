@@ -7,14 +7,14 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/modruntime"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/stretchr/testify/assert"
 )
 
 // mockMethodHandler implements funcapi.MethodHandler for testing.
 type mockMethodHandler struct {
-	job        *modruntime.Job
+	job        *jobruntime.Job
 	paramsFunc func(ctx context.Context, method string) ([]funcapi.ParamConfig, error)
 	handleFunc func(ctx context.Context, method string, params funcapi.ResolvedParams) *funcapi.FunctionResponse
 }
@@ -123,7 +123,7 @@ func TestBuildAcceptedParams(t *testing.T) {
 func TestBuildRequiredParams_TypeSelect(t *testing.T) {
 	// Setup a minimal manager with test data
 	r := newModuleFuncRegistry()
-	r.registerModule("postgres", module.Creator{
+	r.registerModule("postgres", collectorapi.Creator{
 		Methods: func() []funcapi.MethodConfig {
 			return []funcapi.MethodConfig{{
 				ID:   "top-queries",

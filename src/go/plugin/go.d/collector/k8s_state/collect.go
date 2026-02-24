@@ -13,7 +13,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
@@ -80,9 +80,9 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.kubeClusterName = c.getKubeClusterName()
 
 		if chart := c.Charts().Get(discoveryStatusChart.ID); chart != nil {
-			chart.Labels = []module.Label{
-				{Key: labelKeyClusterID, Value: c.kubeClusterID, Source: module.LabelSourceK8s},
-				{Key: labelKeyClusterName, Value: c.kubeClusterName, Source: module.LabelSourceK8s},
+			chart.Labels = []collectorapi.Label{
+				{Key: labelKeyClusterID, Value: c.kubeClusterID, Source: collectorapi.LabelSourceK8s},
+				{Key: labelKeyClusterName, Value: c.kubeClusterName, Source: collectorapi.LabelSourceK8s},
 			}
 		}
 	})

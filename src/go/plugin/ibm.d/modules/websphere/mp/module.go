@@ -6,7 +6,7 @@ package mp
 import (
 	_ "embed"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 
@@ -30,9 +30,9 @@ func (c *Collector) Configuration() any {
 }
 
 func init() {
-	module.Register("websphere_mp", module.Creator{
+	collectorapi.Register("websphere_mp", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.Module { return New() },
 		Config: func() any {
 			cfg := defaultConfig()
 			return &cfg

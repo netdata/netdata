@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -465,7 +465,7 @@ func TestCollector_Collect(t *testing.T) {
 			require.Equal(t, test.wantMetrics, mx)
 			if len(test.wantMetrics) > 0 {
 				assert.Equalf(t, test.wantNumOfCharts, len(*collr.Charts()), "number of charts")
-				collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
+				collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *collectorapi.Chart, _ *collectorapi.Dim) bool {
 					return chart.ID == uptimeChart.ID
 				})
 			}

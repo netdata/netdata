@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
@@ -38,7 +38,7 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+	assert.Implements(t, (*collectorapi.Module)(nil), New())
 }
 
 func TestCollector_Init(t *testing.T) {
