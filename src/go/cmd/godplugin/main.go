@@ -164,18 +164,19 @@ func runFunctionCLI(opts *cli.Option) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	jobMgr := jobmgr.New()
-	// Force-enable configs in function CLI runs (non-TTY by default).
-	jobMgr.PluginName = "nodyncfg"
-	jobMgr.Out = io.Discard
-	jobMgr.VarLibDir = pluginconfig.VarLibDir()
-	jobMgr.Modules = collectorapi.Registry{moduleName: creator}
-	jobMgr.ConfigDefaults = reg
-	jobMgr.FnReg = functions.NewManager()
-	jobMgr.FunctionJSONWriter = func(payload []byte, _ int) {
-		_, _ = os.Stdout.Write(payload)
-		_, _ = os.Stdout.Write([]byte("\n"))
-	}
+	jobMgr := jobmgr.New(jobmgr.Config{
+		// Force-enable configs in function CLI runs (non-TTY by default).
+		PluginName:     "nodyncfg",
+		Out:            io.Discard,
+		VarLibDir:      pluginconfig.VarLibDir(),
+		Modules:        collectorapi.Registry{moduleName: creator},
+		ConfigDefaults: reg,
+		FnReg:          functions.NewManager(),
+		FunctionJSONWriter: func(payload []byte, _ int) {
+			_, _ = os.Stdout.Write(payload)
+			_, _ = os.Stdout.Write([]byte("\n"))
+		},
+	})
 	jobMgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(io.Discard)))
 
 	in := make(chan []*confgroup.Group, 1)
