@@ -104,7 +104,7 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			mgr := New(Config{})
-			mgr.Modules = collectorapi.Registry{
+			mgr.modules = collectorapi.Registry{
 				"testmod": tc.creator,
 			}
 			cfg := prepareUserCfg("testmod", "job1")

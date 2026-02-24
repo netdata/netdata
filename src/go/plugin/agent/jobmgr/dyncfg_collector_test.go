@@ -31,7 +31,7 @@ func TestDyncfgConfigUserconfig_InvalidPayload_Returns400Only(t *testing.T) {
 			var buf bytes.Buffer
 
 			mgr := New(Config{})
-			mgr.Modules = prepareMockRegistry()
+			mgr.modules = prepareMockRegistry()
 			mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
 
 			fn := dyncfg.NewFunction(functions.Function{

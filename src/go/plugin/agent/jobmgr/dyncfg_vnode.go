@@ -117,7 +117,7 @@ func (m *Manager) dyncfgVnodeGet(fn dyncfg.Function) {
 	id := fn.ID()
 	name := strings.TrimPrefix(id, m.dyncfgVnodePrefixValue()+":")
 
-	cfg, ok := m.Vnodes[name]
+	cfg, ok := m.vnodes[name]
 	if !ok {
 		m.Warningf("dyncfg: %s: vnode %s not found", cmd, name)
 		m.dyncfgApi.SendCodef(fn, 404, "The specified vnode '%s' is not registered.", name)
@@ -172,13 +172,13 @@ func (m *Manager) dyncfgVnodeAdd(fn dyncfg.Function) {
 		return
 	}
 
-	if orig, ok := m.Vnodes[name]; ok && orig.Equal(cfg) {
+	if orig, ok := m.vnodes[name]; ok && orig.Equal(cfg) {
 		m.dyncfgApi.SendCodef(fn, 202, "")
 		m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
 		return
 	}
 
-	m.Vnodes[name] = cfg
+	m.vnodes[name] = cfg
 
 	m.runningJobs.forEach(func(_ string, job runtimeJob) {
 		if job.Vnode().Name == name {
@@ -196,7 +196,7 @@ func (m *Manager) dyncfgVnodeRemove(fn dyncfg.Function) {
 	id := fn.ID()
 	name := strings.TrimPrefix(id, m.dyncfgVnodePrefixValue()+":")
 
-	vnode, ok := m.Vnodes[name]
+	vnode, ok := m.vnodes[name]
 	if !ok {
 		m.Warningf("dyncfg: %s: vnode %s not found", cmd, name)
 		m.dyncfgApi.SendCodef(fn, 404, "The specified vnode '%s' is not registered.", name)
@@ -214,7 +214,7 @@ func (m *Manager) dyncfgVnodeRemove(fn dyncfg.Function) {
 		return
 	}
 
-	delete(m.Vnodes, name)
+	delete(m.vnodes, name)
 
 	m.dyncfgApi.ConfigDelete(id)
 	m.dyncfgApi.SendCodef(fn, 200, "")
@@ -265,7 +265,7 @@ func (m *Manager) dyncfgVnodeUpdate(fn dyncfg.Function) {
 	id := fn.ID()
 	name := strings.TrimPrefix(id, m.dyncfgVnodePrefixValue()+":")
 
-	orig, ok := m.Vnodes[name]
+	orig, ok := m.vnodes[name]
 	if !ok {
 		m.Warningf("dyncfg: %s: vnode %s not found", cmd, name)
 		m.dyncfgApi.SendCodef(fn, 404, "The specified vnode '%s' is not registered.", name)
@@ -292,7 +292,7 @@ func (m *Manager) dyncfgVnodeUpdate(fn dyncfg.Function) {
 		return
 	}
 
-	m.Vnodes[name] = cfg
+	m.vnodes[name] = cfg
 
 	m.runningJobs.forEach(func(_ string, job runtimeJob) {
 		if job.Vnode().Name == name {
@@ -332,7 +332,7 @@ func (m *Manager) dyncfgVnodeAffectedJobs(vnode string) string {
 }
 
 func (m *Manager) verifyVnodeUnique(newCfg *vnodes.VirtualNode) error {
-	for _, cfg := range m.Vnodes {
+	for _, cfg := range m.vnodes {
 		if cfg.Name == newCfg.Name {
 			continue
 		}

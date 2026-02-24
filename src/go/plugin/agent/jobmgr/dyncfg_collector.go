@@ -132,7 +132,7 @@ func (m *Manager) dyncfgConfigUserconfig(fn dyncfg.Function) {
 		return
 	}
 
-	creator, ok := m.Modules.Lookup(mn)
+	creator, ok := m.modules.Lookup(mn)
 	if !ok {
 		m.Warningf("dyncfg: %s: module %s not found", cmd, mn)
 		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' is not registered.", mn)
@@ -179,7 +179,7 @@ func (m *Manager) dyncfgConfigTest(fn dyncfg.Function) {
 		return
 	}
 
-	creator, ok := m.Modules.Lookup(mn)
+	creator, ok := m.modules.Lookup(mn)
 	if !ok {
 		m.Warningf("dyncfg: %s: module %s not found", cmd, mn)
 		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' is not registered.", mn)
@@ -193,7 +193,7 @@ func (m *Manager) dyncfgConfigTest(fn dyncfg.Function) {
 	}
 
 	if cfg.Vnode() != "" {
-		if _, ok := m.Vnodes[cfg.Vnode()]; !ok {
+		if _, ok := m.vnodes[cfg.Vnode()]; !ok {
 			m.Warningf("dyncfg: %s: module %s: vnode %s not found", cmd, mn, cfg.Vnode())
 			m.dyncfgApi.SendCodef(fn, 400, "The specified vnode '%s' is not registered.", cfg.Vnode())
 			return
@@ -246,7 +246,7 @@ func (m *Manager) dyncfgConfigSchema(fn dyncfg.Function) {
 		return
 	}
 
-	mod, ok := m.Modules.Lookup(mn)
+	mod, ok := m.modules.Lookup(mn)
 	if !ok {
 		m.Warningf("dyncfg: %s: module %s not found", cmd, mn)
 		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' is not registered.", mn)
@@ -275,7 +275,7 @@ func (m *Manager) dyncfgConfigGet(fn dyncfg.Function) {
 		return
 	}
 
-	creator, ok := m.Modules.Lookup(mn)
+	creator, ok := m.modules.Lookup(mn)
 	if !ok {
 		m.Warningf("dyncfg: %s: module %s not found", cmd, mn)
 		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' is not registered.", mn)
@@ -327,7 +327,7 @@ func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string,
 	cfg.SetSourceType("dyncfg")
 	cfg.SetModule(module)
 	cfg.SetName(name)
-	if def, ok := m.ConfigDefaults.Lookup(module); ok {
+	if def, ok := m.configDefaults.Lookup(module); ok {
 		cfg.ApplyDefaults(def)
 	}
 }

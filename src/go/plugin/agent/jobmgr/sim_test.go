@@ -44,7 +44,7 @@ func (s *runSim) run(t *testing.T) {
 	var buf bytes.Buffer
 	mgr := New(Config{})
 	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
-	mgr.Modules = prepareMockRegistry()
+	mgr.modules = prepareMockRegistry()
 
 	done := make(chan struct{})
 	grpCh := make(chan []*confgroup.Group)

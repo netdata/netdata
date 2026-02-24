@@ -313,8 +313,8 @@ func (m *Manager) respondJSON(fn functions.Function, resp map[string]any) {
 		}
 	}
 
-	if m.FunctionJSONWriter != nil {
-		m.FunctionJSONWriter(data, code)
+	if m.functionJSONWriter != nil {
+		m.functionJSONWriter(data, code)
 		return
 	}
 
