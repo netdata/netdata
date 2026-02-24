@@ -4,6 +4,7 @@ package engine
 
 import (
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
@@ -767,6 +768,465 @@ func TestToTopologyData_DropsAmbiguousEndpointSegmentLinks(t *testing.T) {
 	require.Equal(t, 2, data.Stats["segments_suppressed"])
 }
 
+func TestToTopologyData_ProbableConnectivityConnectsAmbiguousEndpoint(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "switch-b",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
+			{DeviceID: "switch-b", IfIndex: 2, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
+		},
+	}
+
+	strictData := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "70:49:a2:65:72:cd"), 0)
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source:                    "snmp",
+		Layer:                     "2",
+		View:                      "summary",
+		ProbabilisticConnectivity: true,
+	})
+
+	fdbLinks := findFDBLinksByEndpointMAC(data.Links, "70:49:a2:65:72:cd")
+	require.Len(t, fdbLinks, 1)
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(fdbLinks[0].State)))
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyMetricString(fdbLinks[0].Metrics, "inference"))))
+	require.Equal(t, "probable_segment", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
+	require.Equal(t, "low", topologyMetricString(fdbLinks[0].Metrics, "confidence"))
+
+	require.Equal(t, 1, data.Stats["links_probable"])
+	require.Equal(t, 1, data.Stats["links_fdb_endpoint_emitted"])
+	require.Equal(t, 1, data.Stats["links_fdb_endpoint_suppressed"])
+}
+
+func TestToTopologyData_ProbableConnectivityDoesNotReclassifyStrictSinglePortEndpoint(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:dd:dd:dd:dd:dd:dd", Method: "fdb"},
+		},
+	}
+
+	strictData := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+	strictFDBLinks := findFDBLinksByEndpointMAC(strictData.Links, "dd:dd:dd:dd:dd:dd")
+	require.Len(t, strictFDBLinks, 1)
+	require.Equal(t, "", strings.TrimSpace(strictFDBLinks[0].State))
+	require.Equal(t, "", strings.TrimSpace(topologyMetricString(strictFDBLinks[0].Metrics, "inference")))
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source:                    "snmp",
+		Layer:                     "2",
+		View:                      "summary",
+		ProbabilisticConnectivity: true,
+	})
+
+	fdbLinks := findFDBLinksByEndpointMAC(data.Links, "dd:dd:dd:dd:dd:dd")
+	require.Len(t, fdbLinks, 1)
+	require.Equal(t, "", strings.TrimSpace(fdbLinks[0].State))
+	require.Equal(t, "", strings.TrimSpace(topologyMetricString(fdbLinks[0].Metrics, "inference")))
+	require.Equal(t, "direct", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
+	require.Equal(t, 0, data.Stats["links_probable"])
+}
+
+func TestToTopologyData_ProbableConnectivityConnectsUnlinkedLLDPEndpoint(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "switch-b",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:70:49:a2:65:72:cf", Method: "lldp"},
+			{DeviceID: "switch-b", IfIndex: 2, EndpointID: "mac:70:49:a2:65:72:cf", Method: "lldp"},
+		},
+	}
+
+	strictData := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "70:49:a2:65:72:cf"), 0)
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source:                    "snmp",
+		Layer:                     "2",
+		View:                      "summary",
+		ProbabilisticConnectivity: true,
+	})
+
+	fdbLinks := findFDBLinksByEndpointMAC(data.Links, "70:49:a2:65:72:cf")
+	require.Len(t, fdbLinks, 1)
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(fdbLinks[0].State)))
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyMetricString(fdbLinks[0].Metrics, "inference"))))
+	require.Equal(t, "probable_segment", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
+}
+
+func TestToTopologyData_ProbableConnectivityAvoidsExtraBridgePathForLLDPPeers(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "switch-b",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+			{DeviceID: "switch-a", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
+			{DeviceID: "switch-b", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "switch-a",
+				SourcePort: "Gi0/1",
+				TargetID:   "switch-b",
+				TargetPort: "Gi0/1",
+			},
+			{
+				Protocol:   "lldp",
+				SourceID:   "switch-a",
+				SourcePort: "Gi0/2",
+				TargetID:   "switch-b",
+				TargetPort: "Gi0/2",
+			},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:70:49:a2:65:72:aa", Method: "lldp"},
+			{DeviceID: "switch-b", IfIndex: 1, EndpointID: "mac:70:49:a2:65:72:aa", Method: "lldp"},
+			{DeviceID: "switch-a", IfIndex: 2, EndpointID: "mac:70:49:a2:65:72:aa", Method: "lldp"},
+			{DeviceID: "switch-b", IfIndex: 2, EndpointID: "mac:70:49:a2:65:72:aa", Method: "lldp"},
+		},
+	}
+
+	strictData := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "70:49:a2:65:72:aa"), 0)
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source:                    "snmp",
+		Layer:                     "2",
+		View:                      "summary",
+		ProbabilisticConnectivity: true,
+	})
+
+	fdbLinks := findFDBLinksByEndpointMAC(data.Links, "70:49:a2:65:72:aa")
+	require.Len(t, fdbLinks, 1)
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(fdbLinks[0].State)))
+
+	bridgeLinksBySegment := make(map[string]map[string]struct{})
+	for _, link := range data.Links {
+		if !strings.EqualFold(strings.TrimSpace(link.Protocol), "bridge") {
+			continue
+		}
+		segmentActorID := strings.TrimSpace(link.DstActorID)
+		if segmentActorID == "" {
+			continue
+		}
+		devices := bridgeLinksBySegment[segmentActorID]
+		if devices == nil {
+			devices = make(map[string]struct{})
+			bridgeLinksBySegment[segmentActorID] = devices
+		}
+		devices[strings.TrimSpace(link.SrcActorID)] = struct{}{}
+	}
+	for _, devices := range bridgeLinksBySegment {
+		require.LessOrEqual(t, len(devices), 1)
+	}
+}
+
+func TestToTopologyData_ProbableConnectivityConnectsZeroCandidateEndpointUsingReporterHints(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:dd:dd:dd:dd:dd:dd", Method: "fdb"},
+		},
+		Enrichments: []Enrichment{
+			{
+				EndpointID: "ip:10.0.0.99",
+				IPs:        []netip.Addr{netip.MustParseAddr("10.0.0.99")},
+				Labels: map[string]string{
+					"sources":    "arp",
+					"device_ids": "switch-a",
+					"if_indexes": "1",
+					"if_names":   "Gi0/1",
+				},
+			},
+		},
+	}
+
+	strictData := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+	require.Len(t, findFDBLinksByEndpointIP(strictData.Links, "10.0.0.99"), 0)
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source:                    "snmp",
+		Layer:                     "2",
+		View:                      "summary",
+		ProbabilisticConnectivity: true,
+	})
+
+	fdbLinks := findFDBLinksByEndpointIP(data.Links, "10.0.0.99")
+	require.Len(t, fdbLinks, 1)
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(fdbLinks[0].State)))
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyMetricString(fdbLinks[0].Metrics, "inference"))))
+	require.Equal(t, "probable_segment", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
+	require.Equal(t, "low", topologyMetricString(fdbLinks[0].Metrics, "confidence"))
+
+	strictSignatures := topologyLinkSignatures(strictData.Links)
+	probableSignatures := topologyLinkSignatures(data.Links)
+	for signature := range strictSignatures {
+		_, ok := probableSignatures[signature]
+		require.Truef(t, ok, "strict link signature missing in probable output: %s", signature)
+	}
+}
+
+func TestToTopologyData_ProbableConnectivityCreatesPortlessAttachmentForZeroCandidateEndpoint(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:dd:dd:dd:dd:dd:dd", Method: "fdb"},
+		},
+		Enrichments: []Enrichment{
+			{
+				EndpointID: "ip:10.0.0.199",
+				IPs:        []netip.Addr{netip.MustParseAddr("10.0.0.199")},
+				Labels: map[string]string{
+					"sources":    "arp",
+					"device_ids": "switch-a",
+					"if_indexes": "999",
+					"if_names":   "Gi0/999",
+				},
+			},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source:                    "snmp",
+		Layer:                     "2",
+		View:                      "summary",
+		ProbabilisticConnectivity: true,
+	})
+
+	fdbLinks := findFDBLinksByEndpointIP(data.Links, "10.0.0.199")
+	require.Len(t, fdbLinks, 1)
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(fdbLinks[0].State)))
+	require.Equal(t, "probable_portless", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
+
+	segmentActor := findActorByMatch(data.Actors, fdbLinks[0].Src.Match)
+	require.NotNil(t, segmentActor)
+	require.Contains(t, topologyAttrString(segmentActor.Attributes, "segment_id"), "bridge-domain:probable:")
+	require.Equal(t, []string{"switch-a"}, segmentActor.Attributes["parent_devices"])
+
+	bridgeCount := 0
+	for _, link := range data.Links {
+		if !strings.EqualFold(strings.TrimSpace(link.Protocol), "bridge") {
+			continue
+		}
+		if canonicalTopologyMatchKey(link.Dst.Match) != canonicalTopologyMatchKey(fdbLinks[0].Src.Match) {
+			continue
+		}
+		bridgeCount++
+	}
+	require.Equal(t, 1, bridgeCount)
+}
+
+func TestToTopologyData_ProbableConnectivityRecoversUnmanagedOverlapSuppression(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+			{DeviceID: "switch-a", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "switch-a",
+				SourcePort: "Gi0/1",
+				TargetID:   "remote-peer",
+				TargetPort: "cc:cc:cc:cc:cc:cc",
+			},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-a", IfIndex: 2, EndpointID: "mac:cc:cc:cc:cc:cc:cc", Method: "fdb"},
+		},
+	}
+
+	strictData := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+	require.Len(t, findFDBLinksByEndpointMAC(strictData.Links, "cc:cc:cc:cc:cc:cc"), 0)
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source:                    "snmp",
+		Layer:                     "2",
+		View:                      "summary",
+		ProbabilisticConnectivity: true,
+	})
+
+	fdbLinks := findFDBLinksByEndpointMAC(data.Links, "cc:cc:cc:cc:cc:cc")
+	require.Len(t, fdbLinks, 1)
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(fdbLinks[0].State)))
+	require.Equal(t, "probable", strings.ToLower(strings.TrimSpace(topologyMetricString(fdbLinks[0].Metrics, "inference"))))
+	require.Equal(t, "probable_direct", topologyMetricString(fdbLinks[0].Metrics, "attachment_mode"))
+	require.Equal(t, "low", topologyMetricString(fdbLinks[0].Metrics, "confidence"))
+}
+
+func TestToTopologyData_CollapseByIPPrunesSuppressedManagedOverlapEndpoint(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+			{
+				ID:        "nova",
+				Hostname:  "nova",
+				ChassisID: "9c:6b:00:7b:98:c6",
+				Addresses: []netip.Addr{netip.MustParseAddr("172.22.0.1")},
+				Labels:    map[string]string{"inferred": "true"},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+			{DeviceID: "switch-a", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "switch-a",
+				SourcePort: "Gi0/1",
+				TargetID:   "nova",
+				TargetPort: "9c:6b:00:7b:98:c7",
+			},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-a", IfIndex: 2, EndpointID: "mac:9c:6b:00:7b:98:c7", Method: "fdb"},
+		},
+		Enrichments: []Enrichment{
+			{
+				EndpointID: "mac:9c:6b:00:7b:98:c7",
+				MAC:        "9c:6b:00:7b:98:c7",
+				IPs:        []netip.Addr{netip.MustParseAddr("10.20.4.22")},
+				Labels: map[string]string{
+					"sources": "arp",
+				},
+			},
+		},
+	}
+
+	withoutCollapse := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+	require.NotNil(t, findActorByMAC(withoutCollapse.Actors, "9c:6b:00:7b:98:c7"))
+
+	withCollapse := ToTopologyData(result, TopologyDataOptions{
+		Source:             "snmp",
+		Layer:              "2",
+		View:               "summary",
+		CollapseActorsByIP: true,
+	})
+	require.NotNil(t, findActorByMAC(withCollapse.Actors, "9c:6b:00:7b:98:c6"))
+	require.Nil(t, findActorByMAC(withCollapse.Actors, "9c:6b:00:7b:98:c7"))
+	require.Equal(t, 1, withCollapse.Stats["actors_unlinked_suppressed"])
+}
+
 func TestToTopologyData_ReplacesKnownDeviceEndpointWithManagedDeviceEdge(t *testing.T) {
 	result := Result{
 		Devices: []Device{
@@ -1502,6 +1962,43 @@ func findFDBLinksByEndpointMAC(links []topology.Link, mac string) []topology.Lin
 				break
 			}
 		}
+	}
+	return out
+}
+
+func findFDBLinksByEndpointIP(links []topology.Link, ip string) []topology.Link {
+	out := make([]topology.Link, 0)
+	for _, link := range links {
+		if link.Protocol != "fdb" {
+			continue
+		}
+		for _, candidate := range link.Dst.Match.IPAddresses {
+			if candidate == ip {
+				out = append(out, link)
+				break
+			}
+		}
+	}
+	return out
+}
+
+func topologyLinkSignatures(links []topology.Link) map[string]struct{} {
+	out := make(map[string]struct{}, len(links))
+	for _, link := range links {
+		srcKey := canonicalTopologyMatchKey(link.Src.Match)
+		dstKey := canonicalTopologyMatchKey(link.Dst.Match)
+		if srcKey == "" || dstKey == "" {
+			continue
+		}
+		key := strings.Join([]string{
+			strings.ToLower(strings.TrimSpace(link.Protocol)),
+			strings.ToLower(strings.TrimSpace(link.Direction)),
+			srcKey,
+			dstKey,
+			strings.ToLower(strings.TrimSpace(link.State)),
+			strings.ToLower(topologyMetricString(link.Metrics, "attachment_mode")),
+		}, "|")
+		out[key] = struct{}{}
 	}
 	return out
 }

@@ -16,14 +16,17 @@ import (
 
 // TopologyDataOptions controls conversion from Result to topology.Data.
 type TopologyDataOptions struct {
-	SchemaVersion  string
-	Source         string
-	Layer          string
-	View           string
-	AgentID        string
-	LocalDeviceID  string
-	CollectedAt    time.Time
-	ResolveDNSName func(ip string) string
+	SchemaVersion             string
+	Source                    string
+	Layer                     string
+	View                      string
+	AgentID                   string
+	LocalDeviceID             string
+	CollectedAt               time.Time
+	ResolveDNSName            func(ip string) string
+	CollapseActorsByIP        bool
+	EliminateNonIPInferred    bool
+	ProbabilisticConnectivity bool
 }
 
 type endpointActorAccumulator struct {
@@ -31,6 +34,7 @@ type endpointActorAccumulator struct {
 	mac        string
 	ips        map[string]netip.Addr
 	sources    map[string]struct{}
+	deviceIDs  map[string]struct{}
 	ifIndexes  map[string]struct{}
 	ifNames    map[string]struct{}
 }
@@ -86,6 +90,7 @@ type projectedSegments struct {
 	endpointLinksSuppressed       int
 	endpointsWithAmbiguousSegment int
 	endpointDirectOwners          map[string]fdbEndpointOwner
+	suppressedManagedOverlapIDs   map[string]struct{}
 }
 
 type fdbReporterObservation struct {
@@ -98,6 +103,18 @@ type fdbEndpointOwner struct {
 	portVLANKey string
 	port        bridgePortRef
 	source      string
+}
+
+type probableEndpointReporterHint struct {
+	deviceID string
+	ifIndex  int
+	ifName   string
+}
+
+type segmentReporterIndex struct {
+	byDevice        map[string]map[string]struct{}
+	byDeviceIfIndex map[string]map[string]struct{}
+	byDeviceIfName  map[string]map[string]struct{}
 }
 
 type topologyIdentityKeySet map[string]struct{}
@@ -243,7 +260,9 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 		bridgeLinks,
 		reporterAliases,
 		endpointActors.matchByEndpointID,
+		endpointActors.labelsByEndpointID,
 		actorIndex,
+		opts.ProbabilisticConnectivity,
 	)
 	annotateEndpointActorsWithDirectOwners(actors, endpointActors.matchByEndpointID, segmentProjection.endpointDirectOwners, deviceByID)
 	actors = append(actors, segmentProjection.actors...)
@@ -255,11 +274,36 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	sortTopologyLinks(links)
 	segmentSuppressed := 0
 	actors, links, segmentSuppressed = pruneSegmentArtifacts(actors, links)
+	if opts.CollapseActorsByIP {
+		actors = collapseActorsByIP(actors)
+	}
+	if opts.EliminateNonIPInferred {
+		actors, links = eliminateNonIPInferredActors(actors, links)
+	}
+	unlinkedSuppressed := 0
+	if opts.CollapseActorsByIP {
+		actors, unlinkedSuppressed = pruneManagedOverlapUnlinkedEndpointActors(
+			actors,
+			links,
+			segmentProjection.suppressedManagedOverlapIDs,
+		)
+	}
+	actors, links, _ = pruneSegmentArtifacts(actors, links)
 	sortTopologyActors(actors)
 	sortTopologyLinks(links)
 	applyTopologyDisplayNames(actors, links, opts.ResolveDNSName)
 	assignTopologyActorIDsAndLinkEndpoints(actors, links)
 	linkCounts := summarizeTopologyLinks(links)
+	probableLinks := 0
+	for _, link := range links {
+		if strings.EqualFold(strings.TrimSpace(link.State), "probable") {
+			probableLinks++
+			continue
+		}
+		if strings.EqualFold(topologyMetricString(link.Metrics, "inference"), "probable") {
+			probableLinks++
+		}
+	}
 
 	stats := cloneAnyMap(result.Stats)
 	if stats == nil {
@@ -278,9 +322,10 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	stats["links_fdb_endpoint_suppressed"] = segmentProjection.endpointLinksSuppressed
 	stats["endpoints_ambiguous_segments"] = segmentProjection.endpointsWithAmbiguousSegment
 	stats["links_arp"] = linkCounts.arp
+	stats["links_probable"] = probableLinks
 	stats["segments_suppressed"] = segmentSuppressed
 	stats["actors_total"] = len(actors)
-	stats["actors_unlinked_suppressed"] = 0
+	stats["actors_unlinked_suppressed"] = unlinkedSuppressed
 	stats["endpoints_total"] = endpointActors.count
 
 	return topology.Data{
@@ -394,7 +439,9 @@ func projectSegmentTopology(
 	bridgeLinks []bridgeBridgeLinkRecord,
 	reporterAliases map[string][]string,
 	endpointMatchByID map[string]topology.Match,
+	endpointLabelsByID map[string]map[string]string,
 	actorIndex map[string]struct{},
+	probabilisticConnectivity bool,
 ) projectedSegments {
 	out := projectedSegments{
 		actors: make([]topology.Actor, 0),
@@ -451,60 +498,7 @@ func projectSegmentTopology(
 		if segment == nil {
 			continue
 		}
-
-		parentDevices := make(map[string]struct{})
-		ifNames := make(map[string]struct{})
-		ifIndexes := make(map[string]struct{})
-		bridgePorts := make(map[string]struct{})
-		vlanIDs := make(map[string]struct{})
-		for _, port := range segment.ports {
-			if strings.TrimSpace(port.deviceID) != "" {
-				parentDevices[port.deviceID] = struct{}{}
-			}
-			if strings.TrimSpace(port.ifName) != "" {
-				ifNames[port.ifName] = struct{}{}
-			}
-			if port.ifIndex > 0 {
-				ifIndexes[strconv.Itoa(port.ifIndex)] = struct{}{}
-			}
-			if strings.TrimSpace(port.bridgePort) != "" {
-				bridgePorts[port.bridgePort] = struct{}{}
-			}
-			if strings.TrimSpace(port.vlanID) != "" {
-				vlanIDs[port.vlanID] = struct{}{}
-			}
-		}
-
-		match := topology.Match{
-			Hostnames: []string{"segment:" + segmentID},
-		}
-
-		attrs := map[string]any{
-			"segment_id":      segmentID,
-			"segment_type":    "broadcast_domain",
-			"parent_devices":  sortedTopologySet(parentDevices),
-			"if_names":        sortedTopologySet(ifNames),
-			"if_indexes":      sortedTopologySet(ifIndexes),
-			"bridge_ports":    sortedTopologySet(bridgePorts),
-			"vlan_ids":        sortedTopologySet(vlanIDs),
-			"learned_sources": sortedTopologySet(segment.methods),
-			"ports_total":     len(segment.ports),
-			"endpoints_total": len(segment.endpointIDs),
-		}
-		if bridgePortRefKey(segment.designatedPort, false, false) != "" {
-			attrs["designated_port"] = bridgePortRefSortKey(segment.designatedPort)
-		}
-
-		actor := topology.Actor{
-			ActorType:  "segment",
-			Layer:      layer,
-			Source:     source,
-			Match:      match,
-			Attributes: pruneTopologyAttributes(attrs),
-			Labels: map[string]string{
-				"segment_kind": "broadcast_domain",
-			},
-		}
+		match, actor := buildBridgeSegmentActor(segmentID, segment, layer, source)
 		keys := topologyMatchIdentityKeys(actor.Match)
 		if len(keys) > 0 && !topologyIdentityIndexOverlaps(actorIndex, keys) {
 			addTopologyIdentityKeys(actorIndex, keys)
@@ -517,12 +511,16 @@ func projectSegmentTopology(
 	endpointSegmentEdgeSeen := make(map[string]struct{})
 	endpointSegmentCandidates := make(map[string][]string)
 	segmentPortKeys := make(map[string]map[string]struct{}, len(segmentIDs))
+	segmentIfIndexes := make(map[string]map[string]struct{}, len(segmentIDs))
+	segmentIfNames := make(map[string]map[string]struct{}, len(segmentIDs))
 	for _, segmentID := range segmentIDs {
 		segment := segmentByID[segmentID]
 		if segment == nil {
 			continue
 		}
 		portKeys := make(map[string]struct{}, len(segment.ports))
+		ifIndexes := make(map[string]struct{}, len(segment.ports))
+		ifNames := make(map[string]struct{}, len(segment.ports))
 		for _, port := range segment.ports {
 			if portKey := bridgePortObservationKey(port); portKey != "" {
 				portKeys[portKey] = struct{}{}
@@ -530,8 +528,16 @@ func projectSegmentTopology(
 			if portVLANKey := bridgePortObservationVLANKey(port); portVLANKey != "" {
 				portKeys[portVLANKey] = struct{}{}
 			}
+			if port.ifIndex > 0 {
+				ifIndexes[strconv.Itoa(port.ifIndex)] = struct{}{}
+			}
+			if ifName := strings.TrimSpace(port.ifName); ifName != "" {
+				ifNames[strings.ToLower(ifName)] = struct{}{}
+			}
 		}
 		segmentPortKeys[segmentID] = portKeys
+		segmentIfIndexes[segmentID] = ifIndexes
+		segmentIfNames[segmentID] = ifNames
 		for endpointID := range segment.endpointIDs {
 			endpointID = strings.TrimSpace(endpointID)
 			if endpointID == "" {
@@ -540,6 +546,8 @@ func projectSegmentTopology(
 			endpointSegmentCandidates[endpointID] = append(endpointSegmentCandidates[endpointID], segmentID)
 		}
 	}
+	rawFDBObservations := buildFDBReporterObservations(seedMacLinks)
+	rawFDBReporterHints := buildFDBEndpointReporterHints(seedMacLinks)
 	fdbObservations := buildFDBReporterObservations(macLinks)
 	fdbOwners := inferFDBEndpointOwners(fdbObservations, reporterAliases, switchFacingPortKeys)
 	for endpointID, owner := range inferSinglePortEndpointOwners(macLinks, switchFacingPortKeys) {
@@ -558,8 +566,57 @@ func projectSegmentTopology(
 		out.endpointDirectOwners[endpointID] = owner
 	}
 	deviceIdentityByID := buildDeviceIdentityKeySetByID(deviceByID, adjacencies, ifaceByDeviceIndex)
+	reporterSegmentIndex := buildSegmentReporterIndex(segmentIDs, segmentByID)
+	aliasOwnerIDs := buildFDBAliasOwnerMap(reporterAliases)
 	allowedEndpointBySegment := make(map[string]map[string]struct{})
-	for endpointID, candidates := range endpointSegmentCandidates {
+	strictEndpointBySegment := make(map[string]map[string]struct{})
+	probableEndpointBySegment := make(map[string]map[string]struct{})
+	probableAttachmentModeBySegment := make(map[string]map[string]string)
+	allowEndpoint := func(segmentID, endpointID string, probable bool, probableMode string) {
+		if strings.TrimSpace(segmentID) == "" || strings.TrimSpace(endpointID) == "" {
+			return
+		}
+
+		allowed := allowedEndpointBySegment[segmentID]
+		if allowed == nil {
+			allowed = make(map[string]struct{})
+			allowedEndpointBySegment[segmentID] = allowed
+		}
+		allowed[endpointID] = struct{}{}
+
+		if !probable {
+			strictSet := strictEndpointBySegment[segmentID]
+			if strictSet == nil {
+				strictSet = make(map[string]struct{})
+				strictEndpointBySegment[segmentID] = strictSet
+			}
+			strictSet[endpointID] = struct{}{}
+			return
+		}
+
+		probableSet := probableEndpointBySegment[segmentID]
+		if probableSet == nil {
+			probableSet = make(map[string]struct{})
+			probableEndpointBySegment[segmentID] = probableSet
+		}
+		probableSet[endpointID] = struct{}{}
+		if strings.TrimSpace(probableMode) == "" {
+			probableMode = "probable_segment"
+		}
+		modes := probableAttachmentModeBySegment[segmentID]
+		if modes == nil {
+			modes = make(map[string]string)
+			probableAttachmentModeBySegment[segmentID] = modes
+		}
+		modes[endpointID] = probableMode
+	}
+	endpointIDs := collectTopologyEndpointIDs(endpointMatchByID, endpointLabelsByID, endpointSegmentCandidates, rawFDBObservations, fdbObservations)
+	baseCandidatesByEndpoint := make(map[string][]string, len(endpointIDs))
+	probableBaseCandidatesByEndpoint := make(map[string][]string, len(endpointIDs))
+	strictLinkedEndpoints := make(map[string]struct{}, len(endpointIDs))
+
+	for _, endpointID := range endpointIDs {
+		candidates := endpointSegmentCandidates[endpointID]
 		candidateSet := make(map[string]struct{}, len(candidates))
 		for _, candidate := range candidates {
 			candidate = strings.TrimSpace(candidate)
@@ -570,18 +627,12 @@ func projectSegmentTopology(
 		}
 		sortedCandidates := sortedTopologySet(candidateSet)
 		out.endpointLinksCandidates += len(sortedCandidates)
+		baseCandidatesByEndpoint[endpointID] = sortedCandidates
+		strictSegmentID := ""
+		probableCandidates := sortedCandidates
 		if len(sortedCandidates) == 1 {
-			segmentID := sortedCandidates[0]
-			allowed := allowedEndpointBySegment[segmentID]
-			if allowed == nil {
-				allowed = make(map[string]struct{})
-				allowedEndpointBySegment[segmentID] = allowed
-			}
-			allowed[endpointID] = struct{}{}
-			continue
-		}
-
-		if owner, ok := fdbOwners[endpointID]; ok {
+			strictSegmentID = sortedCandidates[0]
+		} else if owner, ok := fdbOwners[endpointID]; ok {
 			filtered := make([]string, 0, len(sortedCandidates))
 			for _, segmentID := range sortedCandidates {
 				portKeys := segmentPortKeys[segmentID]
@@ -597,20 +648,126 @@ func projectSegmentTopology(
 				}
 			}
 			if len(filtered) == 1 {
-				segmentID := filtered[0]
-				allowed := allowedEndpointBySegment[segmentID]
-				if allowed == nil {
-					allowed = make(map[string]struct{})
-					allowedEndpointBySegment[segmentID] = allowed
-				}
-				allowed[endpointID] = struct{}{}
-				continue
+				strictSegmentID = filtered[0]
+			}
+			if len(filtered) > 0 {
+				probableCandidates = filtered
 			}
 		}
+		probableBaseCandidatesByEndpoint[endpointID] = probableCandidates
 
-		if len(sortedCandidates) > 1 {
-			out.endpointsWithAmbiguousSegment++
-			out.endpointLinksSuppressed += len(sortedCandidates)
+		if strictSegmentID != "" {
+			allowEndpoint(strictSegmentID, endpointID, false, "")
+			strictLinkedEndpoints[endpointID] = struct{}{}
+		}
+	}
+
+	if probabilisticConnectivity {
+		for _, endpointID := range endpointIDs {
+			if _, strictLinked := strictLinkedEndpoints[endpointID]; strictLinked {
+				continue
+			}
+
+			baseCandidates := baseCandidatesByEndpoint[endpointID]
+			probableCandidates := append([]string(nil), probableBaseCandidatesByEndpoint[endpointID]...)
+			if len(probableCandidates) == 0 {
+				probableCandidates = probableCandidateSegmentsFromReporterHints(
+					endpointLabelsByID[endpointID],
+					rawFDBObservations.byEndpoint[normalizeFDBEndpointID(endpointID)],
+					reporterSegmentIndex,
+					aliasOwnerIDs,
+				)
+			}
+
+			segmentID := pickMostProbableSegment(
+				probableCandidates,
+				endpointLabelsByID[endpointID],
+				segmentIfIndexes,
+				segmentIfNames,
+			)
+			if segmentID == "" && len(probableCandidates) > 0 {
+				segmentID = probableCandidates[0]
+			}
+
+			if segmentID == "" {
+				hint := selectProbableEndpointReporterHint(
+					endpointLabelsByID[endpointID],
+					rawFDBReporterHints[normalizeFDBEndpointID(endpointID)],
+					fdbOwners[endpointID],
+					aliasOwnerIDs,
+				)
+				if strings.TrimSpace(hint.deviceID) != "" {
+					created := false
+					segmentID, created = ensureProbablePortlessSegment(segmentByID, hint)
+					if created {
+						segmentIDs = append(segmentIDs, segmentID)
+						segmentIfIndexes[segmentID] = make(map[string]struct{})
+						segmentIfNames[segmentID] = make(map[string]struct{})
+						if hint.ifIndex > 0 {
+							segmentIfIndexes[segmentID][strconv.Itoa(hint.ifIndex)] = struct{}{}
+						}
+						if ifName := strings.ToLower(strings.TrimSpace(hint.ifName)); ifName != "" {
+							segmentIfNames[segmentID][ifName] = struct{}{}
+						}
+						match, actor := buildBridgeSegmentActor(segmentID, segmentByID[segmentID], layer, source)
+						keys := topologyMatchIdentityKeys(actor.Match)
+						if len(keys) > 0 && !topologyIdentityIndexOverlaps(actorIndex, keys) {
+							addTopologyIdentityKeys(actorIndex, keys)
+						}
+						out.actors = append(out.actors, actor)
+						segmentMatchByID[segmentID] = match
+					}
+					if seg := segmentByID[segmentID]; seg != nil {
+						seg.addEndpoint(endpointID, "probable")
+					}
+				}
+			}
+
+			if segmentID != "" {
+				probableMode := "probable_segment"
+				if strings.HasPrefix(segmentID, "bridge-domain:probable:") {
+					probableMode = "probable_portless"
+				}
+				allowEndpoint(segmentID, endpointID, true, probableMode)
+				if len(baseCandidates) > 1 {
+					out.endpointLinksSuppressed += len(baseCandidates) - 1
+				}
+				continue
+			}
+
+			if len(baseCandidates) > 1 {
+				out.endpointsWithAmbiguousSegment++
+				out.endpointLinksSuppressed += len(baseCandidates)
+			}
+		}
+	} else {
+		for _, endpointID := range endpointIDs {
+			if _, strictLinked := strictLinkedEndpoints[endpointID]; strictLinked {
+				continue
+			}
+			baseCandidates := baseCandidatesByEndpoint[endpointID]
+			if len(baseCandidates) > 1 {
+				out.endpointsWithAmbiguousSegment++
+				out.endpointLinksSuppressed += len(baseCandidates)
+			}
+		}
+	}
+	sort.Strings(segmentIDs)
+
+	probableOnlyAnchorPortIDBySegment := make(map[string]string)
+	for _, segmentID := range segmentIDs {
+		if len(probableEndpointBySegment[segmentID]) == 0 {
+			continue
+		}
+		if len(strictEndpointBySegment[segmentID]) > 0 {
+			continue
+		}
+		segment := segmentByID[segmentID]
+		if segment == nil {
+			continue
+		}
+		if portID := pickProbableSegmentAnchorPortID(segment, probableEndpointBySegment[segmentID], fdbOwners); portID != "" {
+			probableOnlyAnchorPortIDBySegment[segmentID] = portID
 		}
 	}
 
@@ -632,7 +789,11 @@ func projectSegmentTopology(
 			portIDs = append(portIDs, portID)
 		}
 		sort.Strings(portIDs)
+		probableOnlyAnchorPortID := probableOnlyAnchorPortIDBySegment[segmentID]
 		for _, portID := range portIDs {
+			if probableOnlyAnchorPortID != "" && portID != probableOnlyAnchorPortID {
+				continue
+			}
 			port := segment.ports[portID]
 			device, ok := deviceByID[port.deviceID]
 			if !ok {
@@ -669,16 +830,19 @@ func projectSegmentTopology(
 			segmentsWithAnyLinks[segmentID] = struct{}{}
 		}
 
-		endpointIDs := make([]string, 0, len(segment.endpointIDs))
-		for endpointID := range segment.endpointIDs {
-			endpointIDs = append(endpointIDs, endpointID)
-		}
-		sort.Strings(endpointIDs)
 		allowedEndpoints := allowedEndpointBySegment[segmentID]
+		if len(allowedEndpoints) == 0 {
+			continue
+		}
+		endpointSet := make(map[string]struct{}, len(segment.endpointIDs)+len(allowedEndpoints))
+		for endpointID := range segment.endpointIDs {
+			endpointSet[endpointID] = struct{}{}
+		}
+		for endpointID := range allowedEndpoints {
+			endpointSet[endpointID] = struct{}{}
+		}
+		endpointIDs := sortedTopologySet(endpointSet)
 		for _, endpointID := range endpointIDs {
-			if len(allowedEndpoints) == 0 {
-				continue
-			}
 			if _, ok := allowedEndpoints[endpointID]; !ok {
 				continue
 			}
@@ -692,39 +856,64 @@ func projectSegmentTopology(
 			}
 			overlappingDeviceIDs := endpointMatchOverlappingKnownDeviceIDs(endpointMatch, deviceIdentityByID)
 			if len(overlappingDeviceIDs) > 0 {
-				if len(overlappingDeviceIDs) == 1 {
-					matchedDeviceID := overlappingDeviceIDs[0]
-					if segmentContainsDevice(segment, matchedDeviceID) {
-						out.endpointLinksSuppressed++
-						continue
-					}
-					if matchedDevice, ok := deviceByID[matchedDeviceID]; ok {
-						edgeKey := segmentID + "|managed-device|" + matchedDeviceID
-						if _, seen := endpointSegmentEdgeSeen[edgeKey]; !seen {
-							endpointSegmentEdgeSeen[edgeKey] = struct{}{}
-							out.links = append(out.links, topology.Link{
-								Layer:        layer,
-								Protocol:     "fdb",
-								Direction:    "bidirectional",
-								Src:          segmentEndpoint,
-								Dst:          adjacencySideToEndpoint(matchedDevice, "", ifIndexByDeviceName, ifaceByDeviceIndex),
-								DiscoveredAt: topologyTimePtr(collectedAt),
-								LastSeen:     topologyTimePtr(collectedAt),
-								Metrics: map[string]any{
-									"bridge_domain":   segmentID,
-									"attachment_mode": "managed_device_overlap",
-								},
-							})
-							out.linksFdb++
-							out.bidirectionalCount++
-							out.endpointLinksEmitted++
-							segmentsWithAnyLinks[segmentID] = struct{}{}
-						}
-						continue
+				matchedManagedDeviceIDs := make([]string, 0, len(overlappingDeviceIDs))
+				for _, overlapID := range overlappingDeviceIDs {
+					if _, ok := deviceByID[overlapID]; ok {
+						matchedManagedDeviceIDs = append(matchedManagedDeviceIDs, overlapID)
 					}
 				}
-				out.endpointLinksSuppressed++
-				continue
+				if len(matchedManagedDeviceIDs) > 0 {
+					if len(matchedManagedDeviceIDs) == 1 {
+						matchedDeviceID := matchedManagedDeviceIDs[0]
+						if segmentContainsDevice(segment, matchedDeviceID) {
+							if out.suppressedManagedOverlapIDs == nil {
+								out.suppressedManagedOverlapIDs = make(map[string]struct{})
+							}
+							out.suppressedManagedOverlapIDs[normalizeFDBEndpointID(endpointID)] = struct{}{}
+							out.endpointLinksSuppressed++
+							continue
+						}
+						if matchedDevice, ok := deviceByID[matchedDeviceID]; ok {
+							edgeKey := segmentID + "|managed-device|" + matchedDeviceID
+							if _, seen := endpointSegmentEdgeSeen[edgeKey]; !seen {
+								endpointSegmentEdgeSeen[edgeKey] = struct{}{}
+								out.links = append(out.links, topology.Link{
+									Layer:        layer,
+									Protocol:     "fdb",
+									Direction:    "bidirectional",
+									Src:          segmentEndpoint,
+									Dst:          adjacencySideToEndpoint(matchedDevice, "", ifIndexByDeviceName, ifaceByDeviceIndex),
+									DiscoveredAt: topologyTimePtr(collectedAt),
+									LastSeen:     topologyTimePtr(collectedAt),
+									Metrics: map[string]any{
+										"bridge_domain":   segmentID,
+										"attachment_mode": "managed_device_overlap",
+									},
+								})
+								out.linksFdb++
+								out.bidirectionalCount++
+								out.endpointLinksEmitted++
+								segmentsWithAnyLinks[segmentID] = struct{}{}
+							}
+							if out.suppressedManagedOverlapIDs == nil {
+								out.suppressedManagedOverlapIDs = make(map[string]struct{})
+							}
+							out.suppressedManagedOverlapIDs[normalizeFDBEndpointID(endpointID)] = struct{}{}
+							continue
+						}
+					}
+					if out.suppressedManagedOverlapIDs == nil {
+						out.suppressedManagedOverlapIDs = make(map[string]struct{})
+					}
+					out.suppressedManagedOverlapIDs[normalizeFDBEndpointID(endpointID)] = struct{}{}
+					out.endpointLinksSuppressed++
+					continue
+				}
+				if !probabilisticConnectivity {
+					out.endpointLinksSuppressed++
+					continue
+				}
+				allowEndpoint(segmentID, endpointID, true, "probable_segment")
 			}
 
 			if owner, hasOwner := out.endpointDirectOwners[endpointID]; hasOwner &&
@@ -736,6 +925,18 @@ func projectSegmentTopology(
 						edgeKey := "direct|" + bridgePortObservationVLANKey(owner.port) + "|" + endpointID
 						if _, seen := endpointSegmentEdgeSeen[edgeKey]; !seen {
 							endpointSegmentEdgeSeen[edgeKey] = struct{}{}
+							metrics := map[string]any{
+								"attachment_mode": "direct",
+							}
+							linkState := ""
+							if probableSet := probableEndpointBySegment[segmentID]; len(probableSet) > 0 {
+								if _, isProbable := probableSet[endpointID]; isProbable {
+									metrics["attachment_mode"] = "probable_direct"
+									metrics["inference"] = "probable"
+									metrics["confidence"] = "low"
+									linkState = "probable"
+								}
+							}
 							out.links = append(out.links, topology.Link{
 								Layer:        layer,
 								Protocol:     "fdb",
@@ -744,9 +945,8 @@ func projectSegmentTopology(
 								Dst:          topology.LinkEndpoint{Match: endpointMatch},
 								DiscoveredAt: topologyTimePtr(collectedAt),
 								LastSeen:     topologyTimePtr(collectedAt),
-								Metrics: map[string]any{
-									"attachment_mode": "direct",
-								},
+								State:        linkState,
+								Metrics:      metrics,
 							})
 							out.linksFdb++
 							out.bidirectionalCount++
@@ -763,6 +963,26 @@ func projectSegmentTopology(
 			}
 			endpointSegmentEdgeSeen[edgeKey] = struct{}{}
 
+			metrics := map[string]any{
+				"bridge_domain": segmentID,
+			}
+			linkState := ""
+			if probableSet := probableEndpointBySegment[segmentID]; len(probableSet) > 0 {
+				if _, isProbable := probableSet[endpointID]; isProbable {
+					probableMode := ""
+					if modes := probableAttachmentModeBySegment[segmentID]; len(modes) > 0 {
+						probableMode = strings.TrimSpace(modes[endpointID])
+					}
+					if probableMode == "" {
+						probableMode = "probable_segment"
+					}
+					metrics["attachment_mode"] = probableMode
+					metrics["inference"] = "probable"
+					metrics["confidence"] = "low"
+					linkState = "probable"
+				}
+			}
+
 			out.links = append(out.links, topology.Link{
 				Layer:        layer,
 				Protocol:     "fdb",
@@ -771,9 +991,8 @@ func projectSegmentTopology(
 				Dst:          topology.LinkEndpoint{Match: endpointMatch},
 				DiscoveredAt: topologyTimePtr(collectedAt),
 				LastSeen:     topologyTimePtr(collectedAt),
-				Metrics: map[string]any{
-					"bridge_domain": segmentID,
-				},
+				State:        linkState,
+				Metrics:      metrics,
 			})
 			out.linksFdb++
 			out.bidirectionalCount++
@@ -820,6 +1039,575 @@ func projectSegmentTopology(
 
 	sortTopologyLinks(out.links)
 	return out
+}
+
+func pickProbableSegmentAnchorPortID(
+	segment *bridgeDomainSegment,
+	probableEndpoints map[string]struct{},
+	fdbOwners map[string]fdbEndpointOwner,
+) string {
+	if segment == nil || len(segment.ports) == 0 {
+		return ""
+	}
+
+	portIDs := make([]string, 0, len(segment.ports))
+	portIDByObservation := make(map[string]string, len(segment.ports)*2)
+	designatedPortID := ""
+	for portID, port := range segment.ports {
+		portIDs = append(portIDs, portID)
+		if key := bridgePortObservationKey(port); key != "" {
+			portIDByObservation[key] = portID
+		}
+		if key := bridgePortObservationVLANKey(port); key != "" {
+			portIDByObservation[key] = portID
+		}
+		if segment.portIdentityKey(port) == segment.portIdentityKey(segment.designatedPort) {
+			designatedPortID = portID
+		}
+	}
+	sort.Strings(portIDs)
+
+	endpointIDs := sortedTopologySet(probableEndpoints)
+	for _, endpointID := range endpointIDs {
+		owner, ok := fdbOwners[endpointID]
+		if !ok {
+			continue
+		}
+		if portID, ok := portIDByObservation[owner.portVLANKey]; ok {
+			return portID
+		}
+		if portID, ok := portIDByObservation[owner.portKey]; ok {
+			return portID
+		}
+	}
+
+	if designatedPortID != "" {
+		return designatedPortID
+	}
+	return portIDs[0]
+}
+
+func pickMostProbableSegment(
+	candidates []string,
+	endpointLabels map[string]string,
+	segmentIfIndexes map[string]map[string]struct{},
+	segmentIfNames map[string]map[string]struct{},
+) string {
+	if len(candidates) == 0 {
+		return ""
+	}
+	if len(candidates) == 1 {
+		return candidates[0]
+	}
+
+	ifIndexes := make(map[string]struct{})
+	for _, ifIndex := range labelsCSVToSlice(endpointLabels, "learned_if_indexes") {
+		ifIndex = strings.TrimSpace(ifIndex)
+		if ifIndex == "" {
+			continue
+		}
+		ifIndexes[ifIndex] = struct{}{}
+	}
+	ifNames := make(map[string]struct{})
+	for _, ifName := range labelsCSVToSlice(endpointLabels, "learned_if_names") {
+		ifName = strings.ToLower(strings.TrimSpace(ifName))
+		if ifName == "" {
+			continue
+		}
+		ifNames[ifName] = struct{}{}
+	}
+
+	bestID := ""
+	bestScore := -1
+	for _, segmentID := range candidates {
+		score := 0
+		for ifIndex := range ifIndexes {
+			if indexes := segmentIfIndexes[segmentID]; indexes != nil {
+				if _, ok := indexes[ifIndex]; ok {
+					score += 2
+				}
+			}
+		}
+		for ifName := range ifNames {
+			if names := segmentIfNames[segmentID]; names != nil {
+				if _, ok := names[ifName]; ok {
+					score++
+				}
+			}
+		}
+		if score > bestScore {
+			bestScore = score
+			bestID = segmentID
+			continue
+		}
+		if score == bestScore && (bestID == "" || segmentID < bestID) {
+			bestID = segmentID
+		}
+	}
+	if bestID != "" {
+		return bestID
+	}
+	return candidates[0]
+}
+
+func buildBridgeSegmentActor(segmentID string, segment *bridgeDomainSegment, layer string, source string) (topology.Match, topology.Actor) {
+	parentDevices := make(map[string]struct{})
+	ifNames := make(map[string]struct{})
+	ifIndexes := make(map[string]struct{})
+	bridgePorts := make(map[string]struct{})
+	vlanIDs := make(map[string]struct{})
+	if segment != nil {
+		for _, port := range segment.ports {
+			if strings.TrimSpace(port.deviceID) != "" {
+				parentDevices[port.deviceID] = struct{}{}
+			}
+			if strings.TrimSpace(port.ifName) != "" {
+				ifNames[port.ifName] = struct{}{}
+			}
+			if port.ifIndex > 0 {
+				ifIndexes[strconv.Itoa(port.ifIndex)] = struct{}{}
+			}
+			if strings.TrimSpace(port.bridgePort) != "" {
+				bridgePorts[port.bridgePort] = struct{}{}
+			}
+			if strings.TrimSpace(port.vlanID) != "" {
+				vlanIDs[port.vlanID] = struct{}{}
+			}
+		}
+	}
+
+	match := topology.Match{
+		Hostnames: []string{"segment:" + segmentID},
+	}
+
+	attrs := map[string]any{
+		"segment_id":      segmentID,
+		"segment_type":    "broadcast_domain",
+		"parent_devices":  sortedTopologySet(parentDevices),
+		"if_names":        sortedTopologySet(ifNames),
+		"if_indexes":      sortedTopologySet(ifIndexes),
+		"bridge_ports":    sortedTopologySet(bridgePorts),
+		"vlan_ids":        sortedTopologySet(vlanIDs),
+		"ports_total":     0,
+		"endpoints_total": 0,
+	}
+	if segment != nil {
+		attrs["learned_sources"] = sortedTopologySet(segment.methods)
+		attrs["ports_total"] = len(segment.ports)
+		attrs["endpoints_total"] = len(segment.endpointIDs)
+		if bridgePortRefKey(segment.designatedPort, false, false) != "" {
+			attrs["designated_port"] = bridgePortRefSortKey(segment.designatedPort)
+		}
+	}
+
+	actor := topology.Actor{
+		ActorType:  "segment",
+		Layer:      layer,
+		Source:     source,
+		Match:      match,
+		Attributes: pruneTopologyAttributes(attrs),
+		Labels: map[string]string{
+			"segment_kind": "broadcast_domain",
+		},
+	}
+
+	return match, actor
+}
+
+func collectTopologyEndpointIDs(
+	endpointMatchByID map[string]topology.Match,
+	endpointLabelsByID map[string]map[string]string,
+	endpointSegmentCandidates map[string][]string,
+	rawFDBObservations fdbReporterObservation,
+	filteredFDBObservations fdbReporterObservation,
+) []string {
+	set := make(map[string]struct{})
+	for endpointID := range endpointMatchByID {
+		endpointID = strings.TrimSpace(endpointID)
+		if endpointID != "" {
+			set[endpointID] = struct{}{}
+		}
+	}
+	for endpointID := range endpointLabelsByID {
+		endpointID = strings.TrimSpace(endpointID)
+		if endpointID != "" {
+			set[endpointID] = struct{}{}
+		}
+	}
+	for endpointID := range endpointSegmentCandidates {
+		endpointID = strings.TrimSpace(endpointID)
+		if endpointID != "" {
+			set[endpointID] = struct{}{}
+		}
+	}
+	for endpointID := range rawFDBObservations.byEndpoint {
+		endpointID = strings.TrimSpace(endpointID)
+		if endpointID != "" {
+			set[endpointID] = struct{}{}
+		}
+	}
+	for endpointID := range filteredFDBObservations.byEndpoint {
+		endpointID = strings.TrimSpace(endpointID)
+		if endpointID != "" {
+			set[endpointID] = struct{}{}
+		}
+	}
+	return sortedTopologySet(set)
+}
+
+func buildFDBEndpointReporterHints(macLinks []bridgeMacLinkRecord) map[string]map[string][]bridgePortRef {
+	if len(macLinks) == 0 {
+		return nil
+	}
+
+	byEndpointReporterPorts := make(map[string]map[string]map[string]bridgePortRef)
+	for _, link := range macLinks {
+		if strings.ToLower(strings.TrimSpace(link.method)) != "fdb" {
+			continue
+		}
+		endpointID := normalizeFDBEndpointID(link.endpointID)
+		reporterID := strings.TrimSpace(link.port.deviceID)
+		portKey := bridgePortObservationVLANKey(link.port)
+		if endpointID == "" || reporterID == "" || portKey == "" {
+			continue
+		}
+		reporters := byEndpointReporterPorts[endpointID]
+		if reporters == nil {
+			reporters = make(map[string]map[string]bridgePortRef)
+			byEndpointReporterPorts[endpointID] = reporters
+		}
+		ports := reporters[reporterID]
+		if ports == nil {
+			ports = make(map[string]bridgePortRef)
+			reporters[reporterID] = ports
+		}
+		ports[portKey] = link.port
+	}
+
+	out := make(map[string]map[string][]bridgePortRef, len(byEndpointReporterPorts))
+	for endpointID, reporters := range byEndpointReporterPorts {
+		reporterHints := make(map[string][]bridgePortRef, len(reporters))
+		reporterIDs := make([]string, 0, len(reporters))
+		for reporterID := range reporters {
+			reporterIDs = append(reporterIDs, reporterID)
+		}
+		sort.Strings(reporterIDs)
+		for _, reporterID := range reporterIDs {
+			portsMap := reporters[reporterID]
+			if len(portsMap) == 0 {
+				continue
+			}
+			portKeys := make([]string, 0, len(portsMap))
+			for key := range portsMap {
+				portKeys = append(portKeys, key)
+			}
+			sort.Strings(portKeys)
+			ports := make([]bridgePortRef, 0, len(portKeys))
+			for _, key := range portKeys {
+				ports = append(ports, portsMap[key])
+			}
+			reporterHints[reporterID] = ports
+		}
+		if len(reporterHints) > 0 {
+			out[endpointID] = reporterHints
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func buildSegmentReporterIndex(
+	segmentIDs []string,
+	segmentByID map[string]*bridgeDomainSegment,
+) segmentReporterIndex {
+	index := segmentReporterIndex{
+		byDevice:        make(map[string]map[string]struct{}),
+		byDeviceIfIndex: make(map[string]map[string]struct{}),
+		byDeviceIfName:  make(map[string]map[string]struct{}),
+	}
+	for _, segmentID := range segmentIDs {
+		segment := segmentByID[segmentID]
+		if segment == nil {
+			continue
+		}
+		for _, port := range segment.ports {
+			deviceID := strings.TrimSpace(port.deviceID)
+			if deviceID == "" {
+				continue
+			}
+			addStringSet(index.byDevice, deviceID, segmentID)
+			if port.ifIndex > 0 {
+				addStringSet(index.byDeviceIfIndex, deviceID+"|"+strconv.Itoa(port.ifIndex), segmentID)
+			}
+			if ifName := strings.ToLower(strings.TrimSpace(port.ifName)); ifName != "" {
+				addStringSet(index.byDeviceIfName, deviceID+"|"+ifName, segmentID)
+			}
+		}
+	}
+	return index
+}
+
+func addStringSet(out map[string]map[string]struct{}, key string, value string) {
+	key = strings.TrimSpace(key)
+	value = strings.TrimSpace(value)
+	if key == "" || value == "" {
+		return
+	}
+	set := out[key]
+	if set == nil {
+		set = make(map[string]struct{})
+		out[key] = set
+	}
+	set[value] = struct{}{}
+}
+
+func probableCandidateSegmentsFromReporterHints(
+	endpointLabels map[string]string,
+	fdbReporters map[string]map[string]struct{},
+	reporterSegmentIndex segmentReporterIndex,
+	aliasOwnerIDs map[string]map[string]struct{},
+) []string {
+	deviceIDs := resolveTopologyEndpointDeviceHints(
+		topologyEndpointLabelDeviceIDs(endpointLabels),
+		aliasOwnerIDs,
+	)
+	if len(deviceIDs) == 0 {
+		for reporterID := range fdbReporters {
+			reporterID = strings.TrimSpace(reporterID)
+			if reporterID == "" {
+				continue
+			}
+			deviceIDs = append(deviceIDs, reporterID)
+		}
+		deviceIDs = resolveTopologyEndpointDeviceHints(deviceIDs, aliasOwnerIDs)
+	}
+	if len(deviceIDs) == 0 {
+		return nil
+	}
+
+	ifIndexes := labelsCSVToSlice(endpointLabels, "learned_if_indexes")
+	ifNames := labelsCSVToSlice(endpointLabels, "learned_if_names")
+	hasPortHints := false
+	for _, ifIndex := range ifIndexes {
+		if strings.TrimSpace(ifIndex) != "" {
+			hasPortHints = true
+			break
+		}
+	}
+	if !hasPortHints {
+		for _, ifName := range ifNames {
+			if strings.TrimSpace(ifName) != "" {
+				hasPortHints = true
+				break
+			}
+		}
+	}
+	candidateSet := make(map[string]struct{})
+
+	for _, deviceID := range deviceIDs {
+		for _, ifIndex := range ifIndexes {
+			ifIndex = strings.TrimSpace(ifIndex)
+			if ifIndex == "" {
+				continue
+			}
+			for segmentID := range reporterSegmentIndex.byDeviceIfIndex[deviceID+"|"+ifIndex] {
+				candidateSet[segmentID] = struct{}{}
+			}
+		}
+		for _, ifName := range ifNames {
+			ifName = strings.ToLower(strings.TrimSpace(ifName))
+			if ifName == "" {
+				continue
+			}
+			for segmentID := range reporterSegmentIndex.byDeviceIfName[deviceID+"|"+ifName] {
+				candidateSet[segmentID] = struct{}{}
+			}
+		}
+	}
+
+	if len(candidateSet) == 0 && !hasPortHints {
+		for _, deviceID := range deviceIDs {
+			for segmentID := range reporterSegmentIndex.byDevice[deviceID] {
+				candidateSet[segmentID] = struct{}{}
+			}
+		}
+	}
+	if len(candidateSet) == 0 {
+		return nil
+	}
+	return sortedTopologySet(candidateSet)
+}
+
+func selectProbableEndpointReporterHint(
+	endpointLabels map[string]string,
+	reporterHints map[string][]bridgePortRef,
+	owner fdbEndpointOwner,
+	aliasOwnerIDs map[string]map[string]struct{},
+) probableEndpointReporterHint {
+	if strings.TrimSpace(owner.port.deviceID) != "" {
+		return probableEndpointReporterHint{
+			deviceID: strings.TrimSpace(owner.port.deviceID),
+			ifIndex:  owner.port.ifIndex,
+			ifName:   strings.TrimSpace(owner.port.ifName),
+		}
+	}
+
+	deviceIDs := resolveTopologyEndpointDeviceHints(
+		topologyEndpointLabelDeviceIDs(endpointLabels),
+		aliasOwnerIDs,
+	)
+	if len(deviceIDs) == 0 {
+		for reporterID := range reporterHints {
+			reporterID = strings.TrimSpace(reporterID)
+			if reporterID == "" {
+				continue
+			}
+			deviceIDs = append(deviceIDs, reporterID)
+		}
+		deviceIDs = resolveTopologyEndpointDeviceHints(deviceIDs, aliasOwnerIDs)
+	}
+	if len(deviceIDs) == 0 {
+		return probableEndpointReporterHint{}
+	}
+
+	ifIndexes := labelsCSVToSlice(endpointLabels, "learned_if_indexes")
+	ifNames := labelsCSVToSlice(endpointLabels, "learned_if_names")
+	parsedIfIndex := 0
+	for _, value := range ifIndexes {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if n, err := strconv.Atoi(value); err == nil && n > 0 {
+			parsedIfIndex = n
+			break
+		}
+	}
+	parsedIfName := ""
+	for _, value := range ifNames {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			parsedIfName = value
+			break
+		}
+	}
+
+	selectedDeviceID := deviceIDs[0]
+	for _, deviceID := range deviceIDs {
+		if len(reporterHints[deviceID]) > 0 {
+			selectedDeviceID = deviceID
+			break
+		}
+	}
+	hint := probableEndpointReporterHint{
+		deviceID: selectedDeviceID,
+		ifIndex:  parsedIfIndex,
+		ifName:   parsedIfName,
+	}
+	if ports := reporterHints[selectedDeviceID]; len(ports) > 0 {
+		sort.SliceStable(ports, func(i, j int) bool {
+			return bridgePortRefSortKey(ports[i]) < bridgePortRefSortKey(ports[j])
+		})
+		port := ports[0]
+		if hint.ifIndex == 0 && port.ifIndex > 0 {
+			hint.ifIndex = port.ifIndex
+		}
+		if strings.TrimSpace(hint.ifName) == "" && strings.TrimSpace(port.ifName) != "" {
+			hint.ifName = strings.TrimSpace(port.ifName)
+		}
+	}
+
+	if hint.ifIndex == 0 && strings.TrimSpace(hint.ifName) == "" {
+		hint.ifName = "0"
+	}
+	return hint
+}
+
+func topologyEndpointLabelDeviceIDs(labels map[string]string) []string {
+	out := labelsCSVToSlice(labels, "learned_device_ids")
+	if len(out) == 0 {
+		out = labelsCSVToSlice(labels, "device_ids")
+	}
+	out = uniqueTopologyStrings(out)
+	sort.Strings(out)
+	return out
+}
+
+func resolveTopologyEndpointDeviceHints(
+	hints []string,
+	aliasOwnerIDs map[string]map[string]struct{},
+) []string {
+	set := make(map[string]struct{})
+	for _, hint := range hints {
+		hint = strings.TrimSpace(hint)
+		if hint == "" {
+			continue
+		}
+		if alias := normalizeTopologyEndpointDeviceAlias(hint); alias != "" {
+			if owners := aliasOwnerIDs[alias]; len(owners) > 0 {
+				for ownerID := range owners {
+					ownerID = strings.TrimSpace(ownerID)
+					if ownerID == "" {
+						continue
+					}
+					set[ownerID] = struct{}{}
+				}
+				continue
+			}
+		}
+		set[hint] = struct{}{}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	out := sortedTopologySet(set)
+	return out
+}
+
+func normalizeTopologyEndpointDeviceAlias(hint string) string {
+	hint = strings.TrimSpace(hint)
+	if hint == "" {
+		return ""
+	}
+	if alias := normalizeFDBEndpointID(hint); alias != "" {
+		return alias
+	}
+	lower := strings.ToLower(hint)
+	if strings.HasPrefix(lower, "macaddress:") {
+		if mac := normalizeMAC(hint[len("macAddress:"):]); mac != "" {
+			return "mac:" + mac
+		}
+	}
+	return ""
+}
+
+func ensureProbablePortlessSegment(
+	segmentByID map[string]*bridgeDomainSegment,
+	hint probableEndpointReporterHint,
+) (string, bool) {
+	deviceID := strings.TrimSpace(hint.deviceID)
+	if deviceID == "" {
+		return "", false
+	}
+	port := bridgePortRef{
+		deviceID: deviceID,
+		ifIndex:  hint.ifIndex,
+		ifName:   strings.TrimSpace(hint.ifName),
+	}
+	if port.ifIndex == 0 && strings.TrimSpace(port.ifName) == "" {
+		port.ifName = "0"
+	}
+
+	segmentID := "bridge-domain:probable:" + bridgePortRefSortKey(port)
+	if _, ok := segmentByID[segmentID]; ok {
+		return segmentID, false
+	}
+	segment := newBridgeDomainSegment(port)
+	segment.methods["probable"] = struct{}{}
+	segmentByID[segmentID] = segment
+	return segmentID, true
 }
 
 func endpointMatchFromID(endpointID string) topology.Match {
@@ -1710,6 +2498,299 @@ func topologyMetricString(metrics map[string]any, key string) string {
 	return strings.TrimSpace(typed)
 }
 
+func collapseActorsByIP(actors []topology.Actor) []topology.Actor {
+	if len(actors) <= 1 {
+		return actors
+	}
+
+	parent := make([]int, len(actors))
+	for i := range parent {
+		parent[i] = i
+	}
+	find := func(x int) int {
+		for parent[x] != x {
+			parent[x] = parent[parent[x]]
+			x = parent[x]
+		}
+		return x
+	}
+	union := func(a, b int) {
+		ra := find(a)
+		rb := find(b)
+		if ra == rb {
+			return
+		}
+		if ra < rb {
+			parent[rb] = ra
+			return
+		}
+		parent[ra] = rb
+	}
+
+	ipOwner := make(map[string]int)
+	for idx, actor := range actors {
+		if strings.EqualFold(strings.TrimSpace(actor.ActorType), "segment") {
+			continue
+		}
+		ips := normalizedTopologyActorIPs(actor)
+		if len(ips) == 0 {
+			continue
+		}
+		for _, ip := range ips {
+			if owner, ok := ipOwner[ip]; ok {
+				union(idx, owner)
+				continue
+			}
+			ipOwner[ip] = idx
+		}
+	}
+
+	groups := make(map[int][]int)
+	for idx := range actors {
+		root := find(idx)
+		groups[root] = append(groups[root], idx)
+	}
+
+	keep := make([]bool, len(actors))
+	for i := range keep {
+		keep[i] = true
+	}
+	for _, members := range groups {
+		if len(members) <= 1 {
+			continue
+		}
+		rep := members[0]
+		for _, idx := range members[1:] {
+			if compareTopologyActorCollapsePriority(actors[idx], actors[rep]) < 0 {
+				rep = idx
+			}
+		}
+		merged := actors[rep]
+		collapsedCount := 1
+		for _, idx := range members {
+			if idx == rep {
+				continue
+			}
+			collapsedCount++
+			merged.Match = mergeTopologyActorMatch(merged.Match, actors[idx].Match)
+			merged.Labels = mergeTopologyActorLabels(merged.Labels, actors[idx].Labels)
+			merged.Attributes = mergeTopologyActorAttributes(merged.Attributes, actors[idx].Attributes)
+			keep[idx] = false
+		}
+		if collapsedCount > 1 {
+			if merged.Attributes == nil {
+				merged.Attributes = make(map[string]any)
+			}
+			merged.Attributes["collapsed_by_ip"] = true
+			merged.Attributes["collapsed_count"] = collapsedCount
+		}
+		actors[rep] = merged
+	}
+
+	out := make([]topology.Actor, 0, len(actors))
+	for idx, actor := range actors {
+		if !keep[idx] {
+			continue
+		}
+		out = append(out, actor)
+	}
+	return out
+}
+
+func eliminateNonIPInferredActors(actors []topology.Actor, links []topology.Link) ([]topology.Actor, []topology.Link) {
+	if len(actors) == 0 {
+		return actors, links
+	}
+	removedIdentityKeys := make(map[string]struct{})
+	filteredActors := make([]topology.Actor, 0, len(actors))
+	for _, actor := range actors {
+		if topologyActorIsInferred(actor) && len(normalizedTopologyActorIPs(actor)) == 0 {
+			for _, key := range topologyMatchIdentityKeys(actor.Match) {
+				removedIdentityKeys[key] = struct{}{}
+			}
+			continue
+		}
+		filteredActors = append(filteredActors, actor)
+	}
+	if len(removedIdentityKeys) == 0 {
+		return actors, links
+	}
+
+	filteredLinks := make([]topology.Link, 0, len(links))
+	for _, link := range links {
+		srcKeys := topologyMatchIdentityKeys(link.Src.Match)
+		dstKeys := topologyMatchIdentityKeys(link.Dst.Match)
+		if topologyIdentityKeysOverlap(srcKeys, removedIdentityKeys) {
+			continue
+		}
+		if topologyIdentityKeysOverlap(dstKeys, removedIdentityKeys) {
+			continue
+		}
+		filteredLinks = append(filteredLinks, link)
+	}
+	return filteredActors, filteredLinks
+}
+
+func topologyIdentityKeysOverlap(keys []string, set map[string]struct{}) bool {
+	if len(keys) == 0 || len(set) == 0 {
+		return false
+	}
+	for _, key := range keys {
+		if _, ok := set[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizedTopologyActorIPs(actor topology.Actor) []string {
+	if len(actor.Match.IPAddresses) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(actor.Match.IPAddresses))
+	out := make([]string, 0, len(actor.Match.IPAddresses))
+	for _, value := range actor.Match.IPAddresses {
+		ip := normalizeTopologyIP(value)
+		if ip == "" {
+			continue
+		}
+		if _, ok := seen[ip]; ok {
+			continue
+		}
+		seen[ip] = struct{}{}
+		out = append(out, ip)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func compareTopologyActorCollapsePriority(left, right topology.Actor) int {
+	leftDevice := strings.EqualFold(strings.TrimSpace(left.ActorType), "device")
+	rightDevice := strings.EqualFold(strings.TrimSpace(right.ActorType), "device")
+	if leftDevice != rightDevice {
+		if leftDevice {
+			return -1
+		}
+		return 1
+	}
+	leftInferred := topologyActorIsInferred(left)
+	rightInferred := topologyActorIsInferred(right)
+	if leftInferred != rightInferred {
+		if !leftInferred {
+			return -1
+		}
+		return 1
+	}
+	leftKey := canonicalTopologyMatchKey(left.Match)
+	rightKey := canonicalTopologyMatchKey(right.Match)
+	return strings.Compare(leftKey, rightKey)
+}
+
+func mergeTopologyActorMatch(base, other topology.Match) topology.Match {
+	base.ChassisIDs = mergeTopologyStringLists(base.ChassisIDs, other.ChassisIDs)
+	base.MacAddresses = mergeTopologyStringLists(base.MacAddresses, other.MacAddresses)
+	base.IPAddresses = mergeTopologyStringLists(base.IPAddresses, other.IPAddresses)
+	base.Hostnames = mergeTopologyStringLists(base.Hostnames, other.Hostnames)
+	base.DNSNames = mergeTopologyStringLists(base.DNSNames, other.DNSNames)
+	if strings.TrimSpace(base.SysName) == "" {
+		base.SysName = strings.TrimSpace(other.SysName)
+	}
+	if strings.TrimSpace(base.SysObjectID) == "" {
+		base.SysObjectID = strings.TrimSpace(other.SysObjectID)
+	}
+	return base
+}
+
+func mergeTopologyStringLists(base []string, extra []string) []string {
+	seen := make(map[string]struct{}, len(base)+len(extra))
+	out := make([]string, 0, len(base)+len(extra))
+	for _, value := range append(base, extra...) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func mergeTopologyActorLabels(base, extra map[string]string) map[string]string {
+	if len(extra) == 0 {
+		return base
+	}
+	if base == nil {
+		base = make(map[string]string, len(extra))
+	}
+	for key, value := range extra {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		if _, exists := base[key]; exists {
+			continue
+		}
+		base[key] = value
+	}
+	return base
+}
+
+func mergeTopologyActorAttributes(base, extra map[string]any) map[string]any {
+	if len(extra) == 0 {
+		return base
+	}
+	if base == nil {
+		base = make(map[string]any, len(extra))
+	}
+	for key, value := range extra {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		if _, exists := base[key]; exists {
+			continue
+		}
+		base[key] = value
+	}
+	return base
+}
+
+func topologyActorIsInferred(actor topology.Actor) bool {
+	if strings.EqualFold(strings.TrimSpace(actor.ActorType), "endpoint") {
+		return true
+	}
+	if topologyAnyBoolValue(actor.Attributes["inferred"]) {
+		return true
+	}
+	if len(actor.Labels) > 0 {
+		if topologyAnyBoolValue(actor.Labels["inferred"]) {
+			return true
+		}
+	}
+	return false
+}
+
+func topologyAnyBoolValue(value any) bool {
+	switch typed := value.(type) {
+	case bool:
+		return typed
+	case string:
+		switch strings.ToLower(strings.TrimSpace(typed)) {
+		case "1", "true", "yes", "on":
+			return true
+		}
+	}
+	return false
+}
+
 func pruneSegmentArtifacts(actors []topology.Actor, links []topology.Link) ([]topology.Actor, []topology.Link, int) {
 	if len(actors) == 0 || len(links) == 0 {
 		return actors, links, 0
@@ -1939,6 +3020,75 @@ func pruneUnlinkedEndpointActors(actors []topology.Actor, links []topology.Link)
 		filtered = append(filtered, actor)
 	}
 	return filtered
+}
+
+func pruneManagedOverlapUnlinkedEndpointActors(
+	actors []topology.Actor,
+	links []topology.Link,
+	suppressedEndpointIDs map[string]struct{},
+) ([]topology.Actor, int) {
+	if len(actors) == 0 || len(suppressedEndpointIDs) == 0 {
+		return actors, 0
+	}
+
+	suppressedIdentityKeys := make(map[string]struct{})
+	for endpointID := range suppressedEndpointIDs {
+		endpointID = normalizeFDBEndpointID(endpointID)
+		if endpointID == "" {
+			continue
+		}
+		match := endpointMatchFromID(endpointID)
+		for _, key := range topologyMatchIdentityKeys(match) {
+			key = strings.TrimSpace(key)
+			if key == "" {
+				continue
+			}
+			suppressedIdentityKeys[key] = struct{}{}
+		}
+	}
+	if len(suppressedIdentityKeys) == 0 {
+		return actors, 0
+	}
+
+	linkedIdentityKeys := make(map[string]struct{}, len(links)*2)
+	for _, link := range links {
+		for _, key := range topologyMatchIdentityKeys(link.Src.Match) {
+			key = strings.TrimSpace(key)
+			if key == "" {
+				continue
+			}
+			linkedIdentityKeys[key] = struct{}{}
+		}
+		for _, key := range topologyMatchIdentityKeys(link.Dst.Match) {
+			key = strings.TrimSpace(key)
+			if key == "" {
+				continue
+			}
+			linkedIdentityKeys[key] = struct{}{}
+		}
+	}
+
+	filtered := make([]topology.Actor, 0, len(actors))
+	suppressedCount := 0
+	for _, actor := range actors {
+		if !strings.EqualFold(strings.TrimSpace(actor.ActorType), "endpoint") {
+			filtered = append(filtered, actor)
+			continue
+		}
+
+		actorKeys := topologyMatchIdentityKeys(actor.Match)
+		if !topologyIdentityKeysOverlap(actorKeys, suppressedIdentityKeys) {
+			filtered = append(filtered, actor)
+			continue
+		}
+		// Keep endpoint actors that still participate in at least one emitted link.
+		if topologyIdentityKeysOverlap(actorKeys, linkedIdentityKeys) {
+			filtered = append(filtered, actor)
+			continue
+		}
+		suppressedCount++
+	}
+	return filtered, suppressedCount
 }
 
 func bridgeDomainSegmentID(segment *bridgeDomainSegment) string {
@@ -2752,6 +3902,9 @@ func buildEndpointActors(
 		}
 		acc := ensureEndpointActorAccumulator(accumulators, endpointID)
 		addEndpointIDIdentity(acc, endpointID)
+		if deviceID := strings.TrimSpace(attachment.DeviceID); deviceID != "" {
+			acc.deviceIDs[deviceID] = struct{}{}
+		}
 		if method := strings.TrimSpace(attachment.Method); method != "" {
 			acc.sources[strings.ToLower(method)] = struct{}{}
 		}
@@ -2787,6 +3940,13 @@ func buildEndpointActors(
 		}
 		for _, sourceName := range csvToSet(enrichment.Labels["sources"]) {
 			acc.sources[sourceName] = struct{}{}
+		}
+		for _, deviceID := range csvToSet(enrichment.Labels["device_ids"]) {
+			deviceID = strings.TrimSpace(deviceID)
+			if deviceID == "" {
+				continue
+			}
+			acc.deviceIDs[deviceID] = struct{}{}
 		}
 		for _, ifIndex := range csvToSet(enrichment.Labels["if_indexes"]) {
 			acc.ifIndexes[ifIndex] = struct{}{}
@@ -2827,12 +3987,16 @@ func buildEndpointActors(
 		match.IPAddresses = sortedEndpointIPs(acc.ips)
 		matchByEndpointID[endpointID] = match
 		labelsByEndpointID[endpointID] = map[string]string{
-			"learned_sources": strings.Join(sortedTopologySet(acc.sources), ","),
+			"learned_sources":    strings.Join(sortedTopologySet(acc.sources), ","),
+			"learned_device_ids": strings.Join(sortedTopologySet(acc.deviceIDs), ","),
+			"learned_if_indexes": strings.Join(sortedTopologySet(acc.ifIndexes), ","),
+			"learned_if_names":   strings.Join(sortedTopologySet(acc.ifNames), ","),
 		}
 
 		attrs := map[string]any{
 			"discovered":         true,
 			"learned_sources":    sortedTopologySet(acc.sources),
+			"learned_device_ids": sortedTopologySet(acc.deviceIDs),
 			"learned_if_indexes": sortedTopologySet(acc.ifIndexes),
 			"learned_if_names":   sortedTopologySet(acc.ifNames),
 		}
@@ -2880,6 +4044,7 @@ func ensureEndpointActorAccumulator(accumulators map[string]*endpointActorAccumu
 		endpointID: endpointID,
 		ips:        make(map[string]netip.Addr),
 		sources:    make(map[string]struct{}),
+		deviceIDs:  make(map[string]struct{}),
 		ifIndexes:  make(map[string]struct{}),
 		ifNames:    make(map[string]struct{}),
 	}

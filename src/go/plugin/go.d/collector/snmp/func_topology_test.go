@@ -12,19 +12,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTopologyMethodConfigIncludesViewSelector(t *testing.T) {
+func TestTopologyMethodConfigIncludesIdentityAndConnectivitySelectors(t *testing.T) {
 	cfg := topologyMethodConfig()
 	assert.True(t, cfg.AgentWide)
-	require.Len(t, cfg.RequiredParams, 1)
+	require.Len(t, cfg.RequiredParams, 2)
 
-	param := cfg.RequiredParams[0]
-	assert.Equal(t, topologyParamView, param.ID)
-	assert.Equal(t, funcapi.ParamSelect, param.Selection)
-	require.Len(t, param.Options, 3)
-	assert.Equal(t, topologyViewL2, param.Options[0].ID)
-	assert.True(t, param.Options[0].Default)
-	assert.Equal(t, topologyViewL3, param.Options[1].ID)
-	assert.Equal(t, topologyViewMerged, param.Options[2].ID)
+	identity := cfg.RequiredParams[0]
+	assert.Equal(t, topologyParamNodesIdentity, identity.ID)
+	assert.Equal(t, funcapi.ParamSelect, identity.Selection)
+	require.Len(t, identity.Options, 2)
+	assert.Equal(t, topologyNodesIdentityIP, identity.Options[0].ID)
+	assert.True(t, identity.Options[0].Default)
+	assert.Equal(t, topologyNodesIdentityMAC, identity.Options[1].ID)
+
+	connectivity := cfg.RequiredParams[1]
+	assert.Equal(t, topologyParamConnectivity, connectivity.ID)
+	assert.Equal(t, funcapi.ParamSelect, connectivity.Selection)
+	require.Len(t, connectivity.Options, 2)
+	assert.Equal(t, topologyConnectivityStrict, connectivity.Options[0].ID)
+	assert.Equal(t, topologyConnectivityProbable, connectivity.Options[1].ID)
+	assert.True(t, connectivity.Options[1].Default)
 }
 
 func TestFuncTopology_MethodParams(t *testing.T) {
@@ -32,15 +39,16 @@ func TestFuncTopology_MethodParams(t *testing.T) {
 
 	params, err := f.MethodParams(context.Background(), topologyMethodID)
 	require.NoError(t, err)
-	require.Len(t, params, 1)
-	assert.Equal(t, topologyParamView, params[0].ID)
+	require.Len(t, params, 2)
+	assert.Equal(t, topologyParamNodesIdentity, params[0].ID)
+	assert.Equal(t, topologyParamConnectivity, params[1].ID)
 
 	params, err = f.MethodParams(context.Background(), "unknown")
 	require.NoError(t, err)
 	assert.Nil(t, params)
 }
 
-func TestFuncTopology_Handle_DefaultL2View(t *testing.T) {
+func TestFuncTopology_Handle_DefaultStrictL2(t *testing.T) {
 	prev := snmpTopologyRegistry
 	t.Cleanup(func() {
 		snmpTopologyRegistry = prev
@@ -48,33 +56,18 @@ func TestFuncTopology_Handle_DefaultL2View(t *testing.T) {
 
 	registry := newTopologyRegistry()
 	snmpTopologyRegistry = registry
-
-	cache := newTopologyCache()
-	cache.updateTime = time.Now()
-	cache.lastUpdate = cache.updateTime
-	cache.agentID = "agent-test"
-	cache.localDevice = topologyDevice{
-		ChassisID:     "00:11:22:33:44:55",
-		ChassisIDType: "macAddress",
-		SysName:       "sw-a",
-		ManagementIP:  "10.0.0.1",
-	}
-	cache.lldpLocPorts["1"] = &lldpLocPort{
-		portNum:       "1",
-		portID:        "Gi0/1",
-		portIDSubtype: "interfaceName",
-	}
-	cache.lldpRemotes["1:1"] = &lldpRemote{
-		localPortNum:     "1",
-		remIndex:         "1",
-		chassisID:        "aa:bb:cc:dd:ee:ff",
-		chassisIDSubtype: "macAddress",
-		portID:           "Gi0/2",
-		portIDSubtype:    "interfaceName",
-		sysName:          "sw-b",
-		managementAddr:   "10.0.0.2",
-	}
-	registry.register(cache)
+	registry.register(newTestTopologyCacheLLDP(
+		"agent-test",
+		time.Now().UTC(),
+		"00:11:22:33:44:55",
+		"sw-a",
+		"10.0.0.1",
+		"Gi0/1",
+		"aa:bb:cc:dd:ee:ff",
+		"sw-b",
+		"10.0.0.2",
+		"Gi0/2",
+	))
 
 	f := newFuncTopology(&funcRouter{})
 	resp := f.Handle(context.Background(), topologyMethodID, nil)
@@ -88,7 +81,7 @@ func TestFuncTopology_Handle_DefaultL2View(t *testing.T) {
 	assert.Equal(t, "summary", data.View)
 }
 
-func TestFuncTopology_Handle_L3AndMergedViews(t *testing.T) {
+func TestFuncTopology_Handle_AcceptsIdentityAndConnectivityParams(t *testing.T) {
 	prev := snmpTopologyRegistry
 	t.Cleanup(func() {
 		snmpTopologyRegistry = prev
@@ -96,59 +89,38 @@ func TestFuncTopology_Handle_L3AndMergedViews(t *testing.T) {
 
 	registry := newTopologyRegistry()
 	snmpTopologyRegistry = registry
-
-	cache := newTopologyCache()
-	cache.updateTime = time.Now()
-	cache.lastUpdate = cache.updateTime
-	cache.agentID = "agent-test"
-	cache.localDevice = topologyDevice{
-		ChassisID:     "00:11:22:33:44:55",
-		ChassisIDType: "macAddress",
-		SysName:       "router-a",
-		ManagementIP:  "10.20.4.1",
-	}
-	cache.ifNamesByIndex["978"] = "ge-0/1/1.0"
-	cache.ifIndexByIP["192.168.5.21"] = "978"
-	cache.ospfElement = &ospfElement{
-		routerID:      "192.168.5.21",
-		adminState:    "1",
-		versionNumber: "2",
-	}
-	cache.ospfIfRows["192.168.5.21"] = &ospfIfEntry{
-		ipAddress: "192.168.5.21",
-		netmask:   "255.255.255.252",
-	}
-	cache.ospfNbrRows["192.168.5.22|192.168.5.22|"] = &ospfNbrEntry{
-		remoteIP:       "192.168.5.22",
-		remoteRouterID: "192.168.5.22",
-	}
-	registry.register(cache)
+	registry.register(newTestTopologyCacheLLDP(
+		"agent-test",
+		time.Now().UTC(),
+		"00:11:22:33:44:55",
+		"sw-a",
+		"10.0.0.1",
+		"Gi0/1",
+		"aa:bb:cc:dd:ee:ff",
+		"sw-b",
+		"10.0.0.2",
+		"Gi0/2",
+	))
 
 	f := newFuncTopology(&funcRouter{})
-	cfg := []funcapi.ParamConfig{topologyViewParamConfig()}
+	cfg := []funcapi.ParamConfig{
+		topologyNodesIdentityParamConfig(),
+		topologyConnectivityParamConfig(),
+	}
 
-	l3Params := funcapi.ResolveParams(cfg, map[string][]string{
-		topologyParamView: {topologyViewL3},
+	params := funcapi.ResolveParams(cfg, map[string][]string{
+		topologyParamNodesIdentity: {topologyNodesIdentityMAC},
+		topologyParamConnectivity:  {topologyConnectivityStrict},
 	})
-	resp := f.Handle(context.Background(), topologyMethodID, l3Params)
+	resp := f.Handle(context.Background(), topologyMethodID, params)
 	require.NotNil(t, resp)
 	assert.Equal(t, 200, resp.Status)
 	data, ok := resp.Data.(topologyData)
 	require.True(t, ok)
-	assert.Equal(t, "3", data.Layer)
-
-	mergedParams := funcapi.ResolveParams(cfg, map[string][]string{
-		topologyParamView: {topologyViewMerged},
-	})
-	resp = f.Handle(context.Background(), topologyMethodID, mergedParams)
-	require.NotNil(t, resp)
-	assert.Equal(t, 200, resp.Status)
-	data, ok = resp.Data.(topologyData)
-	require.True(t, ok)
-	assert.Equal(t, "2-3", data.Layer)
+	assert.Equal(t, "2", data.Layer)
 }
 
-func TestFuncTopology_Handle_MultiJobAggregationAndSelectorBehavior(t *testing.T) {
+func TestFuncTopology_Handle_UnknownSelectorsFallbackToDefaults(t *testing.T) {
 	prev := snmpTopologyRegistry
 	t.Cleanup(func() {
 		snmpTopologyRegistry = prev
@@ -156,11 +128,9 @@ func TestFuncTopology_Handle_MultiJobAggregationAndSelectorBehavior(t *testing.T
 
 	registry := newTopologyRegistry()
 	snmpTopologyRegistry = registry
-
-	baseTS := time.Date(2026, 2, 21, 12, 0, 0, 0, time.UTC)
-	cacheA := newTestTopologyCacheLLDP(
+	registry.register(newTestTopologyCacheLLDP(
 		"agent-test",
-		baseTS,
+		time.Now().UTC(),
 		"00:11:22:33:44:55",
 		"sw-a",
 		"10.0.0.1",
@@ -169,75 +139,32 @@ func TestFuncTopology_Handle_MultiJobAggregationAndSelectorBehavior(t *testing.T
 		"sw-b",
 		"10.0.0.2",
 		"Gi0/2",
-	)
-	cacheB := newTestTopologyCacheLLDP(
-		"agent-test",
-		baseTS.Add(time.Second),
-		"aa:bb:cc:dd:ee:ff",
-		"sw-b",
-		"10.0.0.2",
-		"Gi0/2",
-		"00:11:22:33:44:55",
-		"sw-a",
-		"10.0.0.1",
-		"Gi0/1",
-	)
-	registry.register(cacheA)
-	registry.register(cacheB)
+	))
 
 	f := newFuncTopology(&funcRouter{})
-	cfg := []funcapi.ParamConfig{topologyViewParamConfig()}
+	cfg := []funcapi.ParamConfig{
+		topologyNodesIdentityParamConfig(),
+		topologyConnectivityParamConfig(),
+	}
 
 	defaultResp := f.Handle(context.Background(), topologyMethodID, nil)
 	require.NotNil(t, defaultResp)
 	require.Equal(t, 200, defaultResp.Status)
 	defaultData, ok := defaultResp.Data.(topologyData)
 	require.True(t, ok)
-	require.Equal(t, "2", defaultData.Layer)
-	require.Equal(t, "summary", defaultData.View)
-	require.GreaterOrEqual(t, countActorsByType(defaultData, "device"), 2)
-	require.GreaterOrEqual(t, defaultData.Stats["links_total"].(int), 1)
-	require.GreaterOrEqual(t, defaultData.Stats["links_lldp"].(int), 1)
-
-	l2Params := funcapi.ResolveParams(cfg, map[string][]string{
-		topologyParamView: {topologyViewL2},
-	})
-	l2Resp := f.Handle(context.Background(), topologyMethodID, l2Params)
-	require.NotNil(t, l2Resp)
-	require.Equal(t, 200, l2Resp.Status)
-	l2Data, ok := l2Resp.Data.(topologyData)
-	require.True(t, ok)
-	assert.Equal(t, defaultData, l2Data)
 
 	invalidParams := funcapi.ResolveParams(cfg, map[string][]string{
-		topologyParamView: {"unknown-view"},
+		topologyParamNodesIdentity: {"unknown"},
+		topologyParamConnectivity:  {"invalid"},
 	})
 	invalidResp := f.Handle(context.Background(), topologyMethodID, invalidParams)
 	require.NotNil(t, invalidResp)
 	require.Equal(t, 200, invalidResp.Status)
 	invalidData, ok := invalidResp.Data.(topologyData)
 	require.True(t, ok)
-	assert.Equal(t, defaultData, invalidData)
 
-	l3Params := funcapi.ResolveParams(cfg, map[string][]string{
-		topologyParamView: {topologyViewL3},
-	})
-	l3Resp := f.Handle(context.Background(), topologyMethodID, l3Params)
-	require.NotNil(t, l3Resp)
-	assert.Equal(t, 200, l3Resp.Status)
-	l3Data, ok := l3Resp.Data.(topologyData)
-	require.True(t, ok)
-	assert.Equal(t, "3", l3Data.Layer)
-
-	mergedParams := funcapi.ResolveParams(cfg, map[string][]string{
-		topologyParamView: {topologyViewMerged},
-	})
-	mergedResp := f.Handle(context.Background(), topologyMethodID, mergedParams)
-	require.NotNil(t, mergedResp)
-	assert.Equal(t, 200, mergedResp.Status)
-	mergedData, ok := mergedResp.Data.(topologyData)
-	require.True(t, ok)
-	assert.Equal(t, "2-3", mergedData.Layer)
+	assert.Equal(t, defaultData.Layer, invalidData.Layer)
+	assert.Equal(t, defaultData.View, invalidData.View)
 }
 
 func newTestTopologyCacheLLDP(

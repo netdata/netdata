@@ -290,55 +290,6 @@ func TestTopologyRegistry_SnapshotDeduplicatesDuplicateDeviceObservations(t *tes
 	require.Equal(t, 2, countActorsByType(data, "device"))
 }
 
-func TestMergeSNMPTopologyData_DeduplicatesActorsByOverlappingIdentity(t *testing.T) {
-	collectedAt := time.Now().UTC()
-	l2 := topologyData{
-		SchemaVersion: topologySchemaVersion,
-		Source:        "snmp",
-		Layer:         "2",
-		View:          "summary",
-		AgentID:       "agent-test",
-		CollectedAt:   collectedAt,
-		Actors: []topologyActor{
-			{
-				ActorType: "device",
-				Layer:     "2",
-				Source:    "snmp",
-				Match: topologyMatch{
-					ChassisIDs:  []string{"10.20.4.2"},
-					IPAddresses: []string{"10.20.4.2"},
-					SysName:     "sw-a",
-				},
-			},
-		},
-	}
-	l3 := topologyData{
-		SchemaVersion: topologySchemaVersion,
-		Source:        "snmp",
-		Layer:         "3",
-		View:          "summary",
-		AgentID:       "agent-test",
-		CollectedAt:   collectedAt,
-		Actors: []topologyActor{
-			{
-				ActorType: "device",
-				Layer:     "3",
-				Source:    "snmp",
-				Match: topologyMatch{
-					ChassisIDs:   []string{"18:fd:74:33:1a:9c"},
-					MacAddresses: []string{"18FD74331A9C"},
-					IPAddresses:  []string{"10.20.4.2"},
-					SysName:      "sw-a-routing",
-				},
-			},
-		},
-	}
-
-	merged, ok := mergeSNMPTopologyData(l2, true, l3, true, "agent-test", collectedAt)
-	require.True(t, ok)
-	require.Len(t, merged.Actors, 1)
-}
-
 func TestCanonicalMatchKey_NormalizesEquivalentMACRepresentations(t *testing.T) {
 	raw := topologyMatch{ChassisIDs: []string{"7049a26572cd"}}
 	colon := topologyMatch{MacAddresses: []string{"70:49:A2:65:72:CD"}}
@@ -346,6 +297,86 @@ func TestCanonicalMatchKey_NormalizesEquivalentMACRepresentations(t *testing.T) 
 	require.Equal(t, "mac:70:49:a2:65:72:cd", canonicalMatchKey(colon))
 	require.Contains(t, topologyMatchIdentityKeys(raw), "hw:70:49:a2:65:72:cd")
 	require.Contains(t, topologyMatchIdentityKeys(colon), "hw:70:49:a2:65:72:cd")
+}
+
+func TestApplySNMPTopologyOutputPolicies_CollapsesActorsByIP(t *testing.T) {
+	data := topologyData{
+		Actors: []topologyActor{
+			{
+				ActorID:   "device:a",
+				ActorType: "device",
+				Match: topologyMatch{
+					IPAddresses:  []string{"10.0.0.10"},
+					MacAddresses: []string{"aa:aa:aa:aa:aa:aa"},
+				},
+				Attributes: map[string]any{"inferred": false},
+			},
+			{
+				ActorID:   "endpoint:b",
+				ActorType: "endpoint",
+				Match: topologyMatch{
+					IPAddresses:  []string{"10.0.0.10"},
+					MacAddresses: []string{"bb:bb:bb:bb:bb:bb"},
+				},
+			},
+		},
+		Links: []topologyLink{
+			{
+				SrcActorID: "endpoint:b",
+				DstActorID: "device:a",
+				Protocol:   "fdb",
+				Direction:  "bidirectional",
+			},
+		},
+		Stats: map[string]any{},
+	}
+
+	applySNMPTopologyOutputPolicies(&data, topologyQueryOptions{
+		CollapseActorsByIP: true,
+	})
+
+	require.Len(t, data.Actors, 1)
+	require.Len(t, data.Links, 0)
+	require.Equal(t, 1, data.Stats["actors_collapsed_by_ip"])
+}
+
+func TestApplySNMPTopologyOutputPolicies_EliminatesNonIPInferredActorsAndSparseSegments(t *testing.T) {
+	data := topologyData{
+		Actors: []topologyActor{
+			{
+				ActorID:   "segment:s1",
+				ActorType: "segment",
+				Match: topologyMatch{
+					Hostnames: []string{"segment:s1"},
+				},
+			},
+			{
+				ActorID:   "endpoint:e1",
+				ActorType: "endpoint",
+				Match: topologyMatch{
+					MacAddresses: []string{"cc:cc:cc:cc:cc:cc"},
+				},
+			},
+		},
+		Links: []topologyLink{
+			{
+				SrcActorID: "segment:s1",
+				DstActorID: "endpoint:e1",
+				Protocol:   "fdb",
+				Direction:  "bidirectional",
+			},
+		},
+		Stats: map[string]any{},
+	}
+
+	applySNMPTopologyOutputPolicies(&data, topologyQueryOptions{
+		EliminateNonIPInferred: true,
+	})
+
+	require.Len(t, data.Actors, 0)
+	require.Len(t, data.Links, 0)
+	require.Equal(t, 1, data.Stats["actors_non_ip_inferred_suppressed"])
+	require.Equal(t, 1, data.Stats["segments_sparse_suppressed"])
 }
 
 func countActorsByType(data topologyData, actorType string) int {
