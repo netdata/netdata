@@ -169,7 +169,7 @@ type Job struct {
 
 type collectedMetrics struct {
 	intMetrics   map[string]int64
-	floatMetrics map[string]float64
+	floatMetrics map[string]float64 // not used, only v2 collectors will have float metrics
 }
 
 func (cm *collectedMetrics) getValue(id string) (float64, bool) {
@@ -477,12 +477,7 @@ func (j *Job) collect() collectedMetrics {
 	}()
 
 	var mx collectedMetrics
-
-	if v, ok := j.module.(collectorapi.MetricCollector); ok {
-		mx.floatMetrics = v.CollectMetrics(context.TODO())
-	} else {
-		mx.intMetrics = j.module.Collect(context.TODO())
-	}
+	mx.intMetrics = j.module.Collect(context.TODO())
 
 	// Record collected metrics for dump mode
 	// TODO: The dump analyzer only records intMetrics but ignores floatMetrics

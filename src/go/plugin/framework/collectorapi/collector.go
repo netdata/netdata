@@ -37,10 +37,6 @@ type CollectorV1 interface {
 	VirtualNode() *vnodes.VirtualNode
 }
 
-type MetricCollector interface {
-	CollectMetrics(context.Context) map[string]float64
-}
-
 // CollectorV2 is the collector contract for the new metrics+template runtime.
 //
 // Collectors implementing this interface:
