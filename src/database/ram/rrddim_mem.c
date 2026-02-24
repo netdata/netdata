@@ -154,6 +154,7 @@ bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si __maybe_unused, nd_uui
 
     *first_entry_s = rrddim_query_oldest_time_s(smh);
     *last_entry_s = rrddim_query_latest_time_s(smh);
+    rrddim_metric_release(smh);
 
     return true;
 }
@@ -165,6 +166,7 @@ bool rrddim_metric_retention_by_id(STORAGE_INSTANCE *si __maybe_unused, UUIDMAP_
 
     *first_entry_s = rrddim_query_oldest_time_s(smh);
     *last_entry_s = rrddim_query_latest_time_s(smh);
+    rrddim_metric_release(smh);
 
     return true;
 }
