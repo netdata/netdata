@@ -124,9 +124,9 @@ Netdata uses **two connection libraries**: **libcurl for claiming and MQTToWSoHT
 
 ## Troubleshooting ACLK Proxy Connection Issues
 
-### New Log Message Formats (Starting from Nightly Build 2026-02-20)
+### New Log Message Formats (Starting from Nightly Build 2026-02-25)
 
-Starting with nightly build `2026-02-20`, Netdata Agent provides clearer log messages to help diagnose proxy connection problems:
+Starting with nightly build `2026-02-25`, Netdata Agent provides clearer log messages to help diagnose proxy connection problems:
 
 #### Proxy Resolution Messages
 
@@ -150,9 +150,9 @@ The Agent is using an HTTP proxy specified via the `http_proxy` environment vari
 
 **Proxy from environment variable (with credentials):**
 ```
-ACLK: using HTTP proxy http://user:pass@proxy.company.com:3128 (with credentials, from environment variable 'https_proxy')
+ACLK: using HTTP proxy http://proxy.company.com:3128 (with credentials, from environment variable 'https_proxy')
 ```
-The Agent is using an authenticated HTTP proxy where credentials are embedded in the URL.
+The Agent is using an authenticated HTTP proxy. Note: For security, credentials are never printed in logs - the log shows `(with credentials)` to indicate authentication is being used without exposing the actual credentials.
 
 **Proxy set to "env" but variables missing:**
 ```
@@ -226,6 +226,11 @@ ACLK Proxy: socks5://XXXXX@socks.internal:1080
 ACLK Proxy: socks5://socks.internal:1080 (with credentials, from cloud.conf)
 ```
 
+**When no proxy is configured:**
+```
+ACLK Proxy: none
+```
+
 The new format explicitly shows:
 - Which configuration source was used
 - Whether credentials are present
@@ -235,8 +240,7 @@ The new format explicitly shows:
 1. **Check Configuration Source**: Look at the log to see if the proxy is coming from:
    - Environment variables (`http_proxy`, `https_proxy`)
    - cloud.conf configuration
-   - netdata.conf configuration
-   - aclk.conf configuration
+   - netdata.conf configuration (in the `[cloud]` section)
 
 2. **Verify Proxy Availability**: Before using a proxy, verify:
    - The proxy server is reachable: `curl -v http://proxy-server:port`
@@ -245,9 +249,9 @@ The new format explicitly shows:
 
 3. **Check Proxy Type**: Different proxy types are supported:
    - HTTP proxies (`http://`)
-   - HTTPS proxies (`https://`)
-   - SOCKS5 proxies (`socks5://`)
+   - SOCKS5 proxies (`socks5://` or `socks5h://`)
    - Netdata requires explicit configuration for each type
+   - **Note**: Secure proxy schemes (`https://`) are not supported; use HTTP or SOCKS5 proxies to reach both HTTP and HTTPS destinations
 
 4. **Authentication**:
    - Environment variables can include credentials (`http://user:pass@host:port`)
@@ -266,11 +270,9 @@ The new format explicitly shows:
 
 ### Additional Resources
 
-- [Netdata Cloud Security Documentation](./docs/security-and-privacy-design/netdata-cloud-security.md)
-- [Agent Configuration Reference](./src/claim/README.md#configuration-file)
-- [Reverse Proxy Configuration](./docs/netdata-agent/securing-netdata-agents.md)
-
----
+- [Netdata Cloud Security Documentation](/docs/security-and-privacy-design/netdata-cloud-security.md)
+- [Agent Configuration Reference](#proxy-configuration)
+- [Reverse Proxy Configuration](/docs/netdata-agent/securing-netdata-agents.md)
 
 ## Manage Connections
 ### Reconnect Agent
