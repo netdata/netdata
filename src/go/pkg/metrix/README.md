@@ -130,7 +130,7 @@ _ = ok
 ```
 
 For a complete collector integration pattern (cycle management, error handling),
-see [how-to-write-a-module.md](/src/go/plugin/go.d/docs/how-to-write-a-module.md).
+see [how-to-write-a-collector.md](/src/go/plugin/go.d/docs/how-to-write-a-collector.md).
 
 ## Contracts and Pitfalls
 
