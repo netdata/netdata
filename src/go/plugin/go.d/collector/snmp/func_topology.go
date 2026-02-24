@@ -23,23 +23,38 @@ func newFuncTopology(r *funcRouter) *funcTopology {
 const topologyMethodID = "topology:snmp"
 
 const (
-	topologyParamView = "topology_view"
+	topologyParamNodesIdentity = "nodes_identity"
+	topologyParamConnectivity  = "non_lldp_cdp_connectivity"
 
-	topologyViewL2     = "l2"
-	topologyViewL3     = "l3"
-	topologyViewMerged = "merged"
+	topologyNodesIdentityIP  = "ip"
+	topologyNodesIdentityMAC = "mac"
+
+	topologyConnectivityStrict   = "strict"
+	topologyConnectivityProbable = "probable"
 )
 
-func topologyViewParamConfig() funcapi.ParamConfig {
+func topologyNodesIdentityParamConfig() funcapi.ParamConfig {
 	return funcapi.ParamConfig{
-		ID:        topologyParamView,
-		Name:      "Topology View",
-		Help:      "Select topology view: L2, L3, or merged",
+		ID:        topologyParamNodesIdentity,
+		Name:      "Nodes Identity",
+		Help:      "Choose actor identity strategy: ip (collapse by IP, remove non-IP inferred) or mac",
 		Selection: funcapi.ParamSelect,
 		Options: []funcapi.ParamOption{
-			{ID: topologyViewL2, Name: "L2", Default: true},
-			{ID: topologyViewL3, Name: "L3"},
-			{ID: topologyViewMerged, Name: "Merged"},
+			{ID: topologyNodesIdentityIP, Name: "IP", Default: true},
+			{ID: topologyNodesIdentityMAC, Name: "MAC"},
+		},
+	}
+}
+
+func topologyConnectivityParamConfig() funcapi.ParamConfig {
+	return funcapi.ParamConfig{
+		ID:        topologyParamConnectivity,
+		Name:      "Non LLDP/CDP Connectivity",
+		Help:      "Choose inferred non-LLDP/CDP connectivity mode: strict or probable",
+		Selection: funcapi.ParamSelect,
+		Options: []funcapi.ParamOption{
+			{ID: topologyConnectivityStrict, Name: "Strict"},
+			{ID: topologyConnectivityProbable, Name: "Probable", Default: true},
 		},
 	}
 }
@@ -49,12 +64,13 @@ func topologyMethodConfig() funcapi.MethodConfig {
 		ID:           topologyMethodID,
 		Name:         "Topology (SNMP)",
 		UpdateEvery:  10,
-		Help:         "SNMP topology and neighbor discovery data (view selector: L2/L3/merged)",
+		Help:         "SNMP Layer-2 topology and neighbor discovery data",
 		RequireCloud: true,
 		ResponseType: "topology",
 		AgentWide:    true,
 		RequiredParams: []funcapi.ParamConfig{
-			topologyViewParamConfig(),
+			topologyNodesIdentityParamConfig(),
+			topologyConnectivityParamConfig(),
 		},
 	}
 }
@@ -64,7 +80,8 @@ func (f *funcTopology) MethodParams(_ context.Context, method string) ([]funcapi
 		return nil, nil
 	}
 	return []funcapi.ParamConfig{
-		topologyViewParamConfig(),
+		topologyNodesIdentityParamConfig(),
+		topologyConnectivityParamConfig(),
 	}, nil
 }
 
@@ -75,16 +92,26 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 		return funcapi.NotFoundResponse(method)
 	}
 
-	view := topologyViewL2
-	if fView := normalizeTopologyView(params.GetOne(topologyParamView)); fView != "" {
-		view = fView
+	options := topologyQueryOptions{
+		CollapseActorsByIP:        true,
+		EliminateNonIPInferred:    true,
+		ProbabilisticConnectivity: true,
+	}
+	if identity := normalizeTopologyNodesIdentity(params.GetOne(topologyParamNodesIdentity)); identity != "" {
+		if identity == topologyNodesIdentityMAC {
+			options.CollapseActorsByIP = false
+			options.EliminateNonIPInferred = false
+		}
+	}
+	if mode := normalizeTopologyConnectivity(params.GetOne(topologyParamConnectivity)); mode != "" {
+		options.ProbabilisticConnectivity = mode == topologyConnectivityProbable
 	}
 
 	if snmpTopologyRegistry == nil {
 		return funcapi.UnavailableResponse("topology data not available yet, please retry after data collection")
 	}
 
-	data, ok := snmpTopologyRegistry.snapshotForView(view)
+	data, ok := snmpTopologyRegistry.snapshotWithOptions(options)
 
 	if !ok {
 		return funcapi.UnavailableResponse("topology data not available yet, please retry after data collection")
@@ -98,14 +125,23 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 	}
 }
 
-func normalizeTopologyView(v string) string {
+func normalizeTopologyNodesIdentity(v string) string {
 	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "", topologyViewL2:
-		return topologyViewL2
-	case topologyViewL3:
-		return topologyViewL3
-	case topologyViewMerged:
-		return topologyViewMerged
+	case "", topologyNodesIdentityIP:
+		return topologyNodesIdentityIP
+	case topologyNodesIdentityMAC:
+		return topologyNodesIdentityMAC
+	default:
+		return ""
+	}
+}
+
+func normalizeTopologyConnectivity(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "", topologyConnectivityProbable:
+		return topologyConnectivityProbable
+	case topologyConnectivityStrict:
+		return topologyConnectivityStrict
 	default:
 		return ""
 	}

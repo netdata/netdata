@@ -1,5 +1,9 @@
 # TODO-topology-library-phase2-direct-port
 
+## 0) Auth Token Location (Mandatory)
+- Bearer token for authenticated topology function calls is stored at:
+  - `/var/lib/netdata/bearer_tokens/`
+
 ## 0) Install Order (Mandatory)
 - Install backend first:
   - `./install.sh`
@@ -36,6 +40,18 @@
     - regression test added for interface MAC alias propagation.
 - [x] A0.4. Align idle port popover color with idle port bullet color.
   - Updated popover idle color token to match bullet token.
+- [x] A0.5. Execute install order (backend then frontend).
+  - Executed:
+    - `./install.sh` (backend) on 2026-02-24
+    - `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh` (frontend) on 2026-02-24
+  - Result:
+    - both completed successfully
+    - backend installer reported non-fatal warning: `git fetch -t` failed (`Permission denied (publickey)`).
+- [x] A0.6. Probable-link visual distinction in UI.
+  - Updated force-graph link classification to treat `metrics.attachment_mode=probable_*` as probable, even if explicit state is absent.
+  - Updated probable link color to darker cyan for clearer contrast against strict/high-confidence links.
+  - File:
+    - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/graph/forceGraph.js`
 - [ ] A1. Validate latest backend+frontend install on live office topology (hard refresh, multiple refresh cycles).
   - Evidence required:
     - screenshot/log excerpt of expected actor/link stability across refreshes,
@@ -63,6 +79,101 @@
     - `cd src/go && go run ./tools/topology-parity-evidence --mode suite`
     - `cd src/go && go run ./tools/topology-parity-evidence --mode verify`
     - `cd src/go && go run ./tools/topology-parity-evidence --mode phase2`
+  - Current execution note (2026-02-24):
+    - parity evidence commands are blocked in this workstation because fixture root is missing:
+      - `/tmp/topology-library-repos/enlinkd/features/enlinkd/tests/src/test/resources/linkd`
+    - unit/integration go test suites for `engine` and `snmp` pass.
+- [x] A11. Probable connectivity contract hardening (`strict + delta only`).
+  - New required behavior:
+    - probable pass starts from strict-unlinked endpoints only,
+    - adds at most one new probable attachment per strict-unlinked endpoint,
+    - never mutates or duplicates strict links,
+    - never adds extra links for endpoints already linked in strict.
+  - Missing-path fallback (when strict-unlinked endpoint has zero segment candidates):
+    - use reporter evidence (`device_ids`, `if_indexes`, `if_names`) and FDB observations,
+    - if still unresolved, attach endpoint via deterministic `portless probable` segment anchored to one managed reporter device.
+  - Required output markers:
+    - probable links must set `state=probable`,
+    - metrics include `inference=probable`, `confidence=low`, and explicit `attachment_mode`.
+  - Required tests:
+    - strict links are subset of probable links,
+    - probable does not create additional links for strict-linked endpoints,
+    - strict-unlinked endpoints receive one probable link when any reporter evidence exists,
+    - no extra device-device segment paths are introduced by probable fallback.
+  - Implemented (2026-02-24):
+    - probable assignment now iterates all known endpoints (not only endpoints already present in segment candidate map),
+    - strict and probable phases are split:
+      - strict resolves deterministic candidates first,
+      - probable runs only for endpoints still unlinked after strict.
+    - reporter-hint probable candidate selection added:
+      - uses `learned_device_ids`, `learned_if_indexes`, `learned_if_names`,
+      - consumes FDB reporter evidence as fallback when label hints are absent.
+    - deterministic `probable_portless` fallback added for strict-unlinked endpoints with no segment candidates:
+      - creates synthetic `bridge-domain:probable:*` segment anchored to one managed reporter hint,
+      - emits one probable endpoint attachment and one bridge anchor edge.
+    - probable metadata is explicit:
+      - `state=probable`,
+      - `metrics.inference=probable`,
+      - `metrics.confidence=low`,
+      - `metrics.attachment_mode=probable_segment|probable_portless`.
+  - Backend tests:
+    - `cd src/go && go test ./pkg/topology/engine -count=1` passed
+    - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed
+  - Live validation (`nodes_identity=ip`):
+    - strict:
+      - actors: `segment=6 endpoint=74 device=8`
+      - unlinked: `endpoint=48`
+      - stats: `links_total=43`, `links_probable=0`
+    - probable:
+      - actors: `segment=9 endpoint=74 device=8`
+      - unlinked: `endpoint=1`
+      - stats: `links_total=98`, `links_probable=48`
+    - strict subset check:
+    - strict link signatures in probable: `42/42` (none missing)
+    - strict-linked endpoint mutation check:
+      - probable links on strict-linked endpoints: `0`
+  - Follow-up hardening (2026-02-24):
+    - add a final probable salvage pass for endpoints that remain unlinked after normal strict+probable assignment due overlap suppression edge-cases,
+    - salvage emits exactly one probable attachment per still-unlinked endpoint using direct owner evidence first, then deterministic portless probable anchor,
+    - preserve `strict + delta` behavior by touching only still-unlinked endpoints.
+  - Implemented (2026-02-24):
+    - overlap suppression now distinguishes managed-vs-unmanaged identity overlap:
+      - managed overlap behavior unchanged (replace endpoint edge with managed device edge),
+      - unmanaged overlap stays suppressed in strict but is allowed in probable and marked as probable.
+    - probable-only overlap recovery now marks emitted direct-owner links as:
+      - `state=probable`,
+      - `metrics.inference=probable`,
+      - `metrics.confidence=low`,
+      - `metrics.attachment_mode=probable_direct`.
+  - Added regression test:
+    - `TestToTopologyData_ProbableConnectivityRecoversUnmanagedOverlapSuppression`
+  - Verification:
+    - `cd src/go && go test ./pkg/topology/engine -count=1` passed
+    - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed
+  - Install verification:
+    - backend installed with `./install.sh` (non-fatal warning remains: `git fetch -t` SSH key),
+    - frontend installed after backend with `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh`.
+- [x] A10. Fix IP + probable mode so inferred endpoints are connected and rendered as probable (darker cyan).
+  - Reported issue (2026-02-24):
+    - In `nodes_identity=ip` + `non_lldp_cdp_connectivity=probable`, inferred endpoints are still left unlinked and/or not marked as probable in output.
+  - Target behavior:
+    - in probable mode, inferred endpoint attachments should emit links whenever segment candidates exist,
+    - emitted inferred endpoint links should carry probable markers for frontend darker-cyan rendering.
+  - Implementation (2026-02-24):
+    - probable is now layered strictly on top of strict:
+      - strict-linked endpoints remain strict and unchanged,
+      - probable applies only to endpoints that remain unlinked after strict pass.
+      - source-label gate removed, so all strict-unlinked endpoints can receive probable assignment.
+      - probable-only segments now emit a single anchor device->segment bridge edge (minimal patch) to avoid creating extra device-device segment paths in probable mode.
+    - probabilistic endpoint selection now falls back to deterministic first candidate when scoring cannot disambiguate.
+    - exactly one probable segment attachment is emitted per previously-unlinked endpoint.
+  - Validation:
+    - `go test ./pkg/topology/engine -count=1` passed,
+    - `go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed.
+    - parity tools:
+      - `go run ./tools/topology-parity-evidence --mode suite` passed,
+      - `go run ./tools/topology-parity-evidence --mode verify` passed,
+      - `go run ./tools/topology-parity-evidence --mode phase2` passed.
 - [ ] A7. Investigate `mega` duplicate actor behavior and verify exact connectivity evidence.
   - Evidence required:
     - actor ids, MAC/IP identities, and actor kinds for all `mega*` actors in live payload,
@@ -120,6 +231,148 @@
       - `mac:e4:3d:1a:33:10:1a` (`mega`)
     - `mac:e4:3d:1a:33:10:1b` is not on that segment (it is unlinked in current payload).
     - Therefore merging/collapsing only the two `mega` identities does not remove this segment by itself; additional correlation/pruning is required for the `Broadcom` participant if treated as same device artifact.
+- [x] A12. Investigate the single remaining unlinked device in live `nodes_identity=ip` + `probable` mode.
+  - Evidence required:
+    - exact actor id / identities / labels,
+    - whether it has any candidate segment or direct-owner evidence,
+    - exact suppression path in `projectSegmentTopology()` causing it to remain unlinked,
+    - fix recommendation if behavior is unintended.
+  - Findings (from `/tmp/topology-live-ip-probable-after2.json`):
+    - Remaining unlinked endpoint actor:
+      - `actor_id=mac:9c:6b:00:7b:98:c7`, `display_name=nova-nic2`, `ip=10.20.4.22`.
+    - It has direct-owner evidence (`attached_by=single_port_mac`, attached on `XS1930/swp01`).
+    - The same physical node is already represented by managed device actor `mac:9c:6b:00:7b:98:c6` (`display_name=nova`) and has emitted links.
+  - Root cause in backend:
+    - During endpoint emission, identity overlap is evaluated first.
+    - For managed overlap, endpoint-to-segment emission is intentionally suppressed to avoid duplicate identity edges:
+      - `src/go/pkg/topology/engine/topology_adapter.go:850`
+      - `src/go/pkg/topology/engine/topology_adapter.go:857`
+      - `src/go/pkg/topology/engine/topology_adapter.go:891`
+    - `nodes_identity=ip` collapse does not merge these two actors because their IPs differ (`172.22.0.1` vs `10.20.4.22`):
+      - `src/go/pkg/topology/engine/topology_adapter.go:2509`
+      - `src/go/pkg/topology/engine/topology_adapter.go:2514`
+      - `src/go/pkg/topology/engine/topology_adapter.go:2519`
+  - Conclusion:
+    - This is a duplicate-identity suppression artifact (not missing discovery).
+    - The endpoint remains visible as an actor but has no emitted link because the managed device representation already owns connectivity.
+  - Fix implemented (2026-02-24):
+    - backend now tracks endpoint IDs suppressed due managed-overlap replacement.
+    - in `nodes_identity=ip` mode, unlinked endpoint actors matching those suppressed managed-overlap identities are pruned from actor list.
+    - stat `actors_unlinked_suppressed` now reports this count.
+  - Post-install live verification (2026-02-24, local function call):
+    - Function call:
+      - `POST /api/v3/function?function=topology:snmp`
+      - payload: `{"nodes_identity":"ip","non_lldp_cdp_connectivity":"probable"}`
+    - Result:
+      - `unlinked_count=0` (no unlinked actors in emitted topology graph).
+      - `actors_unlinked_suppressed=1` in `data.stats`.
+    - Specific endpoint check requested by user:
+      - `10.20.4.15` is present as actor `mac:50:2c:c6:a6:fc:35`.
+      - It is linked via one probable FDB edge (`metrics.inference=probable`, `attachment_mode=probable_segment`).
+  - Files:
+    - `src/go/pkg/topology/engine/topology_adapter.go`
+    - `src/go/pkg/topology/engine/topology_adapter_test.go`
+- [ ] A13. Investigate nondeterministic visibility/linking for `10.20.4.15` (reported "comes and goes", sometimes unlinked).
+  - Facts to verify per-snapshot:
+    - actor presence,
+    - link presence,
+    - link state/metrics (`probable` tagging),
+    - snapshot timestamp correlation (`collected_at`).
+  - Initial evidence (2026-02-24):
+    - repeated local calls (`20` calls, `nodes_identity=ip`, `non_lldp_cdp_connectivity=probable`) showed:
+      - `unlinked_count=0` in every sampled snapshot,
+      - actor `10.20.4.15` present and linked in every sampled snapshot.
+    - This indicates no immediate nondeterminism in sampled backend snapshots; user-reported behavior may be tied to mode/filter changes or data refresh boundaries.
+- [ ] A14. Make probable/low-confidence link styling fully consistent.
+  - Problem statement:
+    - some low-confidence paths appear bright cyan while others are dark cyan.
+  - Evidence:
+    - frontend styles probable links dark cyan only when inferred from `metrics.inference=probable` or `metrics.attachment_mode=probable_*`:
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/graph/forceGraph.js:534`
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/graph/forceGraph.js:540`
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/graph/forceGraph.js:650`
+    - backend currently emits some low-confidence bridge/overlap links without probable markers:
+      - probable-only segment anchor bridge edge has no `state`/`inference` marker:
+        - `src/go/pkg/topology/engine/topology_adapter.go:818`
+        - `src/go/pkg/topology/engine/topology_adapter.go:826`
+      - managed-overlap edge uses `attachment_mode=managed_device_overlap` only:
+        - `src/go/pkg/topology/engine/topology_adapter.go:880`
+        - `src/go/pkg/topology/engine/topology_adapter.go:890`
+    - frontend normalized graph link details currently omit `state` (only link row keeps it):
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/topologyUtils.js:383`
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/topologyUtils.js:406`
+- [ ] A15. Introduce `Map Type` selector and mode semantics (replace current `Non LLDP/CDP Connectivity`).
+  - Requested UX labels/options:
+    - `LLDP/CDP/Managed Devices Map`
+    - `High Confidence Inferred Map`
+    - `All Devices (Low Confidence)`
+  - Requested behavior:
+    - `LLDP/CDP/Managed Devices Map`: only LLDP/CDP inferred + managed devices view.
+    - `High Confidence Inferred Map`: existing strict behavior, but hide unlinked inferred endpoints.
+    - `All Devices (Low Confidence)`: existing probable behavior.
+  - Existing implementation to replace:
+    - backend param currently `non_lldp_cdp_connectivity` (`strict|probable`):
+      - `src/go/plugin/go.d/collector/snmp/func_topology.go:27`
+      - `src/go/plugin/go.d/collector/snmp/func_topology.go:49`
+    - frontend button currently labeled `Non LLDP/CDP Connectivity`:
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/topology/index.js:488`
+- [ ] A16. Graph geometry updates for large-port actors.
+  - Requested:
+    - link visual length should account for node radius growth (avoid links being visually "consumed" by enlarged actors),
+    - actor label should be below actor, centered.
+  - Current evidence:
+    - links are rendered center-to-center:
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/graph/forceGraph.js:1774`
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/graph/forceGraph.js:1776`
+    - label currently rendered to the right of node:
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/graph/forceGraph.js:1892`
+- [ ] A17. Add backend function filters for very large infrastructures.
+  - Requested new params:
+    - `Managed SNMP Device Focus` (default: `All Devices`, options: `All Managed SNMP Devices`, `All Devices`)
+    - `Depth` (default: `All`, options: `0..10`, `All`)
+  - Required behavior:
+    - build full topology in backend,
+    - then send only subgraph within selected hop depth per focus mode.
+- [ ] A18. Remove visible initial graph animation; present fully settled layout.
+  - Current evidence:
+    - after warmup ticks, simulation restarts and keeps animating:
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/graph/forceGraph.js:869`
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/graph/forceGraph.js:874`
+- [x] A8. Remove `L2|L3|Merged` selection from topology function and UI.
+  - Evidence:
+    - backend function still exposes `topology_view` with `l2/l3/merged`:
+      - `src/go/plugin/go.d/collector/snmp/func_topology.go:26`
+      - `src/go/plugin/go.d/collector/snmp/func_topology.go:40`
+    - current TODO scope is strict L2 only.
+  - Required outcome:
+    - `topology:snmp` returns strict L2 topology only,
+    - no `topology_view` param in method schema or UI filters.
+- [x] A9. Remove L3 protocol handling from SNMP topology pipeline.
+  - Evidence:
+    - function currently normalizes and serves `l3` and `merged` views:
+      - `src/go/plugin/go.d/collector/snmp/func_topology.go:105`
+      - `src/go/plugin/go.d/collector/snmp/func_topology.go:107`
+  - Required outcome:
+    - topology stack is L2-only (LLDP/CDP/BRIDGE/FDB/ARP/STP/VLAN enrichments),
+    - no OSPF/ISIS topology view routing in this workstream path.
+  - Implementation status (2026-02-24):
+    - [x] `topology:snmp` no longer exposes `topology_view`; now exposes:
+      - `nodes_identity=ip|mac` (default `ip`)
+      - `non_lldp_cdp_connectivity=strict|probable` (default `probable`)
+    - [x] topology registry removed L3/merged snapshot routes.
+    - [x] topology autoprobe no longer appends OSPF/ISIS topology profiles.
+    - [x] backend policy pass added:
+      - collapse actors by IP (when `nodes_identity=ip`),
+      - eliminate non-IP inferred actors (when `nodes_identity=ip`),
+      - remove sparse segments (`<=1` participants after filtering).
+    - [x] probable connectivity:
+      - enabled only for non-LLDP/CDP inferred endpoints,
+      - marks emitted links with `state=probable`, `metrics.inference=probable`, `metrics.confidence=low`.
+    - [x] frontend graph:
+      - replaced old 3 visibility toggles with:
+        - `Nodes Identity: ip|mac`
+        - `Non LLDP/CDP Connectivity: strict|probable`
+      - probable links rendered with darker cyan.
 
 ## 1.2) Decisions (Costa, 2026-02-24)
 - [x] D1. Internal options to support in backend/UI state:
@@ -137,6 +390,30 @@
   - non-IP elimination applies to **all inferred devices/endpoints**, including inferred LLDP/CDP actors.
   - `probable` connectivity applies **only** to non-LLDP/CDP inferred endpoints.
   - LLDP/CDP-discovered direct connectivity remains authoritative and unaffected by probable inference.
+- [x] D5. Enforce strict L2 product behavior:
+  - remove `L2|L3|Merged` option from topology function/UI,
+  - remove L3 topology protocols/views from this SNMP topology path,
+  - this topology feature must be strictly L2.
+- [x] D6. Probable connectivity semantics (critical fix):
+  - `probable` must be layered on top of `strict` only,
+  - it must not alter already linked endpoints from strict mode,
+  - it must add exactly one probable link for each endpoint that is unlinked in strict mode (goal: no unlinked endpoints left),
+  - it must not create extra segment links for endpoints already linked in strict mode.
+- [x] D7. Probable fallback scope (2026-02-24):
+  - probable assignment now applies to any endpoint still unlinked after strict pass (not limited by learned source labels),
+  - result contract is still one probable candidate per unresolved endpoint and zero strict-link mutation.
+- [x] D8. Probable mode graph delta contract (2026-02-24):
+  - probable mode must be computed as a delta on top of strict output,
+  - compared to strict, probable must only add the minimum segment/link additions required to connect strict-unlinked actors,
+  - probable must not introduce additional segment paths between actors already connected in strict mode.
+- [x] D9. Implement probable fallback for strict-unlinked endpoints without segment candidates (2026-02-24).
+  - Accept deterministic backend fallback:
+    - first use reporter/port hints to map to an existing segment when possible,
+    - otherwise create a single `portless probable` attachment anchored to one managed reporter device.
+  - Keep hard contract:
+    - strict graph unchanged,
+    - one probable attachment max per strict-unlinked endpoint,
+    - probable markers always present for fallback links.
 
 ## 2) Objective (Non-Negotiable)
 - Build and maintain **Enlinkd-faithful** topology behavior for Netdata SNMP topology, scoped to **L2 + enrichment**.

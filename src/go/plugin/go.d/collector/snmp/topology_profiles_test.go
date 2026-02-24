@@ -26,8 +26,6 @@ func TestAppendTopologyProfiles_AutoprobeEnabled(t *testing.T) {
 	assert.True(t, profilesHaveExtension(profiles, qBridgeProfileName))
 	assert.True(t, profilesHaveExtension(profiles, stpProfileName))
 	assert.True(t, profilesHaveExtension(profiles, vtpProfileName))
-	assert.True(t, profilesHaveExtension(profiles, topologyOspfProfileName))
-	assert.True(t, profilesHaveExtension(profiles, topologyIsisProfileName))
 }
 
 func TestAppendTopologyProfiles_AutoprobeDisabled(t *testing.T) {
