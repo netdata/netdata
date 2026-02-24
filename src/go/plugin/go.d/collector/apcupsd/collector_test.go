@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/modtest"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +36,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	modtest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Cleanup(t *testing.T) {
@@ -222,11 +222,11 @@ func TestCollector_Collect(t *testing.T) {
 
 			if len(test.wantCollected) > 0 {
 				if strings.Contains(name, "commlost") {
-					modtest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
+					collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
 						return chart.ID != statusChart.ID
 					})
 				} else {
-					modtest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 				}
 			}
 

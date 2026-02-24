@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/modtest"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
 )
 
@@ -53,7 +53,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	modtest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -275,7 +275,7 @@ func testCharts(t *testing.T, collr *Collector, mx map[string]int64) {
 	t.Helper()
 	ensureChartsCreatedForEveryThread(t, collr)
 	ensureExtendedChartsCreated(t, collr)
-	modtest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(_ *module.Chart, dim *module.Dim) bool {
+	collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(_ *module.Chart, dim *module.Dim) bool {
 		return dim.ID == "mem.mod.ipsecmod"
 	})
 }

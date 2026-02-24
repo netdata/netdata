@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/modtest"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +42,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_Configuration(t *testing.T) {
-	modtest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -392,7 +392,7 @@ func TestCollector_Collect(t *testing.T) {
 
 				assert.Len(t, *collr.Charts(), want, "want charts")
 
-				modtest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
+				collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *module.Chart, _ *module.Dim) bool {
 					return strings.HasPrefix(chart.ID, "zfspool_zion") && !strings.HasSuffix(chart.ID, "health_state")
 				})
 			}

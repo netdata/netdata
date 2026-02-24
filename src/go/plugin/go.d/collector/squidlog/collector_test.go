@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/modtest"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +34,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	modtest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
@@ -250,7 +250,7 @@ func TestCollector_Collect_ReturnOldDataIfNothingRead(t *testing.T) {
 func testCharts(t *testing.T, collr *Collector, mx map[string]int64) {
 	t.Helper()
 	ensureChartsDynamicDimsCreated(t, collr)
-	modtest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+	collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
 func ensureChartsDynamicDimsCreated(t *testing.T, collr *Collector) {
