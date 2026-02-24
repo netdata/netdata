@@ -56,6 +56,33 @@ metrics:
             5: dormant
             6: notPresent
             7: lowerLayerDown
+      - tag: topo_if_phys_address
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.6
+          name: ifPhysAddress
+          format: hex
+
+  # IP-MIB: interface address map used for management IP -> ifIndex correlation.
+  - MIB: IP-MIB
+    table:
+      OID: 1.3.6.1.2.1.4.20
+      name: ipAddrTable
+    symbols:
+      - OID: 1.3.6.1.2.1.4.20.1.2
+        name: topologyIpIfIndexEntry
+    metric_tags:
+      - tag: topo_ip_addr
+        symbol:
+          OID: 1.3.6.1.2.1.4.20.1.1
+          name: ipAdEntAddr
+      - tag: topo_if_index
+        symbol:
+          OID: 1.3.6.1.2.1.4.20.1.2
+          name: ipAdEntIfIndex
+      - tag: topo_ip_netmask
+        symbol:
+          OID: 1.3.6.1.2.1.4.20.1.3
+          name: ipAdEntNetMask
 
   # BRIDGE-MIB: maps bridge port number to ifIndex.
   - MIB: BRIDGE-MIB
@@ -66,6 +93,11 @@ metrics:
       - OID: 1.3.6.1.2.1.17.1.4.1.2
         name: dot1dBasePortIfIndexEntry
     metric_tags:
+      - tag: bridge_base_address
+        symbol:
+          OID: 1.3.6.1.2.1.17.1.1
+          name: dot1dBaseBridgeAddress
+          format: hex
       - tag: bridge_base_port
         index: 1
       - tag: bridge_if_index
@@ -83,6 +115,11 @@ metrics:
       - OID: 1.3.6.1.2.1.17.4.3.1.2
         name: dot1dTpFdbEntry
     metric_tags:
+      - tag: bridge_base_address
+        symbol:
+          OID: 1.3.6.1.2.1.17.1.1
+          name: dot1dBaseBridgeAddress
+          format: hex
       - tag: fdb_mac
         symbol:
           OID: 1.3.6.1.2.1.17.4.3.1.1

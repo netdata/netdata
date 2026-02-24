@@ -122,6 +122,38 @@ func TestBuildL2ResultFromObservations_InterfaceStatusLabels(t *testing.T) {
 	require.Equal(t, "lowerLayerDown", result.Interfaces[0].Labels["oper_status"])
 }
 
+func TestBuildL2ResultFromObservations_DeviceProtocolsObservedLabel(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID:     "switch-a",
+			Hostname:     "switch-a",
+			ManagementIP: "10.0.0.1",
+			BridgePorts: []BridgePortObservation{
+				{BasePort: "3", IfIndex: 3},
+			},
+			FDBEntries: []FDBObservation{
+				{MAC: "70:49:a2:65:72:cd", BridgePort: "3", Status: "learned"},
+			},
+			ARPNDEntries: []ARPNDObservation{
+				{IfIndex: 3, IP: "10.0.0.20", MAC: "70:49:a2:65:72:cd", Protocol: "arp"},
+			},
+			// Collected STP row that does not form a usable topology edge.
+			STPPorts: []STPPortObservation{
+				{Port: "3", DesignatedBridge: "00:11:22:33:44:55"},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{
+		EnableBridge: true,
+		EnableARP:    true,
+		EnableSTP:    true,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Devices, 1)
+	require.Equal(t, "arp,bridge,fdb,stp", result.Devices[0].Labels["protocols_observed"])
+}
+
 func TestBuildL2ResultFromObservations_SkipsSelfAdjacencies(t *testing.T) {
 	observations := []L2Observation{
 		{

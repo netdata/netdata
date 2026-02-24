@@ -104,6 +104,141 @@ func TestTopologyCache_CdpSnapshot(t *testing.T) {
 	assert.Equal(t, "Gi0/3", data.Links[0].Dst.Attributes["port_id"])
 }
 
+func TestTopologyCache_UpdateTopologyProfileTags_STPBridgeAddressSetsSNMPIdentity(t *testing.T) {
+	coll := &Collector{
+		Config:        Config{Hostname: "10.20.4.2"},
+		topologyCache: newTopologyCache(),
+	}
+	coll.resetTopologyCache()
+	coll.topologyCache.localDevice.ChassisID = "10.20.4.2"
+	coll.topologyCache.localDevice.ChassisIDType = "management_ip"
+
+	coll.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
+		Tags: map[string]string{
+			tagBridgeBaseAddress: "\"18 FD 74 33 1A 9C \"",
+		},
+	}})
+
+	require.Equal(t, "18:fd:74:33:1a:9c", coll.topologyCache.stpBaseBridgeAddress)
+	require.Equal(t, "18:fd:74:33:1a:9c", coll.topologyCache.localDevice.ChassisID)
+	require.Equal(t, "macAddress", coll.topologyCache.localDevice.ChassisIDType)
+}
+
+func TestTopologyCache_UpdateFdbEntry_STPBridgeAddressTagSetsSNMPIdentity(t *testing.T) {
+	cache := newTopologyCache()
+	cache.localDevice = topologyDevice{
+		ChassisID:     "10.20.4.2",
+		ChassisIDType: "management_ip",
+	}
+
+	cache.updateFdbEntry(map[string]string{
+		tagStpBaseBridgeAddress: "18 FD 74 33 1A 9C",
+		tagFdbMac:               "70:49:a2:65:72:cd",
+		tagFdbBridgePort:        "7",
+		tagFdbStatus:            "learned",
+	})
+
+	require.Equal(t, "18:fd:74:33:1a:9c", cache.stpBaseBridgeAddress)
+	require.Equal(t, "18:fd:74:33:1a:9c", cache.localDevice.ChassisID)
+	require.Equal(t, "macAddress", cache.localDevice.ChassisIDType)
+}
+
+func TestTopologyCache_BuildEngineObservation_DerivesBaseBridgeMACFromInterfacePhysAddress(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "10.20.4.2",
+		ChassisIDType: "management_ip",
+		ManagementIP:  "10.20.4.2",
+	}
+
+	cache.updateIfIndexByIP(map[string]string{
+		tagTopoIPAddr:  "10.20.4.2",
+		tagTopoIfIndex: "1",
+	})
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex: "1",
+		tagTopoIfName:  "Port1",
+		tagTopoIfPhys:  "\"18 FD 74 33 1A 9C \"",
+	})
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Equal(t, "18:fd:74:33:1a:9c", obs.BaseBridgeAddress)
+	require.Equal(t, "macAddress:18:fd:74:33:1a:9c", obs.DeviceID)
+}
+
+func TestTopologyCache_UpdateIfIndexByIP_CollectsAllSNMPDeviceIPs(t *testing.T) {
+	cache := newTopologyCache()
+
+	cache.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "1",
+		tagTopoIPAddr:  "10.20.4.1",
+		tagTopoIPMask:  "255.255.255.0",
+	})
+	cache.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "2",
+		tagTopoIPAddr:  "10.20.4.2",
+		tagTopoIPMask:  "255.255.255.0",
+	})
+	cache.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "3",
+		tagTopoIPAddr:  "2001:db8::1",
+	})
+	// Duplicate row should not duplicate management address entries.
+	cache.updateIfIndexByIP(map[string]string{
+		tagTopoIfIndex: "1",
+		tagTopoIPAddr:  "10.20.4.1",
+		tagTopoIPMask:  "255.255.255.0",
+	})
+
+	require.Equal(t, "1", cache.ifIndexByIP["10.20.4.1"])
+	require.Equal(t, "2", cache.ifIndexByIP["10.20.4.2"])
+	require.Equal(t, "3", cache.ifIndexByIP["2001:db8::1"])
+
+	addrs := cache.localDevice.ManagementAddresses
+	require.Len(t, addrs, 3)
+	require.Contains(t, addrs, topologyManagementAddress{
+		Address:     "10.20.4.1",
+		AddressType: "ipv4",
+		Source:      "ip_mib",
+	})
+	require.Contains(t, addrs, topologyManagementAddress{
+		Address:     "10.20.4.2",
+		AddressType: "ipv4",
+		Source:      "ip_mib",
+	})
+	require.Contains(t, addrs, topologyManagementAddress{
+		Address:     "2001:db8::1",
+		AddressType: "ipv6",
+		Source:      "ip_mib",
+	})
+}
+
+func TestTopologyCache_UpdateTopologyProfileTags_LLDPDoesNotOverrideExistingSNMPIdentity(t *testing.T) {
+	coll := &Collector{
+		Config:        Config{Hostname: "10.20.4.2"},
+		topologyCache: newTopologyCache(),
+	}
+	coll.resetTopologyCache()
+	coll.topologyCache.localDevice.ChassisID = "18:fd:74:33:1a:9c"
+	coll.topologyCache.localDevice.ChassisIDType = "macAddress"
+	coll.topologyCache.localDevice.SysName = "MikroTik-Switch"
+
+	coll.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
+		Tags: map[string]string{
+			tagLldpLocChassisID:        "00:11:22:33:44:55",
+			tagLldpLocChassisIDSubtype: "4",
+			tagLldpLocSysName:          "lldp-name",
+		},
+	}})
+
+	require.Equal(t, "18:fd:74:33:1a:9c", coll.topologyCache.localDevice.ChassisID)
+	require.Equal(t, "macAddress", coll.topologyCache.localDevice.ChassisIDType)
+	require.Equal(t, "MikroTik-Switch", coll.topologyCache.localDevice.SysName)
+}
+
 func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()
@@ -556,6 +691,28 @@ func TestTopologyCache_STPObservation(t *testing.T) {
 	require.Equal(t, "66:77:88:99:aa:bb", obs.STPPorts[0].DesignatedBridge)
 }
 
+func TestTopologyCache_BuildEngineObservation_DerivesBaseBridgeMACFromFDBSelfEntries(t *testing.T) {
+	cache := newTopologyCache()
+	cache.updateTime = time.Now()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent1"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "10.20.4.2",
+		ChassisIDType: "management_ip",
+		ManagementIP:  "10.20.4.2",
+	}
+	// Device reports FDB rows but no LLDP local chassis; derive identity from self FDB MAC.
+	cache.updateFdbEntry(map[string]string{
+		tagFdbMac:        "18:fd:74:33:1a:9c",
+		tagFdbBridgePort: "1",
+		tagFdbStatus:     "self",
+	})
+
+	obs := cache.buildEngineObservation(cache.localDevice)
+	require.Equal(t, "18:fd:74:33:1a:9c", obs.BaseBridgeAddress)
+	require.Equal(t, "macAddress:18:fd:74:33:1a:9c", obs.DeviceID)
+}
+
 func TestTopologyCache_InterfaceStatusObservation(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()
@@ -627,6 +784,18 @@ func TestStpBridgeAddressToMAC_ParsesAndRejectsSentinels(t *testing.T) {
 			in:     "32768-66.77.88.99.aa.bb",
 			status: stpBridgeIDValid,
 			mac:    "66:77:88:99:aa:bb",
+		},
+		{
+			name:   "quoted-hex-string",
+			in:     "\"18 FD 74 33 1A 9C \"",
+			status: stpBridgeIDValid,
+			mac:    "18:fd:74:33:1a:9c",
+		},
+		{
+			name:   "hex-string-prefix",
+			in:     "Hex-STRING: 18 FD 74 33 1A 9C",
+			status: stpBridgeIDValid,
+			mac:    "18:fd:74:33:1a:9c",
 		},
 		{
 			name:   "sentinel-text-empty",

@@ -13,6 +13,48 @@
 - Do not optimize for “smallest change” or “fastest patch”.
 
 ## 0.1) Decision Log (Costa)
+- 2026-02-24: **Costa decision accepted (unlinked endpoint pruning mode) — `A`.**
+  - Prune unlinked endpoint actors using exact actor linkage (`actor_id` referenced by links), not identity-overlap heuristics.
+  - Implication: endpoint actors that only overlap by hostname/IP/MAC with linked devices must still be removed when they have no link participation.
+- 2026-02-24: **Costa decision accepted (unlinked visibility policy) — `B` for now.**
+  - Backend must return unlinked endpoint actors in topology payload so UI `unlinked on/off` can work locally.
+  - Keep this as current behavior; add backend query option later to control inclusion/exclusion server-side.
+
+### Pending decision (2026-02-24, discovered in live UI behavior)
+- Context:
+  - UI `unlinked on/off` toggle currently can only hide/show endpoint actors present in payload.
+  - Backend now prunes all unlinked endpoints before response; therefore toggle cannot reveal suppressed endpoints.
+- Evidence:
+  - Current payload stats show suppression:
+    - `actors_unlinked_suppressed=72`
+    - `endpoints_total=85`
+    - `actors_total=32`
+  - Code path:
+    - `ToTopologyData()` prunes endpoints in backend before response (`pruneUnlinkedEndpointActors`).
+- Decision required:
+  - whether unlinked endpoints should remain in backend payload (for UI toggle visibility) or continue being removed server-side.
+- 2026-02-24: **Costa decision accepted (FDB overlap replacement, strict guardrails).**
+  - Keep de-dup suppression when endpoint identity overlaps known managed-device identity.
+  - Add deterministic replacement behavior:
+    - if overlap resolves to **exactly one** managed device, emit managed-device replacement edge (do not drop visibility),
+    - if overlap resolves to `0` or `>1` managed devices, keep suppression (no forced/wrong link).
+  - Expand managed-device identity matching to include interface-MAC aliases so base-MAC mismatch does not hide valid router/switch FDB links.
+- 2026-02-24: **Costa decision accepted (SNMP config cleanup).**
+  - Remove redundant per-job `topology.autoprobe: yes` from SNMP jobs (default is already `true`).
+  - Remove per-job `manual_profiles` forcing `_std-lldp-mib` / `_std-cdp-mib`.
+  - Keep SNMP jobs configured as before for metrics; topology must continue working via defaults/autoprobe.
+- 2026-02-24: **Costa directive accepted (SNMP IP inventory + protocol semantics).**
+  - SNMP-managed devices should expose all collected interface IP addresses (not only one management IP), when available from SNMP.
+  - Protocol label semantics:
+    - `SNMP` means the actor itself is an SNMP-polled managed device.
+    - Inferred endpoints/segments must not be shown as `SNMP`.
+- 2026-02-24: **Costa directive accepted (managed-device MAC completeness).**
+  - We must maximize MAC identity extraction for SNMP-managed devices using all reliable SNMP sources.
+  - `dot1dBaseBridgeAddress` (BRIDGE-MIB) is authoritative when present and valid.
+  - Additional deterministic fallbacks are required when bridge-base MAC is absent/unusable:
+    1. FDB `self` entries,
+    2. IF-MIB `ifPhysAddress`-based inference.
+  - Parsing must be hardened for vendor SNMP hex encodings (quoted/space-separated variants) so valid MAC values are not dropped.
 - 2026-02-20: **Decision A accepted**.
   - We execute a **strict parity-first protocol**.
   - Work order is mandatory:
@@ -3091,6 +3133,114 @@
 - Conclusion:
   - No evidence of SNMP parsing bug for this case.
   - These are two distinct chassis IDs reported by devices (`...c8` vs `...cc`), plus one related segment actor (`chassis-788cb595dfcc.788cb595dfcc.segment`) that can look visually similar.
+
+- Timestamp (UTC): `2026-02-23 23:05:00Z`
+- Gate ID:
+  - `T25-user-directive-protocol-usage-stp-mac-fix`
+- User Directive (Costa):
+  1. UI protocols must reflect protocols **used/collected**, not only protocols that produced useful/final links.
+  2. Validate STP status across all office switches/routers (explicit device-by-device evidence).
+  3. Fix severe MAC identity bug where SNMP device actor misses MAC and duplicates with an endpoint actor.
+- Timestamp (UTC): `2026-02-23 23:40:00Z`
+- Gate ID:
+  - `T26-snmp-primary-identity-policy`
+- User Directive (Costa):
+  - Device identification must be SNMP-primary.
+  - LLDP is topology-neighbor data; it must not overwrite core device identity.
+  - SNMP identification (device identity/capabilities/ports) is always authoritative for managed devices.
+
+- Timestamp (UTC): `2026-02-23 23:55:00Z`
+- Gate ID:
+  - `T26-snmp-primary-identity-policy-applied`
+- Implementation:
+  - `updateTopologyProfileTags()` now keeps LLDP local identity tags as fallback-only:
+    - LLDP local chassis/sysname/sysdescr no longer overwrite already known managed-device identity.
+  - STP base bridge address (SNMP BRIDGE-MIB identity) now explicitly sets managed-device chassis identity as authoritative:
+    - `localDevice.ChassisID=<mac>`, `ChassisIDType=macAddress`.
+  - `buildEngineObservation()` now upgrades local chassis identity from derived bridge MAC when chassis identity is non-MAC.
+  - `snapshotEngineObservations()` now propagates bridge-MAC identity into local-device cache copy used for actor augmentation/matching.
+  - Added tests for:
+    - STP bridge MAC setting managed identity,
+    - LLDP not overriding existing SNMP identity.
+- Files changed:
+  - `src/go/plugin/go.d/collector/snmp/topology_cache.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_registry.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_cache_test.go`
+- Validation:
+  - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` ✅
+
+- Timestamp (UTC): `2026-02-24 00:12:00Z`
+- Gate ID:
+  - `T27-mikrotik-switch-mac-identity-hardening`
+- User-reported regression:
+  - Managed `mikrotik-switch` actor still appeared as IP/chassis identity without MAC, causing duplicate actor split (`device` + `endpoint`).
+- Root cause (fact):
+  - Some devices (including office `10.20.4.2`) expose `dot1dBaseBridgeAddress` in BRIDGE-MIB and FDB rows but do not expose LLDP local chassis, and may not provide FDB `self` rows.
+  - Previous fallback relied on:
+    - profile-level STP tag (not guaranteed present on every path), and
+    - FDB `self` status (not guaranteed present on this device).
+- Fix applied:
+  - Added authoritative bridge identity ingestion from SNMP table metric tags by reading `stp_base_bridge_address` in:
+    - `updateBridgePortMap(...)`
+    - `updateFdbEntry(...)`
+  - Added helper methods:
+    - `applyAuthoritativeBridgeIdentity(mac)`
+    - `updateLocalBridgeIdentityFromTags(tags)`
+  - Updated FDB profile so BRIDGE table rows always carry `dot1dBaseBridgeAddress` tag:
+    - `dot1dBasePortTable` metric tags
+    - `dot1dTpFdbTable` metric tags
+  - This keeps SNMP identity authoritative and avoids LLDP overwriting managed identity.
+- Files changed:
+  - `src/go/plugin/go.d/collector/snmp/topology_cache.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_cache_test.go`
+  - `src/go/plugin/go.d/config/go.d/snmp.profiles/default/_std-topology-fdb-arp-mib.yaml`
+- Added tests:
+  - `TestTopologyCache_UpdateFdbEntry_STPBridgeAddressTagSetsSNMPIdentity`
+- Validation:
+  - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` ✅
+- Implementation requirements recorded:
+  - Backend must expose protocol-usage evidence for devices even when projection suppresses links.
+  - Collector/engine identity path must recover stable MAC identity for managed devices even when LLDP local chassis is missing (example: `10.20.4.2`).
+
+- Timestamp (UTC): `2026-02-23 23:28:00Z`
+- Gate ID:
+  - `T25-user-directive-protocol-usage-stp-mac-fix-applied`
+- Device-by-device STP/FDB evidence (office):
+  - `10.20.4.1` (`MikroTik-router`):
+    - `dot1dBaseBridgeAddress` = `18 FD 74 7E C5 82`
+    - `dot1dStpPortTable` (`1.3.6.1.2.1.17.2.15.1.8`) = `No Such Object`
+    - `dot1dTpFdbPort` row count = `55`
+  - `10.20.4.2` (`MikroTik-switch`):
+    - `dot1dBaseBridgeAddress` = `18 FD 74 33 1A 9C`
+    - STP designated bridge rows resolve to self bridge-id (`...1A 9C`)
+    - `dot1dTpFdbPort` row count = `50`
+  - `10.20.4.3` (`XS1930`):
+    - `dot1dBaseBridgeAddress` = `70 49 A2 65 72 CD`
+    - STP table query = `No Such Instance`
+    - `dot1dTpFdbPort` row count = `50`
+  - `10.20.4.4` (`GS1900`):
+    - `dot1dBaseBridgeAddress` = `FC 22 F4 FB 8D 52`
+    - STP designated bridge rows = sentinel `0-00.00.00.00.00.00`
+    - `dot1dTpFdbPort` row count = `1`
+- Implemented changes:
+  - **MAC identity fallback fix (severe duplicate root cause):**
+    - Added fallback derivation of local bridge MAC from FDB `self` rows when LLDP/STP base tags do not provide chassis MAC.
+    - `buildEngineObservation()` now uses derived MAC for `DeviceID` and `BaseBridgeAddress`.
+    - Files:
+      - `src/go/plugin/go.d/collector/snmp/topology_cache.go`
+      - `src/go/plugin/go.d/collector/snmp/topology_cache_test.go`
+  - **Protocol usage exposure (used/collected, not only useful links):**
+    - Engine now records per-device `protocols_observed` from raw observation presence (`lldp`, `cdp`, `bridge`, `fdb`, `stp`, `arp`).
+    - Topology actor attributes now expose:
+      - `protocols`
+      - `protocols_collected`
+    - Files:
+      - `src/go/pkg/topology/engine/l2_pipeline.go`
+      - `src/go/pkg/topology/engine/l2_pipeline_test.go`
+      - `src/go/pkg/topology/engine/topology_adapter.go`
+      - `src/go/pkg/topology/engine/topology_adapter_test.go`
+- Validation:
+  - `cd src/go && go test ./pkg/topology/engine/... ./plugin/go.d/collector/snmp -count=1` ✅
 - Timestamp (UTC): `2026-02-23 10:55:00Z`
 - Gate ID:
   - `T23-why-enlinkd-does-not-show-c8-cc`
@@ -3141,3 +3291,126 @@
   - FDB endpoint links are projected only when ownership is deterministic; ambiguous candidates are suppressed (`topology_adapter.go:521+`, `543+`, `570+`).
   - LLDP transit ports are excluded in FDB owner inference (`topology_adapter.go:1199-1203`).
   - STP emits links only when designated bridge resolves to a known target actor and is not local/self (`l2_pipeline.go:447-460`, `452-454`).
+
+- Timestamp (UTC): `2026-02-23 23:45:00Z`
+- Gate ID:
+  - `T28-managed-device-mac-completeness`
+- Scope:
+  - Maximize managed-device MAC extraction from reliable SNMP sources and remove dependency on STP-table availability.
+- Changes applied:
+  - Collector identity tags:
+    - Introduced canonical tag key `bridge_base_address` for `dot1dBaseBridgeAddress`.
+    - Kept legacy in-code compatibility for `stp_base_bridge_address` tag.
+  - Parser hardening:
+    - Added SNMP hex text normalization for quoted/prefixed encodings (`"18 FD ..."`, `Hex-STRING: ...`, `STRING: ...`).
+    - Applied normalization in `normalizeMAC`, `decodeHexString`, `normalizeHexIdentifier`.
+  - New MAC fallback source:
+    - Added IF-MIB `ifPhysAddress` collection (`topo_if_phys_address`) in topology profile.
+    - Added IP-MIB `ipAddrTable` collection to map management IP -> ifIndex in topology profile.
+    - Added fallback chain in observation build:
+      1. bridge base address,
+      2. FDB self rows,
+      3. IF-MIB `ifPhysAddress` deterministic inference.
+- Files changed:
+  - `src/go/plugin/go.d/collector/snmp/topology_cache.go`
+  - `src/go/plugin/go.d/collector/snmp/topology_cache_test.go`
+  - `src/go/plugin/go.d/config/go.d/snmp.profiles/default/_std-topology-fdb-arp-mib.yaml`
+  - `src/go/plugin/go.d/config/go.d/snmp.profiles/default/_std-topology-stp-mib.yaml`
+- Validation:
+  - `cd src/go && go test ./plugin/go.d/collector/snmp -count=1` ✅
+  - `cd src/go && go test ./pkg/topology/engine/... -count=1` ✅
+  - Live check after install (`topology:snmp topology_view:l2`):
+    - `MikroTik-Switch` now resolves as MAC-backed actor:
+      - `actor_id=mac:18:fd:74:33:1a:9c`
+      - `device_id=macAddress:18:fd:74:33:1a:9c`
+      - `match.mac_addresses=["18:fd:74:33:1a:9c"]`
+
+- Timestamp (UTC): `2026-02-24 00:40:00Z`
+- Gate ID:
+  - `T29-snmp-managed-ip-inventory`
+- User requirement implemented:
+  - SNMP-managed devices now retain all SNMP-collected interface IPs in actor `management_addresses`.
+- Implementation detail:
+  - `updateIfIndexByIP()` now appends each `ipAddrTable` address into local device management addresses (`source=ip_mib`, ipv4/ipv6 typed).
+- Validation:
+  - `go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` ✅
+  - Live evidence (`topology:snmp topology_view:l2`): `MikroTik-router` actor now reports 7 management addresses (including `10.20.1.1`, `192.168.88.1`, public WAN IPs).
+
+- Timestamp (UTC): `2026-02-24 00:15:00Z`
+- Gate ID:
+  - `T30-router-switch-fdb-link-missing-root-cause`
+- User report:
+  - `mikrotik-router` <-> `mikrotik-switch` link was visible before MAC-identity fix (via ghost endpoint), then disappeared.
+- Facts collected:
+  - Router SNMP confirms switch MAC is learned in FDB:
+    - `dot1dTpFdbPort[18:fd:74:33:1a:9c] = 14`
+    - `dot1dTpFdbStatus[18:fd:74:33:1a:9c] = learned(3)`
+    - `dot1dBasePortIfIndex[14] = 19`, `ifName[19] = mikrotik-switch`
+  - Topology output currently shows router -> `MikroTik-router.mikrotik-switch.segment` but no segment/device continuation edge to `mikrotik-switch` actor.
+  - Adapter logic currently suppresses endpoint links when endpoint identity overlaps a known device (`endpointMatchOverlapsKnownDevice`) and does not emit replacement FDB device-to-device edge in this path.
+- Root cause (fact):
+  - Once `mikrotik-switch` gained correct MAC identity (`18:fd:74:33:1a:9c`), the old ghost endpoint path was de-duplicated/suppressed as intended, but replacement managed-device FDB edge was not emitted.
+- Additional identity nuance (fact):
+  - Switch FDB reports router-side interface MACs (`18:fd:74:7e:c5:82`, `...:8c`, `...:8d`) instead of router base MAC (`...:80`), so strict base-MAC-only identity can miss reverse-side correlation.
+
+- Timestamp (UTC): `2026-02-24 02:05:00Z`
+- Gate ID:
+  - `T31-fdb-overlap-managed-device-replacement`
+- Scope:
+  - Implement the approved strict replacement rule for FDB endpoint/device overlap and preserve suppression guardrails.
+- Changes applied:
+  - Replacement edge behavior in adapter:
+    - when endpoint identity overlaps exactly one known managed device, emit FDB replacement edge from segment to managed device (`attachment_mode=managed_device_overlap`) instead of dropping.
+    - when overlap is ambiguous (`>1`) or unresolved, keep suppression.
+    - when overlap resolves to the same parent device already owning the segment (self-MAC case), keep suppression (avoid self-loop artifacts).
+  - Identity expansion:
+    - managed-device identity keyset now includes interface-MAC aliases (`Interface.MAC`) in addition to existing device/chassis identity keys and LLDP/CDP port-MAC aliases.
+- Tests added/updated:
+  - `TestToTopologyData_ReplacesKnownDeviceEndpointWithManagedDeviceEdge`
+  - `TestToTopologyData_KnownDeviceOverlapUsesInterfaceMACAlias`
+  - Updated overlap-dedup assertions to keep behavior-focused checks under current stats semantics.
+- Files changed:
+  - `src/go/pkg/topology/engine/topology_adapter.go`
+  - `src/go/pkg/topology/engine/topology_adapter_test.go`
+- Validation:
+  - `cd src/go && go test ./pkg/topology/engine/... -count=1` ✅
+  - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` ✅
+
+- Timestamp (UTC): `2026-02-24 05:20:00Z`
+- Gate ID:
+  - `T33-unlinked-endpoints-kept-in-payload`
+- Scope:
+  - Apply temporary Option `B`: keep unlinked endpoints in backend response so UI local toggle can show/hide them.
+- Changes applied:
+  - Removed backend endpoint-pruning step from `ToTopologyData()` output path.
+  - `actors_unlinked_suppressed` is now `0` under this policy.
+  - Updated topology adapter tests to validate unlinked endpoints are retained.
+- Files changed:
+  - `src/go/pkg/topology/engine/topology_adapter.go`
+  - `src/go/pkg/topology/engine/topology_adapter_test.go`
+- Validation:
+  - `cd src/go && go test ./pkg/topology/engine/... -count=1` ✅
+  - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` ✅
+
+- Timestamp (UTC): `2026-02-24 03:05:00Z`
+- Gate ID:
+  - `T32-unlinked-endpoint-prune-by-actor-id`
+- Scope:
+  - Remove false-positive unlinked endpoint actors that survive due to identity overlap with linked devices.
+- Changes applied:
+  - Reordered prune phase in topology projection:
+    - apply display names,
+    - assign actor/link IDs,
+    - prune unlinked endpoints.
+  - Reworked `pruneUnlinkedEndpointActors()`:
+    - endpoint keep/drop now uses exact link participation by `actor_id` (`src_actor_id`/`dst_actor_id`),
+    - removed identity-overlap keep logic for endpoint pruning.
+- Tests added:
+  - `TestToTopologyData_PrunesUnlinkedEndpointEvenWhenIdentityOverlapsLinkedDevice`
+    - verifies endpoint with overlapping identity (same IP as linked device) is pruned when it has no links.
+- Files changed:
+  - `src/go/pkg/topology/engine/topology_adapter.go`
+  - `src/go/pkg/topology/engine/topology_adapter_test.go`
+- Validation:
+  - `cd src/go && go test ./pkg/topology/engine/... -count=1` ✅
+  - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` ✅
