@@ -111,7 +111,7 @@ func (e *Example) Check() bool {
 produces [`charts`](/src/plugins.d/README.md#chart), not
 raw metrics.
 
-Use [`agent/module`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/agent/module/charts.go)
+Use [`framework/module`](https://github.com/netdata/netdata/blob/master/src/go/plugin/framework/module/charts.go)
 package to create them,
 it contains charts and dimensions structs.
 

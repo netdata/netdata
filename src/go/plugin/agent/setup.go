@@ -8,15 +8,15 @@ import (
 	"strings"
 
 	hostinfo2 "github.com/netdata/netdata/go/plugins/pkg/hostinfo"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/module"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/dummy"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/file"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sdext"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext"
 	"gopkg.in/yaml.v2"
 )
 

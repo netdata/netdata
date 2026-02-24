@@ -9,10 +9,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	sharedsd "github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sdext/discoverer/dockersd"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sdext/discoverer/k8ssd"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sdext/discoverer/netlistensd"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sdext/discoverer/snmpsd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/dockersd"
+	k8ssd2 "github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/k8ssd"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/netlistensd"
+	snmpsd2 "github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/snmpsd"
 	"gopkg.in/yaml.v2"
 )
 
@@ -35,15 +35,15 @@ func Registry() sharedsd.Registry {
 		sharedsd.NewDescriptor(
 			discovererK8s,
 			schemaK8s,
-			parseJSONConfig[[]k8ssd.Config],
-			parseYAMLConfig[[]k8ssd.Config],
+			parseJSONConfig[[]k8ssd2.Config],
+			parseYAMLConfig[[]k8ssd2.Config],
 			newK8sDiscoverers,
 		),
 		sharedsd.NewDescriptor(
 			discovererSNMP,
 			schemaSNMP,
-			parseJSONConfig[snmpsd.Config],
-			parseYAMLConfig[snmpsd.Config],
+			parseJSONConfig[snmpsd2.Config],
+			parseYAMLConfig[snmpsd2.Config],
 			newSNMPDiscoverers,
 		),
 	}
@@ -93,7 +93,7 @@ func newDockerDiscoverers(cfg dockersd.Config, source string) ([]model.Discovere
 	return []model.Discoverer{d}, nil
 }
 
-func newK8sDiscoverers(cfgs []k8ssd.Config, source string) ([]model.Discoverer, error) {
+func newK8sDiscoverers(cfgs []k8ssd2.Config, source string) ([]model.Discoverer, error) {
 	if len(cfgs) == 0 {
 		return nil, fmt.Errorf("empty %q discoverer config", discovererK8s)
 	}
@@ -101,7 +101,7 @@ func newK8sDiscoverers(cfgs []k8ssd.Config, source string) ([]model.Discoverer, 
 	discs := make([]model.Discoverer, 0, len(cfgs))
 	for _, cfg := range cfgs {
 		cfg.Source = source
-		d, err := k8ssd.NewDiscoverer(cfg)
+		d, err := k8ssd2.NewDiscoverer(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -111,9 +111,9 @@ func newK8sDiscoverers(cfgs []k8ssd.Config, source string) ([]model.Discoverer, 
 	return discs, nil
 }
 
-func newSNMPDiscoverers(cfg snmpsd.Config, source string) ([]model.Discoverer, error) {
+func newSNMPDiscoverers(cfg snmpsd2.Config, source string) ([]model.Discoverer, error) {
 	cfg.Source = source
-	d, err := snmpsd.NewDiscoverer(cfg)
+	d, err := snmpsd2.NewDiscoverer(cfg)
 	if err != nil {
 		return nil, err
 	}
