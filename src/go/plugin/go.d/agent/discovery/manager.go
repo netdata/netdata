@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/file"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd"
 )
 
 func NewManager(cfg Config) (*Manager, error) {
