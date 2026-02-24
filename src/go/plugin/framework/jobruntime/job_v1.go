@@ -67,7 +67,7 @@ type JobConfig struct {
 	IsStock         bool
 	Vnode           vnodes.VirtualNode
 	DumpMode        bool
-	DumpAnalyzer    interface{}
+	DumpAnalyzer    DumpAnalyzer
 	FunctionOnly    bool
 }
 
@@ -163,7 +163,7 @@ type Job struct {
 
 	// Dump mode support
 	dumpMode     bool
-	dumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
+	dumpAnalyzer DumpAnalyzer
 	skipTracker  tickstate.SkipTracker
 }
 
@@ -267,11 +267,7 @@ func (j *Job) AutoDetection() (err error) {
 
 	// Record job structure for dump mode after successful detection
 	if j.dumpMode && j.dumpAnalyzer != nil && j.charts != nil {
-		if analyzer, ok := j.dumpAnalyzer.(interface {
-			RecordJobStructure(string, string, *collectorapi.Charts)
-		}); ok {
-			analyzer.RecordJobStructure(j.name, j.moduleName, j.charts)
-		}
+		j.dumpAnalyzer.RecordJobStructure(j.name, j.moduleName, j.charts)
 	}
 
 	return nil
@@ -482,11 +478,7 @@ func (j *Job) collect() collectedMetrics {
 	// Record collected metrics for dump mode
 	// TODO: The dump analyzer only records intMetrics but ignores floatMetrics
 	if j.dumpMode && j.dumpAnalyzer != nil && mx.intMetrics != nil {
-		if analyzer, ok := j.dumpAnalyzer.(interface {
-			RecordCollection(string, map[string]int64)
-		}); ok {
-			analyzer.RecordCollection(j.name, mx.intMetrics)
-		}
+		j.dumpAnalyzer.RecordCollection(j.name, mx.intMetrics)
 	}
 
 	return mx
@@ -565,11 +557,7 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 
 	// Update dump analyzer with current chart structure for dynamic collectors
 	if j.dumpMode && j.dumpAnalyzer != nil {
-		if analyzer, ok := j.dumpAnalyzer.(interface {
-			UpdateJobStructure(string, *collectorapi.Charts)
-		}); ok {
-			analyzer.UpdateJobStructure(j.name, j.charts)
-		}
+		j.dumpAnalyzer.UpdateJobStructure(j.name, j.charts)
 	}
 
 	intMx := collectedMetrics{intMetrics: map[string]int64{"success": oldmetrix.Bool(updated > 0), "failed": oldmetrix.Bool(updated == 0)}}

@@ -108,7 +108,7 @@ type Manager struct {
 
 	// Dump mode
 	DumpMode     bool
-	DumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
+	DumpAnalyzer jobruntime.DumpAnalyzer
 	DumpDataDir  string
 
 	fileStatus  *fileStatus
@@ -534,15 +534,15 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 	m.Debugf("creating %s[%s] job, config: %v", cfg.Module(), cfg.Name(), cfg)
 
 	var jobDumpDir string
-	if m.DumpDataDir != "" {
-		jobDumpDir = filepath.Join(m.DumpDataDir, sanitizeName(cfg.Module()), sanitizeName(cfg.Name()))
-		if err := os.MkdirAll(jobDumpDir, 0o755); err != nil {
-			return nil, fmt.Errorf("creating dump directory: %w", err)
+		if m.DumpDataDir != "" {
+			jobDumpDir = filepath.Join(m.DumpDataDir, sanitizeName(cfg.Module()), sanitizeName(cfg.Name()))
+			if err := os.MkdirAll(jobDumpDir, 0o755); err != nil {
+				return nil, fmt.Errorf("creating dump directory: %w", err)
+			}
+			if m.DumpAnalyzer != nil {
+				m.DumpAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
+			}
 		}
-		if analyzer, ok := m.DumpAnalyzer.(interface{ RegisterJob(string, string, string) }); ok {
-			analyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
-		}
-	}
 
 	useV2 := creator.CreateV2 != nil
 	if useV2 {
