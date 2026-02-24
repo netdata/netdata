@@ -4,7 +4,6 @@
 
 - **What it does**: collects metrics from databases, middleware, services, APIs, and infrastructure components using built-in collectors.
 - **How you use it**:
-    - enable a collector in `go.d.conf`,
     - set collector-specific jobs in `config/go.d/*.conf`,
     - restart Netdata and the collector jobs start automatically.
 - **Operational behavior**:
