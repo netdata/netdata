@@ -103,11 +103,18 @@ type fdbEndpointOwner struct {
 type topologyIdentityKeySet map[string]struct{}
 
 type topologyDevicePortStatus struct {
-	IfIndex       int
-	IfName        string
-	InterfaceType string
-	AdminStatus   string
-	OperStatus    string
+	IfIndex        int
+	IfName         string
+	InterfaceType  string
+	AdminStatus    string
+	OperStatus     string
+	LinkMode       string
+	ModeConfidence string
+	ModeSources    []string
+	VLANIDs        []string
+	TopologyRole   string
+	RoleConfidence string
+	RoleSources    []string
 }
 
 type topologyDeviceInterfaceSummary struct {
@@ -116,7 +123,19 @@ type topologyDeviceInterfaceSummary struct {
 	ifNames          []string
 	adminStatusCount map[string]any
 	operStatusCount  map[string]any
+	linkModeCount    map[string]any
+	roleCount        map[string]any
 	portStatuses     []map[string]any
+}
+
+type topologyDevicePortEvidence struct {
+	vlanIDs            map[string]struct{}
+	fdbEndpointIDs     map[string]struct{}
+	hasFDB             bool
+	hasFDBManagedAlias bool
+	hasSTP             bool
+	hasPeer            bool
+	hasBridgeLink      bool
 }
 
 // ToTopologyData converts an engine result to the shared topology schema.
@@ -152,7 +171,6 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	deviceByID := make(map[string]Device, len(result.Devices))
 	ifaceByDeviceIndex := make(map[string]Interface, len(result.Interfaces))
 	ifIndexByDeviceName := make(map[string]int, len(result.Interfaces))
-	ifaceSummaryByDevice := buildTopologyDeviceInterfaceSummaries(result.Interfaces)
 
 	for _, dev := range result.Devices {
 		deviceByID[dev.ID] = dev
@@ -168,12 +186,29 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 			ifIndexByDeviceName[deviceIfNameKey(iface.DeviceID, ifName)] = iface.IfIndex
 		}
 	}
+	bridgeLinks := collectBridgeLinkRecords(result.Adjacencies, ifIndexByDeviceName)
+	reporterAliases := buildFDBReporterAliases(deviceByID, ifaceByDeviceIndex)
+	ifaceSummaryByDevice := buildTopologyDeviceInterfaceSummaries(
+		result.Interfaces,
+		result.Attachments,
+		result.Adjacencies,
+		ifIndexByDeviceName,
+		bridgeLinks,
+		reporterAliases,
+	)
 
 	actors := make([]topology.Actor, 0, len(result.Devices))
 	actorIndex := make(map[string]struct{}, len(result.Devices)*2)
 	actorMACIndex := make(map[string]struct{}, len(result.Devices))
 	for _, dev := range result.Devices {
-		actor := deviceToTopologyActor(dev, source, layer, opts.LocalDeviceID, ifaceSummaryByDevice[dev.ID])
+		actor := deviceToTopologyActor(
+			dev,
+			source,
+			layer,
+			opts.LocalDeviceID,
+			ifaceSummaryByDevice[dev.ID],
+			reporterAliases[dev.ID],
+		)
 		keys := topologyMatchIdentityKeys(actor.Match)
 		if len(keys) == 0 {
 			continue
@@ -205,6 +240,8 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 		deviceByID,
 		ifaceByDeviceIndex,
 		ifIndexByDeviceName,
+		bridgeLinks,
+		reporterAliases,
 		endpointActors.matchByEndpointID,
 		actorIndex,
 	)
@@ -354,6 +391,8 @@ func projectSegmentTopology(
 	deviceByID map[string]Device,
 	ifaceByDeviceIndex map[string]Interface,
 	ifIndexByDeviceName map[string]int,
+	bridgeLinks []bridgeBridgeLinkRecord,
+	reporterAliases map[string][]string,
 	endpointMatchByID map[string]topology.Match,
 	actorIndex map[string]struct{},
 ) projectedSegments {
@@ -365,9 +404,15 @@ func projectSegmentTopology(
 		return out
 	}
 
-	bridgeLinks := collectBridgeLinkRecords(adjacencies, ifIndexByDeviceName)
-	lldpPortKeys := buildLLDPPortKeySet(bridgeLinks)
-	macLinks := collectBridgeMacLinkRecords(attachments, ifaceByDeviceIndex, lldpPortKeys)
+	switchFacingPortKeys := buildSwitchFacingPortKeySet(bridgeLinks)
+	seedMacLinks := collectBridgeMacLinkRecords(attachments, ifaceByDeviceIndex, switchFacingPortKeys)
+	managedAliasEndpointIDs := buildManagedAliasEndpointIDSet(reporterAliases)
+	switchFacingPortKeys = augmentSwitchFacingPortKeySetFromManagedAliases(
+		switchFacingPortKeys,
+		buildFDBReporterObservations(seedMacLinks),
+		reporterAliases,
+	)
+	macLinks := filterBridgeMacLinkRecordsBySwitchFacing(seedMacLinks, switchFacingPortKeys, managedAliasEndpointIDs)
 	model := buildBridgeDomainModel(bridgeLinks, macLinks)
 	if len(model.domains) == 0 {
 		return out
@@ -495,10 +540,9 @@ func projectSegmentTopology(
 			endpointSegmentCandidates[endpointID] = append(endpointSegmentCandidates[endpointID], segmentID)
 		}
 	}
-	reporterAliases := buildFDBReporterAliases(deviceByID, ifaceByDeviceIndex)
 	fdbObservations := buildFDBReporterObservations(macLinks)
-	fdbOwners := inferFDBEndpointOwners(fdbObservations, reporterAliases, lldpPortKeys)
-	for endpointID, owner := range inferSinglePortEndpointOwners(macLinks, lldpPortKeys) {
+	fdbOwners := inferFDBEndpointOwners(fdbObservations, reporterAliases, switchFacingPortKeys)
+	for endpointID, owner := range inferSinglePortEndpointOwners(macLinks, switchFacingPortKeys) {
 		if strings.TrimSpace(endpointID) == "" {
 			continue
 		}
@@ -962,7 +1006,7 @@ func collectBridgeLinkRecords(adjacencies []Adjacency, ifIndexByDeviceName map[s
 func collectBridgeMacLinkRecords(
 	attachments []Attachment,
 	ifaceByDeviceIndex map[string]Interface,
-	lldpPortKeys map[string]struct{},
+	switchFacingPortKeys map[string]struct{},
 ) []bridgeMacLinkRecord {
 	records := make([]bridgeMacLinkRecord, 0, len(attachments))
 	seen := make(map[string]struct{}, len(attachments))
@@ -984,7 +1028,10 @@ func collectBridgeMacLinkRecords(
 			method = "fdb"
 		}
 		if method == "fdb" {
-			if _, isLLDPPort := lldpPortKeys[bridgePortObservationKey(port)]; isLLDPPort {
+			if _, isSwitchFacingPort := switchFacingPortKeys[bridgePortObservationKey(port)]; isSwitchFacingPort {
+				continue
+			}
+			if _, isSwitchFacingPort := switchFacingPortKeys[bridgePortObservationVLANKey(port)]; isSwitchFacingPort {
 				continue
 			}
 		}
@@ -1066,7 +1113,9 @@ func buildDeviceIdentityKeySetByID(
 		if deviceID == "" {
 			continue
 		}
-		keys := topologyMatchIdentityKeys(deviceToTopologyActor(device, "", "", "", topologyDeviceInterfaceSummary{}).Match)
+		keys := topologyMatchIdentityKeys(
+			deviceToTopologyActor(device, "", "", "", topologyDeviceInterfaceSummary{}, nil).Match,
+		)
 		if len(keys) == 0 {
 			continue
 		}
@@ -1186,17 +1235,130 @@ func normalizeFDBEndpointID(endpointID string) string {
 	return ""
 }
 
-func buildLLDPPortKeySet(bridgeLinks []bridgeBridgeLinkRecord) map[string]struct{} {
+func buildSwitchFacingPortKeySet(bridgeLinks []bridgeBridgeLinkRecord) map[string]struct{} {
 	if len(bridgeLinks) == 0 {
 		return nil
 	}
-	out := make(map[string]struct{}, len(bridgeLinks)*2)
+	out := make(map[string]struct{}, len(bridgeLinks)*4)
 	for _, link := range bridgeLinks {
-		if key := bridgePortObservationKey(link.designatedPort); key != "" {
-			out[key] = struct{}{}
+		addBridgePortObservationKeys(out, link.designatedPort)
+		addBridgePortObservationKeys(out, link.port)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func addBridgePortObservationKeys(out map[string]struct{}, port bridgePortRef) {
+	if out == nil {
+		return
+	}
+	if key := bridgePortObservationKey(port); key != "" {
+		out[key] = struct{}{}
+	}
+	if key := bridgePortObservationVLANKey(port); key != "" {
+		out[key] = struct{}{}
+	}
+}
+
+func augmentSwitchFacingPortKeySetFromManagedAliases(
+	switchFacingPortKeys map[string]struct{},
+	observations fdbReporterObservation,
+	reporterAliases map[string][]string,
+) map[string]struct{} {
+	if len(observations.byReporter) == 0 || len(reporterAliases) == 0 {
+		return switchFacingPortKeys
+	}
+
+	aliasOwnerIDs := buildFDBAliasOwnerMap(reporterAliases)
+	if len(aliasOwnerIDs) == 0 {
+		return switchFacingPortKeys
+	}
+
+	updated := switchFacingPortKeys
+	for reporterID, endpoints := range observations.byReporter {
+		reporterID = strings.TrimSpace(reporterID)
+		if reporterID == "" {
+			continue
 		}
-		if key := bridgePortObservationKey(link.port); key != "" {
-			out[key] = struct{}{}
+		for endpointID, ports := range endpoints {
+			owners := aliasOwnerIDs[normalizeFDBEndpointID(endpointID)]
+			if len(owners) == 0 {
+				continue
+			}
+			otherManagedOwner := false
+			for ownerID := range owners {
+				if !strings.EqualFold(ownerID, reporterID) {
+					otherManagedOwner = true
+					break
+				}
+			}
+			if !otherManagedOwner {
+				continue
+			}
+			for portKey := range ports {
+				portKey = strings.TrimSpace(portKey)
+				if portKey == "" {
+					continue
+				}
+				if updated == nil {
+					updated = make(map[string]struct{})
+				}
+				updated[portKey] = struct{}{}
+			}
+		}
+	}
+	return updated
+}
+
+func buildFDBAliasOwnerMap(reporterAliases map[string][]string) map[string]map[string]struct{} {
+	if len(reporterAliases) == 0 {
+		return nil
+	}
+	aliasOwners := make(map[string]map[string]struct{})
+	reporterIDs := make([]string, 0, len(reporterAliases))
+	for reporterID := range reporterAliases {
+		reporterID = strings.TrimSpace(reporterID)
+		if reporterID == "" {
+			continue
+		}
+		reporterIDs = append(reporterIDs, reporterID)
+	}
+	sort.Strings(reporterIDs)
+	for _, reporterID := range reporterIDs {
+		aliases := uniqueTopologyStrings(reporterAliases[reporterID])
+		for _, alias := range aliases {
+			alias = normalizeFDBEndpointID(alias)
+			if alias == "" {
+				continue
+			}
+			owners := aliasOwners[alias]
+			if owners == nil {
+				owners = make(map[string]struct{})
+				aliasOwners[alias] = owners
+			}
+			owners[reporterID] = struct{}{}
+		}
+	}
+	if len(aliasOwners) == 0 {
+		return nil
+	}
+	return aliasOwners
+}
+
+func buildManagedAliasEndpointIDSet(reporterAliases map[string][]string) map[string]struct{} {
+	if len(reporterAliases) == 0 {
+		return nil
+	}
+	out := make(map[string]struct{})
+	for _, aliases := range reporterAliases {
+		for _, alias := range aliases {
+			alias = normalizeFDBEndpointID(alias)
+			if alias == "" {
+				continue
+			}
+			out[alias] = struct{}{}
 		}
 	}
 	if len(out) == 0 {
@@ -1205,10 +1367,40 @@ func buildLLDPPortKeySet(bridgeLinks []bridgeBridgeLinkRecord) map[string]struct
 	return out
 }
 
+func filterBridgeMacLinkRecordsBySwitchFacing(
+	macLinks []bridgeMacLinkRecord,
+	switchFacingPortKeys map[string]struct{},
+	managedAliasEndpointIDs map[string]struct{},
+) []bridgeMacLinkRecord {
+	if len(macLinks) == 0 || len(switchFacingPortKeys) == 0 {
+		return macLinks
+	}
+	out := make([]bridgeMacLinkRecord, 0, len(macLinks))
+	for _, link := range macLinks {
+		if strings.ToLower(strings.TrimSpace(link.method)) == "fdb" {
+			endpointID := normalizeFDBEndpointID(link.endpointID)
+			if endpointID != "" {
+				if _, keepManagedAlias := managedAliasEndpointIDs[endpointID]; keepManagedAlias {
+					out = append(out, link)
+					continue
+				}
+			}
+			if _, isSwitchFacing := switchFacingPortKeys[bridgePortObservationKey(link.port)]; isSwitchFacing {
+				continue
+			}
+			if _, isSwitchFacing := switchFacingPortKeys[bridgePortObservationVLANKey(link.port)]; isSwitchFacing {
+				continue
+			}
+		}
+		out = append(out, link)
+	}
+	return out
+}
+
 func inferFDBEndpointOwners(
 	observations fdbReporterObservation,
 	reporterAliases map[string][]string,
-	lldpPortKeys map[string]struct{},
+	switchFacingPortKeys map[string]struct{},
 ) map[string]fdbEndpointOwner {
 	if len(observations.byEndpoint) == 0 {
 		return nil
@@ -1241,7 +1433,7 @@ func inferFDBEndpointOwners(
 			}
 
 			for _, endpointPort := range ports {
-				if _, isTransitLLDPPort := lldpPortKeys[endpointPort]; isTransitLLDPPort {
+				if _, isSwitchFacingPort := switchFacingPortKeys[endpointPort]; isSwitchFacingPort {
 					continue
 				}
 				if !reporterSatisfiesFDBOwnerRule(endpointPort, reporterID, reporterIDs, observations.byReporter, reporterAliases) {
@@ -1324,7 +1516,7 @@ func bridgePortObservationVLANKey(port bridgePortRef) string {
 
 func inferSinglePortEndpointOwners(
 	macLinks []bridgeMacLinkRecord,
-	lldpPortKeys map[string]struct{},
+	switchFacingPortKeys map[string]struct{},
 ) map[string]fdbEndpointOwner {
 	if len(macLinks) == 0 {
 		return nil
@@ -1351,12 +1543,15 @@ func inferSinglePortEndpointOwners(
 		if portKey == "" {
 			continue
 		}
-		if _, isTransitLLDPPort := lldpPortKeys[portKey]; isTransitLLDPPort {
+		if _, isSwitchFacingPort := switchFacingPortKeys[portKey]; isSwitchFacingPort {
 			continue
 		}
 		portVLANKey := bridgePortObservationVLANKey(link.port)
 		if portVLANKey == "" {
 			portVLANKey = portKey
+		}
+		if _, isSwitchFacingPort := switchFacingPortKeys[portVLANKey]; isSwitchFacingPort {
+			continue
 		}
 
 		scope := byPortScope[portVLANKey]
@@ -1976,7 +2171,14 @@ func incrementProjectedProtocolCounters(out *projectedLinks, protocol string, bi
 	out.unidirectionalCount++
 }
 
-func buildTopologyDeviceInterfaceSummaries(interfaces []Interface) map[string]topologyDeviceInterfaceSummary {
+func buildTopologyDeviceInterfaceSummaries(
+	interfaces []Interface,
+	attachments []Attachment,
+	adjacencies []Adjacency,
+	ifIndexByDeviceName map[string]int,
+	bridgeLinks []bridgeBridgeLinkRecord,
+	reporterAliases map[string][]string,
+) map[string]topologyDeviceInterfaceSummary {
 	if len(interfaces) == 0 {
 		return nil
 	}
@@ -1988,6 +2190,7 @@ func buildTopologyDeviceInterfaceSummaries(interfaces []Interface) map[string]to
 		adminCounts  map[string]int
 		operCounts   map[string]int
 		portStatuses []topologyDevicePortStatus
+		portEvidence map[int]*topologyDevicePortEvidence
 	}
 
 	collectors := make(map[string]*interfaceCollector)
@@ -1999,11 +2202,12 @@ func buildTopologyDeviceInterfaceSummaries(interfaces []Interface) map[string]to
 		col := collectors[deviceID]
 		if col == nil {
 			col = &interfaceCollector{
-				ifIndexes:   make(map[string]struct{}),
-				ifNames:     make(map[string]struct{}),
-				ifTypes:     make(map[string]int),
-				adminCounts: make(map[string]int),
-				operCounts:  make(map[string]int),
+				ifIndexes:    make(map[string]struct{}),
+				ifNames:      make(map[string]struct{}),
+				ifTypes:      make(map[string]int),
+				adminCounts:  make(map[string]int),
+				operCounts:   make(map[string]int),
+				portEvidence: make(map[int]*topologyDevicePortEvidence),
 			}
 			collectors[deviceID] = col
 		}
@@ -2026,14 +2230,100 @@ func buildTopologyDeviceInterfaceSummaries(interfaces []Interface) map[string]to
 		if oper != "" {
 			col.operCounts[oper]++
 		}
-		if ifType != "" || admin != "" || oper != "" {
-			col.portStatuses = append(col.portStatuses, topologyDevicePortStatus{
-				IfIndex:       iface.IfIndex,
-				IfName:        strings.TrimSpace(iface.IfName),
-				InterfaceType: ifType,
-				AdminStatus:   admin,
-				OperStatus:    oper,
-			})
+
+		col.portStatuses = append(col.portStatuses, topologyDevicePortStatus{
+			IfIndex:        iface.IfIndex,
+			IfName:         strings.TrimSpace(iface.IfName),
+			InterfaceType:  ifType,
+			AdminStatus:    admin,
+			OperStatus:     oper,
+			LinkMode:       "unknown",
+			ModeConfidence: "low",
+			TopologyRole:   "unknown",
+			RoleConfidence: "low",
+		})
+	}
+
+	managedAliasOwners := buildFDBAliasOwnerMap(reporterAliases)
+	for _, attachment := range attachments {
+		deviceID := strings.TrimSpace(attachment.DeviceID)
+		if deviceID == "" || attachment.IfIndex <= 0 {
+			continue
+		}
+		col := collectors[deviceID]
+		if col == nil {
+			continue
+		}
+		if !strings.EqualFold(strings.TrimSpace(attachment.Method), "fdb") {
+			continue
+		}
+		fdbStatus := strings.ToLower(strings.TrimSpace(attachment.Labels["fdb_status"]))
+		if fdbStatus == "ignored" {
+			continue
+		}
+
+		evidence := ensureTopologyPortEvidence(col.portEvidence, attachment.IfIndex)
+		evidence.hasFDB = true
+		endpointID := normalizeFDBEndpointID(attachment.EndpointID)
+		if endpointID == "" {
+			endpointID = strings.TrimSpace(attachment.EndpointID)
+		}
+		if endpointID != "" {
+			evidence.fdbEndpointIDs[endpointID] = struct{}{}
+			if aliasOwners, ok := managedAliasOwners[endpointID]; ok {
+				for aliasOwnerID := range aliasOwners {
+					if !strings.EqualFold(strings.TrimSpace(aliasOwnerID), deviceID) {
+						evidence.hasFDBManagedAlias = true
+						break
+					}
+				}
+			}
+		}
+		vlanID := normalizeTopologyVLANID(firstNonEmpty(attachment.Labels["vlan_id"], attachment.Labels["vlan"]))
+		if vlanID != "" {
+			evidence.vlanIDs[vlanID] = struct{}{}
+		}
+	}
+
+	for _, adj := range adjacencies {
+		deviceID := strings.TrimSpace(adj.SourceID)
+		if deviceID == "" {
+			continue
+		}
+		col := collectors[deviceID]
+		if col == nil {
+			continue
+		}
+
+		ifIndex := resolveAdjacencySourceIfIndex(adj, ifIndexByDeviceName)
+		if ifIndex <= 0 {
+			continue
+		}
+		evidence := ensureTopologyPortEvidence(col.portEvidence, ifIndex)
+		switch strings.ToLower(strings.TrimSpace(adj.Protocol)) {
+		case "stp":
+			evidence.hasSTP = true
+			vlanID := normalizeTopologyVLANID(firstNonEmpty(adj.Labels["vlan_id"], adj.Labels["vlan"]))
+			if vlanID != "" {
+				evidence.vlanIDs[vlanID] = struct{}{}
+			}
+		case "lldp", "cdp":
+			evidence.hasPeer = true
+		}
+	}
+
+	for _, link := range bridgeLinks {
+		for _, port := range []bridgePortRef{link.designatedPort, link.port} {
+			deviceID := strings.TrimSpace(port.deviceID)
+			if deviceID == "" || port.ifIndex <= 0 {
+				continue
+			}
+			col := collectors[deviceID]
+			if col == nil {
+				continue
+			}
+			evidence := ensureTopologyPortEvidence(col.portEvidence, port.ifIndex)
+			evidence.hasBridgeLink = true
 		}
 	}
 
@@ -2050,11 +2340,40 @@ func buildTopologyDeviceInterfaceSummaries(interfaces []Interface) map[string]to
 			}
 			return left.IfName < right.IfName
 		})
+
+		modeCounts := make(map[string]int)
+		roleCounts := make(map[string]int)
 		portStatuses := make([]map[string]any, 0, len(col.portStatuses))
 		for _, st := range col.portStatuses {
+			evidence := col.portEvidence[st.IfIndex]
+			mode, confidence, sources, vlans := classifyTopologyPortLinkMode(evidence)
+			role, roleConfidence, roleSources := classifyTopologyPortRole(evidence)
+			st.LinkMode = mode
+			st.ModeConfidence = confidence
+			st.ModeSources = sources
+			st.VLANIDs = vlans
+			st.TopologyRole = role
+			st.RoleConfidence = roleConfidence
+			st.RoleSources = roleSources
+			modeCounts[mode]++
+			roleCounts[role]++
+
 			portStatus := map[string]any{
-				"if_index": st.IfIndex,
-				"if_name":  strings.TrimSpace(st.IfName),
+				"if_index":                 st.IfIndex,
+				"if_name":                  strings.TrimSpace(st.IfName),
+				"link_mode":                st.LinkMode,
+				"link_mode_confidence":     st.ModeConfidence,
+				"topology_role":            st.TopologyRole,
+				"topology_role_confidence": st.RoleConfidence,
+			}
+			if len(st.ModeSources) > 0 {
+				portStatus["link_mode_sources"] = st.ModeSources
+			}
+			if len(st.RoleSources) > 0 {
+				portStatus["topology_role_sources"] = st.RoleSources
+			}
+			if len(st.VLANIDs) > 0 {
+				portStatus["vlan_ids"] = st.VLANIDs
 			}
 			if st.AdminStatus != "" {
 				portStatus["admin_status"] = st.AdminStatus
@@ -2074,10 +2393,143 @@ func buildTopologyDeviceInterfaceSummaries(interfaces []Interface) map[string]to
 			ifNames:          sortedTopologySet(col.ifNames),
 			adminStatusCount: intCountMapToAny(col.adminCounts),
 			operStatusCount:  intCountMapToAny(col.operCounts),
+			linkModeCount:    intCountMapToAny(modeCounts),
+			roleCount:        intCountMapToAny(roleCounts),
 			portStatuses:     portStatuses,
 		}
 	}
 	return out
+}
+
+func normalizeTopologyVLANID(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	return strings.ToLower(value)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func ensureTopologyPortEvidence(
+	evidenceByIfIndex map[int]*topologyDevicePortEvidence,
+	ifIndex int,
+) *topologyDevicePortEvidence {
+	if ifIndex <= 0 {
+		return nil
+	}
+	evidence := evidenceByIfIndex[ifIndex]
+	if evidence == nil {
+		evidence = &topologyDevicePortEvidence{
+			vlanIDs:        make(map[string]struct{}),
+			fdbEndpointIDs: make(map[string]struct{}),
+		}
+		evidenceByIfIndex[ifIndex] = evidence
+	}
+	return evidence
+}
+
+func resolveAdjacencySourceIfIndex(adj Adjacency, ifIndexByDeviceName map[string]int) int {
+	ifIndex := 0
+	if ifName := strings.TrimSpace(adj.SourcePort); ifName != "" {
+		if idx, ok := ifIndexByDeviceName[deviceIfNameKey(adj.SourceID, ifName)]; ok {
+			ifIndex = idx
+		} else if parsed, err := strconv.Atoi(ifName); err == nil && parsed > 0 {
+			ifIndex = parsed
+		}
+	}
+	return ifIndex
+}
+
+func classifyTopologyPortLinkMode(evidence *topologyDevicePortEvidence) (mode string, confidence string, sources []string, vlans []string) {
+	mode = "unknown"
+	confidence = "low"
+	if evidence == nil {
+		return mode, confidence, nil, nil
+	}
+
+	if len(evidence.vlanIDs) > 0 {
+		vlans = sortedTopologySet(evidence.vlanIDs)
+	}
+	if evidence.hasFDB {
+		sources = append(sources, "fdb")
+	}
+	if evidence.hasSTP {
+		sources = append(sources, "stp")
+	}
+	if evidence.hasPeer {
+		sources = append(sources, "peer_link")
+	}
+
+	switch vlanCount := len(evidence.vlanIDs); {
+	case vlanCount >= 2:
+		mode = "trunk"
+		if evidence.hasFDB && evidence.hasSTP {
+			confidence = "high"
+		} else {
+			confidence = "medium"
+		}
+	case vlanCount == 1 && !evidence.hasPeer:
+		mode = "access"
+		confidence = "medium"
+	default:
+		mode = "unknown"
+		confidence = "low"
+	}
+	return mode, confidence, sources, vlans
+}
+
+func classifyTopologyPortRole(evidence *topologyDevicePortEvidence) (role string, confidence string, sources []string) {
+	role = "unknown"
+	confidence = "low"
+	if evidence == nil {
+		return role, confidence, nil
+	}
+
+	if evidence.hasPeer {
+		sources = append(sources, "peer_link")
+	}
+	if evidence.hasBridgeLink {
+		sources = append(sources, "bridge_link")
+	}
+	if evidence.hasSTP {
+		sources = append(sources, "stp")
+	}
+	if evidence.hasFDB {
+		sources = append(sources, "fdb")
+	}
+	if evidence.hasFDBManagedAlias {
+		sources = append(sources, "fdb_managed_alias")
+	}
+
+	switch {
+	case evidence.hasPeer || evidence.hasBridgeLink:
+		role = "switch_facing"
+		confidence = "high"
+	case evidence.hasSTP && evidence.hasFDBManagedAlias:
+		// STP alone is not sufficient to mark switch-facing; require corroborating
+		// managed-alias FDB evidence on the same port.
+		role = "switch_facing"
+		confidence = "medium"
+	case evidence.hasFDB && len(evidence.fdbEndpointIDs) == 1 && !evidence.hasSTP:
+		role = "host_facing"
+		confidence = "medium"
+	case evidence.hasFDB && !evidence.hasSTP:
+		role = "host_candidate"
+		confidence = "low"
+	default:
+		role = "unknown"
+		confidence = "low"
+	}
+	return role, confidence, sources
 }
 
 func intCountMapToAny(in map[string]int) map[string]any {
@@ -2115,18 +2567,42 @@ func topologyDeviceInferred(dev Device) bool {
 	}
 }
 
-func deviceToTopologyActor(dev Device, source, layer, localDeviceID string, ifaceSummary topologyDeviceInterfaceSummary) topology.Actor {
+func deviceToTopologyActor(
+	dev Device,
+	source, layer, localDeviceID string,
+	ifaceSummary topologyDeviceInterfaceSummary,
+	reporterAliases []string,
+) topology.Actor {
 	match := topology.Match{
 		SysObjectID: strings.TrimSpace(dev.SysObject),
 		SysName:     strings.TrimSpace(dev.Hostname),
 	}
 
+	macSet := make(map[string]struct{}, 1+len(reporterAliases))
 	chassis := strings.TrimSpace(dev.ChassisID)
 	if chassis != "" {
 		match.ChassisIDs = []string{chassis}
 		if mac := normalizeMAC(chassis); mac != "" {
-			match.MacAddresses = []string{mac}
+			macSet[mac] = struct{}{}
 		}
+	}
+	for _, alias := range reporterAliases {
+		alias = strings.TrimSpace(alias)
+		if alias == "" {
+			continue
+		}
+		if strings.HasPrefix(alias, "mac:") {
+			if mac := normalizeMAC(strings.TrimPrefix(alias, "mac:")); mac != "" {
+				macSet[mac] = struct{}{}
+			}
+			continue
+		}
+		if mac := normalizeMAC(alias); mac != "" {
+			macSet[mac] = struct{}{}
+		}
+	}
+	if len(macSet) > 0 {
+		match.MacAddresses = sortedTopologySet(macSet)
 	}
 
 	if len(dev.Addresses) > 0 {
@@ -2171,6 +2647,12 @@ func deviceToTopologyActor(dev Device, source, layer, localDeviceID string, ifac
 	}
 	if len(ifaceSummary.operStatusCount) > 0 {
 		attrs["if_oper_status_counts"] = ifaceSummary.operStatusCount
+	}
+	if len(ifaceSummary.linkModeCount) > 0 {
+		attrs["if_link_mode_counts"] = ifaceSummary.linkModeCount
+	}
+	if len(ifaceSummary.roleCount) > 0 {
+		attrs["if_topology_role_counts"] = ifaceSummary.roleCount
 	}
 	if len(ifaceSummary.portStatuses) > 0 {
 		attrs["if_statuses"] = ifaceSummary.portStatuses
