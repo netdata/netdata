@@ -107,6 +107,9 @@ func New(cfg Config) *Manager {
 		Seen:      seen,
 		Exposed:   exposed,
 		Callbacks: mgr.collectorCb,
+		WaitKey: func(cfg confgroup.Config) string {
+			return cfg.FullName()
+		},
 
 		Path:                    fmt.Sprintf(dyncfgCollectorPath, executable.Name),
 		EnableFailCode:          200,
@@ -166,8 +169,6 @@ type Manager struct {
 	addCh    chan confgroup.Config
 	rmCh     chan confgroup.Config
 	dyncfgCh chan dyncfg.Function
-
-	waitCfgOnOff string // block processing of discovered configs until "enable"/"disable" is received from Netdata
 
 	dyncfgApi *dyncfg.Responder
 
@@ -312,7 +313,7 @@ func (m *Manager) runProcessConfGroups(in chan []*confgroup.Group) {
 
 func (m *Manager) run() {
 	for {
-		if m.waitCfgOnOff != "" {
+		if m.handler.WaitingForDecision() {
 			select {
 			case <-m.ctx.Done():
 				return
@@ -367,7 +368,7 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 	if isTerminal || m.PluginName == "nodyncfg" { // FIXME: quick fix of TestAgent_Run (agent_test.go)
 		m.handler.CmdEnable(dyncfg.NewFunction(functions.Function{Args: []string{m.dyncfgJobID(entry.Cfg), "enable"}}))
 	} else {
-		m.waitCfgOnOff = entry.Cfg.FullName()
+		m.handler.WaitForDecision(entry.Cfg)
 	}
 }
 

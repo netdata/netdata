@@ -65,6 +65,9 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		Seen:      d.seen,
 		Exposed:   d.exposed,
 		Callbacks: d.sdCb,
+		WaitKey: func(cfg sdConfig) string {
+			return cfg.PipelineKey()
+		},
 
 		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
 		EnableFailCode: 422,
@@ -101,11 +104,6 @@ type (
 
 		ctx context.Context
 		mgr *PipelineManager
-
-		// waitCfgOnOff holds the pipeline key we're waiting for enable/disable on.
-		// When set, we only process dyncfg commands (not new file configs).
-		// This ensures netdata can send enable/disable before we process more configs.
-		waitCfgOnOff string
 	}
 	sdPipeline interface {
 		Run(ctx context.Context, in chan<- []*confgroup.Group)
@@ -166,7 +164,7 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 
 func (d *ServiceDiscovery) run(ctx context.Context) {
 	for {
-		if d.waitCfgOnOff != "" {
+		if d.handler.WaitingForDecision() {
 			// Waiting for enable/disable command - only process dyncfg commands
 			select {
 			case <-ctx.Done():
@@ -292,7 +290,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 				d.autoEnableConfig(scfg)
 			} else {
 				// Wait for netdata to send enable/disable
-				d.waitCfgOnOff = scfg.PipelineKey()
+				d.handler.WaitForDecision(scfg)
 			}
 		}
 		return
@@ -329,7 +327,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 		if isTerminal || d.dyncfgCh == nil {
 			d.autoEnableConfig(scfg)
 		} else {
-			d.waitCfgOnOff = scfg.PipelineKey()
+			d.handler.WaitForDecision(scfg)
 		}
 	}
 }

@@ -4,6 +4,7 @@ package dyncfg
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -54,6 +55,7 @@ type HandlerOpts[C Config] struct {
 	Seen      *SeenCache[C]
 	Exposed   *ExposedCache[C]
 	Callbacks Callbacks[C]
+	WaitKey   func(cfg C) string // optional key used to gate config processing until enable/disable
 
 	Path                    string    // dyncfg path (e.g. "/collectors/go.d/Jobs")
 	EnableFailCode          int       // response code for enable failure (jobmgr: 200, SD: 422)
@@ -74,6 +76,9 @@ type Handler[C Config] struct {
 	enableFailCode          int
 	removeStockOnEnableFail bool
 	jobCommands             []Command
+	waitKeyFn               func(cfg C) string
+	waitKey                 string
+	waitMu                  sync.RWMutex
 }
 
 func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
@@ -87,6 +92,7 @@ func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
 		enableFailCode:          opts.EnableFailCode,
 		removeStockOnEnableFail: opts.RemoveStockOnEnableFail,
 		jobCommands:             opts.JobCommands,
+		waitKeyFn:               opts.WaitKey,
 	}
 }
 
@@ -95,6 +101,66 @@ func (h *Handler[C]) Exposed() *ExposedCache[C] { return h.exposed }
 
 // SetAPI replaces the responder (e.g. to silence output in CLI mode).
 func (h *Handler[C]) SetAPI(api *Responder) { h.api = api }
+
+// WaitForDecision blocks non-dyncfg config processing until a matching
+// enable/disable command is observed for the provided config.
+func (h *Handler[C]) WaitForDecision(cfg C) {
+	if h.waitKeyFn == nil {
+		return
+	}
+	key := h.waitKeyFn(cfg)
+	if key == "" {
+		return
+	}
+	h.waitMu.Lock()
+	h.waitKey = key
+	h.waitMu.Unlock()
+}
+
+// WaitingForDecision reports whether config processing should currently wait
+// for a matching enable/disable command.
+func (h *Handler[C]) WaitingForDecision() bool {
+	h.waitMu.RLock()
+	defer h.waitMu.RUnlock()
+	return h.waitKey != ""
+}
+
+// SyncDecision updates wait-state based on the incoming command.
+// Only a matching enable/disable command clears the current wait key.
+func (h *Handler[C]) SyncDecision(fn Function) {
+	if h.waitKeyFn == nil {
+		return
+	}
+	cmd := fn.Command()
+	if cmd != CommandEnable && cmd != CommandDisable {
+		return
+	}
+
+	h.waitMu.RLock()
+	waitKey := h.waitKey
+	h.waitMu.RUnlock()
+	if waitKey == "" {
+		return
+	}
+
+	key, _, ok := h.cb.ExtractKey(fn)
+	if !ok {
+		return
+	}
+	entry, ok := h.exposed.LookupByKey(key)
+	if !ok {
+		return
+	}
+	if h.waitKeyFn(entry.Cfg) != waitKey {
+		return
+	}
+
+	h.waitMu.Lock()
+	if h.waitKey == waitKey {
+		h.waitKey = ""
+	}
+	h.waitMu.Unlock()
+}
 
 // NotifyJobCreate registers/updates a config in the dyncfg API (upsert).
 func (h *Handler[C]) NotifyJobCreate(cfg C, status Status) {

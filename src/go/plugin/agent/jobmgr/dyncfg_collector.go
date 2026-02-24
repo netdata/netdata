@@ -89,18 +89,7 @@ func (m *Manager) dyncfgCollectorExec(fn dyncfg.Function) {
 
 func (m *Manager) dyncfgCollectorSeqExec(fn dyncfg.Function) {
 	cmd := fn.Command()
-
-	// Clear waitCfgOnOff before enable/disable (component concern, not handler's).
-	if cmd == dyncfg.CommandEnable || cmd == dyncfg.CommandDisable {
-		key, _, ok := m.collectorCb.ExtractKey(fn)
-		if ok {
-			if entry, ok := m.exposed.LookupByKey(key); ok {
-				if entry.Cfg.FullName() == m.waitCfgOnOff {
-					m.waitCfgOnOff = ""
-				}
-			}
-		}
-	}
+	m.handler.SyncDecision(fn)
 
 	switch cmd {
 	case dyncfg.CommandAdd:

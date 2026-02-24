@@ -154,16 +154,7 @@ func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 
 // dyncfgSeqExec executes state-changing dyncfg commands serially.
 func (d *ServiceDiscovery) dyncfgSeqExec(fn dyncfg.Function) {
-	// Clear waitCfgOnOff before processing enable/disable
-	if fn.Command() == dyncfg.CommandEnable || fn.Command() == dyncfg.CommandDisable {
-		if key, _, ok := d.sdCb.ExtractKey(fn); ok {
-			if entry, ok := d.exposed.LookupByKey(key); ok {
-				if entry.Cfg.PipelineKey() == d.waitCfgOnOff {
-					d.waitCfgOnOff = ""
-				}
-			}
-		}
-	}
+	d.handler.SyncDecision(fn)
 
 	switch fn.Command() {
 	case dyncfg.CommandAdd:

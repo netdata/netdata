@@ -117,6 +117,9 @@ func newTestHandler(cb *mockCallbacks) *Handler[testConfig] {
 		Seen:      NewSeenCache[testConfig](),
 		Exposed:   NewExposedCache[testConfig](),
 		Callbacks: cb,
+		WaitKey: func(cfg testConfig) string {
+			return cfg.Source()
+		},
 
 		Path:                    "/test/path",
 		EnableFailCode:          200,
@@ -144,6 +147,60 @@ func newTestFn(id, cmd, name string, payload []byte) Function {
 		Args:    args,
 		Payload: payload,
 	})
+}
+
+func TestHandler_WaitForDecision_MatchingEnableClearsWait(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	cfg := testConfig{
+		uid:        "uid-job1",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "mod/job1",
+	}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+
+	h.WaitForDecision(cfg)
+	assert.True(t, h.WaitingForDecision())
+
+	h.SyncDecision(newTestFn("test:job1", "enable", "", nil))
+	assert.False(t, h.WaitingForDecision())
+}
+
+func TestHandler_WaitForDecision_MismatchedCommandKeepsWait(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandler(cb)
+
+	waitCfg := testConfig{
+		uid:        "uid-job1",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "mod/job1",
+	}
+	otherCfg := testConfig{
+		uid:        "uid-job2",
+		key:        "job2",
+		sourceType: "stock",
+		source:     "mod/job2",
+	}
+	h.exposed.Add(&Entry[testConfig]{Cfg: waitCfg, Status: StatusAccepted})
+	h.exposed.Add(&Entry[testConfig]{Cfg: otherCfg, Status: StatusAccepted})
+
+	h.WaitForDecision(waitCfg)
+	assert.True(t, h.WaitingForDecision())
+
+	// Non enable/disable commands must not change wait state.
+	h.SyncDecision(newTestFn("test:job1", "schema", "", nil))
+	assert.True(t, h.WaitingForDecision())
+
+	// Enable/disable for a different key must not clear wait state.
+	h.SyncDecision(newTestFn("test:job2", "disable", "", nil))
+	assert.True(t, h.WaitingForDecision())
+
+	// Matching command clears wait state.
+	h.SyncDecision(newTestFn("test:job1", "disable", "", nil))
+	assert.False(t, h.WaitingForDecision())
 }
 
 // --- ExtractKey Failure Tests ---
