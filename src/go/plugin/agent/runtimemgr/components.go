@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
@@ -178,13 +179,8 @@ func firstNotEmpty(items ...string) string {
 	return ""
 }
 
-func sanitizeName(name string) string {
-	replacer := strings.NewReplacer("/", "_", "\\", "_", " ", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
-	return replacer.Replace(name)
-}
-
 func defaultInternalTypeID(pluginName, componentName string) string {
-	plugin := sanitizeName(firstNotEmpty(pluginName, "go.d"))
-	component := sanitizeName(componentName)
+	plugin := naming.Sanitize(firstNotEmpty(pluginName, "go.d"))
+	component := naming.Sanitize(componentName)
 	return fmt.Sprintf("netdata.%s.internal.%s", plugin, component)
 }

@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -572,7 +572,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 
 	var jobDumpDir string
 	if m.dumpDataDir != "" {
-		jobDumpDir = filepath.Join(m.dumpDataDir, sanitizeName(cfg.Module()), sanitizeName(cfg.Name()))
+		jobDumpDir = filepath.Join(m.dumpDataDir, naming.Sanitize(cfg.Module()), naming.Sanitize(cfg.Name()))
 		if err := os.MkdirAll(jobDumpDir, 0o755); err != nil {
 			return nil, fmt.Errorf("creating dump directory: %w", err)
 		}
@@ -656,11 +656,6 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 	job := jobruntime.NewJob(jobCfg)
 
 	return job, nil
-}
-
-func sanitizeName(name string) string {
-	replacer := strings.NewReplacer("/", "_", "\\", "_", " ", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
-	return replacer.Replace(name)
 }
 
 func runRetryTask(ctx context.Context, out chan<- confgroup.Config, cfg confgroup.Config) {

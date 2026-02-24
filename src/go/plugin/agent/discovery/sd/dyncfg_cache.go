@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
 	"github.com/gohugoio/hashstructure"
@@ -114,14 +115,6 @@ func (c sdConfig) DataJSON() []byte {
 	return b
 }
 
-// cleanName sanitizes a name for use in dyncfg IDs.
-// Replaces spaces and colons with underscores to avoid parsing issues.
-func cleanName(name string) string {
-	name = strings.ReplaceAll(name, " ", "_")
-	name = strings.ReplaceAll(name, ":", "_")
-	return name
-}
-
 // newSDConfigFromYAML creates an sdConfig from YAML bytes.
 // Used when loading file configs. Cleans the name for dyncfg compatibility.
 func newSDConfigFromYAML(data []byte, source, sourceType, pipelineKey string) (sdConfig, error) {
@@ -144,7 +137,7 @@ func newSDConfigFromYAML(data []byte, source, sourceType, pipelineKey string) (s
 
 	// Clean the name for dyncfg compatibility
 	if name := m.Name(); name != "" {
-		m["name"] = cleanName(name)
+		m["name"] = naming.Sanitize(name)
 	}
 
 	// Add metadata
@@ -170,7 +163,7 @@ func newSDConfigFromJSON(data []byte, name, source, sourceType, discovererType, 
 
 	// Force name from dyncfg job ID (matching jobmgr pattern: cfg.SetName(name))
 	// This ensures sdConfig.ExposedKey() matches the dyncfg job ID regardless of payload content
-	m["name"] = cleanName(name)
+	m["name"] = naming.Sanitize(name)
 
 	// Add metadata
 	m.SetSource(source)

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
@@ -193,11 +194,9 @@ func normalizeYAMLValue(v any) (any, error) {
 }
 
 // CleanName returns the name sanitized for use in dyncfg IDs.
-// Replaces spaces and colons to avoid parsing issues.
+// Sanitizes for safe use in IDs and paths.
 func (c Config) CleanName() string {
-	name := strings.ReplaceAll(c.Name, " ", "_")
-	name = strings.ReplaceAll(name, ":", "_")
-	return name
+	return naming.Sanitize(c.Name)
 }
 
 // UnmarshalYAML implements yaml.Unmarshaler.
