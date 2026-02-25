@@ -16,7 +16,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
@@ -47,14 +46,14 @@ type Config struct {
 }
 
 func New(cfg Config) *Manager {
-	seen := dyncfg.NewSeenCache[confgroup.Config]()
-	exposed := dyncfg.NewExposedCache[confgroup.Config]()
-	api := dyncfg.NewResponder(netdataapi.New(safewriter.Stdout))
-
 	out := cfg.Out
 	if out == nil {
 		out = io.Discard
 	}
+
+	seen := dyncfg.NewSeenCache[confgroup.Config]()
+	exposed := dyncfg.NewExposedCache[confgroup.Config]()
+	api := dyncfg.NewResponder(netdataapi.New(out))
 	fnReg := cfg.FnReg
 	if fnReg == nil {
 		fnReg = noop{}

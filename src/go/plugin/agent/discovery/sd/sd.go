@@ -5,6 +5,7 @@ package sd
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"sync"
 
@@ -17,12 +18,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 )
 
 type Config struct {
 	ConfigDefaults confgroup.Registry
 	PluginName     string
+	Out            io.Writer
 	ConfDir        multipath.MultiPath
 	FnReg          functions.Registry
 	Discoverers    Registry
@@ -35,6 +36,10 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 	if cfg.Discoverers == nil {
 		return nil, fmt.Errorf("service discovery discoverer registry is not configured")
 	}
+	out := cfg.Out
+	if out == nil {
+		out = io.Discard
+	}
 
 	d := &ServiceDiscovery{
 		Logger:         log,
@@ -43,7 +48,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		pluginName:     cfg.PluginName,
 		fnReg:          cfg.FnReg,
 		discoverers:    cfg.Discoverers,
-		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
+		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(out)),
 		seen:           dyncfg.NewSeenCache[sdConfig](),
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
