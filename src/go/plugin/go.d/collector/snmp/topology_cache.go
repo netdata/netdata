@@ -35,12 +35,6 @@ const (
 	metricVtpVlanEntry          = "vtpVlanEntry"
 	metricArpEntry              = "ipNetToPhysicalEntry"
 	metricArpLegacyEntry        = "ipNetToMediaEntry"
-	metricOspfGeneralEntry      = "ospfGeneralEntry"
-	metricOspfIfEntry           = "ospfIfTopologyEntry"
-	metricOspfNbrEntry          = "ospfNbrTopologyEntry"
-	metricIsisSysEntry          = "isisSysObjectEntry"
-	metricIsisCircEntry         = "isisCircEntry"
-	metricIsisAdjEntry          = "isisISAdjEntry"
 )
 
 const (
@@ -156,32 +150,6 @@ const (
 	tagArpState    = "arp_state"
 	tagArpAddrType = "arp_addr_type"
 
-	tagOspfRouterID           = "ospf_router_id"
-	tagOspfAdminState         = "ospf_admin_state"
-	tagOspfVersionNumber      = "ospf_version_number"
-	tagOspfAreaBdrStatus      = "ospf_area_bdr_rtr_status"
-	tagOspfASBdrStatus        = "ospf_as_bdr_rtr_status"
-	tagOspfIfIPAddr           = "ospf_if_ip_addr"
-	tagOspfIfAddressLessIndex = "ospf_if_address_less_index"
-	tagOspfIfAreaID           = "ospf_if_area_id"
-	tagOspfIfNetmask          = "ospf_if_netmask"
-	tagOspfNbrIPAddr          = "ospf_nbr_ip_addr"
-	tagOspfNbrAddressLess     = "ospf_nbr_address_less_index"
-	tagOspfNbrRouterID        = "ospf_nbr_router_id"
-
-	tagIsisSysID           = "isis_sys_id"
-	tagIsisSysAdminState   = "isis_sys_admin_state"
-	tagIsisCircIndex       = "isis_circ_index"
-	tagIsisCircIfIndex     = "isis_circ_if_index"
-	tagIsisCircAdminState  = "isis_circ_admin_state"
-	tagIsisAdjCircIndex    = "isis_adj_circ_index"
-	tagIsisAdjIndex        = "isis_adj_index"
-	tagIsisAdjState        = "isis_adj_state"
-	tagIsisAdjNeighSNPA    = "isis_adj_neigh_snpa"
-	tagIsisAdjNeighSysType = "isis_adj_neigh_sys_type"
-	tagIsisAdjNeighSysID   = "isis_adj_neigh_sys_id"
-	tagIsisAdjNeighExtCirc = "isis_adj_neigh_extended_circ_id"
-
 	// Internal collector tags used when ingesting additional VLAN-context snapshots.
 	tagTopologyContextVLANID   = "_topology_context_vlan_id"
 	tagTopologyContextVLANName = "_topology_context_vlan_name"
@@ -232,14 +200,6 @@ type topologyCache struct {
 	stpDesignatedRoot    string
 	stpPorts             map[string]*stpPortEntry
 	arpEntries           map[string]*arpEntry
-
-	ospfElement *ospfElement
-	ospfIfRows  map[string]*ospfIfEntry
-	ospfNbrRows map[string]*ospfNbrEntry
-
-	isisElement *isisElement
-	isisCircs   map[string]*isisCircEntry
-	isisAdjs    map[string]*isisAdjEntry
 }
 
 type ifStatus struct {
@@ -337,48 +297,6 @@ type arpEntry struct {
 	state    string
 }
 
-type ospfElement struct {
-	routerID      string
-	adminState    string
-	versionNumber string
-	areaBdrStatus string
-	asBdrStatus   string
-}
-
-type ospfIfEntry struct {
-	ipAddress        string
-	addressLessIndex string
-	areaID           string
-	netmask          string
-}
-
-type ospfNbrEntry struct {
-	remoteIP         string
-	addressLessIndex string
-	remoteRouterID   string
-}
-
-type isisElement struct {
-	sysID      string
-	adminState string
-}
-
-type isisCircEntry struct {
-	circIndex  string
-	ifIndex    string
-	adminState string
-}
-
-type isisAdjEntry struct {
-	circIndex       string
-	adjIndex        string
-	state           string
-	neighborSNPA    string
-	neighborSysType string
-	neighborSysID   string
-	neighborExtCirc string
-}
-
 func newTopologyCache() *topologyCache {
 	return &topologyCache{
 		lldpLocPorts:    make(map[string]*lldpLocPort),
@@ -394,10 +312,6 @@ func newTopologyCache() *topologyCache {
 		vlanIDToName:    make(map[string]string),
 		stpPorts:        make(map[string]*stpPortEntry),
 		arpEntries:      make(map[string]*arpEntry),
-		ospfIfRows:      make(map[string]*ospfIfEntry),
-		ospfNbrRows:     make(map[string]*ospfNbrEntry),
-		isisCircs:       make(map[string]*isisCircEntry),
-		isisAdjs:        make(map[string]*isisAdjEntry),
 	}
 }
 
@@ -430,12 +344,6 @@ func (c *Collector) resetTopologyCache() {
 	c.topologyCache.stpDesignatedRoot = ""
 	c.topologyCache.stpPorts = make(map[string]*stpPortEntry)
 	c.topologyCache.arpEntries = make(map[string]*arpEntry)
-	c.topologyCache.ospfElement = nil
-	c.topologyCache.ospfIfRows = make(map[string]*ospfIfEntry)
-	c.topologyCache.ospfNbrRows = make(map[string]*ospfNbrEntry)
-	c.topologyCache.isisElement = nil
-	c.topologyCache.isisCircs = make(map[string]*isisCircEntry)
-	c.topologyCache.isisAdjs = make(map[string]*isisAdjEntry)
 }
 
 func (c *Collector) updateTopologyProfileTags(pms []*ddsnmp.ProfileMetrics) {
@@ -549,18 +457,6 @@ func (c *Collector) updateTopologyCacheEntry(m ddsnmp.Metric) {
 		c.topologyCache.updateVtpVlanEntry(m.Tags)
 	case metricArpEntry, metricArpLegacyEntry:
 		c.topologyCache.updateArpEntry(m.Tags)
-	case metricOspfGeneralEntry:
-		c.topologyCache.updateOspfElement(m.Tags)
-	case metricOspfIfEntry:
-		c.topologyCache.updateOspfIfEntry(m.Tags)
-	case metricOspfNbrEntry:
-		c.topologyCache.updateOspfNbrEntry(m.Tags)
-	case metricIsisSysEntry:
-		c.topologyCache.updateIsisElement(m.Tags)
-	case metricIsisCircEntry:
-		c.topologyCache.updateIsisCircEntry(m.Tags)
-	case metricIsisAdjEntry:
-		c.topologyCache.updateIsisAdjEntry(m.Tags)
 	}
 }
 
@@ -578,8 +474,7 @@ func (c *Collector) finalizeTopologyCache() {
 func isTopologyMetric(name string) bool {
 	switch name {
 	case metricLldpLocPortEntry, metricLldpLocManAddrEntry, metricLldpRemEntry, metricLldpRemManAddrEntry, metricLldpRemManAddrCompat, metricCdpCacheEntry,
-		metricTopologyIfNameEntry, metricTopologyIfStatusEntry, metricTopologyIPIfEntry, metricBridgePortMapEntry, metricFdbEntry, metricDot1qFdbEntry, metricDot1qVlanEntry, metricStpPortEntry, metricVtpVlanEntry, metricArpEntry, metricArpLegacyEntry,
-		metricOspfGeneralEntry, metricOspfIfEntry, metricOspfNbrEntry, metricIsisSysEntry, metricIsisCircEntry, metricIsisAdjEntry:
+		metricTopologyIfNameEntry, metricTopologyIfStatusEntry, metricTopologyIPIfEntry, metricBridgePortMapEntry, metricFdbEntry, metricDot1qFdbEntry, metricDot1qVlanEntry, metricStpPortEntry, metricVtpVlanEntry, metricArpEntry, metricArpLegacyEntry:
 		return true
 	default:
 		return false
@@ -902,133 +797,6 @@ func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
 	})
 	if mask := normalizeIPAddress(tags[tagTopoIPMask]); mask != "" {
 		c.ifNetmaskByIP[ip] = mask
-	}
-}
-
-func (c *topologyCache) updateOspfElement(tags map[string]string) {
-	if c.ospfElement == nil {
-		c.ospfElement = &ospfElement{}
-	}
-
-	if v := normalizeIPAddress(tags[tagOspfRouterID]); v != "" {
-		c.ospfElement.routerID = v
-	}
-	if v := strings.TrimSpace(tags[tagOspfAdminState]); v != "" {
-		c.ospfElement.adminState = v
-	}
-	if v := strings.TrimSpace(tags[tagOspfVersionNumber]); v != "" {
-		c.ospfElement.versionNumber = v
-	}
-	if v := strings.TrimSpace(tags[tagOspfAreaBdrStatus]); v != "" {
-		c.ospfElement.areaBdrStatus = v
-	}
-	if v := strings.TrimSpace(tags[tagOspfASBdrStatus]); v != "" {
-		c.ospfElement.asBdrStatus = v
-	}
-}
-
-func (c *topologyCache) updateOspfIfEntry(tags map[string]string) {
-	ip := normalizeIPAddress(tags[tagOspfIfIPAddr])
-	if ip == "" {
-		return
-	}
-
-	entry := c.ospfIfRows[ip]
-	if entry == nil {
-		entry = &ospfIfEntry{ipAddress: ip}
-		c.ospfIfRows[ip] = entry
-	}
-	if v := strings.TrimSpace(tags[tagOspfIfAddressLessIndex]); v != "" {
-		entry.addressLessIndex = v
-	}
-	if v := normalizeIPAddress(tags[tagOspfIfAreaID]); v != "" {
-		entry.areaID = v
-	}
-	if v := normalizeIPAddress(tags[tagOspfIfNetmask]); v != "" {
-		entry.netmask = v
-	}
-}
-
-func (c *topologyCache) updateOspfNbrEntry(tags map[string]string) {
-	remoteIP := normalizeIPAddress(tags[tagOspfNbrIPAddr])
-	addressLess := strings.TrimSpace(tags[tagOspfNbrAddressLess])
-	remoteRouterID := normalizeIPAddress(tags[tagOspfNbrRouterID])
-	if remoteIP == "" && addressLess == "" && remoteRouterID == "" {
-		return
-	}
-
-	key := remoteIP + "|" + remoteRouterID + "|" + addressLess
-	entry := c.ospfNbrRows[key]
-	if entry == nil {
-		entry = &ospfNbrEntry{}
-		c.ospfNbrRows[key] = entry
-	}
-	entry.remoteIP = remoteIP
-	entry.remoteRouterID = remoteRouterID
-	entry.addressLessIndex = addressLess
-}
-
-func (c *topologyCache) updateIsisElement(tags map[string]string) {
-	if c.isisElement == nil {
-		c.isisElement = &isisElement{}
-	}
-	if v := normalizeHexIdentifier(tags[tagIsisSysID]); v != "" {
-		c.isisElement.sysID = v
-	}
-	if v := strings.TrimSpace(tags[tagIsisSysAdminState]); v != "" {
-		c.isisElement.adminState = v
-	}
-}
-
-func (c *topologyCache) updateIsisCircEntry(tags map[string]string) {
-	circIndex := strings.TrimSpace(tags[tagIsisCircIndex])
-	if circIndex == "" {
-		return
-	}
-
-	entry := c.isisCircs[circIndex]
-	if entry == nil {
-		entry = &isisCircEntry{circIndex: circIndex}
-		c.isisCircs[circIndex] = entry
-	}
-	if v := strings.TrimSpace(tags[tagIsisCircIfIndex]); v != "" {
-		entry.ifIndex = v
-	}
-	if v := strings.TrimSpace(tags[tagIsisCircAdminState]); v != "" {
-		entry.adminState = v
-	}
-}
-
-func (c *topologyCache) updateIsisAdjEntry(tags map[string]string) {
-	circIndex := strings.TrimSpace(tags[tagIsisAdjCircIndex])
-	adjIndex := strings.TrimSpace(tags[tagIsisAdjIndex])
-	if circIndex == "" || adjIndex == "" {
-		return
-	}
-
-	key := circIndex + ":" + adjIndex
-	entry := c.isisAdjs[key]
-	if entry == nil {
-		entry = &isisAdjEntry{
-			circIndex: circIndex,
-			adjIndex:  adjIndex,
-		}
-		c.isisAdjs[key] = entry
-	}
-	if v := strings.TrimSpace(tags[tagIsisAdjState]); v != "" {
-		entry.state = v
-	}
-	if v := normalizeHexIdentifier(tags[tagIsisAdjNeighSNPA]); v != "" {
-		entry.neighborSNPA = v
-	}
-	if v := strings.TrimSpace(tags[tagIsisAdjNeighSysType]); v != "" {
-		entry.neighborSysType = v
-	}
-	if v := normalizeHexIdentifier(tags[tagIsisAdjNeighSysID]); v != "" {
-		entry.neighborSysID = v
-	}
-	if v := strings.TrimSpace(tags[tagIsisAdjNeighExtCirc]); v != "" {
-		entry.neighborExtCirc = v
 	}
 }
 
@@ -2035,134 +1803,6 @@ func isFDBSelfStatus(value string) bool {
 	default:
 		return false
 	}
-}
-
-func (c *topologyCache) buildEngineL3Observation(local topologyengine.L2Observation) topologyengine.L3Observation {
-	observation := topologyengine.L3Observation{
-		DeviceID:     strings.TrimSpace(local.DeviceID),
-		Hostname:     strings.TrimSpace(local.Hostname),
-		ManagementIP: normalizeIPAddress(local.ManagementIP),
-		SysObjectID:  strings.TrimSpace(local.SysObjectID),
-		ChassisID:    strings.TrimSpace(local.ChassisID),
-	}
-
-	if len(local.Interfaces) > 0 {
-		observation.Interfaces = append(observation.Interfaces, local.Interfaces...)
-	}
-
-	if c.ospfElement != nil && parseIndex(c.ospfElement.adminState) == 1 {
-		observation.OSPFElement = &topologyengine.OSPFElementObservation{
-			RouterID:         normalizeIPAddress(c.ospfElement.routerID),
-			AdminState:       parseIndex(c.ospfElement.adminState),
-			VersionNumber:    parseIndex(c.ospfElement.versionNumber),
-			AreaBorderRouter: parseIndex(c.ospfElement.areaBdrStatus),
-			ASBorderRouter:   parseIndex(c.ospfElement.asBdrStatus),
-		}
-	}
-
-	ospfIfKeys := make([]string, 0, len(c.ospfIfRows))
-	for key := range c.ospfIfRows {
-		ospfIfKeys = append(ospfIfKeys, key)
-	}
-	sort.Strings(ospfIfKeys)
-	for _, key := range ospfIfKeys {
-		entry := c.ospfIfRows[key]
-		if entry == nil {
-			continue
-		}
-
-		localIP := normalizeIPAddress(entry.ipAddress)
-		if localIP == "" {
-			continue
-		}
-
-		ifIndex := parseIndex(entry.addressLessIndex)
-		if ifIndex <= 0 {
-			ifIndex = parseIndex(c.ifIndexByIP[localIP])
-		}
-		ifName := ""
-		if ifIndex > 0 {
-			ifName = strings.TrimSpace(c.ifNamesByIndex[strconv.Itoa(ifIndex)])
-		}
-		netmask := normalizeIPAddress(entry.netmask)
-		if netmask == "" {
-			netmask = normalizeIPAddress(c.ifNetmaskByIP[localIP])
-		}
-
-		observation.OSPFIfTable = append(observation.OSPFIfTable, topologyengine.OSPFInterfaceObservation{
-			IP:             localIP,
-			AddressLessIdx: parseIndex(entry.addressLessIndex),
-			AreaID:         normalizeIPAddress(entry.areaID),
-			IfIndex:        ifIndex,
-			IfName:         ifName,
-			Netmask:        netmask,
-		})
-	}
-
-	ospfNbrKeys := make([]string, 0, len(c.ospfNbrRows))
-	for key := range c.ospfNbrRows {
-		ospfNbrKeys = append(ospfNbrKeys, key)
-	}
-	sort.Strings(ospfNbrKeys)
-	for _, key := range ospfNbrKeys {
-		entry := c.ospfNbrRows[key]
-		if entry == nil {
-			continue
-		}
-		observation.OSPFNbrTable = append(observation.OSPFNbrTable, topologyengine.OSPFNeighborObservation{
-			RemoteRouterID:       normalizeIPAddress(entry.remoteRouterID),
-			RemoteIP:             normalizeIPAddress(entry.remoteIP),
-			RemoteAddressLessIdx: parseIndex(entry.addressLessIndex),
-		})
-	}
-
-	if c.isisElement != nil {
-		observation.ISISElement = &topologyengine.ISISElementObservation{
-			DeviceID:   observation.DeviceID,
-			SysID:      normalizeHexIdentifier(c.isisElement.sysID),
-			AdminState: parseIndex(c.isisElement.adminState),
-		}
-	}
-
-	isisCircKeys := make([]string, 0, len(c.isisCircs))
-	for key := range c.isisCircs {
-		isisCircKeys = append(isisCircKeys, key)
-	}
-	sort.Strings(isisCircKeys)
-	for _, key := range isisCircKeys {
-		entry := c.isisCircs[key]
-		if entry == nil {
-			continue
-		}
-		observation.ISISCircTable = append(observation.ISISCircTable, topologyengine.ISISCircuitObservation{
-			CircIndex:  parseIndex(entry.circIndex),
-			IfIndex:    parseIndex(entry.ifIndex),
-			AdminState: parseIndex(entry.adminState),
-		})
-	}
-
-	isisAdjKeys := make([]string, 0, len(c.isisAdjs))
-	for key := range c.isisAdjs {
-		isisAdjKeys = append(isisAdjKeys, key)
-	}
-	sort.Strings(isisAdjKeys)
-	for _, key := range isisAdjKeys {
-		entry := c.isisAdjs[key]
-		if entry == nil {
-			continue
-		}
-		observation.ISISAdjTable = append(observation.ISISAdjTable, topologyengine.ISISAdjacencyObservation{
-			CircIndex:          parseIndex(entry.circIndex),
-			AdjIndex:           parseIndex(entry.adjIndex),
-			State:              parseIndex(entry.state),
-			NeighborSNPA:       normalizeHexIdentifier(entry.neighborSNPA),
-			NeighborSysType:    parseIndex(entry.neighborSysType),
-			NeighborSysID:      normalizeHexIdentifier(entry.neighborSysID),
-			NeighborExtendedID: parseIndex(entry.neighborExtCirc),
-		})
-	}
-
-	return observation
 }
 
 func ensureTopologyObservationDeviceID(local topologyDevice, baseBridgeAddress string) string {

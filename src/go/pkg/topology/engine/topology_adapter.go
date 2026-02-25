@@ -70,9 +70,7 @@ type builtAdjacencyLink struct {
 }
 
 type pairedLinkAccumulator struct {
-	sources []*builtAdjacencyLink
-	targets []*builtAdjacencyLink
-	all     []*builtAdjacencyLink
+	all []*builtAdjacencyLink
 }
 
 type projectedLinks struct {
@@ -507,8 +505,7 @@ func projectAdjacencyLinks(
 		link := adjacencyToTopologyLink(adj, protocol, layer, collectedAt, deviceByID, ifIndexByDeviceName, ifaceByDeviceIndex)
 
 		pairID := strings.TrimSpace(adj.Labels[adjacencyLabelPairID])
-		pairSide := strings.TrimSpace(adj.Labels[adjacencyLabelPairSide])
-		if pairID != "" && (pairSide == adjacencyPairSideSource || pairSide == adjacencyPairSideTarget) {
+		if pairID != "" {
 			acc := pairs[pairID]
 			if acc == nil {
 				acc = &pairedLinkAccumulator{}
@@ -522,12 +519,6 @@ func projectAdjacencyLinks(
 				link:     link,
 			}
 			acc.all = append(acc.all, entry)
-			switch pairSide {
-			case adjacencyPairSideSource:
-				acc.sources = append(acc.sources, entry)
-			case adjacencyPairSideTarget:
-				acc.targets = append(acc.targets, entry)
-			}
 			continue
 		}
 
@@ -538,17 +529,6 @@ func projectAdjacencyLinks(
 	for _, pairID := range pairOrder {
 		acc := pairs[pairID]
 		if acc == nil {
-			continue
-		}
-
-		if len(acc.sources) == 1 && len(acc.targets) == 1 && len(acc.all) == 2 {
-			merged := acc.sources[0].link
-			merged.Direction = "bidirectional"
-			merged.Src = mergeEndpointIPHints(acc.sources[0].link.Src, acc.targets[0].link.Dst)
-			merged.Dst = mergeEndpointIPHints(acc.targets[0].link.Src, acc.sources[0].link.Dst)
-			merged.Metrics = buildPairedLinkMetrics(acc.sources[0].adj.Labels, acc.targets[0].adj.Labels)
-			out.links = append(out.links, merged)
-			incrementProjectedProtocolCounters(&out, acc.sources[0].protocol, true)
 			continue
 		}
 
@@ -4499,7 +4479,7 @@ func mergeEndpointIPHints(base, extra topology.LinkEndpoint) topology.LinkEndpoi
 }
 
 func isPairLabelKey(key string) bool {
-	return key == adjacencyLabelPairID || key == adjacencyLabelPairSide || key == adjacencyLabelPairPass
+	return key == adjacencyLabelPairID || key == adjacencyLabelPairPass
 }
 
 func incrementProjectedProtocolCounters(out *projectedLinks, protocol string, bidirectional bool) {

@@ -235,6 +235,30 @@
     - live payload (2026-02-26):
       - `MikroTik-router <-> XS1930` now `direction=bidirectional` with `ether3 <-> swp07`.
       - `MikroTik-router <-> GS1900` now `direction=bidirectional` with `ether4 <-> GigabitEthernet2`.
+- [ ] A26. Decide whether to remove `pair_side` concept for topology pairing metadata (Costa, 2026-02-26).
+  - Context:
+    - `pair_side` is backend-internal metadata (not device SNMP field).
+    - L2 physical link semantics are undirected; `source/target` labels can be misleading and were proven brittle in live data.
+  - Evidence:
+    - field definition + write path:
+      - `src/go/pkg/topology/engine/l2_pipeline.go` (`adjacencyLabelPairSide`, `applyAdjacencyPairMetadata`).
+    - projection dependency that caused previous unidirectional issue:
+      - `src/go/pkg/topology/engine/topology_adapter.go` (`projectAdjacencyLinks` merge gate on side buckets).
+    - L3 pipelines also currently populate `pair_side`:
+      - `src/go/pkg/topology/engine/l3_pipeline.go` (OSPF/ISIS adjacency labels).
+  - Decision required (D26):
+    - D26.1 Keep `pair_side` only as optional debug metadata in L2 (never required for merge), or remove it entirely from L2 payload.
+    - D26.2 For L3, decide whether to keep `pair_side` (directional diagnostics) or remove for schema consistency.
+- [x] A26. Decide whether to remove `pair_side` concept for topology pairing metadata (Costa, 2026-02-26).
+  - User decision (Costa, 2026-02-26):
+    - remove `pair_side` from topology payload/labels,
+    - remove L3 protocols and entire L3 topology pipeline (not used).
+- [ ] A27. Remove L3 topology pipeline/protocol exposure and remove `pair_side` label end-to-end.
+  - Scope:
+    - delete L3 pipeline code and tests,
+    - remove L3 topology engine mode/plumbing that depends on L3 pipeline,
+    - remove `pair_side` generation and merge dependency from L2,
+    - update/adjust tests and fixtures accordingly.
 - [x] A13. Implement selector/depth contract fixes (user-approved).
   - Backend:
     - set `map_type` default to `lldp_cdp_managed`,

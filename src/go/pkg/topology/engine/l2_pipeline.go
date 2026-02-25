@@ -48,11 +48,7 @@ const (
 	fdbStatusIgnored = "ignored"
 
 	adjacencyLabelPairID   = "pair_id"
-	adjacencyLabelPairSide = "pair_side"
 	adjacencyLabelPairPass = "pair_pass"
-
-	adjacencyPairSideSource = "source"
-	adjacencyPairSideTarget = "target"
 )
 
 type lldpMatchLink struct {
@@ -108,7 +104,6 @@ type cdpMatchedPair struct {
 
 type matchedPairMetadata struct {
 	id   string
-	side string
 	pass string
 }
 
@@ -1190,12 +1185,10 @@ func buildLLDPPairMetadata(links []lldpMatchLink, pairs []lldpMatchedPair) map[i
 
 		metadata[sourceLink.index] = matchedPairMetadata{
 			id:   pairID,
-			side: adjacencyPairSideSource,
 			pass: pair.pass,
 		}
 		metadata[targetLink.index] = matchedPairMetadata{
 			id:   pairID,
-			side: adjacencyPairSideTarget,
 			pass: pair.pass,
 		}
 	}
@@ -1234,12 +1227,10 @@ func buildCDPPairMetadata(links []cdpMatchLink, pairs []cdpMatchedPair) map[int]
 
 		metadata[sourceLink.index] = matchedPairMetadata{
 			id:   pairID,
-			side: adjacencyPairSideSource,
 			pass: pair.pass,
 		}
 		metadata[targetLink.index] = matchedPairMetadata{
 			id:   pairID,
-			side: adjacencyPairSideTarget,
 			pass: pair.pass,
 		}
 	}
@@ -1261,14 +1252,13 @@ func canonicalAdjacencyPairID(protocol, leftDeviceID, leftPort, rightDeviceID, r
 }
 
 func applyAdjacencyPairMetadata(adj *Adjacency, metadata matchedPairMetadata) {
-	if adj == nil || metadata.id == "" || metadata.side == "" {
+	if adj == nil || metadata.id == "" {
 		return
 	}
 	if adj.Labels == nil {
 		adj.Labels = make(map[string]string)
 	}
 	adj.Labels[adjacencyLabelPairID] = metadata.id
-	adj.Labels[adjacencyLabelPairSide] = metadata.side
 	if metadata.pass != "" {
 		adj.Labels[adjacencyLabelPairPass] = metadata.pass
 	}

@@ -608,7 +608,6 @@ func TestToTopologyData_MergesPairedAdjacenciesIntoBidirectionalLink(t *testing.
 				TargetPort: "Gi0/2",
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "lldp:pair-a-b",
-					adjacencyLabelPairSide: adjacencyPairSideSource,
 					adjacencyLabelPairPass: lldpMatchPassDefault,
 				},
 			},
@@ -620,7 +619,6 @@ func TestToTopologyData_MergesPairedAdjacenciesIntoBidirectionalLink(t *testing.
 				TargetPort: "Gi0/1",
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "lldp:pair-a-b",
-					adjacencyLabelPairSide: adjacencyPairSideTarget,
 					adjacencyLabelPairPass: lldpMatchPassDefault,
 				},
 			},
@@ -678,7 +676,6 @@ func TestToTopologyData_MergesPairedAdjacenciesPreservesRawAddressHints(t *testi
 				TargetPort: "Gi0/2",
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "cdp:pair-a-b",
-					adjacencyLabelPairSide: adjacencyPairSideSource,
 					adjacencyLabelPairPass: cdpMatchPassDefault,
 					"remote_address_raw":   "edge-sw3.mgmt.local",
 				},
@@ -691,7 +688,6 @@ func TestToTopologyData_MergesPairedAdjacenciesPreservesRawAddressHints(t *testi
 				TargetPort: "Gi0/1",
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "cdp:pair-a-b",
-					adjacencyLabelPairSide: adjacencyPairSideTarget,
 					adjacencyLabelPairPass: cdpMatchPassDefault,
 					"remote_address_raw":   "10.0.0.1",
 				},
@@ -714,7 +710,7 @@ func TestToTopologyData_MergesPairedAdjacenciesPreservesRawAddressHints(t *testi
 	require.Contains(t, link.Metrics, "dst_remote_address_raw")
 }
 
-func TestToTopologyData_MergesReversePairsWhenPairSideLabelsAreMalformed(t *testing.T) {
+func TestToTopologyData_MergesReversePairsWithoutDirectionalPairLabels(t *testing.T) {
 	result := Result{
 		Devices: []Device{
 			{
@@ -743,7 +739,6 @@ func TestToTopologyData_MergesReversePairsWhenPairSideLabelsAreMalformed(t *test
 				TargetPort: "",
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "lldp:pair-router-xs",
-					adjacencyLabelPairSide: adjacencyPairSideSource,
 					adjacencyLabelPairPass: lldpMatchPassPortDesc,
 				},
 			},
@@ -755,7 +750,6 @@ func TestToTopologyData_MergesReversePairsWhenPairSideLabelsAreMalformed(t *test
 				TargetPort: "ether3",
 				Labels: map[string]string{
 					adjacencyLabelPairID:   "lldp:pair-router-xs",
-					adjacencyLabelPairSide: adjacencyPairSideSource,
 					adjacencyLabelPairPass: lldpMatchPassPortDesc,
 				},
 			},
