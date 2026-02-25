@@ -26,21 +26,29 @@ const topologyMethodID = "topology:snmp"
 const (
 	topologyParamNodesIdentity      = "nodes_identity"
 	topologyParamMapType            = "map_type"
+	topologyParamInferenceStrategy  = "inference_strategy"
 	topologyParamManagedDeviceFocus = "managed_snmp_device_focus"
 	topologyParamDepth              = "depth"
 
 	topologyNodesIdentityIP  = "ip"
 	topologyNodesIdentityMAC = "mac"
 
-	topologyMapTypeLLDPCDPManaged          = "lldp_cdp_managed"
-	topologyMapTypeHighConfidenceInferred  = "high_confidence_inferred"
-	topologyMapTypeAllDevicesLowConfidence = "all_devices_low_confidence"
-	topologyManagedFocusAllDevices         = "all_devices"
-	topologyManagedFocusIPPrefix           = "ip:"
-	topologyDepthAll                       = "all"
-	topologyDepthMin                       = 0
-	topologyDepthMax                       = 10
-	topologyDepthAllInternal               = -1
+	topologyMapTypeLLDPCDPManaged                = "lldp_cdp_managed"
+	topologyMapTypeHighConfidenceInferred        = "high_confidence_inferred"
+	topologyMapTypeAllDevicesLowConfidence       = "all_devices_low_confidence"
+	topologyInferenceStrategyFDBMinimumKnowledge = "fdb_minimum_knowledge"
+	topologyInferenceStrategySTPParentTree       = "stp_parent_tree"
+	topologyInferenceStrategyFDBPairwise         = "fdb_pairwise_minimum_knowledge"
+	topologyInferenceStrategySTPFDBCorrelated    = "stp_fdb_correlated"
+	topologyInferenceStrategyCDPFDBHybrid        = "cdp_fdb_hybrid"
+	topologyInferenceStrategyFDBOverlapWeighted  = "fdb_overlap_weighted"
+	topologyInferenceStrategyExperimentalFull    = "experimental_full"
+	topologyManagedFocusAllDevices               = "all_devices"
+	topologyManagedFocusIPPrefix                 = "ip:"
+	topologyDepthAll                             = "all"
+	topologyDepthMin                             = 0
+	topologyDepthMax                             = 10
+	topologyDepthAllInternal                     = -1
 )
 
 func topologyNodesIdentityParamConfig() funcapi.ParamConfig {
@@ -72,6 +80,46 @@ func topologyMapTypeParamConfig() funcapi.ParamConfig {
 			{
 				ID:   topologyMapTypeAllDevicesLowConfidence,
 				Name: "All Devices (Low Confidence)",
+			},
+		},
+	}
+}
+
+func topologyInferenceStrategyParamConfig() funcapi.ParamConfig {
+	return funcapi.ParamConfig{
+		ID:        topologyParamInferenceStrategy,
+		Name:      "Strategy Model",
+		Help:      "Choose the topology inference strategy (experimental modes are internal-testing only)",
+		Selection: funcapi.ParamSelect,
+		Options: []funcapi.ParamOption{
+			{
+				ID:      topologyInferenceStrategyFDBMinimumKnowledge,
+				Name:    "FDB Minimum-Knowledge (Baseline)",
+				Default: true,
+			},
+			{
+				ID:   topologyInferenceStrategySTPParentTree,
+				Name: "STP Parent Tree",
+			},
+			{
+				ID:   topologyInferenceStrategyFDBPairwise,
+				Name: "FDB Pairwise Minimum-Knowledge",
+			},
+			{
+				ID:   topologyInferenceStrategySTPFDBCorrelated,
+				Name: "STP + FDB Correlated",
+			},
+			{
+				ID:   topologyInferenceStrategyCDPFDBHybrid,
+				Name: "CDP + FDB Hybrid",
+			},
+			{
+				ID:   topologyInferenceStrategyFDBOverlapWeighted,
+				Name: "FDB Overlap Weighted",
+			},
+			{
+				ID:   topologyInferenceStrategyExperimentalFull,
+				Name: "Experimental Full (Internal Only)",
 			},
 		},
 	}
@@ -132,6 +180,7 @@ func topologyMethodConfig() funcapi.MethodConfig {
 		RequiredParams: []funcapi.ParamConfig{
 			topologyNodesIdentityParamConfig(),
 			topologyMapTypeParamConfig(),
+			topologyInferenceStrategyParamConfig(),
 			topologyManagedFocusParamConfig(nil),
 			topologyDepthParamConfig(),
 		},
@@ -157,6 +206,7 @@ func (f *funcTopology) MethodParams(_ context.Context, method string) ([]funcapi
 	return []funcapi.ParamConfig{
 		topologyNodesIdentityParamConfig(),
 		topologyMapTypeParamConfig(),
+		topologyInferenceStrategyParamConfig(),
 		topologyManagedFocusParamConfig(managedFocusOptions),
 		topologyDepthParamConfig(),
 	}, nil
@@ -173,6 +223,7 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 		CollapseActorsByIP:     true,
 		EliminateNonIPInferred: true,
 		MapType:                topologyMapTypeLLDPCDPManaged,
+		InferenceStrategy:      topologyInferenceStrategyFDBMinimumKnowledge,
 		ManagedDeviceFocus:     topologyManagedFocusAllDevices,
 		Depth:                  topologyDepthAllInternal,
 	}
@@ -184,6 +235,9 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 	}
 	if mapType := normalizeTopologyMapType(params.GetOne(topologyParamMapType)); mapType != "" {
 		options.MapType = mapType
+	}
+	if strategy := normalizeTopologyInferenceStrategy(params.GetOne(topologyParamInferenceStrategy)); strategy != "" {
+		options.InferenceStrategy = strategy
 	}
 	if focus := normalizeTopologyManagedFocus(params.GetOne(topologyParamManagedDeviceFocus)); focus != "" {
 		options.ManagedDeviceFocus = focus
@@ -227,6 +281,27 @@ func normalizeTopologyMapType(v string) string {
 		return topologyMapTypeHighConfidenceInferred
 	case topologyMapTypeAllDevicesLowConfidence:
 		return topologyMapTypeAllDevicesLowConfidence
+	default:
+		return ""
+	}
+}
+
+func normalizeTopologyInferenceStrategy(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "", topologyInferenceStrategyFDBMinimumKnowledge:
+		return topologyInferenceStrategyFDBMinimumKnowledge
+	case topologyInferenceStrategySTPParentTree:
+		return topologyInferenceStrategySTPParentTree
+	case topologyInferenceStrategyFDBPairwise:
+		return topologyInferenceStrategyFDBPairwise
+	case topologyInferenceStrategySTPFDBCorrelated:
+		return topologyInferenceStrategySTPFDBCorrelated
+	case topologyInferenceStrategyCDPFDBHybrid:
+		return topologyInferenceStrategyCDPFDBHybrid
+	case topologyInferenceStrategyFDBOverlapWeighted:
+		return topologyInferenceStrategyFDBOverlapWeighted
+	case topologyInferenceStrategyExperimentalFull:
+		return topologyInferenceStrategyExperimentalFull
 	default:
 		return ""
 	}

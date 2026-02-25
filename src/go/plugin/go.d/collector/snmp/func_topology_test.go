@@ -15,7 +15,7 @@ import (
 func TestTopologyMethodConfigIncludesSelectors(t *testing.T) {
 	cfg := topologyMethodConfig()
 	assert.True(t, cfg.AgentWide)
-	require.Len(t, cfg.RequiredParams, 4)
+	require.Len(t, cfg.RequiredParams, 5)
 
 	identity := cfg.RequiredParams[0]
 	assert.Equal(t, topologyParamNodesIdentity, identity.ID)
@@ -34,14 +34,27 @@ func TestTopologyMethodConfigIncludesSelectors(t *testing.T) {
 	assert.Equal(t, topologyMapTypeHighConfidenceInferred, mapType.Options[1].ID)
 	assert.Equal(t, topologyMapTypeAllDevicesLowConfidence, mapType.Options[2].ID)
 
-	managedFocus := cfg.RequiredParams[2]
+	strategy := cfg.RequiredParams[2]
+	assert.Equal(t, topologyParamInferenceStrategy, strategy.ID)
+	assert.Equal(t, funcapi.ParamSelect, strategy.Selection)
+	require.Len(t, strategy.Options, 7)
+	assert.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, strategy.Options[0].ID)
+	assert.True(t, strategy.Options[0].Default)
+	assert.Equal(t, topologyInferenceStrategySTPParentTree, strategy.Options[1].ID)
+	assert.Equal(t, topologyInferenceStrategyFDBPairwise, strategy.Options[2].ID)
+	assert.Equal(t, topologyInferenceStrategySTPFDBCorrelated, strategy.Options[3].ID)
+	assert.Equal(t, topologyInferenceStrategyCDPFDBHybrid, strategy.Options[4].ID)
+	assert.Equal(t, topologyInferenceStrategyFDBOverlapWeighted, strategy.Options[5].ID)
+	assert.Equal(t, topologyInferenceStrategyExperimentalFull, strategy.Options[6].ID)
+
+	managedFocus := cfg.RequiredParams[3]
 	assert.Equal(t, topologyParamManagedDeviceFocus, managedFocus.ID)
 	assert.Equal(t, funcapi.ParamSelect, managedFocus.Selection)
 	require.Len(t, managedFocus.Options, 1)
 	assert.Equal(t, topologyManagedFocusAllDevices, managedFocus.Options[0].ID)
 	assert.True(t, managedFocus.Options[0].Default)
 
-	depth := cfg.RequiredParams[3]
+	depth := cfg.RequiredParams[4]
 	assert.Equal(t, topologyParamDepth, depth.ID)
 	assert.Equal(t, funcapi.ParamSelect, depth.Selection)
 	require.NotEmpty(t, depth.Options)
@@ -74,14 +87,15 @@ func TestFuncTopology_MethodParams(t *testing.T) {
 
 	params, err := f.MethodParams(context.Background(), topologyMethodID)
 	require.NoError(t, err)
-	require.Len(t, params, 4)
+	require.Len(t, params, 5)
 	assert.Equal(t, topologyParamNodesIdentity, params[0].ID)
 	assert.Equal(t, topologyParamMapType, params[1].ID)
-	assert.Equal(t, topologyParamManagedDeviceFocus, params[2].ID)
-	assert.Equal(t, topologyParamDepth, params[3].ID)
-	require.GreaterOrEqual(t, len(params[2].Options), 2)
-	assert.Equal(t, topologyManagedFocusAllDevices, params[2].Options[0].ID)
-	assert.Equal(t, "ip:10.0.0.1", params[2].Options[1].ID)
+	assert.Equal(t, topologyParamInferenceStrategy, params[2].ID)
+	assert.Equal(t, topologyParamManagedDeviceFocus, params[3].ID)
+	assert.Equal(t, topologyParamDepth, params[4].ID)
+	require.GreaterOrEqual(t, len(params[3].Options), 2)
+	assert.Equal(t, topologyManagedFocusAllDevices, params[3].Options[0].ID)
+	assert.Equal(t, "ip:10.0.0.1", params[3].Options[1].ID)
 
 	params, err = f.MethodParams(context.Background(), "unknown")
 	require.NoError(t, err)
@@ -146,6 +160,7 @@ func TestFuncTopology_Handle_AcceptsSelectorParams(t *testing.T) {
 	cfg := []funcapi.ParamConfig{
 		topologyNodesIdentityParamConfig(),
 		topologyMapTypeParamConfig(),
+		topologyInferenceStrategyParamConfig(),
 		topologyManagedFocusParamConfig(nil),
 		topologyDepthParamConfig(),
 	}
@@ -153,6 +168,7 @@ func TestFuncTopology_Handle_AcceptsSelectorParams(t *testing.T) {
 	params := funcapi.ResolveParams(cfg, map[string][]string{
 		topologyParamNodesIdentity:      {topologyNodesIdentityMAC},
 		topologyParamMapType:            {topologyMapTypeHighConfidenceInferred},
+		topologyParamInferenceStrategy:  {topologyInferenceStrategySTPFDBCorrelated},
 		topologyParamManagedDeviceFocus: {"ip:10.0.0.1"},
 		topologyParamDepth:              {"2"},
 	})
@@ -189,6 +205,7 @@ func TestFuncTopology_Handle_UnknownSelectorsFallbackToDefaults(t *testing.T) {
 	cfg := []funcapi.ParamConfig{
 		topologyNodesIdentityParamConfig(),
 		topologyMapTypeParamConfig(),
+		topologyInferenceStrategyParamConfig(),
 		topologyManagedFocusParamConfig(nil),
 		topologyDepthParamConfig(),
 	}
@@ -202,6 +219,7 @@ func TestFuncTopology_Handle_UnknownSelectorsFallbackToDefaults(t *testing.T) {
 	invalidParams := funcapi.ResolveParams(cfg, map[string][]string{
 		topologyParamNodesIdentity:      {"unknown"},
 		topologyParamMapType:            {"invalid"},
+		topologyParamInferenceStrategy:  {"invalid"},
 		topologyParamManagedDeviceFocus: {"invalid"},
 		topologyParamDepth:              {"invalid"},
 	})
@@ -213,6 +231,18 @@ func TestFuncTopology_Handle_UnknownSelectorsFallbackToDefaults(t *testing.T) {
 
 	assert.Equal(t, defaultData.Layer, invalidData.Layer)
 	assert.Equal(t, defaultData.View, invalidData.View)
+}
+
+func TestNormalizeTopologyInferenceStrategy(t *testing.T) {
+	assert.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, normalizeTopologyInferenceStrategy(""))
+	assert.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, normalizeTopologyInferenceStrategy(topologyInferenceStrategyFDBMinimumKnowledge))
+	assert.Equal(t, topologyInferenceStrategySTPParentTree, normalizeTopologyInferenceStrategy(topologyInferenceStrategySTPParentTree))
+	assert.Equal(t, topologyInferenceStrategyFDBPairwise, normalizeTopologyInferenceStrategy(topologyInferenceStrategyFDBPairwise))
+	assert.Equal(t, topologyInferenceStrategySTPFDBCorrelated, normalizeTopologyInferenceStrategy(topologyInferenceStrategySTPFDBCorrelated))
+	assert.Equal(t, topologyInferenceStrategyCDPFDBHybrid, normalizeTopologyInferenceStrategy(topologyInferenceStrategyCDPFDBHybrid))
+	assert.Equal(t, topologyInferenceStrategyFDBOverlapWeighted, normalizeTopologyInferenceStrategy(topologyInferenceStrategyFDBOverlapWeighted))
+	assert.Equal(t, topologyInferenceStrategyExperimentalFull, normalizeTopologyInferenceStrategy(topologyInferenceStrategyExperimentalFull))
+	assert.Equal(t, "", normalizeTopologyInferenceStrategy("invalid"))
 }
 
 func newTestTopologyCacheLLDP(

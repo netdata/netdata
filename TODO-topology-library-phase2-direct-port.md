@@ -46,8 +46,8 @@
   - Updated popover idle color token to match bullet token.
 - [x] A0.5. Execute install order (backend then frontend).
   - Executed:
-    - `./install.sh` (backend) on 2026-02-24
-    - `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh` (frontend) on 2026-02-24
+    - `./install.sh` (backend) on 2026-02-24 and 2026-02-25
+    - `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh` (frontend) on 2026-02-24 and 2026-02-25
   - Result:
     - both completed successfully
     - backend installer reported non-fatal warning: `git fetch -t` failed (`Permission denied (publickey)`).
@@ -131,6 +131,138 @@
       - non-fatal installer warning remains: `git fetch -t` failed (`Permission denied (publickey)`).
     - frontend:
       - `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh` completed.
+- [x] A14. Inference strategy expansion (`inference_strategy`) with backend-owned selector.
+  - Goal:
+    - support multiple backend inference strategies and compare them empirically on the same dataset.
+  - Candidate additions:
+    - `stp_parent_tree` (working name): STP-designated-parent focused map for managed switch-to-switch edges.
+    - keep existing:
+      - `lldp_cdp_managed`
+      - `high_confidence_inferred`
+      - `all_devices_low_confidence`
+  - Mandatory guardrails:
+    - no frontend special-casing; selector labels/options come from backend required params only.
+    - strict separation:
+      - inference strategy = backend graph construction behavior,
+      - map visibility policy = backend output policy/filtering.
+    - legal safety review before implementing any algorithm that is claim-by-claim similar to active patents.
+  - Implemented (2026-02-25):
+    - decision D14.1 applied:
+      - split concerns into:
+        - `inference_strategy` (backend graph construction),
+        - `map_type` (backend visibility/output policy).
+    - new required param exposed by backend:
+      - id: `inference_strategy`
+      - label: `Strategy Model`
+      - options:
+        - `fdb_minimum_knowledge` (default),
+        - `stp_parent_tree`,
+        - `fdb_pairwise_minimum_knowledge`,
+        - `stp_fdb_correlated`,
+        - `cdp_fdb_hybrid`,
+        - `fdb_overlap_weighted`,
+        - `experimental_full` (internal-only experiment).
+    - strategy wired end-to-end:
+      - function param parsing/normalization and query options,
+      - registry snapshot path (strict/probable keeps selected strategy),
+      - topology adapter and segment projection pipeline.
+    - added strategy-specific behavior:
+      - STP parent-tree bridge-link extraction path,
+      - FDB pairwise reciprocal managed-alias bridge inference,
+      - FDB overlap-weighted bridge inference from shared host-side MAC sets,
+      - CDP+FDB hybrid path (CDP bridge links + FDB pairwise/overlap),
+      - STP+FDB managed-alias correlation for switch-facing ports,
+      - experimental full mode with relaxed switch-facing FDB filtering.
+    - stats now include:
+      - `inference_strategy`.
+  - Validation:
+    - `cd src/go && go test ./pkg/topology/engine -count=1` passed
+    - `cd src/go && go test ./plugin/go.d/collector/snmp -count=1` passed
+    - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed
+    - parity evidence tooling status unchanged (fixtures missing in workstation):
+      - `go run ./tools/topology-parity-evidence --mode suite` failed (missing `/tmp/topology-library-repos/enlinkd/.../linkd`)
+      - `go run ./tools/topology-parity-evidence --mode verify` failed (same reason)
+      - `go run ./tools/topology-parity-evidence --mode phase2` failed (same reason)
+  - Follow-up extension requested (2026-02-25):
+    - add more strategy variants from additional FDB/STP literature where feasible with existing SNMP observation model.
+    - run additional literature review and implement promising variants autonomously.
+    - keep probe/sniffer-only approaches out of backend implementation unless data-collection layer is extended (documented limitation).
+  - New execution request (2026-02-26):
+    - add more inference strategies from additional academic literature and practical SNMP/FDB/STP/CDP combinations,
+    - research and include additional promising variants in the same `inference_strategy` selector,
+    - implement autonomously end-to-end (backend strategy wiring + tests + install) with no frontend hardcoding.
+  - Scope boundary for this execution:
+    - include only strategies implementable from current data model (SNMP-adjacent tables + discovered adjacencies + attachments),
+    - exclude probe/sniffer-only algorithms that require packet injection/capture or additional collectors.
+  - User decisions (2026-02-25):
+    - D14.1 = **B**:
+      - split into `inference_strategy` + `map_type`.
+    - D14.2 = **Full strategy set**:
+      - integrate multiple practical strategy variants for empirical A/B testing (not only one STP strategy).
+    - D14.3 = **A**:
+      - patent-adjacent strategy stays experimental/non-default and documented as internal-testing-only.
+  - Extension implementation status (2026-02-26):
+    - added two new strategy models to `inference_strategy`:
+      - `cdp_fdb_hybrid`,
+      - `fdb_overlap_weighted`.
+    - backend wiring:
+      - strategy param normalization + selector options updated,
+      - engine strategy config updated to include the new models,
+      - bridge-link merge path now supports:
+        - FDB pairwise link inference,
+        - FDB overlap-weighted link inference with configurable shared-MAC threshold.
+    - inference behavior:
+      - `cdp_fdb_hybrid`:
+        - bridge links from CDP,
+        - FDB pairwise + overlap-weighted inference enabled.
+      - `fdb_overlap_weighted`:
+        - FDB pairwise + overlap-weighted inference only (no LLDP/CDP/STP bridge-link input).
+      - overlap rule:
+        - candidate links are ranked by weighted shared-host-MAC score (`shared + shared/union`),
+        - one conservative overlap-inferred bridge pair per device-pair is emitted.
+  - Extension validation (2026-02-26):
+    - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed.
+    - added/updated tests:
+      - selector/normalization tests for new strategy IDs,
+      - CDP-only bridge-link acceptance in CDP hybrid strategy,
+      - overlap-weighted inference positive/negative unit tests,
+      - topology projection test proving CDP-hybrid changes FDB endpoint suppression behavior.
+  - Install verification (2026-02-26):
+    - backend:
+      - `./install.sh` completed,
+      - non-fatal installer warning remains: `git fetch -t` failed (`Permission denied (publickey)`).
+    - frontend:
+      - `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh` completed.
+- [x] A19. Enforce deterministic LLDP/CDP transit-port ownership suppression.
+  - Requirement (2026-02-26):
+    - when LLDP/CDP defines adjacency on a port, all FDB-learned MACs on that port are downstream of the peer,
+    - no inferred bridge-domain segment path should be emitted using FDB data from that transit port.
+  - Scope:
+    - apply as hard rule across strategies (including experimental), independent of selected `inference_strategy`,
+    - retain LLDP/CDP direct links as authoritative,
+    - keep existing post-processing suppression as safety net.
+  - Validation target:
+    - no redundant segment overlap parallel to LLDP/CDP direct links on the same inter-switch ports.
+  - Implemented (2026-02-26):
+    - added hard transit-port key extraction from LLDP/CDP adjacencies and applied it before FDB MAC-link projection.
+    - this suppression is now strategy-independent (applies even when strategy disables switch-facing filtering).
+    - extended artifact pruning overlap check to include CDP direct pairs (not only LLDP).
+    - added deterministic suppression of **inferred bridge links** (STP/FDB-derived) when:
+      - they touch LLDP/CDP transit ports, or
+      - they connect a device pair already directly discovered by LLDP/CDP.
+    - fixed LLDP numeric port vs interface-name mismatch path by using observation keys that prefer `ifIndex` matching for suppression logic, while preserving stable segment display naming keys.
+  - Files:
+    - `src/go/pkg/topology/engine/topology_adapter.go`
+    - `src/go/pkg/topology/engine/topology_adapter_test.go`
+  - Tests added/updated:
+    - `TestPruneSegmentArtifacts_SuppressesCDPDuplicateSegmentPath`
+    - `TestToTopologyData_DeterministicTransitRuleSuppressesFDBOnLLDPPortInExperimental`
+    - `TestToTopologyData_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex`
+    - `TestSuppressInferredBridgeLinksOnDeterministicDiscovery`
+  - Validation:
+    - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed.
+    - backend install executed:
+      - `./install.sh` completed (non-fatal `git fetch -t` warning remains).
 - [x] A11. Probable connectivity contract hardening (`strict + delta only`).
   - New required behavior:
     - probable pass starts from strict-unlinked endpoints only,
@@ -548,6 +680,10 @@
     - no backward compatibility required for topology API in this workstream,
     - replace old connectivity param with new `map_type` contract directly.
 - [ ] D11. Strict-mode inferred visibility refinement.
+- [x] D12. Deterministic LLDP/CDP transit-port ownership rule (2026-02-26).
+  - LLDP/CDP adjacency on a port is authoritative for transit ownership.
+  - FDB entries learned on such transit ports must not create inferred segment connectivity.
+  - Goal: remove redundant overlapping segments parallel to deterministic LLDP/CDP links.
   - Requested:
     - hide unlinked inferred endpoints in strict mode,
     - keep unlinked managed devices visible.

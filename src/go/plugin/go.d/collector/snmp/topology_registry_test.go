@@ -144,6 +144,7 @@ func TestTopologyRegistry_SnapshotWithOptions_LLDPManagedKeepsRequestedMapType(t
 	})
 	require.True(t, ok)
 	require.Equal(t, topologyMapTypeLLDPCDPManaged, data.Stats["map_type"])
+	require.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, data.Stats["inference_strategy"])
 }
 
 func TestTopologyRegistry_ManagedDeviceFocusTargets_ReturnsPerDeviceIPTargets(t *testing.T) {
