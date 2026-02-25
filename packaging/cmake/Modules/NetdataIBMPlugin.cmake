@@ -16,15 +16,29 @@ macro(add_ibm_plugin_target)
     ibm_mq
     SOURCE_DIR "${IBM_MQ_BUILD_DIR}"
     CONFIGURE_COMMAND "${CMAKE_COMMAND} -E true"
+    CONFIGURE_COMMAND "${CMAKE_COMMAND} -E copy_directory bin gskit8 inc java lap lib lib64 licenses msg samp swidtag ${IBM_MQ_BUILD_DIR}"
+    COMMAND       "${CMAKE_COMMAND} -E copy MANIFEST MANIFEST.Redist README.Redist ${IBM_MQ_BUILD_DIR}"
     BUILD_COMMAND "${CMAKE_COMMAND} -E true"
     INSTALL_COMMAND "${CMAKE_COMMAND} -E true"
     DOWNLOAD_NO_PROGRESS True
+    STEP_TARGETS build
     URL https://public.dhe.ibm.com/ibmdl/export/pub/software/websphere/messaging/mqdev/redist/9.4.3.1-IBM-MQC-Redist-LinuxX64.tar.gz
     URL_HASH SHA256=9df98ab0ab69954fa080dc7765c9a3eb7cd6c683e5d596ae10c4fbb32eec2ad8
   )
 
   message(STATUS "Fetching IBM MQ client libraries for build")
   FetchContent_MakeAvailable(ibm_mq)
+
+  if(DEFINED FETCHCONTENT_SOURCE_DIR_IBM_MQ)
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E copy_directory ${FETCHCONTENT_SOURCE_DIR_IBM_MQ} ${IBM_MQ_BUILD_DIR}
+      RESULT_VARIABLE IBM_MQ_COPY_STATUS
+    )
+
+    if(IBM_MQ_COPY_STATUS)
+      message(FATAL_ERROR "Failed to prepare IBM MQ client library directory")
+    endif()
+  endif()
 
   # Find all Go source files - resolve symlinks for consistent dependency tracking
   get_filename_component(RESOLVED_SOURCE_DIR "${CMAKE_SOURCE_DIR}" REALPATH)
@@ -42,7 +56,7 @@ macro(add_ibm_plugin_target)
   set(IBM_RPATH_FLAGS "")
 
   # Add MQ support if MQ client libraries are available
-  if(EXISTS "${IBM_MQ_BUILD_DIR}/inc/cmqc.h")
+  if(EXISTS "${ibm_mq_SOURCE_DIR}/inc/cmqc.h")
     set(IBM_CGO_CFLAGS "-I${IBM_MQ_BUILD_DIR}/inc")
     set(IBM_CGO_LDFLAGS "-L${IBM_MQ_BUILD_DIR}/lib64 -lmqic_r")
     set(IBM_RPATH_FLAGS "-Wl,-rpath,$ORIGIN/../../../${IBM_MQ_INSTALL_SUFFIX}/lib64")
