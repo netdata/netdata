@@ -714,6 +714,123 @@ func TestToTopologyData_MergesPairedAdjacenciesPreservesRawAddressHints(t *testi
 	require.Contains(t, link.Metrics, "dst_remote_address_raw")
 }
 
+func TestToTopologyData_MergesReversePairsWhenPairSideLabelsAreMalformed(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "router-a",
+				Hostname:  "MikroTik-router",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "XS1930",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "router-a", IfIndex: 3, IfName: "ether3", IfDescr: "ether3"},
+			{DeviceID: "switch-b", IfIndex: 8, IfName: "swp07", IfDescr: "swp07"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "router-a",
+				SourcePort: "ether3",
+				TargetID:   "switch-b",
+				TargetPort: "",
+				Labels: map[string]string{
+					adjacencyLabelPairID:   "lldp:pair-router-xs",
+					adjacencyLabelPairSide: adjacencyPairSideSource,
+					adjacencyLabelPairPass: lldpMatchPassPortDesc,
+				},
+			},
+			{
+				Protocol:   "lldp",
+				SourceID:   "switch-b",
+				SourcePort: "8",
+				TargetID:   "router-a",
+				TargetPort: "ether3",
+				Labels: map[string]string{
+					adjacencyLabelPairID:   "lldp:pair-router-xs",
+					adjacencyLabelPairSide: adjacencyPairSideSource,
+					adjacencyLabelPairPass: lldpMatchPassPortDesc,
+				},
+			},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	require.Equal(t, 1, data.Stats["links_total"])
+	require.Equal(t, 1, data.Stats["links_lldp"])
+	require.Equal(t, 1, data.Stats["links_bidirectional"])
+	require.Equal(t, 0, data.Stats["links_unidirectional"])
+	require.Len(t, data.Links, 1)
+
+	link := data.Links[0]
+	require.Equal(t, "lldp", link.Protocol)
+	require.Equal(t, "bidirectional", link.Direction)
+	require.Equal(t, "MikroTik-router", topologyAttrString(link.Src.Attributes, "sys_name"))
+	require.Equal(t, "XS1930", topologyAttrString(link.Dst.Attributes, "sys_name"))
+	require.Equal(t, "ether3", topologyAttrString(link.Src.Attributes, "if_name"))
+	require.Equal(t, "swp07", topologyAttrString(link.Dst.Attributes, "if_name"))
+	require.Equal(t, "8", topologyAttrString(link.Dst.Attributes, "port_id"))
+	require.Equal(t, "swp07", topologyAttrString(link.Dst.Attributes, "port_name"))
+}
+
+func TestToTopologyData_UnknownAdjacencyPortsRemainUnsetWithoutZeroFallback(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "router-a",
+				Hostname:  "MikroTik-router",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "XS1930",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "router-a", IfIndex: 3, IfName: "ether3", IfDescr: "ether3"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "router-a",
+				SourcePort: "ether3",
+				TargetID:   "switch-b",
+				TargetPort: "",
+			},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	require.Len(t, data.Links, 1)
+	link := data.Links[0]
+	require.Equal(t, "lldp", link.Protocol)
+	require.Equal(t, "unidirectional", link.Direction)
+	_, hasPortName := link.Dst.Attributes["port_name"]
+	require.False(t, hasPortName)
+	require.Equal(t, "", strings.TrimSpace(topologyMetricString(link.Metrics, "dst_port_name")))
+	require.Contains(t, topologyMetricString(link.Metrics, "display_name"), ":[unset]")
+}
+
 func TestToTopologyData_DropsAmbiguousEndpointSegmentLinks(t *testing.T) {
 	result := Result{
 		Devices: []Device{

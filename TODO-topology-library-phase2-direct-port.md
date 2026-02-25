@@ -56,6 +56,16 @@
   - Updated probable link color to darker cyan for clearer contrast against strict/high-confidence links.
   - File:
     - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/graph/forceGraph.js`
+- [x] A0.7. Re-run installs now in mandatory order (Costa, 2026-02-25).
+  - Requested execution order:
+    - backend first: `./install.sh`
+    - frontend second: `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh`
+  - Execution result (2026-02-25):
+    - backend install completed successfully; netdata restarted.
+    - known non-fatal warning remains during backend install:
+      - `git fetch -t` failed (`Permission denied (publickey)`).
+    - frontend install completed successfully.
+    - frontend build emitted warnings (unused files/exports and webpack cache/precache size warnings), no fatal errors.
 - [ ] A1. Validate latest backend+frontend install on live office topology (hard refresh, multiple refresh cycles).
   - Evidence required:
     - screenshot/log excerpt of expected actor/link stability across refreshes,
@@ -137,6 +147,94 @@
   - Validation:
     - `cd src/go && go test ./pkg/topology/engine -count=1` passed.
     - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed.
+- [x] A23. Live payload verification after backend+frontend reinstall (Costa, 2026-02-26).
+  - Call used:
+    - `GET /api/v3/function?function=topology:snmp&nodes_identity=ip&map_type=lldp_cdp_managed&inference_strategy=fdb_minimum_knowledge&managed_snmp_device_focus=all_devices&depth=all`
+    - `Authorization: Bearer <token>` where `<token>` is `.token` field from `/var/lib/netdata/bearer_tokens/*`.
+  - Snapshot:
+    - `collected_at`: `2026-02-26T00:51:21.496578064+02:00`
+    - `actors`: `10`
+    - `links`: `9`
+  - LLDP evidence for target links:
+    - `XS1930 -> MikroTik-router`: `src.if_name=swp07`, `src.port_id=8`, `dst.if_name=ether3`.
+    - `GS1900 -> MikroTik-router`: `src.if_name=GigabitEthernet2`, `src.port_id=2`, `dst.if_name=ether4`.
+    - reverse discovery rows (`MikroTik-router -> XS1930/GS1900`) still carry unknown destination port (`dst.port_name=0`) because remote port is absent in those rows.
+  - Pair metadata state:
+    - both direction rows for MikroTik<->XS1930 and MikroTik<->GS1900 still expose `pair_side=source` on both records, so they remain unidirectional in final projection.
+- [x] A24. Verify raw LLDP neighbor port values directly from SNMP devices (Costa, 2026-02-26).
+  - Goal:
+    - confirm whether remote port value is genuinely absent/zero in device-reported LLDP data, versus a topology adapter bug.
+  - Planned evidence:
+    - SNMP walk/get on LLDP remote tables for:
+      - MikroTik-router,
+      - XS1930,
+      - GS1900.
+    - compare raw `lldpRem*` fields against topology link endpoints (`if_name`, `port_id`, `port_name`).
+  - Evidence collected:
+    - SNMP credentials/targets used from `/etc/netdata/go.d/snmp.conf`:
+      - devices: `10.20.4.1` (MikroTik-router), `10.20.4.3` (XS1930), `10.20.4.4` (GS1900),
+      - SNMP v2c community: `atadteN`.
+    - MikroTik-router (`10.20.4.1`) LLDP remote rows:
+      - `.1.0.8802.1.1.2.1.4.1.1.9.0.3.42 = "XS1930"`,
+      - `.1.0.8802.1.1.2.1.4.1.1.9.0.4.46 = "GS1900"`,
+      - corresponding remote port IDs:
+        - `.1.0.8802.1.1.2.1.4.1.1.7.0.3.42 = ""`,
+        - `.1.0.8802.1.1.2.1.4.1.1.7.0.4.46 = ""`.
+      - local ports are confirmed as:
+        - `.1.0.8802.1.1.2.1.3.7.1.3.3 = "ether3"`,
+        - `.1.0.8802.1.1.2.1.3.7.1.3.4 = "ether4"`.
+    - XS1930 (`10.20.4.3`) LLDP row to MikroTik:
+      - `.1.0.8802.1.1.2.1.4.1.1.9.121.8.578647132 = "MikroTik-router"`,
+      - `.1.0.8802.1.1.2.1.4.1.1.7.121.8.578647132 = "ether3"` (remote port present),
+      - local LLDP port id:
+        - `.1.0.8802.1.1.2.1.3.7.1.3.8 = "8"`,
+      - interface canonical name for that index:
+        - `.1.3.6.1.2.1.31.1.1.1.1.8 = swp07`.
+    - GS1900 (`10.20.4.4`) LLDP row to MikroTik:
+      - `.1.0.8802.1.1.2.1.4.1.1.9.0.2.1 = "MikroTik-router"`,
+      - `.1.0.8802.1.1.2.1.4.1.1.7.0.2.1 = "ether4"` (remote port present),
+      - local LLDP port id:
+        - `.1.0.8802.1.1.2.1.3.7.1.3.2 = "2"`,
+      - interface canonical name for that index:
+        - `.1.3.6.1.2.1.31.1.1.1.1.2 = GigabitEthernet2`.
+  - Conclusion:
+    - the `:0` shown on `MikroTik-router -> XS1930/GS1900` direction is not because devices report numeric `0`; MikroTik reports empty remote port ID for those neighbors.
+    - topology currently renders missing remote port as canonical fallback `0` for that direction.
+  - Decisions needed before implementation:
+    - D24.1 Pair backfill ordering/association rule:
+      - choose deterministic matching rule to copy missing endpoint port from reverse-pair row without swapping endpoints.
+    - D24.2 Missing port representation:
+      - choose whether unknown port should remain `0`, switch to `-1`, or be represented as empty/`N/A` in payload/UI.
+  - User decisions (Costa, 2026-02-26):
+    - D24.1 = **strict reverse-endpoint backfill by `pair_id`**:
+      - do not rely on row order;
+      - backfill only when reverse endpoint device mapping is unambiguous.
+    - D24.2 = **empty/`N/A` semantics for missing ports**:
+      - stop emitting synthetic `0` as unknown LLDP/CDP port fallback;
+      - preserve explicit device-reported `0` if present in raw `port_id`.
+- [x] A25. Collapse malformed pair-side LLDP/CDP reverse pairs into one bidirectional link (Costa, 2026-02-26).
+  - Live evidence after D24 deploy:
+    - topology payload shows reverse rows with same `pair_id` and opposite endpoints, but both rows carry `pair_side=source`.
+    - because projection currently merges only when exactly one `source` and one `target`, these stay unidirectional.
+  - Required behavior:
+    - if a `pair_id` group has exactly two entries and each row is exact reverse endpoints of the other,
+      merge into one bidirectional link even when `pair_side` metadata is inconsistent.
+    - keep strict safeguards:
+      - do not merge when there are >2 rows in group,
+      - do not merge when reverse mapping is ambiguous.
+  - Implemented:
+    - projection now has a strict fallback merge for malformed pair-side groups:
+      - if `len(entries)==2` and endpoints are exact reverse, collapse into one bidirectional link.
+      - deterministic orientation is selected from stable tuple key (`protocol|src_id|src_port|dst_id|dst_port`).
+  - Validation:
+    - tests:
+      - `cd src/go && go test ./pkg/topology/engine ./plugin/go.d/collector/snmp -count=1` passed.
+    - deploy:
+      - backend reinstalled with `./install.sh` (known non-fatal `git fetch -t` warning remains),
+      - frontend reinstalled with `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh`.
+    - live payload (2026-02-26):
+      - `MikroTik-router <-> XS1930` now `direction=bidirectional` with `ether3 <-> swp07`.
+      - `MikroTik-router <-> GS1900` now `direction=bidirectional` with `ether4 <-> GigabitEthernet2`.
 - [x] A13. Implement selector/depth contract fixes (user-approved).
   - Backend:
     - set `map_type` default to `lldp_cdp_managed`,
