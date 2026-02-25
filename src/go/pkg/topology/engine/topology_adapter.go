@@ -70,8 +70,9 @@ type builtAdjacencyLink struct {
 }
 
 type pairedLinkAccumulator struct {
-	source *builtAdjacencyLink
-	target *builtAdjacencyLink
+	sources []*builtAdjacencyLink
+	targets []*builtAdjacencyLink
+	all     []*builtAdjacencyLink
 }
 
 type projectedLinks struct {
@@ -520,18 +521,14 @@ func projectAdjacencyLinks(
 				protocol: protocol,
 				link:     link,
 			}
+			acc.all = append(acc.all, entry)
 			switch pairSide {
 			case adjacencyPairSideSource:
-				if acc.source == nil {
-					acc.source = entry
-					continue
-				}
+				acc.sources = append(acc.sources, entry)
 			case adjacencyPairSideTarget:
-				if acc.target == nil {
-					acc.target = entry
-					continue
-				}
+				acc.targets = append(acc.targets, entry)
 			}
+			continue
 		}
 
 		out.links = append(out.links, link)
@@ -544,29 +541,171 @@ func projectAdjacencyLinks(
 			continue
 		}
 
-		if acc.source != nil && acc.target != nil {
-			merged := acc.source.link
+		if len(acc.sources) == 1 && len(acc.targets) == 1 && len(acc.all) == 2 {
+			merged := acc.sources[0].link
 			merged.Direction = "bidirectional"
-			merged.Src = mergeEndpointIPHints(acc.source.link.Src, acc.target.link.Dst)
-			merged.Dst = mergeEndpointIPHints(acc.target.link.Src, acc.source.link.Dst)
-			merged.Metrics = buildPairedLinkMetrics(acc.source.adj.Labels, acc.target.adj.Labels)
+			merged.Src = mergeEndpointIPHints(acc.sources[0].link.Src, acc.targets[0].link.Dst)
+			merged.Dst = mergeEndpointIPHints(acc.targets[0].link.Src, acc.sources[0].link.Dst)
+			merged.Metrics = buildPairedLinkMetrics(acc.sources[0].adj.Labels, acc.targets[0].adj.Labels)
 			out.links = append(out.links, merged)
-			incrementProjectedProtocolCounters(&out, acc.source.protocol, true)
+			incrementProjectedProtocolCounters(&out, acc.sources[0].protocol, true)
 			continue
 		}
 
-		if acc.source != nil {
-			out.links = append(out.links, acc.source.link)
-			incrementProjectedProtocolCounters(&out, acc.source.protocol, false)
+		if left, right, ok := reversePairEntriesForBidirectionalMerge(acc.all); ok {
+			merged := left.link
+			merged.Direction = "bidirectional"
+			merged.Src = mergeEndpointIPHints(left.link.Src, right.link.Dst)
+			merged.Dst = mergeEndpointIPHints(right.link.Src, left.link.Dst)
+			merged.Metrics = buildPairedLinkMetrics(left.adj.Labels, right.adj.Labels)
+			out.links = append(out.links, merged)
+			incrementProjectedProtocolCounters(&out, left.protocol, true)
+			continue
 		}
-		if acc.target != nil {
-			out.links = append(out.links, acc.target.link)
-			incrementProjectedProtocolCounters(&out, acc.target.protocol, false)
+
+		backfillPairGroupMissingEndpointPorts(acc.all)
+		for _, entry := range acc.all {
+			if entry == nil {
+				continue
+			}
+			out.links = append(out.links, entry.link)
+			incrementProjectedProtocolCounters(&out, entry.protocol, false)
 		}
 	}
 
 	sortTopologyLinks(out.links)
 	return out
+}
+
+func reversePairEntriesForBidirectionalMerge(entries []*builtAdjacencyLink) (left, right *builtAdjacencyLink, ok bool) {
+	if len(entries) != 2 || entries[0] == nil || entries[1] == nil {
+		return nil, nil, false
+	}
+
+	a := entries[0]
+	b := entries[1]
+	aSrc := strings.TrimSpace(a.adj.SourceID)
+	aDst := strings.TrimSpace(a.adj.TargetID)
+	bSrc := strings.TrimSpace(b.adj.SourceID)
+	bDst := strings.TrimSpace(b.adj.TargetID)
+	if aSrc == "" || aDst == "" || bSrc == "" || bDst == "" {
+		return nil, nil, false
+	}
+	if aSrc != bDst || aDst != bSrc {
+		return nil, nil, false
+	}
+
+	if pairedEntryDeterministicKey(b) < pairedEntryDeterministicKey(a) {
+		a, b = b, a
+	}
+	return a, b, true
+}
+
+func pairedEntryDeterministicKey(entry *builtAdjacencyLink) string {
+	if entry == nil {
+		return ""
+	}
+	return strings.Join([]string{
+		strings.TrimSpace(entry.protocol),
+		strings.TrimSpace(entry.adj.SourceID),
+		strings.TrimSpace(entry.adj.SourcePort),
+		strings.TrimSpace(entry.adj.TargetID),
+		strings.TrimSpace(entry.adj.TargetPort),
+	}, "|")
+}
+
+func backfillPairGroupMissingEndpointPorts(entries []*builtAdjacencyLink) {
+	if len(entries) < 2 {
+		return
+	}
+
+	directionToIndexes := make(map[string][]int, len(entries))
+	for i, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		src := strings.TrimSpace(entry.adj.SourceID)
+		dst := strings.TrimSpace(entry.adj.TargetID)
+		if src == "" || dst == "" {
+			continue
+		}
+		key := src + "|" + dst
+		directionToIndexes[key] = append(directionToIndexes[key], i)
+	}
+
+	for i, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		src := strings.TrimSpace(entry.adj.SourceID)
+		dst := strings.TrimSpace(entry.adj.TargetID)
+		if src == "" || dst == "" {
+			continue
+		}
+
+		reverseKey := dst + "|" + src
+		candidates := directionToIndexes[reverseKey]
+		if len(candidates) != 1 {
+			continue
+		}
+
+		reverseEntry := entries[candidates[0]]
+		if reverseEntry == nil {
+			continue
+		}
+		if candidates[0] == i {
+			continue
+		}
+
+		entry.link.Src = backfillEndpointPortFromPeer(entry.link.Src, reverseEntry.link.Dst)
+		entry.link.Dst = backfillEndpointPortFromPeer(entry.link.Dst, reverseEntry.link.Src)
+	}
+}
+
+func endpointHasKnownCanonicalPort(endpoint topology.LinkEndpoint) bool {
+	return strings.TrimSpace(topologyCanonicalPortName(endpoint.Attributes)) != ""
+}
+
+func backfillEndpointPortFromPeer(endpoint topology.LinkEndpoint, peer topology.LinkEndpoint) topology.LinkEndpoint {
+	if endpointHasKnownCanonicalPort(endpoint) || !endpointHasKnownCanonicalPort(peer) {
+		return endpoint
+	}
+
+	attrs := cloneAnyMap(endpoint.Attributes)
+	if attrs == nil {
+		attrs = make(map[string]any)
+	}
+	peerAttrs := peer.Attributes
+	if len(peerAttrs) == 0 {
+		return endpoint
+	}
+
+	if topologyAttrInt(attrs, "if_index") <= 0 {
+		if ifIndex := topologyAttrInt(peerAttrs, "if_index"); ifIndex > 0 {
+			attrs["if_index"] = ifIndex
+		}
+	}
+
+	copyIfMissing := func(key string) {
+		if topologyAttrString(attrs, key) != "" {
+			return
+		}
+		if value := topologyAttrString(peerAttrs, key); value != "" {
+			attrs[key] = value
+		}
+	}
+
+	copyIfMissing("if_name")
+	copyIfMissing("if_descr")
+	copyIfMissing("if_alias")
+	copyIfMissing("port_id")
+	copyIfMissing("port_name")
+	copyIfMissing("bridge_port")
+	copyIfMissing("if_admin_status")
+	copyIfMissing("if_oper_status")
+
+	endpoint.Attributes = pruneTopologyAttributes(attrs)
+	return endpoint
 }
 
 func projectSegmentTopology(
@@ -5917,7 +6056,7 @@ func topologySetEndpointDisplay(endpoint *topology.LinkEndpoint, display topolog
 
 func topologySetEndpointCanonicalPortName(endpoint *topology.LinkEndpoint) string {
 	if endpoint == nil {
-		return "0"
+		return ""
 	}
 	attrs := cloneAnyMap(endpoint.Attributes)
 	if attrs == nil {
@@ -6092,7 +6231,7 @@ func topologyCanonicalPortName(attrs map[string]any) string {
 		}
 		return bridgePort
 	}
-	return "0"
+	return ""
 }
 
 func topologyCanonicalLinkName(srcName, srcPortName, dstName, dstPortName string) string {
@@ -6106,11 +6245,11 @@ func topologyCanonicalLinkName(srcName, srcPortName, dstName, dstPortName string
 	}
 	srcPortName = strings.TrimSpace(srcPortName)
 	if srcPortName == "" {
-		srcPortName = "0"
+		srcPortName = "[unset]"
 	}
 	dstPortName = strings.TrimSpace(dstPortName)
 	if dstPortName == "" {
-		dstPortName = "0"
+		dstPortName = "[unset]"
 	}
 	return srcName + ":" + srcPortName + " -> " + dstName + ":" + dstPortName
 }
