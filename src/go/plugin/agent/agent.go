@@ -44,8 +44,7 @@ type Config struct {
 
 	DisableServiceDiscovery bool
 
-	IsInsideK8s    bool
-	SystemdVersion int
+	IsInsideK8s bool
 
 	RunModePolicy policy.RunModePolicy
 
@@ -75,8 +74,7 @@ type Agent struct {
 
 	DisableServiceDiscovery bool
 
-	IsInsideK8s    bool
-	SystemdVersion int
+	IsInsideK8s bool
 
 	runModePolicy policy.RunModePolicy
 
@@ -115,7 +113,6 @@ func New(cfg Config) *Agent {
 		RunJob:                    cfg.RunJob,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
 		IsInsideK8s:               cfg.IsInsideK8s,
-		SystemdVersion:            cfg.SystemdVersion,
 		runModePolicy:             cfg.RunModePolicy,
 		ModuleRegistry:            cfg.ModuleRegistry,
 		DiscoveryProviders:        cfg.DiscoveryProviders,

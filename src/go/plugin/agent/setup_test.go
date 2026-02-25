@@ -147,32 +147,6 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 				"module1": collectorapi.Creator{},
 			},
 		},
-		"load all, logind blocked on systemd 239": {
-			agent: &Agent{
-				SystemdVersion: 239,
-				ModuleRegistry: collectorapi.Registry{
-					"logind": collectorapi.Creator{},
-				},
-			},
-			cfg: config{
-				DefaultRun: true,
-			},
-			wantModules: collectorapi.Registry{},
-		},
-		"load all, logind allowed on non-239 systemd": {
-			agent: &Agent{
-				SystemdVersion: 250,
-				ModuleRegistry: collectorapi.Registry{
-					"logind": collectorapi.Creator{},
-				},
-			},
-			cfg: config{
-				DefaultRun: true,
-			},
-			wantModules: collectorapi.Registry{
-				"logind": collectorapi.Creator{},
-			},
-		},
 		"load all, module not in config modules (default_run=true)": {
 			agent: &Agent{
 				ModuleRegistry: collectorapi.Registry{"module1": collectorapi.Creator{}},

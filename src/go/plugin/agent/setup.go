@@ -53,8 +53,7 @@ func (a *Agent) loadEnabledModules(cfg config) collectorapi.Registry {
 			continue
 		}
 		if all {
-			// Known issue: go.d/logind high CPU usage on Alma Linux8 (https://github.com/netdata/netdata/issues/15930)
-			if !cfg.isExplicitlyEnabled(name) && (creator.Disabled || name == "logind" && a.SystemdVersion == 239) {
+			if !cfg.isExplicitlyEnabled(name) && creator.Disabled {
 				a.Infof("'%s' module disabled by default, should be explicitly enabled in the config", name)
 				continue
 			}
@@ -97,8 +96,7 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 		Registry: reg,
 		BuildContext: discovery.BuildContext{
 			Policy: discovery.PlatformPolicy{
-				IsInsideK8s:    a.IsInsideK8s,
-				SystemdVersion: a.SystemdVersion,
+				IsInsideK8s: a.IsInsideK8s,
 			},
 			RunMode: a.runModePolicy,
 			Identity: discovery.PluginIdentity{

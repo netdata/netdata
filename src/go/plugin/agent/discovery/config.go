@@ -14,8 +14,7 @@ import (
 
 type (
 	PlatformPolicy struct {
-		IsInsideK8s    bool
-		SystemdVersion int
+		IsInsideK8s bool
 	}
 	PluginIdentity struct {
 		Name string

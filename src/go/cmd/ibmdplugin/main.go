@@ -100,7 +100,6 @@ func main() {
 		VarLibDir:           pluginconfig.VarLibDir(),
 		ModuleRegistry:      collectorapi.DefaultRegistry,
 		IsInsideK8s:         hostinfo.IsInsideK8sCluster(),
-		SystemdVersion:      hostinfo.SystemdVersion,
 		RunModePolicy: policy.RunModePolicy{
 			IsTerminal:               isTerminal,
 			AutoEnableDiscovered:     isTerminal,

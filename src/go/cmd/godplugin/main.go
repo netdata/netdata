@@ -73,6 +73,7 @@ func main() {
 	}
 	isTerminal := terminal.IsTerminal()
 	isInsideK8s := hostinfo.IsInsideK8sCluster()
+	moduleRegistry := moduleRegistryWithSystemdPolicy(collectorapi.DefaultRegistry, hostinfo.SystemdVersion)
 
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
@@ -81,9 +82,8 @@ func main() {
 		ServiceDiscoveryConfigDir: pluginconfig.ServiceDiscoveryDir(),
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
-		ModuleRegistry:            collectorapi.DefaultRegistry,
+		ModuleRegistry:            moduleRegistry,
 		IsInsideK8s:               isInsideK8s,
-		SystemdVersion:            hostinfo.SystemdVersion,
 		RunModePolicy: policy.RunModePolicy{
 			IsTerminal:               isTerminal,
 			AutoEnableDiscovered:     isTerminal,
@@ -124,6 +124,19 @@ func parseCLI() *cli.Option {
 	}
 
 	return opt
+}
+
+func moduleRegistryWithSystemdPolicy(base collectorapi.Registry, systemdVersion int) collectorapi.Registry {
+	registry := make(collectorapi.Registry, len(base))
+	for name, creator := range base {
+		if name == "logind" && systemdVersion == 239 {
+			// Known issue: go.d/logind high CPU usage on Alma Linux8.
+			// Keep policy in cmd wiring, not inside generic agent package.
+			creator.Disabled = true
+		}
+		registry[name] = creator
+	}
+	return registry
 }
 
 func runFunctionCLI(opts *cli.Option) int {
