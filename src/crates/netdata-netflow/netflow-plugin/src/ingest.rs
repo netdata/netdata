@@ -476,6 +476,64 @@ impl IngestService {
         Ok(())
     }
 
+    /// Query the most recent `_SOURCE_REALTIME_TIMESTAMP` from a tier's journal
+    /// files. Returns `None` when the tier directory is empty or unreadable.
+    async fn find_last_tier_timestamp(
+        tier_dir: &std::path::Path,
+        cache: &journal_engine::FileIndexCache,
+    ) -> Option<u64> {
+        let dir_str = tier_dir.to_str()?;
+        let (monitor, _rx) = Monitor::new().ok()?;
+        let registry = Registry::new(monitor);
+        registry.watch_directory(dir_str).ok()?;
+
+        let files = registry
+            .find_files_in_range(Seconds(0), Seconds(u32::MAX))
+            .ok()?;
+        if files.is_empty() {
+            return None;
+        }
+
+        let source_ts = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
+        let facets = Facets::new(&["_SOURCE_REALTIME_TIMESTAMP".to_string()]);
+        let keys: Vec<FileIndexKey> = files
+            .iter()
+            .map(|fi| FileIndexKey::new(&fi.file, &facets, Some(source_ts.clone())))
+            .collect();
+
+        let time_range = QueryTimeRange::new(0, u32::MAX).ok()?;
+        let cancel = CancellationToken::new();
+        let indexed = batch_compute_file_indexes(
+            cache,
+            &registry,
+            keys,
+            &time_range,
+            cancel,
+            IndexingLimits::default(),
+            None,
+        )
+        .await
+        .ok()?;
+
+        let indexes: Vec<_> = indexed.into_iter().map(|(_, idx)| idx).collect();
+        if indexes.is_empty() {
+            return None;
+        }
+
+        let entries = LogQuery::new(&indexes, Anchor::Tail, Direction::Backward)
+            .with_limit(1)
+            .execute()
+            .ok()?;
+
+        let entry = entries.into_iter().next()?;
+        for pair in &entry.fields {
+            if pair.field() == "_SOURCE_REALTIME_TIMESTAMP" {
+                return pair.value().parse::<u64>().ok();
+            }
+        }
+        Some(entry.timestamp)
+    }
+
     async fn rebuild_materialized_from_raw(&mut self) -> Result<()> {
         let now = now_usec();
         let before = (now / 1_000_000).max(1) as u32;
@@ -509,6 +567,20 @@ impl IngestService {
             .build()
             .await
             .context("failed to initialize rebuild index cache")?;
+
+        // Find per-tier cutoffs to avoid duplicating already-flushed data.
+        let mut tier_cutoffs = HashMap::new();
+        for tier in MATERIALIZED_TIERS {
+            let tier_dir = self.cfg.journal.tier_dir(tier);
+            if let Some(ts) = Self::find_last_tier_timestamp(&tier_dir, &cache).await {
+                tracing::info!(
+                    "tier {:?}: last flushed timestamp {} — skipping rebuild before it",
+                    tier,
+                    ts
+                );
+                tier_cutoffs.insert(tier, ts);
+            }
+        }
 
         let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
         let facets = Facets::new(&["_SOURCE_REALTIME_TIMESTAMP".to_string()]);
@@ -581,7 +653,7 @@ impl IngestService {
             }
 
             let timestamp_usec = source_realtime_usec.unwrap_or(entry.timestamp);
-            self.observe_tiers(timestamp_usec, &fields);
+            self.observe_tiers_with_cutoffs(timestamp_usec, &fields, &tier_cutoffs);
         }
 
         self.flush_closed_tiers(now)?;
@@ -607,17 +679,24 @@ impl IngestService {
     }
 
     /// Cold path: observe tiers from FlowFields (journal replay at startup).
-    /// Converts to FlowRecord first, then uses the same hash-based accumulator.
-    fn observe_tiers(
+    /// Skips flows that fall into already-flushed
+    /// buckets to prevent duplicate entries on restart.
+    fn observe_tiers_with_cutoffs(
         &mut self,
         timestamp_usec: u64,
         fields: &crate::decoder::FlowFields,
+        cutoffs: &HashMap<TierKind, u64>,
     ) {
         use crate::tiering::{FlowMetrics, rollup_dimension_hash};
         let record = crate::decoder::FlowRecord::from_fields(fields);
         let dim_hash = rollup_dimension_hash(&record);
         let metrics = FlowMetrics::from_fields(fields);
         for tier in MATERIALIZED_TIERS {
+            if let Some(&cutoff) = cutoffs.get(&tier) {
+                if timestamp_usec <= cutoff {
+                    continue;
+                }
+            }
             if let Some(acc) = self.tier_accumulators.get_mut(&tier) {
                 acc.observe_record(timestamp_usec, &record, dim_hash, metrics);
             }
