@@ -1114,6 +1114,114 @@ func TestToTopologyData_ProbableConnectivityCreatesPortlessAttachmentForZeroCand
 	require.Equal(t, 1, bridgeCount)
 }
 
+func TestToTopologyData_InferenceStrategy_STPParentSuppressesFDBOnInterSwitchPorts(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "switch-b",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "stp",
+				SourceID:   "switch-a",
+				SourcePort: "Gi0/1",
+				TargetID:   "switch-b",
+				TargetPort: "Gi0/2",
+			},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:00:11", Method: "fdb"},
+			{DeviceID: "switch-b", IfIndex: 2, EndpointID: "mac:00:00:00:00:00:22", Method: "fdb"},
+		},
+	}
+
+	baseline := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+	require.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, baseline.Stats["inference_strategy"])
+	require.Greater(t, baseline.Stats["links_fdb_endpoint_emitted"].(int), 0)
+
+	stpData := ToTopologyData(result, TopologyDataOptions{
+		Source:            "snmp",
+		Layer:             "2",
+		View:              "summary",
+		InferenceStrategy: topologyInferenceStrategySTPParentTree,
+	})
+	require.Equal(t, topologyInferenceStrategySTPParentTree, stpData.Stats["inference_strategy"])
+	require.Equal(t, 0, stpData.Stats["links_fdb_endpoint_emitted"])
+}
+
+func TestToTopologyData_InferenceStrategy_CDPHybridPrefersCDPBridgeLinks(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{ID: "sw-a", Hostname: "sw-a", ChassisID: "00:00:00:00:00:aa"},
+			{ID: "sw-b", Hostname: "sw-b", ChassisID: "00:00:00:00:00:bb"},
+			{ID: "sw-c", Hostname: "sw-c", ChassisID: "00:00:00:00:00:cc"},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "sw-a", IfIndex: 1, IfName: "Gi0/1"},
+			{DeviceID: "sw-a", IfIndex: 2, IfName: "Gi0/2"},
+			{DeviceID: "sw-b", IfIndex: 1, IfName: "Gi0/1"},
+			{DeviceID: "sw-c", IfIndex: 1, IfName: "Gi0/1"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "sw-a",
+				SourcePort: "Gi0/1",
+				TargetID:   "sw-b",
+				TargetPort: "Gi0/1",
+			},
+			{
+				Protocol:   "cdp",
+				SourceID:   "sw-a",
+				SourcePort: "Gi0/2",
+				TargetID:   "sw-c",
+				TargetPort: "Gi0/1",
+			},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:10:01", Method: "fdb"},
+			{DeviceID: "sw-a", IfIndex: 2, EndpointID: "mac:00:00:00:00:10:02", Method: "fdb"},
+		},
+	}
+
+	baseline := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+	require.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, baseline.Stats["inference_strategy"])
+	require.Equal(t, 0, baseline.Stats["links_fdb_endpoint_emitted"])
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source:            "snmp",
+		Layer:             "2",
+		View:              "summary",
+		InferenceStrategy: topologyInferenceStrategyCDPFDBHybrid,
+	})
+
+	require.Equal(t, topologyInferenceStrategyCDPFDBHybrid, data.Stats["inference_strategy"])
+	require.Equal(t, 1, data.Stats["links_cdp"])
+	require.Equal(t, 0, data.Stats["links_fdb_endpoint_emitted"])
+}
+
 func TestPickProbableSegmentAnchorPortID_PrefersManagedPortWhenOwnerPointsToUnmanaged(t *testing.T) {
 	unmanagedPort := bridgePortRef{
 		deviceID: "ghost-switch",
@@ -2004,6 +2112,47 @@ func TestPruneSegmentArtifacts_SuppressesLLDPDuplicateSegmentPath(t *testing.T) 
 	require.Equal(t, "lldp", filteredLinks[0].Protocol)
 }
 
+func TestPruneSegmentArtifacts_SuppressesCDPDuplicateSegmentPath(t *testing.T) {
+	actors := []topology.Actor{
+		{
+			ActorType: "device",
+			Match:     topology.Match{IPAddresses: []string{"10.0.1.1"}, SysName: "switch-a"},
+		},
+		{
+			ActorType: "device",
+			Match:     topology.Match{IPAddresses: []string{"10.0.1.2"}, SysName: "switch-b"},
+		},
+		{
+			ActorType: "segment",
+			Match:     topology.Match{Hostnames: []string{"segment:dup-cdp"}},
+		},
+	}
+
+	links := []topology.Link{
+		{
+			Protocol: "cdp",
+			Src:      topology.LinkEndpoint{Match: topology.Match{IPAddresses: []string{"10.0.1.1"}}},
+			Dst:      topology.LinkEndpoint{Match: topology.Match{IPAddresses: []string{"10.0.1.2"}}},
+		},
+		{
+			Protocol: "bridge",
+			Src:      topology.LinkEndpoint{Match: topology.Match{IPAddresses: []string{"10.0.1.1"}}},
+			Dst:      topology.LinkEndpoint{Match: topology.Match{Hostnames: []string{"segment:dup-cdp"}}},
+		},
+		{
+			Protocol: "bridge",
+			Src:      topology.LinkEndpoint{Match: topology.Match{Hostnames: []string{"segment:dup-cdp"}}},
+			Dst:      topology.LinkEndpoint{Match: topology.Match{IPAddresses: []string{"10.0.1.2"}}},
+		},
+	}
+
+	filteredActors, filteredLinks, suppressed := pruneSegmentArtifacts(actors, links)
+	require.Equal(t, 1, suppressed)
+	require.Len(t, filteredActors, 2)
+	require.Len(t, filteredLinks, 1)
+	require.Equal(t, "cdp", filteredLinks[0].Protocol)
+}
+
 func TestPruneSegmentArtifacts_SuppressesSegmentsWithSingleNeighbor(t *testing.T) {
 	actors := []topology.Actor{
 		{
@@ -2028,6 +2177,134 @@ func TestPruneSegmentArtifacts_SuppressesSegmentsWithSingleNeighbor(t *testing.T
 	require.Equal(t, 1, suppressed)
 	require.Len(t, filteredActors, 1)
 	require.Len(t, filteredLinks, 0)
+}
+
+func TestToTopologyData_DeterministicTransitRuleSuppressesFDBOnLLDPPortInExperimental(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "switch-b",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+			{DeviceID: "switch-b", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "switch-a",
+				SourcePort: "Gi0/1",
+				TargetID:   "switch-b",
+				TargetPort: "Gi0/2",
+			},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:00:11", Method: "fdb"},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source:            "snmp",
+		Layer:             "2",
+		View:              "summary",
+		InferenceStrategy: topologyInferenceStrategyExperimentalFull,
+	})
+
+	require.Equal(t, topologyInferenceStrategyExperimentalFull, data.Stats["inference_strategy"])
+	require.Equal(t, 0, data.Stats["links_fdb_endpoint_emitted"])
+	require.Nil(t, findActorByType(data.Actors, "segment"))
+}
+
+func TestToTopologyData_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "switch-b",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 2, IfName: "GigabitEthernet2", IfDescr: "GigabitEthernet2"},
+			{DeviceID: "switch-b", IfIndex: 4, IfName: "ether4", IfDescr: "ether4"},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "switch-a",
+				SourcePort: "2",
+				TargetID:   "switch-b",
+				TargetPort: "ether4",
+			},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "switch-a", IfIndex: 2, EndpointID: "mac:00:00:00:00:00:11", Method: "fdb"},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source:            "snmp",
+		Layer:             "2",
+		View:              "summary",
+		InferenceStrategy: topologyInferenceStrategyExperimentalFull,
+	})
+
+	require.Equal(t, 0, data.Stats["links_fdb_endpoint_emitted"])
+	require.Nil(t, findActorByType(data.Actors, "segment"))
+}
+
+func TestSuppressInferredBridgeLinksOnDeterministicDiscovery(t *testing.T) {
+	deterministic := make(map[string]struct{})
+	addBridgePortObservationKeys(deterministic, bridgePortRef{
+		deviceID: "switch-a",
+		ifIndex:  1,
+		ifName:   "Gi0/1",
+	})
+	discoveryPairs := map[string]struct{}{
+		topologyUndirectedPairKey("switch-a", "switch-b"): {},
+	}
+
+	links := []bridgeBridgeLinkRecord{
+		{
+			designatedPort: bridgePortRef{deviceID: "switch-a", ifIndex: 1, ifName: "Gi0/1"},
+			port:           bridgePortRef{deviceID: "switch-b", ifIndex: 1, ifName: "Gi0/1"},
+			method:         "lldp",
+		},
+		{
+			designatedPort: bridgePortRef{deviceID: "switch-a", ifIndex: 2, ifName: "Gi0/2"},
+			port:           bridgePortRef{deviceID: "switch-b", ifIndex: 2, ifName: "Gi0/2"},
+			method:         "fdb_pairwise",
+		},
+		{
+			designatedPort: bridgePortRef{deviceID: "switch-a", ifIndex: 1, ifName: "Gi0/1"},
+			port:           bridgePortRef{deviceID: "switch-c", ifIndex: 7, ifName: "Gi0/7"},
+			method:         "stp",
+		},
+		{
+			designatedPort: bridgePortRef{deviceID: "switch-a", ifIndex: 3, ifName: "Gi0/3"},
+			port:           bridgePortRef{deviceID: "switch-c", ifIndex: 3, ifName: "Gi0/3"},
+			method:         "fdb_pairwise",
+		},
+	}
+
+	filtered := suppressInferredBridgeLinksOnDeterministicDiscovery(links, deterministic, discoveryPairs)
+	require.Len(t, filtered, 2)
+	require.Equal(t, "lldp", filtered[0].method)
+	require.Equal(t, "fdb_pairwise", filtered[1].method)
+	require.Equal(t, "switch-c", filtered[1].port.deviceID)
 }
 
 func TestToTopologyData_FDBOwnerInferenceUsesReporterMatrixRule(t *testing.T) {

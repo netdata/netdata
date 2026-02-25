@@ -27,6 +27,30 @@ type TopologyDataOptions struct {
 	CollapseActorsByIP        bool
 	EliminateNonIPInferred    bool
 	ProbabilisticConnectivity bool
+	InferenceStrategy         string
+}
+
+const (
+	topologyInferenceStrategyFDBMinimumKnowledge = "fdb_minimum_knowledge"
+	topologyInferenceStrategySTPParentTree       = "stp_parent_tree"
+	topologyInferenceStrategyFDBPairwise         = "fdb_pairwise_minimum_knowledge"
+	topologyInferenceStrategySTPFDBCorrelated    = "stp_fdb_correlated"
+	topologyInferenceStrategyCDPFDBHybrid        = "cdp_fdb_hybrid"
+	topologyInferenceStrategyFDBOverlapWeighted  = "fdb_overlap_weighted"
+	topologyInferenceStrategyExperimentalFull    = "experimental_full"
+)
+
+type topologyInferenceStrategyConfig struct {
+	id                               string
+	includeLLDPBridgeLinks           bool
+	includeCDPBridgeLinks            bool
+	includeSTPBridgeLinks            bool
+	useSTPDesignatedParent           bool
+	enableFDBPairwiseLinks           bool
+	enableFDBOverlapLinks            bool
+	fdbOverlapMinShared              int
+	enableSTPManagedAliasCorrelation bool
+	filterSwitchFacingAttachments    bool
 }
 
 type endpointActorAccumulator struct {
@@ -155,6 +179,95 @@ type topologyDevicePortEvidence struct {
 	hasBridgeLink      bool
 }
 
+func normalizeTopologyInferenceStrategy(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", topologyInferenceStrategyFDBMinimumKnowledge:
+		return topologyInferenceStrategyFDBMinimumKnowledge
+	case topologyInferenceStrategySTPParentTree:
+		return topologyInferenceStrategySTPParentTree
+	case topologyInferenceStrategyFDBPairwise:
+		return topologyInferenceStrategyFDBPairwise
+	case topologyInferenceStrategySTPFDBCorrelated:
+		return topologyInferenceStrategySTPFDBCorrelated
+	case topologyInferenceStrategyCDPFDBHybrid:
+		return topologyInferenceStrategyCDPFDBHybrid
+	case topologyInferenceStrategyFDBOverlapWeighted:
+		return topologyInferenceStrategyFDBOverlapWeighted
+	case topologyInferenceStrategyExperimentalFull:
+		return topologyInferenceStrategyExperimentalFull
+	default:
+		return topologyInferenceStrategyFDBMinimumKnowledge
+	}
+}
+
+func topologyInferenceStrategyConfigFor(strategy string) topologyInferenceStrategyConfig {
+	switch normalizeTopologyInferenceStrategy(strategy) {
+	case topologyInferenceStrategySTPParentTree:
+		return topologyInferenceStrategyConfig{
+			id:                            topologyInferenceStrategySTPParentTree,
+			includeSTPBridgeLinks:         true,
+			useSTPDesignatedParent:        true,
+			filterSwitchFacingAttachments: true,
+		}
+	case topologyInferenceStrategyFDBPairwise:
+		return topologyInferenceStrategyConfig{
+			id:                            topologyInferenceStrategyFDBPairwise,
+			enableFDBPairwiseLinks:        true,
+			filterSwitchFacingAttachments: true,
+		}
+	case topologyInferenceStrategySTPFDBCorrelated:
+		return topologyInferenceStrategyConfig{
+			id:                               topologyInferenceStrategySTPFDBCorrelated,
+			includeLLDPBridgeLinks:           true,
+			includeCDPBridgeLinks:            true,
+			includeSTPBridgeLinks:            true,
+			useSTPDesignatedParent:           true,
+			enableFDBPairwiseLinks:           true,
+			enableFDBOverlapLinks:            true,
+			fdbOverlapMinShared:              2,
+			enableSTPManagedAliasCorrelation: true,
+			filterSwitchFacingAttachments:    true,
+		}
+	case topologyInferenceStrategyCDPFDBHybrid:
+		return topologyInferenceStrategyConfig{
+			id:                            topologyInferenceStrategyCDPFDBHybrid,
+			includeCDPBridgeLinks:         true,
+			enableFDBPairwiseLinks:        true,
+			enableFDBOverlapLinks:         true,
+			fdbOverlapMinShared:           2,
+			filterSwitchFacingAttachments: true,
+		}
+	case topologyInferenceStrategyFDBOverlapWeighted:
+		return topologyInferenceStrategyConfig{
+			id:                            topologyInferenceStrategyFDBOverlapWeighted,
+			enableFDBPairwiseLinks:        true,
+			enableFDBOverlapLinks:         true,
+			fdbOverlapMinShared:           2,
+			filterSwitchFacingAttachments: true,
+		}
+	case topologyInferenceStrategyExperimentalFull:
+		return topologyInferenceStrategyConfig{
+			id:                               topologyInferenceStrategyExperimentalFull,
+			includeLLDPBridgeLinks:           true,
+			includeCDPBridgeLinks:            true,
+			includeSTPBridgeLinks:            true,
+			useSTPDesignatedParent:           true,
+			enableFDBPairwiseLinks:           true,
+			enableFDBOverlapLinks:            true,
+			fdbOverlapMinShared:              1,
+			enableSTPManagedAliasCorrelation: true,
+			filterSwitchFacingAttachments:    false,
+		}
+	default:
+		return topologyInferenceStrategyConfig{
+			id:                            topologyInferenceStrategyFDBMinimumKnowledge,
+			includeLLDPBridgeLinks:        true,
+			includeCDPBridgeLinks:         true,
+			filterSwitchFacingAttachments: true,
+		}
+	}
+}
+
 // ToTopologyData converts an engine result to the shared topology schema.
 func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	schemaVersion := strings.TrimSpace(opts.SchemaVersion)
@@ -184,6 +297,7 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	if collectedAt.IsZero() {
 		collectedAt = time.Now().UTC()
 	}
+	strategyConfig := topologyInferenceStrategyConfigFor(opts.InferenceStrategy)
 
 	deviceByID := make(map[string]Device, len(result.Devices))
 	ifaceByDeviceIndex := make(map[string]Interface, len(result.Interfaces))
@@ -198,13 +312,39 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 			continue
 		}
 		ifaceByDeviceIndex[deviceIfIndexKey(iface.DeviceID, iface.IfIndex)] = iface
-		ifName := strings.TrimSpace(iface.IfName)
-		if ifName != "" {
-			ifIndexByDeviceName[deviceIfNameKey(iface.DeviceID, ifName)] = iface.IfIndex
+		for _, alias := range interfaceNameLookupAliases(iface.IfName, iface.IfDescr) {
+			ifIndexByDeviceName[deviceIfNameKey(iface.DeviceID, alias)] = iface.IfIndex
 		}
 	}
-	bridgeLinks := collectBridgeLinkRecords(result.Adjacencies, ifIndexByDeviceName)
+	bridgeLinks := collectBridgeLinkRecords(result.Adjacencies, ifIndexByDeviceName, strategyConfig)
 	reporterAliases := buildFDBReporterAliases(deviceByID, ifaceByDeviceIndex)
+	if strategyConfig.enableFDBPairwiseLinks {
+		bridgeLinks = mergeBridgeLinkRecordSets(
+			bridgeLinks,
+			inferFDBPairwiseBridgeLinks(result.Attachments, ifaceByDeviceIndex, reporterAliases),
+		)
+	}
+	if strategyConfig.enableFDBOverlapLinks {
+		bridgeLinks = mergeBridgeLinkRecordSets(
+			bridgeLinks,
+			inferFDBOverlapWeightedBridgeLinks(
+				result.Attachments,
+				ifaceByDeviceIndex,
+				reporterAliases,
+				strategyConfig.fdbOverlapMinShared,
+			),
+		)
+	}
+	// LLDP/CDP ports and device pairs are deterministic for direct adjacency.
+	// Never allow inferred bridge links (STP/FDB-derived) to run in parallel
+	// on top of those deterministic paths.
+	deterministicTransitPortKeys := buildDeterministicTransitPortKeySet(result.Adjacencies, ifIndexByDeviceName)
+	discoveryDevicePairs := buildDeterministicDiscoveryDevicePairSet(result.Adjacencies)
+	bridgeLinks = suppressInferredBridgeLinksOnDeterministicDiscovery(
+		bridgeLinks,
+		deterministicTransitPortKeys,
+		discoveryDevicePairs,
+	)
 	ifaceSummaryByDevice := buildTopologyDeviceInterfaceSummaries(
 		result.Interfaces,
 		result.Attachments,
@@ -263,6 +403,7 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 		endpointActors.labelsByEndpointID,
 		actorIndex,
 		opts.ProbabilisticConnectivity,
+		strategyConfig,
 	)
 	annotateEndpointActorsWithDirectOwners(actors, endpointActors.matchByEndpointID, segmentProjection.endpointDirectOwners, deviceByID)
 	actors = append(actors, segmentProjection.actors...)
@@ -327,6 +468,7 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	stats["actors_total"] = len(actors)
 	stats["actors_unlinked_suppressed"] = unlinkedSuppressed
 	stats["endpoints_total"] = endpointActors.count
+	stats["inference_strategy"] = strategyConfig.id
 
 	return topology.Data{
 		SchemaVersion: schemaVersion,
@@ -442,6 +584,7 @@ func projectSegmentTopology(
 	endpointLabelsByID map[string]map[string]string,
 	actorIndex map[string]struct{},
 	probabilisticConnectivity bool,
+	strategyConfig topologyInferenceStrategyConfig,
 ) projectedSegments {
 	out := projectedSegments{
 		actors: make([]topology.Actor, 0),
@@ -452,14 +595,35 @@ func projectSegmentTopology(
 	}
 
 	switchFacingPortKeys := buildSwitchFacingPortKeySet(bridgeLinks)
-	seedMacLinks := collectBridgeMacLinkRecords(attachments, ifaceByDeviceIndex, switchFacingPortKeys)
+	// Hard deterministic rule: LLDP/CDP-adjacent ports are transit ports.
+	// FDB data learned on those ports belongs to the neighbor domain and must
+	// not create parallel inferred segment paths on top of direct discovery.
+	deterministicTransitPortKeys := buildDeterministicTransitPortKeySet(adjacencies, ifIndexByDeviceName)
+	filterPortKeys := deterministicTransitPortKeys
+	if strategyConfig.filterSwitchFacingAttachments {
+		filterPortKeys = mergeBridgePortObservationKeySets(filterPortKeys, switchFacingPortKeys)
+	}
+	seedMacLinks := collectBridgeMacLinkRecords(attachments, ifaceByDeviceIndex, filterPortKeys)
+	rawFDBObservations := buildFDBReporterObservations(seedMacLinks)
 	managedAliasEndpointIDs := buildManagedAliasEndpointIDSet(reporterAliases)
 	switchFacingPortKeys = augmentSwitchFacingPortKeySetFromManagedAliases(
 		switchFacingPortKeys,
-		buildFDBReporterObservations(seedMacLinks),
+		rawFDBObservations,
 		reporterAliases,
 	)
-	macLinks := filterBridgeMacLinkRecordsBySwitchFacing(seedMacLinks, switchFacingPortKeys, managedAliasEndpointIDs)
+	if strategyConfig.enableSTPManagedAliasCorrelation {
+		switchFacingPortKeys = augmentSwitchFacingPortKeySetFromSTPManagedAliasCorrelation(
+			switchFacingPortKeys,
+			adjacencies,
+			ifIndexByDeviceName,
+			rawFDBObservations,
+			reporterAliases,
+		)
+	}
+	macLinks := seedMacLinks
+	if strategyConfig.filterSwitchFacingAttachments {
+		macLinks = filterBridgeMacLinkRecordsBySwitchFacing(seedMacLinks, switchFacingPortKeys, managedAliasEndpointIDs)
+	}
 	model := buildBridgeDomainModel(bridgeLinks, macLinks)
 	if len(model.domains) == 0 {
 		return out
@@ -546,7 +710,6 @@ func projectSegmentTopology(
 			endpointSegmentCandidates[endpointID] = append(endpointSegmentCandidates[endpointID], segmentID)
 		}
 	}
-	rawFDBObservations := buildFDBReporterObservations(seedMacLinks)
 	rawFDBReporterHints := buildFDBEndpointReporterHints(seedMacLinks)
 	fdbObservations := buildFDBReporterObservations(macLinks)
 	fdbOwners := inferFDBEndpointOwners(fdbObservations, reporterAliases, switchFacingPortKeys)
@@ -2027,13 +2190,17 @@ func annotateEndpointActorsWithDirectOwners(
 	}
 }
 
-func collectBridgeLinkRecords(adjacencies []Adjacency, ifIndexByDeviceName map[string]int) []bridgeBridgeLinkRecord {
+func collectBridgeLinkRecords(
+	adjacencies []Adjacency,
+	ifIndexByDeviceName map[string]int,
+	strategy topologyInferenceStrategyConfig,
+) []bridgeBridgeLinkRecord {
 	records := make([]bridgeBridgeLinkRecord, 0)
 	seen := make(map[string]struct{})
 
 	for _, adj := range adjacencies {
 		protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
-		if protocol != "lldp" && protocol != "cdp" {
+		if !strategy.acceptsBridgeProtocol(protocol) {
 			continue
 		}
 
@@ -2056,13 +2223,23 @@ func collectBridgeLinkRecords(adjacencies []Adjacency, ifIndexByDeviceName map[s
 
 		designated := src
 		other := dst
-		if bridgePortRefSortKey(src) > bridgePortRefSortKey(dst) {
+		if protocol == "stp" && strategy.useSTPDesignatedParent {
 			designated = dst
 			other = src
+			if bridgePortRefKey(designated, false, false) == "" {
+				designated = src
+				other = dst
+			}
+		} else {
+			if bridgePortRefSortKey(src) > bridgePortRefSortKey(dst) {
+				designated = dst
+				other = src
+			}
 		}
 		records = append(records, bridgeBridgeLinkRecord{
 			port:           other,
 			designatedPort: designated,
+			method:         protocol,
 		})
 	}
 
@@ -2072,6 +2249,178 @@ func collectBridgeLinkRecords(adjacencies []Adjacency, ifIndexByDeviceName map[s
 		return li < lj
 	})
 	return records
+}
+
+func (s topologyInferenceStrategyConfig) acceptsBridgeProtocol(protocol string) bool {
+	switch strings.ToLower(strings.TrimSpace(protocol)) {
+	case "lldp":
+		return s.includeLLDPBridgeLinks
+	case "cdp":
+		return s.includeCDPBridgeLinks
+	case "stp":
+		return s.includeSTPBridgeLinks
+	default:
+		return false
+	}
+}
+
+func mergeBridgeLinkRecordSets(base, extra []bridgeBridgeLinkRecord) []bridgeBridgeLinkRecord {
+	if len(extra) == 0 {
+		return base
+	}
+	out := make([]bridgeBridgeLinkRecord, 0, len(base)+len(extra))
+	out = append(out, base...)
+	seen := make(map[string]struct{}, len(base)+len(extra))
+	for _, link := range out {
+		if key := bridgePairKey(link.designatedPort, link.port); key != "" {
+			seen[key] = struct{}{}
+		}
+	}
+	for _, link := range extra {
+		key := bridgePairKey(link.designatedPort, link.port)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, link)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		li := portSortKey(out[i].designatedPort) + "|" + portSortKey(out[i].port)
+		lj := portSortKey(out[j].designatedPort) + "|" + portSortKey(out[j].port)
+		return li < lj
+	})
+	return out
+}
+
+func buildDeterministicDiscoveryDevicePairSet(adjacencies []Adjacency) map[string]struct{} {
+	if len(adjacencies) == 0 {
+		return nil
+	}
+
+	out := make(map[string]struct{}, len(adjacencies))
+	for _, adj := range adjacencies {
+		protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
+		if protocol != "lldp" && protocol != "cdp" {
+			continue
+		}
+
+		left := strings.TrimSpace(adj.SourceID)
+		right := strings.TrimSpace(adj.TargetID)
+		if left == "" || right == "" {
+			continue
+		}
+		if pair := topologyUndirectedPairKey(left, right); pair != "" {
+			out[pair] = struct{}{}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func suppressInferredBridgeLinksOnDeterministicDiscovery(
+	bridgeLinks []bridgeBridgeLinkRecord,
+	deterministicTransitPortKeys map[string]struct{},
+	discoveryDevicePairs map[string]struct{},
+) []bridgeBridgeLinkRecord {
+	if len(bridgeLinks) == 0 {
+		return bridgeLinks
+	}
+
+	filtered := make([]bridgeBridgeLinkRecord, 0, len(bridgeLinks))
+	for _, link := range bridgeLinks {
+		method := strings.ToLower(strings.TrimSpace(link.method))
+		// Keep direct discovery links as the authoritative source.
+		if method == "lldp" || method == "cdp" {
+			filtered = append(filtered, link)
+			continue
+		}
+
+		if len(deterministicTransitPortKeys) > 0 {
+			if _, blocked := deterministicTransitPortKeys[bridgePortObservationKey(link.designatedPort)]; blocked {
+				continue
+			}
+			if _, blocked := deterministicTransitPortKeys[bridgePortObservationVLANKey(link.designatedPort)]; blocked {
+				continue
+			}
+			if _, blocked := deterministicTransitPortKeys[bridgePortObservationKey(link.port)]; blocked {
+				continue
+			}
+			if _, blocked := deterministicTransitPortKeys[bridgePortObservationVLANKey(link.port)]; blocked {
+				continue
+			}
+		}
+
+		if len(discoveryDevicePairs) > 0 {
+			left := strings.TrimSpace(link.designatedPort.deviceID)
+			right := strings.TrimSpace(link.port.deviceID)
+			if pair := topologyUndirectedPairKey(left, right); pair != "" {
+				if _, blocked := discoveryDevicePairs[pair]; blocked {
+					continue
+				}
+			}
+		}
+
+		filtered = append(filtered, link)
+	}
+	return filtered
+}
+
+func buildDeterministicTransitPortKeySet(
+	adjacencies []Adjacency,
+	ifIndexByDeviceName map[string]int,
+) map[string]struct{} {
+	if len(adjacencies) == 0 {
+		return nil
+	}
+
+	out := make(map[string]struct{}, len(adjacencies)*4)
+	for _, adj := range adjacencies {
+		protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
+		if protocol != "lldp" && protocol != "cdp" {
+			continue
+		}
+
+		src := bridgePortFromAdjacencySide(adj.SourceID, adj.SourcePort, ifIndexByDeviceName)
+		dst := bridgePortFromAdjacencySide(adj.TargetID, adj.TargetPort, ifIndexByDeviceName)
+		addBridgePortObservationKeys(out, src)
+		addBridgePortObservationKeys(out, dst)
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func mergeBridgePortObservationKeySets(left, right map[string]struct{}) map[string]struct{} {
+	if len(left) == 0 && len(right) == 0 {
+		return nil
+	}
+
+	out := make(map[string]struct{}, len(left)+len(right))
+	for key := range left {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		out[key] = struct{}{}
+	}
+	for key := range right {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		out[key] = struct{}{}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func collectBridgeMacLinkRecords(
@@ -2383,6 +2732,430 @@ func augmentSwitchFacingPortKeySetFromManagedAliases(
 	return updated
 }
 
+func augmentSwitchFacingPortKeySetFromSTPManagedAliasCorrelation(
+	switchFacingPortKeys map[string]struct{},
+	adjacencies []Adjacency,
+	ifIndexByDeviceName map[string]int,
+	observations fdbReporterObservation,
+	reporterAliases map[string][]string,
+) map[string]struct{} {
+	if len(adjacencies) == 0 || len(observations.byReporter) == 0 || len(reporterAliases) == 0 {
+		return switchFacingPortKeys
+	}
+
+	updated := switchFacingPortKeys
+	for _, adj := range adjacencies {
+		if !strings.EqualFold(strings.TrimSpace(adj.Protocol), "stp") {
+			continue
+		}
+
+		srcReporterID := strings.TrimSpace(adj.SourceID)
+		dstReporterID := strings.TrimSpace(adj.TargetID)
+		if srcReporterID == "" || dstReporterID == "" || strings.EqualFold(srcReporterID, dstReporterID) {
+			continue
+		}
+
+		srcPort := bridgePortFromAdjacencySide(srcReporterID, adj.SourcePort, ifIndexByDeviceName)
+		dstPort := bridgePortFromAdjacencySide(dstReporterID, adj.TargetPort, ifIndexByDeviceName)
+
+		if stpPortSeesManagedAlias(srcReporterID, srcPort, dstReporterID, observations, reporterAliases) {
+			if updated == nil {
+				updated = make(map[string]struct{})
+			}
+			addBridgePortObservationKeys(updated, srcPort)
+		}
+		if stpPortSeesManagedAlias(dstReporterID, dstPort, srcReporterID, observations, reporterAliases) {
+			if updated == nil {
+				updated = make(map[string]struct{})
+			}
+			addBridgePortObservationKeys(updated, dstPort)
+		}
+	}
+	return updated
+}
+
+func stpPortSeesManagedAlias(
+	reporterID string,
+	port bridgePortRef,
+	peerDeviceID string,
+	observations fdbReporterObservation,
+	reporterAliases map[string][]string,
+) bool {
+	reporterID = strings.TrimSpace(reporterID)
+	peerDeviceID = strings.TrimSpace(peerDeviceID)
+	if reporterID == "" || peerDeviceID == "" {
+		return false
+	}
+	portKey := bridgePortObservationKey(port)
+	if portKey == "" {
+		return false
+	}
+	endpointsByReporter := observations.byReporter[reporterID]
+	if len(endpointsByReporter) == 0 {
+		return false
+	}
+	aliases := reporterAliases[peerDeviceID]
+	if len(aliases) == 0 {
+		return false
+	}
+	for _, alias := range aliases {
+		alias = normalizeFDBEndpointID(alias)
+		if alias == "" {
+			continue
+		}
+		ports := endpointsByReporter[alias]
+		if len(ports) == 0 {
+			continue
+		}
+		if _, ok := ports[portKey]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func inferFDBPairwiseBridgeLinks(
+	attachments []Attachment,
+	ifaceByDeviceIndex map[string]Interface,
+	reporterAliases map[string][]string,
+) []bridgeBridgeLinkRecord {
+	if len(attachments) == 0 || len(reporterAliases) == 0 {
+		return nil
+	}
+
+	aliasOwnerIDs := buildFDBAliasOwnerMap(reporterAliases)
+	if len(aliasOwnerIDs) == 0 {
+		return nil
+	}
+
+	// reporterA -> reporterB -> unique reporter ports where A learns aliases of B.
+	pairs := make(map[string]map[string]map[string]bridgePortRef)
+	for _, attachment := range attachments {
+		if !strings.EqualFold(strings.TrimSpace(attachment.Method), "fdb") {
+			continue
+		}
+		reporterID := strings.TrimSpace(attachment.DeviceID)
+		if reporterID == "" {
+			continue
+		}
+		endpointID := normalizeFDBEndpointID(attachment.EndpointID)
+		if endpointID == "" {
+			continue
+		}
+		owners := aliasOwnerIDs[endpointID]
+		if len(owners) == 0 {
+			continue
+		}
+		port := bridgePortFromAttachment(attachment, ifaceByDeviceIndex)
+		portKey := bridgePortObservationKey(port)
+		if portKey == "" {
+			continue
+		}
+		for ownerID := range owners {
+			ownerID = strings.TrimSpace(ownerID)
+			if ownerID == "" || strings.EqualFold(ownerID, reporterID) {
+				continue
+			}
+			byPeer := pairs[reporterID]
+			if byPeer == nil {
+				byPeer = make(map[string]map[string]bridgePortRef)
+				pairs[reporterID] = byPeer
+			}
+			ports := byPeer[ownerID]
+			if ports == nil {
+				ports = make(map[string]bridgePortRef)
+				byPeer[ownerID] = ports
+			}
+			ports[portKey] = port
+		}
+	}
+	if len(pairs) == 0 {
+		return nil
+	}
+
+	records := make([]bridgeBridgeLinkRecord, 0)
+	seen := make(map[string]struct{})
+	leftIDs := make([]string, 0, len(pairs))
+	for leftID := range pairs {
+		leftIDs = append(leftIDs, leftID)
+	}
+	sort.Strings(leftIDs)
+	for _, leftID := range leftIDs {
+		neighbors := pairs[leftID]
+		if len(neighbors) == 0 {
+			continue
+		}
+		rightIDs := make([]string, 0, len(neighbors))
+		for rightID := range neighbors {
+			rightIDs = append(rightIDs, rightID)
+		}
+		sort.Strings(rightIDs)
+		for _, rightID := range rightIDs {
+			if leftID >= rightID {
+				continue
+			}
+			leftPorts := pairs[leftID][rightID]
+			rightPorts := pairs[rightID][leftID]
+			if len(leftPorts) != 1 || len(rightPorts) != 1 {
+				// Conservative rule: infer direct bridge link only when each side reports
+				// exactly one reciprocal managed-alias learning port.
+				continue
+			}
+			leftPort := firstSortedBridgePort(leftPorts)
+			rightPort := firstSortedBridgePort(rightPorts)
+			if bridgePortObservationKey(leftPort) == "" || bridgePortObservationKey(rightPort) == "" {
+				continue
+			}
+			key := bridgePairKey(leftPort, rightPort)
+			if key == "" {
+				continue
+			}
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+
+			designated := leftPort
+			other := rightPort
+			if bridgePortRefSortKey(leftPort) > bridgePortRefSortKey(rightPort) {
+				designated = rightPort
+				other = leftPort
+			}
+			records = append(records, bridgeBridgeLinkRecord{
+				port:           other,
+				designatedPort: designated,
+				method:         "fdb_pairwise",
+			})
+		}
+	}
+	if len(records) == 0 {
+		return nil
+	}
+	sort.SliceStable(records, func(i, j int) bool {
+		li := portSortKey(records[i].designatedPort) + "|" + portSortKey(records[i].port)
+		lj := portSortKey(records[j].designatedPort) + "|" + portSortKey(records[j].port)
+		return li < lj
+	})
+	return records
+}
+
+func firstSortedBridgePort(ports map[string]bridgePortRef) bridgePortRef {
+	if len(ports) == 0 {
+		return bridgePortRef{}
+	}
+	keys := make([]string, 0, len(ports))
+	for key := range ports {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return ports[keys[0]]
+}
+
+type fdbPortEndpointSet struct {
+	port      bridgePortRef
+	endpoints map[string]struct{}
+}
+
+type fdbOverlapCandidate struct {
+	leftKey   string
+	rightKey  string
+	leftPort  bridgePortRef
+	rightPort bridgePortRef
+	shared    int
+	score     float64
+}
+
+func inferFDBOverlapWeightedBridgeLinks(
+	attachments []Attachment,
+	ifaceByDeviceIndex map[string]Interface,
+	reporterAliases map[string][]string,
+	minShared int,
+) []bridgeBridgeLinkRecord {
+	if len(attachments) == 0 {
+		return nil
+	}
+	if minShared <= 0 {
+		minShared = 1
+	}
+
+	managedAliasSet := make(map[string]struct{})
+	for endpointID := range buildFDBAliasOwnerMap(reporterAliases) {
+		managedAliasSet[endpointID] = struct{}{}
+	}
+
+	portEndpointsByDevice := make(map[string]map[string]*fdbPortEndpointSet)
+	for _, attachment := range attachments {
+		if !strings.EqualFold(strings.TrimSpace(attachment.Method), "fdb") {
+			continue
+		}
+		reporterID := strings.TrimSpace(attachment.DeviceID)
+		if reporterID == "" {
+			continue
+		}
+		endpointID := normalizeFDBEndpointID(attachment.EndpointID)
+		if endpointID == "" {
+			continue
+		}
+		// Overlap mode focuses on host-side FDB overlap and excludes managed
+		// aliases that are already covered by direct reciprocal pairwise rules.
+		if _, isManagedAlias := managedAliasSet[endpointID]; isManagedAlias {
+			continue
+		}
+		port := bridgePortFromAttachment(attachment, ifaceByDeviceIndex)
+		portKey := bridgePortObservationKey(port)
+		if portKey == "" {
+			continue
+		}
+
+		byPort := portEndpointsByDevice[reporterID]
+		if byPort == nil {
+			byPort = make(map[string]*fdbPortEndpointSet)
+			portEndpointsByDevice[reporterID] = byPort
+		}
+		set := byPort[portKey]
+		if set == nil {
+			set = &fdbPortEndpointSet{
+				port:      port,
+				endpoints: make(map[string]struct{}),
+			}
+			byPort[portKey] = set
+		}
+		set.endpoints[endpointID] = struct{}{}
+	}
+	if len(portEndpointsByDevice) < 2 {
+		return nil
+	}
+
+	deviceIDs := make([]string, 0, len(portEndpointsByDevice))
+	for deviceID := range portEndpointsByDevice {
+		deviceIDs = append(deviceIDs, deviceID)
+	}
+	sort.Strings(deviceIDs)
+
+	records := make([]bridgeBridgeLinkRecord, 0)
+	seen := make(map[string]struct{})
+	for leftIdx := 0; leftIdx < len(deviceIDs); leftIdx++ {
+		leftID := deviceIDs[leftIdx]
+		leftPorts := portEndpointsByDevice[leftID]
+		if len(leftPorts) == 0 {
+			continue
+		}
+		for rightIdx := leftIdx + 1; rightIdx < len(deviceIDs); rightIdx++ {
+			rightID := deviceIDs[rightIdx]
+			rightPorts := portEndpointsByDevice[rightID]
+			if len(rightPorts) == 0 {
+				continue
+			}
+
+			candidates := make([]fdbOverlapCandidate, 0)
+			for leftKey, leftSet := range leftPorts {
+				if len(leftSet.endpoints) < minShared {
+					continue
+				}
+				for rightKey, rightSet := range rightPorts {
+					if len(rightSet.endpoints) < minShared {
+						continue
+					}
+					shared := overlapSize(leftSet.endpoints, rightSet.endpoints)
+					if shared < minShared {
+						continue
+					}
+					union := len(leftSet.endpoints) + len(rightSet.endpoints) - shared
+					if union <= 0 {
+						continue
+					}
+					score := float64(shared) + (float64(shared) / float64(union))
+					candidates = append(candidates, fdbOverlapCandidate{
+						leftKey:   leftKey,
+						rightKey:  rightKey,
+						leftPort:  leftSet.port,
+						rightPort: rightSet.port,
+						shared:    shared,
+						score:     score,
+					})
+				}
+			}
+			if len(candidates) == 0 {
+				continue
+			}
+
+			sort.SliceStable(candidates, func(i, j int) bool {
+				if candidates[i].score != candidates[j].score {
+					return candidates[i].score > candidates[j].score
+				}
+				if candidates[i].shared != candidates[j].shared {
+					return candidates[i].shared > candidates[j].shared
+				}
+				iKey := candidates[i].leftKey + "|" + candidates[i].rightKey
+				jKey := candidates[j].leftKey + "|" + candidates[j].rightKey
+				return iKey < jKey
+			})
+
+			usedLeft := make(map[string]struct{})
+			usedRight := make(map[string]struct{})
+			for _, candidate := range candidates {
+				if _, ok := usedLeft[candidate.leftKey]; ok {
+					continue
+				}
+				if _, ok := usedRight[candidate.rightKey]; ok {
+					continue
+				}
+				usedLeft[candidate.leftKey] = struct{}{}
+				usedRight[candidate.rightKey] = struct{}{}
+
+				designated := candidate.leftPort
+				other := candidate.rightPort
+				if bridgePortRefSortKey(designated) > bridgePortRefSortKey(other) {
+					designated = candidate.rightPort
+					other = candidate.leftPort
+				}
+				key := bridgePairKey(designated, other)
+				if key == "" {
+					continue
+				}
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+				records = append(records, bridgeBridgeLinkRecord{
+					port:           other,
+					designatedPort: designated,
+					method:         topologyInferenceStrategyFDBOverlapWeighted,
+				})
+
+				// Conservative default: one overlap-inferred bridge pair per
+				// device pair to avoid over-connecting noisy FDB domains.
+				break
+			}
+		}
+	}
+	if len(records) == 0 {
+		return nil
+	}
+	sort.SliceStable(records, func(i, j int) bool {
+		li := portSortKey(records[i].designatedPort) + "|" + portSortKey(records[i].port)
+		lj := portSortKey(records[j].designatedPort) + "|" + portSortKey(records[j].port)
+		return li < lj
+	})
+	return records
+}
+
+func overlapSize(left, right map[string]struct{}) int {
+	if len(left) == 0 || len(right) == 0 {
+		return 0
+	}
+	if len(left) > len(right) {
+		left, right = right, left
+	}
+	count := 0
+	for value := range left {
+		if _, ok := right[value]; ok {
+			count++
+		}
+	}
+	return count
+}
+
 func buildFDBAliasOwnerMap(reporterAliases map[string][]string) map[string]map[string]struct{} {
 	if len(reporterAliases) == 0 {
 		return nil
@@ -2578,11 +3351,35 @@ func reporterSatisfiesFDBOwnerRule(
 }
 
 func bridgePortObservationKey(port bridgePortRef) string {
-	return bridgePortRefKey(port, false, false)
+	base := bridgePortObservationBaseKey(port)
+	if base == "" {
+		return ""
+	}
+	return base + "|vlan:"
 }
 
 func bridgePortObservationVLANKey(port bridgePortRef) string {
-	return bridgePortRefKey(port, false, true)
+	base := bridgePortObservationBaseKey(port)
+	if base == "" {
+		return ""
+	}
+	return base + "|vlan:" + strings.ToLower(strings.TrimSpace(port.vlanID))
+}
+
+func bridgePortObservationBaseKey(port bridgePortRef) string {
+	deviceID := strings.TrimSpace(port.deviceID)
+	if deviceID == "" {
+		return ""
+	}
+	if port.ifIndex > 0 {
+		return deviceID + "|if:" + strconv.Itoa(port.ifIndex)
+	}
+	name := firstNonEmpty(port.ifName, port.bridgePort)
+	name = normalizeInterfaceNameForLookup(name)
+	if name == "" {
+		return ""
+	}
+	return deviceID + "|name:" + name
 }
 
 func inferSinglePortEndpointOwners(
@@ -3100,9 +3897,10 @@ func pruneSegmentArtifacts(actors []topology.Actor, links []topology.Link) ([]to
 	}
 	sort.Strings(segmentOrder)
 
-	lldpPairs := make(map[string]struct{})
+	discoveryPairs := make(map[string]struct{})
 	for _, link := range links {
-		if !strings.EqualFold(strings.TrimSpace(link.Protocol), "lldp") {
+		protocol := strings.ToLower(strings.TrimSpace(link.Protocol))
+		if protocol != "lldp" && protocol != "cdp" {
 			continue
 		}
 		src := canonicalTopologyMatchKey(link.Src.Match)
@@ -3117,7 +3915,7 @@ func pruneSegmentArtifacts(actors []topology.Actor, links []topology.Link) ([]to
 			continue
 		}
 		if pair := topologyUndirectedPairKey(src, dst); pair != "" {
-			lldpPairs[pair] = struct{}{}
+			discoveryPairs[pair] = struct{}{}
 		}
 	}
 
@@ -3178,7 +3976,7 @@ func pruneSegmentArtifacts(actors []topology.Actor, links []topology.Link) ([]to
 				}
 				if len(pairValues) == 2 {
 					if pair := topologyUndirectedPairKey(pairValues[0], pairValues[1]); pair != "" {
-						if _, found := lldpPairs[pair]; found {
+						if _, found := discoveryPairs[pair]; found {
 							suppressed[segmentKey] = struct{}{}
 							changed = true
 						}
@@ -3392,12 +4190,7 @@ func bridgePortFromAdjacencySide(deviceID, port string, ifIndexByDeviceName map[
 	if deviceID == "" || port == "" {
 		return bridgePortRef{}
 	}
-	ifIndex := ifIndexByDeviceName[deviceIfNameKey(deviceID, port)]
-	if ifIndex == 0 {
-		if n, err := strconv.Atoi(port); err == nil && n > 0 {
-			ifIndex = n
-		}
-	}
+	ifIndex := resolveIfIndexByPortName(deviceID, port, ifIndexByDeviceName)
 	return bridgePortRef{
 		deviceID:   deviceID,
 		ifIndex:    ifIndex,
@@ -3476,6 +4269,7 @@ func bridgePortRefKey(port bridgePortRef, includeBridgePort bool, includeVLAN bo
 	if !includeVLAN {
 		vlanID = ""
 	}
+
 	parts := []string{
 		deviceID,
 		"if:" + strconv.Itoa(port.ifIndex),
@@ -3873,11 +4667,7 @@ func ensureTopologyPortEvidence(
 func resolveAdjacencySourceIfIndex(adj Adjacency, ifIndexByDeviceName map[string]int) int {
 	ifIndex := 0
 	if ifName := strings.TrimSpace(adj.SourcePort); ifName != "" {
-		if idx, ok := ifIndexByDeviceName[deviceIfNameKey(adj.SourceID, ifName)]; ok {
-			ifIndex = idx
-		} else if parsed, err := strconv.Atoi(ifName); err == nil && parsed > 0 {
-			ifIndex = parsed
-		}
+		ifIndex = resolveIfIndexByPortName(adj.SourceID, ifName, ifIndexByDeviceName)
 	}
 	return ifIndex
 }
@@ -4125,12 +4915,7 @@ func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[st
 	ifName := port
 	ifIndex := 0
 	if port != "" {
-		ifIndex = ifIndexByDeviceName[deviceIfNameKey(dev.ID, port)]
-		if ifIndex == 0 {
-			if n, err := strconv.Atoi(port); err == nil && n > 0 {
-				ifIndex = n
-			}
-		}
+		ifIndex = resolveIfIndexByPortName(dev.ID, port, ifIndexByDeviceName)
 	}
 	if ifIndex > 0 && ifName == "" {
 		ifName = strconv.Itoa(ifIndex)
@@ -4580,6 +5365,58 @@ func mapStringStringToAny(in map[string]string) map[string]any {
 
 func deviceIfNameKey(deviceID, ifName string) string {
 	return fmt.Sprintf("%s|%s", strings.TrimSpace(deviceID), strings.ToLower(strings.TrimSpace(ifName)))
+}
+
+func interfaceNameLookupAliases(values ...string) []string {
+	set := make(map[string]struct{}, len(values)*2)
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		set[trimmed] = struct{}{}
+		if normalized := normalizeInterfaceNameForLookup(trimmed); normalized != "" && normalized != strings.ToLower(trimmed) {
+			set[normalized] = struct{}{}
+		}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(set))
+	for value := range set {
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func normalizeInterfaceNameForLookup(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value == "" {
+		return ""
+	}
+	replacer := strings.NewReplacer(" ", "", "-", "", "_", "", ".", "", "\t", "", "\n", "", "\r", "")
+	return replacer.Replace(value)
+}
+
+func resolveIfIndexByPortName(deviceID, port string, ifIndexByDeviceName map[string]int) int {
+	deviceID = strings.TrimSpace(deviceID)
+	port = strings.TrimSpace(port)
+	if deviceID == "" || port == "" {
+		return 0
+	}
+	if idx, ok := ifIndexByDeviceName[deviceIfNameKey(deviceID, port)]; ok && idx > 0 {
+		return idx
+	}
+	if normalized := normalizeInterfaceNameForLookup(port); normalized != "" {
+		if idx, ok := ifIndexByDeviceName[deviceIfNameKey(deviceID, normalized)]; ok && idx > 0 {
+			return idx
+		}
+	}
+	if parsed, err := strconv.Atoi(port); err == nil && parsed > 0 {
+		return parsed
+	}
+	return 0
 }
 
 func topologyIdentityIndexOverlaps(index map[string]struct{}, keys []string) bool {

@@ -54,6 +54,9 @@ func applySNMPTopologyOutputPolicies(data *topologyData, options topologyQueryOp
 	data.Stats["actors_map_type_suppressed"] = removedByMapType
 	data.Stats["segments_sparse_suppressed"] = removedSparseSegments
 	data.Stats["map_type"] = options.MapType
+	if strategy := normalizeTopologyInferenceStrategy(options.InferenceStrategy); strategy != "" {
+		data.Stats["inference_strategy"] = strategy
+	}
 	if removedSparseSegments > 0 {
 		data.Stats["segments_suppressed"] = intStatValue(data.Stats["segments_suppressed"]) + removedSparseSegments
 	}

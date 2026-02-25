@@ -34,6 +34,7 @@ type bridgeDomainSegment struct {
 type bridgeBridgeLinkRecord struct {
 	port           bridgePortRef
 	designatedPort bridgePortRef
+	method         string
 }
 
 type bridgeMacLinkRecord struct {

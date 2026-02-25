@@ -23,6 +23,7 @@ type topologyQueryOptions struct {
 	CollapseActorsByIP     bool
 	EliminateNonIPInferred bool
 	MapType                string
+	InferenceStrategy      string
 	ManagedDeviceFocus     string
 	Depth                  int
 }
@@ -102,6 +103,7 @@ func (r *topologyRegistry) snapshot() (topologyData, bool) {
 		CollapseActorsByIP:     true,
 		EliminateNonIPInferred: true,
 		MapType:                topologyMapTypeLLDPCDPManaged,
+		InferenceStrategy:      topologyInferenceStrategyFDBMinimumKnowledge,
 		ManagedDeviceFocus:     topologyManagedFocusAllDevices,
 		Depth:                  topologyDepthAllInternal,
 	})
@@ -244,8 +246,13 @@ func (r *topologyRegistry) snapshotWithOptions(options topologyQueryOptions) (to
 }
 
 func normalizeTopologyQueryOptions(options topologyQueryOptions) topologyQueryOptions {
-	if normalizeTopologyMapType(options.MapType) == "" {
+	options.MapType = normalizeTopologyMapType(options.MapType)
+	if options.MapType == "" {
 		options.MapType = topologyMapTypeLLDPCDPManaged
+	}
+	options.InferenceStrategy = normalizeTopologyInferenceStrategy(options.InferenceStrategy)
+	if options.InferenceStrategy == "" {
+		options.InferenceStrategy = topologyInferenceStrategyFDBMinimumKnowledge
 	}
 	if normalizeTopologyManagedFocus(options.ManagedDeviceFocus) == "" {
 		options.ManagedDeviceFocus = topologyManagedFocusAllDevices
@@ -358,5 +365,6 @@ func buildSNMPL2TopologyData(
 		CollapseActorsByIP:        queryOptions.CollapseActorsByIP,
 		EliminateNonIPInferred:    queryOptions.EliminateNonIPInferred,
 		ProbabilisticConnectivity: isTopologyMapTypeProbable(queryOptions.MapType),
+		InferenceStrategy:         queryOptions.InferenceStrategy,
 	}), true
 }

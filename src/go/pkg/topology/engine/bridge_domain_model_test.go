@@ -89,7 +89,7 @@ func TestCollectBridgeLinkRecords_DeduplicatesUndirectedAdjacencies(t *testing.T
 	}, map[string]int{
 		deviceIfNameKey("a", "Gi0/1"): 1,
 		deviceIfNameKey("b", "Gi0/2"): 2,
-	})
+	}, topologyInferenceStrategyConfigFor(topologyInferenceStrategyFDBMinimumKnowledge))
 
 	require.Len(t, records, 1)
 	require.Equal(t, "a", records[0].designatedPort.deviceID)
@@ -107,7 +107,126 @@ func TestCollectBridgeLinkRecords_SkipsAdjacencyWithoutRemotePort(t *testing.T) 
 		},
 	}, map[string]int{
 		deviceIfNameKey("a", "Gi0/1"): 1,
-	})
+	}, topologyInferenceStrategyConfigFor(topologyInferenceStrategyFDBMinimumKnowledge))
 
+	require.Empty(t, records)
+}
+
+func TestCollectBridgeLinkRecords_STPParentTreeUsesDesignatedTargetPort(t *testing.T) {
+	records := collectBridgeLinkRecords([]Adjacency{
+		{
+			Protocol:   "stp",
+			SourceID:   "child",
+			SourcePort: "Gi0/10",
+			TargetID:   "root",
+			TargetPort: "Gi0/1",
+		},
+	}, map[string]int{
+		deviceIfNameKey("child", "Gi0/10"): 10,
+		deviceIfNameKey("root", "Gi0/1"):   1,
+	}, topologyInferenceStrategyConfigFor(topologyInferenceStrategySTPParentTree))
+
+	require.Len(t, records, 1)
+	require.Equal(t, "root", records[0].designatedPort.deviceID)
+	require.Equal(t, "child", records[0].port.deviceID)
+	require.Equal(t, "stp", records[0].method)
+}
+
+func TestCollectBridgeLinkRecords_CDPHybridSkipsLLDPAdjacencies(t *testing.T) {
+	records := collectBridgeLinkRecords([]Adjacency{
+		{
+			Protocol:   "lldp",
+			SourceID:   "a",
+			SourcePort: "Gi0/1",
+			TargetID:   "b",
+			TargetPort: "Gi0/2",
+		},
+		{
+			Protocol:   "cdp",
+			SourceID:   "a",
+			SourcePort: "Gi0/3",
+			TargetID:   "c",
+			TargetPort: "Gi0/4",
+		},
+	}, map[string]int{
+		deviceIfNameKey("a", "Gi0/1"): 1,
+		deviceIfNameKey("b", "Gi0/2"): 2,
+		deviceIfNameKey("a", "Gi0/3"): 3,
+		deviceIfNameKey("c", "Gi0/4"): 4,
+	}, topologyInferenceStrategyConfigFor(topologyInferenceStrategyCDPFDBHybrid))
+
+	require.Len(t, records, 1)
+	require.Equal(t, "cdp", records[0].method)
+	require.Equal(t, "a", records[0].designatedPort.deviceID)
+	require.Equal(t, "c", records[0].port.deviceID)
+}
+
+func TestInferFDBPairwiseBridgeLinks_ReciprocalUniquePortPerSide(t *testing.T) {
+	attachments := []Attachment{
+		{
+			DeviceID:   "sw-a",
+			IfIndex:    1,
+			EndpointID: "mac:bb:bb:bb:bb:bb:bb",
+			Method:     "fdb",
+		},
+		{
+			DeviceID:   "sw-b",
+			IfIndex:    2,
+			EndpointID: "mac:aa:aa:aa:aa:aa:aa",
+			Method:     "fdb",
+		},
+	}
+	ifaceByDeviceIndex := map[string]Interface{
+		deviceIfIndexKey("sw-a", 1): {DeviceID: "sw-a", IfIndex: 1, IfName: "Gi0/1"},
+		deviceIfIndexKey("sw-b", 2): {DeviceID: "sw-b", IfIndex: 2, IfName: "Gi0/2"},
+	}
+	reporterAliases := map[string][]string{
+		"sw-a": {"mac:aa:aa:aa:aa:aa:aa"},
+		"sw-b": {"mac:bb:bb:bb:bb:bb:bb"},
+	}
+
+	records := inferFDBPairwiseBridgeLinks(attachments, ifaceByDeviceIndex, reporterAliases)
+	require.Len(t, records, 1)
+	require.Equal(t, "fdb_pairwise", records[0].method)
+	require.Equal(t, "sw-a", records[0].designatedPort.deviceID)
+	require.Equal(t, "sw-b", records[0].port.deviceID)
+}
+
+func TestInferFDBOverlapWeightedBridgeLinks_UsesSharedHostMACs(t *testing.T) {
+	attachments := []Attachment{
+		{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:00:01", Method: "fdb"},
+		{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:00:02", Method: "fdb"},
+		{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:00:03", Method: "fdb"},
+		{DeviceID: "sw-b", IfIndex: 2, EndpointID: "mac:00:00:00:00:00:02", Method: "fdb"},
+		{DeviceID: "sw-b", IfIndex: 2, EndpointID: "mac:00:00:00:00:00:03", Method: "fdb"},
+		{DeviceID: "sw-b", IfIndex: 2, EndpointID: "mac:00:00:00:00:00:04", Method: "fdb"},
+	}
+	ifaceByDeviceIndex := map[string]Interface{
+		deviceIfIndexKey("sw-a", 1): {DeviceID: "sw-a", IfIndex: 1, IfName: "Gi0/1"},
+		deviceIfIndexKey("sw-b", 2): {DeviceID: "sw-b", IfIndex: 2, IfName: "Gi0/2"},
+	}
+	reporterAliases := map[string][]string{
+		"sw-a": {"mac:aa:aa:aa:aa:aa:aa"},
+		"sw-b": {"mac:bb:bb:bb:bb:bb:bb"},
+	}
+
+	records := inferFDBOverlapWeightedBridgeLinks(attachments, ifaceByDeviceIndex, reporterAliases, 2)
+	require.Len(t, records, 1)
+	require.Equal(t, topologyInferenceStrategyFDBOverlapWeighted, records[0].method)
+	require.Equal(t, "sw-a", records[0].designatedPort.deviceID)
+	require.Equal(t, "sw-b", records[0].port.deviceID)
+}
+
+func TestInferFDBOverlapWeightedBridgeLinks_SkipsWhenBelowSharedThreshold(t *testing.T) {
+	attachments := []Attachment{
+		{DeviceID: "sw-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:00:01", Method: "fdb"},
+		{DeviceID: "sw-b", IfIndex: 2, EndpointID: "mac:00:00:00:00:00:01", Method: "fdb"},
+	}
+	ifaceByDeviceIndex := map[string]Interface{
+		deviceIfIndexKey("sw-a", 1): {DeviceID: "sw-a", IfIndex: 1, IfName: "Gi0/1"},
+		deviceIfIndexKey("sw-b", 2): {DeviceID: "sw-b", IfIndex: 2, IfName: "Gi0/2"},
+	}
+
+	records := inferFDBOverlapWeightedBridgeLinks(attachments, ifaceByDeviceIndex, nil, 2)
 	require.Empty(t, records)
 }
