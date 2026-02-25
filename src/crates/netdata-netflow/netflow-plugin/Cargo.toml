@@ -28,6 +28,8 @@ journal-session = { workspace = true }
 humantime = { workspace = true }
 humantime-serde = { workspace = true }
 ipnet = { workspace = true }
+ipnet-trie = "0.3.0"
+itoa = "1"
 jaq-core = "1.2.0"
 jaq-interpret = "1.2.0"
 jaq-std = "1.5.0"

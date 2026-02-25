@@ -17,7 +17,7 @@ use journal_engine::{
 use journal_index::{Anchor, Direction, FieldName, Microseconds, Seconds};
 use journal_log_writer::{Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy};
 use journal_registry::{Monitor, Origin, Registry, Source};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -228,6 +228,7 @@ pub(crate) struct IngestService {
     open_tiers: Arc<RwLock<OpenTierState>>,
     routing_runtime: Option<DynamicRoutingRuntime>,
     network_sources_runtime: Option<NetworkSourcesRuntime>,
+    encode_buf: JournalEncodeBuffer,
 }
 
 impl IngestService {
@@ -361,6 +362,7 @@ impl IngestService {
             open_tiers,
             routing_runtime,
             network_sources_runtime,
+            encode_buf: JournalEncodeBuffer::new(),
         })
     }
 
@@ -424,9 +426,6 @@ impl IngestService {
                     self.metrics.apply_decode_stats(&batch.stats);
 
                     for flow in batch.flows {
-                        let entry = entry_from_fields(&flow.fields);
-                        let refs: Vec<&[u8]> = entry.iter().map(Vec::as_slice).collect();
-
                         let timestamps = if let Some(source_realtime_usec) = flow.source_realtime_usec {
                             EntryTimestamps::default()
                                 .with_source_realtime_usec(source_realtime_usec)
@@ -436,8 +435,8 @@ impl IngestService {
                         };
 
                         if let Err(err) = self
-                            .raw_journal
-                            .write_entry_with_timestamps(&refs, timestamps)
+                            .encode_buf
+                            .encode_record_and_write(&flow.record, &mut self.raw_journal, timestamps)
                         {
                             self.metrics
                                 .journal_write_errors
@@ -452,7 +451,7 @@ impl IngestService {
                         entries_since_sync += 1;
 
                         let ts = flow.source_realtime_usec.unwrap_or_else(now_usec);
-                        self.observe_tiers(ts, &flow.fields);
+                        self.observe_tiers_record(ts, &flow.record);
                     }
 
                     if let Err(err) = self.flush_closed_tiers(now_usec()) {
@@ -568,15 +567,20 @@ impl IngestService {
         .context("failed to query raw flows for tier rebuild")?;
 
         for entry in entries {
-            let mut fields = BTreeMap::new();
+            let mut fields = crate::decoder::FlowFields::new();
+            let mut source_realtime_usec = None;
             for pair in entry.fields {
-                fields.insert(pair.field().to_string(), pair.value().to_string());
+                let name = pair.field();
+                if name == "_SOURCE_REALTIME_TIMESTAMP" {
+                    source_realtime_usec = pair.value().parse::<u64>().ok();
+                    continue;
+                }
+                if let Some(interned) = crate::decoder::intern_field_name(name) {
+                    fields.insert(interned, pair.value().to_string());
+                }
             }
 
-            let timestamp_usec = fields
-                .get("_SOURCE_REALTIME_TIMESTAMP")
-                .and_then(|v| v.parse::<u64>().ok())
-                .unwrap_or(entry.timestamp);
+            let timestamp_usec = source_realtime_usec.unwrap_or(entry.timestamp);
             self.observe_tiers(timestamp_usec, &fields);
         }
 
@@ -585,14 +589,37 @@ impl IngestService {
         Ok(())
     }
 
+    /// Hot path: observe tiers from a FlowRecord. Hash + lookup is zero-alloc
+    /// when the dimension combination already exists in the current bucket.
+    fn observe_tiers_record(
+        &mut self,
+        timestamp_usec: u64,
+        record: &crate::decoder::FlowRecord,
+    ) {
+        use crate::tiering::{FlowMetrics, rollup_dimension_hash};
+        let dim_hash = rollup_dimension_hash(record);
+        let metrics = FlowMetrics::from_record(record);
+        for tier in MATERIALIZED_TIERS {
+            if let Some(acc) = self.tier_accumulators.get_mut(&tier) {
+                acc.observe_record(timestamp_usec, record, dim_hash, metrics);
+            }
+        }
+    }
+
+    /// Cold path: observe tiers from FlowFields (journal replay at startup).
+    /// Converts to FlowRecord first, then uses the same hash-based accumulator.
     fn observe_tiers(
         &mut self,
         timestamp_usec: u64,
-        fields: &std::collections::BTreeMap<String, String>,
+        fields: &crate::decoder::FlowFields,
     ) {
+        use crate::tiering::{FlowMetrics, rollup_dimension_hash};
+        let record = crate::decoder::FlowRecord::from_fields(fields);
+        let dim_hash = rollup_dimension_hash(&record);
+        let metrics = FlowMetrics::from_fields(fields);
         for tier in MATERIALIZED_TIERS {
             if let Some(acc) = self.tier_accumulators.get_mut(&tier) {
-                acc.observe_flow(timestamp_usec, fields);
+                acc.observe_record(timestamp_usec, &record, dim_hash, metrics);
             }
         }
     }
@@ -611,8 +638,8 @@ impl IngestService {
 
             let writer = self.tier_writers.get_mut(tier);
             for row in rows {
-                let entry = entry_from_fields(&row.fields);
-                let refs: Vec<&[u8]> = entry.iter().map(Vec::as_slice).collect();
+                self.encode_buf.encode(&row.fields);
+                let refs = self.encode_buf.field_slices();
                 let timestamps = EntryTimestamps::default()
                     .with_source_realtime_usec(row.timestamp_usec)
                     .with_entry_realtime_usec(row.timestamp_usec);
@@ -717,11 +744,57 @@ impl IngestService {
     }
 }
 
-fn entry_from_fields(fields: &std::collections::BTreeMap<String, String>) -> Vec<Vec<u8>> {
-    fields
-        .iter()
-        .map(|(name, value)| format!("{}={}", name, value).into_bytes())
-        .collect()
+/// Reusable buffer for encoding flow fields into journal entries.
+/// Avoids ~60 Vec<u8> allocations per flow by writing all fields into
+/// a single contiguous buffer and tracking offsets.
+struct JournalEncodeBuffer {
+    data: Vec<u8>,
+    refs: Vec<std::ops::Range<usize>>,
+}
+
+impl JournalEncodeBuffer {
+    fn new() -> Self {
+        Self {
+            data: Vec::with_capacity(4096),
+            refs: Vec::with_capacity(64),
+        }
+    }
+
+    /// Encode a FlowRecord and write to journal in one call.
+    /// Uses a stack-allocated array for field slices — zero heap allocation.
+    /// The borrow of self.data is contained within this method.
+    fn encode_record_and_write(
+        &mut self,
+        record: &crate::decoder::FlowRecord,
+        journal: &mut journal_log_writer::Log,
+        timestamps: journal_log_writer::EntryTimestamps,
+    ) -> journal_log_writer::Result<()> {
+        record.encode_to_journal_buf(&mut self.data, &mut self.refs);
+        // 87 canonical fields — stack array avoids heap allocation.
+        let mut slices = [&[] as &[u8]; 87];
+        let n = self.refs.len().min(87);
+        for (i, r) in self.refs[..n].iter().enumerate() {
+            slices[i] = &self.data[r.clone()];
+        }
+        journal.write_entry_with_timestamps(&slices[..n], timestamps)
+    }
+
+    fn encode(&mut self, fields: &crate::decoder::FlowFields) {
+        self.data.clear();
+        self.refs.clear();
+
+        for (name, value) in fields {
+            let start = self.data.len();
+            self.data.extend_from_slice(name.as_bytes());
+            self.data.push(b'=');
+            self.data.extend_from_slice(value.as_bytes());
+            self.refs.push(start..self.data.len());
+        }
+    }
+
+    fn field_slices(&self) -> Vec<&[u8]> {
+        self.refs.iter().map(|r| &self.data[r.clone()]).collect()
+    }
 }
 
 fn now_usec() -> u64 {
@@ -933,7 +1006,7 @@ mod tests {
     fn decode_fixture_sequence(
         service: &mut IngestService,
         fixtures: &[&str],
-    ) -> Vec<BTreeMap<String, String>> {
+    ) -> Vec<crate::decoder::FlowFields> {
         let base = fixture_dir();
         let mut out = Vec::new();
         for fixture in fixtures {
@@ -948,7 +1021,7 @@ mod tests {
     fn decode_pcap_flows(
         path: &Path,
         decoders: &mut FlowDecoders,
-    ) -> Vec<BTreeMap<String, String>> {
+    ) -> Vec<crate::decoder::FlowFields> {
         let file = File::open(path).unwrap_or_else(|e| panic!("open {}: {e}", path.display()));
         let mut reader =
             PcapReader::new(file).unwrap_or_else(|e| panic!("pcap reader {}: {e}", path.display()));
@@ -958,7 +1031,7 @@ mod tests {
             let packet = packet.unwrap_or_else(|e| panic!("read packet {}: {e}", path.display()));
             if let Some((source, payload)) = extract_udp_payload(packet.data.as_ref()) {
                 let decoded = decoders.decode_udp_payload(source, payload);
-                flows.extend(decoded.flows.into_iter().map(|flow| flow.fields));
+                flows.extend(decoded.flows.into_iter().map(|flow| flow.record.to_fields()));
             }
         }
         flows
@@ -980,9 +1053,9 @@ mod tests {
     }
 
     fn find_flow<'a>(
-        flows: &'a [BTreeMap<String, String>],
+        flows: &'a [crate::decoder::FlowFields],
         predicates: &[(&str, &str)],
-    ) -> &'a BTreeMap<String, String> {
+    ) -> &'a crate::decoder::FlowFields {
         flows
             .iter()
             .find(|fields| {
@@ -997,5 +1070,245 @@ mod tests {
                     flows.len()
                 )
             })
+    }
+
+    /// Pre-extracted UDP payload for benchmark replay.
+    struct UdpPayload {
+        source: SocketAddr,
+        data: Vec<u8>,
+    }
+
+    /// Extract raw UDP payloads from pcap files (without decoding).
+    fn extract_udp_payloads(path: &Path) -> Vec<UdpPayload> {
+        let file = File::open(path).unwrap_or_else(|e| panic!("open {}: {e}", path.display()));
+        let mut reader =
+            PcapReader::new(file).unwrap_or_else(|e| panic!("pcap reader {}: {e}", path.display()));
+        let mut payloads = Vec::new();
+        while let Some(packet) = reader.next_packet() {
+            let packet = packet.unwrap_or_else(|e| panic!("read packet {}: {e}", path.display()));
+            if let Some((source, payload)) = extract_udp_payload(packet.data.as_ref()) {
+                payloads.push(UdpPayload {
+                    source,
+                    data: payload.to_vec(),
+                });
+            }
+        }
+        payloads
+    }
+
+    /// Benchmark: full hot path throughput.
+    ///
+    /// Measures decode → journal_encode+write → tier_observe.
+    /// Replays pcap data packets in a tight loop.
+    /// Run with: cargo test -p netflow-plugin --release -- bench_full_hot_path --nocapture --ignored
+    #[test]
+    #[ignore] // Only run explicitly
+    fn bench_full_hot_path() {
+        let (_tmp, mut service) = new_test_ingest_service(ConfigDecapsulationMode::None);
+        let base = fixture_dir();
+
+        // Phase 1: Load templates into decoder state.
+        let template_files = [
+            "options-template.pcap",
+            "options-data.pcap",
+            "template.pcap",
+            "ipfixprobe-templates.pcap",
+            "icmp-template.pcap",
+            "samplingrate-template.pcap",
+            "multiplesamplingrates-options-template.pcap",
+            "multiplesamplingrates-template.pcap",
+        ];
+        for tf in &template_files {
+            let payloads = extract_udp_payloads(&base.join(tf));
+            for p in &payloads {
+                service.decoders.decode_udp_payload(p.source, &p.data);
+            }
+        }
+
+        // Phase 2: Extract data payloads into memory.
+        let data_files = [
+            "data.pcap",                          // v9 data
+            "ipfixprobe-data.pcap",               // IPFIX biflows
+            "nfv5.pcap",                          // NetFlow v5
+            "icmp-data.pcap",                     // ICMP
+            "samplingrate-data.pcap",             // v9 with sampling
+            "multiplesamplingrates-data.pcap",    // v9 multiple sampling
+        ];
+        let mut data_payloads = Vec::new();
+        for df in &data_files {
+            data_payloads.extend(extract_udp_payloads(&base.join(df)));
+        }
+        assert!(
+            !data_payloads.is_empty(),
+            "no data payloads extracted from fixture files"
+        );
+
+        // Decode once to count flows per iteration
+        let mut flows_per_round = 0_usize;
+        for p in &data_payloads {
+            let batch = service.decoders.decode_udp_payload(p.source, &p.data);
+            flows_per_round += batch.flows.len();
+        }
+        eprintln!("Payloads per round: {}", data_payloads.len());
+        eprintln!("Flows per round:    {}", flows_per_round);
+
+        // Phase 3: Warmup (5 rounds).
+        let warmup_rounds = 5;
+        for _ in 0..warmup_rounds {
+            for p in &data_payloads {
+                let receive_time_usec = super::now_usec();
+                let batch =
+                    service
+                        .decoders
+                        .decode_udp_payload_at(p.source, &p.data, receive_time_usec);
+                for flow in batch.flows {
+                    let timestamps = if let Some(ts) = flow.source_realtime_usec {
+                        EntryTimestamps::default()
+                            .with_source_realtime_usec(ts)
+                            .with_entry_realtime_usec(ts)
+                    } else {
+                        EntryTimestamps::default()
+                    };
+                    let _ = service.encode_buf.encode_record_and_write(
+                        &flow.record,
+                        &mut service.raw_journal,
+                        timestamps,
+                    );
+                    let ts = flow.source_realtime_usec.unwrap_or_else(super::now_usec);
+                    service.observe_tiers_record(ts, &flow.record);
+                }
+            }
+        }
+        let _ = service.flush_closed_tiers(super::now_usec());
+
+        // Phase 4: Benchmark — full pipeline.
+        let bench_rounds = 10_000;
+        let total_flows = bench_rounds * flows_per_round;
+
+        let start = std::time::Instant::now();
+        for _ in 0..bench_rounds {
+            for p in &data_payloads {
+                let receive_time_usec = super::now_usec();
+                let batch =
+                    service
+                        .decoders
+                        .decode_udp_payload_at(p.source, &p.data, receive_time_usec);
+                for flow in batch.flows {
+                    let timestamps = if let Some(ts) = flow.source_realtime_usec {
+                        EntryTimestamps::default()
+                            .with_source_realtime_usec(ts)
+                            .with_entry_realtime_usec(ts)
+                    } else {
+                        EntryTimestamps::default()
+                    };
+                    let _ = service.encode_buf.encode_record_and_write(
+                        &flow.record,
+                        &mut service.raw_journal,
+                        timestamps,
+                    );
+                    let ts = flow.source_realtime_usec.unwrap_or_else(super::now_usec);
+                    service.observe_tiers_record(ts, &flow.record);
+                }
+            }
+        }
+        let elapsed = start.elapsed();
+
+        let flows_per_sec = total_flows as f64 / elapsed.as_secs_f64();
+        let usec_per_flow = elapsed.as_micros() as f64 / total_flows as f64;
+
+        eprintln!();
+        eprintln!("=== Full Hot Path Benchmark ===");
+        eprintln!("Rounds:         {}", bench_rounds);
+        eprintln!("Total flows:    {}", total_flows);
+        eprintln!("Elapsed:        {:.3}s", elapsed.as_secs_f64());
+        eprintln!("Throughput:     {:.0} flows/s", flows_per_sec);
+        eprintln!("Latency:        {:.2} µs/flow", usec_per_flow);
+        eprintln!();
+
+        // Phase 5: Benchmark — decode only (no journal write, no tier observe).
+        let start_decode = std::time::Instant::now();
+        let mut decode_flow_count = 0_usize;
+        for _ in 0..bench_rounds {
+            for p in &data_payloads {
+                let receive_time_usec = super::now_usec();
+                let batch =
+                    service
+                        .decoders
+                        .decode_udp_payload_at(p.source, &p.data, receive_time_usec);
+                decode_flow_count += batch.flows.len();
+            }
+        }
+        let elapsed_decode = start_decode.elapsed();
+        let decode_flows_per_sec = decode_flow_count as f64 / elapsed_decode.as_secs_f64();
+        let decode_usec_per_flow = elapsed_decode.as_micros() as f64 / decode_flow_count as f64;
+
+        eprintln!("=== Decode Only Benchmark ===");
+        eprintln!("Flows:          {}", decode_flow_count);
+        eprintln!("Elapsed:        {:.3}s", elapsed_decode.as_secs_f64());
+        eprintln!("Throughput:     {:.0} flows/s", decode_flows_per_sec);
+        eprintln!("Latency:        {:.2} µs/flow", decode_usec_per_flow);
+        eprintln!();
+
+        // Phase 6: Benchmark — encode+write only (pre-decoded flows).
+        // Collect a batch of pre-decoded flows.
+        let mut prebuilt_flows = Vec::new();
+        for p in &data_payloads {
+            let batch = service.decoders.decode_udp_payload(p.source, &p.data);
+            prebuilt_flows.extend(batch.flows);
+        }
+        let start_write = std::time::Instant::now();
+        for _ in 0..bench_rounds {
+            for flow in &prebuilt_flows {
+                let timestamps = if let Some(ts) = flow.source_realtime_usec {
+                    EntryTimestamps::default()
+                        .with_source_realtime_usec(ts)
+                        .with_entry_realtime_usec(ts)
+                } else {
+                    EntryTimestamps::default()
+                };
+                let _ = service.encode_buf.encode_record_and_write(
+                    &flow.record,
+                    &mut service.raw_journal,
+                    timestamps,
+                );
+            }
+        }
+        let elapsed_write = start_write.elapsed();
+        let write_total = bench_rounds * prebuilt_flows.len();
+        let write_flows_per_sec = write_total as f64 / elapsed_write.as_secs_f64();
+        let write_usec_per_flow = elapsed_write.as_micros() as f64 / write_total as f64;
+
+        eprintln!("=== Encode+Write Only Benchmark ===");
+        eprintln!("Flows:          {}", write_total);
+        eprintln!("Elapsed:        {:.3}s", elapsed_write.as_secs_f64());
+        eprintln!("Throughput:     {:.0} flows/s", write_flows_per_sec);
+        eprintln!("Latency:        {:.2} µs/flow", write_usec_per_flow);
+        eprintln!();
+
+        // Phase 7: Benchmark — tier observe only.
+        let start_tier = std::time::Instant::now();
+        for _ in 0..bench_rounds {
+            for flow in &prebuilt_flows {
+                let ts = flow.source_realtime_usec.unwrap_or(120_000_000);
+                service.observe_tiers_record(ts, &flow.record);
+            }
+        }
+        let elapsed_tier = start_tier.elapsed();
+        let tier_total = bench_rounds * prebuilt_flows.len();
+        let tier_flows_per_sec = tier_total as f64 / elapsed_tier.as_secs_f64();
+        let tier_usec_per_flow = elapsed_tier.as_micros() as f64 / tier_total as f64;
+
+        eprintln!("=== Tier Observe Only Benchmark ===");
+        eprintln!("Flows:          {}", tier_total);
+        eprintln!("Elapsed:        {:.3}s", elapsed_tier.as_secs_f64());
+        eprintln!("Throughput:     {:.0} flows/s", tier_flows_per_sec);
+        eprintln!("Latency:        {:.2} µs/flow", tier_usec_per_flow);
+        eprintln!();
+
+        eprintln!("=== Summary ===");
+        eprintln!("Full pipeline:  {:.0} flows/s ({:.2} µs/flow)", flows_per_sec, usec_per_flow);
+        eprintln!("  Decode:       {:.0} flows/s ({:.2} µs/flow)", decode_flows_per_sec, decode_usec_per_flow);
+        eprintln!("  Encode+Write: {:.0} flows/s ({:.2} µs/flow)", write_flows_per_sec, write_usec_per_flow);
+        eprintln!("  Tier observe: {:.0} flows/s ({:.2} µs/flow)", tier_flows_per_sec, tier_usec_per_flow);
     }
 }

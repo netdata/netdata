@@ -1586,6 +1586,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipnet-trie"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bfa31eccd160220ed5765820b282754ec7e9b36a8f6ea65e08fc0c31c9058cc"
+dependencies = [
+ "ipnet",
+ "prefix-trie",
+]
+
+[[package]]
 name = "ipnetwork"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2253,6 +2263,8 @@ dependencies = [
  "humantime",
  "humantime-serde",
  "ipnet",
+ "ipnet-trie",
+ "itoa",
  "jaq-core",
  "jaq-interpret",
  "jaq-std",
@@ -2812,6 +2824,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy 0.8.27",
+]
+
+[[package]]
+name = "prefix-trie"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb5f930995ba4986bd239ba8d8fded67cad82d1db329c4f316f312847cba16aa"
+dependencies = [
+ "ipnet",
+ "num-traits",
 ]
 
 [[package]]

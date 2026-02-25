@@ -6,6 +6,7 @@ mod ingest;
 mod network_sources;
 mod plugin_config;
 mod query;
+#[cfg(test)]
 mod rollup;
 mod routing_bioris;
 mod routing_bmp;
