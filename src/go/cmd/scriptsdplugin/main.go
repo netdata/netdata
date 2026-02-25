@@ -20,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/nagios"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/scheduler"
 )
@@ -64,6 +65,7 @@ func main() {
 		ServiceDiscoveryConfigDir: nil,
 		CollectorsConfigWatchPath: watchPaths,
 		VarLibDir:                 pluginconfig.VarLibDir(),
+		ModuleRegistry:            collectorapi.DefaultRegistry,
 		RunModule:                 opts.Module,
 		RunJob:                    opts.Job,
 		MinUpdateEvery:            opts.UpdateEvery,

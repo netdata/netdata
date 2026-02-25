@@ -24,6 +24,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	// Register IBM ecosystem collectors
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/as400"         // Requires CGO
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2"           // Requires CGO
@@ -91,6 +92,7 @@ func main() {
 		PluginConfigDir:         pluginconfig.ConfigDir(),
 		CollectorsConfigDir:     pluginconfig.CollectorsDir(),
 		VarLibDir:               pluginconfig.VarLibDir(),
+		ModuleRegistry:          collectorapi.DefaultRegistry,
 		RunModule:               opts.Module,
 		RunJob:                  opts.Job,
 		MinUpdateEvery:          opts.UpdateEvery,

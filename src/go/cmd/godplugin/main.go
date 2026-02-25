@@ -73,6 +73,7 @@ func main() {
 		ServiceDiscoveryConfigDir: pluginconfig.ServiceDiscoveryDir(),
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
+		ModuleRegistry:            collectorapi.DefaultRegistry,
 		RunModule:                 opts.Module,
 		RunJob:                    opts.Job,
 		MinUpdateEvery:            opts.UpdateEvery,
