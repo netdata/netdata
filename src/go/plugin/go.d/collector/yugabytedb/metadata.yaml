@@ -21,7 +21,6 @@ modules:
         - database
         - yb
         - yugabyte
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

@@ -194,7 +194,6 @@ def build_readme_from_integration(integration, categories, mode: str = ""):
             learn_rel_path = generate_category_from_name(
                 integration["meta"]["monitored_instance"]["categories"][0].split("."), categories
             ).replace("Data Collection", "Collecting Metrics")
-            most_popular = integration["meta"]["most_popular"]
             keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
 
             md = f"""<!--startmeta
@@ -202,7 +201,6 @@ meta_yaml: "{meta_yaml}"
 sidebar_label: "{sidebar_label}"
 learn_status: "Published"
 learn_rel_path: "{learn_rel_path}"
-most_popular: {most_popular}
 """
             if keywords:
                 md += f"keywords: {keywords}\n"

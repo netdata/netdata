@@ -19,7 +19,6 @@ modules:
         - database
         - oracle
         - sql
-      most_popular: false
     overview:
       multi_instance: true
       data_collection:

@@ -21,7 +21,6 @@ modules:
         - websocket
         - jakarta
         - javaEE
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

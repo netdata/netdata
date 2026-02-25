@@ -30,7 +30,6 @@ modules:
         - nspawn
         - cgroups
         - linux containers
-      most_popular: true
     overview: &overview
       data_collection: &data_collection
         metrics_description: "Monitor containers and virtual machines resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
@@ -464,7 +463,6 @@ modules:
               module_name: k8s_kubeproxy
             - plugin_name: go.d.plugin
               module_name: coredns
-      most_popular: true
     overview:
       <<: *overview
       data-collection:

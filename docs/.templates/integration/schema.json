@@ -21,10 +21,6 @@
                                 "type": "string",
                                 "description": "Text that will be presented below the category title, or that will be accompanying the category in the UI in any form."
                             },
-                            "priority": {
-                                "type": "integer",
-                                "description": "Priority of the category. A number expressing where the category should be in the menu. Currently, a static number gets assigned to all categories, with a higher priority one for the most-popular flagged categories."
-                            },
                             "children": {
                                 "type": "array",
                                 "description": "an array that recursively has the same elements as the parent.",
@@ -59,10 +55,6 @@
                                 "category_id": {
                                     "type": "string",
                                     "description": "The category_ID for this integration. This is the category ID mentioned inside integrations/category.yaml, for the respective category."
-                                },
-                                "priority": {
-                                    "type": "integer",
-                                    "description": "Priority for this specific category. Will control where the integration will be positioned in this category"
                                 }
                             }
                         }

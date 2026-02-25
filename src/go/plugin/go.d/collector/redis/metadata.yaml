@@ -24,7 +24,6 @@ modules:
       keywords:
         - redis
         - databases
-      most_popular: true
     overview:
       data_collection:
         metrics_description: |

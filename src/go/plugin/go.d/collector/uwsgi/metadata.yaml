@@ -19,7 +19,6 @@ modules:
         - application server
         - python
         - web applications
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

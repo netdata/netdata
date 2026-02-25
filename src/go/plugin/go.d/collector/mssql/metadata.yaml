@@ -27,7 +27,6 @@ modules:
         - "mssql"
         - "sql server"
         - "microsoft"
-      most_popular: false
     overview:
       multi_instance: true
       data_collection:

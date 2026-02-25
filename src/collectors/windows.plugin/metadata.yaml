@@ -19,7 +19,6 @@ modules:
         - microsoft
         - processor
         - CPU
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -123,7 +122,6 @@ modules:
       keywords:
         - memory
         - swap
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -227,7 +225,6 @@ modules:
         - process counts
         - threads
         - context switch
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -331,7 +328,6 @@ modules:
         - volume
         - physical
         - logical
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -514,7 +510,6 @@ modules:
         - udp
         - tcp
         - interface
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -834,7 +829,6 @@ modules:
       keywords:
         - ipc
         - semaphores
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -926,7 +920,6 @@ modules:
       keywords:
         - cpu
         - temperature
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1008,7 +1001,6 @@ modules:
       keywords:
         - thermal
         - temperature
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1089,7 +1081,6 @@ modules:
         description: ""
       keywords:
         - power supply
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1183,7 +1174,6 @@ modules:
       keywords:
         - Sensors
         - Windows
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1410,7 +1400,6 @@ modules:
         - IIS
         - HTTP
         - Web service
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1729,7 +1718,6 @@ modules:
         - hyperv
         - virtualization
         - vm
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2096,7 +2084,6 @@ modules:
         - microsoft
         - sql
         - queries
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2719,7 +2706,6 @@ modules:
         - microsoft
         - netframework
         - dotnet
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2985,7 +2971,6 @@ modules:
         - microsoft
         - active directory
         - ad
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3152,7 +3137,6 @@ modules:
         - active directory
         - adcs
         - ad
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3329,7 +3313,6 @@ modules:
         - active directory
         - adfs
         - ad
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3605,7 +3588,6 @@ modules:
         - windows
         - microsoft
         - services
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3698,7 +3680,6 @@ modules:
         - microsoft
         - exchange
         - mail
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3962,7 +3943,6 @@ modules:
         - windows
         - NUMA
         - processor
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -4048,7 +4028,6 @@ modules:
         - windows
         - ASP
         - webservice
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

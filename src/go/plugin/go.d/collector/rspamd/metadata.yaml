@@ -24,7 +24,6 @@ modules:
         - spam
         - rspamd
         - email
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

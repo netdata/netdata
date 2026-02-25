@@ -31,7 +31,6 @@ modules:
         - webserver
         - http
         - proxy
-      most_popular: true
     overview:
       data_collection:
         metrics_description: |
