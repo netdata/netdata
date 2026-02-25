@@ -58,11 +58,16 @@ func newDepthTestLogger(isTerminal bool) (*Logger, *pcCaptureHandler) {
 	return &Logger{sl: slog.New(sh), rl: newRateLimiter()}, h
 }
 
+//go:noinline
+func emitWhenInfo(l *Logger) {
+	l.When(true).Info("x")
+}
+
 func TestCallDepthTerminalDebugUsesDynamicResolverForWhen(t *testing.T) {
 	setTestLevel(t, slog.LevelDebug)
 
 	l, h := newDepthTestLogger(true)
-	l.When(true).Info("x")
+	emitWhenInfo(l)
 
 	fn := h.lastFunction()
 	assert.NotEmpty(t, fn)
@@ -85,7 +90,7 @@ func TestCallDepthGatingUsesFixedPathOutsideTerminalDebug(t *testing.T) {
 		setTestLevel(t, slog.LevelInfo)
 
 		l, h := newDepthTestLogger(true)
-		l.When(true).Info("x")
+		emitWhenInfo(l)
 
 		fn := h.lastFunction()
 		assert.NotEmpty(t, fn)
@@ -96,10 +101,32 @@ func TestCallDepthGatingUsesFixedPathOutsideTerminalDebug(t *testing.T) {
 		setTestLevel(t, slog.LevelDebug)
 
 		l, h := newDepthTestLogger(false)
-		l.When(true).Info("x")
+		emitWhenInfo(l)
 
 		fn := h.lastFunction()
 		assert.NotEmpty(t, fn)
 		assert.True(t, isSkippedCaller(fn), "expected internal frame with fixed path, got %q", fn)
 	})
+}
+
+func TestResolveCallerPCFallbackMatchesFixedPath(t *testing.T) {
+	setTestLevel(t, slog.LevelDebug)
+
+	orig := callerSkipPrefixes
+	callerSkipPrefixes = []string{""} // force fallback branch
+	t.Cleanup(func() {
+		callerSkipPrefixes = orig
+	})
+
+	fixedLogger, fixedHandler := newDepthTestLogger(false)
+	emitWhenInfo(fixedLogger)
+	expected := fixedHandler.lastFunction()
+	assert.NotEmpty(t, expected)
+
+	dynamicLogger, dynamicHandler := newDepthTestLogger(true)
+	emitWhenInfo(dynamicLogger)
+	actual := dynamicHandler.lastFunction()
+	assert.NotEmpty(t, actual)
+
+	assert.Equal(t, expected, actual)
 }

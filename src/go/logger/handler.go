@@ -97,7 +97,9 @@ func (h *callDepthHandler) WithGroup(name string) slog.Handler {
 
 func (h *callDepthHandler) Handle(ctx context.Context, r slog.Record) error {
 	if h.isTerminal && Level.Enabled(slog.LevelDebug) {
-		r.PC = resolveCallerPC(h.depth + 3)
+		// Keep fixed-skip math identical to the non-dynamic path.
+		// resolveCallerPC will adjust for its own extra stack frame on fallback.
+		r.PC = resolveCallerPC(h.depth + 2)
 		return h.sh.Handle(ctx, r)
 	}
 
@@ -110,13 +112,13 @@ func (h *callDepthHandler) Handle(ctx context.Context, r slog.Record) error {
 	return h.sh.Handle(ctx, r)
 }
 
-var callerSkipPrefixes = [...]string{
+var callerSkipPrefixes = []string{
 	"github.com/netdata/netdata/go/plugins/logger.",
 	"log/slog.",
 	"runtime.",
 }
 
-func resolveCallerPC(fallbackSkip int) uintptr {
+func resolveCallerPC(fixedSkip int) uintptr {
 	var pcs [15]uintptr
 	n := runtime.Callers(2, pcs[:]) // skip runtime.Callers + resolveCallerPC
 	if n > 0 {
@@ -133,7 +135,9 @@ func resolveCallerPC(fallbackSkip int) uintptr {
 	}
 
 	var fallback [1]uintptr
-	runtime.Callers(fallbackSkip, fallback[:])
+	// fixedSkip is the skip value used by Handle's fixed path.
+	// Add one extra frame to account for resolveCallerPC itself.
+	runtime.Callers(fixedSkip+1, fallback[:])
 	return fallback[0]
 }
 
