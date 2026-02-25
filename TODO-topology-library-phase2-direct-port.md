@@ -114,6 +114,29 @@
     - live topology re-check (`nodes_identity=ip`, `map_type=all_devices_low_confidence`):
       - `bmc-switch`, `nova-bmc`, `mega-bmc`, `beast-bmc` no longer attach to `gs1900` probable segment;
       - they now resolve to strict FDB links via `mikrotik-switch.plaka.130.segment`.
+- [x] A22. Canonicalize LLDP/CDP adjacency endpoint port names when remote/local port is numeric.
+  - User evidence (Costa, 2026-02-26):
+    - chart does not expose pair metadata clearly,
+    - reported ports for `xs1930` / `gs1900` are wrong in LLDP links.
+  - Root cause identified:
+    - `adjacencySideToEndpoint()` resolves `if_index` from numeric port tokens but keeps `if_name` as raw port token (for example `8`, `2`) instead of interface canonical names (`swp07`, `GigabitEthernet2`).
+  - Planned fix:
+    - when `if_index` resolves and interface inventory exists, set endpoint `if_name` from canonical interface data (`IfName`, fallback `IfDescr`),
+    - keep raw discovered token in `port_id`,
+    - add regression assertions on numeric LLDP-port case in topology adapter tests.
+  - Implemented (2026-02-26):
+    - `adjacencySideToEndpoint()` now canonicalizes endpoint `if_name` from interface inventory when `if_index` is resolved.
+    - fallback order for endpoint display identity:
+      - `IfName`,
+      - `IfDescr`,
+      - raw port token.
+    - raw observed port token is still preserved in `port_id`.
+    - interface description is now exposed as `if_descr` on adjacency endpoints when available.
+    - regression assertions added in:
+      - `TestToTopologyData_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex`.
+  - Validation:
+    - `cd src/go && go test ./pkg/topology/engine -count=1` passed.
+    - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed.
 - [x] A13. Implement selector/depth contract fixes (user-approved).
   - Backend:
     - set `map_type` default to `lldp_cdp_managed`,

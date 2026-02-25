@@ -2264,6 +2264,14 @@ func TestToTopologyData_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(
 
 	require.Equal(t, 0, data.Stats["links_fdb_endpoint_emitted"])
 	require.Nil(t, findActorByType(data.Actors, "segment"))
+	lldpLink := findLinkByProtocol(data.Links, "lldp")
+	require.NotNil(t, lldpLink)
+	require.Equal(t, 2, lldpLink.Src.Attributes["if_index"])
+	require.Equal(t, "GigabitEthernet2", lldpLink.Src.Attributes["if_name"])
+	require.Equal(t, "2", lldpLink.Src.Attributes["port_id"])
+	require.Equal(t, 4, lldpLink.Dst.Attributes["if_index"])
+	require.Equal(t, "ether4", lldpLink.Dst.Attributes["if_name"])
+	require.Equal(t, "ether4", lldpLink.Dst.Attributes["port_id"])
 }
 
 func TestToTopologyData_SwitchFacingPortDoesNotSuppressEndpointOwnership(t *testing.T) {
