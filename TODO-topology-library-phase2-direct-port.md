@@ -87,6 +87,33 @@
     - parity evidence commands are blocked in this workstation because fixture root is missing:
       - `/tmp/topology-library-repos/enlinkd/features/enlinkd/tests/src/test/resources/linkd`
     - unit/integration go test suites for `engine` and `snmp` pass.
+- [x] A21. Remove switch-facing suppression from endpoint ownership placement (Costa, 2026-02-26).
+  - Requirement:
+    - `switch_facing` / trunk classification must not demote/suppress endpoint ownership placement.
+    - endpoint ownership must remain evidence-driven (reporter matrix, single-port owner, managed alias overlap), including when evidence is on trunk/switch-facing ports.
+    - keep deterministic LLDP/CDP transit-port suppression rule as the only hard transit filter.
+  - Target:
+    - prevent misplacement of managed switch/BMC endpoints (`bmc-switch`, `nova-bmc`, `mega-bmc`, `beast-bmc`) away from their evidence-backed reporter ports.
+  - Implemented (2026-02-26):
+    - removed switch-facing port suppression from endpoint placement pipeline:
+      - FDB attachment collection now filters only deterministic LLDP/CDP transit ports.
+      - removed strategy-level switch-facing hard filtering from segment projection path.
+      - endpoint owner inference (`reporter_matrix`, `single_port_mac`) now filters only deterministic LLDP/CDP transit ports.
+    - added regression coverage:
+      - `TestToTopologyData_SwitchFacingPortDoesNotSuppressEndpointOwnership`
+      - updated strategy test to reflect new contract:
+        - `TestToTopologyData_InferenceStrategy_STPParentDoesNotSuppressFDBEndpointOwnership`
+  - Validation:
+    - tests:
+      - `cd src/go && go test ./pkg/topology/engine -count=1` passed
+      - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed
+    - install/deploy:
+      - backend `./install.sh` completed (known non-fatal warning remains: `git fetch -t` SSH key).
+      - frontend reinstall after backend completed:
+        - `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh`.
+    - live topology re-check (`nodes_identity=ip`, `map_type=all_devices_low_confidence`):
+      - `bmc-switch`, `nova-bmc`, `mega-bmc`, `beast-bmc` no longer attach to `gs1900` probable segment;
+      - they now resolve to strict FDB links via `mikrotik-switch.plaka.130.segment`.
 - [x] A13. Implement selector/depth contract fixes (user-approved).
   - Backend:
     - set `map_type` default to `lldp_cdp_managed`,
@@ -775,6 +802,10 @@
   - depth UI should be one row:
     - `[x] All` toggle,
     - numeric input (`0..10`) when `All` is off.
+- [x] D19. Endpoint ownership must not be suppressed by switch-facing classification (Costa, 2026-02-26).
+  - `switch_facing`/trunk role can be used for switch-to-switch correlation confidence only.
+  - It must not be used as a hard suppression/demotion rule for endpoint ownership placement.
+  - Deterministic LLDP/CDP transit-port suppression remains enabled as hard rule.
 
 ## 2) Objective (Non-Negotiable)
 - Build and maintain **Enlinkd-faithful** topology behavior for Netdata SNMP topology, scoped to **L2 + enrichment**.

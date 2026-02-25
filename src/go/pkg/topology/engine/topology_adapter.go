@@ -594,36 +594,18 @@ func projectSegmentTopology(
 		return out
 	}
 
-	switchFacingPortKeys := buildSwitchFacingPortKeySet(bridgeLinks)
 	// Hard deterministic rule: LLDP/CDP-adjacent ports are transit ports.
 	// FDB data learned on those ports belongs to the neighbor domain and must
 	// not create parallel inferred segment paths on top of direct discovery.
+	//
+	// NOTE:
+	// switch-facing/trunk classification must not suppress endpoint ownership.
+	// It is a topology correlation/confidence signal, not a hard endpoint
+	// placement filter.
 	deterministicTransitPortKeys := buildDeterministicTransitPortKeySet(adjacencies, ifIndexByDeviceName)
-	filterPortKeys := deterministicTransitPortKeys
-	if strategyConfig.filterSwitchFacingAttachments {
-		filterPortKeys = mergeBridgePortObservationKeySets(filterPortKeys, switchFacingPortKeys)
-	}
-	seedMacLinks := collectBridgeMacLinkRecords(attachments, ifaceByDeviceIndex, filterPortKeys)
+	seedMacLinks := collectBridgeMacLinkRecords(attachments, ifaceByDeviceIndex, deterministicTransitPortKeys)
 	rawFDBObservations := buildFDBReporterObservations(seedMacLinks)
-	managedAliasEndpointIDs := buildManagedAliasEndpointIDSet(reporterAliases)
-	switchFacingPortKeys = augmentSwitchFacingPortKeySetFromManagedAliases(
-		switchFacingPortKeys,
-		rawFDBObservations,
-		reporterAliases,
-	)
-	if strategyConfig.enableSTPManagedAliasCorrelation {
-		switchFacingPortKeys = augmentSwitchFacingPortKeySetFromSTPManagedAliasCorrelation(
-			switchFacingPortKeys,
-			adjacencies,
-			ifIndexByDeviceName,
-			rawFDBObservations,
-			reporterAliases,
-		)
-	}
 	macLinks := seedMacLinks
-	if strategyConfig.filterSwitchFacingAttachments {
-		macLinks = filterBridgeMacLinkRecordsBySwitchFacing(seedMacLinks, switchFacingPortKeys, managedAliasEndpointIDs)
-	}
 	model := buildBridgeDomainModel(bridgeLinks, macLinks)
 	if len(model.domains) == 0 {
 		return out
@@ -712,8 +694,8 @@ func projectSegmentTopology(
 	}
 	rawFDBReporterHints := buildFDBEndpointReporterHints(seedMacLinks)
 	fdbObservations := buildFDBReporterObservations(macLinks)
-	fdbOwners := inferFDBEndpointOwners(fdbObservations, reporterAliases, switchFacingPortKeys)
-	for endpointID, owner := range inferSinglePortEndpointOwners(macLinks, switchFacingPortKeys) {
+	fdbOwners := inferFDBEndpointOwners(fdbObservations, reporterAliases, deterministicTransitPortKeys)
+	for endpointID, owner := range inferSinglePortEndpointOwners(macLinks, deterministicTransitPortKeys) {
 		if strings.TrimSpace(endpointID) == "" {
 			continue
 		}
