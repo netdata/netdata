@@ -43,6 +43,8 @@ type Config struct {
 
 	DisableServiceDiscovery bool
 
+	DiscoveryProviders []discovery.ProviderFactory
+
 	DumpMode    time.Duration
 	DumpSummary bool
 	DumpDataDir string
@@ -66,6 +68,8 @@ type Agent struct {
 	MinUpdateEvery int
 
 	DisableServiceDiscovery bool
+
+	DiscoveryProviders []discovery.ProviderFactory
 
 	ModuleRegistry collectorapi.Registry
 	Out            io.Writer
@@ -100,6 +104,7 @@ func New(cfg Config) *Agent {
 		RunJob:                    cfg.RunJob,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
 		ModuleRegistry:            cfg.ModuleRegistry,
+		DiscoveryProviders:        cfg.DiscoveryProviders,
 		Out:                       safewriter.Stdout,
 		api:                       netdataapi.New(safewriter.Stdout),
 		quitCh:                    make(chan struct{}, 1),

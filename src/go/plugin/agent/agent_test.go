@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"github.com/stretchr/testify/assert"
@@ -29,7 +31,24 @@ func TestNew(t *testing.T) {
 }
 
 func TestAgent_Run(t *testing.T) {
-	a := New(Config{Name: "nodyncfg"})
+	a := New(Config{
+		Name: "nodyncfg",
+		DiscoveryProviders: []discovery.ProviderFactory{
+			discovery.NewProviderFactory("dummy", func(ctx discovery.BuildContext) (discovery.Discoverer, bool, error) {
+				if len(ctx.DummyNames) == 0 {
+					return nil, false, nil
+				}
+				d, err := dummy.NewDiscovery(dummy.Config{
+					Registry: ctx.Registry,
+					Names:    ctx.DummyNames,
+				})
+				if err != nil {
+					return nil, false, err
+				}
+				return d, true, nil
+			}),
+		},
+	})
 
 	var buf bytes.Buffer
 	a.Out = safewriter.New(&buf)

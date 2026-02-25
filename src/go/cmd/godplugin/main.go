@@ -15,7 +15,9 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
+	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -34,6 +36,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext"
 )
 
 func init() {
@@ -74,10 +77,15 @@ func main() {
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            collectorapi.DefaultRegistry,
-		RunModule:                 opts.Module,
-		RunJob:                    opts.Job,
-		MinUpdateEvery:            opts.UpdateEvery,
-		DumpSummary:               opts.DumpSummary,
+		DiscoveryProviders: []discovery.ProviderFactory{
+			discoveryproviders.File(),
+			discoveryproviders.Dummy(),
+			discoveryproviders.SD(sdext.Registry()),
+		},
+		RunModule:      opts.Module,
+		RunJob:         opts.Job,
+		MinUpdateEvery: opts.UpdateEvery,
+		DumpSummary:    opts.DumpSummary,
 	})
 
 	a.Infof("plugin: name=%s, %s", a.Name, buildinfo.Info())

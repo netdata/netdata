@@ -11,7 +11,9 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
+	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
@@ -66,11 +68,16 @@ func main() {
 		CollectorsConfigWatchPath: watchPaths,
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            collectorapi.DefaultRegistry,
-		RunModule:                 opts.Module,
-		RunJob:                    opts.Job,
-		MinUpdateEvery:            opts.UpdateEvery,
-		DumpSummary:               opts.DumpSummary,
-		DisableServiceDiscovery:   true,
+		DiscoveryProviders: []discovery.ProviderFactory{
+			discoveryproviders.File(),
+			discoveryproviders.Dummy(),
+			discoveryproviders.SD(nil),
+		},
+		RunModule:               opts.Module,
+		RunJob:                  opts.Job,
+		MinUpdateEvery:          opts.UpdateEvery,
+		DumpSummary:             opts.DumpSummary,
+		DisableServiceDiscovery: true,
 	})
 
 	a.Debugf("plugin: name=%s, %s", a.Name, buildinfo.Info())

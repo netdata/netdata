@@ -8,6 +8,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
 
 type (
@@ -27,10 +28,14 @@ type (
 		VarLibDir                 string
 	}
 	BuildContext struct {
-		Policy   PlatformPolicy
-		Identity PluginIdentity
-		Out      io.Writer
-		Paths    PathsConfig
+		Policy     PlatformPolicy
+		Identity   PluginIdentity
+		Out        io.Writer
+		Paths      PathsConfig
+		Registry   confgroup.Registry
+		ReadPaths  []string
+		DummyNames []string
+		FnReg      functions.Registry
 	}
 )
 

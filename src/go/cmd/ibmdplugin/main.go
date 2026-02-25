@@ -15,7 +15,9 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
+	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
@@ -88,11 +90,16 @@ func main() {
 	}
 
 	a := agent.New(agent.Config{
-		Name:                    executable.Name,
-		PluginConfigDir:         pluginconfig.ConfigDir(),
-		CollectorsConfigDir:     pluginconfig.CollectorsDir(),
-		VarLibDir:               pluginconfig.VarLibDir(),
-		ModuleRegistry:          collectorapi.DefaultRegistry,
+		Name:                executable.Name,
+		PluginConfigDir:     pluginconfig.ConfigDir(),
+		CollectorsConfigDir: pluginconfig.CollectorsDir(),
+		VarLibDir:           pluginconfig.VarLibDir(),
+		ModuleRegistry:      collectorapi.DefaultRegistry,
+		DiscoveryProviders: []discovery.ProviderFactory{
+			discoveryproviders.File(),
+			discoveryproviders.Dummy(),
+			discoveryproviders.SD(nil),
+		},
 		RunModule:               opts.Module,
 		RunJob:                  opts.Job,
 		MinUpdateEvery:          opts.UpdateEvery,

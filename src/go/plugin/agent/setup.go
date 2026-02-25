@@ -9,14 +9,10 @@ import (
 
 	hostinfo2 "github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext"
 	"gopkg.in/yaml.v2"
 )
 
@@ -91,6 +87,13 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 
 	var readPaths, dummyPaths []string
 
+	watchPaths := a.CollectorsConfigWatchPath
+	sdConfDir := a.ServiceDiscoveryConfigDir
+	if a.DisableServiceDiscovery {
+		dummyPaths = nil
+		sdConfDir = nil
+	}
+
 	cfg := discovery.Config{
 		Registry: reg,
 		BuildContext: discovery.BuildContext{
@@ -106,34 +109,30 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 			Paths: discovery.PathsConfig{
 				PluginConfigDir:           a.ConfigDir,
 				CollectorsConfigDir:       a.CollectorsConfDir,
-				CollectorsConfigWatchPath: a.CollectorsConfigWatchPath,
-				ServiceDiscoveryConfigDir: a.ServiceDiscoveryConfigDir,
+				CollectorsConfigWatchPath: watchPaths,
+				ServiceDiscoveryConfigDir: sdConfDir,
 				VarLibDir:                 a.VarLibDir,
 			},
+			Registry:   reg,
+			ReadPaths:  readPaths,
+			DummyNames: dummyPaths,
+			FnReg:      fnReg,
 		},
+		Providers: append([]discovery.ProviderFactory(nil), a.DiscoveryProviders...),
 	}
 
 	if len(a.CollectorsConfDir) == 0 {
 		if hostinfo2.IsInsideK8sCluster() {
+			cfg.Providers = nil
 			return cfg
 		}
 		a.Info("modules conf dir not provided, will use default config for all enabled modules")
 		for name := range enabled {
 			dummyPaths = append(dummyPaths, name)
 		}
-		dummyCfg := dummy.Config{
-			Registry: reg,
-			Names:    dummyPaths,
-		}
-		cfg.Providers = append(cfg.Providers,
-			discovery.NewProviderFactory("dummy", func(discovery.BuildContext) (discovery.Discoverer, bool, error) {
-				d, err := dummy.NewDiscovery(dummyCfg)
-				if err != nil {
-					return nil, false, err
-				}
-				return d, true, nil
-			}),
-		)
+		watchPaths = nil
+		cfg.BuildContext.Paths.CollectorsConfigWatchPath = watchPaths
+		cfg.BuildContext.DummyNames = dummyPaths
 		return cfg
 	}
 
@@ -161,61 +160,10 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 	}
 
 	a.Infof("dummy/read/watch paths: %d/%d/%d", len(dummyPaths), len(readPaths), len(a.CollectorsConfigWatchPath))
-	fileCfg := file.Config{
-		Registry: reg,
-		Read:     readPaths,
-		Watch:    a.CollectorsConfigWatchPath,
-	}
-	cfg.Providers = append(cfg.Providers,
-		discovery.NewProviderFactory("file", func(discovery.BuildContext) (discovery.Discoverer, bool, error) {
-			if len(fileCfg.Read)+len(fileCfg.Watch) == 0 {
-				return nil, false, nil
-			}
-			d, err := file.NewDiscovery(fileCfg)
-			if err != nil {
-				return nil, false, err
-			}
-			return d, true, nil
-		}),
-	)
-
-	if !a.DisableServiceDiscovery {
-		dummyCfg := dummy.Config{
-			Registry: reg,
-			Names:    dummyPaths,
-		}
-		cfg.Providers = append(cfg.Providers,
-			discovery.NewProviderFactory("dummy", func(discovery.BuildContext) (discovery.Discoverer, bool, error) {
-				if len(dummyCfg.Names) == 0 {
-					return nil, false, nil
-				}
-				d, err := dummy.NewDiscovery(dummyCfg)
-				if err != nil {
-					return nil, false, err
-				}
-				return d, true, nil
-			}),
-		)
-
-		sdCfg := sd.Config{
-			ConfigDefaults: reg,
-			ConfDir:        a.ServiceDiscoveryConfigDir,
-			FnReg:          fnReg,
-			Discoverers:    sdext.Registry(),
-		}
-		cfg.Providers = append(cfg.Providers,
-			discovery.NewProviderFactory("sd", func(discovery.BuildContext) (discovery.Discoverer, bool, error) {
-				if len(sdCfg.ConfDir) == 0 {
-					return nil, false, nil
-				}
-				d, err := sd.NewServiceDiscovery(sdCfg)
-				if err != nil {
-					return nil, false, err
-				}
-				return d, true, nil
-			}),
-		)
-	}
+	cfg.BuildContext.Paths.CollectorsConfigWatchPath = watchPaths
+	cfg.BuildContext.Paths.ServiceDiscoveryConfigDir = sdConfDir
+	cfg.BuildContext.ReadPaths = readPaths
+	cfg.BuildContext.DummyNames = dummyPaths
 
 	return cfg
 }
