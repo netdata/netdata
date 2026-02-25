@@ -32,7 +32,7 @@ func TestDyncfgConfig_ShutdownDoesNotQueue(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			var buf bytes.Buffer
 
-			mgr := New(Config{})
+			mgr := New(Config{PluginName: testPluginName})
 			mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
 
 			ctx, cancel := context.WithCancel(context.Background())

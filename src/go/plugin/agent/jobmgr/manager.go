@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
@@ -109,7 +108,7 @@ func New(cfg Config) *Manager {
 			return cfg.FullName()
 		},
 
-		Path:                    fmt.Sprintf(dyncfgCollectorPath, executable.Name),
+		Path:                    fmt.Sprintf(dyncfgCollectorPath, cfg.PluginName),
 		EnableFailCode:          200,
 		RemoveStockOnEnableFail: true,
 		JobCommands: []dyncfg.Command{

@@ -36,6 +36,7 @@ func TestNewManager(t *testing.T) {
 				Providers: []ProviderFactory{
 					NewProviderFactory("sd", func(BuildContext) (Discoverer, bool, error) {
 						d, err := sd.NewServiceDiscovery(sd.Config{
+							PluginName:  "test",
 							ConfDir:     []string{"path"},
 							Discoverers: sd.NewRegistry(),
 						})

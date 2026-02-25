@@ -21,6 +21,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testPluginName = "test"
+
 type wantExposedEntry struct {
 	cfg    confgroup.Config
 	status dyncfg.Status
@@ -42,7 +44,7 @@ func (s *runSim) run(t *testing.T) {
 	require.NotNil(t, s.do, "s.do is nil")
 
 	var buf bytes.Buffer
-	mgr := New(Config{})
+	mgr := New(Config{PluginName: testPluginName})
 	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
 	mgr.modules = prepareMockRegistry()
 

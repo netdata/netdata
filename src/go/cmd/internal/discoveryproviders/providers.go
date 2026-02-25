@@ -52,6 +52,7 @@ func SD(registry sd.Registry) discovery.ProviderFactory {
 
 		d, err := sd.NewServiceDiscovery(sd.Config{
 			ConfigDefaults: ctx.Registry,
+			PluginName:     ctx.Identity.Name,
 			ConfDir:        ctx.Paths.ServiceDiscoveryConfigDir,
 			FnReg:          ctx.FnReg,
 			Discoverers:    registry,

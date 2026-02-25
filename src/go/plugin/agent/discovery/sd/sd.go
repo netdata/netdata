@@ -15,7 +15,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
@@ -23,6 +22,7 @@ import (
 
 type Config struct {
 	ConfigDefaults confgroup.Registry
+	PluginName     string
 	ConfDir        multipath.MultiPath
 	FnReg          functions.Registry
 	Discoverers    Registry
@@ -40,6 +40,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		Logger:         log,
 		confProv:       newConfFileReader(log, cfg.ConfDir),
 		configDefaults: cfg.ConfigDefaults,
+		pluginName:     cfg.PluginName,
 		fnReg:          cfg.FnReg,
 		discoverers:    cfg.Discoverers,
 		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
@@ -61,7 +62,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 			return cfg.PipelineKey()
 		},
 
-		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		Path:           fmt.Sprintf(dyncfgSDPath, cfg.PluginName),
 		EnableFailCode: 422,
 		JobCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
@@ -84,6 +85,7 @@ type (
 		confProv confFileProvider
 
 		configDefaults confgroup.Registry
+		pluginName     string
 		fnReg          functions.Registry
 		discoverers    Registry
 		dyncfgApi      *dyncfg.Responder
