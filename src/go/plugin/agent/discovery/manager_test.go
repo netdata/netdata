@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,15 @@ func TestNewManager(t *testing.T) {
 			cfg: Config{
 				Registry: confgroup.Registry{"module1": confgroup.Default{}},
 				File:     file.Config{Read: []string{"path"}},
+			},
+		},
+		"valid config, sd only": {
+			cfg: Config{
+				Registry: confgroup.Registry{"module1": confgroup.Default{}},
+				SD: sd.Config{
+					ConfDir:     []string{"path"},
+					Discoverers: sd.NewRegistry(),
+				},
 			},
 		},
 		"invalid config, registry not set": {
