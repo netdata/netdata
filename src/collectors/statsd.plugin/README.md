@@ -250,7 +250,7 @@ When sending multiple metrics in a UDP message, keep the total size under the ne
 
 :::important
 
-Netdata will accept UDP packets up to 9000 bytes, but your network equipment may fragment any packets exceeding the MTU.
+Netdata will accept UDP packets up to 65536 bytes, but your network equipment may fragment any packets exceeding the MTU.
 
 :::
 
