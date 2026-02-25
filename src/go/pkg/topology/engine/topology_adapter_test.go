@@ -1114,7 +1114,7 @@ func TestToTopologyData_ProbableConnectivityCreatesPortlessAttachmentForZeroCand
 	require.Equal(t, 1, bridgeCount)
 }
 
-func TestToTopologyData_InferenceStrategy_STPParentSuppressesFDBOnInterSwitchPorts(t *testing.T) {
+func TestToTopologyData_InferenceStrategy_STPParentDoesNotSuppressFDBEndpointOwnership(t *testing.T) {
 	result := Result{
 		Devices: []Device{
 			{
@@ -1164,7 +1164,7 @@ func TestToTopologyData_InferenceStrategy_STPParentSuppressesFDBOnInterSwitchPor
 		InferenceStrategy: topologyInferenceStrategySTPParentTree,
 	})
 	require.Equal(t, topologyInferenceStrategySTPParentTree, stpData.Stats["inference_strategy"])
-	require.Equal(t, 0, stpData.Stats["links_fdb_endpoint_emitted"])
+	require.Greater(t, stpData.Stats["links_fdb_endpoint_emitted"].(int), 0)
 }
 
 func TestToTopologyData_InferenceStrategy_CDPHybridPrefersCDPBridgeLinks(t *testing.T) {
@@ -2264,6 +2264,60 @@ func TestToTopologyData_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(
 
 	require.Equal(t, 0, data.Stats["links_fdb_endpoint_emitted"])
 	require.Nil(t, findActorByType(data.Actors, "segment"))
+}
+
+func TestToTopologyData_SwitchFacingPortDoesNotSuppressEndpointOwnership(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "switch-a",
+				Hostname:  "switch-a",
+				ChassisID: "aa:aa:aa:aa:aa:aa",
+			},
+			{
+				ID:        "switch-b",
+				Hostname:  "switch-b",
+				ChassisID: "bb:bb:bb:bb:bb:bb",
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "switch-a", IfIndex: 1, IfName: "Gi0/1", MAC: "aa:aa:aa:aa:aa:aa"},
+			{DeviceID: "switch-b", IfIndex: 1, IfName: "Gi0/1", MAC: "bb:bb:bb:bb:bb:bb"},
+		},
+		Attachments: []Attachment{
+			// Reciprocal managed-alias observations make this a switch-facing bridge pair.
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:bb:bb:bb:bb:bb:bb", Method: "fdb"},
+			{DeviceID: "switch-b", IfIndex: 1, EndpointID: "mac:aa:aa:aa:aa:aa:aa", Method: "fdb"},
+			// Host endpoint learned on the same switch-facing port.
+			{DeviceID: "switch-a", IfIndex: 1, EndpointID: "mac:00:00:00:00:00:11", Method: "fdb"},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source:            "snmp",
+		Layer:             "2",
+		View:              "summary",
+		InferenceStrategy: topologyInferenceStrategyFDBPairwise,
+	})
+
+	actor := findActorBySysName(data.Actors, "switch-a")
+	require.NotNil(t, actor)
+
+	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
+	require.True(t, ok)
+	port1 := findInterfaceStatusByIndex(statuses, 1)
+	require.Equal(t, "switch_facing", port1["topology_role"])
+
+	targetLinks := findFDBLinksByEndpointMAC(data.Links, "00:00:00:00:00:11")
+	require.Len(t, targetLinks, 1)
+	segmentActor := findActorByMatch(data.Actors, targetLinks[0].Src.Match)
+	require.NotNil(t, segmentActor)
+	parentDevices, ok := segmentActor.Attributes["parent_devices"].([]string)
+	require.True(t, ok)
+	require.Contains(t, parentDevices, "switch-a")
+	ifNames, ok := segmentActor.Attributes["if_names"].([]string)
+	require.True(t, ok)
+	require.Contains(t, ifNames, "Gi0/1")
 }
 
 func TestSuppressInferredBridgeLinksOnDeterministicDiscovery(t *testing.T) {
