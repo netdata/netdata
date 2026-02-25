@@ -20,9 +20,11 @@ type topologyObservationSnapshot struct {
 }
 
 type topologyQueryOptions struct {
-	CollapseActorsByIP        bool
-	EliminateNonIPInferred    bool
-	ProbabilisticConnectivity bool
+	CollapseActorsByIP     bool
+	EliminateNonIPInferred bool
+	MapType                string
+	ManagedDeviceFocus     string
+	Depth                  int
 }
 
 func (c *topologyCache) snapshotEngineObservations() (topologyObservationSnapshot, bool) {
@@ -64,6 +66,11 @@ type topologyRegistry struct {
 	caches map[*topologyCache]struct{}
 }
 
+type topologyManagedFocusTarget struct {
+	Value string
+	Name  string
+}
+
 func newTopologyRegistry() *topologyRegistry {
 	return &topologyRegistry{
 		caches: make(map[*topologyCache]struct{}),
@@ -92,9 +99,11 @@ func (r *topologyRegistry) unregister(cache *topologyCache) {
 
 func (r *topologyRegistry) snapshot() (topologyData, bool) {
 	return r.snapshotWithOptions(topologyQueryOptions{
-		CollapseActorsByIP:        true,
-		EliminateNonIPInferred:    true,
-		ProbabilisticConnectivity: true,
+		CollapseActorsByIP:     true,
+		EliminateNonIPInferred: true,
+		MapType:                topologyMapTypeLLDPCDPManaged,
+		ManagedDeviceFocus:     topologyManagedFocusAllDevices,
+		Depth:                  topologyDepthAllInternal,
 	})
 }
 
@@ -102,6 +111,7 @@ func (r *topologyRegistry) snapshotWithOptions(options topologyQueryOptions) (to
 	if r == nil {
 		return topologyData{}, false
 	}
+	options = normalizeTopologyQueryOptions(options)
 
 	r.mu.RLock()
 	caches := make([]*topologyCache, 0, len(r.caches))
@@ -176,17 +186,148 @@ func (r *topologyRegistry) snapshotWithOptions(options topologyQueryOptions) (to
 		}
 	}
 
-	l2Data, l2OK := buildSNMPL2TopologyData(l2Observations, agentID, localDeviceID, collectedAt, options)
-	if !l2OK {
+	if options.MapType != topologyMapTypeAllDevicesLowConfidence {
+		data, ok := buildSNMPL2TopologyData(
+			l2Observations,
+			agentID,
+			localDeviceID,
+			collectedAt,
+			options,
+		)
+		if !ok {
+			return topologyData{}, false
+		}
+		for _, snapshot := range snapshots {
+			augmentLocalActorFromCache(&data, snapshot.localDevice)
+		}
+		applySNMPTopologyOutputPolicies(&data, options)
+		applyTopologyDepthFocusFilter(&data, options)
+		return data, true
+	}
+
+	strictOptions := options
+	strictOptions.MapType = topologyMapTypeHighConfidenceInferred
+	strictData, strictOK := buildSNMPL2TopologyData(
+		l2Observations,
+		agentID,
+		localDeviceID,
+		collectedAt,
+		strictOptions,
+	)
+	if !strictOK {
 		return topologyData{}, false
 	}
-	data := l2Data
 	for _, snapshot := range snapshots {
-		augmentLocalActorFromCache(&data, snapshot.localDevice)
+		augmentLocalActorFromCache(&strictData, snapshot.localDevice)
 	}
-	applySNMPTopologyOutputPolicies(&data, options)
+	applySNMPTopologyOutputPolicies(&strictData, strictOptions)
 
-	return data, true
+	probableOptions := options
+	probableOptions.MapType = topologyMapTypeAllDevicesLowConfidence
+	probableData, probableOK := buildSNMPL2TopologyData(
+		l2Observations,
+		agentID,
+		localDeviceID,
+		collectedAt,
+		probableOptions,
+	)
+	if !probableOK {
+		return topologyData{}, false
+	}
+	for _, snapshot := range snapshots {
+		augmentLocalActorFromCache(&probableData, snapshot.localDevice)
+	}
+	applySNMPTopologyOutputPolicies(&probableData, probableOptions)
+	markProbableDeltaLinks(&strictData, &probableData)
+	applyTopologyDepthFocusFilter(&probableData, options)
+	return probableData, true
+}
+
+func normalizeTopologyQueryOptions(options topologyQueryOptions) topologyQueryOptions {
+	if normalizeTopologyMapType(options.MapType) == "" {
+		options.MapType = topologyMapTypeLLDPCDPManaged
+	}
+	if normalizeTopologyManagedFocus(options.ManagedDeviceFocus) == "" {
+		options.ManagedDeviceFocus = topologyManagedFocusAllDevices
+	}
+	if options.Depth != topologyDepthAllInternal {
+		if options.Depth < topologyDepthMin {
+			options.Depth = topologyDepthMin
+		} else if options.Depth > topologyDepthMax {
+			options.Depth = topologyDepthMax
+		}
+	}
+	return options
+}
+
+func (r *topologyRegistry) managedDeviceFocusTargets() []topologyManagedFocusTarget {
+	if r == nil {
+		return nil
+	}
+
+	r.mu.RLock()
+	caches := make([]*topologyCache, 0, len(r.caches))
+	for cache := range r.caches {
+		caches = append(caches, cache)
+	}
+	r.mu.RUnlock()
+
+	if len(caches) == 0 {
+		return nil
+	}
+
+	targetByValue := make(map[string]topologyManagedFocusTarget)
+	for _, cache := range caches {
+		snapshot, ok := cache.snapshotEngineObservations()
+		if !ok {
+			continue
+		}
+		managementIP := normalizeIPAddress(snapshot.localDevice.ManagementIP)
+		if managementIP == "" && len(snapshot.l2Observations) > 0 {
+			managementIP = normalizeIPAddress(snapshot.l2Observations[0].ManagementIP)
+		}
+		if managementIP == "" {
+			continue
+		}
+		value := topologyManagedFocusIPPrefix + managementIP
+
+		displayName := strings.TrimSpace(snapshot.localDevice.SysName)
+		if displayName == "" && len(snapshot.l2Observations) > 0 {
+			displayName = strings.TrimSpace(snapshot.l2Observations[0].Hostname)
+		}
+		if displayName == "" {
+			displayName = managementIP
+		}
+		label := displayName
+		if !strings.EqualFold(displayName, managementIP) {
+			label = displayName + " (" + managementIP + ")"
+		}
+		existing, exists := targetByValue[value]
+		if !exists || label < existing.Name {
+			targetByValue[value] = topologyManagedFocusTarget{
+				Value: value,
+				Name:  label,
+			}
+		}
+	}
+
+	if len(targetByValue) == 0 {
+		return nil
+	}
+
+	out := make([]topologyManagedFocusTarget, 0, len(targetByValue))
+	for _, target := range targetByValue {
+		out = append(out, target)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		leftName := strings.ToLower(strings.TrimSpace(out[i].Name))
+		rightName := strings.ToLower(strings.TrimSpace(out[j].Name))
+		if leftName != rightName {
+			return leftName < rightName
+		}
+		return out[i].Value < out[j].Value
+	})
+	return out
 }
 
 func buildSNMPL2TopologyData(
@@ -216,6 +357,6 @@ func buildSNMPL2TopologyData(
 		ResolveDNSName:            resolveTopologyReverseDNSName,
 		CollapseActorsByIP:        queryOptions.CollapseActorsByIP,
 		EliminateNonIPInferred:    queryOptions.EliminateNonIPInferred,
-		ProbabilisticConnectivity: queryOptions.ProbabilisticConnectivity,
+		ProbabilisticConnectivity: isTopologyMapTypeProbable(queryOptions.MapType),
 	}), true
 }

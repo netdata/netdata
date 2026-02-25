@@ -568,10 +568,20 @@ func projectSegmentTopology(
 	deviceIdentityByID := buildDeviceIdentityKeySetByID(deviceByID, adjacencies, ifaceByDeviceIndex)
 	reporterSegmentIndex := buildSegmentReporterIndex(segmentIDs, segmentByID)
 	aliasOwnerIDs := buildFDBAliasOwnerMap(reporterAliases)
+	managedDeviceIDs := make(map[string]struct{}, len(deviceByID))
+	for deviceID := range deviceByID {
+		deviceID = strings.TrimSpace(deviceID)
+		if deviceID == "" {
+			continue
+		}
+		managedDeviceIDs[deviceID] = struct{}{}
+	}
+	managedDeviceIDList := sortedTopologySet(managedDeviceIDs)
 	allowedEndpointBySegment := make(map[string]map[string]struct{})
 	strictEndpointBySegment := make(map[string]map[string]struct{})
 	probableEndpointBySegment := make(map[string]map[string]struct{})
 	probableAttachmentModeBySegment := make(map[string]map[string]string)
+	assignedEndpoints := make(map[string]struct{}, len(endpointMatchByID))
 	allowEndpoint := func(segmentID, endpointID string, probable bool, probableMode string) {
 		if strings.TrimSpace(segmentID) == "" || strings.TrimSpace(endpointID) == "" {
 			return
@@ -583,6 +593,7 @@ func projectSegmentTopology(
 			allowedEndpointBySegment[segmentID] = allowed
 		}
 		allowed[endpointID] = struct{}{}
+		assignedEndpoints[endpointID] = struct{}{}
 
 		if !probable {
 			strictSet := strictEndpointBySegment[segmentID]
@@ -676,6 +687,7 @@ func projectSegmentTopology(
 					rawFDBObservations.byEndpoint[normalizeFDBEndpointID(endpointID)],
 					reporterSegmentIndex,
 					aliasOwnerIDs,
+					managedDeviceIDs,
 				)
 			}
 
@@ -688,6 +700,48 @@ func projectSegmentTopology(
 			if segmentID == "" && len(probableCandidates) > 0 {
 				segmentID = probableCandidates[0]
 			}
+			if segmentID != "" && !segmentHasManagedPort(segmentByID[segmentID], managedDeviceIDs) {
+				hint := selectProbableEndpointReporterHint(
+					endpointLabelsByID[endpointID],
+					rawFDBReporterHints[normalizeFDBEndpointID(endpointID)],
+					fdbOwners[endpointID],
+					aliasOwnerIDs,
+					managedDeviceIDs,
+				)
+				hint = ensureManagedProbableReporterHint(
+					hint,
+					endpointLabelsByID[endpointID],
+					rawFDBReporterHints[normalizeFDBEndpointID(endpointID)],
+					aliasOwnerIDs,
+					managedDeviceIDs,
+					managedDeviceIDList,
+				)
+				if strings.TrimSpace(hint.deviceID) != "" {
+					created := false
+					segmentID, created = ensureProbablePortlessSegment(segmentByID, hint)
+					if created {
+						segmentIDs = append(segmentIDs, segmentID)
+						segmentIfIndexes[segmentID] = make(map[string]struct{})
+						segmentIfNames[segmentID] = make(map[string]struct{})
+						if hint.ifIndex > 0 {
+							segmentIfIndexes[segmentID][strconv.Itoa(hint.ifIndex)] = struct{}{}
+						}
+						if ifName := strings.ToLower(strings.TrimSpace(hint.ifName)); ifName != "" {
+							segmentIfNames[segmentID][ifName] = struct{}{}
+						}
+						match, actor := buildBridgeSegmentActor(segmentID, segmentByID[segmentID], layer, source)
+						keys := topologyMatchIdentityKeys(actor.Match)
+						if len(keys) > 0 && !topologyIdentityIndexOverlaps(actorIndex, keys) {
+							addTopologyIdentityKeys(actorIndex, keys)
+						}
+						out.actors = append(out.actors, actor)
+						segmentMatchByID[segmentID] = match
+					}
+					if seg := segmentByID[segmentID]; seg != nil {
+						seg.addEndpoint(endpointID, "probable")
+					}
+				}
+			}
 
 			if segmentID == "" {
 				hint := selectProbableEndpointReporterHint(
@@ -695,6 +749,15 @@ func projectSegmentTopology(
 					rawFDBReporterHints[normalizeFDBEndpointID(endpointID)],
 					fdbOwners[endpointID],
 					aliasOwnerIDs,
+					managedDeviceIDs,
+				)
+				hint = ensureManagedProbableReporterHint(
+					hint,
+					endpointLabelsByID[endpointID],
+					rawFDBReporterHints[normalizeFDBEndpointID(endpointID)],
+					aliasOwnerIDs,
+					managedDeviceIDs,
+					managedDeviceIDList,
 				)
 				if strings.TrimSpace(hint.deviceID) != "" {
 					created := false
@@ -752,6 +815,58 @@ func projectSegmentTopology(
 			}
 		}
 	}
+	if probabilisticConnectivity && len(managedDeviceIDs) > 0 {
+		for _, endpointID := range endpointIDs {
+			if _, alreadyAssigned := assignedEndpoints[endpointID]; alreadyAssigned {
+				continue
+			}
+			hint := selectProbableEndpointReporterHint(
+				endpointLabelsByID[endpointID],
+				rawFDBReporterHints[normalizeFDBEndpointID(endpointID)],
+				fdbOwners[endpointID],
+				aliasOwnerIDs,
+				managedDeviceIDs,
+			)
+			hint = ensureManagedProbableReporterHint(
+				hint,
+				endpointLabelsByID[endpointID],
+				rawFDBReporterHints[normalizeFDBEndpointID(endpointID)],
+				aliasOwnerIDs,
+				managedDeviceIDs,
+				managedDeviceIDList,
+			)
+			if strings.TrimSpace(hint.deviceID) == "" {
+				continue
+			}
+			created := false
+			segmentID, created := ensureProbablePortlessSegment(segmentByID, hint)
+			if strings.TrimSpace(segmentID) == "" {
+				continue
+			}
+			if created {
+				segmentIDs = append(segmentIDs, segmentID)
+				segmentIfIndexes[segmentID] = make(map[string]struct{})
+				segmentIfNames[segmentID] = make(map[string]struct{})
+				if hint.ifIndex > 0 {
+					segmentIfIndexes[segmentID][strconv.Itoa(hint.ifIndex)] = struct{}{}
+				}
+				if ifName := strings.ToLower(strings.TrimSpace(hint.ifName)); ifName != "" {
+					segmentIfNames[segmentID][ifName] = struct{}{}
+				}
+				match, actor := buildBridgeSegmentActor(segmentID, segmentByID[segmentID], layer, source)
+				keys := topologyMatchIdentityKeys(actor.Match)
+				if len(keys) > 0 && !topologyIdentityIndexOverlaps(actorIndex, keys) {
+					addTopologyIdentityKeys(actorIndex, keys)
+				}
+				out.actors = append(out.actors, actor)
+				segmentMatchByID[segmentID] = match
+			}
+			if seg := segmentByID[segmentID]; seg != nil {
+				seg.addEndpoint(endpointID, "probable")
+			}
+			allowEndpoint(segmentID, endpointID, true, "probable_portless")
+		}
+	}
 	sort.Strings(segmentIDs)
 
 	probableOnlyAnchorPortIDBySegment := make(map[string]string)
@@ -766,7 +881,7 @@ func projectSegmentTopology(
 		if segment == nil {
 			continue
 		}
-		if portID := pickProbableSegmentAnchorPortID(segment, probableEndpointBySegment[segmentID], fdbOwners); portID != "" {
+		if portID := pickProbableSegmentAnchorPortID(segment, probableEndpointBySegment[segmentID], fdbOwners, managedDeviceIDs); portID != "" {
 			probableOnlyAnchorPortIDBySegment[segmentID] = portID
 		}
 	}
@@ -1045,6 +1160,7 @@ func pickProbableSegmentAnchorPortID(
 	segment *bridgeDomainSegment,
 	probableEndpoints map[string]struct{},
 	fdbOwners map[string]fdbEndpointOwner,
+	managedDeviceIDs map[string]struct{},
 ) string {
 	if segment == nil || len(segment.ports) == 0 {
 		return ""
@@ -1053,6 +1169,7 @@ func pickProbableSegmentAnchorPortID(
 	portIDs := make([]string, 0, len(segment.ports))
 	portIDByObservation := make(map[string]string, len(segment.ports)*2)
 	designatedPortID := ""
+	managedPortIDs := make(map[string]struct{})
 	for portID, port := range segment.ports {
 		portIDs = append(portIDs, portID)
 		if key := bridgePortObservationKey(port); key != "" {
@@ -1064,8 +1181,23 @@ func pickProbableSegmentAnchorPortID(
 		if segment.portIdentityKey(port) == segment.portIdentityKey(segment.designatedPort) {
 			designatedPortID = portID
 		}
+		if len(managedDeviceIDs) == 0 {
+			managedPortIDs[portID] = struct{}{}
+			continue
+		}
+		if _, ok := managedDeviceIDs[strings.TrimSpace(port.deviceID)]; ok {
+			managedPortIDs[portID] = struct{}{}
+		}
 	}
 	sort.Strings(portIDs)
+	preferManaged := len(managedPortIDs) > 0
+	allowPortID := func(portID string) bool {
+		if !preferManaged {
+			return true
+		}
+		_, ok := managedPortIDs[portID]
+		return ok
+	}
 
 	endpointIDs := sortedTopologySet(probableEndpoints)
 	for _, endpointID := range endpointIDs {
@@ -1074,17 +1206,49 @@ func pickProbableSegmentAnchorPortID(
 			continue
 		}
 		if portID, ok := portIDByObservation[owner.portVLANKey]; ok {
-			return portID
+			if allowPortID(portID) {
+				return portID
+			}
 		}
 		if portID, ok := portIDByObservation[owner.portKey]; ok {
-			return portID
+			if allowPortID(portID) {
+				return portID
+			}
 		}
 	}
 
+	if designatedPortID != "" && allowPortID(designatedPortID) {
+		return designatedPortID
+	}
+	if preferManaged {
+		managedPortIDList := make([]string, 0, len(managedPortIDs))
+		for portID := range managedPortIDs {
+			managedPortIDList = append(managedPortIDList, portID)
+		}
+		sort.Strings(managedPortIDList)
+		if len(managedPortIDList) > 0 {
+			return managedPortIDList[0]
+		}
+	}
 	if designatedPortID != "" {
 		return designatedPortID
 	}
 	return portIDs[0]
+}
+
+func segmentHasManagedPort(segment *bridgeDomainSegment, managedDeviceIDs map[string]struct{}) bool {
+	if segment == nil || len(segment.ports) == 0 {
+		return false
+	}
+	if len(managedDeviceIDs) == 0 {
+		return true
+	}
+	for _, port := range segment.ports {
+		if _, ok := managedDeviceIDs[strings.TrimSpace(port.deviceID)]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func pickMostProbableSegment(
@@ -1368,6 +1532,7 @@ func probableCandidateSegmentsFromReporterHints(
 	fdbReporters map[string]map[string]struct{},
 	reporterSegmentIndex segmentReporterIndex,
 	aliasOwnerIDs map[string]map[string]struct{},
+	managedDeviceIDs map[string]struct{},
 ) []string {
 	deviceIDs := resolveTopologyEndpointDeviceHints(
 		topologyEndpointLabelDeviceIDs(endpointLabels),
@@ -1383,6 +1548,7 @@ func probableCandidateSegmentsFromReporterHints(
 		}
 		deviceIDs = resolveTopologyEndpointDeviceHints(deviceIDs, aliasOwnerIDs)
 	}
+	deviceIDs = filterManagedDeviceHints(deviceIDs, managedDeviceIDs)
 	if len(deviceIDs) == 0 {
 		return nil
 	}
@@ -1445,12 +1611,23 @@ func selectProbableEndpointReporterHint(
 	reporterHints map[string][]bridgePortRef,
 	owner fdbEndpointOwner,
 	aliasOwnerIDs map[string]map[string]struct{},
+	managedDeviceIDs map[string]struct{},
 ) probableEndpointReporterHint {
-	if strings.TrimSpace(owner.port.deviceID) != "" {
-		return probableEndpointReporterHint{
-			deviceID: strings.TrimSpace(owner.port.deviceID),
-			ifIndex:  owner.port.ifIndex,
-			ifName:   strings.TrimSpace(owner.port.ifName),
+	ownerDeviceID := strings.TrimSpace(owner.port.deviceID)
+	if ownerDeviceID != "" {
+		if len(managedDeviceIDs) == 0 {
+			return probableEndpointReporterHint{
+				deviceID: ownerDeviceID,
+				ifIndex:  owner.port.ifIndex,
+				ifName:   strings.TrimSpace(owner.port.ifName),
+			}
+		}
+		if _, ok := managedDeviceIDs[ownerDeviceID]; ok {
+			return probableEndpointReporterHint{
+				deviceID: ownerDeviceID,
+				ifIndex:  owner.port.ifIndex,
+				ifName:   strings.TrimSpace(owner.port.ifName),
+			}
 		}
 	}
 
@@ -1468,6 +1645,7 @@ func selectProbableEndpointReporterHint(
 		}
 		deviceIDs = resolveTopologyEndpointDeviceHints(deviceIDs, aliasOwnerIDs)
 	}
+	deviceIDs = filterManagedDeviceHints(deviceIDs, managedDeviceIDs)
 	if len(deviceIDs) == 0 {
 		return probableEndpointReporterHint{}
 	}
@@ -1523,6 +1701,111 @@ func selectProbableEndpointReporterHint(
 		hint.ifName = "0"
 	}
 	return hint
+}
+
+func ensureManagedProbableReporterHint(
+	hint probableEndpointReporterHint,
+	endpointLabels map[string]string,
+	reporterHints map[string][]bridgePortRef,
+	aliasOwnerIDs map[string]map[string]struct{},
+	managedDeviceIDs map[string]struct{},
+	managedDeviceIDList []string,
+) probableEndpointReporterHint {
+	if len(managedDeviceIDs) == 0 {
+		return hint
+	}
+	deviceID := strings.TrimSpace(hint.deviceID)
+	if deviceID != "" {
+		if _, ok := managedDeviceIDs[deviceID]; ok {
+			return hint
+		}
+	}
+
+	deviceIDs := resolveTopologyEndpointDeviceHints(
+		topologyEndpointLabelDeviceIDs(endpointLabels),
+		aliasOwnerIDs,
+	)
+	if len(deviceIDs) == 0 {
+		for reporterID := range reporterHints {
+			reporterID = strings.TrimSpace(reporterID)
+			if reporterID == "" {
+				continue
+			}
+			deviceIDs = append(deviceIDs, reporterID)
+		}
+		deviceIDs = resolveTopologyEndpointDeviceHints(deviceIDs, aliasOwnerIDs)
+	}
+	deviceIDs = filterManagedDeviceHints(deviceIDs, managedDeviceIDs)
+	if len(deviceIDs) == 0 {
+		deviceIDs = managedDeviceIDList
+	}
+	if len(deviceIDs) == 0 {
+		return probableEndpointReporterHint{}
+	}
+
+	hint.deviceID = strings.TrimSpace(deviceIDs[0])
+
+	ports := reporterHints[hint.deviceID]
+	if len(ports) > 0 {
+		sort.SliceStable(ports, func(i, j int) bool {
+			return bridgePortRefSortKey(ports[i]) < bridgePortRefSortKey(ports[j])
+		})
+		port := ports[0]
+		if hint.ifIndex == 0 && port.ifIndex > 0 {
+			hint.ifIndex = port.ifIndex
+		}
+		if strings.TrimSpace(hint.ifName) == "" && strings.TrimSpace(port.ifName) != "" {
+			hint.ifName = strings.TrimSpace(port.ifName)
+		}
+	}
+	if hint.ifIndex == 0 {
+		for _, value := range labelsCSVToSlice(endpointLabels, "learned_if_indexes") {
+			value = strings.TrimSpace(value)
+			if value == "" {
+				continue
+			}
+			if n, err := strconv.Atoi(value); err == nil && n > 0 {
+				hint.ifIndex = n
+				break
+			}
+		}
+	}
+	if strings.TrimSpace(hint.ifName) == "" {
+		for _, value := range labelsCSVToSlice(endpointLabels, "learned_if_names") {
+			value = strings.TrimSpace(value)
+			if value == "" {
+				continue
+			}
+			hint.ifName = value
+			break
+		}
+	}
+	if hint.ifIndex == 0 && strings.TrimSpace(hint.ifName) == "" {
+		hint.ifName = "0"
+	}
+	return hint
+}
+
+func filterManagedDeviceHints(hints []string, managedDeviceIDs map[string]struct{}) []string {
+	if len(hints) == 0 || len(managedDeviceIDs) == 0 {
+		return hints
+	}
+	managed := make([]string, 0, len(hints))
+	for _, hint := range hints {
+		hint = strings.TrimSpace(hint)
+		if hint == "" {
+			continue
+		}
+		if _, ok := managedDeviceIDs[hint]; ok {
+			managed = append(managed, hint)
+		}
+	}
+	if len(managed) == 0 {
+		return hints
+	}
+	managed = uniqueTopologyStrings(managed)
+	sort.Strings(managed)
+	return managed
 }
 
 func topologyEndpointLabelDeviceIDs(labels map[string]string) []string {

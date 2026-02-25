@@ -1,5 +1,9 @@
 # TODO-topology-library-phase2-direct-port
 
+## 0) Compatibility Policy (Mandatory)
+- Topology function/API in this workstream is **new** and has **no backward-compatibility requirement**.
+- Breaking parameter/schema changes are allowed when they simplify correctness and remove ambiguity.
+
 ## 0) Auth Token Location (Mandatory)
 - Bearer token for authenticated topology function calls is stored at:
   - `/var/lib/netdata/bearer_tokens/`
@@ -83,6 +87,50 @@
     - parity evidence commands are blocked in this workstation because fixture root is missing:
       - `/tmp/topology-library-repos/enlinkd/features/enlinkd/tests/src/test/resources/linkd`
     - unit/integration go test suites for `engine` and `snmp` pass.
+- [x] A13. Implement selector/depth contract fixes (user-approved).
+  - Backend:
+    - set `map_type` default to `lldp_cdp_managed`,
+    - make `lldp_cdp_managed` execution path return true LLDP/CDP+managed view (no strict-map fallback override),
+    - keep `high_confidence_inferred` and `all_devices_low_confidence` behavior unchanged,
+    - replace managed focus enum with `all_devices` + per-managed-device options (one-by-one),
+    - enforce depth semantics from selected managed device root:
+      - `0`: root only,
+      - `1`: direct neighbors,
+      - `2+`: breadth-first expansion ring-by-ring.
+  - Frontend:
+    - default map type selector to `lldp_cdp_managed`,
+    - managed focus selector should expose `all_devices` + one option per managed SNMP device,
+    - depth control should be rendered in one row as:
+      - `[x] All` toggle + numeric input (`0..10`) when unchecked.
+  - Implemented (2026-02-25):
+    - backend selector defaults and focus contract:
+      - `map_type` default switched to `lldp_cdp_managed`,
+      - non-probable path now honors requested map type (fixed LLDP map falling through strict map),
+      - managed focus now supports:
+        - `all_devices`,
+        - per-device options keyed by `ip:<management-ip>`.
+    - backend depth semantics:
+      - per-device depth focus now resolves roots by selected managed device IP,
+      - depth `0` returns root only (no segment rows),
+      - depth `1+` expands ring-by-ring from the selected root.
+    - frontend controls:
+      - map type default set to `lldp_cdp_managed`,
+      - managed focus rendered via selector with `all_devices` + discovered managed devices one-by-one,
+      - depth rendered as a single row with `[x] All` + numeric input (`0..10`),
+      - when focus is `all_devices`, depth is forced to `all`.
+  - Validation:
+    - backend tests:
+      - `cd src/go && go test ./plugin/go.d/collector/snmp -count=1` passed
+      - `cd src/go && go test ./pkg/topology/engine -count=1` passed
+      - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed
+    - frontend unit test:
+      - `cd ~/src/dashboard/netdata-cloud-frontend.git && npm run -s test -- --runInBand src/domains/functions/topologyUtils.test.js` passed
+  - Install/deploy (2026-02-25):
+    - backend:
+      - `./install.sh` completed,
+      - non-fatal installer warning remains: `git fetch -t` failed (`Permission denied (publickey)`).
+    - frontend:
+      - `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh` completed.
 - [x] A11. Probable connectivity contract hardening (`strict + delta only`).
   - New required behavior:
     - probable pass starts from strict-unlinked endpoints only,
@@ -174,6 +222,38 @@
       - `go run ./tools/topology-parity-evidence --mode suite` passed,
       - `go run ./tools/topology-parity-evidence --mode verify` passed,
       - `go run ./tools/topology-parity-evidence --mode phase2` passed.
+- [x] A12. Investigate intermittent unlinked `10.20.4.15` in probable mode and provide root-cause with payload evidence.
+  - User decision (2026-02-24):
+    - In `All Devices (Low Confidence)` mode, **any unlinked node/endpoint is a bug**.
+    - Fix must be based on **general rules** (portable/reusable), not one-off patches.
+  - Findings (2026-02-24):
+    - In `nodes_identity=mac`, actor `mac:50:2c:c6:a6:fc:35` has one probable FDB link via segment `bridge-domain:chassis-788cb595dfcc|788cb595dfcc|788cb595dfcc||<->macAddress:70:49:a2:65:72:cd|7|7|7|`.
+    - The segment is anchored only by non-IP inferred actor `mac:78:8c:b5:95:df:cc` (`attachment_mode=probable_bridge_anchor`).
+    - In `nodes_identity=ip`, non-IP inferred actors are eliminated (`EliminateNonIPInferred=true`), so the anchor actor is removed; then segment is pruned as sparse and endpoint `10.20.4.15` remains unlinked.
+  - Code points:
+    - identity policy enabling elimination: `src/go/plugin/go.d/collector/snmp/func_topology.go:159-170`
+    - elimination + sparse segment prune order: `src/go/plugin/go.d/collector/snmp/topology_output_policies.go:27-40`
+    - probable anchor selection currently prefers owner-matching port (can be unmanaged): `src/go/pkg/topology/engine/topology_adapter.go:1044-1088`
+  - Required evidence:
+    - actor record for `10.20.4.15` (kind/source/protocols/labels/attributes),
+    - candidate attachment evidence (FDB reporters, learned interfaces, segment candidates),
+    - exact reason it remains unlinked when visible as unlinked.
+  - General-rule fix and validation (2026-02-24):
+    - implemented managed-first probable anchor and reporter-hint selection (no actor/IP-specific logic):
+      - `projectSegmentTopology()` managed-anchor guard and fallback:
+        - `src/go/pkg/topology/engine/topology_adapter.go:700`
+      - managed-aware anchor choice:
+        - `src/go/pkg/topology/engine/topology_adapter.go:1088`
+      - managed-hint filtering:
+        - `src/go/pkg/topology/engine/topology_adapter.go:1459`
+        - `src/go/pkg/topology/engine/topology_adapter.go:1538`
+    - regression tests added:
+      - `src/go/pkg/topology/engine/topology_adapter_test.go:1117`
+      - `src/go/pkg/topology/engine/topology_adapter_test.go:1151`
+      - `src/go/pkg/topology/engine/topology_adapter_test.go:1187`
+    - live checks:
+      - 20 consecutive backend calls in `nodes_identity=ip`, `map_type=all_devices_low_confidence`: `unlinked=0` in all snapshots.
+      - strict->probable delta validation: all added links were marked probable (`added_unmarked=0`).
 - [ ] A7. Investigate `mega` duplicate actor behavior and verify exact connectivity evidence.
   - Evidence required:
     - actor ids, MAC/IP identities, and actor kinds for all `mega*` actors in live payload,
@@ -272,7 +352,32 @@
   - Files:
     - `src/go/pkg/topology/engine/topology_adapter.go`
     - `src/go/pkg/topology/engine/topology_adapter_test.go`
-- [ ] A13. Investigate nondeterministic visibility/linking for `10.20.4.15` (reported "comes and goes", sometimes unlinked).
+- [x] A14. Sanitize office-specific hardcoded artifacts from code/config/tests.
+  - Backend:
+    - updated websocket fuzzing client default URL from office IP to localhost:
+      - `src/web/websocket/autobahn-test-suite/config/fuzzingclient.json`
+  - Frontend:
+    - replaced office subnet values in function tests/mocks with neutral values:
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/flowsUtils.test.js`
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/topologyUtils.test.js`
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/__mocks__/functionTable.json`
+  - Validation:
+    - `cd ~/src/dashboard/netdata-cloud-frontend.git && npm run -s test -- --runInBand src/domains/functions/flowsUtils.test.js src/domains/functions/topologyUtils.test.js` passed.
+- [x] A15. Change topology depth control UI to slider with `0 = All`.
+  - Requested UX:
+    - depth control becomes a single slider,
+    - slider value `0` means `All` (frontend sends `depth=all`),
+    - positive slider values map to backend numeric depths.
+  - Implemented (2026-02-25):
+    - added depth slider control in topology header UI:
+      - `~/src/dashboard/netdata-cloud-frontend.git/src/domains/functions/components/topology/index.js`
+    - semantics:
+      - `0` -> `depth=all`,
+      - `1..10` -> `depth=1..10`.
+    - depth UI is disabled when managed focus is `all_devices` (backend ignores depth in that mode).
+  - Validation:
+    - `cd ~/src/dashboard/netdata-cloud-frontend.git && npm run -s test -- --runInBand src/domains/functions/topologyUtils.test.js` passed.
+- [x] A13. Investigate nondeterministic visibility/linking for `10.20.4.15` (reported "comes and goes", sometimes unlinked).
   - Facts to verify per-snapshot:
     - actor presence,
     - link presence,
@@ -283,6 +388,26 @@
       - `unlinked_count=0` in every sampled snapshot,
       - actor `10.20.4.15` present and linked in every sampled snapshot.
     - This indicates no immediate nondeterminism in sampled backend snapshots; user-reported behavior may be tied to mode/filter changes or data refresh boundaries.
+  - Updated evidence (2026-02-24, current API contract before fix):
+    - repeated local calls (`40` calls, `nodes_identity=ip`, `map_type=all_devices_low_confidence`, `managed_snmp_device_focus=all_devices`, `depth=all`) now show:
+      - `unlinked_count=1` in every sampled snapshot.
+      - unlinked actor is consistently:
+        - `actor_id=mac:50:2c:c6:a6:fc:35`
+        - `attributes.display_name=10.20.4.15`
+        - `learned_device_ids=[macAddress:18:fd:74:7e:c5:80, macAddress:70:49:a2:65:72:cd]`
+  - Root cause:
+    - probable attachment fallback could still keep an endpoint attached to an unmanaged-only probable segment path;
+    - after non-IP elimination + sparse pruning in `nodes_identity=ip`, that path was removed and the endpoint remained unlinked.
+  - Fix (general rule):
+    - enforce managed-anchor probable fallback deterministically for unresolved endpoints and for non-managed chosen probable anchors.
+    - no endpoint/IP-specific branching.
+  - Files:
+    - `src/go/pkg/topology/engine/topology_adapter.go`
+    - `src/go/pkg/topology/engine/topology_adapter_test.go`
+  - Post-fix verification:
+    - repeated local calls (`30` calls, same params) showed:
+      - `unlinked_count=0` in all snapshots,
+      - `mac:50:2c:c6:a6:fc:35` linked in all snapshots (`links=1`).
 - [ ] A14. Make probable/low-confidence link styling fully consistent.
   - Problem statement:
     - some low-confidence paths appear bright cyan while others are dark cyan.
@@ -414,6 +539,70 @@
     - strict graph unchanged,
     - one probable attachment max per strict-unlinked endpoint,
     - probable markers always present for fallback links.
+- [ ] D10. Replace `Non LLDP/CDP Connectivity` control with `Map Type` tri-mode control.
+  - Requested labels/options:
+    - `LLDP/CDP/Managed Devices Map`
+    - `High Confidence Inferred Map`
+    - `All Devices (Low Confidence)`
+  - Decision (Costa, 2026-02-24):
+    - no backward compatibility required for topology API in this workstream,
+    - replace old connectivity param with new `map_type` contract directly.
+- [ ] D11. Strict-mode inferred visibility refinement.
+  - Requested:
+    - hide unlinked inferred endpoints in strict mode,
+    - keep unlinked managed devices visible.
+  - Decision (Costa, 2026-02-24):
+    - apply this as backend output policy for deterministic payload semantics.
+- [ ] D12. Large-map backend subgraph filtering.
+  - Requested params:
+    - `Managed SNMP Device Focus` (`All Devices` | `All Managed SNMP Devices`)
+    - `Depth` (`All` | `0..10`)
+  - Decisions (Costa, 2026-02-24):
+    - hop semantics: collapsed actor-to-actor hops through segments,
+    - focus root-set semantics:
+      - `All Devices` => all actors,
+      - `All Managed SNMP Devices` => managed SNMP actors only.
+- [ ] D13. Graph presentation changes.
+  - Requested:
+    - links should visually account for larger node radii,
+    - node title below node, centered,
+    - remove visible initial animation; show settled layout.
+- [ ] D14. Probable visual contract.
+  - Decision (Costa, 2026-02-24):
+    - strict -> probable delta defines "new links",
+    - **all links added by probable mode** must be dark cyan in UI.
+  - Implementation implication:
+    - backend must mark every probable-added link (including bridge anchors) with probable markers,
+    - frontend should style probable by marker only (no heuristic fallthrough).
+- [x] D15. General-rule implementation only for unlinked resolution.
+  - Decision (Costa, 2026-02-24):
+    - fixes for unlinked nodes/endpoints in `All Devices (Low Confidence)` must be based on reusable/general rules.
+    - one-off actor/IP-specific patches are not acceptable.
+  - Implementation implication:
+    - only rule-based ownership/anchor/collapse policies are allowed in backend.
+    - validation must be snapshot-wide (`all unlinked == 0`), not single-node targeted.
+- [x] D16. Topology selector contract updates (Costa, 2026-02-25).
+  - `map_type` default must be `lldp_cdp_managed`.
+  - `map_type=lldp_cdp_managed` must show only:
+    - LLDP/CDP links,
+    - managed SNMP device actors,
+    - no inferred devices,
+    - no segments/endpoints.
+  - `map_type=high_confidence_inferred` remains as-is.
+  - `map_type=all_devices_low_confidence` remains as-is.
+- [x] D17. Managed focus selector scope (Costa, 2026-02-25).
+  - `managed_snmp_device_focus` must provide:
+    - `all_devices`,
+    - one option per managed SNMP device (device-by-device focus).
+  - Goal: large-map navigation around a specific managed device.
+- [x] D18. Depth semantics and UI contract (Costa, 2026-02-25).
+  - depth semantics:
+    - `0`: only focused device actor,
+    - `1`: focused device + direct connections,
+    - `2+`: iterative neighborhood expansion.
+  - depth UI should be one row:
+    - `[x] All` toggle,
+    - numeric input (`0..10`) when `All` is off.
 
 ## 2) Objective (Non-Negotiable)
 - Build and maintain **Enlinkd-faithful** topology behavior for Netdata SNMP topology, scoped to **L2 + enrichment**.
@@ -580,6 +769,20 @@
   - `cd src/go && go run ./tools/topology-parity-evidence --mode verify`
   - `cd src/go && go run ./tools/topology-parity-evidence --mode phase2`
 - Parsing/correlation changes must include edge-case tests (invalid/sentinel/ambiguous cases) with deterministic expected behavior.
+- New mandatory coverage for current planned changes:
+  - map-type mode tests:
+    - `lldp_cdp_managed` mode excludes non-authoritative inferred edges,
+    - `high_confidence_inferred` mode excludes unlinked inferred endpoints only,
+    - `all_devices_low_confidence` mode preserves probable delta contract.
+  - probable color contract tests (frontend normalization + graph kinding):
+    - all low-confidence link categories map to `probable` style path.
+  - depth/focus filter tests (backend):
+    - deterministic subgraph extraction for depth `0..10`,
+    - no filtering when depth=`all`,
+    - focus root-set behavior validated for both focus modes.
+  - layout tests/smoke checks:
+    - label anchor below node,
+    - visible link endpoint offset respects actor radius growth.
 
 ## 11) Documentation Updates Required
 - Keep this TODO synchronized with:
