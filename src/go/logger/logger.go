@@ -23,35 +23,97 @@ var pluginAttr = slog.String("plugin", executable.Name)
 func New() *Logger {
 	if isTerm {
 		// skip 2 slog pkg calls, 2 this pkg calls
-		return &Logger{sl: slog.New(withCallDepth(4, newTerminalHandler()))}
+		return &Logger{sl: slog.New(withCallDepth(4, newTerminalHandler())), rl: newRateLimiter()}
 	}
-	return &Logger{sl: slog.New(newTextHandler()).With(pluginAttr)}
+	return &Logger{sl: slog.New(newTextHandler()).With(pluginAttr), rl: newRateLimiter()}
 }
 
 type Logger struct {
 	muted atomic.Bool
 	sl    *slog.Logger
+	rl    *rateLimiter
 }
 
-func (l *Logger) Error(a ...any)                   { l.log(slog.LevelError, fmt.Sprint(a...)) }
-func (l *Logger) Warning(a ...any)                 { l.log(slog.LevelWarn, fmt.Sprint(a...)) }
-func (l *Logger) Notice(a ...any)                  { l.log(levelNotice, fmt.Sprint(a...)) }
-func (l *Logger) Info(a ...any)                    { l.log(slog.LevelInfo, fmt.Sprint(a...)) }
-func (l *Logger) Debug(a ...any)                   { l.log(slog.LevelDebug, fmt.Sprint(a...)) }
-func (l *Logger) Errorf(format string, a ...any)   { l.log(slog.LevelError, fmt.Sprintf(format, a...)) }
-func (l *Logger) Warningf(format string, a ...any) { l.log(slog.LevelWarn, fmt.Sprintf(format, a...)) }
-func (l *Logger) Noticef(format string, a ...any)  { l.log(levelNotice, fmt.Sprintf(format, a...)) }
-func (l *Logger) Infof(format string, a ...any)    { l.log(slog.LevelInfo, fmt.Sprintf(format, a...)) }
-func (l *Logger) Debugf(format string, a ...any)   { l.log(slog.LevelDebug, fmt.Sprintf(format, a...)) }
-func (l *Logger) Mute()                            { l.mute(true) }
-func (l *Logger) Unmute()                          { l.mute(false) }
+func (l *Logger) Error(a ...any) {
+	if !l.canLog(slog.LevelError) {
+		return
+	}
+	l.log(slog.LevelError, fmt.Sprint(a...))
+}
+
+func (l *Logger) Warning(a ...any) {
+	if !l.canLog(slog.LevelWarn) {
+		return
+	}
+	l.log(slog.LevelWarn, fmt.Sprint(a...))
+}
+
+func (l *Logger) Notice(a ...any) {
+	if !l.canLog(levelNotice) {
+		return
+	}
+	l.log(levelNotice, fmt.Sprint(a...))
+}
+
+func (l *Logger) Info(a ...any) {
+	if !l.canLog(slog.LevelInfo) {
+		return
+	}
+	l.log(slog.LevelInfo, fmt.Sprint(a...))
+}
+
+func (l *Logger) Debug(a ...any) {
+	if !l.canLog(slog.LevelDebug) {
+		return
+	}
+	l.log(slog.LevelDebug, fmt.Sprint(a...))
+}
+
+func (l *Logger) Errorf(format string, a ...any) {
+	if !l.canLog(slog.LevelError) {
+		return
+	}
+	l.log(slog.LevelError, fmt.Sprintf(format, a...))
+}
+
+func (l *Logger) Warningf(format string, a ...any) {
+	if !l.canLog(slog.LevelWarn) {
+		return
+	}
+	l.log(slog.LevelWarn, fmt.Sprintf(format, a...))
+}
+
+func (l *Logger) Noticef(format string, a ...any) {
+	if !l.canLog(levelNotice) {
+		return
+	}
+	l.log(levelNotice, fmt.Sprintf(format, a...))
+}
+
+func (l *Logger) Infof(format string, a ...any) {
+	if !l.canLog(slog.LevelInfo) {
+		return
+	}
+	l.log(slog.LevelInfo, fmt.Sprintf(format, a...))
+}
+
+func (l *Logger) Debugf(format string, a ...any) {
+	if !l.canLog(slog.LevelDebug) {
+		return
+	}
+	l.log(slog.LevelDebug, fmt.Sprintf(format, a...))
+}
+
+func (l *Logger) Mute()   { l.mute(true) }
+func (l *Logger) Unmute() { l.mute(false) }
 
 func (l *Logger) With(args ...any) *Logger {
 	if l.isNil() {
-		return &Logger{sl: New().sl.With(args...)}
+		ll := New()
+		return &Logger{sl: ll.sl.With(args...), rl: ll.rl}
 	}
 
-	ll := &Logger{sl: l.sl.With(args...)}
+	ll := &Logger{sl: l.sl.With(args...), rl: l.rl}
 	ll.muted.Store(l.muted.Load())
 
 	return ll
@@ -66,6 +128,16 @@ func (l *Logger) log(level slog.Level, msg string) {
 	if !l.muted.Load() {
 		l.sl.Log(context.Background(), level, msg)
 	}
+}
+
+func (l *Logger) canLog(level slog.Level) bool {
+	if !Level.Enabled(level) {
+		return false
+	}
+	if l.isNil() {
+		return true
+	}
+	return !l.muted.Load()
 }
 
 func (l *Logger) mute(v bool) {
