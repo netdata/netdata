@@ -16,9 +16,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -32,6 +32,7 @@ import (
 type Config struct {
 	PluginName         string
 	Out                io.Writer
+	RunModePolicy      policy.RunModePolicy
 	Modules            collectorapi.Registry
 	RunJob             []string
 	ConfigDefaults     confgroup.Registry
@@ -69,6 +70,7 @@ func New(cfg Config) *Manager {
 		),
 		pluginName:     cfg.PluginName,
 		out:            out,
+		runModePolicy:  cfg.RunModePolicy,
 		modules:        cfg.Modules,
 		runJob:         cfg.RunJob,
 		configDefaults: cfg.ConfigDefaults,
@@ -135,6 +137,7 @@ type Manager struct {
 
 	pluginName     string
 	out            io.Writer
+	runModePolicy  policy.RunModePolicy
 	modules        collectorapi.Registry
 	runJob         []string
 	configDefaults confgroup.Registry
@@ -356,7 +359,7 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 
 	m.handler.NotifyJobCreate(entry.Cfg, entry.Status)
 
-	if terminal.IsTerminal() || m.pluginName == "nodyncfg" { // FIXME: quick fix of TestAgent_Run (agent_test.go)
+	if m.runModePolicy.AutoEnableDiscovered {
 		m.handler.CmdEnable(dyncfg.NewFunction(functions.Function{Args: []string{m.dyncfgJobID(entry.Cfg), "enable"}}))
 	} else {
 		m.handler.WaitForDecision(entry.Cfg)

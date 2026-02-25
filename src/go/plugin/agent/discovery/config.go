@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
@@ -28,6 +29,7 @@ type (
 	}
 	BuildContext struct {
 		Policy     PlatformPolicy
+		RunMode    policy.RunModePolicy
 		Identity   PluginIdentity
 		Out        io.Writer
 		Paths      PathsConfig

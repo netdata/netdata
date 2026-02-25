@@ -21,6 +21,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -69,6 +71,7 @@ func main() {
 	if opts.Debug {
 		logger.Level.Set(slog.LevelDebug)
 	}
+	isTerminal := terminal.IsTerminal()
 
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
@@ -80,6 +83,11 @@ func main() {
 		ModuleRegistry:            collectorapi.DefaultRegistry,
 		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
 		SystemdVersion:            hostinfo.SystemdVersion,
+		RunModePolicy: policy.RunModePolicy{
+			IsTerminal:               isTerminal,
+			AutoEnableDiscovered:     isTerminal,
+			UseFileStatusPersistence: !isTerminal,
+		},
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
 			discoveryproviders.Dummy(),
@@ -178,9 +186,13 @@ func runFunctionCLI(opts *cli.Option) int {
 	defer cancel()
 
 	jobMgr := jobmgr.New(jobmgr.Config{
-		// Force-enable configs in function CLI runs (non-TTY by default).
-		PluginName:     "nodyncfg",
-		Out:            io.Discard,
+		PluginName: executable.Name,
+		Out:        io.Discard,
+		RunModePolicy: policy.RunModePolicy{
+			IsTerminal:               false,
+			AutoEnableDiscovered:     true,
+			UseFileStatusPersistence: true,
+		},
 		VarLibDir:      pluginconfig.VarLibDir(),
 		Modules:        collectorapi.Registry{moduleName: creator},
 		ConfigDefaults: reg,

@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -23,6 +23,7 @@ import (
 type Config struct {
 	ConfigDefaults confgroup.Registry
 	PluginName     string
+	RunModePolicy  policy.RunModePolicy
 	Out            io.Writer
 	ConfDir        multipath.MultiPath
 	FnReg          functions.Registry
@@ -46,6 +47,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		confProv:       newConfFileReader(log, cfg.ConfDir),
 		configDefaults: cfg.ConfigDefaults,
 		pluginName:     cfg.PluginName,
+		runModePolicy:  cfg.RunModePolicy,
 		fnReg:          cfg.FnReg,
 		discoverers:    cfg.Discoverers,
 		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(out)),
@@ -91,6 +93,7 @@ type (
 
 		configDefaults confgroup.Registry
 		pluginName     string
+		runModePolicy  policy.RunModePolicy
 		fnReg          functions.Registry
 		discoverers    Registry
 		dyncfgApi      *dyncfg.Responder
@@ -280,7 +283,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 		d.handler.AddDiscoveredConfig(scfg, dyncfg.StatusAccepted)
 
 		d.handler.NotifyJobCreate(scfg, dyncfg.StatusAccepted)
-		if terminal.IsTerminal() || d.fnReg == nil || d.dyncfgCh == nil {
+		if d.runModePolicy.AutoEnableDiscovered || d.fnReg == nil || d.dyncfgCh == nil {
 			// Auto-enable in terminal mode and tests.
 			// Also auto-enable when no function registry is attached, because
 			// no external enable/disable commands can be delivered.
@@ -316,7 +319,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	d.handler.NotifyJobRemove(entry.Cfg)
 	d.handler.NotifyJobCreate(scfg, dyncfg.StatusAccepted)
 
-	if terminal.IsTerminal() || d.fnReg == nil || d.dyncfgCh == nil {
+	if d.runModePolicy.AutoEnableDiscovered || d.fnReg == nil || d.dyncfgCh == nil {
 		d.autoEnableConfig(scfg)
 	} else {
 		d.handler.WaitForDecision(scfg)

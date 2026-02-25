@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/nagios"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/scheduler"
@@ -60,6 +62,7 @@ func main() {
 	if opts.Debug {
 		logger.Level.Set(slog.LevelDebug)
 	}
+	isTerminal := terminal.IsTerminal()
 
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
@@ -71,6 +74,11 @@ func main() {
 		ModuleRegistry:            collectorapi.DefaultRegistry,
 		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
 		SystemdVersion:            hostinfo.SystemdVersion,
+		RunModePolicy: policy.RunModePolicy{
+			IsTerminal:               isTerminal,
+			AutoEnableDiscovered:     isTerminal,
+			UseFileStatusPersistence: !isTerminal,
+		},
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
 			discoveryproviders.Dummy(),

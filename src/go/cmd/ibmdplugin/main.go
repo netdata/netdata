@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	// Register IBM ecosystem collectors
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/as400"         // Requires CGO
@@ -78,6 +80,7 @@ func main() {
 	if opts.Debug {
 		logger.Level.Set(slog.LevelDebug)
 	}
+	isTerminal := terminal.IsTerminal()
 
 	// Parse dump duration if provided
 	var dumpMode time.Duration
@@ -98,6 +101,11 @@ func main() {
 		ModuleRegistry:      collectorapi.DefaultRegistry,
 		IsInsideK8s:         hostinfo.IsInsideK8sCluster(),
 		SystemdVersion:      hostinfo.SystemdVersion,
+		RunModePolicy: policy.RunModePolicy{
+			IsTerminal:               isTerminal,
+			AutoEnableDiscovered:     isTerminal,
+			UseFileStatusPersistence: !isTerminal,
+		},
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
 			discoveryproviders.Dummy(),

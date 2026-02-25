@@ -100,6 +100,7 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 				IsInsideK8s:    a.IsInsideK8s,
 				SystemdVersion: a.SystemdVersion,
 			},
+			RunMode: a.runModePolicy,
 			Identity: discovery.PluginIdentity{
 				Name: a.Name,
 			},

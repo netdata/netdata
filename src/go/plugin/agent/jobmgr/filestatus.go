@@ -11,25 +11,23 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
-	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/filepersister"
 )
 
-func statusFileName(dir string) string {
-	name := strings.ReplaceAll(executable.Name, ".", "")
+func statusFileName(dir, pluginName string) string {
+	name := strings.ReplaceAll(pluginName, ".", "")
 	return filepath.Join(dir, fmt.Sprintf("%s-jobs-statuses.json", name))
 }
 
 func (m *Manager) loadFileStatus() {
 	m.fileStatus = newFileStatus()
 
-	if terminal.IsTerminal() || m.varLibDir == "" {
+	if !m.runModePolicy.UseFileStatusPersistence || m.varLibDir == "" {
 		return
 	}
 
-	s, err := loadFileStatus(statusFileName(m.varLibDir))
+	s, err := loadFileStatus(statusFileName(m.varLibDir, m.pluginName))
 	if err != nil {
 		m.Warningf("failed to load state file: %v", err)
 		return
@@ -38,11 +36,11 @@ func (m *Manager) loadFileStatus() {
 }
 
 func (m *Manager) runFileStatusPersistence() {
-	if m.varLibDir == "" {
+	if !m.runModePolicy.UseFileStatusPersistence || m.varLibDir == "" {
 		return
 	}
 
-	p := filepersister.New(statusFileName(m.varLibDir))
+	p := filepersister.New(statusFileName(m.varLibDir, m.pluginName))
 
 	p.Run(m.ctx, m.fileStatus)
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimemgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -45,6 +46,8 @@ type Config struct {
 
 	IsInsideK8s    bool
 	SystemdVersion int
+
+	RunModePolicy policy.RunModePolicy
 
 	DiscoveryProviders []discovery.ProviderFactory
 
@@ -74,6 +77,8 @@ type Agent struct {
 
 	IsInsideK8s    bool
 	SystemdVersion int
+
+	runModePolicy policy.RunModePolicy
 
 	DiscoveryProviders []discovery.ProviderFactory
 
@@ -111,6 +116,7 @@ func New(cfg Config) *Agent {
 		MinUpdateEvery:            cfg.MinUpdateEvery,
 		IsInsideK8s:               cfg.IsInsideK8s,
 		SystemdVersion:            cfg.SystemdVersion,
+		runModePolicy:             cfg.RunModePolicy,
 		ModuleRegistry:            cfg.ModuleRegistry,
 		DiscoveryProviders:        cfg.DiscoveryProviders,
 		Out:                       safewriter.Stdout,
@@ -318,6 +324,7 @@ func (a *Agent) run(ctx context.Context) {
 	jobMgr := jobmgr.New(jobmgr.Config{
 		PluginName:     a.Name,
 		Out:            a.Out,
+		RunModePolicy:  a.runModePolicy,
 		Modules:        enabledModules,
 		RunJob:         runJob,
 		ConfigDefaults: discCfg.Registry,
