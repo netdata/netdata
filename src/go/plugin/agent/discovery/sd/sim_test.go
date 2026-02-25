@@ -108,9 +108,7 @@ func (sim *discoverySimExt) run(t *testing.T) {
 
 	// Check exposed configs after SD goroutine has stopped (no race on entry.Status).
 	// Caches survive shutdown — StopAll only stops pipelines, doesn't clear caches.
-	if sim.wantExposedCount > 0 {
-		assert.Equal(t, sim.wantExposedCount, mgr.exposed.Count(), "exposed configs count")
-	}
+	assert.Equal(t, sim.wantExposedCount, mgr.exposed.Count(), "exposed configs count")
 	for _, want := range sim.wantExposed {
 		entry, ok := mgr.exposed.LookupByKey(want.discovererType + ":" + want.name)
 		if !assert.Truef(t, ok, "exposed config '%s:%s' not found", want.discovererType, want.name) {

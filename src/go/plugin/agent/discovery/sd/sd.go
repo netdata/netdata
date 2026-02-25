@@ -238,6 +238,12 @@ func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile) {
 		d.Errorf("config '%s' has no discoverer configured", conf.source)
 		return
 	}
+	if !d.hasDiscovererType(scfg.DiscovererType()) {
+		if scfg.SourceType() != confgroup.TypeStock {
+			d.Warningf("config '%s' uses unsupported discoverer type '%s', skipping", conf.source, scfg.DiscovererType())
+		}
+		return
+	}
 
 	if scfg.Name() == "" {
 		d.Errorf("config '%s' has no name configured", conf.source)
