@@ -10,7 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type headerMatch struct {
@@ -72,11 +72,11 @@ func (c *Collector) initHeaderMatch() ([]headerMatch, error) {
 	return hms, nil
 }
 
-func (c *Collector) initCharts() *module.Charts {
+func (c *Collector) initCharts() *collectorapi.Charts {
 	charts := httpCheckCharts.Copy()
 
 	for _, chart := range *charts {
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "url", Value: c.URL},
 		}
 	}

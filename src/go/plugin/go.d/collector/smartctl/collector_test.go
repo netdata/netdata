@@ -14,7 +14,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 var (
@@ -54,7 +54,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -490,7 +490,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			assert.Len(t, *collr.Charts(), test.wantCharts, "wantCharts")
 
-			module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+			collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 		})
 	}
 }

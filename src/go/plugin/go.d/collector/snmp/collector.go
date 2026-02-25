@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -24,12 +24,12 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("snmp", module.Creator{
+	collectorapi.Register("snmp", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:        func() module.Module { return New() },
+		Create:        func() collectorapi.CollectorV1 { return New() },
 		Config:        func() any { return &Config{} },
 		Methods:       snmpMethods,
 		MethodHandler: snmpFunctionHandler,
@@ -66,7 +66,7 @@ func New() *Collector {
 			},
 		},
 
-		charts:            &module.Charts{},
+		charts:            &collectorapi.Charts{},
 		seenScalarMetrics: make(map[string]bool),
 		seenTableMetrics:  make(map[string]bool),
 		seenProfiles:      make(map[string]bool),
@@ -87,12 +87,12 @@ func New() *Collector {
 
 type (
 	Collector struct {
-		module.Base
+		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
 		vnode *vnodes.VirtualNode
 
-		charts            *module.Charts
+		charts            *collectorapi.Charts
 		seenScalarMetrics map[string]bool
 		seenTableMetrics  map[string]bool
 		seenProfiles      map[string]bool
@@ -162,7 +162,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

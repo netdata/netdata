@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const (
@@ -42,7 +42,7 @@ func (c *Collector) collectNetworkRTT(mx map[string]int64) error {
 		return nil
 	}
 
-	sum := metrix.NewSummary()
+	sum := oldmetrix.NewSummary()
 	for _, v := range coords {
 		d := calcDistance(thisNode, v)
 		sum.Observe(d.Seconds())

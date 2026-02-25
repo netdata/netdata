@@ -14,6 +14,21 @@
 - Docs: update consul keywords for discoverability ([#21787](https://github.com/netdata/netdata/issues/21787))
 - Regenerate integrations docs ([#21788](https://github.com/netdata/netdata/issues/21788))
 - Improve datafile deletion process ([#21781](https://github.com/netdata/netdata/issues/21781))
+- Build(deps): bump filippo.io/edwards25519 from 1.1.0 to 1.1.1 in /src/go ([#21791](https://github.com/netdata/netdata/issues/21791))
+- Improve print parsed ([#21790](https://github.com/netdata/netdata/issues/21790))
+- Add revalidation for clean pages under lock to ensure queue integrity ([#21793](https://github.com/netdata/netdata/issues/21793))
+- ML: Reserve cluster centers ([#21795](https://github.com/netdata/netdata/issues/21795))
+- Fix crash when processing a corrupted journalfile ([#21794](https://github.com/netdata/netdata/issues/21794))
+- Fix dcgm exporter discovery ([#21800](https://github.com/netdata/netdata/issues/21800))
+- Build(deps): bump github.com/valyala/fastjson from 1.6.7 to 1.6.10 in /src/go ([#21798](https://github.com/netdata/netdata/issues/21798))
+- Build(deps): bump github.com/vmware/govmomi from 0.52.0 to 0.53.0 in /src/go ([#21799](https://github.com/netdata/netdata/issues/21799))
+- Fix race condition on js.timer in scripts.d scheduler ([#21801](https://github.com/netdata/netdata/issues/21801))
+- Feat(go.d): new metrics collection framework ([#21769](https://github.com/netdata/netdata/issues/21769))
+- Aclk proxy connect log ([#21789](https://github.com/netdata/netdata/issues/21789))
+- Chore(go.d): restructure ([#21803](https://github.com/netdata/netdata/issues/21803))
+- Regenerate integrations docs ([#21807](https://github.com/netdata/netdata/issues/21807))
+- Support environment variable expansion in host labels ([#21796](https://github.com/netdata/netdata/issues/21796))
+- Fix url check ([#21805](https://github.com/netdata/netdata/issues/21805))
 
 ## [2.9.0] - 2026-02-16
 

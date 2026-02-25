@@ -15,8 +15,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/charts"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
@@ -31,12 +31,12 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("nagios", module.Creator{
+	collectorapi.Register("nagios", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			AutoDetectionRetry: 60,
 		},
-		Create: func() module.Module { return New() },
+		Create: func() collectorapi.CollectorV1 { return New() },
 		Config: func() any { return &Config{} },
 	})
 }
@@ -111,10 +111,10 @@ func boolPtr(v bool) *bool {
 // Collector is a placeholder module that keeps the plugin wiring compiling while the real
 // Nagios execution engine is being implemented.
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts       *module.Charts
+	charts       *collectorapi.Charts
 	chartMu      sync.RWMutex
 	perfCharts   map[string]perfChartMeta
 	periods      *timeperiod.Set
@@ -147,7 +147,7 @@ func New() *Collector {
 				},
 			},
 		},
-		charts:     &module.Charts{},
+		charts:     &collectorapi.Charts{},
 		perfCharts: make(map[string]perfChartMeta),
 	}
 }
@@ -158,7 +158,7 @@ func (c *Collector) Configuration() any {
 
 func (c *Collector) Init(ctx context.Context) error {
 	if c.charts == nil {
-		c.charts = &module.Charts{}
+		c.charts = &collectorapi.Charts{}
 	}
 	if c.perfCharts == nil {
 		c.perfCharts = make(map[string]perfChartMeta)
@@ -202,7 +202,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	c.chartMu.RLock()
 	defer c.chartMu.RUnlock()
 	return c.charts
@@ -275,7 +275,7 @@ func (c *Collector) warnMissingVnode(name string) {
 func (c *Collector) initCharts() error {
 	meta := charts.NewJobIdentity(c.jobSpec.Scheduler, c.jobSpec)
 	jobCharts := charts.BuildJobCharts(meta, 100)
-	newCharts := module.Charts{}
+	newCharts := collectorapi.Charts{}
 	if err := newCharts.Add(jobCharts...); err != nil {
 		return err
 	}

@@ -5,7 +5,7 @@ package charts
 import (
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
@@ -20,20 +20,20 @@ func SchedulerMetricKey(scheduler, suffix, dim string) string {
 	return fmt.Sprintf("%s.%s", SchedulerChartID(scheduler, suffix), dim)
 }
 
-func telemetryChartBase(meta JobIdentity, metric string) module.Chart {
-	return module.Chart{
+func telemetryChartBase(meta JobIdentity, metric string) collectorapi.Chart {
+	return collectorapi.Chart{
 		Fam:    "jobs",
 		Ctx:    fmt.Sprintf("%s.jobs.%s", ctxPrefix, metric),
-		Type:   module.Line,
+		Type:   collectorapi.Line,
 		Labels: meta.Labels(),
 	}
 }
 
-func perfdataChartBase(meta JobIdentity) module.Chart {
-	return module.Chart{
+func perfdataChartBase(meta JobIdentity) collectorapi.Chart {
+	return collectorapi.Chart{
 		Fam:    meta.ScriptKey,
 		Ctx:    fmt.Sprintf("%s.%s", ctxPrefix, meta.ScriptKey),
-		Type:   module.Line,
+		Type:   collectorapi.Line,
 		Labels: meta.Labels(),
 	}
 }

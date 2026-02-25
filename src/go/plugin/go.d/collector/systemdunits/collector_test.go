@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +36,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -861,7 +861,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}

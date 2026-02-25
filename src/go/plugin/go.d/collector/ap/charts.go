@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioClients = module.Priority + iota
+	prioClients = collectorapi.Priority + iota
 	prioBandwidth
 	prioPackets
 	prioIssues
@@ -20,7 +20,7 @@ const (
 	prioBitrate
 )
 
-var apChartsTmpl = module.Charts{
+var apChartsTmpl = collectorapi.Charts{
 	apClientsChartTmpl.Copy(),
 	apBandwidthChartTmpl.Copy(),
 	apPacketsChartTmpl.Copy(),
@@ -30,83 +30,83 @@ var apChartsTmpl = module.Charts{
 }
 
 var (
-	apClientsChartTmpl = module.Chart{
+	apClientsChartTmpl = collectorapi.Chart{
 		ID:       "ap_%s_%s_clients",
 		Title:    "Connected clients",
 		Fam:      "clients",
 		Units:    "clients",
 		Ctx:      "ap.clients",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClients,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ap_%s_%s_clients", Name: "clients"},
 		},
 	}
 
-	apBandwidthChartTmpl = module.Chart{
+	apBandwidthChartTmpl = collectorapi.Chart{
 		ID:       "ap_%s_%s_bandwidth",
 		Title:    "Bandwidth",
 		Units:    "kilobits/s",
 		Fam:      "traffic",
 		Ctx:      "ap.net",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioBandwidth,
-		Dims: module.Dims{
-			{ID: "ap_%s_%s_bw_received", Name: "received", Algo: module.Incremental, Mul: 8, Div: 1000},
-			{ID: "ap_%s_%s_bw_sent", Name: "sent", Algo: module.Incremental, Mul: -8, Div: 1000},
+		Dims: collectorapi.Dims{
+			{ID: "ap_%s_%s_bw_received", Name: "received", Algo: collectorapi.Incremental, Mul: 8, Div: 1000},
+			{ID: "ap_%s_%s_bw_sent", Name: "sent", Algo: collectorapi.Incremental, Mul: -8, Div: 1000},
 		},
 	}
 
-	apPacketsChartTmpl = module.Chart{
+	apPacketsChartTmpl = collectorapi.Chart{
 		ID:       "ap_%s_%s_packets",
 		Title:    "Packets",
 		Fam:      "packets",
 		Units:    "packets/s",
 		Ctx:      "ap.packets",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPackets,
-		Dims: module.Dims{
-			{ID: "ap_%s_%s_packets_received", Name: "received", Algo: module.Incremental},
-			{ID: "ap_%s_%s_packets_sent", Name: "sent", Algo: module.Incremental, Mul: -1},
+		Dims: collectorapi.Dims{
+			{ID: "ap_%s_%s_packets_received", Name: "received", Algo: collectorapi.Incremental},
+			{ID: "ap_%s_%s_packets_sent", Name: "sent", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	}
 
-	apIssuesChartTmpl = module.Chart{
+	apIssuesChartTmpl = collectorapi.Chart{
 		ID:       "ap_%s_%s_issues",
 		Title:    "Transmit issues",
 		Fam:      "issues",
 		Units:    "issues/s",
 		Ctx:      "ap.issues",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioIssues,
-		Dims: module.Dims{
-			{ID: "ap_%s_%s_issues_retries", Name: "tx retries", Algo: module.Incremental},
-			{ID: "ap_%s_%s_issues_failures", Name: "tx failures", Algo: module.Incremental, Mul: -1},
+		Dims: collectorapi.Dims{
+			{ID: "ap_%s_%s_issues_retries", Name: "tx retries", Algo: collectorapi.Incremental},
+			{ID: "ap_%s_%s_issues_failures", Name: "tx failures", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	}
 
-	apSignalChartTmpl = module.Chart{
+	apSignalChartTmpl = collectorapi.Chart{
 		ID:       "ap_%s_%s_signal",
 		Title:    "Average Signal",
 		Units:    "dBm",
 		Fam:      "signal",
 		Ctx:      "ap.signal",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioSignal,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ap_%s_%s_average_signal", Name: "average signal", Div: precision},
 		},
 	}
 
-	apBitrateChartTmpl = module.Chart{
+	apBitrateChartTmpl = collectorapi.Chart{
 		ID:       "ap_%s_%s_bitrate",
 		Title:    "Bitrate",
 		Units:    "Mbps",
 		Fam:      "bitrate",
 		Ctx:      "ap.bitrate",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioBitrate,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ap_%s_%s_bitrate_receive", Name: "receive", Div: precision},
 			{ID: "ap_%s_%s_bitrate_transmit", Name: "transmit", Mul: -1, Div: precision},
 		},
@@ -118,7 +118,7 @@ func (c *Collector) addInterfaceCharts(dev *iwInterface) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, dev.name, cleanSSID(dev.ssid))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "device", Value: dev.name},
 			{Key: "ssid", Value: dev.ssid},
 		}

@@ -12,7 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 type metricBuilder struct {
@@ -132,7 +132,7 @@ func buildMultiValue(value int64, mappings map[string]string) map[string]int64 {
 			// This ensures that if multiple keys map to the same state name,
 			// we preserve the "1" (active) value if any key matches
 			if _, ok := multiValue[v]; !ok || value == intKey {
-				multiValue[v] = metrix.Bool(value == intKey)
+				multiValue[v] = oldmetrix.Bool(value == intKey)
 			}
 		}
 	} else {
@@ -141,7 +141,7 @@ func buildMultiValue(value int64, mappings map[string]string) map[string]int64 {
 		// We need to find which original string maps to our current value
 		for k, v := range mappings {
 			if intVal, err := strconv.ParseInt(v, 10, 64); err == nil {
-				multiValue[k] = metrix.Bool(value == intVal)
+				multiValue[k] = oldmetrix.Bool(value == intVal)
 			}
 		}
 	}

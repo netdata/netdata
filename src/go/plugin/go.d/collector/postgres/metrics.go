@@ -2,7 +2,7 @@
 
 package postgres
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+import "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 
 type pgMetrics struct {
 	srvMetrics
@@ -14,8 +14,8 @@ type pgMetrics struct {
 }
 
 type srvMetrics struct {
-	xactTimeHist  metrix.Histogram
-	queryTimeHist metrix.Histogram
+	xactTimeHist  oldmetrix.Histogram
+	queryTimeHist oldmetrix.Histogram
 
 	maxConnections int64
 	maxLocksHeld   int64

@@ -2,13 +2,13 @@
 
 package fluentd
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Dim is an alias for module.Dim
-	Dim = module.Dim
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Dim is an alias for collectorapi.Dim
+	Dim = collectorapi.Dim
 )
 
 // TODO: units for buffer charts

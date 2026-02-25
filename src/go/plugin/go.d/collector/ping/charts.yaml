@@ -1,0 +1,106 @@
+version: v1
+context_namespace: ping
+groups:
+  - family: latency
+    metrics:
+      - min_rtt
+      - max_rtt
+      - avg_rtt
+      - std_dev_rtt
+      - rtt_variance
+      - mean_jitter
+      - ewma_jitter
+      - sma_jitter
+    charts:
+      - id: host_rtt
+        title: Ping round-trip time
+        context: host_rtt
+        units: milliseconds
+        type: area
+        instances:
+          by_labels: [host]
+        dimensions:
+          - selector: min_rtt
+            name: min
+            options:
+              divisor: 1000
+          - selector: max_rtt
+            name: max
+            options:
+              divisor: 1000
+          - selector: avg_rtt
+            name: avg
+            options:
+              divisor: 1000
+      - id: host_std_dev_rtt
+        title: Ping round-trip time standard deviation
+        context: host_std_dev_rtt
+        units: milliseconds
+        instances:
+          by_labels: [host]
+        dimensions:
+          - selector: std_dev_rtt
+            name: std_dev
+            options:
+              divisor: 1000
+      - id: host_jitter
+        title: Ping latency jitter
+        context: host_jitter
+        units: milliseconds
+        instances:
+          by_labels: [host]
+        dimensions:
+          - selector: mean_jitter
+            name: mean
+            options:
+              divisor: 1000
+          - selector: ewma_jitter
+            name: ewma
+            options:
+              divisor: 1000
+          - selector: sma_jitter
+            name: sma
+            options:
+              divisor: 1000
+      - id: host_rtt_variance
+        title: Ping round-trip time variance
+        context: host_rtt_variance
+        units: ms^2
+        instances:
+          by_labels: [host]
+        dimensions:
+          - selector: rtt_variance
+            name: variance
+            options:
+              divisor: 1000000
+  - family: packet loss
+    metrics:
+      - packet_loss
+    charts:
+      - id: host_packet_loss
+        title: Ping packet loss
+        context: host_packet_loss
+        units: percentage
+        instances:
+          by_labels: [host]
+        dimensions:
+          - selector: packet_loss
+            name: loss
+            options:
+              divisor: 1000
+  - family: packets
+    metrics:
+      - packets_recv
+      - packets_sent
+    charts:
+      - id: host_packets
+        title: Ping packets transferred
+        context: host_packets
+        units: packets
+        instances:
+          by_labels: [host]
+        dimensions:
+          - selector: packets_recv
+            name: received
+          - selector: packets_sent
+            name: sent

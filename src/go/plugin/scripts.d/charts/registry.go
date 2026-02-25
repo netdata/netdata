@@ -2,10 +2,10 @@
 
 package charts
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
-func BuildJobCharts(meta JobIdentity, basePriority int) []*module.Chart {
-	return []*module.Chart{
+func BuildJobCharts(meta JobIdentity, basePriority int) []*collectorapi.Chart {
+	return []*collectorapi.Chart{
 		StateChart(meta, basePriority),
 		RuntimeChart(meta, basePriority+1),
 		LatencyChart(meta, basePriority+2),
@@ -15,8 +15,8 @@ func BuildJobCharts(meta JobIdentity, basePriority int) []*module.Chart {
 	}
 }
 
-func BuildSchedulerCharts(scheduler string, basePriority int) []*module.Chart {
-	return []*module.Chart{
+func BuildSchedulerCharts(scheduler string, basePriority int) []*collectorapi.Chart {
+	return []*collectorapi.Chart{
 		SchedulerJobsChart(scheduler, basePriority),
 		SchedulerRateChart(scheduler, basePriority+1),
 		SchedulerNextRunChart(scheduler, basePriority+2),

@@ -6,51 +6,51 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioDNSQueryStatus = module.Priority + iota
+	prioDNSQueryStatus = collectorapi.Priority + iota
 	prioDNSQueryTime
 )
 
 var (
-	dnsChartsTmpl = module.Charts{
+	dnsChartsTmpl = collectorapi.Charts{
 		dnsQueryStatusChartTmpl.Copy(),
 		dnsQueryTimeChartTmpl.Copy(),
 	}
-	dnsQueryStatusChartTmpl = module.Chart{
+	dnsQueryStatusChartTmpl = collectorapi.Chart{
 		ID:       "server_%s_record_%s_query_status",
 		Title:    "DNS Query Status",
 		Units:    "status",
 		Fam:      "query status",
 		Ctx:      "dns_query.query_status",
 		Priority: prioDNSQueryStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "server_%s_record_%s_query_status_success", Name: "success"},
 			{ID: "server_%s_record_%s_query_status_network_error", Name: "network_error"},
 			{ID: "server_%s_record_%s_query_status_dns_error", Name: "dns_error"},
 		},
 	}
-	dnsQueryTimeChartTmpl = module.Chart{
+	dnsQueryTimeChartTmpl = collectorapi.Chart{
 		ID:       "server_%s_record_%s_query_time",
 		Title:    "DNS Query Time",
 		Units:    "seconds",
 		Fam:      "query time",
 		Ctx:      "dns_query.query_time",
 		Priority: prioDNSQueryTime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "server_%s_record_%s_query_time", Name: "query_time", Div: 1e9},
 		},
 	}
 )
 
-func newDNSServerCharts(server, network, rtype string) *module.Charts {
+func newDNSServerCharts(server, network, rtype string) *collectorapi.Charts {
 	charts := dnsChartsTmpl.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, strings.ReplaceAll(server, ".", "_"), rtype)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "server", Value: server},
 			{Key: "network", Value: network},
 			{Key: "record_type", Value: rtype},

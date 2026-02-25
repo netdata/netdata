@@ -2,7 +2,7 @@
 
 package dcgm
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 const (
 	maxNotSeenCharts = 10
@@ -15,7 +15,7 @@ type (
 	}
 
 	cacheChart struct {
-		chart        *module.Chart
+		chart        *collectorapi.Chart
 		seen         bool
 		notSeenTimes int
 		dims         map[string]*cacheDim
@@ -50,7 +50,7 @@ func (c *cache) getChart(key string) (*cacheChart, bool) {
 	return v, true
 }
 
-func (c *cache) putChart(key string, chart *module.Chart) *cacheChart {
+func (c *cache) putChart(key string, chart *collectorapi.Chart) *cacheChart {
 	v := &cacheChart{chart: chart, seen: true, dims: make(map[string]*cacheDim)}
 	c.charts[key] = v
 	return v

@@ -2,13 +2,18 @@
 
 `go.d.plugin` is a [Netdata](https://github.com/netdata/netdata) external plugin:
 
-- **Independent Operation**: Runs as a separate process from Netdata core, visible in system process lists (`ps fax`).
-- **Automated Management**: Integrated with Netdata's lifecycle management, managed automatically by Netdata (start/stop operations).
-- **Efficient Communication**: Uses a unidirectional pipe for optimal data transfer to Netdata.
-- **Modular Architecture**:
-    - Supports an unlimited number of data collection modules.
-    - Each module can run multiple collection jobs simultaneously.
-    - Easy to extend with new collection modules
+- **What it does**: collects metrics from databases, middleware, services, APIs, and infrastructure components using built-in collectors.
+- **How you use it**:
+    - set collector-specific jobs in `config/go.d/*.conf`,
+    - restart Netdata and the collector jobs start automatically.
+- **Operational behavior**:
+    - runs as a separate process from Netdata core (visible in `ps fax`),
+    - lifecycle is managed by Netdata (start/stop/restart),
+    - communicates through the external plugin pipe.
+- **Scale model**:
+    - supports many collectors,
+    - each collector can run multiple jobs,
+    - collectors can be added/extended independently.
 
 ### Required Linux capabilities
 
@@ -20,10 +25,10 @@ All capabilities are set automatically during Netdata installation using the [of
 | CAP_NET_ADMIN       | [Wireguard](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/wireguard#readme) |
 | CAP_DAC_READ_SEARCH | [Filecheck](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/filecheck#readme) |
 
-## Available modules
+## Available collectors
 
 <details>
-<summary>Data Collection Modules</summary>
+<summary>Data Collection Collectors</summary>
 
 | Name                                                                                                                 |           Monitors            |
 |:---------------------------------------------------------------------------------------------------------------------|:-----------------------------:|
@@ -165,7 +170,7 @@ sudo ./edit-config go.d.conf
 Configurations are written in [YAML](http://yaml.org/).
 
 - [plugin configuration](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d.conf)
-- [specific module configuration](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d)
+- [specific collector configuration](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d)
 
 ### Enable a collector
 
@@ -207,22 +212,22 @@ Help Options:
   -h, --help        Show this help message
 ```
 
-### Debugging a Specific Module
+### Debugging a Specific Collector
 
-To debug a particular module, first switch to the Netdata user:
+To debug a particular collector, first switch to the Netdata user:
 
 ```bash
 sudo su -s /bin/bash netdata
 ```
 
-Then run the plugin in debug mode, specifying your target module:
+Then run the plugin in debug mode, specifying your target collector:
 
 ```bash
 # For standard installations
-/usr/libexec/netdata/plugins.d/go.d.plugin -d -m <module_name>
+/usr/libexec/netdata/plugins.d/go.d.plugin -d -m <collector_name>
 
 # For static installations (e.g., in /opt)
-/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin -d -m <module_name>
+/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin -d -m <collector_name>
 ```
 
-Replace` <module_name>` with the [specific module](#available-modules) you wish to debug.
+Replace `<collector_name>` with the [specific collector](#available-collectors) you wish to debug.

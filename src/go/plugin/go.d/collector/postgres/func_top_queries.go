@@ -4,11 +4,11 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlquery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/strmutil"
 )
 
@@ -99,30 +99,16 @@ func (f *funcTopQueries) detectPgStatStatementsColumns(ctx context.Context) (map
 		return c.pgStatStatementsColumns, nil
 	}
 
-	// Query available columns from pg_stat_statements
-	query := `
-		SELECT column_name
-		FROM information_schema.columns
-		WHERE table_name = 'pg_stat_statements'
-		AND table_schema = 'public'
-	`
-	rows, err := c.db.QueryContext(ctx, query)
+	cols, err := sqlquery.FetchTableColumns(
+		ctx,
+		c.db,
+		"public",
+		"pg_stat_statements",
+		sqlquery.PlaceholderDollar,
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query columns: %v", err)
-	}
-	defer rows.Close()
-
-	cols := make(map[string]bool)
-	for rows.Next() {
-		var colName string
-		if err := rows.Scan(&colName); err != nil {
-			return nil, fmt.Errorf("failed to scan column name: %v", err)
-		}
-		cols[colName] = true
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows iteration error: %v", err)
 	}
 
 	// Cache the result
@@ -152,30 +138,16 @@ func (f *funcTopQueries) detectPgStatMonitorColumns(ctx context.Context) (map[st
 		return c.pgStatMonitorColumns, nil
 	}
 
-	// Query available columns from pg_stat_monitor
-	query := `
-		SELECT column_name
-		FROM information_schema.columns
-		WHERE table_name = 'pg_stat_monitor'
-		AND table_schema = 'public'
-	`
-	rows, err := c.db.QueryContext(ctx, query)
+	cols, err := sqlquery.FetchTableColumns(
+		ctx,
+		c.db,
+		"public",
+		"pg_stat_monitor",
+		sqlquery.PlaceholderDollar,
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query columns: %v", err)
-	}
-	defer rows.Close()
-
-	cols := make(map[string]bool)
-	for rows.Next() {
-		var colName string
-		if err := rows.Scan(&colName); err != nil {
-			return nil, fmt.Errorf("failed to scan column name: %v", err)
-		}
-		cols[colName] = true
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows iteration error: %v", err)
 	}
 
 	// Cache the result
@@ -738,70 +710,37 @@ LIMIT %d
 // scanDynamicRows scans rows into the data array based on column types.
 // Uses sql.Null* types to handle NULL values safely.
 func (f *funcTopQueries) scanDynamicRows(rows dbRows, cols []pgColumn) ([][]any, error) {
-	data := make([][]any, 0, 500)
-
-	// Create value holders for scanning (reuse across rows for efficiency)
-	valuePtrs := make([]any, len(cols))
-	values := make([]any, len(cols))
-
-	for rows.Next() {
-		// Reset value holders for each row
-		for i, col := range cols {
-			switch col.Type {
-			case funcapi.FieldTypeString:
-				var v sql.NullString
-				values[i] = &v
-			case funcapi.FieldTypeInteger:
-				var v sql.NullInt64
-				values[i] = &v
-			case funcapi.FieldTypeFloat, funcapi.FieldTypeDuration:
-				var v sql.NullFloat64
-				values[i] = &v
-			default:
-				var v sql.NullString
-				values[i] = &v
-			}
-			valuePtrs[i] = values[i]
-		}
-
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return nil, fmt.Errorf("row scan failed: %v", err)
-		}
-
-		// Convert scanned values to output format
-		row := make([]any, len(cols))
-		for i, col := range cols {
-			switch v := values[i].(type) {
-			case *sql.NullString:
-				if v.Valid {
-					s := v.String
-					if col.Name == "query" {
-						row[i] = strmutil.TruncateText(s, maxQueryTextLength)
-					} else {
-						row[i] = s
-					}
-				} else {
-					row[i] = ""
-				}
-			case *sql.NullInt64:
-				if v.Valid {
-					row[i] = v.Int64
-				} else {
-					row[i] = int64(0)
-				}
-			case *sql.NullFloat64:
-				if v.Valid {
-					row[i] = v.Float64
-				} else {
-					row[i] = float64(0)
-				}
-			}
-		}
-
-		data = append(data, row)
+	specs := make([]sqlquery.ScanColumnSpec, len(cols))
+	for i, col := range cols {
+		specs[i] = pgTopQueriesScanSpec(col)
 	}
 
+	data, err := sqlquery.ScanTypedRows(rows, specs)
+	if err != nil {
+		return nil, fmt.Errorf("row scan failed: %v", err)
+	}
 	return data, nil
+}
+
+func pgTopQueriesScanSpec(col pgColumn) sqlquery.ScanColumnSpec {
+	spec := sqlquery.ScanColumnSpec{}
+	switch col.Type {
+	case funcapi.FieldTypeString:
+		spec.Type = sqlquery.ScanValueString
+		if col.Name == "query" {
+			spec.Transform = func(v any) any {
+				s, _ := v.(string)
+				return strmutil.TruncateText(s, maxQueryTextLength)
+			}
+		}
+	case funcapi.FieldTypeInteger:
+		spec.Type = sqlquery.ScanValueInteger
+	case funcapi.FieldTypeFloat, funcapi.FieldTypeDuration:
+		spec.Type = sqlquery.ScanValueFloat
+	default:
+		spec.Type = sqlquery.ScanValueString
+	}
+	return spec
 }
 
 // buildDynamicSortOptions builds sort options from available columns.

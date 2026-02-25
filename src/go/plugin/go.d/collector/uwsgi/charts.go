@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioTransmittedData = module.Priority + iota
+	prioTransmittedData = collectorapi.Priority + iota
 	prioRequests
 	prioHarakiris
 	prioExceptions
@@ -30,7 +30,7 @@ const (
 	prioWorkerMemoryVsz
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	transmittedDataChart.Copy(),
 	requestsChart.Copy(),
 	harakirisChart.Copy(),
@@ -39,65 +39,65 @@ var charts = module.Charts{
 }
 
 var (
-	transmittedDataChart = module.Chart{
+	transmittedDataChart = collectorapi.Chart{
 		ID:       "transmitted_data",
 		Title:    "UWSGI Transmitted Data",
 		Units:    "bytes/s",
 		Fam:      "workers",
 		Ctx:      "uwsgi.transmitted_data",
 		Priority: prioTransmittedData,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "workers_tx", Name: "tx", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "workers_tx", Name: "tx", Algo: collectorapi.Incremental},
 		},
 	}
-	requestsChart = module.Chart{
+	requestsChart = collectorapi.Chart{
 		ID:       "requests",
 		Title:    "UWSGI Requests",
 		Units:    "requests/s",
 		Fam:      "workers",
 		Ctx:      "uwsgi.requests",
 		Priority: prioRequests,
-		Dims: module.Dims{
-			{ID: "workers_requests", Name: "requests", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "workers_requests", Name: "requests", Algo: collectorapi.Incremental},
 		},
 	}
-	harakirisChart = module.Chart{
+	harakirisChart = collectorapi.Chart{
 		ID:       "harakiris",
 		Title:    "UWSGI Dropped Requests",
 		Units:    "harakiris/s",
 		Fam:      "workers",
 		Ctx:      "uwsgi.harakiris",
 		Priority: prioHarakiris,
-		Dims: module.Dims{
-			{ID: "workers_harakiris", Name: "harakiris", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "workers_harakiris", Name: "harakiris", Algo: collectorapi.Incremental},
 		},
 	}
-	exceptionsChart = module.Chart{
+	exceptionsChart = collectorapi.Chart{
 		ID:       "exceptions",
 		Title:    "UWSGI Raised Exceptions",
 		Units:    "exceptions/s",
 		Fam:      "workers",
 		Ctx:      "uwsgi.exceptions",
 		Priority: prioExceptions,
-		Dims: module.Dims{
-			{ID: "workers_exceptions", Name: "exceptions", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "workers_exceptions", Name: "exceptions", Algo: collectorapi.Incremental},
 		},
 	}
-	respawnsChart = module.Chart{
+	respawnsChart = collectorapi.Chart{
 		ID:       "respawns",
 		Title:    "UWSGI Respawns",
 		Units:    "respawns/s",
 		Fam:      "workers",
 		Ctx:      "uwsgi.respawns",
 		Priority: prioRespawns,
-		Dims: module.Dims{
-			{ID: "workers_respawns", Name: "respawns", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "workers_respawns", Name: "respawns", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
-var workerChartsTmpl = module.Charts{
+var workerChartsTmpl = collectorapi.Charts{
 	workerTransmittedDataChartTmpl.Copy(),
 	workerRequestsChartTmpl.Copy(),
 	workerDeltaRequestsChartTmpl.Copy(),
@@ -112,81 +112,81 @@ var workerChartsTmpl = module.Charts{
 }
 
 var (
-	workerTransmittedDataChartTmpl = module.Chart{
+	workerTransmittedDataChartTmpl = collectorapi.Chart{
 		ID:       "worker_%s_transmitted_data",
 		Title:    "UWSGI Worker Transmitted Data",
 		Units:    "bytes/s",
 		Fam:      "wrk transmitted data",
 		Ctx:      "uwsgi.worker_transmitted_data",
 		Priority: prioWorkerTransmittedData,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "worker_%s_tx", Name: "tx", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "worker_%s_tx", Name: "tx", Algo: collectorapi.Incremental},
 		},
 	}
-	workerRequestsChartTmpl = module.Chart{
+	workerRequestsChartTmpl = collectorapi.Chart{
 		ID:       "worker_%s_requests",
 		Title:    "UWSGI Worker Requests",
 		Units:    "requests/s",
 		Fam:      "wrk requests",
 		Ctx:      "uwsgi.worker_requests",
 		Priority: prioWorkerRequests,
-		Dims: module.Dims{
-			{ID: "worker_%s_requests", Name: "requests", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "worker_%s_requests", Name: "requests", Algo: collectorapi.Incremental},
 		},
 	}
-	workerDeltaRequestsChartTmpl = module.Chart{
+	workerDeltaRequestsChartTmpl = collectorapi.Chart{
 		ID:       "worker_%s_delta_requests",
 		Title:    "UWSGI Worker Delta Requests",
 		Units:    "requests/s",
 		Fam:      "wrk requests",
 		Ctx:      "uwsgi.worker_delta_requests",
 		Priority: prioWorkerDeltaRequests,
-		Dims: module.Dims{
-			{ID: "worker_%s_delta_requests", Name: "delta_requests", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "worker_%s_delta_requests", Name: "delta_requests", Algo: collectorapi.Incremental},
 		},
 	}
-	workerAvgRequestTimeChartTmpl = module.Chart{
+	workerAvgRequestTimeChartTmpl = collectorapi.Chart{
 		ID:       "worker_%s_average_request_time",
 		Title:    "UWSGI Worker Average Request Time",
 		Units:    "milliseconds",
 		Fam:      "wrk request time",
 		Ctx:      "uwsgi.worker_average_request_time",
 		Priority: prioWorkerAvgRequestTime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "worker_%s_average_request_time", Name: "avg"},
 		},
 	}
-	workerHarakirisChartTmpl = module.Chart{
+	workerHarakirisChartTmpl = collectorapi.Chart{
 		ID:       "worker_%s_harakiris",
 		Title:    "UWSGI Worker Dropped Requests",
 		Units:    "harakiris/s",
 		Fam:      "wrk harakiris",
 		Ctx:      "uwsgi.worker_harakiris",
 		Priority: prioWorkerHarakiris,
-		Dims: module.Dims{
-			{ID: "worker_%s_harakiris", Name: "harakiris", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "worker_%s_harakiris", Name: "harakiris", Algo: collectorapi.Incremental},
 		},
 	}
-	workerExceptionsChartTmpl = module.Chart{
+	workerExceptionsChartTmpl = collectorapi.Chart{
 		ID:       "worker_%s_exceptions",
 		Title:    "UWSGI Worker Raised Exceptions",
 		Units:    "exceptions/s",
 		Fam:      "wrk exceptions",
 		Ctx:      "uwsgi.worker_exceptions",
 		Priority: prioWorkerExceptions,
-		Dims: module.Dims{
-			{ID: "worker_%s_exceptions", Name: "exceptions", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "worker_%s_exceptions", Name: "exceptions", Algo: collectorapi.Incremental},
 		},
 	}
-	workerStatusChartTmpl = module.Chart{
+	workerStatusChartTmpl = collectorapi.Chart{
 		ID:       "worker_%s_status",
 		Title:    "UWSGI Worker Status",
 		Units:    "status",
 		Fam:      "wrk status",
 		Ctx:      "uwsgi.status",
 		Priority: prioWorkerStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "worker_%s_status_idle", Name: "idle"},
 			{ID: "worker_%s_status_busy", Name: "busy"},
 			{ID: "worker_%s_status_cheap", Name: "cheap"},
@@ -194,50 +194,50 @@ var (
 			{ID: "worker_%s_status_sig", Name: "sig"},
 		},
 	}
-	workerRequestHandlingStatusChartTmpl = module.Chart{
+	workerRequestHandlingStatusChartTmpl = collectorapi.Chart{
 		ID:       "worker_%s_request_handling_status",
 		Title:    "UWSGI Worker Request Handling Status",
 		Units:    "status",
 		Fam:      "wrk status",
 		Ctx:      "uwsgi.request_handling_status",
 		Priority: prioWorkerRequestHandlingStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "worker_%s_request_handling_status_accepting", Name: "accepting"},
 			{ID: "worker_%s_request_handling_status_not_accepting", Name: "not_accepting"},
 		},
 	}
-	workerRespawnsChartTmpl = module.Chart{
+	workerRespawnsChartTmpl = collectorapi.Chart{
 		ID:       "worker_%s_respawns",
 		Title:    "UWSGI Worker Respawns",
 		Units:    "respawns/s",
 		Fam:      "wrk respawns",
 		Ctx:      "uwsgi.worker_respawns",
 		Priority: prioWorkerRespawns,
-		Dims: module.Dims{
-			{ID: "worker_%s_respawns", Name: "respawns", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "worker_%s_respawns", Name: "respawns", Algo: collectorapi.Incremental},
 		},
 	}
-	workerMemoryRssChartTmpl = module.Chart{
+	workerMemoryRssChartTmpl = collectorapi.Chart{
 		ID:       "worker_%s_memory_rss",
 		Title:    "UWSGI Worker Memory RSS (Resident Set Size)",
 		Units:    "bytes",
 		Fam:      "wrk memory",
 		Ctx:      "uwsgi.worker_memory_rss",
 		Priority: prioWorkerMemoryRss,
-		Type:     module.Area,
-		Dims: module.Dims{
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
 			{ID: "worker_%s_memory_rss", Name: "rss"},
 		},
 	}
-	workerMemoryVszChartTmpl = module.Chart{
+	workerMemoryVszChartTmpl = collectorapi.Chart{
 		ID:       "worker_%s_memory_vsz",
 		Title:    "UWSGI Worker Memory VSZ (Virtual Memory Size)",
 		Units:    "bytes",
 		Fam:      "wrk memory",
 		Ctx:      "uwsgi.worker_memory_vsz",
 		Priority: prioWorkerMemoryVsz,
-		Type:     module.Area,
-		Dims: module.Dims{
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
 			{ID: "worker_%s_memory_vsz", Name: "vsz"},
 		},
 	}
@@ -250,7 +250,7 @@ func (c *Collector) addWorkerCharts(workerID int) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, id)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "worker_id", Value: id},
 		}
 		for _, dim := range chart.Dims {

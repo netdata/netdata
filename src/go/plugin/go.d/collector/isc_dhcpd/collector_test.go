@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +30,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Cleanup(t *testing.T) {
@@ -233,7 +233,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(mx) > 0 {
-				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}

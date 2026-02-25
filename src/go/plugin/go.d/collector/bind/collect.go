@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -26,7 +26,7 @@ func (c *Collector) collectServerStats(metrics map[string]int64, stats *serverSt
 
 	for k, v := range stats.NSStats {
 		var (
-			algo    = module.Incremental
+			algo    = collectorapi.Incremental
 			dimName = k
 			chartID string
 		)
@@ -36,7 +36,7 @@ func (c *Collector) collectServerStats(metrics map[string]int64, stats *serverSt
 		case k == "RecursClients":
 			dimName = "clients"
 			chartID = keyRecursiveClients
-			algo = module.Absolute
+			algo = collectorapi.Absolute
 		case k == "Requestv4":
 			dimName = "IPv4"
 			chartID = keyReceivedRequests
@@ -99,7 +99,7 @@ func (c *Collector) collectServerStats(metrics map[string]int64, stats *serverSt
 
 		for key, val := range v.item {
 			if !chart.HasDim(key) {
-				_ = chart.AddDim(&Dim{ID: key, Algo: module.Incremental})
+				_ = chart.AddDim(&Dim{ID: key, Algo: collectorapi.Incremental})
 				chart.MarkNotCreated()
 			}
 
@@ -121,7 +121,7 @@ func (c *Collector) collectServerStats(metrics map[string]int64, stats *serverSt
 
 		for key, val := range r.Stats {
 			var (
-				algo     = module.Incremental
+				algo     = collectorapi.Incremental
 				dimName  = key
 				chartKey string
 			)
@@ -132,7 +132,7 @@ func (c *Collector) collectServerStats(metrics map[string]int64, stats *serverSt
 			case key == "NumFetch":
 				chartKey = keyResolverNumFetch
 				dimName = "queries"
-				algo = module.Absolute
+				algo = collectorapi.Absolute
 			case strings.HasPrefix(key, "QryRTT"):
 				// TODO: not ordered
 				chartKey = keyResolverRTT
@@ -173,7 +173,7 @@ func (c *Collector) collectServerStats(metrics map[string]int64, stats *serverSt
 			for key, val := range r.QTypes {
 				dimID := fmt.Sprintf("%s_%s", name, key)
 				if !chart.HasDim(dimID) {
-					_ = chart.AddDim(&Dim{ID: dimID, Name: key, Algo: module.Incremental})
+					_ = chart.AddDim(&Dim{ID: dimID, Name: key, Algo: collectorapi.Incremental})
 					chart.MarkNotCreated()
 				}
 				metrics[dimID] = val

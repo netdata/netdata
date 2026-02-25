@@ -14,7 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 var (
@@ -39,7 +40,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -295,7 +296,7 @@ DCGM_FI_DEV_GPU_UTIL{gpu="0",UUID="GPU-aaa",Hostname="host1",DCGM_FI_PROCESS_NAM
 	charts := *collr.Charts()
 	require.NotEmpty(t, charts)
 
-	var labels []module.Label
+	var labels []collectorapi.Label
 	for _, ch := range charts {
 		if ch.Ctx == "dcgm.gpu.compute.utilization" {
 			labels = ch.Labels
@@ -474,7 +475,7 @@ DCGM_FI_DEV_POWER_MGMT_LIMIT_MAX{gpu="0",UUID="GPU-aaa"} 650
 	mx := collr.Collect(context.Background())
 	require.NotNil(t, mx)
 
-	findChartByCtx := func(ctx string) *module.Chart {
+	findChartByCtx := func(ctx string) *collectorapi.Chart {
 		for _, ch := range *collr.Charts() {
 			if ch.Ctx == ctx {
 				return ch
@@ -482,7 +483,7 @@ DCGM_FI_DEV_POWER_MGMT_LIMIT_MAX{gpu="0",UUID="GPU-aaa"} 650
 		}
 		return nil
 	}
-	dimHiddenByName := func(ch *module.Chart, name string) (bool, bool) {
+	dimHiddenByName := func(ch *collectorapi.Chart, name string) (bool, bool) {
 		for _, d := range ch.Dims {
 			if d.Name == name {
 				return d.Hidden, true
@@ -728,7 +729,7 @@ func TestCollector_Cleanup(t *testing.T) {
 	assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
 }
 
-func assertChartHasLabel(t *testing.T, labels []module.Label, key string) {
+func assertChartHasLabel(t *testing.T, labels []collectorapi.Label, key string) {
 	t.Helper()
 	for _, lbl := range labels {
 		if lbl.Key == key {
@@ -738,7 +739,7 @@ func assertChartHasLabel(t *testing.T, labels []module.Label, key string) {
 	assert.Failf(t, "missing label", "expected chart label %q", key)
 }
 
-func assertChartHasNoLabel(t *testing.T, labels []module.Label, key string) {
+func assertChartHasNoLabel(t *testing.T, labels []collectorapi.Label, key string) {
 	t.Helper()
 	for _, lbl := range labels {
 		if lbl.Key == key {

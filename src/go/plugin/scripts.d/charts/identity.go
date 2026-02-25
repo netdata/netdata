@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
 )
@@ -51,12 +51,12 @@ func NewJobIdentity(scheduler string, job spec.JobSpec) JobIdentity {
 }
 
 // Labels returns the canonical label set shared across every chart for this job.
-func (id JobIdentity) Labels() []module.Label {
-	return []module.Label{
-		{Key: "nagios_job", Value: id.JobName, Source: module.LabelSourceConf},
-		{Key: "nagios_scheduler", Value: id.Scheduler, Source: module.LabelSourceConf},
-		{Key: "nagios_plugin", Value: id.PluginBase, Source: module.LabelSourceConf},
-		{Key: "nagios_cmdline", Value: id.Cmdline, Source: module.LabelSourceConf},
+func (id JobIdentity) Labels() []collectorapi.Label {
+	return []collectorapi.Label{
+		{Key: "nagios_job", Value: id.JobName, Source: collectorapi.LabelSourceConf},
+		{Key: "nagios_scheduler", Value: id.Scheduler, Source: collectorapi.LabelSourceConf},
+		{Key: "nagios_plugin", Value: id.PluginBase, Source: collectorapi.LabelSourceConf},
+		{Key: "nagios_cmdline", Value: id.Cmdline, Source: collectorapi.LabelSourceConf},
 	}
 }
 

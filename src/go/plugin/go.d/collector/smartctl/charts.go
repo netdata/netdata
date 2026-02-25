@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioDeviceSmartStatus = module.Priority + iota
+	prioDeviceSmartStatus = collectorapi.Priority + iota
 	prioDeviceAtaSmartErrorLogCount
 	prioDevicePowerOnTime
 	prioDeviceTemperature
@@ -24,7 +24,7 @@ const (
 	prioDeviceSmartAttributeNormalized
 )
 
-var deviceChartsTmpl = module.Charts{
+var deviceChartsTmpl = collectorapi.Charts{
 	devicePowerOnTimeChartTmpl.Copy(),
 	deviceTemperatureChartTmpl.Copy(),
 	devicePowerCycleCountChartTmpl.Copy(),
@@ -33,146 +33,146 @@ var deviceChartsTmpl = module.Charts{
 }
 
 var (
-	deviceSmartStatusChartTmpl = module.Chart{
+	deviceSmartStatusChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_type_%s_smart_status",
 		Title:    "Device smart status",
 		Units:    "status",
 		Fam:      "smart status",
 		Ctx:      "smartctl.device_smart_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDeviceSmartStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "device_%s_type_%s_smart_status_passed", Name: "passed"},
 			{ID: "device_%s_type_%s_smart_status_failed", Name: "failed"},
 		},
 	}
-	deviceAtaSmartErrorLogCountChartTmpl = module.Chart{
+	deviceAtaSmartErrorLogCountChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_type_%s_ata_smart_error_log_count",
 		Title:    "Device ATA smart error log count",
 		Units:    "logs",
 		Fam:      "smart error log",
 		Ctx:      "smartctl.device_ata_smart_error_log_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDeviceAtaSmartErrorLogCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "device_%s_type_%s_ata_smart_error_log_summary_count", Name: "error_log"},
 		},
 	}
-	devicePowerOnTimeChartTmpl = module.Chart{
+	devicePowerOnTimeChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_type_%s_power_on_time",
 		Title:    "Device power on time",
 		Units:    "seconds",
 		Fam:      "power on time",
 		Ctx:      "smartctl.device_power_on_time",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDevicePowerOnTime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "device_%s_type_%s_power_on_time", Name: "power_on_time"},
 		},
 	}
-	deviceTemperatureChartTmpl = module.Chart{
+	deviceTemperatureChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_type_%s_temperature",
 		Title:    "Device temperature",
 		Units:    "Celsius",
 		Fam:      "temperature",
 		Ctx:      "smartctl.device_temperature",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDeviceTemperature,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "device_%s_type_%s_temperature", Name: "temperature"},
 		},
 	}
-	devicePowerCycleCountChartTmpl = module.Chart{
+	devicePowerCycleCountChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_type_%s_power_cycle_count",
 		Title:    "Device power cycles",
 		Units:    "cycles",
 		Fam:      "power cycles",
 		Ctx:      "smartctl.device_power_cycles_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDevicePowerCycleCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "device_%s_type_%s_power_cycle_count", Name: "power"},
 		},
 	}
 )
 
-var deviceScsiErrorLogChartsTmpl = module.Charts{
+var deviceScsiErrorLogChartsTmpl = collectorapi.Charts{
 	deviceScsiReadErrorsChartTmpl.Copy(),
 	deviceScsiWriteErrorsChartTmpl.Copy(),
 	deviceScsiVerifyErrorsChartTmpl.Copy(),
 }
 
 var (
-	deviceScsiReadErrorsChartTmpl = module.Chart{
+	deviceScsiReadErrorsChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_type_%s_read_errors_rate",
 		Title:    "Device read errors",
 		Units:    "errors/s",
 		Fam:      "scsi errors",
 		Ctx:      "smartctl.device_read_errors_rate",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDeviceScsiReadErrors,
-		Dims: module.Dims{
-			{ID: "device_%s_type_%s_scsi_error_log_read_total_errors_corrected", Name: "corrected", Algo: module.Incremental},
-			{ID: "device_%s_type_%s_scsi_error_log_read_total_uncorrected_errors", Name: "uncorrected", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "device_%s_type_%s_scsi_error_log_read_total_errors_corrected", Name: "corrected", Algo: collectorapi.Incremental},
+			{ID: "device_%s_type_%s_scsi_error_log_read_total_uncorrected_errors", Name: "uncorrected", Algo: collectorapi.Incremental},
 		},
 	}
-	deviceScsiWriteErrorsChartTmpl = module.Chart{
+	deviceScsiWriteErrorsChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_type_%s_write_errors_rate",
 		Title:    "Device write errors",
 		Units:    "errors/s",
 		Fam:      "scsi errors",
 		Ctx:      "smartctl.device_write_errors_rate",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDeviceScsiWriteErrors,
-		Dims: module.Dims{
-			{ID: "device_%s_type_%s_scsi_error_log_write_total_errors_corrected", Name: "corrected", Algo: module.Incremental},
-			{ID: "device_%s_type_%s_scsi_error_log_write_total_uncorrected_errors", Name: "uncorrected", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "device_%s_type_%s_scsi_error_log_write_total_errors_corrected", Name: "corrected", Algo: collectorapi.Incremental},
+			{ID: "device_%s_type_%s_scsi_error_log_write_total_uncorrected_errors", Name: "uncorrected", Algo: collectorapi.Incremental},
 		},
 	}
-	deviceScsiVerifyErrorsChartTmpl = module.Chart{
+	deviceScsiVerifyErrorsChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_type_%s_verify_errors_rate",
 		Title:    "Device verify errors",
 		Units:    "errors/s",
 		Fam:      "scsi errors",
 		Ctx:      "smartctl.device_verify_errors_rate",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDeviceScsiVerifyErrors,
-		Dims: module.Dims{
-			{ID: "device_%s_type_%s_scsi_error_log_verify_total_errors_corrected", Name: "corrected", Algo: module.Incremental},
-			{ID: "device_%s_type_%s_scsi_error_log_verify_total_uncorrected_errors", Name: "uncorrected", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "device_%s_type_%s_scsi_error_log_verify_total_errors_corrected", Name: "corrected", Algo: collectorapi.Incremental},
+			{ID: "device_%s_type_%s_scsi_error_log_verify_total_uncorrected_errors", Name: "uncorrected", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	deviceSmartAttributeDecodedChartTmpl = module.Chart{
+	deviceSmartAttributeDecodedChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_type_%s_smart_attr_%s",
 		Title:    "Device smart attribute %s",
 		Units:    "value",
 		Fam:      "attr %s",
 		Ctx:      "smartctl.device_smart_attr_%s",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDeviceSmartAttributeDecoded,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "device_%s_type_%s_attr_%s_decoded", Name: "%s"},
 		},
 	}
-	deviceSmartAttributeNormalizedChartTmpl = module.Chart{
+	deviceSmartAttributeNormalizedChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_type_%s_smart_attr_%s_normalized",
 		Title:    "Device smart attribute normalized %s",
 		Units:    "value",
 		Fam:      "attr %s",
 		Ctx:      "smartctl.device_smart_attr_%s_normalized",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDeviceSmartAttributeNormalized,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "device_%s_type_%s_attr_%s_normalized", Name: "%s"},
 		},
 	}
 )
 
 func (c *Collector) addDeviceCharts(dev *smartDevice) {
-	charts := module.Charts{}
+	charts := collectorapi.Charts{}
 
 	if cs := c.newDeviceCharts(dev); cs != nil && len(*cs) > 0 {
 		if err := charts.Add(*cs...); err != nil {
@@ -206,7 +206,7 @@ func (c *Collector) removeDeviceCharts(scanDev *scanDevice) {
 	}
 }
 
-func (c *Collector) newDeviceCharts(dev *smartDevice) *module.Charts {
+func (c *Collector) newDeviceCharts(dev *smartDevice) *collectorapi.Charts {
 
 	charts := deviceChartsTmpl.Copy()
 
@@ -228,7 +228,7 @@ func (c *Collector) newDeviceCharts(dev *smartDevice) *module.Charts {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, dev.deviceName(), dev.deviceType())
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "device_name", Value: dev.deviceName()},
 			{Key: "device_type", Value: dev.deviceType()},
 			{Key: "model_name", Value: dev.modelName()},
@@ -242,12 +242,12 @@ func (c *Collector) newDeviceCharts(dev *smartDevice) *module.Charts {
 	return charts
 }
 
-func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
+func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice) *collectorapi.Charts {
 	attrs, ok := dev.ataSmartAttributeTable()
 	if !ok {
 		return nil
 	}
-	charts := module.Charts{}
+	charts := collectorapi.Charts{}
 
 	for _, attr := range attrs {
 		if !isSmartAttrValid(attr) ||
@@ -256,7 +256,7 @@ func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
 			continue
 		}
 
-		cs := module.Charts{
+		cs := collectorapi.Charts{
 			deviceSmartAttributeDecodedChartTmpl.Copy(),
 			deviceSmartAttributeNormalizedChartTmpl.Copy(),
 		}
@@ -272,7 +272,7 @@ func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
 			chart.Title = fmt.Sprintf(chart.Title, attrName)
 			chart.Fam = fmt.Sprintf(chart.Fam, cleanAttrName)
 			chart.Ctx = fmt.Sprintf(chart.Ctx, cleanAttrName)
-			chart.Labels = []module.Label{
+			chart.Labels = []collectorapi.Label{
 				{Key: "device_name", Value: dev.deviceName()},
 				{Key: "device_type", Value: dev.deviceType()},
 				{Key: "model_name", Value: dev.modelName()},
@@ -292,7 +292,7 @@ func (c *Collector) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
 	return &charts
 }
 
-func (c *Collector) newDeviceScsiErrorLogCharts(dev *smartDevice) *module.Charts {
+func (c *Collector) newDeviceScsiErrorLogCharts(dev *smartDevice) *collectorapi.Charts {
 	if dev.deviceType() != "scsi" || !dev.data.Get("scsi_error_counter_log").Exists() {
 		return nil
 	}
@@ -301,7 +301,7 @@ func (c *Collector) newDeviceScsiErrorLogCharts(dev *smartDevice) *module.Charts
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, dev.deviceName(), dev.deviceType())
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "device_name", Value: dev.deviceName()},
 			{Key: "device_type", Value: dev.deviceType()},
 			{Key: "model_name", Value: dev.modelName()},

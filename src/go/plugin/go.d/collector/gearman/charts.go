@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioQueuedJobsByActivity = module.Priority + iota
+	prioQueuedJobsByActivity = collectorapi.Priority + iota
 	prioQueuedJobsByPriority
 
 	prioFunctionQueuedJobsByActivity
@@ -18,34 +18,34 @@ const (
 	prioFunctionAvailableWorkers
 )
 
-var summaryCharts = module.Charts{
+var summaryCharts = collectorapi.Charts{
 	chartQueuedJobsActivity.Copy(),
 	chartQueuedJobsPriority.Copy(),
 }
 
 var (
-	chartQueuedJobsActivity = module.Chart{
+	chartQueuedJobsActivity = collectorapi.Chart{
 		ID:       "queued_jobs_by_activity",
 		Title:    "Jobs Activity",
 		Units:    "jobs",
 		Fam:      "jobs",
 		Ctx:      "gearman.queued_jobs_activity",
 		Priority: prioQueuedJobsByActivity,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "total_jobs_running", Name: "running"},
 			{ID: "total_jobs_waiting", Name: "waiting"},
 		},
 	}
-	chartQueuedJobsPriority = module.Chart{
+	chartQueuedJobsPriority = collectorapi.Chart{
 		ID:       "queued_jobs_by_priority",
 		Title:    "Jobs Priority",
 		Units:    "jobs",
 		Fam:      "jobs",
 		Ctx:      "gearman.queued_jobs_priority",
 		Priority: prioQueuedJobsByPriority,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "total_high_priority_jobs", Name: "high"},
 			{ID: "total_normal_priority_jobs", Name: "normal"},
 			{ID: "total_low_priority_jobs", Name: "low"},
@@ -53,53 +53,53 @@ var (
 	}
 )
 
-var functionStatusChartsTmpl = module.Charts{
+var functionStatusChartsTmpl = collectorapi.Charts{
 	functionQueuedJobsActivityChartTmpl.Copy(),
 	functionWorkersChartTmpl.Copy(),
 }
 
 var (
-	functionQueuedJobsActivityChartTmpl = module.Chart{
+	functionQueuedJobsActivityChartTmpl = collectorapi.Chart{
 		ID:       "function_%s_queued_jobs_by_activity",
 		Title:    "Function Jobs Activity",
 		Units:    "jobs",
 		Fam:      "fn jobs",
 		Ctx:      "gearman.function_queued_jobs_activity",
 		Priority: prioFunctionQueuedJobsByActivity,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "function_%s_jobs_running", Name: "running"},
 			{ID: "function_%s_jobs_waiting", Name: "waiting"},
 		},
 	}
-	functionWorkersChartTmpl = module.Chart{
+	functionWorkersChartTmpl = collectorapi.Chart{
 		ID:       "function_%s_workers",
 		Title:    "Function Workers",
 		Units:    "workers",
 		Fam:      "fn workers",
 		Ctx:      "gearman.function_workers",
 		Priority: prioFunctionAvailableWorkers,
-		Type:     module.Line,
-		Dims: module.Dims{
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
 			{ID: "function_%s_workers_available", Name: "available"},
 		},
 	}
 )
 
-var functionPriorityStatusChartsTmpl = module.Charts{
+var functionPriorityStatusChartsTmpl = collectorapi.Charts{
 	functionQueuedJobsByPriorityChartTmpl.Copy(),
 }
 
 var (
-	functionQueuedJobsByPriorityChartTmpl = module.Chart{
+	functionQueuedJobsByPriorityChartTmpl = collectorapi.Chart{
 		ID:       "prio_function_%s_queued_jobs_by_priority",
 		Title:    "Function Jobs Priority",
 		Units:    "jobs",
 		Fam:      "fn jobs",
 		Ctx:      "gearman.function_queued_jobs_priority",
 		Priority: prioFunctionQueuedJobsByPriority,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "function_%s_high_priority_jobs", Name: "high"},
 			{ID: "function_%s_normal_priority_jobs", Name: "normal"},
 			{ID: "function_%s_low_priority_jobs", Name: "low"},
@@ -125,12 +125,12 @@ func (c *Collector) removeFunctionPriorityStatusCharts(name string) {
 	c.removeCharts(px)
 }
 
-func (c *Collector) addFunctionCharts(name string, charts *module.Charts) {
+func (c *Collector) addFunctionCharts(name string, charts *collectorapi.Charts) {
 	charts = charts.Copy()
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, cleanFunctionName(name))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "function_name", Value: name},
 		}
 		for _, dim := range chart.Dims {

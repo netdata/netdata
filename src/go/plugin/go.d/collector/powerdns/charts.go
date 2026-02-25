@@ -2,18 +2,18 @@
 
 package powerdns
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	{
 		ID:    "questions_in",
 		Title: "Incoming questions",
 		Units: "questions/s",
 		Fam:   "questions",
 		Ctx:   "powerdns.questions_in",
-		Dims: module.Dims{
-			{ID: "udp-queries", Name: "udp", Algo: module.Incremental},
-			{ID: "tcp-queries", Name: "tcp", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "udp-queries", Name: "udp", Algo: collectorapi.Incremental},
+			{ID: "tcp-queries", Name: "tcp", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -22,9 +22,9 @@ var charts = module.Charts{
 		Units: "questions/s",
 		Fam:   "questions",
 		Ctx:   "powerdns.questions_out",
-		Dims: module.Dims{
-			{ID: "udp-answers", Name: "udp", Algo: module.Incremental},
-			{ID: "tcp-answers", Name: "tcp", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "udp-answers", Name: "udp", Algo: collectorapi.Incremental},
+			{ID: "tcp-answers", Name: "tcp", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -33,11 +33,11 @@ var charts = module.Charts{
 		Units: "events/s",
 		Fam:   "cache",
 		Ctx:   "powerdns.cache_usage",
-		Dims: module.Dims{
-			{ID: "query-cache-hit", Algo: module.Incremental},
-			{ID: "query-cache-miss", Algo: module.Incremental},
-			{ID: "packetcache-hit", Name: "packet-cache-hit", Algo: module.Incremental},
-			{ID: "packetcache-miss", Name: "packet-cache-miss", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "query-cache-hit", Algo: collectorapi.Incremental},
+			{ID: "query-cache-miss", Algo: collectorapi.Incremental},
+			{ID: "packetcache-hit", Name: "packet-cache-hit", Algo: collectorapi.Incremental},
+			{ID: "packetcache-miss", Name: "packet-cache-miss", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -46,7 +46,7 @@ var charts = module.Charts{
 		Units: "entries",
 		Fam:   "cache",
 		Ctx:   "powerdns.cache_size",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "query-cache-size", Name: "query-cache"},
 			{ID: "packetcache-size", Name: "packet-cache"},
 			{ID: "key-cache-size", Name: "key-cache"},
@@ -59,7 +59,7 @@ var charts = module.Charts{
 		Units: "microseconds",
 		Fam:   "latency",
 		Ctx:   "powerdns.latency",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "latency"},
 		},
 	},

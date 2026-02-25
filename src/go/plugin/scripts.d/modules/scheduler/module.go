@@ -11,7 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/charts"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/schedulers"
@@ -23,10 +23,10 @@ var configSchema string
 var collectSchedulerMetrics = schedulers.CollectMetrics
 
 func init() {
-	module.Register("scheduler", module.Creator{
+	collectorapi.Register("scheduler", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults:        module.Defaults{AutoDetectionRetry: 60},
-		Create:          func() module.Module { return New() },
+		Defaults:        collectorapi.Defaults{AutoDetectionRetry: 60},
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
 	})
 }
@@ -97,11 +97,11 @@ func (c OTLPLoggingConfig) tlsEnabled() bool {
 
 // Collector implements the virtual scheduler job.
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:",inline"`
 
 	applied bool
-	charts  *module.Charts
+	charts  *collectorapi.Charts
 }
 
 // New returns a Collector with defaults applied.
@@ -120,7 +120,7 @@ func New() *Collector {
 			},
 		},
 	}
-	return &Collector{Config: cfg, charts: &module.Charts{}}
+	return &Collector{Config: cfg, charts: &collectorapi.Charts{}}
 }
 
 func boolPtr(v bool) *bool {
@@ -146,7 +146,7 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.Logging.setDefaults()
 	if c.charts == nil {
-		c.charts = &module.Charts{}
+		c.charts = &collectorapi.Charts{}
 	}
 	charts := charts.BuildSchedulerCharts(c.Name, 100)
 	if err := c.charts.Add(charts...); err != nil {
@@ -170,7 +170,7 @@ func (c *Collector) Init(context.Context) error {
 
 func (c *Collector) Check(context.Context) error { return nil }
 
-func (c *Collector) Charts() *module.Charts { return c.charts }
+func (c *Collector) Charts() *collectorapi.Charts { return c.charts }
 
 func (c *Collector) Collect(context.Context) map[string]int64 {
 	all := collectSchedulerMetrics(c.Name)
@@ -195,6 +195,6 @@ func (c *Collector) Cleanup(context.Context) {
 		_ = schedulers.RemoveDefinition(c.Name)
 	}
 	if c.charts != nil {
-		c.charts = &module.Charts{}
+		c.charts = &collectorapi.Charts{}
 	}
 }

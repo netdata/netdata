@@ -1096,11 +1096,14 @@ char *aclk_state(void)
         buffer_strcat(wb, "No\n");
     else {
         const char *cloud_base_url = cloud_config_url_get();
-        char *aclk_proxy = (char *)aclk_get_proxy(NULL, true);
+
+        char proxy_display[512];
+        aclk_proxy_get_full_display(proxy_display, sizeof(proxy_display));
+
         usec_t latency = __atomic_load_n(&publish_latency, __ATOMIC_RELAXED);
         char latency_str[64];
         duration_snprintf(latency_str, sizeof(latency_str), (int64_t) latency, "us", true);
-        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\nACLK Proxy: %s\nPublish Latency: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null", aclk_proxy ? aclk_proxy : "none", latency_str);
+        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\nACLK Proxy: %s\nPublish Latency: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null", proxy_display, latency_str);
     }
 
     bool aclk_is_online = aclk_online();
@@ -1244,9 +1247,12 @@ char *aclk_state_json(void)
     tmp = cloud_base_url ? json_object_new_string(cloud_base_url) : NULL;
     json_object_object_add(msg, "cloud-url", tmp);
 
-    char *aclk_proxy = (char *)aclk_get_proxy(NULL, true);
-    tmp = aclk_proxy ? json_object_new_string(aclk_proxy) : NULL;
-    json_object_object_add(msg, "aclk_proxy", tmp);
+    {
+        char proxy_display[512];
+        aclk_proxy_get_full_display(proxy_display, sizeof(proxy_display));
+        tmp = json_object_new_string(proxy_display);
+        json_object_object_add(msg, "aclk_proxy", tmp);
+    }
 
     usec_t latency = __atomic_load_n(&publish_latency, __ATOMIC_RELAXED);
     tmp =json_object_new_int64((int64_t) latency);

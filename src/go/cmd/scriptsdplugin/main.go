@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/nagios"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/scheduler"
 )

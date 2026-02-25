@@ -5,16 +5,16 @@ package dockerhub
 import (
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Dims is an alias for module.Dims
-	Dims = module.Dims
-	// Dim is an alias for module.Dim
-	Dim = module.Dim
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Dims is an alias for collectorapi.Dims
+	Dims = collectorapi.Dims
+	// Dim is an alias for collectorapi.Dim
+	Dim = collectorapi.Dim
 )
 
 var charts = Charts{
@@ -32,21 +32,21 @@ var charts = Charts{
 		Title: "Pulls",
 		Units: "pulls",
 		Fam:   "pulls",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 	},
 	{
 		ID:    "pulls_rate",
 		Title: "Pulls Rate",
 		Units: "pulls/s",
 		Fam:   "pulls",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 	},
 	{
 		ID:    "stars",
 		Title: "Stars",
 		Units: "stars",
 		Fam:   "stars",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 	},
 	{
 		ID:    "status",
@@ -72,7 +72,7 @@ func addReposToCharts(repositories []string, cs *Charts) {
 		_ = cs.Get("pulls_rate").AddDim(&Dim{
 			ID:   "pull_count_" + name,
 			Name: dimName,
-			Algo: module.Incremental,
+			Algo: collectorapi.Incremental,
 		})
 		_ = cs.Get("stars").AddDim(&Dim{
 			ID:   "star_count_" + name,

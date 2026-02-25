@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioUpsLoad = module.Priority + iota
+	prioUpsLoad = collectorapi.Priority + iota
 	prioUpsLoadUsage
 	prioUpsStatus
 	prioUpsTemperature
@@ -35,7 +35,7 @@ const (
 	prioOutputFrequencyNominal
 )
 
-var upsChartsTmpl = module.Charts{
+var upsChartsTmpl = collectorapi.Charts{
 	upsLoadChartTmpl.Copy(),
 	upsLoadUsageChartTmpl.Copy(),
 	upsStatusChartTmpl.Copy(),
@@ -62,7 +62,7 @@ var upsChartsTmpl = module.Charts{
 }
 
 var (
-	upsLoadChartTmpl = module.Chart{
+	upsLoadChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.load_percentage",
 		Title:    "UPS load",
@@ -70,12 +70,12 @@ var (
 		Fam:      "ups",
 		Ctx:      "upsd.ups_load",
 		Priority: prioUpsLoad,
-		Type:     module.Area,
-		Dims: module.Dims{
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_ups.load", Name: "load", Div: varPrecision},
 		},
 	}
-	upsLoadUsageChartTmpl = module.Chart{
+	upsLoadUsageChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.load_usage",
 		Title:    "UPS load usage (power output)",
@@ -83,11 +83,11 @@ var (
 		Fam:      "ups",
 		Ctx:      "upsd.ups_load_usage",
 		Priority: prioUpsLoadUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_ups.load.usage", Name: "load_usage", Div: varPrecision},
 		},
 	}
-	upsStatusChartTmpl = module.Chart{
+	upsStatusChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.status",
 		Title:    "UPS status",
@@ -95,7 +95,7 @@ var (
 		Fam:      "ups",
 		Ctx:      "upsd.ups_status",
 		Priority: prioUpsStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_ups.status.OL", Name: "on_line"},
 			{ID: "ups_%s_ups.status.OB", Name: "on_battery"},
 			{ID: "ups_%s_ups.status.LB", Name: "low_battery"},
@@ -113,7 +113,7 @@ var (
 			{ID: "ups_%s_ups.status.other", Name: "other"},
 		},
 	}
-	upsTemperatureChartTmpl = module.Chart{
+	upsTemperatureChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.temperature",
 		Title:    "UPS temperature",
@@ -121,14 +121,14 @@ var (
 		Fam:      "ups",
 		Ctx:      "upsd.ups_temperature",
 		Priority: prioUpsTemperature,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_ups.temperature", Name: "temperature", Div: varPrecision},
 		},
 	}
 )
 
 var (
-	upsBatteryChargePercentChartTmpl = module.Chart{
+	upsBatteryChargePercentChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.battery_charge_percentage",
 		Title:    "UPS Battery charge",
@@ -136,12 +136,12 @@ var (
 		Fam:      "battery",
 		Ctx:      "upsd.ups_battery_charge",
 		Priority: prioBatteryCharge,
-		Type:     module.Area,
-		Dims: module.Dims{
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_battery.charge", Name: "charge", Div: varPrecision},
 		},
 	}
-	upsBatteryEstimatedRuntimeChartTmpl = module.Chart{
+	upsBatteryEstimatedRuntimeChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.battery_estimated_runtime",
 		Title:    "UPS Battery estimated runtime",
@@ -149,11 +149,11 @@ var (
 		Fam:      "battery",
 		Ctx:      "upsd.ups_battery_estimated_runtime",
 		Priority: prioBatteryEstimatedRuntime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_battery.runtime", Name: "runtime", Div: varPrecision},
 		},
 	}
-	upsBatteryVoltageChartTmpl = module.Chart{
+	upsBatteryVoltageChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.battery_voltage",
 		Title:    "UPS Battery voltage",
@@ -161,11 +161,11 @@ var (
 		Fam:      "battery",
 		Ctx:      "upsd.ups_battery_voltage",
 		Priority: prioBatteryVoltage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_battery.voltage", Name: "voltage", Div: varPrecision},
 		},
 	}
-	upsBatteryVoltageNominalChartTmpl = module.Chart{
+	upsBatteryVoltageNominalChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.battery_voltage_nominal",
 		Title:    "UPS Battery voltage nominal",
@@ -173,14 +173,14 @@ var (
 		Fam:      "battery",
 		Ctx:      "upsd.ups_battery_voltage_nominal",
 		Priority: prioBatteryVoltageNominal,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_battery.voltage.nominal", Name: "nominal_voltage", Div: varPrecision},
 		},
 	}
 )
 
 var (
-	upsInputVoltageChartTmpl = module.Chart{
+	upsInputVoltageChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.input_voltage",
 		Title:    "UPS Input voltage",
@@ -188,11 +188,11 @@ var (
 		Fam:      "input",
 		Ctx:      "upsd.ups_input_voltage",
 		Priority: prioInputVoltage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_input.voltage", Name: "voltage", Div: varPrecision},
 		},
 	}
-	upsInputVoltageNominalChartTmpl = module.Chart{
+	upsInputVoltageNominalChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.input_voltage_nominal",
 		Title:    "UPS Input voltage nominal",
@@ -200,11 +200,11 @@ var (
 		Fam:      "input",
 		Ctx:      "upsd.ups_input_voltage_nominal",
 		Priority: prioInputVoltageNominal,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_input.voltage.nominal", Name: "nominal_voltage", Div: varPrecision},
 		},
 	}
-	upsInputCurrentChartTmpl = module.Chart{
+	upsInputCurrentChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.input_current",
 		Title:    "UPS Input current",
@@ -212,11 +212,11 @@ var (
 		Fam:      "input",
 		Ctx:      "upsd.ups_input_current",
 		Priority: prioInputCurrent,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_input.current", Name: "current", Div: varPrecision},
 		},
 	}
-	upsInputCurrentNominalChartTmpl = module.Chart{
+	upsInputCurrentNominalChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.input_current_nominal",
 		Title:    "UPS Input current nominal",
@@ -224,11 +224,11 @@ var (
 		Fam:      "input",
 		Ctx:      "upsd.ups_input_current_nominal",
 		Priority: prioInputCurrentNominal,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_input.current.nominal", Name: "nominal_current", Div: varPrecision},
 		},
 	}
-	upsInputFrequencyChartTmpl = module.Chart{
+	upsInputFrequencyChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.input_frequency",
 		Title:    "UPS Input frequency",
@@ -236,11 +236,11 @@ var (
 		Fam:      "input",
 		Ctx:      "upsd.ups_input_frequency",
 		Priority: prioInputFrequency,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_input.frequency", Name: "frequency", Div: varPrecision},
 		},
 	}
-	upsInputFrequencyNominalChartTmpl = module.Chart{
+	upsInputFrequencyNominalChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.input_frequency_nominal",
 		Title:    "UPS Input frequency nominal",
@@ -248,14 +248,14 @@ var (
 		Fam:      "input",
 		Ctx:      "upsd.ups_input_frequency_nominal",
 		Priority: prioInputFrequencyNominal,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_input.frequency.nominal", Name: "nominal_frequency", Div: varPrecision},
 		},
 	}
 )
 
 var (
-	upsOutputVoltageChartTmpl = module.Chart{
+	upsOutputVoltageChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.output_voltage",
 		Title:    "UPS Output voltage",
@@ -263,11 +263,11 @@ var (
 		Fam:      "output",
 		Ctx:      "upsd.ups_output_voltage",
 		Priority: prioOutputVoltage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_output.voltage", Name: "voltage", Div: varPrecision},
 		},
 	}
-	upsOutputVoltageNominalChartTmpl = module.Chart{
+	upsOutputVoltageNominalChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.output_voltage_nominal",
 		Title:    "UPS Output voltage nominal",
@@ -275,11 +275,11 @@ var (
 		Fam:      "output",
 		Ctx:      "upsd.ups_output_voltage_nominal",
 		Priority: prioOutputVoltageNominal,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_output.voltage.nominal", Name: "nominal_voltage", Div: varPrecision},
 		},
 	}
-	upsOutputCurrentChartTmpl = module.Chart{
+	upsOutputCurrentChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.output_current",
 		Title:    "UPS Output current",
@@ -287,11 +287,11 @@ var (
 		Fam:      "output",
 		Ctx:      "upsd.ups_output_current",
 		Priority: prioOutputCurrent,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_output.current", Name: "current", Div: varPrecision},
 		},
 	}
-	upsOutputCurrentNominalChartTmpl = module.Chart{
+	upsOutputCurrentNominalChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.output_current_nominal",
 		Title:    "UPS Output current nominal",
@@ -299,11 +299,11 @@ var (
 		Fam:      "output",
 		Ctx:      "upsd.ups_output_current_nominal",
 		Priority: prioOutputCurrentNominal,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_output.current.nominal", Name: "nominal_current", Div: varPrecision},
 		},
 	}
-	upsOutputFrequencyChartTmpl = module.Chart{
+	upsOutputFrequencyChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.output_frequency",
 		Title:    "UPS Output frequency",
@@ -311,11 +311,11 @@ var (
 		Fam:      "output",
 		Ctx:      "upsd.ups_output_frequency",
 		Priority: prioOutputFrequency,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_output.frequency", Name: "frequency", Div: varPrecision},
 		},
 	}
-	upsOutputFrequencyNominalChartTmpl = module.Chart{
+	upsOutputFrequencyNominalChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "%s.output_frequency_nominal",
 		Title:    "UPS Output frequency nominal",
@@ -323,7 +323,7 @@ var (
 		Fam:      "output",
 		Ctx:      "upsd.ups_output_frequency_nominal",
 		Priority: prioOutputFrequencyNominal,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "ups_%s_output.frequency.nominal", Name: "nominal_frequency", Div: varPrecision},
 		},
 	}
@@ -368,7 +368,7 @@ func (c *Collector) addUPSCharts(ups upsUnit) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, name)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "ups_name", Value: ups.name},
 			{Key: "battery_type", Value: ups.vars[varBatteryType]},
 			{Key: "device_model", Value: ups.vars[varDeviceModel]},

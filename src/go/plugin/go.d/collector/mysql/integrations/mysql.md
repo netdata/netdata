@@ -529,8 +529,29 @@ To create the `netdata` user with these permissions, execute the following in th
   FLUSH PRIVILEGES;
   ```
 
-The `netdata` user will have the ability to connect to the MySQL server on localhost without a password. 
+The `netdata` user will have the ability to connect to the MySQL server on localhost without a password.
 It will only be able to gather statistics without being able to alter or affect operations in any way.
+
+
+#### Enable User Statistics (optional)
+
+To collect per-user statistics, the [User Statistics](https://mariadb.com/docs/server/ha-and-performance/optimization-and-tuning/query-optimizations/statistics-for-optimizing-queries/user-statistics) plugin must be enabled.
+This is available for **MariaDB** and **Percona**, not for MySQL.
+
+By default, statistics are not collected. To enable the plugin, set the `userstat` system variable.
+
+- **In a configuration file** (persistent, requires restart):
+
+  ```ini
+  [mariadb]
+  userstat = 1
+  ```
+
+- **Dynamically** (takes effect immediately, does not persist across restarts):
+
+  ```mysql
+  SET GLOBAL userstat=1;
+  ```
 
 
 

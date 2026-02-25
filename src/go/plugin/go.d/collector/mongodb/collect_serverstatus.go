@@ -7,7 +7,7 @@ import (
 	"reflect"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 // collectServerStatus creates the map[string]int64 for the available dims.
@@ -112,7 +112,7 @@ func (c *Collector) addOptionalCharts(s *documentServerStatus) {
 	}
 }
 
-func (c *Collector) addOptionalChart(iface any, charts ...*module.Chart) {
+func (c *Collector) addOptionalChart(iface any, charts ...*collectorapi.Chart) {
 	if reflect.ValueOf(iface).IsNil() {
 		return
 	}
