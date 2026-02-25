@@ -4894,10 +4894,27 @@ func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[st
 	match.IPAddresses = uniqueTopologyStrings(match.IPAddresses)
 
 	port = strings.TrimSpace(port)
-	ifName := port
+	ifName := ""
+	ifDescr := ""
 	ifIndex := 0
+	var iface Interface
+	hasIface := false
 	if port != "" {
 		ifIndex = resolveIfIndexByPortName(dev.ID, port, ifIndexByDeviceName)
+	}
+	if ifIndex > 0 {
+		if ifaceValue, ok := ifaceByDeviceIndex[deviceIfIndexKey(dev.ID, ifIndex)]; ok {
+			iface = ifaceValue
+			hasIface = true
+			ifName = strings.TrimSpace(iface.IfName)
+			ifDescr = strings.TrimSpace(iface.IfDescr)
+		}
+	}
+	if ifName == "" {
+		ifName = ifDescr
+	}
+	if ifName == "" {
+		ifName = port
 	}
 	if ifIndex > 0 && ifName == "" {
 		ifName = strconv.Itoa(ifIndex)
@@ -4910,14 +4927,15 @@ func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[st
 		"sys_name":      strings.TrimSpace(dev.Hostname),
 		"management_ip": firstAddress(dev.Addresses),
 	}
-	if ifIndex > 0 {
-		if iface, ok := ifaceByDeviceIndex[deviceIfIndexKey(dev.ID, ifIndex)]; ok {
-			if admin := strings.TrimSpace(iface.Labels["admin_status"]); admin != "" {
-				attrs["if_admin_status"] = admin
-			}
-			if oper := strings.TrimSpace(iface.Labels["oper_status"]); oper != "" {
-				attrs["if_oper_status"] = oper
-			}
+	if ifDescr != "" {
+		attrs["if_descr"] = ifDescr
+	}
+	if ifIndex > 0 && hasIface {
+		if admin := strings.TrimSpace(iface.Labels["admin_status"]); admin != "" {
+			attrs["if_admin_status"] = admin
+		}
+		if oper := strings.TrimSpace(iface.Labels["oper_status"]); oper != "" {
+			attrs["if_oper_status"] = oper
 		}
 	}
 
