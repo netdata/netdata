@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/stretchr/testify/assert"
@@ -24,27 +23,54 @@ func TestNewManager(t *testing.T) {
 		"valid config": {
 			cfg: Config{
 				Registry: confgroup.Registry{"module1": confgroup.Default{}},
-				File:     file.Config{Read: []string{"path"}},
+				Providers: []ProviderFactory{
+					NewProviderFactory("test", func(BuildContext) (Discoverer, bool, error) {
+						return prepareMockDiscoverer("test", 1, 1), true, nil
+					}),
+				},
 			},
 		},
 		"valid config, sd only": {
 			cfg: Config{
 				Registry: confgroup.Registry{"module1": confgroup.Default{}},
-				SD: sd.Config{
-					ConfDir:     []string{"path"},
-					Discoverers: sd.NewRegistry(),
+				Providers: []ProviderFactory{
+					NewProviderFactory("sd", func(BuildContext) (Discoverer, bool, error) {
+						d, err := sd.NewServiceDiscovery(sd.Config{
+							ConfDir:     []string{"path"},
+							Discoverers: sd.NewRegistry(),
+						})
+						if err != nil {
+							return nil, false, err
+						}
+						return d, true, nil
+					}),
 				},
 			},
 		},
 		"invalid config, registry not set": {
 			cfg: Config{
-				File: file.Config{Read: []string{"path"}},
+				Providers: []ProviderFactory{
+					NewProviderFactory("test", func(BuildContext) (Discoverer, bool, error) {
+						return prepareMockDiscoverer("test", 1, 1), true, nil
+					}),
+				},
 			},
 			wantErr: true,
 		},
 		"invalid config, discoverers not set": {
 			cfg: Config{
 				Registry: confgroup.Registry{"module1": confgroup.Default{}},
+			},
+			wantErr: true,
+		},
+		"invalid config, all providers disabled": {
+			cfg: Config{
+				Registry: confgroup.Registry{"module1": confgroup.Default{}},
+				Providers: []ProviderFactory{
+					NewProviderFactory("disabled", func(BuildContext) (Discoverer, bool, error) {
+						return nil, false, nil
+					}),
+				},
 			},
 			wantErr: true,
 		},
@@ -152,7 +178,7 @@ func prepareMockDiscoverer(source string, groups, configs int) mockDiscoverer {
 	return d
 }
 
-func prepareManager(discoverers ...discoverer) *Manager {
+func prepareManager(discoverers ...Discoverer) *Manager {
 	mgr := &Manager{
 		send:        make(chan struct{}, 1),
 		sendEvery:   2 * time.Second,

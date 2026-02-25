@@ -91,18 +91,50 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 
 	var readPaths, dummyPaths []string
 
+	cfg := discovery.Config{
+		Registry: reg,
+		BuildContext: discovery.BuildContext{
+			Policy: discovery.PlatformPolicy{
+				IsInsideK8s:    hostinfo2.IsInsideK8sCluster(),
+				SystemdVersion: hostinfo2.SystemdVersion,
+				StockConfigDir: envNDStockConfigDir,
+			},
+			Identity: discovery.PluginIdentity{
+				Name: a.Name,
+			},
+			Out: a.Out,
+			Paths: discovery.PathsConfig{
+				PluginConfigDir:           a.ConfigDir,
+				CollectorsConfigDir:       a.CollectorsConfDir,
+				CollectorsConfigWatchPath: a.CollectorsConfigWatchPath,
+				ServiceDiscoveryConfigDir: a.ServiceDiscoveryConfigDir,
+				VarLibDir:                 a.VarLibDir,
+			},
+		},
+	}
+
 	if len(a.CollectorsConfDir) == 0 {
 		if hostinfo2.IsInsideK8sCluster() {
-			return discovery.Config{Registry: reg}
+			return cfg
 		}
 		a.Info("modules conf dir not provided, will use default config for all enabled modules")
 		for name := range enabled {
 			dummyPaths = append(dummyPaths, name)
 		}
-		return discovery.Config{
+		dummyCfg := dummy.Config{
 			Registry: reg,
-			Dummy:    dummy.Config{Names: dummyPaths},
+			Names:    dummyPaths,
 		}
+		cfg.Providers = append(cfg.Providers,
+			discovery.NewProviderFactory("dummy", func(discovery.BuildContext) (discovery.Discoverer, bool, error) {
+				d, err := dummy.NewDiscovery(dummyCfg)
+				if err != nil {
+					return nil, false, err
+				}
+				return d, true, nil
+			}),
+		)
+		return cfg
 	}
 
 	for name := range enabled {
@@ -129,25 +161,60 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 	}
 
 	a.Infof("dummy/read/watch paths: %d/%d/%d", len(dummyPaths), len(readPaths), len(a.CollectorsConfigWatchPath))
-
-	cfg := discovery.Config{
+	fileCfg := file.Config{
 		Registry: reg,
-		File: file.Config{
-			Read:  readPaths,
-			Watch: a.CollectorsConfigWatchPath,
-		},
+		Read:     readPaths,
+		Watch:    a.CollectorsConfigWatchPath,
 	}
+	cfg.Providers = append(cfg.Providers,
+		discovery.NewProviderFactory("file", func(discovery.BuildContext) (discovery.Discoverer, bool, error) {
+			if len(fileCfg.Read)+len(fileCfg.Watch) == 0 {
+				return nil, false, nil
+			}
+			d, err := file.NewDiscovery(fileCfg)
+			if err != nil {
+				return nil, false, err
+			}
+			return d, true, nil
+		}),
+	)
 
 	if !a.DisableServiceDiscovery {
-		cfg.Dummy = dummy.Config{
-			Names: dummyPaths,
+		dummyCfg := dummy.Config{
+			Registry: reg,
+			Names:    dummyPaths,
 		}
-		cfg.SD = sd.Config{
+		cfg.Providers = append(cfg.Providers,
+			discovery.NewProviderFactory("dummy", func(discovery.BuildContext) (discovery.Discoverer, bool, error) {
+				if len(dummyCfg.Names) == 0 {
+					return nil, false, nil
+				}
+				d, err := dummy.NewDiscovery(dummyCfg)
+				if err != nil {
+					return nil, false, err
+				}
+				return d, true, nil
+			}),
+		)
+
+		sdCfg := sd.Config{
 			ConfigDefaults: reg,
 			ConfDir:        a.ServiceDiscoveryConfigDir,
 			FnReg:          fnReg,
 			Discoverers:    sdext.Registry(),
 		}
+		cfg.Providers = append(cfg.Providers,
+			discovery.NewProviderFactory("sd", func(discovery.BuildContext) (discovery.Discoverer, bool, error) {
+				if len(sdCfg.ConfDir) == 0 {
+					return nil, false, nil
+				}
+				d, err := sd.NewServiceDiscovery(sdCfg)
+				if err != nil {
+					return nil, false, err
+				}
+				return d, true, nil
+			}),
+		)
 	}
 
 	return cfg
