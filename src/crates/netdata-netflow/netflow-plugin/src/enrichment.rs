@@ -5,9 +5,13 @@ use crate::plugin_config::{
 };
 use anyhow::{Context, Result};
 use ipnet::IpNet;
+use ipnet_trie::IpnetTrie;
 use maxminddb::Reader;
 use regex::Regex;
 use serde::Deserialize;
+#[cfg(test)]
+use crate::decoder::FlowFields;
+use crate::decoder::FlowRecord;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::net::{IpAddr, SocketAddr};
@@ -60,9 +64,24 @@ pub(crate) struct DynamicRoutingRuntime {
     state: Arc<RwLock<DynamicRoutingState>>,
 }
 
-#[derive(Debug, Default)]
 struct DynamicRoutingState {
-    entries: Vec<DynamicRoutingPrefixEntry>,
+    entries: IpnetTrie<Vec<DynamicRoutingRoute>>,
+}
+
+impl Default for DynamicRoutingState {
+    fn default() -> Self {
+        Self {
+            entries: IpnetTrie::new(),
+        }
+    }
+}
+
+impl std::fmt::Debug for DynamicRoutingState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DynamicRoutingState")
+            .field("entries", &"<IpnetTrie>")
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -74,12 +93,6 @@ pub(crate) struct NetworkSourceRecord {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct NetworkSourcesRuntime {
     records: Arc<RwLock<Vec<NetworkSourceRecord>>>,
-}
-
-#[derive(Debug, Clone)]
-struct DynamicRoutingPrefixEntry {
-    prefix: IpNet,
-    routes: Vec<DynamicRoutingRoute>,
 }
 
 #[derive(Debug, Clone)]
@@ -124,82 +137,82 @@ impl DynamicRoutingRuntime {
         let Ok(mut state) = self.state.write() else {
             return;
         };
-        if let Some(prefix_entry) = state
-            .entries
+        // Remove existing routes for this prefix (if any), modify, re-insert.
+        let mut routes = state.entries.remove(update.prefix).unwrap_or_default();
+        if let Some(route) = routes
             .iter_mut()
-            .find(|prefix_entry| prefix_entry.prefix == update.prefix)
+            .find(|route| route.peer == update.peer && route.route_key == update.route_key)
         {
-            if let Some(route) = prefix_entry
-                .routes
-                .iter_mut()
-                .find(|route| route.peer == update.peer && route.route_key == update.route_key)
-            {
-                route.next_hop = update.next_hop;
-                route.entry = entry;
-                return;
-            }
-            prefix_entry.routes.push(DynamicRoutingRoute {
+            route.next_hop = update.next_hop;
+            route.entry = entry;
+        } else {
+            routes.push(DynamicRoutingRoute {
                 peer: update.peer,
                 route_key: update.route_key,
                 next_hop: update.next_hop,
                 entry,
             });
-            return;
         }
-
-        state.entries.push(DynamicRoutingPrefixEntry {
-            prefix: update.prefix,
-            routes: vec![DynamicRoutingRoute {
-                peer: update.peer,
-                route_key: update.route_key,
-                next_hop: update.next_hop,
-                entry,
-            }],
-        });
+        state.entries.insert(update.prefix, routes);
     }
 
     pub(crate) fn withdraw(&self, peer: &DynamicRoutingPeerKey, prefix: IpNet, route_key: &str) {
         let Ok(mut state) = self.state.write() else {
             return;
         };
-        if let Some(prefix_entry) = state
-            .entries
-            .iter_mut()
-            .find(|prefix_entry| prefix_entry.prefix == prefix)
-        {
-            prefix_entry
-                .routes
-                .retain(|route| !(&route.peer == peer && route.route_key == route_key));
+        if let Some(mut routes) = state.entries.remove(prefix) {
+            routes.retain(|route| !(&route.peer == peer && route.route_key == route_key));
+            if !routes.is_empty() {
+                state.entries.insert(prefix, routes);
+            }
         }
-        state
-            .entries
-            .retain(|prefix_entry| !prefix_entry.routes.is_empty());
     }
 
     pub(crate) fn clear_peer(&self, peer: &DynamicRoutingPeerKey) {
         let Ok(mut state) = self.state.write() else {
             return;
         };
-        for prefix_entry in &mut state.entries {
-            prefix_entry.routes.retain(|route| &route.peer != peer);
-        }
-        state
+        // Collect affected prefixes (can't mutate trie while iterating).
+        let affected: Vec<IpNet> = state
             .entries
-            .retain(|prefix_entry| !prefix_entry.routes.is_empty());
+            .iter()
+            .filter(|(_, routes)| routes.iter().any(|r| &r.peer == peer))
+            .map(|(prefix, _)| prefix)
+            .collect();
+        for prefix in affected {
+            if let Some(mut routes) = state.entries.remove(prefix) {
+                routes.retain(|r| &r.peer != peer);
+                if !routes.is_empty() {
+                    state.entries.insert(prefix, routes);
+                }
+            }
+        }
     }
 
     pub(crate) fn clear_session(&self, exporter: SocketAddr, session_id: u64) {
         let Ok(mut state) = self.state.write() else {
             return;
         };
-        for prefix_entry in &mut state.entries {
-            prefix_entry.routes.retain(|route| {
-                route.peer.exporter != exporter || route.peer.session_id != session_id
-            });
-        }
-        state
+        let affected: Vec<IpNet> = state
             .entries
-            .retain(|prefix_entry| !prefix_entry.routes.is_empty());
+            .iter()
+            .filter(|(_, routes)| {
+                routes
+                    .iter()
+                    .any(|r| r.peer.exporter == exporter && r.peer.session_id == session_id)
+            })
+            .map(|(prefix, _)| prefix)
+            .collect();
+        for prefix in affected {
+            if let Some(mut routes) = state.entries.remove(prefix) {
+                routes.retain(|r| {
+                    r.peer.exporter != exporter || r.peer.session_id != session_id
+                });
+                if !routes.is_empty() {
+                    state.entries.insert(prefix, routes);
+                }
+            }
+        }
     }
 
     fn lookup(
@@ -212,21 +225,13 @@ impl DynamicRoutingRuntime {
             return None;
         };
 
-        let mut best: Option<&DynamicRoutingPrefixEntry> = None;
-        let mut best_len = 0_u8;
-        for prefix_entry in &state.entries {
-            if prefix_entry.routes.is_empty() || !prefix_entry.prefix.contains(&address) {
-                continue;
-            }
-            let prefix_len = prefix_entry.prefix.prefix_len();
-            if best.is_some() && prefix_len <= best_len {
-                continue;
-            }
-            best = Some(prefix_entry);
-            best_len = prefix_len;
+        // O(prefix_length) trie lookup instead of O(n) linear scan.
+        let host_prefix = IpNet::from(address);
+        let (_, routes) = state.entries.longest_match(&host_prefix)?;
+        if routes.is_empty() {
+            return None;
         }
 
-        let routes = best.map(|entry| &entry.routes)?;
         if let Some(exporter_ip) = preferred_exporter {
             if let Some(next_hop) = preferred_next_hop
                 && let Some(route) = routes.iter().find(|route| {
@@ -255,7 +260,11 @@ impl DynamicRoutingRuntime {
         let Ok(state) = self.state.read() else {
             return 0;
         };
-        state.entries.iter().map(|entry| entry.routes.len()).sum()
+        state
+            .entries
+            .iter()
+            .map(|(_, routes)| routes.len())
+            .sum()
     }
 }
 
@@ -361,7 +370,8 @@ impl FlowEnricher {
         }
     }
 
-    pub(crate) fn enrich_fields(&mut self, fields: &mut BTreeMap<String, String>) -> bool {
+    #[cfg(test)]
+    pub(crate) fn enrich_fields(&mut self, fields: &mut FlowFields) -> bool {
         let Some(exporter_ip) = parse_exporter_ip(fields) else {
             return true;
         };
@@ -435,7 +445,7 @@ impl FlowEnricher {
             .copied()
             .filter(|rate| *rate > 0)
         {
-            fields.insert("SAMPLING_RATE".to_string(), sampling_rate.to_string());
+            fields.insert("SAMPLING_RATE", sampling_rate.to_string());
         }
         if parse_u64_field(fields, "SAMPLING_RATE") == 0 {
             if let Some(sampling_rate) = self
@@ -444,7 +454,7 @@ impl FlowEnricher {
                 .copied()
                 .filter(|rate| *rate > 0)
             {
-                fields.insert("SAMPLING_RATE".to_string(), sampling_rate.to_string());
+                fields.insert("SAMPLING_RATE", sampling_rate.to_string());
             } else {
                 // Akvorado parity: sampling rate is required after overrides/defaults.
                 return false;
@@ -498,16 +508,16 @@ impl FlowEnricher {
         );
         let next_hop = self.get_next_hop(flow_next_hop, routing_next_hop);
 
-        fields.insert("SRC_MASK".to_string(), source_mask.to_string());
-        fields.insert("DST_MASK".to_string(), dest_mask.to_string());
-        fields.insert("SRC_AS".to_string(), source_as.to_string());
-        fields.insert("DST_AS".to_string(), dest_as.to_string());
+        fields.insert("SRC_MASK", source_mask.to_string());
+        fields.insert("DST_MASK", dest_mask.to_string());
+        fields.insert("SRC_AS", source_as.to_string());
+        fields.insert("DST_AS", dest_as.to_string());
         fields.insert(
-            "NEXT_HOP".to_string(),
+            "NEXT_HOP",
             next_hop.map(|addr| addr.to_string()).unwrap_or_default(),
         );
-        write_network_attributes(fields, "SRC", source_network.as_ref());
-        write_network_attributes(fields, "DST", dest_network.as_ref());
+        write_network_attributes(fields, &SRC_KEYS, source_network.as_ref());
+        write_network_attributes(fields, &DST_KEYS, dest_network.as_ref());
 
         if let Some(dest_routing) = dest_routing {
             append_u32_list_field(fields, "DST_AS_PATH", &dest_routing.as_path);
@@ -519,50 +529,239 @@ impl FlowEnricher {
             );
         }
 
-        fields.insert("EXPORTER_NAME".to_string(), exporter_name);
-        fields.insert("EXPORTER_GROUP".to_string(), exporter_classification.group);
-        fields.insert("EXPORTER_ROLE".to_string(), exporter_classification.role);
-        fields.insert("EXPORTER_SITE".to_string(), exporter_classification.site);
+        fields.insert("EXPORTER_NAME", exporter_name);
+        fields.insert("EXPORTER_GROUP", exporter_classification.group);
+        fields.insert("EXPORTER_ROLE", exporter_classification.role);
+        fields.insert("EXPORTER_SITE", exporter_classification.site);
         fields.insert(
-            "EXPORTER_REGION".to_string(),
+            "EXPORTER_REGION",
             exporter_classification.region,
         );
         fields.insert(
-            "EXPORTER_TENANT".to_string(),
+            "EXPORTER_TENANT",
             exporter_classification.tenant,
         );
 
-        fields.insert("IN_IF_NAME".to_string(), in_classification.name);
+        fields.insert("IN_IF_NAME", in_classification.name);
         fields.insert(
-            "IN_IF_DESCRIPTION".to_string(),
+            "IN_IF_DESCRIPTION",
             in_classification.description,
         );
-        fields.insert("IN_IF_SPEED".to_string(), in_interface.speed.to_string());
-        fields.insert("IN_IF_PROVIDER".to_string(), in_classification.provider);
+        fields.insert("IN_IF_SPEED", in_interface.speed.to_string());
+        fields.insert("IN_IF_PROVIDER", in_classification.provider);
         fields.insert(
-            "IN_IF_CONNECTIVITY".to_string(),
+            "IN_IF_CONNECTIVITY",
             in_classification.connectivity,
         );
         fields.insert(
-            "IN_IF_BOUNDARY".to_string(),
+            "IN_IF_BOUNDARY",
             in_classification.boundary.to_string(),
         );
 
-        fields.insert("OUT_IF_NAME".to_string(), out_classification.name);
+        fields.insert("OUT_IF_NAME", out_classification.name);
         fields.insert(
-            "OUT_IF_DESCRIPTION".to_string(),
+            "OUT_IF_DESCRIPTION",
             out_classification.description,
         );
-        fields.insert("OUT_IF_SPEED".to_string(), out_interface.speed.to_string());
-        fields.insert("OUT_IF_PROVIDER".to_string(), out_classification.provider);
+        fields.insert("OUT_IF_SPEED", out_interface.speed.to_string());
+        fields.insert("OUT_IF_PROVIDER", out_classification.provider);
         fields.insert(
-            "OUT_IF_CONNECTIVITY".to_string(),
+            "OUT_IF_CONNECTIVITY",
             out_classification.connectivity,
         );
         fields.insert(
-            "OUT_IF_BOUNDARY".to_string(),
+            "OUT_IF_BOUNDARY",
             out_classification.boundary.to_string(),
         );
+
+        true
+    }
+
+    /// Enrich a FlowRecord in place. Same logic as enrich_fields but operates
+    /// on native typed fields — no string parsing or formatting on the hot path.
+    pub(crate) fn enrich_record(&mut self, rec: &mut FlowRecord) -> bool {
+        let Some(exporter_ip) = rec.exporter_ip else {
+            return true;
+        };
+        let exporter_ip_str = exporter_ip.to_string();
+        let in_if = rec.in_if;
+        let out_if = rec.out_if;
+
+        let mut exporter_name = String::new();
+        let mut exporter_classification = ExporterClassification::default();
+        let mut in_interface = InterfaceInfo {
+            index: in_if,
+            vlan: rec.src_vlan,
+            ..Default::default()
+        };
+        let mut out_interface = InterfaceInfo {
+            index: out_if,
+            vlan: rec.dst_vlan,
+            ..Default::default()
+        };
+        let mut in_classification = InterfaceClassification::default();
+        let mut out_classification = InterfaceClassification::default();
+
+        if in_if != 0
+            && let Some(lookup) = self.static_metadata.lookup(exporter_ip, in_if)
+        {
+            exporter_name = lookup.exporter.name.clone();
+            exporter_classification.group = lookup.exporter.group.clone();
+            exporter_classification.role = lookup.exporter.role.clone();
+            exporter_classification.site = lookup.exporter.site.clone();
+            exporter_classification.region = lookup.exporter.region.clone();
+            exporter_classification.tenant = lookup.exporter.tenant.clone();
+
+            in_interface.name = lookup.interface.name.clone();
+            in_interface.description = lookup.interface.description.clone();
+            in_interface.speed = lookup.interface.speed;
+            in_classification.provider = lookup.interface.provider.clone();
+            in_classification.connectivity = lookup.interface.connectivity.clone();
+            in_classification.boundary = lookup.interface.boundary;
+        }
+
+        if out_if != 0
+            && let Some(lookup) = self.static_metadata.lookup(exporter_ip, out_if)
+        {
+            exporter_name = lookup.exporter.name.clone();
+            exporter_classification.group = lookup.exporter.group.clone();
+            exporter_classification.role = lookup.exporter.role.clone();
+            exporter_classification.site = lookup.exporter.site.clone();
+            exporter_classification.region = lookup.exporter.region.clone();
+            exporter_classification.tenant = lookup.exporter.tenant.clone();
+
+            out_interface.name = lookup.interface.name.clone();
+            out_interface.description = lookup.interface.description.clone();
+            out_interface.speed = lookup.interface.speed;
+            out_classification.provider = lookup.interface.provider.clone();
+            out_classification.connectivity = lookup.interface.connectivity.clone();
+            out_classification.boundary = lookup.interface.boundary;
+        }
+
+        if in_if == 0 && out_if == 0 {
+            return false;
+        }
+        if exporter_name.is_empty() {
+            return false;
+        }
+
+        // Sampling rate overrides.
+        if let Some(sampling_rate) = self
+            .override_sampling_rate
+            .lookup(exporter_ip)
+            .copied()
+            .filter(|rate| *rate > 0)
+        {
+            rec.sampling_rate = sampling_rate;
+        }
+        if rec.sampling_rate == 0 {
+            if let Some(sampling_rate) = self
+                .default_sampling_rate
+                .lookup(exporter_ip)
+                .copied()
+                .filter(|rate| *rate > 0)
+            {
+                rec.sampling_rate = sampling_rate;
+            } else {
+                return false;
+            }
+        }
+
+        let exporter_info = ExporterInfo {
+            ip: exporter_ip_str.clone(),
+            name: exporter_name.clone(),
+        };
+        if !self.classify_exporter(&exporter_info, &mut exporter_classification) {
+            return false;
+        }
+
+        if !self.classify_interface(&exporter_info, &out_interface, &mut out_classification) {
+            return false;
+        }
+        if !self.classify_interface(&exporter_info, &in_interface, &mut in_classification) {
+            return false;
+        }
+
+        // Routing lookups — direct field access, no parsing.
+        let flow_next_hop = rec.next_hop;
+        let source_routing = rec
+            .src_addr
+            .and_then(|src_addr| self.lookup_routing(src_addr, None, Some(exporter_ip)));
+        let dest_routing = rec
+            .dst_addr
+            .and_then(|dst_addr| self.lookup_routing(dst_addr, flow_next_hop, Some(exporter_ip)));
+
+        let source_flow_mask = rec.src_mask;
+        let dest_flow_mask = rec.dst_mask;
+        let source_flow_as = rec.src_as;
+        let dest_flow_as = rec.dst_as;
+        let source_routing_as = source_routing.as_ref().map_or(0, |entry| entry.asn);
+        let dest_routing_as = dest_routing.as_ref().map_or(0, |entry| entry.asn);
+        let source_routing_mask = source_routing.as_ref().map_or(0, |entry| entry.net_mask);
+        let dest_routing_mask = dest_routing.as_ref().map_or(0, |entry| entry.net_mask);
+        let routing_next_hop = dest_routing.as_ref().and_then(|entry| entry.next_hop);
+
+        let source_mask = self.get_net_mask(source_flow_mask, source_routing_mask);
+        let dest_mask = self.get_net_mask(dest_flow_mask, dest_routing_mask);
+        let source_network = rec
+            .src_addr
+            .and_then(|src_addr| self.resolve_network_attributes(src_addr));
+        let dest_network = rec
+            .dst_addr
+            .and_then(|dst_addr| self.resolve_network_attributes(dst_addr));
+        let source_as = apply_network_asn_override(
+            self.get_as_number(source_flow_as, source_routing_as, source_mask),
+            source_network.as_ref().map_or(0, |attrs| attrs.asn),
+        );
+        let dest_as = apply_network_asn_override(
+            self.get_as_number(dest_flow_as, dest_routing_as, dest_mask),
+            dest_network.as_ref().map_or(0, |attrs| attrs.asn),
+        );
+        let next_hop = self.get_next_hop(flow_next_hop, routing_next_hop);
+
+        // Write enriched values directly to record — no to_string().
+        rec.src_mask = source_mask;
+        rec.dst_mask = dest_mask;
+        rec.src_as = source_as;
+        rec.dst_as = dest_as;
+        rec.next_hop = next_hop;
+
+        // Network attributes — direct field assignment.
+        write_network_attributes_record_src(rec, source_network.as_ref());
+        write_network_attributes_record_dst(rec, dest_network.as_ref());
+
+        // BGP routing info — CSV strings built once.
+        if let Some(dest_routing) = dest_routing {
+            append_u32_csv(&mut rec.dst_as_path, &dest_routing.as_path);
+            append_u32_csv(&mut rec.dst_communities, &dest_routing.communities);
+            append_large_communities_csv(
+                &mut rec.dst_large_communities,
+                &dest_routing.large_communities,
+            );
+        }
+
+        // Exporter classification — move strings, no clone.
+        rec.exporter_name = exporter_name;
+        rec.exporter_group = exporter_classification.group;
+        rec.exporter_role = exporter_classification.role;
+        rec.exporter_site = exporter_classification.site;
+        rec.exporter_region = exporter_classification.region;
+        rec.exporter_tenant = exporter_classification.tenant;
+
+        // Interface classification — move strings, no clone.
+        rec.in_if_name = in_classification.name;
+        rec.in_if_description = in_classification.description;
+        rec.in_if_speed = in_interface.speed;
+        rec.in_if_provider = in_classification.provider;
+        rec.in_if_connectivity = in_classification.connectivity;
+        rec.in_if_boundary = in_classification.boundary;
+
+        rec.out_if_name = out_classification.name;
+        rec.out_if_description = out_classification.description;
+        rec.out_if_speed = out_interface.speed;
+        rec.out_if_provider = out_classification.provider;
+        rec.out_if_connectivity = out_classification.connectivity;
+        rec.out_if_boundary = out_classification.boundary;
 
         true
     }
@@ -588,24 +787,56 @@ impl FlowEnricher {
             .and_then(|geoip| geoip.lookup(address))
             .unwrap_or_default();
 
-        let mut candidates: Vec<(u8, u8, NetworkAttributes)> = Vec::new();
+        // Merge all matching prefixes in ascending prefix length order (least specific first,
+        // so more specific prefixes override). Network sources (priority 0) are applied before
+        // static config (priority 1) at the same prefix length.
+        //
+        // Runtime records are behind RwLock, so collect matching entries while the lock is held,
+        // then merge outside the lock to minimize lock duration.
+        let mut runtime_matches: Vec<(u8, NetworkAttributes)> = Vec::new();
         if let Some(runtime) = &self.network_sources_runtime
             && let Ok(records) = runtime.records.read()
         {
             for record in records.iter() {
                 if record.prefix.contains(&address) {
-                    candidates.push((record.prefix.prefix_len(), 0, record.attrs.clone()));
+                    runtime_matches.push((record.prefix.prefix_len(), record.attrs.clone()));
                 }
             }
+            runtime_matches.sort_by_key(|(prefix_len, _)| *prefix_len);
         }
-        for entry in &self.networks.entries {
-            if entry.prefix.contains(&address) {
-                candidates.push((entry.prefix.prefix_len(), 1, entry.value.clone()));
+
+        // Merge-walk: runtime (source_priority=0) then static (source_priority=1) at each level.
+        let mut rt_iter = runtime_matches.iter().peekable();
+        let mut static_iter = self.networks.matching_entries_ascending(address).peekable();
+
+        loop {
+            let rt_len = rt_iter.peek().map(|(len, _)| *len);
+            let st_len = static_iter.peek().map(|e| e.prefix.prefix_len());
+
+            match (rt_len, st_len) {
+                (None, None) => break,
+                (Some(_), None) => {
+                    let (_, attrs) = rt_iter.next().unwrap();
+                    resolved.merge_from(attrs);
+                }
+                (None, Some(_)) => {
+                    let entry = static_iter.next().unwrap();
+                    resolved.merge_from(&entry.value);
+                }
+                (Some(r), Some(s)) if r < s => {
+                    let (_, attrs) = rt_iter.next().unwrap();
+                    resolved.merge_from(attrs);
+                }
+                (Some(r), Some(s)) if r == s => {
+                    // Same prefix length: runtime (priority 0) before static (priority 1).
+                    let (_, attrs) = rt_iter.next().unwrap();
+                    resolved.merge_from(attrs);
+                }
+                _ => {
+                    let entry = static_iter.next().unwrap();
+                    resolved.merge_from(&entry.value);
+                }
             }
-        }
-        candidates.sort_by_key(|(prefix_len, source_priority, _)| (*prefix_len, *source_priority));
-        for (_, _, attrs) in candidates {
-            resolved.merge_from(&attrs);
         }
 
         if resolved.is_empty() {
@@ -2537,6 +2768,7 @@ impl StaticMetadata {
                 .with_context(|| format!("invalid metadata exporter prefix '{prefix}'"))?;
             exporters.insert(parsed_prefix, StaticExporter::from_config(cfg));
         }
+        exporters.finalize();
         Ok(Self { exporters })
     }
 
@@ -2646,6 +2878,7 @@ fn build_network_attributes_map(
         };
         out.insert(parsed_prefix, attrs);
     }
+    out.finalize();
     Ok(out)
 }
 
@@ -3033,6 +3266,7 @@ impl StaticRouting {
                 StaticRoutingEntry::from_config(prefix, parsed_prefix, entry_config)?,
             );
         }
+        prefixes.finalize();
 
         Ok(Self { prefixes })
     }
@@ -3115,39 +3349,69 @@ struct PrefixMapEntry<T> {
     value: T,
 }
 
+/// IP prefix map optimized for longest-prefix-match lookups.
+///
+/// Entries are separated by address family (IPv4 vs IPv6) and sorted by prefix length
+/// descending. Lookup returns the first match, which is the longest prefix match.
+/// This avoids scanning entries of the wrong address family and terminates early.
 #[derive(Debug, Clone, Default)]
 struct PrefixMap<T> {
-    entries: Vec<PrefixMapEntry<T>>,
+    // Sorted by prefix_len descending after finalize() for longest-match-first.
+    v4_entries: Vec<PrefixMapEntry<T>>,
+    v6_entries: Vec<PrefixMapEntry<T>>,
 }
 
 impl<T> PrefixMap<T> {
     fn insert(&mut self, prefix: IpNet, value: T) {
-        self.entries.push(PrefixMapEntry { prefix, value });
+        let entry = PrefixMapEntry { prefix, value };
+        match prefix {
+            IpNet::V4(_) => self.v4_entries.push(entry),
+            IpNet::V6(_) => self.v6_entries.push(entry),
+        }
+    }
+
+    /// Sort entries by prefix length descending. Must be called after all inserts.
+    fn finalize(&mut self) {
+        self.v4_entries
+            .sort_by(|a, b| b.prefix.prefix_len().cmp(&a.prefix.prefix_len()));
+        self.v6_entries
+            .sort_by(|a, b| b.prefix.prefix_len().cmp(&a.prefix.prefix_len()));
     }
 
     fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.v4_entries.is_empty() && self.v6_entries.is_empty()
     }
 
+    /// Longest-prefix-match: returns the value associated with the most specific prefix.
+    /// O(n) worst case but terminates on first match due to descending sort order.
     fn lookup(&self, address: IpAddr) -> Option<&T> {
-        let mut best: Option<(&T, u8)> = None;
-
-        for entry in &self.entries {
-            if !entry.prefix.contains(&address) {
-                continue;
+        let entries = match address {
+            IpAddr::V4(_) => &self.v4_entries,
+            IpAddr::V6(_) => &self.v6_entries,
+        };
+        for entry in entries {
+            if entry.prefix.contains(&address) {
+                return Some(&entry.value);
             }
-
-            let prefix_len = entry.prefix.prefix_len();
-            if let Some((_, current_len)) = best
-                && prefix_len <= current_len
-            {
-                continue;
-            }
-
-            best = Some((&entry.value, prefix_len));
         }
+        None
+    }
 
-        best.map(|(value, _)| value)
+    /// Iterate all matching entries in ascending prefix length order (least specific first).
+    /// Used by resolve_network_attributes where all matching prefixes must be merged.
+    fn matching_entries_ascending(
+        &self,
+        address: IpAddr,
+    ) -> impl Iterator<Item = &PrefixMapEntry<T>> {
+        let entries = match address {
+            IpAddr::V4(_) => &self.v4_entries,
+            IpAddr::V6(_) => &self.v6_entries,
+        };
+        // Entries are sorted descending, so reverse iteration gives ascending order.
+        entries
+            .iter()
+            .rev()
+            .filter(move |entry| entry.prefix.contains(&address))
     }
 }
 
@@ -3159,20 +3423,114 @@ fn apply_network_asn_override(current_asn: u32, network_asn: u32) -> u32 {
     }
 }
 
+/// Pre-defined static keys for SRC/DST network attribute fields.
+#[cfg(test)]
+struct SideKeys {
+    net_name: &'static str,
+    net_role: &'static str,
+    net_site: &'static str,
+    net_region: &'static str,
+    net_tenant: &'static str,
+    country: &'static str,
+    geo_city: &'static str,
+    geo_state: &'static str,
+}
+
+#[cfg(test)]
+const SRC_KEYS: SideKeys = SideKeys {
+    net_name: "SRC_NET_NAME",
+    net_role: "SRC_NET_ROLE",
+    net_site: "SRC_NET_SITE",
+    net_region: "SRC_NET_REGION",
+    net_tenant: "SRC_NET_TENANT",
+    country: "SRC_COUNTRY",
+    geo_city: "SRC_GEO_CITY",
+    geo_state: "SRC_GEO_STATE",
+};
+
+#[cfg(test)]
+const DST_KEYS: SideKeys = SideKeys {
+    net_name: "DST_NET_NAME",
+    net_role: "DST_NET_ROLE",
+    net_site: "DST_NET_SITE",
+    net_region: "DST_NET_REGION",
+    net_tenant: "DST_NET_TENANT",
+    country: "DST_COUNTRY",
+    geo_city: "DST_GEO_CITY",
+    geo_state: "DST_GEO_STATE",
+};
+
+#[cfg(test)]
 fn write_network_attributes(
-    fields: &mut BTreeMap<String, String>,
-    side: &str,
+    fields: &mut FlowFields,
+    keys: &SideKeys,
     attrs: Option<&NetworkAttributes>,
 ) {
     let attrs = attrs.cloned().unwrap_or_default();
-    fields.insert(format!("{side}_NET_NAME"), attrs.name);
-    fields.insert(format!("{side}_NET_ROLE"), attrs.role);
-    fields.insert(format!("{side}_NET_SITE"), attrs.site);
-    fields.insert(format!("{side}_NET_REGION"), attrs.region);
-    fields.insert(format!("{side}_NET_TENANT"), attrs.tenant);
-    fields.insert(format!("{side}_COUNTRY"), attrs.country);
-    fields.insert(format!("{side}_GEO_CITY"), attrs.city);
-    fields.insert(format!("{side}_GEO_STATE"), attrs.state);
+    fields.insert(keys.net_name, attrs.name);
+    fields.insert(keys.net_role, attrs.role);
+    fields.insert(keys.net_site, attrs.site);
+    fields.insert(keys.net_region, attrs.region);
+    fields.insert(keys.net_tenant, attrs.tenant);
+    fields.insert(keys.country, attrs.country);
+    fields.insert(keys.geo_city, attrs.city);
+    fields.insert(keys.geo_state, attrs.state);
+}
+
+// ---------------------------------------------------------------------------
+// FlowRecord-native helpers for enrich_record
+// ---------------------------------------------------------------------------
+
+fn write_network_attributes_record_src(rec: &mut FlowRecord, attrs: Option<&NetworkAttributes>) {
+    let attrs = attrs.cloned().unwrap_or_default();
+    rec.src_net_name = attrs.name;
+    rec.src_net_role = attrs.role;
+    rec.src_net_site = attrs.site;
+    rec.src_net_region = attrs.region;
+    rec.src_net_tenant = attrs.tenant;
+    rec.src_country = attrs.country;
+    rec.src_geo_city = attrs.city;
+    rec.src_geo_state = attrs.state;
+}
+
+fn write_network_attributes_record_dst(rec: &mut FlowRecord, attrs: Option<&NetworkAttributes>) {
+    let attrs = attrs.cloned().unwrap_or_default();
+    rec.dst_net_name = attrs.name;
+    rec.dst_net_role = attrs.role;
+    rec.dst_net_site = attrs.site;
+    rec.dst_net_region = attrs.region;
+    rec.dst_net_tenant = attrs.tenant;
+    rec.dst_country = attrs.country;
+    rec.dst_geo_city = attrs.city;
+    rec.dst_geo_state = attrs.state;
+}
+
+/// Append u32 values as CSV to a String field.
+fn append_u32_csv(target: &mut String, values: &[u32]) {
+    if values.is_empty() {
+        return;
+    }
+    for v in values {
+        if !target.is_empty() {
+            target.push(',');
+        }
+        // itoa is available in Cargo.toml
+        let mut buf = itoa::Buffer::new();
+        target.push_str(buf.format(*v));
+    }
+}
+
+/// Append large communities as CSV to a String field.
+fn append_large_communities_csv(
+    target: &mut String,
+    values: &[StaticRoutingLargeCommunity],
+) {
+    for lc in values {
+        if !target.is_empty() {
+            target.push(',');
+        }
+        target.push_str(&lc.format());
+    }
 }
 
 fn build_sampling_map(
@@ -3198,6 +3556,7 @@ fn build_sampling_map(
         }
     }
 
+    out.finalize();
     Ok(out)
 }
 
@@ -3205,47 +3564,54 @@ fn parse_prefix(prefix: &str) -> Result<IpNet> {
     IpNet::from_str(prefix).with_context(|| format!("invalid prefix '{prefix}'"))
 }
 
-fn parse_exporter_ip(fields: &BTreeMap<String, String>) -> Option<IpAddr> {
+#[cfg(test)]
+fn parse_exporter_ip(fields: &FlowFields) -> Option<IpAddr> {
     fields
         .get("EXPORTER_IP")
         .and_then(|value| value.parse::<IpAddr>().ok())
 }
 
-fn parse_u16_field(fields: &BTreeMap<String, String>, key: &str) -> u16 {
+#[cfg(test)]
+fn parse_u16_field(fields: &FlowFields, key: &str) -> u16 {
     fields
         .get(key)
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(0)
 }
 
-fn parse_u8_field(fields: &BTreeMap<String, String>, key: &str) -> u8 {
+#[cfg(test)]
+fn parse_u8_field(fields: &FlowFields, key: &str) -> u8 {
     fields
         .get(key)
         .and_then(|value| value.parse::<u8>().ok())
         .unwrap_or(0)
 }
 
-fn parse_u32_field(fields: &BTreeMap<String, String>, key: &str) -> u32 {
+#[cfg(test)]
+fn parse_u32_field(fields: &FlowFields, key: &str) -> u32 {
     fields
         .get(key)
         .and_then(|value| value.parse::<u32>().ok())
         .unwrap_or(0)
 }
 
-fn parse_u64_field(fields: &BTreeMap<String, String>, key: &str) -> u64 {
+#[cfg(test)]
+fn parse_u64_field(fields: &FlowFields, key: &str) -> u64 {
     fields
         .get(key)
         .and_then(|value| value.parse::<u64>().ok())
         .unwrap_or(0)
 }
 
-fn parse_ip_field(fields: &BTreeMap<String, String>, key: &str) -> Option<IpAddr> {
+#[cfg(test)]
+fn parse_ip_field(fields: &FlowFields, key: &str) -> Option<IpAddr> {
     fields
         .get(key)
         .and_then(|value| value.parse::<IpAddr>().ok())
 }
 
-fn append_u32_list_field(fields: &mut BTreeMap<String, String>, key: &str, values: &[u32]) {
+#[cfg(test)]
+fn append_u32_list_field(fields: &mut FlowFields, key: &'static str, values: &[u32]) {
     if values.is_empty() {
         return;
     }
@@ -3257,9 +3623,10 @@ fn append_u32_list_field(fields: &mut BTreeMap<String, String>, key: &str, value
     append_csv_field(fields, key, &serialized);
 }
 
+#[cfg(test)]
 fn append_large_communities_field(
-    fields: &mut BTreeMap<String, String>,
-    key: &str,
+    fields: &mut FlowFields,
+    key: &'static str,
     values: &[StaticRoutingLargeCommunity],
 ) {
     if values.is_empty() {
@@ -3273,12 +3640,13 @@ fn append_large_communities_field(
     append_csv_field(fields, key, &serialized);
 }
 
-fn append_csv_field(fields: &mut BTreeMap<String, String>, key: &str, suffix: &str) {
+#[cfg(test)]
+fn append_csv_field(fields: &mut FlowFields, key: &'static str, suffix: &str) {
     if suffix.is_empty() {
         return;
     }
 
-    let entry = fields.entry(key.to_string()).or_default();
+    let entry = fields.entry(key).or_default();
     if entry.is_empty() {
         *entry = suffix.to_string();
     } else {
@@ -3556,7 +3924,7 @@ mod tests {
             .expect("build enricher")
             .expect("enricher must be enabled");
         let mut fields = base_fields("192.0.2.10", 10, 20, 100, 10, 300);
-        fields.insert("EXPORTER_NAME".to_string(), "edge-router".to_string());
+        fields.insert("EXPORTER_NAME", "edge-router".to_string());
 
         assert!(enricher.enrich_fields(&mut fields));
         assert_eq!(
@@ -3818,7 +4186,7 @@ mod tests {
             .expect("build enricher")
             .expect("enricher must be enabled");
         let mut fields = base_fields("192.0.2.10", 10, 20, 100, 10, 300);
-        fields.insert("EXPORTER_NAME".to_string(), "edge-router".to_string());
+        fields.insert("EXPORTER_NAME", "edge-router".to_string());
 
         assert!(enricher.enrich_fields(&mut fields));
         assert_eq!(
@@ -3862,7 +4230,7 @@ mod tests {
             .expect("build enricher")
             .expect("enricher must be enabled");
         let mut fields = base_fields("192.0.2.10", 10, 20, 100, 10, 300);
-        fields.insert("EXPORTER_NAME".to_string(), "edge-router".to_string());
+        fields.insert("EXPORTER_NAME", "edge-router".to_string());
 
         assert!(enricher.enrich_fields(&mut fields));
         assert_eq!(
@@ -3924,7 +4292,7 @@ mod tests {
             .expect("build enricher")
             .expect("enricher must be enabled");
         let mut fields = base_fields("192.0.2.10", 10, 20, 100, 10, 300);
-        fields.insert("EXPORTER_NAME".to_string(), "edge-router".to_string());
+        fields.insert("EXPORTER_NAME", "edge-router".to_string());
 
         assert!(enricher.enrich_fields(&mut fields));
         assert_eq!(
@@ -4527,16 +4895,16 @@ mod tests {
             .expect("enricher must be enabled");
 
         let mut fields = base_fields("192.0.2.10", 10, 20, 100, 10, 300);
-        fields.insert("SRC_ADDR".to_string(), "10.10.20.30".to_string());
-        fields.insert("DST_ADDR".to_string(), "198.51.100.42".to_string());
-        fields.insert("SRC_AS".to_string(), "65100".to_string());
-        fields.insert("DST_AS".to_string(), "65200".to_string());
-        fields.insert("SRC_MASK".to_string(), "30".to_string());
-        fields.insert("DST_MASK".to_string(), "31".to_string());
-        fields.insert("NEXT_HOP".to_string(), String::new());
-        fields.insert("DST_AS_PATH".to_string(), "65000".to_string());
-        fields.insert("DST_COMMUNITIES".to_string(), "111".to_string());
-        fields.insert("DST_LARGE_COMMUNITIES".to_string(), "1:1:1".to_string());
+        fields.insert("SRC_ADDR", "10.10.20.30".to_string());
+        fields.insert("DST_ADDR", "198.51.100.42".to_string());
+        fields.insert("SRC_AS", "65100".to_string());
+        fields.insert("DST_AS", "65200".to_string());
+        fields.insert("SRC_MASK", "30".to_string());
+        fields.insert("DST_MASK", "31".to_string());
+        fields.insert("NEXT_HOP", String::new());
+        fields.insert("DST_AS_PATH", "65000".to_string());
+        fields.insert("DST_COMMUNITIES", "111".to_string());
+        fields.insert("DST_LARGE_COMMUNITIES", "1:1:1".to_string());
 
         assert!(enricher.enrich_fields(&mut fields));
         assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("64500"));
@@ -4662,16 +5030,16 @@ mod tests {
         });
 
         let mut fields = base_fields("192.0.2.10", 10, 20, 100, 10, 300);
-        fields.insert("SRC_ADDR".to_string(), "10.10.20.30".to_string());
-        fields.insert("DST_ADDR".to_string(), "198.51.100.42".to_string());
-        fields.insert("SRC_AS".to_string(), "65100".to_string());
-        fields.insert("DST_AS".to_string(), "65200".to_string());
-        fields.insert("SRC_MASK".to_string(), "30".to_string());
-        fields.insert("DST_MASK".to_string(), "31".to_string());
-        fields.insert("NEXT_HOP".to_string(), "203.0.113.9".to_string());
-        fields.insert("DST_AS_PATH".to_string(), String::new());
-        fields.insert("DST_COMMUNITIES".to_string(), String::new());
-        fields.insert("DST_LARGE_COMMUNITIES".to_string(), String::new());
+        fields.insert("SRC_ADDR", "10.10.20.30".to_string());
+        fields.insert("DST_ADDR", "198.51.100.42".to_string());
+        fields.insert("SRC_AS", "65100".to_string());
+        fields.insert("DST_AS", "65200".to_string());
+        fields.insert("SRC_MASK", "30".to_string());
+        fields.insert("DST_MASK", "31".to_string());
+        fields.insert("NEXT_HOP", "203.0.113.9".to_string());
+        fields.insert("DST_AS_PATH", String::new());
+        fields.insert("DST_COMMUNITIES", String::new());
+        fields.insert("DST_LARGE_COMMUNITIES", String::new());
 
         assert!(enricher.enrich_fields(&mut fields));
         assert_eq!(fields.get("DST_AS").map(String::as_str), Some("64700"));
@@ -4720,12 +5088,12 @@ mod tests {
             .expect("enricher must be enabled");
 
         let mut fields = base_fields("192.0.2.10", 10, 20, 1000, 10, 20);
-        fields.insert("SRC_ADDR".to_string(), "198.51.100.10".to_string());
-        fields.insert("DST_ADDR".to_string(), "198.51.100.20".to_string());
-        fields.insert("SRC_AS".to_string(), "0".to_string());
-        fields.insert("DST_AS".to_string(), "0".to_string());
-        fields.insert("SRC_MASK".to_string(), "24".to_string());
-        fields.insert("DST_MASK".to_string(), "24".to_string());
+        fields.insert("SRC_ADDR", "198.51.100.10".to_string());
+        fields.insert("DST_ADDR", "198.51.100.20".to_string());
+        fields.insert("SRC_AS", "0".to_string());
+        fields.insert("DST_AS", "0".to_string());
+        fields.insert("SRC_MASK", "24".to_string());
+        fields.insert("DST_MASK", "24".to_string());
 
         assert!(enricher.enrich_fields(&mut fields));
         assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("64500"));
@@ -4804,12 +5172,12 @@ mod tests {
             .expect("enricher must be enabled");
 
         let mut fields = base_fields("192.0.2.10", 10, 20, 1000, 10, 20);
-        fields.insert("SRC_ADDR".to_string(), "198.51.100.10".to_string());
-        fields.insert("DST_ADDR".to_string(), "198.51.100.20".to_string());
-        fields.insert("SRC_AS".to_string(), "65001".to_string());
-        fields.insert("DST_AS".to_string(), "0".to_string());
-        fields.insert("SRC_MASK".to_string(), "24".to_string());
-        fields.insert("DST_MASK".to_string(), "24".to_string());
+        fields.insert("SRC_ADDR", "198.51.100.10".to_string());
+        fields.insert("DST_ADDR", "198.51.100.20".to_string());
+        fields.insert("SRC_AS", "65001".to_string());
+        fields.insert("DST_AS", "0".to_string());
+        fields.insert("SRC_MASK", "24".to_string());
+        fields.insert("DST_MASK", "24".to_string());
 
         assert!(enricher.enrich_fields(&mut fields));
         assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("65001"));
@@ -4850,12 +5218,12 @@ mod tests {
             .expect("enricher must be enabled");
 
         let mut fields = base_fields("192.0.2.10", 10, 20, 1000, 10, 20);
-        fields.insert("SRC_ADDR".to_string(), "198.51.100.10".to_string());
-        fields.insert("DST_ADDR".to_string(), "198.51.100.20".to_string());
-        fields.insert("SRC_AS".to_string(), "0".to_string());
-        fields.insert("DST_AS".to_string(), "0".to_string());
-        fields.insert("SRC_MASK".to_string(), "24".to_string());
-        fields.insert("DST_MASK".to_string(), "24".to_string());
+        fields.insert("SRC_ADDR", "198.51.100.10".to_string());
+        fields.insert("DST_ADDR", "198.51.100.20".to_string());
+        fields.insert("SRC_AS", "0".to_string());
+        fields.insert("DST_AS", "0".to_string());
+        fields.insert("SRC_MASK", "24".to_string());
+        fields.insert("DST_MASK", "24".to_string());
 
         assert!(enricher.enrich_fields(&mut fields));
         assert_eq!(
@@ -5030,15 +5398,15 @@ mod tests {
         sampling_rate: u64,
         src_vlan: u16,
         dst_vlan: u16,
-    ) -> BTreeMap<String, String> {
+    ) -> FlowFields {
         BTreeMap::from([
-            ("EXPORTER_IP".to_string(), exporter_ip.to_string()),
-            ("IN_IF".to_string(), in_if.to_string()),
-            ("OUT_IF".to_string(), out_if.to_string()),
-            ("SAMPLING_RATE".to_string(), sampling_rate.to_string()),
-            ("SRC_VLAN".to_string(), src_vlan.to_string()),
-            ("DST_VLAN".to_string(), dst_vlan.to_string()),
-            ("EXPORTER_NAME".to_string(), String::new()),
+            ("EXPORTER_IP", exporter_ip.to_string()),
+            ("IN_IF", in_if.to_string()),
+            ("OUT_IF", out_if.to_string()),
+            ("SAMPLING_RATE", sampling_rate.to_string()),
+            ("SRC_VLAN", src_vlan.to_string()),
+            ("DST_VLAN", dst_vlan.to_string()),
+            ("EXPORTER_NAME", String::new()),
         ])
     }
 
@@ -5064,5 +5432,170 @@ mod tests {
             static_routing: StaticRouting::default(),
             dynamic_routing: None,
         }
+    }
+
+    /// Build a FlowRecord equivalent to the given base_fields.
+    fn base_record(
+        exporter_ip: &str,
+        in_if: u32,
+        out_if: u32,
+        sampling_rate: u64,
+        src_vlan: u16,
+        dst_vlan: u16,
+    ) -> FlowRecord {
+        FlowRecord {
+            exporter_ip: exporter_ip.parse::<IpAddr>().ok(),
+            in_if,
+            out_if,
+            sampling_rate,
+            src_vlan,
+            dst_vlan,
+            ..Default::default()
+        }
+    }
+
+    /// Compare enriched FlowFields from enrich_fields with to_fields() output
+    /// from an equivalently enriched FlowRecord.
+    fn assert_enrich_equivalence(cfg: &EnrichmentConfig, fields: &mut FlowFields, rec: &mut FlowRecord) {
+        let mut enricher1 = FlowEnricher::from_config(cfg)
+            .expect("build enricher")
+            .expect("enricher must be enabled");
+        let mut enricher2 = FlowEnricher::from_config(cfg)
+            .expect("build enricher")
+            .expect("enricher must be enabled");
+
+        let result_fields = enricher1.enrich_fields(fields);
+        let result_record = enricher2.enrich_record(rec);
+
+        assert_eq!(result_fields, result_record, "enrich return value mismatch");
+
+        if !result_fields {
+            return;
+        }
+
+        let rec_fields = rec.to_fields();
+
+        // Compare all enrichment-written fields.
+        let enrichment_keys = [
+            "SAMPLING_RATE",
+            "SRC_MASK", "DST_MASK",
+            "SRC_AS", "DST_AS",
+            "NEXT_HOP",
+            "SRC_NET_NAME", "SRC_NET_ROLE", "SRC_NET_SITE", "SRC_NET_REGION", "SRC_NET_TENANT",
+            "SRC_COUNTRY", "SRC_GEO_CITY", "SRC_GEO_STATE",
+            "DST_NET_NAME", "DST_NET_ROLE", "DST_NET_SITE", "DST_NET_REGION", "DST_NET_TENANT",
+            "DST_COUNTRY", "DST_GEO_CITY", "DST_GEO_STATE",
+            "DST_AS_PATH", "DST_COMMUNITIES", "DST_LARGE_COMMUNITIES",
+            "EXPORTER_NAME", "EXPORTER_GROUP", "EXPORTER_ROLE",
+            "EXPORTER_SITE", "EXPORTER_REGION", "EXPORTER_TENANT",
+            "IN_IF_NAME", "IN_IF_DESCRIPTION", "IN_IF_SPEED",
+            "IN_IF_PROVIDER", "IN_IF_CONNECTIVITY", "IN_IF_BOUNDARY",
+            "OUT_IF_NAME", "OUT_IF_DESCRIPTION", "OUT_IF_SPEED",
+            "OUT_IF_PROVIDER", "OUT_IF_CONNECTIVITY", "OUT_IF_BOUNDARY",
+        ];
+
+        for key in enrichment_keys {
+            let expected = fields.get(key).map(String::as_str).unwrap_or("");
+            let actual = rec_fields.get(key).map(String::as_str).unwrap_or("");
+            assert_eq!(expected, actual, "mismatch for key '{key}'");
+        }
+    }
+
+    #[test]
+    fn enrich_record_matches_enrich_fields_basic() {
+        let cfg = EnrichmentConfig {
+            metadata_static: metadata_config_for_192(),
+            ..Default::default()
+        };
+
+        let mut fields = base_fields("192.0.2.10", 10, 20, 250, 10, 300);
+        let mut rec = base_record("192.0.2.10", 10, 20, 250, 10, 300);
+
+        assert_enrich_equivalence(&cfg, &mut fields, &mut rec);
+    }
+
+    #[test]
+    fn enrich_record_matches_with_sampling_override() {
+        let cfg = EnrichmentConfig {
+            default_sampling_rate: Some(SamplingRateSetting::PerPrefix(BTreeMap::from([(
+                "192.0.2.0/24".to_string(),
+                100_u64,
+            )]))),
+            override_sampling_rate: Some(SamplingRateSetting::PerPrefix(BTreeMap::from([
+                ("192.0.2.0/24".to_string(), 500_u64),
+                ("192.0.2.128/25".to_string(), 1000_u64),
+            ]))),
+            metadata_static: metadata_config_for_192(),
+            ..Default::default()
+        };
+
+        let mut fields = base_fields("192.0.2.142", 10, 20, 0, 10, 300);
+        let mut rec = base_record("192.0.2.142", 10, 20, 0, 10, 300);
+
+        assert_enrich_equivalence(&cfg, &mut fields, &mut rec);
+    }
+
+    #[test]
+    fn enrich_record_rejects_missing_interfaces() {
+        let cfg = EnrichmentConfig {
+            metadata_static: metadata_config_for_192(),
+            ..Default::default()
+        };
+
+        let mut fields = base_fields("192.0.2.10", 0, 0, 250, 0, 0);
+        let mut rec = base_record("192.0.2.10", 0, 0, 250, 0, 0);
+
+        assert_enrich_equivalence(&cfg, &mut fields, &mut rec);
+    }
+
+    #[test]
+    fn enrich_record_matches_with_routing_and_network_attributes() {
+        let cfg = EnrichmentConfig {
+            metadata_static: metadata_config_for_192(),
+            networks: BTreeMap::from([
+                (
+                    "10.0.0.0/8".to_string(),
+                    NetworkAttributesValue::Attributes(NetworkAttributesConfig {
+                        name: "internal".to_string(),
+                        role: "server".to_string(),
+                        site: "dc1".to_string(),
+                        region: "us-east".to_string(),
+                        tenant: "ops".to_string(),
+                        country: String::new(),
+                        state: String::new(),
+                        city: String::new(),
+                        asn: 0,
+                    }),
+                ),
+            ]),
+            routing_static: StaticRoutingConfig {
+                prefixes: BTreeMap::from([(
+                    "10.0.0.0/8".to_string(),
+                    StaticRoutingEntryConfig {
+                        asn: 64512,
+                        as_path: vec![64512, 15169],
+                        communities: vec![100, 200],
+                        large_communities: vec![StaticRoutingLargeCommunityConfig {
+                            asn: 64512,
+                            local_data1: 1,
+                            local_data2: 2,
+                        }],
+                        next_hop: String::new(),
+                        net_mask: None,
+                    },
+                )]),
+            },
+            ..Default::default()
+        };
+
+        let mut fields = base_fields("192.0.2.10", 10, 20, 250, 10, 300);
+        fields.insert("SRC_ADDR", "10.1.2.3".to_string());
+        fields.insert("DST_ADDR", "10.4.5.6".to_string());
+
+        let mut rec = base_record("192.0.2.10", 10, 20, 250, 10, 300);
+        rec.src_addr = Some("10.1.2.3".parse().unwrap());
+        rec.dst_addr = Some("10.4.5.6".parse().unwrap());
+
+        assert_enrich_equivalence(&cfg, &mut fields, &mut rec);
     }
 }

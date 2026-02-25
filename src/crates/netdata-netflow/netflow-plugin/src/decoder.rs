@@ -177,9 +177,688 @@ impl DecodeStats {
     }
 }
 
+/// Flow field map: keys are compile-time constant field names, values are string representations.
+/// Using `&'static str` keys eliminates ~60 heap allocations per flow for field names.
+pub(crate) type FlowFields = BTreeMap<&'static str, String>;
+
+/// Intern a field name string to its `&'static str` equivalent if known.
+/// Used on cold paths (journal deserialization) to convert dynamic String keys.
+pub(crate) fn intern_field_name(name: &str) -> Option<&'static str> {
+    static INTERNED: std::sync::LazyLock<HashMap<&'static str, &'static str>> =
+        std::sync::LazyLock::new(|| {
+            CANONICAL_FLOW_DEFAULTS
+                .iter()
+                .map(|&(k, _)| (k, k))
+                .collect()
+        });
+    INTERNED.get(name).copied()
+}
+
+// ---------------------------------------------------------------------------
+// FlowRecord: flat struct with native types for all 87 canonical fields.
+// Replaces BTreeMap<&'static str, String> on the hot path. Fields that are
+// numbers, IPs, MACs, or enums are stored in their natural representation,
+// eliminating String allocations during decode.
+// ---------------------------------------------------------------------------
+
+/// Direction of a flow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub(crate) enum FlowDirection {
+    #[default]
+    Undefined,
+    Ingress,
+    Egress,
+}
+
+impl FlowDirection {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Undefined => DIRECTION_UNDEFINED,
+            Self::Ingress => DIRECTION_INGRESS,
+            Self::Egress => DIRECTION_EGRESS,
+        }
+    }
+
+    pub(crate) fn from_str_value(s: &str) -> Self {
+        match s {
+            "ingress" | "0" => Self::Ingress,
+            "egress" | "1" => Self::Egress,
+            _ => Self::Undefined,
+        }
+    }
+}
+
+impl std::fmt::Display for FlowDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Flat, typed representation of a canonical flow record.
+/// All 87 canonical fields stored with native types. Only enrichment-derived
+/// text fields remain as String (34 fields, most empty by default).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct FlowRecord {
+    // --- Protocol version / exporter identity ---
+    pub(crate) flow_version: &'static str,
+    pub(crate) exporter_ip: Option<IpAddr>,
+    pub(crate) exporter_port: u16,
+    pub(crate) exporter_name: String,
+    pub(crate) exporter_group: String,
+    pub(crate) exporter_role: String,
+    pub(crate) exporter_site: String,
+    pub(crate) exporter_region: String,
+    pub(crate) exporter_tenant: String,
+
+    // --- Sampling ---
+    pub(crate) sampling_rate: u64,
+
+    // --- L2/L3 identity ---
+    pub(crate) etype: u16,
+    pub(crate) protocol: u8,
+    pub(crate) direction: FlowDirection,
+
+    // --- Counters ---
+    pub(crate) bytes: u64,
+    pub(crate) packets: u64,
+    pub(crate) flows: u64,
+    pub(crate) raw_bytes: u64,
+    pub(crate) raw_packets: u64,
+    pub(crate) forwarding_status: u8,
+
+    // --- Endpoints ---
+    pub(crate) src_addr: Option<IpAddr>,
+    pub(crate) dst_addr: Option<IpAddr>,
+    pub(crate) src_prefix: Option<IpAddr>,
+    pub(crate) dst_prefix: Option<IpAddr>,
+    pub(crate) src_mask: u8,
+    pub(crate) dst_mask: u8,
+    pub(crate) src_as: u32,
+    pub(crate) dst_as: u32,
+
+    // --- Network attributes (enrichment-derived strings) ---
+    pub(crate) src_net_name: String,
+    pub(crate) dst_net_name: String,
+    pub(crate) src_net_role: String,
+    pub(crate) dst_net_role: String,
+    pub(crate) src_net_site: String,
+    pub(crate) dst_net_site: String,
+    pub(crate) src_net_region: String,
+    pub(crate) dst_net_region: String,
+    pub(crate) src_net_tenant: String,
+    pub(crate) dst_net_tenant: String,
+    pub(crate) src_country: String,
+    pub(crate) dst_country: String,
+    pub(crate) src_geo_city: String,
+    pub(crate) dst_geo_city: String,
+    pub(crate) src_geo_state: String,
+    pub(crate) dst_geo_state: String,
+
+    // --- BGP routing (enrichment-derived CSV) ---
+    pub(crate) dst_as_path: String,
+    pub(crate) dst_communities: String,
+    pub(crate) dst_large_communities: String,
+
+    // --- Interfaces ---
+    pub(crate) in_if: u32,
+    pub(crate) out_if: u32,
+    pub(crate) in_if_name: String,
+    pub(crate) out_if_name: String,
+    pub(crate) in_if_description: String,
+    pub(crate) out_if_description: String,
+    pub(crate) in_if_speed: u64,
+    pub(crate) out_if_speed: u64,
+    pub(crate) in_if_provider: String,
+    pub(crate) out_if_provider: String,
+    pub(crate) in_if_connectivity: String,
+    pub(crate) out_if_connectivity: String,
+    pub(crate) in_if_boundary: u8,
+    pub(crate) out_if_boundary: u8,
+
+    // --- Next hop / ports ---
+    pub(crate) next_hop: Option<IpAddr>,
+    pub(crate) src_port: u16,
+    pub(crate) dst_port: u16,
+
+    // --- Timestamps ---
+    pub(crate) flow_start_seconds: u64,
+    pub(crate) flow_end_seconds: u64,
+    pub(crate) flow_start_millis: u64,
+    pub(crate) flow_end_millis: u64,
+    pub(crate) observation_time_millis: u64,
+
+    // --- NAT ---
+    pub(crate) src_addr_nat: Option<IpAddr>,
+    pub(crate) dst_addr_nat: Option<IpAddr>,
+    pub(crate) src_port_nat: u16,
+    pub(crate) dst_port_nat: u16,
+
+    // --- VLAN ---
+    pub(crate) src_vlan: u16,
+    pub(crate) dst_vlan: u16,
+
+    // --- MAC addresses ---
+    pub(crate) src_mac: [u8; 6],
+    pub(crate) dst_mac: [u8; 6],
+
+    // --- IP header fields ---
+    pub(crate) ipttl: u8,
+    pub(crate) iptos: u8,
+    pub(crate) ipv6_flow_label: u32,
+    pub(crate) tcp_flags: u8,
+    pub(crate) ip_fragment_id: u32,
+    pub(crate) ip_fragment_offset: u16,
+
+    // --- ICMP ---
+    pub(crate) icmpv4_type: u8,
+    pub(crate) icmpv4_code: u8,
+    pub(crate) icmpv6_type: u8,
+    pub(crate) icmpv6_code: u8,
+
+    // --- MPLS ---
+    pub(crate) mpls_labels: String,
+}
+
+/// Format a MAC address as lowercase colon-separated hex.
+#[cfg(test)]
+fn format_mac(mac: &[u8; 6]) -> String {
+    format!(
+        "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
+    )
+}
+
+/// Parse a MAC address from "xx:xx:xx:xx:xx:xx" string.
+fn parse_mac(s: &str) -> [u8; 6] {
+    let mut mac = [0u8; 6];
+    let parts: Vec<&str> = s.split(':').collect();
+    if parts.len() == 6 {
+        for (i, part) in parts.iter().enumerate() {
+            mac[i] = u8::from_str_radix(part, 16).unwrap_or(0);
+        }
+    }
+    mac
+}
+
+impl FlowRecord {
+    /// Convert to FlowFields (BTreeMap) for backward compatibility.
+    /// Used during the transition period while tiering/encode still expect FlowFields.
+    #[cfg(test)]
+    pub(crate) fn to_fields(&self) -> FlowFields {
+        let mut f = FlowFields::new();
+        // Version / exporter
+        f.insert("FLOW_VERSION", self.flow_version.to_string());
+        f.insert("EXPORTER_IP", opt_ip_to_string(self.exporter_ip));
+        f.insert("EXPORTER_PORT", self.exporter_port.to_string());
+        f.insert("EXPORTER_NAME", self.exporter_name.clone());
+        f.insert("EXPORTER_GROUP", self.exporter_group.clone());
+        f.insert("EXPORTER_ROLE", self.exporter_role.clone());
+        f.insert("EXPORTER_SITE", self.exporter_site.clone());
+        f.insert("EXPORTER_REGION", self.exporter_region.clone());
+        f.insert("EXPORTER_TENANT", self.exporter_tenant.clone());
+        // Sampling
+        f.insert("SAMPLING_RATE", self.sampling_rate.to_string());
+        // L2/L3
+        f.insert("ETYPE", self.etype.to_string());
+        f.insert("PROTOCOL", self.protocol.to_string());
+        // Counters
+        f.insert("BYTES", self.bytes.to_string());
+        f.insert("PACKETS", self.packets.to_string());
+        f.insert("FLOWS", self.flows.to_string());
+        f.insert("RAW_BYTES", self.raw_bytes.to_string());
+        f.insert("RAW_PACKETS", self.raw_packets.to_string());
+        f.insert("FORWARDING_STATUS", self.forwarding_status.to_string());
+        f.insert("DIRECTION", self.direction.as_str().to_string());
+        // Endpoints
+        f.insert("SRC_ADDR", opt_ip_to_string(self.src_addr));
+        f.insert("DST_ADDR", opt_ip_to_string(self.dst_addr));
+        f.insert("SRC_PREFIX", format_prefix(self.src_prefix, self.src_mask));
+        f.insert("DST_PREFIX", format_prefix(self.dst_prefix, self.dst_mask));
+        f.insert("SRC_MASK", self.src_mask.to_string());
+        f.insert("DST_MASK", self.dst_mask.to_string());
+        f.insert("SRC_AS", self.src_as.to_string());
+        f.insert("DST_AS", self.dst_as.to_string());
+        // Network attributes
+        f.insert("SRC_NET_NAME", self.src_net_name.clone());
+        f.insert("DST_NET_NAME", self.dst_net_name.clone());
+        f.insert("SRC_NET_ROLE", self.src_net_role.clone());
+        f.insert("DST_NET_ROLE", self.dst_net_role.clone());
+        f.insert("SRC_NET_SITE", self.src_net_site.clone());
+        f.insert("DST_NET_SITE", self.dst_net_site.clone());
+        f.insert("SRC_NET_REGION", self.src_net_region.clone());
+        f.insert("DST_NET_REGION", self.dst_net_region.clone());
+        f.insert("SRC_NET_TENANT", self.src_net_tenant.clone());
+        f.insert("DST_NET_TENANT", self.dst_net_tenant.clone());
+        f.insert("SRC_COUNTRY", self.src_country.clone());
+        f.insert("DST_COUNTRY", self.dst_country.clone());
+        f.insert("SRC_GEO_CITY", self.src_geo_city.clone());
+        f.insert("DST_GEO_CITY", self.dst_geo_city.clone());
+        f.insert("SRC_GEO_STATE", self.src_geo_state.clone());
+        f.insert("DST_GEO_STATE", self.dst_geo_state.clone());
+        // BGP routing
+        f.insert("DST_AS_PATH", self.dst_as_path.clone());
+        f.insert("DST_COMMUNITIES", self.dst_communities.clone());
+        f.insert("DST_LARGE_COMMUNITIES", self.dst_large_communities.clone());
+        // Interfaces
+        f.insert("IN_IF", self.in_if.to_string());
+        f.insert("OUT_IF", self.out_if.to_string());
+        f.insert("IN_IF_NAME", self.in_if_name.clone());
+        f.insert("OUT_IF_NAME", self.out_if_name.clone());
+        f.insert("IN_IF_DESCRIPTION", self.in_if_description.clone());
+        f.insert("OUT_IF_DESCRIPTION", self.out_if_description.clone());
+        f.insert("IN_IF_SPEED", self.in_if_speed.to_string());
+        f.insert("OUT_IF_SPEED", self.out_if_speed.to_string());
+        f.insert("IN_IF_PROVIDER", self.in_if_provider.clone());
+        f.insert("OUT_IF_PROVIDER", self.out_if_provider.clone());
+        f.insert("IN_IF_CONNECTIVITY", self.in_if_connectivity.clone());
+        f.insert("OUT_IF_CONNECTIVITY", self.out_if_connectivity.clone());
+        f.insert("IN_IF_BOUNDARY", self.in_if_boundary.to_string());
+        f.insert("OUT_IF_BOUNDARY", self.out_if_boundary.to_string());
+        // Next hop / ports
+        f.insert("NEXT_HOP", opt_ip_to_string(self.next_hop));
+        f.insert("SRC_PORT", self.src_port.to_string());
+        f.insert("DST_PORT", self.dst_port.to_string());
+        // Timestamps
+        f.insert("FLOW_START_SECONDS", self.flow_start_seconds.to_string());
+        f.insert("FLOW_END_SECONDS", self.flow_end_seconds.to_string());
+        f.insert("FLOW_START_MILLIS", self.flow_start_millis.to_string());
+        f.insert("FLOW_END_MILLIS", self.flow_end_millis.to_string());
+        f.insert("OBSERVATION_TIME_MILLIS", self.observation_time_millis.to_string());
+        // NAT
+        f.insert("SRC_ADDR_NAT", opt_ip_to_string(self.src_addr_nat));
+        f.insert("DST_ADDR_NAT", opt_ip_to_string(self.dst_addr_nat));
+        f.insert("SRC_PORT_NAT", self.src_port_nat.to_string());
+        f.insert("DST_PORT_NAT", self.dst_port_nat.to_string());
+        // VLAN
+        f.insert("SRC_VLAN", self.src_vlan.to_string());
+        f.insert("DST_VLAN", self.dst_vlan.to_string());
+        // MAC
+        f.insert("SRC_MAC", if self.src_mac == [0u8; 6] { String::new() } else { format_mac(&self.src_mac) });
+        f.insert("DST_MAC", if self.dst_mac == [0u8; 6] { String::new() } else { format_mac(&self.dst_mac) });
+        // IP header
+        f.insert("IPTTL", self.ipttl.to_string());
+        f.insert("IPTOS", self.iptos.to_string());
+        f.insert("IPV6_FLOW_LABEL", self.ipv6_flow_label.to_string());
+        f.insert("TCP_FLAGS", self.tcp_flags.to_string());
+        f.insert("IP_FRAGMENT_ID", self.ip_fragment_id.to_string());
+        f.insert("IP_FRAGMENT_OFFSET", self.ip_fragment_offset.to_string());
+        // ICMP
+        f.insert("ICMPV4_TYPE", self.icmpv4_type.to_string());
+        f.insert("ICMPV4_CODE", self.icmpv4_code.to_string());
+        f.insert("ICMPV6_TYPE", self.icmpv6_type.to_string());
+        f.insert("ICMPV6_CODE", self.icmpv6_code.to_string());
+        // MPLS
+        f.insert("MPLS_LABELS", self.mpls_labels.clone());
+        f
+    }
+
+    /// Construct from FlowFields. Used for cold-path bridging (V9/IPFIX special
+    /// record decode) and tests. Not on the hot path.
+    pub(crate) fn from_fields(fields: &FlowFields) -> Self {
+        let get_str = |k: &str| fields.get(k).map(|s| s.as_str()).unwrap_or("");
+        let get_u8 = |k: &str| fields.get(k).and_then(|s| s.parse::<u8>().ok()).unwrap_or(0);
+        let get_u16 = |k: &str| fields.get(k).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
+        let get_u32 = |k: &str| fields.get(k).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+        let get_u64 = |k: &str| fields.get(k).and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+        let get_ip = |k: &str| {
+            fields.get(k).and_then(|s| {
+                if s.is_empty() { None } else { s.parse::<IpAddr>().ok() }
+            })
+        };
+        let get_string = |k: &str| fields.get(k).cloned().unwrap_or_default();
+        let get_static = |k: &str| {
+            let s = get_str(k);
+            intern_field_name(s).unwrap_or_else(|| {
+                // For flow_version values like "v5", "v9", etc.
+                match s {
+                    "v5" => "v5",
+                    "v7" => "v7",
+                    "v9" => "v9",
+                    "ipfix" => "ipfix",
+                    "sflow" => "sflow",
+                    _ => "",
+                }
+            })
+        };
+
+        Self {
+            flow_version: get_static("FLOW_VERSION"),
+            exporter_ip: get_ip("EXPORTER_IP"),
+            exporter_port: get_u16("EXPORTER_PORT"),
+            exporter_name: get_string("EXPORTER_NAME"),
+            exporter_group: get_string("EXPORTER_GROUP"),
+            exporter_role: get_string("EXPORTER_ROLE"),
+            exporter_site: get_string("EXPORTER_SITE"),
+            exporter_region: get_string("EXPORTER_REGION"),
+            exporter_tenant: get_string("EXPORTER_TENANT"),
+            sampling_rate: get_u64("SAMPLING_RATE"),
+            etype: get_u16("ETYPE"),
+            protocol: get_u8("PROTOCOL"),
+            direction: FlowDirection::from_str_value(get_str("DIRECTION")),
+            bytes: get_u64("BYTES"),
+            packets: get_u64("PACKETS"),
+            flows: get_u64("FLOWS"),
+            raw_bytes: get_u64("RAW_BYTES"),
+            raw_packets: get_u64("RAW_PACKETS"),
+            forwarding_status: get_u8("FORWARDING_STATUS"),
+            src_addr: get_ip("SRC_ADDR"),
+            dst_addr: get_ip("DST_ADDR"),
+            src_prefix: parse_prefix_ip(get_str("SRC_PREFIX")),
+            dst_prefix: parse_prefix_ip(get_str("DST_PREFIX")),
+            src_mask: get_u8("SRC_MASK"),
+            dst_mask: get_u8("DST_MASK"),
+            src_as: get_u32("SRC_AS"),
+            dst_as: get_u32("DST_AS"),
+            src_net_name: get_string("SRC_NET_NAME"),
+            dst_net_name: get_string("DST_NET_NAME"),
+            src_net_role: get_string("SRC_NET_ROLE"),
+            dst_net_role: get_string("DST_NET_ROLE"),
+            src_net_site: get_string("SRC_NET_SITE"),
+            dst_net_site: get_string("DST_NET_SITE"),
+            src_net_region: get_string("SRC_NET_REGION"),
+            dst_net_region: get_string("DST_NET_REGION"),
+            src_net_tenant: get_string("SRC_NET_TENANT"),
+            dst_net_tenant: get_string("DST_NET_TENANT"),
+            src_country: get_string("SRC_COUNTRY"),
+            dst_country: get_string("DST_COUNTRY"),
+            src_geo_city: get_string("SRC_GEO_CITY"),
+            dst_geo_city: get_string("DST_GEO_CITY"),
+            src_geo_state: get_string("SRC_GEO_STATE"),
+            dst_geo_state: get_string("DST_GEO_STATE"),
+            dst_as_path: get_string("DST_AS_PATH"),
+            dst_communities: get_string("DST_COMMUNITIES"),
+            dst_large_communities: get_string("DST_LARGE_COMMUNITIES"),
+            in_if: get_u32("IN_IF"),
+            out_if: get_u32("OUT_IF"),
+            in_if_name: get_string("IN_IF_NAME"),
+            out_if_name: get_string("OUT_IF_NAME"),
+            in_if_description: get_string("IN_IF_DESCRIPTION"),
+            out_if_description: get_string("OUT_IF_DESCRIPTION"),
+            in_if_speed: get_u64("IN_IF_SPEED"),
+            out_if_speed: get_u64("OUT_IF_SPEED"),
+            in_if_provider: get_string("IN_IF_PROVIDER"),
+            out_if_provider: get_string("OUT_IF_PROVIDER"),
+            in_if_connectivity: get_string("IN_IF_CONNECTIVITY"),
+            out_if_connectivity: get_string("OUT_IF_CONNECTIVITY"),
+            in_if_boundary: get_u8("IN_IF_BOUNDARY"),
+            out_if_boundary: get_u8("OUT_IF_BOUNDARY"),
+            next_hop: get_ip("NEXT_HOP"),
+            src_port: get_u16("SRC_PORT"),
+            dst_port: get_u16("DST_PORT"),
+            flow_start_seconds: get_u64("FLOW_START_SECONDS"),
+            flow_end_seconds: get_u64("FLOW_END_SECONDS"),
+            flow_start_millis: get_u64("FLOW_START_MILLIS"),
+            flow_end_millis: get_u64("FLOW_END_MILLIS"),
+            observation_time_millis: get_u64("OBSERVATION_TIME_MILLIS"),
+            src_addr_nat: get_ip("SRC_ADDR_NAT"),
+            dst_addr_nat: get_ip("DST_ADDR_NAT"),
+            src_port_nat: get_u16("SRC_PORT_NAT"),
+            dst_port_nat: get_u16("DST_PORT_NAT"),
+            src_vlan: get_u16("SRC_VLAN"),
+            dst_vlan: get_u16("DST_VLAN"),
+            src_mac: parse_mac(get_str("SRC_MAC")),
+            dst_mac: parse_mac(get_str("DST_MAC")),
+            ipttl: get_u8("IPTTL"),
+            iptos: get_u8("IPTOS"),
+            ipv6_flow_label: get_u32("IPV6_FLOW_LABEL"),
+            tcp_flags: get_u8("TCP_FLAGS"),
+            ip_fragment_id: get_u32("IP_FRAGMENT_ID"),
+            ip_fragment_offset: get_u16("IP_FRAGMENT_OFFSET"),
+            icmpv4_type: get_u8("ICMPV4_TYPE"),
+            icmpv4_code: get_u8("ICMPV4_CODE"),
+            icmpv6_type: get_u8("ICMPV6_TYPE"),
+            icmpv6_code: get_u8("ICMPV6_CODE"),
+            mpls_labels: get_string("MPLS_LABELS"),
+        }
+    }
+
+    /// Encode non-default fields into a byte buffer for journal writing.
+    /// Skips fields at their default value (0, empty string, None) — the reader
+    /// (`from_fields`) defaults missing fields to the same values, so the
+    /// round-trip is lossless. Reduces per-entry item count from 87 to ~20-25
+    /// for typical flows, proportionally cutting journal write overhead.
+    pub(crate) fn encode_to_journal_buf(&self, data: &mut Vec<u8>, refs: &mut Vec<std::ops::Range<usize>>) {
+        data.clear();
+        refs.clear();
+        let mut ibuf = itoa::Buffer::new();
+
+        // Skip-aware macros: only emit a field when its value differs from the
+        // default that from_fields() would produce for a missing key.
+        macro_rules! push_str {
+            ($name:expr, $val:expr) => {{
+                if !$val.is_empty() {
+                    let start = data.len();
+                    data.extend_from_slice($name.as_bytes());
+                    data.push(b'=');
+                    data.extend_from_slice($val.as_bytes());
+                    refs.push(start..data.len());
+                }
+            }};
+        }
+        macro_rules! push_u8 {
+            ($name:expr, $val:expr) => {{
+                if $val != 0 {
+                    let start = data.len();
+                    data.extend_from_slice($name.as_bytes());
+                    data.push(b'=');
+                    data.extend_from_slice(ibuf.format($val as u64).as_bytes());
+                    refs.push(start..data.len());
+                }
+            }};
+        }
+        macro_rules! push_u16 {
+            ($name:expr, $val:expr) => {{
+                if $val != 0 {
+                    let start = data.len();
+                    data.extend_from_slice($name.as_bytes());
+                    data.push(b'=');
+                    data.extend_from_slice(ibuf.format($val as u64).as_bytes());
+                    refs.push(start..data.len());
+                }
+            }};
+        }
+        macro_rules! push_u32 {
+            ($name:expr, $val:expr) => {{
+                if $val != 0 {
+                    let start = data.len();
+                    data.extend_from_slice($name.as_bytes());
+                    data.push(b'=');
+                    data.extend_from_slice(ibuf.format($val as u64).as_bytes());
+                    refs.push(start..data.len());
+                }
+            }};
+        }
+        macro_rules! push_u64 {
+            ($name:expr, $val:expr) => {{
+                if $val != 0 {
+                    let start = data.len();
+                    data.extend_from_slice($name.as_bytes());
+                    data.push(b'=');
+                    data.extend_from_slice(ibuf.format($val).as_bytes());
+                    refs.push(start..data.len());
+                }
+            }};
+        }
+        macro_rules! push_opt_ip {
+            ($name:expr, $val:expr) => {{
+                if let Some(ip) = $val {
+                    let start = data.len();
+                    data.extend_from_slice($name.as_bytes());
+                    data.push(b'=');
+                    use std::io::Write;
+                    let _ = write!(data, "{}", ip);
+                    refs.push(start..data.len());
+                }
+            }};
+        }
+        macro_rules! push_mac {
+            ($name:expr, $val:expr) => {{
+                if $val != [0u8; 6] {
+                    let start = data.len();
+                    data.extend_from_slice($name.as_bytes());
+                    data.push(b'=');
+                    use std::io::Write;
+                    let _ = write!(data, "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+                        $val[0], $val[1], $val[2], $val[3], $val[4], $val[5]);
+                    refs.push(start..data.len());
+                }
+            }};
+        }
+
+        // Encode only non-default fields.
+        push_str!("FLOW_VERSION", self.flow_version);
+        push_opt_ip!("EXPORTER_IP", self.exporter_ip);
+        push_u16!("EXPORTER_PORT", self.exporter_port);
+        push_str!("EXPORTER_NAME", &self.exporter_name);
+        push_str!("EXPORTER_GROUP", &self.exporter_group);
+        push_str!("EXPORTER_ROLE", &self.exporter_role);
+        push_str!("EXPORTER_SITE", &self.exporter_site);
+        push_str!("EXPORTER_REGION", &self.exporter_region);
+        push_str!("EXPORTER_TENANT", &self.exporter_tenant);
+        push_u64!("SAMPLING_RATE", self.sampling_rate);
+        push_u16!("ETYPE", self.etype);
+        push_u8!("PROTOCOL", self.protocol);
+        push_u64!("BYTES", self.bytes);
+        push_u64!("PACKETS", self.packets);
+        push_u64!("FLOWS", self.flows);
+        push_u64!("RAW_BYTES", self.raw_bytes);
+        push_u64!("RAW_PACKETS", self.raw_packets);
+        push_u8!("FORWARDING_STATUS", self.forwarding_status);
+        // Direction: skip when "unknown" (from_fields defaults to Unknown).
+        {
+            let dir_str = self.direction.as_str();
+            if dir_str != "unknown" {
+                let start = data.len();
+                data.extend_from_slice(b"DIRECTION=");
+                data.extend_from_slice(dir_str.as_bytes());
+                refs.push(start..data.len());
+            }
+        }
+        push_opt_ip!("SRC_ADDR", self.src_addr);
+        push_opt_ip!("DST_ADDR", self.dst_addr);
+        // Prefix fields: skip when src/dst_prefix is None.
+        if let Some(ip) = self.src_prefix {
+            let start = data.len();
+            data.extend_from_slice(b"SRC_PREFIX=");
+            use std::io::Write;
+            let _ = write!(data, "{}", ip);
+            if self.src_mask > 0 {
+                data.push(b'/');
+                data.extend_from_slice(ibuf.format(self.src_mask as u64).as_bytes());
+            }
+            refs.push(start..data.len());
+        }
+        if let Some(ip) = self.dst_prefix {
+            let start = data.len();
+            data.extend_from_slice(b"DST_PREFIX=");
+            use std::io::Write;
+            let _ = write!(data, "{}", ip);
+            if self.dst_mask > 0 {
+                data.push(b'/');
+                data.extend_from_slice(ibuf.format(self.dst_mask as u64).as_bytes());
+            }
+            refs.push(start..data.len());
+        }
+        push_u8!("SRC_MASK", self.src_mask);
+        push_u8!("DST_MASK", self.dst_mask);
+        push_u32!("SRC_AS", self.src_as);
+        push_u32!("DST_AS", self.dst_as);
+        push_str!("SRC_NET_NAME", &self.src_net_name);
+        push_str!("DST_NET_NAME", &self.dst_net_name);
+        push_str!("SRC_NET_ROLE", &self.src_net_role);
+        push_str!("DST_NET_ROLE", &self.dst_net_role);
+        push_str!("SRC_NET_SITE", &self.src_net_site);
+        push_str!("DST_NET_SITE", &self.dst_net_site);
+        push_str!("SRC_NET_REGION", &self.src_net_region);
+        push_str!("DST_NET_REGION", &self.dst_net_region);
+        push_str!("SRC_NET_TENANT", &self.src_net_tenant);
+        push_str!("DST_NET_TENANT", &self.dst_net_tenant);
+        push_str!("SRC_COUNTRY", &self.src_country);
+        push_str!("DST_COUNTRY", &self.dst_country);
+        push_str!("SRC_GEO_CITY", &self.src_geo_city);
+        push_str!("DST_GEO_CITY", &self.dst_geo_city);
+        push_str!("SRC_GEO_STATE", &self.src_geo_state);
+        push_str!("DST_GEO_STATE", &self.dst_geo_state);
+        push_str!("DST_AS_PATH", &self.dst_as_path);
+        push_str!("DST_COMMUNITIES", &self.dst_communities);
+        push_str!("DST_LARGE_COMMUNITIES", &self.dst_large_communities);
+        push_u32!("IN_IF", self.in_if);
+        push_u32!("OUT_IF", self.out_if);
+        push_str!("IN_IF_NAME", &self.in_if_name);
+        push_str!("OUT_IF_NAME", &self.out_if_name);
+        push_str!("IN_IF_DESCRIPTION", &self.in_if_description);
+        push_str!("OUT_IF_DESCRIPTION", &self.out_if_description);
+        push_u64!("IN_IF_SPEED", self.in_if_speed);
+        push_u64!("OUT_IF_SPEED", self.out_if_speed);
+        push_str!("IN_IF_PROVIDER", &self.in_if_provider);
+        push_str!("OUT_IF_PROVIDER", &self.out_if_provider);
+        push_str!("IN_IF_CONNECTIVITY", &self.in_if_connectivity);
+        push_str!("OUT_IF_CONNECTIVITY", &self.out_if_connectivity);
+        push_u8!("IN_IF_BOUNDARY", self.in_if_boundary);
+        push_u8!("OUT_IF_BOUNDARY", self.out_if_boundary);
+        push_opt_ip!("NEXT_HOP", self.next_hop);
+        push_u16!("SRC_PORT", self.src_port);
+        push_u16!("DST_PORT", self.dst_port);
+        push_u64!("FLOW_START_SECONDS", self.flow_start_seconds);
+        push_u64!("FLOW_END_SECONDS", self.flow_end_seconds);
+        push_u64!("FLOW_START_MILLIS", self.flow_start_millis);
+        push_u64!("FLOW_END_MILLIS", self.flow_end_millis);
+        push_u64!("OBSERVATION_TIME_MILLIS", self.observation_time_millis);
+        push_opt_ip!("SRC_ADDR_NAT", self.src_addr_nat);
+        push_opt_ip!("DST_ADDR_NAT", self.dst_addr_nat);
+        push_u16!("SRC_PORT_NAT", self.src_port_nat);
+        push_u16!("DST_PORT_NAT", self.dst_port_nat);
+        push_u16!("SRC_VLAN", self.src_vlan);
+        push_u16!("DST_VLAN", self.dst_vlan);
+        push_mac!("SRC_MAC", self.src_mac);
+        push_mac!("DST_MAC", self.dst_mac);
+        push_u8!("IPTTL", self.ipttl);
+        push_u8!("IPTOS", self.iptos);
+        push_u32!("IPV6_FLOW_LABEL", self.ipv6_flow_label);
+        push_u8!("TCP_FLAGS", self.tcp_flags);
+        push_u32!("IP_FRAGMENT_ID", self.ip_fragment_id);
+        push_u16!("IP_FRAGMENT_OFFSET", self.ip_fragment_offset);
+        push_u8!("ICMPV4_TYPE", self.icmpv4_type);
+        push_u8!("ICMPV4_CODE", self.icmpv4_code);
+        push_u8!("ICMPV6_TYPE", self.icmpv6_type);
+        push_u8!("ICMPV6_CODE", self.icmpv6_code);
+        push_str!("MPLS_LABELS", &self.mpls_labels);
+    }
+}
+
+#[cfg(test)]
+fn opt_ip_to_string(ip: Option<IpAddr>) -> String {
+    match ip {
+        Some(addr) => addr.to_string(),
+        None => String::new(),
+    }
+}
+
+/// Format prefix as "IP/mask" (CIDR) or just "IP" if mask is 0.
+#[cfg(test)]
+fn format_prefix(ip: Option<IpAddr>, mask: u8) -> String {
+    match ip {
+        Some(addr) if mask > 0 => format!("{}/{}", addr, mask),
+        Some(addr) => addr.to_string(),
+        None => String::new(),
+    }
+}
+
+/// Parse "IP/mask" or "IP" back to just the IP address.
+fn parse_prefix_ip(s: &str) -> Option<IpAddr> {
+    if s.is_empty() {
+        return None;
+    }
+    // Strip optional "/mask" suffix
+    let ip_part = s.split('/').next().unwrap_or(s);
+    ip_part.parse::<IpAddr>().ok()
+}
+
+// --- End FlowRecord ---
+
 #[derive(Debug, Clone)]
 pub(crate) struct DecodedFlow {
-    pub(crate) fields: BTreeMap<String, String>,
+    pub(crate) record: FlowRecord,
     pub(crate) source_realtime_usec: Option<u64>,
 }
 
@@ -539,6 +1218,18 @@ impl SamplingState {
             .cloned()
     }
 
+    fn has_any_v9_datalink_templates(&self) -> bool {
+        self.v9_datalink_templates
+            .values()
+            .any(|m| !m.is_empty())
+    }
+
+    fn has_any_ipfix_datalink_templates(&self) -> bool {
+        self.ipfix_datalink_templates
+            .values()
+            .any(|m| !m.is_empty())
+    }
+
     fn to_persisted(&self) -> PersistedDecoderState {
         let mut sampling_rates = Vec::new();
         for (exporter_ip, rates) in &self.by_exporter {
@@ -861,7 +1552,7 @@ impl FlowDecoders {
         if let Some(enricher) = &mut self.enricher {
             batch
                 .flows
-                .retain_mut(|flow| enricher.enrich_fields(&mut flow.fields));
+                .retain_mut(|flow| enricher.enrich_record(&mut flow.record));
         }
 
         self.stats.merge(&batch.stats);
@@ -1009,7 +1700,10 @@ fn decode_netflow(
     observe_v9_sampling_from_raw_payload(source, payload, sampling);
     observe_ipfix_templates_from_raw_payload(source, payload, sampling);
 
-    let raw_v9_flows = if enable_v9 {
+    // Skip special datalink-frame decode paths when no datalink templates are registered.
+    // These functions parse the raw payload looking for template-matched records — pointless
+    // when no templates exist, and they are a significant fraction of per-packet CPU cost.
+    let raw_v9_flows = if enable_v9 && sampling.has_any_v9_datalink_templates() {
         decode_v9_special_from_raw_payload(
             source,
             payload,
@@ -1022,7 +1716,7 @@ fn decode_netflow(
         Vec::new()
     };
 
-    let raw_ipfix_flows = if enable_ipfix {
+    let raw_ipfix_flows = if enable_ipfix && sampling.has_any_ipfix_datalink_templates() {
         decode_ipfix_special_from_raw_payload(
             source,
             payload,
@@ -1111,87 +1805,251 @@ fn decode_netflow(
 }
 
 fn append_unique_flows(dst: &mut Vec<DecodedFlow>, incoming: Vec<DecodedFlow>) {
-    for flow in incoming {
-        if let Some(existing_idx) = dst
-            .iter()
-            .position(|existing| same_flow_identity(existing, &flow))
-        {
-            let merged = {
-                let existing = &mut dst[existing_idx];
-                merge_enriched_fields(existing, &flow)
-            };
-            if merged {
-                continue;
-            }
-
-            let exact_duplicate = {
-                let existing = &dst[existing_idx];
-                existing.source_realtime_usec == flow.source_realtime_usec
-                    && existing.fields == flow.fields
-            };
-            if exact_duplicate {
-                continue;
-            }
-
-            dst.push(flow);
-            continue;
-        }
-
-        let already_present = dst.iter().any(|existing| {
-            existing.source_realtime_usec == flow.source_realtime_usec
-                && existing.fields == flow.fields
-        });
-        if !already_present {
-            dst.push(flow);
-        }
+    if incoming.is_empty() {
+        return;
     }
+
+    // Build a hash index over existing flows for O(1) identity lookups instead of O(n) scans.
+    let mut identity_index: HashMap<u64, Vec<usize>> = HashMap::new();
+    for (idx, flow) in dst.iter().enumerate() {
+        identity_index
+            .entry(flow_identity_hash(flow))
+            .or_default()
+            .push(idx);
+    }
+
+    for flow in incoming {
+        let hash = flow_identity_hash(&flow);
+
+        // Try identity-based merge first (most common case for special decode overlap).
+        if let Some(candidates) = identity_index.get(&hash) {
+            let mut handled = false;
+            for &idx in candidates {
+                if same_flow_identity(&dst[idx], &flow) {
+                    let merged = merge_enriched_records(&mut dst[idx], &flow);
+                    if merged {
+                        // Incoming enrichment data was merged into existing flow.
+                        handled = true;
+                        break;
+                    }
+                    // Merge found nothing to update. If the records are identical,
+                    // it's an exact duplicate — drop regardless of timestamp
+                    // (different decode paths can compute different timestamps
+                    // for the same logical flow).
+                    if dst[idx].record == flow.record {
+                        handled = true;
+                        break;
+                    }
+                    // Records have same identity but different non-identity data
+                    // (e.g., different TTL values). Keep both as distinct flows.
+                }
+            }
+            if handled {
+                continue;
+            }
+        }
+
+        let new_idx = dst.len();
+        identity_index.entry(hash).or_default().push(new_idx);
+        dst.push(flow);
+    }
+}
+
+/// Hash identity fields directly from FlowRecord — zero string allocation.
+/// observation_time_millis is intentionally excluded: it derives from packet
+/// arrival time, not flow identity, so two records for the same logical flow
+/// from different decode paths may have different observation timestamps.
+fn flow_identity_hash(flow: &DecodedFlow) -> u64 {
+    use std::hash::Hasher;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    let r = &flow.record;
+    r.flow_version.hash(&mut hasher);
+    r.exporter_ip.hash(&mut hasher);
+    r.exporter_port.hash(&mut hasher);
+    r.src_addr.hash(&mut hasher);
+    r.dst_addr.hash(&mut hasher);
+    r.protocol.hash(&mut hasher);
+    r.src_port.hash(&mut hasher);
+    r.dst_port.hash(&mut hasher);
+    r.in_if.hash(&mut hasher);
+    r.out_if.hash(&mut hasher);
+    r.bytes.hash(&mut hasher);
+    r.packets.hash(&mut hasher);
+    r.flow_start_millis.hash(&mut hasher);
+    r.flow_end_millis.hash(&mut hasher);
+    r.flow_start_seconds.hash(&mut hasher);
+    r.flow_end_seconds.hash(&mut hasher);
+    r.direction.hash(&mut hasher);
+    hasher.finish()
 }
 
 fn same_flow_identity(existing: &DecodedFlow, incoming: &DecodedFlow) -> bool {
-    const IDENTITY_KEYS: &[&str] = &[
-        "FLOW_VERSION",
-        "EXPORTER_IP",
-        "EXPORTER_PORT",
-        "SRC_ADDR",
-        "DST_ADDR",
-        "PROTOCOL",
-        "SRC_PORT",
-        "DST_PORT",
-        "IN_IF",
-        "OUT_IF",
-        "BYTES",
-        "PACKETS",
-        "FLOW_START_MILLIS",
-        "FLOW_END_MILLIS",
-        "FLOW_START_SECONDS",
-        "FLOW_END_SECONDS",
-        "DIRECTION",
-    ];
-
-    IDENTITY_KEYS.iter().all(|key| {
-        existing.fields.get(*key).map(String::as_str)
-            == incoming.fields.get(*key).map(String::as_str)
-    })
+    let a = &existing.record;
+    let b = &incoming.record;
+    a.flow_version == b.flow_version
+        && a.exporter_ip == b.exporter_ip
+        && a.exporter_port == b.exporter_port
+        && a.src_addr == b.src_addr
+        && a.dst_addr == b.dst_addr
+        && a.protocol == b.protocol
+        && a.src_port == b.src_port
+        && a.dst_port == b.dst_port
+        && a.in_if == b.in_if
+        && a.out_if == b.out_if
+        && a.bytes == b.bytes
+        && a.packets == b.packets
+        && a.flow_start_millis == b.flow_start_millis
+        && a.flow_end_millis == b.flow_end_millis
+        && a.flow_start_seconds == b.flow_start_seconds
+        && a.flow_end_seconds == b.flow_end_seconds
+        && a.direction == b.direction
 }
 
-fn merge_enriched_fields(existing: &mut DecodedFlow, incoming: &DecodedFlow) -> bool {
+/// Merge non-default field values from incoming record into existing record.
+/// Used to fill in enrichment data when two decode passes produce overlapping flows.
+fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &DecodedFlow) -> bool {
     let mut changed = false;
-    for (key, value) in &incoming.fields {
-        if is_default_field_value(key, value) {
-            continue;
-        }
+    let default = FlowRecord::default();
+    let src = &incoming.record;
+    let dst = &mut existing.record;
 
-        let should_replace = existing
-            .fields
-            .get(key)
-            .map(|current| is_default_field_value(key, current))
-            .unwrap_or(true);
-
-        if should_replace {
-            existing.fields.insert(key.clone(), value.clone());
-            changed = true;
-        }
+    // Merge Copy fields: replace existing default with incoming non-default.
+    macro_rules! merge_copy {
+        ($field:ident) => {
+            if src.$field != default.$field && dst.$field == default.$field {
+                dst.$field = src.$field;
+                changed = true;
+            }
+        };
     }
+    // Merge String fields: replace existing empty with incoming non-empty.
+    macro_rules! merge_str {
+        ($field:ident) => {
+            if !src.$field.is_empty() && dst.$field.is_empty() {
+                dst.$field = src.$field.clone();
+                changed = true;
+            }
+        };
+    }
+
+    // Protocol version / exporter identity
+    merge_copy!(flow_version);
+    merge_copy!(exporter_ip);
+    merge_copy!(exporter_port);
+    merge_str!(exporter_name);
+    merge_str!(exporter_group);
+    merge_str!(exporter_role);
+    merge_str!(exporter_site);
+    merge_str!(exporter_region);
+    merge_str!(exporter_tenant);
+
+    // Sampling
+    merge_copy!(sampling_rate);
+
+    // L2/L3 identity
+    merge_copy!(etype);
+    merge_copy!(protocol);
+    merge_copy!(direction);
+
+    // Counters
+    merge_copy!(bytes);
+    merge_copy!(packets);
+    merge_copy!(flows);
+    merge_copy!(raw_bytes);
+    merge_copy!(raw_packets);
+    merge_copy!(forwarding_status);
+
+    // Endpoints
+    merge_copy!(src_addr);
+    merge_copy!(dst_addr);
+    merge_copy!(src_prefix);
+    merge_copy!(dst_prefix);
+    merge_copy!(src_mask);
+    merge_copy!(dst_mask);
+    merge_copy!(src_as);
+    merge_copy!(dst_as);
+
+    // Network attributes
+    merge_str!(src_net_name);
+    merge_str!(dst_net_name);
+    merge_str!(src_net_role);
+    merge_str!(dst_net_role);
+    merge_str!(src_net_site);
+    merge_str!(dst_net_site);
+    merge_str!(src_net_region);
+    merge_str!(dst_net_region);
+    merge_str!(src_net_tenant);
+    merge_str!(dst_net_tenant);
+    merge_str!(src_country);
+    merge_str!(dst_country);
+    merge_str!(src_geo_city);
+    merge_str!(dst_geo_city);
+    merge_str!(src_geo_state);
+    merge_str!(dst_geo_state);
+
+    // BGP routing
+    merge_str!(dst_as_path);
+    merge_str!(dst_communities);
+    merge_str!(dst_large_communities);
+
+    // Interfaces
+    merge_copy!(in_if);
+    merge_copy!(out_if);
+    merge_str!(in_if_name);
+    merge_str!(out_if_name);
+    merge_str!(in_if_description);
+    merge_str!(out_if_description);
+    merge_copy!(in_if_speed);
+    merge_copy!(out_if_speed);
+    merge_str!(in_if_provider);
+    merge_str!(out_if_provider);
+    merge_str!(in_if_connectivity);
+    merge_str!(out_if_connectivity);
+    merge_copy!(in_if_boundary);
+    merge_copy!(out_if_boundary);
+
+    // Next hop / ports
+    merge_copy!(next_hop);
+    merge_copy!(src_port);
+    merge_copy!(dst_port);
+
+    // Timestamps
+    merge_copy!(flow_start_seconds);
+    merge_copy!(flow_end_seconds);
+    merge_copy!(flow_start_millis);
+    merge_copy!(flow_end_millis);
+    merge_copy!(observation_time_millis);
+
+    // NAT
+    merge_copy!(src_addr_nat);
+    merge_copy!(dst_addr_nat);
+    merge_copy!(src_port_nat);
+    merge_copy!(dst_port_nat);
+
+    // VLAN
+    merge_copy!(src_vlan);
+    merge_copy!(dst_vlan);
+
+    // MAC addresses
+    merge_copy!(src_mac);
+    merge_copy!(dst_mac);
+
+    // IP header fields
+    merge_copy!(ipttl);
+    merge_copy!(iptos);
+    merge_copy!(ipv6_flow_label);
+    merge_copy!(tcp_flags);
+    merge_copy!(ip_fragment_id);
+    merge_copy!(ip_fragment_offset);
+
+    // ICMP
+    merge_copy!(icmpv4_type);
+    merge_copy!(icmpv4_code);
+    merge_copy!(icmpv6_type);
+    merge_copy!(icmpv6_code);
+
+    // MPLS
+    merge_str!(mpls_labels);
 
     if existing.source_realtime_usec.is_none() {
         existing.source_realtime_usec = incoming.source_realtime_usec;
@@ -1199,14 +2057,6 @@ fn merge_enriched_fields(existing: &mut DecodedFlow, incoming: &DecodedFlow) -> 
     }
 
     changed
-}
-
-fn is_default_field_value(key: &str, value: &str) -> bool {
-    CANONICAL_FLOW_DEFAULTS
-        .iter()
-        .find(|(name, _)| *name == key)
-        .map(|(_, default)| *default == value)
-        .unwrap_or(value.is_empty())
 }
 
 fn is_ipfix_mpls_label_field(field_type: u16) -> bool {
@@ -1598,7 +2448,7 @@ fn decode_v9_special_record(
     decapsulation_mode: DecapsulationMode,
 ) -> Option<DecodedFlow> {
     let mut fields = base_fields("v9", source);
-    fields.insert("SRC_VLAN".to_string(), "0".to_string());
+    fields.insert("SRC_VLAN", "0".to_string());
     let mut has_datalink_section = false;
     let mut has_decoded_datalink = false;
     let mut flow_start_millis: Option<u64> = None;
@@ -1610,8 +2460,8 @@ fn decode_v9_special_record(
             if let Some(l3_len) =
                 parse_datalink_frame_section(raw_value, &mut fields, decapsulation_mode)
             {
-                fields.insert("BYTES".to_string(), l3_len.to_string());
-                fields.insert("PACKETS".to_string(), "1".to_string());
+                fields.insert("BYTES", l3_len.to_string());
+                fields.insert("PACKETS", "1".to_string());
                 has_decoded_datalink = true;
             }
             continue;
@@ -1645,7 +2495,7 @@ fn decode_v9_special_record(
                 continue;
             }
             fields
-                .entry(canonical.to_string())
+                .entry(canonical)
                 .or_insert_with(|| canonical_value(canonical, &value).to_string());
         }
 
@@ -1662,12 +2512,12 @@ fn decode_v9_special_record(
     }
 
     fields
-        .entry("FLOWS".to_string())
+        .entry("FLOWS")
         .or_insert_with(|| "1".to_string());
     finalize_canonical_flow_fields(&mut fields);
 
     Some(DecodedFlow {
-        fields,
+        record: FlowRecord::from_fields(&fields),
         source_realtime_usec: timestamp_source.select(
             input_realtime_usec,
             packet_realtime_usec,
@@ -1724,7 +2574,7 @@ fn decode_ipfix_special_record(
     decapsulation_mode: DecapsulationMode,
 ) -> Option<DecodedFlow> {
     let mut fields = base_fields("ipfix", source);
-    fields.insert("SRC_VLAN".to_string(), "0".to_string());
+    fields.insert("SRC_VLAN", "0".to_string());
     let mut has_datalink_section = false;
     let mut has_decoded_datalink = false;
     let mut has_mpls_labels = false;
@@ -1742,7 +2592,7 @@ fn decode_ipfix_special_record(
                 } else {
                     "128"
                 };
-                fields.insert("FORWARDING_STATUS".to_string(), status.to_string());
+                fields.insert("FORWARDING_STATUS", status.to_string());
             }
             continue;
         }
@@ -1750,45 +2600,45 @@ fn decode_ipfix_special_record(
         match template_field.field_type {
             IPFIX_FIELD_OCTET_DELTA_COUNT => {
                 fields.insert(
-                    "BYTES".to_string(),
+                    "BYTES",
                     decode_akvorado_unsigned(raw_value).to_string(),
                 );
             }
             IPFIX_FIELD_PACKET_DELTA_COUNT => {
                 fields.insert(
-                    "PACKETS".to_string(),
+                    "PACKETS",
                     decode_akvorado_unsigned(raw_value).to_string(),
                 );
             }
             IPFIX_FIELD_PROTOCOL_IDENTIFIER => {
                 fields.insert(
-                    "PROTOCOL".to_string(),
+                    "PROTOCOL",
                     decode_akvorado_unsigned(raw_value).to_string(),
                 );
             }
             IPFIX_FIELD_SOURCE_TRANSPORT_PORT => {
                 fields.insert(
-                    "SRC_PORT".to_string(),
+                    "SRC_PORT",
                     decode_akvorado_unsigned(raw_value).to_string(),
                 );
             }
             IPFIX_FIELD_DESTINATION_TRANSPORT_PORT => {
                 fields.insert(
-                    "DST_PORT".to_string(),
+                    "DST_PORT",
                     decode_akvorado_unsigned(raw_value).to_string(),
                 );
             }
             IPFIX_FIELD_SOURCE_IPV4_ADDRESS | IPFIX_FIELD_SOURCE_IPV6_ADDRESS => {
                 if let Some(ip) = parse_ip_value(raw_value) {
                     if !is_zero_ip_value(&ip) {
-                        fields.insert("SRC_ADDR".to_string(), ip);
+                        fields.insert("SRC_ADDR", ip);
                     }
                 }
             }
             IPFIX_FIELD_DESTINATION_IPV4_ADDRESS | IPFIX_FIELD_DESTINATION_IPV6_ADDRESS => {
                 if let Some(ip) = parse_ip_value(raw_value) {
                     if !is_zero_ip_value(&ip) {
-                        fields.insert("DST_ADDR".to_string(), ip);
+                        fields.insert("DST_ADDR", ip);
                     }
                 }
             }
@@ -1796,47 +2646,47 @@ fn decode_ipfix_special_record(
                 if let Some(etype) =
                     etype_from_ip_version(&decode_akvorado_unsigned(raw_value).to_string())
                 {
-                    fields.insert("ETYPE".to_string(), etype.to_string());
+                    fields.insert("ETYPE", etype.to_string());
                 }
             }
             IPFIX_FIELD_INPUT_SNMP => {
                 fields.insert(
-                    "IN_IF".to_string(),
+                    "IN_IF",
                     decode_akvorado_unsigned(raw_value).to_string(),
                 );
             }
             IPFIX_FIELD_OUTPUT_SNMP => {
                 fields.insert(
-                    "OUT_IF".to_string(),
+                    "OUT_IF",
                     decode_akvorado_unsigned(raw_value).to_string(),
                 );
             }
             IPFIX_FIELD_DIRECTION => {
                 fields.insert(
-                    "DIRECTION".to_string(),
+                    "DIRECTION",
                     decode_akvorado_unsigned(raw_value).to_string(),
                 );
             }
             IPFIX_FIELD_FORWARDING_STATUS => {
                 fields.insert(
-                    "FORWARDING_STATUS".to_string(),
+                    "FORWARDING_STATUS",
                     decode_akvorado_unsigned(raw_value).to_string(),
                 );
             }
             IPFIX_FIELD_FLOW_START_MILLISECONDS => {
                 let value = decode_akvorado_unsigned(raw_value);
                 flow_start_millis = Some(value);
-                fields.insert("FLOW_START_MILLIS".to_string(), value.to_string());
+                fields.insert("FLOW_START_MILLIS", value.to_string());
             }
             IPFIX_FIELD_FLOW_END_MILLISECONDS => {
                 fields.insert(
-                    "FLOW_END_MILLIS".to_string(),
+                    "FLOW_END_MILLIS",
                     decode_akvorado_unsigned(raw_value).to_string(),
                 );
             }
             IPFIX_FIELD_MINIMUM_TTL | IPFIX_FIELD_MAXIMUM_TTL => {
                 fields
-                    .entry("IPTTL".to_string())
+                    .entry("IPTTL")
                     .or_insert_with(|| decode_akvorado_unsigned(raw_value).to_string());
             }
             field_type if is_ipfix_mpls_label_field(field_type) => {
@@ -1854,8 +2704,8 @@ fn decode_ipfix_special_record(
                 if let Some(l3_len) =
                     parse_datalink_frame_section(raw_value, &mut fields, decapsulation_mode)
                 {
-                    fields.insert("BYTES".to_string(), l3_len.to_string());
-                    fields.insert("PACKETS".to_string(), "1".to_string());
+                    fields.insert("BYTES", l3_len.to_string());
+                    fields.insert("PACKETS", "1".to_string());
                     has_decoded_datalink = true;
                 }
             }
@@ -1871,12 +2721,12 @@ fn decode_ipfix_special_record(
     }
 
     fields
-        .entry("FLOWS".to_string())
+        .entry("FLOWS")
         .or_insert_with(|| "1".to_string());
     finalize_canonical_flow_fields(&mut fields);
 
     Some(DecodedFlow {
-        fields,
+        record: FlowRecord::from_fields(&fields),
         source_realtime_usec: timestamp_source.select(
             input_realtime_usec,
             packet_realtime_usec,
@@ -1887,15 +2737,15 @@ fn decode_ipfix_special_record(
 
 fn parse_datalink_frame_section(
     data: &[u8],
-    fields: &mut BTreeMap<String, String>,
+    fields: &mut FlowFields,
     decapsulation_mode: DecapsulationMode,
 ) -> Option<u64> {
     if data.len() < 14 {
         return None;
     }
 
-    fields.insert("DST_MAC".to_string(), mac_to_string(&data[0..6]));
-    fields.insert("SRC_MAC".to_string(), mac_to_string(&data[6..12]));
+    fields.insert("DST_MAC", mac_to_string(&data[0..6]));
+    fields.insert("SRC_MAC", mac_to_string(&data[6..12]));
 
     let mut etype = u16::from_be_bytes([data[12], data[13]]);
     let mut cursor = &data[14..];
@@ -1906,7 +2756,7 @@ fn parse_datalink_frame_section(
         }
         let vlan = ((u16::from(cursor[0] & 0x0f)) << 8) | u16::from(cursor[1]);
         if vlan > 0 && fields.get("SRC_VLAN").map(String::as_str) == Some("0") {
-            fields.insert("SRC_VLAN".to_string(), vlan.to_string());
+            fields.insert("SRC_VLAN", vlan.to_string());
         }
         etype = u16::from_be_bytes([cursor[2], cursor[3]]);
         cursor = &cursor[4..];
@@ -1939,7 +2789,7 @@ fn parse_datalink_frame_section(
             }
         }
         if !labels.is_empty() {
-            fields.insert("MPLS_LABELS".to_string(), labels.join(","));
+            fields.insert("MPLS_LABELS", labels.join(","));
         }
     }
 
@@ -1952,7 +2802,7 @@ fn parse_datalink_frame_section(
 
 fn parse_ipv4_packet(
     data: &[u8],
-    fields: &mut BTreeMap<String, String>,
+    fields: &mut FlowFields,
     decapsulation_mode: DecapsulationMode,
 ) -> Option<u64> {
     if data.len() < 20 {
@@ -1971,15 +2821,15 @@ fn parse_ipv4_packet(
     let dst = Ipv4Addr::new(data[16], data[17], data[18], data[19]);
 
     if decapsulation_mode.is_none() {
-        fields.insert("ETYPE".to_string(), ETYPE_IPV4.to_string());
-        fields.insert("SRC_ADDR".to_string(), src.to_string());
-        fields.insert("DST_ADDR".to_string(), dst.to_string());
-        fields.insert("PROTOCOL".to_string(), proto.to_string());
-        fields.insert("IPTOS".to_string(), data[1].to_string());
-        fields.insert("IPTTL".to_string(), data[8].to_string());
-        fields.insert("IP_FRAGMENT_ID".to_string(), fragment_id.to_string());
+        fields.insert("ETYPE", ETYPE_IPV4.to_string());
+        fields.insert("SRC_ADDR", src.to_string());
+        fields.insert("DST_ADDR", dst.to_string());
+        fields.insert("PROTOCOL", proto.to_string());
+        fields.insert("IPTOS", data[1].to_string());
+        fields.insert("IPTTL", data[8].to_string());
+        fields.insert("IP_FRAGMENT_ID", fragment_id.to_string());
         fields.insert(
-            "IP_FRAGMENT_OFFSET".to_string(),
+                    "IP_FRAGMENT_OFFSET",
             fragment_offset.to_string(),
         );
     }
@@ -2005,7 +2855,7 @@ fn parse_ipv4_packet(
 
 fn parse_ipv6_packet(
     data: &[u8],
-    fields: &mut BTreeMap<String, String>,
+    fields: &mut FlowFields,
     decapsulation_mode: DecapsulationMode,
 ) -> Option<u64> {
     if data.len() < 40 {
@@ -2026,13 +2876,13 @@ fn parse_ipv6_packet(
         let traffic_class = (u16::from_be_bytes([data[0], data[1]]) & 0x0ff0) >> 4;
         let flow_label = u32::from_be_bytes([data[0], data[1], data[2], data[3]]) & 0x000f_ffff;
 
-        fields.insert("ETYPE".to_string(), ETYPE_IPV6.to_string());
-        fields.insert("SRC_ADDR".to_string(), src.to_string());
-        fields.insert("DST_ADDR".to_string(), dst.to_string());
-        fields.insert("PROTOCOL".to_string(), next_header.to_string());
-        fields.insert("IPTOS".to_string(), traffic_class.to_string());
-        fields.insert("IPTTL".to_string(), hop_limit.to_string());
-        fields.insert("IPV6_FLOW_LABEL".to_string(), flow_label.to_string());
+        fields.insert("ETYPE", ETYPE_IPV6.to_string());
+        fields.insert("SRC_ADDR", src.to_string());
+        fields.insert("DST_ADDR", dst.to_string());
+        fields.insert("PROTOCOL", next_header.to_string());
+        fields.insert("IPTOS", traffic_class.to_string());
+        fields.insert("IPTTL", hop_limit.to_string());
+        fields.insert("IPV6_FLOW_LABEL", flow_label.to_string());
     }
     let inner_l3_length = parse_transport(next_header, &data[40..], fields, decapsulation_mode);
     if decapsulation_mode.is_none() {
@@ -2044,7 +2894,7 @@ fn parse_ipv6_packet(
     }
 }
 
-fn parse_srv6_inner(proto: u8, data: &[u8], fields: &mut BTreeMap<String, String>) -> Option<u64> {
+fn parse_srv6_inner(proto: u8, data: &[u8], fields: &mut FlowFields) -> Option<u64> {
     let mut next = proto;
     let mut cursor = data;
 
@@ -2071,7 +2921,7 @@ fn parse_srv6_inner(proto: u8, data: &[u8], fields: &mut BTreeMap<String, String
 fn parse_transport(
     proto: u8,
     data: &[u8],
-    fields: &mut BTreeMap<String, String>,
+    fields: &mut FlowFields,
     decapsulation_mode: DecapsulationMode,
 ) -> u64 {
     if !decapsulation_mode.is_none() {
@@ -2096,28 +2946,28 @@ fn parse_transport(
         6 | 17 => {
             if data.len() >= 4 {
                 fields.insert(
-                    "SRC_PORT".to_string(),
+                    "SRC_PORT",
                     u16::from_be_bytes([data[0], data[1]]).to_string(),
                 );
                 fields.insert(
-                    "DST_PORT".to_string(),
+                    "DST_PORT",
                     u16::from_be_bytes([data[2], data[3]]).to_string(),
                 );
             }
             if proto == 6 && data.len() >= 14 {
-                fields.insert("TCP_FLAGS".to_string(), data[13].to_string());
+                fields.insert("TCP_FLAGS", data[13].to_string());
             }
         }
         1 => {
             if data.len() >= 2 {
-                fields.insert("ICMPV4_TYPE".to_string(), data[0].to_string());
-                fields.insert("ICMPV4_CODE".to_string(), data[1].to_string());
+                fields.insert("ICMPV4_TYPE", data[0].to_string());
+                fields.insert("ICMPV4_CODE", data[1].to_string());
             }
         }
         58 => {
             if data.len() >= 2 {
-                fields.insert("ICMPV6_TYPE".to_string(), data[0].to_string());
-                fields.insert("ICMPV6_CODE".to_string(), data[1].to_string());
+                fields.insert("ICMPV6_TYPE", data[0].to_string());
+                fields.insert("ICMPV6_CODE", data[1].to_string());
             }
         }
         _ => {}
@@ -2309,38 +3159,34 @@ fn append_v5_records(
             .saturating_add(flow.last as u64)
             .saturating_mul(1000);
 
-        let mut fields = base_fields("v5", source);
-        fields.insert("SRC_ADDR".to_string(), flow.src_addr.to_string());
-        fields.insert("DST_ADDR".to_string(), flow.dst_addr.to_string());
-        fields.insert(
-            "SRC_PREFIX".to_string(),
-            ip_with_prefix(flow.src_addr.into(), flow.src_mask),
-        );
-        fields.insert(
-            "DST_PREFIX".to_string(),
-            ip_with_prefix(flow.dst_addr.into(), flow.dst_mask),
-        );
-        fields.insert("SRC_PORT".to_string(), flow.src_port.to_string());
-        fields.insert("DST_PORT".to_string(), flow.dst_port.to_string());
-        fields.insert("PROTOCOL".to_string(), flow.protocol_number.to_string());
-        fields.insert("SRC_AS".to_string(), flow.src_as.to_string());
-        fields.insert("DST_AS".to_string(), flow.dst_as.to_string());
-        fields.insert("IN_IF".to_string(), flow.input.to_string());
-        fields.insert("OUT_IF".to_string(), flow.output.to_string());
-        fields.insert("NEXT_HOP".to_string(), flow.next_hop.to_string());
-        fields.insert("ETYPE".to_string(), ETYPE_IPV4.to_string());
-        fields.insert("IPTOS".to_string(), flow.tos.to_string());
-        fields.insert("TCP_FLAGS".to_string(), flow.tcp_flags.to_string());
-        fields.insert("BYTES".to_string(), flow.d_octets.to_string());
-        fields.insert("PACKETS".to_string(), flow.d_pkts.to_string());
-        fields.insert("FLOWS".to_string(), "1".to_string());
-        fields.insert("RAW_BYTES".to_string(), flow.d_octets.to_string());
-        fields.insert("RAW_PACKETS".to_string(), flow.d_pkts.to_string());
-        fields.insert("SAMPLING_RATE".to_string(), sampling.to_string());
-        finalize_canonical_flow_fields(&mut fields);
+        let mut rec = base_record("v5", source);
+        rec.src_addr = Some(IpAddr::V4(flow.src_addr));
+        rec.dst_addr = Some(IpAddr::V4(flow.dst_addr));
+        rec.src_prefix = Some(IpAddr::V4(flow.src_addr));
+        rec.dst_prefix = Some(IpAddr::V4(flow.dst_addr));
+        rec.src_mask = flow.src_mask;
+        rec.dst_mask = flow.dst_mask;
+        rec.src_port = flow.src_port;
+        rec.dst_port = flow.dst_port;
+        rec.protocol = flow.protocol_number;
+        rec.src_as = flow.src_as as u32;
+        rec.dst_as = flow.dst_as as u32;
+        rec.in_if = flow.input as u32;
+        rec.out_if = flow.output as u32;
+        rec.next_hop = Some(IpAddr::V4(flow.next_hop));
+        rec.etype = 2048; // IPv4
+        rec.iptos = flow.tos;
+        rec.tcp_flags = flow.tcp_flags;
+        rec.bytes = flow.d_octets as u64;
+        rec.packets = flow.d_pkts as u64;
+        rec.flows = 1;
+        rec.raw_bytes = flow.d_octets as u64;
+        rec.raw_packets = flow.d_pkts as u64;
+        rec.sampling_rate = sampling as u64;
+        finalize_record(&mut rec);
 
         out.push(DecodedFlow {
-            fields,
+            record: rec,
             source_realtime_usec: timestamp_source.select(
                 input_realtime_usec,
                 Some(export_usec),
@@ -2377,37 +3223,34 @@ fn append_v7_records(
             .saturating_add(flow.last as u64)
             .saturating_mul(1000);
 
-        let mut fields = base_fields("v7", source);
-        fields.insert("SRC_ADDR".to_string(), flow.src_addr.to_string());
-        fields.insert("DST_ADDR".to_string(), flow.dst_addr.to_string());
-        fields.insert(
-            "SRC_PREFIX".to_string(),
-            ip_with_prefix(flow.src_addr.into(), flow.src_mask),
-        );
-        fields.insert(
-            "DST_PREFIX".to_string(),
-            ip_with_prefix(flow.dst_addr.into(), flow.dst_mask),
-        );
-        fields.insert("SRC_PORT".to_string(), flow.src_port.to_string());
-        fields.insert("DST_PORT".to_string(), flow.dst_port.to_string());
-        fields.insert("PROTOCOL".to_string(), flow.protocol_number.to_string());
-        fields.insert("SRC_AS".to_string(), flow.src_as.to_string());
-        fields.insert("DST_AS".to_string(), flow.dst_as.to_string());
-        fields.insert("IN_IF".to_string(), flow.input.to_string());
-        fields.insert("OUT_IF".to_string(), flow.output.to_string());
-        fields.insert("NEXT_HOP".to_string(), flow.next_hop.to_string());
-        fields.insert("ETYPE".to_string(), ETYPE_IPV4.to_string());
-        fields.insert("IPTOS".to_string(), flow.tos.to_string());
-        fields.insert("TCP_FLAGS".to_string(), flow.tcp_flags.to_string());
-        fields.insert("BYTES".to_string(), flow.d_octets.to_string());
-        fields.insert("PACKETS".to_string(), flow.d_pkts.to_string());
-        fields.insert("FLOWS".to_string(), "1".to_string());
-        fields.insert("RAW_BYTES".to_string(), flow.d_octets.to_string());
-        fields.insert("RAW_PACKETS".to_string(), flow.d_pkts.to_string());
-        finalize_canonical_flow_fields(&mut fields);
+        let mut rec = base_record("v7", source);
+        rec.src_addr = Some(IpAddr::V4(flow.src_addr));
+        rec.dst_addr = Some(IpAddr::V4(flow.dst_addr));
+        rec.src_prefix = Some(IpAddr::V4(flow.src_addr));
+        rec.dst_prefix = Some(IpAddr::V4(flow.dst_addr));
+        rec.src_mask = flow.src_mask;
+        rec.dst_mask = flow.dst_mask;
+        rec.src_port = flow.src_port;
+        rec.dst_port = flow.dst_port;
+        rec.protocol = flow.protocol_number;
+        rec.src_as = flow.src_as as u32;
+        rec.dst_as = flow.dst_as as u32;
+        rec.in_if = flow.input as u32;
+        rec.out_if = flow.output as u32;
+        rec.next_hop = Some(IpAddr::V4(flow.next_hop));
+        rec.etype = 2048; // IPv4
+        rec.iptos = flow.tos;
+        rec.tcp_flags = flow.tcp_flags;
+        rec.bytes = flow.d_octets as u64;
+        rec.packets = flow.d_pkts as u64;
+        rec.flows = 1;
+        rec.raw_bytes = flow.d_octets as u64;
+        rec.raw_packets = flow.d_pkts as u64;
+        // V7 has no sampling_interval in header (unlike V5)
+        finalize_record(&mut rec);
 
         out.push(DecodedFlow {
-            fields,
+            record: rec,
             source_realtime_usec: timestamp_source.select(
                 input_realtime_usec,
                 Some(export_usec),
@@ -2439,14 +3282,14 @@ fn append_v9_records(
         match flowset.body {
             V9FlowSetBody::Data(data) => {
                 for record in data.fields {
-                    let mut fields = base_fields("v9", source);
+                    let mut rec = base_record("v9", source);
                     let mut sampler_id: Option<u64> = None;
                     let mut observed_sampling_rate: Option<u64> = None;
                     let mut first_switched_millis: Option<u64> = None;
 
                     for (field, value) in record {
                         let value_str = field_value_to_string(&value);
-                        apply_v9_special_mappings(&mut fields, field, &value_str);
+                        apply_v9_special_mappings_record(&mut rec, field, &value_str);
                         match field {
                             V9Field::FlowSamplerId => {
                                 sampler_id = value_str.parse::<u64>().ok();
@@ -2463,14 +3306,17 @@ fn append_v9_records(
                             if should_skip_zero_ip(canonical, &value_str) {
                                 continue;
                             }
-                            fields.entry(canonical.to_string()).or_insert_with(|| {
-                                canonical_value(canonical, &value_str).to_string()
-                            });
+                            // IpProtocolVersion is fully handled by special mappings
+                            // (raw "6" → etype 34525). Skip to avoid overwriting.
+                            if matches!(field, V9Field::IpProtocolVersion) {
+                                continue;
+                            }
+                            set_record_field(&mut rec, canonical, &value_str);
                         }
                     }
 
-                    apply_sampling_state(
-                        &mut fields,
+                    apply_sampling_state_record(
+                        &mut rec,
                         &exporter_ip,
                         version,
                         observation_domain_id,
@@ -2479,17 +3325,17 @@ fn append_v9_records(
                         sampling,
                     );
 
-                    if looks_like_sampling_option_record(&fields, observed_sampling_rate) {
+                    if looks_like_sampling_option_record_from_rec(&rec, observed_sampling_rate) {
                         continue;
                     }
                     if !decapsulation_mode.is_none() {
                         continue;
                     }
 
-                    fields
-                        .entry("FLOWS".to_string())
-                        .or_insert_with(|| "1".to_string());
-                    finalize_canonical_flow_fields(&mut fields);
+                    if rec.flows == 0 {
+                        rec.flows = 1;
+                    }
+                    finalize_record(&mut rec);
                     let first_switched_usec = first_switched_millis.map(|value| {
                         (packet.header.unix_secs as u64)
                             .saturating_sub(packet.header.sys_up_time as u64)
@@ -2497,7 +3343,7 @@ fn append_v9_records(
                             .saturating_mul(1_000_000)
                     });
                     out.push(DecodedFlow {
-                        fields,
+                        record: rec,
                         source_realtime_usec: timestamp_source.select(
                             input_realtime_usec,
                             Some(export_usec),
@@ -2540,8 +3386,9 @@ fn append_ipfix_records(
         match flowset.body {
             IPFixFlowSetBody::Data(data) => {
                 for record in data.fields {
-                    let mut fields = base_fields("ipfix", source);
-                    let mut reverse_overrides = BTreeMap::new();
+                    let mut rec = base_record("ipfix", source);
+                    // Reverse overrides stay as FlowFields — biflow is the cold path
+                    let mut reverse_overrides: FlowFields = BTreeMap::new();
                     let mut reverse_present = false;
                     let need_decap = !decapsulation_mode.is_none();
                     let mut decap_ok = false;
@@ -2558,14 +3405,14 @@ fn append_ipfix_records(
                         if let IPFixField::IANA(IANAIPFixField::DataLinkFrameSection) = &field {
                             if let FieldValue::Vec(raw_value) | FieldValue::Unknown(raw_value) =
                                 &value
-                                && let Some(l3_len) = parse_datalink_frame_section(
+                                && let Some(l3_len) = parse_datalink_frame_section_record(
                                     raw_value,
-                                    &mut fields,
+                                    &mut rec,
                                     decapsulation_mode,
                                 )
                             {
-                                fields.insert("BYTES".to_string(), l3_len.to_string());
-                                fields.insert("PACKETS".to_string(), "1".to_string());
+                                rec.bytes = l3_len;
+                                rec.packets = 1;
                                 decap_ok = true;
                             }
                             continue;
@@ -2585,24 +3432,24 @@ fn append_ipfix_records(
                                 }
                                 let canonical_value =
                                     canonical_value(canonical, &value_str).to_string();
-                                reverse_overrides.insert(canonical.to_string(), canonical_value);
+                                reverse_overrides.insert(canonical, canonical_value);
                             }
                             continue;
                         }
 
                         if let IPFixField::IANA(IANAIPFixField::ResponderOctets) = &field {
                             reverse_present = true;
-                            reverse_overrides.insert("BYTES".to_string(), value_str);
+                            reverse_overrides.insert("BYTES", value_str);
                             continue;
                         }
 
                         if let IPFixField::IANA(IANAIPFixField::ResponderPackets) = &field {
                             reverse_present = true;
-                            reverse_overrides.insert("PACKETS".to_string(), value_str);
+                            reverse_overrides.insert("PACKETS", value_str);
                             continue;
                         }
 
-                        apply_ipfix_special_mappings(&mut fields, &field, &value_str);
+                        apply_ipfix_special_mappings_record(&mut rec, &field, &value_str);
                         match field {
                             IPFixField::IANA(IANAIPFixField::SamplerId)
                             | IPFixField::IANA(IANAIPFixField::SelectorId) => {
@@ -2639,9 +3486,11 @@ fn append_ipfix_records(
                             if should_skip_zero_ip(canonical, &value_str) {
                                 continue;
                             }
-                            let canonical_value =
-                                canonical_value(canonical, &value_str).to_string();
-                            insert_canonical_field(&mut fields, canonical, &canonical_value);
+                            // IpVersion is fully handled by special mappings
+                            if matches!(field, IPFixField::IANA(IANAIPFixField::IpVersion)) {
+                                continue;
+                            }
+                            set_record_field(&mut rec, canonical, &value_str);
                         }
                     }
 
@@ -2654,8 +3503,8 @@ fn append_ipfix_records(
                         }
                     }
 
-                    apply_sampling_state(
-                        &mut fields,
+                    apply_sampling_state_record(
+                        &mut rec,
                         &exporter_ip,
                         version,
                         observation_domain_id,
@@ -2664,17 +3513,17 @@ fn append_ipfix_records(
                         sampling,
                     );
 
-                    if looks_like_sampling_option_record(&fields, observed_sampling_rate) {
+                    if looks_like_sampling_option_record_from_rec(&rec, observed_sampling_rate) {
                         continue;
                     }
                     if need_decap && !decap_ok {
                         continue;
                     }
 
-                    fields
-                        .entry("FLOWS".to_string())
-                        .or_insert_with(|| "1".to_string());
-                    finalize_canonical_flow_fields(&mut fields);
+                    if rec.flows == 0 {
+                        rec.flows = 1;
+                    }
+                    finalize_record(&mut rec);
                     let first_switched_usec = flow_start_seconds
                         .map(|value| value.saturating_mul(1_000_000))
                         .or_else(|| flow_start_millis.map(|value| value.saturating_mul(1_000)))
@@ -2682,21 +3531,24 @@ fn append_ipfix_records(
                         .or_else(|| {
                             flow_start_nanos.map(|value| export_usec.saturating_add(value / 1_000))
                         });
-                    let mut reverse_seed = if reverse_present {
-                        Some(fields.clone())
+                    let source_ts = timestamp_source.select(
+                        input_realtime_usec,
+                        Some(export_usec),
+                        first_switched_usec,
+                    );
+
+                    // For biflow: clone the finalized record before converting
+                    let mut reverse_rec = if reverse_present {
+                        Some(rec.clone())
                     } else {
                         None
                     };
                     out.push(DecodedFlow {
-                        fields,
-                        source_realtime_usec: timestamp_source.select(
-                            input_realtime_usec,
-                            Some(export_usec),
-                            first_switched_usec,
-                        ),
+                        record: rec,
+                        source_realtime_usec: source_ts,
                     });
 
-                    if let Some(mut reverse_fields) = reverse_seed.take() {
+                    if let Some(mut rev) = reverse_rec.take() {
                         let reverse_packets = reverse_overrides
                             .get("PACKETS")
                             .and_then(|v| v.parse::<u64>().ok())
@@ -2705,19 +3557,15 @@ fn append_ipfix_records(
                             continue;
                         }
 
-                        swap_directional_flow_fields(&mut reverse_fields);
-                        for (key, value) in &reverse_overrides {
-                            override_canonical_field(&mut reverse_fields, key, value);
+                        swap_directional_record_fields(&mut rev);
+                        for (&key, value) in &reverse_overrides {
+                            override_record_field(&mut rev, key, value);
                         }
-                        sync_raw_metrics(&mut reverse_fields);
-                        finalize_canonical_flow_fields(&mut reverse_fields);
+                        sync_raw_metrics_record(&mut rev);
+                        finalize_record(&mut rev);
                         out.push(DecodedFlow {
-                            fields: reverse_fields,
-                            source_realtime_usec: timestamp_source.select(
-                                input_realtime_usec,
-                                Some(export_usec),
-                                first_switched_usec,
-                            ),
+                            record: rev,
+                            source_realtime_usec: source_ts,
                         });
                     }
                 }
@@ -2745,8 +3593,7 @@ fn extract_sflow_flows(
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
 ) -> Vec<DecodedFlow> {
-    let exporter_ip =
-        sflow_agent_ip(&datagram.agent_address).unwrap_or_else(|| source.ip().to_string());
+    let exporter_ip_override = sflow_agent_ip_addr(&datagram.agent_address);
     let source_realtime_usec = timestamp_source.select(input_realtime_usec, None, None);
     let need_decap = !decapsulation_mode.is_none();
 
@@ -2785,7 +3632,7 @@ fn extract_sflow_flows(
 
                 if let Some(flow) = build_sflow_flow(
                     source,
-                    &exporter_ip,
+                    exporter_ip_override,
                     sample_data.sampling_rate,
                     in_if,
                     out_if,
@@ -2831,7 +3678,7 @@ fn extract_sflow_flows(
 
                 if let Some(flow) = build_sflow_flow(
                     source,
-                    &exporter_ip,
+                    exporter_ip_override,
                     sample_data.sampling_rate,
                     in_if,
                     out_if,
@@ -2853,7 +3700,7 @@ fn extract_sflow_flows(
 
 fn build_sflow_flow(
     source: SocketAddr,
-    exporter_ip: &str,
+    exporter_ip_override: Option<IpAddr>,
     sampling_rate: u32,
     in_if: Option<u32>,
     out_if: Option<u32>,
@@ -2863,19 +3710,17 @@ fn build_sflow_flow(
     decapsulation_mode: DecapsulationMode,
     need_decap: bool,
 ) -> Option<DecodedFlow> {
-    let mut fields = base_fields("sflow", source);
-    fields.insert("EXPORTER_IP".to_string(), exporter_ip.to_string());
-    fields.insert("SAMPLING_RATE".to_string(), sampling_rate.to_string());
-    fields.insert(
-        "FORWARDING_STATUS".to_string(),
-        forwarding_status.to_string(),
-    );
-
+    let mut rec = base_record("sflow", source);
+    if let Some(ip) = exporter_ip_override {
+        rec.exporter_ip = Some(ip);
+    }
+    rec.sampling_rate = sampling_rate as u64;
+    rec.forwarding_status = forwarding_status as u8;
     if let Some(value) = in_if {
-        fields.insert("IN_IF".to_string(), value.to_string());
+        rec.in_if = value;
     }
     if let Some(value) = out_if {
-        fields.insert("OUT_IF".to_string(), value.to_string());
+        rec.out_if = value;
     }
 
     let has_sampled_ipv4 = flow_records
@@ -2900,16 +3745,26 @@ fn build_sflow_flow(
                 let needs_l3_l4_data = true;
                 if needs_ip_data || needs_l2_data || needs_l3_l4_data || need_decap {
                     let parsed_len = match sampled.protocol {
-                        HeaderProtocol::EthernetIso88023 => parse_datalink_frame_section(
-                            &sampled.header,
-                            &mut fields,
-                            decapsulation_mode,
-                        ),
+                        HeaderProtocol::EthernetIso88023 => {
+                            parse_datalink_frame_section_record(
+                                &sampled.header,
+                                &mut rec,
+                                decapsulation_mode,
+                            )
+                        }
                         HeaderProtocol::Ipv4 => {
-                            parse_ipv4_packet(&sampled.header, &mut fields, decapsulation_mode)
+                            parse_ipv4_packet_record(
+                                &sampled.header,
+                                &mut rec,
+                                decapsulation_mode,
+                            )
                         }
                         HeaderProtocol::Ipv6 => {
-                            parse_ipv6_packet(&sampled.header, &mut fields, decapsulation_mode)
+                            parse_ipv6_packet_record(
+                                &sampled.header,
+                                &mut rec,
+                                decapsulation_mode,
+                            )
                         }
                         _ => None,
                     };
@@ -2924,26 +3779,26 @@ fn build_sflow_flow(
                 if need_decap {
                     continue;
                 }
-                fields.insert("SRC_ADDR".to_string(), sampled.src_ip.to_string());
-                fields.insert("DST_ADDR".to_string(), sampled.dst_ip.to_string());
-                fields.insert("SRC_PORT".to_string(), sampled.src_port.to_string());
-                fields.insert("DST_PORT".to_string(), sampled.dst_port.to_string());
-                fields.insert("PROTOCOL".to_string(), sampled.protocol.to_string());
-                fields.insert("ETYPE".to_string(), ETYPE_IPV4.to_string());
-                fields.insert("IPTOS".to_string(), sampled.tos.to_string());
+                rec.src_addr = Some(IpAddr::V4(sampled.src_ip));
+                rec.dst_addr = Some(IpAddr::V4(sampled.dst_ip));
+                rec.src_port = sampled.src_port as u16;
+                rec.dst_port = sampled.dst_port as u16;
+                rec.protocol = sampled.protocol as u8;
+                rec.etype = 2048;
+                rec.iptos = sampled.tos as u8;
                 l3_length = sampled.length as u64;
             }
             FlowData::SampledIpv6(sampled) => {
                 if need_decap {
                     continue;
                 }
-                fields.insert("SRC_ADDR".to_string(), sampled.src_ip.to_string());
-                fields.insert("DST_ADDR".to_string(), sampled.dst_ip.to_string());
-                fields.insert("SRC_PORT".to_string(), sampled.src_port.to_string());
-                fields.insert("DST_PORT".to_string(), sampled.dst_port.to_string());
-                fields.insert("PROTOCOL".to_string(), sampled.protocol.to_string());
-                fields.insert("ETYPE".to_string(), ETYPE_IPV6.to_string());
-                fields.insert("IPTOS".to_string(), sampled.priority.to_string());
+                rec.src_addr = Some(IpAddr::V6(sampled.src_ip));
+                rec.dst_addr = Some(IpAddr::V6(sampled.dst_ip));
+                rec.src_port = sampled.src_port as u16;
+                rec.dst_port = sampled.dst_port as u16;
+                rec.protocol = sampled.protocol as u8;
+                rec.etype = 34525;
+                rec.iptos = sampled.priority as u8;
                 l3_length = sampled.length as u64;
             }
             FlowData::SampledEthernet(sampled) => {
@@ -2953,71 +3808,65 @@ fn build_sflow_flow(
                 if l3_length == 0 {
                     l3_length = sampled.length.saturating_sub(16) as u64;
                 }
-                fields.insert("SRC_MAC".to_string(), sampled.src_mac.to_string());
-                fields.insert("DST_MAC".to_string(), sampled.dst_mac.to_string());
+                rec.src_mac = parse_mac(&sampled.src_mac.to_string());
+                rec.dst_mac = parse_mac(&sampled.dst_mac.to_string());
             }
             FlowData::ExtendedSwitch(record) => {
                 if need_decap {
                     continue;
                 }
                 if record.src_vlan < 4096 {
-                    fields.insert("SRC_VLAN".to_string(), record.src_vlan.to_string());
+                    rec.src_vlan = record.src_vlan as u16;
                 }
                 if record.dst_vlan < 4096 {
-                    fields.insert("DST_VLAN".to_string(), record.dst_vlan.to_string());
+                    rec.dst_vlan = record.dst_vlan as u16;
                 }
             }
             FlowData::ExtendedRouter(record) => {
                 if need_decap {
                     continue;
                 }
-                fields.insert("SRC_MASK".to_string(), record.src_mask_len.to_string());
-                fields.insert("DST_MASK".to_string(), record.dst_mask_len.to_string());
-                if let Some(next_hop) = sflow_agent_ip(&record.next_hop) {
-                    fields.insert("NEXT_HOP".to_string(), next_hop);
+                rec.src_mask = record.src_mask_len as u8;
+                rec.dst_mask = record.dst_mask_len as u8;
+                if let Some(next_hop) = sflow_agent_ip_addr(&record.next_hop) {
+                    rec.next_hop = Some(next_hop);
                 }
             }
             FlowData::ExtendedGateway(record) => {
                 if need_decap {
                     continue;
                 }
-                if let Some(next_hop) = sflow_agent_ip(&record.next_hop) {
-                    fields.insert("NEXT_HOP".to_string(), next_hop);
+                if let Some(next_hop) = sflow_agent_ip_addr(&record.next_hop) {
+                    rec.next_hop = Some(next_hop);
                 }
 
-                fields.insert("DST_AS".to_string(), record.as_number.to_string());
-                fields.insert("SRC_AS".to_string(), record.as_number.to_string());
+                rec.dst_as = record.as_number;
+                rec.src_as = record.as_number;
                 if record.src_as > 0 {
-                    fields.insert("SRC_AS".to_string(), record.src_as.to_string());
+                    rec.src_as = record.src_as;
                 }
 
                 let mut dst_path = Vec::new();
                 for segment in &record.dst_as_path {
                     dst_path.extend(segment.path.iter().copied());
                 }
-                if let Some(last_asn) = dst_path.last() {
-                    fields.insert("DST_AS".to_string(), last_asn.to_string());
+                if let Some(&last_asn) = dst_path.last() {
+                    rec.dst_as = last_asn;
                 }
                 if !dst_path.is_empty() {
-                    fields.insert(
-                        "DST_AS_PATH".to_string(),
-                        dst_path
-                            .iter()
-                            .map(u32::to_string)
-                            .collect::<Vec<_>>()
-                            .join(","),
-                    );
+                    rec.dst_as_path = dst_path
+                        .iter()
+                        .map(u32::to_string)
+                        .collect::<Vec<_>>()
+                        .join(",");
                 }
                 if !record.communities.is_empty() {
-                    fields.insert(
-                        "DST_COMMUNITIES".to_string(),
-                        record
-                            .communities
-                            .iter()
-                            .map(u32::to_string)
-                            .collect::<Vec<_>>()
-                            .join(","),
-                    );
+                    rec.dst_communities = record
+                        .communities
+                        .iter()
+                        .map(u32::to_string)
+                        .collect::<Vec<_>>()
+                        .join(",");
                 }
             }
             _ => {}
@@ -3025,30 +3874,30 @@ fn build_sflow_flow(
     }
 
     if l3_length > 0 {
-        fields.insert("BYTES".to_string(), l3_length.to_string());
+        rec.bytes = l3_length;
     } else if need_decap {
         return None;
     }
 
-    fields.insert("PACKETS".to_string(), "1".to_string());
-    fields.insert("FLOWS".to_string(), "1".to_string());
-    finalize_canonical_flow_fields(&mut fields);
+    rec.packets = 1;
+    rec.flows = 1;
+    finalize_record(&mut rec);
 
     Some(DecodedFlow {
-        fields,
+        record: rec,
         source_realtime_usec,
     })
 }
 
-fn base_fields(version: &str, source: SocketAddr) -> BTreeMap<String, String> {
+fn base_fields(version: &str, source: SocketAddr) -> FlowFields {
     let mut fields = BTreeMap::new();
-    fields.insert("FLOW_VERSION".to_string(), version.to_string());
-    fields.insert("EXPORTER_IP".to_string(), source.ip().to_string());
-    fields.insert("EXPORTER_PORT".to_string(), source.port().to_string());
+    fields.insert("FLOW_VERSION", version.to_string());
+    fields.insert("EXPORTER_IP", source.ip().to_string());
+    fields.insert("EXPORTER_PORT", source.port().to_string());
     fields
 }
 
-fn finalize_canonical_flow_fields(fields: &mut BTreeMap<String, String>) {
+fn finalize_canonical_flow_fields(fields: &mut FlowFields) {
     // Akvorado-style contract: protocol-specific fields are not part of the canonical record.
     fields.retain(|name, _| !name.starts_with("V9_") && !name.starts_with("IPFIX_"));
 
@@ -3057,20 +3906,20 @@ fn finalize_canonical_flow_fields(fields: &mut BTreeMap<String, String>) {
             .get("BYTES")
             .cloned()
             .unwrap_or_else(|| "0".to_string());
-        fields.insert("RAW_BYTES".to_string(), bytes);
+        fields.insert("RAW_BYTES", bytes);
     }
     if !fields.contains_key("RAW_PACKETS") {
         let packets = fields
             .get("PACKETS")
             .cloned()
             .unwrap_or_else(|| "0".to_string());
-        fields.insert("RAW_PACKETS".to_string(), packets);
+        fields.insert("RAW_PACKETS", packets);
     }
 
-    for (name, default_value) in CANONICAL_FLOW_DEFAULTS {
+    for &(name, default_value) in CANONICAL_FLOW_DEFAULTS {
         fields
-            .entry((*name).to_string())
-            .or_insert_with(|| (*default_value).to_string());
+            .entry(name)
+            .or_insert_with(|| default_value.to_string());
     }
 
     let exporter_name_missing = fields
@@ -3079,7 +3928,7 @@ fn finalize_canonical_flow_fields(fields: &mut BTreeMap<String, String>) {
         .unwrap_or(true);
     if exporter_name_missing && let Some(exporter_ip) = fields.get("EXPORTER_IP") {
         fields.insert(
-            "EXPORTER_NAME".to_string(),
+            "EXPORTER_NAME",
             default_exporter_name(exporter_ip),
         );
     }
@@ -3096,7 +3945,7 @@ fn finalize_canonical_flow_fields(fields: &mut BTreeMap<String, String>) {
         .unwrap_or(true);
     if etype_missing {
         if let Some(inferred) = infer_etype_from_endpoints(fields) {
-            fields.insert("ETYPE".to_string(), inferred.to_string());
+            fields.insert("ETYPE", inferred.to_string());
         }
     }
 }
@@ -3116,35 +3965,668 @@ fn canonical_value<'a>(canonical: &'a str, raw_value: &'a str) -> &'a str {
     }
 }
 
-fn insert_canonical_field(fields: &mut BTreeMap<String, String>, key: &str, value: &str) {
-    let normalized = match key {
-        "SRC_MAC" | "DST_MAC" => value.to_ascii_lowercase(),
-        _ => value.to_string(),
-    };
+// ---------------------------------------------------------------------------
+// FlowRecord-native helpers (Phase 2: V5/V7 decode without BTreeMap)
+// ---------------------------------------------------------------------------
 
-    match key {
-        // Akvorado parity: physical interface fields can backfill logical interface IDs.
-        "IN_IF" | "OUT_IF" => set_if_missing_or_zero(fields, key, &normalized),
-        _ => {
-            fields.entry(key.to_string()).or_insert(normalized);
+/// Create a base FlowRecord with exporter identity populated.
+fn base_record(version: &'static str, source: SocketAddr) -> FlowRecord {
+    FlowRecord {
+        flow_version: version,
+        exporter_ip: Some(source.ip()),
+        exporter_port: source.port(),
+        ..Default::default()
+    }
+}
+
+/// Finalize a FlowRecord: apply defaults, normalize values.
+/// Equivalent of `finalize_canonical_flow_fields` for FlowRecord.
+fn finalize_record(rec: &mut FlowRecord) {
+    // Copy RAW_* from counters if not yet set
+    if rec.raw_bytes == 0 {
+        rec.raw_bytes = rec.bytes;
+    }
+    if rec.raw_packets == 0 {
+        rec.raw_packets = rec.packets;
+    }
+
+    // Default flows to 1
+    if rec.flows == 0 {
+        rec.flows = 1;
+    }
+
+    // Default exporter name from IP if empty
+    if rec.exporter_name.is_empty() {
+        if let Some(ip) = rec.exporter_ip {
+            rec.exporter_name = default_exporter_name(&ip.to_string());
+        }
+    }
+
+    // Apply ICMP port fallback
+    apply_icmp_port_fallback_record(rec);
+
+    // Infer ETYPE from endpoints if not set
+    if rec.etype == 0 {
+        if let Some(src) = rec.src_addr {
+            rec.etype = if src.is_ipv4() { 2048 } else { 34525 };
+        } else if let Some(dst) = rec.dst_addr {
+            rec.etype = if dst.is_ipv4() { 2048 } else { 34525 };
         }
     }
 }
 
-fn override_canonical_field(fields: &mut BTreeMap<String, String>, key: &str, value: &str) {
-    let normalized = match key {
-        "SRC_MAC" | "DST_MAC" => value.to_ascii_lowercase(),
-        _ => value.to_string(),
-    };
-    fields.insert(key.to_string(), normalized);
+/// ICMP port fallback: when src_port is 0 and dst_port contains a combined
+/// ICMP type+code value, extract the individual type/code fields from it.
+/// Mirrors the original apply_icmp_port_fallback for FlowFields.
+fn apply_icmp_port_fallback_record(rec: &mut FlowRecord) {
+    if rec.src_port != 0 || rec.dst_port == 0 {
+        return;
+    }
+
+    let icmp_type = ((rec.dst_port >> 8) & 0xff) as u8;
+    let icmp_code = (rec.dst_port & 0xff) as u8;
+
+    match rec.protocol {
+        1 => {
+            if rec.icmpv4_type == 0 {
+                rec.icmpv4_type = icmp_type;
+            }
+            if rec.icmpv4_code == 0 {
+                rec.icmpv4_code = icmp_code;
+            }
+        }
+        58 => {
+            if rec.icmpv6_type == 0 {
+                rec.icmpv6_type = icmp_type;
+            }
+            if rec.icmpv6_code == 0 {
+                rec.icmpv6_code = icmp_code;
+            }
+        }
+        _ => {}
+    }
 }
 
-fn sync_raw_metrics(fields: &mut BTreeMap<String, String>) {
-    if let Some(bytes) = fields.get("BYTES").cloned() {
-        fields.insert("RAW_BYTES".to_string(), bytes);
+/// Swap src/dst fields in a FlowRecord for biflow reverse direction.
+fn swap_directional_record_fields(rec: &mut FlowRecord) {
+    std::mem::swap(&mut rec.src_addr, &mut rec.dst_addr);
+    std::mem::swap(&mut rec.src_prefix, &mut rec.dst_prefix);
+    std::mem::swap(&mut rec.src_mask, &mut rec.dst_mask);
+    std::mem::swap(&mut rec.src_port, &mut rec.dst_port);
+    std::mem::swap(&mut rec.src_as, &mut rec.dst_as);
+    std::mem::swap(&mut rec.src_net_name, &mut rec.dst_net_name);
+    std::mem::swap(&mut rec.src_net_role, &mut rec.dst_net_role);
+    std::mem::swap(&mut rec.src_net_site, &mut rec.dst_net_site);
+    std::mem::swap(&mut rec.src_net_region, &mut rec.dst_net_region);
+    std::mem::swap(&mut rec.src_net_tenant, &mut rec.dst_net_tenant);
+    std::mem::swap(&mut rec.src_country, &mut rec.dst_country);
+    std::mem::swap(&mut rec.src_geo_city, &mut rec.dst_geo_city);
+    std::mem::swap(&mut rec.src_geo_state, &mut rec.dst_geo_state);
+    std::mem::swap(&mut rec.src_addr_nat, &mut rec.dst_addr_nat);
+    std::mem::swap(&mut rec.src_port_nat, &mut rec.dst_port_nat);
+    std::mem::swap(&mut rec.src_vlan, &mut rec.dst_vlan);
+    std::mem::swap(&mut rec.src_mac, &mut rec.dst_mac);
+    std::mem::swap(&mut rec.in_if, &mut rec.out_if);
+    std::mem::swap(&mut rec.in_if_name, &mut rec.out_if_name);
+    std::mem::swap(&mut rec.in_if_description, &mut rec.out_if_description);
+    std::mem::swap(&mut rec.in_if_speed, &mut rec.out_if_speed);
+    std::mem::swap(&mut rec.in_if_provider, &mut rec.out_if_provider);
+    std::mem::swap(&mut rec.in_if_connectivity, &mut rec.out_if_connectivity);
+    std::mem::swap(&mut rec.in_if_boundary, &mut rec.out_if_boundary);
+}
+
+/// Set a field on FlowRecord by canonical name (string dispatch).
+/// Used by V9/IPFIX template-driven decode where field names come from template mapping.
+fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
+    match key {
+        "FLOW_VERSION" => {} // set by base_record, not overridden
+        "EXPORTER_IP" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.exporter_ip = Some(ip); } }
+        "EXPORTER_PORT" => { rec.exporter_port = value.parse().unwrap_or(rec.exporter_port); }
+        "EXPORTER_NAME" => { rec.exporter_name = value.to_string(); }
+        "EXPORTER_GROUP" => { rec.exporter_group = value.to_string(); }
+        "EXPORTER_ROLE" => { rec.exporter_role = value.to_string(); }
+        "EXPORTER_SITE" => { rec.exporter_site = value.to_string(); }
+        "EXPORTER_REGION" => { rec.exporter_region = value.to_string(); }
+        "EXPORTER_TENANT" => { rec.exporter_tenant = value.to_string(); }
+        "SAMPLING_RATE" => { rec.sampling_rate = value.parse().unwrap_or(0); }
+        "ETYPE" => { rec.etype = value.parse().unwrap_or(0); }
+        "PROTOCOL" => { rec.protocol = value.parse().unwrap_or(0); }
+        "BYTES" => { rec.bytes = value.parse().unwrap_or(0); }
+        "PACKETS" => { rec.packets = value.parse().unwrap_or(0); }
+        "FLOWS" => { rec.flows = value.parse().unwrap_or(0); }
+        "RAW_BYTES" => { rec.raw_bytes = value.parse().unwrap_or(0); }
+        "RAW_PACKETS" => { rec.raw_packets = value.parse().unwrap_or(0); }
+        "FORWARDING_STATUS" => { rec.forwarding_status = value.parse().unwrap_or(0); }
+        "DIRECTION" => { rec.direction = FlowDirection::from_str_value(value); }
+        "SRC_ADDR" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.src_addr = Some(ip); } }
+        "DST_ADDR" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.dst_addr = Some(ip); } }
+        "SRC_PREFIX" => { rec.src_prefix = parse_prefix_ip(value); }
+        "DST_PREFIX" => { rec.dst_prefix = parse_prefix_ip(value); }
+        "SRC_MASK" => { rec.src_mask = value.parse().unwrap_or(0); }
+        "DST_MASK" => { rec.dst_mask = value.parse().unwrap_or(0); }
+        "SRC_AS" => { rec.src_as = value.parse().unwrap_or(0); }
+        "DST_AS" => { rec.dst_as = value.parse().unwrap_or(0); }
+        "SRC_NET_NAME" => { rec.src_net_name = value.to_string(); }
+        "DST_NET_NAME" => { rec.dst_net_name = value.to_string(); }
+        "SRC_NET_ROLE" => { rec.src_net_role = value.to_string(); }
+        "DST_NET_ROLE" => { rec.dst_net_role = value.to_string(); }
+        "SRC_NET_SITE" => { rec.src_net_site = value.to_string(); }
+        "DST_NET_SITE" => { rec.dst_net_site = value.to_string(); }
+        "SRC_NET_REGION" => { rec.src_net_region = value.to_string(); }
+        "DST_NET_REGION" => { rec.dst_net_region = value.to_string(); }
+        "SRC_NET_TENANT" => { rec.src_net_tenant = value.to_string(); }
+        "DST_NET_TENANT" => { rec.dst_net_tenant = value.to_string(); }
+        "SRC_COUNTRY" => { rec.src_country = value.to_string(); }
+        "DST_COUNTRY" => { rec.dst_country = value.to_string(); }
+        "SRC_GEO_CITY" => { rec.src_geo_city = value.to_string(); }
+        "DST_GEO_CITY" => { rec.dst_geo_city = value.to_string(); }
+        "SRC_GEO_STATE" => { rec.src_geo_state = value.to_string(); }
+        "DST_GEO_STATE" => { rec.dst_geo_state = value.to_string(); }
+        "DST_AS_PATH" => { rec.dst_as_path = value.to_string(); }
+        "DST_COMMUNITIES" => { rec.dst_communities = value.to_string(); }
+        "DST_LARGE_COMMUNITIES" => { rec.dst_large_communities = value.to_string(); }
+        "IN_IF" => {
+            let v: u32 = value.parse().unwrap_or(0);
+            if rec.in_if == 0 { rec.in_if = v; }
+        }
+        "OUT_IF" => {
+            let v: u32 = value.parse().unwrap_or(0);
+            if rec.out_if == 0 { rec.out_if = v; }
+        }
+        "IN_IF_NAME" => { rec.in_if_name = value.to_string(); }
+        "OUT_IF_NAME" => { rec.out_if_name = value.to_string(); }
+        "IN_IF_DESCRIPTION" => { rec.in_if_description = value.to_string(); }
+        "OUT_IF_DESCRIPTION" => { rec.out_if_description = value.to_string(); }
+        "IN_IF_SPEED" => { rec.in_if_speed = value.parse().unwrap_or(0); }
+        "OUT_IF_SPEED" => { rec.out_if_speed = value.parse().unwrap_or(0); }
+        "IN_IF_PROVIDER" => { rec.in_if_provider = value.to_string(); }
+        "OUT_IF_PROVIDER" => { rec.out_if_provider = value.to_string(); }
+        "IN_IF_CONNECTIVITY" => { rec.in_if_connectivity = value.to_string(); }
+        "OUT_IF_CONNECTIVITY" => { rec.out_if_connectivity = value.to_string(); }
+        "IN_IF_BOUNDARY" => { rec.in_if_boundary = value.parse().unwrap_or(0); }
+        "OUT_IF_BOUNDARY" => { rec.out_if_boundary = value.parse().unwrap_or(0); }
+        "NEXT_HOP" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.next_hop = Some(ip); } }
+        "SRC_PORT" => { rec.src_port = value.parse().unwrap_or(0); }
+        "DST_PORT" => { rec.dst_port = value.parse().unwrap_or(0); }
+        "FLOW_START_SECONDS" => { rec.flow_start_seconds = value.parse().unwrap_or(0); }
+        "FLOW_END_SECONDS" => { rec.flow_end_seconds = value.parse().unwrap_or(0); }
+        "FLOW_START_MILLIS" => { rec.flow_start_millis = value.parse().unwrap_or(0); }
+        "FLOW_END_MILLIS" => { rec.flow_end_millis = value.parse().unwrap_or(0); }
+        "OBSERVATION_TIME_MILLIS" => { rec.observation_time_millis = value.parse().unwrap_or(0); }
+        "SRC_ADDR_NAT" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.src_addr_nat = Some(ip); } }
+        "DST_ADDR_NAT" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.dst_addr_nat = Some(ip); } }
+        "SRC_PORT_NAT" => { rec.src_port_nat = value.parse().unwrap_or(0); }
+        "DST_PORT_NAT" => { rec.dst_port_nat = value.parse().unwrap_or(0); }
+        "SRC_VLAN" => { rec.src_vlan = value.parse().unwrap_or(0); }
+        "DST_VLAN" => { rec.dst_vlan = value.parse().unwrap_or(0); }
+        "SRC_MAC" => { rec.src_mac = parse_mac(&value.to_ascii_lowercase()); }
+        "DST_MAC" => { rec.dst_mac = parse_mac(&value.to_ascii_lowercase()); }
+        "IPTTL" => { rec.ipttl = value.parse().unwrap_or(0); }
+        "IPTOS" => { rec.iptos = value.parse().unwrap_or(0); }
+        "IPV6_FLOW_LABEL" => { rec.ipv6_flow_label = value.parse().unwrap_or(0); }
+        "TCP_FLAGS" => { rec.tcp_flags = value.parse().unwrap_or(0); }
+        "IP_FRAGMENT_ID" => { rec.ip_fragment_id = value.parse().unwrap_or(0); }
+        "IP_FRAGMENT_OFFSET" => { rec.ip_fragment_offset = value.parse().unwrap_or(0); }
+        "ICMPV4_TYPE" => { rec.icmpv4_type = value.parse().unwrap_or(0); }
+        "ICMPV4_CODE" => { rec.icmpv4_code = value.parse().unwrap_or(0); }
+        "ICMPV6_TYPE" => { rec.icmpv6_type = value.parse().unwrap_or(0); }
+        "ICMPV6_CODE" => { rec.icmpv6_code = value.parse().unwrap_or(0); }
+        "MPLS_LABELS" => { rec.mpls_labels = value.to_string(); }
+        _ => {} // non-canonical fields are dropped
     }
-    if let Some(packets) = fields.get("PACKETS").cloned() {
-        fields.insert("RAW_PACKETS".to_string(), packets);
+}
+
+/// Like set_record_field but always overwrites (for override_canonical_field equivalent).
+fn override_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
+    // IN_IF/OUT_IF always overwrite in the override path (unlike set_record_field)
+    match key {
+        "IN_IF" => { rec.in_if = value.parse().unwrap_or(0); }
+        "OUT_IF" => { rec.out_if = value.parse().unwrap_or(0); }
+        _ => set_record_field(rec, key, value),
+    }
+}
+
+fn sync_raw_metrics_record(rec: &mut FlowRecord) {
+    rec.raw_bytes = rec.bytes;
+    rec.raw_packets = rec.packets;
+}
+
+// ---------------------------------------------------------------------------
+// FlowRecord-native packet parsing (mirrors FlowFields-based versions above)
+// ---------------------------------------------------------------------------
+
+fn etype_u16_from_ip_version(value: &str) -> Option<u16> {
+    match value.parse::<u64>().ok() {
+        Some(4) => Some(2048),
+        Some(6) => Some(34525),
+        _ => None,
+    }
+}
+
+fn decode_type_code_raw(value: &str) -> Option<(u8, u8)> {
+    let tc = value.parse::<u64>().ok()?;
+    Some((((tc >> 8) & 0xff) as u8, (tc & 0xff) as u8))
+}
+
+fn append_mpls_label_record(rec: &mut FlowRecord, value: &str) {
+    let raw = if let Ok(v) = value.parse::<u64>() {
+        v
+    } else if let Some(hex) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+    {
+        u64::from_str_radix(hex, 16).ok().unwrap_or(0)
+    } else if value.chars().all(|c| c.is_ascii_hexdigit()) {
+        u64::from_str_radix(value, 16).ok().unwrap_or(0)
+    } else {
+        0
+    };
+    if raw == 0 {
+        return;
+    }
+    let label = raw >> 4;
+    if label == 0 {
+        return;
+    }
+    if rec.mpls_labels.is_empty() {
+        rec.mpls_labels = label.to_string();
+    } else {
+        rec.mpls_labels.push(',');
+        rec.mpls_labels.push_str(&label.to_string());
+    }
+}
+
+fn parse_datalink_frame_section_record(
+    data: &[u8],
+    rec: &mut FlowRecord,
+    decapsulation_mode: DecapsulationMode,
+) -> Option<u64> {
+    if data.len() < 14 {
+        return None;
+    }
+
+    rec.dst_mac.copy_from_slice(&data[0..6]);
+    rec.src_mac.copy_from_slice(&data[6..12]);
+
+    let mut etype = u16::from_be_bytes([data[12], data[13]]);
+    let mut cursor = &data[14..];
+
+    while etype == ETYPE_VLAN {
+        if cursor.len() < 4 {
+            return None;
+        }
+        // VLAN extraction from 802.1Q tags is intentionally skipped for FlowRecord.
+        // The FlowFields version only extracts when SRC_VLAN was explicitly pre-set
+        // to "0" (V9 special decode), which uses the FlowFields-based parse function.
+        // For FlowRecord callers, VLANs come from other sources (ExtendedSwitch, etc.).
+        etype = u16::from_be_bytes([cursor[2], cursor[3]]);
+        cursor = &cursor[4..];
+    }
+
+    if etype == ETYPE_MPLS_UNICAST {
+        let mut labels = Vec::new();
+        loop {
+            if cursor.len() < 4 {
+                return None;
+            }
+            let raw =
+                (u32::from(cursor[0]) << 16) | (u32::from(cursor[1]) << 8) | u32::from(cursor[2]);
+            let label = raw >> 4;
+            let bottom = cursor[2] & 0x01;
+            cursor = &cursor[4..];
+            if label > 0 {
+                labels.push(label.to_string());
+            }
+            if bottom == 1 || label <= 15 {
+                if cursor.is_empty() {
+                    return None;
+                }
+                etype = match (cursor[0] & 0xf0) >> 4 {
+                    4 => 0x0800,
+                    6 => 0x86dd,
+                    _ => return None,
+                };
+                break;
+            }
+        }
+        if !labels.is_empty() {
+            rec.mpls_labels = labels.join(",");
+        }
+    }
+
+    match etype {
+        0x0800 => parse_ipv4_packet_record(cursor, rec, decapsulation_mode),
+        0x86dd => parse_ipv6_packet_record(cursor, rec, decapsulation_mode),
+        _ => None,
+    }
+}
+
+fn parse_ipv4_packet_record(
+    data: &[u8],
+    rec: &mut FlowRecord,
+    decapsulation_mode: DecapsulationMode,
+) -> Option<u64> {
+    if data.len() < 20 {
+        return None;
+    }
+    let ihl = ((data[0] & 0x0f) as usize).saturating_mul(4);
+    if ihl < 20 || ihl > data.len() {
+        return None;
+    }
+
+    let total_length = u16::from_be_bytes([data[2], data[3]]) as u64;
+    let fragment_id = u16::from_be_bytes([data[4], data[5]]);
+    let fragment_offset = u16::from_be_bytes([data[6], data[7]]) & 0x1fff;
+    let proto = data[9];
+    let src = Ipv4Addr::new(data[12], data[13], data[14], data[15]);
+    let dst = Ipv4Addr::new(data[16], data[17], data[18], data[19]);
+
+    if decapsulation_mode.is_none() {
+        rec.etype = 2048;
+        rec.src_addr = Some(IpAddr::V4(src));
+        rec.dst_addr = Some(IpAddr::V4(dst));
+        rec.protocol = proto;
+        rec.iptos = data[1];
+        rec.ipttl = data[8];
+        rec.ip_fragment_id = fragment_id as u32;
+        rec.ip_fragment_offset = fragment_offset;
+    }
+
+    if fragment_offset == 0 {
+        let inner_l3_length = parse_transport_record(proto, &data[ihl..], rec, decapsulation_mode);
+        if decapsulation_mode.is_none() {
+            return Some(total_length);
+        }
+        return if inner_l3_length > 0 {
+            Some(inner_l3_length)
+        } else {
+            None
+        };
+    }
+
+    if decapsulation_mode.is_none() {
+        Some(total_length)
+    } else {
+        None
+    }
+}
+
+fn parse_ipv6_packet_record(
+    data: &[u8],
+    rec: &mut FlowRecord,
+    decapsulation_mode: DecapsulationMode,
+) -> Option<u64> {
+    if data.len() < 40 {
+        return None;
+    }
+
+    let payload_length = u16::from_be_bytes([data[4], data[5]]) as u64;
+    let next_header = data[6];
+    let hop_limit = data[7];
+    let mut src_bytes = [0_u8; 16];
+    let mut dst_bytes = [0_u8; 16];
+    src_bytes.copy_from_slice(&data[8..24]);
+    dst_bytes.copy_from_slice(&data[24..40]);
+    let src = Ipv6Addr::from(src_bytes);
+    let dst = Ipv6Addr::from(dst_bytes);
+
+    if decapsulation_mode.is_none() {
+        let traffic_class = ((u16::from_be_bytes([data[0], data[1]]) & 0x0ff0) >> 4) as u8;
+        let flow_label = u32::from_be_bytes([data[0], data[1], data[2], data[3]]) & 0x000f_ffff;
+
+        rec.etype = 34525;
+        rec.src_addr = Some(IpAddr::V6(src));
+        rec.dst_addr = Some(IpAddr::V6(dst));
+        rec.protocol = next_header;
+        rec.iptos = traffic_class;
+        rec.ipttl = hop_limit;
+        rec.ipv6_flow_label = flow_label;
+    }
+    let inner_l3_length = parse_transport_record(next_header, &data[40..], rec, decapsulation_mode);
+    if decapsulation_mode.is_none() {
+        Some(payload_length.saturating_add(40))
+    } else if inner_l3_length > 0 {
+        Some(inner_l3_length)
+    } else {
+        None
+    }
+}
+
+fn parse_transport_record(
+    proto: u8,
+    data: &[u8],
+    rec: &mut FlowRecord,
+    decapsulation_mode: DecapsulationMode,
+) -> u64 {
+    if !decapsulation_mode.is_none() {
+        return match decapsulation_mode {
+            DecapsulationMode::Vxlan => {
+                if proto == 17
+                    && data.len() > 16
+                    && u16::from_be_bytes([data[2], data[3]]) == VXLAN_UDP_PORT
+                {
+                    parse_datalink_frame_section_record(&data[16..], rec, DecapsulationMode::None)
+                        .unwrap_or(0)
+                } else {
+                    0
+                }
+            }
+            DecapsulationMode::Srv6 => parse_srv6_inner_record(proto, data, rec).unwrap_or(0),
+            DecapsulationMode::None => 0,
+        };
+    }
+
+    match proto {
+        6 | 17 => {
+            if data.len() >= 4 {
+                rec.src_port = u16::from_be_bytes([data[0], data[1]]);
+                rec.dst_port = u16::from_be_bytes([data[2], data[3]]);
+            }
+            if proto == 6 && data.len() >= 14 {
+                rec.tcp_flags = data[13];
+            }
+        }
+        1 => {
+            if data.len() >= 2 {
+                rec.icmpv4_type = data[0];
+                rec.icmpv4_code = data[1];
+            }
+        }
+        58 => {
+            if data.len() >= 2 {
+                rec.icmpv6_type = data[0];
+                rec.icmpv6_code = data[1];
+            }
+        }
+        _ => {}
+    }
+
+    0
+}
+
+fn parse_srv6_inner_record(proto: u8, data: &[u8], rec: &mut FlowRecord) -> Option<u64> {
+    let mut next = proto;
+    let mut cursor = data;
+
+    loop {
+        match next {
+            4 => return parse_ipv4_packet_record(cursor, rec, DecapsulationMode::None),
+            41 => return parse_ipv6_packet_record(cursor, rec, DecapsulationMode::None),
+            43 => {
+                if cursor.len() < 8 || cursor[2] != 4 {
+                    return None;
+                }
+                let skip = 8_usize.saturating_add((cursor[1] as usize).saturating_mul(8));
+                if cursor.len() < skip {
+                    return None;
+                }
+                next = cursor[0];
+                cursor = &cursor[skip..];
+            }
+            _ => return None,
+        }
+    }
+}
+
+fn apply_v9_special_mappings_record(rec: &mut FlowRecord, field: V9Field, value: &str) {
+    match field {
+        V9Field::IpProtocolVersion => {
+            if let Some(etype) = etype_u16_from_ip_version(value) {
+                rec.etype = etype;
+            }
+        }
+        V9Field::IcmpType => {
+            if let Some((icmp_type, icmp_code)) = decode_type_code_raw(value) {
+                if rec.icmpv4_type == 0 {
+                    rec.icmpv4_type = icmp_type;
+                }
+                if rec.icmpv4_code == 0 {
+                    rec.icmpv4_code = icmp_code;
+                }
+                if rec.icmpv6_type == 0 {
+                    rec.icmpv6_type = value
+                        .parse::<u64>()
+                        .ok()
+                        .map(|v| ((v >> 8) & 0xff) as u8)
+                        .unwrap_or(0);
+                }
+                if rec.icmpv6_code == 0 {
+                    rec.icmpv6_code = value
+                        .parse::<u64>()
+                        .ok()
+                        .map(|v| (v & 0xff) as u8)
+                        .unwrap_or(0);
+                }
+            }
+        }
+        V9Field::IcmpTypeValue => {
+            if rec.icmpv4_type == 0 {
+                rec.icmpv4_type = value.parse().unwrap_or(0);
+            }
+        }
+        V9Field::IcmpCodeValue => {
+            if rec.icmpv4_code == 0 {
+                rec.icmpv4_code = value.parse().unwrap_or(0);
+            }
+        }
+        V9Field::IcmpIpv6TypeValue => {
+            if rec.icmpv6_type == 0 {
+                rec.icmpv6_type = value.parse().unwrap_or(0);
+            }
+        }
+        V9Field::ImpIpv6CodeValue => {
+            if rec.icmpv6_code == 0 {
+                rec.icmpv6_code = value.parse().unwrap_or(0);
+            }
+        }
+        V9Field::MplsLabel1
+        | V9Field::MplsLabel2
+        | V9Field::MplsLabel3
+        | V9Field::MplsLabel4
+        | V9Field::MplsLabel5
+        | V9Field::MplsLabel6
+        | V9Field::MplsLabel7
+        | V9Field::MplsLabel8
+        | V9Field::MplsLabel9
+        | V9Field::MplsLabel10 => {
+            append_mpls_label_record(rec, value);
+        }
+        _ => {}
+    }
+}
+
+fn apply_ipfix_special_mappings_record(
+    rec: &mut FlowRecord,
+    field: &IPFixField,
+    value: &str,
+) {
+    match field {
+        IPFixField::IANA(IANAIPFixField::IpVersion) => {
+            if let Some(etype) = etype_u16_from_ip_version(value) {
+                rec.etype = etype;
+            }
+        }
+        IPFixField::IANA(IANAIPFixField::IcmpTypeCodeIpv4) => {
+            if let Some((icmp_type, icmp_code)) = decode_type_code_raw(value) {
+                if rec.icmpv4_type == 0 {
+                    rec.icmpv4_type = icmp_type;
+                }
+                if rec.icmpv4_code == 0 {
+                    rec.icmpv4_code = icmp_code;
+                }
+            }
+        }
+        IPFixField::IANA(IANAIPFixField::IcmpTypeCodeIpv6) => {
+            if let Some((icmp_type, icmp_code)) = decode_type_code_raw(value) {
+                if rec.icmpv6_type == 0 {
+                    rec.icmpv6_type = icmp_type;
+                }
+                if rec.icmpv6_code == 0 {
+                    rec.icmpv6_code = icmp_code;
+                }
+            }
+        }
+        IPFixField::IANA(IANAIPFixField::MplsTopLabelStackSection)
+        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection)
+        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection2)
+        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection3)
+        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection4)
+        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection5)
+        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection6)
+        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection7)
+        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection8)
+        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection9)
+        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection10) => {
+            append_mpls_label_record(rec, value);
+        }
+        _ => {}
+    }
+}
+
+fn apply_sampling_state_record(
+    rec: &mut FlowRecord,
+    exporter_ip: &str,
+    version: u16,
+    observation_domain_id: u32,
+    sampler_id: Option<u64>,
+    observed_sampling_rate: Option<u64>,
+    sampling: &SamplingState,
+) {
+    if let Some(rate) = observed_sampling_rate.filter(|rate| *rate > 0) {
+        rec.sampling_rate = rate;
+        return;
+    }
+
+    if rec.sampling_rate == 0 {
+        if let Some(id) = sampler_id
+            && let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, id)
+        {
+            rec.sampling_rate = rate;
+            return;
+        }
+
+        if let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, 0) {
+            rec.sampling_rate = rate;
+        }
+    }
+}
+
+fn looks_like_sampling_option_record_from_rec(
+    rec: &FlowRecord,
+    observed_sampling_rate: Option<u64>,
+) -> bool {
+    if observed_sampling_rate.unwrap_or(0) == 0 {
+        return false;
+    }
+    // No endpoints = likely a sampling option record, not a data flow
+    rec.src_addr.is_none() && rec.dst_addr.is_none()
+}
+
+fn sflow_agent_ip_addr(address: &Address) -> Option<IpAddr> {
+    match address {
+        Address::IPv4(ip) => Some(IpAddr::V4(*ip)),
+        Address::IPv6(ip) => Some(IpAddr::V6(*ip)),
+        Address::Unknown => None,
     }
 }
 
@@ -3157,7 +4639,7 @@ fn normalize_direction_value(value: &str) -> &str {
     }
 }
 
-fn apply_icmp_port_fallback(fields: &mut BTreeMap<String, String>) {
+fn apply_icmp_port_fallback(fields: &mut FlowFields) {
     let protocol = fields
         .get("PROTOCOL")
         .and_then(|v| v.parse::<u64>().ok())
@@ -3191,13 +4673,13 @@ fn apply_icmp_port_fallback(fields: &mut BTreeMap<String, String>) {
     }
 }
 
-fn set_if_missing_or_zero(fields: &mut BTreeMap<String, String>, key: &str, value: &str) {
+fn set_if_missing_or_zero(fields: &mut FlowFields, key: &'static str, value: &str) {
     let current = fields
         .get(key)
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(0);
     if current == 0 {
-        fields.insert(key.to_string(), value.to_string());
+        fields.insert(key, value.to_string());
     }
 }
 
@@ -3212,26 +4694,7 @@ fn should_skip_zero_ip(canonical: &str, value: &str) -> bool {
     ) && is_zero_ip_value(value)
 }
 
-fn swap_directional_flow_fields(fields: &mut BTreeMap<String, String>) {
-    for (left, right) in [
-        ("SRC_ADDR", "DST_ADDR"),
-        ("SRC_PORT", "DST_PORT"),
-        ("SRC_MASK", "DST_MASK"),
-        ("SRC_AS", "DST_AS"),
-        ("SRC_VLAN", "DST_VLAN"),
-        ("SRC_MAC", "DST_MAC"),
-        ("SRC_ADDR_NAT", "DST_ADDR_NAT"),
-        ("SRC_PORT_NAT", "DST_PORT_NAT"),
-        ("IN_IF", "OUT_IF"),
-    ] {
-        let lhs = fields.get(left).cloned().unwrap_or_else(|| "".to_string());
-        let rhs = fields.get(right).cloned().unwrap_or_else(|| "".to_string());
-        fields.insert(left.to_string(), rhs);
-        fields.insert(right.to_string(), lhs);
-    }
-}
-
-fn append_mpls_label(fields: &mut BTreeMap<String, String>, value: &str) {
+fn append_mpls_label(fields: &mut FlowFields, value: &str) {
     let raw = if let Ok(v) = value.parse::<u64>() {
         v
     } else if let Some(hex) = value
@@ -3252,7 +4715,7 @@ fn append_mpls_label(fields: &mut BTreeMap<String, String>, value: &str) {
         return;
     }
 
-    let labels = fields.entry("MPLS_LABELS".to_string()).or_default();
+    let labels = fields.entry("MPLS_LABELS").or_default();
     if labels.is_empty() {
         *labels = label.to_string();
     } else {
@@ -3261,8 +4724,8 @@ fn append_mpls_label(fields: &mut BTreeMap<String, String>, value: &str) {
     }
 }
 
-fn append_mpls_label_value(fields: &mut BTreeMap<String, String>, label: u64) {
-    let labels = fields.entry("MPLS_LABELS".to_string()).or_default();
+fn append_mpls_label_value(fields: &mut FlowFields, label: u64) {
+    let labels = fields.entry("MPLS_LABELS").or_default();
     if labels.is_empty() {
         *labels = label.to_string();
     } else {
@@ -3282,59 +4745,6 @@ fn parse_ip_value(raw_value: &[u8]) -> Option<String> {
             Some(Ipv6Addr::from(octets).to_string())
         }
         _ => None,
-    }
-}
-
-fn looks_like_sampling_option_record(
-    fields: &BTreeMap<String, String>,
-    observed_sampling_rate: Option<u64>,
-) -> bool {
-    if observed_sampling_rate.unwrap_or(0) == 0 {
-        return false;
-    }
-
-    let src_addr = fields
-        .get("SRC_ADDR")
-        .map(String::as_str)
-        .unwrap_or_default();
-    let dst_addr = fields
-        .get("DST_ADDR")
-        .map(String::as_str)
-        .unwrap_or_default();
-    let has_endpoints = !src_addr.is_empty() || !dst_addr.is_empty();
-
-    !has_endpoints
-}
-
-fn apply_sampling_state(
-    fields: &mut BTreeMap<String, String>,
-    exporter_ip: &str,
-    version: u16,
-    observation_domain_id: u32,
-    sampler_id: Option<u64>,
-    observed_sampling_rate: Option<u64>,
-    sampling: &SamplingState,
-) {
-    if let Some(rate) = observed_sampling_rate.filter(|rate| *rate > 0) {
-        fields.insert("SAMPLING_RATE".to_string(), rate.to_string());
-        return;
-    }
-
-    let current = fields
-        .get("SAMPLING_RATE")
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(0);
-    if current == 0 {
-        if let Some(id) = sampler_id
-            && let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, id)
-        {
-            fields.insert("SAMPLING_RATE".to_string(), rate.to_string());
-            return;
-        }
-
-        if let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, 0) {
-            fields.insert("SAMPLING_RATE".to_string(), rate.to_string());
-        }
     }
 }
 
@@ -3432,7 +4842,7 @@ fn observe_ipfix_sampling_options(
     }
 }
 
-fn infer_etype_from_endpoints(fields: &BTreeMap<String, String>) -> Option<&'static str> {
+fn infer_etype_from_endpoints(fields: &FlowFields) -> Option<&'static str> {
     let src_addr = fields
         .get("SRC_ADDR")
         .map(String::as_str)
@@ -3474,26 +4884,26 @@ fn etype_from_ip_version(value: &str) -> Option<&'static str> {
     }
 }
 
-fn apply_v9_special_mappings(fields: &mut BTreeMap<String, String>, field: V9Field, value: &str) {
+fn apply_v9_special_mappings(fields: &mut FlowFields, field: V9Field, value: &str) {
     match field {
         V9Field::IpProtocolVersion => {
             if let Some(etype) = etype_from_ip_version(value) {
-                fields.insert("ETYPE".to_string(), etype.to_string());
+                fields.insert("ETYPE", etype.to_string());
             }
         }
         V9Field::IcmpType => {
             if let Some((icmp_type, icmp_code)) = decode_type_code(value) {
                 // Field 32 appears in both v4/v6 paths in some exporters.
-                fields.entry("ICMPV4_TYPE".to_string()).or_insert(icmp_type);
-                fields.entry("ICMPV4_CODE".to_string()).or_insert(icmp_code);
-                fields.entry("ICMPV6_TYPE".to_string()).or_insert_with(|| {
+                fields.entry("ICMPV4_TYPE").or_insert(icmp_type);
+                fields.entry("ICMPV4_CODE").or_insert(icmp_code);
+                fields.entry("ICMPV6_TYPE").or_insert_with(|| {
                     value
                         .parse::<u64>()
                         .ok()
                         .map(|v| (v >> 8).to_string())
                         .unwrap_or_default()
                 });
-                fields.entry("ICMPV6_CODE".to_string()).or_insert_with(|| {
+                fields.entry("ICMPV6_CODE").or_insert_with(|| {
                     value
                         .parse::<u64>()
                         .ok()
@@ -3504,22 +4914,22 @@ fn apply_v9_special_mappings(fields: &mut BTreeMap<String, String>, field: V9Fie
         }
         V9Field::IcmpTypeValue => {
             fields
-                .entry("ICMPV4_TYPE".to_string())
+                .entry("ICMPV4_TYPE")
                 .or_insert_with(|| value.to_string());
         }
         V9Field::IcmpCodeValue => {
             fields
-                .entry("ICMPV4_CODE".to_string())
+                .entry("ICMPV4_CODE")
                 .or_insert_with(|| value.to_string());
         }
         V9Field::IcmpIpv6TypeValue => {
             fields
-                .entry("ICMPV6_TYPE".to_string())
+                .entry("ICMPV6_TYPE")
                 .or_insert_with(|| value.to_string());
         }
         V9Field::ImpIpv6CodeValue => {
             fields
-                .entry("ICMPV6_CODE".to_string())
+                .entry("ICMPV6_CODE")
                 .or_insert_with(|| value.to_string());
         }
         V9Field::MplsLabel1
@@ -3538,67 +4948,27 @@ fn apply_v9_special_mappings(fields: &mut BTreeMap<String, String>, field: V9Fie
     }
 }
 
-fn apply_ipfix_special_mappings(
-    fields: &mut BTreeMap<String, String>,
-    field: &IPFixField,
-    value: &str,
-) {
-    match field {
-        IPFixField::IANA(IANAIPFixField::IpVersion) => {
-            if let Some(etype) = etype_from_ip_version(value) {
-                fields.insert("ETYPE".to_string(), etype.to_string());
-            }
-        }
-        IPFixField::IANA(IANAIPFixField::IcmpTypeCodeIpv4) => {
-            if let Some((icmp_type, icmp_code)) = decode_type_code(value) {
-                fields.entry("ICMPV4_TYPE".to_string()).or_insert(icmp_type);
-                fields.entry("ICMPV4_CODE".to_string()).or_insert(icmp_code);
-            }
-        }
-        IPFixField::IANA(IANAIPFixField::IcmpTypeCodeIpv6) => {
-            if let Some((icmp_type, icmp_code)) = decode_type_code(value) {
-                fields.entry("ICMPV6_TYPE".to_string()).or_insert(icmp_type);
-                fields.entry("ICMPV6_CODE".to_string()).or_insert(icmp_code);
-            }
-        }
-        IPFixField::IANA(IANAIPFixField::MplsTopLabelStackSection)
-        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection)
-        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection2)
-        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection3)
-        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection4)
-        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection5)
-        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection6)
-        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection7)
-        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection8)
-        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection9)
-        | IPFixField::IANA(IANAIPFixField::MplsLabelStackSection10) => {
-            append_mpls_label(fields, value);
-        }
-        _ => {}
-    }
-}
-
 fn apply_reverse_ipfix_special_mappings(
-    fields: &mut BTreeMap<String, String>,
+    fields: &mut FlowFields,
     field: &ReverseInformationElement,
     value: &str,
 ) {
     match field {
         ReverseInformationElement::ReverseIpVersion => {
             if let Some(etype) = etype_from_ip_version(value) {
-                fields.insert("ETYPE".to_string(), etype.to_string());
+                fields.insert("ETYPE", etype.to_string());
             }
         }
         ReverseInformationElement::ReverseIcmpTypeCodeIPv4 => {
             if let Some((icmp_type, icmp_code)) = decode_type_code(value) {
-                fields.entry("ICMPV4_TYPE".to_string()).or_insert(icmp_type);
-                fields.entry("ICMPV4_CODE".to_string()).or_insert(icmp_code);
+                fields.entry("ICMPV4_TYPE").or_insert(icmp_type);
+                fields.entry("ICMPV4_CODE").or_insert(icmp_code);
             }
         }
         ReverseInformationElement::ReverseIcmpTypeCodeIPv6 => {
             if let Some((icmp_type, icmp_code)) = decode_type_code(value) {
-                fields.entry("ICMPV6_TYPE".to_string()).or_insert(icmp_type);
-                fields.entry("ICMPV6_CODE".to_string()).or_insert(icmp_code);
+                fields.entry("ICMPV6_TYPE").or_insert(icmp_type);
+                fields.entry("ICMPV6_CODE").or_insert(icmp_code);
             }
         }
         ReverseInformationElement::ReverseMplsTopLabelStackSection
@@ -3957,14 +5327,6 @@ fn has_template_flowsets(payload: &[u8]) -> bool {
     }
 }
 
-fn ip_with_prefix(ip: IpAddr, mask: u8) -> String {
-    if mask == 0 {
-        ip.to_string()
-    } else {
-        format!("{}/{}", ip, mask)
-    }
-}
-
 fn unix_timestamp_to_usec(seconds: u64, nanos: u64) -> u64 {
     seconds
         .saturating_mul(1_000_000)
@@ -3976,14 +5338,6 @@ fn now_usec() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_micros() as u64)
         .unwrap_or(0)
-}
-
-fn sflow_agent_ip(address: &Address) -> Option<String> {
-    match address {
-        Address::IPv4(ip) => Some(ip.to_string()),
-        Address::IPv6(ip) => Some(ip.to_string()),
-        Address::Unknown => None,
-    }
 }
 
 #[cfg(test)]
@@ -4027,10 +5381,10 @@ fn to_field_token(name: &str) -> String {
 mod tests {
     use super::{
         CANONICAL_FLOW_DEFAULTS, DIRECTION_EGRESS, DIRECTION_INGRESS, DecapsulationMode,
-        DecodeStats, DecodedFlow, ETYPE_IPV4, ETYPE_IPV6, FlowDecoders, PersistedDecoderState,
-        SamplingState, TimestampSource, append_mpls_label, append_unique_flows,
-        apply_icmp_port_fallback, decode_v9_special_from_raw_payload, default_exporter_name,
-        finalize_canonical_flow_fields, normalize_direction_value,
+        DecodeStats, DecodedFlow, ETYPE_IPV4, ETYPE_IPV6, FlowDecoders, FlowFields, FlowRecord,
+        PersistedDecoderState, SamplingState, TimestampSource, append_mpls_label,
+        append_unique_flows, apply_icmp_port_fallback, decode_v9_special_from_raw_payload,
+        default_exporter_name, finalize_canonical_flow_fields, normalize_direction_value,
         observe_v9_templates_from_raw_payload, to_field_token,
     };
     use etherparse::{NetSlice, SlicedPacket, TransportSlice};
@@ -4289,7 +5643,7 @@ mod tests {
             ],
         );
         assert_fields(
-            primary,
+            &primary,
             &[
                 ("FLOW_VERSION", "sflow"),
                 ("EXPORTER_IP", "172.16.0.3"),
@@ -4320,7 +5674,7 @@ mod tests {
             ],
         );
         assert_fields(
-            routed,
+            &routed,
             &[
                 ("NEXT_HOP", "31.14.69.110"),
                 ("SRC_AS", "39421"),
@@ -4342,7 +5696,7 @@ mod tests {
     fn akvorado_sflow_local_interface_fixture_sets_out_if_zero() {
         let flows = decode_fixture_sequence(&["data-local-interface.pcap"]);
         assert_eq!(flows.len(), 1);
-        let flow = &flows[0].fields;
+        let flow = &flows[0].record.to_fields();
         assert_fields(
             flow,
             &[("IN_IF", "27"), ("OUT_IF", "0"), ("SAMPLING_RATE", "1024")],
@@ -4353,7 +5707,7 @@ mod tests {
     fn akvorado_sflow_discard_interface_fixture_sets_forwarding_status() {
         let flows = decode_fixture_sequence(&["data-discard-interface.pcap"]);
         assert_eq!(flows.len(), 1);
-        let flow = &flows[0].fields;
+        let flow = &flows[0].record.to_fields();
         assert_fields(
             flow,
             &[
@@ -4369,7 +5723,7 @@ mod tests {
     fn akvorado_sflow_multiple_interfaces_fixture_sets_out_if_zero() {
         let flows = decode_fixture_sequence(&["data-multiple-interfaces.pcap"]);
         assert_eq!(flows.len(), 1);
-        let flow = &flows[0].fields;
+        let flow = &flows[0].record.to_fields();
         assert_fields(
             flow,
             &[
@@ -4385,7 +5739,7 @@ mod tests {
     fn akvorado_sflow_expanded_sample_fixture_matches_expected_projection() {
         let flows = decode_fixture_sequence(&["data-sflow-expanded-sample.pcap"]);
         assert_eq!(flows.len(), 1);
-        let flow = &flows[0].fields;
+        let flow = &flows[0].record.to_fields();
         assert_fields(
             flow,
             &[
@@ -4436,7 +5790,7 @@ mod tests {
         let flows = decode_pcap_flows(&base.join("data.pcap"), &mut decoders);
         assert!(!flows.is_empty(), "no flows decoded from data.pcap");
 
-        let first = &flows[0].fields;
+        let first = &flows[0].record.to_fields();
         assert_eq!(
             first.get("SRC_ADDR").map(String::as_str),
             Some("198.38.121.178")
@@ -4601,7 +5955,7 @@ mod tests {
             flows.len()
         );
 
-        let mut got: Vec<BTreeMap<String, String>> = flows.into_iter().map(|f| f.fields).collect();
+        let mut got: Vec<FlowFields> = flows.into_iter().map(|f| f.record.to_fields()).collect();
         let mut want = vec![
             expected_full_flow(
                 "v9",
@@ -4736,7 +6090,7 @@ mod tests {
         );
 
         assert_fields(
-            flow,
+            &flow,
             &[
                 ("FLOW_VERSION", "ipfix"),
                 ("EXPORTER_IP", "49.49.49.49"),
@@ -4792,7 +6146,7 @@ mod tests {
             flows.len()
         );
 
-        let flow = &flows[0].fields;
+        let flow = &flows[0].record.to_fields();
         assert_fields(
             flow,
             &[
@@ -4871,10 +6225,10 @@ mod tests {
 
     #[test]
     fn icmp_fallback_uses_dst_port_when_src_port_missing() {
-        let mut fields = BTreeMap::from([
-            ("PROTOCOL".to_string(), "1".to_string()),
-            ("SRC_PORT".to_string(), "0".to_string()),
-            ("DST_PORT".to_string(), "2048".to_string()),
+        let mut fields: FlowFields = BTreeMap::from([
+            ("PROTOCOL", "1".to_string()),
+            ("SRC_PORT", "0".to_string()),
+            ("DST_PORT", "2048".to_string()),
         ]);
         apply_icmp_port_fallback(&mut fields);
         assert_eq!(fields.get("ICMPV4_TYPE").map(String::as_str), Some("8"));
@@ -4897,12 +6251,12 @@ mod tests {
 
     #[test]
     fn finalize_sets_exporter_name_fallback_from_exporter_ip() {
-        let mut fields = BTreeMap::from([
-            ("FLOW_VERSION".to_string(), "ipfix".to_string()),
-            ("EXPORTER_IP".to_string(), "192.0.2.142".to_string()),
-            ("EXPORTER_PORT".to_string(), "2055".to_string()),
-            ("BYTES".to_string(), "100".to_string()),
-            ("PACKETS".to_string(), "2".to_string()),
+        let mut fields: FlowFields = BTreeMap::from([
+            ("FLOW_VERSION", "ipfix".to_string()),
+            ("EXPORTER_IP", "192.0.2.142".to_string()),
+            ("EXPORTER_PORT", "2055".to_string()),
+            ("BYTES", "100".to_string()),
+            ("PACKETS", "2".to_string()),
         ]);
 
         finalize_canonical_flow_fields(&mut fields);
@@ -4915,13 +6269,13 @@ mod tests {
 
     #[test]
     fn finalize_preserves_explicit_exporter_name() {
-        let mut fields = BTreeMap::from([
-            ("FLOW_VERSION".to_string(), "ipfix".to_string()),
-            ("EXPORTER_IP".to_string(), "192.0.2.142".to_string()),
-            ("EXPORTER_PORT".to_string(), "2055".to_string()),
-            ("EXPORTER_NAME".to_string(), "edge-router".to_string()),
-            ("BYTES".to_string(), "100".to_string()),
-            ("PACKETS".to_string(), "2".to_string()),
+        let mut fields: FlowFields = BTreeMap::from([
+            ("FLOW_VERSION", "ipfix".to_string()),
+            ("EXPORTER_IP", "192.0.2.142".to_string()),
+            ("EXPORTER_PORT", "2055".to_string()),
+            ("EXPORTER_NAME", "edge-router".to_string()),
+            ("BYTES", "100".to_string()),
+            ("PACKETS", "2".to_string()),
         ]);
 
         finalize_canonical_flow_fields(&mut fields);
@@ -4940,7 +6294,7 @@ mod tests {
         append_unique_flows(&mut dst, vec![incoming]);
 
         assert_eq!(dst.len(), 1);
-        let fields = &dst[0].fields;
+        let fields = dst[0].record.to_fields();
         assert_eq!(fields.get("IPTTL").map(String::as_str), Some("255"));
         assert_eq!(
             fields.get("MPLS_LABELS").map(String::as_str),
@@ -4969,16 +6323,12 @@ mod tests {
         append_unique_flows(&mut dst, vec![incoming]);
 
         assert_eq!(dst.len(), 2);
-        assert_eq!(dst[0].fields.get("IPTTL").map(String::as_str), Some("64"));
-        assert_eq!(
-            dst[0].fields.get("MPLS_LABELS").map(String::as_str),
-            Some("20005")
-        );
-        assert_eq!(dst[1].fields.get("IPTTL").map(String::as_str), Some("255"));
-        assert_eq!(
-            dst[1].fields.get("MPLS_LABELS").map(String::as_str),
-            Some("20006")
-        );
+        let f0 = dst[0].record.to_fields();
+        let f1 = dst[1].record.to_fields();
+        assert_eq!(f0.get("IPTTL").map(String::as_str), Some("64"));
+        assert_eq!(f0.get("MPLS_LABELS").map(String::as_str), Some("20005"));
+        assert_eq!(f1.get("IPTTL").map(String::as_str), Some("255"));
+        assert_eq!(f1.get("MPLS_LABELS").map(String::as_str), Some("20006"));
     }
 
     #[test]
@@ -4992,14 +6342,10 @@ mod tests {
         append_unique_flows(&mut dst, vec![incoming]);
 
         assert_eq!(dst.len(), 2);
-        assert_eq!(
-            dst[0].fields.get("MPLS_LABELS").map(String::as_str),
-            Some("20005")
-        );
-        assert_eq!(
-            dst[1].fields.get("MPLS_LABELS").map(String::as_str),
-            Some("20006")
-        );
+        let f0 = dst[0].record.to_fields();
+        let f1 = dst[1].record.to_fields();
+        assert_eq!(f0.get("MPLS_LABELS").map(String::as_str), Some("20005"));
+        assert_eq!(f1.get("MPLS_LABELS").map(String::as_str), Some("20006"));
     }
 
     #[test]
@@ -5252,7 +6598,7 @@ mod tests {
             ],
         );
         assert_fields(
-            v6_echo_request,
+            &v6_echo_request,
             &[
                 ("BYTES", "104"),
                 ("PACKETS", "1"),
@@ -5273,7 +6619,7 @@ mod tests {
             ],
         );
         assert_fields(
-            v6_echo_reply,
+            &v6_echo_reply,
             &[
                 ("BYTES", "104"),
                 ("PACKETS", "1"),
@@ -5294,7 +6640,7 @@ mod tests {
             ],
         );
         assert_fields(
-            v4_echo_request,
+            &v4_echo_request,
             &[
                 ("BYTES", "84"),
                 ("PACKETS", "1"),
@@ -5315,7 +6661,7 @@ mod tests {
             ],
         );
         assert_fields(
-            v4_echo_reply,
+            &v4_echo_reply,
             &[
                 ("BYTES", "84"),
                 ("PACKETS", "1"),
@@ -5347,7 +6693,7 @@ mod tests {
         );
         assert_eq!(first.get("SAMPLING_RATE").map(String::as_str), Some("10"));
         assert_fields(
-            first,
+            &first,
             &[
                 ("BYTES", "89"),
                 ("PACKETS", "1"),
@@ -5373,7 +6719,7 @@ mod tests {
         );
         assert_eq!(second.get("SAMPLING_RATE").map(String::as_str), Some("10"));
         assert_fields(
-            second,
+            &second,
             &[
                 ("BYTES", "890"),
                 ("PACKETS", "10"),
@@ -5399,7 +6745,7 @@ mod tests {
             flows.len()
         );
 
-        let mut got: Vec<BTreeMap<String, String>> = flows.into_iter().map(|f| f.fields).collect();
+        let mut got: Vec<FlowFields> = flows.into_iter().map(|f| f.record.to_fields()).collect();
         let mut want = vec![
             expected_full_flow(
                 "v9",
@@ -5485,7 +6831,7 @@ mod tests {
             flows.len()
         );
 
-        let mut got: Vec<BTreeMap<String, String>> = flows.into_iter().map(|f| f.fields).collect();
+        let mut got: Vec<FlowFields> = flows.into_iter().map(|f| f.record.to_fields()).collect();
         let mut want = vec![
             expected_full_flow(
                 "ipfix",
@@ -5624,7 +6970,7 @@ mod tests {
         );
 
         assert_fields(
-            flow,
+            &flow,
             &[
                 ("SAMPLING_RATE", "1000"),
                 ("IN_IF", "1342177291"),
@@ -5817,7 +7163,7 @@ mod tests {
             flows.len()
         );
 
-        let mut got: Vec<BTreeMap<String, String>> = flows.into_iter().map(|f| f.fields).collect();
+        let mut got: Vec<FlowFields> = flows.into_iter().map(|f| f.record.to_fields()).collect();
         let mut want = vec![
             expected_full_flow(
                 "ipfix",
@@ -5988,7 +7334,7 @@ mod tests {
             flows.len()
         );
 
-        let mut got: Vec<BTreeMap<String, String>> = flows.into_iter().map(|f| f.fields).collect();
+        let mut got: Vec<FlowFields> = flows.into_iter().map(|f| f.record.to_fields()).collect();
         let mut want = vec![expected_full_flow(
             "ipfix",
             "10.0.0.15",
@@ -6050,7 +7396,7 @@ mod tests {
             flows.len()
         );
 
-        let mut got: Vec<BTreeMap<String, String>> = flows.into_iter().map(|f| f.fields).collect();
+        let mut got: Vec<FlowFields> = flows.into_iter().map(|f| f.record.to_fields()).collect();
         let mut want = vec![expected_full_flow(
             "ipfix",
             "10.0.0.15",
@@ -6137,11 +7483,7 @@ mod tests {
         const PACKET_TS_SECONDS: u64 = 1_647_285_928;
         const SYS_UPTIME_MILLIS: u64 = 944_951_609;
         for flow in &flows {
-            let first_switched_millis = flow
-                .fields
-                .get("FLOW_START_MILLIS")
-                .and_then(|v| v.parse::<u64>().ok())
-                .unwrap_or(0);
+            let first_switched_millis = flow.record.flow_start_millis;
             let expected = PACKET_TS_SECONDS
                 .saturating_sub(SYS_UPTIME_MILLIS)
                 .saturating_add(first_switched_millis)
@@ -6200,7 +7542,7 @@ mod tests {
             ],
         );
         assert_fields(
-            flow,
+            &flow,
             &[
                 ("BYTES", "104"),
                 ("PACKETS", "1"),
@@ -6262,7 +7604,7 @@ mod tests {
             flows.len()
         );
 
-        let mut got: Vec<BTreeMap<String, String>> = flows.into_iter().map(|f| f.fields).collect();
+        let mut got: Vec<FlowFields> = flows.into_iter().map(|f| f.record.to_fields()).collect();
         let mut want = vec![expected_full_flow(
             "ipfix",
             "10.0.0.15",
@@ -6497,29 +7839,30 @@ mod tests {
         out
     }
 
-    fn project_flows(flows: &[DecodedFlow], keys: &[&str]) -> Vec<BTreeMap<String, String>> {
+    fn project_flows(flows: &[DecodedFlow], keys: &[&'static str]) -> Vec<FlowFields> {
         flows
             .iter()
             .map(|flow| {
+                let fields = flow.record.to_fields();
                 keys.iter()
                     .map(|k| {
                         (
-                            (*k).to_string(),
-                            flow.fields
+                            *k,
+                            fields
                                 .get(*k)
                                 .cloned()
                                 .unwrap_or_else(|| "".to_string()),
                         )
                     })
-                    .collect::<BTreeMap<String, String>>()
+                    .collect::<FlowFields>()
             })
             .collect()
     }
 
-    fn expected_projection(values: &[(&str, &str)]) -> BTreeMap<String, String> {
+    fn expected_projection(values: &[(&'static str, &str)]) -> FlowFields {
         values
             .iter()
-            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .map(|(k, v)| (*k, (*v).to_string()))
             .collect()
     }
 
@@ -6527,80 +7870,67 @@ mod tests {
         flow_version: &str,
         exporter_ip: &str,
         exporter_port: &str,
-        overrides: &[(&str, &str)],
-    ) -> BTreeMap<String, String> {
-        let mut row: BTreeMap<String, String> = CANONICAL_FLOW_DEFAULTS
+        overrides: &[(&'static str, &str)],
+    ) -> FlowFields {
+        let mut row: FlowFields = CANONICAL_FLOW_DEFAULTS
             .iter()
-            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .map(|(k, v)| (*k, (*v).to_string()))
             .collect();
 
-        row.insert("FLOW_VERSION".to_string(), flow_version.to_string());
-        row.insert("EXPORTER_IP".to_string(), exporter_ip.to_string());
-        row.insert("EXPORTER_PORT".to_string(), exporter_port.to_string());
+        row.insert("FLOW_VERSION", flow_version.to_string());
+        row.insert("EXPORTER_IP", exporter_ip.to_string());
+        row.insert("EXPORTER_PORT", exporter_port.to_string());
         row.insert(
-            "EXPORTER_NAME".to_string(),
+                    "EXPORTER_NAME",
             default_exporter_name(exporter_ip),
         );
 
         for (k, v) in overrides {
-            row.insert((*k).to_string(), (*v).to_string());
+            row.insert(*k, (*v).to_string());
         }
 
         if let Some(bytes) = row.get("BYTES").cloned()
             && bytes != "0"
         {
-            row.insert("RAW_BYTES".to_string(), bytes);
+            row.insert("RAW_BYTES", bytes);
         }
         if let Some(packets) = row.get("PACKETS").cloned()
             && packets != "0"
         {
-            row.insert("RAW_PACKETS".to_string(), packets);
+            row.insert("RAW_PACKETS", packets);
         }
 
         row
     }
 
-    fn sort_projected_flows(rows: &mut Vec<BTreeMap<String, String>>, keys: &[&str]) {
+    fn sort_projected_flows(rows: &mut Vec<FlowFields>, keys: &[&str]) {
         rows.sort_by(|a, b| projection_signature(a, keys).cmp(&projection_signature(b, keys)));
     }
 
-    fn projection_signature(row: &BTreeMap<String, String>, keys: &[&str]) -> String {
+    fn projection_signature(row: &FlowFields, keys: &[&str]) -> String {
         keys.iter()
             .map(|k| row.get(*k).cloned().unwrap_or_default())
             .collect::<Vec<_>>()
             .join("|")
     }
 
-    fn sort_full_rows(rows: &mut Vec<BTreeMap<String, String>>) {
+    fn sort_full_rows(rows: &mut Vec<FlowFields>) {
         rows.sort_by(|a, b| full_row_signature(a).cmp(&full_row_signature(b)));
     }
 
-    fn full_row_signature(row: &BTreeMap<String, String>) -> String {
+    fn full_row_signature(row: &FlowFields) -> String {
         row.iter()
             .map(|(k, v)| format!("{k}={v}"))
             .collect::<Vec<_>>()
             .join("|")
     }
 
-    fn find_flow<'a>(
-        flows: &'a [DecodedFlow],
+    fn find_flow(
+        flows: &[DecodedFlow],
         predicates: &[(&str, &str)],
-    ) -> &'a BTreeMap<String, String> {
-        flows
-            .iter()
-            .map(|flow| &flow.fields)
-            .find(|fields| {
-                predicates
-                    .iter()
-                    .all(|(k, v)| fields.get(*k).map(String::as_str) == Some(*v))
-            })
-            .unwrap_or_else(|| {
-                panic!(
-                    "flow not found for predicates {:?}; decoded flow count={}",
-                    predicates,
-                    flows.len()
-                )
-            })
+    ) -> FlowFields {
+        let flow = find_decoded_flow(flows, predicates);
+        flow.record.to_fields()
     }
 
     fn find_decoded_flow<'a>(
@@ -6610,9 +7940,10 @@ mod tests {
         flows
             .iter()
             .find(|flow| {
+                let fields = flow.record.to_fields();
                 predicates
                     .iter()
-                    .all(|(k, v)| flow.fields.get(*k).map(String::as_str) == Some(*v))
+                    .all(|(k, v)| fields.get(*k).map(String::as_str) == Some(*v))
             })
             .unwrap_or_else(|| {
                 panic!(
@@ -6623,7 +7954,7 @@ mod tests {
             })
     }
 
-    fn assert_fields(fields: &BTreeMap<String, String>, expectations: &[(&str, &str)]) {
+    fn assert_fields(fields: &FlowFields, expectations: &[(&str, &str)]) {
         for (key, expected) in expectations {
             let actual = fields.get(*key).map(String::as_str);
             assert_eq!(
@@ -6634,35 +7965,35 @@ mod tests {
         }
     }
 
-    fn canonical_test_flow(overrides: &[(&str, &str)]) -> DecodedFlow {
-        let mut fields = BTreeMap::from([
-            ("FLOW_VERSION".to_string(), "ipfix".to_string()),
-            ("EXPORTER_IP".to_string(), "10.127.100.7".to_string()),
-            ("EXPORTER_PORT".to_string(), "50145".to_string()),
-            ("SRC_ADDR".to_string(), "10.0.0.1".to_string()),
-            ("DST_ADDR".to_string(), "10.0.0.2".to_string()),
-            ("PROTOCOL".to_string(), "17".to_string()),
-            ("SRC_PORT".to_string(), "49153".to_string()),
-            ("DST_PORT".to_string(), "862".to_string()),
-            ("IN_IF".to_string(), "0".to_string()),
-            ("OUT_IF".to_string(), "16".to_string()),
-            ("BYTES".to_string(), "62".to_string()),
-            ("PACKETS".to_string(), "1".to_string()),
-            ("FLOW_START_MILLIS".to_string(), "1699893330381".to_string()),
-            ("FLOW_END_MILLIS".to_string(), "1699893330381".to_string()),
-            ("FLOW_START_SECONDS".to_string(), "0".to_string()),
-            ("FLOW_END_SECONDS".to_string(), "0".to_string()),
-            ("DIRECTION".to_string(), DIRECTION_INGRESS.to_string()),
-            ("IPTTL".to_string(), "0".to_string()),
-            ("MPLS_LABELS".to_string(), "".to_string()),
+    fn canonical_test_flow(overrides: &[(&'static str, &str)]) -> DecodedFlow {
+        let mut fields: FlowFields = BTreeMap::from([
+            ("FLOW_VERSION", "ipfix".to_string()),
+            ("EXPORTER_IP", "10.127.100.7".to_string()),
+            ("EXPORTER_PORT", "50145".to_string()),
+            ("SRC_ADDR", "10.0.0.1".to_string()),
+            ("DST_ADDR", "10.0.0.2".to_string()),
+            ("PROTOCOL", "17".to_string()),
+            ("SRC_PORT", "49153".to_string()),
+            ("DST_PORT", "862".to_string()),
+            ("IN_IF", "0".to_string()),
+            ("OUT_IF", "16".to_string()),
+            ("BYTES", "62".to_string()),
+            ("PACKETS", "1".to_string()),
+            ("FLOW_START_MILLIS", "1699893330381".to_string()),
+            ("FLOW_END_MILLIS", "1699893330381".to_string()),
+            ("FLOW_START_SECONDS", "0".to_string()),
+            ("FLOW_END_SECONDS", "0".to_string()),
+            ("DIRECTION", DIRECTION_INGRESS.to_string()),
+            ("IPTTL", "0".to_string()),
+            ("MPLS_LABELS", "".to_string()),
         ]);
 
         for (key, value) in overrides {
-            fields.insert((*key).to_string(), (*value).to_string());
+            fields.insert(*key, (*value).to_string());
         }
 
         DecodedFlow {
-            fields,
+            record: FlowRecord::from_fields(&fields),
             source_realtime_usec: Some(1699893404000000),
         }
     }
@@ -6808,5 +8139,265 @@ mod tests {
             _ => return None,
         };
         Some((SocketAddr::new(src_ip, src_port), payload))
+    }
+
+    #[test]
+    fn flow_record_round_trip_all_fields() {
+        use super::{FlowDirection, FlowRecord};
+        use std::net::Ipv6Addr;
+
+        // Build a FlowRecord with non-default values in every field.
+        let rec = FlowRecord {
+            flow_version: "v9",
+            exporter_ip: Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))),
+            exporter_port: 9995,
+            exporter_name: "router-core".into(),
+            exporter_group: "core-group".into(),
+            exporter_role: "core".into(),
+            exporter_site: "dc1".into(),
+            exporter_region: "us-east".into(),
+            exporter_tenant: "acme".into(),
+            sampling_rate: 100,
+            etype: 2048,
+            protocol: 6,
+            direction: FlowDirection::Ingress,
+            bytes: 123456,
+            packets: 42,
+            flows: 1,
+            raw_bytes: 1234,
+            raw_packets: 4,
+            forwarding_status: 1,
+            src_addr: Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))),
+            dst_addr: Some(IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1))),
+            src_prefix: Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 0))),
+            dst_prefix: Some(IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 0))),
+            src_mask: 24,
+            dst_mask: 48,
+            src_as: 64512,
+            dst_as: 15169,
+            src_net_name: "internal".into(),
+            dst_net_name: "google-dns".into(),
+            src_net_role: "private".into(),
+            dst_net_role: "public".into(),
+            src_net_site: "dc1".into(),
+            dst_net_site: "remote".into(),
+            src_net_region: "east".into(),
+            dst_net_region: "west".into(),
+            src_net_tenant: "acme".into(),
+            dst_net_tenant: "external".into(),
+            src_country: "US".into(),
+            dst_country: "DE".into(),
+            src_geo_city: "New York".into(),
+            dst_geo_city: "Frankfurt".into(),
+            src_geo_state: "NY".into(),
+            dst_geo_state: "HE".into(),
+            dst_as_path: "64512,15169".into(),
+            dst_communities: "64512:100,64512:200".into(),
+            dst_large_communities: "64512:1:1".into(),
+            in_if: 1,
+            out_if: 2,
+            in_if_name: "eth0".into(),
+            out_if_name: "eth1".into(),
+            in_if_description: "Uplink A".into(),
+            out_if_description: "Uplink B".into(),
+            in_if_speed: 10000,
+            out_if_speed: 1000,
+            in_if_provider: "isp-a".into(),
+            out_if_provider: "isp-b".into(),
+            in_if_connectivity: "transit".into(),
+            out_if_connectivity: "peering".into(),
+            in_if_boundary: 1,
+            out_if_boundary: 2,
+            next_hop: Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 254))),
+            src_port: 12345,
+            dst_port: 443,
+            flow_start_seconds: 1700000000,
+            flow_end_seconds: 1700000060,
+            flow_start_millis: 1700000000000,
+            flow_end_millis: 1700000060000,
+            observation_time_millis: 1700000030000,
+            src_addr_nat: Some(IpAddr::V4(Ipv4Addr::new(203, 0, 113, 1))),
+            dst_addr_nat: Some(IpAddr::V4(Ipv4Addr::new(203, 0, 113, 2))),
+            src_port_nat: 54321,
+            dst_port_nat: 8443,
+            src_vlan: 100,
+            dst_vlan: 200,
+            src_mac: [0xca, 0x6e, 0x98, 0xf8, 0x49, 0x8f],
+            dst_mac: [0xde, 0xad, 0xbe, 0xef, 0x00, 0x01],
+            ipttl: 64,
+            iptos: 0x28,
+            ipv6_flow_label: 12345,
+            tcp_flags: 0x12,
+            ip_fragment_id: 54321,
+            ip_fragment_offset: 0,
+            icmpv4_type: 8,
+            icmpv4_code: 0,
+            icmpv6_type: 128,
+            icmpv6_code: 0,
+            mpls_labels: "100,200,300".into(),
+        };
+
+        // Round trip: FlowRecord -> FlowFields -> FlowRecord
+        let fields = rec.to_fields();
+        let rec2 = FlowRecord::from_fields(&fields);
+
+        // Verify all fields survived the round trip.
+        assert_eq!(rec.flow_version, rec2.flow_version);
+        assert_eq!(rec.exporter_ip, rec2.exporter_ip);
+        assert_eq!(rec.exporter_port, rec2.exporter_port);
+        assert_eq!(rec.exporter_name, rec2.exporter_name);
+        assert_eq!(rec.exporter_group, rec2.exporter_group);
+        assert_eq!(rec.exporter_role, rec2.exporter_role);
+        assert_eq!(rec.exporter_site, rec2.exporter_site);
+        assert_eq!(rec.exporter_region, rec2.exporter_region);
+        assert_eq!(rec.exporter_tenant, rec2.exporter_tenant);
+        assert_eq!(rec.sampling_rate, rec2.sampling_rate);
+        assert_eq!(rec.etype, rec2.etype);
+        assert_eq!(rec.protocol, rec2.protocol);
+        assert_eq!(rec.direction, rec2.direction);
+        assert_eq!(rec.bytes, rec2.bytes);
+        assert_eq!(rec.packets, rec2.packets);
+        assert_eq!(rec.flows, rec2.flows);
+        assert_eq!(rec.raw_bytes, rec2.raw_bytes);
+        assert_eq!(rec.raw_packets, rec2.raw_packets);
+        assert_eq!(rec.forwarding_status, rec2.forwarding_status);
+        assert_eq!(rec.src_addr, rec2.src_addr);
+        assert_eq!(rec.dst_addr, rec2.dst_addr);
+        assert_eq!(rec.src_prefix, rec2.src_prefix);
+        assert_eq!(rec.dst_prefix, rec2.dst_prefix);
+        assert_eq!(rec.src_mask, rec2.src_mask);
+        assert_eq!(rec.dst_mask, rec2.dst_mask);
+        assert_eq!(rec.src_as, rec2.src_as);
+        assert_eq!(rec.dst_as, rec2.dst_as);
+        assert_eq!(rec.src_net_name, rec2.src_net_name);
+        assert_eq!(rec.dst_net_name, rec2.dst_net_name);
+        assert_eq!(rec.src_net_role, rec2.src_net_role);
+        assert_eq!(rec.dst_net_role, rec2.dst_net_role);
+        assert_eq!(rec.src_net_site, rec2.src_net_site);
+        assert_eq!(rec.dst_net_site, rec2.dst_net_site);
+        assert_eq!(rec.src_net_region, rec2.src_net_region);
+        assert_eq!(rec.dst_net_region, rec2.dst_net_region);
+        assert_eq!(rec.src_net_tenant, rec2.src_net_tenant);
+        assert_eq!(rec.dst_net_tenant, rec2.dst_net_tenant);
+        assert_eq!(rec.src_country, rec2.src_country);
+        assert_eq!(rec.dst_country, rec2.dst_country);
+        assert_eq!(rec.src_geo_city, rec2.src_geo_city);
+        assert_eq!(rec.dst_geo_city, rec2.dst_geo_city);
+        assert_eq!(rec.src_geo_state, rec2.src_geo_state);
+        assert_eq!(rec.dst_geo_state, rec2.dst_geo_state);
+        assert_eq!(rec.dst_as_path, rec2.dst_as_path);
+        assert_eq!(rec.dst_communities, rec2.dst_communities);
+        assert_eq!(rec.dst_large_communities, rec2.dst_large_communities);
+        assert_eq!(rec.in_if, rec2.in_if);
+        assert_eq!(rec.out_if, rec2.out_if);
+        assert_eq!(rec.in_if_name, rec2.in_if_name);
+        assert_eq!(rec.out_if_name, rec2.out_if_name);
+        assert_eq!(rec.in_if_description, rec2.in_if_description);
+        assert_eq!(rec.out_if_description, rec2.out_if_description);
+        assert_eq!(rec.in_if_speed, rec2.in_if_speed);
+        assert_eq!(rec.out_if_speed, rec2.out_if_speed);
+        assert_eq!(rec.in_if_provider, rec2.in_if_provider);
+        assert_eq!(rec.out_if_provider, rec2.out_if_provider);
+        assert_eq!(rec.in_if_connectivity, rec2.in_if_connectivity);
+        assert_eq!(rec.out_if_connectivity, rec2.out_if_connectivity);
+        assert_eq!(rec.in_if_boundary, rec2.in_if_boundary);
+        assert_eq!(rec.out_if_boundary, rec2.out_if_boundary);
+        assert_eq!(rec.next_hop, rec2.next_hop);
+        assert_eq!(rec.src_port, rec2.src_port);
+        assert_eq!(rec.dst_port, rec2.dst_port);
+        assert_eq!(rec.flow_start_seconds, rec2.flow_start_seconds);
+        assert_eq!(rec.flow_end_seconds, rec2.flow_end_seconds);
+        assert_eq!(rec.flow_start_millis, rec2.flow_start_millis);
+        assert_eq!(rec.flow_end_millis, rec2.flow_end_millis);
+        assert_eq!(rec.observation_time_millis, rec2.observation_time_millis);
+        assert_eq!(rec.src_addr_nat, rec2.src_addr_nat);
+        assert_eq!(rec.dst_addr_nat, rec2.dst_addr_nat);
+        assert_eq!(rec.src_port_nat, rec2.src_port_nat);
+        assert_eq!(rec.dst_port_nat, rec2.dst_port_nat);
+        assert_eq!(rec.src_vlan, rec2.src_vlan);
+        assert_eq!(rec.dst_vlan, rec2.dst_vlan);
+        assert_eq!(rec.src_mac, rec2.src_mac);
+        assert_eq!(rec.dst_mac, rec2.dst_mac);
+        assert_eq!(rec.ipttl, rec2.ipttl);
+        assert_eq!(rec.iptos, rec2.iptos);
+        assert_eq!(rec.ipv6_flow_label, rec2.ipv6_flow_label);
+        assert_eq!(rec.tcp_flags, rec2.tcp_flags);
+        assert_eq!(rec.ip_fragment_id, rec2.ip_fragment_id);
+        assert_eq!(rec.ip_fragment_offset, rec2.ip_fragment_offset);
+        assert_eq!(rec.icmpv4_type, rec2.icmpv4_type);
+        assert_eq!(rec.icmpv4_code, rec2.icmpv4_code);
+        assert_eq!(rec.icmpv6_type, rec2.icmpv6_type);
+        assert_eq!(rec.icmpv6_code, rec2.icmpv6_code);
+        assert_eq!(rec.mpls_labels, rec2.mpls_labels);
+
+        // Also verify field count matches canonical count
+        assert_eq!(fields.len(), CANONICAL_FLOW_DEFAULTS.len());
+    }
+
+    #[test]
+    fn flow_record_encode_journal_round_trip() {
+        use super::{FlowDirection, FlowRecord};
+
+        let rec = FlowRecord {
+            flow_version: "ipfix",
+            exporter_ip: Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))),
+            protocol: 17,
+            src_port: 53,
+            dst_port: 12345,
+            bytes: 512,
+            packets: 1,
+            flows: 1,
+            direction: FlowDirection::Egress,
+            ..Default::default()
+        };
+
+        // Encode to journal buffer
+        let mut data = Vec::new();
+        let mut refs = Vec::new();
+        rec.encode_to_journal_buf(&mut data, &mut refs);
+
+        // Parse back: each ref points to a "KEY=VALUE" slice in data
+        let mut parsed = FlowFields::new();
+        for r in &refs {
+            let slice = &data[r.clone()];
+            let s = std::str::from_utf8(slice).expect("valid utf8");
+            if let Some((k, v)) = s.split_once('=') {
+                if let Some(interned) = super::intern_field_name(k) {
+                    parsed.insert(interned, v.to_string());
+                }
+            }
+        }
+
+        // Verify key fields survived encode → parse
+        assert_eq!(parsed.get("FLOW_VERSION").map(String::as_str), Some("ipfix"));
+        assert_eq!(parsed.get("EXPORTER_IP").map(String::as_str), Some("10.0.0.1"));
+        assert_eq!(parsed.get("PROTOCOL").map(String::as_str), Some("17"));
+        assert_eq!(parsed.get("SRC_PORT").map(String::as_str), Some("53"));
+        assert_eq!(parsed.get("DST_PORT").map(String::as_str), Some("12345"));
+        assert_eq!(parsed.get("BYTES").map(String::as_str), Some("512"));
+        assert_eq!(parsed.get("DIRECTION").map(String::as_str), Some("egress"));
+
+        // Only non-default fields are encoded (skip-empty optimization).
+        assert_eq!(refs.len(), 9); // 7 explicit + flows=1 + packets=1... let's check
+        assert!(refs.len() < CANONICAL_FLOW_DEFAULTS.len());
+
+        // Verify lossless round-trip: decode back → same record.
+        let decoded = FlowRecord::from_fields(&parsed);
+        assert_eq!(decoded.flow_version, rec.flow_version);
+        assert_eq!(decoded.exporter_ip, rec.exporter_ip);
+        assert_eq!(decoded.protocol, rec.protocol);
+        assert_eq!(decoded.src_port, rec.src_port);
+        assert_eq!(decoded.dst_port, rec.dst_port);
+        assert_eq!(decoded.bytes, rec.bytes);
+        assert_eq!(decoded.packets, rec.packets);
+        assert_eq!(decoded.flows, rec.flows);
+        assert_eq!(decoded.direction, rec.direction);
+        // Default fields remain at defaults
+        assert_eq!(decoded.src_as, 0);
+        assert_eq!(decoded.dst_as, 0);
+        assert_eq!(decoded.src_addr, None);
+        assert_eq!(decoded.dst_addr, None);
+        assert!(decoded.exporter_name.is_empty());
+        assert!(decoded.src_country.is_empty());
     }
 }

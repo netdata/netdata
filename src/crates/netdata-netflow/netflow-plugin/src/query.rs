@@ -470,9 +470,10 @@ impl FlowQueryService {
                 open_rows.len() as u64,
             );
             for row in open_rows {
+                // Convert FlowFields (&'static str keys) to query's BTreeMap<String, String>
                 let record = FlowRecord {
                     timestamp_usec: row.timestamp_usec,
-                    fields: row.fields,
+                    fields: row.fields.into_iter().map(|(k, v)| (k.to_string(), v)).collect(),
                 };
                 accumulate_record(
                     &record,
@@ -1264,7 +1265,7 @@ fn metrics_from_fields(fields: &BTreeMap<String, String>) -> FlowMetrics {
 }
 
 #[cfg(test)]
-fn dimensions_from_fields(fields: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+fn dimensions_from_fields(fields: &crate::decoder::FlowFields) -> crate::decoder::FlowFields {
     dimensions_for_rollup(fields)
 }
 
@@ -1361,14 +1362,14 @@ mod tests {
 
     #[test]
     fn rollup_dimensions_exclude_only_metrics_and_internal() {
-        let mut fields = BTreeMap::new();
-        fields.insert("_BOOT_ID".to_string(), "boot".to_string());
-        fields.insert("_SOURCE_REALTIME_TIMESTAMP".to_string(), "1".to_string());
-        fields.insert("V9_IN_BYTES".to_string(), "10".to_string());
-        fields.insert("SRC_ADDR".to_string(), "10.0.0.1".to_string());
-        fields.insert("DST_ADDR".to_string(), "10.0.0.2".to_string());
-        fields.insert("PROTOCOL".to_string(), "6".to_string());
-        fields.insert("BYTES".to_string(), "10".to_string());
+        let mut fields: crate::decoder::FlowFields = BTreeMap::new();
+        fields.insert("_BOOT_ID", "boot".to_string());
+        fields.insert("_SOURCE_REALTIME_TIMESTAMP", "1".to_string());
+        fields.insert("V9_IN_BYTES", "10".to_string());
+        fields.insert("SRC_ADDR", "10.0.0.1".to_string());
+        fields.insert("DST_ADDR", "10.0.0.2".to_string());
+        fields.insert("PROTOCOL", "6".to_string());
+        fields.insert("BYTES", "10".to_string());
 
         let dims = dimensions_from_fields(&fields);
         assert!(dims.contains_key("SRC_ADDR"));
@@ -1380,8 +1381,8 @@ mod tests {
         assert!(!dims.contains_key("_SOURCE_REALTIME_TIMESTAMP"));
 
         let key = build_rollup_key(&dims);
-        assert!(!key.0.iter().any(|(k, _)| k == "SRC_ADDR"));
-        assert!(!key.0.iter().any(|(k, _)| k == "DST_ADDR"));
+        assert!(!key.0.iter().any(|(k, _)| *k == "SRC_ADDR"));
+        assert!(!key.0.iter().any(|(k, _)| *k == "DST_ADDR"));
     }
 
     #[test]
