@@ -253,12 +253,34 @@
   - User decision (Costa, 2026-02-26):
     - remove `pair_side` from topology payload/labels,
     - remove L3 protocols and entire L3 topology pipeline (not used).
-- [ ] A27. Remove L3 topology pipeline/protocol exposure and remove `pair_side` label end-to-end.
+- [x] A27. Remove L3 topology pipeline/protocol exposure and remove `pair_side` label end-to-end.
   - Scope:
     - delete L3 pipeline code and tests,
     - remove L3 topology engine mode/plumbing that depends on L3 pipeline,
     - remove `pair_side` generation and merge dependency from L2,
     - update/adjust tests and fixtures accordingly.
+  - Implemented (2026-02-26):
+    - removed L3 engine pipeline code and tests (`l3_pipeline`, `routing_pipeline`, parity L3 builder).
+    - removed L3 observation/types and SNMP L3 cache ingestion/build path.
+    - removed `pair_side` labels from L2 pairing metadata and projection merge logic.
+    - updated topology tests to assert direction-agnostic pairing behavior.
+  - Validation:
+    - `cd src/go && go test ./pkg/topology/engine ./plugin/go.d/collector/snmp -count=1` passed.
+- [x] A28. Diff against `master` for dedicated topology SNMP profiles added/modified in this PR and clean up unused topology-only profiles (Costa, 2026-02-26).
+  - Requirement:
+    - verify profile files by actual branch diff (`master...HEAD`), not assumptions.
+    - if dedicated topology profiles are no longer needed after L3/pair-side removal, remove/update them and keep autoprobe/profile references consistent.
+  - Evidence:
+    - `git diff --name-status master...HEAD -- src/go/plugin/go.d/config/go.d/snmp.profiles/default` includes:
+      - `_std-topology-ospf-mib.yaml` (added),
+      - `_std-topology-isis-mib.yaml` (added).
+    - global reference check (`rg`) shows these two files are unreferenced after L3 removal.
+  - Implemented (2026-02-26):
+    - deleted unreferenced L3-only profiles:
+      - `src/go/plugin/go.d/config/go.d/snmp.profiles/default/_std-topology-ospf-mib.yaml`,
+      - `src/go/plugin/go.d/config/go.d/snmp.profiles/default/_std-topology-isis-mib.yaml`.
+  - Validation:
+    - `cd src/go && go test ./plugin/go.d/collector/snmp -count=1`
 - [x] A13. Implement selector/depth contract fixes (user-approved).
   - Backend:
     - set `map_type` default to `lldp_cdp_managed`,
