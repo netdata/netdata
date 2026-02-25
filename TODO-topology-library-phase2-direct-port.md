@@ -263,6 +263,29 @@
     - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed.
     - backend install executed:
       - `./install.sh` completed (non-fatal `git fetch -t` warning remains).
+- [x] A20. Strategy behavior verification on live office dataset (2026-02-26).
+  - Verification method:
+    - called function with full argument string in `function=` parameter (collector parser contract), for each:
+      - `map_type`: `high_confidence_inferred`, `all_devices_low_confidence`
+      - `inference_strategy`: all 7 models
+      - `nodes_identity=ip`, `managed_snmp_device_focus=all_devices`, `depth=all`
+  - Fact (graph structure only: actor IDs + link endpoints/protocol/state):
+    - 6 strategies produce identical topology graph:
+      - `fdb_minimum_knowledge`
+      - `stp_parent_tree`
+      - `fdb_pairwise_minimum_knowledge`
+      - `stp_fdb_correlated`
+      - `cdp_fdb_hybrid`
+      - `fdb_overlap_weighted`
+    - 1 strategy differs:
+      - `experimental_full`
+  - Fact (full payload hash):
+    - differs in additional metadata across some strategies even when graph is same.
+  - Key implication:
+    - current strategy implementations mostly affect candidate generation and metadata;
+    - final strict/high-confidence ownership path converges to same graph for this dataset.
+  - Risk:
+    - strategy selector appears to have low practical signal in office dataset for strict/high-confidence mapping.
 - [x] A11. Probable connectivity contract hardening (`strict + delta only`).
   - New required behavior:
     - probable pass starts from strict-unlinked endpoints only,
@@ -684,6 +707,19 @@
   - LLDP/CDP adjacency on a port is authoritative for transit ownership.
   - FDB entries learned on such transit ports must not create inferred segment connectivity.
   - Goal: remove redundant overlapping segments parallel to deterministic LLDP/CDP links.
+- [ ] D13. Strategy-specific high-confidence semantics.
+  - Open requirement from user:
+    - each strategy should contribute strategy-specific high-confidence links/actors when evidence qualifies.
+  - Current state:
+    - high-confidence endpoint ownership is centralized via common rules:
+      - reporter matrix (`inferFDBEndpointOwners`)
+      - single-port owner (`inferSinglePortEndpointOwners`)
+    - strategies currently influence mostly:
+      - bridge-link candidate generation,
+      - switch-facing suppression scope.
+  - Decision needed:
+    - keep centralized high-confidence owner model and treat strategies as candidate generators only, or
+    - add strategy-native high-confidence confidence/scoring and emission paths.
   - Requested:
     - hide unlinked inferred endpoints in strict mode,
     - keep unlinked managed devices visible.

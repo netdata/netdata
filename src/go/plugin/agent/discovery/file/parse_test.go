@@ -253,9 +253,9 @@ func TestParse(t *testing.T) {
 							"hostname":            "10.20.4.84",
 							"community":           "atadteN",
 							"topology":            map[string]any{"autoprobe": false},
-							"autodetection_retry": module.AutoDetectionRetry,
-							"priority":            module.Priority,
-							"update_every":        module.UpdateEvery,
+							"autodetection_retry": collectorapi.AutoDetectionRetry,
+							"priority":            collectorapi.Priority,
+							"update_every":        collectorapi.UpdateEvery,
 						},
 					},
 				}
@@ -301,9 +301,9 @@ func TestParse(t *testing.T) {
 							"hostname":            "10.20.4.1",
 							"community":           "atadteN",
 							"topology":            map[string]any{"autoprobe": true, "protocols": []any{"lldp", "cdp", "fdb"}},
-							"update_every":        module.UpdateEvery,
-							"autodetection_retry": module.AutoDetectionRetry,
-							"priority":            module.Priority,
+							"update_every":        collectorapi.UpdateEvery,
+							"autodetection_retry": collectorapi.AutoDetectionRetry,
+							"priority":            collectorapi.Priority,
 						},
 					},
 				}
@@ -340,9 +340,9 @@ func TestParse(t *testing.T) {
 						{
 							"name":                "name",
 							"module":              "module",
-							"autodetection_retry": module.AutoDetectionRetry,
-							"priority":            module.Priority,
-							"update_every":        module.UpdateEvery,
+							"autodetection_retry": collectorapi.AutoDetectionRetry,
+							"priority":            collectorapi.Priority,
+							"update_every":        collectorapi.UpdateEvery,
 						},
 					},
 				}

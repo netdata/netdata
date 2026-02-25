@@ -61,30 +61,30 @@ var (
 )
 
 var (
-	topologyCharts = module.Charts{
+	topologyCharts = collectorapi.Charts{
 		topologyDevicesChart.Copy(),
 		topologyLinksChart.Copy(),
 	}
-	topologyDevicesChart = module.Chart{
+	topologyDevicesChart = collectorapi.Chart{
 		ID:       "topology_devices",
 		Title:    "Topology devices",
 		Units:    "devices",
 		Fam:      "Topology",
 		Ctx:      "snmp.topology_devices",
 		Priority: prioTopology,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "snmp_topology_devices_total", Name: "total"},
 			{ID: "snmp_topology_devices_discovered", Name: "discovered"},
 		},
 	}
-	topologyLinksChart = module.Chart{
+	topologyLinksChart = collectorapi.Chart{
 		ID:       "topology_links",
 		Title:    "Topology links",
 		Units:    "links",
 		Fam:      "Topology",
 		Ctx:      "snmp.topology_links",
 		Priority: prioTopology,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "snmp_topology_links_total", Name: "total"},
 			{ID: "snmp_topology_links_lldp", Name: "lldp"},
 			{ID: "snmp_topology_links_cdp", Name: "cdp"},
@@ -116,7 +116,7 @@ func (c *Collector) addTopologyCharts() {
 
 	for _, chart := range *charts {
 		for k, v := range labels {
-			chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
+			chart.Labels = append(chart.Labels, collectorapi.Label{Key: k, Value: v})
 		}
 	}
 
