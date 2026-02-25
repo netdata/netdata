@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
@@ -81,7 +82,7 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.VarLibDir)
 
-	a.Run()
+	agenthost.Run(a)
 }
 
 func parseCLI() *cli.Option {

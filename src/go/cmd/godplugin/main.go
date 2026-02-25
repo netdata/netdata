@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
@@ -89,7 +90,7 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
-	a.Run()
+	agenthost.Run(a)
 }
 
 func parseCLI() *cli.Option {

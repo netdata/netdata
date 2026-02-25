@@ -4,6 +4,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -131,6 +132,53 @@ func New(cfg Config) *Agent {
 func (a *Agent) Run() {
 	go a.keepAlive()
 	serve(a)
+}
+
+// RunContext runs one agent instance lifecycle on the provided context.
+func (a *Agent) RunContext(ctx context.Context) {
+	a.run(ctx)
+}
+
+// RunKeepAlive runs keepalive loop until context cancellation or too many failures.
+func (a *Agent) RunKeepAlive(ctx context.Context) error {
+	if terminal.IsTerminal() {
+		return nil
+	}
+
+	tk := time.NewTicker(time.Second)
+	defer tk.Stop()
+
+	var n int
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-tk.C:
+			if err := a.api.EMPTYLINE(); err != nil {
+				n++
+			} else {
+				n = 0
+			}
+			if n >= 30 {
+				return fmt.Errorf("too many keepAlive errors")
+			}
+		}
+	}
+}
+
+// QuitCh returns agent quit notifications (e.g., dump completion).
+func (a *Agent) QuitCh() <-chan struct{} {
+	return a.quitCh
+}
+
+// DumpModeDuration returns configured dump mode duration.
+func (a *Agent) DumpModeDuration() time.Duration {
+	return a.dumpMode
+}
+
+// TriggerDumpAnalysis prints dump analysis report.
+func (a *Agent) TriggerDumpAnalysis() {
+	a.collectDumpAnalysis()
 }
 
 func serve(a *Agent) {
@@ -289,24 +337,9 @@ func (a *Agent) run(ctx context.Context) {
 }
 
 func (a *Agent) keepAlive() {
-	if terminal.IsTerminal() {
-		return
-	}
-
-	tk := time.NewTicker(time.Second)
-	defer tk.Stop()
-
-	var n int
-	for range tk.C {
-		if err := a.api.EMPTYLINE(); err != nil {
-			n++
-		} else {
-			n = 0
-		}
-		if n >= 30 {
-			a.Info("too many keepAlive errors. Terminating...")
-			os.Exit(0)
-		}
+	if err := a.RunKeepAlive(context.Background()); err != nil {
+		a.Info("too many keepAlive errors. Terminating...")
+		os.Exit(0)
 	}
 }
 
