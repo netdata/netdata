@@ -3,7 +3,9 @@ package logger
 import (
 	"context"
 	"log/slog"
+	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 
@@ -14,6 +16,8 @@ type pcCaptureHandler struct {
 	mu  sync.Mutex
 	pcs []uintptr
 }
+
+const expectedLoggerPrefix = "github.com/netdata/netdata/go/plugins/logger."
 
 func (h *pcCaptureHandler) Enabled(context.Context, slog.Level) bool {
 	return true
@@ -71,7 +75,7 @@ func TestCallDepthTerminalDebugUsesDynamicResolverForWhen(t *testing.T) {
 
 	fn := h.lastFunction()
 	assert.NotEmpty(t, fn)
-	assert.False(t, isSkippedCaller(fn), "expected non-internal caller, got %q", fn)
+	assert.False(t, strings.HasPrefix(fn, expectedLoggerPrefix), "expected non-logger caller, got %q", fn)
 }
 
 func TestCallDepthTerminalDebugUsesDynamicResolverForOnce(t *testing.T) {
@@ -82,7 +86,7 @@ func TestCallDepthTerminalDebugUsesDynamicResolverForOnce(t *testing.T) {
 
 	fn := h.lastFunction()
 	assert.NotEmpty(t, fn)
-	assert.False(t, isSkippedCaller(fn), "expected non-internal caller, got %q", fn)
+	assert.False(t, strings.HasPrefix(fn, expectedLoggerPrefix), "expected non-logger caller, got %q", fn)
 }
 
 func TestCallDepthGatingUsesFixedPathOutsideTerminalDebug(t *testing.T) {
@@ -94,7 +98,7 @@ func TestCallDepthGatingUsesFixedPathOutsideTerminalDebug(t *testing.T) {
 
 		fn := h.lastFunction()
 		assert.NotEmpty(t, fn)
-		assert.True(t, isSkippedCaller(fn), "expected internal frame with fixed path, got %q", fn)
+		assert.True(t, strings.HasPrefix(fn, expectedLoggerPrefix), "expected logger frame with fixed path, got %q", fn)
 	})
 
 	t.Run("non-terminal debug", func(t *testing.T) {
@@ -105,8 +109,16 @@ func TestCallDepthGatingUsesFixedPathOutsideTerminalDebug(t *testing.T) {
 
 		fn := h.lastFunction()
 		assert.NotEmpty(t, fn)
-		assert.True(t, isSkippedCaller(fn), "expected internal frame with fixed path, got %q", fn)
+		assert.True(t, strings.HasPrefix(fn, expectedLoggerPrefix), "expected logger frame with fixed path, got %q", fn)
 	})
+}
+
+func TestCallerSkipPrefixMatchesRuntimeLoggerPath(t *testing.T) {
+	fn := runtime.FuncForPC(reflect.ValueOf((*Logger).Info).Pointer())
+	if assert.NotNil(t, fn) {
+		assert.True(t, strings.HasPrefix(fn.Name(), expectedLoggerPrefix))
+	}
+	assert.Equal(t, expectedLoggerPrefix, callerSkipPrefixes[0])
 }
 
 func TestResolveCallerPCFallbackMatchesFixedPath(t *testing.T) {
