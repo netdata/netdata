@@ -43,6 +43,9 @@ type Config struct {
 
 	DisableServiceDiscovery bool
 
+	IsInsideK8s    bool
+	SystemdVersion int
+
 	DiscoveryProviders []discovery.ProviderFactory
 
 	DumpMode    time.Duration
@@ -68,6 +71,9 @@ type Agent struct {
 	MinUpdateEvery int
 
 	DisableServiceDiscovery bool
+
+	IsInsideK8s    bool
+	SystemdVersion int
 
 	DiscoveryProviders []discovery.ProviderFactory
 
@@ -103,6 +109,8 @@ func New(cfg Config) *Agent {
 		RunModule:                 cfg.RunModule,
 		RunJob:                    cfg.RunJob,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
+		IsInsideK8s:               cfg.IsInsideK8s,
+		SystemdVersion:            cfg.SystemdVersion,
 		ModuleRegistry:            cfg.ModuleRegistry,
 		DiscoveryProviders:        cfg.DiscoveryProviders,
 		Out:                       safewriter.Stdout,

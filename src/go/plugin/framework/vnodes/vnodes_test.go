@@ -12,3 +12,8 @@ func TestLoad(t *testing.T) {
 	assert.NotNil(t, Load("testdata"))
 	assert.NotNil(t, Load("not_exist"))
 }
+
+func TestIsStockConfig(t *testing.T) {
+	assert.True(t, isStockConfig("/usr/lib/netdata/conf.d/vnodes/test.conf"))
+	assert.False(t, isStockConfig("/etc/netdata/vnodes/test.conf"))
+}

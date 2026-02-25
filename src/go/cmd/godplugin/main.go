@@ -28,6 +28,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
@@ -77,6 +78,8 @@ func main() {
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            collectorapi.DefaultRegistry,
+		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
+		SystemdVersion:            hostinfo.SystemdVersion,
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
 			discoveryproviders.Dummy(),

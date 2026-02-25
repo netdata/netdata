@@ -91,7 +91,7 @@ func (r *Reader) groups() (groups []*confgroup.Group) {
 }
 
 func configSourceType(path string) string {
-	if strings.Contains(path, "/etc/netdata") {
+	if strings.Contains(path, "/etc/") {
 		return "user"
 	}
 	return "stock"

@@ -21,6 +21,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/nagios"
@@ -68,6 +69,8 @@ func main() {
 		CollectorsConfigWatchPath: watchPaths,
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            collectorapi.DefaultRegistry,
+		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
+		SystemdVersion:            hostinfo.SystemdVersion,
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
 			discoveryproviders.Dummy(),

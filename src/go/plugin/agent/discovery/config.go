@@ -15,7 +15,6 @@ type (
 	PlatformPolicy struct {
 		IsInsideK8s    bool
 		SystemdVersion int
-		StockConfigDir string
 	}
 	PluginIdentity struct {
 		Name string

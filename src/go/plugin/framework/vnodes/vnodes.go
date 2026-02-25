@@ -171,13 +171,6 @@ func loadConfigFile(conf any, path string) error {
 	return nil
 }
 
-var (
-	envNDStockConfigDir = os.Getenv("NETDATA_STOCK_CONFIG_DIR")
-)
-
 func isStockConfig(path string) bool {
-	if envNDStockConfigDir == "" {
-		return false
-	}
-	return strings.HasPrefix(path, envNDStockConfigDir)
+	return !strings.Contains(path, "/etc/")
 }

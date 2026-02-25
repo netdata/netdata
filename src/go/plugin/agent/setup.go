@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	hostinfo2 "github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -55,7 +54,7 @@ func (a *Agent) loadEnabledModules(cfg config) collectorapi.Registry {
 		}
 		if all {
 			// Known issue: go.d/logind high CPU usage on Alma Linux8 (https://github.com/netdata/netdata/issues/15930)
-			if !cfg.isExplicitlyEnabled(name) && (creator.Disabled || name == "logind" && hostinfo2.SystemdVersion == 239) {
+			if !cfg.isExplicitlyEnabled(name) && (creator.Disabled || name == "logind" && a.SystemdVersion == 239) {
 				a.Infof("'%s' module disabled by default, should be explicitly enabled in the config", name)
 				continue
 			}
@@ -98,9 +97,8 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 		Registry: reg,
 		BuildContext: discovery.BuildContext{
 			Policy: discovery.PlatformPolicy{
-				IsInsideK8s:    hostinfo2.IsInsideK8sCluster(),
-				SystemdVersion: hostinfo2.SystemdVersion,
-				StockConfigDir: envNDStockConfigDir,
+				IsInsideK8s:    a.IsInsideK8s,
+				SystemdVersion: a.SystemdVersion,
 			},
 			Identity: discovery.PluginIdentity{
 				Name: a.Name,
@@ -122,7 +120,7 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 	}
 
 	if len(a.CollectorsConfDir) == 0 {
-		if hostinfo2.IsInsideK8sCluster() {
+		if a.IsInsideK8s {
 			cfg.Providers = nil
 			return cfg
 		}
@@ -141,7 +139,7 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 		a.Debugf("looking for '%s' in %v", cfgName, a.CollectorsConfDir)
 
 		path, err := a.CollectorsConfDir.Find(cfgName)
-		if hostinfo2.IsInsideK8sCluster() {
+		if a.IsInsideK8s {
 			if err != nil {
 				a.Infof("not found '%s', won't use default (reading stock configs is disabled in k8s)", cfgName)
 				continue
@@ -201,13 +199,6 @@ func loadYAML(conf any, path string) error {
 	return nil
 }
 
-var (
-	envNDStockConfigDir = os.Getenv("NETDATA_STOCK_CONFIG_DIR")
-)
-
 func isStockConfig(path string) bool {
-	if envNDStockConfigDir == "" {
-		return false
-	}
-	return strings.HasPrefix(path, envNDStockConfigDir)
+	return !strings.Contains(path, "/etc/")
 }
