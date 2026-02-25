@@ -6,15 +6,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
-
-	"github.com/mattn/go-isatty"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 )
 
-var isTerm = isatty.IsTerminal(os.Stderr.Fd())
+var isTerm = terminal.IsTerminal()
 
 var isJournal = isStderrConnectedToJournal()
 
@@ -23,7 +21,7 @@ var pluginAttr = slog.String("plugin", executable.Name)
 func New() *Logger {
 	if isTerm {
 		// skip 2 slog pkg calls, 2 this pkg calls
-		return &Logger{sl: slog.New(withCallDepth(4, newTerminalHandler())), rl: newRateLimiter()}
+		return &Logger{sl: slog.New(withTerminalCallDepth(4, newTerminalHandler())), rl: newRateLimiter()}
 	}
 	return &Logger{sl: slog.New(newTextHandler()).With(pluginAttr), rl: newRateLimiter()}
 }

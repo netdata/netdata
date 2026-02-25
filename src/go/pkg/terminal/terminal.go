@@ -9,7 +9,9 @@ import (
 )
 
 // IsTerminal reports whether plugin IO is attached to a terminal.
-// It checks stdout and stdin for consistent behavior across components.
+// It checks stderr, stdout, and stdin.
 func IsTerminal() bool {
-	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsTerminal(os.Stdin.Fd())
+	return isatty.IsTerminal(os.Stderr.Fd()) ||
+		isatty.IsTerminal(os.Stdout.Fd()) ||
+		isatty.IsTerminal(os.Stdin.Fd())
 }

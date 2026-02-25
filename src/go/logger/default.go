@@ -4,16 +4,15 @@ package logger
 
 import (
 	"log/slog"
-	"os"
 	"time"
 
-	"github.com/mattn/go-isatty"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 )
 
 func newDefaultLogger() *Logger {
-	if isatty.IsTerminal(os.Stderr.Fd()) {
+	if terminal.IsTerminal() {
 		// skip 2 slog pkg calls, 3 this pkg calls
-		return &Logger{sl: slog.New(withCallDepth(5, newTerminalHandler())), rl: newRateLimiter()}
+		return &Logger{sl: slog.New(withTerminalCallDepth(5, newTerminalHandler())), rl: newRateLimiter()}
 	}
 	return &Logger{sl: slog.New(newTextHandler()).With(pluginAttr), rl: newRateLimiter()}
 }

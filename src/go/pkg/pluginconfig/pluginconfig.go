@@ -19,8 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
-
-	"github.com/mattn/go-isatty"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 )
 
 var (
@@ -259,7 +258,7 @@ func (d *directories) validate() error {
 	return nil
 }
 
-var isTerm = isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsTerminal(os.Stdout.Fd())
+var isTerm = terminal.IsTerminal()
 
 func readEnvFromOS(execDir string) envData {
 	e := envData{
