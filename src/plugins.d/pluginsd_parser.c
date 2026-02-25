@@ -524,10 +524,16 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
         if (strstr(options, "nooverflow") != NULL)
             rrddim_option_set(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
 
-        if (strstr(options, "type=float") != NULL)
+        if (strstr(options, "type=float") != NULL) {
+            if(!rrddim_is_float(rd))
+                memset(&rd->collector.collected, 0, sizeof(rd->collector.collected));
             rrddim_option_set(rd, RRDDIM_OPTION_VALUE_FLOAT);
-        else if (strstr(options, "type=int") != NULL)
+        }
+        else if (strstr(options, "type=int") != NULL) {
+            if(rrddim_is_float(rd))
+                memset(&rd->collector.collected, 0, sizeof(rd->collector.collected));
             rrddim_option_clear(rd, RRDDIM_OPTION_VALUE_FLOAT);
+        }
     }
     else
         rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
@@ -958,11 +964,20 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
     // ------------------------------------------------------------------------
     // parse the parameters
 
-    collected_number collected_value = (collected_number) str2ll_encoded(collected_str);
+    // The sender only sends float baselines when it has STREAM_CAP_FLOAT_BASELINE;
+    // older senders always send int64, even for float dimensions.
+    bool sender_sent_float = rrddim_is_float(rd) && stream_has_capability(&parser->user, STREAM_CAP_FLOAT_BASELINE);
+
+    collected_number collected_value = 0;
+    NETDATA_DOUBLE collected_value_d = 0.0;
+    if(sender_sent_float)
+        collected_value_d = str2ndd_encoded(collected_str, NULL);
+    else
+        collected_value = (collected_number) str2ll_encoded(collected_str);
 
     NETDATA_DOUBLE value;
     if(*value_str == '#')
-        value = (NETDATA_DOUBLE)collected_value;
+        value = sender_sent_float ? collected_value_d : (NETDATA_DOUBLE)collected_value;
     else
         value = str2ndd_encoded(value_str, NULL);
 
@@ -1011,7 +1026,12 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
         // check if receiver and sender have the same number parsing capabilities
         bool can_copy = stream_has_capability(&parser->user, STREAM_CAP_IEEE754) == stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754);
 
-        // check the sender capabilities
+        // check if the float baseline capability matches between incoming and outgoing
+        bool downstream_float = rrddim_is_float(rd) && stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_FLOAT_BASELINE);
+        if(sender_sent_float != downstream_float)
+            can_copy = false;
+
+        // check the downstream parent capabilities
         bool with_slots = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_SLOTS) ? true : false;
         NUMBER_ENCODING integer_encoding = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
         NUMBER_ENCODING doubles_encoding = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
@@ -1030,8 +1050,10 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
         buffer_fast_strcat(wb, "' ", 2);
         if(can_copy)
             buffer_strcat(wb, collected_str);
+        else if(downstream_float)
+            buffer_print_netdata_double_encoded(wb, doubles_encoding, sender_sent_float ? collected_value_d : (NETDATA_DOUBLE)collected_value);
         else
-            buffer_print_int64_encoded(wb, integer_encoding, collected_value); // original v2 had hex
+            buffer_print_int64_encoded(wb, integer_encoding, sender_sent_float ? (int64_t)collected_value_d : collected_value);
         buffer_fast_strcat(wb, " ", 1);
         if(can_copy)
             buffer_strcat(wb, value_str);
@@ -1050,7 +1072,9 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
     rrddim_store_metric(rd, parser->user.v2.end_time * USEC_PER_SEC, value, flags);
     rd->collector.last_collected_time.tv_sec = parser->user.v2.end_time;
     rd->collector.last_collected_time.tv_usec = 0;
-    if(rrddim_is_float(rd))
+    if(sender_sent_float)
+        rrddim_set_last_collected_float(rd, collected_value_d);
+    else if(rrddim_is_float(rd))
         rrddim_set_last_collected_float(rd, (NETDATA_DOUBLE)collected_value);
     else
         rrddim_set_last_collected_int(rd, collected_value);
