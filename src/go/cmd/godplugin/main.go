@@ -72,6 +72,7 @@ func main() {
 		logger.Level.Set(slog.LevelDebug)
 	}
 	isTerminal := terminal.IsTerminal()
+	isInsideK8s := hostinfo.IsInsideK8sCluster()
 
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
@@ -81,7 +82,7 @@ func main() {
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            collectorapi.DefaultRegistry,
-		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
+		IsInsideK8s:               isInsideK8s,
 		SystemdVersion:            hostinfo.SystemdVersion,
 		RunModePolicy: policy.RunModePolicy{
 			IsTerminal:               isTerminal,
@@ -91,7 +92,7 @@ func main() {
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
 			discoveryproviders.Dummy(),
-			discoveryproviders.SD(sdext.Registry()),
+			discoveryproviders.SD(sdext.Registry(!isInsideK8s)),
 		},
 		RunModule:      opts.Module,
 		RunJob:         opts.Job,
