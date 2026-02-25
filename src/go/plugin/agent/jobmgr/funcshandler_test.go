@@ -237,7 +237,7 @@ func newTestManagerWithCapture(t *testing.T) (*Manager, *map[string]any) {
 	var resp map[string]any
 	mgr := &Manager{
 		moduleFuncs: newModuleFuncRegistry(),
-		FunctionJSONWriter: func(payload []byte, code int) {
+		functionJSONWriter: func(payload []byte, code int) {
 			if err := json.Unmarshal(payload, &resp); err != nil {
 				t.Fatalf("failed to decode response: %v", err)
 			}
