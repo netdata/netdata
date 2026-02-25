@@ -120,6 +120,53 @@ func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.
 	require.Equal(t, 0, data.Stats["links_bidirectional"].(int))
 }
 
+func TestTopologyRegistry_SnapshotWithOptions_LLDPManagedKeepsRequestedMapType(t *testing.T) {
+	registry := newTopologyRegistry()
+	registry.register(newTestTopologyCacheLLDP(
+		"agent-test",
+		time.Now().UTC(),
+		"00:11:22:33:44:55",
+		"sw-a",
+		"10.0.0.1",
+		"Gi0/1",
+		"aa:bb:cc:dd:ee:ff",
+		"sw-b",
+		"10.0.0.2",
+		"Gi0/2",
+	))
+
+	data, ok := registry.snapshotWithOptions(topologyQueryOptions{
+		CollapseActorsByIP:     true,
+		EliminateNonIPInferred: true,
+		MapType:                topologyMapTypeLLDPCDPManaged,
+		ManagedDeviceFocus:     topologyManagedFocusAllDevices,
+		Depth:                  topologyDepthAllInternal,
+	})
+	require.True(t, ok)
+	require.Equal(t, topologyMapTypeLLDPCDPManaged, data.Stats["map_type"])
+}
+
+func TestTopologyRegistry_ManagedDeviceFocusTargets_ReturnsPerDeviceIPTargets(t *testing.T) {
+	registry := newTopologyRegistry()
+	registry.register(newTestTopologyCacheLLDP(
+		"agent-test",
+		time.Now().UTC(),
+		"00:11:22:33:44:55",
+		"sw-a",
+		"10.0.0.1",
+		"Gi0/1",
+		"aa:bb:cc:dd:ee:ff",
+		"sw-b",
+		"10.0.0.2",
+		"Gi0/2",
+	))
+
+	targets := registry.managedDeviceFocusTargets()
+	require.Len(t, targets, 1)
+	require.Equal(t, "ip:10.0.0.1", targets[0].Value)
+	require.Equal(t, "sw-a (10.0.0.1)", targets[0].Name)
+}
+
 func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()
@@ -333,6 +380,7 @@ func TestApplySNMPTopologyOutputPolicies_CollapsesActorsByIP(t *testing.T) {
 
 	applySNMPTopologyOutputPolicies(&data, topologyQueryOptions{
 		CollapseActorsByIP: true,
+		MapType:            topologyMapTypeHighConfidenceInferred,
 	})
 
 	require.Len(t, data.Actors, 1)
@@ -371,12 +419,274 @@ func TestApplySNMPTopologyOutputPolicies_EliminatesNonIPInferredActorsAndSparseS
 
 	applySNMPTopologyOutputPolicies(&data, topologyQueryOptions{
 		EliminateNonIPInferred: true,
+		MapType:                topologyMapTypeHighConfidenceInferred,
 	})
 
 	require.Len(t, data.Actors, 0)
 	require.Len(t, data.Links, 0)
 	require.Equal(t, 1, data.Stats["actors_non_ip_inferred_suppressed"])
 	require.Equal(t, 1, data.Stats["segments_sparse_suppressed"])
+}
+
+func TestApplySNMPTopologyOutputPolicies_HighConfidenceSuppressesUnlinkedInferredEndpoints(t *testing.T) {
+	data := topologyData{
+		Actors: []topologyActor{
+			{
+				ActorID:   "device:d1",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.1"}},
+			},
+			{
+				ActorID:   "endpoint:linked",
+				ActorType: "endpoint",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.2"}},
+			},
+			{
+				ActorID:   "endpoint:unlinked",
+				ActorType: "endpoint",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.3"}},
+			},
+		},
+		Links: []topologyLink{
+			{
+				SrcActorID: "device:d1",
+				DstActorID: "endpoint:linked",
+				Protocol:   "fdb",
+				Direction:  "bidirectional",
+			},
+		},
+		Stats: map[string]any{},
+	}
+
+	applySNMPTopologyOutputPolicies(&data, topologyQueryOptions{
+		MapType: topologyMapTypeHighConfidenceInferred,
+	})
+
+	require.Len(t, data.Actors, 2)
+	require.Equal(t, 1, data.Stats["actors_map_type_suppressed"])
+	for _, actor := range data.Actors {
+		require.NotEqual(t, "endpoint:unlinked", actor.ActorID)
+	}
+}
+
+func TestApplySNMPTopologyOutputPolicies_LLDPManagedMapKeepsOnlyLLDPCDPAndManagedDevices(t *testing.T) {
+	data := topologyData{
+		Actors: []topologyActor{
+			{
+				ActorID:   "device:d1",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.1"}},
+			},
+			{
+				ActorID:   "device:d2",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.2"}},
+			},
+			{
+				ActorID:   "endpoint:e1",
+				ActorType: "endpoint",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.3"}},
+			},
+		},
+		Links: []topologyLink{
+			{
+				SrcActorID: "device:d1",
+				DstActorID: "device:d2",
+				Protocol:   "lldp",
+				Direction:  "bidirectional",
+			},
+			{
+				SrcActorID: "device:d1",
+				DstActorID: "endpoint:e1",
+				Protocol:   "fdb",
+				Direction:  "bidirectional",
+			},
+		},
+		Stats: map[string]any{},
+	}
+
+	applySNMPTopologyOutputPolicies(&data, topologyQueryOptions{
+		MapType: topologyMapTypeLLDPCDPManaged,
+	})
+
+	require.Len(t, data.Actors, 2)
+	require.Len(t, data.Links, 1)
+	require.Equal(t, "lldp", data.Links[0].Protocol)
+	require.Equal(t, 1, data.Stats["actors_map_type_suppressed"])
+}
+
+func TestMarkProbableDeltaLinks_MarksAllAddedLinksAsProbable(t *testing.T) {
+	strictData := topologyData{
+		Links: []topologyLink{
+			{
+				SrcActorID: "device:d1",
+				DstActorID: "device:d2",
+				Protocol:   "lldp",
+				Direction:  "bidirectional",
+			},
+		},
+		Stats: map[string]any{},
+	}
+	probableData := topologyData{
+		Links: []topologyLink{
+			{
+				SrcActorID: "device:d1",
+				DstActorID: "device:d2",
+				Protocol:   "lldp",
+				Direction:  "bidirectional",
+			},
+			{
+				SrcActorID: "device:d1",
+				DstActorID: "segment:s1",
+				Protocol:   "bridge",
+				Direction:  "bidirectional",
+				Metrics: map[string]any{
+					"bridge_domain": "bridge-domain:s1",
+				},
+			},
+		},
+		Stats: map[string]any{},
+	}
+
+	markProbableDeltaLinks(&strictData, &probableData)
+
+	require.Len(t, probableData.Links, 2)
+	require.Equal(t, "", probableData.Links[0].State)
+	require.Equal(t, "probable", probableData.Links[1].State)
+	require.Equal(t, "probable", probableData.Links[1].Metrics["inference"])
+	require.Equal(t, "probable_bridge_anchor", probableData.Links[1].Metrics["attachment_mode"])
+}
+
+func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthZero(t *testing.T) {
+	data := topologyData{
+		Actors: []topologyActor{
+			{
+				ActorID:   "device:managed-a",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.1"}},
+			},
+			{
+				ActorID:   "device:managed-b",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.2"}},
+			},
+			{
+				ActorID:   "endpoint:e1",
+				ActorType: "endpoint",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.3"}},
+			},
+			{
+				ActorID:   "segment:s1",
+				ActorType: "segment",
+				Source:    "snmp",
+				Match:     topologyMatch{Hostnames: []string{"segment:s1"}},
+			},
+		},
+		Links: []topologyLink{
+			{
+				SrcActorID: "device:managed-a",
+				DstActorID: "device:managed-b",
+				Protocol:   "lldp",
+				Direction:  "bidirectional",
+			},
+			{
+				SrcActorID: "device:managed-a",
+				DstActorID: "segment:s1",
+				Protocol:   "bridge",
+				Direction:  "bidirectional",
+			},
+			{
+				SrcActorID: "segment:s1",
+				DstActorID: "endpoint:e1",
+				Protocol:   "fdb",
+				Direction:  "bidirectional",
+			},
+		},
+		Stats: map[string]any{},
+	}
+
+	applyTopologyDepthFocusFilter(&data, topologyQueryOptions{
+		ManagedDeviceFocus:     "ip:10.0.0.1",
+		Depth:                  0,
+		EliminateNonIPInferred: true,
+	})
+
+	require.Len(t, data.Actors, 1)
+	require.Len(t, data.Links, 0)
+	require.Equal(t, "ip:10.0.0.1", data.Stats["managed_snmp_device_focus"])
+	require.Equal(t, 0, data.Stats["depth"])
+}
+
+func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthOneIncludesDirectNeighbors(t *testing.T) {
+	data := topologyData{
+		Actors: []topologyActor{
+			{
+				ActorID:   "device:managed-a",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.1"}},
+			},
+			{
+				ActorID:   "device:managed-b",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.2"}},
+			},
+			{
+				ActorID:   "endpoint:e1",
+				ActorType: "endpoint",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.3"}},
+			},
+			{
+				ActorID:   "segment:s1",
+				ActorType: "segment",
+				Source:    "snmp",
+				Match:     topologyMatch{Hostnames: []string{"segment:s1"}},
+			},
+		},
+		Links: []topologyLink{
+			{
+				SrcActorID: "device:managed-a",
+				DstActorID: "device:managed-b",
+				Protocol:   "lldp",
+				Direction:  "bidirectional",
+			},
+			{
+				SrcActorID: "device:managed-a",
+				DstActorID: "segment:s1",
+				Protocol:   "bridge",
+				Direction:  "bidirectional",
+			},
+			{
+				SrcActorID: "segment:s1",
+				DstActorID: "endpoint:e1",
+				Protocol:   "fdb",
+				Direction:  "bidirectional",
+			},
+		},
+		Stats: map[string]any{},
+	}
+
+	applyTopologyDepthFocusFilter(&data, topologyQueryOptions{
+		ManagedDeviceFocus:     "ip:10.0.0.1",
+		Depth:                  1,
+		EliminateNonIPInferred: true,
+	})
+
+	require.Len(t, data.Actors, 4)
+	require.Len(t, data.Links, 3)
+	require.Equal(t, "ip:10.0.0.1", data.Stats["managed_snmp_device_focus"])
+	require.Equal(t, 1, data.Stats["depth"])
 }
 
 func countActorsByType(data topologyData, actorType string) int {

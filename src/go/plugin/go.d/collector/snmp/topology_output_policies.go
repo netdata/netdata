@@ -13,6 +13,11 @@ func applySNMPTopologyOutputPolicies(data *topologyData, options topologyQueryOp
 	if data == nil {
 		return
 	}
+	mapType := normalizeTopologyMapType(options.MapType)
+	if mapType == "" {
+		mapType = topologyMapTypeAllDevicesLowConfidence
+	}
+	options.MapType = mapType
 
 	collapsed := 0
 	if options.CollapseActorsByIP {
@@ -20,13 +25,20 @@ func applySNMPTopologyOutputPolicies(data *topologyData, options topologyQueryOp
 	}
 
 	removedNonIP := 0
-	removedSparseSegments := 0
 	if options.EliminateNonIPInferred {
 		removedNonIP = eliminateNonIPInferredActors(data)
-		removedSparseSegments = pruneSparseSegments(data, 1)
 	}
 
 	filterDanglingLinks(data)
+	removedByMapType := applyMapTypePolicy(data, options.MapType)
+	filterDanglingLinks(data)
+
+	removedSparseSegments := 0
+	if options.EliminateNonIPInferred {
+		removedSparseSegments = pruneSparseSegments(data, 1)
+	}
+	filterDanglingLinks(data)
+
 	sort.Slice(data.Actors, func(i, j int) bool {
 		return canonicalMatchKey(data.Actors[i].Match) < canonicalMatchKey(data.Actors[j].Match)
 	})
@@ -37,14 +49,141 @@ func applySNMPTopologyOutputPolicies(data *topologyData, options topologyQueryOp
 	if data.Stats == nil {
 		data.Stats = make(map[string]any)
 	}
-	data.Stats["actors_total"] = len(data.Actors)
-	data.Stats["links_total"] = len(data.Links)
 	data.Stats["actors_collapsed_by_ip"] = collapsed
 	data.Stats["actors_non_ip_inferred_suppressed"] = removedNonIP
+	data.Stats["actors_map_type_suppressed"] = removedByMapType
 	data.Stats["segments_sparse_suppressed"] = removedSparseSegments
+	data.Stats["map_type"] = options.MapType
 	if removedSparseSegments > 0 {
 		data.Stats["segments_suppressed"] = intStatValue(data.Stats["segments_suppressed"]) + removedSparseSegments
 	}
+	recomputeTopologyLinkStats(data)
+}
+
+func applyMapTypePolicy(data *topologyData, mapType string) int {
+	switch normalizeTopologyMapType(mapType) {
+	case topologyMapTypeLLDPCDPManaged:
+		return applyLLDPCDPManagedMapPolicy(data)
+	case topologyMapTypeHighConfidenceInferred:
+		return suppressUnlinkedInferredEndpoints(data)
+	default:
+		return 0
+	}
+}
+
+func applyLLDPCDPManagedMapPolicy(data *topologyData) int {
+	if data == nil || len(data.Actors) == 0 {
+		return 0
+	}
+
+	managedIDs := make(map[string]struct{})
+	for _, actor := range data.Actors {
+		if !isManagedSNMPDeviceActor(actor) {
+			continue
+		}
+		managedIDs[actor.ActorID] = struct{}{}
+	}
+
+	keepLink := func(link topologyLink) bool {
+		protocol := strings.ToLower(strings.TrimSpace(link.Protocol))
+		return protocol == "lldp" || protocol == "cdp"
+	}
+
+	keptLinks := make([]topologyLink, 0, len(data.Links))
+	linkedIDs := make(map[string]struct{}, len(managedIDs))
+	for managedID := range managedIDs {
+		linkedIDs[managedID] = struct{}{}
+	}
+	for _, link := range data.Links {
+		if !keepLink(link) {
+			continue
+		}
+		keptLinks = append(keptLinks, link)
+		if strings.TrimSpace(link.SrcActorID) != "" {
+			linkedIDs[link.SrcActorID] = struct{}{}
+		}
+		if strings.TrimSpace(link.DstActorID) != "" {
+			linkedIDs[link.DstActorID] = struct{}{}
+		}
+	}
+	data.Links = keptLinks
+
+	keptActors := make([]topologyActor, 0, len(data.Actors))
+	removed := 0
+	for _, actor := range data.Actors {
+		if _, ok := linkedIDs[actor.ActorID]; ok {
+			keptActors = append(keptActors, actor)
+			continue
+		}
+		removed++
+	}
+	data.Actors = keptActors
+	return removed
+}
+
+func suppressUnlinkedInferredEndpoints(data *topologyData) int {
+	if data == nil || len(data.Actors) == 0 {
+		return 0
+	}
+
+	linked := make(map[string]struct{}, len(data.Links)*2)
+	for _, link := range data.Links {
+		if strings.TrimSpace(link.SrcActorID) != "" {
+			linked[link.SrcActorID] = struct{}{}
+		}
+		if strings.TrimSpace(link.DstActorID) != "" {
+			linked[link.DstActorID] = struct{}{}
+		}
+	}
+
+	removed := 0
+	removedIDs := make(map[string]struct{})
+	kept := make([]topologyActor, 0, len(data.Actors))
+	for _, actor := range data.Actors {
+		if !strings.EqualFold(strings.TrimSpace(actor.ActorType), "endpoint") {
+			kept = append(kept, actor)
+			continue
+		}
+		if !topologyActorIsInferred(actor) {
+			kept = append(kept, actor)
+			continue
+		}
+		if _, ok := linked[actor.ActorID]; ok {
+			kept = append(kept, actor)
+			continue
+		}
+		removed++
+		removedIDs[actor.ActorID] = struct{}{}
+	}
+	if removed == 0 {
+		return 0
+	}
+	data.Actors = kept
+	if len(data.Links) == 0 {
+		return removed
+	}
+	filtered := make([]topologyLink, 0, len(data.Links))
+	for _, link := range data.Links {
+		if _, drop := removedIDs[link.SrcActorID]; drop {
+			continue
+		}
+		if _, drop := removedIDs[link.DstActorID]; drop {
+			continue
+		}
+		filtered = append(filtered, link)
+	}
+	data.Links = filtered
+	return removed
+}
+
+func isManagedSNMPDeviceActor(actor topologyActor) bool {
+	if !strings.EqualFold(strings.TrimSpace(actor.ActorType), "device") {
+		return false
+	}
+	if strings.ToLower(strings.TrimSpace(actor.Source)) != "snmp" {
+		return false
+	}
+	return !topologyActorIsInferred(actor)
 }
 
 func collapseActorsByIP(data *topologyData) int {
@@ -464,6 +603,358 @@ func intStatValue(value any) int {
 		}
 	}
 	return 0
+}
+
+func topologyMetricValueString(metrics map[string]any, key string) string {
+	if metrics == nil {
+		return ""
+	}
+	value, ok := metrics[key]
+	if !ok || value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
+}
+
+func recomputeTopologyLinkStats(data *topologyData) {
+	if data == nil {
+		return
+	}
+	if data.Stats == nil {
+		data.Stats = make(map[string]any)
+	}
+	data.Stats["actors_total"] = len(data.Actors)
+	data.Stats["links_total"] = len(data.Links)
+
+	probable := 0
+	for _, link := range data.Links {
+		state := strings.ToLower(strings.TrimSpace(link.State))
+		inference := strings.ToLower(topologyMetricValueString(link.Metrics, "inference"))
+		attachment := strings.ToLower(topologyMetricValueString(link.Metrics, "attachment_mode"))
+		if state == "probable" || inference == "probable" || strings.HasPrefix(attachment, "probable_") {
+			probable++
+		}
+	}
+	data.Stats["links_probable"] = probable
+}
+
+func topologyLinkDeltaKey(link topologyLink) string {
+	return strings.Join([]string{
+		strings.ToLower(strings.TrimSpace(link.Protocol)),
+		strings.ToLower(strings.TrimSpace(link.Direction)),
+		strings.TrimSpace(link.SrcActorID),
+		strings.TrimSpace(link.DstActorID),
+		attrKey(link.Src.Attributes, "if_index"),
+		attrKey(link.Src.Attributes, "if_name"),
+		attrKey(link.Src.Attributes, "port_id"),
+		attrKey(link.Dst.Attributes, "if_index"),
+		attrKey(link.Dst.Attributes, "if_name"),
+		attrKey(link.Dst.Attributes, "port_id"),
+		fmt.Sprint(link.Metrics["bridge_domain"]),
+	}, "|")
+}
+
+func markProbableDeltaLinks(strictData, probableData *topologyData) {
+	if strictData == nil || probableData == nil {
+		return
+	}
+
+	strictKeys := make(map[string]struct{}, len(strictData.Links))
+	for _, link := range strictData.Links {
+		strictKeys[topologyLinkDeltaKey(link)] = struct{}{}
+	}
+
+	for idx, link := range probableData.Links {
+		key := topologyLinkDeltaKey(link)
+		if _, exists := strictKeys[key]; exists {
+			continue
+		}
+		link.State = "probable"
+		if link.Metrics == nil {
+			link.Metrics = make(map[string]any)
+		}
+		link.Metrics["inference"] = "probable"
+		if topologyMetricValueString(link.Metrics, "confidence") == "" {
+			link.Metrics["confidence"] = "low"
+		}
+		if topologyMetricValueString(link.Metrics, "attachment_mode") == "" {
+			if strings.EqualFold(strings.TrimSpace(link.Protocol), "bridge") {
+				link.Metrics["attachment_mode"] = "probable_bridge_anchor"
+			} else {
+				link.Metrics["attachment_mode"] = "probable_added"
+			}
+		}
+		probableData.Links[idx] = link
+	}
+	recomputeTopologyLinkStats(probableData)
+}
+
+func applyTopologyDepthFocusFilter(data *topologyData, options topologyQueryOptions) {
+	if data == nil || len(data.Actors) == 0 {
+		return
+	}
+	options = normalizeTopologyQueryOptions(options)
+	focusIP := topologyManagedFocusSelectedIP(options.ManagedDeviceFocus)
+
+	beforeActors := len(data.Actors)
+	beforeLinks := len(data.Links)
+
+	if options.ManagedDeviceFocus == topologyManagedFocusAllDevices {
+		if data.Stats == nil {
+			data.Stats = make(map[string]any)
+		}
+		data.Stats["managed_snmp_device_focus"] = options.ManagedDeviceFocus
+		data.Stats["depth"] = topologyDepthAll
+		data.Stats["actors_focus_depth_filtered"] = 0
+		data.Stats["links_focus_depth_filtered"] = 0
+		recomputeTopologyLinkStats(data)
+		return
+	}
+
+	actorByID := make(map[string]topologyActor, len(data.Actors))
+	segmentSet := make(map[string]struct{})
+	nonSegmentSet := make(map[string]struct{})
+	for _, actor := range data.Actors {
+		id := strings.TrimSpace(actor.ActorID)
+		if id == "" {
+			continue
+		}
+		actorByID[id] = actor
+		if strings.EqualFold(strings.TrimSpace(actor.ActorType), "segment") {
+			segmentSet[id] = struct{}{}
+		} else {
+			nonSegmentSet[id] = struct{}{}
+		}
+	}
+	if len(nonSegmentSet) == 0 {
+		recomputeTopologyLinkStats(data)
+		return
+	}
+
+	roots := make(map[string]struct{})
+	if focusIP != "" {
+		for actorID, actor := range actorByID {
+			if _, ok := nonSegmentSet[actorID]; !ok {
+				continue
+			}
+			if !isManagedSNMPDeviceActor(actor) {
+				continue
+			}
+			if !topologyActorHasIP(actor, focusIP) {
+				continue
+			}
+			roots[actorID] = struct{}{}
+		}
+	} else {
+		recomputeTopologyLinkStats(data)
+		return
+	}
+	if len(roots) == 0 {
+		if data.Stats == nil {
+			data.Stats = make(map[string]any)
+		}
+		data.Stats["managed_snmp_device_focus"] = options.ManagedDeviceFocus
+		if options.Depth == topologyDepthAllInternal {
+			data.Stats["depth"] = topologyDepthAll
+		} else {
+			data.Stats["depth"] = options.Depth
+		}
+		data.Stats["actors_focus_depth_filtered"] = 0
+		data.Stats["links_focus_depth_filtered"] = 0
+		recomputeTopologyLinkStats(data)
+		return
+	}
+
+	nonSegmentAdj := make(map[string]map[string]struct{}, len(nonSegmentSet))
+	nodeSegments := make(map[string]map[string]struct{}, len(nonSegmentSet))
+	segmentNeighbors := make(map[string]map[string]struct{}, len(segmentSet))
+	for actorID := range nonSegmentSet {
+		nonSegmentAdj[actorID] = make(map[string]struct{})
+		nodeSegments[actorID] = make(map[string]struct{})
+	}
+	for segmentID := range segmentSet {
+		segmentNeighbors[segmentID] = make(map[string]struct{})
+	}
+
+	for _, link := range data.Links {
+		src := strings.TrimSpace(link.SrcActorID)
+		dst := strings.TrimSpace(link.DstActorID)
+		if src == "" || dst == "" || src == dst {
+			continue
+		}
+		_, srcSegment := segmentSet[src]
+		_, dstSegment := segmentSet[dst]
+		_, srcNonSegment := nonSegmentSet[src]
+		_, dstNonSegment := nonSegmentSet[dst]
+
+		switch {
+		case srcNonSegment && dstNonSegment:
+			nonSegmentAdj[src][dst] = struct{}{}
+			nonSegmentAdj[dst][src] = struct{}{}
+		case srcSegment && dstNonSegment:
+			segmentNeighbors[src][dst] = struct{}{}
+			nodeSegments[dst][src] = struct{}{}
+		case dstSegment && srcNonSegment:
+			segmentNeighbors[dst][src] = struct{}{}
+			nodeSegments[src][dst] = struct{}{}
+		}
+	}
+
+	distance := make(map[string]int, len(nonSegmentSet))
+	queue := make([]string, 0, len(roots))
+	for root := range roots {
+		distance[root] = 0
+		queue = append(queue, root)
+	}
+	segmentExpandedDepth := make(map[string]int)
+
+	for head := 0; head < len(queue); head++ {
+		current := queue[head]
+		currentDepth := distance[current]
+		if options.Depth != topologyDepthAllInternal && currentDepth >= options.Depth {
+			continue
+		}
+
+		for neighbor := range nonSegmentAdj[current] {
+			if _, seen := distance[neighbor]; seen {
+				continue
+			}
+			distance[neighbor] = currentDepth + 1
+			queue = append(queue, neighbor)
+		}
+
+		for segmentID := range nodeSegments[current] {
+			if expandedAt, ok := segmentExpandedDepth[segmentID]; ok && expandedAt <= currentDepth {
+				continue
+			}
+			segmentExpandedDepth[segmentID] = currentDepth
+			for neighbor := range segmentNeighbors[segmentID] {
+				if _, seen := distance[neighbor]; seen {
+					continue
+				}
+				distance[neighbor] = currentDepth + 1
+				queue = append(queue, neighbor)
+			}
+		}
+	}
+
+	includedNonSegment := make(map[string]struct{}, len(distance))
+	for actorID, depth := range distance {
+		if options.Depth == topologyDepthAllInternal || depth <= options.Depth {
+			includedNonSegment[actorID] = struct{}{}
+		}
+	}
+	if len(includedNonSegment) == 0 {
+		recomputeTopologyLinkStats(data)
+		return
+	}
+
+	includedActors := make(map[string]struct{}, len(includedNonSegment)+len(segmentSet))
+	for actorID := range includedNonSegment {
+		includedActors[actorID] = struct{}{}
+	}
+	if options.Depth == topologyDepthAllInternal || options.Depth > 0 {
+		for segmentID, neighbors := range segmentNeighbors {
+			for actorID := range neighbors {
+				if _, ok := includedNonSegment[actorID]; ok {
+					includedActors[segmentID] = struct{}{}
+					break
+				}
+			}
+		}
+	}
+
+	filteredActors := make([]topologyActor, 0, len(data.Actors))
+	for _, actor := range data.Actors {
+		if _, ok := includedActors[actor.ActorID]; ok {
+			filteredActors = append(filteredActors, actor)
+		}
+	}
+	data.Actors = filteredActors
+
+	filteredLinks := make([]topologyLink, 0, len(data.Links))
+	for _, link := range data.Links {
+		if _, ok := includedActors[link.SrcActorID]; !ok {
+			continue
+		}
+		if _, ok := includedActors[link.DstActorID]; !ok {
+			continue
+		}
+		filteredLinks = append(filteredLinks, link)
+	}
+	data.Links = filteredLinks
+
+	filterDanglingLinks(data)
+	if options.EliminateNonIPInferred {
+		pruneSparseSegments(data, 1)
+		filterDanglingLinks(data)
+	}
+
+	sort.Slice(data.Actors, func(i, j int) bool {
+		return canonicalMatchKey(data.Actors[i].Match) < canonicalMatchKey(data.Actors[j].Match)
+	})
+	sort.Slice(data.Links, func(i, j int) bool {
+		return topologyLinkSortKey(data.Links[i]) < topologyLinkSortKey(data.Links[j])
+	})
+
+	if data.Stats == nil {
+		data.Stats = make(map[string]any)
+	}
+	data.Stats["managed_snmp_device_focus"] = options.ManagedDeviceFocus
+	if options.Depth == topologyDepthAllInternal {
+		data.Stats["depth"] = topologyDepthAll
+	} else {
+		data.Stats["depth"] = options.Depth
+	}
+	data.Stats["actors_focus_depth_filtered"] = beforeActors - len(data.Actors)
+	data.Stats["links_focus_depth_filtered"] = beforeLinks - len(data.Links)
+	recomputeTopologyLinkStats(data)
+}
+
+func topologyManagedFocusSelectedIP(value string) string {
+	normalized := normalizeTopologyManagedFocus(value)
+	if normalized == topologyManagedFocusAllDevices {
+		return ""
+	}
+	if len(normalized) <= len(topologyManagedFocusIPPrefix) {
+		return ""
+	}
+	if !strings.EqualFold(normalized[:len(topologyManagedFocusIPPrefix)], topologyManagedFocusIPPrefix) {
+		return ""
+	}
+	return normalizeIPAddress(strings.TrimSpace(normalized[len(topologyManagedFocusIPPrefix):]))
+}
+
+func topologyActorHasIP(actor topologyActor, ip string) bool {
+	ip = normalizeIPAddress(ip)
+	if ip == "" {
+		return false
+	}
+	for _, candidate := range normalizedMatchIPs(actor.Match) {
+		if candidate == ip {
+			return true
+		}
+	}
+	if ip == normalizeIPAddress(topologyMetricValueString(actor.Attributes, "management_ip")) {
+		return true
+	}
+	if raw, ok := actor.Attributes["management_addresses"]; ok {
+		switch values := raw.(type) {
+		case []string:
+			for _, value := range values {
+				if ip == normalizeIPAddress(value) {
+					return true
+				}
+			}
+		case []any:
+			for _, value := range values {
+				if ip == normalizeIPAddress(fmt.Sprint(value)) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func topologyLinkActorKey(link topologyLink) string {

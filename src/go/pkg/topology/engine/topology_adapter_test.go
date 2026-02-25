@@ -1114,6 +1114,151 @@ func TestToTopologyData_ProbableConnectivityCreatesPortlessAttachmentForZeroCand
 	require.Equal(t, 1, bridgeCount)
 }
 
+func TestPickProbableSegmentAnchorPortID_PrefersManagedPortWhenOwnerPointsToUnmanaged(t *testing.T) {
+	unmanagedPort := bridgePortRef{
+		deviceID: "ghost-switch",
+		ifIndex:  900,
+		ifName:   "ghost0",
+	}
+	managedPort := bridgePortRef{
+		deviceID: "managed-switch",
+		ifIndex:  7,
+		ifName:   "swp06",
+	}
+
+	segment := newBridgeDomainSegment(unmanagedPort)
+	segment.addPort(managedPort)
+
+	endpointID := "mac:50:2c:c6:a6:fc:35"
+	owner := fdbEndpointOwner{
+		portKey:     bridgePortObservationKey(unmanagedPort),
+		portVLANKey: bridgePortObservationVLANKey(unmanagedPort),
+		port:        unmanagedPort,
+		source:      "single_port_mac",
+	}
+
+	picked := pickProbableSegmentAnchorPortID(
+		segment,
+		map[string]struct{}{endpointID: {}},
+		map[string]fdbEndpointOwner{endpointID: owner},
+		map[string]struct{}{"managed-switch": {}},
+	)
+
+	require.NotEmpty(t, picked)
+	require.Equal(t, bridgePortRefSortKey(managedPort), bridgePortRefSortKey(segment.ports[picked]))
+}
+
+func TestSelectProbableEndpointReporterHint_PrefersManagedHintsOverUnmanagedOwner(t *testing.T) {
+	endpointLabels := map[string]string{
+		"learned_device_ids": "ghost-switch,managed-switch",
+		"learned_if_indexes": "7",
+		"learned_if_names":   "swp06",
+	}
+	reporterHints := map[string][]bridgePortRef{
+		"ghost-switch": {
+			{deviceID: "ghost-switch", ifIndex: 900, ifName: "ghost0"},
+		},
+		"managed-switch": {
+			{deviceID: "managed-switch", ifIndex: 7, ifName: "swp06"},
+		},
+	}
+	owner := fdbEndpointOwner{
+		port: bridgePortRef{
+			deviceID: "ghost-switch",
+			ifIndex:  900,
+			ifName:   "ghost0",
+		},
+		source: "single_port_mac",
+	}
+
+	hint := selectProbableEndpointReporterHint(
+		endpointLabels,
+		reporterHints,
+		owner,
+		nil,
+		map[string]struct{}{"managed-switch": {}},
+	)
+
+	require.Equal(t, "managed-switch", hint.deviceID)
+	require.Equal(t, 7, hint.ifIndex)
+	require.Equal(t, "swp06", hint.ifName)
+}
+
+func TestProbableCandidateSegmentsFromReporterHints_PrefersManagedReporterSegments(t *testing.T) {
+	index := segmentReporterIndex{
+		byDevice: map[string]map[string]struct{}{
+			"ghost-switch":   {"segment:ghost": {}},
+			"managed-switch": {"segment:managed": {}},
+		},
+		byDeviceIfIndex: map[string]map[string]struct{}{
+			"ghost-switch|7":   {"segment:ghost": {}},
+			"managed-switch|7": {"segment:managed": {}},
+		},
+		byDeviceIfName: map[string]map[string]struct{}{
+			"ghost-switch|swp06":   {"segment:ghost": {}},
+			"managed-switch|swp06": {"segment:managed": {}},
+		},
+	}
+
+	segments := probableCandidateSegmentsFromReporterHints(
+		map[string]string{
+			"learned_device_ids": "ghost-switch,managed-switch",
+			"learned_if_indexes": "7",
+			"learned_if_names":   "swp06",
+		},
+		nil,
+		index,
+		nil,
+		map[string]struct{}{"managed-switch": {}},
+	)
+
+	require.Equal(t, []string{"segment:managed"}, segments)
+}
+
+func TestEnsureManagedProbableReporterHint_UpgradesUnmanagedHint(t *testing.T) {
+	hint := probableEndpointReporterHint{
+		deviceID: "ghost-switch",
+	}
+	endpointLabels := map[string]string{
+		"learned_device_ids": "macAddress:18:fd:74:7e:c5:80",
+		"learned_if_indexes": "7",
+		"learned_if_names":   "swp06",
+	}
+	aliasOwnerIDs := map[string]map[string]struct{}{
+		"mac:18:fd:74:7e:c5:80": {
+			"managed-switch": {},
+		},
+	}
+
+	updated := ensureManagedProbableReporterHint(
+		hint,
+		endpointLabels,
+		nil,
+		aliasOwnerIDs,
+		map[string]struct{}{"managed-switch": {}},
+		[]string{"managed-switch"},
+	)
+
+	require.Equal(t, "managed-switch", updated.deviceID)
+	require.Equal(t, 7, updated.ifIndex)
+	require.Equal(t, "swp06", updated.ifName)
+}
+
+func TestEnsureManagedProbableReporterHint_FallsBackToFirstManagedDevice(t *testing.T) {
+	updated := ensureManagedProbableReporterHint(
+		probableEndpointReporterHint{deviceID: "ghost-switch"},
+		nil,
+		nil,
+		nil,
+		map[string]struct{}{"managed-a": {}, "managed-b": {}},
+		[]string{"managed-a", "managed-b"},
+	)
+
+	require.Equal(t, "managed-a", updated.deviceID)
+	require.Equal(t, 0, updated.ifIndex)
+	require.Equal(t, "0", updated.ifName)
+}
+
 func TestToTopologyData_ProbableConnectivityRecoversUnmanagedOverlapSuppression(t *testing.T) {
 	result := Result{
 		Devices: []Device{

@@ -4,6 +4,7 @@ package snmp
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -23,14 +24,23 @@ func newFuncTopology(r *funcRouter) *funcTopology {
 const topologyMethodID = "topology:snmp"
 
 const (
-	topologyParamNodesIdentity = "nodes_identity"
-	topologyParamConnectivity  = "non_lldp_cdp_connectivity"
+	topologyParamNodesIdentity      = "nodes_identity"
+	topologyParamMapType            = "map_type"
+	topologyParamManagedDeviceFocus = "managed_snmp_device_focus"
+	topologyParamDepth              = "depth"
 
 	topologyNodesIdentityIP  = "ip"
 	topologyNodesIdentityMAC = "mac"
 
-	topologyConnectivityStrict   = "strict"
-	topologyConnectivityProbable = "probable"
+	topologyMapTypeLLDPCDPManaged          = "lldp_cdp_managed"
+	topologyMapTypeHighConfidenceInferred  = "high_confidence_inferred"
+	topologyMapTypeAllDevicesLowConfidence = "all_devices_low_confidence"
+	topologyManagedFocusAllDevices         = "all_devices"
+	topologyManagedFocusIPPrefix           = "ip:"
+	topologyDepthAll                       = "all"
+	topologyDepthMin                       = 0
+	topologyDepthMax                       = 10
+	topologyDepthAllInternal               = -1
 )
 
 func topologyNodesIdentityParamConfig() funcapi.ParamConfig {
@@ -46,16 +56,67 @@ func topologyNodesIdentityParamConfig() funcapi.ParamConfig {
 	}
 }
 
-func topologyConnectivityParamConfig() funcapi.ParamConfig {
+func topologyMapTypeParamConfig() funcapi.ParamConfig {
 	return funcapi.ParamConfig{
-		ID:        topologyParamConnectivity,
-		Name:      "Non LLDP/CDP Connectivity",
-		Help:      "Choose inferred non-LLDP/CDP connectivity mode: strict or probable",
+		ID:        topologyParamMapType,
+		Name:      "Map Type",
+		Help:      "Choose topology map mode",
 		Selection: funcapi.ParamSelect,
 		Options: []funcapi.ParamOption{
-			{ID: topologyConnectivityStrict, Name: "Strict"},
-			{ID: topologyConnectivityProbable, Name: "Probable", Default: true},
+			{
+				ID:      topologyMapTypeLLDPCDPManaged,
+				Name:    "LLDP/CDP/Managed Devices Map",
+				Default: true,
+			},
+			{ID: topologyMapTypeHighConfidenceInferred, Name: "High Confidence Inferred Map"},
+			{
+				ID:   topologyMapTypeAllDevicesLowConfidence,
+				Name: "All Devices (Low Confidence)",
+			},
 		},
+	}
+}
+
+func topologyManagedFocusParamConfig(extraOptions []funcapi.ParamOption) funcapi.ParamConfig {
+	options := make([]funcapi.ParamOption, 0, 1+len(extraOptions))
+	options = append(options, funcapi.ParamOption{
+		ID:      topologyManagedFocusAllDevices,
+		Name:    "All Devices",
+		Default: true,
+	})
+	options = append(options, extraOptions...)
+
+	return funcapi.ParamConfig{
+		ID:        topologyParamManagedDeviceFocus,
+		Name:      "Managed SNMP Device Focus",
+		Help:      "Choose focus root set for depth filtering",
+		Selection: funcapi.ParamSelect,
+		Options:   options,
+	}
+}
+
+func topologyDepthParamConfig() funcapi.ParamConfig {
+	options := make([]funcapi.ParamOption, 0, 1+(topologyDepthMax-topologyDepthMin+1))
+	options = append(options, funcapi.ParamOption{
+		ID:      topologyDepthAll,
+		Name:    "All",
+		Default: true,
+	})
+	for depth := topologyDepthMin; depth <= topologyDepthMax; depth++ {
+		value := strconv.Itoa(depth)
+		options = append(options, funcapi.ParamOption{
+			ID:   value,
+			Name: value,
+		},
+		)
+	}
+
+	return funcapi.ParamConfig{
+		ID:        topologyParamDepth,
+		Name:      "Depth",
+		Help:      "Limit topology expansion hops from focus roots",
+		Selection: funcapi.ParamSelect,
+		Options:   options,
 	}
 }
 
@@ -70,7 +131,9 @@ func topologyMethodConfig() funcapi.MethodConfig {
 		AgentWide:    true,
 		RequiredParams: []funcapi.ParamConfig{
 			topologyNodesIdentityParamConfig(),
-			topologyConnectivityParamConfig(),
+			topologyMapTypeParamConfig(),
+			topologyManagedFocusParamConfig(nil),
+			topologyDepthParamConfig(),
 		},
 	}
 }
@@ -79,9 +142,23 @@ func (f *funcTopology) MethodParams(_ context.Context, method string) ([]funcapi
 	if method != topologyMethodID {
 		return nil, nil
 	}
+	managedFocusOptions := []funcapi.ParamOption(nil)
+	if snmpTopologyRegistry != nil {
+		for _, target := range snmpTopologyRegistry.managedDeviceFocusTargets() {
+			if strings.TrimSpace(target.Value) == "" {
+				continue
+			}
+			managedFocusOptions = append(managedFocusOptions, funcapi.ParamOption{
+				ID:   target.Value,
+				Name: target.Name,
+			})
+		}
+	}
 	return []funcapi.ParamConfig{
 		topologyNodesIdentityParamConfig(),
-		topologyConnectivityParamConfig(),
+		topologyMapTypeParamConfig(),
+		topologyManagedFocusParamConfig(managedFocusOptions),
+		topologyDepthParamConfig(),
 	}, nil
 }
 
@@ -93,9 +170,11 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 	}
 
 	options := topologyQueryOptions{
-		CollapseActorsByIP:        true,
-		EliminateNonIPInferred:    true,
-		ProbabilisticConnectivity: true,
+		CollapseActorsByIP:     true,
+		EliminateNonIPInferred: true,
+		MapType:                topologyMapTypeLLDPCDPManaged,
+		ManagedDeviceFocus:     topologyManagedFocusAllDevices,
+		Depth:                  topologyDepthAllInternal,
 	}
 	if identity := normalizeTopologyNodesIdentity(params.GetOne(topologyParamNodesIdentity)); identity != "" {
 		if identity == topologyNodesIdentityMAC {
@@ -103,9 +182,13 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 			options.EliminateNonIPInferred = false
 		}
 	}
-	if mode := normalizeTopologyConnectivity(params.GetOne(topologyParamConnectivity)); mode != "" {
-		options.ProbabilisticConnectivity = mode == topologyConnectivityProbable
+	if mapType := normalizeTopologyMapType(params.GetOne(topologyParamMapType)); mapType != "" {
+		options.MapType = mapType
 	}
+	if focus := normalizeTopologyManagedFocus(params.GetOne(topologyParamManagedDeviceFocus)); focus != "" {
+		options.ManagedDeviceFocus = focus
+	}
+	options.Depth = normalizeTopologyDepth(params.GetOne(topologyParamDepth))
 
 	if snmpTopologyRegistry == nil {
 		return funcapi.UnavailableResponse("topology data not available yet, please retry after data collection")
@@ -136,13 +219,59 @@ func normalizeTopologyNodesIdentity(v string) string {
 	}
 }
 
-func normalizeTopologyConnectivity(v string) string {
+func normalizeTopologyMapType(v string) string {
 	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "", topologyConnectivityProbable:
-		return topologyConnectivityProbable
-	case topologyConnectivityStrict:
-		return topologyConnectivityStrict
+	case "", topologyMapTypeLLDPCDPManaged:
+		return topologyMapTypeLLDPCDPManaged
+	case topologyMapTypeHighConfidenceInferred:
+		return topologyMapTypeHighConfidenceInferred
+	case topologyMapTypeAllDevicesLowConfidence:
+		return topologyMapTypeAllDevicesLowConfidence
 	default:
 		return ""
+	}
+}
+
+func normalizeTopologyManagedFocus(v string) string {
+	value := strings.TrimSpace(v)
+	switch strings.ToLower(value) {
+	case "", topologyManagedFocusAllDevices:
+		return topologyManagedFocusAllDevices
+	}
+	if len(value) > len(topologyManagedFocusIPPrefix) &&
+		strings.EqualFold(value[:len(topologyManagedFocusIPPrefix)], topologyManagedFocusIPPrefix) {
+		ip := normalizeIPAddress(strings.TrimSpace(value[len(topologyManagedFocusIPPrefix):]))
+		if ip == "" {
+			return ""
+		}
+		return topologyManagedFocusIPPrefix + ip
+	}
+	return ""
+}
+
+func normalizeTopologyDepth(v string) int {
+	value := strings.ToLower(strings.TrimSpace(v))
+	if value == "" || value == topologyDepthAll {
+		return topologyDepthAllInternal
+	}
+	depth, err := strconv.Atoi(value)
+	if err != nil {
+		return topologyDepthAllInternal
+	}
+	if depth < topologyDepthMin {
+		return topologyDepthMin
+	}
+	if depth > topologyDepthMax {
+		return topologyDepthMax
+	}
+	return depth
+}
+
+func isTopologyMapTypeProbable(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "", topologyMapTypeAllDevicesLowConfidence:
+		return true
+	default:
+		return false
 	}
 }
