@@ -8,7 +8,7 @@ modules:
         name: HDD temperature
         link: https://linux.die.net/man/8/hddtemp
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.storage
         icon_filename: "hard-drive.svg"
       related_resources:
         integrations:

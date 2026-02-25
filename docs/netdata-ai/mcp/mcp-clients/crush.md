@@ -59,7 +59,46 @@ Crush uses JSON configuration files with the following priority:
 2. `crush.json` (project-specific)
 3. `~/.config/crush/crush.json` (global)
 
-### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
+### Netdata Cloud MCP
+
+Connect to your entire Netdata Cloud infrastructure
+through a single endpoint — no local setup, bridges,
+or firewall changes needed.
+
+**Prerequisites:**
+
+- Netdata Cloud account with Business plan
+- Nodes claimed to Netdata Cloud
+- API token with `scope:mcp`
+  ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+
+```json
+{
+  "$schema": "https://charm.land/crush.json",
+  "mcp": {
+    "netdata-cloud": {
+      "type": "http",
+      "url": "https://app.netdata.cloud/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+      },
+      "timeout": 120,
+      "disabled": false
+    }
+  }
+}
+```
+
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
+Netdata Cloud API token (must have `scope:mcp`).
+For more details, see
+[Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+
+### Local Agent or Parent
+
+The following methods connect directly to a Netdata Agent or Parent on your network.
+
+#### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
 
 Connect directly to Netdata's HTTP endpoint without needing the nd-mcp bridge:
 
@@ -98,7 +137,7 @@ For HTTPS connections:
 }
 ```
 
-### Method 2: Direct SSE Connection (v2.7.2+)
+#### Method 2: Direct SSE Connection (v2.7.2+)
 
 Connect directly to Netdata's SSE endpoint for real-time streaming:
 
@@ -119,7 +158,7 @@ Connect directly to Netdata's SSE endpoint for real-time streaming:
 }
 ```
 
-### Method 3: Using nd-mcp Bridge (stdio)
+#### Method 3: Using nd-mcp Bridge (stdio)
 
 For environments where you prefer or need to use the bridge:
 
@@ -138,7 +177,7 @@ For environments where you prefer or need to use the bridge:
 }
 ```
 
-### Method 4: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
+#### Method 4: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
 
 If nd-mcp is not available, use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/netdata-ai/mcp/README.md#using-mcp-remote-client).
 

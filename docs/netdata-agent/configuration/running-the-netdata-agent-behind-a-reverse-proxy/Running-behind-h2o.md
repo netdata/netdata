@@ -102,6 +102,12 @@ necessary to specify inside the H2O configuration that the final destination is 
 
 ### Enable authentication
 
+:::tip Simpler Alternative
+
+If you use Netdata Cloud, [Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md) provides authentication with a single setting - no htpasswd files or H2O auth configuration needed.
+
+:::
+
 Create an authentication file to enable basic authentication via H2O, this secures your Netdata dashboard.
 
 If you don't have an authentication file, you can use the following command:

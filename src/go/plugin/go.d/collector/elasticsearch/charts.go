@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioNodeIndicesIndexingOps = module.Priority + iota
+	prioNodeIndicesIndexingOps = collectorapi.Priority + iota
 	prioNodeIndicesIndexingOpsCurrent
 	prioNodeIndicesIndexingOpsTime
 	prioNodeIndicesSearchOps
@@ -61,7 +61,7 @@ const (
 	prioNodeIndexStoreSize
 )
 
-var nodeChartsTmpl = module.Charts{
+var nodeChartsTmpl = collectorapi.Charts{
 	nodeIndicesIndexingOpsChartTmpl.Copy(),
 	nodeIndicesIndexingOpsCurrentChartTmpl.Copy(),
 	nodeIndicesIndexingOpsTimeChartTmpl.Copy(),
@@ -108,181 +108,181 @@ var nodeChartsTmpl = module.Charts{
 }
 
 var (
-	nodeIndicesIndexingOpsChartTmpl = module.Chart{
+	nodeIndicesIndexingOpsChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_indexing_operations",
 		Title:    "Indexing Operations",
 		Units:    "operations/s",
 		Fam:      "indices indexing",
 		Ctx:      "elasticsearch.node_indices_indexing",
 		Priority: prioNodeIndicesIndexingOps,
-		Dims: module.Dims{
-			{ID: "node_%s_indices_indexing_index_total", Name: "index", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_indices_indexing_index_total", Name: "index", Algo: collectorapi.Incremental},
 		},
 	}
-	nodeIndicesIndexingOpsCurrentChartTmpl = module.Chart{
+	nodeIndicesIndexingOpsCurrentChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_indexing_operations_current",
 		Title:    "Indexing Operations Current",
 		Units:    "operations",
 		Fam:      "indices indexing",
 		Ctx:      "elasticsearch.node_indices_indexing_current",
 		Priority: prioNodeIndicesIndexingOpsCurrent,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_indices_indexing_index_current", Name: "index"},
 		},
 	}
-	nodeIndicesIndexingOpsTimeChartTmpl = module.Chart{
+	nodeIndicesIndexingOpsTimeChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_indexing_operations_time",
 		Title:    "Time Spent On Indexing Operations",
 		Units:    "milliseconds",
 		Fam:      "indices indexing",
 		Ctx:      "elasticsearch.node_indices_indexing_time",
 		Priority: prioNodeIndicesIndexingOpsTime,
-		Dims: module.Dims{
-			{ID: "node_%s_indices_indexing_index_time_in_millis", Name: "index", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_indices_indexing_index_time_in_millis", Name: "index", Algo: collectorapi.Incremental},
 		},
 	}
 
-	nodeIndicesSearchOpsChartTmpl = module.Chart{
+	nodeIndicesSearchOpsChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_search_operations",
 		Title:    "Search Operations",
 		Units:    "operations/s",
 		Fam:      "indices search",
 		Ctx:      "elasticsearch.node_indices_search",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioNodeIndicesSearchOps,
-		Dims: module.Dims{
-			{ID: "node_%s_indices_search_query_total", Name: "queries", Algo: module.Incremental},
-			{ID: "node_%s_indices_search_fetch_total", Name: "fetches", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_indices_search_query_total", Name: "queries", Algo: collectorapi.Incremental},
+			{ID: "node_%s_indices_search_fetch_total", Name: "fetches", Algo: collectorapi.Incremental},
 		},
 	}
-	nodeIndicesSearchOpsCurrentChartTmpl = module.Chart{
+	nodeIndicesSearchOpsCurrentChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_search_operations_current",
 		Title:    "Search Operations Current",
 		Units:    "operations",
 		Fam:      "indices search",
 		Ctx:      "elasticsearch.node_indices_search_current",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioNodeIndicesSearchOpsCurrent,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_indices_search_query_current", Name: "queries"},
 			{ID: "node_%s_indices_search_fetch_current", Name: "fetches"},
 		},
 	}
-	nodeIndicesSearchOpsTimeChartTmpl = module.Chart{
+	nodeIndicesSearchOpsTimeChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_search_operations_time",
 		Title:    "Time Spent On Search Operations",
 		Units:    "milliseconds",
 		Fam:      "indices search",
 		Ctx:      "elasticsearch.node_indices_search_time",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioNodeIndicesSearchOpsTime,
-		Dims: module.Dims{
-			{ID: "node_%s_indices_search_query_time_in_millis", Name: "query", Algo: module.Incremental},
-			{ID: "node_%s_indices_search_fetch_time_in_millis", Name: "fetch", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_indices_search_query_time_in_millis", Name: "query", Algo: collectorapi.Incremental},
+			{ID: "node_%s_indices_search_fetch_time_in_millis", Name: "fetch", Algo: collectorapi.Incremental},
 		},
 	}
 
-	nodeIndicesRefreshOpsChartTmpl = module.Chart{
+	nodeIndicesRefreshOpsChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_refresh_operations",
 		Title:    "Refresh Operations",
 		Units:    "operations/s",
 		Fam:      "indices refresh",
 		Ctx:      "elasticsearch.node_indices_refresh",
 		Priority: prioNodeIndicesRefreshOps,
-		Dims: module.Dims{
-			{ID: "node_%s_indices_refresh_total", Name: "refresh", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_indices_refresh_total", Name: "refresh", Algo: collectorapi.Incremental},
 		},
 	}
-	nodeIndicesRefreshOpsTimeChartTmpl = module.Chart{
+	nodeIndicesRefreshOpsTimeChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_refresh_operations_time",
 		Title:    "Time Spent On Refresh Operations",
 		Units:    "milliseconds",
 		Fam:      "indices refresh",
 		Ctx:      "elasticsearch.node_indices_refresh_time",
 		Priority: prioNodeIndicesRefreshOpsTime,
-		Dims: module.Dims{
-			{ID: "node_%s_indices_refresh_total_time_in_millis", Name: "refresh", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_indices_refresh_total_time_in_millis", Name: "refresh", Algo: collectorapi.Incremental},
 		},
 	}
 
-	nodeIndicesFlushOpsChartTmpl = module.Chart{
+	nodeIndicesFlushOpsChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_flush_operations",
 		Title:    "Flush Operations",
 		Units:    "operations/s",
 		Fam:      "indices flush",
 		Ctx:      "elasticsearch.node_indices_flush",
 		Priority: prioNodeIndicesFlushOps,
-		Dims: module.Dims{
-			{ID: "node_%s_indices_flush_total", Name: "flush", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_indices_flush_total", Name: "flush", Algo: collectorapi.Incremental},
 		},
 	}
-	nodeIndicesFlushOpsTimeChartTmpl = module.Chart{
+	nodeIndicesFlushOpsTimeChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_flush_operations_time",
 		Title:    "Time Spent On Flush Operations",
 		Units:    "milliseconds",
 		Fam:      "indices flush",
 		Ctx:      "elasticsearch.node_indices_flush_time",
 		Priority: prioNodeIndicesFlushOpsTime,
-		Dims: module.Dims{
-			{ID: "node_%s_indices_flush_total_time_in_millis", Name: "flush", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_indices_flush_total_time_in_millis", Name: "flush", Algo: collectorapi.Incremental},
 		},
 	}
 
-	nodeIndicesFieldDataMemoryUsageChartTmpl = module.Chart{
+	nodeIndicesFieldDataMemoryUsageChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_fielddata_memory_usage",
 		Title:    "Fielddata Cache Memory Usage",
 		Units:    "bytes",
 		Fam:      "indices fielddata",
 		Ctx:      "elasticsearch.node_indices_fielddata_memory_usage",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNodeIndicesFieldDataMemoryUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_indices_fielddata_memory_size_in_bytes", Name: "used"},
 		},
 	}
-	nodeIndicesFieldDataEvictionsChartTmpl = module.Chart{
+	nodeIndicesFieldDataEvictionsChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_fielddata_evictions",
 		Title:    "Fielddata Evictions",
 		Units:    "operations/s",
 		Fam:      "indices fielddata",
 		Ctx:      "elasticsearch.node_indices_fielddata_evictions",
 		Priority: prioNodeIndicesFieldDataEvictions,
-		Dims: module.Dims{
-			{ID: "node_%s_indices_fielddata_evictions", Name: "evictions", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_indices_fielddata_evictions", Name: "evictions", Algo: collectorapi.Incremental},
 		},
 	}
 
-	nodeIndicesSegmentsCountChartTmpl = module.Chart{
+	nodeIndicesSegmentsCountChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_segments_count",
 		Title:    "Segments Count",
 		Units:    "segments",
 		Fam:      "indices segments",
 		Ctx:      "elasticsearch.node_indices_segments_count",
 		Priority: prioNodeIndicesSegmentsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_indices_segments_count", Name: "segments"},
 		},
 	}
-	nodeIndicesSegmentsMemoryUsageTotalChartTmpl = module.Chart{
+	nodeIndicesSegmentsMemoryUsageTotalChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_segments_memory_usage_total",
 		Title:    "Segments Memory Usage Total",
 		Units:    "bytes",
 		Fam:      "indices segments",
 		Ctx:      "elasticsearch.node_indices_segments_memory_usage_total",
 		Priority: prioNodeIndicesSegmentsMemoryUsageTotal,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_indices_segments_memory_in_bytes", Name: "used"},
 		},
 	}
-	nodeIndicesSegmentsMemoryUsageChartTmpl = module.Chart{
+	nodeIndicesSegmentsMemoryUsageChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_segments_memory_usage",
 		Title:    "Segments Memory Usage",
 		Units:    "bytes",
 		Fam:      "indices segments",
 		Ctx:      "elasticsearch.node_indices_segments_memory_usage",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioNodeIndicesSegmentsMemoryUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_indices_segments_terms_memory_in_bytes", Name: "terms"},
 			{ID: "node_%s_indices_segments_stored_fields_memory_in_bytes", Name: "stored_fields"},
 			{ID: "node_%s_indices_segments_term_vectors_memory_in_bytes", Name: "term_vectors"},
@@ -295,144 +295,144 @@ var (
 		},
 	}
 
-	nodeIndicesTransLogOpsChartTmpl = module.Chart{
+	nodeIndicesTransLogOpsChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_indices_translog_operations",
 		Title:    "Translog Operations",
 		Units:    "operations",
 		Fam:      "indices translog",
 		Ctx:      "elasticsearch.node_indices_translog_operations",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNodeIndicesTransLogOps,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_indices_translog_operations", Name: "total"},
 			{ID: "node_%s_indices_translog_uncommitted_operations", Name: "uncommitted"},
 		},
 	}
-	nodeIndexTransLogSizeChartTmpl = module.Chart{
+	nodeIndexTransLogSizeChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_index_translog_size",
 		Title:    "Translog Size",
 		Units:    "bytes",
 		Fam:      "indices translog",
 		Ctx:      "elasticsearch.node_indices_translog_size",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNodeIndexTransLogSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_indices_translog_size_in_bytes", Name: "total"},
 			{ID: "node_%s_indices_translog_uncommitted_size_in_bytes", Name: "uncommitted"},
 		},
 	}
 
-	nodeFileDescriptorsChartTmpl = module.Chart{
+	nodeFileDescriptorsChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_file_descriptors",
 		Title:    "Process File Descriptors",
 		Units:    "fd",
 		Fam:      "process",
 		Ctx:      "elasticsearch.node_file_descriptors",
 		Priority: prioNodeFileDescriptors,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_process_open_file_descriptors", Name: "open"},
 		},
 	}
 
-	nodeJVMMemHeapChartTmpl = module.Chart{
+	nodeJVMMemHeapChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_jvm_mem_heap",
 		Title:    "JVM Heap Percentage Currently in Use",
 		Units:    "percentage",
 		Fam:      "jvm",
 		Ctx:      "elasticsearch.node_jvm_heap",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNodeJVMMemHeap,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_jvm_mem_heap_used_percent", Name: "inuse"},
 		},
 	}
-	nodeJVMMemHeapBytesChartTmpl = module.Chart{
+	nodeJVMMemHeapBytesChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_jvm_mem_heap_bytes",
 		Title:    "JVM Heap Commit And Usage",
 		Units:    "bytes",
 		Fam:      "jvm",
 		Ctx:      "elasticsearch.node_jvm_heap_bytes",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNodeJVMMemHeapBytes,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_jvm_mem_heap_committed_in_bytes", Name: "committed"},
 			{ID: "node_%s_jvm_mem_heap_used_in_bytes", Name: "used"},
 		},
 	}
-	nodeJVMBufferPoolsCountChartTmpl = module.Chart{
+	nodeJVMBufferPoolsCountChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_jvm_buffer_pools_count",
 		Title:    "JVM Buffer Pools Count",
 		Units:    "pools",
 		Fam:      "jvm",
 		Ctx:      "elasticsearch.node_jvm_buffer_pools_count",
 		Priority: prioNodeJVMBufferPoolsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_jvm_buffer_pools_direct_count", Name: "direct"},
 			{ID: "node_%s_jvm_buffer_pools_mapped_count", Name: "mapped"},
 		},
 	}
-	nodeJVMBufferPoolDirectMemoryChartTmpl = module.Chart{
+	nodeJVMBufferPoolDirectMemoryChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_jvm_buffer_pool_direct_memory",
 		Title:    "JVM Buffer Pool Direct Memory",
 		Units:    "bytes",
 		Fam:      "jvm",
 		Ctx:      "elasticsearch.node_jvm_buffer_pool_direct_memory",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNodeJVMBufferPoolDirectMemory,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_jvm_buffer_pools_direct_total_capacity_in_bytes", Name: "total"},
 			{ID: "node_%s_jvm_buffer_pools_direct_used_in_bytes", Name: "used"},
 		},
 	}
-	nodeJVMBufferPoolMappedMemoryChartTmpl = module.Chart{
+	nodeJVMBufferPoolMappedMemoryChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_jvm_buffer_pool_mapped_memory",
 		Title:    "JVM Buffer Pool Mapped Memory",
 		Units:    "bytes",
 		Fam:      "jvm",
 		Ctx:      "elasticsearch.node_jvm_buffer_pool_mapped_memory",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNodeJVMBufferPoolMappedMemory,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_jvm_buffer_pools_mapped_total_capacity_in_bytes", Name: "total"},
 			{ID: "node_%s_jvm_buffer_pools_mapped_used_in_bytes", Name: "used"},
 		},
 	}
-	nodeJVMGCCountChartTmpl = module.Chart{
+	nodeJVMGCCountChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_jvm_gc_count",
 		Title:    "JVM Garbage Collections",
 		Units:    "gc/s",
 		Fam:      "jvm",
 		Ctx:      "elasticsearch.node_jvm_gc_count",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioNodeJVMGCCount,
-		Dims: module.Dims{
-			{ID: "node_%s_jvm_gc_collectors_young_collection_count", Name: "young", Algo: module.Incremental},
-			{ID: "node_%s_jvm_gc_collectors_old_collection_count", Name: "old", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_jvm_gc_collectors_young_collection_count", Name: "young", Algo: collectorapi.Incremental},
+			{ID: "node_%s_jvm_gc_collectors_old_collection_count", Name: "old", Algo: collectorapi.Incremental},
 		},
 	}
-	nodeJVMGCTimeChartTmpl = module.Chart{
+	nodeJVMGCTimeChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_jvm_gc_time",
 		Title:    "JVM Time Spent On Garbage Collections",
 		Units:    "milliseconds",
 		Fam:      "jvm",
 		Ctx:      "elasticsearch.node_jvm_gc_time",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioNodeJVMGCTime,
-		Dims: module.Dims{
-			{ID: "node_%s_jvm_gc_collectors_young_collection_time_in_millis", Name: "young", Algo: module.Incremental},
-			{ID: "node_%s_jvm_gc_collectors_old_collection_time_in_millis", Name: "old", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_jvm_gc_collectors_young_collection_time_in_millis", Name: "young", Algo: collectorapi.Incremental},
+			{ID: "node_%s_jvm_gc_collectors_old_collection_time_in_millis", Name: "old", Algo: collectorapi.Incremental},
 		},
 	}
 
-	nodeThreadPoolQueuedChartTmpl = module.Chart{
+	nodeThreadPoolQueuedChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_thread_pool_queued",
 		Title:    "Thread Pool Queued Threads Count",
 		Units:    "threads",
 		Fam:      "thread pool",
 		Ctx:      "elasticsearch.node_thread_pool_queued",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioNodeThreadPoolQueued,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_thread_pool_generic_queue", Name: "generic"},
 			{ID: "node_%s_thread_pool_search_queue", Name: "search"},
 			{ID: "node_%s_thread_pool_search_throttled_queue", Name: "search_throttled"},
@@ -450,15 +450,15 @@ var (
 			{ID: "node_%s_thread_pool_management_queue", Name: "management"},
 		},
 	}
-	nodeThreadPoolRejectedChartTmpl = module.Chart{
+	nodeThreadPoolRejectedChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_thread_pool_rejected",
 		Title:    "Thread Pool Rejected Threads Count",
 		Units:    "threads",
 		Fam:      "thread pool",
 		Ctx:      "elasticsearch.node_thread_pool_rejected",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioNodeThreadPoolRejected,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_thread_pool_generic_rejected", Name: "generic"},
 			{ID: "node_%s_thread_pool_search_rejected", Name: "search"},
 			{ID: "node_%s_thread_pool_search_throttled_rejected", Name: "search_throttled"},
@@ -477,63 +477,63 @@ var (
 		},
 	}
 
-	nodeClusterCommunicationPacketsChartTmpl = module.Chart{
+	nodeClusterCommunicationPacketsChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_cluster_communication_packets",
 		Title:    "Node Cluster Communication",
 		Units:    "pps",
 		Fam:      "transport",
 		Ctx:      "elasticsearch.node_cluster_communication_packets",
 		Priority: prioNodeClusterCommunicationPackets,
-		Dims: module.Dims{
-			{ID: "node_%s_transport_rx_count", Name: "received", Algo: module.Incremental},
-			{ID: "node_%s_transport_tx_count", Name: "sent", Mul: -1, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_transport_rx_count", Name: "received", Algo: collectorapi.Incremental},
+			{ID: "node_%s_transport_tx_count", Name: "sent", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	nodeClusterCommunicationChartTmpl = module.Chart{
+	nodeClusterCommunicationChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_cluster_communication_traffic",
 		Title:    "Cluster Communication Bandwidth",
 		Units:    "bytes/s",
 		Fam:      "transport",
 		Ctx:      "elasticsearch.node_cluster_communication_traffic",
 		Priority: prioNodeClusterCommunication,
-		Dims: module.Dims{
-			{ID: "node_%s_transport_rx_size_in_bytes", Name: "received", Algo: module.Incremental},
-			{ID: "node_%s_transport_tx_size_in_bytes", Name: "sent", Mul: -1, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_transport_rx_size_in_bytes", Name: "received", Algo: collectorapi.Incremental},
+			{ID: "node_%s_transport_tx_size_in_bytes", Name: "sent", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
 
-	nodeHTTPConnectionsChartTmpl = module.Chart{
+	nodeHTTPConnectionsChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_http_connections",
 		Title:    "HTTP Connections",
 		Units:    "connections",
 		Fam:      "http",
 		Ctx:      "elasticsearch.node_http_connections",
 		Priority: prioNodeHTTPConnections,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_http_current_open", Name: "open"},
 		},
 	}
 
-	nodeBreakersTripsChartTmpl = module.Chart{
+	nodeBreakersTripsChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_cluster_%s_breakers_trips",
 		Title:    "Circuit Breaker Trips Count",
 		Units:    "trips/s",
 		Fam:      "circuit breakers",
 		Ctx:      "elasticsearch.node_breakers_trips",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioNodeBreakersTrips,
-		Dims: module.Dims{
-			{ID: "node_%s_breakers_request_tripped", Name: "requests", Algo: module.Incremental},
-			{ID: "node_%s_breakers_fielddata_tripped", Name: "fielddata", Algo: module.Incremental},
-			{ID: "node_%s_breakers_in_flight_requests_tripped", Name: "in_flight_requests", Algo: module.Incremental},
-			{ID: "node_%s_breakers_model_inference_tripped", Name: "model_inference", Algo: module.Incremental},
-			{ID: "node_%s_breakers_accounting_tripped", Name: "accounting", Algo: module.Incremental},
-			{ID: "node_%s_breakers_parent_tripped", Name: "parent", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_breakers_request_tripped", Name: "requests", Algo: collectorapi.Incremental},
+			{ID: "node_%s_breakers_fielddata_tripped", Name: "fielddata", Algo: collectorapi.Incremental},
+			{ID: "node_%s_breakers_in_flight_requests_tripped", Name: "in_flight_requests", Algo: collectorapi.Incremental},
+			{ID: "node_%s_breakers_model_inference_tripped", Name: "model_inference", Algo: collectorapi.Incremental},
+			{ID: "node_%s_breakers_accounting_tripped", Name: "accounting", Algo: collectorapi.Incremental},
+			{ID: "node_%s_breakers_parent_tripped", Name: "parent", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
-var clusterHealthChartsTmpl = module.Charts{
+var clusterHealthChartsTmpl = collectorapi.Charts{
 	clusterStatusChartTmpl.Copy(),
 	clusterNodesCountChartTmpl.Copy(),
 	clusterShardsCountChartTmpl.Copy(),
@@ -542,39 +542,39 @@ var clusterHealthChartsTmpl = module.Charts{
 }
 
 var (
-	clusterStatusChartTmpl = module.Chart{
+	clusterStatusChartTmpl = collectorapi.Chart{
 		ID:       "cluster_%s_status",
 		Title:    "Cluster Status",
 		Units:    "status",
 		Fam:      "cluster health",
 		Ctx:      "elasticsearch.cluster_health_status",
 		Priority: prioClusterStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_status_green", Name: "green"},
 			{ID: "cluster_status_red", Name: "red"},
 			{ID: "cluster_status_yellow", Name: "yellow"},
 		},
 	}
-	clusterNodesCountChartTmpl = module.Chart{
+	clusterNodesCountChartTmpl = collectorapi.Chart{
 		ID:       "cluster_%s_number_of_nodes",
 		Title:    "Cluster Nodes Count",
 		Units:    "nodes",
 		Fam:      "cluster health",
 		Ctx:      "elasticsearch.cluster_number_of_nodes",
 		Priority: prioClusterNodesCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_number_of_nodes", Name: "nodes"},
 			{ID: "cluster_number_of_data_nodes", Name: "data_nodes"},
 		},
 	}
-	clusterShardsCountChartTmpl = module.Chart{
+	clusterShardsCountChartTmpl = collectorapi.Chart{
 		ID:       "cluster_%s_shards_count",
 		Title:    "Cluster Shards Count",
 		Units:    "shards",
 		Fam:      "cluster health",
 		Ctx:      "elasticsearch.cluster_shards_count",
 		Priority: prioClusterShardsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_active_primary_shards", Name: "active_primary"},
 			{ID: "cluster_active_shards", Name: "active"},
 			{ID: "cluster_relocating_shards", Name: "relocating"},
@@ -583,31 +583,31 @@ var (
 			{ID: "cluster_delayed_unassigned_shards", Name: "delayed_unassigned"},
 		},
 	}
-	clusterPendingTasksChartTmpl = module.Chart{
+	clusterPendingTasksChartTmpl = collectorapi.Chart{
 		ID:       "cluster_%s_pending_tasks",
 		Title:    "Cluster Pending Tasks",
 		Units:    "tasks",
 		Fam:      "cluster health",
 		Ctx:      "elasticsearch.cluster_pending_tasks",
 		Priority: prioClusterPendingTasks,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_number_of_pending_tasks", Name: "pending"},
 		},
 	}
-	clusterInFlightFetchesCountChartTmpl = module.Chart{
+	clusterInFlightFetchesCountChartTmpl = collectorapi.Chart{
 		ID:       "cluster_%s_number_of_in_flight_fetch",
 		Title:    "Cluster Unfinished Fetches",
 		Units:    "fetches",
 		Fam:      "cluster health",
 		Ctx:      "elasticsearch.cluster_number_of_in_flight_fetch",
 		Priority: prioClusterInFlightFetchesCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_number_of_in_flight_fetch", Name: "in_flight_fetch"},
 		},
 	}
 )
 
-var clusterStatsChartsTmpl = module.Charts{
+var clusterStatsChartsTmpl = collectorapi.Charts{
 	clusterIndicesCountChartTmpl.Copy(),
 	clusterIndicesShardsCountChartTmpl.Copy(),
 	clusterIndicesDocsCountChartTmpl.Copy(),
@@ -617,73 +617,73 @@ var clusterStatsChartsTmpl = module.Charts{
 }
 
 var (
-	clusterIndicesCountChartTmpl = module.Chart{
+	clusterIndicesCountChartTmpl = collectorapi.Chart{
 		ID:       "cluster_%s_indices_count",
 		Title:    "Cluster Indices Count",
 		Units:    "indices",
 		Fam:      "cluster stats",
 		Ctx:      "elasticsearch.cluster_indices_count",
 		Priority: prioClusterIndicesCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_indices_count", Name: "indices"},
 		},
 	}
-	clusterIndicesShardsCountChartTmpl = module.Chart{
+	clusterIndicesShardsCountChartTmpl = collectorapi.Chart{
 		ID:       "cluster_%s_indices_shards_count",
 		Title:    "Cluster Indices Shards Count",
 		Units:    "shards",
 		Fam:      "cluster stats",
 		Ctx:      "elasticsearch.cluster_indices_shards_count",
 		Priority: prioClusterIndicesShardsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_indices_shards_total", Name: "total"},
 			{ID: "cluster_indices_shards_primaries", Name: "primaries"},
 			{ID: "cluster_indices_shards_replication", Name: "replication"},
 		},
 	}
-	clusterIndicesDocsCountChartTmpl = module.Chart{
+	clusterIndicesDocsCountChartTmpl = collectorapi.Chart{
 		ID:       "cluster_%s_indices_docs_count",
 		Title:    "Cluster Indices Docs Count",
 		Units:    "docs",
 		Fam:      "cluster stats",
 		Ctx:      "elasticsearch.cluster_indices_docs_count",
 		Priority: prioClusterIndicesDocsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_indices_docs_count", Name: "docs"},
 		},
 	}
-	clusterIndicesStoreSizeChartTmpl = module.Chart{
+	clusterIndicesStoreSizeChartTmpl = collectorapi.Chart{
 		ID:       "cluster_%s_indices_store_size",
 		Title:    "Cluster Indices Store Size",
 		Units:    "bytes",
 		Fam:      "cluster stats",
 		Ctx:      "elasticsearch.cluster_indices_store_size",
 		Priority: prioClusterIndicesStoreSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_indices_store_size_in_bytes", Name: "size"},
 		},
 	}
-	clusterIndicesQueryCacheChartTmpl = module.Chart{
+	clusterIndicesQueryCacheChartTmpl = collectorapi.Chart{
 		ID:       "cluster_%s_indices_query_cache",
 		Title:    "Cluster Indices Query Cache",
 		Units:    "events/s",
 		Fam:      "cluster stats",
 		Ctx:      "elasticsearch.cluster_indices_query_cache",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioClusterIndicesQueryCache,
-		Dims: module.Dims{
-			{ID: "cluster_indices_query_cache_hit_count", Name: "hit", Algo: module.Incremental},
-			{ID: "cluster_indices_query_cache_miss_count", Name: "miss", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "cluster_indices_query_cache_hit_count", Name: "hit", Algo: collectorapi.Incremental},
+			{ID: "cluster_indices_query_cache_miss_count", Name: "miss", Algo: collectorapi.Incremental},
 		},
 	}
-	clusterNodesByRoleCountChartTmpl = module.Chart{
+	clusterNodesByRoleCountChartTmpl = collectorapi.Chart{
 		ID:       "cluster_%s_nodes_by_role_count",
 		Title:    "Cluster Nodes By Role Count",
 		Units:    "nodes",
 		Fam:      "cluster stats",
 		Ctx:      "elasticsearch.cluster_nodes_by_role_count",
 		Priority: prioClusterNodesByRoleCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cluster_nodes_count_coordinating_only", Name: "coordinating_only"},
 			{ID: "cluster_nodes_count_data", Name: "data"},
 			{ID: "cluster_nodes_count_data_cold", Name: "data_cold"},
@@ -700,7 +700,7 @@ var (
 	}
 )
 
-var nodeIndexChartsTmpl = module.Charts{
+var nodeIndexChartsTmpl = collectorapi.Charts{
 	nodeIndexHealthChartTmpl.Copy(),
 	nodeIndexShardsCountChartTmpl.Copy(),
 	nodeIndexDocsCountChartTmpl.Copy(),
@@ -708,49 +708,49 @@ var nodeIndexChartsTmpl = module.Charts{
 }
 
 var (
-	nodeIndexHealthChartTmpl = module.Chart{
+	nodeIndexHealthChartTmpl = collectorapi.Chart{
 		ID:       "node_index_%s_cluster_%s_health",
 		Title:    "Index Health",
 		Units:    "status",
 		Fam:      "index stats",
 		Ctx:      "elasticsearch.node_index_health",
 		Priority: prioNodeIndexHealth,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_index_%s_stats_health_green", Name: "green"},
 			{ID: "node_index_%s_stats_health_red", Name: "red"},
 			{ID: "node_index_%s_stats_health_yellow", Name: "yellow"},
 		},
 	}
-	nodeIndexShardsCountChartTmpl = module.Chart{
+	nodeIndexShardsCountChartTmpl = collectorapi.Chart{
 		ID:       "node_index_%s_cluster_%s_shards_count",
 		Title:    "Index Shards Count",
 		Units:    "shards",
 		Fam:      "index stats",
 		Ctx:      "elasticsearch.node_index_shards_count",
 		Priority: prioNodeIndexShardsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_index_%s_stats_shards_count", Name: "shards"},
 		},
 	}
-	nodeIndexDocsCountChartTmpl = module.Chart{
+	nodeIndexDocsCountChartTmpl = collectorapi.Chart{
 		ID:       "node_index_%s_cluster_%s_docs_count",
 		Title:    "Index Docs Count",
 		Units:    "docs",
 		Fam:      "index stats",
 		Ctx:      "elasticsearch.node_index_docs_count",
 		Priority: prioNodeIndexDocsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_index_%s_stats_docs_count", Name: "docs"},
 		},
 	}
-	nodeIndexStoreSizeChartTmpl = module.Chart{
+	nodeIndexStoreSizeChartTmpl = collectorapi.Chart{
 		ID:       "node_index_%s_cluster_%s_store_size",
 		Title:    "Index Store Size",
 		Units:    "bytes",
 		Fam:      "index stats",
 		Ctx:      "elasticsearch.node_index_store_size",
 		Priority: prioNodeIndexStoreSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_index_%s_stats_store_size_in_bytes", Name: "store_size"},
 		},
 	}
@@ -761,7 +761,7 @@ func (c *Collector) addClusterStatsCharts() {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, c.clusterName)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_name", Value: c.clusterName},
 		}
 	}
@@ -776,7 +776,7 @@ func (c *Collector) addClusterHealthCharts() {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, c.clusterName)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_name", Value: c.clusterName},
 		}
 	}
@@ -791,7 +791,7 @@ func (c *Collector) addNodeCharts(nodeID string, node *esNodeStats) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, nodeID, c.clusterName)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "node_name", Value: node.Name},
 			{Key: "host", Value: node.Host},
@@ -816,7 +816,7 @@ func (c *Collector) addIndexCharts(index string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, index, c.clusterName)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "index", Value: index},
 		}

@@ -184,7 +184,11 @@ trait ChartSampler: Send + Sync {
     /// # Parameters
     /// - `buffer`: Buffer to write the chart data to
     /// - `collection_time`: When the data was collected
-    async fn sample_to_buffer(&mut self, buffer: &mut bytes::BytesMut, collection_time: std::time::SystemTime);
+    async fn sample_to_buffer(
+        &mut self,
+        buffer: &mut bytes::BytesMut,
+        collection_time: std::time::SystemTime,
+    );
     fn interval(&self) -> Duration;
 }
 
@@ -200,7 +204,11 @@ impl<T> ChartSampler for SingletonChartSampler<T>
 where
     T: NetdataChart + Default + PartialEq + Clone + Send + Sync,
 {
-    async fn sample_to_buffer(&mut self, buffer: &mut BytesMut, collection_time: std::time::SystemTime) {
+    async fn sample_to_buffer(
+        &mut self,
+        buffer: &mut BytesMut,
+        collection_time: std::time::SystemTime,
+    ) {
         // Sample the current value
         let current = {
             let guard = self.data.read();

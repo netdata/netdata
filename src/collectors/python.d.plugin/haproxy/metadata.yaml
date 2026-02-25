@@ -9,7 +9,7 @@
 #     name: HAProxy
 #     link: 'https://www.haproxy.org/'
 #     categories:
-#     - data-collection.web-servers-and-web-proxies
+#     - data-collection.web-servers-and-proxies
 #     icon_filename: 'haproxy.png'
 #   related_resources:
 #     integrations:

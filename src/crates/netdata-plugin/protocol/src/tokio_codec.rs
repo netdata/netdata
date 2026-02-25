@@ -199,8 +199,19 @@ impl Encoder<Message> for MessageParser {
                     .as_bytes(),
                 );
             }
-            Message::FunctionProgress(_) => {
-                unimplemented!()
+            Message::FunctionProgressResponse(progress) => {
+                dst.extend_from_slice(
+                    format!(
+                        "FUNCTION_PROGRESS {} {} {}\n",
+                        quote_if_needed(&progress.transaction),
+                        progress.done,
+                        progress.all,
+                    )
+                    .as_bytes(),
+                );
+            }
+            Message::FunctionProgressRequest(_) => {
+                // Inbound-only message, not encoded for output
             }
         }
 

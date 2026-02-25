@@ -1,5 +1,17 @@
 # Running Netdata Behind a Reverse Proxy
 
+:::tip Simpler Alternative for Netdata Cloud Users
+
+If you use Netdata Cloud (free or paid), consider [Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md) instead. With a single setting (`bearer token protection = yes`), you get:
+
+- **Cloud SSO authentication** - Users sign in through Netdata Cloud
+- **Role-based access** - Cloud roles apply to direct agent access
+- **No proxy setup required** - No nginx, Apache, or htpasswd configuration
+
+Reverse proxy setup is still valuable if you need custom authentication, don't use Netdata Cloud, or require offline access.
+
+:::
+
 You can improve security and capabilities by running your Netdata Agent behind another web server in production environments. This approach lets you secure access to the dashboard with SSL, user authentication, and firewall rules while providing more robustness and capabilities than the Agent's [internal web server](/src/web/README.md).
 
 ## Supported Reverse Proxy Solutions

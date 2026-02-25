@@ -9,7 +9,8 @@ mod transport;
 // Re-export types from netdata-plugin-types
 pub use netdata_plugin_types::{
     ConfigDeclaration, DynCfgCmds, DynCfgSourceType, DynCfgStatus, DynCfgType, FunctionCall,
-    FunctionCancel, FunctionDeclaration, FunctionProgress, FunctionResult, HttpAccess,
+    FunctionCancel, FunctionDeclaration, FunctionProgressRequest, FunctionProgressResponse,
+    FunctionResult, HttpAccess,
 };
 
 pub use message_parser::Message;

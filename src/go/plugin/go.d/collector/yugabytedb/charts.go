@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioMasterClientOps = module.Priority + iota
+	prioMasterClientOps = collectorapi.Priority + iota
 	prioMasterClientOpsLatency
 	prioMasterDdlOps
 	prioMasterDdlOpsLatency
@@ -35,200 +35,200 @@ const (
 )
 
 var (
-	masterClientOpsChartTmpl = module.Chart{
+	masterClientOpsChartTmpl = collectorapi.Chart{
 		ID:       "master_client_%s_operations",
 		Title:    "Master Client Operations",
 		Units:    "ops/s",
 		Fam:      "master client ops",
 		Ctx:      "yugabytedb.master_client_operations",
 		Priority: prioMasterClientOps,
-		Dims: module.Dims{
-			{ID: metricPxMasterLatencyMasterClient + "_%s_count", Name: "operations", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxMasterLatencyMasterClient + "_%s_count", Name: "operations", Algo: collectorapi.Incremental},
 		},
 	}
-	masterClientOpLatencyChartTmpl = module.Chart{
+	masterClientOpLatencyChartTmpl = collectorapi.Chart{
 		ID:       "master_client_%s_operations_latency",
 		Title:    "Master Client Operation Latency",
 		Units:    "microseconds",
 		Fam:      "master client ops",
 		Ctx:      "yugabytedb.master_client_operations_latency",
 		Priority: prioMasterClientOpsLatency,
-		Dims: module.Dims{
-			{ID: metricPxMasterLatencyMasterClient + "_%s_sum", Name: "latency", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxMasterLatencyMasterClient + "_%s_sum", Name: "latency", Algo: collectorapi.Incremental},
 		},
 	}
 
-	masterDdlOpsChartTmpl = module.Chart{
+	masterDdlOpsChartTmpl = collectorapi.Chart{
 		ID:       "master_ddl_%s_operations",
 		Title:    "Master DDL Operations",
 		Units:    "ops/s",
 		Fam:      "ddl ops",
 		Ctx:      "yugabytedb.master_ddl_operations",
 		Priority: prioMasterDdlOps,
-		Dims: module.Dims{
-			{ID: metricPxMasterLatencyMasterDdl + "_%s_count", Name: "operations", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxMasterLatencyMasterDdl + "_%s_count", Name: "operations", Algo: collectorapi.Incremental},
 		},
 	}
-	masterDdlOpLatencyChartTmpl = module.Chart{
+	masterDdlOpLatencyChartTmpl = collectorapi.Chart{
 		ID:       "master_ddl_%s_operations_latency",
 		Title:    "Master DDL Operations Latency",
 		Units:    "microseconds",
 		Fam:      "ddl ops",
 		Ctx:      "yugabytedb.master_ddl_operations_latency",
 		Priority: prioMasterDdlOpsLatency,
-		Dims: module.Dims{
-			{ID: metricPxMasterLatencyMasterDdl + "_%s_sum", Name: "latency", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxMasterLatencyMasterDdl + "_%s_sum", Name: "latency", Algo: collectorapi.Incremental},
 		},
 	}
 
-	masterServiceOpsChartTmpl = module.Chart{
+	masterServiceOpsChartTmpl = collectorapi.Chart{
 		ID:       "master_%s_%s_operations",
 		Title:    "Master %s Operations",
 		Units:    "ops/s",
 		Fam:      "master svc operations",
 		Ctx:      "yugabytedb.master_%s_operations",
 		Priority: prioServiceOps,
-		Dims: module.Dims{
-			{ID: metricPxTserverHandlerLatency + "_%s_%s_count", Name: "operations", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxTserverHandlerLatency + "_%s_%s_count", Name: "operations", Algo: collectorapi.Incremental},
 		},
 	}
-	masterServiceOpLatencyChartTmpl = module.Chart{
+	masterServiceOpLatencyChartTmpl = collectorapi.Chart{
 		ID:       "master_%s_%s_operation_latency",
 		Title:    "Master %s Operation Latency",
 		Units:    "microseconds",
 		Fam:      "master svc operations",
 		Ctx:      "yugabytedb.master_%s_operations_latency",
 		Priority: prioServiceOpsLatency,
-		Dims: module.Dims{
-			{ID: metricPxTserverHandlerLatency + "_%s_%s_sum", Name: "latency", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxTserverHandlerLatency + "_%s_%s_sum", Name: "latency", Algo: collectorapi.Incremental},
 		},
 	}
-	masterServiceTrafficChartTmpl = module.Chart{
+	masterServiceTrafficChartTmpl = collectorapi.Chart{
 		ID:       "master_%s_%s_traffic",
 		Title:    "Master %s Traffic",
 		Units:    "bytes/s",
 		Fam:      "master svc operations",
 		Ctx:      "yugabytedb.master_%s_traffic",
 		Priority: prioServiceTraffic,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: metricPxTserverResponseBytes + "_%s_%s", Name: "received", Algo: module.Incremental},
-			{ID: metricPxTserverRequestBytes + "_%s_%s", Name: "sent", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: metricPxTserverResponseBytes + "_%s_%s", Name: "received", Algo: collectorapi.Incremental},
+			{ID: metricPxTserverRequestBytes + "_%s_%s", Name: "sent", Algo: collectorapi.Incremental},
 		},
 	}
 
-	masterConsensusOpsChartTmpl = module.Chart{
+	masterConsensusOpsChartTmpl = collectorapi.Chart{
 		ID:       "master_consensus_%s_operations",
 		Title:    "Master Consensus Operations",
 		Units:    "ops/s",
 		Fam:      "master consensus operations",
 		Ctx:      "yugabytedb.master_consensus_operations",
 		Priority: prioConsensusOps,
-		Dims: module.Dims{
-			{ID: metricPxServerLatencyConsensusService + "_%s_count", Name: "operations", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxServerLatencyConsensusService + "_%s_count", Name: "operations", Algo: collectorapi.Incremental},
 		},
 	}
-	masterConsensusOpLatencyChartTmpl = module.Chart{
+	masterConsensusOpLatencyChartTmpl = collectorapi.Chart{
 		ID:       "master_consensus_%s_operation_latency",
 		Title:    "Master Consensus Operation Latency",
 		Units:    "microseconds",
 		Fam:      "master consensus operations",
 		Ctx:      "yugabytedb.master_consensus_operations_latency",
 		Priority: prioConsensusOpsLatency,
-		Dims: module.Dims{
-			{ID: metricPxServerLatencyConsensusService + "_%s_sum", Name: "latency", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxServerLatencyConsensusService + "_%s_sum", Name: "latency", Algo: collectorapi.Incremental},
 		},
 	}
-	masterConsensusTrafficChartTmpl = module.Chart{
+	masterConsensusTrafficChartTmpl = collectorapi.Chart{
 		ID:       "master_consensus_%s_traffic",
 		Title:    "Master Consensus Traffic",
 		Units:    "bytes/s",
 		Fam:      "master consensus operations",
 		Ctx:      "yugabytedb.master_consensus_traffic",
 		Priority: prioConsensusTraffic,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: metricPxServerResponseBytesConsensusService + "_%s", Name: "received", Algo: module.Incremental},
-			{ID: metricPxServerRequestBytesConsensusService + "_%s", Name: "sent", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: metricPxServerResponseBytesConsensusService + "_%s", Name: "received", Algo: collectorapi.Incremental},
+			{ID: metricPxServerRequestBytesConsensusService + "_%s", Name: "sent", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	tserverServiceOpsChartTmpl = module.Chart{
+	tserverServiceOpsChartTmpl = collectorapi.Chart{
 		ID:       "tserver_%s_%s_operations",
 		Title:    "TServer %s Operations",
 		Units:    "ops/s",
 		Fam:      "tserver svc operations",
 		Ctx:      "yugabytedb.tserver_%s_operations",
 		Priority: prioServiceOps,
-		Dims: module.Dims{
-			{ID: metricPxTserverHandlerLatency + "_%s_%s_count", Name: "operations", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxTserverHandlerLatency + "_%s_%s_count", Name: "operations", Algo: collectorapi.Incremental},
 		},
 	}
-	tserverServiceOpLatencyChartTmpl = module.Chart{
+	tserverServiceOpLatencyChartTmpl = collectorapi.Chart{
 		ID:       "tserver_%s_%s_operation_latency",
 		Title:    "TServer %s Operation Latency",
 		Units:    "microseconds",
 		Fam:      "tserver svc operations",
 		Ctx:      "yugabytedb.tserver_%s_operations_latency",
 		Priority: prioServiceOpsLatency,
-		Dims: module.Dims{
-			{ID: metricPxTserverHandlerLatency + "_%s_%s_sum", Name: "latency", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxTserverHandlerLatency + "_%s_%s_sum", Name: "latency", Algo: collectorapi.Incremental},
 		},
 	}
-	tserverServiceTrafficChartTmpl = module.Chart{
+	tserverServiceTrafficChartTmpl = collectorapi.Chart{
 		ID:       "tserver_%s_%s_traffic",
 		Title:    "TServer %s Traffic",
 		Units:    "bytes/s",
 		Fam:      "tserver svc operations",
 		Ctx:      "yugabytedb.tserver_%s_traffic",
 		Priority: prioServiceTraffic,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: metricPxTserverResponseBytes + "_%s_%s", Name: "received", Algo: module.Incremental},
-			{ID: metricPxTserverRequestBytes + "_%s_%s", Name: "sent", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: metricPxTserverResponseBytes + "_%s_%s", Name: "received", Algo: collectorapi.Incremental},
+			{ID: metricPxTserverRequestBytes + "_%s_%s", Name: "sent", Algo: collectorapi.Incremental},
 		},
 	}
 
-	tserverConsensusOpsChartTmpl = module.Chart{
+	tserverConsensusOpsChartTmpl = collectorapi.Chart{
 		ID:       "tserver_consensus_%s_operations",
 		Title:    "TServer Consensus Operations",
 		Units:    "ops/s",
 		Fam:      "tserver consensus operations",
 		Ctx:      "yugabytedb.tserver_consensus_operations",
 		Priority: prioConsensusOps,
-		Dims: module.Dims{
-			{ID: metricPxServerLatencyConsensusService + "_%s_count", Name: "operations", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxServerLatencyConsensusService + "_%s_count", Name: "operations", Algo: collectorapi.Incremental},
 		},
 	}
-	tserverConsensusOpLatencyChartTmpl = module.Chart{
+	tserverConsensusOpLatencyChartTmpl = collectorapi.Chart{
 		ID:       "tserver_consensus_%s_operation_latency",
 		Title:    "TServer Consensus Operation Latency",
 		Units:    "microseconds",
 		Fam:      "tserver consensus operations",
 		Ctx:      "yugabytedb.tserver_consensus_operations_latency",
 		Priority: prioConsensusOpsLatency,
-		Dims: module.Dims{
-			{ID: metricPxServerLatencyConsensusService + "_%s_sum", Name: "latency", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxServerLatencyConsensusService + "_%s_sum", Name: "latency", Algo: collectorapi.Incremental},
 		},
 	}
-	tserverConsensusTrafficChartTmpl = module.Chart{
+	tserverConsensusTrafficChartTmpl = collectorapi.Chart{
 		ID:       "tserver_consensus_%s_traffic",
 		Title:    "TServer Consensus Traffic",
 		Units:    "bytes/s",
 		Fam:      "tserver consensus operations",
 		Ctx:      "yugabytedb.tserver_consensus_traffic",
 		Priority: prioConsensusTraffic,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: metricPxServerResponseBytesConsensusService + "_%s", Name: "received", Algo: module.Incremental},
-			{ID: metricPxServerRequestBytesConsensusService + "_%s", Name: "sent", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: metricPxServerResponseBytesConsensusService + "_%s", Name: "received", Algo: collectorapi.Incremental},
+			{ID: metricPxServerRequestBytesConsensusService + "_%s", Name: "sent", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
-var ysqlBaseCharts = module.Charts{
+var ysqlBaseCharts = collectorapi.Charts{
 	ysqlConnectionUsageChart.Copy(),
 	ysqlActiveConnectionsChart.Copy(),
 	ysqlEstablishedConnectionsChart.Copy(),
@@ -236,111 +236,111 @@ var ysqlBaseCharts = module.Charts{
 }
 
 var (
-	ysqlConnectionUsageChart = module.Chart{
+	ysqlConnectionUsageChart = collectorapi.Chart{
 		ID:       "ysql_connections_usage",
 		Title:    "YSQL Connections Usage",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "yugabytedb.ysql_connection_usage",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioYSQLConnectionUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "yb_ysqlserver_connection_available", Name: "available"},
 			{ID: metricSqlConnTotal, Name: "used"},
 		},
 	}
-	ysqlActiveConnectionsChart = module.Chart{
+	ysqlActiveConnectionsChart = collectorapi.Chart{
 		ID:       "ysql_active_connections",
 		Title:    "YSQL Active Connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "yugabytedb.ysql_active_connections",
 		Priority: prioYSQLActiveConnections,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: metricSqlActiveConnTotal, Name: "active"},
 		},
 	}
-	ysqlEstablishedConnectionsChart = module.Chart{
+	ysqlEstablishedConnectionsChart = collectorapi.Chart{
 		ID:       "ysql_established_connections",
 		Title:    "YSQL Established Connections",
 		Units:    "connections/s",
 		Fam:      "connections",
 		Ctx:      "yugabytedb.ysql_established_connections",
 		Priority: prioYSQLEstablishedConnections,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: metricSqlNewConnTotal, Name: "established"},
 		},
 	}
-	ysqlOverLimitConnectionsChart = module.Chart{
+	ysqlOverLimitConnectionsChart = collectorapi.Chart{
 		ID:       "ysql_over_limit_connections",
 		Title:    "YSQL Rejected Over Limit Connections",
 		Units:    "rejects/s",
 		Fam:      "connections",
 		Ctx:      "yugabytedb.ysql_over_limit_connections",
 		Priority: prioYSQLOverLimitConnections,
-		Dims: module.Dims{
-			{ID: metricSqlConnOverLimitTotal, Name: "over_limit", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricSqlConnOverLimitTotal, Name: "over_limit", Algo: collectorapi.Incremental},
 		},
 	}
 
-	ysqlStatementsChartTmpl = module.Chart{
+	ysqlStatementsChartTmpl = collectorapi.Chart{
 		ID:       "ysql_sql_%s_statements",
 		Title:    "YSQL SQL Statements",
 		Units:    "statements/s",
 		Fam:      "ysql statements",
 		Ctx:      "yugabytedb.ysql_sql_statements",
 		Priority: prioYSQLStatements,
-		Dims: module.Dims{
-			{ID: metricPxYSQLLatencySQLProcessor + "_%s_count", Name: "statements", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxYSQLLatencySQLProcessor + "_%s_count", Name: "statements", Algo: collectorapi.Incremental},
 		},
 	}
-	ysqlStatementsLatencyChartTmpl = module.Chart{
+	ysqlStatementsLatencyChartTmpl = collectorapi.Chart{
 		ID:       "ysql_sql_%s_statements_latency",
 		Title:    "YSQL SQL Statements Latency",
 		Units:    "microseconds",
 		Fam:      "ysql statements",
 		Ctx:      "yugabytedb.ysql_sql_statements_latency",
 		Priority: prioYSQLStatementsLatency,
-		Dims: module.Dims{
-			{ID: metricPxYSQLLatencySQLProcessor + "_%s_sum", Name: "latency", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxYSQLLatencySQLProcessor + "_%s_sum", Name: "latency", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	ycqlStatementsChartTmpl = module.Chart{
+	ycqlStatementsChartTmpl = collectorapi.Chart{
 		ID:       "ycql_sql_%s_statements",
 		Title:    "YCQL SQL Statements",
 		Units:    "statements/s",
 		Fam:      "ycql statements",
 		Ctx:      "yugabytedb.ycql_sql_statements",
 		Priority: prioYCQLStatements,
-		Dims: module.Dims{
-			{ID: metricPxYCQLLatencySQLProcessor + "_%s_count", Name: "statements", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxYCQLLatencySQLProcessor + "_%s_count", Name: "statements", Algo: collectorapi.Incremental},
 		},
 	}
-	ycqlStatementsLatencyChartTmpl = module.Chart{
+	ycqlStatementsLatencyChartTmpl = collectorapi.Chart{
 		ID:       "ysql_cql_%s_statements_latency",
 		Title:    "YSQL SQL Statements Latency",
 		Units:    "microseconds",
 		Fam:      "ycql statements",
 		Ctx:      "yugabytedb.ycql_sql_statements_latency",
 		Priority: prioYCQLStatementsLatency,
-		Dims: module.Dims{
-			{ID: metricPxYCQLLatencySQLProcessor + "_%s_sum", Name: "latency", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: metricPxYCQLLatencySQLProcessor + "_%s_sum", Name: "latency", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 func (c *Collector) addMasterClientOpCharts(op string) {
-	charts := module.Charts{
+	charts := collectorapi.Charts{
 		masterClientOpsChartTmpl.Copy(),
 		masterClientOpLatencyChartTmpl.Copy(),
 	}
 
 	for _, chart := range charts {
 		chart.ID = fmt.Sprintf(chart.ID, op)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "operation", Value: op},
 		}
 		for _, dim := range chart.Dims {
@@ -353,14 +353,14 @@ func (c *Collector) addMasterClientOpCharts(op string) {
 }
 
 func (c *Collector) addMasterDDLOpCharts(op string) {
-	charts := module.Charts{
+	charts := collectorapi.Charts{
 		masterDdlOpsChartTmpl.Copy(),
 		masterDdlOpLatencyChartTmpl.Copy(),
 	}
 
 	for _, chart := range charts {
 		chart.ID = fmt.Sprintf(chart.ID, op)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "operation", Value: op},
 		}
 		for _, dim := range chart.Dims {
@@ -373,15 +373,15 @@ func (c *Collector) addMasterDDLOpCharts(op string) {
 }
 
 func (c *Collector) addConsensusServiceOpCharts(op string) {
-	var charts module.Charts
+	var charts collectorapi.Charts
 	if c.srvType == srvTypeMaster {
-		charts = module.Charts{
+		charts = collectorapi.Charts{
 			masterConsensusOpsChartTmpl.Copy(),
 			masterConsensusOpLatencyChartTmpl.Copy(),
 			masterConsensusTrafficChartTmpl.Copy(),
 		}
 	} else {
-		charts = module.Charts{
+		charts = collectorapi.Charts{
 			tserverConsensusOpsChartTmpl.Copy(),
 			tserverConsensusOpLatencyChartTmpl.Copy(),
 			tserverConsensusTrafficChartTmpl.Copy(),
@@ -390,7 +390,7 @@ func (c *Collector) addConsensusServiceOpCharts(op string) {
 
 	for _, chart := range charts {
 		chart.ID = fmt.Sprintf(chart.ID, op)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "operation", Value: op},
 		}
 		for _, dim := range chart.Dims {
@@ -403,15 +403,15 @@ func (c *Collector) addConsensusServiceOpCharts(op string) {
 }
 
 func (c *Collector) addServiceOpCharts(svc, op string) {
-	var charts module.Charts
+	var charts collectorapi.Charts
 	if c.srvType == srvTypeMaster {
-		charts = module.Charts{
+		charts = collectorapi.Charts{
 			masterServiceOpsChartTmpl.Copy(),
 			masterServiceOpLatencyChartTmpl.Copy(),
 			masterServiceTrafficChartTmpl.Copy(),
 		}
 	} else {
-		charts = module.Charts{
+		charts = collectorapi.Charts{
 			tserverServiceOpsChartTmpl.Copy(),
 			tserverServiceOpLatencyChartTmpl.Copy(),
 			tserverServiceTrafficChartTmpl.Copy(),
@@ -422,7 +422,7 @@ func (c *Collector) addServiceOpCharts(svc, op string) {
 		chart.ID = fmt.Sprintf(chart.ID, svc, op)
 		chart.Title = fmt.Sprintf(chart.Title, svc)
 		chart.Ctx = fmt.Sprintf(chart.Ctx, strings.ToLower(svc))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "operation", Value: op},
 		}
 		for _, dim := range chart.Dims {
@@ -435,14 +435,14 @@ func (c *Collector) addServiceOpCharts(svc, op string) {
 }
 
 func (c *Collector) addCQLStatementCharts(stmt string) {
-	charts := module.Charts{
+	charts := collectorapi.Charts{
 		ycqlStatementsChartTmpl.Copy(),
 		ycqlStatementsLatencyChartTmpl.Copy(),
 	}
 
 	for _, chart := range charts {
 		chart.ID = fmt.Sprintf(chart.ID, stmt)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "statement", Value: stmt},
 		}
 		for _, dim := range chart.Dims {
@@ -455,14 +455,14 @@ func (c *Collector) addCQLStatementCharts(stmt string) {
 }
 
 func (c *Collector) addSQLStatementCharts(stmt string) {
-	charts := module.Charts{
+	charts := collectorapi.Charts{
 		ysqlStatementsChartTmpl.Copy(),
 		ysqlStatementsLatencyChartTmpl.Copy(),
 	}
 
 	for _, chart := range charts {
 		chart.ID = fmt.Sprintf(chart.ID, stmt)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "statement", Value: stmt},
 		}
 		for _, dim := range chart.Dims {

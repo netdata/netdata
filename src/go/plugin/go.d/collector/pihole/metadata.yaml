@@ -9,7 +9,7 @@ modules:
         link: https://pi-hole.net
         icon_filename: pihole.png
         categories:
-          - data-collection.dns-and-dhcp-servers
+          - data-collection.networking
       keywords:
         - pihole
       related_resources:

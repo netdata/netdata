@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func (c *Collector) collectDbStats(mx map[string]int64) error {
@@ -75,7 +75,7 @@ func (c *Collector) addDatabaseCharts(name string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, name)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "database", Value: name},
 		}
 		for _, dim := range chart.Dims {

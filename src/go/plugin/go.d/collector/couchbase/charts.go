@@ -3,13 +3,13 @@
 package couchbase
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type (
-	Charts = module.Charts
-	Chart  = module.Chart
-	Dim    = module.Dim
+	Charts = collectorapi.Charts
+	Chart  = collectorapi.Chart
+	Dim    = collectorapi.Dim
 )
 
 var bucketQuotaPercentUsedChart = Chart{
@@ -26,7 +26,7 @@ var bucketOpsPerSecChart = Chart{
 	Units: "ops/s",
 	Fam:   "buckets basic stats",
 	Ctx:   "couchbase.bucket_ops_per_sec",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 }
 
 var bucketDiskFetchesChart = Chart{
@@ -35,7 +35,7 @@ var bucketDiskFetchesChart = Chart{
 	Units: "fetches",
 	Fam:   "buckets basic stats",
 	Ctx:   "couchbase.bucket_disk_fetches",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 }
 
 var bucketItemCountChart = Chart{
@@ -44,7 +44,7 @@ var bucketItemCountChart = Chart{
 	Units: "items",
 	Fam:   "buckets basic stats",
 	Ctx:   "couchbase.bucket_item_count",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 }
 
 var bucketDiskUsedChart = Chart{
@@ -53,7 +53,7 @@ var bucketDiskUsedChart = Chart{
 	Units: "bytes",
 	Fam:   "buckets basic stats",
 	Ctx:   "couchbase.bucket_disk_used_stats",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 }
 
 var bucketDataUsedChart = Chart{
@@ -62,7 +62,7 @@ var bucketDataUsedChart = Chart{
 	Units: "bytes",
 	Fam:   "buckets basic stats",
 	Ctx:   "couchbase.bucket_data_used",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 }
 
 var bucketMemUsedChart = Chart{
@@ -71,7 +71,7 @@ var bucketMemUsedChart = Chart{
 	Units: "bytes",
 	Fam:   "buckets basic stats",
 	Ctx:   "couchbase.bucket_mem_used",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 }
 
 var bucketVBActiveNumNonResidentChart = Chart{
@@ -80,5 +80,5 @@ var bucketVBActiveNumNonResidentChart = Chart{
 	Units: "items",
 	Fam:   "buckets basic stats",
 	Ctx:   "couchbase.bucket_vb_active_num_non_resident",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 }

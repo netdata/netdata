@@ -1,0 +1,46 @@
+# OpenTelemetry Viewer Plugin Configuration
+# This file configures the OpenTelemetry viewer plugin for Netdata
+
+journal:
+  # Paths to journal directories to watch and index. Multiple directories can
+  # be specified to monitor different journal sources. At least one path must
+  # be specified
+  paths:
+    - "@localstatedir_POST@/log/netdata/otel/v1"
+
+cache:
+  # Directory to store the hybrid cache (memory + disk backed by Foyer)
+  directory: "@cachedir_POST@/otel-signal-viewer"
+
+  # Memory cache capacity (number of indexed journal files to keep in memory)
+  # Higher values improve query performance but use more RAM
+  memory_capacity: 1000
+
+  # Disk cache size (maximum size of the disk-backed cache)
+  # Higher values improve performance for large journal files
+  disk_capacity: "32MB"
+
+  # Cache block size (size of individual cache blocks in Foyer)
+  block_size: "4MB"
+
+  # Number of background workers for indexing journal files
+  # Default: number of CPU cores (auto-detected)
+  # Uncomment to override:
+  # workers: 4
+
+  # Queue capacity for pending indexing requests
+  # Controls backpressure on the indexing system
+  queue_capacity: 100
+
+indexing:
+  # Maximum number of unique values to index per field.
+  # Fields with more unique values than this limit will have their indexing
+  # truncated to prevent unbounded memory growth. This protects against
+  # high-cardinality fields (e.g., MESSAGE with millions of unique values)
+  # causing memory exhaustion during indexing.
+  max_unique_values_per_field: 500
+
+  # Maximum payload size (in bytes) for field values to index.
+  # Field values with payloads larger than this limit will be skipped.
+  # This prevents field values with large payloads from consuming excessive memory.
+  max_field_payload_size: 100

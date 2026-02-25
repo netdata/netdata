@@ -10,14 +10,14 @@ modules:
         link: https://httpd.apache.org/
         icon_filename: apache.svg
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
       keywords:
         - webserver
       related_resources:
         integrations:
           list:
             - plugin_name: go.d.plugin
-              module_name: weblog
+              module_name: web_log
             - plugin_name: go.d.plugin
               module_name: httpcheck
             - plugin_name: apps.plugin
@@ -337,4 +337,4 @@ modules:
         link: https://httpd.apache.org/
         icon_filename: apache.svg
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies

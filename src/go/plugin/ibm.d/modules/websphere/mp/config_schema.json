@@ -4,126 +4,149 @@
     "properties": {
       "cell_name": {
         "default": "",
-        "title": "CellName appends the Liberty cell label to every exported time-series.",
+        "description": "CellName appends the Liberty cell label to every exported time-series.",
+        "title": "Cell Name",
         "type": "string"
       },
       "collect_jvm_metrics": {
         "default": "enabled",
+        "description": "CollectJVMMetrics toggles JVM/base scope metrics scraped from the MicroProfile endpoint.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectJVMMetrics toggles JVM/base scope metrics scraped from the MicroProfile endpoint.",
+        "title": "Collect Jvm Metrics",
         "type": "string"
       },
       "collect_rest_matching": {
         "default": "",
-        "title": "CollectRESTMatching filters REST endpoints using glob-style patterns (supports `*`, `?`, `!` prefixes).",
+        "description": "CollectRESTMatching filters REST endpoints using glob-style patterns (supports `*`, `?`, `!` prefixes).",
+        "title": "Collect Rest Matching",
         "type": "string"
       },
       "collect_rest_metrics": {
         "default": "enabled",
+        "description": "CollectRESTMetrics toggles per-endpoint REST/JAX-RS metrics (may introduce cardinality).",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectRESTMetrics toggles per-endpoint REST/JAX-RS metrics (may introduce cardinality).",
+        "title": "Collect Rest Metrics",
         "type": "string"
       },
       "headers": {
-        "title": "Custom headers",
+        "description": "Custom headers",
+        "title": "Headers",
         "type": "object"
       },
       "max_rest_endpoints": {
         "default": 50,
-        "title": "MaxRESTEndpoints limits how many REST endpoints are exported when REST metrics are enabled (0 disables the limit).",
+        "description": "MaxRESTEndpoints limits how many REST endpoints are exported when REST metrics are enabled (0 disables the limit).",
+        "title": "Max Rest Endpoints",
         "type": "integer"
       },
       "metrics_endpoint": {
         "default": "/metrics",
-        "title": "MetricsEndpoint overrides the metrics path relative to the base URL (accepts absolute URLs as well).",
+        "description": "MetricsEndpoint overrides the metrics path relative to the base URL (accepts absolute URLs as well).",
+        "title": "Metrics Endpoint",
         "type": "string"
       },
       "node_name": {
         "default": "",
-        "title": "NodeName appends the Liberty node label to every exported time-series.",
+        "description": "NodeName appends the Liberty node label to every exported time-series.",
+        "title": "Node Name",
         "type": "string"
       },
       "not_follow_redirects": {
         "default": false,
-        "title": "Disable HTTP redirects",
+        "description": "Disable HTTP redirects",
+        "title": "Not Follow Redirects",
         "type": "boolean"
       },
       "password": {
         "default": "",
-        "title": "Password for authentication",
+        "description": "Password for authentication",
+        "title": "Password",
         "type": "string"
       },
       "proxy_password": {
         "default": "",
-        "title": "Proxy password",
+        "description": "Proxy password",
+        "title": "Proxy Password",
         "type": "string"
       },
       "proxy_url": {
         "default": "",
-        "title": "Proxy URL",
+        "description": "Proxy URL",
+        "title": "Proxy Url",
         "type": "string"
       },
       "proxy_username": {
         "default": "",
-        "title": "Proxy username",
+        "description": "Proxy username",
+        "title": "Proxy Username",
         "type": "string"
       },
       "server_name": {
         "default": "",
-        "title": "ServerName appends the Liberty server label to every exported time-series.",
+        "description": "ServerName appends the Liberty server label to every exported time-series.",
+        "title": "Server Name",
         "type": "string"
       },
       "timeout": {
         "default": 10000000000,
-        "title": "Request timeout in seconds",
+        "description": "Request timeout in seconds",
+        "title": "Timeout",
         "type": "integer"
       },
       "tls_ca": {
         "default": "",
-        "title": "Custom CA bundle path",
+        "description": "Custom CA bundle path",
+        "title": "TLS Ca",
         "type": "string"
       },
       "tls_cert": {
         "default": "",
-        "title": "Client certificate path",
+        "description": "Client certificate path",
+        "title": "TLS Cert",
         "type": "string"
       },
       "tls_key": {
         "default": "",
-        "title": "Client key path",
+        "description": "Client key path",
+        "title": "TLS Key",
         "type": "string"
       },
       "tls_skip_verify": {
         "default": false,
-        "title": "Skip TLS certificate verification",
+        "description": "Skip TLS certificate verification",
+        "title": "TLS Skip Verify",
         "type": "boolean"
       },
       "update_every": {
         "default": 1,
+        "description": "Data collection frequency",
         "minimum": 1,
-        "title": "Data collection frequency",
+        "title": "Update Every",
         "type": "integer"
       },
       "url": {
         "default": "",
-        "title": "Target URL",
+        "description": "Target URL",
+        "title": "Url",
         "type": "string"
       },
       "username": {
         "default": "",
-        "title": "Username for authentication",
+        "description": "Username for authentication",
+        "title": "Username",
         "type": "string"
       },
       "vnode": {
         "default": "",
+        "description": "Vnode",
         "title": "Vnode",
         "type": "string"
       }

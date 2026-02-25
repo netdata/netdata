@@ -9,6 +9,7 @@
 #define POLLINFO_FLAG_CLIENT_SOCKET     (1U << 1)
 #define POLLINFO_FLAG_DONT_CLOSE        (1U << 2)
 #define POLLINFO_FLAG_REMOVED_FROM_POLL (1U << 3)
+#define POLLINFO_FLAG_FIRST_REQUEST_RECEIVED (1U << 4)
 
 typedef struct poll POLLJOB;
 typedef struct pollinfo POLLINFO;

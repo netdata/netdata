@@ -8,7 +8,7 @@ modules:
         name: Litespeed
         link: "https://www.litespeedtech.com/products/litespeed-web-server"
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
         icon_filename: "litespeed.svg"
       related_resources:
         integrations:

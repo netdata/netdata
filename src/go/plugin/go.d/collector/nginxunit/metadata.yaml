@@ -8,7 +8,7 @@ modules:
         name: NGINX Unit
         link: https://unit.nginx.org/
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
         icon_filename: nginx.svg
       related_resources:
         integrations:

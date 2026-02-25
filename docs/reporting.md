@@ -74,7 +74,12 @@ factors, and remediation recommendations.
 
 Connect your AI assistant directly to Netdata using the Model Context Protocol (MCP). Ask questions in natural language and receive answers based on live infrastructure data.
 
-Every Netdata Agent and Parent (v2.6.0+) includes an MCP server. AI assistants can query metrics, alerts, logs, and live system information across your entire infrastructure.
+MCP is available in two ways:
+
+- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — infrastructure-wide access to all your nodes (Business/Homelab plan)
+- **Agent/Parent MCP** on every Netdata Agent and Parent (v2.6.0+) — direct local access (free, open-source)
+
+AI assistants can query metrics, alerts, logs, and live system information across your entire infrastructure.
 
 ### Supported AI clients
 
@@ -112,9 +117,10 @@ Once connected, ask natural language questions:
 
 ### Availability
 
-- Available on all plans (v2.6.0+)
+- **Cloud MCP**: Available on Business and Homelab plans — infrastructure-wide access, zero local setup
+- **Agent/Parent MCP**: Available on all plans (v2.6.0+) — free, open-source, direct local access
 - Unlimited queries with no per-query charges
-- Requires API key for access to sensitive data
+- Requires API key (Cloud token or local API key) for access
 
 See [Netdata MCP](/docs/netdata-ai/mcp/README.md) for detailed setup instructions.
 

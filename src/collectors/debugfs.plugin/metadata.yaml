@@ -7,7 +7,7 @@ modules:
         name: System Memory Fragmentation
         link: 'https://www.kernel.org/doc/html/next/admin-guide/sysctl/vm.html'
         categories:
-          - data-collection.linux-systems.memory-metrics
+          - data-collection.operating-systems
         icon_filename: 'microchip.svg'
       related_resources:
         integrations:
@@ -149,7 +149,7 @@ modules:
         name: Linux ZSwap
         link: 'https://www.kernel.org/doc/html/latest/admin-guide/mm/zswap.html'
         categories:
-          - data-collection.linux-systems.memory-metrics
+          - data-collection.operating-systems
         icon_filename: 'microchip.svg'
       related_resources:
         integrations:
@@ -294,7 +294,7 @@ modules:
         name: Power Capping
         link: 'https://www.kernel.org/doc/html/next/power/powercap/powercap.html'
         categories:
-          - data-collection.linux-systems.kernel-metrics
+          - data-collection.hardware-and-sensors
         icon_filename: 'powersupply.svg'
       related_resources:
         integrations:

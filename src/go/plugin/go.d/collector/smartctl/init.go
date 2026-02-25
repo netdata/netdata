@@ -5,11 +5,11 @@ package smartctl
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 func (c *Collector) validateConfig() error {
@@ -54,19 +54,17 @@ func (c *Collector) initNdsudoSmartctlCli() (smartctlCli, error) {
 }
 
 func (c *Collector) initDirectSmartctlCli() (smartctlCli, error) {
-	smartctlPath, err := exec.LookPath("smartctl")
+	path, err := ndexec.FindBinary(
+		[]string{"smartctl"},
+		[]string{
+			filepath.Join(os.Getenv("ProgramFiles"), "smartmontools", "bin", "smartctl.exe"),
+		},
+	)
 	if err != nil {
-		if runtime.GOOS != "windows" {
-			return nil, fmt.Errorf("smartctl executable not found in PATH: %v", err)
-		}
-		defaultWinPath := filepath.Join("C:\\Program Files\\smartmontools\\bin", "smartctl.exe")
-		if _, err := os.Stat(defaultWinPath); err != nil {
-			return nil, fmt.Errorf("smartctl executable not found in PATH or default location: %v", err)
-		}
-		smartctlPath = defaultWinPath
+		return nil, fmt.Errorf("smartctl: %w", err)
 	}
 
-	c.Debugf("found smartctl at: %s", smartctlPath)
-	smartctlExec := newDirectSmartctlCli(smartctlPath, c.Timeout.Duration(), c.Logger)
-	return smartctlExec, nil
+	c.Debugf("found smartctl at: %s", path)
+
+	return newDirectSmartctlCli(path, c.Timeout.Duration(), c.Logger), nil
 }

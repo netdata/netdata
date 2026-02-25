@@ -13,16 +13,16 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
 func init() {
-	module.Register("proxysql", module.Creator{
+	collectorapi.Register("proxysql", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         proxysqlMethods,
 		MethodHandler:   proxysqlFunctionHandler,
@@ -90,10 +90,10 @@ func (c Config) topQueriesLimit() int {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts *module.Charts
+	charts *collectorapi.Charts
 
 	db *sql.DB
 
@@ -131,7 +131,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

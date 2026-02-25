@@ -9,13 +9,24 @@ modules:
         link: https://kubernetes.io/
         icon_filename: kubernetes.svg
         categories:
-          - data-collection.kubernetes
+          - data-collection.containers-and-vms
       keywords:
         - kubernetes
         - k8s
       related_resources:
         integrations:
-          list: []
+          list:
+            - plugin_name: go.d.plugin
+              module_name: k8s_apiserver
+            - plugin_name: go.d.plugin
+              module_name: k8s_kubelet
+            - plugin_name: go.d.plugin
+              module_name: k8s_kubeproxy
+            - plugin_name: cgroups.plugin
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: "Kubernetes Containers"
+            - plugin_name: go.d.plugin
+              module_name: coredns
       info_provided_to_referring_integrations:
         description: ""
       most_popular: true

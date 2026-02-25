@@ -15,19 +15,19 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
 func init() {
-	module.Register("systemdunits", module.Creator{
+	collectorapi.Register("systemdunits", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10, // gathering systemd units can be a CPU intensive op
 		},
-		Create: func() module.Module { return New() },
+		Create: func() collectorapi.CollectorV1 { return New() },
 		Config: func() any { return &Config{} },
 	})
 }
@@ -42,7 +42,7 @@ func New() *Collector {
 			IncludeUnitFiles:      []string{"*.service"},
 			CollectUnitFilesEvery: confopt.Duration(time.Minute * 5),
 		},
-		charts:        &module.Charts{},
+		charts:        &collectorapi.Charts{},
 		client:        newSystemdDBusClient(),
 		seenUnits:     make(map[string]bool),
 		unitTransient: make(map[string]bool),
@@ -61,7 +61,7 @@ type Config struct {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
 	client systemdClient
@@ -77,7 +77,7 @@ type Collector struct {
 	cachedUnitFiles       []dbus.UnitFile
 	seenUnitFiles         map[string]bool
 
-	charts *module.Charts
+	charts *collectorapi.Charts
 }
 
 func (c *Collector) Configuration() any {
@@ -116,7 +116,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

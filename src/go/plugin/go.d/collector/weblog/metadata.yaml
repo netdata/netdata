@@ -8,7 +8,7 @@ modules:
         name: Web server log files
         link: ""
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
         icon_filename: webservers.svg
       keywords:
         - webserver

@@ -9,7 +9,7 @@ modules:
         link: https://www.fluentd.org/
         icon_filename: fluentd.svg
         categories:
-          - data-collection.logs-servers
+          - data-collection.applications
       keywords:
         - fluentd
         - logging

@@ -8,7 +8,7 @@ modules:
         name: NGINX
         link: https://www.nginx.com/
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
         icon_filename: nginx.svg
       related_resources:
         integrations:
@@ -20,7 +20,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       alternative_monitored_instances: []
       info_provided_to_referring_integrations:
         description: ""

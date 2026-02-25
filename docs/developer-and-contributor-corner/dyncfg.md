@@ -150,12 +150,13 @@ The health module manages alert definitions through DynCfg:
 </details>
 
 <details>
-<summary><strong>journal-viewer-plugin (External Plugin, Rust)</strong></summary><br/>
+<summary><strong>systemd-journal.plugin (External Plugin, C)</strong></summary><br/>
 
-External Rust plugin that provides systemd journal log viewing and analysis:
+External C plugin that manages journal directory configurations:
 
-- **Location**: `src/crates/netdata-log-viewer/journal-viewer-plugin/`
-- **Use Case**: Viewing and analyzing systemd journal logs
+- **File**: `src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c`
+- **Pattern**: SINGLE configuration type
+- **Use Case**: Managing journal directory paths
 
 <br/>
 </details>

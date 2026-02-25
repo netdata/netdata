@@ -7,7 +7,7 @@ modules:
         name: macOS
         link: "https://www.apple.com/macos"
         categories:
-          - data-collection.macos-systems
+          - data-collection.operating-systems
         icon_filename: "macos.svg"
       related_resources:
         integrations:

@@ -8,7 +8,7 @@ modules:
         name: SpigotMC
         link: https://www.spigotmc.org/
         categories:
-          - data-collection.gaming
+          - data-collection.applications
         icon_filename: "spigot.jfif"
       related_resources:
         integrations:

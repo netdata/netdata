@@ -420,9 +420,15 @@ impl<M: MemoryMap> JournalFile<M> {
     {
         validate_offset_alignment(offset)?;
 
-        let is_compact = self
-            .journal_header_ref()
-            .has_incompatible_flag(HeaderIncompatibleFlags::Compact);
+        let journal_header = self.journal_header_ref();
+        let is_compact = journal_header.has_incompatible_flag(HeaderIncompatibleFlags::Compact);
+        let header_size = journal_header.header_size;
+        let arena_end = header_size + journal_header.arena_size;
+
+        // Objects cannot be located in the file header
+        if offset.get() < header_size {
+            return Err(JournalError::ObjectExceedsFileBounds);
+        }
 
         self.window_manager.with_guarded(offset, |wm| {
             // Get the object header to determine size
@@ -431,8 +437,17 @@ impl<M: MemoryMap> JournalFile<M> {
                     wm.get_slice(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
                 let header = ObjectHeader::ref_from_bytes(header_slice)
                     .map_err(|_| JournalError::ZerocopyFailure)?;
-                header.size
+                header.validated_size()?
             };
+
+            // Validate that the object doesn't exceed the journal's arena bounds
+            let end_offset = offset
+                .get()
+                .checked_add(size_needed)
+                .ok_or(JournalError::ObjectExceedsFileBounds)?;
+            if end_offset > arena_end {
+                return Err(JournalError::ObjectExceedsFileBounds);
+            }
 
             // Get the full object data
             let data = wm.get_slice(offset.get(), size_needed)?;
@@ -869,15 +884,22 @@ impl<M: MemoryMapMut> JournalFile<M> {
     {
         validate_offset_alignment(offset)?;
 
-        let is_compact = self
-            .journal_header_ref()
-            .has_incompatible_flag(HeaderIncompatibleFlags::Compact);
+        let journal_header = self.journal_header_ref();
+        let is_compact = journal_header.has_incompatible_flag(HeaderIncompatibleFlags::Compact);
+        let header_size = journal_header.header_size;
+        let arena_end = header_size + journal_header.arena_size;
+
+        // Objects cannot be located in the file header
+        if offset.get() < header_size {
+            return Err(JournalError::ObjectExceedsFileBounds);
+        }
 
         self.window_manager.with_guarded(offset, |wm| {
             // Get or set the size
             let size_needed = match size {
                 Some(size) => {
-                    // Setting object header for a new object
+                    // Setting object header for a new object (no bounds check needed,
+                    // the file will be extended as necessary)
                     let header_slice =
                         wm.get_slice_mut(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
                     let header = ObjectHeader::mut_from_bytes(header_slice)
@@ -895,7 +917,18 @@ impl<M: MemoryMapMut> JournalFile<M> {
                     if header.type_ != type_ as u8 {
                         return Err(JournalError::InvalidObjectType);
                     }
-                    header.size
+                    let size = header.validated_size()?;
+
+                    // Validate that the object doesn't exceed the journal's arena bounds
+                    let end_offset = offset
+                        .get()
+                        .checked_add(size)
+                        .ok_or(JournalError::ObjectExceedsFileBounds)?;
+                    if end_offset > arena_end {
+                        return Err(JournalError::ObjectExceedsFileBounds);
+                    }
+
+                    size
                 }
             };
 
@@ -1158,7 +1191,11 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
                 // Try to get the data object
                 match self.journal.data_ref(data_offset) {
                     Ok(data_guard) => Some(Ok(data_guard)),
-                    Err(e) => Some(Err(e)),
+                    Err(e) => {
+                        // If we can't read the data, return the error and stop iteration
+                        self.current_index = self.total_items;
+                        Some(Err(e))
+                    }
                 }
             }
             Err(e) => {

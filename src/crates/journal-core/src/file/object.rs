@@ -419,6 +419,21 @@ impl ObjectHeader {
     pub fn aligned_size(&self) -> u64 {
         (self.size + 7) & !7
     }
+
+    /// Validates that the object size is sane.
+    ///
+    /// Returns the size if valid, or an error if the size is invalid.
+    /// This should be called when reading an ObjectHeader from a journal file
+    /// to protect against corrupted data.
+    pub fn validated_size(&self) -> crate::error::Result<u64> {
+        let min_size = std::mem::size_of::<ObjectHeader>() as u64;
+
+        if self.size < min_size {
+            return Err(crate::error::JournalError::InvalidObjectSize(self.size));
+        }
+
+        Ok(self.size)
+    }
 }
 
 #[derive(Debug, Copy, Clone, FromBytes, IntoBytes, KnownLayout, Immutable)]
@@ -983,8 +998,7 @@ impl<B: ByteSlice> DataObject<B> {
                 return Err(JournalError::DecompressorError);
             }
 
-            let uncompressed_size =
-                u64::from_le_bytes(payload[..8].try_into().unwrap()) as usize;
+            let uncompressed_size = u64::from_le_bytes(payload[..8].try_into().unwrap()) as usize;
             let compressed_data = &payload[8..];
 
             buf.clear();

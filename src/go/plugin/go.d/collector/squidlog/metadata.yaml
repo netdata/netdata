@@ -6,10 +6,10 @@ modules:
       module_name: squidlog
       monitored_instance:
         name: Squid log files
-        link: https://www.lighttpd.net/
+        link: http://www.squid-cache.org/
         icon_filename: squid.png
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
       keywords:
         - squid
         - logs

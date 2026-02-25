@@ -9,7 +9,7 @@ modules:
         link: "https://buy.hpe.com/us/en/options/controller-controller-options/smart-array-controllers-smart-host-bus-adapters/c/7109730"
         icon_filename: "hp.svg"
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords:
         - storage
         - raid-controller

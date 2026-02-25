@@ -333,6 +333,7 @@ struct page_descr_with_data *page_descriptor_get(void) {
 }
 
 static inline void page_descriptor_release(struct page_descr_with_data *descr) {
+    uuidmap_free(descr->uuid_id);
     aral_freez(rrdeng_main.descriptors.ar, descr);
 }
 
@@ -950,7 +951,7 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
         header->descr[i].type = descr->type;
-        uuid_copy(*(nd_uuid_t *)header->descr[i].uuid, *descr->id);
+        uuid_copy(*(nd_uuid_t *)header->descr[i].uuid, *uuidmap_uuid_ptr(descr->uuid_id));
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time_ut = descr->start_time_ut;
 
@@ -1477,6 +1478,7 @@ void datafile_delete(
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
     bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
+    size_t attempts = 0;
 
     while (!datafile_got_for_deletion) {
         if(worker)
@@ -1485,6 +1487,20 @@ void datafile_delete(
         datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
 
         if (!datafile_got_for_deletion) {
+            if(++attempts >= 30) {
+                // pending_deletion is already set, blocking new acquires.
+                // Bail out and let the next rotation cycle retry - lockers
+                // will drain over time since no new ones can be added.
+                netdata_log_error("DBENGINE: datafile %u of tier %d could not be acquired for deletion "
+                                  "after %zu attempts (%u lockers remain) - will retry on next rotation",
+                                  datafile->fileno, ctx->config.tier, attempts, datafile->users.lockers);
+
+                if(worker)
+                    worker_is_idle();
+
+                return;
+            }
+
             netdata_log_info("DBENGINE: waiting for data file '%s/"
                          DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION
                          "' to be available for deletion, "
@@ -1827,9 +1843,6 @@ uint64_t last_async_callback;
 
 void async_cb(uv_async_t *handle)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
-
     last_async_callback = uv_hrtime();
 
     netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
@@ -1845,10 +1858,8 @@ static void async_closed_cb(uv_handle_t *handle)
     __atomic_store_n(&main->async_ready, true, __ATOMIC_RELEASE);
 }
 #else
-void async_cb(uv_async_t *handle)
+void async_cb(uv_async_t *handle __maybe_unused)
 {
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
     netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 #endif

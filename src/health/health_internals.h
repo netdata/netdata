@@ -92,6 +92,7 @@ struct health_plugin_globals {
 
     struct {
         DICTIONARY *dict;
+        bool registering;
     } prototypes;
 };
 

@@ -2,20 +2,20 @@
 
 package whoisquery
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
-var baseCharts = module.Charts{
+var baseCharts = collectorapi.Charts{
 	{
 		ID:    "time_until_expiration",
 		Title: "Time Until Domain Expiration",
 		Units: "seconds",
 		Fam:   "expiration time",
 		Ctx:   "whoisquery.time_until_expiration",
-		Opts:  module.Opts{StoreFirst: true},
-		Dims: module.Dims{
+		Opts:  collectorapi.Opts{StoreFirst: true},
+		Dims: collectorapi.Dims{
 			{ID: "expiry"},
 		},
-		Vars: module.Vars{
+		Vars: collectorapi.Vars{
 			{ID: "days_until_expiration_warning"},
 			{ID: "days_until_expiration_critical"},
 		},

@@ -7,7 +7,7 @@ modules:
         name: OpenSIPS
         link: "https://opensips.org/"
         categories:
-          - data-collection.telephony-servers
+          - data-collection.applications
         icon_filename: "opensips.png"
       related_resources:
         integrations:

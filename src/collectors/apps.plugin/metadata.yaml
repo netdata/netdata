@@ -8,7 +8,7 @@ modules:
         name: Applications
         link: ""
         categories:
-          - data-collection.processes-and-system-services
+          - data-collection.operating-systems
         icon_filename: "applications.svg"
       related_resources:
         integrations:
@@ -197,7 +197,7 @@ modules:
         name: User Groups
         link: ""
         categories:
-          - data-collection.processes-and-system-services
+          - data-collection.operating-systems
         icon_filename: "user.svg"
       related_resources:
         integrations:
@@ -388,7 +388,7 @@ modules:
         name: Users
         link: ""
         categories:
-          - data-collection.processes-and-system-services
+          - data-collection.operating-systems
         icon_filename: "users.svg"
       related_resources:
         integrations:

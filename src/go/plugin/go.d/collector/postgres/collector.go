@@ -13,8 +13,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 
 	"github.com/jackc/pgx/v5/stdlib"
 )
@@ -23,9 +23,9 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("postgres", module.Creator{
+	collectorapi.Register("postgres", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         pgMethods,
 		MethodHandler:   pgFunctionHandler,
@@ -105,10 +105,10 @@ func (c Config) topQueriesLimit() int {
 
 type (
 	Collector struct {
-		module.Base
+		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts                            *module.Charts
+		charts                            *collectorapi.Charts
 		addXactQueryRunningTimeChartsOnce *sync.Once
 		addWALFilesChartsOnce             *sync.Once
 
@@ -157,8 +157,8 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.dbSr = sr
 
-	c.mx.xactTimeHist = metrix.NewHistogramWithRangeBuckets(c.XactTimeHistogram)
-	c.mx.queryTimeHist = metrix.NewHistogramWithRangeBuckets(c.QueryTimeHistogram)
+	c.mx.xactTimeHist = oldmetrix.NewHistogramWithRangeBuckets(c.XactTimeHistogram)
+	c.mx.queryTimeHist = oldmetrix.NewHistogramWithRangeBuckets(c.QueryTimeHistogram)
 
 	c.funcRouter = newFuncRouter(c)
 
@@ -176,7 +176,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

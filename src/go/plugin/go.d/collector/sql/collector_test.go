@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 var (
@@ -18,7 +18,7 @@ var (
 )
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Charts(t *testing.T) {

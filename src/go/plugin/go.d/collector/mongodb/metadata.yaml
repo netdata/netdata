@@ -9,7 +9,7 @@ modules:
         link: https://www.mongodb.com/
         icon_filename: mongodb.svg
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords:
         - mongodb
         - databases

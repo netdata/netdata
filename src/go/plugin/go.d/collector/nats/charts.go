@@ -11,11 +11,11 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioServerTraffic = module.Priority + iota
+	prioServerTraffic = collectorapi.Priority + iota
 	prioServerMessages
 	prioServerConnections
 	prioServerConnectionsRate
@@ -59,8 +59,8 @@ const (
 	prioLeafRTT
 )
 
-func serverCharts() *module.Charts {
-	charts := module.Charts{
+func serverCharts() *collectorapi.Charts {
+	charts := collectorapi.Charts{
 		chartServerConnectionsCurrent.Copy(),
 		chartServerConnectionsRate.Copy(),
 		chartServerTraffic.Copy(),
@@ -76,110 +76,110 @@ func serverCharts() *module.Charts {
 }
 
 var (
-	chartServerTraffic = module.Chart{
+	chartServerTraffic = collectorapi.Chart{
 		ID:       "server_traffic",
 		Title:    "Server Traffic",
 		Units:    "bytes/s",
 		Fam:      "traffic",
 		Ctx:      "nats.server_traffic",
 		Priority: prioServerTraffic,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "varz_srv_in_bytes", Name: "received", Algo: module.Incremental},
-			{ID: "varz_srv_out_bytes", Name: "sent", Mul: -1, Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "varz_srv_in_bytes", Name: "received", Algo: collectorapi.Incremental},
+			{ID: "varz_srv_out_bytes", Name: "sent", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	chartServerMessages = module.Chart{
+	chartServerMessages = collectorapi.Chart{
 		ID:       "server_messages",
 		Title:    "Server Messages",
 		Units:    "messages/s",
 		Fam:      "traffic",
 		Ctx:      "nats.server_messages",
 		Priority: prioServerMessages,
-		Dims: module.Dims{
-			{ID: "varz_srv_in_msgs", Name: "received", Algo: module.Incremental},
-			{ID: "varz_srv_out_msgs", Name: "sent", Mul: -1, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "varz_srv_in_msgs", Name: "received", Algo: collectorapi.Incremental},
+			{ID: "varz_srv_out_msgs", Name: "sent", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	chartServerConnectionsCurrent = module.Chart{
+	chartServerConnectionsCurrent = collectorapi.Chart{
 		ID:       "server_connections",
 		Title:    "Server Active Connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "nats.server_connections",
 		Priority: prioServerConnections,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "varz_srv_connections", Name: "active"},
 		},
 	}
-	chartServerConnectionsRate = module.Chart{
+	chartServerConnectionsRate = collectorapi.Chart{
 		ID:       "server_connections_rate",
 		Title:    "Server Connections",
 		Units:    "connections/s",
 		Fam:      "connections",
 		Ctx:      "nats.server_connections_rate",
 		Priority: prioServerConnectionsRate,
-		Dims: module.Dims{
-			{ID: "varz_srv_total_connections", Name: "connections", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "varz_srv_total_connections", Name: "connections", Algo: collectorapi.Incremental},
 		},
 	}
-	chartServerHealthProbeStatus = module.Chart{
+	chartServerHealthProbeStatus = collectorapi.Chart{
 		ID:       "server_health_probe_status",
 		Title:    "Server Health Probe Status",
 		Units:    "status",
 		Fam:      "health",
 		Ctx:      "nats.server_health_probe_status",
 		Priority: prioServerHealthProbeStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "varz_srv_healthz_status_ok", Name: "ok"},
 			{ID: "varz_srv_healthz_status_error", Name: "error"},
 		},
 	}
-	chartServerCpuUsage = module.Chart{
+	chartServerCpuUsage = collectorapi.Chart{
 		ID:       "server_cpu_usage",
 		Title:    "Server CPU Usage",
 		Units:    "percent",
 		Fam:      "rusage",
 		Ctx:      "nats.server_cpu_usage",
 		Priority: prioServerCpuUsage,
-		Type:     module.Area,
-		Dims: module.Dims{
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
 			{ID: "varz_srv_cpu", Name: "used"},
 		},
 	}
-	chartServerMemUsage = module.Chart{
+	chartServerMemUsage = collectorapi.Chart{
 		ID:       "server_mem_usage",
 		Title:    "Server Memory Usage",
 		Units:    "bytes",
 		Fam:      "rusage",
 		Ctx:      "nats.server_mem_usage",
 		Priority: prioServerMemoryUsage,
-		Type:     module.Area,
-		Dims: module.Dims{
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
 			{ID: "varz_srv_mem", Name: "used"},
 		},
 	}
-	chartServerUptime = module.Chart{
+	chartServerUptime = collectorapi.Chart{
 		ID:       "server_uptime",
 		Title:    "Server Uptime",
 		Units:    "seconds",
 		Fam:      "uptime",
 		Ctx:      "nats.server_uptime",
 		Priority: prioServerUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "varz_srv_uptime", Name: "uptime"},
 		},
 	}
 )
 
-func httpEndpointsCharts() module.Charts {
-	var charts module.Charts
+func httpEndpointsCharts() collectorapi.Charts {
+	var charts collectorapi.Charts
 
 	for _, path := range httpEndpoints {
 		chart := httpEndpointRequestsChartTmpl.Copy()
 
 		chart.ID = fmt.Sprintf(chart.ID, path)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "http_endpoint", Value: path},
 		}
 		for _, dim := range chart.Dims {
@@ -191,19 +191,19 @@ func httpEndpointsCharts() module.Charts {
 	return charts
 }
 
-var httpEndpointRequestsChartTmpl = module.Chart{
+var httpEndpointRequestsChartTmpl = collectorapi.Chart{
 	ID:       "http_endpoint_%s_requests",
 	Title:    "HTTP Endpoint Requests",
 	Units:    "requests/s",
 	Fam:      "http requests",
 	Ctx:      "nats.http_endpoint_requests",
 	Priority: prioHttpEndpointRequests,
-	Dims: module.Dims{
-		{ID: "varz_http_endpoint_%s_req", Name: "requests", Algo: module.Incremental},
+	Dims: collectorapi.Dims{
+		{ID: "varz_http_endpoint_%s_req", Name: "requests", Algo: collectorapi.Incremental},
 	},
 }
 
-var jetStreamCharts = module.Charts{
+var jetStreamCharts = collectorapi.Charts{
 	jetStreamStatus.Copy(),
 	jetStreamStreams.Copy(),
 	jetStreamStreamsStorageBytes.Copy(),
@@ -217,122 +217,122 @@ var jetStreamCharts = module.Charts{
 }
 
 var (
-	jetStreamStatus = module.Chart{
+	jetStreamStatus = collectorapi.Chart{
 		ID:       "jetstream_status",
 		Title:    "JetStream Status",
 		Units:    "status",
 		Fam:      "jstream streams",
 		Ctx:      "nats.jetstream_status",
 		Priority: prioJetStreamStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jsz_enabled", Name: "enabled"},
 			{ID: "jsz_disabled", Name: "disabled"},
 		},
 	}
-	jetStreamStreams = module.Chart{
+	jetStreamStreams = collectorapi.Chart{
 		ID:       "jetstream_streams",
 		Title:    "JetStream Streams",
 		Units:    "streams",
 		Fam:      "jstream streams",
 		Ctx:      "nats.jetstream_streams",
 		Priority: prioJetStreamStreams,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jsz_streams", Name: "active"},
 		},
 	}
-	jetStreamStreamsStorageBytes = module.Chart{
+	jetStreamStreamsStorageBytes = collectorapi.Chart{
 		ID:       "jetstream_streams_storage_bytes",
 		Title:    "JetStream Bytes",
 		Units:    "bytes",
 		Fam:      "jstream streams",
 		Ctx:      "nats.jetstream_streams_storage_bytes",
 		Priority: prioJetStreamBytes,
-		Type:     module.Area,
-		Dims: module.Dims{
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
 			{ID: "jsz_bytes", Name: "used"},
 		},
 	}
-	jetStreamStreamsStorageMessages = module.Chart{
+	jetStreamStreamsStorageMessages = collectorapi.Chart{
 		ID:       "jetstream_streams_storage_messages",
 		Title:    "JetStream Messages",
 		Units:    "messages",
 		Fam:      "jstream streams",
 		Ctx:      "nats.jetstream_streams_storage_messages",
 		Priority: prioJetStreamMessages,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jsz_messages", Name: "stored"},
 		},
 	}
-	jetStreamConsumers = module.Chart{
+	jetStreamConsumers = collectorapi.Chart{
 		ID:       "jetstream_consumers",
 		Title:    "JetStream Consumers",
 		Units:    "consumers",
 		Fam:      "jstream consumers",
 		Ctx:      "nats.jetstream_consumers",
 		Priority: prioJetStreamConsumers,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jsz_consumers", Name: "active"},
 		},
 	}
-	jetStreamApiRequests = module.Chart{
+	jetStreamApiRequests = collectorapi.Chart{
 		ID:       "jetstream_api_requests",
 		Title:    "JetStream API Requests",
 		Units:    "requests/s",
 		Fam:      "jstream api",
 		Ctx:      "nats.jetstream_api_requests",
 		Priority: prioJetStreamApiRequests,
-		Dims: module.Dims{
-			{ID: "jsz_api_total", Name: "requests", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "jsz_api_total", Name: "requests", Algo: collectorapi.Incremental},
 		},
 	}
-	jetStreamApiErrors = module.Chart{
+	jetStreamApiErrors = collectorapi.Chart{
 		ID:       "jetstream_api_errors",
 		Title:    "JetStream API Errors",
 		Units:    "errors/s",
 		Fam:      "jstream api",
 		Ctx:      "nats.jetstream_api_errors",
 		Priority: prioJetStreamApiErrors,
-		Dims: module.Dims{
-			{ID: "jsz_api_errors", Name: "errors", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "jsz_api_errors", Name: "errors", Algo: collectorapi.Incremental},
 		},
 	}
-	jetStreamApiInflightRequests = module.Chart{
+	jetStreamApiInflightRequests = collectorapi.Chart{
 		ID:       "jetstream_api_inflight",
 		Title:    "JetStream API Inflight",
 		Units:    "requests",
 		Fam:      "jstream api",
 		Ctx:      "nats.jetstream_api_inflight",
 		Priority: prioJetStreamApiInflight,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jsz_api_inflight", Name: "inflight"},
 		},
 	}
-	jetStreamMemoryUsed = module.Chart{
+	jetStreamMemoryUsed = collectorapi.Chart{
 		ID:       "jetstream_memory_used",
 		Title:    "JetStream Used Memory",
 		Units:    "bytes",
 		Fam:      "jstream rusage",
 		Ctx:      "nats.jetstream_memory_used",
 		Priority: prioJetStreamMemoryUsed,
-		Type:     module.Area,
-		Dims: module.Dims{
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
 			{ID: "jsz_memory_used", Name: "used"},
 		},
 	}
-	jetStreamStorageUsed = module.Chart{
+	jetStreamStorageUsed = collectorapi.Chart{
 		ID:       "jetstream_storage_used",
 		Title:    "JetStream Used Storage",
 		Units:    "bytes",
 		Fam:      "jstream rusage",
 		Ctx:      "nats.jetstream_storage_used",
 		Priority: prioJetStreamStorageUsed,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jsz_store_used", Name: "used"},
 		},
 	}
 )
 
-var accountChartsTmpl = module.Charts{
+var accountChartsTmpl = collectorapi.Charts{
 	accountTrafficTmpl.Copy(),
 	accountMessagesTmpl.Copy(),
 	accountConnectionsCurrentTmpl.Copy(),
@@ -343,142 +343,142 @@ var accountChartsTmpl = module.Charts{
 }
 
 var (
-	accountTrafficTmpl = module.Chart{
+	accountTrafficTmpl = collectorapi.Chart{
 		ID:       "account_%s_traffic",
 		Title:    "Account Traffic",
 		Units:    "bytes/s",
 		Fam:      "acc traffic",
 		Ctx:      "nats.account_traffic",
 		Priority: prioAccountTraffic,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "accstatz_acc_%s_received_bytes", Name: "received", Algo: module.Incremental},
-			{ID: "accstatz_acc_%s_sent_bytes", Name: "sent", Mul: -1, Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "accstatz_acc_%s_received_bytes", Name: "received", Algo: collectorapi.Incremental},
+			{ID: "accstatz_acc_%s_sent_bytes", Name: "sent", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	accountMessagesTmpl = module.Chart{
+	accountMessagesTmpl = collectorapi.Chart{
 		ID:       "account_%s_messages",
 		Title:    "Account Messages",
 		Units:    "messages/s",
 		Fam:      "acc traffic",
 		Ctx:      "nats.account_messages",
 		Priority: prioAccountMessages,
-		Type:     module.Line,
-		Dims: module.Dims{
-			{ID: "accstatz_acc_%s_received_msgs", Name: "received", Algo: module.Incremental},
-			{ID: "accstatz_acc_%s_sent_msgs", Name: "sent", Mul: -1, Algo: module.Incremental},
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
+			{ID: "accstatz_acc_%s_received_msgs", Name: "received", Algo: collectorapi.Incremental},
+			{ID: "accstatz_acc_%s_sent_msgs", Name: "sent", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	accountConnectionsCurrentTmpl = module.Chart{
+	accountConnectionsCurrentTmpl = collectorapi.Chart{
 		ID:       "account_%s_connections",
 		Title:    "Account Active Connections",
 		Units:    "connections",
 		Fam:      "acc connections",
 		Ctx:      "nats.account_connections",
 		Priority: prioAccountConnections,
-		Type:     module.Line,
-		Dims: module.Dims{
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
 			{ID: "accstatz_acc_%s_conns", Name: "active"},
 		},
 	}
-	accountConnectionsRateTmpl = module.Chart{
+	accountConnectionsRateTmpl = collectorapi.Chart{
 		ID:       "account_%s_connections_rate",
 		Title:    "Account Connections",
 		Units:    "connections/s",
 		Fam:      "acc connections",
 		Ctx:      "nats.account_connections_rate",
 		Priority: prioAccountConnectionsRate,
-		Type:     module.Line,
-		Dims: module.Dims{
-			{ID: "accstatz_acc_%s_total_conns", Name: "connections", Algo: module.Incremental},
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
+			{ID: "accstatz_acc_%s_total_conns", Name: "connections", Algo: collectorapi.Incremental},
 		},
 	}
-	accountSubscriptionsTmpl = module.Chart{
+	accountSubscriptionsTmpl = collectorapi.Chart{
 		ID:       "account_%s_subscriptions",
 		Title:    "Account Active Subscriptions",
 		Units:    "subscriptions",
 		Fam:      "acc subscriptions",
 		Ctx:      "nats.account_subscriptions",
 		Priority: prioAccountSubscriptions,
-		Type:     module.Line,
-		Dims: module.Dims{
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
 			{ID: "accstatz_acc_%s_num_subs", Name: "active"},
 		},
 	}
-	accountSlowConsumersTmpl = module.Chart{
+	accountSlowConsumersTmpl = collectorapi.Chart{
 		ID:       "account_%s_slow_consumers",
 		Title:    "Account Slow Consumers",
 		Units:    "consumers/s",
 		Fam:      "acc consumers",
 		Ctx:      "nats.account_slow_consumers",
 		Priority: prioAccountSlowConsumers,
-		Type:     module.Line,
-		Dims: module.Dims{
-			{ID: "accstatz_acc_%s_slow_consumers", Name: "slow", Algo: module.Incremental},
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
+			{ID: "accstatz_acc_%s_slow_consumers", Name: "slow", Algo: collectorapi.Incremental},
 		},
 	}
-	accountLeadNodesTmpl = module.Chart{
+	accountLeadNodesTmpl = collectorapi.Chart{
 		ID:       "account_%s_leaf_nodes",
 		Title:    "Account Leaf Nodes",
 		Units:    "servers",
 		Fam:      "acc leaf nodes",
 		Ctx:      "nats.account_leaf_nodes",
 		Priority: prioAccountLeafNodes,
-		Type:     module.Line,
-		Dims: module.Dims{
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
 			{ID: "accstatz_acc_%s_leaf_nodes", Name: "leafnode"},
 		},
 	}
 )
 
-var routeChartsTmpl = module.Charts{
+var routeChartsTmpl = collectorapi.Charts{
 	routeTrafficTmpl.Copy(),
 	routeMessagesTmpl.Copy(),
 	routeSubscriptionsTmpl.Copy(),
 }
 
 var (
-	routeTrafficTmpl = module.Chart{
+	routeTrafficTmpl = collectorapi.Chart{
 		ID:       "route_%d_traffic",
 		Title:    "Route Traffic",
 		Units:    "bytes/s",
 		Fam:      "route traffic",
 		Ctx:      "nats.route_traffic",
 		Priority: prioRouteTraffic,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "routez_route_id_%d_in_bytes", Name: "in", Algo: module.Incremental},
-			{ID: "routez_route_id_%d_out_bytes", Name: "out", Mul: -1, Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "routez_route_id_%d_in_bytes", Name: "in", Algo: collectorapi.Incremental},
+			{ID: "routez_route_id_%d_out_bytes", Name: "out", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	routeMessagesTmpl = module.Chart{
+	routeMessagesTmpl = collectorapi.Chart{
 		ID:       "route_%d_messages",
 		Title:    "Route Messages",
 		Units:    "messages/s",
 		Fam:      "route traffic",
 		Ctx:      "nats.route_messages",
 		Priority: prioRouteMessages,
-		Type:     module.Line,
-		Dims: module.Dims{
-			{ID: "routez_route_id_%d_in_msgs", Name: "in", Algo: module.Incremental},
-			{ID: "routez_route_id_%d_out_msgs", Name: "out", Mul: -1, Algo: module.Incremental},
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
+			{ID: "routez_route_id_%d_in_msgs", Name: "in", Algo: collectorapi.Incremental},
+			{ID: "routez_route_id_%d_out_msgs", Name: "out", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	routeSubscriptionsTmpl = module.Chart{
+	routeSubscriptionsTmpl = collectorapi.Chart{
 		ID:       "route_%d_subscriptions",
 		Title:    "Route Active Subscriptions",
 		Units:    "subscriptions",
 		Fam:      "route subscriptions",
 		Ctx:      "nats.route_subscriptions",
 		Priority: prioRouteSubscriptions,
-		Type:     module.Line,
-		Dims: module.Dims{
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
 			{ID: "routez_route_id_%d_num_subs", Name: "active"},
 		},
 	}
 )
 
-var gatewayConnChartsTmpl = module.Charts{
+var gatewayConnChartsTmpl = collectorapi.Charts{
 	gatewayConnTrafficTmpl.Copy(),
 	gatewayConnMessagesTmpl.Copy(),
 	gatewayConnSubscriptionsTmpl.Copy(),
@@ -486,58 +486,58 @@ var gatewayConnChartsTmpl = module.Charts{
 }
 
 var (
-	gatewayConnTrafficTmpl = module.Chart{
+	gatewayConnTrafficTmpl = collectorapi.Chart{
 		ID:       "%s_gw_%s_cid_%d_traffic",
 		Title:    "%s Gateway Traffic",
 		Units:    "bytes/s",
 		Fam:      "gw traffic",
 		Ctx:      "nats.%s_gateway_conn_traffic",
 		Priority: prioGatewayConnTraffic,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "gatewayz_%s_gw_%s_cid_%d_in_bytes", Name: "in", Algo: module.Incremental},
-			{ID: "gatewayz_%s_gw_%s_cid_%d_out_bytes", Name: "out", Mul: -1, Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "gatewayz_%s_gw_%s_cid_%d_in_bytes", Name: "in", Algo: collectorapi.Incremental},
+			{ID: "gatewayz_%s_gw_%s_cid_%d_out_bytes", Name: "out", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	gatewayConnMessagesTmpl = module.Chart{
+	gatewayConnMessagesTmpl = collectorapi.Chart{
 		ID:       "%s_gw_%s_cid_%d_messages",
 		Title:    "%s Gateway Messages",
 		Units:    "messages/s",
 		Fam:      "gw traffic",
 		Ctx:      "nats.%s_gateway_conn_messages",
 		Priority: prioGatewayConnMessages,
-		Type:     module.Line,
-		Dims: module.Dims{
-			{ID: "gatewayz_%s_gw_%s_cid_%d_in_msgs", Name: "in", Algo: module.Incremental},
-			{ID: "gatewayz_%s_gw_%s_cid_%d_out_msgs", Name: "out", Mul: -1, Algo: module.Incremental},
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
+			{ID: "gatewayz_%s_gw_%s_cid_%d_in_msgs", Name: "in", Algo: collectorapi.Incremental},
+			{ID: "gatewayz_%s_gw_%s_cid_%d_out_msgs", Name: "out", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	gatewayConnSubscriptionsTmpl = module.Chart{
+	gatewayConnSubscriptionsTmpl = collectorapi.Chart{
 		ID:       "%s_gw_%s_cid_%d_subscriptions",
 		Title:    "%s Gateway Active Subscriptions",
 		Units:    "subscriptions",
 		Fam:      "gw subscriptions",
 		Ctx:      "nats.%s_gateway_conn_subscriptions",
 		Priority: prioGatewayConnSubscriptions,
-		Type:     module.Line,
-		Dims: module.Dims{
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
 			{ID: "gatewayz_%s_gw_%s_cid_%d_num_subs", Name: "active"},
 		},
 	}
-	gatewayConnUptime = module.Chart{
+	gatewayConnUptime = collectorapi.Chart{
 		ID:       "%s_gw_%s_cid_%d_uptime",
 		Title:    "%s Gateway Connection Uptime",
 		Units:    "seconds",
 		Fam:      "gw uptime",
 		Ctx:      "nats.%s_gateway_conn_uptime",
 		Priority: prioGatewayConnUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "gatewayz_%s_gw_%s_cid_%d_uptime", Name: "uptime"},
 		},
 	}
 )
 
-var leafConnChartsTmpl = module.Charts{
+var leafConnChartsTmpl = collectorapi.Charts{
 	leafConnTrafficTmpl.Copy(),
 	leafConnMessagesTmpl.Copy(),
 	leafConnSubscriptionsTmpl.Copy(),
@@ -545,52 +545,52 @@ var leafConnChartsTmpl = module.Charts{
 }
 
 var (
-	leafConnTrafficTmpl = module.Chart{
+	leafConnTrafficTmpl = collectorapi.Chart{
 		ID:       "leaf_node_conn_%s_%s_%s_%d_traffic",
 		Title:    "Leaf Node Connection Traffic",
 		Units:    "bytes/s",
 		Fam:      "leaf traffic",
 		Ctx:      "nats.leaf_node_conn_traffic",
 		Priority: prioLeafConnTraffic,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "leafz_leaf_%s_%s_%s_%d_in_bytes", Name: "in", Algo: module.Incremental},
-			{ID: "leafz_leaf_%s_%s_%s_%d_out_bytes", Name: "out", Mul: -1, Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "leafz_leaf_%s_%s_%s_%d_in_bytes", Name: "in", Algo: collectorapi.Incremental},
+			{ID: "leafz_leaf_%s_%s_%s_%d_out_bytes", Name: "out", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	leafConnMessagesTmpl = module.Chart{
+	leafConnMessagesTmpl = collectorapi.Chart{
 		ID:       "leaf_node_conn_%s_%s_%s_%d_messages",
 		Title:    "Leaf Node Connection Messages",
 		Units:    "messages/s",
 		Fam:      "leaf traffic",
 		Ctx:      "nats.leaf_node_conn_messages",
 		Priority: prioLeafConnMessages,
-		Type:     module.Line,
-		Dims: module.Dims{
-			{ID: "leafz_leaf_%s_%s_%s_%d_in_msgs", Name: "in", Algo: module.Incremental},
-			{ID: "leafz_leaf_%s_%s_%s_%d_out_msgs", Name: "out", Mul: -1, Algo: module.Incremental},
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
+			{ID: "leafz_leaf_%s_%s_%s_%d_in_msgs", Name: "in", Algo: collectorapi.Incremental},
+			{ID: "leafz_leaf_%s_%s_%s_%d_out_msgs", Name: "out", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	leafConnSubscriptionsTmpl = module.Chart{
+	leafConnSubscriptionsTmpl = collectorapi.Chart{
 		ID:       "leaf_node_conn_%s_%s_%s_%d_subscriptions",
 		Title:    "Leaf Node Connection Active Subscriptions",
 		Units:    "subscriptions",
 		Fam:      "leaf subscriptions",
 		Ctx:      "nats.leaf_node_conn_subscriptions",
 		Priority: prioLeafConnSubscriptions,
-		Type:     module.Line,
-		Dims: module.Dims{
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
 			{ID: "leafz_leaf_%s_%s_%s_%d_num_subs", Name: "active"},
 		},
 	}
-	leafConnRTT = module.Chart{
+	leafConnRTT = collectorapi.Chart{
 		ID:       "leaf_node_conn_%s_%s_%s_%d_rtt",
 		Title:    "Leaf Node Connection RTT",
 		Units:    "microseconds",
 		Fam:      "leaf rtt",
 		Ctx:      "nats.leaf_node_conn_rtt",
 		Priority: prioLeafRTT,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "leafz_leaf_%s_%s_%s_%d_rtt", Name: "rtt"},
 		},
 	}
@@ -666,7 +666,7 @@ func (c *Collector) addServerCharts() {
 	charts := serverCharts()
 
 	for _, chart := range *charts {
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "server_name", Value: c.srvMeta.name},
@@ -683,7 +683,7 @@ func (c *Collector) addAccountCharts(acc *accCacheEntry) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, acc.accName)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "server_name", Value: c.srvMeta.name},
@@ -709,7 +709,7 @@ func (c *Collector) addRouteCharts(route *routeCacheEntry) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, route.rid)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "server_name", Value: c.srvMeta.name},
@@ -743,7 +743,7 @@ func (c *Collector) addGatewayConnCharts(gwConn *gwConnCacheEntry, isInbound boo
 		chart.ID = fmt.Sprintf(chart.ID, direction, gwConn.rgwName, gwConn.cid)
 		chart.Title = fmt.Sprintf(chart.Title, cases.Title(language.English, cases.Compact).String(direction))
 		chart.Ctx = fmt.Sprintf(chart.Ctx, direction)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "server_name", Value: c.srvMeta.name},
@@ -776,7 +776,7 @@ func (c *Collector) addLeafCharts(leaf *leafCacheEntry) {
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, leaf.leafName, leaf.account, leaf.ip, leaf.port)
 		chart.ID = cleanChartID(chart.ID)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_name", Value: c.srvMeta.clusterName},
 			{Key: "server_id", Value: c.srvMeta.id},
 			{Key: "server_name", Value: c.srvMeta.name},

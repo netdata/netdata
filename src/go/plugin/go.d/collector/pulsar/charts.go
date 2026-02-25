@@ -7,15 +7,15 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type (
-	Charts = module.Charts
-	Chart  = module.Chart
-	Dims   = module.Dims
-	Dim    = module.Dim
-	Opts   = module.Opts
+	Charts = collectorapi.Charts
+	Chart  = collectorapi.Chart
+	Dims   = collectorapi.Dims
+	Dim    = collectorapi.Dim
+	Opts   = collectorapi.Opts
 )
 
 var summaryCharts = Charts{
@@ -46,7 +46,7 @@ var (
 		Units: "components",
 		Fam:   "ns summary",
 		Ctx:   "pulsar.broker_components",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 		Dims: Dims{
 			{ID: "pulsar_namespaces_count", Name: "namespaces"},
@@ -74,7 +74,7 @@ var (
 		Units: "KiB/s",
 		Fam:   "ns summary",
 		Ctx:   "pulsar.throughput_rate",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Opts:  Opts{StoreFirst: true},
 		Dims: Dims{
 			{ID: metricPulsarThroughputIn, Name: "publish", Div: 1024 * 1000},
@@ -98,7 +98,7 @@ var (
 		Units: "message batches/s",
 		Fam:   "ns summary",
 		Ctx:   "pulsar.storage_operations_rate",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Opts:  Opts{StoreFirst: true},
 		Dims: Dims{
 			{ID: metricPulsarStorageReadRate, Name: "read", Div: 1000},
@@ -122,7 +122,7 @@ var (
 		Units: "entries/s",
 		Fam:   "ns summary",
 		Ctx:   "pulsar.storage_write_latency",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 		Dims: Dims{
 			{ID: "pulsar_storage_write_latency_le_0_5", Name: "<=0.5ms", Div: 60},
@@ -143,7 +143,7 @@ var (
 		Units: "entries/s",
 		Fam:   "ns summary",
 		Ctx:   "pulsar.entry_size",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 		Dims: Dims{
 			{ID: "pulsar_entry_size_le_128", Name: "<=128B", Div: 60},
@@ -306,7 +306,7 @@ var (
 		Units: "producers",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_producers",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicSubscriptionsChart = Chart{
@@ -315,7 +315,7 @@ var (
 		Units: "subscriptions",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_subscriptions",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicConsumersChart = Chart{
@@ -324,7 +324,7 @@ var (
 		Units: "consumers",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_consumers",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicMessagesRateInChart = Chart{
@@ -333,7 +333,7 @@ var (
 		Units: "publishes/s",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_messages_rate_in",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicMessagesRateOutChart = Chart{
@@ -342,7 +342,7 @@ var (
 		Units: "dispatches/s",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_messages_rate_out",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicThroughputRateInChart = Chart{
@@ -351,7 +351,7 @@ var (
 		Units: "KiB/s",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_throughput_rate_in",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicThroughputRateOutChart = Chart{
@@ -360,7 +360,7 @@ var (
 		Units: "KiB/s",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_throughput_rate_out",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicStorageSizeChart = Chart{
@@ -369,7 +369,7 @@ var (
 		Units: "KiB",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_storage_size",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicStorageReadRateChart = Chart{
@@ -378,7 +378,7 @@ var (
 		Units: "message batches/s",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_storage_read_rate",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicStorageWriteRateChart = Chart{
@@ -387,7 +387,7 @@ var (
 		Units: "message batches/s",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_storage_write_rate",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicMsgBacklogSizeChart = Chart{
@@ -396,7 +396,7 @@ var (
 		Units: "messages",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_msg_backlog",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicSubsDelayedChart = Chart{
@@ -405,7 +405,7 @@ var (
 		Units: "message batches",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_subscription_delayed",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicSubsMsgRateRedeliverChart = Chart{
@@ -414,7 +414,7 @@ var (
 		Units: "messages/s",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_subscription_msg_rate_redeliver",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicSubsBlockedOnUnackedMsgChart = Chart{
@@ -423,7 +423,7 @@ var (
 		Units: "blocked subscriptions",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_subscription_blocked_on_unacked_messages",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicReplicationRateInChart = Chart{
@@ -432,7 +432,7 @@ var (
 		Units: "messages/s",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_replication_rate_in",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicReplicationRateOutChart = Chart{
@@ -441,7 +441,7 @@ var (
 		Units: "messages/s",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_replication_rate_out",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicReplicationThroughputRateInChart = Chart{
@@ -450,7 +450,7 @@ var (
 		Units: "KiB/s",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_replication_throughput_rate_in",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicReplicationThroughputRateOutChart = Chart{
@@ -459,7 +459,7 @@ var (
 		Units: "KiB/s",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_replication_throughput_rate_out",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 	topicReplicationBacklogChart = Chart{
@@ -468,7 +468,7 @@ var (
 		Units: "messages",
 		Fam:   "ns %s",
 		Ctx:   "pulsar.topic_replication_backlog",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Opts:  Opts{StoreFirst: true},
 	}
 )

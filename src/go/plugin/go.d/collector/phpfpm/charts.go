@@ -2,13 +2,13 @@
 
 package phpfpm
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Dims is an alias for module.Dims
-	Dims = module.Dims
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Dims is an alias for collectorapi.Dims
+	Dims = collectorapi.Dims
 )
 
 var charts = Charts{
@@ -31,7 +31,7 @@ var charts = Charts{
 		Fam:   "requests",
 		Ctx:   "phpfpm.requests",
 		Dims: Dims{
-			{ID: "requests", Algo: module.Incremental},
+			{ID: "requests", Algo: collectorapi.Incremental},
 		},
 	},
 	{

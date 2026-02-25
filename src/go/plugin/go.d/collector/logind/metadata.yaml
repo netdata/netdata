@@ -9,7 +9,7 @@ modules:
         link: https://www.freedesktop.org/software/systemd/man/systemd-logind.service.html
         icon_filename: users.svg
         categories:
-          - data-collection.systemd
+          - data-collection.operating-systems
       keywords:
         - logind
         - systemd

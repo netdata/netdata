@@ -16,10 +16,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"

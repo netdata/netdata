@@ -10,7 +10,7 @@ modules:
         link: https://www.elastic.co/elasticsearch/
         icon_filename: elasticsearch.svg
         categories:
-          - data-collection.search-engines
+          - data-collection.databases
       keywords:
         - elastic
         - elasticsearch
@@ -22,7 +22,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       most_popular: true
@@ -795,4 +796,4 @@ modules:
         link: https://opensearch.org/
         icon_filename: opensearch.svg
         categories:
-          - data-collection.search-engines
+          - data-collection.databases

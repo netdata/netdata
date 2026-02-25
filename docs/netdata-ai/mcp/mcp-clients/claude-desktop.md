@@ -46,13 +46,54 @@ Use the community AppImage project:
 
 Claude Desktop supports MCP servers through two methods: Custom Connectors for remote servers (recommended), and traditional JSON configuration (manual).
 
-### Method 1: Claude Desktop Custom Connectors (Anthropic-hosted beta)
+### Netdata Cloud MCP
+
+Connect to your entire Netdata Cloud infrastructure
+through a single endpoint — no local Netdata setup
+or firewall changes needed.
+
+**Prerequisites:**
+
+- Netdata Cloud account with Business plan
+- Nodes claimed to Netdata Cloud
+- API token with `scope:mcp`
+  ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+
+Edit `claude_desktop_config.json` (see Method 2 below for file location):
+
+```json
+{
+  "mcpServers": {
+    "netdata-cloud": {
+      "command": "npx",
+      "args": [
+        "mcp-remote@latest",
+        "https://app.netdata.cloud/api/v1/mcp",
+        "--header",
+        "Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+      ]
+    }
+  }
+}
+```
+
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
+Netdata Cloud API token (must have `scope:mcp`).
+Restart Claude Desktop after saving.
+For more details, see
+[Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+
+### Local Agent or Parent
+
+The following methods connect directly to a Netdata Agent or Parent on your network.
+
+#### Method 1: Claude Desktop Custom Connectors (Anthropic-hosted beta)
 
 Anthropic’s custom connectors beta lets Team/Enterprise owners add remote servers through Claude’s UI. The connector flow relies on the server’s OAuth or custom auth and does **not** expose arbitrary HTTP headers. Follow the server developer’s instructions to complete the OAuth hand-off; the UI handles credential storage (https://support.claude.com/en/articles/11175166-getting-started-with-custom-connectors-using-remote-mcp).
 
 Because Netdata currently authenticates via bearer tokens, you’ll need the stdio launcher methods below unless you front your Netdata MCP endpoint with an OAuth-capable bridge.
 
-### Method 2: Traditional JSON Configuration with nd-mcp Bridge
+#### Method 2: Traditional JSON Configuration with nd-mcp Bridge
 
 For all Netdata versions (v2.6.0+), you can manually configure MCP servers:
 
@@ -84,7 +125,7 @@ Add the Netdata configuration:
 5. Save the configuration file
 6. **Restart Claude Desktop** (required for changes to take effect)
 
-### Method 3: Traditional JSON Configuration with `npx mcp-remote` (v2.7.2+)
+#### Method 3: Traditional JSON Configuration with `npx mcp-remote` (v2.7.2+)
 
 For Netdata v2.7.2+ with HTTP/SSE support. `mcp-remote` wraps remote transports in a stdio session Claude can launch (https://modelcontextprotocol.io/docs/develop/connect-local-servers). Edit `claude_desktop_config.json` as above.
 

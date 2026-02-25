@@ -17,7 +17,7 @@ This plugin provides a `systemd-journal` function that Netdata can call to query
        │ (plugin protocol)
        ↓
 ┌──────────────────────────┐
-│  journal-viewer-plugin   │
+│  otel-signal-viewer-plugin   │
 │                          │
 │  ┌───────────────┐       │
 │  │ Journal       │       │
@@ -69,7 +69,7 @@ docker run -d --name jaeger \
 ### Building
 
 ```bash
-cargo build --bin journal-viewer-plugin --release
+cargo build --bin otel-signal-viewer-plugin --release
 ```
 
 ### Running
@@ -81,7 +81,7 @@ The plugin is designed to be spawned by Netdata:
 # Configure in /etc/netdata/netdata.conf:
 
 [plugins]
-    journal-viewer = yes
+    otel-signal-viewer-plugin = yes
 ```
 
 For development/testing:
@@ -106,7 +106,7 @@ See [DEVELOPMENT.md](./DEVELOPMENT.md) for comprehensive documentation.
 ### Development Workflow
 
 1. **Make changes** to the plugin code
-2. **Rebuild** (fast, seconds): `cargo build --bin journal-viewer-plugin`
+2. **Rebuild** (fast, seconds): `cargo build --bin otel-signal-viewer-plugin`
 3. **Restart** Netdata: `sudo systemctl restart netdata`
 4. **View traces** in Jaeger: http://localhost:16686
 5. **Check logs**: `sudo journalctl -u netdata -f`
@@ -124,7 +124,7 @@ See [DEVELOPMENT.md](./DEVELOPMENT.md) for comprehensive documentation.
 ```
 netdata-log-viewer/
 ├── histogram-service/       # Core business logic (library)
-├── journal-viewer-plugin/   # Netdata plugin (binary)
+├── otel-signal-viewer-plugin/   # Netdata plugin (binary)
 ├── types/                   # Shared request/response types
 ├── watcher-plugin/          # DEPRECATED - no longer needed
 ├── lv/                      # DEPRECATED - no longer needed
@@ -142,7 +142,7 @@ The plugin is configured at compile time with sensible defaults:
 - **Memory cache**: 10,000 entries
 - **Disk cache**: 64 MiB
 
-To customize, edit `create_shared_state()` in `journal-viewer-plugin/src/main.rs`.
+To customize, edit `create_shared_state()` in `otel-signal-viewer-plugin/src/main.rs`.
 
 ## Observability
 
@@ -162,13 +162,13 @@ Control log verbosity with `RUST_LOG`:
 export RUST_LOG="debug"
 
 # Selective logging
-export RUST_LOG="journal_viewer_plugin=trace,histogram_service=debug,journal=info"
+export RUST_LOG="otel_signal_viewer=trace,histogram_service=debug,journal=info"
 ```
 
 ### Metrics (Netdata)
 
 The plugin reports its own metrics:
-- `journal_viewer.journal_calls` - Successful/failed/cancelled function calls
+- `otel_signal_viewer.journal_calls` - Successful/failed/cancelled function calls
 
 ## Function Interface
 
@@ -229,7 +229,7 @@ The plugin exposes the `systemd-journal` function:
 sudo tail -f /var/log/netdata/error.log
 
 # Run manually
-sudo -u netdata /path/to/journal-viewer-plugin
+sudo -u netdata /path/to/otel-signal-viewer-plugin
 ```
 
 ### No traces in Jaeger

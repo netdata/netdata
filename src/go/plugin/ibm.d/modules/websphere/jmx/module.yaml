@@ -5,7 +5,7 @@ description: |
   via the embedded JMX bridge helper.
 link: https://www.ibm.com/products/websphere-application-server
 categories:
-  - data-collection.application_servers
+  - data-collection.applications
 keywords:
   - websphere
   - jmx

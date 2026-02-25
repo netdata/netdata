@@ -9,7 +9,7 @@ modules:
         link: https://thekelleys.org.uk/dnsmasq/doc.html
         icon_filename: dnsmasq.svg
         categories:
-          - data-collection.dns-and-dhcp-servers
+          - data-collection.networking
       keywords:
         - dnsmasq
         - dns

@@ -6,7 +6,7 @@ modules:
       plugin_name: go.d.plugin
       monitored_instance:
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
         icon_filename: cassandra.svg
         name: Cassandra
         link: https://cassandra.apache.org/_/index.html

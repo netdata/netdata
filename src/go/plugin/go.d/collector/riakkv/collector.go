@@ -13,19 +13,19 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
 func init() {
-	module.Register("riakkv", module.Creator{
-		Create: func() module.Module { return New() },
+	collectorapi.Register("riakkv", collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 { return New() },
 		// Riak updates the metrics on the /stats endpoint every 1 second.
 		// If we use 1 here, it means we might get weird jitter in the graph,
 		// so the default is set to 2 seconds to prevent that.
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			UpdateEvery: 2,
 		},
 		JobConfigSchema: configSchema,
@@ -59,11 +59,11 @@ type Config struct {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
 	once   *sync.Once
-	charts *module.Charts
+	charts *collectorapi.Charts
 
 	httpClient *http.Client
 }
@@ -101,7 +101,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

@@ -9,7 +9,7 @@ modules:
         link: https://hadoop.apache.org/docs/r1.2.1/hdfs_design.html
         icon_filename: hadoop.svg
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords:
         - hdfs
         - hadoop

@@ -3,11 +3,11 @@
 package dovecot
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioSessions = module.Priority + iota
+	prioSessions = collectorapi.Priority + iota
 	prioLogins
 	prioAuthenticationAttempts
 	prioCommands
@@ -21,7 +21,7 @@ const (
 	prioAuthCachePerformance
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	sessionsChart.Copy(),
 	loginsChart.Copy(),
 	authAttemptsChart.Copy(),
@@ -37,149 +37,149 @@ var charts = module.Charts{
 }
 
 var (
-	sessionsChart = module.Chart{
+	sessionsChart = collectorapi.Chart{
 		ID:       "sessions",
 		Title:    "Dovecot Active Sessions",
 		Units:    "sessions",
 		Fam:      "sessions",
 		Ctx:      "dovecot.sessions",
 		Priority: prioSessions,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "num_connected_sessions", Name: "active"},
 		},
 	}
-	loginsChart = module.Chart{
+	loginsChart = collectorapi.Chart{
 		ID:       "logins",
 		Title:    "Dovecot Logins",
 		Units:    "logins",
 		Fam:      "logins",
 		Ctx:      "dovecot.logins",
 		Priority: prioLogins,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "num_logins", Name: "logins"},
 		},
 	}
-	authAttemptsChart = module.Chart{
+	authAttemptsChart = collectorapi.Chart{
 		ID:       "auth",
 		Title:    "Dovecot Authentications",
 		Units:    "attempts/s",
 		Fam:      "logins",
 		Ctx:      "dovecot.auth",
 		Priority: prioAuthenticationAttempts,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "auth_successes", Name: "ok", Algo: module.Incremental},
-			{ID: "auth_failures", Name: "failed", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "auth_successes", Name: "ok", Algo: collectorapi.Incremental},
+			{ID: "auth_failures", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	}
-	commandsChart = module.Chart{
+	commandsChart = collectorapi.Chart{
 		ID:       "commands",
 		Title:    "Dovecot Commands",
 		Units:    "commands",
 		Fam:      "commands",
 		Ctx:      "dovecot.commands",
 		Priority: prioCommands,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "num_cmds", Name: "commands"},
 		},
 	}
-	pageFaultsChart = module.Chart{
+	pageFaultsChart = collectorapi.Chart{
 		ID:       "faults",
 		Title:    "Dovecot Page Faults",
 		Units:    "faults/s",
 		Fam:      "page faults",
 		Ctx:      "dovecot.faults",
 		Priority: prioPageFaults,
-		Dims: module.Dims{
-			{ID: "min_faults", Name: "minor", Algo: module.Incremental},
-			{ID: "maj_faults", Name: "major", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "min_faults", Name: "minor", Algo: collectorapi.Incremental},
+			{ID: "maj_faults", Name: "major", Algo: collectorapi.Incremental},
 		},
 	}
-	contextSwitchesChart = module.Chart{
+	contextSwitchesChart = collectorapi.Chart{
 		ID:       "context_switches",
 		Title:    "Dovecot Context Switches",
 		Units:    "switches/s",
 		Fam:      "context switches",
 		Ctx:      "dovecot.context_switches",
 		Priority: prioContextSwitches,
-		Dims: module.Dims{
-			{ID: "vol_cs", Name: "voluntary", Algo: module.Incremental},
-			{ID: "invol_cs", Name: "involuntary", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "vol_cs", Name: "voluntary", Algo: collectorapi.Incremental},
+			{ID: "invol_cs", Name: "involuntary", Algo: collectorapi.Incremental},
 		},
 	}
-	diskIOChart = module.Chart{
+	diskIOChart = collectorapi.Chart{
 		ID:       "io",
 		Title:    "Dovecot Disk I/O",
 		Units:    "KiB/s",
 		Fam:      "disk",
 		Ctx:      "dovecot.io",
 		Priority: prioDiskIO,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "disk_input", Name: "read", Div: 1024, Algo: module.Incremental},
-			{ID: "disk_output", Name: "write", Mul: -1, Div: 1024, Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "disk_input", Name: "read", Div: 1024, Algo: collectorapi.Incremental},
+			{ID: "disk_output", Name: "write", Mul: -1, Div: 1024, Algo: collectorapi.Incremental},
 		},
 	}
-	netTrafficChart = module.Chart{
+	netTrafficChart = collectorapi.Chart{
 		ID:       "net",
 		Title:    "Dovecot Network Bandwidth",
 		Units:    "kilobits/s",
 		Fam:      "network",
 		Ctx:      "dovecot.net",
 		Priority: prioNetTraffic,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "read_bytes", Name: "read", Mul: 8, Div: 1000, Algo: module.Incremental},
-			{ID: "write_bytes", Name: "write", Mul: -8, Div: 1000, Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "read_bytes", Name: "read", Mul: 8, Div: 1000, Algo: collectorapi.Incremental},
+			{ID: "write_bytes", Name: "write", Mul: -8, Div: 1000, Algo: collectorapi.Incremental},
 		},
 	}
-	sysCallsChart = module.Chart{
+	sysCallsChart = collectorapi.Chart{
 		ID:       "syscalls",
 		Title:    "Dovecot Number of SysCalls",
 		Units:    "syscalls/s",
 		Fam:      "system",
 		Ctx:      "dovecot.syscalls",
 		Priority: prioSysCalls,
-		Dims: module.Dims{
-			{ID: "read_count", Name: "read", Algo: module.Incremental},
-			{ID: "write_count", Name: "write", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "read_count", Name: "read", Algo: collectorapi.Incremental},
+			{ID: "write_count", Name: "write", Algo: collectorapi.Incremental},
 		},
 	}
-	lookupsChart = module.Chart{
+	lookupsChart = collectorapi.Chart{
 		ID:       "lookup",
 		Title:    "Dovecot Lookups",
 		Units:    "lookups/s",
 		Fam:      "lookups",
 		Ctx:      "dovecot.lookup",
 		Priority: prioLookups,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "mail_lookup_path", Name: "path", Algo: module.Incremental},
-			{ID: "mail_lookup_attr", Name: "attr", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "mail_lookup_path", Name: "path", Algo: collectorapi.Incremental},
+			{ID: "mail_lookup_attr", Name: "attr", Algo: collectorapi.Incremental},
 		},
 	}
-	cacheChart = module.Chart{
+	cacheChart = collectorapi.Chart{
 		ID:       "cache",
 		Title:    "Dovecot Cache Hits",
 		Units:    "hits/s",
 		Fam:      "cache",
 		Ctx:      "dovecot.cache",
 		Priority: prioCachePerformance,
-		Dims: module.Dims{
-			{ID: "mail_cache_hits", Name: "hits", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "mail_cache_hits", Name: "hits", Algo: collectorapi.Incremental},
 		},
 	}
-	authCacheChart = module.Chart{
+	authCacheChart = collectorapi.Chart{
 		ID:       "auth_cache",
 		Title:    "Dovecot Authentication Cache",
 		Units:    "requests/s",
 		Fam:      "cache",
 		Ctx:      "dovecot.auth_cache",
 		Priority: prioAuthCachePerformance,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "auth_cache_hits", Name: "hits", Algo: module.Incremental},
-			{ID: "auth_cache_misses", Name: "misses", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "auth_cache_hits", Name: "hits", Algo: collectorapi.Incremental},
+			{ID: "auth_cache_misses", Name: "misses", Algo: collectorapi.Incremental},
 		},
 	}
 )

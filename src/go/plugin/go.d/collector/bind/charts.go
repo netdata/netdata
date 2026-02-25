@@ -3,18 +3,18 @@
 package bind
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type (
-	// Charts is an alias for module.Charts.
-	Charts = module.Charts
-	// Chart is an alias for module.Chart.
-	Chart = module.Chart
-	// Dims is an alias for module.Dims.
-	Dims = module.Dims
-	// Dim is an alias for module.Dim.
-	Dim = module.Dim
+	// Charts is an alias for collectorapi.Charts.
+	Charts = collectorapi.Charts
+	// Chart is an alias for collectorapi.Chart.
+	Chart = collectorapi.Chart
+	// Dims is an alias for collectorapi.Dims.
+	Dims = collectorapi.Dims
+	// Dim is an alias for collectorapi.Dim.
+	Dim = collectorapi.Dim
 )
 
 const (
@@ -56,7 +56,7 @@ var charts = map[string]Chart{
 		Units:    "requests/s",
 		Fam:      "requests",
 		Ctx:      "bind.requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: basePriority + 2,
 	},
 	keyQueriesSuccess: {
@@ -73,7 +73,7 @@ var charts = map[string]Chart{
 		Units:    "queries/s",
 		Fam:      "queries",
 		Ctx:      "bind.protocol_queries",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: basePriority + 4,
 	},
 	keyQueriesAnalysis: {
@@ -82,7 +82,7 @@ var charts = map[string]Chart{
 		Units:    "queries/s",
 		Fam:      "queries",
 		Ctx:      "bind.global_queries",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: basePriority + 5,
 	},
 	keyReceivedUpdates: {
@@ -91,7 +91,7 @@ var charts = map[string]Chart{
 		Units:    "updates/s",
 		Fam:      "updates",
 		Ctx:      "bind.global_updates",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: basePriority + 6,
 	},
 	keyQueryFailures: {
@@ -108,7 +108,7 @@ var charts = map[string]Chart{
 		Units:    "failures/s",
 		Fam:      "failures",
 		Ctx:      "bind.global_failures_detail",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: basePriority + 8,
 	},
 	keyNSStats: {
@@ -125,7 +125,7 @@ var charts = map[string]Chart{
 		Units:    "requests/s",
 		Fam:      "requests",
 		Ctx:      "bind.in_opcodes",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: basePriority + 10,
 	},
 	keyInQTypes: {
@@ -134,7 +134,7 @@ var charts = map[string]Chart{
 		Units:    "requests/s",
 		Fam:      "requests",
 		Ctx:      "bind.in_qtypes",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: basePriority + 11,
 	},
 	keyInSockStats: {
@@ -152,7 +152,7 @@ var charts = map[string]Chart{
 		Units:    "queries/s",
 		Fam:      "view %s",
 		Ctx:      "bind.resolver_rtt",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: basePriority + 22,
 	},
 	keyResolverStats: {
@@ -169,7 +169,7 @@ var charts = map[string]Chart{
 		Units:    "requests/s",
 		Fam:      "view %s",
 		Ctx:      "bind.resolver_qtypes",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: basePriority + 24,
 	},
 	keyResolverNumFetch: {
@@ -186,11 +186,11 @@ var charts = map[string]Chart{
 		Units:    "operations/s",
 		Fam:      "view %s",
 		Ctx:      "bind.resolver_cachehits",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: basePriority + 26,
 		Dims: Dims{
-			{ID: "%s_CacheHits", Name: "hits", Algo: module.Incremental},
-			{ID: "%s_CacheMisses", Name: "misses", Algo: module.Incremental, Mul: -1},
+			{ID: "%s_CacheHits", Name: "hits", Algo: collectorapi.Incremental},
+			{ID: "%s_CacheMisses", Name: "misses", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	},
 }

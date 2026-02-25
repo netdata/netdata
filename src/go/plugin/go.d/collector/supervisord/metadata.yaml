@@ -9,7 +9,7 @@ modules:
         link: http://supervisord.org/
         icon_filename: supervisord.png
         categories:
-          - data-collection.processes-and-system-services
+          - data-collection.operating-systems
       keywords:
         - supervisor
       related_resources:

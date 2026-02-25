@@ -5,18 +5,18 @@ package squidlog
 import (
 	"errors"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type (
-	Charts = module.Charts
-	Chart  = module.Chart
-	Dims   = module.Dims
-	Dim    = module.Dim
+	Charts = collectorapi.Charts
+	Chart  = collectorapi.Chart
+	Dims   = collectorapi.Dims
+	Dim    = collectorapi.Dim
 )
 
 const (
-	prioReqTotal = module.Priority + iota
+	prioReqTotal = collectorapi.Priority + iota
 	prioReqExcluded
 	prioReqType
 
@@ -54,7 +54,7 @@ var (
 		Ctx:      "squidlog.requests",
 		Priority: prioReqTotal,
 		Dims: Dims{
-			{ID: "requests", Algo: module.Incremental},
+			{ID: "requests", Algo: collectorapi.Incremental},
 		},
 	}
 	reqExcludedChart = Chart{
@@ -65,7 +65,7 @@ var (
 		Ctx:      "squidlog.excluded_requests",
 		Priority: prioReqExcluded,
 		Dims: Dims{
-			{ID: "unmatched", Algo: module.Incremental},
+			{ID: "unmatched", Algo: collectorapi.Incremental},
 		},
 	}
 	reqTypesChart = Chart{
@@ -74,13 +74,13 @@ var (
 		Units:    "requests/s",
 		Fam:      "requests",
 		Ctx:      "squidlog.type_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqType,
 		Dims: Dims{
-			{ID: "req_type_success", Name: "success", Algo: module.Incremental},
-			{ID: "req_type_bad", Name: "bad", Algo: module.Incremental},
-			{ID: "req_type_redirect", Name: "redirect", Algo: module.Incremental},
-			{ID: "req_type_error", Name: "error", Algo: module.Incremental},
+			{ID: "req_type_success", Name: "success", Algo: collectorapi.Incremental},
+			{ID: "req_type_bad", Name: "bad", Algo: collectorapi.Incremental},
+			{ID: "req_type_redirect", Name: "redirect", Algo: collectorapi.Incremental},
+			{ID: "req_type_error", Name: "error", Algo: collectorapi.Incremental},
 		},
 	}
 
@@ -91,16 +91,16 @@ var (
 		Units:    "responses/s",
 		Fam:      "http code",
 		Ctx:      "squidlog.http_status_code_class_responses",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioHTTPRespCodesClass,
 		Dims: Dims{
-			{ID: "http_resp_2xx", Name: "2xx", Algo: module.Incremental},
-			{ID: "http_resp_5xx", Name: "5xx", Algo: module.Incremental},
-			{ID: "http_resp_3xx", Name: "3xx", Algo: module.Incremental},
-			{ID: "http_resp_4xx", Name: "4xx", Algo: module.Incremental},
-			{ID: "http_resp_1xx", Name: "1xx", Algo: module.Incremental},
-			{ID: "http_resp_0xx", Name: "0xx", Algo: module.Incremental},
-			{ID: "http_resp_6xx", Name: "6xx", Algo: module.Incremental},
+			{ID: "http_resp_2xx", Name: "2xx", Algo: collectorapi.Incremental},
+			{ID: "http_resp_5xx", Name: "5xx", Algo: collectorapi.Incremental},
+			{ID: "http_resp_3xx", Name: "3xx", Algo: collectorapi.Incremental},
+			{ID: "http_resp_4xx", Name: "4xx", Algo: collectorapi.Incremental},
+			{ID: "http_resp_1xx", Name: "1xx", Algo: collectorapi.Incremental},
+			{ID: "http_resp_0xx", Name: "0xx", Algo: collectorapi.Incremental},
+			{ID: "http_resp_6xx", Name: "6xx", Algo: collectorapi.Incremental},
 		},
 	}
 	httpRespCodesChart = Chart{
@@ -109,7 +109,7 @@ var (
 		Units:    "responses/s",
 		Fam:      "http code",
 		Ctx:      "squidlog.http_status_code_responses",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioHTTPRespCodes,
 	}
 
@@ -122,7 +122,7 @@ var (
 		Ctx:      "squidlog.bandwidth",
 		Priority: prioBandwidth,
 		Dims: Dims{
-			{ID: "bytes_sent", Name: "sent", Algo: module.Incremental, Div: 1000},
+			{ID: "bytes_sent", Name: "sent", Algo: collectorapi.Incremental, Div: 1000},
 		},
 	}
 
@@ -162,7 +162,7 @@ var (
 		Fam:      "cache result",
 		Ctx:      "squidlog.cache_result_code_requests",
 		Priority: prioCacheCode,
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 	}
 	cacheCodeTransportTagChart = Chart{
 		ID:       "requests_by_cache_result_code_transport_tag",
@@ -170,7 +170,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "cache result",
 		Ctx:      "squidlog.cache_result_code_transport_tag_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCacheTransportTag,
 	}
 	cacheCodeHandlingTagChart = Chart{
@@ -179,7 +179,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "cache result",
 		Ctx:      "squidlog.cache_result_code_handling_tag_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCacheHandlingTag,
 	}
 	cacheCodeObjectTagChart = Chart{
@@ -188,7 +188,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "cache result",
 		Ctx:      "squidlog.cache_code_object_tag_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCacheObjectTag,
 	}
 	cacheCodeLoadSourceTagChart = Chart{
@@ -197,7 +197,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "cache result",
 		Ctx:      "squidlog.cache_code_load_source_tag_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCacheLoadSourceTag,
 	}
 	cacheCodeErrorTagChart = Chart{
@@ -206,7 +206,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "cache result",
 		Ctx:      "squidlog.cache_code_error_tag_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioCacheErrorTag,
 	}
 
@@ -217,7 +217,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "http method",
 		Ctx:      "squidlog.http_method_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqMethod,
 	}
 
@@ -228,7 +228,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "mime type",
 		Ctx:      "squidlog.mime_type_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioMimeType,
 	}
 
@@ -239,7 +239,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "hierarchy",
 		Ctx:      "squidlog.hier_code_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioHierCode,
 	}
 	serverAddrChart = Chart{
@@ -248,7 +248,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "hierarchy",
 		Ctx:      "squidlog.server_address_forwarded_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioServers,
 	}
 )

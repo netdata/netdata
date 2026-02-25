@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "go.d chart template spec v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "groups"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "context_namespace": {
+      "type": "string"
+    },
+    "engine": {
+      "$ref": "#/$defs/engine"
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/group"
+      }
+    }
+  },
+  "$defs": {
+    "selector_expr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "engine_autogen": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "type_id": {
+          "type": "string"
+        },
+        "max_type_id_len": {
+          "oneOf": [
+            {
+              "const": 0
+            },
+            {
+              "type": "integer",
+              "minimum": 4
+            }
+          ]
+        },
+        "expire_after_success_cycles": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector_expr"
+        },
+        "autogen": {
+          "$ref": "#/$defs/engine_autogen"
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family"
+      ],
+      "properties": {
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_namespace": {
+          "type": "string"
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/group"
+          }
+        },
+        "charts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/chart"
+          }
+        }
+      }
+    },
+    "chart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "context",
+        "units",
+        "dimensions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family": {
+          "type": "string"
+        },
+        "context": {
+          "type": "string",
+          "minLength": 1
+        },
+        "units": {
+          "type": "string",
+          "minLength": 1
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "absolute",
+            "incremental"
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "line",
+            "area",
+            "stacked",
+            "heatmap"
+          ]
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "label_promotion": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "instances": {
+          "$ref": "#/$defs/instances"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        },
+        "dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/dimension"
+          }
+        }
+      }
+    },
+    "instances": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "by_labels"
+      ],
+      "properties": {
+        "by_labels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_instances": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expire_after_cycles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dimensions": {
+          "$ref": "#/$defs/dimension_lifecycle"
+        }
+      }
+    },
+    "dimension_lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_dims": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expire_after_cycles": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector"
+      ],
+      "properties": {
+        "selector": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "name_from_label": {
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/$defs/dimension_options"
+        }
+      }
+    },
+    "dimension_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "multiplier": {
+          "type": "integer"
+        },
+        "divisor": {
+          "type": "integer"
+        },
+        "hidden": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

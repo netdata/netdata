@@ -9,7 +9,7 @@ modules:
         link: https://pulsar.apache.org/
         icon_filename: pulsar.svg
         categories:
-          - data-collection.message-brokers
+          - data-collection.databases
       keywords:
         - pulsar
       related_resources:

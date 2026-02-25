@@ -9,16 +9,16 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
 func init() {
-	module.Register("rethinkdb", module.Creator{
+	collectorapi.Register("rethinkdb", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         rethinkdbMethods,
 		MethodHandler:   rethinkdbFunctionHandler,
@@ -83,10 +83,10 @@ func (c Config) runningQueriesLimit() int {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts *module.Charts
+	charts *collectorapi.Charts
 
 	newConn func(cfg Config) (rdbConn, error)
 	rdb     rdbConn
@@ -118,7 +118,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

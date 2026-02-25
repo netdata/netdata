@@ -8,7 +8,7 @@ modules:
         name: Gearman
         link: https://gearman.org/
         categories:
-          - data-collection.distributed-computing-systems
+          - data-collection.applications
         icon_filename: "gearman.png"
       related_resources:
         integrations:

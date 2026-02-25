@@ -7,7 +7,7 @@ modules:
         name: Postfix
         link: https://www.postfix.org/
         categories:
-          - data-collection.mail-servers
+          - data-collection.applications
         icon_filename: "postfix.svg"
       related_resources:
         integrations:

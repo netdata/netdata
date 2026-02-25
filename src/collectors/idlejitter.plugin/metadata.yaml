@@ -7,7 +7,7 @@ modules:
         name: Idle OS Jitter
         link: ''
         categories:
-          - data-collection.synthetic-checks
+          - data-collection.synthetic-testing
         icon_filename: 'syslog.png'
       related_resources:
         integrations:

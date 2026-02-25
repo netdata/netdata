@@ -12,7 +12,7 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 // CompileTransforms exported for testing purposes only
@@ -105,7 +105,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 			m.MultiValue = make(map[string]int64)
 			for k, v := range mappings {
 				if _, ok := m.MultiValue[v]; !ok || m.Value == k {
-					m.MultiValue[v] = metrix.Bool(m.Value == k)
+					m.MultiValue[v] = oldmetrix.Bool(m.Value == k)
 				}
 			}
 			return ""
@@ -209,9 +209,9 @@ func newMetricTransformFuncMap() template.FuncMap {
 					m.Family = famPrefix + family + "/Status"
 				}
 				m.MultiValue = map[string]int64{
-					"ok":             metrix.Bool(m.Value == 1),
-					"unavailable":    metrix.Bool(m.Value == 2),
-					"nonoperational": metrix.Bool(m.Value == 3),
+					"ok":             oldmetrix.Bool(m.Value == 1),
+					"unavailable":    oldmetrix.Bool(m.Value == 2),
+					"nonoperational": oldmetrix.Bool(m.Value == 3),
 				}
 			case "entPhySensorValue", "entSensorValue":
 				scaleMap := map[string]float64{
@@ -257,7 +257,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 					m.MultiValue = make(map[string]int64)
 					for k, v := range mapping {
 						if _, ok := m.MultiValue[v]; !ok || m.Value == k {
-							m.MultiValue[v] = metrix.Bool(m.Value == k)
+							m.MultiValue[v] = oldmetrix.Bool(m.Value == k)
 						}
 					}
 				} else {

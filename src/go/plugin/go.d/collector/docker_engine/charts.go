@@ -2,11 +2,11 @@
 
 package docker_engine
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	Charts = module.Charts
-	Dims   = module.Dims
+	Charts = collectorapi.Charts
+	Dims   = collectorapi.Dims
 )
 
 var charts = Charts{
@@ -16,13 +16,13 @@ var charts = Charts{
 		Units: "actions/s",
 		Fam:   "containers",
 		Ctx:   "docker_engine.engine_daemon_container_actions",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "container_actions_changes", Name: "changes", Algo: module.Incremental},
-			{ID: "container_actions_commit", Name: "commit", Algo: module.Incremental},
-			{ID: "container_actions_create", Name: "create", Algo: module.Incremental},
-			{ID: "container_actions_delete", Name: "delete", Algo: module.Incremental},
-			{ID: "container_actions_start", Name: "start", Algo: module.Incremental},
+			{ID: "container_actions_changes", Name: "changes", Algo: collectorapi.Incremental},
+			{ID: "container_actions_commit", Name: "commit", Algo: collectorapi.Incremental},
+			{ID: "container_actions_create", Name: "create", Algo: collectorapi.Incremental},
+			{ID: "container_actions_delete", Name: "delete", Algo: collectorapi.Incremental},
+			{ID: "container_actions_start", Name: "start", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -31,7 +31,7 @@ var charts = Charts{
 		Units: "containers",
 		Fam:   "containers",
 		Ctx:   "docker_engine.engine_daemon_container_states_containers",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "container_states_running", Name: "running"},
 			{ID: "container_states_paused", Name: "paused"},
@@ -44,16 +44,16 @@ var charts = Charts{
 		Units: "fails/s",
 		Fam:   "builder",
 		Ctx:   "docker_engine.builder_builds_failed_total",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: "builder_fails_build_canceled", Name: "build_canceled", Algo: module.Incremental},
-			{ID: "builder_fails_build_target_not_reachable_error", Name: "build_target_not_reachable_error", Algo: module.Incremental},
-			{ID: "builder_fails_command_not_supported_error", Name: "command_not_supported_error", Algo: module.Incremental},
-			{ID: "builder_fails_dockerfile_empty_error", Name: "dockerfile_empty_error", Algo: module.Incremental},
-			{ID: "builder_fails_dockerfile_syntax_error", Name: "dockerfile_syntax_error", Algo: module.Incremental},
-			{ID: "builder_fails_error_processing_commands_error", Name: "error_processing_commands_error", Algo: module.Incremental},
-			{ID: "builder_fails_missing_onbuild_arguments_error", Name: "missing_onbuild_arguments_error", Algo: module.Incremental},
-			{ID: "builder_fails_unknown_instruction_error", Name: "unknown_instruction_error", Algo: module.Incremental},
+			{ID: "builder_fails_build_canceled", Name: "build_canceled", Algo: collectorapi.Incremental},
+			{ID: "builder_fails_build_target_not_reachable_error", Name: "build_target_not_reachable_error", Algo: collectorapi.Incremental},
+			{ID: "builder_fails_command_not_supported_error", Name: "command_not_supported_error", Algo: collectorapi.Incremental},
+			{ID: "builder_fails_dockerfile_empty_error", Name: "dockerfile_empty_error", Algo: collectorapi.Incremental},
+			{ID: "builder_fails_dockerfile_syntax_error", Name: "dockerfile_syntax_error", Algo: collectorapi.Incremental},
+			{ID: "builder_fails_error_processing_commands_error", Name: "error_processing_commands_error", Algo: collectorapi.Incremental},
+			{ID: "builder_fails_missing_onbuild_arguments_error", Name: "missing_onbuild_arguments_error", Algo: collectorapi.Incremental},
+			{ID: "builder_fails_unknown_instruction_error", Name: "unknown_instruction_error", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -63,7 +63,7 @@ var charts = Charts{
 		Fam:   "health checks",
 		Ctx:   "docker_engine.engine_daemon_health_checks_failed_total",
 		Dims: Dims{
-			{ID: "health_checks_failed", Name: "fails", Algo: module.Incremental},
+			{ID: "health_checks_failed", Name: "fails", Algo: collectorapi.Incremental},
 		},
 	},
 }
@@ -84,7 +84,7 @@ var swarmManagerCharts = Charts{
 		Title: "Swarm Manager Object Store",
 		Units: "objects",
 		Fam:   "swarm",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Ctx:   "docker_engine.swarm_manager_object_store",
 		Dims: Dims{
 			{ID: "swarm_manager_nodes_total", Name: "nodes"},
@@ -101,7 +101,7 @@ var swarmManagerCharts = Charts{
 		Units: "nodes",
 		Fam:   "swarm",
 		Ctx:   "docker_engine.swarm_manager_nodes_per_state",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "swarm_manager_nodes_state_ready", Name: "ready"},
 			{ID: "swarm_manager_nodes_state_down", Name: "down"},
@@ -115,7 +115,7 @@ var swarmManagerCharts = Charts{
 		Units: "tasks",
 		Fam:   "swarm",
 		Ctx:   "docker_engine.swarm_manager_tasks_per_state",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "swarm_manager_tasks_state_running", Name: "running"},
 			{ID: "swarm_manager_tasks_state_failed", Name: "failed"},

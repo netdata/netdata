@@ -9,7 +9,7 @@ modules:
         link: https://www.rabbitmq.com/
         icon_filename: rabbitmq.svg
         categories:
-          - data-collection.message-brokers
+          - data-collection.databases
       keywords:
         - rabbitmq
         - message brokers

@@ -7,7 +7,7 @@ modules:
         name: Timex
         link: ""
         categories:
-          - data-collection.system-clock-and-ntp
+          - data-collection.networking
         icon_filename: "syslog.png"
       related_resources:
         integrations:

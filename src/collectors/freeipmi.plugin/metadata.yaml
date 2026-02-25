@@ -7,7 +7,7 @@ modules:
         name: Intelligent Platform Management Interface (IPMI)
         link: "https://en.wikipedia.org/wiki/Intelligent_Platform_Management_Interface"
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.hardware-and-sensors
         icon_filename: "netdata.png"
       related_resources:
         integrations:

@@ -591,6 +591,13 @@ modules:
       multi_instance: true
       additional_permissions:
         description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
     setup:
       prerequisites:
         list:

@@ -6,36 +6,36 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioDiskTemperature = module.Priority + iota
+	prioDiskTemperature = collectorapi.Priority + iota
 	prioDiskTemperatureSensorStatus
 )
 
 var (
-	diskTemperatureChartsTmpl = module.Chart{
+	diskTemperatureChartsTmpl = collectorapi.Chart{
 		ID:       "disk_%s_temperature",
 		Title:    "Disk temperature",
 		Units:    "Celsius",
 		Fam:      "temperature",
 		Ctx:      "hddtemp.disk_temperature",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDiskTemperature,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "disk_%s_temperature", Name: "temperature"},
 		},
 	}
-	diskTemperatureSensorChartsTmpl = module.Chart{
+	diskTemperatureSensorChartsTmpl = collectorapi.Chart{
 		ID:       "disk_%s_temperature_sensor_status",
 		Title:    "Disk temperature sensor status",
 		Units:    "status",
 		Fam:      "sensor",
 		Ctx:      "hddtemp.disk_temperature_sensor_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioDiskTemperatureSensorStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "disk_%s_temp_sensor_status_ok", Name: "ok"},
 			{ID: "disk_%s_temp_sensor_status_err", Name: "err"},
 			{ID: "disk_%s_temp_sensor_status_na", Name: "na"},
@@ -54,9 +54,9 @@ func (c *Collector) addDiskTempChart(id string, disk diskStats) {
 	c.addDiskChart(id, disk, diskTemperatureChartsTmpl.Copy())
 }
 
-func (c *Collector) addDiskChart(id string, disk diskStats, chart *module.Chart) {
+func (c *Collector) addDiskChart(id string, disk diskStats, chart *collectorapi.Chart) {
 	chart.ID = fmt.Sprintf(chart.ID, strings.ToLower(id))
-	chart.Labels = []module.Label{
+	chart.Labels = []collectorapi.Label{
 		{Key: "disk_id", Value: id},
 		{Key: "model", Value: disk.model},
 	}

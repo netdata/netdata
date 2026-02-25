@@ -7,7 +7,7 @@ modules:
         name: Icecast
         link: "https://icecast.org/"
         categories:
-          - data-collection.media-streaming-servers
+          - data-collection.applications
         icon_filename: "icecast.svg"
       related_resources:
         integrations:

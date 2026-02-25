@@ -7,7 +7,7 @@ modules:
         name: IOPing
         link: "https://github.com/koct9i/ioping"
         categories:
-          - data-collection.synthetic-checks
+          - data-collection.synthetic-testing
         icon_filename: "syslog.png"
       related_resources:
         integrations:

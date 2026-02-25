@@ -11,7 +11,7 @@ endmeta-->
 # GreptimeDB
 
 
-<img src="https://netdata.cloud/img/greptimedb.png" width="150"/>
+<img src="https://netdata.cloud/img/greptimedb.svg" width="150"/>
 
 
 Use the Prometheus remote write exporting connector to archive your Netdata metrics to the external storage provider of your choice for long-term storage and further analysis.

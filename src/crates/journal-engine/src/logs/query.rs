@@ -5,6 +5,7 @@
 //! functions for extracting raw field data from journal entries.
 
 use crate::error::Result;
+use journal_core::field_map::REMAPPING_MARKER;
 use journal_core::file::{JournalFile, Mmap};
 use journal_index::{
     Anchor, Direction, FieldName, FieldValuePair, FileIndex, Filter, LogEntryId, LogQueryParams,
@@ -13,6 +14,10 @@ use journal_index::{
 use journal_registry::File;
 use std::collections::HashMap;
 use std::num::NonZeroU64;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use tokio_util::sync::CancellationToken;
+use tracing::warn;
 
 /// Pagination state for multi-file log queries.
 ///
@@ -50,6 +55,8 @@ pub struct PaginationState {
 pub struct LogQuery<'a> {
     file_indexes: &'a [FileIndex],
     builder: LogQueryParamsBuilder,
+    cancellation: Option<CancellationToken>,
+    progress: Option<Arc<AtomicUsize>>,
 }
 
 impl<'a> LogQuery<'a> {
@@ -73,6 +80,8 @@ impl<'a> LogQuery<'a> {
             builder: LogQueryParamsBuilder::new(anchor, direction).with_source_timestamp_field(
                 Some(FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP")),
             ),
+            cancellation: None,
+            progress: None,
         }
     }
 
@@ -131,6 +140,24 @@ impl<'a> LogQuery<'a> {
         self
     }
 
+    /// Set a cancellation token for the query (optional).
+    ///
+    /// When set, the query will check the token before processing each file
+    /// and return early with partial results if cancelled.
+    pub fn with_cancellation(mut self, token: CancellationToken) -> Self {
+        self.cancellation = Some(token);
+        self
+    }
+
+    /// Set a progress counter for the query (optional).
+    ///
+    /// When set, the counter is incremented (via `fetch_add`) after each file
+    /// is processed in `retrieve_log_entries`.
+    pub fn with_progress(mut self, counter: Arc<AtomicUsize>) -> Self {
+        self.progress = Some(counter);
+        self
+    }
+
     /// Execute the query and return log entries.
     ///
     /// This consumes the builder and returns a vector of log entries sorted by timestamp
@@ -141,8 +168,13 @@ impl<'a> LogQuery<'a> {
     /// Returns an error if anchor or direction were not set, or if time boundaries are invalid.
     pub fn execute(self) -> Result<Vec<LogEntryData>> {
         let params = self.builder.build()?;
-        let (log_entry_ids, _state) =
-            retrieve_log_entries(self.file_indexes.to_vec(), params, None);
+        let (log_entry_ids, _state) = retrieve_log_entries(
+            self.file_indexes.to_vec(),
+            params,
+            None,
+            self.cancellation.as_ref(),
+            self.progress.as_ref(),
+        );
 
         extract_entry_data(&log_entry_ids)
     }
@@ -169,8 +201,13 @@ impl<'a> LogQuery<'a> {
         state: Option<&PaginationState>,
     ) -> Result<(Vec<LogEntryData>, PaginationState)> {
         let params = self.builder.build()?;
-        let (log_entry_ids, new_state) =
-            retrieve_log_entries(self.file_indexes.to_vec(), params, state);
+        let (log_entry_ids, new_state) = retrieve_log_entries(
+            self.file_indexes.to_vec(),
+            params,
+            state,
+            self.cancellation.as_ref(),
+            self.progress.as_ref(),
+        );
 
         let data = extract_entry_data(&log_entry_ids)?;
         Ok((data, new_state))
@@ -196,6 +233,8 @@ fn retrieve_log_entries(
     file_indexes: Vec<FileIndex>,
     params: LogQueryParams,
     state: Option<&PaginationState>,
+    cancellation: Option<&CancellationToken>,
+    progress: Option<&Arc<AtomicUsize>>,
 ) -> (Vec<LogEntryId>, PaginationState) {
     // Handle edge cases
     if params.limit() == Some(0) || file_indexes.is_empty() {
@@ -241,6 +280,11 @@ fn retrieve_log_entries(
         }
     };
 
+    if let Some(counter) = progress {
+        let filtered = file_indexes.len() - relevant_indexes.len();
+        counter.fetch_add(filtered, Ordering::Relaxed);
+    }
+
     if relevant_indexes.is_empty() {
         return (Vec::new(), PaginationState::default());
     }
@@ -267,6 +311,21 @@ fn retrieve_log_entries(
     let mut new_state = state.cloned().unwrap_or_default();
 
     for file_index in relevant_indexes {
+        // Check cancellation before processing each file
+        if let Some(token) = cancellation {
+            if token.is_cancelled() {
+                warn!(
+                    "log query cancelled after processing {} files, returning partial results",
+                    new_state.file_positions.len()
+                );
+                break;
+            }
+        }
+
+        if let Some(counter) = progress {
+            counter.fetch_add(1, Ordering::Relaxed);
+        }
+
         // Pruning optimization: if we have a full result set, check if we can skip
         // remaining files based on their time ranges
         if collected_entries.len() >= limit {
@@ -314,17 +373,16 @@ fn retrieve_log_entries(
 
         let new_entries = match file_index.find_log_entries(file, &file_params) {
             Ok(entries) => entries,
-            Err(_) => continue, // Skip files that fail to read
+            Err(e) => {
+                warn!(file = file.path(), "failed to retrieve log entries: {e}");
+                continue;
+            }
         };
 
-        if new_entries.is_empty() {
-            continue;
+        if !new_entries.is_empty() {
+            collected_entries =
+                merge_log_entries(collected_entries, new_entries, limit, params.direction());
         }
-
-        // Merge the new entries with our existing results, maintaining
-        // sorted order and respecting the limit constraint
-        collected_entries =
-            merge_log_entries(collected_entries, new_entries, limit, params.direction());
     }
 
     // Update pagination state based on the last position for each file in collected_entries
@@ -498,8 +556,13 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
             entry_guard.collect_offsets(&mut data_offsets)?;
             drop(entry_guard);
 
-            // Extract all field=value pairs
+            // Extract all field=value pairs, skipping field remapping entries.
+            // Remapping entries are internal bookkeeping (ND_REMAPPING=1) that map
+            // systemd field names back to OTEL names. Their data objects contain
+            // "SYSTEMD_NAME=otel.name", so if processed as log data the OTEL name
+            // would appear as the cell value — which is exactly the column name.
             let mut fields = Vec::new();
+            let mut is_remapping_entry = false;
             for data_offset in data_offsets.iter().copied() {
                 let data_guard = journal_file.data_ref(data_offset)?;
                 let payload_bytes = if data_guard.is_compressed() {
@@ -508,6 +571,12 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
                 } else {
                     data_guard.raw_payload()
                 };
+
+                if payload_bytes == REMAPPING_MARKER {
+                    is_remapping_entry = true;
+                    break;
+                }
+
                 let payload_str = String::from_utf8_lossy(payload_bytes);
 
                 if let Some(mut pair) = FieldValuePair::parse(&payload_str) {
@@ -522,6 +591,10 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
                 }
             }
 
+            if is_remapping_entry {
+                continue;
+            }
+
             result[original_idx] = Some(LogEntryData {
                 timestamp: entry.timestamp.get(),
                 fields,
@@ -529,6 +602,6 @@ fn extract_entry_data(log_entries: &[LogEntryId]) -> Result<Vec<LogEntryData>> {
         }
     }
 
-    // Unwrap all Options (they're all Some at this point)
-    Ok(result.into_iter().map(|opt| opt.unwrap()).collect())
+    // Filter out None entries (remapping entries are skipped and left as None)
+    Ok(result.into_iter().flatten().collect())
 }

@@ -7,7 +7,7 @@ modules:
         name: Linux kernel SLAB allocator statistics
         link: "https://kernel.org/"
         categories:
-          - data-collection.linux-systems.kernel-metrics
+          - data-collection.operating-systems
         icon_filename: 'linuxserver.svg'
       related_resources:
         integrations:

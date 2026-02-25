@@ -15,7 +15,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 )
 
 func TestNormalizeValue(t *testing.T) {
@@ -230,7 +230,7 @@ func TestSqlJobMethods(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := tc.setupCollector()
-			job := module.NewJob(module.JobConfig{
+			job := jobruntime.NewJob(jobruntime.JobConfig{
 				Name:       tc.jobName,
 				ModuleName: "sql",
 				FullName:   "sql_" + tc.jobName,
