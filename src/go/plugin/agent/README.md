@@ -25,6 +25,17 @@ Package provides:
 
 You are responsible only for __creating modules__.
 
+## Architecture Boundaries
+
+The `agent` package is framework/core orchestration only.
+
+- `src/go/plugin/agent/**`: context-driven orchestration and adapter contracts.
+- `src/go/cmd/*`: composition root and process host responsibilities:
+  - signal handling / exits / keepalive lifecycle
+  - module registry selection
+  - discovery provider wiring and policy selection
+- Provider implementations (for example go.d SD discoverers) are selected explicitly in `cmd` wiring, not by implicit imports in `agent`.
+
 ## Custom plugin example
 
 [Yep! So easy!](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/examples/simple/main.go)
