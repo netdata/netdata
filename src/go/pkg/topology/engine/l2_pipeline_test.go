@@ -890,7 +890,6 @@ func TestBuildL2ResultFromObservations_LLDPPairsAcrossChassisRepresentations(t *
 	for _, adj := range result.Adjacencies {
 		require.Equal(t, "lldp", adj.Protocol)
 		require.NotEmpty(t, adj.Labels[adjacencyLabelPairID])
-		require.NotEmpty(t, adj.Labels[adjacencyLabelPairSide])
 		require.NotEmpty(t, adj.Labels[adjacencyLabelPairPass])
 		if pairID == "" {
 			pairID = adj.Labels[adjacencyLabelPairID]
@@ -946,7 +945,6 @@ func TestBuildL2ResultFromObservations_LLDPPairsAcrossKnownDeviceIdentityDespite
 	for _, adj := range result.Adjacencies {
 		require.Equal(t, "lldp", adj.Protocol)
 		require.NotEmpty(t, adj.Labels[adjacencyLabelPairID])
-		require.NotEmpty(t, adj.Labels[adjacencyLabelPairSide])
 		require.NotEmpty(t, adj.Labels[adjacencyLabelPairPass])
 	}
 }
@@ -1124,25 +1122,22 @@ func TestBuildL2ResultFromObservations_AnnotatesPairMetadata(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Adjacencies, 4)
 
-	pairSides := make(map[string]map[string]struct{})
+	pairIDs := make(map[string]map[string]struct{})
 	pairPasses := make(map[string]string)
 	for _, adj := range result.Adjacencies {
 		if adj.Protocol != "lldp" && adj.Protocol != "cdp" {
 			continue
 		}
 		pairID := adj.Labels[adjacencyLabelPairID]
-		pairSide := adj.Labels[adjacencyLabelPairSide]
 		pairPass := adj.Labels[adjacencyLabelPairPass]
 
 		require.NotEmpty(t, pairID)
-		require.NotEmpty(t, pairSide)
-		require.Contains(t, []string{adjacencyPairSideSource, adjacencyPairSideTarget}, pairSide)
 		require.NotEmpty(t, pairPass)
 
-		if pairSides[adj.Protocol] == nil {
-			pairSides[adj.Protocol] = make(map[string]struct{})
+		if pairIDs[adj.Protocol] == nil {
+			pairIDs[adj.Protocol] = make(map[string]struct{})
 		}
-		pairSides[adj.Protocol][pairSide] = struct{}{}
+		pairIDs[adj.Protocol][pairID] = struct{}{}
 
 		if existingPass, ok := pairPasses[adj.Protocol]; ok {
 			require.Equal(t, existingPass, pairPass)
@@ -1151,8 +1146,8 @@ func TestBuildL2ResultFromObservations_AnnotatesPairMetadata(t *testing.T) {
 		}
 	}
 
-	require.Len(t, pairSides["lldp"], 2)
-	require.Len(t, pairSides["cdp"], 2)
+	require.Len(t, pairIDs["lldp"], 1)
+	require.Len(t, pairIDs["cdp"], 1)
 	require.Equal(t, lldpMatchPassDefault, pairPasses["lldp"])
 	require.Equal(t, cdpMatchPassDefault, pairPasses["cdp"])
 }
