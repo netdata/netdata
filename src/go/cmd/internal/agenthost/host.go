@@ -15,21 +15,24 @@ import (
 )
 
 // Run hosts an agent process lifecycle (signals, restart, quit, dump timer).
-// This is an additive cmd-side host path; agent.Run remains available for rollback.
 func Run(a *agent.Agent) {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 	signal.Ignore(syscall.SIGPIPE)
 
-	keepAliveErr := make(chan error, 1)
-	go func() {
-		if err := a.RunKeepAlive(context.Background()); err != nil {
-			select {
-			case keepAliveErr <- err:
-			default:
+	var keepAliveErr <-chan error
+	if !a.IsTerminalMode() {
+		ch := make(chan error, 1)
+		keepAliveErr = ch
+		go func() {
+			if err := a.RunKeepAlive(context.Background()); err != nil {
+				select {
+				case ch <- err:
+				default:
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	var wg sync.WaitGroup
 	var exit bool
@@ -46,8 +49,13 @@ func Run(a *agent.Agent) {
 		collectorapi.ObsoleteCharts(true)
 
 		ctx, cancel := context.WithCancel(context.Background())
+		runDone := make(chan struct{})
 		wg.Add(1)
-		go func() { defer wg.Done(); a.RunContext(ctx) }()
+		go func() {
+			defer wg.Done()
+			defer close(runDone)
+			a.RunContext(ctx)
+		}()
 
 		select {
 		case sig := <-ch:
@@ -67,6 +75,9 @@ func Run(a *agent.Agent) {
 			exit = true
 		case <-keepAliveErr:
 			a.Info("too many keepAlive errors. Terminating...")
+			exit = true
+		case <-runDone:
+			a.Info("agent run loop stopped. Terminating...")
 			exit = true
 		}
 

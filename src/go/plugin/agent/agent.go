@@ -7,17 +7,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
-	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
@@ -144,23 +140,18 @@ func New(cfg Config) *Agent {
 	return a
 }
 
-// Run starts the Agent.
-func (a *Agent) Run() {
-	go a.keepAlive()
-	serve(a)
-}
-
 // RunContext runs one agent instance lifecycle on the provided context.
 func (a *Agent) RunContext(ctx context.Context) {
 	a.run(ctx)
 }
 
+// IsTerminalMode reports whether run-mode policy is interactive terminal.
+func (a *Agent) IsTerminalMode() bool {
+	return a.runModePolicy.IsTerminal
+}
+
 // RunKeepAlive runs keepalive loop until context cancellation or too many failures.
 func (a *Agent) RunKeepAlive(ctx context.Context) error {
-	if terminal.IsTerminal() {
-		return nil
-	}
-
 	tk := time.NewTicker(time.Second)
 	defer tk.Stop()
 
@@ -197,79 +188,6 @@ func (a *Agent) TriggerDumpAnalysis() {
 	a.collectDumpAnalysis()
 }
 
-func serve(a *Agent) {
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
-	signal.Ignore(syscall.SIGPIPE)
-
-	var wg sync.WaitGroup
-
-	var exit bool
-
-	// Set up dump mode timer if enabled
-	var dumpTimer *time.Timer
-	var dumpTimerCh <-chan time.Time
-	if a.dumpMode > 0 {
-		dumpTimer = time.NewTimer(a.dumpMode)
-		dumpTimerCh = dumpTimer.C
-	}
-
-	for {
-		collectorapi.ObsoleteCharts(true)
-
-		ctx, cancel := context.WithCancel(context.Background())
-
-		wg.Add(1)
-		go func() { defer wg.Done(); a.run(ctx) }()
-
-		select {
-		case sig := <-ch:
-			switch sig {
-			case syscall.SIGHUP:
-				a.Infof("received %s signal (%d). Restarting running instance", sig, sig)
-			default:
-				a.Infof("received %s signal (%d). Terminating...", sig, sig)
-				exit = true
-			}
-		case <-a.quitCh:
-			a.Infof("received QUIT command. Terminating...")
-			exit = true
-		case <-dumpTimerCh:
-			a.Infof("dump mode duration expired, collecting analysis...")
-			a.collectDumpAnalysis()
-			exit = true
-		}
-
-		if exit {
-			collectorapi.ObsoleteCharts(false)
-		}
-
-		cancel()
-
-		func() {
-			timeout := time.Second * 10
-			t := time.NewTimer(timeout)
-			defer t.Stop()
-			done := make(chan struct{})
-
-			go func() { wg.Wait(); close(done) }()
-
-			select {
-			case <-t.C:
-				a.Errorf("stopping all goroutines timed out after %s. Exiting...", timeout)
-				os.Exit(0)
-			case <-done:
-			}
-		}()
-
-		if exit {
-			os.Exit(0)
-		}
-
-		time.Sleep(time.Second)
-	}
-}
-
 func (a *Agent) run(ctx context.Context) {
 	a.Info("instance is started")
 	defer func() { a.Info("instance is stopped") }()
@@ -279,9 +197,6 @@ func (a *Agent) run(ctx context.Context) {
 
 	if !cfg.Enabled {
 		a.Info("plugin is disabled in the configuration file, exiting...")
-		if terminal.IsTerminal() {
-			os.Exit(0)
-		}
 		a.api.DISABLE()
 		return
 	}
@@ -289,9 +204,6 @@ func (a *Agent) run(ctx context.Context) {
 	enabledModules := a.loadEnabledModules(cfg)
 	if len(enabledModules) == 0 {
 		a.Info("no modules to run")
-		if terminal.IsTerminal() {
-			os.Exit(0)
-		}
 		a.api.DISABLE()
 		return
 	}
@@ -303,9 +215,6 @@ func (a *Agent) run(ctx context.Context) {
 	discMgr, err := discovery.NewManager(discCfg)
 	if err != nil {
 		a.Error(err)
-		if terminal.IsTerminal() {
-			os.Exit(0)
-		}
 		return
 	}
 
@@ -351,13 +260,6 @@ func (a *Agent) run(ctx context.Context) {
 
 	wg.Wait()
 	<-ctx.Done()
-}
-
-func (a *Agent) keepAlive() {
-	if err := a.RunKeepAlive(context.Background()); err != nil {
-		a.Info("too many keepAlive errors. Terminating...")
-		os.Exit(0)
-	}
 }
 
 func (a *Agent) collectDumpAnalysis() {
