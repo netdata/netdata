@@ -1103,6 +1103,68 @@ func TestTopologyCache_UpdateIfNameByIndex_StoresStatusWithoutIfName(t *testing.
 	require.Equal(t, "down", cache.ifStatusByIndex["7"].oper)
 }
 
+func TestBuildLocalTopologyDevice_IncludesSysContactVendorAndModel(t *testing.T) {
+	coll := &Collector{
+		Config: Config{Hostname: "10.0.0.1"},
+		sysInfo: &snmputils.SysInfo{
+			SysObjectID: "1.3.6.1.4.1.9.1.1",
+			Name:        "sw1",
+			Descr:       "Switch 1",
+			Contact:     "ops@example.net",
+			Location:    "dc1",
+			Vendor:      "Cisco",
+			Model:       "C9300-24T",
+		},
+	}
+
+	device := buildLocalTopologyDevice(coll)
+	require.Equal(t, "1.3.6.1.4.1.9.1.1", device.SysObjectID)
+	require.Equal(t, "sw1", device.SysName)
+	require.Equal(t, "Switch 1", device.SysDescr)
+	require.Equal(t, "ops@example.net", device.SysContact)
+	require.Equal(t, "dc1", device.SysLocation)
+	require.Equal(t, "Cisco", device.Vendor)
+	require.Equal(t, "C9300-24T", device.Model)
+}
+
+func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
+	data := topologyData{
+		Actors: []topologyActor{
+			{
+				ActorType: "device",
+				Match: topologyMatch{
+					SysName:     "sw1",
+					ChassisIDs:  []string{"00:11:22:33:44:55"},
+					IPAddresses: []string{"10.0.0.1"},
+				},
+				Attributes: map[string]any{},
+			},
+		},
+	}
+
+	local := topologyDevice{
+		ChassisID:   "00:11:22:33:44:55",
+		SysName:     "sw1",
+		SysDescr:    "Switch 1",
+		SysContact:  "ops@example.net",
+		SysLocation: "dc1",
+		Vendor:      "Cisco",
+		Model:       "C9300-24T",
+	}
+
+	augmentLocalActorFromCache(&data, local)
+
+	actor := findDeviceActorBySysName(data, "sw1")
+	require.NotNil(t, actor)
+	require.Equal(t, "Switch 1", actor.Attributes["sys_descr"])
+	require.Equal(t, "ops@example.net", actor.Attributes["sys_contact"])
+	require.Equal(t, "dc1", actor.Attributes["sys_location"])
+	require.Equal(t, "Cisco", actor.Attributes["vendor"])
+	require.Equal(t, "snmp", actor.Attributes["vendor_source"])
+	require.Equal(t, "high", actor.Attributes["vendor_confidence"])
+	require.Equal(t, "C9300-24T", actor.Attributes["model"])
+}
+
 func actorHasAttributeList(snapshot topologyData, key string) bool {
 	for _, actor := range snapshot.Actors {
 		if actor.Attributes == nil {

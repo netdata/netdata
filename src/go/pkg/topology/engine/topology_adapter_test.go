@@ -540,6 +540,74 @@ func TestToTopologyData_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T)
 	require.False(t, hasNeighbors)
 }
 
+func TestToTopologyData_InfersVendorFromMACOUI(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "sw1",
+				Hostname:  "sw1",
+				ChassisID: "00:11:22:33:44:55",
+			},
+			{
+				ID:        "remote-device",
+				Hostname:  "edge-remote",
+				ChassisID: "28:6f:b9:00:00:22",
+				Labels:    map[string]string{"inferred": "true"},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "sw1", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1"},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "sw1", IfIndex: 1, EndpointID: "mac:08:ea:44:11:22:33", Method: "fdb"},
+		},
+		Enrichments: []Enrichment{
+			{EndpointID: "mac:08:ea:44:11:22:33", MAC: "08:ea:44:11:22:33"},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	remote := findActorBySysName(data.Actors, "edge-remote")
+	require.NotNil(t, remote)
+	require.Equal(t, "Nokia Shanghai Bell Co., Ltd.", remote.Attributes["vendor"])
+	require.Equal(t, "mac_oui", remote.Attributes["vendor_source"])
+	require.Equal(t, "low", remote.Attributes["vendor_confidence"])
+
+	endpoint := findActorByMAC(data.Actors, "08:ea:44:11:22:33")
+	require.NotNil(t, endpoint)
+	require.Equal(t, "endpoint", endpoint.ActorType)
+	require.Equal(t, "Extreme Networks Headquarters", endpoint.Attributes["vendor"])
+	require.Equal(t, "mac_oui", endpoint.Attributes["vendor_source"])
+	require.Equal(t, "low", endpoint.Attributes["vendor_confidence"])
+}
+
+func TestDeviceToTopologyActor_DoesNotOverrideExplicitVendor(t *testing.T) {
+	actor := deviceToTopologyActor(
+		Device{
+			ID:        "switch-a",
+			Hostname:  "switch-a",
+			ChassisID: "08:ea:44:99:88:77",
+			Labels: map[string]string{
+				"vendor": "Explicit Vendor",
+			},
+		},
+		"snmp",
+		"2",
+		"",
+		topologyDeviceInterfaceSummary{},
+		nil,
+	)
+
+	require.Equal(t, "Explicit Vendor", actor.Attributes["vendor"])
+	require.Equal(t, "labels", actor.Attributes["vendor_source"])
+	require.Equal(t, "high", actor.Attributes["vendor_confidence"])
+}
+
 func TestToTopologyData_DefaultDiscoveredCountWithoutLocalID(t *testing.T) {
 	result := Result{
 		Devices: []Device{

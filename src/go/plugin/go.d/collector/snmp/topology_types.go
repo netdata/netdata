@@ -29,6 +29,7 @@ type topologyDevice struct {
 	SysObjectID           string                      `json:"sys_object_id,omitempty"`
 	SysName               string                      `json:"sys_name,omitempty"`
 	SysDescr              string                      `json:"sys_descr,omitempty"`
+	SysContact            string                      `json:"sys_contact,omitempty"`
 	SysLocation           string                      `json:"sys_location,omitempty"`
 	ManagementIP          string                      `json:"management_ip,omitempty"`
 	ManagementAddresses   []topologyManagementAddress `json:"management_addresses,omitempty"`
