@@ -169,13 +169,14 @@ TV Mode is perfect for:
 
 :::warning
 
-TV Mode URLs contain unique access tokens that provide full access to your Netdata Cloud dashboards. **Share these URLs only with trusted users**.
+TV Mode URLs contain unique access tokens that provide full access to your Netdata Cloud dashboards and are embedded directly in the URL. Treat these URLs like secrets and **share them only with trusted users**.
 
 :::
 
 - **Token Security**: Anyone with the TV Mode URL can access the dashboard without authentication.
 - **Token Management**: TV Mode tokens can be viewed and revoked in **User Settings > API Tokens**. Learn more in the [API Tokens documentation](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md).
-- **Expiration**: Manage token lifecycle by revoking tokens when they're no longer needed.
+- **Safe Handling**: Because the access token is in the URL, it can appear in browser history, logs, screenshots, clipboard managers, or HTTP Referer headers. Avoid posting TV Mode URLs in tickets, chats, or other shared channels, and revoke the token immediately if the URL is exposed.
+- **Revocation & Lifecycle**: TV Mode tokens do not expire automatically; manage their lifecycle by revoking tokens when they're no longer needed.
 
 ## Minimum Browser Viewport Requirement
 
