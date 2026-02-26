@@ -14,5 +14,5 @@ type Analyzer interface {
 
 // Capturable marks collectors that can emit additional capture artifacts.
 type Capturable interface {
-	EnableDump(string)
+	EnableCaptureArtifacts(string)
 }

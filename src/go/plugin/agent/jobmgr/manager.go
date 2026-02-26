@@ -615,7 +615,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 
 	if jobDumpDir != "" {
 		if dumpAware, ok := mod.(metricsaudit.Capturable); ok {
-			dumpAware.EnableDump(jobDumpDir)
+			dumpAware.EnableCaptureArtifacts(jobDumpDir)
 		}
 	}
 
