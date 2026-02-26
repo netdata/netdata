@@ -698,7 +698,8 @@ static https_client_resp_t handle_http_request(https_req_ctx_t *ctx) {
         char *creds_base64 = callocz(1, creds_base64_len + 1);
         (void) netdata_base64_encode((unsigned char *)creds_base64, (unsigned char *)creds_plain, creds_plain_len);
         buffer_sprintf(hdr, "Proxy-Authorization: Basic %s\x0D\x0A", creds_base64);
-        freez(creds_plain);
+        aclk_sensitive_free(&creds_plain);
+        aclk_sensitive_free(&creds_base64);
     }
 
     buffer_strcat(hdr, "\x0D\x0A");
@@ -827,35 +828,22 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
 
     ctx->poll_fd.fd = ctx->sock;
 
-    // Do the CONNECT if proxy is used
+    // Do proxy negotiation if proxy is used.
     if (request->proxy_host) {
-        https_req_t req = HTTPS_REQ_T_INITIALIZER;
-        req.request_type = HTTP_REQ_CONNECT;
-        req.timeout_s = request->timeout_s;
-        req.host = request->host;
-        req.port = request->port;
-        req.url = request->url;
-        req.proxy_username = request->proxy_username;
-        req.proxy_password = request->proxy_password;
-        ctx->request = &req;
-        rc = handle_http_request(ctx);
-        if (rc != HTTPS_CLIENT_RESP_OK) {
-            netdata_log_error("ACLK: failed to CONNECT via proxy %s%s:%d to %s:%d",
-                              proxy_proto, request->proxy_host, request->proxy_port,
-                              request->host, request->port);
-            http_parse_ctx_destroy(&ctx->parse_ctx);
-            goto exit_sock;
-        }
-        if (ctx->parse_ctx.http_code != 200) {
+        enum mqtt_wss_proxy_type proxy_type = (enum mqtt_wss_proxy_type)request->proxy_type;
+        if (proxy_type == MQTT_WSS_DIRECT)
+            proxy_type = aclk_proxy_type_from_scheme(request->proxy);
+        if (proxy_type == MQTT_WSS_DIRECT)
+            proxy_type = MQTT_WSS_PROXY_HTTP;
+
+        if (aclk_proxy_negotiation_connect(ctx->sock, proxy_type, request->proxy_username, request->proxy_password,
+                                           request->host, request->port, (int)request->timeout_s * 1000)) {
             rc = HTTPS_CLIENT_RESP_PROXY_NOT_200;
-            netdata_log_error("ACLK: proxy %s%s:%d returned HTTP %d (expected 200) for CONNECT to %s:%d",
+            netdata_log_error("ACLK: proxy negotiation failed via proxy %s%s:%d to %s:%d",
                               proxy_proto, request->proxy_host, request->proxy_port,
-                              ctx->parse_ctx.http_code,
                               request->host, request->port);
-            http_parse_ctx_destroy(&ctx->parse_ctx);
             goto exit_sock;
         }
-        http_parse_ctx_destroy(&ctx->parse_ctx);
     }
     ctx->request = request;
 

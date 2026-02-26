@@ -108,5 +108,12 @@ unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int mins_ms
 
 void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd,
     char **log_proxy, enum mqtt_wss_proxy_type *type);
+enum mqtt_wss_proxy_type aclk_proxy_type_from_scheme(const char *proxy_url);
+const char *aclk_mqtt_proxy_type_to_scheme(enum mqtt_wss_proxy_type type);
+int aclk_proxy_negotiation_connect(int sockfd, enum mqtt_wss_proxy_type proxy_type,
+                                   const char *proxy_username, const char *proxy_password,
+                                   const char *target_host, int target_port, int timeout_ms);
+void aclk_sensitive_memzero(void *ptr, size_t len);
+void aclk_sensitive_free(char **ptr);
 
 #endif /* ACLK_UTIL_H */
