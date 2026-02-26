@@ -60,8 +60,8 @@ func main() {
 		return
 	}
 
-	if opts.DumpDataDir != "" && opts.DumpMode == "" {
-		opts.DumpMode = "10m"
+	if opts.MetricsAuditDataDir != "" && opts.MetricsAuditDuration == "" {
+		opts.MetricsAuditDuration = "10m"
 	}
 
 	pluginconfig.MustInit(pluginconfig.InitInput{
@@ -77,32 +77,32 @@ func main() {
 	}
 	isTerminal := terminal.IsTerminal()
 
-	// Parse dump duration if provided
-	var dumpMode time.Duration
-	if opts.DumpMode != "" {
+	// Parse metrics-audit duration if provided.
+	var auditDuration time.Duration
+	if opts.MetricsAuditDuration != "" {
 		var err error
-		dumpMode, err = time.ParseDuration(opts.DumpMode)
+		auditDuration, err = time.ParseDuration(opts.MetricsAuditDuration)
 		if err != nil {
-			logger.Errorf("error: invalid dump duration '%s': %v", opts.DumpMode, err)
+			logger.Errorf("error: invalid --metrics-audit duration '%s': %v", opts.MetricsAuditDuration, err)
 			os.Exit(1)
 		}
-		if dumpMode <= 0 {
-			logger.Errorf("error: invalid dump duration '%s': duration must be > 0", opts.DumpMode)
+		if auditDuration <= 0 {
+			logger.Errorf("error: invalid --metrics-audit duration '%s': duration must be > 0", opts.MetricsAuditDuration)
 			os.Exit(1)
 		}
 	}
 
-	if opts.DumpDataDir != "" && dumpMode <= 0 {
-		logger.Errorf("error: --dump-data requires positive --dump duration")
+	if opts.MetricsAuditDataDir != "" && auditDuration <= 0 {
+		logger.Errorf("error: --metrics-audit-data requires positive --metrics-audit duration")
 		os.Exit(1)
 	}
 
-	dumpDataDir := ""
-	if opts.DumpDataDir != "" {
+	metricsAuditDataDir := ""
+	if opts.MetricsAuditDataDir != "" {
 		var err error
-		dumpDataDir, err = prepareDumpDataDir(opts.DumpDataDir, pluginconfig.VarLibDir())
+		metricsAuditDataDir, err = prepareMetricsAuditDataDir(opts.MetricsAuditDataDir, pluginconfig.VarLibDir())
 		if err != nil {
-			logger.Errorf("error preparing dump-data directory: %v", err)
+			logger.Errorf("error preparing --metrics-audit-data directory: %v", err)
 			os.Exit(1)
 		}
 	}
@@ -126,9 +126,9 @@ func main() {
 		RunModule:               opts.Module,
 		RunJob:                  opts.Job,
 		MinUpdateEvery:          opts.UpdateEvery,
-		AuditDuration:           dumpMode,
-		AuditSummary:            opts.DumpSummary,
-		AuditDataDir:            dumpDataDir,
+		AuditDuration:           auditDuration,
+		AuditSummary:            opts.MetricsAuditSummary,
+		AuditDataDir:            metricsAuditDataDir,
 		DisableServiceDiscovery: true,
 	})
 
@@ -148,9 +148,9 @@ func main() {
 
 type options struct {
 	cli.Option
-	DumpMode    string `long:"dump" description:"run in dump mode for specified duration (e.g. 30s, 5m) and analyze metric structure"`
-	DumpSummary bool   `long:"dump-summary" description:"show consolidated summary across all jobs in dump mode"`
-	DumpDataDir string `long:"dump-data" description:"write structured dump artifacts for the selected module to the given directory"`
+	MetricsAuditDuration string `long:"metrics-audit" description:"run metrics-audit mode for specified duration (e.g. 30s, 5m) and analyze metric structure"`
+	MetricsAuditSummary  bool   `long:"metrics-audit-summary" description:"show consolidated metrics-audit summary across all jobs"`
+	MetricsAuditDataDir  string `long:"metrics-audit-data" description:"write structured metrics-audit artifacts for the selected module to the given directory"`
 }
 
 func parseCLI() *options {
@@ -183,7 +183,7 @@ func parseCLI() *options {
 	return opt
 }
 
-func prepareDumpDataDir(path string, varLibDir string) (string, error) {
+func prepareMetricsAuditDataDir(path string, varLibDir string) (string, error) {
 	if path == "" {
 		return "", nil
 	}
@@ -196,7 +196,7 @@ func prepareDumpDataDir(path string, varLibDir string) (string, error) {
 		return "", err
 	}
 	if absolute == "" || absolute == "/" {
-		return "", fmt.Errorf("refusing to use unsafe dump-data directory '%s'", absolute)
+		return "", fmt.Errorf("refusing to use unsafe metrics-audit-data directory '%s'", absolute)
 	}
 	if err := os.MkdirAll(absolute, 0o755); err != nil {
 		return "", err

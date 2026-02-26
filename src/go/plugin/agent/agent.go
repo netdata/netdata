@@ -174,7 +174,7 @@ func (a *Agent) RunKeepAlive(ctx context.Context) error {
 	}
 }
 
-// QuitCh returns agent quit notifications (e.g., dump completion).
+// QuitCh returns agent quit notifications (e.g., metrics-audit completion).
 func (a *Agent) QuitCh() <-chan struct{} {
 	return a.quitCh
 }

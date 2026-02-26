@@ -34,7 +34,7 @@ type writeTask struct {
 	flush chan struct{}
 }
 
-// Auditor collects and analyzes metric structure from dump mode
+// Auditor collects and analyzes metric structure from metrics-audit mode.
 type Auditor struct {
 	mu              sync.RWMutex
 	jobs            map[JobID]*JobAnalysis
@@ -66,7 +66,7 @@ type ChartAnalysis struct {
 	SeenDimensions  map[string]bool    // track which dimensions received data
 }
 
-// New creates a new dump analyzer
+// New creates a new metrics-audit analyzer.
 func New() *Auditor {
 	return &Auditor{
 		jobs:      make(map[JobID]*JobAnalysis),

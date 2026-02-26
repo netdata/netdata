@@ -561,10 +561,10 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 
 	useV2 := creator.CreateV2 != nil
 
-	var jobDumpDir string
+	var jobCaptureDir string
 	if m.auditDataDir != "" && !useV2 {
-		jobDumpDir = filepath.Join(m.auditDataDir, naming.Sanitize(cfg.Module()), naming.Sanitize(cfg.Name()))
-		if err := os.MkdirAll(jobDumpDir, 0o755); err != nil {
+		jobCaptureDir = filepath.Join(m.auditDataDir, naming.Sanitize(cfg.Module()), naming.Sanitize(cfg.Name()))
+		if err := os.MkdirAll(jobCaptureDir, 0o755); err != nil {
 			return nil, fmt.Errorf("creating audit directory: %w", err)
 		}
 	}
@@ -608,14 +608,14 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		return nil, err
 	}
 
-	if m.auditAnalyzer != nil && jobDumpDir != "" {
+	if m.auditAnalyzer != nil && jobCaptureDir != "" {
 		// Auditing hooks are V1-only; V2 jobs are intentionally excluded.
-		m.auditAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
+		m.auditAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobCaptureDir)
 	}
 
-	if jobDumpDir != "" {
-		if dumpAware, ok := mod.(metricsaudit.Capturable); ok {
-			dumpAware.EnableCaptureArtifacts(jobDumpDir)
+	if jobCaptureDir != "" {
+		if captureAware, ok := mod.(metricsaudit.Capturable); ok {
+			captureAware.EnableCaptureArtifacts(jobCaptureDir)
 		}
 	}
 
