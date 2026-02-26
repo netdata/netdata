@@ -66,6 +66,16 @@
       - `git fetch -t` failed (`Permission denied (publickey)`).
     - frontend install completed successfully.
     - frontend build emitted warnings (unused files/exports and webpack cache/precache size warnings), no fatal errors.
+- [x] A0.8. Reinstall backend and frontend now in mandatory order (Costa, 2026-02-26).
+  - Requested execution order:
+    - backend first: `./install.sh`
+    - frontend second: `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh`
+  - Execution result (2026-02-26):
+    - backend install completed successfully; netdata restarted via `systemctl start netdata`.
+    - known non-fatal backend warning remains:
+      - `git fetch -t` failed (`Permission denied (publickey)`).
+    - frontend install completed successfully (`sudo ./agent.sh`, exit code 0).
+    - frontend build emitted non-fatal warnings (unused files/exports, webpack/precache size warnings).
 - [ ] A1. Validate latest backend+frontend install on live office topology (hard refresh, multiple refresh cycles).
   - Evidence required:
     - screenshot/log excerpt of expected actor/link stability across refreshes,
