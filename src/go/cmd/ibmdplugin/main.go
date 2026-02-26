@@ -108,7 +108,6 @@ func main() {
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
 			discoveryproviders.Dummy(),
-			discoveryproviders.SD(nil),
 		},
 		RunModule:               opts.Module,
 		RunJob:                  opts.Job,
