@@ -503,6 +503,7 @@ func buildLocalTopologyDevice(c *Collector) topologyDevice {
 	device.SysObjectID = c.sysInfo.SysObjectID
 	device.SysName = c.sysInfo.Name
 	device.SysDescr = c.sysInfo.Descr
+	device.SysContact = c.sysInfo.Contact
 	device.SysLocation = c.sysInfo.Location
 
 	if c.sysInfo.Vendor != "" {
@@ -1866,8 +1867,19 @@ func augmentLocalActorFromCache(data *topologyData, local topologyDevice) {
 		if sysDescr := strings.TrimSpace(local.SysDescr); sysDescr != "" {
 			attrs["sys_descr"] = sysDescr
 		}
+		if sysContact := strings.TrimSpace(local.SysContact); sysContact != "" {
+			attrs["sys_contact"] = sysContact
+		}
 		if sysLocation := strings.TrimSpace(local.SysLocation); sysLocation != "" {
 			attrs["sys_location"] = sysLocation
+		}
+		if vendor := strings.TrimSpace(local.Vendor); vendor != "" {
+			attrs["vendor"] = vendor
+			attrs["vendor_source"] = "snmp"
+			attrs["vendor_confidence"] = "high"
+		}
+		if model := strings.TrimSpace(local.Model); model != "" {
+			attrs["model"] = model
 		}
 		if managementIP := normalizeIPAddress(local.ManagementIP); managementIP != "" {
 			attrs["management_ip"] = managementIP

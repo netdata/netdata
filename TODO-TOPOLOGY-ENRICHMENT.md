@@ -307,6 +307,8 @@ The frontend will use these fields to build an actor detail modal with:
 | `src/go/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector/collector_device_meta.go` | Device metadata from SNMP profiles |
 | `src/go/plugin/go.d/pkg/snmputils/sysinfo.go` | Existing vendor derivation path from sysObjectID/PEN (authoritative SNMP identity) |
 | `src/go/plugin/go.d/pkg/snmputils/overrides.go` | Existing override loading framework, candidate place for configurable OUI aliasing |
+| `src/go/pkg/topology/engine/mac_oui_lookup.go` | Embedded OUI lookup and match-based vendor inference for non-SNMP actors |
+| `src/go/pkg/topology/engine/mac_oui_vendors.tsv` | Versioned embedded OUI dataset (generated from IEEE registries) |
 | `src/go/pkg/topology/engine/types.go` | L2Observation, ObservedInterface, LLDP/CDP/STP/FDB types |
 
 ## 11. Pending decisions (must be confirmed before implementation)
@@ -434,7 +436,7 @@ Date: 2026-02-26
   - `fdb_total_macs`, `vlan_count`
   - `lldp_neighbor_count`, `cdp_neighbor_count`
 - [ ] P0-6 `total_bandwidth_bps` (depends on speed wiring from P1-2)
-- [ ] P0-1 identity enrichment (`sys_contact`, `vendor`, `model` local exposure path)
+- [x] P0-1 identity enrichment (`sys_contact`, `vendor`, `model`) for local actor exposure path (D2=A)
 - [ ] P0-7 / P0-8 chart reference mapping
 - [ ] P1-1 / P1-2 additional identity and per-port collector-path extensions
-- [ ] P1-3 OUI vendor inference (D4=B source decision finalized)
+- [x] P1-3 OUI vendor inference (embedded versioned dataset; attrs include `vendor_source` + `vendor_confidence`)
