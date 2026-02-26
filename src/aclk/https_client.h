@@ -69,6 +69,7 @@ typedef struct {
     const char *proxy_username;
     const char *proxy_password;
     const char *proxy;
+    int proxy_type; // enum mqtt_wss_proxy_type (int avoids extra header coupling)
 } https_req_t;
 
 typedef struct {
@@ -113,7 +114,8 @@ void https_req_response_free(https_req_response_t *res);
         .payload = NULL,                            \
         .payload_size = 0,                          \
         .proxy_host = NULL,                         \
-        .proxy_port = 8080                          \
+        .proxy_port = 8080,                         \
+        .proxy_type = 0                             \
     }
 
 https_client_resp_t https_request(https_req_t *request, https_req_response_t *response, bool *fallback_ipv4);

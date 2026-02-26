@@ -99,26 +99,30 @@ Netdata uses the `http_proxy` environment variable only when you set the `proxy`
 
 :::note
 
-Netdata does not support secure connections to proxies. **Data between Netdata Agents and Netdata Cloud remains end-to-end encrypted** since the Agent requests a TCP tunnel (HTTP `CONNECT`) from the proxy and handles all encryption directly, however initial Agent-to-proxy communication is not encrypted.
+Netdata does not support secure connections to proxies. **Data between Netdata Agents and Netdata Cloud remains end-to-end encrypted** since the Agent establishes a TCP tunnel through the proxy (HTTP `CONNECT` for HTTP proxies, SOCKS5 `CONNECT` for SOCKS proxies) and handles all encryption directly, however initial Agent-to-proxy communication is not encrypted.
 
 :::
 
 **How End-to-End Encryption Works with Proxies:**
 
-1. **Proxy Connection**: The Agent connects to the HTTP proxy using a plain HTTP connection.
-2. **TCP Tunneling Request**: The Agent sends an HTTP CONNECT request to the proxy, asking it to establish a TCP tunnel to the Netdata Cloud server.
-3. **Proxy Tunneling**: Once the proxy accepts the CONNECT request (responds with HTTP 200), it creates a TCP tunnel between the Agent and the Netdata Cloud server. At this point, the proxy simply forwards raw TCP data in both directions without interpreting it.
+1. **Proxy Connection**: The Agent connects to the configured proxy using a plain TCP connection.
+2. **TCP Tunneling Request**: The Agent asks the proxy to establish a TCP tunnel to the Netdata Cloud server (HTTP `CONNECT` for HTTP proxy, SOCKS5 `CONNECT` for SOCKS5/SOCKS5h).
+3. **Proxy Tunneling**: Once accepted, the proxy forwards raw TCP data in both directions without interpreting application-layer traffic.
 4. **Encrypted Communication**: The Agent then establishes a TLS/SSL connection through this tunnel directly with the Netdata Cloud server. All subsequent data (including the WebSocket handshake and MQTT protocol data) is encrypted end-to-end.
 
 :::note
 
-The proxy only sees encrypted TLS traffic flowing through the tunnel it established, never the decrypted content. This standard method is called "TCP tunneling" or "HTTP CONNECT tunneling."
+The proxy only sees encrypted TLS traffic flowing through the tunnel it established, never the decrypted content.
 
 :::
 
 :::info
 
 Netdata uses **two connection libraries**: **libcurl for claiming and MQTToWSoHTTPS for the actual Cloud connection**. While libcurl supports encrypted proxy connections, MQTToWSoHTTPS does not - so encrypted proxy connections will fail during the Cloud connection phase. The proxy configuration patterns above work for both libraries and provide end-to-end encryption for Netdata Cloud communication.
+
+For SOCKS proxies:
+- `socks5://` resolves target hostnames locally on the Agent and sends IP to the proxy.
+- `socks5h://` sends hostname to the proxy and resolves DNS remotely on the proxy side.
 
 :::
 
