@@ -59,6 +59,8 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, pms []*ddsn
 					mx[id] = v
 				}
 			}
+
+			c.updateTopologyScalarMetric(m)
 		}
 	}
 }

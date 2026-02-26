@@ -418,8 +418,36 @@ func TestToTopologyData_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T)
 			},
 		},
 		Interfaces: []Interface{
-			{DeviceID: "sw1", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1", Labels: map[string]string{"admin_status": "up", "oper_status": "up"}},
-			{DeviceID: "sw1", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2", Labels: map[string]string{"admin_status": "down", "oper_status": "down"}},
+			{
+				DeviceID: "sw1",
+				IfIndex:  1,
+				IfName:   "Gi0/1",
+				IfDescr:  "Gi0/1",
+				MAC:      "00:11:22:33:44:55",
+				Labels: map[string]string{
+					"admin_status": "up",
+					"oper_status":  "up",
+					"if_alias":     "uplink-core",
+					"speed_bps":    "1000000000",
+					"last_change":  "12345",
+					"duplex":       "full",
+				},
+			},
+			{
+				DeviceID: "sw1",
+				IfIndex:  2,
+				IfName:   "Gi0/2",
+				IfDescr:  "Gi0/2",
+				MAC:      "00:11:22:33:44:66",
+				Labels: map[string]string{
+					"admin_status": "down",
+					"oper_status":  "down",
+					"if_alias":     "server-a",
+					"speed_bps":    "100000000",
+					"last_change":  "54321",
+					"duplex":       "half",
+				},
+			},
 		},
 		Adjacencies: []Adjacency{
 			{
@@ -503,6 +531,7 @@ func TestToTopologyData_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T)
 	require.Equal(t, 1, actor.Attributes["ports_up"])
 	require.Equal(t, 1, actor.Attributes["ports_down"])
 	require.Equal(t, 1, actor.Attributes["ports_admin_down"])
+	require.EqualValues(t, 1_000_000_000, actor.Attributes["total_bandwidth_bps"])
 	require.Equal(t, 3, actor.Attributes["fdb_total_macs"])
 	require.Equal(t, 2, actor.Attributes["vlan_count"])
 	require.Equal(t, 1, actor.Attributes["lldp_neighbor_count"])
@@ -512,8 +541,21 @@ func TestToTopologyData_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T)
 	require.True(t, ok)
 
 	port1 := findInterfaceStatusByIndex(statuses, 1)
+	require.Equal(t, "Gi0/1", port1["if_descr"])
+	require.Equal(t, "uplink-core", port1["if_alias"])
+	require.Equal(t, "00:11:22:33:44:55", port1["mac"])
+	require.EqualValues(t, 1_000_000_000, port1["speed"])
+	require.EqualValues(t, 12345, port1["last_change"])
+	require.Equal(t, "full", port1["duplex"])
 	require.Equal(t, 2, port1["fdb_mac_count"])
 	require.Equal(t, "blocking", port1["stp_state"])
+	vlans, ok := port1["vlans"].([]map[string]any)
+	require.True(t, ok)
+	require.Len(t, vlans, 2)
+	require.Equal(t, "10", vlans[0]["vlan_id"])
+	require.Equal(t, true, vlans[0]["tagged"])
+	require.Equal(t, "20", vlans[1]["vlan_id"])
+	require.Equal(t, true, vlans[1]["tagged"])
 	neighbors, ok := port1["neighbors"].([]map[string]any)
 	require.True(t, ok)
 	require.Len(t, neighbors, 2)
@@ -535,6 +577,11 @@ func TestToTopologyData_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T)
 	require.Equal(t, []string{"bridge", "router"}, lldpNeighbor["remote_capabilities"])
 
 	port2 := findInterfaceStatusByIndex(statuses, 2)
+	require.Equal(t, "server-a", port2["if_alias"])
+	require.Equal(t, "00:11:22:33:44:66", port2["mac"])
+	require.EqualValues(t, 100_000_000, port2["speed"])
+	require.EqualValues(t, 54321, port2["last_change"])
+	require.Equal(t, "half", port2["duplex"])
 	require.Equal(t, 1, port2["fdb_mac_count"])
 	_, hasNeighbors := port2["neighbors"]
 	require.False(t, hasNeighbors)

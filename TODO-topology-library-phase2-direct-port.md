@@ -258,6 +258,32 @@
     - include union of all shortest-hop paths between every selected focus device pair.
     - if multiple shortest paths have the same distance, include all of them.
     - apply `Focus Depth` expansion from selected focus roots only.
+- [x] A30. Eliminate frontend `"unknown"` synthesis for missing/unmapped link peer ports (Costa, 2026-02-26).
+  - User observation:
+    - link peer ports are shown inconsistently as `"unknown"` vs `"[unset]"`.
+  - Root cause (frontend):
+    - `src/domains/functions/topologyUtils.js`:
+      - `getEndpointPort()` returns `"[unset]"` for missing endpoint port,
+      - later, `resolveActorPortName()` overwrites unresolved ports to `"unknown"` when inventory exists but alias/port lookup misses.
+    - this is a frontend normalization mismatch, not a device-emitted `"unknown"` contract.
+  - Planned fix:
+    - preserve backend/raw endpoint port token on inventory mismatch,
+    - keep `"[unset]"` when endpoint has no port,
+    - avoid forcing `"unknown"` for link peer ports.
+  - Validation:
+    - add/update unit tests in `src/domains/functions/topologyUtils.test.js`,
+    - run frontend tests for topology utils.
+  - Implemented:
+    - `resolveActorPortName()` now preserves unresolved candidate token when inventory lookup misses:
+      - keeps raw peer port values,
+      - keeps `"[unset]"` when backend provided missing-port sentinel,
+      - no forced downgrade to `"unknown"` for mismatch-only cases.
+    - files:
+      - `src/domains/functions/topologyUtils.js`
+      - `src/domains/functions/topologyUtils.test.js`
+  - Validation results:
+    - `cd ~/src/dashboard/cloud-frontend && npm test -- src/domains/functions/topologyUtils.test.js --runInBand`
+    - result: PASS (`8` tests, including new unresolved-port preservation test).
   - User decision (Costa, 2026-02-26):
     - D29.1 = **Apply `Focus Depth` from selected focus devices only** (not from every node included by shortest-path union).
 - [x] A30. Defensive parsing for multi-focus selector + reinstall sequence (Costa, 2026-02-26).
@@ -302,6 +328,18 @@
     - added explicit regression tests for empty/blank selection cases.
   - Validation:
     - `cd src/go && go test ./plugin/go.d/collector/snmp -count=1` passed.
+- [x] A32. Reinstall backend and frontend on latest topology branch state (Costa, 2026-02-26).
+  - Task:
+    - run backend install from this repo.
+    - run frontend install from `~/src/dashboard/cloud-frontend`.
+  - Execution order:
+    - backend first, frontend second.
+  - Result:
+    - backend install completed via `./install.sh`; netdata restarted successfully.
+    - frontend install completed via `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh`.
+  - Warnings observed:
+    - backend installer non-fatal warning persists: `git fetch -t` failed with exit code 128 (SSH publickey).
+    - frontend webpack completed with warnings only (unused files/exports, large assets not precached, one `react-datepicker` critical dependency warning).
 - [ ] A26. Decide whether to remove `pair_side` concept for topology pairing metadata (Costa, 2026-02-26).
   - Context:
     - `pair_side` is backend-internal metadata (not device SNMP field).

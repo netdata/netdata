@@ -36,6 +36,11 @@ type topologyDevice struct {
 	SysDescr              string                               `json:"sys_descr,omitempty"`
 	SysContact            string                               `json:"sys_contact,omitempty"`
 	SysLocation           string                               `json:"sys_location,omitempty"`
+	SysUptime             int64                                `json:"sys_uptime,omitempty"`
+	SerialNumber          string                               `json:"serial_number,omitempty"`
+	SoftwareVersion       string                               `json:"software_version,omitempty"`
+	FirmwareVersion       string                               `json:"firmware_version,omitempty"`
+	HardwareVersion       string                               `json:"hardware_version,omitempty"`
 	ManagementIP          string                               `json:"management_ip,omitempty"`
 	ManagementAddresses   []topologyManagementAddress          `json:"management_addresses,omitempty"`
 	AgentID               string                               `json:"agent_id,omitempty"`

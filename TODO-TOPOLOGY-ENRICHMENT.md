@@ -351,16 +351,16 @@ Evidence:
 - `augmentLocalActorFromCache()` enriches only the matched local actor.
 
 Options:
-- **A**: Local actor only (preferred for now)
+- **A**: Local actor only
   - Pros: accurate provenance, no synthetic data
   - Cons: heterogeneous actor richness
   - Risk: frontend must handle missing fields for non-local actors
-- **B**: Attempt to project these fields onto all actors when available in labels
-  - Pros: potentially richer graph
-  - Cons: sparse/inconsistent; may project stale or inferred data
-  - Risk: data quality ambiguity
+- **B**: Project onto all managed actors when available in managed-device labels (selected)
+  - Pros: richer network-engineering metadata while keeping managed provenance
+  - Cons: still heterogeneous for unmanaged/synthetic actors
+  - Risk: requires careful gating so inferred/unmanaged actors do not get synthetic identity data
 
-Recommendation: **A**
+Recommendation: **B**
 
 ### D3. `netdata_host_id` and `device_charts` semantics for non-local actors
 
@@ -421,10 +421,13 @@ Recommendation: **B**
 Date: 2026-02-26
 
 1. D1 metadata normalization: **B** (alias normalization map)
-2. D2 identity scope: **A** (local actor only for now)
+2. D2 identity scope: **B** (all managed actors)
 3. D3 host/charts semantics: **A** (only when explicitly known)
 4. D4 OUI vendor source: **B** (embedded versioned OUI dataset)
 5. D5 execution order for next work: **both** (implement OUI updater tool and chart-reference mapping in same cycle)
+6. D6 metadata versioning schema enforcement: **1.B + 2.B only**
+   - **1.B**: Add explicit metadata keys for `firmware_version`, `hardware_version`, `software_version`; keep `version` as generic software fallback only.
+   - **2.B**: Enforce the same device metadata field allowlist for `sysobjectid_metadata` entries (no permissive arbitrary keys).
 
 ## 13. Implementation progress
 
@@ -437,9 +440,77 @@ Date: 2026-02-26
   - `ports_up`, `ports_down`, `ports_admin_down`
   - `fdb_total_macs`, `vlan_count`
   - `lldp_neighbor_count`, `cdp_neighbor_count`
-- [ ] P0-6 `total_bandwidth_bps` (depends on speed wiring from P1-2)
-- [x] P0-1 identity enrichment (`sys_contact`, `vendor`, `model`) for local actor exposure path (D2=A)
+- [x] P0-6 `total_bandwidth_bps`
+- [x] P0-1 identity enrichment (`sys_contact`, `vendor`, `model`) expansion to all managed actors (D2=B)
+- [x] P0-1 identity enrichment (`sys_contact`, `vendor`, `model`) for local actor exposure path (completed earlier)
 - [x] P0-7 / P0-8 chart reference mapping (local actor when explicitly known): `netdata_host_id`, chart prefixes, `device_charts`, `if_statuses[].chart_id_suffix`, `if_statuses[].available_metrics`
-- [ ] P1-1 / P1-2 additional identity and per-port collector-path extensions
+- [x] P1-1 additional identity wiring:
+  - `sys_uptime`, `serial_number`, `firmware_version`, `hardware_version`
+- [x] P1-2 additional per-port enrichment wiring:
+  - `speed`, `if_descr`, `if_alias`, `mac`, `last_change`, `duplex`, structured `vlans`
 - [x] P1-3 OUI vendor inference (embedded versioned dataset; attrs include `vendor_source` + `vendor_confidence`)
 - [x] OUI dataset updater tool added (`go run ./tools/topology-oui-dataset -out pkg/topology/engine/mac_oui_vendors.tsv`)
+- [x] Validation:
+  - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine -count=1`
+- [x] Live payload verification (token-authenticated `GET /api/v3/function?function=topology:snmp...`) after backend+frontend install:
+  - required param labels/types verified:
+    - `map_type` label `Map`,
+    - `inference_strategy` label `Infer Strategy`,
+    - `managed_snmp_device_focus` label `Focus On` with `multiselect`,
+    - `depth` label `Focus Depth`.
+  - per-port enrichment observed in live payload (`90` ports):
+    - `if_descr=90`, `if_alias=4`, `mac=73`, `speed=32`, `last_change=65`, `duplex=26`, `vlans=5`.
+- [x] D6 implementation (2026-02-26):
+  - `metadata.device.fields` allowlist extended with explicit keys: `software_version`, `firmware_version`, `hardware_version`.
+  - `sysobjectid_metadata` now enforces the same `device` field allowlist (strict validation).
+  - Compatibility preserved for shipped APC profiles by allowing existing `category` metadata field under the same strict allowlist.
+  - Topology metadata mapping updated:
+    - `version` now maps to `software_version` only.
+    - `software_*` aliases no longer map to `firmware_version`.
+    - local actor attributes now expose `software_version` when available.
+  - Validation:
+    - `cd src/go && go test ./plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition -count=1`
+    - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine -count=1`
+- [x] Fix live `sys_uptime` gap caused by scalar metric name mismatch:
+  - root cause:
+    - `updateTopologyScalarMetric()` accepted only `sysUpTime`,
+    - default profile emits scalar as `systemUptime` (`_system-base.yaml`).
+  - fix:
+    - accept both `sysUpTime` and `systemUptime` as uptime source metric names.
+  - regression test:
+    - `TestCollector_UpdateTopologyScalarMetric_StoresSysUptime` now covers both names.
+  - validation:
+    - `cd src/go && go test ./plugin/go.d/collector/snmp -count=1`.
+    - live payload after reinstall: managed actors with `sys_uptime` reached `5/5`.
+
+## 14. Completeness audit (2026-02-26)
+
+### Verdict
+
+The enrichment TODO scope is **implemented at code level** for the requested actor/port metadata fields, including D2=B scope (`all managed actors`).
+
+### Evidence (code-level)
+
+1. Identity enrichment path now includes firmware/serial/hardware/sys_uptime:
+   - `src/go/plugin/go.d/collector/snmp/topology_types.go`
+   - `src/go/plugin/go.d/collector/snmp/topology_cache.go` (`buildLocalTopologyDevice`, `augmentLocalActorFromCache`, metadata alias normalization)
+   - `src/go/plugin/go.d/collector/snmp/collect_snmp.go` (`sysUpTime` scalar capture)
+2. Per-port P1 fields are now collected and projected:
+   - profile collection: `src/go/plugin/go.d/config/go.d/snmp.profiles/default/_std-topology-fdb-arp-mib.yaml`
+   - cache/observation path: `src/go/plugin/go.d/collector/snmp/topology_cache.go`
+   - engine/adapter projection: `src/go/pkg/topology/engine/types.go`, `src/go/pkg/topology/engine/l2_pipeline.go`, `src/go/pkg/topology/engine/topology_adapter.go`
+3. Actor aggregate `total_bandwidth_bps` is now emitted from topology interface summaries:
+   - `src/go/pkg/topology/engine/topology_adapter.go`
+4. Automated validation passed:
+   - `go test ./plugin/go.d/collector/snmp ./pkg/topology/engine -count=1`
+
+### Implication for “fit for network engineers”
+
+Topology payload now carries the core device lifecycle and per-port operational metadata required by the stated modal goals, with optional-field behavior preserved for devices that do not expose all MIBs.
+
+### Residual risk / remaining verification
+
+- Live end-to-end payload verification is now available with local bearer token auth and was executed successfully.
+- Remaining coverage gap in current office dataset:
+  - managed actors show `serial_number=0/5`, `firmware_version=0/5`, `hardware_version=0/5`.
+  - this appears data-source constrained (not exposed by current SNMP profile metadata for these devices), not a payload-schema omission.

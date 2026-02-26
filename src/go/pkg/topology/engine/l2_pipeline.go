@@ -205,7 +205,13 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 			if ifName == "" {
 				continue
 			}
-			engIface := Interface{DeviceID: device.ID, IfIndex: iface.IfIndex, IfName: ifName, IfDescr: ifDescr}
+			engIface := Interface{
+				DeviceID: device.ID,
+				IfIndex:  iface.IfIndex,
+				IfName:   ifName,
+				IfDescr:  ifDescr,
+				MAC:      normalizeMAC(iface.MAC),
+			}
 			if ifType := strings.TrimSpace(iface.InterfaceType); ifType != "" {
 				if engIface.Labels == nil {
 					engIface.Labels = make(map[string]string)
@@ -223,6 +229,36 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 					engIface.Labels = make(map[string]string)
 				}
 				engIface.Labels["oper_status"] = oper
+			}
+			if ifAlias := strings.TrimSpace(iface.IfAlias); ifAlias != "" {
+				if engIface.Labels == nil {
+					engIface.Labels = make(map[string]string)
+				}
+				engIface.Labels["if_alias"] = ifAlias
+			}
+			if iface.SpeedBps > 0 {
+				if engIface.Labels == nil {
+					engIface.Labels = make(map[string]string)
+				}
+				engIface.Labels["speed_bps"] = strconv.FormatInt(iface.SpeedBps, 10)
+			}
+			if iface.LastChange > 0 {
+				if engIface.Labels == nil {
+					engIface.Labels = make(map[string]string)
+				}
+				engIface.Labels["last_change"] = strconv.FormatInt(iface.LastChange, 10)
+			}
+			if duplex := strings.TrimSpace(iface.Duplex); duplex != "" {
+				if engIface.Labels == nil {
+					engIface.Labels = make(map[string]string)
+				}
+				engIface.Labels["duplex"] = duplex
+			}
+			if engIface.MAC != "" {
+				if engIface.Labels == nil {
+					engIface.Labels = make(map[string]string)
+				}
+				engIface.Labels["mac"] = engIface.MAC
 			}
 			interfaces[ifaceKey(engIface)] = engIface
 			ifNameByDeviceIfIndex[deviceIfIndexKey(device.ID, iface.IfIndex)] = ifName

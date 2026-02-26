@@ -734,3 +734,60 @@ func Test_validateEnrichMetadata(t *testing.T) {
 		})
 	}
 }
+
+func Test_validateEnrichSysobjectIDMetadata(t *testing.T) {
+	tests := map[string]struct {
+		entries   []SysobjectIDMetadataEntryConfig
+		wantError bool
+	}{
+		"accepts explicit version fields": {
+			entries: []SysobjectIDMetadataEntryConfig{
+				{
+					SysobjectID: "1.3.6.1.4.1.9.1.1",
+					Metadata: map[string]MetadataField{
+						"software_version": {
+							Value: "17.9.4",
+						},
+						"firmware_version": {
+							Symbol: SymbolConfig{
+								OID:  "1.2.3",
+								Name: "firmwareVersion",
+							},
+						},
+						"hardware_version": {
+							Symbols: []SymbolConfig{
+								{
+									OID:  "1.2.4",
+									Name: "hardwareVersion",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"rejects unknown field name": {
+			entries: []SysobjectIDMetadataEntryConfig{
+				{
+					SysobjectID: "1.3.6.1.4.1.9.1.1",
+					Metadata: map[string]MetadataField{
+						"custom_firmware_build": {
+							Value: "x1",
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if tc.wantError {
+				assert.Error(t, validateEnrichSysobjectIDMetadata(tc.entries))
+			} else {
+				assert.NoError(t, validateEnrichSysobjectIDMetadata(tc.entries))
+			}
+		})
+	}
+}
