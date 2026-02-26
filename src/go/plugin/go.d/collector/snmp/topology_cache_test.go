@@ -1105,10 +1105,42 @@ func TestTopologyCache_UpdateIfNameByIndex_StoresStatusWithoutIfName(t *testing.
 	require.Equal(t, "down", cache.ifStatusByIndex["7"].oper)
 }
 
+func TestTopologyCache_UpdateIfNameByIndex_StoresExtendedInterfaceFields(t *testing.T) {
+	cache := newTopologyCache()
+
+	cache.updateIfNameByIndex(map[string]string{
+		tagTopoIfIndex:  "9",
+		tagTopoIfName:   "swp09",
+		tagTopoIfAlias:  "uplink-core",
+		tagTopoIfDescr:  "Uplink Port 9",
+		tagTopoIfPhys:   "AA BB CC DD EE FF",
+		tagTopoIfHigh:   "1000",
+		tagTopoIfLast:   "34567",
+		tagTopoIfDuplex: "3",
+	})
+
+	status := cache.ifStatusByIndex["9"]
+	require.Equal(t, "Uplink Port 9", status.ifDescr)
+	require.Equal(t, "uplink-core", status.ifAlias)
+	require.Equal(t, "aa:bb:cc:dd:ee:ff", status.mac)
+	require.EqualValues(t, 1000_000_000, status.speedBps)
+	require.EqualValues(t, 34567, status.lastChange)
+	require.Equal(t, "full", status.duplex)
+}
+
 func TestBuildLocalTopologyDevice_IncludesSysContactVendorAndModel(t *testing.T) {
 	coll := &Collector{
 		Config: Config{Hostname: "10.0.0.1"},
-		vnode:  &vnodes.VirtualNode{GUID: "11111111-1111-1111-1111-111111111111"},
+		vnode: &vnodes.VirtualNode{
+			GUID: "11111111-1111-1111-1111-111111111111",
+			Labels: map[string]string{
+				"serial":       "SN-12345",
+				"version":      "17.9.4",
+				"firmware":     "1.2.3",
+				"hardware_rev": "A1",
+				"sys_uptime":   "123456",
+			},
+		},
 		sysInfo: &snmputils.SysInfo{
 			SysObjectID: "1.3.6.1.4.1.9.1.1",
 			Name:        "sw1",
@@ -1128,9 +1160,50 @@ func TestBuildLocalTopologyDevice_IncludesSysContactVendorAndModel(t *testing.T)
 	require.Equal(t, "dc1", device.SysLocation)
 	require.Equal(t, "Cisco", device.Vendor)
 	require.Equal(t, "C9300-24T", device.Model)
+	require.Equal(t, "SN-12345", device.SerialNumber)
+	require.Equal(t, "17.9.4", device.SoftwareVersion)
+	require.Equal(t, "1.2.3", device.FirmwareVersion)
+	require.Equal(t, "A1", device.HardwareVersion)
+	require.EqualValues(t, 123456, device.SysUptime)
 	require.Equal(t, "11111111-1111-1111-1111-111111111111", device.NetdataHostID)
 	require.Equal(t, topologyProfileChartIDPrefix, device.ChartIDPrefix)
 	require.Equal(t, topologyProfileChartContextPrefix, device.ChartContextPrefix)
+}
+
+func TestCollector_UpdateTopologyScalarMetric_StoresSysUptime(t *testing.T) {
+	for _, metricName := range []string{"sysUpTime", "systemUptime"} {
+		t.Run(metricName, func(t *testing.T) {
+			coll := &Collector{
+				topologyCache: newTopologyCache(),
+			}
+			coll.topologyCache.localDevice = topologyDevice{}
+
+			coll.updateTopologyScalarMetric(ddsnmp.Metric{
+				Name:  metricName,
+				Value: 4321,
+			})
+
+			require.EqualValues(t, 4321, coll.topologyCache.localDevice.SysUptime)
+			require.Equal(t, "4321", coll.topologyCache.localDevice.Labels["sys_uptime"])
+		})
+	}
+}
+
+func TestBuildLocalTopologyDevice_MapsVersionToSoftwareOnly(t *testing.T) {
+	coll := &Collector{
+		Config: Config{Hostname: "10.0.0.2"},
+		vnode: &vnodes.VirtualNode{
+			GUID: "22222222-2222-2222-2222-222222222222",
+			Labels: map[string]string{
+				"version": "9.1.2",
+			},
+		},
+	}
+
+	device := buildLocalTopologyDevice(coll)
+	require.Equal(t, "9.1.2", device.SoftwareVersion)
+	require.Empty(t, device.FirmwareVersion)
+	require.Empty(t, device.HardwareVersion)
 }
 
 func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
@@ -1161,8 +1234,13 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 		SysDescr:           "Switch 1",
 		SysContact:         "ops@example.net",
 		SysLocation:        "dc1",
+		SysUptime:          987654,
 		Vendor:             "Cisco",
 		Model:              "C9300-24T",
+		SerialNumber:       "SN-12345",
+		SoftwareVersion:    "17.9.4",
+		FirmwareVersion:    "1.2.3",
+		HardwareVersion:    "A1",
 		NetdataHostID:      "11111111-1111-1111-1111-111111111111",
 		ChartIDPrefix:      topologyProfileChartIDPrefix,
 		ChartContextPrefix: topologyProfileChartContextPrefix,
@@ -1184,10 +1262,15 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 	require.Equal(t, "Switch 1", actor.Attributes["sys_descr"])
 	require.Equal(t, "ops@example.net", actor.Attributes["sys_contact"])
 	require.Equal(t, "dc1", actor.Attributes["sys_location"])
+	require.EqualValues(t, 987654, actor.Attributes["sys_uptime"])
 	require.Equal(t, "Cisco", actor.Attributes["vendor"])
 	require.Equal(t, "snmp", actor.Attributes["vendor_source"])
 	require.Equal(t, "high", actor.Attributes["vendor_confidence"])
 	require.Equal(t, "C9300-24T", actor.Attributes["model"])
+	require.Equal(t, "SN-12345", actor.Attributes["serial_number"])
+	require.Equal(t, "17.9.4", actor.Attributes["software_version"])
+	require.Equal(t, "1.2.3", actor.Attributes["firmware_version"])
+	require.Equal(t, "A1", actor.Attributes["hardware_version"])
 	require.Equal(t, "11111111-1111-1111-1111-111111111111", actor.Attributes["netdata_host_id"])
 	require.Equal(t, topologyProfileChartIDPrefix, actor.Attributes["chart_id_prefix"])
 	require.Equal(t, topologyProfileChartContextPrefix, actor.Attributes["chart_context_prefix"])

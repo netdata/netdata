@@ -139,6 +139,11 @@ type ObservedInterface struct {
 	IfIndex       int
 	IfName        string
 	IfDescr       string
+	IfAlias       string
+	MAC           string
+	SpeedBps      int64
+	LastChange    int64
+	Duplex        string
 	InterfaceType string
 	AdminStatus   string
 	OperStatus    string

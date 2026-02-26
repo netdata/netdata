@@ -106,6 +106,11 @@ func TestBuildL2ResultFromObservations_InterfaceStatusLabels(t *testing.T) {
 					IfIndex:       8,
 					IfName:        "Gi0/0",
 					IfDescr:       "Gi0/0",
+					IfAlias:       "uplink-a",
+					MAC:           "AA:BB:CC:DD:EE:FF",
+					SpeedBps:      1_000_000_000,
+					LastChange:    12345,
+					Duplex:        "full",
 					InterfaceType: "ethernetcsmacd",
 					AdminStatus:   "up",
 					OperStatus:    "lowerLayerDown",
@@ -120,6 +125,11 @@ func TestBuildL2ResultFromObservations_InterfaceStatusLabels(t *testing.T) {
 	require.Equal(t, "ethernetcsmacd", result.Interfaces[0].Labels["if_type"])
 	require.Equal(t, "up", result.Interfaces[0].Labels["admin_status"])
 	require.Equal(t, "lowerLayerDown", result.Interfaces[0].Labels["oper_status"])
+	require.Equal(t, "uplink-a", result.Interfaces[0].Labels["if_alias"])
+	require.Equal(t, "aa:bb:cc:dd:ee:ff", result.Interfaces[0].Labels["mac"])
+	require.Equal(t, "1000000000", result.Interfaces[0].Labels["speed_bps"])
+	require.Equal(t, "12345", result.Interfaces[0].Labels["last_change"])
+	require.Equal(t, "full", result.Interfaces[0].Labels["duplex"])
 }
 
 func TestBuildL2ResultFromObservations_DeviceProtocolsObservedLabel(t *testing.T) {

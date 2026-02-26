@@ -145,6 +145,12 @@ type topologyIdentityKeySet map[string]struct{}
 type topologyDevicePortStatus struct {
 	IfIndex        int
 	IfName         string
+	IfDescr        string
+	IfAlias        string
+	MAC            string
+	SpeedBps       int64
+	LastChange     int64
+	Duplex         string
 	InterfaceType  string
 	AdminStatus    string
 	OperStatus     string
@@ -157,6 +163,7 @@ type topologyDevicePortStatus struct {
 	RoleSources    []string
 	FDBMACCount    int
 	STPState       string
+	VLANs          []map[string]any
 	Neighbors      []topologyPortNeighborStatus
 }
 
@@ -180,6 +187,7 @@ type topologyDeviceInterfaceSummary struct {
 	portsUp           int
 	portsDown         int
 	portsAdminDown    int
+	totalBandwidthBps int64
 	fdbTotalMACs      int
 	vlanCount         int
 	lldpNeighborCount int
@@ -189,6 +197,7 @@ type topologyDeviceInterfaceSummary struct {
 
 type topologyDevicePortEvidence struct {
 	vlanIDs            map[string]struct{}
+	vlanNames          map[string]string
 	fdbEndpointIDs     map[string]struct{}
 	hasFDB             bool
 	hasFDBManagedAlias bool
@@ -4572,6 +4581,18 @@ func buildTopologyDeviceInterfaceSummaries(
 		admin := strings.TrimSpace(iface.Labels["admin_status"])
 		oper := strings.TrimSpace(iface.Labels["oper_status"])
 		ifType := strings.TrimSpace(iface.Labels["if_type"])
+		ifAlias := strings.TrimSpace(iface.Labels["if_alias"])
+		ifDescr := strings.TrimSpace(iface.IfDescr)
+		if ifDescr == "" {
+			ifDescr = strings.TrimSpace(iface.IfName)
+		}
+		speedBps := parseTopologyLabelInt64(iface.Labels["speed_bps"])
+		lastChange := parseTopologyLabelInt64(iface.Labels["last_change"])
+		duplex := normalizeTopologyDuplex(iface.Labels["duplex"])
+		mac := normalizeMAC(iface.MAC)
+		if mac == "" {
+			mac = normalizeMAC(iface.Labels["mac"])
+		}
 		if ifType != "" {
 			col.ifTypes[ifType]++
 		}
@@ -4585,6 +4606,12 @@ func buildTopologyDeviceInterfaceSummaries(
 		col.portStatuses = append(col.portStatuses, topologyDevicePortStatus{
 			IfIndex:        iface.IfIndex,
 			IfName:         strings.TrimSpace(iface.IfName),
+			IfDescr:        ifDescr,
+			IfAlias:        ifAlias,
+			MAC:            mac,
+			SpeedBps:       speedBps,
+			LastChange:     lastChange,
+			Duplex:         duplex,
 			InterfaceType:  ifType,
 			AdminStatus:    admin,
 			OperStatus:     oper,
@@ -4633,6 +4660,11 @@ func buildTopologyDeviceInterfaceSummaries(
 		vlanID := normalizeTopologyVLANID(firstNonEmpty(attachment.Labels["vlan_id"], attachment.Labels["vlan"]))
 		if vlanID != "" {
 			evidence.vlanIDs[vlanID] = struct{}{}
+			if vlanName := strings.TrimSpace(attachment.Labels["vlan_name"]); vlanName != "" {
+				if _, exists := evidence.vlanNames[vlanID]; !exists {
+					evidence.vlanNames[vlanID] = vlanName
+				}
+			}
 		}
 	}
 
@@ -4658,6 +4690,11 @@ func buildTopologyDeviceInterfaceSummaries(
 			vlanID := normalizeTopologyVLANID(firstNonEmpty(adj.Labels["vlan_id"], adj.Labels["vlan"]))
 			if vlanID != "" {
 				evidence.vlanIDs[vlanID] = struct{}{}
+				if vlanName := strings.TrimSpace(adj.Labels["vlan_name"]); vlanName != "" {
+					if _, exists := evidence.vlanNames[vlanID]; !exists {
+						evidence.vlanNames[vlanID] = vlanName
+					}
+				}
 			}
 			if state := normalizeTopologySTPState(adj.Labels["stp_state"]); state != "" {
 				evidence.stpStates[state] = struct{}{}
@@ -4706,6 +4743,7 @@ func buildTopologyDeviceInterfaceSummaries(
 		portsUp := 0
 		portsDown := 0
 		portsAdminDown := 0
+		totalBandwidthBps := int64(0)
 		fdbTotalMACs := 0
 		lldpNeighborCount := 0
 		cdpNeighborCount := 0
@@ -4724,6 +4762,7 @@ func buildTopologyDeviceInterfaceSummaries(
 			if evidence != nil {
 				st.FDBMACCount = len(evidence.fdbEndpointIDs)
 				st.STPState = summarizeTopologySTPState(evidence.stpStates)
+				st.VLANs = topologyPortVLANAttributes(st.VLANIDs, evidence.vlanNames, st.LinkMode)
 				st.Neighbors = sortedTopologyPortNeighbors(evidence.neighbors)
 			}
 
@@ -4732,6 +4771,7 @@ func buildTopologyDeviceInterfaceSummaries(
 			}
 			if strings.EqualFold(strings.TrimSpace(st.OperStatus), "up") {
 				portsUp++
+				totalBandwidthBps = safeTopologyInt64Add(totalBandwidthBps, st.SpeedBps)
 			} else if strings.EqualFold(strings.TrimSpace(st.OperStatus), "down") || strings.EqualFold(strings.TrimSpace(st.OperStatus), "lowerlayerdown") {
 				portsDown++
 			}
@@ -4754,10 +4794,20 @@ func buildTopologyDeviceInterfaceSummaries(
 			portStatus := map[string]any{
 				"if_index":                 st.IfIndex,
 				"if_name":                  strings.TrimSpace(st.IfName),
+				"if_descr":                 strings.TrimSpace(st.IfDescr),
+				"if_alias":                 strings.TrimSpace(st.IfAlias),
+				"mac":                      strings.TrimSpace(st.MAC),
+				"duplex":                   strings.TrimSpace(st.Duplex),
 				"link_mode":                st.LinkMode,
 				"link_mode_confidence":     st.ModeConfidence,
 				"topology_role":            st.TopologyRole,
 				"topology_role_confidence": st.RoleConfidence,
+			}
+			if st.SpeedBps > 0 {
+				portStatus["speed"] = st.SpeedBps
+			}
+			if st.LastChange > 0 {
+				portStatus["last_change"] = st.LastChange
 			}
 			if len(st.ModeSources) > 0 {
 				portStatus["link_mode_sources"] = st.ModeSources
@@ -4767,6 +4817,9 @@ func buildTopologyDeviceInterfaceSummaries(
 			}
 			if len(st.VLANIDs) > 0 {
 				portStatus["vlan_ids"] = st.VLANIDs
+			}
+			if len(st.VLANs) > 0 {
+				portStatus["vlans"] = st.VLANs
 			}
 			if st.FDBMACCount > 0 {
 				portStatus["fdb_mac_count"] = st.FDBMACCount
@@ -4808,6 +4861,7 @@ func buildTopologyDeviceInterfaceSummaries(
 			portsUp:           portsUp,
 			portsDown:         portsDown,
 			portsAdminDown:    portsAdminDown,
+			totalBandwidthBps: totalBandwidthBps,
 			fdbTotalMACs:      fdbTotalMACs,
 			vlanCount:         len(deviceVLANIDs),
 			lldpNeighborCount: lldpNeighborCount,
@@ -4824,6 +4878,71 @@ func normalizeTopologyVLANID(value string) string {
 		return ""
 	}
 	return strings.ToLower(value)
+}
+
+func topologyPortVLANAttributes(vlanIDs []string, vlanNames map[string]string, linkMode string) []map[string]any {
+	if len(vlanIDs) == 0 {
+		return nil
+	}
+	tagged := true
+	if len(vlanIDs) == 1 && strings.EqualFold(strings.TrimSpace(linkMode), "access") {
+		tagged = false
+	}
+	out := make([]map[string]any, 0, len(vlanIDs))
+	for _, vlanID := range vlanIDs {
+		vlanID = normalizeTopologyVLANID(vlanID)
+		if vlanID == "" {
+			continue
+		}
+		entry := map[string]any{
+			"vlan_id": vlanID,
+			"tagged":  tagged,
+		}
+		if vlanName := strings.TrimSpace(vlanNames[vlanID]); vlanName != "" {
+			entry["vlan_name"] = vlanName
+		}
+		out = append(out, entry)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func safeTopologyInt64Add(base, add int64) int64 {
+	if add <= 0 {
+		return base
+	}
+	if base > math.MaxInt64-add {
+		return math.MaxInt64
+	}
+	return base + add
+}
+
+func parseTopologyLabelInt64(value string) int64 {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return 0
+	}
+	return parsed
+}
+
+func normalizeTopologyDuplex(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	switch value {
+	case "full", "3":
+		return "full"
+	case "half", "2":
+		return "half"
+	case "unknown", "1":
+		return "unknown"
+	default:
+		return ""
+	}
 }
 
 func firstNonEmpty(values ...string) string {
@@ -5024,6 +5143,7 @@ func ensureTopologyPortEvidence(
 	if evidence == nil {
 		evidence = &topologyDevicePortEvidence{
 			vlanIDs:        make(map[string]struct{}),
+			vlanNames:      make(map[string]string),
 			fdbEndpointIDs: make(map[string]struct{}),
 			stpStates:      make(map[string]struct{}),
 			neighbors:      make(map[string]topologyPortNeighborStatus),
@@ -5252,6 +5372,9 @@ func deviceToTopologyActor(
 	}
 	if ifaceSummary.portsAdminDown > 0 {
 		attrs["ports_admin_down"] = ifaceSummary.portsAdminDown
+	}
+	if ifaceSummary.totalBandwidthBps > 0 {
+		attrs["total_bandwidth_bps"] = ifaceSummary.totalBandwidthBps
 	}
 	if ifaceSummary.fdbTotalMACs > 0 {
 		attrs["fdb_total_macs"] = ifaceSummary.fdbTotalMACs

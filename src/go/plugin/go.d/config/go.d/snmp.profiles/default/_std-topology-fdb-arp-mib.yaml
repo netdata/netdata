@@ -18,6 +18,14 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
+      - tag: topo_if_alias
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias
+      - tag: topo_if_high_speed
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.15
+          name: ifHighSpeed
 
   # IF-MIB ifTable: explicit interface status collection for topology port states.
   # Some vendors do not support stable cross-table joins from ifXTable to ifTable.
@@ -36,6 +44,10 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.3
           name: ifType
+      - tag: topo_if_descr
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.2
+          name: ifDescr
       - tag: topo_if_admin_status
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.7
@@ -61,6 +73,34 @@ metrics:
           OID: 1.3.6.1.2.1.2.2.1.6
           name: ifPhysAddress
           format: hex
+      - tag: topo_if_speed
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.5
+          name: ifSpeed
+      - tag: topo_if_last_change
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.9
+          name: ifLastChange
+
+  # EtherLike-MIB: interface duplex mode.
+  - MIB: EtherLike-MIB
+    table:
+      OID: 1.3.6.1.2.1.10.7.2
+      name: dot3StatsTable
+    symbols:
+      - OID: 1.3.6.1.2.1.10.7.2.1.19
+        name: topologyIfDuplexEntry
+    metric_tags:
+      - tag: topo_if_index
+        index: 1
+      - tag: topo_if_duplex
+        symbol:
+          OID: 1.3.6.1.2.1.10.7.2.1.19
+          name: dot3StatsDuplexStatus
+          mapping:
+            1: unknown
+            2: half
+            3: full
 
   # IP-MIB: interface address map used for management IP -> ifIndex correlation.
   - MIB: IP-MIB

@@ -5,6 +5,7 @@ package snmp
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 	"net"
 	"sort"
 	"strconv"
@@ -26,6 +27,7 @@ const (
 	metricCdpCacheEntry         = "cdpCacheEntry"
 	metricTopologyIfNameEntry   = "topologyIfNameEntry"
 	metricTopologyIfStatusEntry = "topologyIfStatusEntry"
+	metricTopologyIfDuplexEntry = "topologyIfDuplexEntry"
 	metricTopologyIPIfEntry     = "topologyIpIfIndexEntry"
 	metricBridgePortMapEntry    = "dot1dBasePortIfIndexEntry"
 	metricFdbEntry              = "dot1dTpFdbEntry"
@@ -100,14 +102,20 @@ const (
 	tagCdpPhysicalLocation      = "cdp_physical_location"
 	tagCdpLastChange            = "cdp_last_change"
 
-	tagTopoIfIndex = "topo_if_index"
-	tagTopoIfName  = "topo_if_name"
-	tagTopoIfType  = "topo_if_type"
-	tagTopoIfAdmin = "topo_if_admin_status"
-	tagTopoIfOper  = "topo_if_oper_status"
-	tagTopoIfPhys  = "topo_if_phys_address"
-	tagTopoIPAddr  = "topo_ip_addr"
-	tagTopoIPMask  = "topo_ip_netmask"
+	tagTopoIfIndex  = "topo_if_index"
+	tagTopoIfName   = "topo_if_name"
+	tagTopoIfType   = "topo_if_type"
+	tagTopoIfAdmin  = "topo_if_admin_status"
+	tagTopoIfOper   = "topo_if_oper_status"
+	tagTopoIfPhys   = "topo_if_phys_address"
+	tagTopoIfDescr  = "topo_if_descr"
+	tagTopoIfAlias  = "topo_if_alias"
+	tagTopoIfSpeed  = "topo_if_speed"
+	tagTopoIfHigh   = "topo_if_high_speed"
+	tagTopoIfLast   = "topo_if_last_change"
+	tagTopoIfDuplex = "topo_if_duplex"
+	tagTopoIPAddr   = "topo_ip_addr"
+	tagTopoIPMask   = "topo_ip_netmask"
 
 	tagBridgeBasePort = "bridge_base_port"
 	tagBridgeIfIndex  = "bridge_if_index"
@@ -158,6 +166,7 @@ const (
 const (
 	topologyProfileChartIDPrefix      = "snmp_device_prof_"
 	topologyProfileChartContextPrefix = "snmp.device_prof_"
+	topologyHighSpeedMultiplier       = int64(1_000_000)
 )
 
 var lldpChassisIDSubtypeMap = map[string]string{
@@ -179,6 +188,40 @@ var lldpPortIDSubtypeMap = map[string]string{
 	"6": "agentCircuitId",
 	"7": "local",
 }
+
+var (
+	topologyMetadataAliasSysDescr = []string{
+		"description", "sys_descr", "sys_description",
+	}
+	topologyMetadataAliasSysContact = []string{
+		"contact", "sys_contact",
+	}
+	topologyMetadataAliasSysLocation = []string{
+		"location", "sys_location",
+	}
+	topologyMetadataAliasVendor = []string{
+		"vendor", "manufacturer",
+	}
+	topologyMetadataAliasModel = []string{
+		"model", "device_model",
+	}
+	topologyMetadataAliasSysUptime = []string{
+		"sys_uptime", "sysuptime", "uptime",
+	}
+	topologyMetadataAliasSerial = []string{
+		"serial_number", "serial", "serial_num", "serial_no", "serialnumber",
+	}
+	topologyMetadataAliasFirmware = []string{
+		"firmware_version", "firmware", "firmware_rev", "firmware_revision",
+	}
+	topologyMetadataAliasSoftware = []string{
+		"software_version", "software", "software_rev", "software_revision",
+		"sw_version", "sw_rev", "version", "os_version",
+	}
+	topologyMetadataAliasHardware = []string{
+		"hardware_version", "hardware", "hardware_rev", "hw_version", "hw_rev",
+	}
+)
 
 type topologyCache struct {
 	mu         sync.RWMutex
@@ -208,10 +251,15 @@ type topologyCache struct {
 }
 
 type ifStatus struct {
-	admin  string
-	oper   string
-	ifType string
-	mac    string
+	admin      string
+	oper       string
+	ifType     string
+	ifDescr    string
+	ifAlias    string
+	mac        string
+	speedBps   int64
+	lastChange int64
+	duplex     string
 }
 
 type lldpLocPort struct {
@@ -448,6 +496,8 @@ func (c *Collector) updateTopologyCacheEntry(m ddsnmp.Metric) {
 		c.topologyCache.updateIfNameByIndex(m.Tags)
 	case metricTopologyIfStatusEntry:
 		c.topologyCache.updateIfNameByIndex(m.Tags)
+	case metricTopologyIfDuplexEntry:
+		c.topologyCache.updateIfNameByIndex(m.Tags)
 	case metricTopologyIPIfEntry:
 		c.topologyCache.updateIfIndexByIP(m.Tags)
 	case metricBridgePortMapEntry:
@@ -535,6 +585,33 @@ func (c *Collector) collectLocalDeviceCharts() map[string]string {
 	return out
 }
 
+func (c *Collector) updateTopologyScalarMetric(m ddsnmp.Metric) {
+	if c == nil || c.topologyCache == nil {
+		return
+	}
+	if !isTopologySysUptimeMetric(m.Name) || m.Value <= 0 {
+		return
+	}
+
+	c.topologyCache.mu.Lock()
+	defer c.topologyCache.mu.Unlock()
+
+	local := c.topologyCache.localDevice
+	local.SysUptime = m.Value
+	local.Labels = ensureLabels(local.Labels)
+	setTopologyMetadataLabelIfMissing(local.Labels, "sys_uptime", strconv.FormatInt(m.Value, 10))
+	c.topologyCache.localDevice = local
+}
+
+func isTopologySysUptimeMetric(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "sysuptime", "systemuptime":
+		return true
+	default:
+		return false
+	}
+}
+
 func (c *Collector) collectLocalInterfaceCharts() map[string]topologyInterfaceChartRef {
 	if c == nil || c.ifaceCache == nil {
 		return nil
@@ -592,7 +669,7 @@ func (c *Collector) chartExists(chartID string) bool {
 func isTopologyMetric(name string) bool {
 	switch name {
 	case metricLldpLocPortEntry, metricLldpLocManAddrEntry, metricLldpRemEntry, metricLldpRemManAddrEntry, metricLldpRemManAddrCompat, metricCdpCacheEntry,
-		metricTopologyIfNameEntry, metricTopologyIfStatusEntry, metricTopologyIPIfEntry, metricBridgePortMapEntry, metricFdbEntry, metricDot1qFdbEntry, metricDot1qVlanEntry, metricStpPortEntry, metricVtpVlanEntry, metricArpEntry, metricArpLegacyEntry:
+		metricTopologyIfNameEntry, metricTopologyIfStatusEntry, metricTopologyIfDuplexEntry, metricTopologyIPIfEntry, metricBridgePortMapEntry, metricFdbEntry, metricDot1qFdbEntry, metricDot1qVlanEntry, metricStpPortEntry, metricVtpVlanEntry, metricArpEntry, metricArpLegacyEntry:
 		return true
 	default:
 		return false
@@ -616,26 +693,63 @@ func buildLocalTopologyDevice(c *Collector) topologyDevice {
 		ChartContextPrefix: topologyProfileChartContextPrefix,
 	}
 
-	if c.sysInfo == nil {
-		return device
-	}
-
-	device.SysObjectID = c.sysInfo.SysObjectID
-	device.SysName = c.sysInfo.Name
-	device.SysDescr = c.sysInfo.Descr
-	device.SysContact = c.sysInfo.Contact
-	device.SysLocation = c.sysInfo.Location
-
-	if c.sysInfo.Vendor != "" {
-		device.Vendor = c.sysInfo.Vendor
-	} else if c.sysInfo.Organization != "" {
-		device.Vendor = c.sysInfo.Organization
-	}
-	device.Model = c.sysInfo.Model
-
 	if c.vnode != nil {
 		device.AgentID = c.vnode.GUID
 		device.NetdataHostID = c.vnode.GUID
+		device.Labels = cloneTopologyLabels(c.vnode.Labels)
+	}
+
+	if c.sysInfo != nil {
+		device.SysObjectID = c.sysInfo.SysObjectID
+		device.SysName = c.sysInfo.Name
+		device.SysDescr = c.sysInfo.Descr
+		device.SysContact = c.sysInfo.Contact
+		device.SysLocation = c.sysInfo.Location
+
+		if c.sysInfo.Vendor != "" {
+			device.Vendor = c.sysInfo.Vendor
+		} else if c.sysInfo.Organization != "" {
+			device.Vendor = c.sysInfo.Organization
+		}
+		device.Model = c.sysInfo.Model
+	}
+
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysDescr); value != "" && device.SysDescr == "" {
+		device.SysDescr = value
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysContact); value != "" && device.SysContact == "" {
+		device.SysContact = value
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysLocation); value != "" && device.SysLocation == "" {
+		device.SysLocation = value
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasVendor); value != "" && device.Vendor == "" {
+		device.Vendor = value
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasModel); value != "" && device.Model == "" {
+		device.Model = value
+	}
+
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysUptime); value != "" {
+		if uptime := parsePositiveInt64(value); uptime > 0 {
+			device.SysUptime = uptime
+		}
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSerial); value != "" {
+		device.SerialNumber = value
+		setTopologyMetadataLabelIfMissing(device.Labels, "serial_number", value)
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSoftware); value != "" {
+		device.SoftwareVersion = value
+		setTopologyMetadataLabelIfMissing(device.Labels, "software_version", value)
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasFirmware); value != "" {
+		device.FirmwareVersion = value
+		setTopologyMetadataLabelIfMissing(device.Labels, "firmware_version", value)
+	}
+	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasHardware); value != "" {
+		device.HardwareVersion = value
+		setTopologyMetadataLabelIfMissing(device.Labels, "hardware_version", value)
 	}
 
 	return device
@@ -892,10 +1006,39 @@ func (c *topologyCache) updateIfNameByIndex(tags map[string]string) {
 	if oper := normalizeInterfaceOperStatus(tags[tagTopoIfOper]); oper != "" {
 		status.oper = oper
 	}
+	if ifDescr := strings.TrimSpace(tags[tagTopoIfDescr]); ifDescr != "" {
+		status.ifDescr = ifDescr
+	}
+	if ifAlias := strings.TrimSpace(tags[tagTopoIfAlias]); ifAlias != "" {
+		status.ifAlias = ifAlias
+	}
 	if mac := normalizeMAC(tags[tagTopoIfPhys]); mac != "" && mac != "00:00:00:00:00:00" {
 		status.mac = mac
 	}
-	if status.ifType != "" || status.admin != "" || status.oper != "" || status.mac != "" {
+	if ifHighSpeed := parsePositiveInt64(tags[tagTopoIfHigh]); ifHighSpeed > 0 {
+		if ifHighSpeed > math.MaxInt64/topologyHighSpeedMultiplier {
+			status.speedBps = math.MaxInt64
+		} else {
+			status.speedBps = ifHighSpeed * topologyHighSpeedMultiplier
+		}
+	} else if ifSpeed := parsePositiveInt64(tags[tagTopoIfSpeed]); ifSpeed > 0 {
+		status.speedBps = ifSpeed
+	}
+	if lastChange := parsePositiveInt64(tags[tagTopoIfLast]); lastChange > 0 {
+		status.lastChange = lastChange
+	}
+	if duplex := normalizeInterfaceDuplex(tags[tagTopoIfDuplex]); duplex != "" {
+		status.duplex = duplex
+	}
+	if status.ifType != "" ||
+		status.admin != "" ||
+		status.oper != "" ||
+		status.ifDescr != "" ||
+		status.ifAlias != "" ||
+		status.mac != "" ||
+		status.speedBps > 0 ||
+		status.lastChange > 0 ||
+		status.duplex != "" {
 		c.ifStatusByIndex[ifIndex] = status
 	}
 }
@@ -1655,10 +1798,19 @@ func (c *topologyCache) buildEngineObservation(local topologyDevice) topologyeng
 			ifName = ifIndex
 		}
 		status := c.ifStatusByIndex[ifIndex]
+		ifDescr := strings.TrimSpace(status.ifDescr)
+		if ifDescr == "" {
+			ifDescr = ifName
+		}
 		observation.Interfaces = append(observation.Interfaces, topologyengine.ObservedInterface{
 			IfIndex:       idx,
 			IfName:        ifName,
-			IfDescr:       ifName,
+			IfDescr:       ifDescr,
+			IfAlias:       strings.TrimSpace(status.ifAlias),
+			MAC:           strings.TrimSpace(status.mac),
+			SpeedBps:      status.speedBps,
+			LastChange:    status.lastChange,
+			Duplex:        strings.TrimSpace(status.duplex),
 			InterfaceType: strings.TrimSpace(status.ifType),
 			AdminStatus:   strings.TrimSpace(status.admin),
 			OperStatus:    strings.TrimSpace(status.oper),
@@ -1994,6 +2146,9 @@ func augmentLocalActorFromCache(data *topologyData, local topologyDevice) {
 		if sysLocation := strings.TrimSpace(local.SysLocation); sysLocation != "" {
 			attrs["sys_location"] = sysLocation
 		}
+		if local.SysUptime > 0 {
+			attrs["sys_uptime"] = local.SysUptime
+		}
 		if vendor := strings.TrimSpace(local.Vendor); vendor != "" {
 			attrs["vendor"] = vendor
 			attrs["vendor_source"] = "snmp"
@@ -2001,6 +2156,18 @@ func augmentLocalActorFromCache(data *topologyData, local topologyDevice) {
 		}
 		if model := strings.TrimSpace(local.Model); model != "" {
 			attrs["model"] = model
+		}
+		if serial := strings.TrimSpace(local.SerialNumber); serial != "" {
+			attrs["serial_number"] = serial
+		}
+		if software := strings.TrimSpace(local.SoftwareVersion); software != "" {
+			attrs["software_version"] = software
+		}
+		if firmware := strings.TrimSpace(local.FirmwareVersion); firmware != "" {
+			attrs["firmware_version"] = firmware
+		}
+		if hardware := strings.TrimSpace(local.HardwareVersion); hardware != "" {
+			attrs["hardware_version"] = hardware
 		}
 		if managementIP := normalizeIPAddress(local.ManagementIP); managementIP != "" {
 			attrs["management_ip"] = managementIP
@@ -2348,6 +2515,81 @@ func mapStringStringToAny(in map[string]string) map[string]any {
 	return out
 }
 
+func cloneTopologyLabels(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for key, value := range in {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		out[key] = value
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func topologyCanonicalMetadataKey(key string) string {
+	key = strings.ToLower(strings.TrimSpace(key))
+	if key == "" {
+		return ""
+	}
+	key = strings.NewReplacer("-", "_", ".", "_", " ", "_").Replace(key)
+	for strings.Contains(key, "__") {
+		key = strings.ReplaceAll(key, "__", "_")
+	}
+	return strings.Trim(key, "_")
+}
+
+func topologyMetadataValue(labels map[string]string, aliases []string) string {
+	if len(labels) == 0 || len(aliases) == 0 {
+		return ""
+	}
+	byKey := make(map[string]string, len(labels))
+	for key, value := range labels {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		canonical := topologyCanonicalMetadataKey(key)
+		if canonical == "" {
+			continue
+		}
+		if _, exists := byKey[canonical]; !exists {
+			byKey[canonical] = value
+		}
+	}
+	for _, alias := range aliases {
+		alias = topologyCanonicalMetadataKey(alias)
+		if alias == "" {
+			continue
+		}
+		if value := strings.TrimSpace(byKey[alias]); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func setTopologyMetadataLabelIfMissing(labels map[string]string, key, value string) {
+	if labels == nil {
+		return
+	}
+	key = strings.TrimSpace(key)
+	value = strings.TrimSpace(value)
+	if key == "" || value == "" {
+		return
+	}
+	if existing := strings.TrimSpace(labels[key]); existing == "" {
+		labels[key] = value
+	}
+}
+
 func enrichTopologyInterfaceStatusesWithChartRefs(
 	statuses any,
 	interfaceCharts map[string]topologyInterfaceChartRef,
@@ -2440,6 +2682,42 @@ func normalizeTopologyDevice(dev topologyDevice) topologyDevice {
 	}
 	if dev.ChassisID != "" && dev.ChassisIDType == "" {
 		dev.ChassisIDType = "unknown"
+	}
+	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasSysDescr); value != "" && dev.SysDescr == "" {
+		dev.SysDescr = value
+	}
+	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasSysContact); value != "" && dev.SysContact == "" {
+		dev.SysContact = value
+	}
+	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasSysLocation); value != "" && dev.SysLocation == "" {
+		dev.SysLocation = value
+	}
+	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasVendor); value != "" && dev.Vendor == "" {
+		dev.Vendor = value
+	}
+	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasModel); value != "" && dev.Model == "" {
+		dev.Model = value
+	}
+	if dev.SysUptime <= 0 {
+		if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasSysUptime); value != "" {
+			dev.SysUptime = parsePositiveInt64(value)
+		}
+	}
+	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasSerial); value != "" && dev.SerialNumber == "" {
+		dev.SerialNumber = value
+		setTopologyMetadataLabelIfMissing(dev.Labels, "serial_number", value)
+	}
+	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasSoftware); value != "" && dev.SoftwareVersion == "" {
+		dev.SoftwareVersion = value
+		setTopologyMetadataLabelIfMissing(dev.Labels, "software_version", value)
+	}
+	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasFirmware); value != "" && dev.FirmwareVersion == "" {
+		dev.FirmwareVersion = value
+		setTopologyMetadataLabelIfMissing(dev.Labels, "firmware_version", value)
+	}
+	if value := topologyMetadataValue(dev.Labels, topologyMetadataAliasHardware); value != "" && dev.HardwareVersion == "" {
+		dev.HardwareVersion = value
+		setTopologyMetadataLabelIfMissing(dev.Labels, "hardware_version", value)
 	}
 	return dev
 }
@@ -2948,6 +3226,32 @@ func normalizeInterfaceType(value string) string {
 		return "ieee8023adlag"
 	}
 	return strings.ToLower(strings.NewReplacer("_", "", "-", "", " ", "").Replace(value))
+}
+
+func normalizeInterfaceDuplex(value string) string {
+	value = canonicalSNMPEnumValue(value)
+	switch value {
+	case "1", "unknown":
+		return "unknown"
+	case "2", "half", "halfduplex", "half_duplex":
+		return "half"
+	case "3", "full", "fullduplex", "full_duplex":
+		return "full"
+	default:
+		return ""
+	}
+}
+
+func parsePositiveInt64(value string) int64 {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return 0
+	}
+	return parsed
 }
 
 func canonicalSNMPEnumValue(value string) string {
