@@ -199,7 +199,7 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
             chart_name,
             dimension_name,
             (unsigned long long)rd->collector.last_collected_time.tv_sec,
-            rrddim_last_collected_raw_int(rd),
+            (collected_number)rrddim_last_collected_raw_int(rd),
             (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
             (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
 
@@ -337,7 +337,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
     if(rrddim_is_float(rd))
         buffer_sprintf(instance->buffer, NETDATA_DOUBLE_FORMAT, rrddim_last_collected_as_double(rd));
     else
-        buffer_sprintf(instance->buffer, COLLECTED_NUMBER_FORMAT, rrddim_last_collected_raw_int(rd));
+        buffer_sprintf(instance->buffer, COLLECTED_NUMBER_FORMAT, (collected_number)rrddim_last_collected_raw_int(rd));
 
     buffer_sprintf(
         instance->buffer,

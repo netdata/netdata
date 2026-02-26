@@ -182,7 +182,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
     if(rrddim_is_float(rd))
         buffer_sprintf(instance->buffer, NETDATA_DOUBLE_FORMAT, rrddim_last_collected_as_double(rd));
     else
-        buffer_sprintf(instance->buffer, COLLECTED_NUMBER_FORMAT, rrddim_last_collected_raw_int(rd));
+        buffer_sprintf(instance->buffer, COLLECTED_NUMBER_FORMAT, (collected_number)rrddim_last_collected_raw_int(rd));
 
     buffer_sprintf(instance->buffer, ",\"timestamp\":%llu}",
         (unsigned long long)rd->collector.last_collected_time.tv_sec);

@@ -149,7 +149,7 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
             chart_name,
             dimension_name,
             (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "",
-            rrddim_last_collected_raw_int(rd),
+            (collected_number)rrddim_last_collected_raw_int(rd),
             (unsigned long long)rd->collector.last_collected_time.tv_sec);
 
     return 0;
