@@ -155,17 +155,36 @@ type topologyDevicePortStatus struct {
 	TopologyRole   string
 	RoleConfidence string
 	RoleSources    []string
+	FDBMACCount    int
+	STPState       string
+	Neighbors      []topologyPortNeighborStatus
+}
+
+type topologyPortNeighborStatus struct {
+	Protocol           string
+	RemoteDevice       string
+	RemotePort         string
+	RemoteIP           string
+	RemoteChassisID    string
+	RemoteCapabilities []string
 }
 
 type topologyDeviceInterfaceSummary struct {
-	portsTotal       int
-	ifIndexes        []string
-	ifNames          []string
-	adminStatusCount map[string]any
-	operStatusCount  map[string]any
-	linkModeCount    map[string]any
-	roleCount        map[string]any
-	portStatuses     []map[string]any
+	portsTotal        int
+	ifIndexes         []string
+	ifNames           []string
+	adminStatusCount  map[string]any
+	operStatusCount   map[string]any
+	linkModeCount     map[string]any
+	roleCount         map[string]any
+	portsUp           int
+	portsDown         int
+	portsAdminDown    int
+	fdbTotalMACs      int
+	vlanCount         int
+	lldpNeighborCount int
+	cdpNeighborCount  int
+	portStatuses      []map[string]any
 }
 
 type topologyDevicePortEvidence struct {
@@ -176,6 +195,8 @@ type topologyDevicePortEvidence struct {
 	hasSTP             bool
 	hasPeer            bool
 	hasBridgeLink      bool
+	stpStates          map[string]struct{}
+	neighbors          map[string]topologyPortNeighborStatus
 }
 
 func normalizeTopologyInferenceStrategy(value string) string {
@@ -348,6 +369,7 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 		result.Interfaces,
 		result.Attachments,
 		result.Adjacencies,
+		deviceByID,
 		ifIndexByDeviceName,
 		bridgeLinks,
 		reporterAliases,
@@ -4503,6 +4525,7 @@ func buildTopologyDeviceInterfaceSummaries(
 	interfaces []Interface,
 	attachments []Attachment,
 	adjacencies []Adjacency,
+	deviceByID map[string]Device,
 	ifIndexByDeviceName map[string]int,
 	bridgeLinks []bridgeBridgeLinkRecord,
 	reporterAliases map[string][]string,
@@ -4628,15 +4651,23 @@ func buildTopologyDeviceInterfaceSummaries(
 			continue
 		}
 		evidence := ensureTopologyPortEvidence(col.portEvidence, ifIndex)
-		switch strings.ToLower(strings.TrimSpace(adj.Protocol)) {
+		protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
+		switch protocol {
 		case "stp":
 			evidence.hasSTP = true
 			vlanID := normalizeTopologyVLANID(firstNonEmpty(adj.Labels["vlan_id"], adj.Labels["vlan"]))
 			if vlanID != "" {
 				evidence.vlanIDs[vlanID] = struct{}{}
 			}
+			if state := normalizeTopologySTPState(adj.Labels["stp_state"]); state != "" {
+				evidence.stpStates[state] = struct{}{}
+			}
 		case "lldp", "cdp":
 			evidence.hasPeer = true
+			neighbor := buildTopologyPortNeighborStatus(protocol, adj, deviceByID)
+			if key := topologyPortNeighborStatusKey(neighbor); key != "" {
+				evidence.neighbors[key] = neighbor
+			}
 		}
 	}
 
@@ -4671,6 +4702,13 @@ func buildTopologyDeviceInterfaceSummaries(
 
 		modeCounts := make(map[string]int)
 		roleCounts := make(map[string]int)
+		deviceVLANIDs := make(map[string]struct{})
+		portsUp := 0
+		portsDown := 0
+		portsAdminDown := 0
+		fdbTotalMACs := 0
+		lldpNeighborCount := 0
+		cdpNeighborCount := 0
 		portStatuses := make([]map[string]any, 0, len(col.portStatuses))
 		for _, st := range col.portStatuses {
 			evidence := col.portEvidence[st.IfIndex]
@@ -4683,6 +4721,33 @@ func buildTopologyDeviceInterfaceSummaries(
 			st.TopologyRole = role
 			st.RoleConfidence = roleConfidence
 			st.RoleSources = roleSources
+			if evidence != nil {
+				st.FDBMACCount = len(evidence.fdbEndpointIDs)
+				st.STPState = summarizeTopologySTPState(evidence.stpStates)
+				st.Neighbors = sortedTopologyPortNeighbors(evidence.neighbors)
+			}
+
+			for _, vlanID := range st.VLANIDs {
+				deviceVLANIDs[vlanID] = struct{}{}
+			}
+			if strings.EqualFold(strings.TrimSpace(st.OperStatus), "up") {
+				portsUp++
+			} else if strings.EqualFold(strings.TrimSpace(st.OperStatus), "down") || strings.EqualFold(strings.TrimSpace(st.OperStatus), "lowerlayerdown") {
+				portsDown++
+			}
+			if strings.EqualFold(strings.TrimSpace(st.AdminStatus), "down") || strings.EqualFold(strings.TrimSpace(st.AdminStatus), "administrativelydown") {
+				portsAdminDown++
+			}
+			fdbTotalMACs += st.FDBMACCount
+			for _, neighbor := range st.Neighbors {
+				switch strings.ToLower(strings.TrimSpace(neighbor.Protocol)) {
+				case "lldp":
+					lldpNeighborCount++
+				case "cdp":
+					cdpNeighborCount++
+				}
+			}
+
 			modeCounts[mode]++
 			roleCounts[role]++
 
@@ -4703,6 +4768,23 @@ func buildTopologyDeviceInterfaceSummaries(
 			if len(st.VLANIDs) > 0 {
 				portStatus["vlan_ids"] = st.VLANIDs
 			}
+			if st.FDBMACCount > 0 {
+				portStatus["fdb_mac_count"] = st.FDBMACCount
+			}
+			if st.STPState != "" {
+				portStatus["stp_state"] = st.STPState
+			}
+			if len(st.Neighbors) > 0 {
+				neighbors := make([]map[string]any, 0, len(st.Neighbors))
+				for _, neighbor := range st.Neighbors {
+					if attrs := topologyPortNeighborStatusToAttributes(neighbor); len(attrs) > 0 {
+						neighbors = append(neighbors, attrs)
+					}
+				}
+				if len(neighbors) > 0 {
+					portStatus["neighbors"] = neighbors
+				}
+			}
 			if st.AdminStatus != "" {
 				portStatus["admin_status"] = st.AdminStatus
 			}
@@ -4716,14 +4798,21 @@ func buildTopologyDeviceInterfaceSummaries(
 		}
 
 		out[deviceID] = topologyDeviceInterfaceSummary{
-			portsTotal:       len(col.ifIndexes),
-			ifIndexes:        sortedTopologySet(col.ifIndexes),
-			ifNames:          sortedTopologySet(col.ifNames),
-			adminStatusCount: intCountMapToAny(col.adminCounts),
-			operStatusCount:  intCountMapToAny(col.operCounts),
-			linkModeCount:    intCountMapToAny(modeCounts),
-			roleCount:        intCountMapToAny(roleCounts),
-			portStatuses:     portStatuses,
+			portsTotal:        len(col.ifIndexes),
+			ifIndexes:         sortedTopologySet(col.ifIndexes),
+			ifNames:           sortedTopologySet(col.ifNames),
+			adminStatusCount:  intCountMapToAny(col.adminCounts),
+			operStatusCount:   intCountMapToAny(col.operCounts),
+			linkModeCount:     intCountMapToAny(modeCounts),
+			roleCount:         intCountMapToAny(roleCounts),
+			portsUp:           portsUp,
+			portsDown:         portsDown,
+			portsAdminDown:    portsAdminDown,
+			fdbTotalMACs:      fdbTotalMACs,
+			vlanCount:         len(deviceVLANIDs),
+			lldpNeighborCount: lldpNeighborCount,
+			cdpNeighborCount:  cdpNeighborCount,
+			portStatuses:      portStatuses,
 		}
 	}
 	return out
@@ -4747,6 +4836,183 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+func normalizeTopologySTPState(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	switch value {
+	case "", "0":
+		return ""
+	case "1", "disabled":
+		return "disabled"
+	case "2", "blocking", "discarding":
+		return "blocking"
+	case "3", "listening":
+		return "listening"
+	case "4", "learning":
+		return "learning"
+	case "5", "forwarding":
+		return "forwarding"
+	case "6", "broken":
+		return "broken"
+	default:
+		return value
+	}
+}
+
+func summarizeTopologySTPState(states map[string]struct{}) string {
+	if len(states) == 0 {
+		return ""
+	}
+
+	rank := map[string]int{
+		"forwarding": 1,
+		"learning":   2,
+		"listening":  3,
+		"blocking":   4,
+		"disabled":   5,
+		"broken":     6,
+	}
+	selected := ""
+	selectedRank := -1
+	for state := range states {
+		state = normalizeTopologySTPState(state)
+		if state == "" {
+			continue
+		}
+		currentRank, ok := rank[state]
+		if !ok {
+			currentRank = 7
+		}
+		if currentRank > selectedRank {
+			selected = state
+			selectedRank = currentRank
+		}
+	}
+	return selected
+}
+
+func topologyNeighborCapabilitiesFromLabels(labels map[string]string) []string {
+	if len(labels) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	for _, key := range []string{"capabilities_enabled", "capabilities_supported", "capabilities"} {
+		for _, capability := range labelsCSVToSlice(labels, key) {
+			capability = strings.TrimSpace(capability)
+			if capability == "" {
+				continue
+			}
+			seen[capability] = struct{}{}
+		}
+	}
+	return sortedTopologySet(seen)
+}
+
+func buildTopologyPortNeighborStatus(protocol string, adj Adjacency, deviceByID map[string]Device) topologyPortNeighborStatus {
+	protocol = strings.ToLower(strings.TrimSpace(protocol))
+	targetID := strings.TrimSpace(adj.TargetID)
+
+	neighbor := topologyPortNeighborStatus{
+		Protocol:     protocol,
+		RemoteDevice: targetID,
+		RemotePort:   strings.TrimSpace(adj.TargetPort),
+	}
+	if targetID == "" {
+		return neighbor
+	}
+
+	remote, ok := deviceByID[targetID]
+	if !ok {
+		if protocol == "cdp" {
+			neighbor.RemoteIP = strings.TrimSpace(adj.Labels["remote_address_raw"])
+		}
+		return neighbor
+	}
+
+	if remoteName := strings.TrimSpace(remote.Hostname); remoteName != "" {
+		neighbor.RemoteDevice = remoteName
+	}
+	neighbor.RemoteIP = firstAddress(remote.Addresses)
+	neighbor.RemoteChassisID = strings.TrimSpace(remote.ChassisID)
+	neighbor.RemoteCapabilities = topologyNeighborCapabilitiesFromLabels(remote.Labels)
+	if neighbor.RemoteIP == "" && protocol == "cdp" {
+		neighbor.RemoteIP = strings.TrimSpace(adj.Labels["remote_address_raw"])
+	}
+	return neighbor
+}
+
+func topologyPortNeighborStatusKey(status topologyPortNeighborStatus) string {
+	protocol := strings.ToLower(strings.TrimSpace(status.Protocol))
+	remoteDevice := strings.ToLower(strings.TrimSpace(status.RemoteDevice))
+	remotePort := strings.ToLower(strings.TrimSpace(status.RemotePort))
+	remoteIP := strings.ToLower(strings.TrimSpace(status.RemoteIP))
+	remoteChassisID := normalizeMAC(status.RemoteChassisID)
+	if remoteChassisID == "" {
+		remoteChassisID = strings.ToLower(strings.TrimSpace(status.RemoteChassisID))
+	}
+
+	if protocol == "" && remoteDevice == "" && remotePort == "" && remoteIP == "" && remoteChassisID == "" {
+		return ""
+	}
+	return strings.Join([]string{
+		protocol,
+		remoteDevice,
+		remotePort,
+		remoteIP,
+		remoteChassisID,
+	}, "|")
+}
+
+func sortedTopologyPortNeighbors(neighbors map[string]topologyPortNeighborStatus) []topologyPortNeighborStatus {
+	if len(neighbors) == 0 {
+		return nil
+	}
+	out := make([]topologyPortNeighborStatus, 0, len(neighbors))
+	for _, neighbor := range neighbors {
+		neighbor.Protocol = strings.ToLower(strings.TrimSpace(neighbor.Protocol))
+		neighbor.RemoteDevice = strings.TrimSpace(neighbor.RemoteDevice)
+		neighbor.RemotePort = strings.TrimSpace(neighbor.RemotePort)
+		neighbor.RemoteIP = strings.TrimSpace(neighbor.RemoteIP)
+		neighbor.RemoteChassisID = strings.TrimSpace(neighbor.RemoteChassisID)
+		neighbor.RemoteCapabilities = uniqueTopologyStrings(neighbor.RemoteCapabilities)
+		if topologyPortNeighborStatusKey(neighbor) == "" {
+			continue
+		}
+		out = append(out, neighbor)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		left, right := out[i], out[j]
+		if left.Protocol != right.Protocol {
+			return left.Protocol < right.Protocol
+		}
+		if left.RemoteDevice != right.RemoteDevice {
+			return left.RemoteDevice < right.RemoteDevice
+		}
+		if left.RemotePort != right.RemotePort {
+			return left.RemotePort < right.RemotePort
+		}
+		if left.RemoteIP != right.RemoteIP {
+			return left.RemoteIP < right.RemoteIP
+		}
+		return left.RemoteChassisID < right.RemoteChassisID
+	})
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func topologyPortNeighborStatusToAttributes(status topologyPortNeighborStatus) map[string]any {
+	attrs := map[string]any{
+		"protocol":            strings.ToLower(strings.TrimSpace(status.Protocol)),
+		"remote_device":       strings.TrimSpace(status.RemoteDevice),
+		"remote_port":         strings.TrimSpace(status.RemotePort),
+		"remote_ip":           strings.TrimSpace(status.RemoteIP),
+		"remote_chassis_id":   strings.TrimSpace(status.RemoteChassisID),
+		"remote_capabilities": uniqueTopologyStrings(status.RemoteCapabilities),
+	}
+	return pruneTopologyAttributes(attrs)
+}
+
 func ensureTopologyPortEvidence(
 	evidenceByIfIndex map[int]*topologyDevicePortEvidence,
 	ifIndex int,
@@ -4759,6 +5025,8 @@ func ensureTopologyPortEvidence(
 		evidence = &topologyDevicePortEvidence{
 			vlanIDs:        make(map[string]struct{}),
 			fdbEndpointIDs: make(map[string]struct{}),
+			stpStates:      make(map[string]struct{}),
+			neighbors:      make(map[string]topologyPortNeighborStatus),
 		}
 		evidenceByIfIndex[ifIndex] = evidence
 	}
@@ -4965,6 +5233,27 @@ func deviceToTopologyActor(
 	}
 	if len(ifaceSummary.ifNames) > 0 {
 		attrs["if_names"] = ifaceSummary.ifNames
+	}
+	if ifaceSummary.portsUp > 0 {
+		attrs["ports_up"] = ifaceSummary.portsUp
+	}
+	if ifaceSummary.portsDown > 0 {
+		attrs["ports_down"] = ifaceSummary.portsDown
+	}
+	if ifaceSummary.portsAdminDown > 0 {
+		attrs["ports_admin_down"] = ifaceSummary.portsAdminDown
+	}
+	if ifaceSummary.fdbTotalMACs > 0 {
+		attrs["fdb_total_macs"] = ifaceSummary.fdbTotalMACs
+	}
+	if ifaceSummary.vlanCount > 0 {
+		attrs["vlan_count"] = ifaceSummary.vlanCount
+	}
+	if ifaceSummary.lldpNeighborCount > 0 {
+		attrs["lldp_neighbor_count"] = ifaceSummary.lldpNeighborCount
+	}
+	if ifaceSummary.cdpNeighborCount > 0 {
+		attrs["cdp_neighbor_count"] = ifaceSummary.cdpNeighborCount
 	}
 	if len(ifaceSummary.adminStatusCount) > 0 {
 		attrs["if_admin_status_counts"] = ifaceSummary.adminStatusCount
