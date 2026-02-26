@@ -138,7 +138,7 @@ If multiple users edit the same dashboard at once, the second user who clicks **
 
 ## TV Mode
 
-**TV Mode** generates shareable, token-authenticated URLs for displaying dashboards on large screens without requiring login. This is ideal for displaying critical metrics on TVs, wallboards, or shared monitors in operations centers and team spaces.
+**TV Mode** generates shareable, token-authenticated URLs for displaying dashboards on large screens without requiring a login. This is ideal for displaying critical metrics on TVs, wallboards, or shared monitors in operations centers and team spaces.
 
 ### How to Use TV Mode
 
@@ -152,9 +152,9 @@ If multiple users edit the same dashboard at once, the second user who clicks **
 When you generate a TV Mode URL:
 
 - **Automatic Token Creation**: Netdata Cloud automatically creates an API token with full scope (`scope:all`) for authentication.
-- **Embedded Authentication**: The generated URL includes the access token, allowing the dashboard to load without requiring login.
+- **Embedded Authentication**: The generated URL includes the access token, allowing the dashboard to load without requiring a login.
 - **Time Range Preservation**: The URL captures your current time range settings, so viewers see the same data timeframe you selected.
-- **Optimized Display**: The dashboard renders in a special webview mode optimized for large-screen displays.
+- **Optimized Display**: The dashboard renders in a TV-optimized display mode for large screens.
 
 ### Use Cases
 
