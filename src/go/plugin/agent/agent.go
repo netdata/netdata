@@ -21,6 +21,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 )
 
 // Config is an Agent configuration.
@@ -86,7 +87,7 @@ type Agent struct {
 	// Dump mode
 	dumpMode     time.Duration
 	dumpSummary  bool
-	dumpAnalyzer *DumpAnalyzer
+	dumpAnalyzer *metricsaudit.Auditor
 
 	dumpDataDir string
 	quitOnce    sync.Once
@@ -121,7 +122,7 @@ func New(cfg Config) *Agent {
 	}
 
 	if a.dumpMode > 0 {
-		a.dumpAnalyzer = NewDumpAnalyzer()
+		a.dumpAnalyzer = metricsaudit.New()
 		a.Infof("dump mode enabled: will run for %v and analyze metric structure", a.dumpMode)
 		if a.dumpSummary {
 			a.Infof("dump summary enabled: will show consolidated summary across all jobs")
@@ -131,7 +132,7 @@ func New(cfg Config) *Agent {
 	if cfg.DumpDataDir != "" {
 		a.dumpDataDir = cfg.DumpDataDir
 		if a.dumpAnalyzer == nil {
-			a.dumpAnalyzer = NewDumpAnalyzer()
+			a.dumpAnalyzer = metricsaudit.New()
 		}
 		a.dumpAnalyzer.EnableDataCapture(cfg.DumpDataDir, a.signalDumpComplete)
 		a.Infof("dump data directory: %s", cfg.DumpDataDir)
