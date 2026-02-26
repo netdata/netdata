@@ -87,10 +87,10 @@ type Agent struct {
 	dumpMode     time.Duration
 	dumpSummary  bool
 	dumpAnalyzer *DumpAnalyzer
-	mgr          *jobmgr.Manager
 
 	dumpDataDir string
-	dumpOnce    sync.Once
+	quitOnce    sync.Once
+	auditOnce   sync.Once
 }
 
 // New creates a new Agent.
@@ -178,14 +178,22 @@ func (a *Agent) QuitCh() <-chan struct{} {
 	return a.quitCh
 }
 
-// DumpModeDuration returns configured dump mode duration.
-func (a *Agent) DumpModeDuration() time.Duration {
+// AuditDuration returns configured metrics-audit timer duration.
+func (a *Agent) AuditDuration() time.Duration {
 	return a.dumpMode
 }
 
-// TriggerDumpAnalysis prints dump analysis report.
-func (a *Agent) TriggerDumpAnalysis() {
-	a.collectDumpAnalysis()
+// FinalizeMetricsAudit prints metrics-audit analysis report once.
+func (a *Agent) FinalizeMetricsAudit(reason string) {
+	a.auditOnce.Do(func() {
+		if a.dumpAnalyzer == nil {
+			return
+		}
+		if reason != "" {
+			a.Infof("finalizing metrics audit (%s)", reason)
+		}
+		a.printMetricsAudit()
+	})
 }
 
 func (a *Agent) run(ctx context.Context) {
@@ -243,9 +251,6 @@ func (a *Agent) run(ctx context.Context) {
 		RuntimeService: runtimeSvc,
 	})
 
-	// Store reference for dump mode and enable dump mode if configured
-	a.mgr = jobMgr
-
 	in := make(chan []*confgroup.Group)
 	var wg sync.WaitGroup
 
@@ -262,9 +267,8 @@ func (a *Agent) run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (a *Agent) collectDumpAnalysis() {
-	if a.dumpAnalyzer == nil || a.mgr == nil {
-		a.Error("dump analyzer or job manager not initialized")
+func (a *Agent) printMetricsAudit() {
+	if a.dumpAnalyzer == nil {
 		return
 	}
 
@@ -277,7 +281,7 @@ func (a *Agent) collectDumpAnalysis() {
 }
 
 func (a *Agent) signalDumpComplete() {
-	a.dumpOnce.Do(func() {
+	a.quitOnce.Do(func() {
 		a.Infof("dump data collection complete, shutting down")
 		select {
 		case a.quitCh <- struct{}{}:

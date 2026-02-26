@@ -36,10 +36,11 @@ func Run(a *agent.Agent) {
 
 	var wg sync.WaitGroup
 	var exit bool
+	var finalizeReason string
 
 	var dumpTimer *time.Timer
 	var dumpTimerCh <-chan time.Time
-	if mode := a.DumpModeDuration(); mode > 0 {
+	if mode := a.AuditDuration(); mode > 0 {
 		dumpTimer = time.NewTimer(mode)
 		dumpTimerCh = dumpTimer.C
 		defer dumpTimer.Stop()
@@ -65,24 +66,29 @@ func Run(a *agent.Agent) {
 			default:
 				a.Infof("received %s signal (%d). Terminating...", sig, sig)
 				exit = true
+				finalizeReason = sig.String()
 			}
 		case <-a.QuitCh():
 			a.Infof("received QUIT command. Terminating...")
 			exit = true
+			finalizeReason = "quit"
 		case <-dumpTimerCh:
-			a.Infof("dump mode duration expired, collecting analysis...")
-			a.TriggerDumpAnalysis()
+			a.Infof("dump mode duration expired, finalizing metrics audit...")
 			exit = true
+			finalizeReason = "audit timer expired"
 		case <-keepAliveErr:
 			a.Info("too many keepAlive errors. Terminating...")
 			exit = true
+			finalizeReason = "keepalive error"
 		case <-runDone:
 			a.Info("agent run loop stopped. Terminating...")
 			exit = true
+			finalizeReason = "run loop stopped"
 		}
 
 		if exit {
 			collectorapi.ObsoleteCharts(false)
+			a.FinalizeMetricsAudit(finalizeReason)
 		}
 
 		cancel()
