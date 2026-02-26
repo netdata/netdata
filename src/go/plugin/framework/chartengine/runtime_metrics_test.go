@@ -191,8 +191,8 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				require.Equal(t, "netdata_go_plugin_component_component_jobs", update.ChartID)
 				require.Len(t, update.Values, 1)
 				assert.Equal(t, "total", update.Values[0].Name)
-				assert.True(t, update.Values[0].IsFloat)
-				assert.Equal(t, float64(7), update.Values[0].Float64)
+				assert.False(t, update.Values[0].IsFloat)
+				assert.Equal(t, int64(7), update.Values[0].Int64)
 			},
 		},
 		"autogen planning uses runtime metric metadata": {

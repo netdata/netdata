@@ -1056,6 +1056,58 @@ groups:
 	assert.Equal(t, "ms/s", sum.Meta.Units)
 }
 
+func TestBuildPlanAutogenUsesMetricFloatMetadataForScalar(t *testing.T) {
+	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	unmatched := store.Write().SnapshotMeter("svc").Gauge(
+		"temperature_celsius",
+		metrix.WithFloat(true),
+	)
+
+	cc.BeginCycle()
+	unmatched.Observe(10.5)
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	var created *CreateDimensionAction
+	for _, action := range plan.Actions {
+		dim, ok := action.(CreateDimensionAction)
+		if !ok || dim.ChartID != "svc.temperature_celsius" {
+			continue
+		}
+		created = &dim
+		break
+	}
+	require.NotNil(t, created)
+	assert.True(t, created.Float)
+	update := findUpdateAction(plan)
+	require.NotNil(t, update)
+	require.Len(t, update.Values, 1)
+	assert.True(t, update.Values[0].IsFloat)
+	assert.Equal(t, float64(10.5), update.Values[0].Float64)
+}
+
 func TestBuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles(t *testing.T) {
 	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
 	require.NoError(t, err)
@@ -1126,7 +1178,7 @@ groups:
 	store := metrix.NewCollectorStore()
 	cc := mustCycleController(t, store)
 	sm := store.Write().SnapshotMeter("svc")
-	m := sm.Counter("requests_total")
+	m := sm.Counter("requests_total", metrix.WithFloat(true))
 	methodGET := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
 
 	cc.BeginCycle()
@@ -1140,6 +1192,22 @@ groups:
 	require.NotNil(t, create)
 	assert.Equal(t, "svc_requests", create.ChartID)
 	assert.NotEqual(t, "svc.requests_total-method=GET", create.ChartID)
+	var createdDim *CreateDimensionAction
+	for _, action := range plan.Actions {
+		dim, ok := action.(CreateDimensionAction)
+		if !ok || dim.ChartID != "svc_requests" {
+			continue
+		}
+		createdDim = &dim
+		break
+	}
+	require.NotNil(t, createdDim)
+	assert.False(t, createdDim.Float)
+	update := findUpdateAction(plan)
+	require.NotNil(t, update)
+	require.Len(t, update.Values, 1)
+	assert.False(t, update.Values[0].IsFloat)
+	assert.Equal(t, int64(10), update.Values[0].Int64)
 }
 
 func TestBuildPlanAutogenStrictOverflowDrop(t *testing.T) {
@@ -1517,10 +1585,12 @@ groups:
             name_from_label: mode
             options:
               hidden: true
+              float: true
           - selector: m_b
             name_from_label: mode
             options:
               hidden: false
+              float: false
 `
 	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
 
@@ -1557,10 +1627,12 @@ groups:
 	require.NotNil(t, created)
 	assert.Equal(t, "total", created.Name)
 	assert.True(t, created.Hidden)
+	assert.True(t, created.Float)
 
 	update := findUpdateAction(plan)
 	require.NotNil(t, update)
 	require.Len(t, update.Values, 1)
+	assert.True(t, update.Values[0].IsFloat)
 	assert.Equal(t, "total", update.Values[0].Name)
 	assert.Equal(t, float64(8), update.Values[0].Float64)
 }

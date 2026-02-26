@@ -499,6 +499,7 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		Description: strings.TrimSpace(cfg.description),
 		ChartFamily: strings.TrimSpace(cfg.chartFamily),
 		Unit:        strings.TrimSpace(cfg.unit),
+		Float:       cfg.float,
 	}
 
 	var histogram *histogramSchema
@@ -563,6 +564,9 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		}
 		if cfg.unitSet && d.meta.Unit != metricMeta.Unit {
 			return nil, fmt.Errorf("metrix: metric unit mismatch for %s", name)
+		}
+		if cfg.floatSet && d.meta.Float != metricMeta.Float {
+			return nil, fmt.Errorf("metrix: metric float mismatch for %s", name)
 		}
 		return d, nil
 	}

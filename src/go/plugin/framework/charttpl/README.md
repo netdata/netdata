@@ -94,6 +94,7 @@ When multiple series share the same instance identity labels, they appear as dim
 | `options.multiplier` | int    | no       | DIM multiplier (`0` means default `1`)                         |
 | `options.divisor`    | int    | no       | DIM divisor (`0` means default `1`)                            |
 | `options.hidden`     | bool   | no       | Mark dimension hidden                                          |
+| `options.float`      | bool   | no       | Emit `type=float` and use `SETFLOAT` updates                   |
 
 **Selector syntax**: A selector takes the form `metric_name` or `metric_name{label=value, ...}`.
 The metric name prefix is required; label-only selectors like `{label=value}` are rejected.

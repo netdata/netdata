@@ -49,6 +49,8 @@ type Dimension struct {
 	Multiplier int
 	// Divisor maps to DIMENSION divisor option.
 	Divisor int
+	// Float maps to DIMENSION type=float option.
+	Float bool
 	// Dynamic is compile-derived and true when rendering can fan out by labels.
 	Dynamic bool
 }

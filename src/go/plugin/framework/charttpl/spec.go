@@ -94,9 +94,10 @@ type Dimension struct {
 	Options       *DimensionOptions `yaml:"options,omitempty" json:"options,omitempty"`
 }
 
-// DimensionOptions controls emitted DIMENSION options.
+// DimensionOptions controls DIMENSION options and update emission mode.
 type DimensionOptions struct {
 	Multiplier int  `yaml:"multiplier,omitempty" json:"multiplier,omitempty"`
 	Divisor    int  `yaml:"divisor,omitempty" json:"divisor,omitempty"`
 	Hidden     bool `yaml:"hidden,omitempty" json:"hidden,omitempty"`
+	Float      bool `yaml:"float,omitempty" json:"float,omitempty"`
 }

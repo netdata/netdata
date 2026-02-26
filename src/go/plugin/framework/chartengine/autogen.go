@@ -27,6 +27,7 @@ type autogenRoute struct {
 	family            string
 	contextName       string
 	staticDimension   bool
+	float             bool
 }
 
 type autogenSourceBuilder func(
@@ -99,6 +100,7 @@ func (e *Engine) resolveAutogenRoute(
 			Hidden:            false,
 			Multiplier:        1,
 			Divisor:           1,
+			Float:             route.float,
 			Static:            route.staticDimension,
 			Inferred:          false,
 			Autogen:           true,
@@ -188,6 +190,7 @@ func applyAutogenMetricMeta(route autogenRoute, meta metrix.MetricMeta, seriesMe
 		route.units = normalizeAutogenUnitByAlgorithm(unit, route.algorithm)
 		route.chartType = chartTypeFromUnits(route.units)
 	}
+	route.float = meta.Float
 	return route
 }
 

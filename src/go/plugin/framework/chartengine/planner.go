@@ -72,6 +72,7 @@ type InferredDimension struct {
 
 type dimensionState struct {
 	hidden     bool
+	float      bool
 	static     bool
 	order      int
 	algorithm  program.Algorithm
@@ -500,6 +501,7 @@ func (ctx *planBuildContext) accumulateRoute(
 		entry.value = value
 		entry.dimensionState = dimensionState{
 			hidden:     route.Hidden,
+			float:      route.Float,
 			static:     route.Static,
 			order:      route.DimensionIndex,
 			algorithm:  route.Algorithm,
@@ -510,6 +512,9 @@ func (ctx *planBuildContext) accumulateRoute(
 	} else {
 		if entry.hidden != route.Hidden {
 			// First-observed hidden flag wins within one build; conflicting routes are ignored.
+		}
+		if entry.float != route.Float {
+			// First-observed float flag wins within one build; conflicting routes are ignored.
 		}
 		entry.value += value
 	}
@@ -578,6 +583,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 					ChartMeta:  cs.meta,
 					Name:       name,
 					Hidden:     entry.hidden,
+					Float:      entry.float,
 					Algorithm:  entry.algorithm,
 					Multiplier: entry.multiplier,
 					Divisor:    entry.divisor,
@@ -593,7 +599,8 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 			if ok && entry != nil && entry.seenSeq == cs.currentBuildSeq {
 				values = append(values, UpdateDimensionValue{
 					Name:    name,
-					IsFloat: true,
+					IsFloat: entry.float,
+					Int64:   int64(entry.value),
 					Float64: entry.value,
 				})
 				continue
