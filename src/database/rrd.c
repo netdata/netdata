@@ -28,10 +28,11 @@ STRING *rrd_string_strdupz(const char *s) {
     if(unlikely(!s || !*s)) return string_strdupz(s);
 
     size_t len = strlen(s);
-    char *buf = mallocz(len + 1);
+    size_t dst_size = (len * 2) + 1;
+    char *buf = mallocz(dst_size);
 
     // Sanitize the string, preserving valid UTF-8
-    text_sanitize((unsigned char *)buf, (const unsigned char *)s, len + 1,
+    text_sanitize((unsigned char *)buf, (const unsigned char *)s, dst_size,
                   rrd_string_allowed_chars, true, "", NULL);
 
     STRING *result = string_strdupz(buf);

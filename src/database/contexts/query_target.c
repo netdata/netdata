@@ -1152,7 +1152,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
         );
 
     // Sanitize the query ID - safe because qt->id is ASCII-only (from snprintfz)
-    char buf[MAX_QUERY_TARGET_ID_LENGTH];
+    char buf[MAX_QUERY_TARGET_ID_LENGTH + 1];
     text_sanitize((unsigned char *)buf, (const unsigned char *)qt->id, sizeof(buf),
                   rrd_string_allowed_chars, true, "", NULL);
     strcpy(qt->id, buf);
