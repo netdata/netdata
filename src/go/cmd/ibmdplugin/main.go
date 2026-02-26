@@ -53,7 +53,13 @@ func init() {
 func main() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(s string, args ...interface{}) {}))
 
-	opts := parseCLI()
+	opts, err := parseCLI()
+	if err != nil {
+		if cli.IsHelp(err) {
+			os.Exit(0)
+		}
+		os.Exit(1)
+	}
 
 	if opts.Version {
 		fmt.Printf("%s.plugin, version: %s\n", executable.Name, buildinfo.Version)
@@ -153,7 +159,7 @@ type options struct {
 	MetricsAuditDataDir  string `long:"metrics-audit-data" description:"write structured metrics-audit artifacts for the selected module to the given directory"`
 }
 
-func parseCLI() *options {
+func parseCLI() (*options, error) {
 	opt := &options{
 		Option: cli.Option{
 			UpdateEvery: 1,
@@ -166,21 +172,16 @@ func parseCLI() *options {
 
 	rest, err := parser.ParseArgs(os.Args)
 	if err != nil {
-		if cli.IsHelp(err) {
-			os.Exit(0)
-		}
-		os.Exit(1)
+		return nil, err
 	}
 
 	if len(rest) > 1 {
-		updateEvery, convErr := strconv.Atoi(rest[1])
-		if convErr != nil {
-			os.Exit(1)
+		if opt.UpdateEvery, err = strconv.Atoi(rest[1]); err != nil {
+			return nil, err
 		}
-		opt.UpdateEvery = updateEvery
 	}
 
-	return opt
+	return opt, nil
 }
 
 func prepareMetricsAuditDataDir(path string, varLibDir string) (string, error) {
