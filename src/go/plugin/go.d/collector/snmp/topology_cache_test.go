@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/assert"
@@ -1106,6 +1108,7 @@ func TestTopologyCache_UpdateIfNameByIndex_StoresStatusWithoutIfName(t *testing.
 func TestBuildLocalTopologyDevice_IncludesSysContactVendorAndModel(t *testing.T) {
 	coll := &Collector{
 		Config: Config{Hostname: "10.0.0.1"},
+		vnode:  &vnodes.VirtualNode{GUID: "11111111-1111-1111-1111-111111111111"},
 		sysInfo: &snmputils.SysInfo{
 			SysObjectID: "1.3.6.1.4.1.9.1.1",
 			Name:        "sw1",
@@ -1125,6 +1128,9 @@ func TestBuildLocalTopologyDevice_IncludesSysContactVendorAndModel(t *testing.T)
 	require.Equal(t, "dc1", device.SysLocation)
 	require.Equal(t, "Cisco", device.Vendor)
 	require.Equal(t, "C9300-24T", device.Model)
+	require.Equal(t, "11111111-1111-1111-1111-111111111111", device.NetdataHostID)
+	require.Equal(t, topologyProfileChartIDPrefix, device.ChartIDPrefix)
+	require.Equal(t, topologyProfileChartContextPrefix, device.ChartContextPrefix)
 }
 
 func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
@@ -1137,19 +1143,38 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 					ChassisIDs:  []string{"00:11:22:33:44:55"},
 					IPAddresses: []string{"10.0.0.1"},
 				},
-				Attributes: map[string]any{},
+				Attributes: map[string]any{
+					"if_statuses": []map[string]any{
+						{
+							"if_index": 1,
+							"if_name":  "swp07",
+						},
+					},
+				},
 			},
 		},
 	}
 
 	local := topologyDevice{
-		ChassisID:   "00:11:22:33:44:55",
-		SysName:     "sw1",
-		SysDescr:    "Switch 1",
-		SysContact:  "ops@example.net",
-		SysLocation: "dc1",
-		Vendor:      "Cisco",
-		Model:       "C9300-24T",
+		ChassisID:          "00:11:22:33:44:55",
+		SysName:            "sw1",
+		SysDescr:           "Switch 1",
+		SysContact:         "ops@example.net",
+		SysLocation:        "dc1",
+		Vendor:             "Cisco",
+		Model:              "C9300-24T",
+		NetdataHostID:      "11111111-1111-1111-1111-111111111111",
+		ChartIDPrefix:      topologyProfileChartIDPrefix,
+		ChartContextPrefix: topologyProfileChartContextPrefix,
+		DeviceCharts: map[string]string{
+			"ping_rtt": "ping_rtt",
+		},
+		InterfaceCharts: map[string]topologyInterfaceChartRef{
+			"swp07": {
+				ChartIDSuffix:    "swp07",
+				AvailableMetrics: []string{"ifErrors", "ifTraffic"},
+			},
+		},
 	}
 
 	augmentLocalActorFromCache(&data, local)
@@ -1163,6 +1188,84 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 	require.Equal(t, "snmp", actor.Attributes["vendor_source"])
 	require.Equal(t, "high", actor.Attributes["vendor_confidence"])
 	require.Equal(t, "C9300-24T", actor.Attributes["model"])
+	require.Equal(t, "11111111-1111-1111-1111-111111111111", actor.Attributes["netdata_host_id"])
+	require.Equal(t, topologyProfileChartIDPrefix, actor.Attributes["chart_id_prefix"])
+	require.Equal(t, topologyProfileChartContextPrefix, actor.Attributes["chart_context_prefix"])
+
+	deviceCharts, ok := actor.Attributes["device_charts"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "ping_rtt", deviceCharts["ping_rtt"])
+
+	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
+	require.True(t, ok)
+	require.Len(t, statuses, 1)
+	require.Equal(t, "swp07", statuses[0]["chart_id_suffix"])
+	require.Equal(t, []string{"ifErrors", "ifTraffic"}, statuses[0]["available_metrics"])
+}
+
+func TestCollector_SyncTopologyChartReferences(t *testing.T) {
+	charts := &collectorapi.Charts{}
+	require.NoError(t, charts.Add(
+		&collectorapi.Chart{
+			ID:    "snmp_device_prof_sysUpTime",
+			Title: "System Uptime",
+			Units: "1",
+			Fam:   "sys",
+			Ctx:   "snmp.device_prof_sysUpTime",
+			Dims: collectorapi.Dims{
+				{ID: "snmp_device_prof_sysUpTime", Name: "sysUpTime"},
+			},
+		},
+		&collectorapi.Chart{
+			ID:    "snmp_device_prof_ifTraffic_swp07",
+			Title: "Traffic swp07",
+			Units: "bit/s",
+			Fam:   "ifTraffic",
+			Ctx:   "snmp.device_prof_ifTraffic",
+			Dims: collectorapi.Dims{
+				{ID: "snmp_device_prof_ifTraffic_swp07_in", Name: "in"},
+			},
+		},
+		&collectorapi.Chart{
+			ID:    "ping_rtt",
+			Title: "Ping round-trip time",
+			Units: "milliseconds",
+			Fam:   "Ping/RTT",
+			Ctx:   "snmp.device_ping_rtt",
+			Dims: collectorapi.Dims{
+				{ID: "ping_rtt_avg", Name: "avg"},
+			},
+		},
+	))
+
+	coll := &Collector{
+		charts:            charts,
+		seenScalarMetrics: map[string]bool{"sysUpTime": true},
+		ifaceCache:        newIfaceCache(),
+		topologyCache:     newTopologyCache(),
+		vnode:             &vnodes.VirtualNode{GUID: "11111111-1111-1111-1111-111111111111"},
+	}
+
+	coll.ifaceCache.interfaces["swp07"] = &ifaceEntry{
+		name: "swp07",
+		availableMetrics: map[string]struct{}{
+			"ifTraffic": {},
+			"ifErrors":  {},
+		},
+		updated: true,
+	}
+
+	coll.syncTopologyChartReferences()
+
+	local := coll.topologyCache.localDevice
+	require.Equal(t, "11111111-1111-1111-1111-111111111111", local.NetdataHostID)
+	require.Equal(t, topologyProfileChartIDPrefix, local.ChartIDPrefix)
+	require.Equal(t, topologyProfileChartContextPrefix, local.ChartContextPrefix)
+	require.Equal(t, "snmp_device_prof_sysUpTime", local.DeviceCharts["sysUpTime"])
+	require.Equal(t, "ping_rtt", local.DeviceCharts["ping_rtt"])
+	require.Contains(t, local.InterfaceCharts, "swp07")
+	require.Equal(t, "swp07", local.InterfaceCharts["swp07"].ChartIDSuffix)
+	require.Equal(t, []string{"ifTraffic"}, local.InterfaceCharts["swp07"].AvailableMetrics)
 }
 
 func actorHasAttributeList(snapshot topologyData, key string) bool {

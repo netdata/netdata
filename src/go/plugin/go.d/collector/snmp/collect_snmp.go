@@ -31,6 +31,7 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	c.collectTopologyVTPVLANContexts()
 
 	c.finalizeIfaceCache()
+	c.syncTopologyChartReferences()
 	c.finalizeTopologyCache()
 	c.collectTopologyMetrics(mx)
 
