@@ -6,34 +6,53 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func (da *Auditor) PrintReport() {
+	_ = da.flushWriteQueue(2 * time.Second)
+
+	type reportJob struct {
+		id  JobID
+		job *JobAnalysis
+	}
+
 	da.mu.RLock()
-	defer da.mu.RUnlock()
-
-	// Sort jobs for consistent output
-	var jobNames []string
-	for name := range da.jobs {
-		jobNames = append(jobNames, name)
+	jobs := make([]reportJob, 0, len(da.jobs))
+	for id, job := range da.jobs {
+		jobs = append(jobs, reportJob{id: id, job: job})
 	}
-	sort.Strings(jobNames)
+	writeErrorCount := da.writeErrorCount
+	writeErrors := append([]string(nil), da.writeErrors...)
+	da.mu.RUnlock()
 
-	for _, jobName := range jobNames {
-		job := da.jobs[jobName]
-		da.printJobAnalysis(job)
+	sort.Slice(jobs, func(i, j int) bool {
+		if jobs[i].id.Module == jobs[j].id.Module {
+			return jobs[i].id.Name < jobs[j].id.Name
+		}
+		return jobs[i].id.Module < jobs[j].id.Module
+	})
+
+	for _, entry := range jobs {
+		da.printJobAnalysis(entry.job)
 	}
+
+	da.printWriteErrorSummary(writeErrorCount, writeErrors)
 }
 
 // PrintSummary prints a consolidated summary across all jobs
 func (da *Auditor) PrintSummary() {
-	da.mu.RLock()
-	defer da.mu.RUnlock()
-
 	// First print the regular report
 	da.PrintReport()
+
+	da.mu.RLock()
+	jobs := make([]*JobAnalysis, 0, len(da.jobs))
+	for _, job := range da.jobs {
+		jobs = append(jobs, job)
+	}
+	da.mu.RUnlock()
 
 	// Then print the consolidated summary
 	fmt.Println("\n" + strings.Repeat("═", 80))
@@ -56,7 +75,8 @@ func (da *Auditor) PrintSummary() {
 
 	contextMap := make(map[string]*contextSummary) // context -> summary
 
-	for jobName, job := range da.jobs {
+	for _, job := range jobs {
+		jobLabel := fmt.Sprintf("%s[%s]", job.Module, job.Name)
 		for i := range job.Charts {
 			ca := &job.Charts[i]
 
@@ -104,7 +124,7 @@ func (da *Auditor) PrintSummary() {
 
 			// Update instance count and job tracking
 			contextMap[ctx].instances++
-			contextMap[ctx].jobs[jobName] = true
+			contextMap[ctx].jobs[jobLabel] = true
 
 			// Update label keys and dimension names if needed
 			for _, label := range ca.Chart.Labels {
@@ -219,6 +239,23 @@ func (da *Auditor) PrintSummary() {
 	// Add a bottom border for the last family
 	if len(families) > 0 {
 		fmt.Println("└─────────────────────────────────────────────────────────────")
+	}
+}
+
+func (da *Auditor) printWriteErrorSummary(count int, samples []string) {
+	if count == 0 {
+		return
+	}
+
+	fmt.Println("\n" + strings.Repeat("═", 80))
+	fmt.Printf("CAPTURE WRITE ERRORS: %d (showing up to %d)\n", count, len(samples))
+	fmt.Println(strings.Repeat("═", 80))
+
+	for _, msg := range samples {
+		fmt.Printf("⚠️ %s\n", msg)
+	}
+	if remaining := count - len(samples); remaining > 0 {
+		fmt.Printf("... %d additional write errors omitted\n", remaining)
 	}
 }
 
@@ -1426,8 +1463,25 @@ func (da *Auditor) PrintDebugInfo() {
 	fmt.Println("\n\nDEBUG INFORMATION:")
 	fmt.Println(strings.Repeat("-", 80))
 
-	for jobName, job := range da.jobs {
-		fmt.Printf("\n[%s] Chart Structure:\n", jobName)
+	type debugEntry struct {
+		id  JobID
+		job *JobAnalysis
+	}
+
+	entries := make([]debugEntry, 0, len(da.jobs))
+	for id, job := range da.jobs {
+		entries = append(entries, debugEntry{id: id, job: job})
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].id.Module == entries[j].id.Module {
+			return entries[i].id.Name < entries[j].id.Name
+		}
+		return entries[i].id.Module < entries[j].id.Module
+	})
+
+	for _, entry := range entries {
+		job := entry.job
+		fmt.Printf("\n[%s][%s] Chart Structure:\n", entry.id.Module, entry.id.Name)
 
 		for _, ca := range job.Charts {
 			fmt.Printf("\nChart ID: %s\n", ca.Chart.ID)

@@ -9,16 +9,44 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
+const (
+	writeQueueSize       = 256
+	maxWriteErrorSamples = 10
+)
+
+// JobID identifies a job uniquely across modules.
+type JobID struct {
+	Module string
+	Name   string
+}
+
+func newJobID(moduleName, jobName string) JobID {
+	return JobID{
+		Module: moduleName,
+		Name:   jobName,
+	}
+}
+
+type writeTask struct {
+	label string
+	run   func() error
+	after func()
+	flush chan struct{}
+}
+
 // Auditor collects and analyzes metric structure from dump mode
 type Auditor struct {
-	mu         sync.RWMutex
-	jobs       map[string]*JobAnalysis // key: job name
-	startTime  time.Time
-	dataDir    string
-	jobDirs    map[string]string
-	jobDone    map[string]bool
-	onComplete func()
-	completed  bool
+	mu              sync.RWMutex
+	jobs            map[JobID]*JobAnalysis
+	startTime       time.Time
+	dataDir         string
+	jobDirs         map[JobID]string
+	jobDone         map[JobID]bool
+	onComplete      func()
+	completed       bool
+	writeCh         chan writeTask
+	writeErrorCount int
+	writeErrors     []string
 }
 
 // JobAnalysis holds analysis for a single job
@@ -41,9 +69,9 @@ type ChartAnalysis struct {
 // New creates a new dump analyzer
 func New() *Auditor {
 	return &Auditor{
-		jobs:      make(map[string]*JobAnalysis),
+		jobs:      make(map[JobID]*JobAnalysis),
 		startTime: time.Now(),
-		jobDirs:   make(map[string]string),
-		jobDone:   make(map[string]bool),
+		jobDirs:   make(map[JobID]string),
+		jobDone:   make(map[JobID]bool),
 	}
 }

@@ -8,8 +8,8 @@ import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 type Analyzer interface {
 	RegisterJob(jobName, moduleName, dir string)
 	RecordJobStructure(jobName, moduleName string, charts *collectorapi.Charts)
-	UpdateJobStructure(jobName string, charts *collectorapi.Charts)
-	RecordCollection(jobName string, mx map[string]int64)
+	UpdateJobStructure(jobName, moduleName string, charts *collectorapi.Charts)
+	RecordCollection(jobName, moduleName string, mx map[string]int64)
 }
 
 // Capturable marks collectors that can emit additional capture artifacts.

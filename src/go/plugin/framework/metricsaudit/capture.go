@@ -13,167 +13,117 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
+type manifestJob struct {
+	Name        string `json:"name"`
+	Module      string `json:"module"`
+	Directory   string `json:"directory"`
+	Collections int    `json:"collections"`
+}
+
+type manifestPayload struct {
+	GeneratedAt time.Time     `json:"generated_at"`
+	Jobs        []manifestJob `json:"jobs"`
+}
+
 func (da *Auditor) EnableDataCapture(dir string, onComplete func()) {
 	da.mu.Lock()
 	defer da.mu.Unlock()
+
 	da.dataDir = dir
 	da.onComplete = onComplete
+	if dir == "" || da.writeCh != nil {
+		return
+	}
+
+	da.writeCh = make(chan writeTask, writeQueueSize)
+	go da.runWriter(da.writeCh)
+}
+
+func (da *Auditor) runWriter(ch <-chan writeTask) {
+	for task := range ch {
+		if task.flush != nil {
+			close(task.flush)
+			continue
+		}
+
+		if task.run != nil {
+			if err := task.run(); err != nil {
+				da.recordWriteError(fmt.Errorf("%s: %w", task.label, err))
+			}
+		}
+
+		if task.after != nil {
+			task.after()
+		}
+	}
 }
 
 // RegisterJob registers directory info for a job.
 func (da *Auditor) RegisterJob(jobName, moduleName, dir string) {
+	id := newJobID(moduleName, jobName)
+
 	da.mu.Lock()
-	defer da.mu.Unlock()
+	if da.jobDirs == nil {
+		da.jobDirs = make(map[JobID]string)
+	}
+	da.jobDirs[id] = dir
+	if da.jobDone == nil {
+		da.jobDone = make(map[JobID]bool)
+	}
+	da.jobDone[id] = false
+	da.mu.Unlock()
+
 	if dir == "" {
 		return
 	}
-	if da.jobDirs == nil {
-		da.jobDirs = make(map[string]string)
+
+	for _, sub := range []string{"queries", "rows", "metrics", "meta"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			da.recordWriteError(fmt.Errorf("prepare %s directory for %s[%s]: %w", sub, moduleName, jobName, err))
+		}
 	}
-	da.jobDirs[jobName] = dir
-	if da.jobDone == nil {
-		da.jobDone = make(map[string]bool)
-	}
-	da.jobDone[jobName] = false
-	// Ensure expected sub-directories exist
-	_ = os.MkdirAll(filepath.Join(dir, "queries"), 0o755)
-	_ = os.MkdirAll(filepath.Join(dir, "rows"), 0o755)
-	_ = os.MkdirAll(filepath.Join(dir, "metrics"), 0o755)
-	_ = os.MkdirAll(filepath.Join(dir, "meta"), 0o755)
 }
 
-// RecordJobStructure records the initial chart structure for a job
+// RecordJobStructure records the initial chart structure for a job.
 func (da *Auditor) RecordJobStructure(jobName, moduleName string, charts *collectorapi.Charts) {
-	da.mu.Lock()
-	defer da.mu.Unlock()
+	if charts == nil {
+		return
+	}
 
 	job := &JobAnalysis{
 		Name:           jobName,
 		Module:         moduleName,
-		Charts:         make([]ChartAnalysis, 0),
+		Charts:         make([]ChartAnalysis, 0, len(*charts)),
 		AllSeenMetrics: make(map[string]bool),
 	}
 
-	// Copy chart structure
 	for _, chart := range *charts {
 		ca := ChartAnalysis{
 			Chart:           chart,
 			CollectedValues: make(map[string][]int64),
 			SeenDimensions:  make(map[string]bool),
 		}
-
-		// Initialize dimension tracking
 		for _, dim := range chart.Dims {
 			ca.CollectedValues[dim.ID] = make([]int64, 0)
 			ca.SeenDimensions[dim.ID] = false
 		}
-
 		job.Charts = append(job.Charts, ca)
 	}
 
-	da.jobs[jobName] = job
-	da.writeJobMetadata(jobName, moduleName)
-}
+	id := newJobID(moduleName, jobName)
+	var dir string
+	var captureEnabled bool
 
-// UpdateJobStructure updates the chart structure for a job with current charts
-// This is needed for collectors that create charts dynamically during collection
-func (da *Auditor) UpdateJobStructure(jobName string, charts *collectorapi.Charts) {
 	da.mu.Lock()
-	defer da.mu.Unlock()
+	da.jobs[id] = job
+	dir = da.jobDirs[id]
+	captureEnabled = da.dataDir != "" && dir != ""
+	da.mu.Unlock()
 
-	job, exists := da.jobs[jobName]
-	if !exists {
-		return // Job not found, cannot update
-	}
-
-	// Create a map of existing chart data to preserve collected values
-	existingCharts := make(map[string]*ChartAnalysis)
-	for i := range job.Charts {
-		existingCharts[job.Charts[i].Chart.ID] = &job.Charts[i]
-	}
-
-	// Rebuild chart list while preserving existing data
-	job.Charts = make([]ChartAnalysis, 0)
-
-	// Copy current chart structure
-	for _, chart := range *charts {
-		var ca ChartAnalysis
-
-		// Check if we have existing data for this chart
-		if existing, exists := existingCharts[chart.ID]; exists {
-			// Preserve existing chart analysis but update the chart reference
-			ca = *existing
-			ca.Chart = chart
-
-			// Add any new dimensions that weren't tracked before
-			for _, dim := range chart.Dims {
-				if _, tracked := ca.CollectedValues[dim.ID]; !tracked {
-					ca.CollectedValues[dim.ID] = make([]int64, 0)
-					ca.SeenDimensions[dim.ID] = false
-				}
-			}
-		} else {
-			// New chart - create fresh tracking
-			ca = ChartAnalysis{
-				Chart:           chart,
-				CollectedValues: make(map[string][]int64),
-				SeenDimensions:  make(map[string]bool),
-			}
-
-			// Initialize dimension tracking
-			for _, dim := range chart.Dims {
-				ca.CollectedValues[dim.ID] = make([]int64, 0)
-				ca.SeenDimensions[dim.ID] = false
-			}
-		}
-
-		job.Charts = append(job.Charts, ca)
-	}
-}
-
-// RecordCollection records collected metrics directly from structured data
-func (da *Auditor) RecordCollection(jobName string, mx map[string]int64) {
-	da.mu.Lock()
-	defer da.mu.Unlock()
-
-	job, exists := da.jobs[jobName]
-	if !exists {
+	if !captureEnabled {
 		return
 	}
 
-	job.CollectionCount++
-	job.LastCollection = time.Now()
-
-	// Track ALL metrics in mx map
-	for metricID := range mx {
-		job.AllSeenMetrics[metricID] = true
-	}
-
-	// Record values for each chart
-	for i := range job.Charts {
-		ca := &job.Charts[i]
-
-		// Check each dimension in this chart
-		for _, dim := range ca.Chart.Dims {
-			if value, collected := mx[dim.ID]; collected {
-				ca.SeenDimensions[dim.ID] = true
-				ca.CollectedValues[dim.ID] = append(ca.CollectedValues[dim.ID], value)
-			}
-		}
-	}
-
-	da.writeMetrics(jobName, job.CollectionCount, mx)
-	da.markJobCollected(jobName)
-}
-
-func (da *Auditor) writeJobMetadata(jobName, moduleName string) {
-	if da.dataDir == "" {
-		return
-	}
-	dir, ok := da.jobDirs[jobName]
-	if !ok || dir == "" {
-		return
-	}
 	meta := struct {
 		Job      string            `json:"job"`
 		Module   string            `json:"module"`
@@ -188,86 +138,290 @@ func (da *Auditor) writeJobMetadata(jobName, moduleName string) {
 		},
 	}
 	path := filepath.Join(dir, "meta", "job.json")
-	_ = writeJSON(path, meta)
+	da.enqueueJSONWrite(
+		fmt.Sprintf("write metadata for %s[%s]", moduleName, jobName),
+		path,
+		meta,
+		nil,
+	)
 }
 
-func (da *Auditor) writeMetrics(jobName string, seq int, mx map[string]int64) {
-	if da.dataDir == "" {
+// UpdateJobStructure updates the chart structure for a job with current charts.
+// This is needed for collectors that create charts dynamically during collection.
+func (da *Auditor) UpdateJobStructure(jobName, moduleName string, charts *collectorapi.Charts) {
+	if charts == nil {
 		return
 	}
-	dir, ok := da.jobDirs[jobName]
-	if !ok || dir == "" {
+
+	id := newJobID(moduleName, jobName)
+
+	da.mu.Lock()
+	defer da.mu.Unlock()
+
+	job, exists := da.jobs[id]
+	if !exists {
 		return
 	}
-	metricsDir := filepath.Join(dir, "metrics")
-	_ = os.MkdirAll(metricsDir, 0o755)
-	payload := struct {
-		CollectedAt time.Time        `json:"collected_at"`
-		Metrics     map[string]int64 `json:"metrics"`
-	}{
-		CollectedAt: time.Now(),
-		Metrics:     mx,
+
+	existingCharts := make(map[string]*ChartAnalysis)
+	for i := range job.Charts {
+		existingCharts[job.Charts[i].Chart.ID] = &job.Charts[i]
 	}
-	filename := fmt.Sprintf("metrics-%04d.json", seq)
-	path := filepath.Join(metricsDir, filename)
-	_ = writeJSON(path, payload)
+
+	job.Charts = make([]ChartAnalysis, 0, len(*charts))
+	for _, chart := range *charts {
+		var ca ChartAnalysis
+		if existing, ok := existingCharts[chart.ID]; ok {
+			ca = *existing
+			ca.Chart = chart
+			for _, dim := range chart.Dims {
+				if _, tracked := ca.CollectedValues[dim.ID]; !tracked {
+					ca.CollectedValues[dim.ID] = make([]int64, 0)
+					ca.SeenDimensions[dim.ID] = false
+				}
+			}
+		} else {
+			ca = ChartAnalysis{
+				Chart:           chart,
+				CollectedValues: make(map[string][]int64),
+				SeenDimensions:  make(map[string]bool),
+			}
+			for _, dim := range chart.Dims {
+				ca.CollectedValues[dim.ID] = make([]int64, 0)
+				ca.SeenDimensions[dim.ID] = false
+			}
+		}
+		job.Charts = append(job.Charts, ca)
+	}
 }
 
-func (da *Auditor) markJobCollected(jobName string) {
-	if da.dataDir == "" {
+// RecordCollection records collected metrics directly from structured data.
+func (da *Auditor) RecordCollection(jobName, moduleName string, mx map[string]int64) {
+	if mx == nil {
 		return
 	}
+
+	id := newJobID(moduleName, jobName)
+
+	var seq int
+	var metricsDir string
+	var metricsPath string
+	var captureEnabled bool
+	var manifest *manifestPayload
+	var onComplete func()
+
+	da.mu.Lock()
+	job, exists := da.jobs[id]
+	if !exists {
+		da.mu.Unlock()
+		return
+	}
+
+	job.CollectionCount++
+	job.LastCollection = time.Now()
+	seq = job.CollectionCount
+
+	for metricID := range mx {
+		job.AllSeenMetrics[metricID] = true
+	}
+
+	for i := range job.Charts {
+		ca := &job.Charts[i]
+		for _, dim := range ca.Chart.Dims {
+			if value, collected := mx[dim.ID]; collected {
+				ca.SeenDimensions[dim.ID] = true
+				ca.CollectedValues[dim.ID] = append(ca.CollectedValues[dim.ID], value)
+			}
+		}
+	}
+
+	if dir := da.jobDirs[id]; da.dataDir != "" && dir != "" {
+		captureEnabled = true
+		metricsDir = filepath.Join(dir, "metrics")
+		metricsPath = filepath.Join(metricsDir, fmt.Sprintf("metrics-%04d.json", seq))
+	}
+
+	manifest, onComplete = da.markJobCollectedLocked(id)
+	da.mu.Unlock()
+
+	if captureEnabled {
+		payload := struct {
+			CollectedAt time.Time        `json:"collected_at"`
+			Metrics     map[string]int64 `json:"metrics"`
+		}{
+			CollectedAt: time.Now(),
+			Metrics:     cloneIntMetrics(mx),
+		}
+
+		da.enqueueWriteTask(writeTask{
+			label: fmt.Sprintf("write metrics snapshot for %s[%s]", moduleName, jobName),
+			run: func() error {
+				if err := os.MkdirAll(metricsDir, 0o755); err != nil {
+					return err
+				}
+				return writeJSON(metricsPath, payload)
+			},
+		})
+	}
+
+	da.handleCompletionWrite(manifest, onComplete)
+}
+
+func (da *Auditor) handleCompletionWrite(manifest *manifestPayload, onComplete func()) {
+	if onComplete == nil {
+		return
+	}
+	if manifest == nil {
+		go onComplete()
+		return
+	}
+
+	da.mu.RLock()
+	manifestPath := filepath.Join(da.dataDir, "manifest.json")
+	da.mu.RUnlock()
+
+	enqueued := da.enqueueJSONWrite("write audit manifest", manifestPath, manifest, func() {
+		go onComplete()
+	})
+	if !enqueued {
+		go onComplete()
+	}
+}
+
+func (da *Auditor) markJobCollectedLocked(id JobID) (*manifestPayload, func()) {
 	if da.jobDone == nil {
-		return
+		return nil, nil
 	}
-	da.jobDone[jobName] = true
-	for job, dir := range da.jobDirs {
+	if _, tracked := da.jobDone[id]; !tracked {
+		return nil, nil
+	}
+
+	da.jobDone[id] = true
+	for jobID, dir := range da.jobDirs {
 		if dir == "" {
 			continue
 		}
-		if !da.jobDone[job] {
-			return
+		if !da.jobDone[jobID] {
+			return nil, nil
 		}
 	}
+
 	if da.completed {
-		return
+		return nil, nil
 	}
 	da.completed = true
-	da.writeManifest()
-	if da.onComplete != nil {
-		go da.onComplete()
+	if da.dataDir == "" {
+		return nil, da.onComplete
 	}
+
+	manifest := da.buildManifestLocked()
+	return &manifest, da.onComplete
 }
 
-func (da *Auditor) writeManifest() {
-	if da.dataDir == "" {
-		return
-	}
-	type manifestJob struct {
-		Name        string `json:"name"`
-		Module      string `json:"module"`
-		Directory   string `json:"directory"`
-		Collections int    `json:"collections"`
-	}
-	var jobs []manifestJob
-	for name, job := range da.jobs {
-		dir := da.jobDirs[name]
+func (da *Auditor) buildManifestLocked() manifestPayload {
+	jobs := make([]manifestJob, 0, len(da.jobs))
+	for id, job := range da.jobs {
+		dir := da.jobDirs[id]
 		jobs = append(jobs, manifestJob{
-			Name:        name,
-			Module:      job.Module,
+			Name:        id.Name,
+			Module:      id.Module,
 			Directory:   dir,
 			Collections: job.CollectionCount,
 		})
 	}
-	sort.Slice(jobs, func(i, j int) bool { return jobs[i].Name < jobs[j].Name })
-	manifest := struct {
-		GeneratedAt time.Time     `json:"generated_at"`
-		Jobs        []manifestJob `json:"jobs"`
-	}{
+
+	sort.Slice(jobs, func(i, j int) bool {
+		if jobs[i].Module == jobs[j].Module {
+			return jobs[i].Name < jobs[j].Name
+		}
+		return jobs[i].Module < jobs[j].Module
+	})
+
+	return manifestPayload{
 		GeneratedAt: time.Now(),
 		Jobs:        jobs,
 	}
-	_ = writeJSON(filepath.Join(da.dataDir, "manifest.json"), manifest)
+}
+
+func (da *Auditor) enqueueJSONWrite(label, path string, payload any, after func()) bool {
+	return da.enqueueWriteTask(writeTask{
+		label: label,
+		run: func() error {
+			return writeJSON(path, payload)
+		},
+		after: after,
+	})
+}
+
+func (da *Auditor) enqueueWriteTask(task writeTask) bool {
+	da.mu.RLock()
+	ch := da.writeCh
+	da.mu.RUnlock()
+	if ch == nil {
+		return false
+	}
+
+	select {
+	case ch <- task:
+		return true
+	default:
+		da.recordWriteError(fmt.Errorf("%s: write queue is full", task.label))
+		return false
+	}
+}
+
+func (da *Auditor) flushWriteQueue(timeout time.Duration) bool {
+	da.mu.RLock()
+	ch := da.writeCh
+	da.mu.RUnlock()
+	if ch == nil {
+		return true
+	}
+
+	ack := make(chan struct{})
+	task := writeTask{flush: ack}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case ch <- task:
+	case <-timer.C:
+		da.recordWriteError(fmt.Errorf("flush write queue: timed out while enqueueing sentinel"))
+		return false
+	}
+
+	timer.Reset(timeout)
+	select {
+	case <-ack:
+		return true
+	case <-timer.C:
+		da.recordWriteError(fmt.Errorf("flush write queue: timed out waiting for sentinel"))
+		return false
+	}
+}
+
+func (da *Auditor) recordWriteError(err error) {
+	if err == nil {
+		return
+	}
+
+	da.mu.Lock()
+	defer da.mu.Unlock()
+	da.writeErrorCount++
+	if len(da.writeErrors) < maxWriteErrorSamples {
+		da.writeErrors = append(da.writeErrors, err.Error())
+	}
+}
+
+func cloneIntMetrics(mx map[string]int64) map[string]int64 {
+	if len(mx) == 0 {
+		return map[string]int64{}
+	}
+	out := make(map[string]int64, len(mx))
+	for k, v := range mx {
+		out[k] = v
+	}
+	return out
 }
 
 func writeJSON(path string, payload any) error {
@@ -277,5 +431,3 @@ func writeJSON(path string, payload any) error {
 	}
 	return os.WriteFile(path, data, 0o644)
 }
-
-// contextInfo holds information about a context within a family

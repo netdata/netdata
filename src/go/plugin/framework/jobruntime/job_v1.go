@@ -481,7 +481,7 @@ func (j *Job) collect() collectedMetrics {
 	// Record collected metrics for dump mode
 	// TODO: The dump analyzer only records intMetrics but ignores floatMetrics
 	if j.dumpMode && j.dumpAnalyzer != nil && mx.intMetrics != nil {
-		j.dumpAnalyzer.RecordCollection(j.name, mx.intMetrics)
+		j.dumpAnalyzer.RecordCollection(j.name, j.moduleName, mx.intMetrics)
 	}
 
 	return mx
@@ -560,7 +560,7 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 
 	// Update dump analyzer with current chart structure for dynamic collectors
 	if j.dumpMode && j.dumpAnalyzer != nil {
-		j.dumpAnalyzer.UpdateJobStructure(j.name, j.charts)
+		j.dumpAnalyzer.UpdateJobStructure(j.name, j.moduleName, j.charts)
 	}
 
 	intMx := collectedMetrics{intMetrics: map[string]int64{"success": oldmetrix.Bool(updated > 0), "failed": oldmetrix.Bool(updated == 0)}}
