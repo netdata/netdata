@@ -155,6 +155,11 @@ const (
 	tagTopologyContextVLANName = "_topology_context_vlan_name"
 )
 
+const (
+	topologyProfileChartIDPrefix      = "snmp_device_prof_"
+	topologyProfileChartContextPrefix = "snmp.device_prof_"
+)
+
 var lldpChassisIDSubtypeMap = map[string]string{
 	"1": "chassisComponent",
 	"2": "interfaceAlias",
@@ -471,6 +476,119 @@ func (c *Collector) finalizeTopologyCache() {
 	c.topologyCache.lastUpdate = c.topologyCache.updateTime
 }
 
+func (c *Collector) syncTopologyChartReferences() {
+	if c == nil || c.topologyCache == nil {
+		return
+	}
+
+	deviceCharts := c.collectLocalDeviceCharts()
+	interfaceCharts := c.collectLocalInterfaceCharts()
+
+	c.topologyCache.mu.Lock()
+	defer c.topologyCache.mu.Unlock()
+
+	local := c.topologyCache.localDevice
+	if local.ChartIDPrefix == "" {
+		local.ChartIDPrefix = topologyProfileChartIDPrefix
+	}
+	if local.ChartContextPrefix == "" {
+		local.ChartContextPrefix = topologyProfileChartContextPrefix
+	}
+	if c.vnode != nil && strings.TrimSpace(c.vnode.GUID) != "" {
+		local.NetdataHostID = strings.TrimSpace(c.vnode.GUID)
+	}
+	local.DeviceCharts = deviceCharts
+	local.InterfaceCharts = interfaceCharts
+	c.topologyCache.localDevice = local
+}
+
+func (c *Collector) collectLocalDeviceCharts() map[string]string {
+	if c == nil || c.charts == nil {
+		return nil
+	}
+
+	out := make(map[string]string)
+	staticCharts := map[string]string{
+		"ping_rtt":         "ping_rtt",
+		"ping_rtt_stddev":  "ping_rtt_stddev",
+		"topology_devices": "topology_devices",
+		"topology_links":   "topology_links",
+	}
+	for semantic, chartID := range staticCharts {
+		if c.chartExists(chartID) {
+			out[semantic] = chartID
+		}
+	}
+	for metricName := range c.seenScalarMetrics {
+		metricName = strings.TrimSpace(metricName)
+		if metricName == "" {
+			continue
+		}
+		chartID := topologyProfileChartIDPrefix + cleanMetricName.Replace(metricName)
+		if c.chartExists(chartID) {
+			out[metricName] = chartID
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func (c *Collector) collectLocalInterfaceCharts() map[string]topologyInterfaceChartRef {
+	if c == nil || c.ifaceCache == nil {
+		return nil
+	}
+
+	c.ifaceCache.mu.RLock()
+	defer c.ifaceCache.mu.RUnlock()
+
+	out := make(map[string]topologyInterfaceChartRef)
+	for _, entry := range c.ifaceCache.interfaces {
+		if entry == nil {
+			continue
+		}
+		suffix := strings.TrimSpace(entry.name)
+		if suffix == "" {
+			continue
+		}
+
+		availableMetrics := make([]string, 0, len(entry.availableMetrics))
+		for metricName := range entry.availableMetrics {
+			metricName = strings.TrimSpace(metricName)
+			if metricName == "" {
+				continue
+			}
+			chartID := topologyProfileChartIDPrefix + cleanMetricName.Replace(metricName+"_"+suffix)
+			if c.chartExists(chartID) {
+				availableMetrics = append(availableMetrics, metricName)
+			}
+		}
+		sort.Strings(availableMetrics)
+		if len(availableMetrics) == 0 {
+			continue
+		}
+
+		out[suffix] = topologyInterfaceChartRef{
+			ChartIDSuffix:    suffix,
+			AvailableMetrics: deduplicateSortedStrings(availableMetrics),
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func (c *Collector) chartExists(chartID string) bool {
+	if c == nil || c.charts == nil {
+		return false
+	}
+	chart := c.charts.Get(strings.TrimSpace(chartID))
+	return chart != nil && !chart.Obsolete
+}
+
 func isTopologyMetric(name string) bool {
 	switch name {
 	case metricLldpLocPortEntry, metricLldpLocManAddrEntry, metricLldpRemEntry, metricLldpRemManAddrEntry, metricLldpRemManAddrCompat, metricCdpCacheEntry,
@@ -493,7 +611,9 @@ func resolveTopologyAgentID(c *Collector) string {
 
 func buildLocalTopologyDevice(c *Collector) topologyDevice {
 	device := topologyDevice{
-		ManagementIP: c.Hostname,
+		ManagementIP:       c.Hostname,
+		ChartIDPrefix:      topologyProfileChartIDPrefix,
+		ChartContextPrefix: topologyProfileChartContextPrefix,
 	}
 
 	if c.sysInfo == nil {
@@ -515,6 +635,7 @@ func buildLocalTopologyDevice(c *Collector) topologyDevice {
 
 	if c.vnode != nil {
 		device.AgentID = c.vnode.GUID
+		device.NetdataHostID = c.vnode.GUID
 	}
 
 	return device
@@ -1884,6 +2005,23 @@ func augmentLocalActorFromCache(data *topologyData, local topologyDevice) {
 		if managementIP := normalizeIPAddress(local.ManagementIP); managementIP != "" {
 			attrs["management_ip"] = managementIP
 		}
+		if netdataHostID := strings.TrimSpace(local.NetdataHostID); netdataHostID != "" {
+			attrs["netdata_host_id"] = netdataHostID
+		}
+		if chartIDPrefix := strings.TrimSpace(local.ChartIDPrefix); chartIDPrefix != "" {
+			attrs["chart_id_prefix"] = chartIDPrefix
+		}
+		if chartContextPrefix := strings.TrimSpace(local.ChartContextPrefix); chartContextPrefix != "" {
+			attrs["chart_context_prefix"] = chartContextPrefix
+		}
+		if len(local.DeviceCharts) > 0 {
+			attrs["device_charts"] = mapStringStringToAny(local.DeviceCharts)
+		}
+		if len(local.InterfaceCharts) > 0 {
+			if statuses, ok := attrs["if_statuses"]; ok && statuses != nil {
+				attrs["if_statuses"] = enrichTopologyInterfaceStatusesWithChartRefs(statuses, local.InterfaceCharts)
+			}
+		}
 
 		actor.Attributes = pruneNilAttributes(attrs)
 		if actor.Labels == nil {
@@ -2191,7 +2329,99 @@ func pruneNilAttributes(attrs map[string]any) map[string]any {
 	return attrs
 }
 
+func mapStringStringToAny(in map[string]string) map[string]any {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(in))
+	for key, value := range in {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		out[key] = value
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func enrichTopologyInterfaceStatusesWithChartRefs(
+	statuses any,
+	interfaceCharts map[string]topologyInterfaceChartRef,
+) any {
+	if len(interfaceCharts) == 0 || statuses == nil {
+		return statuses
+	}
+
+	lookup := make(map[string]topologyInterfaceChartRef, len(interfaceCharts))
+	for ifName, ref := range interfaceCharts {
+		ifName = strings.ToLower(strings.TrimSpace(ifName))
+		if ifName == "" {
+			continue
+		}
+		if strings.TrimSpace(ref.ChartIDSuffix) == "" {
+			ref.ChartIDSuffix = ifName
+		}
+		ref.AvailableMetrics = deduplicateSortedStrings(ref.AvailableMetrics)
+		lookup[ifName] = ref
+	}
+	if len(lookup) == 0 {
+		return statuses
+	}
+
+	switch typed := statuses.(type) {
+	case []map[string]any:
+		for _, status := range typed {
+			ifName := strings.ToLower(strings.TrimSpace(fmt.Sprint(status["if_name"])))
+			if ifName == "" {
+				continue
+			}
+			ref, ok := lookup[ifName]
+			if !ok {
+				continue
+			}
+			status["chart_id_suffix"] = ref.ChartIDSuffix
+			if len(ref.AvailableMetrics) > 0 {
+				status["available_metrics"] = ref.AvailableMetrics
+			}
+		}
+		return typed
+	case []any:
+		for i := range typed {
+			status, ok := typed[i].(map[string]any)
+			if !ok || status == nil {
+				continue
+			}
+			ifName := strings.ToLower(strings.TrimSpace(fmt.Sprint(status["if_name"])))
+			if ifName == "" {
+				continue
+			}
+			ref, ok := lookup[ifName]
+			if !ok {
+				continue
+			}
+			status["chart_id_suffix"] = ref.ChartIDSuffix
+			if len(ref.AvailableMetrics) > 0 {
+				status["available_metrics"] = ref.AvailableMetrics
+			}
+			typed[i] = status
+		}
+		return typed
+	default:
+		return statuses
+	}
+}
+
 func normalizeTopologyDevice(dev topologyDevice) topologyDevice {
+	if dev.ChartIDPrefix == "" {
+		dev.ChartIDPrefix = topologyProfileChartIDPrefix
+	}
+	if dev.ChartContextPrefix == "" {
+		dev.ChartContextPrefix = topologyProfileChartContextPrefix
+	}
 	if dev.ManagementIP == "" && len(dev.ManagementAddresses) > 0 {
 		if ip := pickManagementIP(dev.ManagementAddresses); ip != "" {
 			dev.ManagementIP = ip
@@ -2233,6 +2463,30 @@ func ensureLabels(labels map[string]string) map[string]string {
 		return make(map[string]string)
 	}
 	return labels
+}
+
+func deduplicateSortedStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func appendManagementAddress(addrs []topologyManagementAddress, addr topologyManagementAddress) []topologyManagementAddress {

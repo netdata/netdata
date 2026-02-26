@@ -23,25 +23,35 @@ type topologyManagementAddress struct {
 	Source      string `json:"source,omitempty"`
 }
 
+type topologyInterfaceChartRef struct {
+	ChartIDSuffix    string   `json:"chart_id_suffix,omitempty"`
+	AvailableMetrics []string `json:"available_metrics,omitempty"`
+}
+
 type topologyDevice struct {
-	ChassisID             string                      `json:"chassis_id"`
-	ChassisIDType         string                      `json:"chassis_id_type"`
-	SysObjectID           string                      `json:"sys_object_id,omitempty"`
-	SysName               string                      `json:"sys_name,omitempty"`
-	SysDescr              string                      `json:"sys_descr,omitempty"`
-	SysContact            string                      `json:"sys_contact,omitempty"`
-	SysLocation           string                      `json:"sys_location,omitempty"`
-	ManagementIP          string                      `json:"management_ip,omitempty"`
-	ManagementAddresses   []topologyManagementAddress `json:"management_addresses,omitempty"`
-	AgentID               string                      `json:"agent_id,omitempty"`
-	AgentJobID            string                      `json:"agent_job_id,omitempty"`
-	Vendor                string                      `json:"vendor,omitempty"`
-	Model                 string                      `json:"model,omitempty"`
-	Capabilities          []string                    `json:"capabilities,omitempty"`
-	CapabilitiesSupported []string                    `json:"capabilities_supported,omitempty"`
-	CapabilitiesEnabled   []string                    `json:"capabilities_enabled,omitempty"`
-	Labels                map[string]string           `json:"labels,omitempty"`
-	Discovered            bool                        `json:"discovered,omitempty"`
+	ChassisID             string                               `json:"chassis_id"`
+	ChassisIDType         string                               `json:"chassis_id_type"`
+	SysObjectID           string                               `json:"sys_object_id,omitempty"`
+	SysName               string                               `json:"sys_name,omitempty"`
+	SysDescr              string                               `json:"sys_descr,omitempty"`
+	SysContact            string                               `json:"sys_contact,omitempty"`
+	SysLocation           string                               `json:"sys_location,omitempty"`
+	ManagementIP          string                               `json:"management_ip,omitempty"`
+	ManagementAddresses   []topologyManagementAddress          `json:"management_addresses,omitempty"`
+	AgentID               string                               `json:"agent_id,omitempty"`
+	AgentJobID            string                               `json:"agent_job_id,omitempty"`
+	NetdataHostID         string                               `json:"netdata_host_id,omitempty"`
+	ChartIDPrefix         string                               `json:"chart_id_prefix,omitempty"`
+	ChartContextPrefix    string                               `json:"chart_context_prefix,omitempty"`
+	DeviceCharts          map[string]string                    `json:"device_charts,omitempty"`
+	InterfaceCharts       map[string]topologyInterfaceChartRef `json:"interface_charts,omitempty"`
+	Vendor                string                               `json:"vendor,omitempty"`
+	Model                 string                               `json:"model,omitempty"`
+	Capabilities          []string                             `json:"capabilities,omitempty"`
+	CapabilitiesSupported []string                             `json:"capabilities_supported,omitempty"`
+	CapabilitiesEnabled   []string                             `json:"capabilities_enabled,omitempty"`
+	Labels                map[string]string                    `json:"labels,omitempty"`
+	Discovered            bool                                 `json:"discovered,omitempty"`
 }
 
 type topologyEndpoint struct {
