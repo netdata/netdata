@@ -119,12 +119,12 @@ Netdata parses lines starting with:
 -    `CLABEL` - add a label to a chart
 -    `CLABEL_COMMIT` - commit added labels to the chart
 -    `FUNCTION` - define a function that can be called later to execute it
+-    `FUNCTION_DEL` - unregister a function
 -    `BEGIN` - initialize data collection for a chart
 -    `SET` - set the value of a dimension for the initialized chart
 -    `END` - complete data collection for the initialized chart
 -    `FLUSH` - ignore the last collected values
 -    `DISABLE` - disable this plugin
--    `FUNCTION` - define functions
 -    `FUNCTION_PROGRESS` - report the progress of a function execution
 -    `FUNCTION_RESULT_BEGIN` - to initiate the transmission of function results
 -    `FUNCTION_RESULT_END` - to end the transmission of function result
@@ -479,6 +479,16 @@ Users can use a function to ask for more information from the collector. Netdata
 Both node and chart functions are exactly the same, but chart functions allow Netdata to relate functions with charts and therefore present a context-sensitive menu of functions related to the chart the user is using.
 
 Users can get a list of all the registered functions using the `/api/v1/functions` endpoint of Netdata and call functions using the `/api/v1/function` API call of Netdata.
+
+#### FUNCTION_DEL
+
+The plugin can unregister a previously registered function while continuing to run:
+
+> FUNCTION_DEL [GLOBAL] "name of the function"
+
+- Use `GLOBAL` for host-level functions (the same scope as `FUNCTION GLOBAL`).
+- Unregistered functions disappear from `/api/v1/functions` and return 503 on calls.
+- Functions can be re-registered later with a new `FUNCTION` line.
 
 Once a function is called, the plugin will receive at its standard input a command that looks like this:
 
@@ -897,5 +907,4 @@ There are a few rules for writing plugins properly:
 3.  If you are not sure of memory leaks, exit every one hour. Netdata will re-start your process.
 
 4.  If possible, try to autodetect if your plugin should be enabled, without any configuration.
-
 

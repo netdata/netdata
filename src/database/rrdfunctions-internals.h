@@ -18,6 +18,7 @@ typedef enum __attribute__((packed)) {
 
 struct rrd_host_function {
     bool sync;                      // when true, the function is called synchronously
+    bool unregistered;              // when true, the function is unavailable
     RRD_FUNCTION_OPTIONS options;   // RRD_FUNCTION_OPTIONS
     HTTP_ACCESS access;
     STRING *help;
@@ -33,6 +34,7 @@ struct rrd_host_function {
     struct rrd_collector *collector;
 };
 
+bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host);
 int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item);
 
 #endif //NETDATA_RRDFUNCTIONS_INTERNALS_H
