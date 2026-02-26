@@ -269,6 +269,9 @@
         },
         "hidden": {
           "type": "boolean"
+        },
+        "float": {
+          "type": "boolean"
         }
       }
     }

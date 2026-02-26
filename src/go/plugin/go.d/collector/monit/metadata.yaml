@@ -21,7 +21,6 @@ modules:
         - mmonit
         - supervision tool
         - monitrc
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

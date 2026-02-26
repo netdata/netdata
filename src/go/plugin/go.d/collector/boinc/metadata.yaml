@@ -18,7 +18,6 @@ modules:
       keywords:
         - boinc
         - distributed
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

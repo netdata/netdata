@@ -22,7 +22,6 @@ modules:
         - web
         - appserver
         - http
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

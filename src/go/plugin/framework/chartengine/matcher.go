@@ -22,6 +22,7 @@ type routeBinding struct {
 	Hidden            bool
 	Multiplier        int
 	Divisor           int
+	Float             bool
 	Static            bool
 	Inferred          bool
 	Autogen           bool
@@ -130,6 +131,7 @@ func (e *Engine) resolveSeriesRoutes(
 			Hidden:            candidate.dimension.Hidden,
 			Multiplier:        candidate.dimension.Multiplier,
 			Divisor:           candidate.dimension.Divisor,
+			Float:             candidate.dimension.Float,
 			Static:            !candidate.dimension.Dynamic,
 			Inferred:          candidate.dimension.InferNameFromSeriesMeta,
 			Autogen:           false,

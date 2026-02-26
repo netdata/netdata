@@ -14,10 +14,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
+	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
@@ -25,14 +29,17 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext"
 )
 
 func init() {
@@ -64,6 +71,9 @@ func main() {
 	if opts.Debug {
 		logger.Level.Set(slog.LevelDebug)
 	}
+	isTerminal := terminal.IsTerminal()
+	isInsideK8s := hostinfo.IsInsideK8sCluster()
+	moduleRegistry := moduleRegistryWithSystemdPolicy(collectorapi.DefaultRegistry, hostinfo.SystemdVersion)
 
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
@@ -72,10 +82,22 @@ func main() {
 		ServiceDiscoveryConfigDir: pluginconfig.ServiceDiscoveryDir(),
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
-		RunModule:                 opts.Module,
-		RunJob:                    opts.Job,
-		MinUpdateEvery:            opts.UpdateEvery,
-		DumpSummary:               opts.DumpSummary,
+		ModuleRegistry:            moduleRegistry,
+		IsInsideK8s:               isInsideK8s,
+		RunModePolicy: policy.RunModePolicy{
+			IsTerminal:               isTerminal,
+			AutoEnableDiscovered:     isTerminal,
+			UseFileStatusPersistence: !isTerminal,
+		},
+		DiscoveryProviders: []discovery.ProviderFactory{
+			discoveryproviders.File(),
+			discoveryproviders.Dummy(),
+			discoveryproviders.SD(sdext.Registry(!isInsideK8s)),
+		},
+		RunModule:      opts.Module,
+		RunJob:         opts.Job,
+		MinUpdateEvery: opts.UpdateEvery,
+		DumpSummary:    opts.DumpSummary,
 	})
 
 	a.Infof("plugin: name=%s, %s", a.Name, buildinfo.Info())
@@ -89,7 +111,7 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
-	a.Run()
+	agenthost.Run(a)
 }
 
 func parseCLI() *cli.Option {
@@ -102,6 +124,19 @@ func parseCLI() *cli.Option {
 	}
 
 	return opt
+}
+
+func moduleRegistryWithSystemdPolicy(base collectorapi.Registry, systemdVersion int) collectorapi.Registry {
+	registry := make(collectorapi.Registry, len(base))
+	for name, creator := range base {
+		if name == "logind" && systemdVersion == 239 {
+			// Known issue: go.d/logind high CPU usage on Alma Linux8.
+			// Keep policy in cmd wiring, not inside generic agent package.
+			creator.Disabled = true
+		}
+		registry[name] = creator
+	}
+	return registry
 }
 
 func runFunctionCLI(opts *cli.Option) int {
@@ -165,9 +200,13 @@ func runFunctionCLI(opts *cli.Option) int {
 	defer cancel()
 
 	jobMgr := jobmgr.New(jobmgr.Config{
-		// Force-enable configs in function CLI runs (non-TTY by default).
-		PluginName:     "nodyncfg",
-		Out:            io.Discard,
+		PluginName: executable.Name,
+		Out:        io.Discard,
+		RunModePolicy: policy.RunModePolicy{
+			IsTerminal:               false,
+			AutoEnableDiscovered:     true,
+			UseFileStatusPersistence: true,
+		},
 		VarLibDir:      pluginconfig.VarLibDir(),
 		Modules:        collectorapi.Registry{moduleName: creator},
 		ConfigDefaults: reg,

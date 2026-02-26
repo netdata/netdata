@@ -239,6 +239,7 @@ func compileDimension(dim charttpl.Dimension, visibleMetrics map[string]struct{}
 			Hidden:                  options.hidden,
 			Multiplier:              options.multiplier,
 			Divisor:                 options.divisor,
+			Float:                   options.float,
 			Dynamic:                 inferFromSeriesMeta || nameFromLabel != "",
 		},
 		selectorKeys:     append([]string(nil), meta.ConstrainedLabelKeys...),
@@ -251,6 +252,7 @@ type compiledDimensionOptions struct {
 	hidden     bool
 	multiplier int
 	divisor    int
+	float      bool
 }
 
 func compileDimensionOptions(in *charttpl.DimensionOptions) compiledDimensionOptions {
@@ -262,6 +264,7 @@ func compileDimensionOptions(in *charttpl.DimensionOptions) compiledDimensionOpt
 		return out
 	}
 	out.hidden = in.Hidden
+	out.float = in.Float
 	if in.Multiplier != 0 {
 		out.multiplier = in.Multiplier
 	}

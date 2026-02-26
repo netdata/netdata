@@ -11,7 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"gopkg.in/yaml.v2"
 
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -23,7 +22,7 @@ const (
 )
 
 func (m *Manager) dyncfgVnodePrefixValue() string {
-	return fmt.Sprintf(dyncfgVnodeIDf, executable.Name)
+	return fmt.Sprintf(dyncfgVnodeIDf, m.pluginName)
 }
 
 func dyncfgVnodeModCmds() string {
@@ -53,7 +52,7 @@ func (m *Manager) dyncfgVnodeModuleCreate() {
 		ID:                m.dyncfgVnodePrefixValue(),
 		Status:            dyncfg.StatusAccepted.String(),
 		ConfigType:        dyncfg.ConfigTypeTemplate.String(),
-		Path:              fmt.Sprintf(dyncfgVnodePath, executable.Name),
+		Path:              fmt.Sprintf(dyncfgVnodePath, m.pluginName),
 		SourceType:        "internal",
 		Source:            "internal",
 		SupportedCommands: dyncfgVnodeModCmds(),
@@ -65,7 +64,7 @@ func (m *Manager) dyncfgVnodeJobCreate(cfg *vnodes.VirtualNode, status dyncfg.St
 		ID:                fmt.Sprintf("%s:%s", m.dyncfgVnodePrefixValue(), cfg.Name),
 		Status:            status.String(),
 		ConfigType:        dyncfg.ConfigTypeJob.String(),
-		Path:              fmt.Sprintf(dyncfgVnodePath, executable.Name),
+		Path:              fmt.Sprintf(dyncfgVnodePath, m.pluginName),
 		SourceType:        cfg.SourceType,
 		Source:            cfg.Source,
 		SupportedCommands: dyncfgVnodeJobCmds(cfg.SourceType == confgroup.TypeDyncfg),

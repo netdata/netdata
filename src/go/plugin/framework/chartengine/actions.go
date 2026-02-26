@@ -38,6 +38,7 @@ type CreateDimensionAction struct {
 	ChartMeta  program.ChartMeta
 	Name       string
 	Hidden     bool
+	Float      bool
 	Algorithm  program.Algorithm
 	Multiplier int
 	Divisor    int
@@ -68,6 +69,7 @@ type RemoveDimensionAction struct {
 	ChartMeta  program.ChartMeta
 	Name       string
 	Hidden     bool
+	Float      bool
 	Algorithm  program.Algorithm
 	Multiplier int
 	Divisor    int

@@ -329,6 +329,8 @@ func (j *JobV2) postCheck() error {
 }
 
 func (j *JobV2) runOnce() {
+	defer j.ResetAllOnce()
+
 	j.applyPendingVnodeUpdate()
 
 	curTime := time.Now()

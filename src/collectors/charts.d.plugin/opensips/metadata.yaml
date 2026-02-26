@@ -20,7 +20,6 @@ modules:
         - voice
         - video
         - stream
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Examine OpenSIPS metrics for insights into SIP server operations. Study call rates, error rates, and response times for reliable voice over IP services."

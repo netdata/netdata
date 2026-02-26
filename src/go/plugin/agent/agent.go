@@ -4,12 +4,10 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -17,8 +15,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimemgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -41,6 +39,12 @@ type Config struct {
 	MinUpdateEvery int
 
 	DisableServiceDiscovery bool
+
+	IsInsideK8s bool
+
+	RunModePolicy policy.RunModePolicy
+
+	DiscoveryProviders []discovery.ProviderFactory
 
 	DumpMode    time.Duration
 	DumpSummary bool
@@ -65,6 +69,12 @@ type Agent struct {
 	MinUpdateEvery int
 
 	DisableServiceDiscovery bool
+
+	IsInsideK8s bool
+
+	runModePolicy policy.RunModePolicy
+
+	DiscoveryProviders []discovery.ProviderFactory
 
 	ModuleRegistry collectorapi.Registry
 	Out            io.Writer
@@ -98,7 +108,10 @@ func New(cfg Config) *Agent {
 		RunModule:                 cfg.RunModule,
 		RunJob:                    cfg.RunJob,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
-		ModuleRegistry:            collectorapi.DefaultRegistry,
+		IsInsideK8s:               cfg.IsInsideK8s,
+		runModePolicy:             cfg.RunModePolicy,
+		ModuleRegistry:            cfg.ModuleRegistry,
+		DiscoveryProviders:        cfg.DiscoveryProviders,
 		Out:                       safewriter.Stdout,
 		api:                       netdataapi.New(safewriter.Stdout),
 		quitCh:                    make(chan struct{}, 1),
@@ -127,83 +140,52 @@ func New(cfg Config) *Agent {
 	return a
 }
 
-// Run starts the Agent.
-func (a *Agent) Run() {
-	go a.keepAlive()
-	serve(a)
+// RunContext runs one agent instance lifecycle on the provided context.
+func (a *Agent) RunContext(ctx context.Context) {
+	a.run(ctx)
 }
 
-func serve(a *Agent) {
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
-	signal.Ignore(syscall.SIGPIPE)
+// IsTerminalMode reports whether run-mode policy is interactive terminal.
+func (a *Agent) IsTerminalMode() bool {
+	return a.runModePolicy.IsTerminal
+}
 
-	var wg sync.WaitGroup
+// RunKeepAlive runs keepalive loop until context cancellation or too many failures.
+func (a *Agent) RunKeepAlive(ctx context.Context) error {
+	tk := time.NewTicker(time.Second)
+	defer tk.Stop()
 
-	var exit bool
-
-	// Set up dump mode timer if enabled
-	var dumpTimer *time.Timer
-	var dumpTimerCh <-chan time.Time
-	if a.dumpMode > 0 {
-		dumpTimer = time.NewTimer(a.dumpMode)
-		dumpTimerCh = dumpTimer.C
-	}
-
+	var n int
 	for {
-		collectorapi.ObsoleteCharts(true)
-
-		ctx, cancel := context.WithCancel(context.Background())
-
-		wg.Add(1)
-		go func() { defer wg.Done(); a.run(ctx) }()
-
 		select {
-		case sig := <-ch:
-			switch sig {
-			case syscall.SIGHUP:
-				a.Infof("received %s signal (%d). Restarting running instance", sig, sig)
-			default:
-				a.Infof("received %s signal (%d). Terminating...", sig, sig)
-				exit = true
+		case <-ctx.Done():
+			return nil
+		case <-tk.C:
+			if err := a.api.EMPTYLINE(); err != nil {
+				n++
+			} else {
+				n = 0
 			}
-		case <-a.quitCh:
-			a.Infof("received QUIT command. Terminating...")
-			exit = true
-		case <-dumpTimerCh:
-			a.Infof("dump mode duration expired, collecting analysis...")
-			a.collectDumpAnalysis()
-			exit = true
-		}
-
-		if exit {
-			collectorapi.ObsoleteCharts(false)
-		}
-
-		cancel()
-
-		func() {
-			timeout := time.Second * 10
-			t := time.NewTimer(timeout)
-			defer t.Stop()
-			done := make(chan struct{})
-
-			go func() { wg.Wait(); close(done) }()
-
-			select {
-			case <-t.C:
-				a.Errorf("stopping all goroutines timed out after %s. Exiting...", timeout)
-				os.Exit(0)
-			case <-done:
+			if n >= 30 {
+				return fmt.Errorf("too many keepAlive errors")
 			}
-		}()
-
-		if exit {
-			os.Exit(0)
 		}
-
-		time.Sleep(time.Second)
 	}
+}
+
+// QuitCh returns agent quit notifications (e.g., dump completion).
+func (a *Agent) QuitCh() <-chan struct{} {
+	return a.quitCh
+}
+
+// DumpModeDuration returns configured dump mode duration.
+func (a *Agent) DumpModeDuration() time.Duration {
+	return a.dumpMode
+}
+
+// TriggerDumpAnalysis prints dump analysis report.
+func (a *Agent) TriggerDumpAnalysis() {
+	a.collectDumpAnalysis()
 }
 
 func (a *Agent) run(ctx context.Context) {
@@ -215,9 +197,6 @@ func (a *Agent) run(ctx context.Context) {
 
 	if !cfg.Enabled {
 		a.Info("plugin is disabled in the configuration file, exiting...")
-		if terminal.IsTerminal() {
-			os.Exit(0)
-		}
 		a.api.DISABLE()
 		return
 	}
@@ -225,9 +204,6 @@ func (a *Agent) run(ctx context.Context) {
 	enabledModules := a.loadEnabledModules(cfg)
 	if len(enabledModules) == 0 {
 		a.Info("no modules to run")
-		if terminal.IsTerminal() {
-			os.Exit(0)
-		}
 		a.api.DISABLE()
 		return
 	}
@@ -239,9 +215,6 @@ func (a *Agent) run(ctx context.Context) {
 	discMgr, err := discovery.NewManager(discCfg)
 	if err != nil {
 		a.Error(err)
-		if terminal.IsTerminal() {
-			os.Exit(0)
-		}
 		return
 	}
 
@@ -257,6 +230,7 @@ func (a *Agent) run(ctx context.Context) {
 	jobMgr := jobmgr.New(jobmgr.Config{
 		PluginName:     a.Name,
 		Out:            a.Out,
+		RunModePolicy:  a.runModePolicy,
 		Modules:        enabledModules,
 		RunJob:         runJob,
 		ConfigDefaults: discCfg.Registry,
@@ -286,28 +260,6 @@ func (a *Agent) run(ctx context.Context) {
 
 	wg.Wait()
 	<-ctx.Done()
-}
-
-func (a *Agent) keepAlive() {
-	if terminal.IsTerminal() {
-		return
-	}
-
-	tk := time.NewTicker(time.Second)
-	defer tk.Stop()
-
-	var n int
-	for range tk.C {
-		if err := a.api.EMPTYLINE(); err != nil {
-			n++
-		} else {
-			n = 0
-		}
-		if n >= 30 {
-			a.Info("too many keepAlive errors. Terminating...")
-			os.Exit(0)
-		}
-	}
 }
 
 func (a *Agent) collectDumpAnalysis() {

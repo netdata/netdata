@@ -19,7 +19,6 @@ modules:
         - tor
         - traffic
         - vpn
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

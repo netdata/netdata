@@ -440,6 +440,8 @@ func (j *Job) postCheck() error {
 }
 
 func (j *Job) runOnce() {
+	defer j.ResetAllOnce()
+
 	curTime := time.Now()
 	sinceLastRun := calcSinceLastRun(curTime, j.prevRun)
 	j.prevRun = curTime

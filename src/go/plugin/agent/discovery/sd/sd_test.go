@@ -83,8 +83,33 @@ func TestServiceDiscovery_Run(t *testing.T) {
 	}
 }
 
+func TestServiceDiscovery_UnsupportedDiscovererConfigIsIgnored(t *testing.T) {
+	sim := &discoverySimExt{
+		configs: []confFile{
+			prepareUnsupportedDiscovererConfigFile("/usr/lib/netdata/conf.d/sd/unsupported.conf", "unsupported"),
+		},
+		wantPipelines:    nil,
+		wantExposedCount: 0,
+	}
+	sim.run(t)
+}
+
 func prepareConfigFile(source, name string) confFile {
 	disc, _ := pipeline.NewDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{})
+	cfg := pipeline.Config{
+		Name:       name,
+		Discoverer: disc,
+	}
+	bs, _ := yaml.Marshal(cfg)
+
+	return confFile{
+		source:  source,
+		content: bs,
+	}
+}
+
+func prepareUnsupportedDiscovererConfigFile(source, name string) confFile {
+	disc, _ := pipeline.NewDiscovererPayload("unsupported", map[string]any{})
 	cfg := pipeline.Config{
 		Name:       name,
 		Discoverer: disc,

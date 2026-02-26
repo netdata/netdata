@@ -14,7 +14,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
+	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
@@ -22,7 +26,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	// Register IBM ecosystem collectors
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/as400"         // Requires CGO
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2"           // Requires CGO
@@ -73,6 +80,7 @@ func main() {
 	if opts.Debug {
 		logger.Level.Set(slog.LevelDebug)
 	}
+	isTerminal := terminal.IsTerminal()
 
 	// Parse dump duration if provided
 	var dumpMode time.Duration
@@ -86,10 +94,21 @@ func main() {
 	}
 
 	a := agent.New(agent.Config{
-		Name:                    executable.Name,
-		PluginConfigDir:         pluginconfig.ConfigDir(),
-		CollectorsConfigDir:     pluginconfig.CollectorsDir(),
-		VarLibDir:               pluginconfig.VarLibDir(),
+		Name:                executable.Name,
+		PluginConfigDir:     pluginconfig.ConfigDir(),
+		CollectorsConfigDir: pluginconfig.CollectorsDir(),
+		VarLibDir:           pluginconfig.VarLibDir(),
+		ModuleRegistry:      collectorapi.DefaultRegistry,
+		IsInsideK8s:         hostinfo.IsInsideK8sCluster(),
+		RunModePolicy: policy.RunModePolicy{
+			IsTerminal:               isTerminal,
+			AutoEnableDiscovered:     isTerminal,
+			UseFileStatusPersistence: !isTerminal,
+		},
+		DiscoveryProviders: []discovery.ProviderFactory{
+			discoveryproviders.File(),
+			discoveryproviders.Dummy(),
+		},
 		RunModule:               opts.Module,
 		RunJob:                  opts.Job,
 		MinUpdateEvery:          opts.UpdateEvery,
@@ -110,7 +129,7 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
-	a.Run()
+	agenthost.Run(a)
 }
 
 func parseCLI() *cli.Option {

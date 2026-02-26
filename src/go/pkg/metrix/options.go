@@ -30,6 +30,8 @@ type instrumentConfig struct {
 	chartFamily    string
 	unitSet        bool
 	unit           string
+	floatSet       bool
+	float          bool
 }
 
 func WithFreshness(policy FreshnessPolicy) InstrumentOption {
@@ -101,5 +103,13 @@ func WithUnit(unit string) InstrumentOption {
 	return optionFunc(func(cfg *instrumentConfig) {
 		cfg.unitSet = true
 		cfg.unit = unit
+	})
+}
+
+// WithFloat sets optional metric-family float-dimension metadata hint.
+func WithFloat(isFloat bool) InstrumentOption {
+	return optionFunc(func(cfg *instrumentConfig) {
+		cfg.floatSet = true
+		cfg.float = isFloat
 	})
 }

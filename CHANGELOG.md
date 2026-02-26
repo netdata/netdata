@@ -29,6 +29,14 @@
 - Regenerate integrations docs ([#21807](https://github.com/netdata/netdata/issues/21807))
 - Support environment variable expansion in host labels ([#21796](https://github.com/netdata/netdata/issues/21796))
 - Fix url check ([#21805](https://github.com/netdata/netdata/issues/21805))
+- Refactor(go.d): tighten agent dyncfg flow and type safety ([#21808](https://github.com/netdata/netdata/issues/21808))
+- Feat(go.d/logger): add conditional and rate-limited logging ([#21813](https://github.com/netdata/netdata/issues/21813))
+- Docs(go.d/mysql): add User Statistics prerequisite for per-user metrics ([#21814](https://github.com/netdata/netdata/issues/21814))
+- Regenerate integrations docs ([#21815](https://github.com/netdata/netdata/issues/21815))
+- Chore(go.d/logger): improve caller attribution and unify terminal checks ([#21817](https://github.com/netdata/netdata/issues/21817))
+- Reduce log noise for indexing limit warnings on online journal files ([#21816](https://github.com/netdata/netdata/issues/21816))
+- Fix(go.d/sd): skip unsupported discoverer configs ([#21818](https://github.com/netdata/netdata/issues/21818))
+- Fix potential use after free in RAM mode ([#21809](https://github.com/netdata/netdata/issues/21809))
 
 ## [2.9.0] - 2026-02-16
 

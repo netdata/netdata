@@ -180,16 +180,28 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
         (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
-    buffer_sprintf(
-        instance->buffer,
-        "put %s.%s.%s %llu " COLLECTED_NUMBER_FORMAT " host=%s%s\n",
-        instance->config.prefix,
-        chart_name,
-        dimension_name,
-        (unsigned long long)rd->collector.last_collected_time.tv_sec,
-        rd->collector.last_collected_value,
-        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-        (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
+    if(rrddim_is_float(rd))
+        buffer_sprintf(
+            instance->buffer,
+            "put %s.%s.%s %llu " NETDATA_DOUBLE_FORMAT " host=%s%s\n",
+            instance->config.prefix,
+            chart_name,
+            dimension_name,
+            (unsigned long long)rd->collector.last_collected_time.tv_sec,
+            rrddim_last_collected_as_double(rd),
+            (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
+            (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
+    else
+        buffer_sprintf(
+            instance->buffer,
+            "put %s.%s.%s %llu " COLLECTED_NUMBER_FORMAT " host=%s%s\n",
+            instance->config.prefix,
+            chart_name,
+            dimension_name,
+            (unsigned long long)rd->collector.last_collected_time.tv_sec,
+            rrddim_last_collected_raw_int(rd),
+            (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
+            (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
 
     return 0;
 }
@@ -316,16 +328,24 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         "{"
         "\"metric\":\"%s.%s.%s\","
         "\"timestamp\":%llu,"
-        "\"value\":"COLLECTED_NUMBER_FORMAT","
+        "\"value\":",
+        instance->config.prefix,
+        chart_name,
+        dimension_name,
+        (unsigned long long)rd->collector.last_collected_time.tv_sec);
+
+    if(rrddim_is_float(rd))
+        buffer_sprintf(instance->buffer, NETDATA_DOUBLE_FORMAT, rrddim_last_collected_as_double(rd));
+    else
+        buffer_sprintf(instance->buffer, COLLECTED_NUMBER_FORMAT, rrddim_last_collected_raw_int(rd));
+
+    buffer_sprintf(
+        instance->buffer,
+        ","
         "\"tags\":{"
         "\"host\":\"%s\"%s"
         "}"
         "}",
-        instance->config.prefix,
-        chart_name,
-        dimension_name,
-        (unsigned long long)rd->collector.last_collected_time.tv_sec,
-        rd->collector.last_collected_value,
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "");
 

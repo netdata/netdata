@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
@@ -23,6 +22,8 @@ import (
 )
 
 var lock = &sync.Mutex{}
+
+const testPluginName = "test"
 
 type discoverySim struct {
 	configs       []confFile
@@ -48,7 +49,8 @@ func (sim *discoverySimExt) run(t *testing.T) {
 	fact := &mockFactory{}
 	var buf bytes.Buffer
 	mgr := &ServiceDiscovery{
-		Logger: logger.New(),
+		Logger:     logger.New(),
+		pluginName: testPluginName,
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
 			return fact.create(config)
 		},
@@ -70,7 +72,7 @@ func (sim *discoverySimExt) run(t *testing.T) {
 		Exposed:   mgr.exposed,
 		Callbacks: mgr.sdCb,
 
-		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
 		EnableFailCode: 422,
 		JobCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
@@ -108,9 +110,7 @@ func (sim *discoverySimExt) run(t *testing.T) {
 
 	// Check exposed configs after SD goroutine has stopped (no race on entry.Status).
 	// Caches survive shutdown — StopAll only stops pipelines, doesn't clear caches.
-	if sim.wantExposedCount > 0 {
-		assert.Equal(t, sim.wantExposedCount, mgr.exposed.Count(), "exposed configs count")
-	}
+	assert.Equal(t, sim.wantExposedCount, mgr.exposed.Count(), "exposed configs count")
 	for _, want := range sim.wantExposed {
 		entry, ok := mgr.exposed.LookupByKey(want.discovererType + ":" + want.name)
 		if !assert.Truef(t, ok, "exposed config '%s:%s' not found", want.discovererType, want.name) {
@@ -125,7 +125,8 @@ func (sim *discoverySim) run(t *testing.T) {
 	fact := &mockFactory{}
 	var buf bytes.Buffer
 	mgr := &ServiceDiscovery{
-		Logger: logger.New(),
+		Logger:     logger.New(),
+		pluginName: testPluginName,
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
 			return fact.create(config)
 		},
@@ -148,7 +149,7 @@ func (sim *discoverySim) run(t *testing.T) {
 		Exposed:   mgr.exposed,
 		Callbacks: mgr.sdCb,
 
-		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
 		EnableFailCode: 422,
 		JobCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,

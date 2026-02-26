@@ -14,13 +14,11 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/terminal"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -34,6 +32,7 @@ import (
 type Config struct {
 	PluginName         string
 	Out                io.Writer
+	RunModePolicy      policy.RunModePolicy
 	Modules            collectorapi.Registry
 	RunJob             []string
 	ConfigDefaults     confgroup.Registry
@@ -48,14 +47,14 @@ type Config struct {
 }
 
 func New(cfg Config) *Manager {
-	seen := dyncfg.NewSeenCache[confgroup.Config]()
-	exposed := dyncfg.NewExposedCache[confgroup.Config]()
-	api := dyncfg.NewResponder(netdataapi.New(safewriter.Stdout))
-
 	out := cfg.Out
 	if out == nil {
 		out = io.Discard
 	}
+
+	seen := dyncfg.NewSeenCache[confgroup.Config]()
+	exposed := dyncfg.NewExposedCache[confgroup.Config]()
+	api := dyncfg.NewResponder(netdataapi.New(out))
 	fnReg := cfg.FnReg
 	if fnReg == nil {
 		fnReg = noop{}
@@ -71,6 +70,7 @@ func New(cfg Config) *Manager {
 		),
 		pluginName:     cfg.PluginName,
 		out:            out,
+		runModePolicy:  cfg.RunModePolicy,
 		modules:        cfg.Modules,
 		runJob:         cfg.RunJob,
 		configDefaults: cfg.ConfigDefaults,
@@ -109,7 +109,7 @@ func New(cfg Config) *Manager {
 			return cfg.FullName()
 		},
 
-		Path:                    fmt.Sprintf(dyncfgCollectorPath, executable.Name),
+		Path:                    fmt.Sprintf(dyncfgCollectorPath, cfg.PluginName),
 		EnableFailCode:          200,
 		RemoveStockOnEnableFail: true,
 		JobCommands: []dyncfg.Command{
@@ -137,6 +137,7 @@ type Manager struct {
 
 	pluginName     string
 	out            io.Writer
+	runModePolicy  policy.RunModePolicy
 	modules        collectorapi.Registry
 	runJob         []string
 	configDefaults confgroup.Registry
@@ -358,7 +359,7 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 
 	m.handler.NotifyJobCreate(entry.Cfg, entry.Status)
 
-	if terminal.IsTerminal() || m.pluginName == "nodyncfg" { // FIXME: quick fix of TestAgent_Run (agent_test.go)
+	if m.runModePolicy.AutoEnableDiscovered {
 		m.handler.CmdEnable(dyncfg.NewFunction(functions.Function{Args: []string{m.dyncfgJobID(entry.Cfg), "enable"}}))
 	} else {
 		m.handler.WaitForDecision(entry.Cfg)

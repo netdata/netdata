@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -20,7 +19,7 @@ const (
 )
 
 func (d *ServiceDiscovery) dyncfgSDPrefixValue() string {
-	return fmt.Sprintf(dyncfgSDPrefixf, executable.Name)
+	return fmt.Sprintf(dyncfgSDPrefixf, d.pluginName)
 }
 
 func (d *ServiceDiscovery) dyncfgTemplateID(discovererType string) string {
@@ -45,7 +44,7 @@ func (d *ServiceDiscovery) dyncfgSDTemplateCreate(discovererType string) {
 		ID:                d.dyncfgTemplateID(discovererType),
 		Status:            dyncfg.StatusAccepted.String(),
 		ConfigType:        dyncfg.ConfigTypeTemplate.String(),
-		Path:              fmt.Sprintf(dyncfgSDPath, executable.Name),
+		Path:              fmt.Sprintf(dyncfgSDPath, d.pluginName),
 		SourceType:        "internal",
 		Source:            "internal",
 		SupportedCommands: dyncfgSDTemplateCmds(),

@@ -40,6 +40,7 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 				ChartMeta:  meta,
 				Name:       "received",
 				Hidden:     false,
+				Float:      true,
 				Algorithm:  chartengine.AlgorithmIncremental,
 				Multiplier: 1,
 				Divisor:    1,
@@ -59,6 +60,7 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 				ChartMeta:  meta,
 				Name:       "received",
 				Hidden:     false,
+				Float:      true,
 				Algorithm:  chartengine.AlgorithmIncremental,
 				Multiplier: 1,
 				Divisor:    1,
@@ -88,10 +90,10 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 	assert.Contains(t, out, "CLABEL 'instance' 'localhost' '2'")
 	assert.Contains(t, out, "CLABEL '_collect_job' 'job01' '1'")
 	assert.Contains(t, out, "CLABEL_COMMIT")
-	assert.Contains(t, out, "DIMENSION 'received' 'received' 'incremental' '1' '1' ''")
+	assert.Contains(t, out, "DIMENSION 'received' 'received' 'incremental' '1' '1' 'type=float'")
 	assert.Contains(t, out, "BEGIN 'collector.job.win_nic_traffic_eth0' 100")
-	assert.Contains(t, out, "SET 'received' = 123")
-	assert.Contains(t, out, "DIMENSION 'received' 'received' 'incremental' '1' '1' 'obsolete'")
+	assert.Contains(t, out, "SET 'received' = 123.5")
+	assert.Contains(t, out, "DIMENSION 'received' 'received' 'incremental' '1' '1' 'obsolete type=float'")
 	assert.Contains(t, out, "obsolete")
 
 	createPos := strings.Index(out, "CHART 'collector.job.win_nic_traffic_eth0'")
@@ -165,6 +167,65 @@ func TestApplyPlanAutogenChartCreateUpdateRemove(t *testing.T) {
 	assert.Contains(t, out, "BEGIN 'collector.job.svc.errors_total-method=GET'")
 	assert.Contains(t, out, "SET 'svc.errors_total' = 10")
 	assert.Contains(t, out, "obsolete")
+}
+
+func TestApplyPlanUsesIntegerSETForNonFloatUpdates(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := chartengine.ChartMeta{
+		Title:     "Runtime jobs",
+		Family:    "Runtime",
+		Context:   "runtime.jobs",
+		Units:     "jobs",
+		Algorithm: chartengine.AlgorithmAbsolute,
+		Type:      chartengine.ChartTypeLine,
+	}
+
+	plan := Plan{
+		Actions: []EngineAction{
+			chartengine.CreateChartAction{
+				ChartTemplateID: "g0c0",
+				ChartID:         "runtime_jobs",
+				Meta:            meta,
+			},
+			chartengine.CreateDimensionAction{
+				ChartID:    "runtime_jobs",
+				ChartMeta:  meta,
+				Name:       "total",
+				Algorithm:  chartengine.AlgorithmAbsolute,
+				Multiplier: 1,
+				Divisor:    1,
+			},
+			chartengine.UpdateChartAction{
+				ChartID: "runtime_jobs",
+				Values: []chartengine.UpdateDimensionValue{
+					{
+						Name:    "total",
+						IsFloat: false,
+						Int64:   7,
+						Float64: 7.9,
+					},
+				},
+			},
+		},
+	}
+
+	err := ApplyPlan(api, plan, EmitEnv{
+		TypeID:      "collector.job",
+		UpdateEvery: 1,
+		Plugin:      "go.d.plugin",
+		Module:      "runtime",
+		JobName:     "job01",
+		MSSinceLast: 1,
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, out, "DIMENSION 'total' 'total' 'absolute' '1' '1' ''")
+	assert.Contains(t, out, "BEGIN 'collector.job.runtime_jobs' 1")
+	assert.Contains(t, out, "SET 'total' = 7")
+	assert.NotContains(t, out, "SET 'total' = 7.9")
 }
 
 func TestApplyPlanDimensionOnlyCreateEmitsLabelsAndCommit(t *testing.T) {

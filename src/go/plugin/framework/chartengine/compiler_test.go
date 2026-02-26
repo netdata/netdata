@@ -60,6 +60,7 @@ func TestCompileScenarios(t *testing.T) {
 										Name:     "total",
 										Options: &charttpl.DimensionOptions{
 											Hidden:     true,
+											Float:      true,
 											Multiplier: -8,
 											Divisor:    1000,
 										},
@@ -76,6 +77,7 @@ func TestCompileScenarios(t *testing.T) {
 				require.Len(t, charts, 1)
 				require.Len(t, charts[0].Dimensions, 1)
 				assert.True(t, charts[0].Dimensions[0].Hidden)
+				assert.True(t, charts[0].Dimensions[0].Float)
 				assert.Equal(t, -8, charts[0].Dimensions[0].Multiplier)
 				assert.Equal(t, 1000, charts[0].Dimensions[0].Divisor)
 			},

@@ -85,7 +85,7 @@ bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
 
         buffer_sprintf(
             wb
-            , " \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s\"\n"
+            , " \"%s\" \"%s\" \"%s\" %d %d \"%s %s %s %s\"\n"
             , rrddim_id(rd)
                 , rrddim_name(rd)
                 , rrd_algorithm_name(rd->algorithm)
@@ -94,6 +94,7 @@ bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
             , rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)?"obsolete":""
             , rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)?"hidden":""
             , rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
+            , rrddim_is_float(rd)?"type=float":"type=int"
         );
     }
     rrddim_foreach_done(rd);

@@ -27,6 +27,7 @@ type materializedChartState struct {
 type materializedDimensionState struct {
 	name               string
 	hidden             bool
+	float              bool
 	static             bool
 	order              int
 	algorithm          program.Algorithm
@@ -77,6 +78,7 @@ func (c *materializedChartState) ensureDimension(name string, state dimensionSta
 			c.orderedDimsDirty = true
 		}
 		dim.hidden = state.hidden
+		dim.float = state.float
 		dim.static = state.static
 		dim.order = state.order
 		dim.algorithm = state.algorithm
@@ -87,6 +89,7 @@ func (c *materializedChartState) ensureDimension(name string, state dimensionSta
 	dim = &materializedDimensionState{
 		name:       name,
 		hidden:     state.hidden,
+		float:      state.float,
 		static:     state.static,
 		order:      state.order,
 		algorithm:  state.algorithm,

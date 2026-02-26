@@ -15,7 +15,7 @@ use journal_core::collections::{HashMap, HashSet};
 use journal_core::file::{JournalFile, Mmap, offset_array::InlinedCursor};
 use journal_registry::File;
 use std::num::NonZeroU64;
-use tracing::{error, warn};
+use tracing::{error, trace, warn};
 
 /// Default maximum number of unique values to index per field.
 pub const DEFAULT_MAX_UNIQUE_VALUES_PER_FIELD: usize = 500;
@@ -203,8 +203,13 @@ impl FileIndexer {
             .collect();
 
         // Create the bitmaps for field=value pairs
-        let entries =
-            self.build_entries_index(&journal_file, &field_map, field_names, tail_object_offset)?;
+        let entries = self.build_entries_index(
+            &journal_file,
+            &field_map,
+            field_names,
+            tail_object_offset,
+            was_online,
+        )?;
 
         // Convert field_names to HashSet<FieldName> for indexed_fields
         let indexed_fields: HashSet<FieldName> = field_names.iter().cloned().collect();
@@ -243,6 +248,7 @@ impl FileIndexer {
         field_map: &HashMap<String, String>,
         field_names: &[FieldName],
         tail_object_offset: NonZeroU64,
+        was_online: bool,
     ) -> Result<HashMap<FieldValuePair, Bitmap>> {
         let mut entries_index = HashMap::default();
         let mut truncated_fields: Vec<&FieldName> = Vec::new();
@@ -365,28 +371,38 @@ impl FileIndexer {
             }
         }
 
-        // Log summary of indexing issues
+        // Log summary of indexing issues.
         if !truncated_fields.is_empty() {
             let field_names: Vec<&str> = truncated_fields.iter().map(|f| f.as_str()).collect();
-            warn!(
+            let msg = format!(
                 "File '{}': {} field(s) truncated due to cardinality limit ({}): {:?}",
                 journal_file.file().path(),
                 truncated_fields.len(),
                 self.limits.max_unique_values_per_field,
                 field_names
             );
+            if was_online {
+                trace!("{msg}");
+            } else {
+                warn!("{msg}");
+            }
         }
         if !fields_with_large_payloads.is_empty() {
             let field_names: Vec<&str> = fields_with_large_payloads
                 .iter()
                 .map(|f| f.as_str())
                 .collect();
-            tracing::info!(
+            let msg = format!(
                 "File '{}': {} field(s) had values skipped due to large payloads: {:?}",
                 journal_file.file().path(),
                 fields_with_large_payloads.len(),
                 field_names
             );
+            if was_online {
+                trace!("{msg}");
+            } else {
+                tracing::info!("{msg}");
+            }
         }
 
         Ok(entries_index)

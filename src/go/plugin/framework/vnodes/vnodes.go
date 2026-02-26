@@ -11,12 +11,12 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 )
 
 //go:embed "config_schema.json"
@@ -171,13 +171,6 @@ func loadConfigFile(conf any, path string) error {
 	return nil
 }
 
-var (
-	envNDStockConfigDir = os.Getenv("NETDATA_STOCK_CONFIG_DIR")
-)
-
 func isStockConfig(path string) bool {
-	if envNDStockConfigDir == "" {
-		return false
-	}
-	return strings.HasPrefix(path, envNDStockConfigDir)
+	return pluginconfig.IsStock(path)
 }

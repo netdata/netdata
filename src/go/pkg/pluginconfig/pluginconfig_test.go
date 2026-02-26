@@ -344,3 +344,21 @@ func TestDirectoriesBuildValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestIsStock(t *testing.T) {
+	orig := dirs
+	t.Cleanup(func() { dirs = orig })
+
+	t.Run("fallback heuristic when stock dir is not initialized", func(t *testing.T) {
+		dirs = directories{}
+		assert.True(t, IsStock("/usr/lib/netdata/conf.d/go.d/module.conf"))
+		assert.False(t, IsStock("/etc/netdata/go.d/module.conf"))
+	})
+
+	t.Run("uses configured stock root when available", func(t *testing.T) {
+		dirs = directories{stockConfigDir: "/custom/stock"}
+		assert.True(t, IsStock("/custom/stock/go.d/module.conf"))
+		assert.False(t, IsStock("/usr/lib/netdata/conf.d/go.d/module.conf"))
+		assert.False(t, IsStock("/etc/netdata/go.d/module.conf"))
+	})
+}

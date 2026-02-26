@@ -13,7 +13,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -25,7 +24,7 @@ const (
 )
 
 func (m *Manager) dyncfgCollectorPrefixValue() string {
-	return fmt.Sprintf(dyncfgCollectorPrefixf, executable.Name)
+	return fmt.Sprintf(dyncfgCollectorPrefixf, m.pluginName)
 }
 
 func (m *Manager) dyncfgModID(name string) string {
@@ -51,7 +50,7 @@ func (m *Manager) dyncfgCollectorModuleCreate(name string) {
 		ID:                m.dyncfgModID(name),
 		Status:            dyncfg.StatusAccepted.String(),
 		ConfigType:        dyncfg.ConfigTypeTemplate.String(),
-		Path:              fmt.Sprintf(dyncfgCollectorPath, executable.Name),
+		Path:              fmt.Sprintf(dyncfgCollectorPath, m.pluginName),
 		SourceType:        "internal",
 		Source:            "internal",
 		SupportedCommands: dyncfgCollectorModCmds(),

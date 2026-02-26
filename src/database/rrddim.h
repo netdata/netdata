@@ -27,6 +27,7 @@ typedef enum __attribute__ ((__packed__)) rrddim_options {
     RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS   = (1 << 1), // do not offer RESET or OVERFLOW info to callers
     RRDDIM_OPTION_BACKFILLED_HIGH_TIERS             = (1 << 2), // when set, we have backfilled higher tiers
     RRDDIM_OPTION_UPDATED                           = (1 << 3), // single-threaded collector updated flag
+    RRDDIM_OPTION_VALUE_FLOAT                       = (1 << 4), // collected_value lane should be treated as float
 
     // this is 8-bit
 } RRDDIM_OPTIONS;
@@ -34,6 +35,8 @@ typedef enum __attribute__ ((__packed__)) rrddim_options {
 #define rrddim_option_check(rd, option) ((rd)->collector.options & (option))
 #define rrddim_option_set(rd, option)   (rd)->collector.options |= (option)
 #define rrddim_option_clear(rd, option) (rd)->collector.options &= ~(option)
+#define rrddim_is_float(rd)             ((rd)->collector.options & RRDDIM_OPTION_VALUE_FLOAT)
+#define rrddim_is_int(rd)               (!rrddim_is_float(rd))
 
 // flags are runtime changing status flags (atomics are required to alter/access them)
 typedef enum __attribute__ ((__packed__)) rrddim_flags {
@@ -119,9 +122,18 @@ struct rrddim {
 
         uint32_t counter;                               // the number of times we added values to this rrddim
 
-        collected_number collected_value;               // the current value, as collected - resets to 0 after being used
-        collected_number collected_value_max;           // the absolute maximum of the collected value
-        collected_number last_collected_value;          // the last value that was collected, after being processed
+        union {
+            struct {
+                collected_number collected_value;               // legacy int lane
+                collected_number collected_value_max;           // legacy int lane
+                collected_number last_collected_value;          // legacy int lane
+            } i;
+            struct {
+                NETDATA_DOUBLE collected_value;
+                NETDATA_DOUBLE collected_value_max;
+                NETDATA_DOUBLE last_collected_value;
+            } f;
+        } collected;                                           // type-aware storage (option bit selects lane)
 
         struct timeval last_collected_time;             // when was this dimension last updated
                                             // this is actual date time we updated the last_collected_value
@@ -189,6 +201,53 @@ static inline bool rrddim_check_upstream_exposed_collector(RRDDIM *rd) {
     return rd->rrdset->version == rd->stream.snd.sent_version;
 }
 
+// ------------------------------------------------------------------------
+// Type-aware accessors (Phase 1: int-only behavior preserved)
+
+static inline void rrddim_set_collected_int(RRDDIM *rd, int64_t v) {
+    rd->collector.collected.i.collected_value = (collected_number)v;
+}
+
+static inline void rrddim_set_collected_float(RRDDIM *rd, NETDATA_DOUBLE v) {
+    rd->collector.collected.f.collected_value = v;
+}
+
+static inline void rrddim_set_collected_max_int(RRDDIM *rd, int64_t v) {
+    rd->collector.collected.i.collected_value_max = (collected_number)v;
+}
+
+static inline void rrddim_set_collected_max_float(RRDDIM *rd, NETDATA_DOUBLE v) {
+    rd->collector.collected.f.collected_value_max = v;
+}
+
+static inline void rrddim_set_last_collected_int(RRDDIM *rd, int64_t v) {
+    rd->collector.collected.i.last_collected_value = (collected_number)v;
+}
+
+static inline void rrddim_set_last_collected_float(RRDDIM *rd, NETDATA_DOUBLE v) {
+    rd->collector.collected.f.last_collected_value = v;
+}
+
+static inline NETDATA_DOUBLE rrddim_collected_as_double(RRDDIM *rd) {
+    return rrddim_is_float(rd) ? rd->collector.collected.f.collected_value
+                               : (NETDATA_DOUBLE)rd->collector.collected.i.collected_value;
+}
+
+static inline NETDATA_DOUBLE rrddim_last_collected_as_double(RRDDIM *rd) {
+    return rrddim_is_float(rd) ? rd->collector.collected.f.last_collected_value
+                               : (NETDATA_DOUBLE)rd->collector.collected.i.last_collected_value;
+}
+
+static inline NETDATA_DOUBLE rrddim_collected_max_as_double(RRDDIM *rd) {
+    return rrddim_is_float(rd) ? rd->collector.collected.f.collected_value_max
+                               : (NETDATA_DOUBLE)rd->collector.collected.i.collected_value_max;
+}
+
+static inline int64_t rrddim_last_collected_raw_int(RRDDIM *rd) {
+    return rrddim_is_float(rd) ? (int64_t)rd->collector.collected.f.last_collected_value
+                               : (int64_t)rd->collector.collected.i.last_collected_value;
+}
+
 void rrddim_index_init(RRDSET *st);
 void rrddim_index_destroy(RRDSET *st);
 
@@ -228,6 +287,7 @@ void rrddim_isnot_obsolete___safe_from_collector_thread(RRDSET *st, RRDDIM *rd);
 
 collected_number rrddim_timed_set_by_pointer(RRDSET *st, RRDDIM *rd, struct timeval collected_time, collected_number value);
 collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
+NETDATA_DOUBLE rrddim_set_by_pointer_double(RRDSET *st, RRDDIM *rd, NETDATA_DOUBLE value);
 collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
 
 bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd);

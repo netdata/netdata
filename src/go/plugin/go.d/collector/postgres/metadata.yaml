@@ -27,7 +27,6 @@ modules:
         - postgres
         - postgresql
         - sql
-      most_popular: true
     overview:
       multi_instance: true
       data_collection:

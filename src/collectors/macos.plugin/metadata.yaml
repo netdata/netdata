@@ -18,7 +18,6 @@ modules:
         - macos
         - apple
         - darwin
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor macOS metrics for efficient operating system performance."

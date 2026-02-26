@@ -19,7 +19,6 @@ modules:
         - rethinkdb
         - database
         - db
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

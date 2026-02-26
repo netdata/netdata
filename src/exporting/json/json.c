@@ -164,9 +164,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
 
         "\"id\":\"%s\","
         "\"name\":\"%s\","
-        "\"value\":" COLLECTED_NUMBER_FORMAT ","
-
-        "\"timestamp\":%llu}",
+        "\"value\":",
 
         instance->config.prefix,
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
@@ -179,9 +177,14 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         rrdset_parts_type(st),
         rrdset_units(st),
         rrddim_id(rd),
-        rrddim_name(rd),
-        rd->collector.last_collected_value,
+        rrddim_name(rd));
 
+    if(rrddim_is_float(rd))
+        buffer_sprintf(instance->buffer, NETDATA_DOUBLE_FORMAT, rrddim_last_collected_as_double(rd));
+    else
+        buffer_sprintf(instance->buffer, COLLECTED_NUMBER_FORMAT, rrddim_last_collected_raw_int(rd));
+
+    buffer_sprintf(instance->buffer, ",\"timestamp\":%llu}",
         (unsigned long long)rd->collector.last_collected_time.tv_sec);
 
     if (instance->config.type != EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {

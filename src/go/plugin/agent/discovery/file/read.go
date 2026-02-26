@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
@@ -91,8 +91,8 @@ func (r *Reader) groups() (groups []*confgroup.Group) {
 }
 
 func configSourceType(path string) string {
-	if strings.Contains(path, "/etc/netdata") {
-		return "user"
+	if pluginconfig.IsStock(path) {
+		return confgroup.TypeStock
 	}
-	return "stock"
+	return confgroup.TypeUser
 }

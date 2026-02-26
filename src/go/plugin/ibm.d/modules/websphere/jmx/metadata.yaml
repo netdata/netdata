@@ -17,7 +17,6 @@ modules:
         description: ""
       keywords:
         - websphere_jmx
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

@@ -129,16 +129,28 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
         (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
-    buffer_sprintf(
-        instance->buffer,
-        "%s.%s.%s.%s%s " COLLECTED_NUMBER_FORMAT " %llu\n",
-        instance->config.prefix,
-        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-        chart_name,
-        dimension_name,
-        (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "",
-        rd->collector.last_collected_value,
-        (unsigned long long)rd->collector.last_collected_time.tv_sec);
+    if(rrddim_is_float(rd))
+        buffer_sprintf(
+            instance->buffer,
+            "%s.%s.%s.%s%s " NETDATA_DOUBLE_FORMAT " %llu\n",
+            instance->config.prefix,
+            (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
+            chart_name,
+            dimension_name,
+            (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "",
+            rrddim_last_collected_as_double(rd),
+            (unsigned long long)rd->collector.last_collected_time.tv_sec);
+    else
+        buffer_sprintf(
+            instance->buffer,
+            "%s.%s.%s.%s%s " COLLECTED_NUMBER_FORMAT " %llu\n",
+            instance->config.prefix,
+            (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
+            chart_name,
+            dimension_name,
+            (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "",
+            rrddim_last_collected_raw_int(rd),
+            (unsigned long long)rd->collector.last_collected_time.tv_sec);
 
     return 0;
 }

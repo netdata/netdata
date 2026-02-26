@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -176,10 +177,8 @@ func newSDConfigFromJSON(data []byte, name, source, sourceType, discovererType, 
 
 // sourceTypeFromPath determines the source type (stock/user) from a file path.
 func sourceTypeFromPath(path string) string {
-	// User configs are in /etc/ (e.g., /etc/netdata/sd.d/)
-	// Stock configs are in /usr/lib/ or similar system paths
-	if strings.Contains(path, "/etc/") {
-		return confgroup.TypeUser
+	if pluginconfig.IsStock(path) {
+		return confgroup.TypeStock
 	}
-	return confgroup.TypeStock
+	return confgroup.TypeUser
 }

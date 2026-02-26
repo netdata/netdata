@@ -103,7 +103,7 @@ func TestManagerCreateCollectorJobV2Branching(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			mgr := New(Config{})
+			mgr := New(Config{PluginName: testPluginName})
 			mgr.modules = collectorapi.Registry{
 				"testmod": tc.creator,
 			}
