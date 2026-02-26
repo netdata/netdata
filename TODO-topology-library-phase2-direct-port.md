@@ -260,6 +260,48 @@
     - apply `Focus Depth` expansion from selected focus roots only.
   - User decision (Costa, 2026-02-26):
     - D29.1 = **Apply `Focus Depth` from selected focus devices only** (not from every node included by shortest-path union).
+- [x] A30. Defensive parsing for multi-focus selector + reinstall sequence (Costa, 2026-02-26).
+  - Context:
+    - `focus_on` is now multi-select; backend currently expects resolved arrays of option IDs.
+    - risk identified: if a client sends a single comma-delimited value (`ip:a,ip:b`) instead of array values, backend can fall back to default (`all_devices`).
+  - User decision (Costa, 2026-02-26):
+    - D30.1 = **Do both**:
+      - first implement defensive comma-delimited parsing fallback in backend,
+      - then install backend and frontend (in this order).
+  - Implemented:
+    - backend now tokenizes each incoming `focus_on` value by comma and trims whitespace before normalization.
+    - behavior is now equivalent for:
+      - true multi-select arrays (for example `["ip:10.0.0.1", "ip:10.0.0.2"]`),
+      - single comma-delimited string fallback (for example `["ip:10.0.0.1, ip:10.0.0.2"]`).
+    - preserved precedence: presence of `all_devices` still resolves to `all_devices`.
+  - Validation:
+    - tests:
+      - `cd src/go && go test ./plugin/go.d/collector/snmp -count=1` passed.
+    - backend reinstall:
+      - `./install.sh` completed and netdata restarted successfully.
+      - known non-fatal warning remains: `git fetch -t` failed due SSH permissions.
+    - frontend reinstall:
+      - `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh` completed.
+      - webpack completed with warnings only (unused files/exports, large assets not precached, one `react-datepicker` critical dependency warning).
+- [x] A31. Enforce `focus_on` multi-select empty/`all_devices` semantics (Costa, 2026-02-26).
+  - User requirement:
+    - if `all_devices` is selected together with any other option, treat selection as only `all_devices`.
+    - if no option is selected, treat it as `all_devices`.
+  - Facts from current implementation:
+    - `normalizeTopologyManagedFocuses()` already collapses any selection containing `all_devices` to only `all_devices`.
+    - empty/blank selections currently normalize to `all_devices`.
+  - Plan:
+    - add explicit regression tests for:
+      - empty slice and blank-token selections => `all_devices`,
+      - mixed selections containing `all_devices` => `all_devices`.
+    - no behavioral code change unless tests reveal a gap.
+  - Implemented:
+    - confirmed behavior already present in `normalizeTopologyManagedFocuses()`:
+      - any selection containing `all_devices` collapses to only `all_devices`,
+      - empty/blank selections normalize to `all_devices`.
+    - added explicit regression tests for empty/blank selection cases.
+  - Validation:
+    - `cd src/go && go test ./plugin/go.d/collector/snmp -count=1` passed.
 - [ ] A26. Decide whether to remove `pair_side` concept for topology pairing metadata (Costa, 2026-02-26).
   - Context:
     - `pair_side` is backend-internal metadata (not device SNMP field).

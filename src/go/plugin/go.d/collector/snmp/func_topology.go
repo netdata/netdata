@@ -334,13 +334,14 @@ func normalizeTopologyManagedFocusValue(v string) string {
 }
 
 func normalizeTopologyManagedFocuses(values []string) []string {
-	if len(values) == 0 {
+	expanded := splitTopologyManagedFocusValues(values)
+	if len(expanded) == 0 {
 		return []string{topologyManagedFocusAllDevices}
 	}
 
-	seen := make(map[string]struct{}, len(values))
-	out := make([]string, 0, len(values))
-	for _, raw := range values {
+	seen := make(map[string]struct{}, len(expanded))
+	out := make([]string, 0, len(expanded))
+	for _, raw := range expanded {
 		normalized := normalizeTopologyManagedFocusValue(raw)
 		if normalized == "" {
 			continue
@@ -359,6 +360,24 @@ func normalizeTopologyManagedFocuses(values []string) []string {
 		return []string{topologyManagedFocusAllDevices}
 	}
 	sort.Strings(out)
+	return out
+}
+
+func splitTopologyManagedFocusValues(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	out := make([]string, 0, len(values))
+	for _, raw := range values {
+		for _, token := range strings.Split(raw, ",") {
+			token = strings.TrimSpace(token)
+			if token == "" {
+				continue
+			}
+			out = append(out, token)
+		}
+	}
 	return out
 }
 

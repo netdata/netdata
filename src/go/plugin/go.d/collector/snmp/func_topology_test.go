@@ -251,6 +251,9 @@ func TestNormalizeTopologyInferenceStrategy(t *testing.T) {
 
 func TestNormalizeTopologyManagedFocuses(t *testing.T) {
 	assert.Equal(t, []string{topologyManagedFocusAllDevices}, normalizeTopologyManagedFocuses(nil))
+	assert.Equal(t, []string{topologyManagedFocusAllDevices}, normalizeTopologyManagedFocuses([]string{}))
+	assert.Equal(t, []string{topologyManagedFocusAllDevices}, normalizeTopologyManagedFocuses([]string{""}))
+	assert.Equal(t, []string{topologyManagedFocusAllDevices}, normalizeTopologyManagedFocuses([]string{" , , "}))
 	assert.Equal(
 		t,
 		[]string{topologyManagedFocusAllDevices},
@@ -263,8 +266,18 @@ func TestNormalizeTopologyManagedFocuses(t *testing.T) {
 	)
 	assert.Equal(
 		t,
+		[]string{"ip:10.0.0.1", "ip:10.0.0.2"},
+		normalizeTopologyManagedFocuses([]string{" ip:10.0.0.2 , ip:10.0.0.1 "}),
+	)
+	assert.Equal(
+		t,
 		[]string{topologyManagedFocusAllDevices},
 		normalizeTopologyManagedFocuses([]string{"ip:10.0.0.1", topologyManagedFocusAllDevices}),
+	)
+	assert.Equal(
+		t,
+		[]string{topologyManagedFocusAllDevices},
+		normalizeTopologyManagedFocuses([]string{"ip:10.0.0.1,all_devices"}),
 	)
 	assert.Equal(
 		t,
