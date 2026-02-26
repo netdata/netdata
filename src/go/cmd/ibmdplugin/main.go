@@ -62,7 +62,10 @@ func main() {
 		opts.DumpMode = "10m"
 	}
 
-	pluginconfig.MustInit(opts)
+	pluginconfig.MustInit(pluginconfig.InitInput{
+		ConfDir:   opts.ConfDir,
+		WatchPath: opts.WatchPath,
+	})
 
 	dumpDataDir := ""
 	if opts.DumpDataDir != "" {
