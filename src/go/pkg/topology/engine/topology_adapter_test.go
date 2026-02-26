@@ -398,6 +398,148 @@ func TestToTopologyData_ClassifiesSTPCorroboratedManagedAliasAsSwitchFacing(t *t
 	require.Equal(t, []string{"stp", "fdb", "fdb_managed_alias"}, port1["topology_role_sources"])
 }
 
+func TestToTopologyData_EnrichesPortStatusesWithNeighborsFDBAndSTP(t *testing.T) {
+	result := Result{
+		Devices: []Device{
+			{
+				ID:        "sw1",
+				Hostname:  "sw1",
+				ChassisID: "00:11:22:33:44:55",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+			},
+			{
+				ID:        "sw2",
+				Hostname:  "sw2",
+				ChassisID: "aa:bb:cc:dd:ee:ff",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+				Labels: map[string]string{
+					"capabilities_enabled": "bridge,router",
+				},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "sw1", IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1", Labels: map[string]string{"admin_status": "up", "oper_status": "up"}},
+			{DeviceID: "sw1", IfIndex: 2, IfName: "Gi0/2", IfDescr: "Gi0/2", Labels: map[string]string{"admin_status": "down", "oper_status": "down"}},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "sw1",
+				SourcePort: "Gi0/1",
+				TargetID:   "sw2",
+				TargetPort: "Gi0/24",
+			},
+			{
+				Protocol:   "cdp",
+				SourceID:   "sw1",
+				SourcePort: "Gi0/1",
+				TargetID:   "sw2",
+				TargetPort: "Gi0/24",
+			},
+			{
+				Protocol:   "stp",
+				SourceID:   "sw1",
+				SourcePort: "Gi0/1",
+				TargetID:   "sw2",
+				TargetPort: "Gi0/24",
+				Labels: map[string]string{
+					"stp_state": "forwarding",
+					"vlan_id":   "10",
+				},
+			},
+			{
+				Protocol:   "stp",
+				SourceID:   "sw1",
+				SourcePort: "Gi0/1",
+				TargetID:   "sw2",
+				TargetPort: "Gi0/24",
+				Labels: map[string]string{
+					"stp_state": "blocking",
+					"vlan_id":   "20",
+				},
+			},
+		},
+		Attachments: []Attachment{
+			{
+				DeviceID:   "sw1",
+				IfIndex:    1,
+				EndpointID: "mac:00:00:00:00:10:01",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"fdb_status": "learned",
+					"vlan_id":    "10",
+				},
+			},
+			{
+				DeviceID:   "sw1",
+				IfIndex:    1,
+				EndpointID: "mac:00:00:00:00:20:01",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"fdb_status": "learned",
+					"vlan_id":    "20",
+				},
+			},
+			{
+				DeviceID:   "sw1",
+				IfIndex:    2,
+				EndpointID: "mac:00:00:00:00:30:01",
+				Method:     "fdb",
+				Labels: map[string]string{
+					"fdb_status": "learned",
+				},
+			},
+		},
+	}
+
+	data := ToTopologyData(result, TopologyDataOptions{
+		Source: "snmp",
+		Layer:  "2",
+		View:   "summary",
+	})
+
+	actor := findActorBySysName(data.Actors, "sw1")
+	require.NotNil(t, actor)
+	require.Equal(t, 1, actor.Attributes["ports_up"])
+	require.Equal(t, 1, actor.Attributes["ports_down"])
+	require.Equal(t, 1, actor.Attributes["ports_admin_down"])
+	require.Equal(t, 3, actor.Attributes["fdb_total_macs"])
+	require.Equal(t, 2, actor.Attributes["vlan_count"])
+	require.Equal(t, 1, actor.Attributes["lldp_neighbor_count"])
+	require.Equal(t, 1, actor.Attributes["cdp_neighbor_count"])
+
+	statuses, ok := actor.Attributes["if_statuses"].([]map[string]any)
+	require.True(t, ok)
+
+	port1 := findInterfaceStatusByIndex(statuses, 1)
+	require.Equal(t, 2, port1["fdb_mac_count"])
+	require.Equal(t, "blocking", port1["stp_state"])
+	neighbors, ok := port1["neighbors"].([]map[string]any)
+	require.True(t, ok)
+	require.Len(t, neighbors, 2)
+
+	cdpNeighbor := findNeighborByProtocol(neighbors, "cdp")
+	require.NotNil(t, cdpNeighbor)
+	require.Equal(t, "sw2", cdpNeighbor["remote_device"])
+	require.Equal(t, "Gi0/24", cdpNeighbor["remote_port"])
+	require.Equal(t, "10.0.0.2", cdpNeighbor["remote_ip"])
+	require.Equal(t, "aa:bb:cc:dd:ee:ff", cdpNeighbor["remote_chassis_id"])
+	require.Equal(t, []string{"bridge", "router"}, cdpNeighbor["remote_capabilities"])
+
+	lldpNeighbor := findNeighborByProtocol(neighbors, "lldp")
+	require.NotNil(t, lldpNeighbor)
+	require.Equal(t, "sw2", lldpNeighbor["remote_device"])
+	require.Equal(t, "Gi0/24", lldpNeighbor["remote_port"])
+	require.Equal(t, "10.0.0.2", lldpNeighbor["remote_ip"])
+	require.Equal(t, "aa:bb:cc:dd:ee:ff", lldpNeighbor["remote_chassis_id"])
+	require.Equal(t, []string{"bridge", "router"}, lldpNeighbor["remote_capabilities"])
+
+	port2 := findInterfaceStatusByIndex(statuses, 2)
+	require.Equal(t, 1, port2["fdb_mac_count"])
+	_, hasNeighbors := port2["neighbors"]
+	require.False(t, hasNeighbors)
+}
+
 func TestToTopologyData_DefaultDiscoveredCountWithoutLocalID(t *testing.T) {
 	result := Result{
 		Devices: []Device{
@@ -2540,6 +2682,16 @@ func findInterfaceStatusByIndex(statuses []map[string]any, ifIndex int) map[stri
 		value, ok := status["if_index"].(int)
 		if ok && value == ifIndex {
 			return status
+		}
+	}
+	return nil
+}
+
+func findNeighborByProtocol(neighbors []map[string]any, protocol string) map[string]any {
+	for _, neighbor := range neighbors {
+		value, ok := neighbor["protocol"].(string)
+		if ok && strings.EqualFold(value, protocol) {
+			return neighbor
 		}
 	}
 	return nil
