@@ -664,15 +664,8 @@ static https_client_resp_t handle_http_request(https_req_ctx_t *ctx) {
     }
     buffer_strcat(hdr, http_methods[req_type]);
 
-    if (req_type == HTTP_REQ_CONNECT) {
-        buffer_strcat(hdr, ctx->request->host);
-        buffer_sprintf(hdr, ":%d", ctx->request->port);
-        http_parse_ctx_create(&ctx->parse_ctx, HTTP_PARSE_PROXY_CONNECT);
-    }
-    else {
-        buffer_strcat(hdr, ctx->request->url);
-        http_parse_ctx_create(&ctx->parse_ctx, HTTP_PARSE_INITIAL);
-    }
+    buffer_strcat(hdr, ctx->request->url);
+    http_parse_ctx_create(&ctx->parse_ctx, HTTP_PARSE_INITIAL);
 
     buffer_strcat(hdr, HTTP_1_1 HTTP_ENDL);
 
@@ -682,26 +675,6 @@ static https_client_resp_t handle_http_request(https_req_ctx_t *ctx) {
     if (req_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
         buffer_sprintf(hdr, "Content-Length: %zu\x0D\x0A", ctx->request->payload_size);
     }
-    if (ctx->request->proxy_username) {
-        size_t creds_plain_len = strlen(ctx->request->proxy_username) + strlen(ctx->request->proxy_password) + 1 /* ':' */;
-        char *creds_plain = callocz(1, creds_plain_len + 1);
-        char *ptr = creds_plain;
-        strcpy(ptr, ctx->request->proxy_username);
-        ptr += strlen(ctx->request->proxy_username);
-        *ptr++ = ':';
-        strcpy(ptr, ctx->request->proxy_password);
-
-        int creds_base64_len = (((4 * creds_plain_len / 3) + 3) & ~3);
-        // OpenSSL encoder puts newline every 64 output bytes
-        // we remove those but during encoding we need that space in the buffer
-        creds_base64_len += (1+(creds_base64_len/64)) * strlen("\n");
-        char *creds_base64 = callocz(1, creds_base64_len + 1);
-        (void) netdata_base64_encode((unsigned char *)creds_base64, (unsigned char *)creds_plain, creds_plain_len);
-        buffer_sprintf(hdr, "Proxy-Authorization: Basic %s\x0D\x0A", creds_base64);
-        aclk_sensitive_free(&creds_plain);
-        aclk_sensitive_free(&creds_base64);
-    }
-
     buffer_strcat(hdr, "\x0D\x0A");
 
     // Send the request
