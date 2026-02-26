@@ -100,12 +100,20 @@ static void rrdcontext_prune_hub_queue(RRDHOST *host, usec_t now_ut, bool force_
 
         spinlock_lock(&host->rrdctx.hub_queue.spinlock);
         if(stale) {
-            RRDCONTEXT_QUEUE_DEL(&host->rrdctx.hub_queue, idx);
-            __atomic_add_fetch(&host->rrdctx.hub_queue.version, 1, __ATOMIC_RELAXED);
-            __atomic_sub_fetch(&host->rrdctx.hub_queue.entries, 1, __ATOMIC_RELAXED);
-            dropped++;
-            if(queued > 0)
-                queued--;
+            // Revalidate after re-lock: queue may have changed while lock was dropped.
+            RRDCONTEXT *rc_at_idx = RRDCONTEXT_QUEUE_GET(&host->rrdctx.hub_queue, idx);
+            if(rc_at_idx == rc) {
+                RRDCONTEXT_QUEUE_DEL(&host->rrdctx.hub_queue, idx);
+                __atomic_add_fetch(&host->rrdctx.hub_queue.version, 1, __ATOMIC_RELAXED);
+                __atomic_sub_fetch(&host->rrdctx.hub_queue.entries, 1, __ATOMIC_RELAXED);
+
+                rc->queue.idx = 0;
+                rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_HUB);
+
+                dropped++;
+                if(queued > 0)
+                    queued--;
+            }
         }
         else if(do_it) {
             rrdcontext_del_from_hub_queue(rc, true);
