@@ -559,15 +559,16 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 
 	m.Debugf("creating %s[%s] job, config: %v", cfg.Module(), cfg.Name(), cfg)
 
+	useV2 := creator.CreateV2 != nil
+
 	var jobDumpDir string
-	if m.dumpDataDir != "" {
+	if m.dumpDataDir != "" && !useV2 {
 		jobDumpDir = filepath.Join(m.dumpDataDir, naming.Sanitize(cfg.Module()), naming.Sanitize(cfg.Name()))
 		if err := os.MkdirAll(jobDumpDir, 0o755); err != nil {
 			return nil, fmt.Errorf("creating dump directory: %w", err)
 		}
 	}
 
-	useV2 := creator.CreateV2 != nil
 	if useV2 {
 		mod := creator.CreateV2()
 		if mod == nil {
@@ -575,11 +576,6 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		}
 		if err := applyConfig(cfg, mod); err != nil {
 			return nil, err
-		}
-		if jobDumpDir != "" {
-			if dumpAware, ok := mod.(metricsaudit.Capturable); ok {
-				dumpAware.EnableDump(jobDumpDir)
-			}
 		}
 
 		jobCfg := jobruntime.JobV2Config{
