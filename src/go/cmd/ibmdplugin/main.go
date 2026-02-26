@@ -11,9 +11,11 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jessevdk/go-flags"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
@@ -135,13 +137,38 @@ func main() {
 	agenthost.Run(a)
 }
 
-func parseCLI() *cli.Option {
-	opt, err := cli.Parse(os.Args)
+type options struct {
+	cli.Option
+	DumpMode    string `long:"dump" description:"run in dump mode for specified duration (e.g. 30s, 5m) and analyze metric structure"`
+	DumpSummary bool   `long:"dump-summary" description:"show consolidated summary across all jobs in dump mode"`
+	DumpDataDir string `long:"dump-data" description:"write structured dump artifacts for the selected module to the given directory"`
+}
+
+func parseCLI() *options {
+	opt := &options{
+		Option: cli.Option{
+			UpdateEvery: 1,
+		},
+	}
+
+	parser := flags.NewParser(opt, flags.Default)
+	parser.Name = executable.Name
+	parser.Usage = "[OPTIONS] [update every]"
+
+	rest, err := parser.ParseArgs(os.Args)
 	if err != nil {
 		if cli.IsHelp(err) {
 			os.Exit(0)
 		}
 		os.Exit(1)
+	}
+
+	if len(rest) > 1 {
+		updateEvery, convErr := strconv.Atoi(rest[1])
+		if convErr != nil {
+			os.Exit(1)
+		}
+		opt.UpdateEvery = updateEvery
 	}
 
 	return opt

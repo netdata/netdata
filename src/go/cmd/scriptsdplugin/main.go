@@ -85,12 +85,11 @@ func main() {
 			discoveryproviders.File(),
 			discoveryproviders.Dummy(),
 		},
-		RunModule:               opts.Module,
-		RunJob:                  opts.Job,
-		MinUpdateEvery:          opts.UpdateEvery,
-		DumpSummary:             opts.DumpSummary,
-		DisableServiceDiscovery: true,
-	})
+			RunModule:               opts.Module,
+			RunJob:                  opts.Job,
+			MinUpdateEvery:          opts.UpdateEvery,
+			DisableServiceDiscovery: true,
+		})
 
 	a.Debugf("plugin: name=%s, %s", a.Name, buildinfo.Info())
 	if u, err := user.Current(); err == nil {
