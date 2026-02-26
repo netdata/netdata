@@ -697,12 +697,12 @@ func applyTopologyDepthFocusFilter(data *topologyData, options topologyQueryOpti
 		return
 	}
 	options = normalizeTopologyQueryOptions(options)
-	focusIP := topologyManagedFocusSelectedIP(options.ManagedDeviceFocus)
+	focusIPs := topologyManagedFocusSelectedIPs(options.ManagedDeviceFocus)
 
 	beforeActors := len(data.Actors)
 	beforeLinks := len(data.Links)
 
-	if options.ManagedDeviceFocus == topologyManagedFocusAllDevices {
+	if isTopologyManagedFocusAllDevices(options.ManagedDeviceFocus) {
 		if data.Stats == nil {
 			data.Stats = make(map[string]any)
 		}
@@ -734,23 +734,26 @@ func applyTopologyDepthFocusFilter(data *topologyData, options topologyQueryOpti
 		return
 	}
 
+	if len(focusIPs) == 0 {
+		recomputeTopologyLinkStats(data)
+		return
+	}
+
 	roots := make(map[string]struct{})
-	if focusIP != "" {
-		for actorID, actor := range actorByID {
-			if _, ok := nonSegmentSet[actorID]; !ok {
-				continue
-			}
-			if !isManagedSNMPDeviceActor(actor) {
-				continue
-			}
+	for actorID, actor := range actorByID {
+		if _, ok := nonSegmentSet[actorID]; !ok {
+			continue
+		}
+		if !isManagedSNMPDeviceActor(actor) {
+			continue
+		}
+		for _, focusIP := range focusIPs {
 			if !topologyActorHasIP(actor, focusIP) {
 				continue
 			}
 			roots[actorID] = struct{}{}
+			break
 		}
-	} else {
-		recomputeTopologyLinkStats(data)
-		return
 	}
 	if len(roots) == 0 {
 		if data.Stats == nil {
@@ -852,19 +855,54 @@ func applyTopologyDepthFocusFilter(data *topologyData, options topologyQueryOpti
 		return
 	}
 
-	includedActors := make(map[string]struct{}, len(includedNonSegment)+len(segmentSet))
+	includedActorsByDepth := make(map[string]struct{}, len(includedNonSegment)+len(segmentSet))
 	for actorID := range includedNonSegment {
-		includedActors[actorID] = struct{}{}
+		includedActorsByDepth[actorID] = struct{}{}
 	}
 	if options.Depth == topologyDepthAllInternal || options.Depth > 0 {
 		for segmentID, neighbors := range segmentNeighbors {
 			for actorID := range neighbors {
 				if _, ok := includedNonSegment[actorID]; ok {
-					includedActors[segmentID] = struct{}{}
+					includedActorsByDepth[segmentID] = struct{}{}
 					break
 				}
 			}
 		}
+	}
+
+	shortestPathActors, shortestPathPairs := topologyShortestPathUnion(data, roots)
+	includedActors := make(map[string]struct{}, len(includedActorsByDepth)+len(shortestPathActors))
+	for actorID := range includedActorsByDepth {
+		includedActors[actorID] = struct{}{}
+	}
+	for actorID := range shortestPathActors {
+		includedActors[actorID] = struct{}{}
+	}
+
+	filteredLinks := make([]topologyLink, 0, len(data.Links))
+	linkActors := make(map[string]struct{})
+	for _, link := range data.Links {
+		srcActorID := strings.TrimSpace(link.SrcActorID)
+		dstActorID := strings.TrimSpace(link.DstActorID)
+		if srcActorID == "" || dstActorID == "" {
+			continue
+		}
+
+		_, srcInDepth := includedActorsByDepth[srcActorID]
+		_, dstInDepth := includedActorsByDepth[dstActorID]
+		_, inShortestPath := shortestPathPairs[topologyActorPairKey(srcActorID, dstActorID)]
+		if !(srcInDepth && dstInDepth) && !inShortestPath {
+			continue
+		}
+
+		filteredLinks = append(filteredLinks, link)
+		linkActors[srcActorID] = struct{}{}
+		linkActors[dstActorID] = struct{}{}
+	}
+	data.Links = filteredLinks
+
+	for actorID := range linkActors {
+		includedActors[actorID] = struct{}{}
 	}
 
 	filteredActors := make([]topologyActor, 0, len(data.Actors))
@@ -874,18 +912,6 @@ func applyTopologyDepthFocusFilter(data *topologyData, options topologyQueryOpti
 		}
 	}
 	data.Actors = filteredActors
-
-	filteredLinks := make([]topologyLink, 0, len(data.Links))
-	for _, link := range data.Links {
-		if _, ok := includedActors[link.SrcActorID]; !ok {
-			continue
-		}
-		if _, ok := includedActors[link.DstActorID]; !ok {
-			continue
-		}
-		filteredLinks = append(filteredLinks, link)
-	}
-	data.Links = filteredLinks
 
 	filterDanglingLinks(data)
 	if options.EliminateNonIPInferred {
@@ -915,17 +941,155 @@ func applyTopologyDepthFocusFilter(data *topologyData, options topologyQueryOpti
 }
 
 func topologyManagedFocusSelectedIP(value string) string {
-	normalized := normalizeTopologyManagedFocus(value)
-	if normalized == topologyManagedFocusAllDevices {
+	ips := topologyManagedFocusSelectedIPs(value)
+	if len(ips) == 0 {
 		return ""
 	}
-	if len(normalized) <= len(topologyManagedFocusIPPrefix) {
+	return ips[0]
+}
+
+func topologyManagedFocusSelectedIPs(value string) []string {
+	normalized := parseTopologyManagedFocuses(value)
+	if len(normalized) == 1 && normalized[0] == topologyManagedFocusAllDevices {
+		return nil
+	}
+
+	out := make([]string, 0, len(normalized))
+	for _, focus := range normalized {
+		if len(focus) <= len(topologyManagedFocusIPPrefix) {
+			continue
+		}
+		if !strings.EqualFold(focus[:len(topologyManagedFocusIPPrefix)], topologyManagedFocusIPPrefix) {
+			continue
+		}
+		ip := normalizeIPAddress(strings.TrimSpace(focus[len(topologyManagedFocusIPPrefix):]))
+		if ip == "" {
+			continue
+		}
+		out = append(out, ip)
+	}
+	return out
+}
+
+func topologyShortestPathUnion(
+	data *topologyData,
+	roots map[string]struct{},
+) (map[string]struct{}, map[string]struct{}) {
+	includedActors := make(map[string]struct{})
+	includedPairs := make(map[string]struct{})
+	if data == nil || len(roots) < 2 {
+		return includedActors, includedPairs
+	}
+
+	adjacency := make(map[string]map[string]struct{})
+	for _, link := range data.Links {
+		src := strings.TrimSpace(link.SrcActorID)
+		dst := strings.TrimSpace(link.DstActorID)
+		if src == "" || dst == "" || src == dst {
+			continue
+		}
+		if _, ok := adjacency[src]; !ok {
+			adjacency[src] = make(map[string]struct{})
+		}
+		if _, ok := adjacency[dst]; !ok {
+			adjacency[dst] = make(map[string]struct{})
+		}
+		adjacency[src][dst] = struct{}{}
+		adjacency[dst][src] = struct{}{}
+	}
+
+	rootIDs := make([]string, 0, len(roots))
+	for actorID := range roots {
+		rootIDs = append(rootIDs, actorID)
+	}
+	sort.Strings(rootIDs)
+
+	for i := 0; i < len(rootIDs); i++ {
+		source := rootIDs[i]
+		if _, ok := adjacency[source]; !ok {
+			continue
+		}
+
+		parents, distance := topologyShortestParents(adjacency, source)
+		for j := i + 1; j < len(rootIDs); j++ {
+			target := rootIDs[j]
+			if _, ok := distance[target]; !ok {
+				continue
+			}
+
+			visited := make(map[string]struct{})
+			stack := []string{target}
+			for len(stack) > 0 {
+				node := stack[len(stack)-1]
+				stack = stack[:len(stack)-1]
+				if _, seen := visited[node]; seen {
+					continue
+				}
+				visited[node] = struct{}{}
+				includedActors[node] = struct{}{}
+				if node == source {
+					continue
+				}
+
+				for _, parent := range parents[node] {
+					includedActors[parent] = struct{}{}
+					includedPairs[topologyActorPairKey(node, parent)] = struct{}{}
+					stack = append(stack, parent)
+				}
+			}
+		}
+	}
+
+	return includedActors, includedPairs
+}
+
+func topologyShortestParents(
+	adjacency map[string]map[string]struct{},
+	source string,
+) (map[string][]string, map[string]int) {
+	parents := make(map[string][]string)
+	distance := map[string]int{source: 0}
+	queue := []string{source}
+
+	for head := 0; head < len(queue); head++ {
+		current := queue[head]
+		neighbors := make([]string, 0, len(adjacency[current]))
+		for neighbor := range adjacency[current] {
+			neighbors = append(neighbors, neighbor)
+		}
+		sort.Strings(neighbors)
+		for _, neighbor := range neighbors {
+			nextDepth := distance[current] + 1
+			currentDepth, seen := distance[neighbor]
+			if !seen {
+				distance[neighbor] = nextDepth
+				parents[neighbor] = []string{current}
+				queue = append(queue, neighbor)
+				continue
+			}
+			if nextDepth == currentDepth {
+				parents[neighbor] = append(parents[neighbor], current)
+			}
+		}
+	}
+
+	for node := range parents {
+		sort.Strings(parents[node])
+	}
+
+	return parents, distance
+}
+
+func topologyActorPairKey(left, right string) string {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == "" || right == "" {
 		return ""
 	}
-	if !strings.EqualFold(normalized[:len(topologyManagedFocusIPPrefix)], topologyManagedFocusIPPrefix) {
-		return ""
+	if left > right {
+		left, right = right, left
 	}
-	return normalizeIPAddress(strings.TrimSpace(normalized[len(topologyManagedFocusIPPrefix):]))
+	return left + "|" + right
 }
 
 func topologyActorHasIP(actor topologyActor, ip string) bool {

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -688,6 +689,154 @@ func TestApplyTopologyDepthFocusFilter_ManagedFocusDepthOneIncludesDirectNeighbo
 	require.Len(t, data.Links, 3)
 	require.Equal(t, "ip:10.0.0.1", data.Stats["managed_snmp_device_focus"])
 	require.Equal(t, 1, data.Stats["depth"])
+}
+
+func TestApplyTopologyDepthFocusFilter_MultiFocusDepthZeroIncludesAllShortestPaths(t *testing.T) {
+	data := topologyData{
+		Actors: []topologyActor{
+			{
+				ActorID:   "device:managed-a",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.1"}},
+			},
+			{
+				ActorID:   "device:managed-b",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.2"}},
+			},
+			{
+				ActorID:   "device:managed-c",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.3"}},
+			},
+			{
+				ActorID:   "segment:s1",
+				ActorType: "segment",
+				Source:    "snmp",
+				Match:     topologyMatch{Hostnames: []string{"segment:s1"}},
+			},
+		},
+		Links: []topologyLink{
+			{
+				SrcActorID: "device:managed-a",
+				DstActorID: "device:managed-b",
+				Protocol:   "lldp",
+				Direction:  "bidirectional",
+			},
+			{
+				SrcActorID: "device:managed-b",
+				DstActorID: "device:managed-c",
+				Protocol:   "lldp",
+				Direction:  "bidirectional",
+			},
+			{
+				SrcActorID: "device:managed-a",
+				DstActorID: "segment:s1",
+				Protocol:   "bridge",
+				Direction:  "bidirectional",
+			},
+			{
+				SrcActorID: "segment:s1",
+				DstActorID: "device:managed-c",
+				Protocol:   "fdb",
+				Direction:  "bidirectional",
+			},
+		},
+		Stats: map[string]any{},
+	}
+
+	applyTopologyDepthFocusFilter(&data, topologyQueryOptions{
+		ManagedDeviceFocus:     "ip:10.0.0.3,ip:10.0.0.1",
+		Depth:                  0,
+		EliminateNonIPInferred: true,
+	})
+
+	actorIDs := make([]string, 0, len(data.Actors))
+	for _, actor := range data.Actors {
+		actorIDs = append(actorIDs, actor.ActorID)
+	}
+	assert.ElementsMatch(
+		t,
+		[]string{"device:managed-a", "device:managed-b", "device:managed-c", "segment:s1"},
+		actorIDs,
+	)
+	require.Len(t, data.Links, 4)
+	require.Equal(t, "ip:10.0.0.1,ip:10.0.0.3", data.Stats["managed_snmp_device_focus"])
+	require.Equal(t, 0, data.Stats["depth"])
+}
+
+func TestApplyTopologyDepthFocusFilter_DepthExpandsFromSelectedRootsOnly(t *testing.T) {
+	data := topologyData{
+		Actors: []topologyActor{
+			{
+				ActorID:   "device:managed-a",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.1"}},
+			},
+			{
+				ActorID:   "device:managed-b",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.2"}},
+			},
+			{
+				ActorID:   "device:managed-c",
+				ActorType: "device",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.3"}},
+			},
+			{
+				ActorID:   "endpoint:x",
+				ActorType: "endpoint",
+				Source:    "snmp",
+				Match:     topologyMatch{IPAddresses: []string{"10.0.0.50"}},
+			},
+		},
+		Links: []topologyLink{
+			{
+				SrcActorID: "device:managed-a",
+				DstActorID: "device:managed-b",
+				Protocol:   "lldp",
+				Direction:  "bidirectional",
+			},
+			{
+				SrcActorID: "device:managed-b",
+				DstActorID: "device:managed-c",
+				Protocol:   "lldp",
+				Direction:  "bidirectional",
+			},
+			{
+				SrcActorID: "device:managed-b",
+				DstActorID: "endpoint:x",
+				Protocol:   "fdb",
+				Direction:  "bidirectional",
+			},
+		},
+		Stats: map[string]any{},
+	}
+
+	applyTopologyDepthFocusFilter(&data, topologyQueryOptions{
+		ManagedDeviceFocus:     "ip:10.0.0.1,ip:10.0.0.3",
+		Depth:                  1,
+		EliminateNonIPInferred: true,
+	})
+
+	actorIDs := make([]string, 0, len(data.Actors))
+	for _, actor := range data.Actors {
+		actorIDs = append(actorIDs, actor.ActorID)
+	}
+	assert.ElementsMatch(
+		t,
+		[]string{"device:managed-a", "device:managed-b", "device:managed-c"},
+		actorIDs,
+	)
+	for _, link := range data.Links {
+		assert.False(t, link.SrcActorID == "endpoint:x" || link.DstActorID == "endpoint:x")
+	}
 }
 
 func countActorsByType(data topologyData, actorType string) int {
