@@ -162,7 +162,7 @@ const char *aclk_lws_wss_get_proxy_setting(ACLK_PROXY_TYPE *type)
         *type = PROXY_DISABLED;
         safe_log_proxy_error(
             "Config var \"" ACLK_PROXY_CONFIG_VAR
-            "\" defined but of unknown format. Supported syntax: \"socks5[h]://[user:pass@]host:port\".",
+            "\" defined but of unknown format. Supported syntax: \"http://[user:pass@]host:port\" or \"socks5[h]://[user:pass@]host:port\".",
             proxy);
         freez((void *)proxy_source);
         proxy_source = NULL;
