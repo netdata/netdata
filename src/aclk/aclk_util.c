@@ -681,7 +681,7 @@ static int aclk_http_proxy_negotiate(int sockfd, const char *proxy_username, con
             break;
     }
 
-    if (used == sizeof(resp) - 1)
+    if (!strstr(resp, "\r\n\r\n"))
         goto cleanup;
 
     if (strncmp(resp, "HTTP/1.1 ", 9) != 0 && strncmp(resp, "HTTP/1.0 ", 9) != 0)
