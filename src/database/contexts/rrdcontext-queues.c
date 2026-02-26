@@ -99,6 +99,9 @@ static void rrdcontext_prune_hub_queue(RRDHOST *host, usec_t now_ut, bool force_
             dictionary_acquired_item_release(host->rrdctx.contexts, item);
 
         spinlock_lock(&host->rrdctx.hub_queue.spinlock);
+        if(unlikely(!service_running(SERVICE_CONTEXT)))
+            break;
+
         if(stale) {
             // Revalidate after re-lock: queue may have changed while lock was dropped.
             RRDCONTEXT *rc_at_idx = RRDCONTEXT_QUEUE_GET(&host->rrdctx.hub_queue, idx);
