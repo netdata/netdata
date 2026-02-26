@@ -17,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
@@ -67,7 +68,7 @@ type JobConfig struct {
 	IsStock         bool
 	Vnode           vnodes.VirtualNode
 	DumpMode        bool
-	DumpAnalyzer    DumpAnalyzer
+	DumpAnalyzer    metricsaudit.Analyzer
 	FunctionOnly    bool
 }
 
@@ -163,7 +164,7 @@ type Job struct {
 
 	// Dump mode support
 	dumpMode     bool
-	dumpAnalyzer DumpAnalyzer
+	dumpAnalyzer metricsaudit.Analyzer
 	skipTracker  tickstate.SkipTracker
 }
 

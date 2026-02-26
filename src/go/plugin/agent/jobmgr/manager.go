@@ -24,6 +24,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"gopkg.in/yaml.v2"
@@ -40,7 +41,7 @@ type Config struct {
 	FnReg              FunctionRegistry
 	Vnodes             map[string]*vnodes.VirtualNode
 	DumpMode           bool
-	DumpAnalyzer       jobruntime.DumpAnalyzer
+	DumpAnalyzer       metricsaudit.Analyzer
 	DumpDataDir        string
 	FunctionJSONWriter func(payload []byte, code int)
 	RuntimeService     runtimecomp.Service
@@ -147,7 +148,7 @@ type Manager struct {
 
 	// Dump mode
 	dumpMode     bool
-	dumpAnalyzer jobruntime.DumpAnalyzer
+	dumpAnalyzer metricsaudit.Analyzer
 	dumpDataDir  string
 
 	fileStatus  *fileStatus
@@ -564,9 +565,6 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		if err := os.MkdirAll(jobDumpDir, 0o755); err != nil {
 			return nil, fmt.Errorf("creating dump directory: %w", err)
 		}
-		if m.dumpAnalyzer != nil {
-			m.dumpAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
-		}
 	}
 
 	useV2 := creator.CreateV2 != nil
@@ -579,7 +577,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 			return nil, err
 		}
 		if jobDumpDir != "" {
-			if dumpAware, ok := mod.(interface{ EnableDump(string) }); ok {
+			if dumpAware, ok := mod.(metricsaudit.Capturable); ok {
 				dumpAware.EnableDump(jobDumpDir)
 			}
 		}
@@ -614,8 +612,13 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		return nil, err
 	}
 
+	if m.dumpAnalyzer != nil && jobDumpDir != "" {
+		// Auditing hooks are V1-only; V2 jobs are intentionally excluded.
+		m.dumpAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
+	}
+
 	if jobDumpDir != "" {
-		if dumpAware, ok := mod.(interface{ EnableDump(string) }); ok {
+		if dumpAware, ok := mod.(metricsaudit.Capturable); ok {
 			dumpAware.EnableDump(jobDumpDir)
 		}
 	}
