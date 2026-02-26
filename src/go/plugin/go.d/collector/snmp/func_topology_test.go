@@ -27,6 +27,7 @@ func TestTopologyMethodConfigIncludesSelectors(t *testing.T) {
 
 	mapType := cfg.RequiredParams[1]
 	assert.Equal(t, topologyParamMapType, mapType.ID)
+	assert.Equal(t, "Map", mapType.Name)
 	assert.Equal(t, funcapi.ParamSelect, mapType.Selection)
 	require.Len(t, mapType.Options, 3)
 	assert.Equal(t, topologyMapTypeLLDPCDPManaged, mapType.Options[0].ID)
@@ -36,6 +37,7 @@ func TestTopologyMethodConfigIncludesSelectors(t *testing.T) {
 
 	strategy := cfg.RequiredParams[2]
 	assert.Equal(t, topologyParamInferenceStrategy, strategy.ID)
+	assert.Equal(t, "Infer Strategy", strategy.Name)
 	assert.Equal(t, funcapi.ParamSelect, strategy.Selection)
 	require.Len(t, strategy.Options, 7)
 	assert.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, strategy.Options[0].ID)
@@ -49,13 +51,15 @@ func TestTopologyMethodConfigIncludesSelectors(t *testing.T) {
 
 	managedFocus := cfg.RequiredParams[3]
 	assert.Equal(t, topologyParamManagedDeviceFocus, managedFocus.ID)
-	assert.Equal(t, funcapi.ParamSelect, managedFocus.Selection)
+	assert.Equal(t, "Focus On", managedFocus.Name)
+	assert.Equal(t, funcapi.ParamMultiSelect, managedFocus.Selection)
 	require.Len(t, managedFocus.Options, 1)
 	assert.Equal(t, topologyManagedFocusAllDevices, managedFocus.Options[0].ID)
 	assert.True(t, managedFocus.Options[0].Default)
 
 	depth := cfg.RequiredParams[4]
 	assert.Equal(t, topologyParamDepth, depth.ID)
+	assert.Equal(t, "Focus Depth", depth.Name)
 	assert.Equal(t, funcapi.ParamSelect, depth.Selection)
 	require.NotEmpty(t, depth.Options)
 	assert.Equal(t, topologyDepthAll, depth.Options[0].ID)
@@ -243,6 +247,32 @@ func TestNormalizeTopologyInferenceStrategy(t *testing.T) {
 	assert.Equal(t, topologyInferenceStrategyFDBOverlapWeighted, normalizeTopologyInferenceStrategy(topologyInferenceStrategyFDBOverlapWeighted))
 	assert.Equal(t, topologyInferenceStrategyExperimentalFull, normalizeTopologyInferenceStrategy(topologyInferenceStrategyExperimentalFull))
 	assert.Equal(t, "", normalizeTopologyInferenceStrategy("invalid"))
+}
+
+func TestNormalizeTopologyManagedFocuses(t *testing.T) {
+	assert.Equal(t, []string{topologyManagedFocusAllDevices}, normalizeTopologyManagedFocuses(nil))
+	assert.Equal(
+		t,
+		[]string{topologyManagedFocusAllDevices},
+		normalizeTopologyManagedFocuses([]string{"invalid"}),
+	)
+	assert.Equal(
+		t,
+		[]string{"ip:10.0.0.1", "ip:10.0.0.2"},
+		normalizeTopologyManagedFocuses([]string{"ip:10.0.0.2", "ip:10.0.0.1", "ip:10.0.0.2"}),
+	)
+	assert.Equal(
+		t,
+		[]string{topologyManagedFocusAllDevices},
+		normalizeTopologyManagedFocuses([]string{"ip:10.0.0.1", topologyManagedFocusAllDevices}),
+	)
+	assert.Equal(
+		t,
+		"ip:10.0.0.1,ip:10.0.0.2",
+		formatTopologyManagedFocuses([]string{"ip:10.0.0.2", "ip:10.0.0.1"}),
+	)
+	assert.True(t, isTopologyManagedFocusAllDevices(topologyManagedFocusAllDevices))
+	assert.False(t, isTopologyManagedFocusAllDevices("ip:10.0.0.1"))
 }
 
 func newTestTopologyCacheLLDP(

@@ -4,6 +4,7 @@ package snmp
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -67,7 +68,7 @@ func topologyNodesIdentityParamConfig() funcapi.ParamConfig {
 func topologyMapTypeParamConfig() funcapi.ParamConfig {
 	return funcapi.ParamConfig{
 		ID:        topologyParamMapType,
-		Name:      "Map Type",
+		Name:      "Map",
 		Help:      "Choose topology map mode",
 		Selection: funcapi.ParamSelect,
 		Options: []funcapi.ParamOption{
@@ -88,7 +89,7 @@ func topologyMapTypeParamConfig() funcapi.ParamConfig {
 func topologyInferenceStrategyParamConfig() funcapi.ParamConfig {
 	return funcapi.ParamConfig{
 		ID:        topologyParamInferenceStrategy,
-		Name:      "Strategy Model",
+		Name:      "Infer Strategy",
 		Help:      "Choose the topology inference strategy (experimental modes are internal-testing only)",
 		Selection: funcapi.ParamSelect,
 		Options: []funcapi.ParamOption{
@@ -136,9 +137,9 @@ func topologyManagedFocusParamConfig(extraOptions []funcapi.ParamOption) funcapi
 
 	return funcapi.ParamConfig{
 		ID:        topologyParamManagedDeviceFocus,
-		Name:      "Managed SNMP Device Focus",
+		Name:      "Focus On",
 		Help:      "Choose focus root set for depth filtering",
-		Selection: funcapi.ParamSelect,
+		Selection: funcapi.ParamMultiSelect,
 		Options:   options,
 	}
 }
@@ -161,7 +162,7 @@ func topologyDepthParamConfig() funcapi.ParamConfig {
 
 	return funcapi.ParamConfig{
 		ID:        topologyParamDepth,
-		Name:      "Depth",
+		Name:      "Focus Depth",
 		Help:      "Limit topology expansion hops from focus roots",
 		Selection: funcapi.ParamSelect,
 		Options:   options,
@@ -239,8 +240,8 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 	if strategy := normalizeTopologyInferenceStrategy(params.GetOne(topologyParamInferenceStrategy)); strategy != "" {
 		options.InferenceStrategy = strategy
 	}
-	if focus := normalizeTopologyManagedFocus(params.GetOne(topologyParamManagedDeviceFocus)); focus != "" {
-		options.ManagedDeviceFocus = focus
+	if focuses := normalizeTopologyManagedFocuses(params.Get(topologyParamManagedDeviceFocus)); len(focuses) > 0 {
+		options.ManagedDeviceFocus = formatTopologyManagedFocuses(focuses)
 	}
 	options.Depth = normalizeTopologyDepth(params.GetOne(topologyParamDepth))
 
@@ -309,8 +310,16 @@ func normalizeTopologyInferenceStrategy(v string) string {
 
 func normalizeTopologyManagedFocus(v string) string {
 	value := strings.TrimSpace(v)
+	if value == "" {
+		return topologyManagedFocusAllDevices
+	}
+	return normalizeTopologyManagedFocusValue(value)
+}
+
+func normalizeTopologyManagedFocusValue(v string) string {
+	value := strings.TrimSpace(v)
 	switch strings.ToLower(value) {
-	case "", topologyManagedFocusAllDevices:
+	case topologyManagedFocusAllDevices:
 		return topologyManagedFocusAllDevices
 	}
 	if len(value) > len(topologyManagedFocusIPPrefix) &&
@@ -322,6 +331,55 @@ func normalizeTopologyManagedFocus(v string) string {
 		return topologyManagedFocusIPPrefix + ip
 	}
 	return ""
+}
+
+func normalizeTopologyManagedFocuses(values []string) []string {
+	if len(values) == 0 {
+		return []string{topologyManagedFocusAllDevices}
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, raw := range values {
+		normalized := normalizeTopologyManagedFocusValue(raw)
+		if normalized == "" {
+			continue
+		}
+		if normalized == topologyManagedFocusAllDevices {
+			return []string{topologyManagedFocusAllDevices}
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		out = append(out, normalized)
+	}
+
+	if len(out) == 0 {
+		return []string{topologyManagedFocusAllDevices}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func parseTopologyManagedFocuses(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return []string{topologyManagedFocusAllDevices}
+	}
+	return normalizeTopologyManagedFocuses(strings.Split(value, ","))
+}
+
+func formatTopologyManagedFocuses(values []string) string {
+	normalized := normalizeTopologyManagedFocuses(values)
+	if len(normalized) == 0 {
+		return topologyManagedFocusAllDevices
+	}
+	return strings.Join(normalized, ",")
+}
+
+func isTopologyManagedFocusAllDevices(value string) bool {
+	normalized := parseTopologyManagedFocuses(value)
+	return len(normalized) == 1 && normalized[0] == topologyManagedFocusAllDevices
 }
 
 func normalizeTopologyDepth(v string) int {

@@ -254,9 +254,7 @@ func normalizeTopologyQueryOptions(options topologyQueryOptions) topologyQueryOp
 	if options.InferenceStrategy == "" {
 		options.InferenceStrategy = topologyInferenceStrategyFDBMinimumKnowledge
 	}
-	if normalizeTopologyManagedFocus(options.ManagedDeviceFocus) == "" {
-		options.ManagedDeviceFocus = topologyManagedFocusAllDevices
-	}
+	options.ManagedDeviceFocus = formatTopologyManagedFocuses(parseTopologyManagedFocuses(options.ManagedDeviceFocus))
 	if options.Depth != topologyDepthAllInternal {
 		if options.Depth < topologyDepthMin {
 			options.Depth = topologyDepthMin

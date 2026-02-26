@@ -245,6 +245,21 @@
     - live payload (2026-02-26):
       - `MikroTik-router <-> XS1930` now `direction=bidirectional` with `ether3 <-> swp07`.
       - `MikroTik-router <-> GS1900` now `direction=bidirectional` with `ether4 <-> GigabitEthernet2`.
+- [x] A29. Topology required-param label cleanup + multi-focus shortest-path semantics (Costa, 2026-02-26).
+  - Required label renames:
+    - `Map Type` -> `Map`
+    - `Strategy Mode` -> `Infer Strategy`
+    - `Managed SNMP Device Focus` -> `Focus On`
+    - `Depth` -> `Focus Depth`
+  - `Focus On` selection contract:
+    - switched from single-select to multi-select.
+    - selected roots are managed device IP options (`ip:x.x.x.x`) plus existing `all_devices`.
+  - Multi-focus behavior contract:
+    - include union of all shortest-hop paths between every selected focus device pair.
+    - if multiple shortest paths have the same distance, include all of them.
+    - apply `Focus Depth` expansion from selected focus roots only.
+  - User decision (Costa, 2026-02-26):
+    - D29.1 = **Apply `Focus Depth` from selected focus devices only** (not from every node included by shortest-path union).
 - [ ] A26. Decide whether to remove `pair_side` concept for topology pairing metadata (Costa, 2026-02-26).
   - Context:
     - `pair_side` is backend-internal metadata (not device SNMP field).
