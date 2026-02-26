@@ -94,6 +94,10 @@
 - Decision 7: **A** (finalize on all terminal host paths when audit mode is enabled; idempotent).
 - Decision 8: **B** (replace `pluginconfig.MustInit(*cli.Option)` with a minimal init input contract carrying only required fields).
 - Decision 9: **A** (best-effort non-blocking hooks; deterministic error surfacing; no silent write failures).
+- Terminology cleanup pass (post-refactor):
+  - API capability method rename: **1B** (rename `EnableDump` to metricsaudit-aligned terminology).
+  - CLI naming direction: **2B + 4B** (rename ibm.d flags to `--metrics-audit`, `--metrics-audit-summary`, `--metrics-audit-data`).
+  - Internal config/runtime naming: **3B** (rename internal dump-* fields/methods to audit-* equivalents).
 - Requested a thoughtful re-check after independent external reviews returned REVISE.
 - External follow-up review returned **NOT READY** pending contract-level clarifications.
 - Final external readiness review returned **READY** to start implementation.
