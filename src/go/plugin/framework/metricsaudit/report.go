@@ -16,13 +16,13 @@ func (da *Auditor) PrintReport() {
 
 	type reportJob struct {
 		id  JobID
-		job *JobAnalysis
+		job JobAnalysis
 	}
 
 	da.mu.RLock()
 	jobs := make([]reportJob, 0, len(da.jobs))
 	for id, job := range da.jobs {
-		jobs = append(jobs, reportJob{id: id, job: job})
+		jobs = append(jobs, reportJob{id: id, job: cloneJobAnalysis(job)})
 	}
 	writeErrorCount := da.writeErrorCount
 	writeErrors := append([]string(nil), da.writeErrors...)
@@ -36,7 +36,8 @@ func (da *Auditor) PrintReport() {
 	})
 
 	for _, entry := range jobs {
-		da.printJobAnalysis(entry.job)
+		job := entry.job
+		da.printJobAnalysis(&job)
 	}
 
 	da.printWriteErrorSummary(writeErrorCount, writeErrors)
@@ -48,9 +49,9 @@ func (da *Auditor) PrintSummary() {
 	da.PrintReport()
 
 	da.mu.RLock()
-	jobs := make([]*JobAnalysis, 0, len(da.jobs))
+	jobs := make([]JobAnalysis, 0, len(da.jobs))
 	for _, job := range da.jobs {
-		jobs = append(jobs, job)
+		jobs = append(jobs, cloneJobAnalysis(job))
 	}
 	da.mu.RUnlock()
 
@@ -75,7 +76,8 @@ func (da *Auditor) PrintSummary() {
 
 	contextMap := make(map[string]*contextSummary) // context -> summary
 
-	for _, job := range jobs {
+	for i := range jobs {
+		job := &jobs[i]
 		jobLabel := fmt.Sprintf("%s[%s]", job.Module, job.Name)
 		for i := range job.Charts {
 			ca := &job.Charts[i]
@@ -330,7 +332,7 @@ func (da *Auditor) printJobAnalysis(job *JobAnalysis) {
 	}
 
 	// Check for severe bugs - duplicate chart IDs and contexts in multiple families
-	fmt.Println("\n" + job.Name)
+	fmt.Printf("\n%s[%s]\n", job.Module, job.Name)
 
 	// Report duplicate chart IDs first (most severe)
 	for chartID, count := range chartIDCounts {
@@ -519,6 +521,71 @@ func (da *Auditor) printJobAnalysis(job *JobAnalysis) {
 		fmt.Printf("🔴 ISSUES FOUND%s, job %s defines: %d families, %d contexts, %d dimensions, %d instances, %d time-series, collects: %d unique metrics\n",
 			warningText, job.Name, len(statsFamilies), len(statsContexts), statsDistinctDimensions, statsInstances, statsTimeSeries, uniqueMetricsInMx)
 	}
+}
+
+func cloneJobAnalysis(src *JobAnalysis) JobAnalysis {
+	if src == nil {
+		return JobAnalysis{}
+	}
+
+	dst := JobAnalysis{
+		Name:            src.Name,
+		Module:          src.Module,
+		CollectionCount: src.CollectionCount,
+		LastCollection:  src.LastCollection,
+		AllSeenMetrics:  make(map[string]bool, len(src.AllSeenMetrics)),
+		Charts:          make([]ChartAnalysis, len(src.Charts)),
+	}
+	for metricID, seen := range src.AllSeenMetrics {
+		dst.AllSeenMetrics[metricID] = seen
+	}
+	for i := range src.Charts {
+		dst.Charts[i] = cloneChartAnalysis(src.Charts[i])
+	}
+
+	return dst
+}
+
+func cloneChartAnalysis(src ChartAnalysis) ChartAnalysis {
+	dst := ChartAnalysis{
+		Chart:           cloneChart(src.Chart),
+		CollectedValues: make(map[string][]int64, len(src.CollectedValues)),
+		SeenDimensions:  make(map[string]bool, len(src.SeenDimensions)),
+	}
+	for id, values := range src.CollectedValues {
+		dst.CollectedValues[id] = append([]int64(nil), values...)
+	}
+	for id, seen := range src.SeenDimensions {
+		dst.SeenDimensions[id] = seen
+	}
+	return dst
+}
+
+func cloneChart(src *collectorapi.Chart) *collectorapi.Chart {
+	if src == nil {
+		return nil
+	}
+
+	dst := *src
+	dst.Labels = append([]collectorapi.Label(nil), src.Labels...)
+	dst.Dims = make(collectorapi.Dims, len(src.Dims))
+	for i, dim := range src.Dims {
+		if dim == nil {
+			continue
+		}
+		d := *dim
+		dst.Dims[i] = &d
+	}
+	dst.Vars = make(collectorapi.Vars, len(src.Vars))
+	for i, v := range src.Vars {
+		if v == nil {
+			continue
+		}
+		varCopy := *v
+		dst.Vars[i] = &varCopy
+	}
+
+	return &dst
 }
 
 func (da *Auditor) printContextAnalysis(ctxInfo *contextInfo, isLast bool) []string {

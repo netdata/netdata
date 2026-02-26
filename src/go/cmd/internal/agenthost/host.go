@@ -88,12 +88,11 @@ func Run(a *agent.Agent) {
 
 		if exit {
 			collectorapi.ObsoleteCharts(false)
-			a.FinalizeMetricsAudit(finalizeReason)
 		}
 
 		cancel()
 
-		func() {
+		stopped := func() bool {
 			timeout := time.Second * 10
 			t := time.NewTimer(timeout)
 			defer t.Stop()
@@ -104,12 +103,21 @@ func Run(a *agent.Agent) {
 			select {
 			case <-t.C:
 				a.Errorf("stopping all goroutines timed out after %s. Exiting...", timeout)
-				os.Exit(0)
+				return false
 			case <-done:
+				return true
 			}
 		}()
 
+		if !stopped {
+			if exit {
+				a.FinalizeMetricsAudit(finalizeReason + ", forced shutdown")
+			}
+			os.Exit(0)
+		}
+
 		if exit {
+			a.FinalizeMetricsAudit(finalizeReason)
 			os.Exit(0)
 		}
 
