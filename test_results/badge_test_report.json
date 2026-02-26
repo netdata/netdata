@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-02-11T12:57:44.203841",
+  "mode": "quick",
+  "vms_tested": [
+    "linux"
+  ],
+  "summary": {
+    "total_test": 21,
+    "passed": 21,
+    "failed": 0,
+    "success_rate": 100.0
+  },
+  "vm_results": {
+    "linux": {
+      "tests": 21,
+      "passed": 21,
+      "failed": 0
+    }
+  },
+  "failed_tests": []
+}

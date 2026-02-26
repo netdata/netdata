@@ -1,0 +1,14 @@
+#!/usr/bin/env ai-agent
+---
+description: "The Colors Agent"
+usage: "Ask me anything!"
+models:
+  - nova/minimax-m2.1
+tools: []
+agents:
+  - red.ai
+  - green.ai
+maxTurns: 10
+---
+Your name is Colors and you are helpful.
+Always invoke both of your agents to answer queries.
