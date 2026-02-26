@@ -93,7 +93,7 @@ You can set the `proxy` option at the `[global]` section in `claim.conf` to:
 Netdata uses the `http_proxy` environment variable only when you set the `proxy` option to `env` (which is the default). You can set the `http_proxy` environment variable to:
 
 - `http://[user:pass@]host:port`, to connect via an HTTP proxy
-- `socks5[h]://[user:pass@]host:port`, to connect via a SOCKS5 or SOCKS5h proxy
+- `socks5[h]://[user:pass@]host:port`, to connect via a SOCKS5 or SOCKS5H proxy
 
 #### Proxy Security Considerations
 
@@ -106,7 +106,7 @@ Netdata does not support secure connections to proxies. **Data between Netdata A
 **How End-to-End Encryption Works with Proxies:**
 
 1. **Proxy Connection**: The Agent connects to the configured proxy using a plain TCP connection.
-2. **TCP Tunneling Request**: The Agent asks the proxy to establish a TCP tunnel to the Netdata Cloud server (HTTP `CONNECT` for HTTP proxy, SOCKS5 `CONNECT` for SOCKS5/SOCKS5h).
+2. **TCP Tunneling Request**: The Agent asks the proxy to establish a TCP tunnel to the Netdata Cloud server (HTTP `CONNECT` for HTTP proxy, SOCKS5 `CONNECT` for SOCKS5/SOCKS5H).
 3. **Proxy Tunneling**: Once accepted, the proxy forwards raw TCP data in both directions without interpreting application-layer traffic.
 4. **Encrypted Communication**: The Agent then establishes a TLS/SSL connection through this tunnel directly with the Netdata Cloud server. All subsequent data (including the WebSocket handshake and MQTT protocol data) is encrypted end-to-end.
 
