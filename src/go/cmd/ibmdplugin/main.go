@@ -126,9 +126,9 @@ func main() {
 		RunModule:               opts.Module,
 		RunJob:                  opts.Job,
 		MinUpdateEvery:          opts.UpdateEvery,
-		DumpMode:                dumpMode,
-		DumpSummary:             opts.DumpSummary,
-		DumpDataDir:             dumpDataDir,
+		AuditDuration:           dumpMode,
+		AuditSummary:            opts.DumpSummary,
+		AuditDataDir:            dumpDataDir,
 		DisableServiceDiscovery: true,
 	})
 

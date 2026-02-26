@@ -97,10 +97,10 @@ func main() {
 			discoveryproviders.Dummy(),
 			discoveryproviders.SD(sdext.Registry(!isInsideK8s)),
 		},
-			RunModule:      opts.Module,
-			RunJob:         opts.Job,
-			MinUpdateEvery: opts.UpdateEvery,
-		})
+		RunModule:      opts.Module,
+		RunJob:         opts.Job,
+		MinUpdateEvery: opts.UpdateEvery,
+	})
 
 	a.Infof("plugin: name=%s, %s", a.Name, buildinfo.Info())
 	if u, err := user.Current(); err == nil {

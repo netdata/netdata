@@ -94,7 +94,7 @@ func TestDirectoriesBuild(t *testing.T) {
 		},
 		"fallback_dirs_when_no_config": {
 			input: InitInput{},
-			env:  envData{},
+			env:   envData{},
 			// build-relative fallback from execDir
 			want: directories{
 				userConfigDirs:     []string{filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata")},
@@ -241,7 +241,7 @@ func TestDirectoriesBuild(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel() // safe: build() uses only inputs, no globals
 			var got directories
-				err := got.build(tc.input, tc.env, testPluginName, execDir)
+			err := got.build(tc.input, tc.env, testPluginName, execDir)
 
 			if tc.wantErr {
 				require.Error(t, err)

@@ -67,8 +67,8 @@ type JobConfig struct {
 	Priority        int
 	IsStock         bool
 	Vnode           vnodes.VirtualNode
-	DumpMode        bool
-	DumpAnalyzer    metricsaudit.Analyzer
+	AuditMode       bool
+	AuditAnalyzer   metricsaudit.Analyzer
 	FunctionOnly    bool
 }
 
@@ -102,8 +102,8 @@ func NewJob(cfg JobConfig) *Job {
 		api:                  netdataapi.New(&buf),
 		vnode:                cfg.Vnode,
 		updVnode:             make(chan *vnodes.VirtualNode, 1),
-		dumpMode:             cfg.DumpMode,
-		dumpAnalyzer:         cfg.DumpAnalyzer,
+		auditMode:            cfg.AuditMode,
+		auditAnalyzer:        cfg.AuditAnalyzer,
 	}
 
 	log := logger.New().With(
@@ -162,10 +162,10 @@ type Job struct {
 
 	stopCtrl stopController
 
-	// Dump mode support
-	dumpMode     bool
-	dumpAnalyzer metricsaudit.Analyzer
-	skipTracker  tickstate.SkipTracker
+	// Metrics-audit mode support.
+	auditMode     bool
+	auditAnalyzer metricsaudit.Analyzer
+	skipTracker   tickstate.SkipTracker
 }
 
 type collectedMetrics struct {
@@ -266,9 +266,9 @@ func (j *Job) AutoDetection() (err error) {
 		return err
 	}
 
-	// Record job structure for dump mode after successful detection
-	if j.dumpMode && j.dumpAnalyzer != nil && j.charts != nil {
-		j.dumpAnalyzer.RecordJobStructure(j.name, j.moduleName, j.charts)
+	// Record job structure for metrics-audit mode after successful detection.
+	if j.auditMode && j.auditAnalyzer != nil && j.charts != nil {
+		j.auditAnalyzer.RecordJobStructure(j.name, j.moduleName, j.charts)
 	}
 
 	return nil
@@ -478,10 +478,10 @@ func (j *Job) collect() collectedMetrics {
 	var mx collectedMetrics
 	mx.intMetrics = j.module.Collect(context.TODO())
 
-	// Record collected metrics for dump mode
-	// TODO: The dump analyzer only records intMetrics but ignores floatMetrics
-	if j.dumpMode && j.dumpAnalyzer != nil && mx.intMetrics != nil {
-		j.dumpAnalyzer.RecordCollection(j.name, j.moduleName, mx.intMetrics)
+	// Record collected metrics for metrics-audit mode.
+	// TODO: The analyzer only records intMetrics but ignores floatMetrics.
+	if j.auditMode && j.auditAnalyzer != nil && mx.intMetrics != nil {
+		j.auditAnalyzer.RecordCollection(j.name, j.moduleName, mx.intMetrics)
 	}
 
 	return mx
@@ -558,9 +558,9 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 		j.createChart(j.collectDurationChart)
 	}
 
-	// Update dump analyzer with current chart structure for dynamic collectors
-	if j.dumpMode && j.dumpAnalyzer != nil {
-		j.dumpAnalyzer.UpdateJobStructure(j.name, j.moduleName, j.charts)
+	// Update analyzer with current chart structure for dynamic collectors.
+	if j.auditMode && j.auditAnalyzer != nil {
+		j.auditAnalyzer.UpdateJobStructure(j.name, j.moduleName, j.charts)
 	}
 
 	intMx := collectedMetrics{intMetrics: map[string]int64{"success": oldmetrix.Bool(updated > 0), "failed": oldmetrix.Bool(updated == 0)}}

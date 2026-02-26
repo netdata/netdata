@@ -40,9 +40,9 @@ type Config struct {
 	VarLibDir          string
 	FnReg              FunctionRegistry
 	Vnodes             map[string]*vnodes.VirtualNode
-	DumpMode           bool
-	DumpAnalyzer       metricsaudit.Analyzer
-	DumpDataDir        string
+	AuditMode          bool
+	AuditAnalyzer      metricsaudit.Analyzer
+	AuditDataDir       string
 	FunctionJSONWriter func(payload []byte, code int)
 	RuntimeService     runtimecomp.Service
 }
@@ -79,9 +79,9 @@ func New(cfg Config) *Manager {
 		fnReg:          fnReg,
 		vnodes:         vnodesReg,
 
-		dumpMode:           cfg.DumpMode,
-		dumpAnalyzer:       cfg.DumpAnalyzer,
-		dumpDataDir:        cfg.DumpDataDir,
+		auditMode:          cfg.AuditMode,
+		auditAnalyzer:      cfg.AuditAnalyzer,
+		auditDataDir:       cfg.AuditDataDir,
 		functionJSONWriter: cfg.FunctionJSONWriter,
 		runtimeService:     cfg.RuntimeService,
 
@@ -146,10 +146,10 @@ type Manager struct {
 	fnReg          FunctionRegistry
 	vnodes         map[string]*vnodes.VirtualNode
 
-	// Dump mode
-	dumpMode     bool
-	dumpAnalyzer metricsaudit.Analyzer
-	dumpDataDir  string
+	// Metrics-audit mode.
+	auditMode     bool
+	auditAnalyzer metricsaudit.Analyzer
+	auditDataDir  string
 
 	fileStatus  *fileStatus
 	moduleFuncs *moduleFuncRegistry
@@ -562,10 +562,10 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 	useV2 := creator.CreateV2 != nil
 
 	var jobDumpDir string
-	if m.dumpDataDir != "" && !useV2 {
-		jobDumpDir = filepath.Join(m.dumpDataDir, naming.Sanitize(cfg.Module()), naming.Sanitize(cfg.Name()))
+	if m.auditDataDir != "" && !useV2 {
+		jobDumpDir = filepath.Join(m.auditDataDir, naming.Sanitize(cfg.Module()), naming.Sanitize(cfg.Name()))
 		if err := os.MkdirAll(jobDumpDir, 0o755); err != nil {
-			return nil, fmt.Errorf("creating dump directory: %w", err)
+			return nil, fmt.Errorf("creating audit directory: %w", err)
 		}
 	}
 
@@ -608,9 +608,9 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		return nil, err
 	}
 
-	if m.dumpAnalyzer != nil && jobDumpDir != "" {
+	if m.auditAnalyzer != nil && jobDumpDir != "" {
 		// Auditing hooks are V1-only; V2 jobs are intentionally excluded.
-		m.dumpAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
+		m.auditAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
 	}
 
 	if jobDumpDir != "" {
@@ -631,8 +631,8 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 		IsStock:         cfg.SourceType() == "stock",
 		Module:          mod,
 		Out:             m.out,
-		DumpMode:        m.dumpMode,
-		DumpAnalyzer:    m.dumpAnalyzer,
+		AuditMode:       m.auditMode,
+		AuditAnalyzer:   m.auditAnalyzer,
 		FunctionOnly:    functionOnly,
 	}
 
