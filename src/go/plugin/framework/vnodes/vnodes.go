@@ -11,12 +11,12 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 )
 
 //go:embed "config_schema.json"
@@ -172,5 +172,5 @@ func loadConfigFile(conf any, path string) error {
 }
 
 func isStockConfig(path string) bool {
-	return !strings.Contains(path, "/etc/")
+	return pluginconfig.IsStock(path)
 }

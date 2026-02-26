@@ -56,7 +56,12 @@ type directories struct {
 }
 
 func IsStock(path string) bool {
-	return strings.HasPrefix(path, StockConfigDir())
+	stock := StockConfigDir()
+	if stock == "" {
+		// Fallback for contexts that haven't called MustInit yet (mostly unit tests).
+		return !strings.Contains(path, "/etc/")
+	}
+	return strings.HasPrefix(path, stock)
 }
 
 // MustInit parses env, applies CLI overrides, discovers directories, and stores them.

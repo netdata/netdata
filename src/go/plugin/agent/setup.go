@@ -5,8 +5,8 @@ package agent
 import (
 	"io"
 	"os"
-	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -199,5 +199,5 @@ func loadYAML(conf any, path string) error {
 }
 
 func isStockConfig(path string) bool {
-	return !strings.Contains(path, "/etc/")
+	return pluginconfig.IsStock(path)
 }
