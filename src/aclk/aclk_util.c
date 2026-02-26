@@ -467,7 +467,7 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd,
     if (!*ptr) {
         aclk_sensitive_free(&proxy);
         freez(*uname);
-        freez(*pwd);
+        aclk_sensitive_free(pwd);
         return;
     }
 
@@ -484,7 +484,7 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd,
 
     if (!type) {
         freez(*uname);
-        freez(*pwd);
+        aclk_sensitive_free(pwd);
     }
 
     aclk_sensitive_free(&proxy);
@@ -618,40 +618,42 @@ static int aclk_read_exact_timeout(int fd, void *buf, size_t len, int timeout_ms
 static int aclk_http_proxy_negotiate(int sockfd, const char *proxy_username, const char *proxy_password,
                                      const char *target_host, int target_port, int timeout_ms)
 {
+    int result = 1;
+    bool has_creds = (proxy_username && *proxy_username);
     char req[4096];
     size_t off = 0;
     int rc = snprintf(req + off, sizeof(req) - off, "CONNECT %s:%d HTTP/1.1\r\nHost: %s\r\n",
                       target_host, target_port, target_host);
     if (rc < 0 || (size_t)rc >= sizeof(req) - off)
-        return 1;
+        goto cleanup;
     off += (size_t)rc;
 
-    if (proxy_username && *proxy_username) {
+    if (has_creds) {
         size_t pass_len = proxy_password ? strlen(proxy_password) : 0;
-        size_t plain_len = strlen(proxy_username) + pass_len + 1;
-        char *plain = callocz(1, plain_len + 1);
-        snprintfz(plain, plain_len + 1, "%s:%s", proxy_username, proxy_password ? proxy_password : "");
+        size_t creds_plain_len = strlen(proxy_username) + pass_len + 1;
+        char *creds_plain = callocz(1, creds_plain_len + 1);
+        snprintfz(creds_plain, creds_plain_len + 1, "%s:%s", proxy_username, proxy_password ? proxy_password : "");
 
-        int b64_len = (((4 * (int)plain_len / 3) + 3) & ~3);
-        b64_len += (1 + (b64_len / 64)) * (int)strlen("\n");
-        char *b64 = callocz(1, (size_t)b64_len + 1);
-        (void)netdata_base64_encode((unsigned char *)b64, (unsigned char *)plain, plain_len);
+        int creds_base64_len = (((4 * (int)creds_plain_len / 3) + 3) & ~3);
+        creds_base64_len += (1 + (creds_base64_len / 64)) * (int)strlen("\n");
+        char *creds_base64 = callocz(1, (size_t)creds_base64_len + 1);
+        (void)netdata_base64_encode((unsigned char *)creds_base64, (unsigned char *)creds_plain, creds_plain_len);
 
-        rc = snprintf(req + off, sizeof(req) - off, "Proxy-Authorization: Basic %s\r\n", b64);
-        aclk_sensitive_free(&plain);
-        aclk_sensitive_free(&b64);
+        rc = snprintf(req + off, sizeof(req) - off, "Proxy-Authorization: Basic %s\r\n", creds_base64);
+        aclk_sensitive_free(&creds_plain);
+        aclk_sensitive_free(&creds_base64);
         if (rc < 0 || (size_t)rc >= sizeof(req) - off)
-            return 1;
+            goto cleanup;
         off += (size_t)rc;
     }
 
     if (off + 2 >= sizeof(req))
-        return 1;
+        goto cleanup;
     req[off++] = '\r';
     req[off++] = '\n';
 
     if (aclk_write_all_timeout(sockfd, req, off, timeout_ms))
-        return 1;
+        goto cleanup;
 
     char resp[8192];
     size_t used = 0;
@@ -659,19 +661,19 @@ static int aclk_http_proxy_negotiate(int sockfd, const char *proxy_username, con
     while (used < sizeof(resp) - 1) {
         int remaining_ms = aclk_timeout_remaining_ms(start, timeout_ms);
         if (remaining_ms <= 0)
-            return 1;
+            goto cleanup;
 
         int prc = aclk_poll_for_io(sockfd, POLLIN, remaining_ms);
         if (prc <= 0)
-            return 1;
+            goto cleanup;
 
         ssize_t n = read(sockfd, resp + used, sizeof(resp) - 1 - used);
         if (n == 0)
-            return 1;
+            goto cleanup;
         if (n < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
                 continue;
-            return 1;
+            goto cleanup;
         }
         used += (size_t)n;
         resp[used] = '\0';
@@ -680,13 +682,18 @@ static int aclk_http_proxy_negotiate(int sockfd, const char *proxy_username, con
     }
 
     if (used == sizeof(resp) - 1)
-        return 1;
+        goto cleanup;
 
     if (strncmp(resp, "HTTP/1.1 ", 9) != 0 && strncmp(resp, "HTTP/1.0 ", 9) != 0)
-        return 1;
+        goto cleanup;
 
     int status = atoi(resp + 9);
-    return (status == 200) ? 0 : 1;
+    result = (status == 200) ? 0 : 1;
+
+cleanup:
+    if (has_creds)
+        aclk_sensitive_memzero(req, sizeof(req));
+    return result;
 }
 
 static int aclk_socks5_resolve_local(const char *host, uint8_t *atype, uint8_t *addr, size_t *addr_len)
@@ -799,7 +806,9 @@ static int aclk_socks5_proxy_negotiate(int sockfd, enum mqtt_wss_proxy_type prox
             pos += pass_len;
         }
 
-        if (aclk_write_all_timeout(sockfd, auth_req, pos, aclk_timeout_remaining_ms(start, timeout_ms))) {
+        int auth_rc = aclk_write_all_timeout(sockfd, auth_req, pos, aclk_timeout_remaining_ms(start, timeout_ms));
+        aclk_sensitive_memzero(auth_req, sizeof(auth_req));
+        if (auth_rc) {
             return 1;
         }
 

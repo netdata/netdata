@@ -26,8 +26,8 @@ ENUM_STR_MAP_DEFINE(https_client_resp_t) = {
         .name = "cannot set socket to non-blocking mode",
     },
     {
-        .id = HTTPS_CLIENT_RESP_PROXY_NOT_200,
-        .name = "proxy did not return http/200",
+        .id = HTTPS_CLIENT_RESP_PROXY_NEGOTIATION_FAILED,
+        .name = "proxy negotiation failed",
     },
     {
         .id = HTTPS_CLIENT_RESP_NO_SSL_CTX,
@@ -811,7 +811,7 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
 
         if (aclk_proxy_negotiation_connect(ctx->sock, proxy_type, request->proxy_username, request->proxy_password,
                                            request->host, request->port, (int)request->timeout_s * 1000)) {
-            rc = HTTPS_CLIENT_RESP_PROXY_NOT_200;
+            rc = HTTPS_CLIENT_RESP_PROXY_NEGOTIATION_FAILED;
             netdata_log_error("ACLK: proxy negotiation failed via proxy %s%s:%d to %s:%d",
                               proxy_proto, request->proxy_host, request->proxy_port,
                               request->host, request->port);
