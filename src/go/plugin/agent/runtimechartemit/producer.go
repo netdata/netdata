@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package runtimemgr
+package runtimechartemit
 
 type runtimeProducer interface {
 	Name() string

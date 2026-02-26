@@ -17,7 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimemgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimechartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -227,7 +227,7 @@ func (a *Agent) run(ctx context.Context) {
 		return
 	}
 
-	runtimeSvc := runtimemgr.New(a.Logger.With(slog.String("component", "runtime metrics service")))
+	runtimeSvc := runtimechartemit.New(a.Logger.With(slog.String("component", "runtime metrics service")))
 	runtimeSvc.Start(a.Name, a.Out)
 	defer runtimeSvc.Stop()
 
