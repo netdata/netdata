@@ -69,16 +69,6 @@ func main() {
 		WatchPath: opts.WatchPath,
 	})
 
-	dumpDataDir := ""
-	if opts.DumpDataDir != "" {
-		var err error
-		dumpDataDir, err = prepareDumpDataDir(opts.DumpDataDir, pluginconfig.VarLibDir())
-		if err != nil {
-			logger.Errorf("error preparing dump-data directory: %v", err)
-			os.Exit(1)
-		}
-	}
-
 	if lvl := pluginconfig.EnvLogLevel(); lvl != "" {
 		logger.Level.SetByName(lvl)
 	}
@@ -94,6 +84,25 @@ func main() {
 		dumpMode, err = time.ParseDuration(opts.DumpMode)
 		if err != nil {
 			logger.Errorf("error: invalid dump duration '%s': %v", opts.DumpMode, err)
+			os.Exit(1)
+		}
+		if dumpMode <= 0 {
+			logger.Errorf("error: invalid dump duration '%s': duration must be > 0", opts.DumpMode)
+			os.Exit(1)
+		}
+	}
+
+	if opts.DumpDataDir != "" && dumpMode <= 0 {
+		logger.Errorf("error: --dump-data requires positive --dump duration")
+		os.Exit(1)
+	}
+
+	dumpDataDir := ""
+	if opts.DumpDataDir != "" {
+		var err error
+		dumpDataDir, err = prepareDumpDataDir(opts.DumpDataDir, pluginconfig.VarLibDir())
+		if err != nil {
+			logger.Errorf("error preparing dump-data directory: %v", err)
 			os.Exit(1)
 		}
 	}
@@ -189,11 +198,12 @@ func prepareDumpDataDir(path string, varLibDir string) (string, error) {
 	if absolute == "" || absolute == "/" {
 		return "", fmt.Errorf("refusing to use unsafe dump-data directory '%s'", absolute)
 	}
-	if err := os.RemoveAll(absolute); err != nil {
-		return "", err
-	}
 	if err := os.MkdirAll(absolute, 0o755); err != nil {
 		return "", err
 	}
-	return absolute, nil
+	runDir := filepath.Join(absolute, fmt.Sprintf("run-%s", time.Now().UTC().Format("20060102-150405.000000000")))
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		return "", err
+	}
+	return runDir, nil
 }
