@@ -36,9 +36,9 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 				require.Eventually(t, sd.handler.WaitingForDecision, time.Second, 10*time.Millisecond)
 				require.Eventually(t, func() bool { return !sd.handler.WaitingForDecision() }, time.Second, 10*time.Millisecond)
 
-				entry, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job1")
+				status, ok := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job1")
 				require.True(t, ok, "expected discovered config to stay exposed after wait timeout")
-				assert.Equal(t, dyncfg.StatusAccepted, entry.Status)
+				assert.Equal(t, dyncfg.StatusAccepted, status)
 				assert.False(t, sd.mgr.IsRunning(pipelineKeyFromSource(cfg.source)))
 			},
 		},
@@ -56,12 +56,12 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 				})
 
 				require.Eventually(t, func() bool {
-					entry, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job1")
+					status, ok := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job1")
 					if !ok {
 						return false
 					}
 					return !sd.handler.WaitingForDecision() &&
-						entry.Status == dyncfg.StatusRunning &&
+						status == dyncfg.StatusRunning &&
 						sd.mgr.IsRunning(pipelineKeyFromSource(cfg.source))
 				}, time.Second, 10*time.Millisecond)
 			},
@@ -98,17 +98,17 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 				}, time.Second, 10*time.Millisecond)
 
 				require.Eventually(t, func() bool {
-					_, ok1 := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job1")
-					_, ok2 := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job2")
+					_, ok1 := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job1")
+					_, ok2 := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job2")
 					return ok1 && ok2
 				}, time.Second, 10*time.Millisecond)
 
-				entry1, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job1")
+				status1, ok := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job1")
 				require.True(t, ok)
-				assert.Equal(t, dyncfg.StatusAccepted, entry1.Status)
-				entry2, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job2")
+				assert.Equal(t, dyncfg.StatusAccepted, status1)
+				status2, ok := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job2")
 				require.True(t, ok)
-				assert.Equal(t, dyncfg.StatusAccepted, entry2.Status)
+				assert.Equal(t, dyncfg.StatusAccepted, status2)
 			},
 		},
 	}
@@ -198,4 +198,20 @@ func stopWaitTestServiceDiscovery(t *testing.T, sd *ServiceDiscovery, cancel con
 
 func newWaitTestPipeline(cfg pipeline.Config) (sdPipeline, error) {
 	return newTestPipeline(cfg.Name), nil
+}
+
+func exposedStatusByKey(cache *dyncfg.ExposedCache[sdConfig], key string) (dyncfg.Status, bool) {
+	var status dyncfg.Status
+	var found bool
+
+	cache.ForEach(func(k string, entry *dyncfg.Entry[sdConfig]) bool {
+		if k != key {
+			return true
+		}
+		status = entry.Status
+		found = true
+		return false
+	})
+
+	return status, found
 }

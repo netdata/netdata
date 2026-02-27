@@ -474,7 +474,7 @@ func (m *Manager) cleanup() {
 	}
 
 	for _, job := range m.runningJobs.snapshot() {
-		job.Stop()
+		m.stopRunningJob(job.FullName())
 	}
 
 	m.waitCmdTestWorkers()

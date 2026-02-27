@@ -242,6 +242,10 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 		return
 	}
 
+	cleanupCtx, cleanupCancel := context.WithTimeout(m.baseContext(), cmdTestWorkerDrainWait)
+	defer cleanupCancel()
+	defer job.Cleanup(cleanupCtx)
+
 	if err := applyConfig(task.cfg, job); err != nil {
 		m.Warningf("dyncfg: test: module %s: failed to apply config: %v", task.moduleName, err)
 		m.dyncfgApi.SendCodef(task.fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
@@ -252,10 +256,6 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 		slog.String("collector", task.cfg.Module()),
 		slog.String("job", task.cfg.Name()),
 	)
-
-	cleanupCtx, cleanupCancel := context.WithTimeout(m.baseContext(), cmdTestWorkerDrainWait)
-	defer cleanupCancel()
-	defer job.Cleanup(cleanupCtx)
 
 	ctx, cancel := context.WithTimeout(m.baseContext(), task.timeout)
 	defer cancel()
