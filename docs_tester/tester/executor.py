@@ -69,10 +69,11 @@ class Executor:
         }
 
         backup_path = None
+        config_file = '/etc/netdata/netdata.conf'
         
         try:
             file_match = re.search(r'/etc/netdata/[\w./-]+', config_content)
-            config_file = file_match.group(0) if file_match else '/etc/netdata/netdata.conf'
+            config_file = file_match.group(0) if file_match else config_file
 
             result['steps'].append({
                 'action': 'backup',
@@ -275,13 +276,30 @@ class Executor:
         """Execute a file operation step"""
         instruction = step.instruction
         
+        # Check if instruction looks like a valid shell command
+        # Valid commands typically start with known commands or paths
+        command_patterns = [
+            'sudo ', 'systemctl', 'mkdir ', 'chmod ', 'chown ', 'rm ', 'cp ', 'mv ',
+            'tee ', 'cat ', 'echo ', 'printf ', '/', './', 'apt ', 'yum ', 'dnf ',
+            'pip ', 'curl ', 'wget ', 'kill ', 'pkill ', 'service '
+        ]
+        looks_like_command = any(instruction.startswith(p) or f' {p}' in instruction for p in command_patterns)
+        
+        if not looks_like_command:
+            # This is likely prose/natural language, skip for safety
+            step_result['evidence'].append({
+                'action': 'file_operation',
+                'description': f'Skipping prose instruction: {instruction[:100]}'
+            })
+            step_result['evidence'].append({
+                'status': 'skipped',
+                'note': 'Instruction appears to be prose description, not a valid command'
+            })
+            return step_result
+        
         # If the instruction is a command, execute it with sudo if needed
         if instruction.startswith('sudo ') or instruction.startswith('systemctl') or '/etc/' in instruction:
-            # Use sudo for privileged operations
             cmd_result = self.ssh.sudo(instruction)
-        elif not any(kw in instruction.lower() for kw in ['edit', 'create', 'add', 'delete', 'remove', 'configure', 'write', 'file', 'config']):
-            # It's actually a command, not a file operation
-            return self._execute_command_step(step, step_result)
         else:
             cmd_result = self.ssh.sudo(instruction)
         
