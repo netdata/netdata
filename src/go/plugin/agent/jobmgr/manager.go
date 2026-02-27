@@ -427,9 +427,9 @@ func (m *Manager) runNotifyRunningJobs() {
 		case <-m.ctx.Done():
 			return
 		case clock := <-tk.C:
-			m.runningJobs.lock()
-			m.runningJobs.forEach(func(_ string, job runtimeJob) { job.Tick(clock) })
-			m.runningJobs.unlock()
+			for _, job := range m.runningJobs.snapshot() {
+				job.Tick(clock)
+			}
 		}
 	}
 }
@@ -437,11 +437,11 @@ func (m *Manager) runNotifyRunningJobs() {
 func (m *Manager) startRunningJob(job runtimeJob) {
 	m.stopRunningJob(job.FullName())
 
-	m.runningJobs.lock()
-	defer m.runningJobs.unlock()
-
 	go job.Start()
+
+	m.runningJobs.lock()
 	m.runningJobs.add(job.FullName(), job)
+	m.runningJobs.unlock()
 
 	// Track job for module function routing.
 	m.moduleFuncs.addJob(job.ModuleName(), job.Name(), job)
@@ -491,12 +491,9 @@ func (m *Manager) cleanup() {
 		}
 	}
 
-	m.runningJobs.lock()
-	defer m.runningJobs.unlock()
-
-	m.runningJobs.forEach(func(_ string, job runtimeJob) {
+	for _, job := range m.runningJobs.snapshot() {
 		job.Stop()
-	})
+	}
 }
 
 // registerJobMethods registers methods for a specific job with Netdata

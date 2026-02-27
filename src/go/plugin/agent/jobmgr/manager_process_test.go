@@ -4,6 +4,7 @@ package jobmgr
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
 func TestRunProcessConfGroups_ChannelCloseDoesNotSpin(t *testing.T) {
@@ -111,3 +113,88 @@ func TestRun_WaitTimeoutClearsGateAndKeepsAccepted(t *testing.T) {
 	require.True(t, ok, "first config must stay exposed after timeout")
 	assert.Equal(t, dyncfg.StatusAccepted, entry1.Status)
 }
+
+func TestRunNotifyRunningJobs_TickOutsideLock(t *testing.T) {
+	mgr := New(Config{PluginName: testPluginName})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mgr.ctx = ctx
+
+	job := &lockProbeJob{
+		fullName:    "success_lockprobe",
+		moduleName:  "success",
+		name:        "lockprobe",
+		tickStarted: make(chan struct{}),
+		tickRelease: make(chan struct{}),
+	}
+
+	mgr.runningJobs.lock()
+	mgr.runningJobs.add(job.FullName(), job)
+	mgr.runningJobs.unlock()
+
+	done := make(chan struct{})
+	go func() {
+		mgr.runNotifyRunningJobs()
+		close(done)
+	}()
+
+	select {
+	case <-job.tickStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("tick did not start")
+	}
+
+	stopDone := make(chan struct{})
+	go func() {
+		mgr.stopRunningJob(job.FullName())
+		close(stopDone)
+	}()
+
+	select {
+	case <-stopDone:
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("stopRunningJob blocked while Tick was in progress")
+	}
+
+	close(job.tickRelease)
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("runNotifyRunningJobs did not stop")
+	}
+}
+
+type lockProbeJob struct {
+	fullName   string
+	moduleName string
+	name       string
+
+	tickOnce    sync.Once
+	stopOnce    sync.Once
+	tickStarted chan struct{}
+	tickRelease chan struct{}
+}
+
+func (j *lockProbeJob) FullName() string   { return j.fullName }
+func (j *lockProbeJob) ModuleName() string { return j.moduleName }
+func (j *lockProbeJob) Name() string       { return j.name }
+func (j *lockProbeJob) Collector() any     { return nil }
+func (j *lockProbeJob) Start()             {}
+func (j *lockProbeJob) Stop()              { j.stopOnce.Do(func() {}) }
+func (j *lockProbeJob) Tick(_ int) {
+	j.tickOnce.Do(func() {
+		close(j.tickStarted)
+		<-j.tickRelease
+	})
+}
+func (j *lockProbeJob) AutoDetection() error              { return nil }
+func (j *lockProbeJob) AutoDetectionEvery() int           { return 0 }
+func (j *lockProbeJob) RetryAutoDetection() bool          { return false }
+func (j *lockProbeJob) Cleanup()                          {}
+func (j *lockProbeJob) IsRunning() bool                   { return true }
+func (j *lockProbeJob) Panicked() bool                    { return false }
+func (j *lockProbeJob) Vnode() vnodes.VirtualNode         { return vnodes.VirtualNode{} }
+func (j *lockProbeJob) UpdateVnode(_ *vnodes.VirtualNode) {}

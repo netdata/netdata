@@ -179,11 +179,11 @@ func (m *Manager) dyncfgVnodeAdd(fn dyncfg.Function) {
 
 	m.vnodes[name] = cfg
 
-	m.runningJobs.forEach(func(_ string, job runtimeJob) {
+	for _, job := range m.runningJobs.snapshot() {
 		if job.Vnode().Name == name {
 			job.UpdateVnode(cfg)
 		}
-	})
+	}
 
 	m.dyncfgApi.SendCodef(fn, 202, "")
 	m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
@@ -293,11 +293,11 @@ func (m *Manager) dyncfgVnodeUpdate(fn dyncfg.Function) {
 
 	m.vnodes[name] = cfg
 
-	m.runningJobs.forEach(func(_ string, job runtimeJob) {
+	for _, job := range m.runningJobs.snapshot() {
 		if job.Vnode().Name == name {
 			job.UpdateVnode(cfg)
 		}
-	})
+	}
 
 	m.dyncfgApi.SendCodef(fn, 202, "")
 	m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
