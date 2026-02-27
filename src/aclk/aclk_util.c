@@ -687,8 +687,23 @@ static int aclk_http_proxy_negotiate(int sockfd, const char *proxy_username, con
     if (strncmp(resp, "HTTP/1.1 ", 9) != 0 && strncmp(resp, "HTTP/1.0 ", 9) != 0)
         goto cleanup;
 
+    if (!isdigit((unsigned char)resp[9]) || !isdigit((unsigned char)resp[10]) || !isdigit((unsigned char)resp[11])) {
+        netdata_log_error("ACLK: HTTP proxy response missing valid status code");
+        goto cleanup;
+    }
+
     int status = atoi(resp + 9);
-    result = (status == 200) ? 0 : 1;
+    if (status == 200) {
+        result = 0;
+    } else {
+        // extract the status line (first line) for logging
+        char *eol = strstr(resp, "\r\n");
+        if (eol)
+            *eol = '\0';
+        netdata_log_error("ACLK: HTTP proxy CONNECT to %s:%d failed with status %d: %s",
+                          target_host, target_port, status, resp);
+        result = 1;
+    }
 
 cleanup:
     if (has_creds)
@@ -838,6 +853,11 @@ static int aclk_socks5_proxy_negotiate(int sockfd, enum mqtt_wss_proxy_type prox
             netdata_log_error("ACLK: SOCKS5H target hostname length invalid (%zu)", host_len);
             return 1;
         }
+        // 1 (atype) + 1 (length) + host_len + 2 (port)
+        if (pos + 1 + 1 + host_len + 2 > sizeof(connect_req)) {
+            netdata_log_error("ACLK: SOCKS5H CONNECT request too large for buffer");
+            return 1;
+        }
         connect_req[pos++] = 0x03;
         connect_req[pos++] = (uint8_t)host_len;
         memcpy(connect_req + pos, target_host, host_len);
@@ -848,6 +868,11 @@ static int aclk_socks5_proxy_negotiate(int sockfd, enum mqtt_wss_proxy_type prox
         size_t addr_len = 0;
         if (aclk_socks5_resolve_local(target_host, &atyp, addr, &addr_len)) {
             netdata_log_error("ACLK: SOCKS5 local DNS resolution failed for target host '%s'", target_host);
+            return 1;
+        }
+        // 1 (atype) + addr_len + 2 (port)
+        if (pos + 1 + addr_len + 2 > sizeof(connect_req)) {
+            netdata_log_error("ACLK: SOCKS5 CONNECT request too large for buffer");
             return 1;
         }
         connect_req[pos++] = atyp;
