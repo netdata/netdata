@@ -1,0 +1,30 @@
+[package]
+name = "bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# Local crates
+netdata-plugin-error = { path = "../error" }
+netdata-plugin-protocol = { path = "../protocol" }
+netdata-plugin-schema = { path = "../schema" }
+
+# Async runtime and tokio utilities
+tokio = { version = "1.0", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+
+async-trait = { workspace = true }
+futures = { workspace = true }
+tracing = { workspace = true }
+schemars = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+console-subscriber = "0.4"
+

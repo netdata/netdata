@@ -5,7 +5,7 @@ package whoisquery
 import (
 	"errors"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func (c *Collector) validateConfig() error {
@@ -19,11 +19,11 @@ func (c *Collector) initProvider() (provider, error) {
 	return newProvider(c.Config)
 }
 
-func (c *Collector) initCharts() *module.Charts {
+func (c *Collector) initCharts() *collectorapi.Charts {
 	charts := baseCharts.Copy()
 
 	for _, chart := range *charts {
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "domain", Value: c.Source},
 		}
 	}

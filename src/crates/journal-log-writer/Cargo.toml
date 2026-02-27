@@ -1,0 +1,30 @@
+[package]
+name = "journal-log-writer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+journal-common = { workspace = true }
+journal-core = { workspace = true }
+journal-registry = { workspace = true }
+rdp = { workspace = true }
+
+uuid = { workspace = true, features = ["v4"] }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+nix = { workspace = true, features = ["time"] }
+
+# Optional serde support for structured logging
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+flatten-serde-json = { workspace = true, optional = true }
+
+[features]
+serde-api = ["serde", "serde_json", "flatten-serde-json"]
+
+[dev-dependencies]
+tempfile = { workspace = true }

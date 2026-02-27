@@ -13,6 +13,7 @@
 
 static ISensorManager *pSensorManager = NULL;
 static ND_THREAD *sensors_thread_update = NULL;
+static netdata_mutex_t sensors_mutex;
 
 #define NETDATA_WIN_SENSOR_STATES (6)
 #define NETDATA_WIN_VECTOR_POS (3)
@@ -26,11 +27,15 @@ enum netdata_win_sensor_monitored {
     NETDATA_WIN_SENSOR_DATA_TYPE_LIGHT_TEMPERATURE,
     NETDATA_WIN_SENSOR_VOLTAGE,
     NETDATA_WIN_SENSOR_RESISTENCE,
+    NETDATA_WIN_SENSOR_CAPACITANCE_FARAD,
+    NETDATA_WIN_SENSOR_INDUCTANCE_HENRY,
     NETDATA_WIN_SENSOR_ATMOSPHERE_PRESSURE,
     NETDATA_WIN_SENSOR_LATITUDE_DEGREES,
     NETDATA_WIN_SENSOR_LONGITUDE_DEGREES,
     NETDATA_WIN_SENSOR_FORCE_NEWTONS,
     NETDATA_WIN_SENSOR_GAUGE_PRESSURE,
+    NETDATA_WIN_SENSOR_HUMAN_PRESENCE,
+    NETDATA_WIN_SENSOR_HUMAN_PROXIMITY_METERS,
 
     // Add only one vector axis here
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_X,
@@ -87,11 +92,15 @@ REFPROPERTYKEY sensor_keys[] = {
     &SENSOR_DATA_TYPE_LIGHT_TEMPERATURE_KELVIN,
     &SENSOR_DATA_TYPE_VOLTAGE_VOLTS,
     &SENSOR_DATA_TYPE_RESISTANCE_OHMS,
+    &SENSOR_DATA_TYPE_CAPACITANCE_FARAD,
+    &SENSOR_DATA_TYPE_INDUCTANCE_HENRY,
     &SENSOR_DATA_TYPE_ATMOSPHERIC_PRESSURE_BAR,
     &SENSOR_DATA_TYPE_LATITUDE_DEGREES,
     &SENSOR_DATA_TYPE_LONGITUDE_DEGREES,
     &SENSOR_DATA_TYPE_FORCE_NEWTONS,
     &SENSOR_DATA_TYPE_GAUGE_PRESSURE_PASCAL,
+    &SENSOR_DATA_TYPE_HUMAN_PRESENCE,
+    &SENSOR_DATA_TYPE_HUMAN_PROXIMITY_METERS,
 
     // Add only one vector axis here
     &SENSOR_DATA_TYPE_DISTANCE_X_METERS,
@@ -190,18 +199,32 @@ static struct win_sensor_config {
         .priority = NETDATA_CHART_PRIO_SENSOR_TEMPERATURE,
     },
     {
-        .title = "Electrical potential.",
+        .title = "Electrical potential",
         .units = "V",
         .context = "system.hw.sensor.voltage.input",
         .family = "Potential",
         .priority = NETDATA_CHART_PRIO_SENSOR_VOLTAGE,
     },
     {
-        .title = "Electrical resistence.",
+        .title = "Electrical resistence",
         .units = "Ohms",
-        .context = "system.hw.sensor.resistence.input",
-        .family = "Resistence",
-        .priority = NETDATA_CHART_PRIO_SENSOR_RESISTENCE,
+        .context = "system.hw.sensor.resistance.input",
+        .family = "Resistance",
+        .priority = NETDATA_CHART_PRIO_SENSOR_RESISTANCE,
+    },
+    {
+        .title = "Electrical capacitance",
+        .units = "F",
+        .context = "system.hw.sensor.capacitance.input",
+        .family = "Capacitance",
+        .priority = NETDATA_CHART_PRIO_SENSOR_CAPACITANCE,
+    },
+    {
+        .title = "Electrical inductance",
+        .units = "H",
+        .context = "system.hw.sensor.inductance.input",
+        .family = "Inductance",
+        .priority = NETDATA_CHART_PRIO_SENSOR_INDUCTANCE,
     },
     {
         .title = "Ambient atmospheric pressure",
@@ -237,6 +260,20 @@ static struct win_sensor_config {
         .context = "system.hw.sensor.gauge_pressure.input",
         .family = "Pressure",
         .priority = NETDATA_CHART_PRIO_SENSOR_GAUGE_PRESSURE,
+    },
+    {
+        .title = "Human presence",
+        .units = "presence",
+        .context = "system.hw.sensor.human_presence.input",
+        .family = "Presence",
+        .priority = NETDATA_CHART_PRIO_SENSOR_HUMAN,
+    },
+    {
+        .title = "Human proximity",
+        .units = "m",
+        .context = "system.hw.sensor.human_proximity.input",
+        .family = "Proximity",
+        .priority = NETDATA_CHART_PRIO_SENSOR_PROXIMITY,
     },
     {
         .title = "Distance",
@@ -310,23 +347,37 @@ struct sensor_data {
 DICTIONARY *sensors;
 
 // Microsoft appends additional data
-#define ADDTIONAL_UUID_STR_LEN (UUID_STR_LEN + 8)
+#define ADDTIONAL_UUID_STR_LEN (UUID_STR_LEN + 17)
 
-static void netdata_clsid_to_char(char *output, const GUID *pguid)
+static bool netdata_clsid_to_char(char *output, size_t output_len, const GUID *pguid)
 {
+    if (unlikely(!output))
+        return false;
+
     LPWSTR wguid = NULL;
-    if (SUCCEEDED(StringFromCLSID(pguid, &wguid)) && wguid) {
-        size_t len = wcslen(wguid);
-        wcstombs(output, wguid, len);
-        CoTaskMemFree(wguid);
+    HRESULT hr = StringFromCLSID(pguid, &wguid);
+    output[0] = '\0';
+    if (FAILED(hr) || unlikely(!wguid))
+        return false;
+
+    size_t converted = wcstombs(output, wguid, output_len - 1);
+    CoTaskMemFree(wguid);
+
+    if (unlikely(converted == (size_t)-1)) {
+        output[0] = '\0';
+        return false;
     }
+
+    output[converted] = '\0';
+
+    return true;
 }
 
 static inline char *netdata_convert_guid_to_string(HRESULT hr, GUID *value)
 {
     if (SUCCEEDED(hr)) {
         char cguid[ADDTIONAL_UUID_STR_LEN];
-        netdata_clsid_to_char(cguid, value);
+        netdata_clsid_to_char(cguid, ADDTIONAL_UUID_STR_LEN, value);
         return strdupz(cguid);
     }
     return NULL;
@@ -353,8 +404,11 @@ static inline char *netdata_pvar_to_char(const PROPERTYKEY *key, ISensor *pSenso
     HRESULT hr = pSensor->lpVtbl->GetProperty(pSensor, key, &pv);
     if (SUCCEEDED(hr) && pv.vt == VT_LPWSTR) {
         char value[8192];
-        size_t len = wcslen(pv.pwszVal);
+        int len = wcslen(pv.pwszVal);
         len = wcstombs(value, pv.pwszVal, len);
+        if (len < 0) {
+            return NULL;
+        }
         value[len] = '\0';
         PropVariantClear(&pv);
         return strdupz(value);
@@ -378,12 +432,11 @@ static int netdata_collect_sensor_data(collected_number *value, ISensor *pSensor
     PROPVARIANT pv = {};
     HRESULT hr;
 
-    int defined = 0;
     hr = pSensor->lpVtbl->GetData(pSensor, &pReport);
     if (SUCCEEDED(hr) && pReport) {
         PropVariantInit(&pv);
         hr = pReport->lpVtbl->GetSensorValue(pReport, key, &pv);
-        if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4)) {
+        if (SUCCEEDED(hr)) {
             switch (pv.vt) {
                 case VT_UI4:
                     *value = (collected_number)(pv.ulVal * 100);
@@ -394,16 +447,28 @@ static int netdata_collect_sensor_data(collected_number *value, ISensor *pSensor
                 case VT_R8:
                     *value = (collected_number)(pv.dblVal * div_factor);
                     break;
+                case VT_BOOL:
+                    *value = (pv.boolVal == VARIANT_TRUE) ? 100 : 0;
+                    break;
+                default:
+                    goto error_collect_sensor_data;
             }
-            defined = 1;
+            pReport->lpVtbl->Release(pReport);
+        } else {
+            pReport->lpVtbl->Release(pReport);
+            goto error_collect_sensor_data;
         }
         PropVariantClear(&pv);
-        pReport->lpVtbl->Release(pReport);
-    } else {
-        *value = 0;
-    }
+    } else
+        goto error_collect_sensor_data;
 
-    return defined;
+    return 1;
+error_collect_sensor_data:
+    if (pv.vt != VT_EMPTY)
+        PropVariantClear(&pv);
+
+    *value = 0;
+    return 0;
 }
 
 static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
@@ -474,7 +539,7 @@ static void netdata_sensors_get_custom_data(struct sensor_data *sd, ISensor *pSe
 static struct netdata_sensors_extra_config *netdata_sensors_fill_configuration(const char *name)
 {
 #define NETDATA_DEFAULT_SENSOR_SECTION "plugin:windows:GetSensors"
-    char section_name[CONFIG_MAX_NAME];
+    char section_name[CONFIG_MAX_NAME + 1];
     snprintfz(section_name, CONFIG_MAX_NAME, "%s:%s", NETDATA_DEFAULT_SENSOR_SECTION, name);
 
     const char *units = inicfg_get(&netdata_config, section_name, "units", NULL);
@@ -501,6 +566,7 @@ static void netdata_get_sensors()
     ULONG count = 0;
     hr = pSensorCollection->lpVtbl->GetCount(pSensorCollection, &count);
     if (FAILED(hr)) {
+        pSensorCollection->lpVtbl->Release(pSensorCollection);
         return;
     }
 
@@ -510,16 +576,24 @@ static void netdata_get_sensors()
         ISensor *pSensor = NULL;
         hr = pSensorCollection->lpVtbl->GetAt(pSensorCollection, i, &pSensor);
         if (FAILED(hr) || !pSensor) {
+            if (pSensor)
+                pSensor->lpVtbl->Release(pSensor);
             continue;
         }
 
         GUID id = {0};
         hr = pSensor->lpVtbl->GetID(pSensor, &id);
         if (FAILED(hr)) {
+            pSensor->lpVtbl->Release(pSensor);
             continue;
         }
-        netdata_clsid_to_char(thread_values, &id);
 
+        if (!netdata_clsid_to_char(thread_values, sizeof(thread_values), &id)) {
+            pSensor->lpVtbl->Release(pSensor);
+            continue;
+        }
+
+        __netdata_mutex_lock(&sensors_mutex);
         struct sensor_data *sd = dictionary_set(sensors, thread_values, NULL, sizeof(*sd));
 
         if (unlikely(!sd->initialized)) {
@@ -569,6 +643,7 @@ static void netdata_get_sensors()
                 }
             }
         }
+        __netdata_mutex_unlock(&sensors_mutex);
 
         pSensor->lpVtbl->Release(pSensor);
     }
@@ -578,6 +653,30 @@ static void netdata_get_sensors()
 
 static void netdata_sensors_monitor(void *ptr __maybe_unused)
 {
+    // Initialize COM for this thread - sensor thread only needs COM for Sensor API, not WMI
+    HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    bool com_initialized = SUCCEEDED(hr);
+
+    // RPC_E_CHANGED_MODE means COM was already initialized in a different mode (e.g., COINIT_APARTMENTTHREADED)
+    // In this case, COM is available but we didn't increment the reference count
+    if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Sensor thread: cannot initialize COM interface (error 0x%lX)", (unsigned long)hr);
+        return;
+    }
+
+    // Create sensor manager instance for this thread
+    hr = CoCreateInstance(
+        &CLSID_SensorManager, NULL, CLSCTX_INPROC_SERVER, &IID_ISensorManager, (void **)&pSensorManager);
+    if (FAILED(hr)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Sensor thread: cannot create ISensorManager (error 0x%lX)", (unsigned long)hr);
+        // Only uninitialize if we successfully initialized COM ourselves
+        if (com_initialized)
+            CoUninitialize();
+        return;
+    }
+
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
 
@@ -589,6 +688,16 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
 
         netdata_get_sensors();
     }
+
+    // Thread cleanup - release sensor manager and uninitialize COM
+    if (pSensorManager) {
+        pSensorManager->lpVtbl->Release(pSensorManager);
+        pSensorManager = NULL;
+    }
+
+    // Only uninitialize if we successfully initialized COM ourselves
+    if (com_initialized)
+        CoUninitialize();
 }
 
 void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -605,24 +714,12 @@ void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value,
 
 static int initialize(int update_every)
 {
-    // This is an internal plugin, if we initialize these two times, collector will fail. To avoid this
-    // we call InitializeWMI to verify COM interface was already initialized.
-    HRESULT hr = InitializeWMI();
-    if (hr != S_OK) {
-        hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-        if (FAILED(hr)) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Collector cannot initialize COM interface.");
-            return -1;
-        }
-    }
+    // Note: COM and Sensor API initialization is now done in the sensor thread
+    // (netdata_sensors_monitor) because COM must be initialized per-thread.
+    // The sensor thread owns the pSensorManager instance and handles its cleanup.
 
-    hr = CoCreateInstance(
-        &CLSID_SensorManager, NULL, CLSCTX_INPROC_SERVER, &IID_ISensorManager, (void **)&pSensorManager);
-    if (FAILED(hr)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Collector cannot initialize sensor API.");
-        CoUninitialize();
+    if (unlikely(__netdata_mutex_init(&sensors_mutex)))
         return -1;
-    }
 
     sensors = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct sensor_data));
@@ -797,18 +894,21 @@ int do_GetSensors(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
+    __netdata_mutex_lock(&sensors_mutex);
     dictionary_sorted_walkthrough_read(sensors, dict_sensors_charts_cb, &update_every);
+    __netdata_mutex_unlock(&sensors_mutex);
     return 0;
 }
 
 void do_Sensors_cleanup()
 {
+    // Wait for sensor thread to finish
+    // The thread handles its own COM cleanup (CoUninitialize) and pSensorManager release
     if (nd_thread_join(sensors_thread_update))
         nd_log_daemon(NDLP_ERR, "Failed to join sensors thread update");
 
-    if (pSensorManager) {
-        pSensorManager->lpVtbl->Release(pSensorManager);
-
-        CoUninitialize();
-    }
+    __netdata_mutex_destroy(&sensors_mutex);
+    dictionary_destroy(sensors);
+    // Note: pSensorManager is owned and cleaned up by the sensor thread itself
+    // No additional cleanup needed here since the thread has already released resources
 }

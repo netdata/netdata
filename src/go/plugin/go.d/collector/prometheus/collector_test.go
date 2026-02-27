@@ -15,7 +15,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 var (
@@ -33,7 +34,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -600,7 +601,7 @@ test_gauge_no_meta_metric_1{label1="value2"} 12
 	}
 }
 
-func removeObsoleteCharts(charts *module.Charts) {
+func removeObsoleteCharts(charts *collectorapi.Charts) {
 	var i int
 	for _, chart := range *charts {
 		if !chart.Obsolete {

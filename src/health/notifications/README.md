@@ -85,7 +85,7 @@ flowchart TD
 :::tip
 
 Use the `edit-config` script to safely edit configuration files. It automatically creates the necessary files in the right place and opens them in your editor.
-[Learn how to use `edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config)
+[Learn how to use `edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files)
 
 :::
 

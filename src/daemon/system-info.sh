@@ -256,19 +256,25 @@ elif [ -n "${dmidecode}" ] && dmidecode -t processor >/dev/null 2>&1; then
   CPU_MODEL="$(echo "${dmidecode_output}" | grep -F "Version:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   possible_cpu_freq="$(echo "${dmidecode_output}" | grep -F "Current Speed:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 else
-  if [ -n "${nproc}" ]; then
-    CPU_INFO_SOURCE="nproc"
-    LCPU_COUNT="$(${nproc})"
-  elif [ "${KERNEL_NAME}" = FreeBSD ]; then
+  # Check OS-specific methods FIRST, then fall back to generic methods
+  if [ "${KERNEL_NAME}" = FreeBSD ]; then
     CPU_INFO_SOURCE="sysctl"
     LCPU_COUNT="$(sysctl -n kern.smp.cpus)"
-    if ! possible_cpu_freq=$(sysctl -n machdep.tsc_freq 2>/dev/null); then
+    # Try dev.cpu.0.freq first (what freebsd.plugin uses, returns MHz)
+    if possible_cpu_freq=$(sysctl -n dev.cpu.0.freq 2>/dev/null); then
+      possible_cpu_freq="${possible_cpu_freq} MHz"
+    # Fallback to machdep.tsc_freq (returns Hz, no unit suffix needed)
+    elif ! possible_cpu_freq=$(sysctl -n machdep.tsc_freq 2>/dev/null); then
+      # Last resort: parse hw.model for GHz values
       possible_cpu_freq=$(sysctl -n hw.model 2>/dev/null | grep -Eo "[0-9\.]+GHz" | grep -o "^[0-9\.]*" | awk '{print int($0*1000)}')
       [ -n "$possible_cpu_freq" ] && possible_cpu_freq="${possible_cpu_freq} MHz"
     fi
   elif [ "${KERNEL_NAME}" = Darwin ]; then
     CPU_INFO_SOURCE="sysctl"
     LCPU_COUNT="$(sysctl -n hw.logicalcpu)"
+  elif [ -n "${nproc}" ]; then
+    CPU_INFO_SOURCE="nproc"
+    LCPU_COUNT="$(${nproc})"
   elif [ -d /sys/devices/system/cpu ]; then
     CPU_INFO_SOURCE="sysfs"
     # This is potentially more accurate than checking `/proc/cpuinfo`.

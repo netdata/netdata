@@ -924,6 +924,14 @@ static const char *agent_health(DAEMON_STATUS_FILE *ds) {
         return "healthy-recovered";
 }
 
+// Callback to discard curl response data.
+// Without this, curl writes to stdout which can crash on Windows when running as a service.
+static size_t post_status_file_discard_response(void *ptr, size_t size, size_t nmemb, void *userdata) {
+    (void)ptr;
+    (void)userdata;
+    return size * nmemb;
+}
+
 static void post_status_file(struct post_status_file_thread_data *d) {
     daemon_status_file_startup_step("startup(crash reports json)");
 
@@ -953,6 +961,15 @@ static void post_status_file(struct post_status_file_thread_data *d) {
     curl_easy_setopt(curl, CURLOPT_URL, "https://agent-events.netdata.cloud/agent-events");
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
+
+    // Discard response data - without this curl writes to stdout which can crash
+    // on Windows when running as a service or without a console
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, post_status_file_discard_response);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, NULL);
+
+    // Prevent signal-based timeouts which can cause issues on Windows/MSYS2
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -1562,8 +1579,8 @@ void daemon_status_file_shutdown_timeout(BUFFER *trace) {
 
     safecpy(session_status.fatal.function, "shutdown_timeout");
 
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    daemon_status_file_save(wb, &session_status, false);
+    static_save_buffer_init();
+    daemon_status_file_save(static_save_buffer, &session_status, false);
 
     // keep the spinlock locked, to prevent further steps updating the status
 }

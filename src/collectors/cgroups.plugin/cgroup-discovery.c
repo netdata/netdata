@@ -1026,7 +1026,7 @@ static int discovery_is_cgroup_duplicate(struct cgroup *cg) {
     // https://github.com/netdata/netdata/issues/797#issuecomment-241248884
     struct cgroup *c;
     for (c = discovered_cgroup_root; c; c = c->discovered_next) {
-        if (c != cg && c->enabled && (is_cgroup_systemd_service(c) == is_cgroup_systemd_service(cg)) &&
+        if (c != cg && c->enabled && c->available && (is_cgroup_systemd_service(c) == is_cgroup_systemd_service(cg)) &&
             c->hash_chart_id == cg->hash_chart_id && !strcmp(c->chart_id, cg->chart_id)) {
             collector_error(
                     "CGROUP: chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.",
@@ -1055,6 +1055,12 @@ static void netdata_cgroup_ebpf_set_values(size_t length)
 
 static void netdata_cgroup_ebpf_initialize_shm()
 {
+    // Unlink any existing shared memory and semaphore to start fresh.
+    // This prevents truncating memory that another process might be using.
+    // Existing mappings in other processes remain valid until they unmap.
+    (void) shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
+    (void) sem_unlink(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME);
+
     shm_fd_cgroup_ebpf = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_CREAT | O_RDWR, 0660);
     if (shm_fd_cgroup_ebpf < 0) {
         collector_error("Cannot initialize shared memory used by cgroup and eBPF, integration won't happen.");
@@ -1093,13 +1099,14 @@ static void netdata_cgroup_ebpf_initialize_shm()
     end_init_shm:
     close(shm_fd_cgroup_ebpf);
     shm_fd_cgroup_ebpf = -1;
-    shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
+    (void) shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
 }
 
 static void cgroup_cleanup_ebpf_integration()
 {
     if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
         sem_close(shm_mutex_cgroup_ebpf);
+        (void) sem_unlink(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME);
     }
 
     if (shm_cgroup_ebpf.header) {
@@ -1110,6 +1117,7 @@ static void cgroup_cleanup_ebpf_integration()
     if (shm_fd_cgroup_ebpf > 0) {
         close(shm_fd_cgroup_ebpf);
     }
+    (void) shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
 }
 
 // ----------------------------------------------------------------------------
@@ -1348,5 +1356,5 @@ void cgroup_discovery_worker(void *ptr)
     cgroup_cleanup_ebpf_integration();
     worker_unregister();
     service_exits();
-    __atomic_store_n(&discovery_thread.exited,1,__ATOMIC_RELAXED);
+    __atomic_store_n(&discovery_thread.exited, 1, __ATOMIC_RELEASE);
 }

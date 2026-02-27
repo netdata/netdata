@@ -5,7 +5,7 @@ description: |
   servers via the MicroProfile Metrics (Prometheus/OpenMetrics) endpoint.
 link: https://www.ibm.com/products/websphere-application-server
 categories:
-  - data-collection.application_servers
+  - data-collection.applications
 icon: ibm.svg
 keywords:
   - websphere

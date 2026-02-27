@@ -8,11 +8,10 @@ modules:
         name: ZooKeeper
         link: https://zookeeper.apache.org/
         categories:
-          - data-collection.service-discovery-registry
+          - data-collection.applications
         icon_filename: zookeeper.svg
       keywords:
         - zookeeper
-      most_popular: false
       info_provided_to_referring_integrations:
         description: ""
       related_resources:

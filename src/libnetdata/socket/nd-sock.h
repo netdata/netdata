@@ -125,6 +125,14 @@ static ssize_t nd_sock_revc_nowait(ND_SOCK *s, void *buf, size_t num) {
 }
 
 ALWAYS_INLINE
+static ssize_t nd_sock_peek_nowait(ND_SOCK *s, void *buf, size_t num) {
+    if (nd_sock_is_ssl(s))
+        return netdata_ssl_peek(&s->ssl, buf, num);
+    else
+        return recv(s->fd, buf, num, MSG_PEEK | MSG_DONTWAIT);
+}
+
+ALWAYS_INLINE
 static ssize_t nd_sock_send_nowait(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))
         return netdata_ssl_write(&s->ssl, buf, num);

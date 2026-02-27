@@ -6,9 +6,11 @@ You can remove a node from your Space in Netdata Cloud, but the process depends 
 
 Before attempting to remove a node, it's important to understand what each status means:
 
-* **Online**: Node is actively connected and streaming data
+* **Online** (Live): Node is actively connected and streaming data
 * **Stale**: Node is a child that stopped streaming to its parent, but the parent still has its historical data
-* **Offline**: Node is disconnected and no longer has data available for querying
+* **Offline** (Unreachable): Node is disconnected and no longer has data available for querying
+
+For a complete explanation of node states, state transitions, and when nodes move between states, see [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
 
 <details>
 <summary><strong>Why Can't I Delete Stale Nodes?</strong></summary><br/>
@@ -115,7 +117,7 @@ is ephemeral node = yes
 
 :::tip
 
-For nodes that are part of streaming configurations, see the [Nodes Ephemerality documentation](https://learn.netdata.cloud/docs/observability-centralization-points/nodes-ephemerality) for more advanced configuration options.
+For nodes that are part of streaming configurations, see [Nodes Ephemerality](/docs/nodes-ephemerality.md) for more advanced configuration options.
 
 :::
 
@@ -136,4 +138,10 @@ To prevent removed nodes from reappearing:
 
 ## Additional Resources
 
-For more advanced configuration options with streaming setups, see the [Nodes Ephemerality documentation](https://learn.netdata.cloud/docs/observability-centralization-points/nodes-ephemerality).
+For a complete reference on node states and transitions, see [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
+
+For more advanced configuration options with streaming setups, see [Nodes Ephemerality](/docs/nodes-ephemerality.md).
+
+To avoid removal issues when cloning VMs, see [VM Templates](/docs/learn/vm-templates.md) for proper identity cleanup.
+
+To understand how node identity affects removal and cleanup, see [Node Identities](/docs/learn/node-identities.md).

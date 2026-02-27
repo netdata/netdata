@@ -251,10 +251,26 @@ static void init_thread_stmt_pool(void) {
     spinlock_unlock(&JudyL_thread_stmt_lock);
 }
 
+int simple_prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement)
+{
+    spinlock_lock(&sqlite_spinlock);
+    if (__atomic_load_n(&sqlite_databases_closed, __ATOMIC_ACQUIRE)) {
+        spinlock_unlock(&sqlite_spinlock);
+        return SQLITE_MISUSE;
+    }
+
+    int rc = sqlite3_prepare_v2(database, query, -1, statement, 0);
+    spinlock_unlock(&sqlite_spinlock);
+    return rc;
+}
+
 int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement)
 {
-    if (__atomic_load_n(&sqlite_databases_closed, __ATOMIC_ACQUIRE))
+    spinlock_lock(&sqlite_spinlock);
+    if (__atomic_load_n(&sqlite_databases_closed, __ATOMIC_ACQUIRE)) {
+        spinlock_unlock(&sqlite_spinlock);
         return SQLITE_MISUSE;
+    }
 
     int rc = sqlite3_prepare_v2(database, query, -1, statement, 0);
     if (rc == SQLITE_OK) {
@@ -264,6 +280,7 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
         if (stmt_key < MAX_PREPARED_THREAD_STATEMENTS)
             thread_stmt_pool->stmt[stmt_key] = *statement;
     }
+    spinlock_unlock(&sqlite_spinlock);
     return rc;
 }
 

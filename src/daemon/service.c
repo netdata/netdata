@@ -210,10 +210,35 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
 
         if (delete) {
             netdata_log_info("Host '%s' with machine guid '%s' is archived, ephemeral clean up.", rrdhost_hostname(host), host->machine_guid);
-            // we inform cloud a child has been removed
-            aclk_host_state_update(host, 0, 0);
-            unregister_node(host->machine_guid);
-            rrdhost_free___while_having_rrd_wrlock(host);
+
+            // Save machine_guid before releasing lock - we'll use it to look up fresh pointers
+            char machine_guid[UUID_STR_LEN];
+            strncpyz(machine_guid, host->machine_guid, GUID_LEN);
+
+            // Release lock before synchronous cloud operations to avoid deadlock
+            // (build_node_info acquires rrd_rdlock which would deadlock with our wrlock)
+            rrd_wrunlock();
+
+            // Look up fresh pointer for cloud operations (don't use stale 'host' pointer)
+            RRDHOST *cloud_host = rrdhost_find_by_guid(machine_guid);
+            if (cloud_host) {
+                send_node_info_with_wait(cloud_host);
+                send_node_update_with_wait(cloud_host, 0, 0);
+            }
+
+            // Re-acquire lock for cleanup
+            rrd_wrlock();
+
+            // Re-validate host still exists for cleanup
+            RRDHOST *host_check = rrdhost_find_by_guid(machine_guid);
+            if (host_check) {
+                unregister_node(host_check->machine_guid);
+                rrdhost_free___while_having_rrd_wrlock(host_check);
+            }
+
+            // Restart iteration - the list may have changed while lock was released
+            next = localhost;
+            now = now_realtime_sec();
         }
         else
             rrdhost_cleanup_data_collection_and_health(host);

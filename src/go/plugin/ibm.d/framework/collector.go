@@ -3,21 +3,21 @@ package framework
 import (
 	"context"
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"strings"
 )
 
 // Collector is the base type for all framework-based collectors
 type Collector struct {
-	module.Base
+	collectorapi.Base
 
 	Config             Config
 	State              *CollectorState
 	registeredContexts []interface{} // All contexts from generated code
 	contextMap         map[string]interface{}
-	charts             *module.Charts
-	impl               CollectorImpl  // The actual collector implementation
-	globalLabels       []module.Label // Job-level labels applied to all charts
+	charts             *collectorapi.Charts
+	impl               CollectorImpl        // The actual collector implementation
+	globalLabels       []collectorapi.Label // Job-level labels applied to all charts
 	instanceCharts     map[string]struct{}
 }
 
@@ -27,8 +27,8 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.State = NewCollectorState()
 	c.State.collector = &c.Base // Set logger reference
 	c.contextMap = make(map[string]interface{})
-	c.charts = &module.Charts{}
-	c.globalLabels = make([]module.Label, 0)
+	c.charts = &collectorapi.Charts{}
+	c.globalLabels = make([]collectorapi.Label, 0)
 	c.instanceCharts = make(map[string]struct{})
 
 	// Set defaults
@@ -55,7 +55,7 @@ func (c *Collector) Check(ctx context.Context) error {
 }
 
 // Charts returns the chart definitions (go.d framework requirement)
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
@@ -153,7 +153,7 @@ func (c *Collector) convertMetrics() map[string]int64 {
 						c.Debugf("Creating dynamic chart for instance: %s", instanceKey)
 						// Add labels from the instance
 						for k, v := range metric.Instance.labels {
-							chart.Labels = append(chart.Labels, module.Label{
+							chart.Labels = append(chart.Labels, collectorapi.Label{
 								Key:   k,
 								Value: v,
 							})
@@ -216,7 +216,7 @@ func cleanLabelValue(value string) string {
 }
 
 // createChartFromContext creates a go.d chart from a Context[T]
-func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, instance *Instance) *module.Chart {
+func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, instance *Instance) *collectorapi.Chart {
 	// Use reflection to extract context metadata
 	contextMeta := extractContextMetadata(ctx)
 	if contextMeta == nil {
@@ -231,7 +231,7 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, i
 		chartID = cleanChartID(contextMeta.Name)
 	}
 
-	chart := &module.Chart{
+	chart := &collectorapi.Chart{
 		ID: chartID,
 		// OverID:   instanceID,  // Commented out - let go.d framework handle chart naming
 		Title:    contextMeta.Title,
@@ -240,7 +240,7 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, i
 		Ctx:      contextMeta.Name,
 		Type:     contextMeta.Type,
 		Priority: contextMeta.Priority,
-		Opts:     module.Opts{},
+		Opts:     collectorapi.Opts{},
 	}
 
 	// Set UpdateEvery override if instance has one
@@ -257,7 +257,7 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, i
 	for _, dim := range contextMeta.Dimensions {
 		// Use the full dimension ID: {instance_id}.{dimension_name}
 		dimID := instancePrefix + dim.Name
-		chartDim := &module.Dim{
+		chartDim := &collectorapi.Dim{
 			ID:   dimID,
 			Name: dim.Name,
 			Algo: dim.Algorithm,
@@ -321,7 +321,7 @@ func (c *Collector) RegisterContexts(contexts ...interface{}) {
 }
 
 // GetBase returns the base module
-func (c *Collector) GetBase() *module.Base {
+func (c *Collector) GetBase() *collectorapi.Base {
 	return &c.Base
 }
 
@@ -343,15 +343,15 @@ func (c *Collector) SetGlobalLabel(key, value string) {
 	}
 
 	// Add new label
-	c.globalLabels = append(c.globalLabels, module.Label{Key: key, Value: value})
+	c.globalLabels = append(c.globalLabels, collectorapi.Label{Key: key, Value: value})
 	c.updateChartsWithGlobalLabels()
 }
 
 // SetGlobalLabels replaces all global labels
 func (c *Collector) SetGlobalLabels(labels map[string]string) {
-	c.globalLabels = make([]module.Label, 0, len(labels))
+	c.globalLabels = make([]collectorapi.Label, 0, len(labels))
 	for key, value := range labels {
-		c.globalLabels = append(c.globalLabels, module.Label{Key: key, Value: value})
+		c.globalLabels = append(c.globalLabels, collectorapi.Label{Key: key, Value: value})
 	}
 	c.updateChartsWithGlobalLabels()
 }
@@ -369,7 +369,7 @@ func (c *Collector) updateChartsWithGlobalLabels() {
 }
 
 // applyGlobalLabelsToChart adds global labels to a chart, avoiding duplicates
-func (c *Collector) applyGlobalLabelsToChart(chart *module.Chart) {
+func (c *Collector) applyGlobalLabelsToChart(chart *collectorapi.Chart) {
 	// Create a map of existing labels for quick lookup
 	existingLabels := make(map[string]int)
 	for i, label := range chart.Labels {

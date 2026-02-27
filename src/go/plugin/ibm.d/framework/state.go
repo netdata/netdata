@@ -2,7 +2,7 @@ package framework
 
 import (
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"reflect"
 	"strings"
 	"time"
@@ -336,7 +336,7 @@ func extractContextMetadata(ctx interface{}) *ContextMetadata {
 	if typ := v.FieldByName("Type"); typ.IsValid() {
 		// Type is module.ChartType (string)
 		if typ.Kind() == reflect.String {
-			meta.Type = module.ChartType(typ.String())
+			meta.Type = collectorapi.ChartType(typ.String())
 		}
 	}
 	if priority := v.FieldByName("Priority"); priority.IsValid() && priority.Kind() == reflect.Int {
@@ -368,7 +368,7 @@ func extractContextMetadata(ctx interface{}) *ContextMetadata {
 				if algo := dim.FieldByName("Algorithm"); algo.IsValid() {
 					// Algorithm is module.DimAlgo type (string)
 					if algo.Kind() == reflect.String {
-						d.Algorithm = module.DimAlgo(algo.String())
+						d.Algorithm = collectorapi.DimAlgo(algo.String())
 					}
 				}
 				if mul := dim.FieldByName("Mul"); mul.IsValid() && mul.Kind() == reflect.Int {

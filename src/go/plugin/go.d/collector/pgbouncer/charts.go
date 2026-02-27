@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioClientConnectionsUtilization = module.Priority + iota
+	prioClientConnectionsUtilization = collectorapi.Priority + iota
 	prioDBClientConnections
 	prioDBServerConnections
 	prioDBServerConnectionsUtilization
@@ -26,25 +26,25 @@ const (
 )
 
 var (
-	globalCharts = module.Charts{
+	globalCharts = collectorapi.Charts{
 		clientConnectionsUtilization.Copy(),
 	}
 
-	clientConnectionsUtilization = module.Chart{
+	clientConnectionsUtilization = collectorapi.Chart{
 		ID:       "client_connections_utilization",
 		Title:    "Client connections utilization",
 		Units:    "percentage",
 		Fam:      "client connections",
 		Ctx:      "pgbouncer.client_connections_utilization",
 		Priority: prioClientConnectionsUtilization,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cl_conns_utilization", Name: "used"},
 		},
 	}
 )
 
 var (
-	dbChartsTmpl = module.Charts{
+	dbChartsTmpl = collectorapi.Charts{
 		dbClientConnectionsTmpl.Copy(),
 
 		dbServerConnectionsUtilizationTmpl.Copy(),
@@ -64,30 +64,30 @@ var (
 		dbNetworkIOChartTmpl.Copy(),
 	}
 
-	dbClientConnectionsTmpl = module.Chart{
+	dbClientConnectionsTmpl = collectorapi.Chart{
 		ID:       "db_%s_client_connections",
 		Title:    "Database client connections",
 		Units:    "connections",
 		Fam:      "client connections",
 		Ctx:      "pgbouncer.db_client_connections",
 		Priority: prioDBClientConnections,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "db_%s_cl_active", Name: "active"},
 			{ID: "db_%s_cl_waiting", Name: "waiting"},
 			{ID: "db_%s_cl_cancel_req", Name: "cancel_req"},
 		},
 	}
 
-	dbServerConnectionsTmpl = module.Chart{
+	dbServerConnectionsTmpl = collectorapi.Chart{
 		ID:       "db_%s_server_connections",
 		Title:    "Database server connections",
 		Units:    "connections",
 		Fam:      "server connections",
 		Ctx:      "pgbouncer.db_server_connections",
 		Priority: prioDBServerConnections,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "db_%s_sv_active", Name: "active"},
 			{ID: "db_%s_sv_idle", Name: "idle"},
 			{ID: "db_%s_sv_used", Name: "used"},
@@ -96,129 +96,129 @@ var (
 		},
 	}
 
-	dbServerConnectionsUtilizationTmpl = module.Chart{
+	dbServerConnectionsUtilizationTmpl = collectorapi.Chart{
 		ID:       "db_%s_server_connections_utilization",
 		Title:    "Database server connections utilization",
 		Units:    "percentage",
 		Fam:      "server connections limit",
 		Ctx:      "pgbouncer.db_server_connections_utilization",
 		Priority: prioDBServerConnectionsUtilization,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "db_%s_sv_conns_utilization", Name: "used"},
 		},
 	}
 
-	dbClientsWaitTimeChartTmpl = module.Chart{
+	dbClientsWaitTimeChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_clients_wait_time",
 		Title:    "Database clients wait time",
 		Units:    "seconds",
 		Fam:      "clients wait time",
 		Ctx:      "pgbouncer.db_clients_wait_time",
 		Priority: prioDBClientsWaitTime,
-		Dims: module.Dims{
-			{ID: "db_%s_total_wait_time", Name: "time", Algo: module.Incremental, Div: 1e6},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_total_wait_time", Name: "time", Algo: collectorapi.Incremental, Div: 1e6},
 		},
 	}
-	dbClientMaxWaitTimeChartTmpl = module.Chart{
+	dbClientMaxWaitTimeChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_client_max_wait_time",
 		Title:    "Database client max wait time",
 		Units:    "seconds",
 		Fam:      "client max wait time",
 		Ctx:      "pgbouncer.db_client_max_wait_time",
 		Priority: prioDBClientsWaitMaxTime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "db_%s_maxwait", Name: "time", Div: 1e6},
 		},
 	}
 
-	dbTransactionsChartTmpl = module.Chart{
+	dbTransactionsChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_transactions",
 		Title:    "Database pooled SQL transactions",
 		Units:    "transactions/s",
 		Fam:      "transactions",
 		Ctx:      "pgbouncer.db_transactions",
 		Priority: prioDBTransactions,
-		Dims: module.Dims{
-			{ID: "db_%s_total_xact_count", Name: "transactions", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_total_xact_count", Name: "transactions", Algo: collectorapi.Incremental},
 		},
 	}
-	dbTransactionsTimeChartTmpl = module.Chart{
+	dbTransactionsTimeChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_transactions_time",
 		Title:    "Database transactions time",
 		Units:    "seconds",
 		Fam:      "transactions time",
 		Ctx:      "pgbouncer.db_transactions_time",
 		Priority: prioDBTransactionsTime,
-		Dims: module.Dims{
-			{ID: "db_%s_total_xact_time", Name: "time", Algo: module.Incremental, Div: 1e6},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_total_xact_time", Name: "time", Algo: collectorapi.Incremental, Div: 1e6},
 		},
 	}
-	dbTransactionAvgTimeChartTmpl = module.Chart{
+	dbTransactionAvgTimeChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_transactions_average_time",
 		Title:    "Database transaction average time",
 		Units:    "seconds",
 		Fam:      "transaction avg time",
 		Ctx:      "pgbouncer.db_transaction_avg_time",
 		Priority: prioDBTransactionsAvgTime,
-		Dims: module.Dims{
-			{ID: "db_%s_avg_xact_time", Name: "time", Algo: module.Incremental, Div: 1e6},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_avg_xact_time", Name: "time", Algo: collectorapi.Incremental, Div: 1e6},
 		},
 	}
 
-	dbQueriesChartTmpl = module.Chart{
+	dbQueriesChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_queries",
 		Title:    "Database pooled SQL queries",
 		Units:    "queries/s",
 		Fam:      "queries",
 		Ctx:      "pgbouncer.db_queries",
 		Priority: prioDBQueries,
-		Dims: module.Dims{
-			{ID: "db_%s_total_query_count", Name: "queries", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_total_query_count", Name: "queries", Algo: collectorapi.Incremental},
 		},
 	}
-	dbQueriesTimeChartTmpl = module.Chart{
+	dbQueriesTimeChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_queries_time",
 		Title:    "Database queries time",
 		Units:    "seconds",
 		Fam:      "queries time",
 		Ctx:      "pgbouncer.db_queries_time",
 		Priority: prioDBQueriesTime,
-		Dims: module.Dims{
-			{ID: "db_%s_total_query_time", Name: "time", Algo: module.Incremental, Div: 1e6},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_total_query_time", Name: "time", Algo: collectorapi.Incremental, Div: 1e6},
 		},
 	}
-	dbQueryAvgTimeChartTmpl = module.Chart{
+	dbQueryAvgTimeChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_query_average_time",
 		Title:    "Database query average time",
 		Units:    "seconds",
 		Fam:      "query avg time",
 		Ctx:      "pgbouncer.db_query_avg_time",
 		Priority: prioDBQueryAvgTime,
-		Dims: module.Dims{
-			{ID: "db_%s_avg_query_time", Name: "time", Algo: module.Incremental, Div: 1e6},
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_avg_query_time", Name: "time", Algo: collectorapi.Incremental, Div: 1e6},
 		},
 	}
 
-	dbNetworkIOChartTmpl = module.Chart{
+	dbNetworkIOChartTmpl = collectorapi.Chart{
 		ID:       "db_%s_network_io",
 		Title:    "Database traffic",
 		Units:    "B/s",
 		Fam:      "traffic",
 		Ctx:      "pgbouncer.db_network_io",
 		Priority: prioDBNetworkIO,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "db_%s_total_received", Name: "received", Algo: module.Incremental},
-			{ID: "db_%s_total_sent", Name: "sent", Algo: module.Incremental, Mul: -1},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "db_%s_total_received", Name: "received", Algo: collectorapi.Incremental},
+			{ID: "db_%s_total_sent", Name: "sent", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	}
 )
 
-func newDatabaseCharts(dbname, pgDBName string) *module.Charts {
+func newDatabaseCharts(dbname, pgDBName string) *collectorapi.Charts {
 	charts := dbChartsTmpl.Copy()
 	for _, c := range *charts {
 		c.ID = fmt.Sprintf(c.ID, dbname)
-		c.Labels = []module.Label{
+		c.Labels = []collectorapi.Label{
 			{Key: "database", Value: dbname},
 			{Key: "postgres_database", Value: pgDBName},
 		}

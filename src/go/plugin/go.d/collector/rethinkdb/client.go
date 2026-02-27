@@ -12,6 +12,7 @@ import (
 
 type rdbConn interface {
 	stats() ([][]byte, error)
+	jobs(ctx context.Context) ([]map[string]any, error)
 	close() error
 }
 
@@ -65,6 +66,30 @@ func (c *rethinkdbClient) stats() ([][]byte, error) {
 	}
 
 	return stats, nil
+}
+
+func (c *rethinkdbClient) jobs(ctx context.Context) ([]map[string]any, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	opts := rethinkdb.RunOpts{Context: ctx}
+
+	cur, err := rethinkdb.DB("rethinkdb").Table("jobs").Run(c.sess, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	if cur.IsNil() {
+		return nil, errors.New("no jobs found (cursor is nil)")
+	}
+	defer func() { _ = cur.Close() }()
+
+	var rows []map[string]any
+	if err := cur.All(&rows); err != nil {
+		return nil, err
+	}
+
+	return rows, nil
 }
 
 func (c *rethinkdbClient) close() (err error) {

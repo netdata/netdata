@@ -228,6 +228,9 @@ struct rrdset {
     } replay;
 #endif // NETDATA_LOG_REPLICATION_REQUESTS
 
+    // Replication stuck detection - outside debug flag for production safety
+    uint8_t replication_empty_response_count;  // track consecutive empty responses
+
     SPINLOCK destroy_lock;
 };
 

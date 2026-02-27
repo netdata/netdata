@@ -81,11 +81,9 @@ You can create investigations in two ways:
 2. Click **"New Investigation"**
 3. Enter your question and context
 
-#### From Anywhere with "Troubleshoot with AI"
+#### From Any Alert
 
-Click the **"Troubleshoot with AI"** button in the top right corner from any screen. This automatically captures your current context—including the specific chart, dashboard, or service you're viewing. Add your question and any extra context, then start the investigation.
-
-[SCREENSHOT FROM FIRST BLOG POST SHOULD BE PLACED HERE - showing the Troubleshoot with AI button]
+Click **"Ask AI"** next to any alert, or use the **"Alert Troubleshooting"** option in the Insights tab. This automatically captures your current context—including the specific alert, timeframe, and affected services. Add your question and any extra context, then start the investigation.
 
 ### Getting Your Results
 

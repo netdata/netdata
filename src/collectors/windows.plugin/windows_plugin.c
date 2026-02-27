@@ -60,11 +60,14 @@ static struct proc_module {
      .dim = "PerflibServices",
      .enabled = CONFIG_BOOLEAN_YES,
      .update_every = 30 * UPDATE_EVERY_MIN,
-     .func = do_GetServicesStatus},
+     .func = do_GetServicesStatus,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = do_GetServicesStatus_cleanup},
 
     // the same is provided by PerflibProcessor, with more detailed analysis
     //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",       .enabled = CONFIG_BOOLEAN_YES,
-    // .update_every = UPDATE_EVERY_MIN, .func = do_GetSystemCPU},
+    // .update_every = UPDATE_EVERY_MIN, .func = do_GetSystemCPU, .cleanup = do_GetSystemCPU_cleanup},
 
     {.name = "PerflibProcesses",
      .dim = "PerflibProcesses",

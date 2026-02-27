@@ -945,7 +945,7 @@ bool aclk_host_state_update_auto(RRDHOST *host) {
             live = 1;
             break;
     }
-    aclk_host_state_update(host, live, 1);
+    aclk_host_state_update(host, live, 1, NULL);
     return true;
 }
 
@@ -976,16 +976,23 @@ void aclk_create_node_instance_job(RRDHOST *host)
     aclk_add_job(query);
 }
 
-void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable)
+void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struct aclk_sync_completion *sync_completion)
 {
-    if (unlikely(!host))
+    if (unlikely(!host)) {
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
         return;
+    }
 
     CLAIM_ID claim_id = claim_id_get();
-    if (!claim_id_is_set(claim_id))
+    if (!claim_id_is_set(claim_id)) {
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
         return;
+    }
 
     aclk_query_t *query = aclk_query_new(NODE_STATE_UPDATE);
+    query->sync_completion = sync_completion;
 
     int32_t hops = rrdhost_ingestion_hops(host);
     node_instance_connection_t node_state_update = {
@@ -1017,15 +1024,21 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable)
     aclk_add_job(query);
 }
 
-void aclk_host_state_update(RRDHOST *host, int live, int queryable)
+void aclk_host_state_update(RRDHOST *host, int live, int queryable, struct aclk_sync_completion *sync_completion)
 {
-    if (!aclk_online())
+    if (!aclk_online()) {
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
         return;
+    }
 
-    if (uuid_is_null(host->node_id.uuid))
+    if (uuid_is_null(host->node_id.uuid)) {
         aclk_create_node_instance_job(host);
+        if (sync_completion)
+            aclk_sync_completion_signal(sync_completion);
+    }
     else
-        aclk_update_node_instance_job(host, live, queryable);
+        aclk_update_node_instance_job(host, live, queryable, sync_completion);
 }
 
 void aclk_send_node_instances()
@@ -1034,7 +1047,7 @@ void aclk_send_node_instances()
     dfe_start_reentrant(rrdhost_root_index, host)
     {
         int live = rrdhost_ingestion_status(host) == RRDHOST_INGEST_STATUS_ONLINE ? 1 : 0;
-        aclk_host_state_update(host, live, 1);
+        aclk_host_state_update(host, live, 1, NULL);
     }
     dfe_done(host);
 }
@@ -1083,11 +1096,14 @@ char *aclk_state(void)
         buffer_strcat(wb, "No\n");
     else {
         const char *cloud_base_url = cloud_config_url_get();
-        char *aclk_proxy = (char *)aclk_get_proxy(NULL, true);
+
+        char proxy_display[512];
+        aclk_proxy_get_full_display(proxy_display, sizeof(proxy_display));
+
         usec_t latency = __atomic_load_n(&publish_latency, __ATOMIC_RELAXED);
         char latency_str[64];
         duration_snprintf(latency_str, sizeof(latency_str), (int64_t) latency, "us", true);
-        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\nACLK Proxy: %s\nPublish Latency: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null", aclk_proxy ? aclk_proxy : "none", latency_str);
+        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\nACLK Proxy: %s\nPublish Latency: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null", proxy_display, latency_str);
     }
 
     bool aclk_is_online = aclk_online();
@@ -1231,9 +1247,12 @@ char *aclk_state_json(void)
     tmp = cloud_base_url ? json_object_new_string(cloud_base_url) : NULL;
     json_object_object_add(msg, "cloud-url", tmp);
 
-    char *aclk_proxy = (char *)aclk_get_proxy(NULL, true);
-    tmp = aclk_proxy ? json_object_new_string(aclk_proxy) : NULL;
-    json_object_object_add(msg, "aclk_proxy", tmp);
+    {
+        char proxy_display[512];
+        aclk_proxy_get_full_display(proxy_display, sizeof(proxy_display));
+        tmp = json_object_new_string(proxy_display);
+        json_object_object_add(msg, "aclk_proxy", tmp);
+    }
 
     usec_t latency = __atomic_load_n(&publish_latency, __ATOMIC_RELAXED);
     tmp =json_object_new_int64((int64_t) latency);

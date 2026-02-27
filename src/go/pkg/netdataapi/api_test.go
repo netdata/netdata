@@ -135,6 +135,17 @@ func TestSET(t *testing.T) {
 	require.Equal(t, expected, w.String())
 }
 
+func TestSETFLOAT(t *testing.T) {
+	w := &bytes.Buffer{}
+	api := New(w)
+
+	api.SETFLOAT("cpu_user", 42.42)
+
+	expected := "SET 'cpu_user' = 42.42\n"
+
+	require.Equal(t, expected, w.String())
+}
+
 func TestSETEMPTY(t *testing.T) {
 	w := &bytes.Buffer{}
 	api := New(w)
@@ -151,8 +162,9 @@ func TestVARIABLE(t *testing.T) {
 	api := New(w)
 
 	api.VARIABLE("var1", 100)
+	api.VARIABLE("var2", 100.1)
 
-	expected := "VARIABLE CHART 'var1' = 100\n"
+	expected := "VARIABLE CHART 'var1' = 100\nVARIABLE CHART 'var2' = 100.1\n"
 
 	require.Equal(t, expected, w.String())
 }

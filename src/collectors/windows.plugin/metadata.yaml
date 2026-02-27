@@ -7,7 +7,7 @@ modules:
         name: Processor
         link: "https://learn.microsoft.com/en-us/windows-hardware/design/minimum/windows-processor-requirements"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -19,7 +19,6 @@ modules:
         - microsoft
         - processor
         - CPU
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -113,7 +112,7 @@ modules:
         name: Memory statistics
         link: "https://learn.microsoft.com/en-us/windows/win32/Memory/memory-management"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -123,7 +122,6 @@ modules:
       keywords:
         - memory
         - swap
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -202,7 +200,7 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: paged
-                - name: pool-paged
+                - name: non-paged
             - name: mem.system_page_table_entries
               description: Unused page table entries.
               unit: "pages"
@@ -216,7 +214,7 @@ modules:
         name: System statistics
         link: "https://learn.microsoft.com/en-us/windows/win32/procthread/processes-and-threads"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -227,7 +225,6 @@ modules:
         - process counts
         - threads
         - context switch
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -317,7 +314,7 @@ modules:
         name: Physical and Logical Disk Performance Metrics
         link: "https://learn.microsoft.com/en-us/windows/win32/fileio/disk-management"
         categories:
-          - data-collection.windows-systems
+          - data-collection.storage
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -331,7 +328,6 @@ modules:
         - volume
         - physical
         - logical
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -500,7 +496,7 @@ modules:
         name: Network Subsystem
         link: "https://learn.microsoft.com/en-us/windows/win32/networking"
         categories:
-          - data-collection.windows-systems
+          - data-collection.networking
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -514,7 +510,6 @@ modules:
         - udp
         - tcp
         - interface
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -824,7 +819,7 @@ modules:
         name: Semaphore statistics
         link: "https://learn.microsoft.com/en-us/windows/win32/sync/semaphore-objects"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -834,7 +829,6 @@ modules:
       keywords:
         - ipc
         - semaphores
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -903,6 +897,12 @@ modules:
               chart_type: area
               dimensions:
                 - name: semaphores
+            - name: system.ipc_mutexes
+              description: IPC Mutexes
+              unit: "mutexes"
+              chart_type: area
+              dimensions:
+                - name: mutexes
   - meta:
       plugin_name: windows.plugin
       module_name: GetHardwareInfo
@@ -910,7 +910,7 @@ modules:
         name: Hardware information collected from kernel ring.
         link: "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -920,7 +920,6 @@ modules:
       keywords:
         - cpu
         - temperature
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -992,7 +991,7 @@ modules:
         name: System thermal zone
         link: "https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/design-guide"
         categories:
-          - data-collection.windows-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -1002,7 +1001,6 @@ modules:
       keywords:
         - thermal
         - temperature
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1074,7 +1072,7 @@ modules:
         name: Power supply
         link: "https://learn.microsoft.com/en-us/windows/win32/power/power-management-portal"
         categories:
-          - data-collection.windows-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "powersupply.svg"
       related_resources:
         integrations:
@@ -1083,7 +1081,6 @@ modules:
         description: ""
       keywords:
         - power supply
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1167,7 +1164,7 @@ modules:
         name: Sensors
         link: "https://learn.microsoft.com/en-us/windows/win32/sensorsapi/portal"
         categories:
-          - data-collection.windows-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -1177,7 +1174,6 @@ modules:
       keywords:
         - Sensors
         - Windows
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1293,9 +1289,21 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
-            - name: system.hw.sensor.resistence.input
-              description: Electrical resistence.
+            - name: system.hw.sensor.resistance.input
+              description: Electrical resistance
               unit: "Ohms"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.capacitance.input
+              description: Electrical capacitance
+              unit: "F"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.inductance.input
+              description: Electrical indutance
+              unit: "H"
               chart_type: line
               dimensions:
                 - name: input
@@ -1326,6 +1334,18 @@ modules:
             - name: system.hw.sensor.gauge_pressure.input
               description: Gauge Pressure
               unit: "Pa"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.human_presence.input
+              description: Human presence
+              unit: "presence"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.human_proximity.input
+              description: Human proximity
+              unit: "m"
               chart_type: line
               dimensions:
                 - name: input
@@ -1369,7 +1389,7 @@ modules:
         name: IIS
         link: "https://www.iis.net/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.web-servers-and-proxies
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -1380,7 +1400,6 @@ modules:
         - IIS
         - HTTP
         - Web service
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1686,7 +1705,7 @@ modules:
         name: Hyper-V
         link: "https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/about/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.containers-and-vms
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -1699,7 +1718,6 @@ modules:
         - hyperv
         - virtualization
         - vm
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2054,7 +2072,7 @@ modules:
         name: MS SQL Server
         link: "https://www.microsoft.com/en-us/sql-server/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.databases
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -2066,7 +2084,6 @@ modules:
         - microsoft
         - sql
         - queries
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2225,9 +2242,49 @@ modules:
               description: Set to yes to use Windows credentials instead of SQL Server authentication.
               default_value: no
               required: false
+            - name: trust server certificate
+              description: Set to yes to trust the server's SSL certificate chain.
+              default_value: yes
+              required: false
             - name: express
               description: Set to yes when running SQL Express version.
               default_value: no
+              required: false
+            - name: collect transactions
+              description: Run queries to collect information from the server's transactions.
+              default_value: yes
+              required: false
+            - name: collect waits
+              description: Run queries to collect information from the server's lock waits.
+              default_value: yes
+              required: false
+            - name: collect lock metrics
+              description: Run queries to collect information from the server's overall locks.
+              default_value: yes
+              required: false
+            - name: collect replication
+              description: Run queries to collect information from the server's replication.
+              default_value: yes
+              required: false
+            - name: collect jobs
+              description: Run queries to collect information from the server's jobs.
+              default_value: yes
+              required: false
+            - name: collect buffer stats
+              description: Run queries to collect information from the server's buffer statistics.
+              default_value: yes
+              required: false
+            - name: collect database size
+              description: Run queries to collect information from the server's database size.
+              default_value: yes
+              required: false
+            - name: collect user connections
+              description: Run queries to collect information from the server's connection.
+              default_value: yes
+              required: false
+            - name: collect blocked processes
+              description: Run queries to collect information from the server's blocked processes.
+              default_value: yes
               required: false
         examples:
           folding:
@@ -2289,6 +2346,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: user
+            - name: mssql.instance_sessions_connections
+              description: Session connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: session
             - name: mssql.instance_sqlstats_batch_requests
               description: Total of batches requests
               unit: requests/s
@@ -2631,7 +2694,7 @@ modules:
         name: NET Framework
         link: "https://dotnet.microsoft.com/en-us/learn/dotnet/what-is-dotnet-framework"
         categories:
-          - data-collection.windows-systems
+          - data-collection.applications
         icon_filename: "dotnet.svg"
       related_resources:
         integrations:
@@ -2643,7 +2706,6 @@ modules:
         - microsoft
         - netframework
         - dotnet
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2823,19 +2885,19 @@ modules:
               unit: objects/s
               chart_type: line
               dimensions:
-                - name: objects
+                - name: allocated
             - name: netframework.clrremoting_context_proxies
               description: Remoting proxy objects
               unit: objects/s
               chart_type: line
               dimensions:
-                - name: contexts
+                - name: objects
             - name: netframework.clrremoting_remote_calls
               description: Remote Procedure Calls (RPC) invoked
               unit: calls/s
               chart_type: line
               dimensions:
-                - name: rpc
+                - name: calls
             - name: netframework.clrsecurity_link_time_checks
               description: Link-time code access security checks
               unit: checks/s
@@ -2897,7 +2959,7 @@ modules:
         name: Active Directory
         link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview"
         categories:
-          - data-collection.windows-systems
+          - data-collection.applications
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -2909,7 +2971,6 @@ modules:
         - microsoft
         - active directory
         - ad
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3026,18 +3087,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: request
-            - name: ad.dra_replication_sync_objects_remaining
-              description: DRA replication full sync objects remaining
-              unit: objects
-              chart_type: line
-              dimensions:
-                - name: object
-            - name: ad.dra_replication_sync_objects_remaining
-              description: DRA replication full sync objects remaining
-              unit: objects
-              chart_type: line
-              dimensions:
-                - name: object
             - name: ad.name_cache_hits
               description: Name cache hits
               unit: hits/s
@@ -3075,7 +3124,7 @@ modules:
         name: Active Directory Certificate Service
         link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-cs/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.applications
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3088,7 +3137,6 @@ modules:
         - active directory
         - adcs
         - ad
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3252,7 +3300,7 @@ modules:
         name: Active Directory Federation Service
         link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-fs/ad-fs-overview"
         categories:
-          - data-collection.windows-systems
+          - data-collection.applications
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3265,7 +3313,6 @@ modules:
         - active directory
         - adfs
         - ad
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3530,7 +3577,7 @@ modules:
         name: Windows Services
         link: "https://learn.microsoft.com/en-us/dotnet/framework/windows-services/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3541,7 +3588,6 @@ modules:
         - windows
         - microsoft
         - services
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3622,7 +3668,7 @@ modules:
         name: MS Exchange
         link: "https://www.microsoft.com/en-us/microsoft-365/exchange/email"
         categories:
-          - data-collection.windows-systems
+          - data-collection.applications
         icon_filename: "exchange.svg"
       related_resources:
         integrations:
@@ -3634,7 +3680,6 @@ modules:
         - microsoft
         - exchange
         - mail
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3887,7 +3932,7 @@ modules:
         name: NUMA Architecture
         link: "https://learn.microsoft.com/en-us/windows/win32/procthread/numa-support"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3898,7 +3943,6 @@ modules:
         - windows
         - NUMA
         - processor
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3966,7 +4010,6 @@ modules:
               dimensions:
                 - name: free
                 - name: standby
-                - name: available
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibASP
@@ -3974,7 +4017,7 @@ modules:
         name: ASP.NET
         link: "https://dotnet.microsoft.com/en-us/apps/aspnet"
         categories:
-          - data-collection.windows-systems
+          - data-collection.web-servers-and-proxies
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3985,7 +4028,6 @@ modules:
         - windows
         - ASP
         - webservice
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -4123,6 +4165,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: not found
+            - name: aspnet.requests_not_authorized
+              description: Requests that were not authorized.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: not_authorized
             - name: aspnet.requests_in_application_queue
               description: Requests in the application queue.
               unit: requests

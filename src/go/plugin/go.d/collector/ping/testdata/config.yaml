@@ -7,3 +7,5 @@ privileged: yes
 packets: 123
 interval: 123.123
 interface: "ok"
+jitter_ewma_samples: 123
+jitter_sma_window: 123

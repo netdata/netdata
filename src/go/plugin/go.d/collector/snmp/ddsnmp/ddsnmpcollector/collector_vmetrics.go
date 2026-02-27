@@ -22,7 +22,7 @@ func newVirtualMetricsCollector(log *logger.Logger) *vmetricsCollector {
 	}
 }
 
-func (p *vmetricsCollector) Collect(profDef *ddprofiledefinition.ProfileDefinition, collected []ddsnmp.Metric) []ddsnmp.Metric {
+func (p *vmetricsCollector) collect(profDef *ddprofiledefinition.ProfileDefinition, collected []ddsnmp.Metric) []ddsnmp.Metric {
 	if len(profDef.VirtualMetrics) == 0 {
 		return nil
 	}
@@ -418,8 +418,7 @@ type aggregatorsBuilder struct {
 	aggregators   []*vmetricsAggregator
 }
 
-func newAggregatorsBuilder(
-	log *logger.Logger, prof *ddprofiledefinition.ProfileDefinition, existingNames map[string]bool) *aggregatorsBuilder {
+func newAggregatorsBuilder(log *logger.Logger, prof *ddprofiledefinition.ProfileDefinition, existingNames map[string]bool) *aggregatorsBuilder {
 	return &aggregatorsBuilder{
 		log:           log,
 		prof:          prof,

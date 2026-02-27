@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 
 	"github.com/cloudflare/cfssl/revoke"
 )
@@ -54,8 +54,8 @@ func (c *Collector) collectCertificates(mx map[string]int64, certs []*x509.Certi
 				if !ok {
 					return
 				}
-				mx[px+"revoked"] = metrix.Bool(rev)
-				mx[px+"not_revoked"] = metrix.Bool(!rev)
+				mx[px+"revoked"] = oldmetrix.Bool(rev)
+				mx[px+"not_revoked"] = oldmetrix.Bool(!rev)
 			}()
 		}
 

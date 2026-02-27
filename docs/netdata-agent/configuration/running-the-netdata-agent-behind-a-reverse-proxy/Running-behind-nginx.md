@@ -164,7 +164,7 @@ Using the above, you access Netdata on the backend servers like this:
 
 ### Encrypt the communication between Nginx and Netdata
 
-In case Netdata's web server has been [configured to use TLS](/src/web/server/README.md#enable-httpstls-support), it is
+In case Netdata's web server has been [configured to use TLS](/src/web/server/README.md#examples), it is
 necessary to specify inside the Nginx configuration that the final destination is using TLS. To do this, please, append
 the following parameters in your `nginx.conf`
 
@@ -178,6 +178,12 @@ Optionally, it is also possible to [enable TLS/SSL on Nginx](http://nginx.org/en
 If Nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
 
 ### Enable authentication
+
+:::tip Simpler Alternative
+
+If you use Netdata Cloud, [Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md) provides authentication with a single setting - no htpasswd files or nginx auth configuration needed.
+
+:::
 
 Create an authentication file to enable basic authentication via Nginx, this secures your Netdata dashboard.
 

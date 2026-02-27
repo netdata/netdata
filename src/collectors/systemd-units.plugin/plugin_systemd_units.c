@@ -1186,7 +1186,7 @@ static void netdata_systemd_units_function_info(const char *transaction)
     buffer_json_finalize(wb);
     netdata_mutex_lock(&stdout_mutex);
     wb->response_code = HTTP_RESP_OK;
-    wb->content_type = CT_TEXT_PLAIN;
+    wb->content_type = CT_APPLICATION_JSON;
     wb->expires = now_realtime_sec() + 3600;
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
@@ -2224,7 +2224,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused)
     // the event loop for functions
 
     struct functions_evloop_globals *wg =
-        functions_evloop_init(ND_SD_JOURNAL_WORKER_THREADS, "SDU", &stdout_mutex, &plugin_should_exit);
+        functions_evloop_init(ND_SD_JOURNAL_WORKER_THREADS, "SDU", &stdout_mutex, &plugin_should_exit, NULL);
 
     functions_evloop_add_function(
         wg, ND_SD_UNITS_FUNCTION_NAME, function_systemd_units, ND_SD_UNITS_DEFAULT_TIMEOUT, NULL);
@@ -2253,7 +2253,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused)
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
-    while (!plugin_should_exit) {
+    while (!__atomic_load_n(&plugin_should_exit, __ATOMIC_ACQUIRE)) {
         usec_t dt_ut = heartbeat_next(&hb);
         send_newline_ut += dt_ut;
 

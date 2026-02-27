@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioContainersState = module.Priority + iota
+	prioContainersState = collectorapi.Priority + iota
 	prioContainersHealthy
 
 	prioContainerState
@@ -21,7 +21,7 @@ const (
 	prioImagesSize
 )
 
-var summaryCharts = module.Charts{
+var summaryCharts = collectorapi.Charts{
 	containersStateChart.Copy(),
 	containersHealthyChart.Copy(),
 
@@ -30,28 +30,28 @@ var summaryCharts = module.Charts{
 }
 
 var (
-	containersStateChart = module.Chart{
+	containersStateChart = collectorapi.Chart{
 		ID:       "containers_state",
 		Title:    "Total number of Docker containers in various states",
 		Units:    "containers",
 		Fam:      "containers",
 		Ctx:      "docker.containers_state",
 		Priority: prioContainersState,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "containers_state_running", Name: "running"},
 			{ID: "containers_state_paused", Name: "paused"},
 			{ID: "containers_state_exited", Name: "exited"},
 		},
 	}
-	containersHealthyChart = module.Chart{
+	containersHealthyChart = collectorapi.Chart{
 		ID:       "healthy_containers",
 		Title:    "Total number of Docker containers in various health states",
 		Units:    "containers",
 		Fam:      "containers",
 		Ctx:      "docker.containers_health_status",
 		Priority: prioContainersHealthy,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "containers_health_status_healthy", Name: "healthy"},
 			{ID: "containers_health_status_unhealthy", Name: "unhealthy"},
 			{ID: "containers_health_status_not_running_unhealthy", Name: "not_running_unhealthy"},
@@ -62,47 +62,47 @@ var (
 )
 
 var (
-	imagesCountChart = module.Chart{
+	imagesCountChart = collectorapi.Chart{
 		ID:       "images_count",
 		Title:    "Total number of Docker images in various states",
 		Units:    "images",
 		Fam:      "images",
 		Ctx:      "docker.images",
 		Priority: prioImagesCount,
-		Type:     module.Stacked,
-		Dims: module.Dims{
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
 			{ID: "images_active", Name: "active"},
 			{ID: "images_dangling", Name: "dangling"},
 		},
 	}
-	imagesSizeChart = module.Chart{
+	imagesSizeChart = collectorapi.Chart{
 		ID:       "images_size",
 		Title:    "Total size of all Docker images",
 		Units:    "bytes",
 		Fam:      "images",
 		Ctx:      "docker.images_size",
 		Priority: prioImagesSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "images_size", Name: "size"},
 		},
 	}
 )
 
 var (
-	containerChartsTmpl = module.Charts{
+	containerChartsTmpl = collectorapi.Charts{
 		containerStateChartTmpl.Copy(),
 		containerHealthStatusChartTmpl.Copy(),
 		containerWritableLayerSizeChartTmpl.Copy(),
 	}
 
-	containerStateChartTmpl = module.Chart{
+	containerStateChartTmpl = collectorapi.Chart{
 		ID:       "container_%s_state",
 		Title:    "Docker container state",
 		Units:    "state",
 		Fam:      "containers",
 		Ctx:      "docker.container_state",
 		Priority: prioContainerState,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "container_%s_state_running", Name: "running"},
 			{ID: "container_%s_state_paused", Name: "paused"},
 			{ID: "container_%s_state_exited", Name: "exited"},
@@ -112,14 +112,14 @@ var (
 			{ID: "container_%s_state_dead", Name: "dead"},
 		},
 	}
-	containerHealthStatusChartTmpl = module.Chart{
+	containerHealthStatusChartTmpl = collectorapi.Chart{
 		ID:       "container_%s_health_status",
 		Title:    "Docker container health status",
 		Units:    "status",
 		Fam:      "containers",
 		Ctx:      "docker.container_health_status",
 		Priority: prioContainerHealthStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "container_%s_health_status_healthy", Name: "healthy"},
 			{ID: "container_%s_health_status_unhealthy", Name: "unhealthy"},
 			{ID: "container_%s_health_status_not_running_unhealthy", Name: "not_running_unhealthy"},
@@ -127,14 +127,14 @@ var (
 			{ID: "container_%s_health_status_none", Name: "no_healthcheck"},
 		},
 	}
-	containerWritableLayerSizeChartTmpl = module.Chart{
+	containerWritableLayerSizeChartTmpl = collectorapi.Chart{
 		ID:       "container_%s_writable_layer_size",
 		Title:    "Docker container writable layer size",
 		Units:    "bytes",
 		Fam:      "containers",
 		Ctx:      "docker.container_writeable_layer_size",
 		Priority: prioContainerWritableLayerSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "container_%s_size_rw", Name: "writable_layer"},
 		},
 	}
@@ -149,7 +149,7 @@ func (c *Collector) addContainerCharts(name, image string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, name)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "container_name", Value: name},
 			{Key: "image", Value: image},
 		}

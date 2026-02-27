@@ -6,7 +6,7 @@ modules:
       plugin_name: go.d.plugin
       monitored_instance:
         categories:
-          - data-collection.system-clock-and-ntp
+          - data-collection.networking
         icon_filename: chrony.jpg
         name: Chrony
         link: https://chrony.tuxfamily.org/
@@ -17,7 +17,6 @@ modules:
       related_resources:
         integrations:
           list: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

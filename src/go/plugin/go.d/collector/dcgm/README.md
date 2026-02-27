@@ -1,0 +1,1 @@
+integrations/nvidia_data_center_gpu_manager_dcgm.md

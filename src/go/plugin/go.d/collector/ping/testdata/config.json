@@ -8,5 +8,7 @@
   "privileged": true,
   "packets": 123,
   "interval": 123.123,
-  "interface": "ok"
+  "interface": "ok",
+  "jitter_ewma_samples": 123,
+  "jitter_sma_window": 123
 }

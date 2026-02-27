@@ -5,6 +5,9 @@
 #include "database/rrd.h"
 
 #include "aclk_util.h"
+
+// Forward declaration - defined in aclk_query_queue.h
+struct aclk_sync_completion;
 //#include "aclk_rrdhost_state.h"
 
 #include "https_client.h"
@@ -91,7 +94,7 @@ extern struct aclk_shared_state {
     int mqtt_shutdown_msg_rcvd;
 } aclk_shared_state;
 
-void aclk_host_state_update(RRDHOST *host, int live, int queryable);
+void aclk_host_state_update(RRDHOST *host, int live, int queryable, struct aclk_sync_completion *sync_completion);
 bool aclk_host_state_update_auto(RRDHOST *host);
 
 void aclk_send_node_instances();

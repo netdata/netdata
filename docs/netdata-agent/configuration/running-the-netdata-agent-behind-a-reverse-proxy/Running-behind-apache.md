@@ -159,6 +159,12 @@ Repeat the operation for as many servers as you need.
 
 ## Enable Basic Auth
 
+:::tip Simpler Alternative
+
+If you use Netdata Cloud, [Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md) provides authentication with a single setting - no htpasswd files or Apache auth configuration needed.
+
+:::
+
 If you wish to add an authentication (user/password) to access your Netdata, do these:
 
 Install the package `apache2-utils`. On Debian/Ubuntu run `sudo apt-get install apache2-utils`.

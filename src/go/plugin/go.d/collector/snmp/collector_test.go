@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 
 	"github.com/golang/mock/gomock"
@@ -36,7 +36,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -226,6 +226,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 					return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
 						{
+							Source: "test",
 							Metrics: []ddsnmp.Metric{
 								{
 									Name:    "uptime",
@@ -243,7 +244,26 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			want: map[string]int64{
 				// scalar → "snmp_device_prof_<name>"
-				"snmp_device_prof_uptime": 123,
+				"snmp_device_prof_test_stats_errors_processing_scalar": 0,
+				"snmp_device_prof_test_stats_errors_processing_table":  0,
+				"snmp_device_prof_test_stats_errors_snmp":              0,
+				"snmp_device_prof_test_stats_metrics_rows":             0,
+				"snmp_device_prof_test_stats_metrics_scalar":           0,
+				"snmp_device_prof_test_stats_metrics_table":            0,
+				"snmp_device_prof_test_stats_metrics_tables":           0,
+				"snmp_device_prof_test_stats_metrics_virtual":          0,
+				"snmp_device_prof_test_stats_snmp_get_oids":            0,
+				"snmp_device_prof_test_stats_snmp_get_requests":        0,
+				"snmp_device_prof_test_stats_snmp_tables_cached":       0,
+				"snmp_device_prof_test_stats_snmp_tables_walked":       0,
+				"snmp_device_prof_test_stats_snmp_walk_pdus":           0,
+				"snmp_device_prof_test_stats_snmp_walk_requests":       0,
+				"snmp_device_prof_test_stats_table_cache_hits":         0,
+				"snmp_device_prof_test_stats_table_cache_misses":       0,
+				"snmp_device_prof_test_stats_timings_scalar":           0,
+				"snmp_device_prof_test_stats_timings_table":            0,
+				"snmp_device_prof_test_stats_timings_virtual":          0,
+				"snmp_device_prof_uptime":                              123,
 			},
 		},
 		"collects table multivalue metric": {
@@ -260,6 +280,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 					return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
 						{
+							Source: "test",
 							Metrics: []ddsnmp.Metric{
 								{
 									Name:    "if_octets",
@@ -281,8 +302,27 @@ func TestCollector_Collect(t *testing.T) {
 			want: map[string]int64{
 				// table key: "snmp_device_prof_<name>_<sorted tag values>_<subkey>"
 				// here tags = {"ifName":"eth0"} → key part becomes "_eth0"
-				"snmp_device_prof_if_octets_eth0_in":  1,
-				"snmp_device_prof_if_octets_eth0_out": 2,
+				"snmp_device_prof_test_stats_errors_processing_scalar": 0,
+				"snmp_device_prof_test_stats_errors_processing_table":  0,
+				"snmp_device_prof_test_stats_errors_snmp":              0,
+				"snmp_device_prof_test_stats_metrics_rows":             0,
+				"snmp_device_prof_test_stats_metrics_scalar":           0,
+				"snmp_device_prof_test_stats_metrics_table":            0,
+				"snmp_device_prof_test_stats_metrics_tables":           0,
+				"snmp_device_prof_test_stats_metrics_virtual":          0,
+				"snmp_device_prof_test_stats_snmp_get_oids":            0,
+				"snmp_device_prof_test_stats_snmp_get_requests":        0,
+				"snmp_device_prof_test_stats_snmp_tables_cached":       0,
+				"snmp_device_prof_test_stats_snmp_tables_walked":       0,
+				"snmp_device_prof_test_stats_snmp_walk_pdus":           0,
+				"snmp_device_prof_test_stats_snmp_walk_requests":       0,
+				"snmp_device_prof_test_stats_table_cache_hits":         0,
+				"snmp_device_prof_test_stats_table_cache_misses":       0,
+				"snmp_device_prof_test_stats_timings_scalar":           0,
+				"snmp_device_prof_test_stats_timings_table":            0,
+				"snmp_device_prof_test_stats_timings_virtual":          0,
+				"snmp_device_prof_if_octets_eth0_in":                   1,
+				"snmp_device_prof_if_octets_eth0_out":                  2,
 			},
 		},
 	}

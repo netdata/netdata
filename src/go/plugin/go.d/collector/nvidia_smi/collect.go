@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -81,12 +81,12 @@ func (c *Collector) collectGPUInfo(mx map[string]int64) error {
 		addMetric(mx, px+"voltage", gpu.Voltage.GraphicsVolt, 0)
 		for i := 0; i < 16; i++ {
 			s := "P" + strconv.Itoa(i)
-			mx[px+"performance_state_"+s] = metrix.Bool(gpu.PerformanceState == s)
+			mx[px+"performance_state_"+s] = oldmetrix.Bool(gpu.PerformanceState == s)
 		}
 		if isValidValue(gpu.MIGMode.CurrentMIG) {
 			mode := strings.ToLower(gpu.MIGMode.CurrentMIG)
-			mx[px+"mig_current_mode_enabled"] = metrix.Bool(mode == "enabled")
-			mx[px+"mig_current_mode_disabled"] = metrix.Bool(mode == "disabled")
+			mx[px+"mig_current_mode_enabled"] = oldmetrix.Bool(mode == "enabled")
+			mx[px+"mig_current_mode_disabled"] = oldmetrix.Bool(mode == "disabled")
 			mx[px+"mig_devices_count"] = int64(len(gpu.MIGDevices.MIGDevice))
 		}
 

@@ -1,0 +1,4 @@
+BEGIN
+  DBMS_LOCK.SLEEP(30);
+END;
+/

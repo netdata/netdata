@@ -53,7 +53,7 @@ package {{.Package}}
 import (
 	"strings"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	module "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 // cleanLabelValue cleans a label value for use in instance/dimension IDs

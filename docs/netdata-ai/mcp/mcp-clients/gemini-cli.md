@@ -19,8 +19,8 @@ Gemini CLI supports all major MCP transport types, giving you maximum flexibilit
 2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Direct HTTP/SSE support available (recommended)
-3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP/SSE connections on v2.7.2+.
-4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP/SSE connections on v2.7.2+.
+4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 
 ## Installation
 
@@ -39,7 +39,51 @@ npm run build
 
 Gemini CLI has built-in MCP server support. For detailed MCP configuration, see the [official MCP documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md).
 
-### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
+### Netdata Cloud MCP
+
+Connect to your entire Netdata Cloud infrastructure
+through a single endpoint — no local setup, bridges,
+or firewall changes needed.
+
+**Prerequisites:**
+
+- Netdata Cloud account with Business plan
+- Nodes claimed to Netdata Cloud
+- API token with `scope:mcp`
+  ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+
+```bash
+# Using CLI command
+gemini mcp add --transport http netdata-cloud https://app.netdata.cloud/api/v1/mcp \
+  --header "Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+```
+
+Or configure in `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "netdata-cloud": {
+      "httpUrl": "https://app.netdata.cloud/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+      },
+      "timeout": 30000
+    }
+  }
+}
+```
+
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
+Netdata Cloud API token (must have `scope:mcp`).
+For more details, see
+[Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+
+### Local Agent or Parent
+
+The following methods connect directly to a Netdata Agent or Parent on your network.
+
+#### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
 
 Connect directly to Netdata's HTTP endpoint without needing any bridge:
 
@@ -69,7 +113,7 @@ Or configure in `~/.gemini/settings.json`:
 }
 ```
 
-### Method 2: Direct SSE Connection (v2.7.2+)
+#### Method 2: Direct SSE Connection (v2.7.2+)
 
 Connect directly to Netdata's SSE endpoint:
 
@@ -95,7 +139,7 @@ Or configure in `~/.gemini/settings.json`:
 }
 ```
 
-### Method 3: Using nd-mcp Bridge (stdio)
+#### Method 3: Using nd-mcp Bridge (stdio)
 
 For environments where you prefer or need to use the bridge:
 
@@ -123,9 +167,9 @@ Or configure in `~/.gemini/settings.json`:
 }
 ```
 
-### Method 4: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
+#### Method 4: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
 
-If nd-mcp is not available, use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
+If nd-mcp is not available, use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/netdata-ai/mcp/README.md#using-mcp-remote-client).
 
 ```bash
 # Using CLI command with SSE
@@ -201,8 +245,8 @@ gemini mcp list
 
 Replace in all examples:
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
-- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge) (stdio method only)
+- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
+- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge) (stdio method only)
 
 ## How to Use
 
@@ -235,7 +279,7 @@ Check memory usage patterns and suggest optimization strategies
 Explain the current active alerts and their potential impact
 ```
 
-> **💡 Advanced Usage:** Gemini CLI can combine observability data with system automation for powerful DevOps workflows. Learn about the opportunities and security considerations in [AI DevOps Copilot](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md).
+> **💡 Advanced Usage:** Gemini CLI can combine observability data with system automation for powerful DevOps workflows. Learn about the opportunities and security considerations in [AI DevOps Copilot](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md).
 
 ## Troubleshooting
 
@@ -314,5 +358,5 @@ Control which Netdata tools are available:
 - [Gemini CLI GitHub Repository](https://github.com/google-gemini/gemini-cli)
 - [Gemini CLI MCP Documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md)
 - [Gemini CLI Configuration Guide](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/configuration.md)
-- [Netdata MCP Setup](/docs/learn/mcp.md)
-- [AI DevOps Best Practices](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md)
+- [Netdata MCP Setup](/docs/netdata-ai/mcp/README.md)
+- [AI DevOps Best Practices](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md)

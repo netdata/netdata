@@ -9,7 +9,7 @@
         "description": "Data collection interval, measured in seconds.",
         "type": "integer",
         "minimum": 1,
-        "default": 1
+        "default": 5
       },
       "privileged": {
         "title": "Privileged mode",
@@ -61,6 +61,20 @@
         "description": "The network device name (e.g., `eth0`, `wlan0`) used as the source for ICMP echo requests.",
         "type": "string",
         "default": ""
+      },
+      "jitter_ewma_samples": {
+        "title": "Jitter EWMA samples",
+        "description": "EWMA smoothing factor for jitter calculation. Higher values result in smoother but slower-responding jitter metrics.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 16
+      },
+      "jitter_sma_window": {
+        "title": "Jitter SMA window",
+        "description": "Number of iterations for calculating Simple Moving Average jitter.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
       },
       "vnode": {
         "title": "Vnode",

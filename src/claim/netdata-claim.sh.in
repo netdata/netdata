@@ -52,7 +52,7 @@ write_config() {
     touch "${claim_config}.tmp"
     chmod 0660 "${claim_config}.tmp"
     chown "root:${netdata_group}" "${claim_config}.tmp"
-    echo "${config}" > "${claim_config}.tmp"
+    printf '%b\n' "${config}" > "${claim_config}.tmp"
     chmod 0640 "${claim_config}.tmp"
     mv -f "${claim_config}.tmp" "${claim_config}"
 }

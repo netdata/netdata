@@ -266,18 +266,18 @@ void nd_thread_join_threads()
     ND_THREAD *nti;
     do {
         spinlock_lock(&threads_globals.exited.spinlock);
-
         nti = threads_globals.exited.list;
-
-        if (nti) {
+        if(nti) {
+            // Remove from exited list while holding the lock to prevent race condition
+            // where another thread with a direct pointer calls nd_thread_join() and frees
+            // the nti before we get a chance to use it
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
             nti->list = ND_THREAD_LIST_NONE;
-            nd_log_daemon(NDLP_DEBUG, "nd_thread_join_threads: Joining thread with id %d (%s) during shutdown", nti->tid, nti->tag);
         }
-
         spinlock_unlock(&threads_globals.exited.spinlock);
 
-        // handles null
+        // nd_thread_join() handles NULL and will skip list removal since we already did it
+        // The atomic CAS in nd_thread_join() still protects against direct callers racing with us
         nd_thread_join(nti);
 
     } while (nti);
@@ -458,8 +458,16 @@ int nd_thread_join(ND_THREAD *nti) {
     if(!nti)
         return ESRCH;
 
-    if(nd_thread_status_check(nti, NETDATA_THREAD_STATUS_JOINED))
-        return 0;
+    // Atomically check and set JOINED flag to prevent race conditions
+    // where two threads both try to join the same thread
+    NETDATA_THREAD_OPTIONS old_options;
+    do {
+        old_options = __atomic_load_n(&nti->options, __ATOMIC_ACQUIRE);
+        if(old_options & NETDATA_THREAD_STATUS_JOINED)
+            return 0;
+    } while(!__atomic_compare_exchange_n(&nti->options, &old_options,
+                                          old_options | NETDATA_THREAD_STATUS_JOINED,
+                                          false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE));
 
     int ret;
 
@@ -493,26 +501,25 @@ int nd_thread_join(ND_THREAD *nti) {
         }
     }
 
-    if(ret == 0) {
-        // we successfully joined the thread (or cleaned up after Windows fast-exit)
-       nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);
+    // Always clean up the thread structure - if uv_thread_join() failed,
+    // retrying won't help (thread doesn't exist, not joinable, or logic error)
+    // JOINED flag was already set atomically at the start of this function
 
-        spinlock_lock(&threads_globals.running.spinlock);
-        if(nti->list == ND_THREAD_LIST_RUNNING) {
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
-            nti->list = ND_THREAD_LIST_NONE;
-        }
-        spinlock_unlock(&threads_globals.running.spinlock);
-
-        spinlock_lock(&threads_globals.exited.spinlock);
-        if(nti->list == ND_THREAD_LIST_EXITED) {
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
-            nti->list = ND_THREAD_LIST_NONE;
-        }
-        spinlock_unlock(&threads_globals.exited.spinlock);
-
-        freez(nti);
+    spinlock_lock(&threads_globals.running.spinlock);
+    if(nti->list == ND_THREAD_LIST_RUNNING) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
+        nti->list = ND_THREAD_LIST_NONE;
     }
+    spinlock_unlock(&threads_globals.running.spinlock);
+
+    spinlock_lock(&threads_globals.exited.spinlock);
+    if(nti->list == ND_THREAD_LIST_EXITED) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
+        nti->list = ND_THREAD_LIST_NONE;
+    }
+    spinlock_unlock(&threads_globals.exited.spinlock);
+
+    freez(nti);
 
     return ret;
 }

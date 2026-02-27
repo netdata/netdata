@@ -222,6 +222,8 @@ Request a BAA through Netdata Support if required.
 
 ### SOC 2 Compliance
 
+<img src="https://netdata.cloud/img/SOC2 T2 - green - h.png" width="150" alt="SOC2 Badge"/>
+
 Netdata achieved SOC2 Type 2 compliance for these Service Criteria:
 
 | **Principle**        | **Practices**                            |

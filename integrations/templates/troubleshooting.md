@@ -128,6 +128,6 @@ Note that this will test _all_ alert mechanisms for the selected role.
 [% for item in entry.troubleshooting.problems.list %]
 ### [[ item.name ]]
 
-[[ description ]]
+[[ item.description ]]
 
 [% endfor %]

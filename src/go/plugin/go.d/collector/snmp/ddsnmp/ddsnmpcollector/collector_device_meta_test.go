@@ -915,7 +915,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			missingOIDs := make(map[string]bool)
 			collector := newDeviceMetadataCollector(mockHandler, missingOIDs, logger.New(), tc.sysobjectid)
 
-			result, err := collector.Collect(tc.profile)
+			result, err := collector.collect(tc.profile)
 
 			if tc.expectedError {
 				assert.Error(t, err)

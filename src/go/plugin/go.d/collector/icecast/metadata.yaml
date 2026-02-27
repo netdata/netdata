@@ -7,7 +7,7 @@ modules:
         name: Icecast
         link: "https://icecast.org/"
         categories:
-          - data-collection.media-streaming-servers
+          - data-collection.applications
         icon_filename: "icecast.svg"
       related_resources:
         integrations:
@@ -18,7 +18,6 @@ modules:
         - icecast
         - streaming
         - media
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This collector monitors Icecast listener counts."

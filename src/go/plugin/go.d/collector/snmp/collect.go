@@ -16,10 +16,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -112,12 +112,20 @@ func (c *Collector) ensureInitialized() error {
 		})
 	}
 
+	if c.ddSnmpColl == nil && !c.Ping.Enabled {
+		return errors.New("no profiles found and ping disabled")
+	}
+
 	if c.CreateVnode {
-		deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
-		if err != nil {
-			return err
+		if c.ddSnmpColl == nil {
+			c.vnode = c.setupVnode(si, nil)
+		} else {
+			deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
+			if err != nil {
+				return err
+			}
+			c.vnode = c.setupVnode(si, deviceMeta)
 		}
-		c.vnode = c.setupVnode(si, deviceMeta)
 	}
 
 	c.sysInfo = si
@@ -199,8 +207,12 @@ func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
 		}
 	}
 
-	c.Infof("device matched %d profile(s): %s (sysObjectID: '%s')",
-		len(snmpProfiles), strings.Join(profInfo, ", "), si.SysObjectID)
+	msg := fmt.Sprintf("device matched %d profile(s): %s (sysObjectID: '%s')", len(snmpProfiles), strings.Join(profInfo, ", "), si.SysObjectID)
+	if len(snmpProfiles) == 0 {
+		c.Warning(msg)
+	} else {
+		c.Info(msg)
+	}
 
 	return snmpProfiles
 }

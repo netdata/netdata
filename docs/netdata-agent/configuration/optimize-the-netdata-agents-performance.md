@@ -43,7 +43,7 @@ In this setup:
 - **You** access all metrics through the Parent nodes
 
 :::tip
-This architecture works especially well in production environments where you monitor many systems. Learn more in our [Centralization Points documentation](/docs/observability-centralization-points/README.md).
+This architecture works especially well in production environments where you monitor many systems. Learn more in our [Centralization Points documentation](/docs/deployment-guides/deployment-with-centralization-points.md).
 :::
 
 ## Disable unneeded collectors
@@ -80,7 +80,7 @@ Configure retention settings using our [database configuration guide](/src/datab
 
 ## Switch to RAM mode
 
-For IoT devices and Child nodes in [Parent-Child setups](/docs/observability-centralization-points/README.md), switch to RAM mode to eliminate disk operations entirely. This mode:
+For IoT devices and Child nodes in [Parent-Child setups](/docs/deployment-guides/deployment-with-centralization-points.md), switch to RAM mode to eliminate disk operations entirely. This mode:
 
 - Stores all metrics in memory only
 - Eliminates disk IO for metric storage

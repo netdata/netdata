@@ -4,7 +4,7 @@
 
 Netdata is a distributed, real-time observability platform that monitors metrics and logs from systems and applications, built on a foundation designed to seamlessly extend to distributed tracing. It collects data at per-second granularity, stores it at (or as close to) the edge where it's generated, provides automated dashboards, machine learning anomaly detection, and AI-powered analysis without requiring configuration or specialized skills.
 
-Instead of centralizing the data, Netdata distributes the monitoring code to each system, keeping data local while providing unified access. This architecture enables linear scaling to millions of metrics per second and terabytes of logs while offering significantly faster queries.
+Instead of centralizing the data, Netdata **distributes the monitoring code** to each system, **keeping data local** while providing **unified access**. This architecture enables **linear scaling** to millions of metrics per second and terabytes of logs, **automated root cause analysis**, faster UX and significantly **lower total cost of ownership**.
 
 We have designed this platform for operations teams, sysadmins, DevOps engineers, and SREs who need comprehensive real-time, low-latency visibility into their infrastructure and applications. Netdata is opinionated — it collects everything, visualizes everything, runs machine learning anomaly detection on everything, with several innovations that make modern observability accessible to lean teams, without the need for specialized skills.
 
@@ -226,7 +226,7 @@ Netdata thrives as part of a vibrant open-source community with 1.5 million down
 - **Metrics export**: Exports metrics to all open standards and commonly used time-series databases (Prometheus, Graphite, InfluxDB, OpenTSDB, and more)
 - **Logs**: Uses battle tested systemd journal files for storing logs, providing maximum interoperability
 - **Alert routing**: Delivers notifications to PagerDuty, Slack, email, webhooks, and 20+ platforms
-- **AI integration**: Supports AI assistants via Model Context Protocol (MCP)
+- **AI integration**: Supports AI assistants via Model Context Protocol (MCP) — available via Netdata Cloud (infrastructure-wide) and on every Agent/Parent (local access)
 - **Visualization**: Works with Grafana through native datasource plugin
 - **Container orchestration**: Integrates with Kubernetes, Docker Swarm, and Nomad
 
@@ -250,7 +250,7 @@ Netdata will automatically provide:
 3. Live and interactive exploration of running **processes**, **network connections**, **systemd units**, **systemd services**, **IMPI sensors**, and more
 4. Unsupervised **machine-learning based anomaly detection** for all metrics
 5. Hundreds of **pre-configured alerts** for systems and applications
-6. **AI insights** (reports) and **AI-assistant** (chat) connections via MCP
+6. **AI insights** (reports) and **AI-assistant** (chat) connections via MCP (Cloud MCP for infrastructure-wide access, Agent/Parent MCP for local access)
 
 :::tip
 

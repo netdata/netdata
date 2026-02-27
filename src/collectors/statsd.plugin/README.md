@@ -250,7 +250,7 @@ When sending multiple metrics in a UDP message, keep the total size under the ne
 
 :::important
 
-Netdata will accept UDP packets up to 9000 bytes, but your network equipment may fragment any packets exceeding the MTU.
+Netdata can accept UDP datagrams up to the maximum UDP payload size (65,507 bytes for IPv4), but packets larger than the network MTU will be fragmented at the IP layer (or dropped if fragmentation is not allowed).
 
 :::
 
@@ -859,7 +859,7 @@ Private charts clearly show the metric type (gauge, timer, etc.) and available o
 <summary><strong>Creating a StatsD Configuration File</strong></summary>
 <br/> 
 
-Use Netdata's [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) to create a new file:
+Use Netdata's [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) to create a new file:
 
 ```bash
 sudo ./edit-config statsd.d/k6.conf

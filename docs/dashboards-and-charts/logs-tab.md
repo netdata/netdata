@@ -2,7 +2,7 @@
 
 The Logs tab is using the [`systemd` journal plugin](/src/collectors/systemd-journal.plugin/README.md), to present a structured view into your infrastructure's `systemd` logs.
 
-We have a thorough section explaining how you can [work with logs](/docs/category-overview-pages/working-with-logs.md), detailing how the plugin works, and what other utilities are used under the hood to provide you with the visualizations and the log entries.
+We have a thorough section explaining how you can [work with logs](https://learn.netdata.cloud/docs/logs), detailing how the plugin works, and what other utilities are used under the hood to provide you with the visualizations and the log entries.
 
 The [`systemd` journal plugin](/src/collectors/systemd-journal.plugin/README.md) documentation has information about:
 

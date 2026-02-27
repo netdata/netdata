@@ -9,7 +9,7 @@ modules:
         link: "https://www.exim.org/"
         icon_filename: 'exim.jpg'
         categories:
-          - data-collection.mail-servers
+          - data-collection.applications
       keywords:
         - exim
         - mail
@@ -19,7 +19,6 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      most_popular: false
     overview:
       data_collection:
         metrics_description: >

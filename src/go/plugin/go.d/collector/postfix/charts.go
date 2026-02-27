@@ -3,41 +3,41 @@
 package postfix
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioPostfixQueueEmailsCount = module.Priority + iota
+	prioPostfixQueueEmailsCount = collectorapi.Priority + iota
 	prioPostfixQueueSize
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	queueEmailsCountChart.Copy(),
 	queueSizeChart.Copy(),
 }
 
 var (
-	queueEmailsCountChart = module.Chart{
+	queueEmailsCountChart = collectorapi.Chart{
 		ID:       "postfix_queue_emails",
 		Title:    "Postfix Queue Emails",
 		Units:    "emails",
 		Fam:      "queue",
 		Ctx:      "postfix.qemails",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPostfixQueueEmailsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "emails"},
 		},
 	}
-	queueSizeChart = module.Chart{
+	queueSizeChart = collectorapi.Chart{
 		ID:       "postfix_queue_size",
 		Title:    "Postfix Queue Size",
 		Units:    "KiB",
 		Fam:      "queue",
 		Ctx:      "postfix.qsize",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioPostfixQueueSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "size"},
 		},
 	}

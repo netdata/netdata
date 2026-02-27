@@ -16,7 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func Test_loadDDSnmpProfiles(t *testing.T) {
@@ -36,7 +36,7 @@ func Test_loadDDSnmpProfiles(t *testing.T) {
 
 	var want int64
 	for _, name := range names {
-		want += metrix.Bool(!strings.HasPrefix(name, "_"))
+		want += oldmetrix.Bool(!strings.HasPrefix(name, "_"))
 	}
 
 	require.Equal(t, want-1 /*README.md*/, int64(len(profiles)))

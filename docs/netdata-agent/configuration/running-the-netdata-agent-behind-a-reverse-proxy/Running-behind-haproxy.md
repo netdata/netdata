@@ -160,6 +160,12 @@ backend netdata_backend
 
 ## Enable authentication
 
+:::tip Simpler Alternative
+
+If you use Netdata Cloud, [Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md) provides authentication with a single setting - no HAProxy userlist configuration needed.
+
+:::
+
 To use basic HTTP Authentication, create an authentication list:
 
 ```text

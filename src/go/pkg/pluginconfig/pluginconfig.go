@@ -16,9 +16,9 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
-	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 )
 
 var (
@@ -54,17 +54,28 @@ type directories struct {
 	varLibDir       string
 }
 
+// InitInput is the minimal CLI-derived input required to initialize paths.
+type InitInput struct {
+	ConfDir   []string
+	WatchPath []string
+}
+
 func IsStock(path string) bool {
-	return strings.HasPrefix(path, StockConfigDir())
+	stock := StockConfigDir()
+	if stock == "" {
+		// Fallback for contexts that haven't called MustInit yet (mostly unit tests).
+		return !strings.Contains(path, "/etc/")
+	}
+	return strings.HasPrefix(path, stock)
 }
 
 // MustInit parses env, applies CLI overrides, discovers directories, and stores them.
 // Safe to call multiple times; only the first call has effect.
-func MustInit(opts *cli.Option) {
+func MustInit(input InitInput) {
 	initOnce.Do(func() {
 		env = readEnvFromOS(executable.Directory)
 		var d directories
-		if err := d.build(opts, env, executable.Name, executable.Directory); err != nil {
+		if err := d.build(input, env, executable.Name, executable.Directory); err != nil {
 			// fail fast during startup (internal invariant was broken)
 			panic(fmt.Errorf("pluginconfig initialization failed: %w", err))
 		}
@@ -110,31 +121,31 @@ func (d *directories) serviceDiscoveryDir() multipath.MultiPath {
 	return multipath.New(combined...)
 }
 
-func (d *directories) build(opts *cli.Option, env envData, execName, execDir string) error {
-	d.initUserRoots(opts, env, execDir)
+func (d *directories) build(input InitInput, env envData, execName, execDir string) error {
+	d.initUserRoots(input, env, execDir)
 	d.initStockRoot(env, execDir)
 	d.deriveCollectors(execName)
 	d.deriveServiceDiscovery(execName)
-	d.initWatchPaths(opts, env)
+	d.initWatchPaths(input, env)
 	d.initVarLib(env)
 	return d.validate()
 }
 
 // Build step 1: initialize "user" roots as a multipath: CLI (highest), env, fallback.
-func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir string) {
+func (d *directories) initUserRoots(input InitInput, env envData, execDir string) {
 	var roots multipath.MultiPath
 
 	// 1) CLI dirs
-	for _, p := range opts.ConfDir {
+	for _, p := range input.ConfDir {
 		p = safePathClean(handleDirOnWin(env.cygwinBase, p, execDir))
 		roots = append(roots, p)
 	}
 
-	// 2) NETDATA_USER_CONFIG_DIR
-	if buildinfo.UserConfigDir != "" {
-		roots = append(roots, safePathClean(buildinfo.UserConfigDir))
-	} else if dir := safePathClean(env.userDir); dir != "" {
+	// 2) NETDATA_USER_CONFIG_DIR (env has priority over buildinfo)
+	if dir := safePathClean(env.userDir); dir != "" {
 		roots = append(roots, dir)
+	} else if buildinfo.UserConfigDir != "" {
+		roots = append(roots, safePathClean(buildinfo.UserConfigDir))
 	}
 
 	if len(roots) != 0 {
@@ -143,6 +154,7 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 	}
 
 	relDir := safePathClean(filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata"))
+	relDir = handleDirOnWin(env.cygwinBase, relDir, execDir)
 	if isDirExists(relDir) {
 		d.userConfigDirs = multipath.New(relDir)
 		return
@@ -164,16 +176,18 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 
 // Build step 2: initialize single "stock" root: env, common locations, build-relative fallback.
 func (d *directories) initStockRoot(env envData, execDir string) {
-	if buildinfo.StockConfigDir != "" {
-		d.stockConfigDir = safePathClean(buildinfo.StockConfigDir)
-		return
-	}
+	// env.stockDir has priority
 	if stock := safePathClean(env.stockDir); stock != "" {
 		d.stockConfigDir = stock
 		return
 	}
+	if buildinfo.StockConfigDir != "" {
+		d.stockConfigDir = safePathClean(buildinfo.StockConfigDir)
+		return
+	}
 
 	relDir := safePathClean(filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d"))
+	relDir = handleDirOnWin(env.cygwinBase, relDir, execDir)
 	if isDirExists(relDir) {
 		d.stockConfigDir = relDir
 		return
@@ -219,8 +233,8 @@ func (d *directories) deriveServiceDiscovery(execName string) {
 }
 
 // Build step 5: init watchers (normalize + dedupe via multipath.New)
-func (d *directories) initWatchPaths(opts *cli.Option, env envData) {
-	in := append([]string{}, opts.WatchPath...)
+func (d *directories) initWatchPaths(input InitInput, env envData) {
+	in := append([]string{}, input.WatchPath...)
 	if env.watchPath != "" {
 		in = append(in, env.watchPath)
 	}
@@ -254,19 +268,28 @@ func (d *directories) validate() error {
 	return nil
 }
 
+var isTerm = terminal.IsTerminal()
+
 func readEnvFromOS(execDir string) envData {
 	e := envData{
 		cygwinBase: os.Getenv("NETDATA_CYGWIN_BASE_PATH"),
 		userDir:    os.Getenv("NETDATA_USER_CONFIG_DIR"),
 		stockDir:   os.Getenv("NETDATA_STOCK_CONFIG_DIR"),
-		varLibDir:  os.Getenv("NETDATA_LIB_DIR"),
 		watchPath:  os.Getenv("NETDATA_PLUGINS_GOD_WATCH_PATH"),
+		varLibDir:  os.Getenv("NETDATA_LIB_DIR"),
 		logLevel:   os.Getenv("NETDATA_LOG_LEVEL"),
 	}
 	e.userDir = handleDirOnWin(e.cygwinBase, safePathClean(e.userDir), execDir)
 	e.stockDir = handleDirOnWin(e.cygwinBase, safePathClean(e.stockDir), execDir)
 	e.varLibDir = handleDirOnWin(e.cygwinBase, safePathClean(e.varLibDir), execDir)
 	e.watchPath = handleDirOnWin(e.cygwinBase, safePathClean(e.watchPath), execDir)
+
+	if isTerm {
+		e.userDir = ""
+		e.stockDir = ""
+		e.watchPath = ""
+	}
+
 	return e
 }
 
@@ -280,7 +303,7 @@ func handleDirOnWin(base, p string, execDir string) string {
 	if base == "" || !strings.HasPrefix(p, "/") {
 		return p
 	}
-	return filepath.Join(base, p)
+	return filepath.Join(base, strings.TrimPrefix(p, "/"))
 }
 
 func isDirExists(dir string) bool {

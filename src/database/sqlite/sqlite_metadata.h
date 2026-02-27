@@ -33,7 +33,7 @@ void metaqueue_ml_load_models(RRDDIM *rd);
 void detect_machine_guid_change(nd_uuid_t *host_uuid);
 bool metadata_queue_load_host_context();
 void reset_host_context_load_flag();
-void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc);
+void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc, time_t *next_run);
 
 int sql_metadata_cache_stats(int op);
 
@@ -59,7 +59,7 @@ void commit_alert_transitions(RRDHOST *host);
 //void metadata_sync_shutdown_background(void);
 //void metadata_sync_shutdown_background_wait(void);
 void metadata_queue_ctx_host_cleanup(nd_uuid_t *host_uuid, const char *context);
-void store_host_info_and_metadata(RRDHOST *host, BUFFER *work_buffer);
+void store_host_info_and_metadata(RRDHOST *host);
 void metadata_execute_store_statement(sqlite3_stmt *stmt);
 size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid));
 

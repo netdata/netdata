@@ -3,41 +3,41 @@
 package tor
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioTraffic = module.Priority + iota
+	prioTraffic = collectorapi.Priority + iota
 	prioUptime
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	trafficChart.Copy(),
 	uptimeChart.Copy(),
 }
 
-var trafficChart = module.Chart{
+var trafficChart = collectorapi.Chart{
 	ID:       "traffic",
 	Title:    "Tor Traffic",
 	Units:    "KiB/s",
 	Fam:      "traffic",
 	Ctx:      "tor.traffic",
-	Type:     module.Area,
+	Type:     collectorapi.Area,
 	Priority: prioTraffic,
-	Dims: module.Dims{
-		{ID: "traffic/read", Name: "read", Algo: module.Incremental, Div: 1024},
-		{ID: "traffic/written", Name: "write", Algo: module.Incremental, Mul: -1, Div: 1024},
+	Dims: collectorapi.Dims{
+		{ID: "traffic/read", Name: "read", Algo: collectorapi.Incremental, Div: 1024},
+		{ID: "traffic/written", Name: "write", Algo: collectorapi.Incremental, Mul: -1, Div: 1024},
 	},
 }
 
-var uptimeChart = module.Chart{
+var uptimeChart = collectorapi.Chart{
 	ID:       "uptime",
 	Title:    "Tor Uptime",
 	Units:    "seconds",
 	Fam:      "uptime",
 	Ctx:      "tor.uptime",
 	Priority: prioUptime,
-	Dims: module.Dims{
+	Dims: collectorapi.Dims{
 		{ID: "uptime"},
 	},
 }

@@ -15,35 +15,50 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
+type noopLogger struct{}
+
+func (noopLogger) Printf(context.Context, string, ...any) {}
+
 func init() {
-	module.Register("redis", module.Creator{
+	redis.SetLogger(noopLogger{})
+
+	collectorapi.Register("redis", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         redisMethods,
+		MethodHandler:   redisFunctionHandler,
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			Address:     "redis://@localhost:6379",
 			Timeout:     confopt.Duration(time.Second),
 			PingSamples: 5,
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 
 		addAOFChartsOnce:       &sync.Once{},
 		addReplSlaveChartsOnce: &sync.Once{},
-		pingSummary:            metrix.NewSummary(),
+		pingSummary:            oldmetrix.NewSummary(),
 		collectedCommands:      make(map[string]bool),
 		collectedDbs:           make(map[string]bool),
 	}
+	c.funcRouter = newFuncRouter(c)
+	return c
 }
 
 type Config struct {
@@ -55,29 +70,57 @@ type Config struct {
 	Username           string           `yaml:"username,omitempty" json:"username"`
 	Password           string           `yaml:"password,omitempty" json:"password"`
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
-	PingSamples        int `yaml:"ping_samples" json:"ping_samples"`
+	PingSamples        int             `yaml:"ping_samples" json:"ping_samples"`
+	Functions          FunctionsConfig `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	TopQueries TopQueriesConfig `yaml:"top_queries,omitempty" json:"top_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
 }
 
 type (
 	Collector struct {
-		module.Base
+		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts                 *module.Charts
+		charts                 *collectorapi.Charts
 		addAOFChartsOnce       *sync.Once
 		addReplSlaveChartsOnce *sync.Once
 
 		rdb redisClient
 
+		funcRouter *funcRouter
+
 		server            string
 		version           *semver.Version
-		pingSummary       metrix.Summary
+		pingSummary       oldmetrix.Summary
 		collectedCommands map[string]bool
 		collectedDbs      map[string]bool
 	}
 	redisClient interface {
 		Info(ctx context.Context, section ...string) *redis.StringCmd
 		Ping(context.Context) *redis.StatusCmd
+		SlowLogGet(ctx context.Context, num int64) *redis.SlowLogCmd
 		Close() error
 	}
 )
@@ -118,7 +161,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
@@ -134,7 +177,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return ms
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.rdb == nil {
 		return
 	}

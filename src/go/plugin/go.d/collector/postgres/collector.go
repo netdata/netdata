@@ -13,8 +13,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 
 	"github.com/jackc/pgx/v5/stdlib"
 )
@@ -23,10 +23,12 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("postgres", module.Creator{
+	collectorapi.Register("postgres", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         pgMethods,
+		MethodHandler:   pgFunctionHandler,
 	})
 }
 
@@ -41,6 +43,11 @@ func New() *Collector {
 			// https://discord.com/channels/847502280503590932/1022693928874549368
 			MaxDBTables:  50,
 			MaxDBIndexes: 250,
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
+			},
 		},
 		charts:  baseCharts.Copy(),
 		dbConns: make(map[string]*dbConn),
@@ -69,30 +76,63 @@ type Config struct {
 	QueryTimeHistogram []float64        `yaml:"query_time_histogram,omitempty" json:"query_time_histogram"`
 	MaxDBTables        int64            `yaml:"max_db_tables" json:"max_db_tables"`
 	MaxDBIndexes       int64            `yaml:"max_db_indexes" json:"max_db_indexes"`
+	Functions          FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	TopQueries TopQueriesConfig `yaml:"top_queries,omitempty" json:"top_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
 }
 
 type (
 	Collector struct {
-		module.Base
+		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts                            *module.Charts
+		charts                            *collectorapi.Charts
 		addXactQueryRunningTimeChartsOnce *sync.Once
 		addWALFilesChartsOnce             *sync.Once
 
 		db      *sql.DB
 		dbConns map[string]*dbConn
 
-		superUser            *bool
-		pgIsInRecovery       *bool
-		pgVersion            int
-		dbSr                 matcher.Matcher
-		recheckSettingsTime  time.Time
-		recheckSettingsEvery time.Duration
-		doSlowTime           time.Time
-		doSlowEvery          time.Duration
+		superUser               *bool
+		pgIsInRecovery          *bool
+		pgVersion               int
+		pgStatStatementsAvail   bool            // cached positive result only
+		pgStatStatementsColumns map[string]bool // cached column names from pg_stat_statements
+		pgStatMonitorAvail      bool            // cached positive result only
+		pgStatMonitorColumns    map[string]bool // cached column names from pg_stat_monitor
+		queryStatsSource        string          // "pg_stat_monitor" or "pg_stat_statements" (auto-detected)
+		pgStatStatementsMu      sync.RWMutex    // protects pgStatStatements*/pgStatMonitor* fields for concurrent access
+		dbSr                    matcher.Matcher
+		recheckSettingsTime     time.Time
+		recheckSettingsEvery    time.Duration
+		doSlowTime              time.Time
+		doSlowEvery             time.Duration
 
 		mx *pgMetrics
+
+		funcRouter *funcRouter
 	}
 	dbConn struct {
 		db         *sql.DB
@@ -117,8 +157,10 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.dbSr = sr
 
-	c.mx.xactTimeHist = metrix.NewHistogramWithRangeBuckets(c.XactTimeHistogram)
-	c.mx.queryTimeHist = metrix.NewHistogramWithRangeBuckets(c.QueryTimeHistogram)
+	c.mx.xactTimeHist = oldmetrix.NewHistogramWithRangeBuckets(c.XactTimeHistogram)
+	c.mx.queryTimeHist = oldmetrix.NewHistogramWithRangeBuckets(c.QueryTimeHistogram)
+
+	c.funcRouter = newFuncRouter(c)
 
 	return nil
 }
@@ -134,7 +176,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
@@ -150,7 +192,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.db == nil {
 		return
 	}

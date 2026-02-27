@@ -155,7 +155,7 @@ static inline int health_parse_repeat(
     return 1;
 }
 
-static inline int health_parse_db_lookup(size_t line, const char *filename, char *string, struct rrd_alert_config *ac) {
+int health_parse_db_lookup(size_t line, const char *filename, char *string, struct rrd_alert_config *ac) {
     if(ac->dimensions) string_freez(ac->dimensions);
     ac->dimensions = NULL;
     ac->after = 0;
@@ -190,6 +190,9 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
     }
 
     if(group_options) {
+        // skip leading whitespace inside parentheses
+        while(*s && isspace((uint8_t)*s)) s++;
+
         if(*s == '!') {
             s++;
             if(*s == '=') s++;
@@ -203,36 +206,55 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
             }
             else if(*s == '=') {
                 s++;
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL;
-            }
-            else
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER;
-        }
-        else if(*s == '>') {
-            if(*s == '=') {
-                s++;
                 ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL;
             }
             else
                 ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS;
         }
+        else if(*s == '>') {
+            s++;
+            if(*s == '=') {
+                s++;
+                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL;
+            }
+            else
+                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER;
+        }
+        else if(*s == '=' || *s == ':') {
+            // explicit equal operator (=, == or :)
+            s++;
+            if(*s == '=') s++;  // support == as well
+            ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
+        }
 
         while(*s && isspace((uint8_t)*s)) s++;
 
-        if(*s) {
-            if(isdigit((uint8_t)*s) || *s == '.') {
-                ac->time_group_value = str2ndd(s, &s);
-                while(s && *s && isspace((uint8_t)*s)) s++;
+        if(*s == ')') {
+            // empty options like countif() - allowed, will use defaults
+        }
+        else if((isdigit((uint8_t)*s)) ||
+                (*s == '.' && isdigit((uint8_t)s[1])) ||
+                ((*s == '-' || *s == '+') && s[1] &&
+                 ((isdigit((uint8_t)s[1])) || (s[1] == '.' && isdigit((uint8_t)s[2]))))) {
+            // parse numeric value (including negative numbers like >=-3, or >+5, or >-.5)
+            ac->time_group_value = str2ndd(s, &s);
+            while(s && *s && isspace((uint8_t)*s)) s++;
 
-                if(!s || *s != ')') {
-                    netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after number in aggregation method on '%s'",
-                                      line, filename, key);
-                    return 0;
-                }
+            if(!s || *s != ')') {
+                netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after number in aggregation method on '%s'",
+                                  line, filename, key);
+                return 0;
             }
         }
-        else if(*s != ')') {
-            netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after method on '%s'",
+        else if(*s) {
+            // invalid character - not a valid start of a number or ')'
+            netdata_log_error("Health configuration at line %zu of file '%s': invalid character '%c' in aggregation method options on '%s'",
+                              line, filename, *s, key);
+            return 0;
+        }
+        else {
+            // end of string without closing parenthesis
+            netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after aggregation method on '%s'",
                               line, filename, key);
             return 0;
         }
@@ -262,6 +284,7 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
     }
 
     // then is the 'after' time
+    while(*s && isspace((uint8_t)*s)) s++;  // skip whitespace after group method
     key = s;
     while(*s && !isspace((uint8_t)*s)) s++;
     while(*s && isspace((uint8_t)*s)) *s++ = '\0';
@@ -290,6 +313,7 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
             if (!duration_parse_seconds(value, &ac->before)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                                   line, filename, value, key);
+                return 0;
             }
         }
         else if(!strcasecmp(key, HEALTH_EVERY_KEY)) {
@@ -300,6 +324,7 @@ static inline int health_parse_db_lookup(size_t line, const char *filename, char
             if (!duration_parse_seconds(value, &ac->update_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                                   line, filename, value, key);
+                return 0;
             }
         }
         else if(!strcasecmp(key, "absolute") || !strcasecmp(key, "abs") || !strcasecmp(key, "absolute_sum")) {

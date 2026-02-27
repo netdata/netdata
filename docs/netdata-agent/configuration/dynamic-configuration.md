@@ -51,7 +51,7 @@ Your nodes using Dynamic Configuration Manager require a connection to Netdata C
 
 :::info
 
-To understand what actions you can perform based on your role, refer to the [Role-Based Access documentation](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#dynamic-configuration-manager).
+To understand what actions you can perform based on your role, refer to the [Role-Based Access documentation](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
 :::
 

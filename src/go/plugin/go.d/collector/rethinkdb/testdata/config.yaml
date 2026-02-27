@@ -5,3 +5,8 @@ address: "ok"
 timeout: 123.123
 username: "ok"
 password: "ok"
+functions:
+  running_queries:
+    disabled: true
+    timeout: 123.123
+    limit: 123

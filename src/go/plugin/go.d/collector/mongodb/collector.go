@@ -12,17 +12,19 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
 func init() {
-	module.Register("mongodb", module.Creator{
+	collectorapi.Register("mongodb", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         mongoMethods,
+		MethodHandler:   mongoFunctionHandler,
 	})
 }
 
@@ -34,6 +36,11 @@ func New() *Collector {
 			Databases: matcher.SimpleExpr{
 				Includes: []string{},
 				Excludes: []string{},
+			},
+			Functions: FunctionsConfig{
+				TopQueries: TopQueriesConfig{
+					Limit: 500,
+				},
 			},
 		},
 
@@ -56,13 +63,38 @@ type Config struct {
 	URI                string             `yaml:"uri" json:"uri"`
 	Timeout            confopt.Duration   `yaml:"timeout,omitempty" json:"timeout"`
 	Databases          matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
+	Functions          FunctionsConfig    `yaml:"functions,omitempty" json:"functions"`
+}
+
+type FunctionsConfig struct {
+	TopQueries TopQueriesConfig `yaml:"top_queries,omitempty" json:"top_queries"`
+}
+
+type TopQueriesConfig struct {
+	Disabled bool             `yaml:"disabled" json:"disabled"`
+	Timeout  confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Limit    int              `yaml:"limit,omitempty" json:"limit"`
+}
+
+func (c Config) topQueriesTimeout() time.Duration {
+	if c.Functions.TopQueries.Timeout == 0 {
+		return c.Timeout.Duration()
+	}
+	return c.Functions.TopQueries.Timeout.Duration()
+}
+
+func (c Config) topQueriesLimit() int {
+	if c.Functions.TopQueries.Limit <= 0 {
+		return 500
+	}
+	return c.Functions.TopQueries.Limit
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts                *module.Charts
+	charts                *collectorapi.Charts
 	addShardingChartsOnce *sync.Once
 
 	conn mongoConn
@@ -72,6 +104,12 @@ type Collector struct {
 	databases      map[string]bool
 	replSetMembers map[string]bool
 	shards         map[string]bool
+
+	// Top queries column cache with double-checked locking
+	topQueriesColsMu sync.RWMutex
+	topQueriesCols   map[string]bool
+
+	funcRouter *funcRouter
 }
 
 func (c *Collector) Configuration() any {
@@ -87,6 +125,8 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("init database selector: %v", err)
 	}
 
+	c.funcRouter = newFuncRouter(c)
+
 	return nil
 }
 
@@ -101,7 +141,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
@@ -119,7 +159,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.conn == nil {
 		return
 	}

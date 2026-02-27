@@ -9,7 +9,7 @@ modules:
         link: https://www.freedesktop.org/wiki/Software/systemd/
         icon_filename: systemd.svg
         categories:
-          - data-collection.systemd
+          - data-collection.operating-systems
       keywords:
         - systemd
       related_resources:
@@ -17,7 +17,6 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

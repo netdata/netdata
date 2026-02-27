@@ -49,12 +49,18 @@
                             "module_name": {
                               "type": "string",
                               "description": "Related integration module name."
+                            },
+                            "monitored_instance_name": {
+                              "type": "string",
+                              "description": "Related integration monitored instance name. Use to reference a specific module when a plugin+module combination has multiple monitored instances (e.g. cgroups.plugin)."
                             }
                           },
                           "required": [
-                            "plugin_name",
-                            "module_name"
-                          ]
+                            "plugin_name"
+                          ],
+                          "dependencies": {
+                            "monitored_instance_name": ["module_name"]
+                          }
                         }
                       }
                     },
@@ -80,10 +86,6 @@
                   "description"
                 ]
               },
-              "most_popular": {
-                "type": "boolean",
-                "description": "Whether or not the integration is to be flagged as most-popular, meaning it will show up at the top of the menu."
-              },
               "community": {
                 "type": "boolean",
                 "description": "Whether or not the integration should be flagged as community."
@@ -94,10 +96,9 @@
               "module_name",
               "monitored_instance",
               "keywords",
-              "related_resources",
-              "info_provided_to_referring_integrations",
-              "most_popular"
-            ]
+                "related_resources",
+                "info_provided_to_referring_integrations"
+              ]
           },
           "overview": {
             "type": "object",
@@ -346,7 +347,8 @@
                             "enum": [
                               "line",
                               "area",
-                              "stacked"
+                              "stacked",
+                              "heatmap"
                             ]
                           },
                           "dimensions": {
@@ -390,6 +392,219 @@
               "description",
               "availability",
               "scopes"
+            ]
+          },
+          "functions": {
+            "type": "object",
+            "description": "Real-time function documentation for this collector.",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "High-level description of available functions."
+              },
+              "list": {
+                "type": "array",
+                "description": "List of functions exposed by the collector.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Function method ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Function display name."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Detailed description of what the function does and returns."
+                    },
+                    "parameters": {
+                      "type": "array",
+                      "description": "Function parameters and their descriptions.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Parameter ID."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Parameter display name."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Parameter description."
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Parameter type (e.g. select, string)."
+                          },
+                          "required": {
+                            "type": "boolean",
+                            "description": "Whether the parameter is required."
+                          },
+                          "default": {
+                            "type": "string",
+                            "description": "Default value, if applicable."
+                          },
+                          "options": {
+                            "type": "array",
+                            "description": "Allowed parameter options (for select parameters).",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "description": "Option ID."
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "description": "Option display name."
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "description": "Option description."
+                                },
+                                "default": {
+                                  "type": "boolean",
+                                  "description": "Whether this option is the default."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "description",
+                          "type",
+                          "required",
+                          "default",
+                          "options"
+                        ]
+                      }
+                    },
+                    "returns": {
+                      "type": "object",
+                      "description": "Return shape and columns for the function response.",
+                      "properties": {
+                        "description": {
+                          "type": "string",
+                          "description": "Return description."
+                        },
+                        "columns": {
+                          "type": "array",
+                          "description": "List of returned columns.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Column name."
+                              },
+                              "type": {
+                                "type": "string",
+                                "description": "Column type."
+                              },
+                              "description": {
+                                "type": "string",
+                                "description": "Column description."
+                              },
+                              "unit": {
+                                "type": "string",
+                                "description": "Column unit, if applicable."
+                              },
+                              "visibility": {
+                                "type": "string",
+                                "description": "Whether the column is shown by default.",
+                                "enum": [
+                                  "hidden"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "type",
+                              "unit"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "description",
+                        "columns"
+                      ]
+                    },
+                    "performance": {
+                      "type": "string",
+                      "description": "Performance considerations."
+                    },
+                    "security": {
+                      "type": "string",
+                      "description": "Security/PII considerations."
+                    },
+                    "prerequisites": {
+                      "type": "object",
+                      "description": "Prerequisites and required permissions.",
+                      "properties": {
+                        "list": {
+                          "type": "array",
+                          "description": "List of prerequisites.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string",
+                                "description": "Short prerequisite title."
+                              },
+                              "description": {
+                                "type": "string",
+                                "description": "Prerequisite description."
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "description"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "list"
+                      ]
+                    },
+                    "availability": {
+                      "type": "string",
+                      "description": "Availability and enablement notes."
+                    },
+                    "require_cloud": {
+                      "type": "boolean",
+                      "description": "Whether the function requires cloud connection."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "parameters",
+                    "returns",
+                    "performance",
+                    "security",
+                    "availability"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "description",
+              "list"
             ]
           }
         },

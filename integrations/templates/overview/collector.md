@@ -36,7 +36,7 @@ This collector only supports collecting metrics from a single instance of this i
 [% endif %]
 
 [% if related %]
-[[ entry.meta.name ]] can be monitored further using the following other integrations:
+[[ entry.meta.monitored_instance.name ]] can be monitored further using the following other integrations:
 
 [% for res in related %]
 - {% relatedResource id="[[ res.id ]]" %}[[ res.name ]]{% /relatedResource %}

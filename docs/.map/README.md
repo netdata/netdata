@@ -13,29 +13,57 @@ Publishing documentation to [Learn](https://github.com/netdata/learn) involves a
 
 | Step  | Action                                                                                  | Output                                                         |
 |-------|-----------------------------------------------------------------------------------------|----------------------------------------------------------------|
-| **1** | Edit `map.csv` alongside your doc changes. Fill in all 4 columns (description can be left empty) correctly.             | Docs mapped with proper sidebar labels, paths, and edit links. |
+| **1** | Edit `map.yaml` alongside your doc changes. Update nodes and ordering as needed.        | Docs mapped with proper sidebar labels, paths, and edit links. |
 | **2** | Test locally with the `ingest.py` script. Optionally run a full local Learn deployment. | Confirms no broken links or build errors.                      |
-| **3** | Merge the Docs PR (requires approval).                                                  | Docs + `map.csv` merged into the repo.                         |
+| **3** | Merge the Docs PR (requires approval).                                                  | Docs + `map.yaml` merged into the repo.                        |
 | **4** | Inspect the automatic Learn ingest PR. Check files + deploy preview.                    | Verified preview of Learn with changes.                        |
 | **5** | Merge the Learn ingest PR.                                                              | Docs officially live on Learn.                                 |
 
-### 1. Edit `map.csv`
+### 1. Edit `map.yaml`
 
-All docs must be mapped in the [map.csv](https://github.com/netdata/netdata/blob/master/docs/.map/map.csv) file. Each row has five columns:
+All docs must be mapped in the [map.yaml](https://github.com/netdata/netdata/blob/master/docs/.map/map.yaml) file. The file is an ordered navigation tree under the top-level `sidebar:` key.
 
-| Column                | Purpose                                                                       | Notes                                                                                                                                                    |
-|-----------------------|-------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **custom\_edit\_url** | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`).                                                                                        |
-| **sidebar\_label**    | The label shown in the sidebar.                                               | To make a category: the **overview** page’s `sidebar_label` **must match** `learn_rel_path` (lowercase). <br>👉 Every folder must have an overview page. |
-| **learn\_status**     | `Published` or `Unpublished`.                                                 | If `Unpublished`, see [Unpublishing Files](#unpublishing-files).                                                                                         |
-| **learn\_rel\_path**  | The location path on Learn.                                                   | Use **uppercase letters** and **spaces**. Example: `Netdata Agent/Installation/Linux`. <br>👉 Every level requires an overview page.                     |
-| **description**       | Legacy metadata description.                                                  | Rarely used today.                                                                                                                                       |
+Each node is either:
 
-Example row in `map.csv`:
+- A **doc node** (with a `meta` object)
+- A **category node** (with `meta` + `items`)
+- An **integration placeholder** (`type: integration_placeholder`)
 
-```csv
-custom_edit_url,sidebar_label,learn_status,learn_rel_path,description
-https://github.com/netdata/netdata/edit/master/docs/installation/linux.md,Linux,Published,"Netdata Agent/Installation/Linux","How to install Netdata Agent on Linux"
+#### `meta` fields
+
+| Field           | Purpose                                                                       | Notes                                                                                                                                                                                      |
+|-----------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **label**       | The label shown in the sidebar.                                               | For category overview pages, this should match the sidebar position. Categories are defined by having `items`.                                                                             |
+| **path**        | Single path segment override (optional).                                      | Used when the document's Learn path segment differs from the tree structure. Example: `OpenTelemetry` (not a full path). If omitted, the path is derived from the tree hierarchy.          |
+| **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`). Can be omitted only for nodes with `integration_placeholder` children (the integrations themselves will have edit URLs). |
+| **keywords**    | List of keywords for search.                                                  | Example: `["install", "linux"]`                                                                                                                                                            |
+| **description** | Legacy metadata description.                                                  | Rarely used today.                                                                                                                                                                         |
+
+#### Path Reconstruction
+
+The full Learn path for each document is automatically reconstructed by walking the tree hierarchy and concatenating parent labels. The `path` field in `meta` is only needed when a document's path segment differs from its tree position.
+
+For example, a document appearing under "Collecting Metrics" in the sidebar with `path: OpenTelemetry` will have Learn path `OpenTelemetry` instead of `Collecting Metrics/OpenTelemetry Metrics`.
+
+#### Integration placeholder node
+
+```yaml
+- type: integration_placeholder
+  integration_kind: collectors
+```
+
+Placeholders are positional: the ingest pipeline replaces them in-place with generated integration entries while preserving list order.
+
+#### Example node
+
+```yaml
+- meta:
+    label: "Linux"
+    edit_url: "https://github.com/netdata/netdata/edit/master/docs/installation/linux.md"
+    description: "How to install Netdata Agent on Linux"
+    keywords:
+      - "install"
+      - "linux"
 ```
 
 ### 2. Test the Changes
@@ -45,15 +73,17 @@ Before merging, **always test the map file**.
 1. Clone [Learn](https://github.com/netdata/learn) locally.
 2. Prepare environment and dependencies (see [ingest instructions](https://github.com/netdata/learn#ingest-and-process-documentation-files)).
 3. Run the ingest command:
+
    ```bash
    python3 ingest/ingest.py --repos OWNEROFREPO/netdata:YOURBRANCH
    ```
+
 4. Inspect the ingested changes.
 5. (Optional, advanced) [Deploy Learn](https://github.com/netdata/learn#local-deploy-of-learn) locally to confirm it builds correctly.
 
 ### 3. Merge the Docs PR
 
-- Submit your PR with the updated docs **and** `map.csv`.
+- Submit your PR with the updated docs **and** `map.yaml`.
 - Get at least one approval.
 - **Reviewers expect you to have tested already**. Don’t rely on them to test. Please also mention it if you have done testing, so it is clear.
 

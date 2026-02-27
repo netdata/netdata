@@ -3,12 +3,30 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
+static RRDSET *st = NULL;
+static RRDDIM *rd_user = NULL, *rd_kernel = NULL, *rd_idle = NULL;
+
+void do_GetSystemCPU_cleanup(void)
+{
+    if (rd_user)
+        rrddim_free(st, rd_user);
+    if (rd_kernel)
+        rrddim_free(st, rd_kernel);
+    if (rd_idle)
+        rrddim_free(st, rd_idle);
+    if (st)
+        rrdset_free(st);
+
+    rd_user = rd_kernel = rd_idle = NULL;
+    st = NULL;
+}
+
 int do_GetSystemCPU(int update_every, usec_t dt __maybe_unused)
 {
     FILETIME idleTime, kernelTime, userTime;
 
     if (GetSystemTimes(&idleTime, &kernelTime, &userTime) == 0) {
-        netdata_log_error("GetSystemTimes() failed.");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "GetSystemTimes() failed.");
         return 1;
     }
 
@@ -19,8 +37,6 @@ int do_GetSystemCPU(int update_every, usec_t dt __maybe_unused)
     // kernel includes idle
     kernel -= idle;
 
-    static RRDSET *st = NULL;
-    static RRDDIM *rd_user = NULL, *rd_kernel = NULL, *rd_idle = NULL;
     if (!st) {
         st = rrdset_create_localhost(
             "system",

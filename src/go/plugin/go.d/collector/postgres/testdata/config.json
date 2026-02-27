@@ -12,5 +12,12 @@
     123.123
   ],
   "max_db_tables": 123,
-  "max_db_indexes": 123
+  "max_db_indexes": 123,
+  "functions": {
+    "top_queries": {
+      "disabled": true,
+      "timeout": 123.123,
+      "limit": 123
+    }
+  }
 }

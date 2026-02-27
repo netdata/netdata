@@ -1,0 +1,33 @@
+[package]
+name = "journal-index"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+allocative = [
+    "dep:allocative",
+    "roaring/allocative",
+    "journal-core/allocative",
+    "journal-common/allocative"
+]
+
+[dependencies]
+allocative = { workspace = true, optional = true }
+regex = { workspace = true }
+roaring = { workspace = true , features = ["serde"] }
+serde = { workspace =  true, features = ["derive"] }
+static_assertions = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+journal-core = { path = "../journal-core" }
+journal-common = { workspace = true }
+journal-registry = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+uuid = { workspace = true }

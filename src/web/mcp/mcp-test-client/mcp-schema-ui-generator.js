@@ -1631,7 +1631,7 @@ class MCPSchemaUIGenerator {
         }
 
         // Check for allowed root properties
-        const allowedRootProps = ['type', 'properties', 'required', 'title', 'description', 'additionalProperties'];
+        const allowedRootProps = ['type', 'properties', 'required', 'title', 'description', 'additionalProperties', '$schema'];
         for (const prop of Object.keys(schema)) {
             if (!allowedRootProps.includes(prop)) {
                 errors.push(`Unknown root property: "${prop}"`);

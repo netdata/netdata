@@ -19,3 +19,13 @@ tls_cert: "ok"
 tls_key: "ok"
 tls_skip_verify: yes
 force_http2: yes
+functions:
+  dsn: "ok"
+  top_queries:
+    disabled: yes
+    timeout: 123.123
+    limit: 123
+  running_queries:
+    disabled: yes
+    timeout: 123.123
+    limit: 123

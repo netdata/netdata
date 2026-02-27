@@ -7,6 +7,7 @@ on:
       - master
     paths: # If any of these files change, we need to regenerate integrations.js.
       - 'src/collectors/**/metadata.yaml'
+      - 'src/crates/**/metadata.yaml'
       - 'src/go/plugin/**/metadata.yaml'
       - 'src/exporting/**/metadata.yaml'
       - 'src/health/notifications/**/metadata.yaml'
@@ -28,7 +29,7 @@ jobs:
     steps:
       - name: Checkout Agent
         id: checkout-agent
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
           submodules: recursive
@@ -57,7 +58,7 @@ jobs:
         run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json
       - name: Create PR
         id: create-pr
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           commit-message: Regenerate integrations docs

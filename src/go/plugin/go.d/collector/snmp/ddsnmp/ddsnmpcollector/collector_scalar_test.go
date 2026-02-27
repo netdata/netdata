@@ -709,7 +709,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 			missingOIDs := make(map[string]bool)
 			collector := newScalarCollector(mockHandler, missingOIDs, logger.New())
 
-			result, err := collector.Collect(tc.profile)
+			var stats ddsnmp.CollectionStats
+			result, err := collector.collect(tc.profile, &stats)
 
 			if tc.expectedError {
 				assert.Error(t, err)

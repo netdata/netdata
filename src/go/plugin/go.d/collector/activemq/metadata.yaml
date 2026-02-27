@@ -6,14 +6,13 @@ modules:
       plugin_name: go.d.plugin
       monitored_instance:
         categories:
-          - data-collection.message-brokers
+          - data-collection.databases
         icon_filename: activemq.png
         name: ActiveMQ
         link: https://activemq.apache.org/
       alternative_monitored_instances: []
       keywords:
         - message broker
-      most_popular: false
       info_provided_to_referring_integrations:
         description: ""
       related_resources:

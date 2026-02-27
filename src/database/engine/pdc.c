@@ -388,7 +388,9 @@ static bool epdl_check_if_pages_are_already_in_cache(struct rrdengine_instance *
 // PDC logic
 
 static ALWAYS_INLINE void pdc_destroy(PDC *pdc) {
-    mrg_metric_release(main_mrg, pdc->metric);
+    if(pdc->metric)
+        mrg_metric_release(main_mrg, pdc->metric);
+
     completion_destroy(&pdc->prep_completion);
     completion_destroy(&pdc->page_completion);
 

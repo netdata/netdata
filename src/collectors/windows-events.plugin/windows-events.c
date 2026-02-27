@@ -1355,7 +1355,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // the event loop for functions
 
     struct functions_evloop_globals *wg =
-            functions_evloop_init(WINDOWS_EVENTS_WORKER_THREADS, "WEVT", &stdout_mutex, &plugin_should_exit);
+            functions_evloop_init(WINDOWS_EVENTS_WORKER_THREADS, "WEVT", &stdout_mutex, &plugin_should_exit, NULL);
 
     functions_evloop_add_function(wg,
                                   WEVT_FUNCTION_NAME,
@@ -1385,7 +1385,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
-    while(!plugin_should_exit) {
+    while(!__atomic_load_n(&plugin_should_exit, __ATOMIC_ACQUIRE)) {
 
         if(since_last_scan_ut > WINDOWS_EVENTS_SCAN_EVERY_USEC) {
             wevt_sources_scan();

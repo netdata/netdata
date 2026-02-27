@@ -6,11 +6,9 @@
 struct netdata_numa {
     RRDSET *st_numa;
     RRDDIM *rd_standby;
-    RRDDIM *rd_available;
     RRDDIM *rd_free_zero;
 
     COUNTER_DATA standby;
-    COUNTER_DATA available;
     COUNTER_DATA free_zero;
 };
 
@@ -21,7 +19,6 @@ static void numa_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *val
     struct netdata_numa *d = value;
 
     d->standby.key = "Standby List MBytes";
-    d->available.key = "Available MBytes";
     d->free_zero.key = "Free & Zero Page List MBytes";
 }
 
@@ -37,7 +34,7 @@ static void netdata_numa_chart(struct netdata_numa *nn, int update_every)
 {
     if (unlikely(!nn->st_numa)) {
         char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, RRD_ID_LENGTH_MAX, "numae_node_%s_mem_usage", windows_shared_buffer);
+        snprintfz(id, RRD_ID_LENGTH_MAX, "numa_node_%s_mem_usage", windows_shared_buffer);
 
         nn->st_numa = rrdset_create_localhost(
             "numa_node_mem_usage",
@@ -58,13 +55,9 @@ static void netdata_numa_chart(struct netdata_numa *nn, int update_every)
         nn->rd_free_zero = rrddim_add(nn->st_numa, "free", NULL, MEGA_FACTOR, 1, RRD_ALGORITHM_ABSOLUTE);
 
         nn->rd_standby = rrddim_add(nn->st_numa, "standby", NULL, MEGA_FACTOR, 1, RRD_ALGORITHM_ABSOLUTE);
-
-        nn->rd_available = rrddim_add(nn->st_numa, "available", NULL, MEGA_FACTOR, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(nn->st_numa, nn->rd_free_zero, (collected_number)nn->free_zero.current.Data);
-
-    rrddim_set_by_pointer(nn->st_numa, nn->rd_available, (collected_number)nn->available.current.Data);
 
     rrddim_set_by_pointer(nn->st_numa, nn->rd_standby, (collected_number)nn->standby.current.Data);
 
@@ -91,10 +84,9 @@ static bool do_numa(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         struct netdata_numa *nn = dictionary_set(numa_dict, windows_shared_buffer, NULL, sizeof(*nn));
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->standby) ||
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->available) ||
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->free_zero))
-            netdata_numa_chart(nn, update_every);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->standby);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &nn->free_zero);
+        netdata_numa_chart(nn, update_every);
     }
 
     return true;

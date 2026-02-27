@@ -2,6 +2,8 @@
 
 package mysql
 
+import "context"
+
 const (
 	queryShowSessionVariables = `
 SHOW SESSION VARIABLES 
@@ -15,13 +17,13 @@ const (
 	queryDisableSessionSlowQueryLog = "SET SESSION slow_query_log='OFF';"
 )
 
-func (c *Collector) disableSessionQueryLog() {
+func (c *Collector) disableSessionQueryLog(ctx context.Context) {
 	q := queryShowSessionVariables
 	c.Debugf("executing query: '%s'", q)
 
 	var sqlLogOff, slowQueryLog string
 	var name string
-	_, err := c.collectQuery(q, func(column, value string, _ bool) {
+	_, err := c.collectQuery(ctx, q, func(column, value string, _ bool) {
 		switch column {
 		case "Variable_name":
 			name = value
@@ -43,7 +45,7 @@ func (c *Collector) disableSessionQueryLog() {
 		// requires SUPER privileges
 		q = queryDisableSessionQueryLog
 		c.Debugf("executing query: '%s'", q)
-		if _, err := c.collectQuery(q, func(_, _ string, _ bool) {}); err != nil {
+		if _, err := c.collectQuery(ctx, q, func(_, _ string, _ bool) {}); err != nil {
 			c.Infof("failed to disable session query log (sql_log_off): %v", err)
 			c.doDisableSessionQueryLog = false
 		}
@@ -51,7 +53,7 @@ func (c *Collector) disableSessionQueryLog() {
 	if slowQueryLog == "ON" {
 		q = queryDisableSessionSlowQueryLog
 		c.Debugf("executing query: '%s'", q)
-		if _, err := c.collectQuery(q, func(_, _ string, _ bool) {}); err != nil {
+		if _, err := c.collectQuery(ctx, q, func(_, _ string, _ bool) {}); err != nil {
 			c.Debugf("failed to disable session slow query log (slow_query_log): %v", err)
 		}
 	}

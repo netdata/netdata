@@ -34,13 +34,13 @@ If your Agent is v1.22 or older, you may to enable the collector yourself.
 
 To enable or disable the entire eBPF collector:
 
-1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
 
     ```bash
     cd /etc/netdata
     ```
 
-2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script to edit `netdata.conf`.
+2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script to edit `netdata.conf`.
 
     ```bash
     ./edit-config netdata.conf
@@ -60,13 +60,13 @@ You can configure the eBPF collector's behavior to fine-tune which metrics you r
 
 To edit the `ebpf.d.conf`:
 
-1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
 
     ```bash
     cd /etc/netdata
     ```
 
-2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script to edit [`ebpf.d.conf`](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/ebpf.d.conf).
+2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script to edit [`ebpf.d.conf`](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/ebpf.d.conf).
 
     ```bash
     ./edit-config ebpf.d.conf
@@ -262,13 +262,13 @@ You can configure each thread of the eBPF data collector. This allows you to ove
 
 To configure an eBPF thread:
 
-1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
 
     ```bash
     cd /etc/netdata
     ```
 
-2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script to edit a thread configuration file. The following configuration files are available:
+2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script to edit a thread configuration file. The following configuration files are available:
 
     - `network.conf`: Configuration for the [`network` thread](#network-configuration). This config file overwrites the global options and also
         lets you specify which network the eBPF collector monitors.

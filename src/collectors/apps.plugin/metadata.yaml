@@ -8,7 +8,7 @@ modules:
         name: Applications
         link: ""
         categories:
-          - data-collection.processes-and-system-services
+          - data-collection.operating-systems
         icon_filename: "applications.svg"
       related_resources:
         integrations:
@@ -20,7 +20,6 @@ modules:
         - processes
         - os
         - host monitoring
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor Applications for optimal software performance and resource usage."
@@ -197,7 +196,7 @@ modules:
         name: User Groups
         link: ""
         categories:
-          - data-collection.processes-and-system-services
+          - data-collection.operating-systems
         icon_filename: "user.svg"
       related_resources:
         integrations:
@@ -211,7 +210,6 @@ modules:
         - authorization
         - os
         - host monitoring
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors resource utilization on a user groups context."
@@ -388,7 +386,7 @@ modules:
         name: Users
         link: ""
         categories:
-          - data-collection.processes-and-system-services
+          - data-collection.operating-systems
         icon_filename: "users.svg"
       related_resources:
         integrations:
@@ -400,7 +398,6 @@ modules:
         - processes
         - os
         - host monitoring
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors resource utilization on a user context."

@@ -283,6 +283,15 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
 #endif
 
     metric = mrg_metric_dup(main_mrg, metric);
+    if(!metric) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(is_1st_metric_writer)
+            mrg_metric_clear_writer(main_mrg, (METRIC *)smh);
+        else
+            __atomic_sub_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
+#endif
+        return NULL;
+    }
 
     struct rrdeng_collect_handle *handle;
 

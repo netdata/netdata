@@ -310,8 +310,11 @@ func enrichProfiles(profiles []*Profile) {
 					continue
 				}
 
-				if tagCfg.MappingRef == "ifType" {
+				switch tagCfg.MappingRef {
+				case "ifType":
 					tagCfg.Mapping = sharedMappings.ifType
+				case "ifTypeGroup":
+					tagCfg.Mapping = sharedMappings.ifTypeGroup
 				}
 			}
 		}

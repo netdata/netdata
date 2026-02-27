@@ -1,0 +1,12 @@
+[package]
+name = "netdata-plugin-types"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+netdata-plugin-error = { path = "../error" }
+bitflags = { workspace = true }
+serde_json = { workspace = true }

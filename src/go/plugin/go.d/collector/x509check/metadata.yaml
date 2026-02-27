@@ -8,12 +8,11 @@ modules:
         name: X.509 certificate
         link: ""
         categories:
-          - data-collection.synthetic-checks
+          - data-collection.synthetic-testing
         icon_filename: lock.svg
       keywords:
         - x509
         - certificate
-      most_popular: false
       info_provided_to_referring_integrations:
         description: ""
       related_resources:

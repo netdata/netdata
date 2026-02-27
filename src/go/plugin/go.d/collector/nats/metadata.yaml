@@ -8,7 +8,7 @@ modules:
         name: NATS
         link: https://nats.io/
         categories:
-          - data-collection.message-brokers
+          - data-collection.databases
         icon_filename: nats.svg
       related_resources:
         integrations:
@@ -20,7 +20,6 @@ modules:
         - nats
         - messaging
         - broker
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

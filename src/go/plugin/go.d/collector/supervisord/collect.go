@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -113,7 +113,7 @@ func (c *Collector) addProcessToCharts(p processStatus) {
 		default:
 			continue
 		}
-		dim := &module.Dim{ID: dimID, Name: p.name}
+		dim := &collectorapi.Dim{ID: dimID, Name: p.name}
 		if err := chart.AddDim(dim); err != nil {
 			c.Warning(err)
 			return

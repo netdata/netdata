@@ -25,5 +25,12 @@
   "collect_node_stats": true,
   "collect_cluster_health": true,
   "collect_cluster_stats": true,
-  "collect_indices_stats": true
+  "collect_indices_stats": true,
+  "functions": {
+    "top_queries": {
+      "disabled": true,
+      "timeout": 123.123,
+      "limit": 123
+    }
+  }
 }

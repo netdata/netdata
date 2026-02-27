@@ -2,13 +2,13 @@
 
 package lighttpd
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Dims is an alias for module.Dims
-	Dims = module.Dims
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Dims is an alias for collectorapi.Dims
+	Dims = collectorapi.Dims
 )
 
 var charts = Charts{
@@ -19,7 +19,7 @@ var charts = Charts{
 		Fam:   "requests",
 		Ctx:   "lighttpd.requests",
 		Dims: Dims{
-			{ID: "total_accesses", Name: "requests", Algo: module.Incremental},
+			{ID: "total_accesses", Name: "requests", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -28,9 +28,9 @@ var charts = Charts{
 		Units: "kilobits/s",
 		Fam:   "bandwidth",
 		Ctx:   "lighttpd.net",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
-			{ID: "total_kBytes", Name: "sent", Algo: module.Incremental, Mul: 8},
+			{ID: "total_kBytes", Name: "sent", Algo: collectorapi.Incremental, Mul: 8},
 		},
 	},
 	{
@@ -39,7 +39,7 @@ var charts = Charts{
 		Units: "servers",
 		Fam:   "servers",
 		Ctx:   "lighttpd.workers",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: "idle_servers", Name: "idle"},
 			{ID: "busy_servers", Name: "busy"},

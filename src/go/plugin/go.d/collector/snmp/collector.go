@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -24,18 +24,20 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("snmp", module.Creator{
+	collectorapi.Register("snmp", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create: func() module.Module { return New() },
-		Config: func() any { return &Config{} },
+		Create:        func() collectorapi.CollectorV1 { return New() },
+		Config:        func() any { return &Config{} },
+		Methods:       snmpMethods,
+		MethodHandler: snmpFunctionHandler,
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			CreateVnode:              true,
 			VnodeDeviceDownThreshold: 3,
@@ -64,9 +66,12 @@ func New() *Collector {
 			},
 		},
 
-		charts:            &module.Charts{},
+		charts:            &collectorapi.Charts{},
 		seenScalarMetrics: make(map[string]bool),
 		seenTableMetrics:  make(map[string]bool),
+		seenProfiles:      make(map[string]bool),
+
+		ifaceCache: newIfaceCache(),
 
 		newProber:     ping.NewProber,
 		newSnmpClient: gosnmp.NewHandler,
@@ -74,18 +79,26 @@ func New() *Collector {
 			return ddsnmpcollector.New(cfg)
 		},
 	}
+
+	c.funcRouter = newFuncRouter(c.ifaceCache)
+
+	return c
 }
 
 type (
 	Collector struct {
-		module.Base
+		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
 		vnode *vnodes.VirtualNode
 
-		charts            *module.Charts
+		charts            *collectorapi.Charts
 		seenScalarMetrics map[string]bool
 		seenTableMetrics  map[string]bool
+		seenProfiles      map[string]bool
+
+		ifaceCache *ifaceCache // interface metrics cache for functions
+		funcRouter *funcRouter // function router for method handlers
 
 		prober    ping.Prober
 		newProber func(ping.ProberConfig, *logger.Logger) ping.Prober
@@ -149,7 +162,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
@@ -166,7 +179,10 @@ func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.snmpClient != nil {
 		_ = c.snmpClient.Close()
 	}

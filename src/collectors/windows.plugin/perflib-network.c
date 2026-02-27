@@ -271,7 +271,7 @@ struct network_protocol {
         .packets =
             {
                 .InEchoReps = {.key = "Received Echo Reply/sec"},
-                .OutEchoReps = {.key = "Received Echo Reply/sec"},
+                .OutEchoReps = {.key = "Sent Echo Reply/sec"},
                 .InDestUnreachs = {.key = "Received Dest. Unreachable"},
                 .OutDestUnreachs = {.key = "Sent Destination Unreachable"},
                 .InRedirects = {.key = "Received Redirect/sec"},
@@ -304,7 +304,7 @@ struct network_protocol {
         .packets =
             {
                 .InEchoReps = {.key = "Received Echo Reply/sec"},
-                .OutEchoReps = {.key = "Received Echo Reply/sec"},
+                .OutEchoReps = {.key = "Sent Echo Reply/sec"},
                 .InDestUnreachs = {.key = "Received Dest. Unreachable"},
                 .OutDestUnreachs = {.key = "Sent Destination Unreachable"},
                 .InRedirects = {.key = "Received Redirect/sec"},

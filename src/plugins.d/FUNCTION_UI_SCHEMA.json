@@ -1,0 +1,253 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Netdata Functions UI Response",
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status": {
+      "type": "integer"
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/definitions/info_response" },
+    { "$ref": "#/definitions/data_response" },
+    { "$ref": "#/definitions/error_response" },
+    { "$ref": "#/definitions/not_modified_response" }
+  ],
+  "definitions": {
+    "field_type": {
+      "type": "string",
+      "enum": [
+        "none",
+        "integer",
+        "float",
+        "boolean",
+        "string",
+        "detail-string",
+        "bar-with-integer",
+        "duration",
+        "timestamp",
+        "array",
+        "feedTemplate"
+      ]
+    },
+    "field_visual": {
+      "type": "string",
+      "enum": [
+        "value",
+        "bar",
+        "pill",
+        "richValue",
+        "rowOptions",
+        "feedTemplate"
+      ]
+    },
+    "field_transform": {
+      "type": "string",
+      "enum": [
+        "none",
+        "number",
+        "duration",
+        "datetime",
+        "datetime_usec",
+        "xml",
+        "text"
+      ]
+    },
+    "field_sort": {
+      "type": "string",
+      "enum": ["ascending", "descending"]
+    },
+    "field_summary": {
+      "type": "string",
+      "enum": ["count", "uniqueCount", "sum", "min", "max", "mean", "median"]
+    },
+    "field_filter": {
+      "type": "string",
+      "enum": ["none", "range", "multiselect", "facet"]
+    },
+    "value_options": {
+      "type": "object",
+      "properties": {
+        "units": { "type": ["string", "null"] },
+        "transform": { "$ref": "#/definitions/field_transform" },
+        "decimal_points": { "type": "integer", "minimum": 0 },
+        "default_value": { "type": ["string", "number", "boolean", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "column": {
+      "type": "object",
+      "required": ["index", "name", "type"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "unique_key": { "type": "boolean" },
+        "name": { "type": "string" },
+        "type": { "$ref": "#/definitions/field_type" },
+        "units": { "type": ["string", "null"] },
+        "visualization": { "$ref": "#/definitions/field_visual" },
+        "value_options": { "$ref": "#/definitions/value_options" },
+        "max": { "type": "number" },
+        "pointer_to": { "type": ["string", "null"] },
+        "sort": { "$ref": "#/definitions/field_sort" },
+        "sortable": { "type": "boolean" },
+        "sticky": { "type": "boolean" },
+        "summary": { "$ref": "#/definitions/field_summary" },
+        "filter": { "$ref": "#/definitions/field_filter" },
+        "full_width": { "type": "boolean" },
+        "wrap": { "type": "boolean" },
+        "default_expanded_filter": { "type": "boolean" },
+        "dummy": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "columns": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/column" }
+    },
+    "required_param_option": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "defaultSelected": { "type": "boolean" },
+        "disabled": { "type": "boolean" },
+        "sort": { "$ref": "#/definitions/field_sort" }
+      },
+      "additionalProperties": true
+    },
+    "required_param": {
+      "type": "object",
+      "required": ["id", "name", "type", "options"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "enum": ["select", "multiselect"] },
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/required_param_option" }
+        },
+        "help": { "type": "string" },
+        "unique_view": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "accepted_params": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "required_params": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/required_param" }
+    },
+    "chart_config": {
+      "type": "object",
+      "required": ["name", "type", "columns"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "group_by_config": {
+      "type": "object",
+      "required": ["name", "columns"],
+      "properties": {
+        "name": { "type": "string" },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "info_response": {
+      "type": "object",
+      "required": ["status", "type", "has_history", "accepted_params", "required_params", "v"],
+      "properties": {
+        "status": { "type": "integer" },
+        "type": { "type": "string" },
+        "has_history": { "type": "boolean" },
+        "accepted_params": { "$ref": "#/definitions/accepted_params" },
+        "required_params": { "$ref": "#/definitions/required_params" },
+        "v": { "type": "integer" },
+        "help": { "type": "string" },
+        "update_every": { "type": "integer" },
+        "expires": { "type": "integer" }
+      },
+      "allOf": [
+        { "not": { "required": ["columns"] } },
+        { "not": { "required": ["data"] } }
+      ],
+      "additionalProperties": true
+    },
+    "data_response": {
+      "type": "object",
+      "required": ["status", "type", "columns", "data"],
+      "properties": {
+        "status": { "type": "integer" },
+        "type": { "type": "string", "enum": ["table", "log"] },
+        "columns": { "$ref": "#/definitions/columns" },
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "has_history": { "type": "boolean" },
+        "accepted_params": { "$ref": "#/definitions/accepted_params" },
+        "required_params": { "$ref": "#/definitions/required_params" },
+        "help": { "type": "string" },
+        "update_every": { "type": "integer" },
+        "expires": { "type": "integer" },
+        "default_sort_column": { "type": "string" },
+        "group_by": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/group_by_config" }
+        },
+        "charts": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/chart_config" }
+        },
+        "default_charts": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "facets": { "type": ["array", "object"] },
+        "histogram": { "type": "object" },
+        "items": { "type": "object" },
+        "pagination": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "error_response": {
+      "type": "object",
+      "required": ["status", "errorMessage"],
+      "properties": {
+        "status": { "type": "integer", "minimum": 400 },
+        "errorMessage": { "type": "string" },
+        "error": { "type": "string" },
+        "message": { "type": "string" },
+        "help": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "not_modified_response": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "const": 304 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

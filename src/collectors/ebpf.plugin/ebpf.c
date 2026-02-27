@@ -1126,7 +1126,7 @@ void ebpf_stop_threads(int sig)
             nd_thread_join(ebpf_threads[i].thread);
     }
 
-    ebpf_plugin_exit = true;
+    __atomic_store_n(&ebpf_plugin_exit, true, __ATOMIC_RELEASE);
 
     netdata_mutex_lock(&mutex_cgroup_shm);
     nd_thread_signal_cancel(cgroup_integration_thread.thread);

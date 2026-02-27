@@ -1,0 +1,26 @@
+{
+  "update_every": 123,
+  "autodetection_retry": 123,
+  "vnode": "vnode",
+  "url": "http://127.0.0.1:9400/metrics",
+  "timeout": 123.123,
+  "max_time_series": 3210,
+  "max_time_series_per_metric": 321,
+  "username": "username",
+  "password": "password",
+  "bearer_token_file": "/tmp/token",
+  "proxy_url": "http://127.0.0.1:3128",
+  "proxy_username": "proxy-user",
+  "proxy_password": "proxy-pass",
+  "headers": {
+    "X-Test": "1"
+  },
+  "tls_skip_verify": true,
+  "tls_ca": "/tmp/ca.crt",
+  "tls_cert": "/tmp/client.crt",
+  "tls_key": "/tmp/client.key",
+  "body": "hello",
+  "method": "POST",
+  "not_follow_redirects": true,
+  "force_http2": true
+}

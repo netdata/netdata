@@ -3,55 +3,55 @@
 package httpcheck
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioResponseTime = module.Priority + iota
+	prioResponseTime = collectorapi.Priority + iota
 	prioResponseLength
 	prioResponseStatus
 	prioResponseInStatusDuration
 )
 
-var httpCheckCharts = module.Charts{
+var httpCheckCharts = collectorapi.Charts{
 	responseTimeChart.Copy(),
 	responseLengthChart.Copy(),
 	responseStatusChart.Copy(),
 	responseInStatusDurationChart.Copy(),
 }
 
-var responseTimeChart = module.Chart{
+var responseTimeChart = collectorapi.Chart{
 	ID:       "response_time",
 	Title:    "HTTP Response Time",
 	Units:    "ms",
 	Fam:      "response",
 	Ctx:      "httpcheck.response_time",
 	Priority: prioResponseTime,
-	Dims: module.Dims{
+	Dims: collectorapi.Dims{
 		{ID: "time"},
 	},
 }
 
-var responseLengthChart = module.Chart{
+var responseLengthChart = collectorapi.Chart{
 	ID:       "response_length",
 	Title:    "HTTP Response Body Length",
 	Units:    "characters",
 	Fam:      "response",
 	Ctx:      "httpcheck.response_length",
 	Priority: prioResponseLength,
-	Dims: module.Dims{
+	Dims: collectorapi.Dims{
 		{ID: "length"},
 	},
 }
 
-var responseStatusChart = module.Chart{
+var responseStatusChart = collectorapi.Chart{
 	ID:       "request_status",
 	Title:    "HTTP Check Status",
 	Units:    "boolean",
 	Fam:      "status",
 	Ctx:      "httpcheck.status",
 	Priority: prioResponseStatus,
-	Dims: module.Dims{
+	Dims: collectorapi.Dims{
 		{ID: "success"},
 		{ID: "no_connection"},
 		{ID: "timeout"},
@@ -62,14 +62,14 @@ var responseStatusChart = module.Chart{
 	},
 }
 
-var responseInStatusDurationChart = module.Chart{
+var responseInStatusDurationChart = collectorapi.Chart{
 	ID:       "current_state_duration",
 	Title:    "HTTP Current State Duration",
 	Units:    "seconds",
 	Fam:      "status",
 	Ctx:      "httpcheck.in_state",
 	Priority: prioResponseInStatusDuration,
-	Dims: module.Dims{
+	Dims: collectorapi.Dims{
 		{ID: "in_state", Name: "time"},
 	},
 }

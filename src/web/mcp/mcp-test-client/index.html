@@ -2078,7 +2078,54 @@
                     });
                 }
             }
-            
+
+            // Add dynamic methods for prompts
+            if (flowName === 'prompts' && Object.keys(availablePrompts).length > 0) {
+                for (const [promptName, prompt] of Object.entries(availablePrompts)) {
+                    allMethods.push({
+                        name: promptName,
+                        title: prompt.title || '',
+                        type: 'request',
+                        description: prompt.description || 'No description available',
+                        dynamic: true,
+                        promptName: promptName,
+                        schema: prompt,
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "prompts/get",
+                            params: {
+                                name: promptName,
+                                arguments: {}
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Add dynamic methods for resources
+            if (flowName === 'resources' && Object.keys(availableResources).length > 0) {
+                for (const [resourceUri, resource] of Object.entries(availableResources)) {
+                    allMethods.push({
+                        name: resource.name || resourceUri,
+                        title: resourceUri,
+                        type: 'request',
+                        description: resource.description || 'No description available',
+                        dynamic: true,
+                        resourceUri: resourceUri,
+                        schema: resource,
+                        template: {
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "resources/read",
+                            params: {
+                                uri: resourceUri
+                            }
+                        }
+                    });
+                }
+            }
+
             // Add history for custom flow
             if (flowName === 'custom') {
                 const savedHistory = loadRequestHistory();
@@ -2552,18 +2599,17 @@
                         10000,
                         'Prompts list request timed out'
                     );
+                    if (promptsResponse && promptsResponse.error) {
+                        log('⚠ Prompts list failed: ' + JSON.stringify(promptsResponse.error));
+                    } else {
+                        const promptCount = promptsResponse && promptsResponse.result && promptsResponse.result.prompts
+                            ? promptsResponse.result.prompts.length
+                            : 0;
+                        log('✓ Prompts list received (' + promptCount + ' prompts)');
+                    }
                 } catch (err) {
                     pendingRequests.delete(promptsRequest.id);
-                    throw err;
-                }
-
-                if (promptsResponse && promptsResponse.error) {
-                    log('⚠ Prompts list failed: ' + JSON.stringify(promptsResponse.error));
-                } else {
-                    const promptCount = promptsResponse && promptsResponse.result && promptsResponse.result.prompts
-                        ? promptsResponse.result.prompts.length
-                        : 0;
-                    log('✓ Prompts list received (' + promptCount + ' prompts)');
+                    log('⚠ Prompts list skipped: ' + err.message);
                 }
 
                 // Step 6: Request resources list
@@ -2581,18 +2627,17 @@
                         10000,
                         'Resources list request timed out'
                     );
+                    if (resourcesResponse && resourcesResponse.error) {
+                        log('⚠ Resources list failed: ' + JSON.stringify(resourcesResponse.error));
+                    } else {
+                        const resourceCount = resourcesResponse && resourcesResponse.result && resourcesResponse.result.resources
+                            ? resourcesResponse.result.resources.length
+                            : 0;
+                        log('✓ Resources list received (' + resourceCount + ' resources)');
+                    }
                 } catch (err) {
                     pendingRequests.delete(resourcesRequest.id);
-                    throw err;
-                }
-
-                if (resourcesResponse && resourcesResponse.error) {
-                    log('⚠ Resources list failed: ' + JSON.stringify(resourcesResponse.error));
-                } else {
-                    const resourceCount = resourcesResponse && resourcesResponse.result && resourcesResponse.result.resources
-                        ? resourcesResponse.result.resources.length
-                        : 0;
-                    log('✓ Resources list received (' + resourceCount + ' resources)');
+                    log('⚠ Resources list skipped: ' + err.message);
                 }
 
                 // Step 7: Switch UI to tools flow
@@ -3227,8 +3272,13 @@
                     availablePrompts[prompt.name] = prompt;
                 });
                 log(`Loaded ${Object.keys(availablePrompts).length} prompts`);
+                // Refresh prompts methods if currently viewing
+                const activeFlow = document.querySelector('.flow-item.active');
+                if (activeFlow && activeFlow.dataset.flow === 'prompts') {
+                    displayMethods('prompts');
+                }
             }
-            
+
             // Handle resources/list response
             if (response.result && response.result.resources) {
                 availableResources = {};
@@ -3236,6 +3286,11 @@
                     availableResources[resource.uri] = resource;
                 });
                 log(`Loaded ${Object.keys(availableResources).length} resources`);
+                // Refresh resources methods if currently viewing
+                const activeFlow = document.querySelector('.flow-item.active');
+                if (activeFlow && activeFlow.dataset.flow === 'resources') {
+                    displayMethods('resources');
+                }
             }
         }
         

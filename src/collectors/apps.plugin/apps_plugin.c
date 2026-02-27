@@ -381,7 +381,7 @@ cleanup:
 static bool profile_speed = false;
 static bool print_tree_and_exit = false;
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
-int pss_refresh_period = 300; // seconds
+int pss_refresh_period = 0; // disabled by default
 #endif
 
 static void parse_args(int argc, char **argv)
@@ -586,9 +586,9 @@ static void parse_args(int argc, char **argv)
                     "                        (default is %d seconds)\n"
                     "\n"
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
-                    " --pss TIME            estimated memory interval (e.g. 5m, 300s)\n"
-                    "                        use 'off' to disable smaps sampling\n"
-                    "                        (default is 5 minutes)\n"
+                    " --pss TIME            enable estimated memory using PSS sampling at the given interval\n"
+                    "                        (e.g. 5m, 300s). Use 'off' or '0' to disable.\n"
+                    "                        (default is off)\n"
                     "\n"
 #endif
 #endif
@@ -784,12 +784,13 @@ int main(int argc, char **argv) {
 
     apps_pids_init();
     OS_FUNCTION(apps_os_init)();
+    int exit_status = 0;
 
     // ------------------------------------------------------------------------
     // the event loop for functions
 
     struct functions_evloop_globals *wg =
-            functions_evloop_init(1, "APPS", &apps_and_stdout_mutex, &apps_plugin_exit);
+        functions_evloop_init(1, "APPS", &apps_and_stdout_mutex, &apps_plugin_exit, &exit_status);
 
     functions_evloop_add_function(wg, "processes", function_processes, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
 
@@ -801,7 +802,7 @@ int main(int argc, char **argv) {
     global_iterations_counter = 1;
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
-    for(; !apps_plugin_exit ; global_iterations_counter++) {
+    for (; !__atomic_load_n(&apps_plugin_exit, __ATOMIC_ACQUIRE); global_iterations_counter++) {
         netdata_mutex_unlock(&apps_and_stdout_mutex);
 
         usec_t dt;
@@ -881,4 +882,5 @@ int main(int argc, char **argv) {
         debug_log("done Loop No %zu", global_iterations_counter);
     }
     netdata_mutex_unlock(&apps_and_stdout_mutex);
+    exit(exit_status);
 }

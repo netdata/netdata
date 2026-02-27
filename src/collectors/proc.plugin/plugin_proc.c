@@ -113,37 +113,35 @@ bool is_mem_swap_enabled = false;
 bool is_mem_zswap_enabled = false;
 bool is_mem_ksm_enabled = false;
 
-static bool is_lxcfs_proc_mounted() {
-    procfile *ff = NULL;
+bool is_lxcfs_proc_mounted(void) {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "/proc/self/mounts");
 
-    if (unlikely(!ff)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "/proc/self/mounts");
-        ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
-        if (unlikely(!ff))
-            return false;
-    }
+    procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+    if (unlikely(!ff))
+        return false;
 
     ff = procfile_readall(ff);
     if (unlikely(!ff))
         return false;
 
-    unsigned long l, lines = procfile_lines(ff);
+    bool found = false;
+    unsigned long lines = procfile_lines(ff);
 
-    for (l = 0; l < lines; l++) {
+    for (unsigned long l = 0; l < lines; l++) {
         size_t words = procfile_linewords(ff, l);
-        if (words < 2) {
+        if (words < 2)
             continue;
+
+        if (!strcmp(procfile_lineword(ff, l, 0), "lxcfs") &&
+            !strncmp(procfile_lineword(ff, l, 1), "/proc", 5)) {
+            found = true;
+            break;
         }
-        if (!strcmp(procfile_lineword(ff, l, 0), "lxcfs") && !strncmp(procfile_lineword(ff, l, 1), "/proc", 5)) {
-            procfile_close(ff);
-            return true;   
-        }            
     }
 
     procfile_close(ff);
-
-    return false;
+    return found;
 }
 
 static bool is_ksm_enabled() {
