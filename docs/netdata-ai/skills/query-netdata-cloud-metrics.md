@@ -1,14 +1,14 @@
-# Skill: Query Netdata Cloud Metrics
-
-Help users query time-series metrics from Netdata Cloud via the REST API.
+# Query time-series metrics from Netdata Cloud via the REST API.
 
 ## Mandatory Requirements (READ FIRST)
 
-1. You provide detailed and actionable instructions. You don't execute queries for users.
+1. You MUST provide detailed and actionable instructions. You don't execute queries for users. You role is to educate them.
 
 2. **Never ask users for credentials.** Do not request API tokens, Space IDs, or Room IDs. Always provide ready-to-use instructions with clear placeholders (`YOUR_API_TOKEN`, `YOUR_SPACE_ID`, `YOUR_ROOM_ID`) so users can substitute their own values locally. Your job is to teach users how to construct queries, not to execute queries on their behalf.
 
-3. **Every response MUST include a complete, runnable curl command.** Users come here to get a query they can run — not a description of what a query would look like. If your response does not contain a full curl command with the complete JSON request body, you have failed to help the user. Specifically:
+3. **`scope.contexts` MUST always be set.** Without it, the default scope is the entire room — every context, every instance, every dimension, every label across all nodes. This causes a **metadata explosion**: the response will contain megabytes of metadata for thousands of metrics the user didn't ask about. Always set `scope.contexts` to the specific context(s) relevant to the query (e.g., `["system.cpu"]`, `["disk.space"]`).
+
+4. **Every response MUST include a complete, runnable curl command.** Users come here to get a query they can run — not a description of what a query would look like. If your response does not contain a full curl command with the complete JSON request body, you have failed to help the user. Specifically:
    - Always include the full `curl -X POST` command with headers, URL, and the entire `-d '{...}'` JSON body.
    - The JSON body must include all required fields: `scope`, `selectors`, `window`, `aggregations`, `format`, `options`, and `timeout`.
    - Set the 3 credentials as variables at the top: `TOKEN="YOUR_API_TOKEN"`, `SPACE="YOUR_SPACE_ID"`, `ROOM="YOUR_ROOM_ID"`.
@@ -131,7 +131,7 @@ Contexts are metric types (e.g., `system.cpu`, `disk.space`, `net.net`).
 {
   "scope": {
     "nodes": [],
-    "contexts": [],
+    "contexts": ["REQUIRED — e.g. system.cpu, disk.space"],
     "instances": [],
     "dimensions": [],
     "labels": []
@@ -167,7 +167,7 @@ Contexts are metric types (e.g., `system.cpu`, `disk.space`, `net.net`).
     }
   },
   "format": "json2",
-  "options": [],
+  "options": ["jsonwrap", "minify", "unaligned"],
   "timeout": 10000,
   "limit": null
 }
@@ -179,26 +179,29 @@ Contexts are metric types (e.g., `system.cpu`, `disk.space`, `net.net`).
 
 Scope controls **both data and metadata** in the response. Use scope fields for filtering so that the response metadata is focused on what you asked for.
 
+**WARNING**: The default scope (when fields are omitted) is **all nodes and all contexts in the room**. This can produce multi-megabyte responses with metadata for thousands of metrics. `scope.contexts` MUST always be set to avoid this metadata explosion.
+
 | Field | Type | Accepts | Default (if omitted) |
 |-------|------|---------|---------------------|
 | `nodes` | `string[]` | **Node UUIDs only** (the `nd` field from `/nodes`) | All nodes in the room |
-| `contexts` | `string[]` | Exact names or patterns (`system.*`, `*cpu*`) | All contexts |
+| `contexts` | `string[]` | Exact names or patterns (`system.*`, `*cpu*`) | **REQUIRED** — always set to avoid metadata explosion |
 | `instances` | `string[]` | Exact names or patterns (`disk_space./@NODE_UUID`) | All instances |
 | `dimensions` | `string[]` | Exact names or patterns (`*user*`, `sent`) | All dimensions |
 | `labels` | `string[]` | `key:value` pairs (`filesystem:btrfs`, `mount_point:/`) | No label filter |
 
 Multiple entries in the same field are OR-combined. Multiple `labels` entries with different keys are AND-combined.
 
-**LIMITATION: `scope.nodes` accepts only node UUIDs.** Hostnames, hostname patterns, machine GUIDs, and wildcards do not work via the Cloud API. To filter by node:
-1. Call `/nodes` to get UUIDs (the `nd` field)
-2. Use those UUIDs in `scope.nodes`
-3. Omit `scope.nodes` entirely to include all nodes
+**Filtering by node**: Use `selectors.nodes` with hostname patterns (e.g., `["web*", "prod-*"]`). This is the simplest and preferred approach. Metadata will include all nodes in the room, but data will be filtered correctly.
+
+**Advanced**: `scope.nodes` restricts both data AND metadata, but it only accepts node UUIDs (the `nd` field from `/nodes`). Hostnames, patterns, and wildcards do not work. Use this only when you need tight metadata scoping — otherwise prefer `selectors.nodes`.
+
+CRITICAL: `scope.contexts` MUST always be set. The context is the metric type shown next to the chart title on the Netdata dashboard (e.g., `system.cpu`, `disk.space`). Clicking it copies it to the clipboard.
 
 ---
 
 ### selectors — Further Filter Data Within the Scope
 
-Selectors filter **data only** — response metadata still reflects the full scope. For programmatic API queries, use `scope` for filtering and set all selectors to `["*"]`.
+Selectors filter **data only** — response metadata still reflects the full scope (the room). For programmatic API queries, use `scope` for filtering and set all selectors to `["*"]`.
 
 Selectors exist for the Netdata dashboard, which needs full metadata to show context ("the whole") while displaying a filtered subset.
 
@@ -211,7 +214,9 @@ Selectors exist for the Netdata dashboard, which needs full metadata to show con
 | `labels` | `string[]` | `name:value` of all labels | Simple patterns (negative not recommended) |
 | `alerts` | `string[]` | Alert name, `name:status` (CLEAR, WARNING, CRITICAL, REMOVED, UNDEFINED, UNINITIALIZED) | Simple patterns; negative excludes instances |
 
-**Note:** `selectors.nodes` is the only way to filter by hostname pattern via the Cloud API. Use it when you cannot look up UUIDs first, but be aware metadata will include all nodes in scope.
+**`selectors.nodes` is the preferred way to filter by node.** It accepts hostname patterns (e.g., `["web*", "!staging*"]`), making it simpler than looking up UUIDs for `scope.nodes`. Metadata will include all nodes in scope, but data is filtered correctly.
+
+CRITICAL: `scope.contexts` MUST always be set to avoid metadata explosion.
 
 ---
 
@@ -315,26 +320,8 @@ Controls how raw data points within each time interval are combined into one val
 | `incremental-sum` | | Difference between last and first value in interval |
 | `countif` | | Count values matching condition. Set condition in `time_group_options`: `">0"`, `"=0"`, `"!=0"`, `"<=10"` |
 | `percentile` | | Percentile. Set percentile value in `time_group_options`: `"95"`, `"99"` |
-| `percentile25` | | 25th percentile (no options needed) |
-| `percentile50` | | 50th percentile |
-| `percentile75` | | 75th percentile |
-| `percentile80` | | 80th percentile |
-| `percentile90` | | 90th percentile |
-| `percentile95` | | 95th percentile |
-| `percentile97` | | 97th percentile |
-| `percentile98` | | 98th percentile |
-| `percentile99` | | 99th percentile |
 | `trimmed-mean` | | Mean after trimming outliers. Set trim % in `time_group_options` |
-| `trimmed-mean1` | | Trimmed mean, 1% trim |
-| `trimmed-mean2` | | Trimmed mean, 2% trim |
-| `trimmed-mean3` | | Trimmed mean, 3% trim |
-| `trimmed-mean5` | | Trimmed mean, 5% trim |
-| `trimmed-mean10` | | Trimmed mean, 10% trim |
-| `trimmed-mean15` | | Trimmed mean, 15% trim |
-| `trimmed-mean20` | | Trimmed mean, 20% trim |
-| `trimmed-mean25` | | Trimmed mean, 25% trim |
 | `trimmed-median` | | Median after trimming outliers. Set trim % in `time_group_options` |
-| `trimmed-median1` through `trimmed-median25` | | Same variants as trimmed-mean |
 
 IMPORTANT: when specifying any time_group except `min`, `max`, `avg`, `sum`, you MUST specify tier=0 to ensure a non-aggregated tier is used.
 
@@ -405,9 +392,10 @@ Array of strings. Each option modifies the response behavior.
 |--------|-------------|
 | `jsonwrap` | **Recommended.** Wraps the result with metadata (summary, view, db, timings) |
 | `minify` | **Recommended.** Minimizes JSON output size |
+| `unaligned` | **Recommended for API queries.** Without this, time intervals are aligned to wall-clock boundaries based on the requested period (e.g., 1-hour queries snap to 00:00–01:00). This is useful for dashboards (prevents charts from "dancing" on refresh) but confusing for API users who expect data for the exact time range they requested. Always use `unaligned` for programmatic queries. |
 | `nonzero` | Exclude dimensions that have only zero values |
 | `null2zero` | Replace null values with zero |
-| `abs` | Take absolute value of all data |
+| `abs` | Return the absolute value of all data |
 | `absolute` | Same as `abs` |
 | `display-absolute` | Display absolute values |
 | `flip` | Flip the sign of values (multiply by -1) |
@@ -417,24 +405,15 @@ Array of strings. Each option modifies the response behavior.
 | `seconds` | Return timestamps as seconds |
 | `ms` | Return timestamps as milliseconds |
 | `milliseconds` | Same as `ms` |
-| `unaligned` | Do not align time intervals to round boundaries |
 | `match-ids` | Match dimensions by ID only (not name) |
 | `match-names` | Match dimensions by name only (not ID) |
 | `anomaly-bit` | Return anomaly rate instead of metric values |
-| `jw-anomaly-rates` | Include anomaly rates in jsonwrap metadata |
-| `details` | Include additional detail information |
-| `group-by-labels` | Include label information in view.dimensions for group-by results |
 | `natural-points` | Return natural data points (one per collection interval) |
 | `virtual-points` | Return virtual (interpolated) data points |
-| `selected-tier` | Force using the tier selected by the `tier` parameter |
-| `all-dimensions` | Include all dimensions, even those with no data |
-| `label-quotes` | Quote label values in output |
 | `objectrows` | Return data rows as objects instead of arrays |
 | `google_json` | Format compatible with Google Charts |
-| `raw` | Return raw data without trimming partial points |
-| `debug` | Include debug information |
 
-Recommended minimum: `["jsonwrap", "minify"]`
+Recommended minimum: `["jsonwrap", "minify", "unaligned"]`
 
 ---
 
@@ -525,7 +504,16 @@ ItemsCount fields: `sl` (selected), `ex` (excluded), `qr` (query success), `fl` 
 Each value array contains 3 elements:
 - **Index 0 (`value`)**: The metric value
 - **Index 1 (`arp`)**: Anomaly rate (0-100). Percentage of raw samples in this interval flagged as anomalous by ML
-- **Index 2 (`pa`)**: Partial data. Non-zero means the interval has incomplete data (e.g., at query boundaries)
+- **Index 2 (`pa`)**: Point annotations bitmap. Values can be combined (OR'd):
+
+| Bit | Value | Meaning |
+|-----|-------|---------|
+| (none) | `0` | Normal data point — no issues |
+| bit 0 | `1` | **Empty** — no data was collected for this interval |
+| bit 1 | `2` | **Reset** — a counter reset/overflow was detected |
+| bit 2 | `4` | **Partial** — not all expected sources contributed to this point (e.g., in group-by queries, some series had no data) |
+
+Values combine: e.g., `5` = empty + partial, `6` = reset + partial.
 
 ### db
 
@@ -604,7 +592,7 @@ read -r -d '' PAYLOAD <<'EOF'
     "time": {"time_group": "average"}
   },
   "format": "json2",
-  "options": ["jsonwrap", "minify"],
+  "options": ["jsonwrap", "minify", "unaligned"],
   "timeout": 30000
 }
 EOF
@@ -635,7 +623,7 @@ read -r -d '' PAYLOAD <<'EOF'
     "time": {"time_group": "average"}
   },
   "format": "json2",
-  "options": ["jsonwrap", "minify"],
+  "options": ["jsonwrap", "minify", "unaligned"],
   "timeout": 30000
 }
 EOF
@@ -666,7 +654,7 @@ read -r -d '' PAYLOAD <<'EOF'
     "time": {"time_group": "average"}
   },
   "format": "json2",
-  "options": ["jsonwrap", "minify"],
+  "options": ["jsonwrap", "minify", "unaligned"],
   "timeout": 30000
 }
 EOF
@@ -697,7 +685,7 @@ read -r -d '' PAYLOAD <<'EOF'
     "time": {"time_group": "max"}
   },
   "format": "json2",
-  "options": ["jsonwrap", "minify"],
+  "options": ["jsonwrap", "minify", "unaligned"],
   "timeout": 30000
 }
 EOF
@@ -728,7 +716,7 @@ read -r -d '' PAYLOAD <<'EOF'
     "time": {"time_group": "average"}
   },
   "format": "json2",
-  "options": ["jsonwrap", "minify"],
+  "options": ["jsonwrap", "minify", "unaligned"],
   "timeout": 30000
 }
 EOF
@@ -759,7 +747,7 @@ read -r -d '' PAYLOAD <<'EOF'
     "time": {"time_group": "average"}
   },
   "format": "json2",
-  "options": ["jsonwrap", "minify"],
+  "options": ["jsonwrap", "minify", "unaligned"],
   "timeout": 30000
 }
 EOF
@@ -790,7 +778,7 @@ read -r -d '' PAYLOAD <<'EOF'
     "time": {"time_group": "average"}
   },
   "format": "json2",
-  "options": ["jsonwrap", "minify"],
+  "options": ["jsonwrap", "minify", "unaligned"],
   "timeout": 30000
 }
 EOF
@@ -821,7 +809,7 @@ read -r -d '' PAYLOAD <<'EOF'
     "time": {"time_group": "average"}
   },
   "format": "json2",
-  "options": ["jsonwrap", "minify"],
+  "options": ["jsonwrap", "minify", "unaligned"],
   "timeout": 30000
 }
 EOF
@@ -852,7 +840,7 @@ read -r -d '' PAYLOAD <<'EOF'
     "time": {"time_group": "average"}
   },
   "format": "json2",
-  "options": ["jsonwrap", "minify"],
+  "options": ["jsonwrap", "minify", "unaligned"],
   "timeout": 30000
 }
 EOF
@@ -879,15 +867,18 @@ Then inspect `summary.labels` in the response:
 
 ## Known Limitations
 
-1. **`scope.nodes` accepts only node UUIDs** — not hostnames, not patterns, not wildcards. Use `/nodes` to discover UUIDs first.
-2. **Only `json2` format** is supported by the Cloud API. Other formats (csv, ssv, etc.) are not reliably supported through the Cloud proxy.
-3. **Max ~500 data points** per query. The Cloud clamps requests to 500 before forwarding to agents; actual returned count may vary slightly due to time alignment.
-4. **Default timeout is 10 seconds** (10000ms). Increase for large/slow queries.
-5. **Stale nodes** appear in `/nodes` but return no data. Check `state` field.
-6. **`selectors.nodes`** is the only way to filter by hostname pattern, but metadata will include all nodes in scope.
+1. **`scope.contexts` MUST always be set** — without it, the response includes metadata for every metric in the room (hundreds of contexts, thousands of instances). This causes multi-megabyte responses.
+2. **`scope.nodes` accepts only node UUIDs** — use `selectors.nodes` with hostname patterns instead (simpler). Only use `scope.nodes` when you need tight metadata scoping.
+3. **Only `json2` format** is supported by the Cloud API. Other formats (csv, ssv, etc.) are not reliably supported through the Cloud proxy.
+4. **Max ~500 data points** per query. The Cloud clamps requests to 500 before forwarding to agents; actual returned count may vary slightly due to time alignment.
+5. **Default timeout is 10 seconds** (10000ms). Increase for large/slow queries.
+6. **Stale nodes** appear in `/nodes` but return no data. Check `state` field.
+7. **Always use `unaligned` option** for API queries — without it, time intervals snap to wall-clock boundaries, which is confusing for programmatic use.
 
 ---
 
 > **REMINDER — Credentials**: Do not request or accept user credentials. Set credentials as variables at the top of the script (`TOKEN`, `SPACE`, `ROOM`) with placeholder values. Users replace these 3 variables and run the command themselves.
 
 > **REMINDER — Always show a runnable curl command**: Your response is only useful if it contains a complete, runnable script: 3 variables at the top, a heredoc `PAYLOAD` with clean JSON (no escaping), and the curl command. Never describe a query without showing it. Never summarize parameters without building the actual request. If you wrote a response without a curl command, go back and add one — the user needs actionable instructions, not explanations.
+
+> **REMINDER — scope.contexts and unaligned**: Every query MUST set `scope.contexts` — omitting it returns metadata for the entire room (megabytes of irrelevant data). Every query MUST include `"unaligned"` in options — without it, time intervals snap to wall-clock boundaries instead of the requested time range.
