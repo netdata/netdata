@@ -84,7 +84,7 @@ func New(cfg Config) *Manager {
 		configDefaults: cfg.ConfigDefaults,
 		varLibDir:      cfg.VarLibDir,
 		fnReg:          fnReg,
-		vnodes:         vnodesReg,
+		vnodes:         newVnodeStore(vnodesReg),
 
 		auditMode:          cfg.AuditMode,
 		auditAnalyzer:      cfg.AuditAnalyzer,
@@ -153,7 +153,7 @@ type Manager struct {
 	configDefaults confgroup.Registry
 	varLibDir      string
 	fnReg          FunctionRegistry
-	vnodes         map[string]*vnodes.VirtualNode
+	vnodes         *vnodeStore
 
 	// Metrics-audit mode.
 	auditMode     bool
@@ -200,9 +200,10 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 
 	m.dyncfgVnodeModuleCreate()
 
-	for _, cfg := range m.vnodes {
+	m.vnodes.ForEach(func(cfg *vnodes.VirtualNode) bool {
 		m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
-	}
+		return true
+	})
 
 	for name, creator := range m.modules {
 		m.dyncfgCollectorModuleCreate(name)
@@ -612,7 +613,7 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
 	var vnode *vnodes.VirtualNode
 
 	if cfg.Vnode() != "" {
-		n, ok := m.vnodes[cfg.Vnode()]
+		n, ok := m.vnodes.Lookup(cfg.Vnode())
 		if !ok || n == nil {
 			return nil, fmt.Errorf("vnode '%s' is not found", cfg.Vnode())
 		}

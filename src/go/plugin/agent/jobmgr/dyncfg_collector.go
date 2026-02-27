@@ -199,7 +199,7 @@ func (m *Manager) dyncfgCmdTest(fn dyncfg.Function) {
 	}
 
 	if cfg.Vnode() != "" {
-		if _, ok := m.vnodes[cfg.Vnode()]; !ok {
+		if _, ok := m.vnodes.Lookup(cfg.Vnode()); !ok {
 			m.Warningf("dyncfg: %s: module %s: vnode %s not found", cmd, mn, cfg.Vnode())
 			m.dyncfgApi.SendCodef(fn, 400, "The specified vnode '%s' is not registered.", cfg.Vnode())
 			return
