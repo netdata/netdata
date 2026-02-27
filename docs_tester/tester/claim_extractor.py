@@ -126,8 +126,12 @@ class ClaimExtractor:
             return None
             
         elif code_type in ['yaml', 'yml', 'conf', 'ini', 'text']:
-            # Check if it's a config file example
-            if re.search(r'^\[', content_str, re.MULTILINE) or '=' in content_str:
+            # Check if it's a config file example (INI [section], key=value, or YAML key: value)
+            is_ini = re.search(r'^\[', content_str, re.MULTILINE)
+            is_keyvalue = '=' in content_str
+            is_yaml = re.search(r'^\s*[\w-]+:', content_str, re.MULTILINE)
+            
+            if is_ini or is_keyvalue or is_yaml:
                 # Extract file path from nearby text
                 file_match = re.search(r'(?:file|path|edit|create|add to)\s+[`"]?([/\w.-]+)[`"]?', content_str, re.IGNORECASE)
                 file_path = file_match.group(1) if file_match else None
