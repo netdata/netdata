@@ -5,6 +5,7 @@ package dyncfg
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -50,12 +51,13 @@ type CodedError interface {
 
 // HandlerOpts configures the handler with component-specific settings.
 type HandlerOpts[C Config] struct {
-	Logger    *logger.Logger
-	API       *Responder
-	Seen      *SeenCache[C]
-	Exposed   *ExposedCache[C]
-	Callbacks Callbacks[C]
-	WaitKey   func(cfg C) string // optional key used to gate config processing until enable/disable
+	Logger      *logger.Logger
+	API         *Responder
+	Seen        *SeenCache[C]
+	Exposed     *ExposedCache[C]
+	Callbacks   Callbacks[C]
+	WaitKey     func(cfg C) string // optional key used to gate config processing until enable/disable
+	WaitTimeout time.Duration      // optional timeout for decision wait; zero keeps wait open until matching command
 
 	Path                    string    // dyncfg path (e.g. "/collectors/go.d/Jobs")
 	EnableFailCode          int       // response code for enable failure (jobmgr: 200, SD: 422)
@@ -77,8 +79,19 @@ type Handler[C Config] struct {
 	removeStockOnEnableFail bool
 	jobCommands             []Command
 	waitKeyFn               func(cfg C) string
+	waitTimeout             time.Duration
 	waitKey                 string
+	waitSince               time.Time
+	waitDeadline            time.Time
 	waitMu                  sync.RWMutex
+	waitNow                 func() time.Time
+}
+
+// WaitTimeoutEvent describes a wait gate timeout transition.
+type WaitTimeoutEvent struct {
+	Key       string
+	Elapsed   time.Duration
+	Threshold time.Duration
 }
 
 func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
@@ -93,6 +106,8 @@ func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
 		removeStockOnEnableFail: opts.RemoveStockOnEnableFail,
 		jobCommands:             opts.JobCommands,
 		waitKeyFn:               opts.WaitKey,
+		waitTimeout:             opts.WaitTimeout,
+		waitNow:                 time.Now,
 	}
 }
 
@@ -147,6 +162,13 @@ func (h *Handler[C]) WaitForDecision(cfg C) {
 	}
 	h.waitMu.Lock()
 	h.waitKey = key
+	h.waitSince = time.Time{}
+	h.waitDeadline = time.Time{}
+	if h.waitTimeout > 0 {
+		now := h.now()
+		h.waitSince = now
+		h.waitDeadline = now.Add(h.waitTimeout)
+	}
 	h.waitMu.Unlock()
 }
 
@@ -156,6 +178,49 @@ func (h *Handler[C]) WaitingForDecision() bool {
 	h.waitMu.RLock()
 	defer h.waitMu.RUnlock()
 	return h.waitKey != ""
+}
+
+// WaitDecisionRemaining returns time until wait gate timeout.
+func (h *Handler[C]) WaitDecisionRemaining() (time.Duration, bool) {
+	h.waitMu.RLock()
+	defer h.waitMu.RUnlock()
+
+	if h.waitTimeout <= 0 || h.waitKey == "" || h.waitDeadline.IsZero() {
+		return 0, false
+	}
+	now := h.now()
+	if now.After(h.waitDeadline) || now.Equal(h.waitDeadline) {
+		return 0, true
+	}
+	return h.waitDeadline.Sub(now), true
+}
+
+// ExpireWaitDecision clears the current wait gate when it exceeds configured timeout.
+func (h *Handler[C]) ExpireWaitDecision() (WaitTimeoutEvent, bool) {
+	var event WaitTimeoutEvent
+
+	if h.waitTimeout <= 0 {
+		return event, false
+	}
+	now := h.now()
+
+	h.waitMu.Lock()
+	defer h.waitMu.Unlock()
+
+	if h.waitKey == "" || h.waitDeadline.IsZero() || now.Before(h.waitDeadline) {
+		return event, false
+	}
+
+	event.Key = h.waitKey
+	event.Threshold = h.waitTimeout
+	if !h.waitSince.IsZero() && now.After(h.waitSince) {
+		event.Elapsed = now.Sub(h.waitSince)
+	} else {
+		event.Elapsed = h.waitTimeout
+	}
+
+	h.clearWaitLocked()
+	return event, true
 }
 
 // SyncDecision updates wait-state based on the incoming command.
@@ -190,9 +255,22 @@ func (h *Handler[C]) SyncDecision(fn Function) {
 
 	h.waitMu.Lock()
 	if h.waitKey == waitKey {
-		h.waitKey = ""
+		h.clearWaitLocked()
 	}
 	h.waitMu.Unlock()
+}
+
+func (h *Handler[C]) clearWaitLocked() {
+	h.waitKey = ""
+	h.waitSince = time.Time{}
+	h.waitDeadline = time.Time{}
+}
+
+func (h *Handler[C]) now() time.Time {
+	if h.waitNow != nil {
+		return h.waitNow()
+	}
+	return time.Now()
 }
 
 // NotifyJobCreate registers/updates a config in the dyncfg API (upsert).
