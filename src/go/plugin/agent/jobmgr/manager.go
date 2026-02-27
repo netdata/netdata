@@ -47,6 +47,8 @@ type Config struct {
 	RuntimeService     runtimecomp.Service
 }
 
+const waitDecisionTimeout = 5 * time.Second
+
 func New(cfg Config) *Manager {
 	out := cfg.Out
 	if out == nil {
@@ -109,6 +111,7 @@ func New(cfg Config) *Manager {
 		WaitKey: func(cfg confgroup.Config) string {
 			return cfg.FullName()
 		},
+		WaitTimeout: waitDecisionTimeout,
 
 		Path:                    fmt.Sprintf(dyncfgCollectorPath, cfg.PluginName),
 		EnableFailCode:          200,
@@ -313,11 +316,44 @@ func (m *Manager) runProcessConfGroups(in chan []*confgroup.Group) {
 func (m *Manager) run() {
 	for {
 		if m.handler.WaitingForDecision() {
+			waitFor, hasTimeout := m.handler.WaitDecisionRemaining()
+			if !hasTimeout {
+				select {
+				case <-m.ctx.Done():
+					return
+				case fn := <-m.dyncfgCh:
+					m.dyncfgSeqExec(fn)
+				}
+				continue
+			}
+
+			timer := time.NewTimer(waitFor)
 			select {
 			case <-m.ctx.Done():
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
 				return
 			case fn := <-m.dyncfgCh:
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
 				m.dyncfgSeqExec(fn)
+			case <-timer.C:
+				if event, timedOut := m.handler.ExpireWaitDecision(); timedOut {
+					m.Errorf(
+						"dyncfg: timed out waiting for enable/disable decision for '%s' (elapsed=%s threshold=%s); keeping status 'accepted' and continuing",
+						event.Key,
+						event.Elapsed,
+						event.Threshold,
+					)
+				}
 			}
 		} else {
 			select {
