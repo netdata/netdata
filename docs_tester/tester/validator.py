@@ -49,7 +49,8 @@ class Validator:
             'details': {}
         }
 
-        if f'{service_name}' in output.lower():
+        service_lower = service_name.lower()
+        if service_lower in output.lower():
             if 'active (running)' not in output.lower():
                 result['valid'] = False
                 result['details']['reason'] = f'{service_name} is not running'

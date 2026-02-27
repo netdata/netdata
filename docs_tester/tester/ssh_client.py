@@ -59,24 +59,24 @@ class SSHClient:
 
     def file_exists(self, path: str) -> bool:
         """Check if file exists on remote VM"""
-        result = self._run(f"test -e {path} && echo 'exists' || echo 'not_found'")
+        quoted_path = shlex.quote(path)
+        result = self._run(f"test -e {quoted_path} && echo 'exists' || echo 'not_found'")
         return 'exists' in result.get('stdout', '')
 
     def read_file(self, path: str) -> Optional[str]:
         """Read file content from remote VM"""
-        result = self._run(f"cat {path}")
+        quoted_path = shlex.quote(path)
+        result = self._run(f"cat {quoted_path}")
         if result['success']:
             return result['stdout']
         return None
 
     def write_file(self, path: str, content: str) -> Dict[str, Any]:
         """Write content to file on remote VM using sudo"""
-        # Write content via stdin to sudo tee
-        sudo_command = f"echo '{self.password}' | sudo -S tee {path} > /dev/null"
-        
-        # Use printf to handle the content
+        quoted_path = shlex.quote(path)
+        escaped_content = content.replace("'", "'\\''")
         cmd = self._ssh_base + [
-            f"printf '%s\\n' '{self.password}' | sudo -S tee {path} > /dev/null"
+            f"printf '%s\\n' '{escaped_content}' | sudo -S tee {quoted_path} > /dev/null"
         ]
         
         try:
@@ -95,14 +95,15 @@ class SSHClient:
     def backup_file(self, path: str) -> Optional[str]:
         """Create backup of remote file"""
         import time
+        quoted_path = shlex.quote(path)
         timestamp = int(time.time())
         backup_path = f"{path}.backup.{timestamp}"
-        result = self.sudo(f"cp {path} {backup_path}")
+        result = self.sudo(f"cp {quoted_path} {shlex.quote(backup_path)}")
         if result['success']:
             return backup_path
         return None
 
     def restore_file(self, backup_path: str, original_path: str) -> bool:
         """Restore file from backup"""
-        result = self.sudo(f"mv {backup_path} {original_path}")
+        result = self.sudo(f"mv {shlex.quote(backup_path)} {shlex.quote(original_path)}")
         return result['success']

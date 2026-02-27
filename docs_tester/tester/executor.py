@@ -68,6 +68,8 @@ class Executor:
             'steps': []
         }
 
+        backup_path = None
+        
         try:
             file_match = re.search(r'/etc/netdata/[\w./-]+', config_content)
             config_file = file_match.group(0) if file_match else '/etc/netdata/netdata.conf'
@@ -117,11 +119,13 @@ class Executor:
                 result['status'] = 'FAIL'
                 result['error'] = 'Netdata is not running after configuration change'
 
-            self.ssh.restore_file(backup_path, config_file)
-
         except Exception as e:
             result['status'] = 'FAIL'
             result['error'] = str(e)
+        
+        finally:
+            if backup_path:
+                self.ssh.restore_file(backup_path, config_file)
 
         return result
 
