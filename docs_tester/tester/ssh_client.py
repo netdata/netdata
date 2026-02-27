@@ -12,16 +12,16 @@ class SSHClient:
         self.user = user
         self.password = password
 
-    def execute(self, command: str, capture_output: bool = True, timeout: int = 60) -> Dict[str, Any]:
+    def _run(self, command: str, capture_output: bool = True, timeout: int = 60) -> Dict[str, Any]:
         """Execute command on remote VM via SSH"""
-        try:
-            cmd = [
-                'sshpass', '-p', self.password,
-                'ssh', '-o', 'StrictHostKeyChecking=no',
-                f'{self.user}@{self.host}',
-                command
-            ]
+        cmd = [
+            'sshpass', '-p', self.password,
+            'ssh', '-o', 'StrictHostKeyChecking=no',
+            f'{self.user}@{self.host}',
+            command
+        ]
 
+        try:
             if capture_output:
                 result = subprocess.run(
                     cmd, capture_output=True, text=True, timeout=timeout
@@ -43,40 +43,44 @@ class SSHClient:
                 'stderr': str(e)
             }
 
-    def execute_with_sudo(self, command: str, capture_output: bool = True) -> Dict[str, Any]:
-        """Execute command with sudo on remote VM"""
-        sudo_command = f"sudo {command}"
-        return self.execute(sudo_command, capture_output)
+    def execute(self, command: str, capture_output: bool = True, timeout: int = 60) -> Dict[str, Any]:
+        """Execute command on remote VM via SSH"""
+        return self._run(command, capture_output, timeout)
+
+    def sudo(self, command: str, capture_output: bool = True, timeout: int = 60) -> Dict[str, Any]:
+        """Execute command with sudo on remote VM using bash -c"""
+        sudo_cmd = f"bash -c 'echo {self.password} | sudo -S {command}'"
+        return self._run(sudo_cmd, capture_output, timeout)
 
     def file_exists(self, path: str) -> bool:
         """Check if file exists on remote VM"""
-        result = self.execute(f"test -e {path} && echo 'exists' || echo 'not_found'")
+        result = self._run(f"test -e {path} && echo 'exists' || echo 'not_found'")
         return 'exists' in result.get('stdout', '')
 
     def read_file(self, path: str) -> Optional[str]:
         """Read file content from remote VM"""
-        result = self.execute(f"cat {path}")
+        result = self._run(f"cat {path}")
         if result['success']:
             return result['stdout']
         return None
 
     def write_file(self, path: str, content: str) -> Dict[str, Any]:
-        """Write content to file on remote VM"""
+        """Write content to file on remote VM using sudo"""
         escaped_content = content.replace("'", "'\\''")
-        cmd = f"sudo tee {path} <<'EOF'\n{content}\nEOF"
-        return self.execute(cmd)
+        cmd = f"bash -c 'echo {self.password} | sudo -S tee {path} > /dev/null' <<< '{escaped_content}'"
+        return self._run(cmd, capture_output=False)
 
     def backup_file(self, path: str) -> Optional[str]:
         """Create backup of remote file"""
         import time
         timestamp = int(time.time())
         backup_path = f"{path}.backup.{timestamp}"
-        result = self.execute(f"sudo cp {path} {backup_path}")
+        result = self.sudo(f"cp {path} {backup_path}")
         if result['success']:
             return backup_path
         return None
 
     def restore_file(self, backup_path: str, original_path: str) -> bool:
         """Restore file from backup"""
-        result = self.execute(f"sudo mv {backup_path} {original_path}")
+        result = self.sudo(f"mv {backup_path} {original_path}")
         return result['success']

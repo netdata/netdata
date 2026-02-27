@@ -46,10 +46,15 @@ class Reporter:
                 'PENDING': '⏳'
             }.get(result['status'], '❓')
 
-            claim = result['claim']
-            claim_type = claim['type'].title()
-            line_range = claim['line_range']
-            description = claim['description']
+            if 'claim' in result:
+                claim = result['claim']
+                claim_type = claim['type'].title()
+                line_range = claim['line_range']
+                description = claim['description']
+            else:
+                claim_type = result.get('type', 'Workflow').title()
+                line_range = result.get('line_range', 'N/A')
+                description = result.get('description', 'N/A')
 
             report += f"""
 ### {status_emoji} {result['status']}: {claim_type} (Line {line_range})
@@ -62,7 +67,13 @@ class Reporter:
 
             if result.get('steps'):
                 for step in result['steps']:
-                    report += f"- {step['description']}\n"
+                    if isinstance(step, dict):
+                        if 'description' in step:
+                            report += f"- {step['description']}\n"
+                        elif 'instruction' in step:
+                            report += f"- {step['instruction']}\n"
+                    else:
+                        report += f"- {step.description}\n"
 
             if result.get('steps'):
                 report += f"""
