@@ -1,7 +1,7 @@
 """Claim extraction from documentation"""
 
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -42,13 +42,39 @@ class ClaimExtractor:
     def parse_content(self, content: str) -> List[Dict[str, Any]]:
         """Parse documentation content and extract testable claims"""
         claims = []
-        lines = content.split('\n')
+        
+        # First pass: extract all code blocks as individual claims
+        code_claims = self._extract_all_code_blocks(content)
+        claims.extend(code_claims)
+        
+        # Second pass: extract workflows with their actual commands
+        workflows = self._extract_workflows_with_commands(content)
+        for workflow in workflows:
+            claims.append({
+                'type': 'workflow',
+                'line_range': f"{workflow.start_line}-{workflow.end_line}",
+                'content': workflow.description,
+                'description': workflow.description,
+                'steps': workflow.steps
+            })
+        
+        # Third pass: extract behavioral claims
+        behavioral_claims = self._extract_behavioral_claims(content)
+        claims.extend(behavioral_claims)
+        
+        return claims
 
+    def _extract_all_code_blocks(self, content: str) -> List[Dict[str, Any]]:
+        """Extract all code blocks as testable claims"""
+        claims = []
+        lines = content.split('\n')
+        
         in_code_block = False
         code_type = None
         code_content = []
         code_start_line = 0
-
+        code_end_line = 0
+        
         for i, line in enumerate(lines, 1):
             if line.startswith('```'):
                 if not in_code_block:
@@ -58,128 +84,193 @@ class ClaimExtractor:
                     code_content = []
                 else:
                     in_code_block = False
-                    if code_type:
-                        claim = self._analyze_code_block(
-                            code_type, code_content, code_start_line, i
+                    code_end_line = i
+                    if code_type and code_content:
+                        claim = self._create_claim_from_code_block(
+                            code_type, code_content, code_start_line, code_end_line
                         )
                         if claim:
                             claims.append(claim)
             elif in_code_block:
                 code_content.append(line)
-            else:
-                claim = self._extract_behavioral_claim(line, i)
-                if claim:
-                    claims.append(claim)
-
-        workflows = self._extract_workflows(content)
-        for workflow in workflows:
-            claims.append({
-                'type': 'workflow',
-                'line_range': f"{workflow.start_line}-{workflow.end_line}",
-                'content': workflow.description,
-                'description': workflow.description,
-                'steps': workflow.steps
-            })
-
+        
         return claims
 
-    def _analyze_code_block(
+    def _create_claim_from_code_block(
         self, code_type: str, content: List[str], start_line: int, end_line: int
     ) -> Optional[Dict[str, Any]]:
-        """Analyze a code block and determine what to test"""
-        content_str = '\n'.join(content)
-
-        if code_type in ['bash', 'sh', 'shell']:
+        """Create a claim from a code block"""
+        content_str = '\n'.join(content).strip()
+        
+        if not content_str:
+            return None
+        
+        # Skip if it's just a URL or example output
+        if content_str.startswith('http://') or content_str.startswith('https://'):
             return {
-                'type': 'command',
+                'type': 'url',
                 'line_range': f"{start_line}-{end_line}",
                 'content': content_str,
-                'description': f"Command test at lines {start_line}-{end_line}"
+                'description': f"URL reference at lines {start_line}-{end_line}"
             }
-        elif code_type in ['yaml', 'yml', 'conf', 'ini']:
-            return {
-                'type': 'configuration',
-                'line_range': f"{start_line}-{end_line}",
-                'content': content_str,
-                'description': f"Configuration test at lines {start_line}-{end_line}"
-            }
+        
+        if code_type in ['bash', 'sh', 'shell', 'bash+wget', 'bash+curl']:
+            # Check if it's a command
+            if any(cmd in content_str.lower() for cmd in ['sudo', 'systemctl', 'curl', 'wget', 'echo', 'cat', 'tee', 'mkdir', 'chmod', 'chown', 'apt', 'yum', 'dnf', 'pip']):
+                return {
+                    'type': 'command',
+                    'line_range': f"{start_line}-{end_line}",
+                    'content': content_str,
+                    'description': f"Command to execute at lines {start_line}-{end_line}"
+                }
+            return None
+            
+        elif code_type in ['yaml', 'yml', 'conf', 'ini', 'text']:
+            # Check if it's a config file example
+            if re.search(r'^\[', content_str, re.MULTILINE) or '=' in content_str:
+                # Extract file path from nearby text
+                file_match = re.search(r'(?:file|path|edit|create|add to)\s+[`"]?([/\w.-]+)[`"]?', content_str, re.IGNORECASE)
+                file_path = file_match.group(1) if file_match else None
+                
+                return {
+                    'type': 'configuration',
+                    'line_range': f"{start_line}-{end_line}",
+                    'content': content_str,
+                    'file_path': file_path,
+                    'description': f"Configuration at lines {start_line}-{end_line}"
+                }
+            return None
+        
         elif code_type == 'http' or 'curl' in content_str:
             return {
                 'type': 'api',
                 'line_range': f"{start_line}-{end_line}",
                 'content': content_str,
-                'description': f"API endpoint test at lines {start_line}-{end_line}"
+                'description': f"API endpoint at lines {start_line}-{end_line}"
             }
-
+        
         return None
 
-    def _extract_behavioral_claim(self, line: str, line_num: int) -> Optional[Dict[str, Any]]:
-        """Extract behavioral claims from text"""
-        patterns = [
-            r'(?:will|should|must)\s+(?:enable|trigger|alert|show|display|create|start|stop)',
-            r'(?:enables|triggers|alerts|shows|displays|creates|starts|stops)\s+',
-        ]
-
-        for pattern in patterns:
-            if re.search(pattern, line, re.IGNORECASE):
-                return {
-                    'type': 'behavioral',
-                    'line_range': str(line_num),
-                    'content': line.strip(),
-                    'description': f"Behavioral claim at line {line_num}"
-                }
-
-        return None
-
-    def _extract_workflows(self, content: str) -> List[Workflow]:
-        """Extract step-by-step workflows from text"""
+    def _extract_workflows_with_commands(self, content: str) -> List[Workflow]:
+        """Extract workflows and associate code blocks with steps"""
         workflows = []
-        current_workflow = Workflow()
-        step_counter = 0
-
         lines = content.split('\n')
-
+        
+        # Find all code blocks first
+        code_blocks = []
+        in_block = False
+        block_start = 0
+        block_type = None
+        block_content = []
+        
         for i, line in enumerate(lines, 1):
-            stripped_line = line.strip()
-
-            if self._is_section_header(stripped_line):
-                if current_workflow.steps:
-                    workflows.append(current_workflow)
-                current_workflow = Workflow()
-                current_workflow.start_line = i
-                step_counter = 0
-                continue
-
-            numbered_step = self._extract_numbered_step(stripped_line)
-            if numbered_step:
-                step_counter += 1
-                current_workflow.steps.append(Step(
-                    type=self._classify_step_type(numbered_step),
-                    instruction=numbered_step,
+            if line.startswith('```'):
+                if not in_block:
+                    in_block = True
+                    block_start = i
+                    block_type = line[3:].strip()
+                    block_content = []
+                else:
+                    in_block = False
+                    if block_content and block_type in ['bash', 'sh', 'shell']:
+                        code_blocks.append({
+                            'start': block_start,
+                            'end': i,
+                            'type': block_type,
+                            'content': '\n'.join(block_content).strip()
+                        })
+                    block_content = []
+            elif in_block:
+                block_content.append(line)
+        
+        # Now find workflow sections and match code blocks to steps
+        in_workflow = False
+        workflow_start = 0
+        current_steps = []
+        step_num = 0
+        
+        for i, line in enumerate(lines, 1):
+            stripped = line.strip()
+            
+            # Detect workflow start (numbered list or step markers)
+            is_numbered = re.match(r'^\d+[.)]\s+', stripped)
+            is_step_marker = re.match(r'^(?:first|next|then|finally|step|to|edit|run|execute|restart|stop|start|add|create|remove|delete|configure)\b', stripped, re.IGNORECASE)
+            
+            if is_numbered or is_step_marker:
+                if not in_workflow:
+                    in_workflow = True
+                    workflow_start = i
+                
+                # Find associated code block
+                associated_code = None
+                for block in code_blocks:
+                    if block['start'] > i and block['start'] - i < 20:  # Within 20 lines
+                        associated_code = block['content']
+                        break
+                
+                step_text = re.sub(r'^\d+[.)]\s+', '', stripped)
+                
+                step_type = self._classify_step_type(step_text)
+                
+                # If there's associated code, use it as the instruction
+                instruction = associated_code if associated_code else step_text
+                
+                step_num += 1
+                current_steps.append(Step(
+                    type=step_type,
+                    instruction=instruction,
                     expected="Step completes successfully",
-                    number=step_counter
+                    number=step_num
                 ))
-                current_workflow.description = f"Numbered list procedure (lines {current_workflow.start_line}-{i})"
-                current_workflow.end_line = i
-                continue
-
-            step_marker = self._extract_step_marker(stripped_line)
-            if step_marker:
-                step_counter += 1
-                current_workflow.steps.append(Step(
-                    type=self._classify_step_type(step_marker),
-                    instruction=step_marker,
-                    expected="Step completes successfully",
-                    number=step_counter
-                ))
-                current_workflow.description = f"Marked procedure (lines {current_workflow.start_line}-{i})"
-                current_workflow.end_line = i
-                continue
-
-        if current_workflow.steps:
-            workflows.append(current_workflow)
-
+            
+            elif in_workflow and (stripped.startswith('##') or stripped == ''):
+                # End of workflow
+                if current_steps:
+                    workflows.append(Workflow(
+                        description=f"Workflow at lines {workflow_start}-{i-1}",
+                        steps=current_steps,
+                        start_line=workflow_start,
+                        end_line=i-1
+                    ))
+                in_workflow = False
+                current_steps = []
+                step_num = 0
+        
+        # Handle last workflow
+        if current_steps:
+            workflows.append(Workflow(
+                description=f"Workflow at lines {workflow_start}-{len(lines)}",
+                steps=current_steps,
+                start_line=workflow_start,
+                end_line=len(lines)
+            ))
+        
         return workflows
+
+    def _extract_behavioral_claims(self, content: str) -> List[Dict[str, Any]]:
+        """Extract behavioral claims from text"""
+        claims = []
+        lines = content.split('\n')
+        
+        behavioral_patterns = [
+            r'(?:will|should|must|can|may)\s+(?:enable|trigger|alert|show|display|create|start|stop|appear|make|allow)',
+            r'(?:enables|triggers|alerts|shows|displays|creates|starts|stops|appears)\s+',
+            r'(?:results? in|leads to|causes)\s+',
+        ]
+        
+        for i, line in enumerate(lines, 1):
+            for pattern in behavioral_patterns:
+                if re.search(pattern, line, re.IGNORECASE):
+                    # Check if this line is near a code block - if so, skip (it's already covered)
+                    claims.append({
+                        'type': 'behavioral',
+                        'line_range': str(i),
+                        'content': line.strip(),
+                        'description': f"Behavioral claim at line {i}"
+                    })
+                    break
+        
+        return claims
 
     def _is_section_header(self, line: str) -> bool:
         """Check if line is a section header"""
@@ -190,7 +281,6 @@ class ClaimExtractor:
         patterns = [
             r'^\d+\.\s+(.+)',
             r'^\d+\)\s+(.+)',
-            r'^\s+-\s+(.+)'
         ]
 
         for pattern in patterns:
@@ -203,34 +293,31 @@ class ClaimExtractor:
     def _extract_step_marker(self, line: str) -> Optional[str]:
         """Extract step from markers like 'First:', 'Next:', 'Finally:'"""
         patterns = [
-            r'(?i)first.?\s*:?\s+(.+)',
-            r'(?i)next.?\s*:?\s+(.+)',
-            r'(?i)then.?\s*:?\s+(.+)',
-            r'(?i)finally.?\s*:?\s+(.+)',
-            r'(?i)after.?\s*:?\s+(.+)'
+            r'(?i)^(first|next|then|finally|step \d+):\s*(.+)',
+            r'(?i)^(to|edit|run|execute|restart|stop|start|add|create|remove|delete|configure)\s+(.+)',
         ]
 
         for pattern in patterns:
             match = re.match(pattern, line)
             if match:
-                return match.group(1).strip()
+                return line.strip()
 
         return None
 
     def _classify_step_type(self, step_text: str) -> StepType:
         """Classify step as command, file operation, verification, or wait"""
         step_lower = step_text.lower()
-
-        file_ops = ['create', 'edit', 'delete', 'modify', 'add', 'remove', 'write', 'copy', 'move']
+        
+        file_ops = ['create', 'edit', 'delete', 'modify', 'add', 'remove', 'write', 'copy', 'move', 'configure', 'install']
         if any(op in step_lower for op in file_ops):
             return StepType.FILE_OPERATION
-
-        verify_keywords = ['verify', 'check', 'confirm', 'test', 'validate', 'ensure']
+        
+        verify_keywords = ['verify', 'check', 'confirm', 'test', 'validate', 'ensure', 'make sure', 'ensure that']
         if any(keyword in step_lower for keyword in verify_keywords):
             return StepType.VERIFICATION
-
-        wait_keywords = ['wait', 'pause', 'sleep', 'after', 'once', 'until']
+        
+        wait_keywords = ['wait', 'pause', 'sleep', 'after', 'once', 'until', 'give it']
         if any(keyword in step_lower for keyword in wait_keywords):
             return StepType.WAIT_CONDITION
-
+        
         return StepType.COMMAND

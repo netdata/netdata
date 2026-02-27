@@ -1,6 +1,9 @@
 """SSH Client for remote command execution"""
 
 import subprocess
+import os
+import tempfile
+import time
 from typing import Dict, Any, Optional
 
 
@@ -11,15 +14,15 @@ class SSHClient:
         self.host = host
         self.user = user
         self.password = password
+        self._ssh_base = [
+            'sshpass', '-p', password,
+            'ssh', '-o', 'StrictHostKeyChecking=no',
+            f'{user}@{host}'
+        ]
 
     def _run(self, command: str, capture_output: bool = True, timeout: int = 60) -> Dict[str, Any]:
         """Execute command on remote VM via SSH"""
-        cmd = [
-            'sshpass', '-p', self.password,
-            'ssh', '-o', 'StrictHostKeyChecking=no',
-            f'{self.user}@{self.host}',
-            command
-        ]
+        cmd = self._ssh_base + [command]
 
         try:
             if capture_output:
@@ -48,9 +51,10 @@ class SSHClient:
         return self._run(command, capture_output, timeout)
 
     def sudo(self, command: str, capture_output: bool = True, timeout: int = 60) -> Dict[str, Any]:
-        """Execute command with sudo on remote VM using bash -c"""
-        sudo_cmd = f"bash -c 'echo {self.password} | sudo -S {command}'"
-        return self._run(sudo_cmd, capture_output, timeout)
+        """Execute command with sudo on remote VM using -S flag"""
+        # Use sudo -S to read password from stdin
+        sudo_command = f"echo '{self.password}' | sudo -S {command}"
+        return self._run(sudo_command, capture_output, timeout)
 
     def file_exists(self, path: str) -> bool:
         """Check if file exists on remote VM"""
@@ -66,9 +70,26 @@ class SSHClient:
 
     def write_file(self, path: str, content: str) -> Dict[str, Any]:
         """Write content to file on remote VM using sudo"""
-        escaped_content = content.replace("'", "'\\''")
-        cmd = f"bash -c 'echo {self.password} | sudo -S tee {path} > /dev/null' <<< '{escaped_content}'"
-        return self._run(cmd, capture_output=False)
+        # Write content via stdin to sudo tee
+        sudo_command = f"echo '{self.password}' | sudo -S tee {path} > /dev/null"
+        
+        # Use printf to handle the content
+        cmd = self._ssh_base + [
+            f"printf '%s\\n' '{self.password}' | sudo -S tee {path} > /dev/null"
+        ]
+        
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=30
+            )
+            return {
+                'success': result.returncode == 0,
+                'stdout': result.stdout,
+                'stderr': result.stderr,
+                'returncode': result.returncode
+            }
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
 
     def backup_file(self, path: str) -> Optional[str]:
         """Create backup of remote file"""

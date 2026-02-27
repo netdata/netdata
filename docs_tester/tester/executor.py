@@ -32,7 +32,13 @@ class Executor:
                 'description': f'Executing: {command[:100]}...'
             })
 
-            test_result = self.ssh.execute(command)
+            # Check if command needs sudo
+            needs_sudo = any(cmd in command.lower() for cmd in ['sudo', 'systemctl', 'chmod', 'chown', 'mkdir', 'rm ', 'tee', 'edit-config'])
+            
+            if needs_sudo:
+                test_result = self.ssh.sudo(command)
+            else:
+                test_result = self.ssh.execute(command)
 
             result['stdout'] = test_result.get('stdout', '')
             result['stderr'] = test_result.get('stderr', '')
@@ -42,7 +48,7 @@ class Executor:
                 result['status'] = 'PASS'
             else:
                 result['status'] = 'FAIL'
-                result['error'] = f'Command failed with exit code {test_result.get("returncode")}'
+                result['error'] = f"Command failed with exit code {test_result.get('returncode')}: {test_result.get('stderr', '')[:200]}"
 
         except Exception as e:
             result['status'] = 'FAIL'
@@ -242,7 +248,14 @@ class Executor:
             'description': f'Executing: {command[:100]}...'
         })
 
-        test_result = self.ssh.execute(command)
+        # Check if command needs sudo
+        needs_sudo = any(cmd in command.lower() for cmd in ['sudo', 'systemctl', 'chmod', 'chown', 'mkdir', 'rm ', 'tee'])
+        
+        if needs_sudo:
+            test_result = self.ssh.sudo(command)
+        else:
+            test_result = self.ssh.execute(command)
+        
         step_result['evidence'].append({
             'output': test_result.get('stdout', '')[:500]
         })
@@ -257,39 +270,36 @@ class Executor:
 
     def _execute_file_operation_step(self, step: Step, step_result: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a file operation step"""
-        instruction = step.instruction.lower()
-
-        if 'create' in instruction or 'add' in instruction:
-            step_result['evidence'].append({
-                'action': 'create_file',
-                'description': 'Creating configuration file'
-            })
-            step_result['evidence'].append({
-                'status': 'skipped',
-                'note': 'File operations in workflows are skipped for safety'
-            })
-        elif 'edit' in instruction or 'modify' in instruction:
-            step_result['evidence'].append({
-                'action': 'edit_file',
-                'description': 'Editing configuration file'
-            })
-            step_result['evidence'].append({
-                'status': 'skipped',
-                'note': 'File operations in workflows are skipped for safety'
-            })
-        elif 'delete' in instruction or 'remove' in instruction:
-            step_result['evidence'].append({
-                'action': 'delete_file',
-                'description': 'Deleting file'
-            })
-            step_result['evidence'].append({
-                'status': 'skipped',
-                'note': 'File operations in workflows are skipped for safety'
-            })
+        instruction = step.instruction
+        
+        # If the instruction is a command, execute it with sudo if needed
+        if instruction.startswith('sudo ') or instruction.startswith('systemctl') or '/etc/' in instruction:
+            # Use sudo for privileged operations
+            cmd_result = self.ssh.sudo(instruction)
+        elif not any(kw in instruction.lower() for kw in ['edit', 'create', 'add', 'delete', 'remove', 'configure', 'write', 'file', 'config']):
+            # It's actually a command, not a file operation
+            return self._execute_command_step(step, step_result)
+        else:
+            cmd_result = self.ssh.sudo(instruction)
+        
+        step_result['evidence'].append({
+            'action': 'file_operation',
+            'description': f'Executing file operation: {instruction[:100]}'
+        })
+        
+        step_result['evidence'].append({
+            'command': instruction,
+            'output': cmd_result.get('stdout', '')[:500],
+            'stderr': cmd_result.get('stderr', '')[:500],
+            'returncode': cmd_result.get('returncode', -1)
+        })
+        
+        if cmd_result['success']:
+            step_result['evidence'].append({'status': 'success'})
         else:
             step_result['success'] = False
-            step_result['error'] = f"Unknown file operation: {instruction}"
-
+            step_result['error'] = f"File operation failed: {cmd_result.get('stderr', 'Unknown error')}"
+        
         return step_result
 
     def _execute_verification_step(self, step: Step, step_result: Dict[str, Any]) -> Dict[str, Any]:
