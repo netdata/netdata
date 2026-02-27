@@ -51,7 +51,7 @@ func newJobFactory(m *Manager) *jobFactory {
 	}
 }
 
-func (f *jobFactory) Create(cfg confgroup.Config) (runtimeJob, error) {
+func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 	creator, ok := f.modules[cfg.Module()]
 	if !ok {
 		return nil, fmt.Errorf("can not find %s module", cfg.Module())
@@ -73,47 +73,49 @@ func (f *jobFactory) Create(cfg confgroup.Config) (runtimeJob, error) {
 
 	f.logger.Debugf("creating %s[%s] job, config: %v", cfg.Module(), cfg.Name(), cfg)
 
-	useV2 := creator.CreateV2 != nil
+	if creator.CreateV2 != nil {
+		return f.createV2(cfg, creator, functionOnly, vnode)
+	}
+	return f.createV1(cfg, creator, functionOnly, vnode)
+}
 
-	var jobCaptureDir string
-	if f.auditDataDir != "" && !useV2 {
-		jobCaptureDir = filepath.Join(f.auditDataDir, naming.Sanitize(cfg.Module()), naming.Sanitize(cfg.Name()))
-		if err := os.MkdirAll(jobCaptureDir, 0o755); err != nil {
-			return nil, fmt.Errorf("creating audit directory: %w", err)
-		}
+func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator, functionOnly bool, vnode *vnodes.VirtualNode) (runtimeJob, error) {
+	mod := creator.CreateV2()
+	if mod == nil {
+		return nil, fmt.Errorf("module %s CreateV2 returned nil", cfg.Module())
+	}
+	if err := applyConfig(cfg, mod); err != nil {
+		return nil, err
 	}
 
-	if useV2 {
-		mod := creator.CreateV2()
-		if mod == nil {
-			return nil, fmt.Errorf("module %s CreateV2 returned nil", cfg.Module())
-		}
-		if err := applyConfig(cfg, mod); err != nil {
-			return nil, err
-		}
-
-		jobCfg := jobruntime.JobV2Config{
-			PluginName:      f.pluginName,
-			Name:            cfg.Name(),
-			ModuleName:      cfg.Module(),
-			FullName:        cfg.FullName(),
-			UpdateEvery:     cfg.UpdateEvery(),
-			AutoDetectEvery: cfg.AutoDetectionRetry(),
-			IsStock:         cfg.SourceType() == "stock",
-			Labels:          makeLabels(cfg),
-			Out:             f.out,
-			Module:          mod,
-			FunctionOnly:    functionOnly,
-			RuntimeService:  f.runtimeService,
-		}
-		if vnode != nil {
-			jobCfg.Vnode = *vnode.Copy()
-		}
-		return jobruntime.NewJobV2(jobCfg), nil
+	jobCfg := jobruntime.JobV2Config{
+		PluginName:      f.pluginName,
+		Name:            cfg.Name(),
+		ModuleName:      cfg.Module(),
+		FullName:        cfg.FullName(),
+		UpdateEvery:     cfg.UpdateEvery(),
+		AutoDetectEvery: cfg.AutoDetectionRetry(),
+		IsStock:         cfg.SourceType() == "stock",
+		Labels:          makeLabels(cfg),
+		Out:             f.out,
+		Module:          mod,
+		FunctionOnly:    functionOnly,
+		RuntimeService:  f.runtimeService,
 	}
+	if vnode != nil {
+		jobCfg.Vnode = *vnode.Copy()
+	}
+	return jobruntime.NewJobV2(jobCfg), nil
+}
 
+func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator, functionOnly bool, vnode *vnodes.VirtualNode) (runtimeJob, error) {
 	if creator.Create == nil {
 		return nil, fmt.Errorf("module %s has no compatible creator", cfg.Module())
+	}
+
+	jobCaptureDir, err := f.createV1CaptureDir(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	mod := creator.Create()
@@ -151,4 +153,15 @@ func (f *jobFactory) Create(cfg confgroup.Config) (runtimeJob, error) {
 	}
 
 	return jobruntime.NewJob(jobCfg), nil
+}
+
+func (f *jobFactory) createV1CaptureDir(cfg confgroup.Config) (string, error) {
+	if f.auditDataDir == "" {
+		return "", nil
+	}
+	jobCaptureDir := filepath.Join(f.auditDataDir, naming.Sanitize(cfg.Module()), naming.Sanitize(cfg.Name()))
+	if err := os.MkdirAll(jobCaptureDir, 0o755); err != nil {
+		return "", fmt.Errorf("creating audit directory: %w", err)
+	}
+	return jobCaptureDir, nil
 }

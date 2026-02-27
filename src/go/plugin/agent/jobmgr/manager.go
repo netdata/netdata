@@ -592,7 +592,7 @@ func (m *Manager) baseContext() context.Context {
 }
 
 func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
-	return newJobFactory(m).Create(cfg)
+	return newJobFactory(m).create(cfg)
 }
 
 func runRetryTask(ctx context.Context, out chan<- confgroup.Config, cfg confgroup.Config) {
