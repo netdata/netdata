@@ -47,7 +47,12 @@ type Config struct {
 	RuntimeService     runtimecomp.Service
 }
 
-const waitDecisionTimeout = 5 * time.Second
+const (
+	waitDecisionTimeout    = 5 * time.Second
+	cmdTestWorkerCap       = 4
+	cmdTestDefaultTimeout  = 60 * time.Second
+	cmdTestWorkerDrainWait = 5 * time.Second
+)
 
 func New(cfg Config) *Manager {
 	out := cfg.Out
@@ -94,11 +99,12 @@ func New(cfg Config) *Manager {
 		runningJobs:       newRunningJobsCache(),
 		retryingTasks:     newRetryingTasksCache(),
 
-		started:   make(chan struct{}),
-		addCh:     make(chan confgroup.Config),
-		rmCh:      make(chan confgroup.Config),
-		dyncfgCh:  make(chan dyncfg.Function),
-		dyncfgApi: api,
+		started:    make(chan struct{}),
+		addCh:      make(chan confgroup.Config),
+		rmCh:       make(chan confgroup.Config),
+		dyncfgCh:   make(chan dyncfg.Function),
+		cmdTestSem: make(chan struct{}, cmdTestWorkerCap),
+		dyncfgApi:  api,
 	}
 
 	mgr.collectorCb = &collectorCallbacks{mgr: mgr}
@@ -166,11 +172,13 @@ type Manager struct {
 	handler     *dyncfg.Handler[confgroup.Config]
 	collectorCb *collectorCallbacks
 
-	ctx      context.Context
-	started  chan struct{}
-	addCh    chan confgroup.Config
-	rmCh     chan confgroup.Config
-	dyncfgCh chan dyncfg.Function
+	ctx        context.Context
+	started    chan struct{}
+	addCh      chan confgroup.Config
+	rmCh       chan confgroup.Config
+	dyncfgCh   chan dyncfg.Function
+	cmdTestSem chan struct{}
+	cmdTestWG  sync.WaitGroup
 
 	dyncfgApi *dyncfg.Responder
 
@@ -494,6 +502,22 @@ func (m *Manager) cleanup() {
 	for _, job := range m.runningJobs.snapshot() {
 		job.Stop()
 	}
+
+	m.waitCmdTestWorkers()
+}
+
+func (m *Manager) waitCmdTestWorkers() {
+	done := make(chan struct{})
+	go func() {
+		m.cmdTestWG.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(cmdTestWorkerDrainWait):
+		m.Warningf("dyncfg: timeout waiting %s for command test workers to drain", cmdTestWorkerDrainWait)
+	}
 }
 
 // registerJobMethods registers methods for a specific job with Netdata
@@ -563,6 +587,13 @@ func (m *Manager) unregisterJobMethods(job collectorapi.RuntimeJob) {
 
 	// Remove from registry
 	m.moduleFuncs.unregisterJobMethods(job.ModuleName(), job.Name())
+}
+
+func (m *Manager) baseContext() context.Context {
+	if m.ctx != nil {
+		return m.ctx
+	}
+	return context.Background()
 }
 
 func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {

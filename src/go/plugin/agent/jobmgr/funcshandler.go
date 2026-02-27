@@ -63,7 +63,7 @@ func (m *Manager) makeMethodFuncHandler(moduleName, methodID string) func(functi
 		// This ensures DB queries are cancelled if the function times out
 		// NOTE: fn.Timeout is already a time.Duration (set by parser as seconds)
 		// Do NOT multiply by time.Second again - that would create huge timeouts
-		ctx, cancel := context.WithTimeout(context.Background(), fn.Timeout)
+		ctx, cancel := context.WithTimeout(m.baseContext(), fn.Timeout)
 		defer cancel()
 
 		// RACE CONDITION MITIGATION: Verify job is still running before handler
@@ -485,7 +485,7 @@ func (m *Manager) makeJobMethodFuncHandler(moduleName, jobName, methodID string)
 		}
 
 		// Create context with timeout from function request
-		ctx, cancel := context.WithTimeout(context.Background(), fn.Timeout)
+		ctx, cancel := context.WithTimeout(m.baseContext(), fn.Timeout)
 		defer cancel()
 
 		// Verify job is still running before calling handler
