@@ -25,26 +25,28 @@ import (
 func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 	tests := map[string]struct {
 		waitTimeout time.Duration
-		run         func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile)
+		run         func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile, stop func())
 	}{
 		"timeout clears wait gate and keeps accepted state": {
 			waitTimeout: 40 * time.Millisecond,
-			run: func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile) {
+			run: func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile, stop func()) {
 				cfg := prepareConfigFile("/etc/netdata/sd.d/job1.conf", "job1")
 				confCh <- cfg
 
 				require.Eventually(t, sd.handler.WaitingForDecision, time.Second, 10*time.Millisecond)
 				require.Eventually(t, func() bool { return !sd.handler.WaitingForDecision() }, time.Second, 10*time.Millisecond)
 
-				status, ok := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job1")
+				stop()
+
+				entry, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job1")
 				require.True(t, ok, "expected discovered config to stay exposed after wait timeout")
-				assert.Equal(t, dyncfg.StatusAccepted, status)
+				assert.Equal(t, dyncfg.StatusAccepted, entry.Status)
 				assert.False(t, sd.mgr.IsRunning(pipelineKeyFromSource(cfg.source)))
 			},
 		},
 		"enable command before timeout clears wait and starts pipeline": {
 			waitTimeout: 750 * time.Millisecond,
-			run: func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile) {
+			run: func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile, stop func()) {
 				cfg := prepareConfigFile("/etc/netdata/sd.d/job1.conf", "job1")
 				confCh <- cfg
 
@@ -56,19 +58,21 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 				})
 
 				require.Eventually(t, func() bool {
-					status, ok := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job1")
-					if !ok {
-						return false
-					}
 					return !sd.handler.WaitingForDecision() &&
-						status == dyncfg.StatusRunning &&
+						exposedExistsByKey(sd.exposed, testDiscovererTypeNetListeners+":job1") &&
 						sd.mgr.IsRunning(pipelineKeyFromSource(cfg.source))
 				}, time.Second, 10*time.Millisecond)
+
+				stop()
+
+				entry, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job1")
+				require.True(t, ok)
+				assert.Equal(t, dyncfg.StatusRunning, entry.Status)
 			},
 		},
 		"timeout unblocks and next config is processed": {
 			waitTimeout: 40 * time.Millisecond,
-			run: func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile) {
+			run: func(t *testing.T, sd *ServiceDiscovery, confCh chan confFile, stop func()) {
 				cfg1 := prepareConfigFile("/etc/netdata/sd.d/job1.conf", "job1")
 				cfg2 := prepareConfigFile("/etc/netdata/sd.d/job2.conf", "job2")
 
@@ -98,17 +102,19 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 				}, time.Second, 10*time.Millisecond)
 
 				require.Eventually(t, func() bool {
-					_, ok1 := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job1")
-					_, ok2 := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job2")
+					ok1 := exposedExistsByKey(sd.exposed, testDiscovererTypeNetListeners+":job1")
+					ok2 := exposedExistsByKey(sd.exposed, testDiscovererTypeNetListeners+":job2")
 					return ok1 && ok2
 				}, time.Second, 10*time.Millisecond)
 
-				status1, ok := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job1")
+				stop()
+
+				entry1, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job1")
 				require.True(t, ok)
-				assert.Equal(t, dyncfg.StatusAccepted, status1)
-				status2, ok := exposedStatusByKey(sd.exposed, testDiscovererTypeNetListeners+":job2")
+				assert.Equal(t, dyncfg.StatusAccepted, entry1.Status)
+				entry2, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job2")
 				require.True(t, ok)
-				assert.Equal(t, dyncfg.StatusAccepted, status2)
+				assert.Equal(t, dyncfg.StatusAccepted, entry2.Status)
 			},
 		},
 	}
@@ -116,8 +122,16 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			sd, confCh, cancel, done := newWaitTestServiceDiscovery(t, tc.waitTimeout)
-			defer stopWaitTestServiceDiscovery(t, sd, cancel, done)
-			tc.run(t, sd, confCh)
+			stopped := false
+			stop := func() {
+				if stopped {
+					return
+				}
+				stopped = true
+				stopWaitTestServiceDiscovery(t, sd, cancel, done)
+			}
+			defer stop()
+			tc.run(t, sd, confCh, stop)
 		})
 	}
 }
@@ -200,18 +214,7 @@ func newWaitTestPipeline(cfg pipeline.Config) (sdPipeline, error) {
 	return newTestPipeline(cfg.Name), nil
 }
 
-func exposedStatusByKey(cache *dyncfg.ExposedCache[sdConfig], key string) (dyncfg.Status, bool) {
-	var status dyncfg.Status
-	var found bool
-
-	cache.ForEach(func(k string, entry *dyncfg.Entry[sdConfig]) bool {
-		if k != key {
-			return true
-		}
-		status = entry.Status
-		found = true
-		return false
-	})
-
-	return status, found
+func exposedExistsByKey(cache *dyncfg.ExposedCache[sdConfig], key string) bool {
+	_, ok := cache.LookupByKey(key)
+	return ok
 }
