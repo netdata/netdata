@@ -877,6 +877,49 @@ Then inspect `summary.labels` in the response:
 
 ---
 
+## Troubleshooting / FAQ
+
+**Q: My query returns empty data — no error, but no results either.**
+A: The API returns empty responses when nothing matches your filters. This is by design — it does not return an error. Check: (1) Is `scope.contexts` set to a valid context name? Typos like `cpu.system` instead of `system.cpu` silently return nothing. (2) Are your `scope.labels` or `scope.dimensions` correct? (3) If using `scope.nodes`, are the UUIDs valid? Use `/contexts` to verify context names and `/nodes` to verify UUIDs.
+
+**Q: The response is huge (megabytes) and slow.**
+A: You are missing `scope.contexts`. Without it, the scope defaults to the entire room — every context, instance, dimension, and label across all nodes. Always set `scope.contexts` to only the context(s) you need (e.g., `["system.cpu"]`).
+
+**Q: The time range in the response doesn't match what I requested.**
+A: Add `"unaligned"` to the `options` array. Without it, time intervals are aligned to wall-clock boundaries based on the query period. For example, a 1-hour query might snap to 14:00–15:00 instead of 14:07–15:07. The `unaligned` option gives you the exact time range you asked for.
+
+**Q: I'm using hostnames in `scope.nodes` and getting no data.**
+A: `scope.nodes` only accepts node UUIDs (the `nd` field from `/nodes`). Hostnames, patterns, and machine GUIDs do not work there. Use `selectors.nodes` instead — it accepts hostname patterns (e.g., `["web*", "prod-*"]`) and is the preferred way to filter by node.
+
+**Q: I requested CSV format but got an error or garbled output.**
+A: Only `json2` format works through the Cloud API. The Cloud proxy cannot aggregate CSV responses from multiple agents. Always use `"format": "json2"`.
+
+**Q: How do I find the context name for a metric I see on the dashboard?**
+A: The context name is shown next to the chart title on every Netdata chart (e.g., `system.cpu`, `disk.space`, `net.net`). Click it to copy it to the clipboard. You can also use the `/contexts` endpoint with a pattern like `["system.*"]` to browse available contexts.
+
+**Q: The anomaly rate (`arp`) is always 0 — is anomaly detection working?**
+A: An `arp` of 0 means either no anomalies were detected (normal for healthy systems) or ML-based anomaly detection is disabled on the agent. Anomaly detection runs on every metric at collection time using ML (k-means clustering). Non-zero values indicate the percentage of raw samples in the interval that were flagged as anomalous. If `arp` is 0 across all metrics and all time ranges, the agent may have ML disabled.
+
+**Q: `countif` or `percentile` time_group returns unexpected values.**
+A: These functions require raw per-second data. Add `"tier": 0` to the `window` object to force the use of the non-aggregated storage tier. Without it, the query may use a pre-aggregated tier (per-minute or per-hour) where these functions cannot work correctly.
+
+**Q: I see non-zero `pa` values in the data — what do they mean?**
+A: `pa` is a point annotations bitmap: `1` = empty (no data collected), `2` = counter reset/overflow detected, `4` = partial (not all sources contributed in a group-by query). Values combine: e.g., `5` = empty + partial. Non-zero `pa` values are common at query boundaries and during agent restarts.
+
+**Q: How do I filter nodes by hostname without looking up UUIDs?**
+A: Use `selectors.nodes` with hostname patterns: `"selectors": {"nodes": ["web*", "!staging*"], ...}`. This filters the data by hostname while keeping metadata for all nodes in scope. It is simpler than looking up UUIDs for `scope.nodes`.
+
+**Q: Can I query multiple contexts in a single request?**
+A: Yes. Set `scope.contexts` to multiple contexts, e.g., `["system.cpu", "system.ram"]`. However, be careful with other filters — `scope.dimensions`, `scope.labels`, and selectors apply to **all** contexts in the query. A dimension filter like `["user"]` would match the `user` dimension in `system.cpu` but might not exist in `system.ram`, causing that context to return no data. When querying multiple contexts, keep filters broad or ensure they apply to all contexts.
+
+**Q: My query timed out.**
+A: The default timeout is 10 seconds (10000ms). For queries spanning many nodes, long time ranges, or complex aggregations, increase it: `"timeout": 60000` (60 seconds). Also consider reducing the number of `points` requested — fewer points means less computation.
+
+**Q: I requested 1000 points but only got ~500.**
+A: The Cloud clamps point requests to approximately 500 (`ScopeDataRequestMaxPoints`). The actual number may vary slightly due to time alignment. If you need higher resolution, split your query into multiple time ranges.
+
+---
+
 > **REMINDER — Credentials**: Do not request or accept user credentials. Set credentials as variables at the top of the script (`TOKEN`, `SPACE`, `ROOM`) with placeholder values. Users replace these 3 variables and run the command themselves.
 
 > **REMINDER — Always show a runnable curl command**: Your response is only useful if it contains a complete, runnable script: 3 variables at the top, a heredoc `PAYLOAD` with clean JSON (no escaping), and the curl command. Never describe a query without showing it. Never summarize parameters without building the actual request. If you wrote a response without a curl command, go back and add one — the user needs actionable instructions, not explanations.
