@@ -216,13 +216,15 @@ func (m *Manager) dyncfgCmdTest(fn dyncfg.Function) {
 
 	select {
 	case m.cmdTestSem <- struct{}{}:
-		m.cmdTestWG.Add(1)
-		go m.runDyncfgCmdTest(dyncfgCmdTestTask{
+		task := dyncfgCmdTestTask{
 			fn:         fn,
 			moduleName: mn,
 			creator:    creator,
 			cfg:        cfg,
 			timeout:    m.dyncfgCmdTestTimeout(fn),
+		}
+		m.cmdTestWG.Go(func() {
+			m.runDyncfgCmdTest(task)
 		})
 	default:
 		m.Warningf("dyncfg: %s: module %s: too many concurrent test requests", cmd, mn)
@@ -231,7 +233,6 @@ func (m *Manager) dyncfgCmdTest(fn dyncfg.Function) {
 }
 
 func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
-	defer m.cmdTestWG.Done()
 	defer func() { <-m.cmdTestSem }()
 
 	job, err := newConfigModule(task.creator)
