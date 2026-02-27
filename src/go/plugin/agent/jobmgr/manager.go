@@ -324,44 +324,21 @@ func (m *Manager) runProcessConfGroups(in chan []*confgroup.Group) {
 func (m *Manager) run() {
 	for {
 		if m.handler.WaitingForDecision() {
-			waitFor, hasTimeout := m.handler.WaitDecisionRemaining()
-			if !hasTimeout {
-				select {
-				case <-m.ctx.Done():
-					return
-				case fn := <-m.dyncfgCh:
-					m.dyncfgSeqExec(fn)
-				}
+			step, ok := m.handler.NextWaitDecisionStep(m.ctx, m.dyncfgCh)
+			if !ok {
+				return
+			}
+			if step.HasCommand {
+				m.dyncfgSeqExec(step.Command)
 				continue
 			}
-
-			timer := time.NewTimer(waitFor)
-			select {
-			case <-m.ctx.Done():
-				if !timer.Stop() {
-					select {
-					case <-timer.C:
-					default:
-					}
-				}
-				return
-			case fn := <-m.dyncfgCh:
-				if !timer.Stop() {
-					select {
-					case <-timer.C:
-					default:
-					}
-				}
-				m.dyncfgSeqExec(fn)
-			case <-timer.C:
-				if event, timedOut := m.handler.ExpireWaitDecision(); timedOut {
-					m.Errorf(
-						"dyncfg: timed out waiting for enable/disable decision for '%s' (elapsed=%s threshold=%s); keeping status 'accepted' and continuing",
-						event.Key,
-						event.Elapsed,
-						event.Threshold,
-					)
-				}
+			if step.TimedOut {
+				m.Errorf(
+					"dyncfg: timed out waiting for enable/disable decision for '%s' (elapsed=%s threshold=%s); keeping status 'accepted' and continuing",
+					step.Timeout.Key,
+					step.Timeout.Elapsed,
+					step.Timeout.Threshold,
+				)
 			}
 		} else {
 			select {

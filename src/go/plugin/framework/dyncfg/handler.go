@@ -3,6 +3,7 @@
 package dyncfg
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -92,6 +93,14 @@ type WaitTimeoutEvent struct {
 	Key       string
 	Elapsed   time.Duration
 	Threshold time.Duration
+}
+
+// WaitDecisionStep is one serialized wait-loop transition.
+type WaitDecisionStep struct {
+	Command    Function
+	HasCommand bool
+	Timeout    WaitTimeoutEvent
+	TimedOut   bool
 }
 
 func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
@@ -193,6 +202,46 @@ func (h *Handler[C]) WaitDecisionRemaining() (time.Duration, bool) {
 		return 0, true
 	}
 	return h.waitDeadline.Sub(now), true
+}
+
+// NextWaitDecisionStep blocks until either a dyncfg command arrives, wait timeout fires, or context is canceled.
+// It centralizes wait-loop orchestration so caller logic stays minimal.
+func (h *Handler[C]) NextWaitDecisionStep(ctx context.Context, dyncfgCh <-chan Function) (WaitDecisionStep, bool) {
+	var step WaitDecisionStep
+
+	waitFor, hasTimeout := h.WaitDecisionRemaining()
+	if !hasTimeout {
+		select {
+		case <-ctx.Done():
+			return step, false
+		case fn := <-dyncfgCh:
+			step.Command = fn
+			step.HasCommand = true
+			return step, true
+		}
+	}
+
+	timer := time.NewTimer(waitFor)
+	defer func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return step, false
+	case fn := <-dyncfgCh:
+		step.Command = fn
+		step.HasCommand = true
+		return step, true
+	case <-timer.C:
+		step.Timeout, step.TimedOut = h.ExpireWaitDecision()
+		return step, true
+	}
 }
 
 // ExpireWaitDecision clears the current wait gate when it exceeds configured timeout.

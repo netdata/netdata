@@ -4,6 +4,7 @@ package dyncfg
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -267,6 +268,73 @@ func TestHandler_WaitForDecision_TimeoutDisabledKeepsWait(t *testing.T) {
 	h.waitNow = func() time.Time { return base.Add(24 * time.Hour) }
 	_, timedOut := h.ExpireWaitDecision()
 	assert.False(t, timedOut)
+	assert.True(t, h.WaitingForDecision())
+}
+
+func TestHandler_NextWaitDecisionStep_Command(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandlerWithWaitTimeout(cb, 5*time.Second)
+
+	cfg := testConfig{
+		uid:        "uid-job1",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "mod/job1",
+	}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+	h.WaitForDecision(cfg)
+
+	ch := make(chan Function, 1)
+	fn := newTestFn("test:job1", "enable", "", nil)
+	ch <- fn
+
+	step, ok := h.NextWaitDecisionStep(context.Background(), ch)
+	require.True(t, ok)
+	require.True(t, step.HasCommand)
+	assert.Equal(t, fn.UID(), step.Command.UID())
+	assert.False(t, step.TimedOut)
+}
+
+func TestHandler_NextWaitDecisionStep_Timeout(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandlerWithWaitTimeout(cb, 20*time.Millisecond)
+
+	cfg := testConfig{
+		uid:        "uid-job1",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "mod/job1",
+	}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+	h.WaitForDecision(cfg)
+
+	ch := make(chan Function)
+	step, ok := h.NextWaitDecisionStep(context.Background(), ch)
+	require.True(t, ok)
+	require.True(t, step.TimedOut)
+	assert.Equal(t, "mod/job1", step.Timeout.Key)
+	assert.False(t, h.WaitingForDecision())
+}
+
+func TestHandler_NextWaitDecisionStep_ContextCancel(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandlerWithWaitTimeout(cb, 5*time.Second)
+
+	cfg := testConfig{
+		uid:        "uid-job1",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "mod/job1",
+	}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+	h.WaitForDecision(cfg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	ch := make(chan Function)
+	_, ok := h.NextWaitDecisionStep(ctx, ch)
+	assert.False(t, ok)
 	assert.True(t, h.WaitingForDecision())
 }
 
