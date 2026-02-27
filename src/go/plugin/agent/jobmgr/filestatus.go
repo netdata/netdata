@@ -119,11 +119,6 @@ func (s *fileStatus) add(cfg confgroup.Config, status string) {
 	}
 
 	s.items[cfg.Module()][s.jobKey(cfg)] = status
-
-	select {
-	case s.ch <- struct{}{}:
-	default:
-	}
 }
 
 func (s *fileStatus) remove(cfg confgroup.Config) {
