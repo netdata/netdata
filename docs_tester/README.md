@@ -2,28 +2,27 @@
 
 General-purpose documentation testing agent for validating Netdata documentation claims against live installations.
 
-## Test Environment Access
+## Environment Setup
 
-**IMPORTANT: VPN Required**
+Set the following environment variables before running the tester:
 
-The tester requires access to a Debian 12 VM for validating documentation claims.
+```bash
+export TEST_VM_HOST="<vm-host-ip>"       # Test VM IP address
+export TEST_VM_USER="<vm-user>"           # SSH username (must have sudo access)
+export TEST_VM_PASSWORD="<vm-password>"   # SSH password
+export NETDATA_URL="http://<vm-host-ip>:19999"  # Netdata URL
+```
 
-### Connection Details
+### Example
 
-- **Host**: 10.10.30.140
-- **OS**: Linux (Debian 12)
-- **User**: cm
-- **Password**: 123
-- **Access**: This user has root access via sudo
+```bash
+export TEST_VM_HOST="10.10.30.140"
+export TEST_VM_USER="cm"
+export TEST_VM_PASSWORD="123"
+export NETDATA_URL="http://10.10.30.140:19999"
+```
 
-### VPN Instructions
-
-You must be connected to the corporate VPN before running the tester.
-
-1. Connect to the corporate VPN
-2. Wait for connection to establish
-3. Verify connectivity: `ping -c 3 10.10.30.140`
-4. Proceed with testing
+**IMPORTANT**: VPN Required for accessing test VMs.
 
 ## Quick Start
 

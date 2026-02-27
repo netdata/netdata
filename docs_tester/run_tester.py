@@ -16,12 +16,12 @@ def main():
     
     from tester import DocumentationTester
     
-    # Default configuration
+    # Default configuration - load from environment variables
     config = {
-        'vm_host': '10.10.30.140',
-        'vm_user': 'cm',
-        'vm_password': '123',
-        'netdata_url': 'http://10.10.30.140:19999',
+        'vm_host': os.environ.get('TEST_VM_HOST'),
+        'vm_user': os.environ.get('TEST_VM_USER'),
+        'vm_password': os.environ.get('TEST_VM_PASSWORD'),
+        'netdata_url': os.environ.get('NETDATA_URL'),
         'output_dir': 'test_results'
     }
     

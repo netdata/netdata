@@ -11,6 +11,7 @@ import json
 import subprocess
 import time
 import argparse
+import shlex
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Union, TYPE_CHECKING
@@ -46,19 +47,21 @@ class DocumentationTester:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.test_results = []
-        self.vm_host = config.get('vm_host', '10.10.30.140')
-        self.vm_user = config.get('vm_user', 'cm')
-        self.vm_password = config.get('vm_password', '123')
-        self.netdata_url = config.get('netdata_url', 'http://10.10.30.140:19999')
+        self.vm_host = config.get('vm_host') or os.environ.get('TEST_VM_HOST', '10.10.30.140')
+        self.vm_user = config.get('vm_user') or os.environ.get('TEST_VM_USER', 'cm')
+        self.vm_password = config.get('vm_password') or os.environ.get('TEST_VM_PASSWORD', '')
+        self.netdata_url = config.get('netdata_url') or os.environ.get('NETDATA_URL', 'http://10.10.30.140:19999')
         self.output_dir = Path(config.get('output_dir', 'test_results'))
         self.output_dir.mkdir(exist_ok=True)
         self.workflows: List[Workflow] = []
+        self._backup_timestamp: Optional[int] = None
 
     def ssh_command(self, command: str, capture_output: bool = True) -> Dict[str, Any]:
         """Execute SSH command on test VM"""
         try:
+            quoted_password = shlex.quote(self.vm_password) if self.vm_password else ''
             cmd = [
-                'sshpass', '-p', self.vm_password,
+                'sshpass', '-p', self.vm_password if self.vm_password else '',
                 'ssh', '-o', 'StrictHostKeyChecking=no',
                 f'{self.vm_user}@{self.vm_host}',
                 command
@@ -327,7 +330,8 @@ class DocumentationTester:
                 'description': f"Backing up {config_file}"
             })
             
-            backup_cmd = f'sudo cp {config_file} {config_file}.backup.{int(time.time())}'
+            self._backup_timestamp = int(time.time())
+            backup_cmd = f'sudo cp {config_file} {config_file}.backup.{self._backup_timestamp}'
             backup_result = self.ssh_command(backup_cmd)
             
             if not backup_result['success']:
@@ -482,8 +486,12 @@ class DocumentationTester:
 
     def restore_config(self, config_file: str):
         """Restore original configuration"""
-        restore_cmd = f'sudo mv {config_file}.backup.{int(time.time())} {config_file} 2>/dev/null || true'
+        if self._backup_timestamp is not None:
+            restore_cmd = f'sudo mv {config_file}.backup.{self._backup_timestamp} {config_file} 2>/dev/null || true'
+        else:
+            restore_cmd = f'sudo mv {config_file}.backup.* {config_file} 2>/dev/null || true'
         self.ssh_command(restore_cmd)
+        self._backup_timestamp = None
 
     def execute_workflow(self, workflow) -> Dict[str, Any]:
         """Execute a workflow and verify each step"""
@@ -772,10 +780,9 @@ class DocumentationTester:
 def main():
     parser = argparse.ArgumentParser(description='Test Netdata documentation claims')
     parser.add_argument('doc_file', help='Path to documentation file')
-    parser.add_argument('--vm-host', default='10.10.30.140', help='Test VM IP')
-    parser.add_argument('--vm-user', default='cm', help='SSH user')
-    parser.add_argument('--vm-password', default='123', help='SSH password')
-    parser.add_argument('--netdata-url', default='http://10.10.30.140:19999', help='Netdata URL')
+    parser.add_argument('--vm-host', help='Test VM IP (or set TEST_VM_HOST env var)')
+    parser.add_argument('--vm-user', help='SSH user (or set TEST_VM_USER env var)')
+    parser.add_argument('--netdata-url', help='Netdata URL (or set NETDATA_URL env var)')
     parser.add_argument('--output-dir', default='test_results', help='Output directory')
     parser.add_argument('--format', choices=['markdown', 'json'], default='markdown', help='Report format')
     
@@ -784,7 +791,6 @@ def main():
     config = {
         'vm_host': args.vm_host,
         'vm_user': args.vm_user,
-        'vm_password': args.vm_password,
         'netdata_url': args.netdata_url,
         'output_dir': args.output_dir
     }
