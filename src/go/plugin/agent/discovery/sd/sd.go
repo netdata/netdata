@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
@@ -19,6 +20,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 )
+
+const waitDecisionTimeout = 5 * time.Second
 
 type Config struct {
 	ConfigDefaults confgroup.Registry
@@ -68,6 +71,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		WaitKey: func(cfg sdConfig) string {
 			return cfg.PipelineKey()
 		},
+		WaitTimeout: waitDecisionTimeout,
 
 		Path:           fmt.Sprintf(dyncfgSDPath, cfg.PluginName),
 		EnableFailCode: 422,
@@ -167,12 +171,21 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 func (d *ServiceDiscovery) run(ctx context.Context) {
 	for {
 		if d.handler.WaitingForDecision() {
-			// Waiting for enable/disable command - only process dyncfg commands
-			select {
-			case <-ctx.Done():
+			step, ok := d.handler.NextWaitDecisionStep(ctx, d.dyncfgCh)
+			if !ok {
 				return
-			case fn := <-d.dyncfgCh:
-				d.dyncfgSeqExec(fn)
+			}
+			if step.HasCommand {
+				d.dyncfgSeqExec(step.Command)
+				continue
+			}
+			if step.TimedOut {
+				d.Errorf(
+					"dyncfg: timed out waiting for enable/disable decision for '%s' (elapsed=%s threshold=%s); keeping status 'accepted' and continuing",
+					step.Timeout.Key,
+					step.Timeout.Elapsed,
+					step.Timeout.Threshold,
+				)
 			}
 		} else {
 			select {
