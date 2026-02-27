@@ -73,7 +73,8 @@ class Reporter:
                         elif 'instruction' in step:
                             report += f"- {step['instruction']}\n"
                     else:
-                        report += f"- {step.description}\n"
+                        # Step object - use instruction attribute
+                        report += f"- {step.instruction}\n"
 
             if result.get('steps'):
                 report += f"""

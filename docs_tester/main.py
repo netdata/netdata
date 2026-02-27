@@ -117,9 +117,9 @@ def main():
 
     print("Generating report...")
     if args.format == 'markdown':
-        report = reporter.generate_markdown_report(test_results, args.doc_file, args.netdata_url)
+        report = reporter.generate_markdown_report(test_results, args.doc_file, netdata_url)
     else:
-        report = reporter.generate_json_report(test_results, args.doc_file, args.netdata_url)
+        report = reporter.generate_json_report(test_results, args.doc_file, netdata_url)
 
     report_file = reporter.save_report(report, args.doc_file, args.format)
 
