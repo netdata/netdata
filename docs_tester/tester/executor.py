@@ -8,6 +8,8 @@ from typing import Dict, Any, Optional
 from .ssh_client import SSHClient
 from .claim_extractor import StepType, Step, Workflow
 
+MAX_SLEEP_SECONDS = 300  # Cap sleep at 5 minutes
+
 
 class Executor:
     """Execute commands, configurations, and workflows"""
@@ -134,9 +136,6 @@ class Executor:
         }
 
         try:
-            import urllib.request
-            import urllib.error
-
             url_match = re.search(r'http[s]?://[^\s\'"]+', content)
             url = url_match.group(0) if url_match else None
 
@@ -353,6 +352,7 @@ class Executor:
                 duration *= 60
             elif time_unit == 'hour':
                 duration *= 3600
+            duration = min(duration, MAX_SLEEP_SECONDS)
             time.sleep(duration)
         else:
             step_result['evidence'].append({

@@ -4,6 +4,7 @@ import subprocess
 import os
 import tempfile
 import time
+import shlex
 from typing import Dict, Any, Optional
 
 
@@ -14,8 +15,9 @@ class SSHClient:
         self.host = host
         self.user = user
         self.password = password
+        self._quoted_password = shlex.quote(password) if password else ''
         self._ssh_base = [
-            'sshpass', '-p', password,
+            'sshpass', '-p', password if password else '',
             'ssh', '-o', 'StrictHostKeyChecking=no',
             f'{user}@{host}'
         ]
@@ -52,8 +54,7 @@ class SSHClient:
 
     def sudo(self, command: str, capture_output: bool = True, timeout: int = 60) -> Dict[str, Any]:
         """Execute command with sudo on remote VM using -S flag"""
-        # Use sudo -S to read password from stdin
-        sudo_command = f"echo '{self.password}' | sudo -S {command}"
+        sudo_command = f"echo {self._quoted_password} | sudo -S {command}"
         return self._run(sudo_command, capture_output, timeout)
 
     def file_exists(self, path: str) -> bool:

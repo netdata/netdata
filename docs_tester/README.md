@@ -2,55 +2,22 @@
 
 General-purpose documentation testing agent for validating Netdata documentation claims against live installations.
 
-## Configuration
+## Environment Setup
 
-The tester reads configuration from environment variables:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VM_HOST` | Test VM hostname/IP | (required) |
-| `VM_USER` | SSH username | (required) |
-| `VM_PASSWORD` | SSH password | (required) |
-| `NETDATA_URL` | Netdata agent URL | http://VM_HOST:19999 |
-| `OUTPUT_DIR` | Test results directory | test_results |
-
-### Setting Up Credentials
+Set the following environment variables before running the tester:
 
 ```bash
-# Set environment variables
-export VM_HOST="your-vm-host"
-export VM_USER="your-username"
-export VM_PASSWORD="your-password"
-export NETDATA_URL="http://your-vm-host:19999"
+export TEST_VM_HOST="<vm-host-ip>"       # Test VM IP address
+export TEST_VM_USER="<vm-user>"           # SSH username (must have sudo access)
+export TEST_VM_PASSWORD="<vm-password>"   # SSH password
+export NETDATA_URL="http://<vm-host-ip>:19999"  # Netdata URL
 ```
 
-## Test Environment Access
-
-**IMPORTANT: VPN Required**
-
-The tester requires access to a Linux VM (Debian 12 recommended) for validating documentation claims.
-
-### Connection Requirements
-
-- SSH access with sudo privileges
-- Netdata agent installed and running
-- VPN access if VM is on internal network
-
-### VPN Instructions
-
-1. Connect to the corporate VPN
-2. Wait for connection to establish
-3. Verify connectivity: `ping -c 3 $VM_HOST`
-4. Proceed with testing
+**IMPORTANT**: VPN Required for accessing internal test VMs.
 
 ## Quick Start
 
 ```bash
-# Set credentials
-export VM_HOST="10.10.30.140"
-export VM_USER="cm"
-export VM_PASSWORD="123"
-
 # Test a documentation file
 python3 docs_tester/main.py path/to/documentation.md
 ```
@@ -68,3 +35,4 @@ python3 docs_tester/main.py path/to/documentation.md
 - `run_tester.py` - Convenience wrapper
 - `pr_commenter.py` - PR commenting utility
 - `tester/` - Core testing modules
+- `config.py` - Configuration defaults

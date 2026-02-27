@@ -10,7 +10,7 @@ class Reporter:
 
     def __init__(self, output_dir: str = 'test_results'):
         self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def generate_markdown_report(
         self, test_results: List[Dict[str, Any]], doc_file: str, netdata_url: str
@@ -119,7 +119,7 @@ class Reporter:
         extension = 'md' if format == 'markdown' else 'json'
         report_file = self.output_dir / f'{doc_name}_{timestamp}.{extension}'
 
-        report_file.write_text(report)
+        report_file.write_text(report, encoding='utf-8')
         print(f"Report saved to: {report_file}")
 
         return str(report_file)

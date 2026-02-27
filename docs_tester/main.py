@@ -5,6 +5,7 @@ Netdata Documentation Tester - Main CLI Entry Point
 
 import sys
 import argparse
+import os
 from pathlib import Path
 
 from tester import SSHClient, ClaimExtractor, Executor, Reporter
@@ -15,10 +16,9 @@ from config import VM_HOST, VM_USER, VM_PASSWORD, NETDATA_URL, OUTPUT_DIR
 def main():
     parser = argparse.ArgumentParser(description='Test Netdata documentation claims')
     parser.add_argument('doc_file', help='Path to documentation file')
-    parser.add_argument('--vm-host', default=VM_HOST, help='Test VM IP')
-    parser.add_argument('--vm-user', default=VM_USER, help='SSH user')
-    parser.add_argument('--vm-password', default=VM_PASSWORD, help='SSH password')
-    parser.add_argument('--netdata-url', default=NETDATA_URL, help='Netdata URL')
+    parser.add_argument('--vm-host', help='Test VM IP (or set TEST_VM_HOST env var)')
+    parser.add_argument('--vm-user', help='SSH user (or set TEST_VM_USER env var)')
+    parser.add_argument('--netdata-url', help='Netdata URL (or set NETDATA_URL env var)')
     parser.add_argument('--output-dir', default=OUTPUT_DIR, help='Output directory')
     parser.add_argument('--format', choices=['markdown', 'json'], default='markdown', help='Report format')
 
@@ -28,14 +28,20 @@ def main():
         print(f"Error: Documentation file not found: {args.doc_file}")
         sys.exit(1)
 
+    # Use CLI args or fall back to environment variables
+    vm_host = args.vm_host or VM_HOST
+    vm_user = args.vm_user or VM_USER
+    vm_password = os.environ.get('TEST_VM_PASSWORD', VM_PASSWORD)
+    netdata_url = args.netdata_url or NETDATA_URL
+
     print(f"Testing documentation: {args.doc_file}")
-    print(f"Test VM: {args.vm_host}")
-    print(f"Netdata URL: {args.netdata_url}")
+    print(f"Test VM: {vm_host}")
+    print(f"Netdata URL: {netdata_url}")
     print("-" * 60)
 
-    ssh_client = SSHClient(args.vm_host, args.vm_user, args.vm_password)
+    ssh_client = SSHClient(vm_host, vm_user, vm_password)
     claim_extractor = ClaimExtractor()
-    executor = Executor(ssh_client, args.netdata_url)
+    executor = Executor(ssh_client, netdata_url)
     reporter = Reporter(args.output_dir)
 
     print("Parsing documentation...")
