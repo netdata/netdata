@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"slices"
 	"sync"
 	"time"
@@ -17,13 +15,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -596,116 +592,7 @@ func (m *Manager) baseContext() context.Context {
 }
 
 func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
-	creator, ok := m.modules[cfg.Module()]
-	if !ok {
-		return nil, fmt.Errorf("can not find %s module", cfg.Module())
-	}
-
-	// Determine if job is function-only (module-level OR config-level)
-	functionOnly := creator.FunctionOnly || cfg.FunctionOnly()
-
-	// Reject if config sets function_only but module has no methods
-	// Note: module-level FunctionOnly without Methods is caught at registration time
-	if cfg.FunctionOnly() && creator.Methods == nil && creator.JobMethods == nil {
-		return nil, fmt.Errorf("function_only is set but %s module has no methods defined", cfg.Module())
-	}
-
-	var vnode *vnodes.VirtualNode
-
-	if cfg.Vnode() != "" {
-		n, ok := m.vnodes.Lookup(cfg.Vnode())
-		if !ok || n == nil {
-			return nil, fmt.Errorf("vnode '%s' is not found", cfg.Vnode())
-		}
-		vnode = n
-	}
-
-	m.Debugf("creating %s[%s] job, config: %v", cfg.Module(), cfg.Name(), cfg)
-
-	useV2 := creator.CreateV2 != nil
-
-	var jobCaptureDir string
-	if m.auditDataDir != "" && !useV2 {
-		jobCaptureDir = filepath.Join(m.auditDataDir, naming.Sanitize(cfg.Module()), naming.Sanitize(cfg.Name()))
-		if err := os.MkdirAll(jobCaptureDir, 0o755); err != nil {
-			return nil, fmt.Errorf("creating audit directory: %w", err)
-		}
-	}
-
-	if useV2 {
-		mod := creator.CreateV2()
-		if mod == nil {
-			return nil, fmt.Errorf("module %s CreateV2 returned nil", cfg.Module())
-		}
-		if err := applyConfig(cfg, mod); err != nil {
-			return nil, err
-		}
-
-		jobCfg := jobruntime.JobV2Config{
-			PluginName:      m.pluginName,
-			Name:            cfg.Name(),
-			ModuleName:      cfg.Module(),
-			FullName:        cfg.FullName(),
-			UpdateEvery:     cfg.UpdateEvery(),
-			AutoDetectEvery: cfg.AutoDetectionRetry(),
-			IsStock:         cfg.SourceType() == "stock",
-			Labels:          makeLabels(cfg),
-			Out:             m.out,
-			Module:          mod,
-			FunctionOnly:    functionOnly,
-			RuntimeService:  m.runtimeService,
-		}
-		if vnode != nil {
-			jobCfg.Vnode = *vnode.Copy()
-		}
-		return jobruntime.NewJobV2(jobCfg), nil
-	}
-
-	if creator.Create == nil {
-		return nil, fmt.Errorf("module %s has no compatible creator", cfg.Module())
-	}
-
-	mod := creator.Create()
-
-	if err := applyConfig(cfg, mod); err != nil {
-		return nil, err
-	}
-
-	if m.auditAnalyzer != nil && jobCaptureDir != "" {
-		// Auditing hooks are V1-only; V2 jobs are intentionally excluded.
-		m.auditAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobCaptureDir)
-	}
-
-	if jobCaptureDir != "" {
-		if captureAware, ok := mod.(metricsaudit.Capturable); ok {
-			captureAware.EnableCaptureArtifacts(jobCaptureDir)
-		}
-	}
-
-	jobCfg := jobruntime.JobConfig{
-		PluginName:      m.pluginName,
-		Name:            cfg.Name(),
-		ModuleName:      cfg.Module(),
-		FullName:        cfg.FullName(),
-		UpdateEvery:     cfg.UpdateEvery(),
-		AutoDetectEvery: cfg.AutoDetectionRetry(),
-		Priority:        cfg.Priority(),
-		Labels:          makeLabels(cfg),
-		IsStock:         cfg.SourceType() == "stock",
-		Module:          mod,
-		Out:             m.out,
-		AuditMode:       m.auditMode,
-		AuditAnalyzer:   m.auditAnalyzer,
-		FunctionOnly:    functionOnly,
-	}
-
-	if vnode != nil {
-		jobCfg.Vnode = *vnode.Copy()
-	}
-
-	job := jobruntime.NewJob(jobCfg)
-
-	return job, nil
+	return newJobFactory(m).Create(cfg)
 }
 
 func runRetryTask(ctx context.Context, out chan<- confgroup.Config, cfg confgroup.Config) {
