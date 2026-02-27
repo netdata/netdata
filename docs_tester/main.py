@@ -8,6 +8,7 @@ import argparse
 from pathlib import Path
 
 from tester import SSHClient, ClaimExtractor, Executor, Reporter
+from tester.claim_extractor import Step, StepType
 from config import VM_HOST, VM_USER, VM_PASSWORD, NETDATA_URL, OUTPUT_DIR
 
 
@@ -81,11 +82,23 @@ def main():
     for i, claim in enumerate(workflow_claims, 1):
         print(f"[{i}/{len(workflow_claims)}] Testing workflow: {claim['description']}")
 
+        # Convert dict steps to Step objects
+        step_objects = []
+        for idx, step_dict in enumerate(claim.get('steps', []), 1):
+            step = Step(
+                type=StepType[step_dict.get('type', 'COMMAND').upper()] if isinstance(step_dict.get('type'), str) else step_dict.get('type', StepType.COMMAND),
+                instruction=step_dict.get('instruction', ''),
+                expected=step_dict.get('expected', 'Step completes successfully'),
+                number=idx
+            )
+            step_objects.append(step)
+
+        # Create Workflow object
         workflow = type('Workflow', (), {
             'description': claim['description'],
             'start_line': int(claim['line_range'].split('-')[0]) if '-' in claim['line_range'] else int(claim['line_range']),
             'end_line': int(claim['line_range'].split('-')[1]) if '-' in claim['line_range'] else int(claim['line_range']),
-            'steps': claim.get('steps', [])
+            'steps': step_objects
         })()
 
         result = executor.execute_workflow(workflow)

@@ -75,16 +75,19 @@ I've tested the claims in this documentation update against a live Netdata insta
 def post_pr_comment(pr_number: str, comment: str):
     """Post comment to GitHub PR using gh CLI"""
     try:
-        temp_file = Path('/tmp/pr_comment.md')
-        temp_file.write_text(comment)
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+            f.write(comment)
+            temp_path = f.name
 
-        cmd = ['gh', 'pr', 'comment', pr_number, '--body-file', str(temp_file)]
-        subprocess.run(cmd, check=True)
+        try:
+            cmd = ['gh', 'pr', 'comment', pr_number, '--body-file', temp_path]
+            subprocess.run(cmd, check=True)
 
-        print(f"✅ Comment posted to PR #{pr_number}")
-        print(f"   View: https://github.com/netdata/netdata/pull/{pr_number}")
-
-        temp_file.unlink()
+            print(f"✅ Comment posted to PR #{pr_number}")
+            print(f"   View: https://github.com/netdata/netdata/pull/{pr_number}")
+        finally:
+            Path(temp_path).unlink()
 
     except subprocess.CalledProcessError as e:
         print(f"❌ Failed to post comment: {e}")
@@ -106,14 +109,6 @@ def main():
         print(f"Error: Report file not found: {args.report_file}")
         sys.exit(1)
 
-    try:
-        subprocess.run(['gh', 'auth', 'status'],
-                       capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("Error: GitHub CLI (gh) not authenticated or not found")
-        print("Run: gh auth login")
-        sys.exit(1)
-
     comment = generate_pr_comment(args.report_file, args.pr_number)
 
     if args.dry_run:
@@ -125,6 +120,15 @@ def main():
         print()
         print("=" * 60)
     else:
+        # Only check auth when actually posting
+        try:
+            subprocess.run(['gh', 'auth', 'status'],
+                          capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print("Error: GitHub CLI (gh) not authenticated or not found")
+            print("Run: gh auth login")
+            sys.exit(1)
+
         post_pr_comment(args.pr_number, comment)
 
 
