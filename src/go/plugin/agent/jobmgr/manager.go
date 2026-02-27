@@ -522,9 +522,30 @@ func (m *Manager) waitCmdTestWorkers() {
 
 // registerJobMethods registers methods for a specific job with Netdata
 func (m *Manager) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) {
+	planned := make(map[string]struct{}, len(methods))
+
 	for _, method := range methods {
 		if method.ID == "" {
 			m.Warningf("skipping job method registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
+			continue
+		}
+
+		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
+
+		if _, exists := planned[method.ID]; exists {
+			m.Errorf("job method registration aborted for %s[%s]: duplicate method ID in batch ('%s')", job.ModuleName(), job.Name(), funcName)
+			return
+		}
+		planned[method.ID] = struct{}{}
+
+		if collision, exists := m.moduleFuncs.findMethodCollision(job.ModuleName(), job.Name(), method.ID); exists {
+			m.Errorf("job method registration aborted for %s[%s]: collision on '%s' (%s)", job.ModuleName(), job.Name(), funcName, collision)
+			return
+		}
+	}
+
+	for _, method := range methods {
+		if method.ID == "" {
 			continue
 		}
 

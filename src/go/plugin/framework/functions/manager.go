@@ -107,6 +107,19 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 	m.mux.Lock()
 	fs, ok := m.FunctionRegistry[name]
+	var (
+		direct   func(Function)
+		prefixes map[string]func(Function)
+	)
+	if ok && fs != nil {
+		direct = fs.direct
+		if len(fs.prefixes) > 0 {
+			prefixes = make(map[string]func(Function), len(fs.prefixes))
+			for prefix, handler := range fs.prefixes {
+				prefixes[prefix] = handler
+			}
+		}
+	}
 	m.mux.Unlock()
 
 	if !ok || fs == nil {
@@ -114,13 +127,13 @@ func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 	}
 
 	return func(f Function) {
-		if len(fs.prefixes) > 0 {
-			m.handlePrefixRouting(f, fs)
+		if len(prefixes) > 0 {
+			m.handlePrefixRouting(f, prefixes)
 			return
 		}
 
-		if fs.direct != nil {
-			fs.direct(f)
+		if direct != nil {
+			direct(f)
 			return
 		}
 
@@ -128,14 +141,14 @@ func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 	}, true
 }
 
-func (m *Manager) handlePrefixRouting(f Function, fs *functionSet) {
+func (m *Manager) handlePrefixRouting(f Function, prefixes map[string]func(Function)) {
 	if len(f.Args) == 0 {
 		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
 		return
 	}
 
 	id := f.Args[0]
-	for prefix, handler := range fs.prefixes {
+	for prefix, handler := range prefixes {
 		if strings.HasPrefix(id, prefix) {
 			handler(f)
 			return

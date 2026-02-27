@@ -290,3 +290,34 @@ func (r *moduleFuncRegistry) getJobMethod(moduleName, jobName, methodID string) 
 	}
 	return nil, false
 }
+
+// findMethodCollision checks whether module:method key would collide with already-registered methods.
+// It checks static module methods and job methods from other jobs within the same module.
+func (r *moduleFuncRegistry) findMethodCollision(moduleName, jobName, methodID string) (collision string, ok bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	mf, ok := r.modules[moduleName]
+	if !ok {
+		return "", false
+	}
+
+	if mf.methodsByID != nil {
+		if _, exists := mf.methodsByID[methodID]; exists {
+			return "static method", true
+		}
+	}
+
+	for ownerJob, methods := range mf.jobMethods {
+		if ownerJob == jobName {
+			continue
+		}
+		for _, method := range methods {
+			if method.ID == methodID {
+				return "job method on " + ownerJob, true
+			}
+		}
+	}
+
+	return "", false
+}

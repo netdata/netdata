@@ -11,8 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -167,6 +170,65 @@ func TestRunNotifyRunningJobs_TickOutsideLock(t *testing.T) {
 	}
 }
 
+func TestRegisterJobMethods_FailFastOnCollisionWithStaticMethod(t *testing.T) {
+	fnReg := &recordingFunctionRegistry{}
+	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
+	mgr.moduleFuncs.registerModule("mod", collectorapi.Creator{
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{ID: "dup"}}
+		},
+	})
+
+	job := &lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
+	mgr.registerJobMethods(job, []funcapi.MethodConfig{{ID: "dup"}})
+
+	assert.Empty(t, fnReg.registeredNames())
+	assert.Empty(t, mgr.moduleFuncs.getJobMethods("mod", "job1"))
+}
+
+func TestRegisterJobMethods_FailFastOnCollisionWithOtherJob(t *testing.T) {
+	fnReg := &recordingFunctionRegistry{}
+	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
+	mgr.moduleFuncs.registerModule("mod", collectorapi.Creator{})
+	mgr.moduleFuncs.registerJobMethods("mod", "jobA", []funcapi.MethodConfig{{ID: "dup"}})
+
+	job := &lockProbeJob{fullName: "mod_jobB", moduleName: "mod", name: "jobB"}
+	mgr.registerJobMethods(job, []funcapi.MethodConfig{{ID: "dup"}})
+
+	assert.Empty(t, fnReg.registeredNames())
+	assert.Empty(t, mgr.moduleFuncs.getJobMethods("mod", "jobB"))
+}
+
+func TestRegisterJobMethods_FailFastOnDuplicateWithinBatch(t *testing.T) {
+	fnReg := &recordingFunctionRegistry{}
+	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
+	mgr.moduleFuncs.registerModule("mod", collectorapi.Creator{})
+
+	job := &lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
+	mgr.registerJobMethods(job, []funcapi.MethodConfig{
+		{ID: "dup"},
+		{ID: "dup"},
+	})
+
+	assert.Empty(t, fnReg.registeredNames())
+	assert.Empty(t, mgr.moduleFuncs.getJobMethods("mod", "job1"))
+}
+
+func TestRegisterJobMethods_SuccessCommitsAllMethods(t *testing.T) {
+	fnReg := &recordingFunctionRegistry{}
+	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
+	mgr.moduleFuncs.registerModule("mod", collectorapi.Creator{})
+
+	job := &lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
+	mgr.registerJobMethods(job, []funcapi.MethodConfig{
+		{ID: "a"},
+		{ID: "b"},
+	})
+
+	assert.ElementsMatch(t, []string{"mod:a", "mod:b"}, fnReg.registeredNames())
+	assert.Len(t, mgr.moduleFuncs.getJobMethods("mod", "job1"), 2)
+}
+
 type lockProbeJob struct {
 	fullName   string
 	moduleName string
@@ -198,3 +260,26 @@ func (j *lockProbeJob) IsRunning() bool                   { return true }
 func (j *lockProbeJob) Panicked() bool                    { return false }
 func (j *lockProbeJob) Vnode() vnodes.VirtualNode         { return vnodes.VirtualNode{} }
 func (j *lockProbeJob) UpdateVnode(_ *vnodes.VirtualNode) {}
+
+type recordingFunctionRegistry struct {
+	mu         sync.Mutex
+	registered []string
+}
+
+func (r *recordingFunctionRegistry) Register(name string, _ func(functions.Function)) {
+	r.mu.Lock()
+	r.registered = append(r.registered, name)
+	r.mu.Unlock()
+}
+
+func (r *recordingFunctionRegistry) Unregister(string)                                       {}
+func (r *recordingFunctionRegistry) RegisterPrefix(string, string, func(functions.Function)) {}
+func (r *recordingFunctionRegistry) UnregisterPrefix(string, string)                         {}
+
+func (r *recordingFunctionRegistry) registeredNames() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]string, len(r.registered))
+	copy(out, r.registered)
+	return out
+}
