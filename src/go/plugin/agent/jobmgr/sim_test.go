@@ -63,6 +63,21 @@ func (s *runSim) run(t *testing.T) {
 	}
 
 	s.do(mgr, grpCh)
+
+	expectedResults := strings.Count(s.wantDyncfg, "FUNCTION_RESULT_END")
+	require.Eventually(t, func() bool {
+		return countDiscovered(mgr) == len(s.wantDiscovered) &&
+			mgr.seen.Count() == len(s.wantSeen) &&
+			mgr.exposed.Count() == len(s.wantExposed) &&
+			runningSetMatches(mgr.runningJobs.snapshot(), s.wantRunning) &&
+			strings.Count(buf.String(), "FUNCTION_RESULT_END") >= expectedResults
+	}, timeout, 10*time.Millisecond, "manager state did not settle before shutdown")
+
+	runningBeforeShutdown := make(map[string]struct{})
+	for _, job := range mgr.runningJobs.snapshot() {
+		runningBeforeShutdown[job.FullName()] = struct{}{}
+	}
+
 	cancel()
 
 	select {
@@ -123,10 +138,10 @@ func (s *runSim) run(t *testing.T) {
 		require.Truef(t, we.status == entry.Status, "exposed: wrong status for '%s', want %s got %s", we.cfg.UID(), we.status, entry.Status)
 	}
 
-	wantLen, gotLen = len(s.wantRunning), len(mgr.runningJobs.items)
+	wantLen, gotLen = len(s.wantRunning), len(runningBeforeShutdown)
 	require.Equalf(t, wantLen, gotLen, "runningJobs: different len (want %d got %d)", wantLen, gotLen)
 	for _, name := range s.wantRunning {
-		_, ok := mgr.runningJobs.lookup(name)
+		_, ok := runningBeforeShutdown[name]
 		require.Truef(t, ok, "runningJobs: job '%s' is not found", name)
 	}
 }
@@ -202,4 +217,31 @@ func prepareMockRegistry() collectorapi.Registry {
 	})
 
 	return reg
+}
+
+func countDiscovered(mgr *Manager) int {
+	var n int
+	for _, cfgs := range mgr.discoveredConfigs.items {
+		n += len(cfgs)
+	}
+	return n
+}
+
+func runningSetMatches(jobs []runtimeJob, want []string) bool {
+	if len(jobs) != len(want) {
+		return false
+	}
+
+	wantSet := make(map[string]struct{}, len(want))
+	for _, name := range want {
+		wantSet[name] = struct{}{}
+	}
+
+	for _, job := range jobs {
+		if _, ok := wantSet[job.FullName()]; !ok {
+			return false
+		}
+	}
+
+	return true
 }
