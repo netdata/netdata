@@ -78,7 +78,7 @@ func (cb *sdCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, ok bool
 
 func (cb *sdCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (sdConfig, error) {
 	dt, _, _ := cb.sd.extractDiscovererAndName(fn.ID())
-	if _, err := parseDyncfgPayload(fn.Payload(), dt, cb.sd.configDefaults, cb.sd.discovererRegistry()); err != nil {
+	if _, err := parseDyncfgPayload(fn.Payload(), dt, cb.sd.configDefaults, cb.sd.discovererRegistry(), true); err != nil {
 		return nil, err
 	}
 	pkey := pipelineKey(dt, name)
@@ -246,7 +246,7 @@ func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 	}
 
 	// Parse and validate the config without storing it
-	_, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults, d.discovererRegistry())
+	_, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults, d.discovererRegistry(), true)
 	if err != nil {
 		d.Warningf("dyncfg: test: failed to parse config for '%s': %v", dt, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
@@ -279,7 +279,7 @@ func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn dyncfg.Function) {
 		return
 	}
 
-	if _, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults, d.discovererRegistry()); err != nil {
+	if _, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults, d.discovererRegistry(), false); err != nil {
 		d.Warningf("dyncfg: userconfig: failed to parse config for '%s': %v", id, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
 		return
