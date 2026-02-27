@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,14 +39,56 @@ type runSim struct {
 	wantDyncfg     string
 }
 
+const funcResultEndMarker = "FUNCTION_RESULT_END\n\n"
+
+type simOutput struct {
+	mu sync.Mutex
+
+	buf             bytes.Buffer
+	funcResultCount int
+	tail            string
+}
+
+func (o *simOutput) Write(p []byte) (int, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	n, err := o.buf.Write(p)
+	if n > 0 {
+		data := o.tail + string(p[:n])
+		o.funcResultCount += strings.Count(data, funcResultEndMarker)
+
+		tailLen := len(funcResultEndMarker) - 1
+		if len(data) > tailLen {
+			o.tail = data[len(data)-tailLen:]
+		} else {
+			o.tail = data
+		}
+	}
+
+	return n, err
+}
+
+func (o *simOutput) String() string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.buf.String()
+}
+
+func (o *simOutput) FuncResultCount() int {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.funcResultCount
+}
+
 func (s *runSim) run(t *testing.T) {
 	t.Helper()
 
 	require.NotNil(t, s.do, "s.do is nil")
 
-	var buf bytes.Buffer
+	var out simOutput
 	mgr := New(Config{PluginName: testPluginName})
-	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))))
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))))
 	mgr.modules = prepareMockRegistry()
 
 	done := make(chan struct{})
@@ -70,7 +113,7 @@ func (s *runSim) run(t *testing.T) {
 			mgr.seen.Count() == len(s.wantSeen) &&
 			mgr.exposed.Count() == len(s.wantExposed) &&
 			runningSetMatches(mgr.runningJobs.snapshot(), s.wantRunning) &&
-			strings.Count(buf.String(), "FUNCTION_RESULT_END") >= expectedResults
+			out.FuncResultCount() >= expectedResults
 	}, timeout, 10*time.Millisecond, "manager state did not settle before shutdown")
 
 	runningBeforeShutdown := make(map[string]struct{})
@@ -87,7 +130,7 @@ func (s *runSim) run(t *testing.T) {
 	}
 
 	var lines []string
-	for _, s := range strings.Split(buf.String(), "\n") {
+	for _, s := range strings.Split(out.String(), "\n") {
 		if strings.HasPrefix(s, "CONFIG") && strings.Contains(s, " template ") {
 			continue
 		}
