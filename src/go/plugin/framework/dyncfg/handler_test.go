@@ -223,12 +223,12 @@ func TestHandler_WaitForDecision_TimeoutClearsWait(t *testing.T) {
 	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
 
 	base := time.Unix(1000, 0)
-	h.waitNow = func() time.Time { return base }
+	h.waitGate.setNow(func() time.Time { return base })
 
 	h.WaitForDecision(cfg)
 	assert.True(t, h.WaitingForDecision())
 
-	h.waitNow = func() time.Time { return base.Add(4 * time.Second) }
+	h.waitGate.setNow(func() time.Time { return base.Add(4 * time.Second) })
 	remaining, ok := h.WaitDecisionRemaining()
 	assert.True(t, ok)
 	assert.Equal(t, time.Second, remaining)
@@ -237,7 +237,7 @@ func TestHandler_WaitForDecision_TimeoutClearsWait(t *testing.T) {
 	assert.False(t, timedOut)
 	assert.True(t, h.WaitingForDecision())
 
-	h.waitNow = func() time.Time { return base.Add(5 * time.Second) }
+	h.waitGate.setNow(func() time.Time { return base.Add(5 * time.Second) })
 	event, timedOut := h.ExpireWaitDecision()
 	assert.True(t, timedOut)
 	assert.Equal(t, "mod/job1", event.Key)
@@ -262,10 +262,10 @@ func TestHandler_WaitForDecision_TimeoutDisabledKeepsWait(t *testing.T) {
 	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
 
 	base := time.Unix(1000, 0)
-	h.waitNow = func() time.Time { return base }
+	h.waitGate.setNow(func() time.Time { return base })
 	h.WaitForDecision(cfg)
 
-	h.waitNow = func() time.Time { return base.Add(24 * time.Hour) }
+	h.waitGate.setNow(func() time.Time { return base.Add(24 * time.Hour) })
 	_, timedOut := h.ExpireWaitDecision()
 	assert.False(t, timedOut)
 	assert.True(t, h.WaitingForDecision())

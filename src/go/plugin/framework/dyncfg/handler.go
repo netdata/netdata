@@ -79,13 +79,7 @@ type Handler[C Config] struct {
 	enableFailCode          int
 	removeStockOnEnableFail bool
 	jobCommands             []Command
-	waitKeyFn               func(cfg C) string
-	waitTimeout             time.Duration
-	waitKey                 string
-	waitSince               time.Time
-	waitDeadline            time.Time
-	waitMu                  sync.RWMutex
-	waitNow                 func() time.Time
+	waitGate                *waitGate[C]
 }
 
 // WaitTimeoutEvent describes a wait gate timeout transition.
@@ -103,6 +97,171 @@ type WaitDecisionStep struct {
 	TimedOut   bool
 }
 
+// waitGate encapsulates wait-for-decision state and timing orchestration.
+type waitGate[C Config] struct {
+	keyFn    func(cfg C) string
+	timeout  time.Duration
+	key      string
+	since    time.Time
+	deadline time.Time
+	mu       sync.RWMutex
+	now      func() time.Time
+}
+
+func newWaitGate[C Config](keyFn func(cfg C) string, timeout time.Duration) *waitGate[C] {
+	return &waitGate[C]{
+		keyFn:   keyFn,
+		timeout: timeout,
+		now:     time.Now,
+	}
+}
+
+func (wg *waitGate[C]) waitForDecision(cfg C) {
+	if wg.keyFn == nil {
+		return
+	}
+	key := wg.keyFn(cfg)
+	if key == "" {
+		return
+	}
+
+	wg.mu.Lock()
+	wg.key = key
+	wg.since = time.Time{}
+	wg.deadline = time.Time{}
+	if wg.timeout > 0 {
+		now := wg.nowTime()
+		wg.since = now
+		wg.deadline = now.Add(wg.timeout)
+	}
+	wg.mu.Unlock()
+}
+
+func (wg *waitGate[C]) waitingForDecision() bool {
+	wg.mu.RLock()
+	defer wg.mu.RUnlock()
+	return wg.key != ""
+}
+
+func (wg *waitGate[C]) decisionRemaining() (time.Duration, bool) {
+	wg.mu.RLock()
+	defer wg.mu.RUnlock()
+
+	if wg.timeout <= 0 || wg.key == "" || wg.deadline.IsZero() {
+		return 0, false
+	}
+	now := wg.nowTime()
+	if now.After(wg.deadline) || now.Equal(wg.deadline) {
+		return 0, true
+	}
+	return wg.deadline.Sub(now), true
+}
+
+func (wg *waitGate[C]) nextStep(ctx context.Context, dyncfgCh <-chan Function) (WaitDecisionStep, bool) {
+	var step WaitDecisionStep
+
+	waitFor, hasTimeout := wg.decisionRemaining()
+	if !hasTimeout {
+		select {
+		case <-ctx.Done():
+			return step, false
+		case fn := <-dyncfgCh:
+			step.Command = fn
+			step.HasCommand = true
+			return step, true
+		}
+	}
+
+	timer := time.NewTimer(waitFor)
+	defer func() {
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return step, false
+	case fn := <-dyncfgCh:
+		step.Command = fn
+		step.HasCommand = true
+		return step, true
+	case <-timer.C:
+		step.Timeout, step.TimedOut = wg.expireDecision()
+		return step, true
+	}
+}
+
+func (wg *waitGate[C]) expireDecision() (WaitTimeoutEvent, bool) {
+	var event WaitTimeoutEvent
+
+	if wg.timeout <= 0 {
+		return event, false
+	}
+	now := wg.nowTime()
+
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+
+	if wg.key == "" || wg.deadline.IsZero() || now.Before(wg.deadline) {
+		return event, false
+	}
+
+	event.Key = wg.key
+	event.Threshold = wg.timeout
+	if !wg.since.IsZero() && now.After(wg.since) {
+		event.Elapsed = now.Sub(wg.since)
+	} else {
+		event.Elapsed = wg.timeout
+	}
+
+	wg.clearLocked()
+	return event, true
+}
+
+func (wg *waitGate[C]) currentKey() string {
+	wg.mu.RLock()
+	defer wg.mu.RUnlock()
+	return wg.key
+}
+
+func (wg *waitGate[C]) keyFor(cfg C) string {
+	if wg.keyFn == nil {
+		return ""
+	}
+	return wg.keyFn(cfg)
+}
+
+func (wg *waitGate[C]) clearIfMatch(key string) {
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+	if wg.key == key {
+		wg.clearLocked()
+	}
+}
+
+func (wg *waitGate[C]) clearLocked() {
+	wg.key = ""
+	wg.since = time.Time{}
+	wg.deadline = time.Time{}
+}
+
+func (wg *waitGate[C]) nowTime() time.Time {
+	if wg.now != nil {
+		return wg.now()
+	}
+	return time.Now()
+}
+
+func (wg *waitGate[C]) setNow(now func() time.Time) {
+	wg.mu.Lock()
+	wg.now = now
+	wg.mu.Unlock()
+}
+
 func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
 	return &Handler[C]{
 		Logger:                  opts.Logger,
@@ -114,9 +273,7 @@ func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
 		enableFailCode:          opts.EnableFailCode,
 		removeStockOnEnableFail: opts.RemoveStockOnEnableFail,
 		jobCommands:             opts.JobCommands,
-		waitKeyFn:               opts.WaitKey,
-		waitTimeout:             opts.WaitTimeout,
-		waitNow:                 time.Now,
+		waitGate:                newWaitGate(opts.WaitKey, opts.WaitTimeout),
 	}
 }
 
@@ -162,130 +319,40 @@ func (h *Handler[C]) RemoveDiscoveredConfig(cfg C) (*Entry[C], bool) {
 // WaitForDecision blocks non-dyncfg config processing until a matching
 // enable/disable command is observed for the provided config.
 func (h *Handler[C]) WaitForDecision(cfg C) {
-	if h.waitKeyFn == nil {
-		return
-	}
-	key := h.waitKeyFn(cfg)
-	if key == "" {
-		return
-	}
-	h.waitMu.Lock()
-	h.waitKey = key
-	h.waitSince = time.Time{}
-	h.waitDeadline = time.Time{}
-	if h.waitTimeout > 0 {
-		now := h.now()
-		h.waitSince = now
-		h.waitDeadline = now.Add(h.waitTimeout)
-	}
-	h.waitMu.Unlock()
+	h.waitGate.waitForDecision(cfg)
 }
 
 // WaitingForDecision reports whether config processing should currently wait
 // for a matching enable/disable command.
 func (h *Handler[C]) WaitingForDecision() bool {
-	h.waitMu.RLock()
-	defer h.waitMu.RUnlock()
-	return h.waitKey != ""
+	return h.waitGate.waitingForDecision()
 }
 
 // WaitDecisionRemaining returns time until wait gate timeout.
 func (h *Handler[C]) WaitDecisionRemaining() (time.Duration, bool) {
-	h.waitMu.RLock()
-	defer h.waitMu.RUnlock()
-
-	if h.waitTimeout <= 0 || h.waitKey == "" || h.waitDeadline.IsZero() {
-		return 0, false
-	}
-	now := h.now()
-	if now.After(h.waitDeadline) || now.Equal(h.waitDeadline) {
-		return 0, true
-	}
-	return h.waitDeadline.Sub(now), true
+	return h.waitGate.decisionRemaining()
 }
 
 // NextWaitDecisionStep blocks until either a dyncfg command arrives, wait timeout fires, or context is canceled.
 // It centralizes wait-loop orchestration so caller logic stays minimal.
 func (h *Handler[C]) NextWaitDecisionStep(ctx context.Context, dyncfgCh <-chan Function) (WaitDecisionStep, bool) {
-	var step WaitDecisionStep
-
-	waitFor, hasTimeout := h.WaitDecisionRemaining()
-	if !hasTimeout {
-		select {
-		case <-ctx.Done():
-			return step, false
-		case fn := <-dyncfgCh:
-			step.Command = fn
-			step.HasCommand = true
-			return step, true
-		}
-	}
-
-	timer := time.NewTimer(waitFor)
-	defer func() {
-		if !timer.Stop() {
-			select {
-			case <-timer.C:
-			default:
-			}
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return step, false
-	case fn := <-dyncfgCh:
-		step.Command = fn
-		step.HasCommand = true
-		return step, true
-	case <-timer.C:
-		step.Timeout, step.TimedOut = h.ExpireWaitDecision()
-		return step, true
-	}
+	return h.waitGate.nextStep(ctx, dyncfgCh)
 }
 
 // ExpireWaitDecision clears the current wait gate when it exceeds configured timeout.
 func (h *Handler[C]) ExpireWaitDecision() (WaitTimeoutEvent, bool) {
-	var event WaitTimeoutEvent
-
-	if h.waitTimeout <= 0 {
-		return event, false
-	}
-	now := h.now()
-
-	h.waitMu.Lock()
-	defer h.waitMu.Unlock()
-
-	if h.waitKey == "" || h.waitDeadline.IsZero() || now.Before(h.waitDeadline) {
-		return event, false
-	}
-
-	event.Key = h.waitKey
-	event.Threshold = h.waitTimeout
-	if !h.waitSince.IsZero() && now.After(h.waitSince) {
-		event.Elapsed = now.Sub(h.waitSince)
-	} else {
-		event.Elapsed = h.waitTimeout
-	}
-
-	h.clearWaitLocked()
-	return event, true
+	return h.waitGate.expireDecision()
 }
 
 // SyncDecision updates wait-state based on the incoming command.
 // Only a matching enable/disable command clears the current wait key.
 func (h *Handler[C]) SyncDecision(fn Function) {
-	if h.waitKeyFn == nil {
-		return
-	}
 	cmd := fn.Command()
 	if cmd != CommandEnable && cmd != CommandDisable {
 		return
 	}
 
-	h.waitMu.RLock()
-	waitKey := h.waitKey
-	h.waitMu.RUnlock()
+	waitKey := h.waitGate.currentKey()
 	if waitKey == "" {
 		return
 	}
@@ -298,28 +365,11 @@ func (h *Handler[C]) SyncDecision(fn Function) {
 	if !ok {
 		return
 	}
-	if h.waitKeyFn(entry.Cfg) != waitKey {
+	if h.waitGate.keyFor(entry.Cfg) != waitKey {
 		return
 	}
 
-	h.waitMu.Lock()
-	if h.waitKey == waitKey {
-		h.clearWaitLocked()
-	}
-	h.waitMu.Unlock()
-}
-
-func (h *Handler[C]) clearWaitLocked() {
-	h.waitKey = ""
-	h.waitSince = time.Time{}
-	h.waitDeadline = time.Time{}
-}
-
-func (h *Handler[C]) now() time.Time {
-	if h.waitNow != nil {
-		return h.waitNow()
-	}
-	return time.Now()
+	h.waitGate.clearIfMatch(waitKey)
 }
 
 // NotifyJobCreate registers/updates a config in the dyncfg API (upsert).
