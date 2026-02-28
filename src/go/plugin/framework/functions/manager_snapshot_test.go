@@ -49,7 +49,7 @@ func TestLookupFunction_SnapshotScenarios(t *testing.T) {
 				}
 			},
 		},
-		"prefix routing prefers longest match": {
+		"overlapping prefix registration is rejected": {
 			run: func(t *testing.T, mgr *Manager) {
 				longHits := 0
 				shortHits := 0
@@ -57,15 +57,17 @@ func TestLookupFunction_SnapshotScenarios(t *testing.T) {
 				mgr.RegisterPrefix("config", "collector:", func(Function) { shortHits++ })
 				mgr.RegisterPrefix("config", "collector:job:", func(Function) { longHits++ })
 
+				require.NotNil(t, mgr.functionRegistry["config"])
+				require.Len(t, mgr.functionRegistry["config"].prefixes, 1)
+				_, longRegistered := mgr.functionRegistry["config"].prefixes["collector:job:"]
+				assert.False(t, longRegistered)
+
 				handler, ok := mgr.lookupFunction("config")
 				require.True(t, ok)
 
-				for range 32 {
-					handler(Function{Name: "config", Args: []string{"collector:job:alpha"}})
-				}
-
-				assert.Equal(t, 32, longHits)
-				assert.Equal(t, 0, shortHits)
+				handler(Function{Name: "config", Args: []string{"collector:job:alpha"}})
+				assert.Equal(t, 0, longHits)
+				assert.Equal(t, 1, shortHits)
 			},
 		},
 	}

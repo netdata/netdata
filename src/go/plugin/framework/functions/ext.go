@@ -2,6 +2,8 @@
 
 package functions
 
+import "strings"
+
 func (m *Manager) Register(name string, fn func(Function)) {
 	if fn == nil {
 		m.Warningf("not registering '%s': nil function", name)
@@ -58,11 +60,32 @@ func (m *Manager) RegisterPrefix(name, prefix string, fn func(Function)) {
 
 	if _, exists := fs.prefixes[prefix]; exists {
 		m.Warningf("re-registering function '%s' with prefix '%s'", name, prefix)
-	} else {
-		m.Debugf("registering function '%s' with prefix '%s'", name, prefix)
+		fs.prefixes[prefix] = fn
+		return
 	}
 
+	for existing := range fs.prefixes {
+		if prefixesOverlap(existing, prefix) {
+			m.Errorf(
+				"not registering function '%s' with prefix '%s': overlaps with existing prefix '%s'",
+				name,
+				prefix,
+				existing,
+			)
+			return
+		}
+	}
+
+	m.Debugf("registering function '%s' with prefix '%s'", name, prefix)
 	fs.prefixes[prefix] = fn
+}
+
+func prefixesOverlap(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+
+	return strings.HasPrefix(a, b) || strings.HasPrefix(b, a)
 }
 
 func (m *Manager) UnregisterPrefix(name, prefix string) {

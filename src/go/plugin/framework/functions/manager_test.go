@@ -124,6 +124,20 @@ func TestManager_RegisterPrefix(t *testing.T) {
 			},
 			expected: []string{"config:collector:"},
 		},
+		"overlapping prefix is rejected (short first)": {
+			input: []inputFn{
+				{name: "config", prefix: "collector:"},
+				{name: "config", prefix: "collector:job:"},
+			},
+			expected: []string{"config:collector:"},
+		},
+		"overlapping prefix is rejected (long first)": {
+			input: []inputFn{
+				{name: "config", prefix: "collector:job:"},
+				{name: "config", prefix: "collector:"},
+			},
+			expected: []string{"config:collector:job:"},
+		},
 	}
 
 	for name, test := range tests {

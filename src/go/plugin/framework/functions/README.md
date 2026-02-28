@@ -66,6 +66,9 @@ Admission checks:
 - schedule key is route-aware:
     - direct registration: `fn.Name`
     - prefix registration: `fn.Name|<matched-prefix>`
+- prefix registration guard:
+    - overlapped prefixes for the same function name are rejected at registration time
+    - manager logs an error and keeps the previously registered prefix set unchanged
 - worker transitions lifecycle:
     - `queued -> running -> awaiting_result`
 - worker return is **not** terminal completion

@@ -604,33 +604,18 @@ func (m *Manager) snapshotFunction(name string) (functionSnapshot, bool) {
 	return snap, true
 }
 
-func matchBestPrefix(prefixes map[string]func(Function), id string) (string, func(Function), bool) {
+func matchPrefix(prefixes map[string]func(Function), id string) (string, func(Function), bool) {
 	if len(prefixes) == 0 || id == "" {
 		return "", nil, false
 	}
 
-	var (
-		bestPrefix  string
-		bestHandler func(Function)
-		matched     bool
-	)
 	for prefix, handler := range prefixes {
-		if !strings.HasPrefix(id, prefix) {
-			continue
-		}
-		if !matched ||
-			len(prefix) > len(bestPrefix) ||
-			(len(prefix) == len(bestPrefix) && prefix < bestPrefix) {
-			bestPrefix = prefix
-			bestHandler = handler
-			matched = true
+		if strings.HasPrefix(id, prefix) {
+			return prefix, handler, true
 		}
 	}
 
-	if !matched {
-		return "", nil, false
-	}
-	return bestPrefix, bestHandler, true
+	return "", nil, false
 }
 
 func (m *Manager) lookupFunctionRoute(fn Function) (handler func(Function), scheduleKey string, ok bool) {
@@ -643,7 +628,7 @@ func (m *Manager) lookupFunctionRoute(fn Function) (handler func(Function), sche
 	if len(snap.prefixes) > 0 {
 		if len(fn.Args) > 0 {
 			id := fn.Args[0]
-			if prefix, routeHandler, matched := matchBestPrefix(snap.prefixes, id); matched && routeHandler != nil {
+			if prefix, routeHandler, matched := matchPrefix(snap.prefixes, id); matched && routeHandler != nil {
 				return routeHandler, routeScheduleKey(fn.Name, prefix), true
 			}
 		}
@@ -671,7 +656,7 @@ func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 		if len(snap.prefixes) > 0 {
 			if len(f.Args) > 0 {
 				id := f.Args[0]
-				if _, handler, matched := matchBestPrefix(snap.prefixes, id); matched && handler != nil {
+				if _, handler, matched := matchPrefix(snap.prefixes, id); matched && handler != nil {
 					handler(f)
 					return
 				}
