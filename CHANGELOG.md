@@ -50,6 +50,11 @@
 - Chore(go.plugin): rename runtimemgr for clarity ([#21833](https://github.com/netdata/netdata/issues/21833))
 - Add skill document for querying Netdata Cloud metrics ([#21834](https://github.com/netdata/netdata/issues/21834))
 - Improve query metrics skill document ([#21836](https://github.com/netdata/netdata/issues/21836))
+- Add troubleshooting FAQ to query metrics skill ([#21837](https://github.com/netdata/netdata/issues/21837))
+- Fix: netdev_mutex deadlock when do_proc_net_dev() fails ([#21839](https://github.com/netdata/netdata/issues/21839))
+- Fix: apps.plugin use-after-free crash on parent pointer dereference ([#21838](https://github.com/netdata/netdata/issues/21838))
+- Fix FreeBSD 15.0 build failure in freebsd_ipfw.c ([#21843](https://github.com/netdata/netdata/issues/21843))
+- Chore(go/plugin/sd): dont validate config in userconfig ([#21842](https://github.com/netdata/netdata/issues/21842))
 
 ## [2.9.0] - 2026-02-16
 

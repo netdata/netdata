@@ -128,9 +128,13 @@ func readConfDir(dir string) map[string]*VirtualNode {
 
 			v := v
 
-			if v.Name == "" {
-				v.Name = v.Hostname
+			if v.Name != "" && v.Name != v.Hostname {
+				log.Warningf(
+					"ignoring virtual node name '%s' for hostname '%s'; file-based vnode identity uses hostname",
+					v.Name, v.Hostname,
+				)
 			}
+			v.Name = v.Hostname
 			v.Source = fmt.Sprintf("file=%s", path)
 			if isStockConfig(path) {
 				v.SourceType = "stock"

@@ -15,7 +15,7 @@ import (
 // parseDyncfgPayload parses a dyncfg JSON payload into a pipeline.Config.
 // Since pipeline.Config now has proper JSON tags matching the schema,
 // we can unmarshal directly without type-specific parsing.
-func parseDyncfgPayload(payload []byte, discovererType string, configDefaults confgroup.Registry, reg Registry) (pipeline.Config, error) {
+func parseDyncfgPayload(payload []byte, discovererType string, configDefaults confgroup.Registry, reg Registry, validate bool) (pipeline.Config, error) {
 	if reg == nil {
 		return pipeline.Config{}, fmt.Errorf("discoverer registry is not configured")
 	}
@@ -42,9 +42,11 @@ func parseDyncfgPayload(payload []byte, discovererType string, configDefaults co
 		return pipeline.Config{}, fmt.Errorf("invalid %q discoverer config: %w", discovererType, err)
 	}
 
-	// Perform full semantic validation (name, discoverer, services rules)
-	if err := pipeline.ValidateConfig(cfg); err != nil {
-		return pipeline.Config{}, err
+	if validate {
+		// Perform full semantic validation (name, discoverer, services rules)
+		if err := pipeline.ValidateConfig(cfg); err != nil {
+			return pipeline.Config{}, err
+		}
 	}
 
 	return cfg, nil
