@@ -169,11 +169,7 @@ func (m *Manager) startWorkers(workersWG *sync.WaitGroup) {
 	}
 
 	for range m.workerCount {
-		workersWG.Add(1)
-		go func() {
-			defer workersWG.Done()
-			m.runWorker()
-		}()
+		workersWG.Go(m.runWorker)
 	}
 }
 
