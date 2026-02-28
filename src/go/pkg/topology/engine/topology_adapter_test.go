@@ -624,6 +624,10 @@ func TestToTopologyData_InfersVendorFromMACOUI(t *testing.T) {
 	require.Equal(t, "Nokia Shanghai Bell Co., Ltd.", remote.Attributes["vendor"])
 	require.Equal(t, "mac_oui", remote.Attributes["vendor_source"])
 	require.Equal(t, "low", remote.Attributes["vendor_confidence"])
+	require.Equal(t, "Nokia Shanghai Bell Co., Ltd.", remote.Attributes["vendor_derived"])
+	require.Equal(t, "mac_oui", remote.Attributes["vendor_derived_source"])
+	require.Equal(t, "low", remote.Attributes["vendor_derived_confidence"])
+	require.NotEmpty(t, remote.Attributes["vendor_derived_match_prefix"])
 
 	endpoint := findActorByMAC(data.Actors, "08:ea:44:11:22:33")
 	require.NotNil(t, endpoint)
@@ -631,6 +635,10 @@ func TestToTopologyData_InfersVendorFromMACOUI(t *testing.T) {
 	require.Equal(t, "Extreme Networks Headquarters", endpoint.Attributes["vendor"])
 	require.Equal(t, "mac_oui", endpoint.Attributes["vendor_source"])
 	require.Equal(t, "low", endpoint.Attributes["vendor_confidence"])
+	require.Equal(t, "Extreme Networks Headquarters", endpoint.Attributes["vendor_derived"])
+	require.Equal(t, "mac_oui", endpoint.Attributes["vendor_derived_source"])
+	require.Equal(t, "low", endpoint.Attributes["vendor_derived_confidence"])
+	require.NotEmpty(t, endpoint.Attributes["vendor_derived_match_prefix"])
 }
 
 func TestDeviceToTopologyActor_DoesNotOverrideExplicitVendor(t *testing.T) {
@@ -653,6 +661,10 @@ func TestDeviceToTopologyActor_DoesNotOverrideExplicitVendor(t *testing.T) {
 	require.Equal(t, "Explicit Vendor", actor.Attributes["vendor"])
 	require.Equal(t, "labels", actor.Attributes["vendor_source"])
 	require.Equal(t, "high", actor.Attributes["vendor_confidence"])
+	require.Equal(t, "Extreme Networks Headquarters", actor.Attributes["vendor_derived"])
+	require.Equal(t, "mac_oui", actor.Attributes["vendor_derived_source"])
+	require.Equal(t, "low", actor.Attributes["vendor_derived_confidence"])
+	require.NotEmpty(t, actor.Attributes["vendor_derived_match_prefix"])
 }
 
 func TestToTopologyData_DefaultDiscoveredCountWithoutLocalID(t *testing.T) {

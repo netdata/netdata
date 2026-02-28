@@ -284,8 +284,77 @@
   - Validation results:
     - `cd ~/src/dashboard/cloud-frontend && npm test -- src/domains/functions/topologyUtils.test.js --runInBand`
     - result: PASS (`8` tests, including new unresolved-port preservation test).
+- [x] A33. Vendor/type provenance audit and MAC-OUI expansion (Costa, 2026-02-26).
+  - New requirements:
+    - apply MAC-OUI vendor inference for all topology device and endpoint actors,
+    - verify existing SNMP vendor/type fields and current overwrite behavior in topology payload,
+    - if overwrite risk exists, add distinct derived MAC-OUI vendor fields,
+    - assess feasibility of endpoint class detection (station/printer/handheld/mobile/laptop/etc.).
+  - Facts (code evidence, 2026-02-26):
+    - engine-level device actor vendor precedence:
+      - `dev.Labels["vendor"]` wins (`vendor_source=labels`) in `src/go/pkg/topology/engine/topology_adapter.go:5348-5351`,
+      - else MAC-OUI fills `vendor` (`vendor_source=mac_oui`) in `src/go/pkg/topology/engine/topology_adapter.go:5352-5356`.
+    - engine-level endpoint actors already apply MAC-OUI vendor:
+      - `src/go/pkg/topology/engine/topology_adapter.go:5612-5616`.
+    - SNMP local actor augmentation overwrites actor attribute vendor with SNMP value/source:
+      - `attrs["vendor"]`, `vendor_source=snmp`, `vendor_confidence=high` in
+        `src/go/plugin/go.d/collector/snmp/topology_cache.go:2152-2155`.
+    - SNMP collector already provides device type, but as label:
+      - `labels["type"] = si.Category` in `src/go/plugin/go.d/collector/snmp/collect.go:175-176`.
+      - local labels are copied into topology actor labels in
+        `src/go/plugin/go.d/collector/snmp/topology_cache.go:2197-2203`.
+    - `snmputils.SysInfo` already includes `Vendor` + `Category` in
+      `src/go/plugin/go.d/pkg/snmputils/sysinfo.go:37-40`.
+  - Pending decisions:
+    - D33.1 Vendor payload shape when SNMP and MAC-OUI both exist:
+      - A) keep canonical `vendor` as highest-confidence source, and add explicit derived fields
+        (for example `vendor_derived`, `vendor_derived_source`, `vendor_derived_match_prefix`).
+      - B) keep current single `vendor` field only (no derived fields).
+    - D33.2 Type classification scope:
+      - A) emit only high-confidence type from SNMP/profile metadata and LLDP/CDP capabilities (network-device class only).
+      - B) add heuristic endpoint classes from MAC OUI/hostname patterns with low confidence.
+      - C) keep endpoint class detection out-of-scope for now.
   - User decision (Costa, 2026-02-26):
-    - D29.1 = **Apply `Focus Depth` from selected focus devices only** (not from every node included by shortest-path union).
+    - D33.1 = **A** (keep canonical `vendor`, add explicit derived MAC-OUI vendor fields).
+  - User constraint (Costa, 2026-02-26):
+    - endpoint type fingerprinting must **not** rely on hostname-pattern heuristics as primary evidence.
+  - User decision (Costa, 2026-02-26):
+    - D33.2 = **C for now** (defer endpoint/device classification/fingerprinting; deliver vendor work only in this phase).
+  - Implemented (vendor-only scope):
+    - backend now emits derived MAC-OUI vendor provenance on topology actors:
+      - `vendor_derived`,
+      - `vendor_derived_source`,
+      - `vendor_derived_confidence`,
+      - `vendor_derived_match_prefix`.
+    - canonical vendor behavior kept intact:
+      - canonical `vendor` still prefers explicit device label/SNMP-derived value when present.
+      - canonical `vendor` still falls back to MAC-OUI when explicit vendor is absent.
+    - endpoint actors now emit both canonical vendor (when derived from MAC-OUI) and explicit derived vendor fields.
+    - local SNMP actor augmentation keeps canonical `vendor_source=snmp` while preserving pre-existing derived vendor fields.
+  - Files:
+    - `src/go/pkg/topology/engine/topology_adapter.go`
+    - `src/go/pkg/topology/engine/topology_adapter_test.go`
+    - `src/go/plugin/go.d/collector/snmp/topology_cache_test.go`
+  - Validation:
+    - `cd src/go && go test ./pkg/topology/engine ./plugin/go.d/collector/snmp -count=1` passed.
+    - `cd src/go && go test ./plugin/go.d/collector/snmp ./pkg/topology/engine/... -count=1` passed.
+- [x] A34. Install backend+frontend and verify live `vendor_derived*` payload (Costa, 2026-02-26).
+  - Install execution (required order):
+    - backend: `./install.sh` completed successfully.
+    - frontend: `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh` completed successfully.
+  - Non-fatal warnings observed:
+    - backend installer: `git fetch -t` failed (`Permission denied (publickey)`), install still completed.
+    - frontend build: existing webpack/unused-file warnings only, exit code `0`.
+  - Live payload verification:
+    - queried `topology:snmp` with bearer token from `/var/lib/netdata/bearer_tokens/*`.
+    - map modes checked:
+      - `lldp_cdp_managed`,
+      - `high_confidence_inferred`,
+      - `all_devices_low_confidence`.
+    - result in this live snapshot:
+      - `actors=9`, `endpoints=0` for all three map modes,
+      - all `9` device actors include `attributes.vendor_derived*`,
+      - canonical `vendor_source` remains mixed and correct (`snmp` and `mac_oui`), while derived source is `mac_oui`.
 - [x] A30. Defensive parsing for multi-focus selector + reinstall sequence (Costa, 2026-02-26).
   - Context:
     - `focus_on` is now multi-select; backend currently expects resolved arrays of option IDs.
@@ -1305,3 +1374,95 @@
 - Result:
   - Completed.
   - Idle popover badge now uses the same color token as idle bullets for visual parity.
+
+- [ ] A35. Investigate why 10.20.4.205 is not linked to costa-desktop (Costa, 2026-02-26).
+  - collect live topology payload evidence (actors/links for 10.20.4.205 and costa-desktop).
+  - map outcome to backend suppression/correlation rules with code references.
+- [x] A35. Investigate why 10.20.4.205 is not linked to costa-desktop (Costa, 2026-02-26).
+  - Live topology facts:
+    - `costa-desktop` actor exists with MAC `d8:5e:d3:0e:c5:e6` and IP list only `fc00:f853:ccd:e793::1`.
+    - LLDP link exists: `MikroTik-router:ether5 -> costa-desktop:enp6s0` (unidirectional).
+    - no actor in payload includes `10.20.4.205` in `match.ip_addresses`.
+  - Raw SNMP facts (MikroTik `10.20.4.1`, community `atadteN`):
+    - LLDP remote sysName:
+      - `.1.0.8802.1.1.2.1.4.1.1.9.0.5.47 = "costa-desktop"`.
+    - LLDP remote chassis:
+      - `.1.0.8802.1.1.2.1.4.1.1.5.0.5.47 = "D8:5E:D3:0E:C5:E6"`.
+    - LLDP remote management address subtype/address:
+      - `.1.0.8802.1.1.2.1.4.2.1.1.0.5.47 = 2` (IPv6),
+      - `.1.0.8802.1.1.2.1.4.2.1.2.0.5.47 = "fc00:f853:ccd:e793::1"`.
+    - ARP table includes IPv4 for same host:
+      - `.1.3.6.1.2.1.4.22.1.3.35.10.20.4.205 = 10.20.4.205`,
+      - `.1.3.6.1.2.1.4.22.1.2.35.10.20.4.205 = d8:5e:d3:e:c5:e6`.
+  - Interpretation:
+    - topology identity for this LLDP neighbor is built from LLDP-reported management address (`fc00:...`) and chassis MAC, not from ARP IPv4.
+    - therefore `10.20.4.205` is not currently attached to `costa-desktop` actor in this map output.
+  - Additional finding:
+    - direct API calls with `map_type=lldp_cdp_managed|high_confidence_inferred|all_devices_low_confidence` all return `stats.map_type=lldp_cdp_managed`.
+    - this prevents exposing ARP/FDB-only endpoint links through the requested map mode and should be investigated separately.
+
+- [x] A36. Fix identity merge gaps for LLDP neighbors that also exist in ARP/ND (Costa, 2026-02-26).
+  - User constraint (Costa, 2026-02-26):
+    - ignore backward compatibility for this topology API path; choose the technically correct long-term model (UI is current sole consumer).
+  - Problem statement:
+    - same physical endpoint can appear with LLDP identity (name + chassis + LLDP mgmt IP) and separately with ARP/ND identity (IPv4/IPv6 per L3 table), causing missing aliases in actor metadata.
+  - Decision needed:
+    - choose merge policy for ARP/ND IP aliases onto LLDP-derived endpoint actors.
+  - Evidence:
+    - ARP/ND enrichments are accumulated on endpoint IDs (`mac:*` / `ip:*`) in `src/go/pkg/topology/engine/l2_pipeline.go:623-676`.
+    - Device actors use device-scoped addresses only (`dev.Addresses`) when emitting `match.ip_addresses` in `src/go/pkg/topology/engine/topology_adapter.go:5320-5329`.
+    - Endpoint actors that hardware-overlap managed devices are intentionally deduplicated/suppressed in `src/go/pkg/topology/engine/topology_adapter.go:5642-5648` and `:1267-1318`.
+  - Options:
+    - A) Adapter-stage alias merge (recommended):
+      - map enrichment MAC -> managed device (only unique matches), then append enrichment IPs to that device's addresses before actor/link endpoint projection.
+      - pros: minimal scope, uses existing overlap logic, no collector/protocol behavior change.
+      - cons: ARP staleness can still leak stale aliases.
+      - risk control: only merge when MAC resolves to exactly one managed device identity.
+    - B) Pipeline-stage alias merge:
+      - merge ARP/ND IPs directly into `Result.Devices` during L2 build.
+      - pros: canonicalized earlier in the pipeline.
+      - cons: wider behavioral blast radius across all downstream consumers of `Result`.
+      - risk: harder to isolate regressions.
+    - C) No merge, surface dual identities:
+      - keep device actor and endpoint actor separate, even on overlap.
+      - pros: preserves raw evidence.
+      - cons: duplicate actors for one physical node; weak UX for operators.
+    - D) Canonical identity graph in L2 engine (best long-term):
+      - build one identity-resolution stage before topology projection; emit one resolved actor identity set (MAC/IP/hostname/chassis aliases + evidence/confidence), then project links from resolved actor IDs.
+      - pros: correct architecture, removes adapter-level suppression heuristics as identity glue, deterministic behavior for LLDP+ARP+FDB combinations.
+      - cons: larger refactor than point-fix.
+      - risk: needs strict anti-merge guards (IP reuse/ARP staleness/virtual MAC cases).
+  - User decision:
+    - selected option `D` (Costa, 2026-02-26).
+  - Expected outcome:
+    - `costa-desktop`-like peers retain LLDP link evidence while also surfacing additional IP aliases (`10.20.4.205`) on the same actor.
+  - Implemented:
+    - added canonical identity-alias reconciliation stage in `l2_pipeline` (`reconcileDeviceIdentityAliases`):
+      - builds unique MAC->device ownership index from device chassis + interface MAC identities,
+      - merges ARP/ND enrichment IP aliases into matching device addresses,
+      - ignores unspecified addresses (`0.0.0.0` / `::`),
+      - skips ambiguous MAC ownership and conflicting IP->multiple-MAC cases.
+    - emitted diagnostics in result stats:
+      - `identity_alias_endpoints_mapped`,
+      - `identity_alias_endpoints_ambiguous_mac`,
+      - `identity_alias_ips_merged`,
+      - `identity_alias_ips_conflict_skipped`.
+    - added regression tests:
+      - merges LLDP+ARP identity aliases into one device actor identity,
+      - skips conflicting IP aliases observed under multiple MACs,
+      - skips aliases when MAC ownership is ambiguous across devices.
+  - Files:
+    - `src/go/pkg/topology/engine/l2_pipeline.go`
+    - `src/go/pkg/topology/engine/l2_pipeline_test.go`
+  - Validation:
+    - `cd src/go && go test -count=1 ./pkg/topology/engine/...` passed.
+
+- [x] A37. Install backend and frontend after A36 (Costa, 2026-02-26).
+  - Executed install order:
+    - backend: `./install.sh` (from repo root).
+    - frontend: `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh`.
+  - Result:
+    - both commands exited with status `0`.
+  - Notes:
+    - backend installer reported non-fatal `git fetch -t` failure due missing GitHub key access, then completed install and restarted netdata.
+    - frontend build completed with existing webpack warnings only.

@@ -696,6 +696,8 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 		enrichmentsARPND = len(enrichments)
 	}
 
+	identityAliasStats := reconcileDeviceIdentityAliases(devices, interfaces, enrichments)
+
 	for id, dev := range devices {
 		if dev.Labels == nil {
 			dev.Labels = make(map[string]string)
@@ -716,17 +718,21 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 		Attachments: sortedAttachments(attachments),
 		Enrichments: sortedEnrichments(enrichments),
 		Stats: map[string]any{
-			"devices_total":        len(devices),
-			"links_total":          len(adjacencies),
-			"links_lldp":           linksLLDP,
-			"links_cdp":            linksCDP,
-			"links_stp":            linksSTP,
-			"attachments_total":    len(attachments),
-			"attachments_fdb":      attachmentsFDB,
-			"enrichments_total":    len(enrichments),
-			"enrichments_arp_nd":   enrichmentsARPND,
-			"bridge_domains_total": len(bridgeDomains),
-			"endpoints_total":      len(endpointIDs),
+			"devices_total":                          len(devices),
+			"links_total":                            len(adjacencies),
+			"links_lldp":                             linksLLDP,
+			"links_cdp":                              linksCDP,
+			"links_stp":                              linksSTP,
+			"attachments_total":                      len(attachments),
+			"attachments_fdb":                        attachmentsFDB,
+			"enrichments_total":                      len(enrichments),
+			"enrichments_arp_nd":                     enrichmentsARPND,
+			"bridge_domains_total":                   len(bridgeDomains),
+			"endpoints_total":                        len(endpointIDs),
+			"identity_alias_endpoints_mapped":        identityAliasStats.endpointsMapped,
+			"identity_alias_endpoints_ambiguous_mac": identityAliasStats.endpointsAmbiguousMAC,
+			"identity_alias_ips_merged":              identityAliasStats.ipsMerged,
+			"identity_alias_ips_conflict_skipped":    identityAliasStats.ipsConflictSkipped,
 		},
 	}
 	return result, nil
@@ -1837,6 +1843,184 @@ func mergeEnrichmentAccumulator(target, source *enrichmentAccumulator) {
 	for key := range source.AddrTypes {
 		target.AddrTypes[key] = struct{}{}
 	}
+}
+
+type identityAliasReconcileStats struct {
+	endpointsMapped       int
+	endpointsAmbiguousMAC int
+	ipsMerged             int
+	ipsConflictSkipped    int
+}
+
+func reconcileDeviceIdentityAliases(
+	devices map[string]Device,
+	interfaces map[string]Interface,
+	enrichments map[string]*enrichmentAccumulator,
+) identityAliasReconcileStats {
+	stats := identityAliasReconcileStats{}
+	if len(devices) == 0 || len(enrichments) == 0 {
+		return stats
+	}
+
+	uniqueMACToDeviceID, ambiguousMACs := buildUniqueMACToDeviceIndex(devices, interfaces)
+	if len(uniqueMACToDeviceID) == 0 {
+		return stats
+	}
+
+	ipToMACs := make(map[string]map[string]struct{})
+	enrichmentKeys := make([]string, 0, len(enrichments))
+	for endpointID := range enrichments {
+		enrichmentKeys = append(enrichmentKeys, endpointID)
+	}
+	sort.Strings(enrichmentKeys)
+
+	for _, endpointID := range enrichmentKeys {
+		acc := enrichments[endpointID]
+		if acc == nil {
+			continue
+		}
+		mac := normalizeMAC(acc.MAC)
+		if mac == "" {
+			continue
+		}
+		for _, ipKey := range sortedIPKeys(acc.IPs) {
+			addr, ok := acc.IPs[ipKey]
+			if !ok || !isUsableAliasIPAddress(addr) {
+				continue
+			}
+			owners := ipToMACs[ipKey]
+			if owners == nil {
+				owners = make(map[string]struct{})
+				ipToMACs[ipKey] = owners
+			}
+			owners[mac] = struct{}{}
+		}
+	}
+
+	aliasIPsByDevice := make(map[string]map[string]netip.Addr)
+	for _, endpointID := range enrichmentKeys {
+		acc := enrichments[endpointID]
+		if acc == nil {
+			continue
+		}
+		mac := normalizeMAC(acc.MAC)
+		if mac == "" {
+			continue
+		}
+		if _, ambiguous := ambiguousMACs[mac]; ambiguous {
+			stats.endpointsAmbiguousMAC++
+			continue
+		}
+
+		deviceID := strings.TrimSpace(uniqueMACToDeviceID[mac])
+		if deviceID == "" {
+			continue
+		}
+		stats.endpointsMapped++
+
+		if aliasIPsByDevice[deviceID] == nil {
+			aliasIPsByDevice[deviceID] = make(map[string]netip.Addr)
+		}
+		for _, ipKey := range sortedIPKeys(acc.IPs) {
+			addr, ok := acc.IPs[ipKey]
+			if !ok || !isUsableAliasIPAddress(addr) {
+				continue
+			}
+			if len(ipToMACs[ipKey]) > 1 {
+				stats.ipsConflictSkipped++
+				continue
+			}
+			aliasIPsByDevice[deviceID][addr.String()] = addr.Unmap()
+		}
+	}
+
+	for deviceID, aliasIPs := range aliasIPsByDevice {
+		device, ok := devices[deviceID]
+		if !ok || len(aliasIPs) == 0 {
+			continue
+		}
+
+		merged := make(map[string]netip.Addr, len(device.Addresses)+len(aliasIPs))
+		for _, addr := range device.Addresses {
+			if !isUsableAliasIPAddress(addr) {
+				continue
+			}
+			normalized := addr.Unmap()
+			merged[normalized.String()] = normalized
+		}
+		before := len(merged)
+		for key, addr := range aliasIPs {
+			merged[key] = addr
+		}
+		added := len(merged) - before
+		if added <= 0 {
+			continue
+		}
+		stats.ipsMerged += added
+
+		keys := make([]string, 0, len(merged))
+		for key := range merged {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		addresses := make([]netip.Addr, 0, len(keys))
+		for _, key := range keys {
+			addresses = append(addresses, merged[key])
+		}
+		device.Addresses = addresses
+		devices[deviceID] = device
+	}
+
+	return stats
+}
+
+func buildUniqueMACToDeviceIndex(
+	devices map[string]Device,
+	interfaces map[string]Interface,
+) (map[string]string, map[string]struct{}) {
+	ownersByMAC := make(map[string]map[string]struct{})
+	addOwner := func(mac, deviceID string) {
+		mac = normalizeMAC(mac)
+		deviceID = strings.TrimSpace(deviceID)
+		if mac == "" || deviceID == "" {
+			return
+		}
+		owners := ownersByMAC[mac]
+		if owners == nil {
+			owners = make(map[string]struct{})
+			ownersByMAC[mac] = owners
+		}
+		owners[deviceID] = struct{}{}
+	}
+
+	for _, device := range devices {
+		addOwner(primaryL2MACIdentity(device.ChassisID, ""), device.ID)
+	}
+	for _, iface := range interfaces {
+		addOwner(iface.MAC, iface.DeviceID)
+	}
+
+	unique := make(map[string]string, len(ownersByMAC))
+	ambiguous := make(map[string]struct{})
+	for mac, owners := range ownersByMAC {
+		if len(owners) == 1 {
+			for deviceID := range owners {
+				unique[mac] = deviceID
+			}
+			continue
+		}
+		ambiguous[mac] = struct{}{}
+	}
+	return unique, ambiguous
+}
+
+func isUsableAliasIPAddress(addr netip.Addr) bool {
+	addr = addr.Unmap()
+	if !addr.IsValid() {
+		return false
+	}
+	return !addr.IsUnspecified()
 }
 
 func sortedIPKeys(in map[string]netip.Addr) []string {

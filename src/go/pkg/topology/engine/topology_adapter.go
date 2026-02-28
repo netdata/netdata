@@ -5345,15 +5345,22 @@ func deviceToTopologyActor(
 		"capabilities_supported": labelsCSVToSlice(dev.Labels, "capabilities_supported"),
 		"capabilities_enabled":   labelsCSVToSlice(dev.Labels, "capabilities_enabled"),
 	}
+	derivedVendor, derivedPrefix := inferTopologyVendorFromMatch(match)
+	if derivedVendor != "" {
+		attrs["vendor_derived"] = derivedVendor
+		attrs["vendor_derived_source"] = "mac_oui"
+		attrs["vendor_derived_confidence"] = "low"
+		attrs["vendor_derived_match_prefix"] = derivedPrefix
+	}
 	if vendor := strings.TrimSpace(dev.Labels["vendor"]); vendor != "" {
 		attrs["vendor"] = vendor
 		attrs["vendor_source"] = "labels"
 		attrs["vendor_confidence"] = "high"
-	} else if vendor, prefix := inferTopologyVendorFromMatch(match); vendor != "" {
-		attrs["vendor"] = vendor
+	} else if derivedVendor != "" {
+		attrs["vendor"] = derivedVendor
 		attrs["vendor_source"] = "mac_oui"
 		attrs["vendor_confidence"] = "low"
-		attrs["vendor_match_prefix"] = prefix
+		attrs["vendor_match_prefix"] = derivedPrefix
 	}
 	if ifaceSummary.portsTotal > 0 {
 		attrs["ports_total"] = ifaceSummary.portsTotal
@@ -5609,11 +5616,16 @@ func buildEndpointActors(
 			"learned_if_indexes": sortedTopologySet(acc.ifIndexes),
 			"learned_if_names":   sortedTopologySet(acc.ifNames),
 		}
-		if vendor, prefix := inferTopologyVendorFromMatch(match); vendor != "" {
-			attrs["vendor"] = vendor
+		derivedVendor, derivedPrefix := inferTopologyVendorFromMatch(match)
+		if derivedVendor != "" {
+			attrs["vendor"] = derivedVendor
 			attrs["vendor_source"] = "mac_oui"
 			attrs["vendor_confidence"] = "low"
-			attrs["vendor_match_prefix"] = prefix
+			attrs["vendor_match_prefix"] = derivedPrefix
+			attrs["vendor_derived"] = derivedVendor
+			attrs["vendor_derived_source"] = "mac_oui"
+			attrs["vendor_derived_confidence"] = "low"
+			attrs["vendor_derived_match_prefix"] = derivedPrefix
 		}
 		actor := topology.Actor{
 			ActorType:  "endpoint",
