@@ -590,6 +590,156 @@ func TestBuildL2ResultFromObservations_ARPMergesIPOnlyIntoMACEndpoint(t *testing
 	require.Equal(t, 1, result.Stats["endpoints_total"])
 }
 
+func TestBuildL2ResultFromObservations_ReconcilesARPAliasIntoLLDPDeviceIdentity(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID:     "mikrotik-router",
+			Hostname:     "MikroTik-router",
+			ManagementIP: "10.20.4.1",
+			ChassisID:    "18:fd:74:7e:c5:80",
+			LLDPRemotes: []LLDPRemoteObservation{
+				{
+					LocalPortNum:       "5",
+					LocalPortID:        "ether5",
+					LocalPortIDSubtype: "interfaceName",
+					ChassisID:          "d8:5e:d3:0e:c5:e6",
+					SysName:            "costa-desktop",
+					PortID:             "enp6s0",
+					PortIDSubtype:      "interfaceName",
+					ManagementIP:       "fc00:f853:ccd:e793::1",
+				},
+			},
+			ARPNDEntries: []ARPNDObservation{
+				{
+					Protocol: "arp",
+					IfIndex:  5,
+					IfName:   "ether5",
+					IP:       "10.20.4.205",
+					MAC:      "d8:5e:d3:0e:c5:e6",
+					State:    "reachable",
+					AddrType: "ipv4",
+				},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true, EnableARP: true})
+	require.NoError(t, err)
+
+	costaDesktop := findDeviceByHostname(result.Devices, "costa-desktop")
+	require.NotNil(t, costaDesktop)
+	require.ElementsMatch(
+		t,
+		[]string{"10.20.4.205", "fc00:f853:ccd:e793::1"},
+		deviceAddressStrings(*costaDesktop),
+	)
+	require.Equal(t, 1, result.Stats["identity_alias_endpoints_mapped"])
+	require.Equal(t, 1, result.Stats["identity_alias_ips_merged"])
+}
+
+func TestBuildL2ResultFromObservations_SkipsConflictingARPAliases(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID:     "mikrotik-router",
+			Hostname:     "MikroTik-router",
+			ManagementIP: "10.20.4.1",
+			ChassisID:    "18:fd:74:7e:c5:80",
+			LLDPRemotes: []LLDPRemoteObservation{
+				{
+					LocalPortNum:       "5",
+					LocalPortID:        "ether5",
+					LocalPortIDSubtype: "interfaceName",
+					ChassisID:          "d8:5e:d3:0e:c5:e6",
+					SysName:            "costa-desktop",
+					PortID:             "enp6s0",
+					PortIDSubtype:      "interfaceName",
+					ManagementIP:       "fc00:f853:ccd:e793::1",
+				},
+			},
+			ARPNDEntries: []ARPNDObservation{
+				{
+					Protocol: "arp",
+					IfIndex:  5,
+					IfName:   "ether5",
+					IP:       "10.20.4.205",
+					MAC:      "d8:5e:d3:0e:c5:e6",
+					State:    "reachable",
+					AddrType: "ipv4",
+				},
+				{
+					Protocol: "arp",
+					IfIndex:  7,
+					IfName:   "ether7",
+					IP:       "10.20.4.205",
+					MAC:      "70:49:a2:65:72:cd",
+					State:    "reachable",
+					AddrType: "ipv4",
+				},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableLLDP: true, EnableARP: true})
+	require.NoError(t, err)
+
+	costaDesktop := findDeviceByHostname(result.Devices, "costa-desktop")
+	require.NotNil(t, costaDesktop)
+	require.Equal(t, []string{"fc00:f853:ccd:e793::1"}, deviceAddressStrings(*costaDesktop))
+	require.Equal(t, 1, result.Stats["identity_alias_endpoints_mapped"])
+	require.Equal(t, 0, result.Stats["identity_alias_ips_merged"])
+	require.Equal(t, 1, result.Stats["identity_alias_ips_conflict_skipped"])
+}
+
+func TestBuildL2ResultFromObservations_SkipsAmbiguousMACAliasOwnership(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID:     "switch-a",
+			Hostname:     "switch-a",
+			ManagementIP: "10.0.0.1",
+			ChassisID:    "00:11:22:33:44:55",
+			Interfaces: []ObservedInterface{
+				{IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1", MAC: "aa:aa:aa:aa:aa:aa"},
+			},
+		},
+		{
+			DeviceID:     "switch-b",
+			Hostname:     "switch-b",
+			ManagementIP: "10.0.0.2",
+			ChassisID:    "00:11:22:33:44:66",
+			Interfaces: []ObservedInterface{
+				{IfIndex: 1, IfName: "Gi0/1", IfDescr: "Gi0/1", MAC: "aa:aa:aa:aa:aa:aa"},
+			},
+		},
+		{
+			DeviceID: "observer",
+			Hostname: "observer",
+			ARPNDEntries: []ARPNDObservation{
+				{
+					Protocol: "arp",
+					IfIndex:  9,
+					IfName:   "Gi0/9",
+					IP:       "10.0.0.50",
+					MAC:      "aa:aa:aa:aa:aa:aa",
+					State:    "reachable",
+					AddrType: "ipv4",
+				},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{EnableARP: true})
+	require.NoError(t, err)
+
+	switchA := findDeviceByID(result.Devices, "switch-a")
+	switchB := findDeviceByID(result.Devices, "switch-b")
+	require.NotNil(t, switchA)
+	require.NotNil(t, switchB)
+	require.NotContains(t, deviceAddressStrings(*switchA), "10.0.0.50")
+	require.NotContains(t, deviceAddressStrings(*switchB), "10.0.0.50")
+	require.Equal(t, 0, result.Stats["identity_alias_ips_merged"])
+	require.Equal(t, 1, result.Stats["identity_alias_endpoints_ambiguous_mac"])
+}
+
 func TestNormalizeMAC_PadsSingleNibbleTokens(t *testing.T) {
 	require.Equal(t, "00:15:99:9f:07:ef", normalizeMAC("0:15:99:9f:7:ef"))
 	require.Equal(t, "60:33:4b:08:17:a8", normalizeMAC("60:33:4b:8:17:a8"))
@@ -1165,4 +1315,33 @@ func TestBuildL2ResultFromObservations_AnnotatesPairMetadata(t *testing.T) {
 func TestBuildL2ResultFromObservations_ErrorsOnEmptyInput(t *testing.T) {
 	_, err := BuildL2ResultFromObservations(nil, DiscoverOptions{EnableLLDP: true})
 	require.Error(t, err)
+}
+
+func findDeviceByHostname(devices []Device, hostname string) *Device {
+	for i := range devices {
+		if devices[i].Hostname == hostname {
+			return &devices[i]
+		}
+	}
+	return nil
+}
+
+func findDeviceByID(devices []Device, id string) *Device {
+	for i := range devices {
+		if devices[i].ID == id {
+			return &devices[i]
+		}
+	}
+	return nil
+}
+
+func deviceAddressStrings(device Device) []string {
+	out := make([]string, 0, len(device.Addresses))
+	for _, addr := range device.Addresses {
+		if !addr.IsValid() {
+			continue
+		}
+		out = append(out, addr.String())
+	}
+	return out
 }

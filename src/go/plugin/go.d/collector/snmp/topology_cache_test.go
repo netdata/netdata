@@ -1217,6 +1217,10 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 					IPAddresses: []string{"10.0.0.1"},
 				},
 				Attributes: map[string]any{
+					"vendor_derived":              "Acme Derived",
+					"vendor_derived_source":       "mac_oui",
+					"vendor_derived_confidence":   "low",
+					"vendor_derived_match_prefix": "00:11:22",
 					"if_statuses": []map[string]any{
 						{
 							"if_index": 1,
@@ -1266,6 +1270,10 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 	require.Equal(t, "Cisco", actor.Attributes["vendor"])
 	require.Equal(t, "snmp", actor.Attributes["vendor_source"])
 	require.Equal(t, "high", actor.Attributes["vendor_confidence"])
+	require.Equal(t, "Acme Derived", actor.Attributes["vendor_derived"])
+	require.Equal(t, "mac_oui", actor.Attributes["vendor_derived_source"])
+	require.Equal(t, "low", actor.Attributes["vendor_derived_confidence"])
+	require.Equal(t, "00:11:22", actor.Attributes["vendor_derived_match_prefix"])
 	require.Equal(t, "C9300-24T", actor.Attributes["model"])
 	require.Equal(t, "SN-12345", actor.Attributes["serial_number"])
 	require.Equal(t, "17.9.4", actor.Attributes["software_version"])
