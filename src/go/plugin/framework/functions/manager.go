@@ -129,58 +129,16 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 	m.scheduler = newKeyScheduler(m.queueSize)
 	var workersWG sync.WaitGroup
 
-	for range m.workerCount {
-		workersWG.Add(1)
-		go func() {
-			defer workersWG.Done()
-			m.runWorker()
-		}()
-	}
-	shutdown := func(signalQuit, cancelInflight bool) {
-		m.setStopping(true)
-		if signalQuit && quitCh != nil {
-			quitCh <- struct{}{}
-		}
-
-		if m.scheduler != nil {
-			m.scheduler.stopAccepting()
-		}
-
-		drainCtx, cancelDrain := context.WithTimeout(context.Background(), m.shutdownDrainTimeout)
-		defer cancelDrain()
-
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			workersWG.Wait()
-		}()
-
-		timedOut := false
-		select {
-		case <-done:
-		case <-drainCtx.Done():
-			timedOut = true
-		}
-
-		if cancelInflight {
-			if timedOut || m.hasActiveInvocations() {
-				m.cancelAllInvocations()
-				m.forceFinalizeAll(499, "request canceled during shutdown")
-				if m.scheduler != nil {
-					m.scheduler.stop()
-				}
-			}
-		}
-	}
+	m.startWorkers(&workersWG)
 
 	for {
 		select {
 		case <-ctx.Done():
-			shutdown(false, true)
+			m.shutdown(false, true, quitCh, &workersWG)
 			return
 		case line, ok := <-m.input.lines():
 			if !ok {
-				shutdown(false, true)
+				m.shutdown(false, true, quitCh, &workersWG)
 				return
 			}
 			event, err := parser.parseEvent(line)
@@ -193,7 +151,7 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 			case inputEventNone, inputEventProgress:
 				continue
 			case inputEventQuit:
-				shutdown(true, true)
+				m.shutdown(true, true, quitCh, &workersWG)
 				return
 			case inputEventCancel:
 				m.handleCancelEvent(event)
@@ -202,6 +160,77 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 				m.dispatchInvocation(ctx, event.fn)
 			}
 		}
+	}
+}
+
+func (m *Manager) startWorkers(workersWG *sync.WaitGroup) {
+	if workersWG == nil {
+		return
+	}
+
+	for range m.workerCount {
+		workersWG.Add(1)
+		go func() {
+			defer workersWG.Done()
+			m.runWorker()
+		}()
+	}
+}
+
+func (m *Manager) shutdown(signalQuit, cancelInflight bool, quitCh chan struct{}, workersWG *sync.WaitGroup) {
+	m.setStopping(true)
+	m.signalQuitIfRequested(signalQuit, quitCh)
+	m.stopSchedulerAdmission()
+	timedOut := m.waitWorkers(workersWG)
+	m.finalizeUnresolvedOnShutdown(cancelInflight, timedOut)
+}
+
+func (m *Manager) signalQuitIfRequested(signalQuit bool, quitCh chan struct{}) {
+	if signalQuit && quitCh != nil {
+		quitCh <- struct{}{}
+	}
+}
+
+func (m *Manager) stopSchedulerAdmission() {
+	if m.scheduler != nil {
+		m.scheduler.stopAccepting()
+	}
+}
+
+func (m *Manager) waitWorkers(workersWG *sync.WaitGroup) bool {
+	if workersWG == nil {
+		return false
+	}
+
+	drainCtx, cancelDrain := context.WithTimeout(context.Background(), m.shutdownDrainTimeout)
+	defer cancelDrain()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		workersWG.Wait()
+	}()
+
+	select {
+	case <-done:
+		return false
+	case <-drainCtx.Done():
+		return true
+	}
+}
+
+func (m *Manager) finalizeUnresolvedOnShutdown(cancelInflight, timedOut bool) {
+	if !cancelInflight {
+		return
+	}
+	if !timedOut && !m.hasActiveInvocations() {
+		return
+	}
+
+	m.cancelAllInvocations()
+	m.forceFinalizeAll(499, "request canceled during shutdown")
+	if m.scheduler != nil {
+		m.scheduler.stop()
 	}
 }
 
