@@ -131,7 +131,7 @@ Shutdown uses one bounded path for `ctx.Done()`, `QUIT`, and input close (EOF):
 - set stopping
 - stop scheduler admission
 - wait up to `defaultShutdownDrainTimeout = 8s` for natural drain
-- if drain times out:
+- if drain times out **or** unresolved active UIDs remain after worker drain:
     - cancel in-flight
     - force-finalize unresolved UIDs with `499`
     - hard-stop scheduler waiters
@@ -141,7 +141,7 @@ Input close still enters the same bounded path above:
 - input close/EOF:
     - stop scheduler admission
     - attempt bounded drain first
-    - escalate to cancel/force-finalize only on timeout
+    - escalate to cancel/force-finalize on timeout or if active UIDs remain unresolved
 
 ## Flow diagram
 

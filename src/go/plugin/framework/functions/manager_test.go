@@ -15,6 +15,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	managerTestPermissions = "0xFFFF"
+	managerTestSource      = "method=api,role=test"
+)
+
 func TestNewManager(t *testing.T) {
 	mgr := NewManager()
 
@@ -243,9 +248,9 @@ func TestManager_Run(t *testing.T) {
 	}{
 		"valid function: single": {
 			register: []string{"fn1"},
-			input: `
-FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
-`,
+			input: fmt.Sprintf(`
+FUNCTION UID 1 "fn1 arg1 arg2" %s "%s"
+`, managerTestPermissions, managerTestSource),
 			expected: []Function{
 				{
 					key:         lineFunction,
@@ -253,8 +258,8 @@ FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "",
 					Payload:     nil,
 				},
@@ -262,10 +267,10 @@ FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
 		},
 		"valid function: multiple": {
 			register: []string{"fn1", "fn2"},
-			input: `
-FUNCTION UID1 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
-FUNCTION UID2 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
-`,
+			input: fmt.Sprintf(`
+FUNCTION UID1 1 "fn1 arg1 arg2" %s "%s"
+FUNCTION UID2 1 "fn2 arg1 arg2" %s "%s"
+`, managerTestPermissions, managerTestSource, managerTestPermissions, managerTestSource),
 			expected: []Function{
 				{
 					key:         lineFunction,
@@ -273,8 +278,8 @@ FUNCTION UID2 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "",
 					Payload:     nil,
 				},
@@ -284,8 +289,8 @@ FUNCTION UID2 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
 					Timeout:     time.Second,
 					Name:        "fn2",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "",
 					Payload:     nil,
 				},
@@ -293,12 +298,12 @@ FUNCTION UID2 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
 		},
 		"valid function: single with payload": {
 			register: []string{"fn1", "fn2"},
-			input: `
-FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+			input: fmt.Sprintf(`
+FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2" %s "%s" application/json
 payload line1
 payload line2
 FUNCTION_PAYLOAD_END
-`,
+`, managerTestPermissions, managerTestSource),
 			expected: []Function{
 				{
 					key:         lineFunctionPayload,
@@ -306,8 +311,8 @@ FUNCTION_PAYLOAD_END
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "application/json",
 					Payload:     []byte("payload line1\npayload line2"),
 				},
@@ -315,17 +320,17 @@ FUNCTION_PAYLOAD_END
 		},
 		"valid function: multiple with payload": {
 			register: []string{"fn1", "fn2"},
-			input: `
-FUNCTION_PAYLOAD UID1 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+			input: fmt.Sprintf(`
+FUNCTION_PAYLOAD UID1 1 "fn1 arg1 arg2" %s "%s" application/json
 payload line1
 payload line2
 FUNCTION_PAYLOAD_END
 
-FUNCTION_PAYLOAD UID2 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+FUNCTION_PAYLOAD UID2 1 "fn2 arg1 arg2" %s "%s" application/json
 payload line3
 payload line4
 FUNCTION_PAYLOAD_END
-`,
+`, managerTestPermissions, managerTestSource, managerTestPermissions, managerTestSource),
 			expected: []Function{
 				{
 					key:         lineFunctionPayload,
@@ -333,8 +338,8 @@ FUNCTION_PAYLOAD_END
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "application/json",
 					Payload:     []byte("payload line1\npayload line2"),
 				},
@@ -344,8 +349,8 @@ FUNCTION_PAYLOAD_END
 					Timeout:     time.Second,
 					Name:        "fn2",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "application/json",
 					Payload:     []byte("payload line3\npayload line4"),
 				},
@@ -353,20 +358,23 @@ FUNCTION_PAYLOAD_END
 		},
 		"valid function: multiple with and without payload": {
 			register: []string{"fn1", "fn2", "fn3", "fn4"},
-			input: `
-FUNCTION_PAYLOAD UID1 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+			input: fmt.Sprintf(`
+FUNCTION_PAYLOAD UID1 1 "fn1 arg1 arg2" %s "%s" application/json
 payload line1
 payload line2
 FUNCTION_PAYLOAD_END
 
-FUNCTION UID2 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
-FUNCTION UID3 1 "fn3 arg1 arg2" 0xFFFF "method=api,role=test"
+FUNCTION UID2 1 "fn2 arg1 arg2" %s "%s"
+FUNCTION UID3 1 "fn3 arg1 arg2" %s "%s"
 
-FUNCTION_PAYLOAD UID4 1 "fn4 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+FUNCTION_PAYLOAD UID4 1 "fn4 arg1 arg2" %s "%s" application/json
 payload line3
 payload line4
 FUNCTION_PAYLOAD_END
-`,
+`, managerTestPermissions, managerTestSource,
+				managerTestPermissions, managerTestSource,
+				managerTestPermissions, managerTestSource,
+				managerTestPermissions, managerTestSource),
 			expected: []Function{
 				{
 					key:         lineFunctionPayload,
@@ -374,8 +382,8 @@ FUNCTION_PAYLOAD_END
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "application/json",
 					Payload:     []byte("payload line1\npayload line2"),
 				},
@@ -385,8 +393,8 @@ FUNCTION_PAYLOAD_END
 					Timeout:     time.Second,
 					Name:        "fn2",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "",
 					Payload:     nil,
 				},
@@ -396,8 +404,8 @@ FUNCTION_PAYLOAD_END
 					Timeout:     time.Second,
 					Name:        "fn3",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "",
 					Payload:     nil,
 				},
@@ -407,8 +415,8 @@ FUNCTION_PAYLOAD_END
 					Timeout:     time.Second,
 					Name:        "fn4",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "application/json",
 					Payload:     []byte("payload line3\npayload line4"),
 				},

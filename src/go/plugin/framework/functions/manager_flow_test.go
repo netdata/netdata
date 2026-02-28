@@ -308,6 +308,32 @@ func TestManager_FlowScenarios(t *testing.T) {
 				assert.EqualValues(t, 1, maxSeen.Load())
 			},
 		},
+		"duplicate tombstoned uid is ignored without extra terminal output": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				var calls atomic.Int32
+
+				mgr.Register("fn", func(fn Function) {
+					calls.Add(1)
+					mgr.respUID(fn.UID, 200, "ok")
+				})
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- functionLine("tx1", "fn")
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 200", time.Second)
+
+				// Re-send same UID while tombstone is still active.
+				in.ch <- functionLine("tx1", "fn")
+				close(in.ch)
+				waitForDone(t, done)
+
+				got := out.String()
+				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 200"))
+				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 409"))
+				assert.EqualValues(t, 1, calls.Load())
+			},
+		},
 		"queue full is rejected with 503": {
 			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
 				mgr.queueSize = 1

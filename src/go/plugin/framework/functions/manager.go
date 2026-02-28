@@ -240,9 +240,13 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 		cancel()
 		m.Warningf("ignoring duplicate recently finalized transaction id: %s", fn.UID)
 		return
+	case invocationAdmissionInvalid:
+		cancel()
+		m.Warningf("ignoring invalid transaction id: %q", fn.UID)
+		return
 	default:
 		cancel()
-		m.respf(fn, 409, "duplicate transaction id: %s", fn.UID)
+		m.Warningf("ignoring transaction id '%s': unsupported admission state", fn.UID)
 		return
 	}
 
