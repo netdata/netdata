@@ -338,28 +338,16 @@ func (m *Manager) setAwaitingResultState(uid string, fnTimeout time.Duration) {
 	}
 
 	m.invStateMux.Lock()
-	if rec, ok := m.invState[uid]; ok {
-		rec.state = stateAwaitingResult
-		rec.awaitingSince = time.Now()
+	defer m.invStateMux.Unlock()
 
-		delay := m.awaitingWarnDelay
-		if fnTimeout > 0 && fnTimeout < delay {
-			delay = fnTimeout
-		}
-		if delay <= 0 {
-			m.invStateMux.Unlock()
-			return
-		}
-
-		if rec.awaitingTimer != nil {
-			rec.awaitingTimer.Stop()
-		}
-		uidCopy := uid
-		rec.awaitingTimer = time.AfterFunc(delay, func() {
-			m.logAwaitingResult(uidCopy)
-		})
+	rec, ok := m.invState[uid]
+	if !ok || rec == nil {
+		return
 	}
-	m.invStateMux.Unlock()
+
+	rec.state = stateAwaitingResult
+	rec.awaitingSince = time.Now()
+	m.startAwaitingTimerLocked(uid, rec, fnTimeout)
 }
 
 func (m *Manager) logAwaitingResult(uid string) {
@@ -438,12 +426,7 @@ func (m *Manager) requestCancellation(uid string) (invocationState, bool) {
 	}
 
 	if rec.state == stateRunning || rec.state == stateAwaitingResult {
-		if rec.fallbackTimer == nil {
-			uidCopy := uid
-			rec.fallbackTimer = time.AfterFunc(m.cancelFallbackDelay, func() {
-				m.respUID(uidCopy, 499, "request canceled")
-			})
-		}
+		m.startCancelFallbackTimerLocked(uid, rec)
 	}
 
 	return rec.state, true
@@ -518,14 +501,7 @@ func (m *Manager) tryFinalize(uid, source string, emit func()) bool {
 
 	var scheduleKey string
 	if rec, ok := m.invState[uid]; ok && rec != nil {
-		if rec.fallbackTimer != nil {
-			rec.fallbackTimer.Stop()
-			rec.fallbackTimer = nil
-		}
-		if rec.awaitingTimer != nil {
-			rec.awaitingTimer.Stop()
-			rec.awaitingTimer = nil
-		}
+		m.stopTimersLocked(rec)
 		scheduleKey = rec.scheduleKey
 	}
 	delete(m.invState, uid)
@@ -545,6 +521,60 @@ func (m *Manager) pruneExpiredTombstonesLocked(now time.Time) {
 		if !expiresAt.After(now) {
 			delete(m.tombstones, uid)
 		}
+	}
+}
+
+// startAwaitingTimerLocked starts/refreshes awaiting-result warning timer.
+// Caller must hold m.invStateMux.
+func (m *Manager) startAwaitingTimerLocked(uid string, rec *invocationRecord, fnTimeout time.Duration) {
+	if uid == "" || rec == nil {
+		return
+	}
+
+	delay := m.awaitingWarnDelay
+	if fnTimeout > 0 && fnTimeout < delay {
+		delay = fnTimeout
+	}
+	if delay <= 0 {
+		return
+	}
+
+	if rec.awaitingTimer != nil {
+		rec.awaitingTimer.Stop()
+	}
+	uidCopy := uid
+	rec.awaitingTimer = time.AfterFunc(delay, func() {
+		m.logAwaitingResult(uidCopy)
+	})
+}
+
+// startCancelFallbackTimerLocked starts cancel fallback timer once.
+// Caller must hold m.invStateMux.
+func (m *Manager) startCancelFallbackTimerLocked(uid string, rec *invocationRecord) {
+	if uid == "" || rec == nil || rec.fallbackTimer != nil {
+		return
+	}
+
+	uidCopy := uid
+	rec.fallbackTimer = time.AfterFunc(m.cancelFallbackDelay, func() {
+		m.respUID(uidCopy, 499, "request canceled")
+	})
+}
+
+// stopTimersLocked stops invocation timers and clears timer references.
+// Caller must hold m.invStateMux.
+func (m *Manager) stopTimersLocked(rec *invocationRecord) {
+	if rec == nil {
+		return
+	}
+
+	if rec.fallbackTimer != nil {
+		rec.fallbackTimer.Stop()
+		rec.fallbackTimer = nil
+	}
+	if rec.awaitingTimer != nil {
+		rec.awaitingTimer.Stop()
+		rec.awaitingTimer = nil
 	}
 }
 
@@ -608,6 +638,7 @@ func (m *Manager) lookupFunctionRoute(fn Function) (handler func(Function), sche
 	if !ok {
 		return nil, "", false
 	}
+	unknownHandler := m.unknownFunctionHandler()
 
 	if len(snap.prefixes) > 0 {
 		if len(fn.Args) > 0 {
@@ -617,18 +648,14 @@ func (m *Manager) lookupFunctionRoute(fn Function) (handler func(Function), sche
 			}
 		}
 
-		return func(f Function) {
-			m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
-		}, routeScheduleKey(fn.Name, scheduleKeyUnmatched), true
+		return unknownHandler, routeScheduleKey(fn.Name, scheduleKeyUnmatched), true
 	}
 
 	if snap.direct != nil {
 		return snap.direct, routeScheduleKey(fn.Name, ""), true
 	}
 
-	return func(f Function) {
-		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
-	}, routeScheduleKey(fn.Name, scheduleKeyDirectMissing), true
+	return unknownHandler, routeScheduleKey(fn.Name, scheduleKeyDirectMissing), true
 }
 
 // lookupFunction returns a snapshot handler used by existing tests to verify
@@ -638,6 +665,7 @@ func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 	if !ok {
 		return nil, false
 	}
+	unknownHandler := m.unknownFunctionHandler()
 
 	return func(f Function) {
 		if len(snap.prefixes) > 0 {
@@ -648,7 +676,7 @@ func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 					return
 				}
 			}
-			m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
+			unknownHandler(f)
 			return
 		}
 
@@ -657,8 +685,14 @@ func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 			return
 		}
 
-		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
+		unknownHandler(f)
 	}, true
+}
+
+func (m *Manager) unknownFunctionHandler() func(Function) {
+	return func(f Function) {
+		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
+	}
 }
 
 const (
