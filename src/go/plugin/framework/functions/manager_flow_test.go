@@ -26,7 +26,7 @@ type chanInput struct {
 	ch chan string
 }
 
-func (m *chanInput) lines() chan string {
+func (m *chanInput) lines() <-chan string {
 	return m.ch
 }
 

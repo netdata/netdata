@@ -498,6 +498,6 @@ type mockInput struct {
 	chLines chan string
 }
 
-func (m *mockInput) lines() chan string {
+func (m *mockInput) lines() <-chan string {
 	return m.chLines
 }

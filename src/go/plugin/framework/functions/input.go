@@ -9,7 +9,7 @@ import (
 )
 
 type input interface {
-	lines() chan string
+	lines() <-chan string
 }
 
 func newStdinInput() input {
@@ -30,7 +30,7 @@ func (in *stdinReader) run() {
 	}
 }
 
-func (in *stdinReader) lines() chan string {
+func (in *stdinReader) lines() <-chan string {
 	in.once.Do(func() {
 		in.linesCh = make(chan string)
 		go in.run()
