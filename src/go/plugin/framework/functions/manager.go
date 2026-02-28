@@ -23,8 +23,9 @@ type functionSet struct {
 }
 
 const (
-	defaultWorkerCount = 1
-	defaultQueueSize   = 64
+	defaultWorkerCount  = 1
+	defaultQueueSize    = 64
+	defaultTombstoneTTL = 60 * time.Second
 )
 
 type invocationState uint8
@@ -53,6 +54,8 @@ func NewManager() *Manager {
 		queueSize:        defaultQueueSize,
 		invStateMux:      &sync.Mutex{},
 		invState:         make(map[string]invocationState),
+		tombstones:       make(map[string]time.Time),
+		tombstoneTTL:     defaultTombstoneTTL,
 	}
 }
 
@@ -69,13 +72,17 @@ type Manager struct {
 	workerCount int
 	queueSize   int
 
-	invStateMux *sync.Mutex
-	invState    map[string]invocationState
+	invStateMux  *sync.Mutex
+	invState     map[string]invocationState
+	tombstones   map[string]time.Time
+	tombstoneTTL time.Duration
 }
 
 func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
 	m.Info("instance is started")
 	defer func() { m.Info("instance is stopped") }()
+	restoreFinalizeHook := setFinalizeHook(m.TryFinalize)
+	defer restoreFinalizeHook()
 
 	var wg sync.WaitGroup
 
@@ -166,7 +173,6 @@ func (m *Manager) dispatchInvocation(fn *Function, workCh chan<- *invocationRequ
 	select {
 	case workCh <- req:
 	default:
-		m.deleteInvocationState(fn.UID)
 		m.respf(fn, 503, "function queue is full")
 	}
 }
@@ -187,7 +193,6 @@ func (m *Manager) runWorker(ctx context.Context, workCh <-chan *invocationReques
 			m.setInvocationState(req.fn.UID, stateRunning)
 			req.handler(*req.fn)
 			m.setInvocationState(req.fn.UID, stateAwaitingResult)
-			m.deleteInvocationState(req.fn.UID)
 		}
 	}
 }
@@ -199,6 +204,12 @@ func (m *Manager) trySetInvocationState(uid string, state invocationState) bool 
 
 	m.invStateMux.Lock()
 	defer m.invStateMux.Unlock()
+
+	m.pruneExpiredTombstonesLocked(time.Now())
+
+	if _, ok := m.tombstones[uid]; ok {
+		return false
+	}
 
 	if _, ok := m.invState[uid]; ok {
 		return false
@@ -220,15 +231,36 @@ func (m *Manager) setInvocationState(uid string, state invocationState) {
 	}
 }
 
-func (m *Manager) deleteInvocationState(uid string) {
-	if uid == "" {
-		return
+// TryFinalize emits a terminal response once per transaction UID.
+// Later terminal attempts for the same UID are dropped while tombstone is active.
+func (m *Manager) TryFinalize(uid, source string, emit func()) bool {
+	if uid == "" || emit == nil {
+		return false
 	}
 
 	m.invStateMux.Lock()
-	defer m.invStateMux.Unlock()
+	now := time.Now()
+	m.pruneExpiredTombstonesLocked(now)
+	if _, ok := m.tombstones[uid]; ok {
+		m.invStateMux.Unlock()
+		m.Debugf("dropping late terminal response for uid '%s' (source=%s)", uid, source)
+		return false
+	}
 
 	delete(m.invState, uid)
+	m.tombstones[uid] = now.Add(m.tombstoneTTL)
+	m.invStateMux.Unlock()
+
+	emit()
+	return true
+}
+
+func (m *Manager) pruneExpiredTombstonesLocked(now time.Time) {
+	for uid, expiresAt := range m.tombstones {
+		if !expiresAt.After(now) {
+			delete(m.tombstones, uid)
+		}
+	}
 }
 
 func (m *Manager) lookupFunction(name string) (func(Function), bool) {
@@ -307,11 +339,15 @@ func (m *Manager) respf(fn *Function, code int, msgf string, a ...any) {
 		})
 	}
 
-	m.api.FUNCRESULT(netdataapi.FunctionResult{
+	res := netdataapi.FunctionResult{
 		UID:             fn.UID,
 		ContentType:     "application/json",
 		Payload:         string(bs),
 		Code:            strconv.Itoa(code),
 		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
+	}
+
+	FinalizeTerminal(fn.UID, "functions.manager.respf", func() {
+		m.api.FUNCRESULT(res)
 	})
 }

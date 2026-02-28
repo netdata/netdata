@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	fnpkg "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
 
 // Responder handles standardized responses for dyncfg operations
@@ -51,12 +52,15 @@ func (r *Responder) SendCodef(fn Function, code int, message string, args ...any
 		})
 	}
 
-	r.api.FUNCRESULT(netdataapi.FunctionResult{
+	res := netdataapi.FunctionResult{
 		UID:             fn.UID(),
 		ContentType:     "application/json",
 		Payload:         string(payload),
 		Code:            strconv.Itoa(code),
 		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
+	}
+	fnpkg.FinalizeTerminal(fn.UID(), "dyncfg.responder.sendcodef", func() {
+		r.api.FUNCRESULT(res)
 	})
 }
 
@@ -71,12 +75,15 @@ func (r *Responder) SendJSONWithCode(fn Function, payload string, code int) {
 		return
 	}
 
-	r.api.FUNCRESULT(netdataapi.FunctionResult{
+	res := netdataapi.FunctionResult{
 		UID:             fn.UID(),
 		ContentType:     "application/json",
 		Payload:         payload,
 		Code:            strconv.Itoa(code),
 		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
+	}
+	fnpkg.FinalizeTerminal(fn.UID(), "dyncfg.responder.sendjsonwithcode", func() {
+		r.api.FUNCRESULT(res)
 	})
 }
 
@@ -91,12 +98,15 @@ func (r *Responder) sendPayload(fn Function, payload, contentType string) {
 		return
 	}
 
-	r.api.FUNCRESULT(netdataapi.FunctionResult{
+	res := netdataapi.FunctionResult{
 		UID:             fn.UID(),
 		ContentType:     contentType,
 		Payload:         payload,
 		Code:            "200",
 		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
+	}
+	fnpkg.FinalizeTerminal(fn.UID(), "dyncfg.responder.sendpayload", func() {
+		r.api.FUNCRESULT(res)
 	})
 }
 
