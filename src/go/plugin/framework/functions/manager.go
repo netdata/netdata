@@ -24,6 +24,12 @@ type functionSet struct {
 }
 
 const (
+	// defaultWorkerCount stays at 1 for now.
+	// Working theory: remaining concurrency risk is in collector MethodHandler
+	// implementations (shared mutable state and lifecycle races), not in manager
+	// queue/worker logic.
+	// TODO: establish and document a MethodHandler goroutine-safety contract
+	// before increasing this default.
 	defaultWorkerCount          = 1
 	defaultQueueSize            = 64
 	defaultCancelFallbackDelay  = 5 * time.Second
@@ -40,9 +46,10 @@ const (
 )
 
 type invocationRequest struct {
-	fn      *Function
-	handler func(Function)
-	ctx     context.Context
+	fn          *Function
+	handler     func(Function)
+	ctx         context.Context
+	scheduleKey string
 }
 
 type invocationRecord struct {
@@ -50,6 +57,7 @@ type invocationRecord struct {
 	cancel          context.CancelFunc
 	cancelRequested bool
 	fallbackTimer   *time.Timer
+	scheduleKey     string
 }
 
 func NewManager() *Manager {
@@ -85,6 +93,8 @@ type Manager struct {
 	workerCount int
 	queueSize   int
 
+	scheduler *keyScheduler
+
 	invStateMux          *sync.Mutex
 	invState             map[string]*invocationRecord
 	tombstones           map[string]time.Time
@@ -104,14 +114,14 @@ func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
 
 func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 	parser := newInputParser()
-	workCh := make(chan *invocationRequest, m.queueSize)
+	m.scheduler = newKeyScheduler(m.queueSize)
 	var workersWG sync.WaitGroup
 
 	for range m.workerCount {
 		workersWG.Add(1)
 		go func() {
 			defer workersWG.Done()
-			m.runWorker(workCh)
+			m.runWorker()
 		}()
 	}
 	shutdown := func(signalQuit, cancelInflight bool) {
@@ -123,7 +133,9 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 		if cancelInflight {
 			m.cancelAllInvocations()
 		}
-		close(workCh)
+		if m.scheduler != nil {
+			m.scheduler.stopAccepting()
+		}
 
 		drainCtx, cancelDrain := context.WithTimeout(context.Background(), m.shutdownDrainTimeout)
 		defer cancelDrain()
@@ -141,6 +153,9 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 
 		if cancelInflight {
 			m.forceFinalizeAll(499, "request canceled during shutdown")
+			if m.scheduler != nil {
+				m.scheduler.stop()
+			}
 		}
 	}
 
@@ -170,13 +185,13 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 				m.handleCancelEvent(event)
 				continue
 			case inputEventCall:
-				m.dispatchInvocation(ctx, event.fn, workCh)
+				m.dispatchInvocation(ctx, event.fn)
 			}
 		}
 	}
 }
 
-func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function, workCh chan<- *invocationRequest) {
+func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 	if fn == nil {
 		return
 	}
@@ -185,7 +200,7 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function, wo
 		return
 	}
 
-	handler, ok := m.lookupFunction(fn.Name)
+	handler, scheduleKey, ok := m.lookupFunctionRoute(*fn)
 	if !ok {
 		m.Infof("skipping execution of '%s': unregistered function", fn.Name)
 		m.respf(fn, 501, "unregistered function: %s", fn.Name)
@@ -198,58 +213,32 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function, wo
 	}
 
 	reqCtx, cancel := context.WithCancel(parentCtx)
-	if !m.trySetInvocationState(fn.UID, stateQueued, cancel) {
+	if !m.trySetInvocationState(fn.UID, stateQueued, cancel, scheduleKey) {
 		cancel()
 		m.respf(fn, 409, "duplicate active transaction id: %s", fn.UID)
 		return
 	}
 
 	req := &invocationRequest{
-		fn:      fn,
-		handler: handler,
-		ctx:     reqCtx,
+		fn:          fn,
+		handler:     handler,
+		ctx:         reqCtx,
+		scheduleKey: scheduleKey,
 	}
 
-	select {
-	case workCh <- req:
-	default:
+	if m.scheduler == nil {
+		cancel()
+		m.respf(fn, 503, "functions manager is stopping")
+		return
+	}
+
+	if err := m.scheduler.enqueue(req); err != nil {
 		cancel()
 		m.respf(fn, 503, "function queue is full")
 	}
 }
 
-func (m *Manager) runWorker(workCh <-chan *invocationRequest) {
-	for req := range workCh {
-		if req == nil || req.fn == nil || req.handler == nil {
-			continue
-		}
-		if req.ctx != nil && req.ctx.Err() != nil {
-			continue
-		}
-		if !m.startInvocation(req.fn.UID) {
-			continue
-		}
-
-		panicked := false
-		func() {
-			defer func() {
-				if recover() != nil {
-					panicked = true
-				}
-			}()
-			req.handler(*req.fn)
-		}()
-
-		if panicked {
-			m.respUID(req.fn.UID, 500, "function handler panic")
-			continue
-		}
-
-		m.setInvocationState(req.fn.UID, stateAwaitingResult)
-	}
-}
-
-func (m *Manager) trySetInvocationState(uid string, state invocationState, cancel context.CancelFunc) bool {
+func (m *Manager) trySetInvocationState(uid string, state invocationState, cancel context.CancelFunc, scheduleKey string) bool {
 	if uid == "" {
 		return false
 	}
@@ -267,8 +256,9 @@ func (m *Manager) trySetInvocationState(uid string, state invocationState, cance
 		return false
 	}
 	m.invState[uid] = &invocationRecord{
-		state:  state,
-		cancel: cancel,
+		state:       state,
+		cancel:      cancel,
+		scheduleKey: scheduleKey,
 	}
 	return true
 }
@@ -340,6 +330,10 @@ func (m *Manager) requestCancellation(uid string) (invocationState, bool) {
 		rec.cancel()
 	}
 
+	if rec.state == stateQueued && m.scheduler != nil {
+		m.scheduler.cancelQueued(rec.scheduleKey, uid)
+	}
+
 	if rec.state == stateRunning || rec.state == stateAwaitingResult {
 		if rec.fallbackTimer == nil {
 			uidCopy := uid
@@ -404,15 +398,21 @@ func (m *Manager) tryFinalize(uid, source string, emit func()) bool {
 		return false
 	}
 
+	var scheduleKey string
 	if rec, ok := m.invState[uid]; ok && rec != nil {
 		if rec.fallbackTimer != nil {
 			rec.fallbackTimer.Stop()
 			rec.fallbackTimer = nil
 		}
+		scheduleKey = rec.scheduleKey
 	}
 	delete(m.invState, uid)
 	m.tombstones[uid] = now.Add(m.tombstoneTTL)
 	m.invStateMux.Unlock()
+
+	if scheduleKey != "" && m.scheduler != nil {
+		m.scheduler.complete(scheduleKey, uid)
+	}
 
 	emit()
 	return true
@@ -426,6 +426,58 @@ func (m *Manager) pruneExpiredTombstonesLocked(now time.Time) {
 	}
 }
 
+func (m *Manager) lookupFunctionRoute(fn Function) (handler func(Function), scheduleKey string, ok bool) {
+	name := fn.Name
+	m.mux.Lock()
+	fs, ok := m.FunctionRegistry[name]
+	var (
+		direct   func(Function)
+		prefixes map[string]func(Function)
+	)
+	if ok && fs != nil {
+		direct = fs.direct
+		if len(fs.prefixes) > 0 {
+			prefixes = make(map[string]func(Function), len(fs.prefixes))
+			for prefix, handler := range fs.prefixes {
+				prefixes[prefix] = handler
+			}
+		}
+	}
+	m.mux.Unlock()
+
+	if !ok || fs == nil {
+		return nil, "", false
+	}
+
+	if len(prefixes) > 0 {
+		if len(fn.Args) > 0 {
+			id := fn.Args[0]
+			for prefix, routeHandler := range prefixes {
+				if strings.HasPrefix(id, prefix) {
+					if routeHandler != nil {
+						return routeHandler, routeScheduleKey(name, prefix), true
+					}
+					break
+				}
+			}
+		}
+
+		return func(f Function) {
+			m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
+		}, routeScheduleKey(name, "__unmatched__"), true
+	}
+
+	if direct != nil {
+		return direct, routeScheduleKey(name, ""), true
+	}
+
+	return func(f Function) {
+		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
+	}, routeScheduleKey(name, "__direct_missing__"), true
+}
+
+// lookupFunction returns a snapshot handler used by existing tests to verify
+// registry snapshot semantics at lookup time.
 func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 	m.mux.Lock()
 	fs, ok := m.FunctionRegistry[name]
@@ -450,7 +502,19 @@ func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 
 	return func(f Function) {
 		if len(prefixes) > 0 {
-			m.handlePrefixRouting(f, prefixes)
+			if len(f.Args) > 0 {
+				id := f.Args[0]
+				for prefix, handler := range prefixes {
+					if strings.HasPrefix(id, prefix) {
+						if handler != nil {
+							handler(f)
+							return
+						}
+						break
+					}
+				}
+			}
+			m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
 			return
 		}
 
@@ -463,21 +527,11 @@ func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 	}, true
 }
 
-func (m *Manager) handlePrefixRouting(f Function, prefixes map[string]func(Function)) {
-	if len(f.Args) == 0 {
-		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
-		return
+func routeScheduleKey(name, discriminator string) string {
+	if discriminator == "" {
+		return name
 	}
-
-	id := f.Args[0]
-	for prefix, handler := range prefixes {
-		if strings.HasPrefix(id, prefix) {
-			handler(f)
-			return
-		}
-	}
-
-	m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
+	return name + "|" + discriminator
 }
 
 func (m *Manager) respUID(uid string, code int, msgf string, a ...any) {

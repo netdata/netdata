@@ -303,6 +303,7 @@ func TestManager_FlowScenarios(t *testing.T) {
 						started <- struct{}{}
 						<-release
 					}
+					mgr.respUID(fn.UID, 200, "ok")
 				})
 
 				cancel, done := startFlowManager(t, mgr)
@@ -449,14 +450,14 @@ func TestManager_tryFinalize(t *testing.T) {
 				require.False(t, ok)
 				assert.Equal(t, 1, calls)
 
-				admitted := mgr.trySetInvocationState("uid1", stateQueued, func() {})
+				admitted := mgr.trySetInvocationState("uid1", stateQueued, func() {}, "fn")
 				assert.False(t, admitted)
 
 				mgr.invStateMux.Lock()
 				mgr.tombstones["uid1"] = time.Now().Add(-time.Second)
 				mgr.invStateMux.Unlock()
 
-				admitted = mgr.trySetInvocationState("uid1", stateQueued, func() {})
+				admitted = mgr.trySetInvocationState("uid1", stateQueued, func() {}, "fn")
 				assert.True(t, admitted)
 			},
 		},
@@ -478,11 +479,72 @@ func TestManager_tryFinalize(t *testing.T) {
 func TestManager_WorkerPoolConcurrencyBound(t *testing.T) {
 	tests := map[string]struct {
 		workerCount int
-		requests    int
+		input       []string
+		register    func(t *testing.T, mgr *Manager, current, maxSeen *atomic.Int32)
+		assertions  func(t *testing.T, maxSeen int32)
 	}{
-		"worker count 4 keeps concurrency bounded and serves all requests": {
+		"same key is serialized": {
 			workerCount: 4,
-			requests:    24,
+			input: []string{
+				functionLine("tx-1", "fn"),
+				functionLine("tx-2", "fn"),
+				functionLine("tx-3", "fn"),
+				functionLine("tx-4", "fn"),
+			},
+			register: func(t *testing.T, mgr *Manager, current, maxSeen *atomic.Int32) {
+				t.Helper()
+				mgr.Register("fn", func(fn Function) {
+					c := current.Add(1)
+					for {
+						prev := maxSeen.Load()
+						if c <= prev || maxSeen.CompareAndSwap(prev, c) {
+							break
+						}
+					}
+
+					time.Sleep(30 * time.Millisecond)
+					current.Add(-1)
+					mgr.respUID(fn.UID, 200, "ok")
+				})
+			},
+			assertions: func(t *testing.T, maxSeen int32) {
+				t.Helper()
+				assert.Equal(t, int32(1), maxSeen)
+			},
+		},
+		"different keys run concurrently": {
+			workerCount: 4,
+			input: []string{
+				functionLine("tx-a1", "fnA"),
+				functionLine("tx-b1", "fnB"),
+				functionLine("tx-a2", "fnA"),
+				functionLine("tx-b2", "fnB"),
+			},
+			register: func(t *testing.T, mgr *Manager, current, maxSeen *atomic.Int32) {
+				t.Helper()
+				registerFn := func(name string) {
+					mgr.Register(name, func(fn Function) {
+						c := current.Add(1)
+						for {
+							prev := maxSeen.Load()
+							if c <= prev || maxSeen.CompareAndSwap(prev, c) {
+								break
+							}
+						}
+
+						time.Sleep(40 * time.Millisecond)
+						current.Add(-1)
+						mgr.respUID(fn.UID, 200, "ok")
+					})
+				}
+				registerFn("fnA")
+				registerFn("fnB")
+			},
+			assertions: func(t *testing.T, maxSeen int32) {
+				t.Helper()
+				assert.GreaterOrEqual(t, maxSeen, int32(2))
+				assert.LessOrEqual(t, maxSeen, int32(4))
+			},
 		},
 	}
 
@@ -490,42 +552,27 @@ func TestManager_WorkerPoolConcurrencyBound(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			mgr, out := newFlowManager()
 			mgr.workerCount = tc.workerCount
-			mgr.queueSize = tc.requests + tc.workerCount
-			in := &chanInput{ch: make(chan string, tc.requests+tc.workerCount)}
+			mgr.queueSize = len(tc.input) + tc.workerCount
+			in := &chanInput{ch: make(chan string, len(tc.input)+tc.workerCount)}
 			mgr.input = in
 
 			var current atomic.Int32
 			var maxSeen atomic.Int32
 
-			mgr.Register("fn", func(fn Function) {
-				c := current.Add(1)
-				for {
-					prev := maxSeen.Load()
-					if c <= prev || maxSeen.CompareAndSwap(prev, c) {
-						break
-					}
-				}
-
-				time.Sleep(30 * time.Millisecond)
-				mgr.respUID(fn.UID, 200, "ok")
-				current.Add(-1)
-			})
+			tc.register(t, mgr, &current, &maxSeen)
 
 			cancel, done := startFlowManager(t, mgr)
 			defer cancel()
 
-			for i := range tc.requests {
-				in.ch <- functionLine(fmt.Sprintf("tx-%d", i), "fn")
+			for _, line := range tc.input {
+				in.ch <- line
 			}
 			close(in.ch)
 			waitForDone(t, done)
 
 			got := out.String()
-			assert.Equal(t, tc.requests, countSubstring(got, "FUNCTION_RESULT_BEGIN tx-"))
-			assert.LessOrEqual(t, maxSeen.Load(), int32(tc.workerCount))
-			if tc.workerCount > 1 {
-				assert.GreaterOrEqual(t, maxSeen.Load(), int32(2))
-			}
+			assert.Equal(t, len(tc.input), countSubstring(got, "FUNCTION_RESULT_BEGIN tx-"))
+			tc.assertions(t, maxSeen.Load())
 		})
 	}
 }
