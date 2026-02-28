@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -416,44 +417,61 @@ FUNCTION_PAYLOAD_END
 	}
 
 	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			mgr := NewManager()
+		for workerProfile, workerCount := range map[string]int{
+			"single-worker": 1,
+			"multi-worker":  4,
+		} {
+			t.Run(name+"/"+workerProfile, func(t *testing.T) {
+				mgr := NewManager()
+				mgr.workerCount = workerCount
 
-			mgr.input = newMockInput(test.input)
+				mgr.input = newMockInput(test.input)
 
-			mock := &mockFunctionExecutor{}
-			for _, v := range test.register {
-				mgr.Register(v, mock.execute)
-			}
+				mock := &mockFunctionExecutor{}
+				for _, v := range test.register {
+					mgr.Register(v, mock.execute)
+				}
 
-			testTime := time.Second * 5
-			ctx, cancel := context.WithTimeout(context.Background(), testTime)
-			defer cancel()
+				testTime := time.Second * 5
+				ctx, cancel := context.WithTimeout(context.Background(), testTime)
+				defer cancel()
 
-			done := make(chan struct{})
+				done := make(chan struct{})
 
-			go func() { defer close(done); mgr.Run(ctx, nil) }()
+				go func() { defer close(done); mgr.Run(ctx, nil) }()
 
-			timeout := testTime + time.Second*2
-			tk := time.NewTimer(timeout)
-			defer tk.Stop()
+				timeout := testTime + time.Second*2
+				tk := time.NewTimer(timeout)
+				defer tk.Stop()
 
-			select {
-			case <-done:
-				assert.Equal(t, test.expected, mock.executed)
-			case <-tk.C:
-				t.Errorf("timed out after %s", timeout)
-			}
-		})
+				select {
+				case <-done:
+					assert.ElementsMatch(t, test.expected, mock.snapshot())
+				case <-tk.C:
+					t.Errorf("timed out after %s", timeout)
+				}
+			})
+		}
 	}
 }
 
 type mockFunctionExecutor struct {
+	mu       sync.Mutex
 	executed []Function
 }
 
 func (m *mockFunctionExecutor) execute(fn Function) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.executed = append(m.executed, fn)
+}
+
+func (m *mockFunctionExecutor) snapshot() []Function {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]Function, len(m.executed))
+	copy(out, m.executed)
+	return out
 }
 
 func newMockInput(data string) *mockInput {

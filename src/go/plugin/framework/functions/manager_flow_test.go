@@ -474,3 +474,58 @@ func TestManager_tryFinalize(t *testing.T) {
 		})
 	}
 }
+
+func TestManager_WorkerPoolConcurrencyBound(t *testing.T) {
+	tests := map[string]struct {
+		workerCount int
+		requests    int
+	}{
+		"worker count 4 keeps concurrency bounded and serves all requests": {
+			workerCount: 4,
+			requests:    24,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr, out := newFlowManager()
+			mgr.workerCount = tc.workerCount
+			mgr.queueSize = tc.requests + tc.workerCount
+			in := &chanInput{ch: make(chan string, tc.requests+tc.workerCount)}
+			mgr.input = in
+
+			var current atomic.Int32
+			var maxSeen atomic.Int32
+
+			mgr.Register("fn", func(fn Function) {
+				c := current.Add(1)
+				for {
+					prev := maxSeen.Load()
+					if c <= prev || maxSeen.CompareAndSwap(prev, c) {
+						break
+					}
+				}
+
+				time.Sleep(30 * time.Millisecond)
+				mgr.respUID(fn.UID, 200, "ok")
+				current.Add(-1)
+			})
+
+			cancel, done := startFlowManager(t, mgr)
+			defer cancel()
+
+			for i := range tc.requests {
+				in.ch <- functionLine(fmt.Sprintf("tx-%d", i), "fn")
+			}
+			close(in.ch)
+			waitForDone(t, done)
+
+			got := out.String()
+			assert.Equal(t, tc.requests, countSubstring(got, "FUNCTION_RESULT_BEGIN tx-"))
+			assert.LessOrEqual(t, maxSeen.Load(), int32(tc.workerCount))
+			if tc.workerCount > 1 {
+				assert.GreaterOrEqual(t, maxSeen.Load(), int32(2))
+			}
+		})
+	}
+}
