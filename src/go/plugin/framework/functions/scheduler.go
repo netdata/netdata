@@ -10,6 +10,7 @@ import (
 var (
 	errSchedulerQueueFull = errors.New("scheduler queue is full")
 	errSchedulerStopping  = errors.New("scheduler is stopping")
+	errSchedulerInvalid   = errors.New("scheduler invalid request")
 )
 
 type scheduleLane struct {
@@ -45,7 +46,7 @@ func newKeyScheduler(maxPending int) *keyScheduler {
 
 func (s *keyScheduler) enqueue(req *invocationRequest) error {
 	if req == nil || req.fn == nil || req.fn.UID == "" || req.scheduleKey == "" {
-		return errSchedulerQueueFull
+		return errSchedulerInvalid
 	}
 
 	s.mux.Lock()
@@ -162,15 +163,20 @@ func (s *keyScheduler) complete(scheduleKey, uid string) {
 		return
 	}
 
-	if len(lane.queue) > 0 {
+	for len(lane.queue) > 0 {
 		next := lane.queue[0]
 		lane.queue = lane.queue[1:]
-		if next != nil && next.fn != nil {
-			lane.ownerUID = next.fn.UID
-			s.ready = append(s.ready, next)
-			s.cond.Signal()
-			return
+		if next == nil || next.fn == nil {
+			if s.pending > 0 {
+				s.pending--
+			}
+			continue
 		}
+
+		lane.ownerUID = next.fn.UID
+		s.ready = append(s.ready, next)
+		s.cond.Signal()
+		return
 	}
 
 	lane.ownerUID = ""

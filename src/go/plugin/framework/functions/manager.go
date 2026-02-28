@@ -5,6 +5,7 @@ package functions
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -234,7 +235,16 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 
 	if err := m.scheduler.enqueue(req); err != nil {
 		cancel()
-		m.respf(fn, 503, "function queue is full")
+		switch {
+		case errors.Is(err, errSchedulerQueueFull):
+			m.respf(fn, 503, "function queue is full")
+		case errors.Is(err, errSchedulerStopping):
+			m.respf(fn, 503, "functions manager is stopping")
+		case errors.Is(err, errSchedulerInvalid):
+			m.respf(fn, 500, "invalid scheduler request")
+		default:
+			m.respf(fn, 503, "function queue is full")
+		}
 	}
 }
 
