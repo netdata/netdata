@@ -126,6 +126,27 @@ func TestInputParser_ParseEvent(t *testing.T) {
 				assert.Nil(t, p.currentFn)
 			},
 		},
+		"quit during payload aborts payload and emits quit": {
+			lines: []string{testPayloadStartLine, "line1", "QUIT"},
+			assertEvent: func(t *testing.T, events []inputEvent) {
+				require.Len(t, events, 1)
+				assert.Equal(t, inputEventQuit, events[0].kind)
+			},
+			assertState: func(t *testing.T, p *inputParser) {
+				assert.False(t, p.readingPayload)
+				assert.Nil(t, p.currentFn)
+				assert.Equal(t, 0, p.payloadBuf.Len())
+			},
+		},
+		"unknown FUNCTION_ control during payload aborts payload and errors": {
+			lines:   []string{testPayloadStartLine, "line1", "FUNCTION_UNKNOWN tx1"},
+			wantErr: true,
+			assertState: func(t *testing.T, p *inputParser) {
+				assert.False(t, p.readingPayload)
+				assert.Nil(t, p.currentFn)
+				assert.Equal(t, 0, p.payloadBuf.Len())
+			},
+		},
 	}
 
 	for name, tc := range tests {

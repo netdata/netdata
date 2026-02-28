@@ -33,6 +33,9 @@ Payload-mode control behavior:
 - `FUNCTION_PROGRESS ...`:
     - emit progress event
     - continue payload accumulation
+- `QUIT`:
+    - abort payload frame
+    - emit quit event
 - Any other `FUNCTION*` control line:
     - abort current payload frame
     - never dispatch partial payload
