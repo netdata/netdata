@@ -46,6 +46,15 @@ const (
 	stateAwaitingResult
 )
 
+type invocationAdmission uint8
+
+const (
+	invocationAdmissionAccepted invocationAdmission = iota + 1
+	invocationAdmissionDuplicateActive
+	invocationAdmissionDuplicateTombstone
+	invocationAdmissionInvalid
+)
+
 type invocationRequest struct {
 	fn          *Function
 	handler     func(Function)
@@ -153,11 +162,13 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 			timedOut = true
 		}
 
-		if cancelInflight && timedOut {
-			m.cancelAllInvocations()
-			m.forceFinalizeAll(499, "request canceled during shutdown")
-			if m.scheduler != nil {
-				m.scheduler.stop()
+		if cancelInflight {
+			if timedOut || m.hasActiveInvocations() {
+				m.cancelAllInvocations()
+				m.forceFinalizeAll(499, "request canceled during shutdown")
+				if m.scheduler != nil {
+					m.scheduler.stop()
+				}
 			}
 		}
 	}
@@ -216,9 +227,22 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 	}
 
 	reqCtx, cancel := context.WithCancel(parentCtx)
-	if !m.trySetInvocationState(fn.UID, stateQueued, cancel, scheduleKey) {
+	switch m.trySetInvocationState(fn.UID, stateQueued, cancel, scheduleKey) {
+	case invocationAdmissionAccepted:
+		// admitted
+	case invocationAdmissionDuplicateActive:
 		cancel()
-		m.respf(fn, 409, "duplicate active transaction id: %s", fn.UID)
+		// Do not emit terminal output for duplicates of an active UID. Emitting
+		// via tryFinalize would mutate active tracking for the original invocation.
+		m.Warningf("ignoring duplicate active transaction id: %s", fn.UID)
+		return
+	case invocationAdmissionDuplicateTombstone:
+		cancel()
+		m.Warningf("ignoring duplicate recently finalized transaction id: %s", fn.UID)
+		return
+	default:
+		cancel()
+		m.respf(fn, 409, "duplicate transaction id: %s", fn.UID)
 		return
 	}
 
@@ -250,9 +274,9 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 	}
 }
 
-func (m *Manager) trySetInvocationState(uid string, state invocationState, cancel context.CancelFunc, scheduleKey string) bool {
+func (m *Manager) trySetInvocationState(uid string, state invocationState, cancel context.CancelFunc, scheduleKey string) invocationAdmission {
 	if uid == "" {
-		return false
+		return invocationAdmissionInvalid
 	}
 
 	m.invStateMux.Lock()
@@ -261,18 +285,18 @@ func (m *Manager) trySetInvocationState(uid string, state invocationState, cance
 	m.pruneExpiredTombstonesLocked(time.Now())
 
 	if _, ok := m.tombstones[uid]; ok {
-		return false
+		return invocationAdmissionDuplicateTombstone
 	}
 
 	if _, ok := m.invState[uid]; ok {
-		return false
+		return invocationAdmissionDuplicateActive
 	}
 	m.invState[uid] = &invocationRecord{
 		state:       state,
 		cancel:      cancel,
 		scheduleKey: scheduleKey,
 	}
-	return true
+	return invocationAdmissionAccepted
 }
 
 func (m *Manager) setAwaitingResultState(uid string, fnTimeout time.Duration) {
@@ -398,6 +422,12 @@ func (m *Manager) setStopping(v bool) {
 
 func (m *Manager) isStopping() bool {
 	return m.stopping.Load()
+}
+
+func (m *Manager) hasActiveInvocations() bool {
+	m.invStateMux.Lock()
+	defer m.invStateMux.Unlock()
+	return len(m.invState) > 0
 }
 
 // TerminalFinalizer returns the manager-bound terminal finalizer for responder wiring.

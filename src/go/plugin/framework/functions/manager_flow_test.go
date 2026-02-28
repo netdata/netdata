@@ -256,18 +256,34 @@ func TestManager_FlowScenarios(t *testing.T) {
 				assert.EqualValues(t, 0, calls.Load())
 			},
 		},
-		"duplicate uid is rejected with 409": {
+		"duplicate active uid is ignored without corrupting lane progression": {
 			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				mgr.workerCount = 2
 				started := make(chan struct{}, 1)
 				release := make(chan struct{})
-				var calls atomic.Int32
+				var (
+					calls   atomic.Int32
+					running atomic.Int32
+					maxSeen atomic.Int32
+				)
 
 				mgr.Register("fn", func(fn Function) {
 					calls.Add(1)
+
+					curr := running.Add(1)
+					for {
+						prev := maxSeen.Load()
+						if curr <= prev || maxSeen.CompareAndSwap(prev, curr) {
+							break
+						}
+					}
+					defer running.Add(-1)
+
 					if fn.UID == "tx1" {
 						started <- struct{}{}
 						<-release
 					}
+					mgr.respUID(fn.UID, 200, "ok")
 				})
 
 				cancel, done := startFlowManager(t, mgr)
@@ -275,13 +291,21 @@ func TestManager_FlowScenarios(t *testing.T) {
 
 				in.ch <- functionLine("tx1", "fn")
 				<-started
+				// Same-key request should stay queued until tx1 completes.
+				in.ch <- functionLine("tx2", "fn")
+				// Duplicate active UID must not advance lanes or finalize tx1.
 				in.ch <- functionLine("tx1", "fn")
 				close(release)
 				close(in.ch)
 				waitForDone(t, done)
 
-				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 409", time.Second)
-				assert.EqualValues(t, 1, calls.Load())
+				got := out.String()
+				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 200"))
+				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx2 200"))
+				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 409"))
+				assert.EqualValues(t, 2, calls.Load())
+				// Same key must remain serialized despite duplicate UID input.
+				assert.EqualValues(t, 1, maxSeen.Load())
 			},
 		},
 		"queue full is rejected with 503": {
@@ -419,6 +443,37 @@ func TestManager_FlowScenarios(t *testing.T) {
 				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 200"))
 			},
 		},
+		"shutdown finalizes unresolved awaiting_result even when workers are drained": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				mgr.shutdownDrainTimeout = 250 * time.Millisecond
+				mgr.awaitingWarnDelay = time.Second
+				returned := make(chan struct{}, 1)
+
+				mgr.Register("fn", func(Function) {
+					// Return without terminal response.
+					returned <- struct{}{}
+				})
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- functionLine("tx1", "fn")
+				<-returned
+				waitForCondition(t, time.Second, func() bool {
+					mgr.invStateMux.Lock()
+					defer mgr.invStateMux.Unlock()
+					rec, ok := mgr.invState["tx1"]
+					return ok && rec != nil && rec.state == stateAwaitingResult
+				}, "tx1 reaches awaiting_result before shutdown")
+
+				close(in.ch)
+				waitForDone(t, done)
+
+				got := out.String()
+				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 200"))
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -504,14 +559,14 @@ func TestManager_tryFinalize(t *testing.T) {
 				assert.Equal(t, 1, calls)
 
 				admitted := mgr.trySetInvocationState("uid1", stateQueued, func() {}, "fn")
-				assert.False(t, admitted)
+				assert.Equal(t, invocationAdmissionDuplicateTombstone, admitted)
 
 				mgr.invStateMux.Lock()
 				mgr.tombstones["uid1"] = time.Now().Add(-time.Second)
 				mgr.invStateMux.Unlock()
 
 				admitted = mgr.trySetInvocationState("uid1", stateQueued, func() {}, "fn")
-				assert.True(t, admitted)
+				assert.Equal(t, invocationAdmissionAccepted, admitted)
 			},
 		},
 		"empty uid or nil emitter is rejected": {

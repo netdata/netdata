@@ -53,7 +53,7 @@ Admission checks:
 
 - manager stopping -> reject `503`
 - unknown/nil handler -> reject `501`
-- duplicate active/tombstoned UID -> reject `409`
+- duplicate active/tombstoned UID -> ignore duplicate input (debug/warn log, no terminal output)
 - queue full -> reject `503`
 
 ### Keyed scheduler + worker pool
@@ -156,7 +156,7 @@ flowchart TD
     C --> C1{"Admission checks"}
     C1 -->|stopping| R503["respf 503"]
     C1 -->|unregistered/nil handler| R501["respf 501"]
-    C1 -->|duplicate/tombstoned UID| R409["respf 409"]
+    C1 -->|duplicate/tombstoned UID| DUP["ignore duplicate + log"]
     C1 -->|queue full| R503
     C1 -->|accepted| Q["scheduler.enqueue by route key + state=queued"]
     Q --> S["keyScheduler"]
@@ -175,7 +175,6 @@ flowchart TD
     TMR -->|timer fires & still unresolved| C499
     R501 --> FIN["manager finalizer"]
     R503 --> FIN
-    R409 --> FIN
     R500 --> FIN
     C499 --> FIN
     HRESP["Handler/dyncfg responder terminal output"] --> FIN
