@@ -230,6 +230,7 @@ func (a *Agent) run(ctx context.Context) {
 	runtimeSvc := runtimechartemit.New(a.Logger.With(slog.String("component", "runtime metrics service")))
 	runtimeSvc.Start(a.Name, a.Out)
 	defer runtimeSvc.Stop()
+	fnMgr.SetRuntimeService(runtimeSvc)
 
 	var runJob []string
 	if a.RunModule != "" && a.RunModule != "all" {

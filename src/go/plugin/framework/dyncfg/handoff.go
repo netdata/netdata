@@ -18,16 +18,16 @@ const (
 )
 
 // BoundedSend sends value to ch using bounded wait:
-// wait = min(remaining request deadline, cap), with cap used when no deadline exists.
-func BoundedSend[T any](ctx context.Context, ch chan<- T, value T, cap time.Duration) BoundedSendResult {
-	if cap <= 0 {
-		cap = DefaultDownstreamHandoffCap
+// wait = min(remaining request deadline, maxWait), with maxWait used when no deadline exists.
+func BoundedSend[T any](ctx context.Context, ch chan<- T, value T, maxWait time.Duration) BoundedSendResult {
+	if maxWait <= 0 {
+		maxWait = DefaultDownstreamHandoffCap
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	wait := cap
+	wait := maxWait
 	if deadline, ok := ctx.Deadline(); ok {
 		remaining := time.Until(deadline)
 		if remaining <= 0 {

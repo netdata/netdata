@@ -102,7 +102,7 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 	if store == nil {
 		return nil
 	}
-	meter := store.Write().StatefulMeter("netdata.go.plugin.chartengine")
+	meter := store.Write().StatefulMeter("netdata.go.plugin.framework.chartengine")
 	phaseDuration := meter.Vec("phase").Summary(
 		"build_phase_duration_seconds",
 		metrix.WithSummaryQuantiles(0.5, 0.9, 0.99),

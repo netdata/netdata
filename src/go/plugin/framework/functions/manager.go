@@ -14,8 +14,10 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
 
 type functionSet struct {
@@ -73,6 +75,7 @@ type invocationRecord struct {
 }
 
 func NewManager() *Manager {
+	runtimeStore := metrix.NewRuntimeStore()
 	return &Manager{
 		Logger: logger.New().With(
 			slog.String("component", "functions manager"),
@@ -90,6 +93,8 @@ func NewManager() *Manager {
 		cancelFallbackDelay:  defaultCancelFallbackDelay,
 		shutdownDrainTimeout: defaultShutdownDrainTimeout,
 		awaitingWarnDelay:    defaultAwaitingWarnDelay,
+		runtimeStore:         runtimeStore,
+		runtimeMetrics:       newManagerRuntimeMetrics(runtimeStore),
 	}
 }
 
@@ -116,17 +121,31 @@ type Manager struct {
 	shutdownDrainTimeout time.Duration
 	awaitingWarnDelay    time.Duration
 	stopping             atomic.Bool
+
+	runtimeService             runtimecomp.Service
+	runtimeStore               metrix.RuntimeStore
+	runtimeMetrics             *managerRuntimeMetrics
+	runtimeComponentName       string
+	runtimeComponentRegistered bool
 }
 
 func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
 	m.Info("instance is started")
 	defer func() { m.Info("instance is stopped") }()
+
+	if err := m.registerRuntimeComponent(); err != nil {
+		m.Warningf("runtime metrics registration failed: %v", err)
+	} else {
+		defer m.unregisterRuntimeComponent()
+	}
+
 	m.run(ctx, quitCh)
 }
 
 func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 	parser := newInputParser()
 	m.scheduler = newKeyScheduler(m.queueSize)
+	m.observeSchedulerPending()
 	var workersWG sync.WaitGroup
 
 	m.startWorkers(&workersWG)
@@ -260,10 +279,12 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 		// Do not emit terminal output for duplicates of an active UID. Emitting
 		// via tryFinalize would mutate active tracking for the original invocation.
 		m.Warningf("ignoring duplicate active transaction id: %s", fn.UID)
+		m.observeDuplicateUIDIgnored()
 		return
 	case invocationAdmissionDuplicateTombstone:
 		cancel()
 		m.Warningf("ignoring duplicate recently finalized transaction id: %s", fn.UID)
+		m.observeDuplicateUIDIgnored()
 		return
 	case invocationAdmissionInvalid:
 		cancel()
@@ -293,6 +314,7 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 		switch {
 		case errors.Is(err, errSchedulerQueueFull):
 			m.respf(fn, 503, "function queue is full")
+			m.observeQueueFull()
 		case errors.Is(err, errSchedulerStopping):
 			m.respf(fn, 503, "functions manager is stopping")
 		case errors.Is(err, errSchedulerInvalid):
@@ -300,7 +322,9 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 		default:
 			m.respf(fn, 503, "function queue is full")
 		}
+		return
 	}
+	m.observeSchedulerPending()
 }
 
 func (m *Manager) trySetInvocationState(uid string, state invocationState, cancel context.CancelFunc, scheduleKey string) invocationAdmission {
@@ -325,6 +349,7 @@ func (m *Manager) trySetInvocationState(uid string, state invocationState, cance
 		cancel:      cancel,
 		scheduleKey: scheduleKey,
 	}
+	m.observeInvocationsLocked()
 	return invocationAdmissionAccepted
 }
 
@@ -344,6 +369,7 @@ func (m *Manager) setAwaitingResultState(uid string, fnTimeout time.Duration) {
 	rec.state = stateAwaitingResult
 	rec.awaitingSince = time.Now()
 	m.startAwaitingTimerLocked(uid, rec, fnTimeout)
+	m.observeInvocationsLocked()
 }
 
 func (m *Manager) logAwaitingResult(uid string) {
@@ -376,6 +402,7 @@ func (m *Manager) startInvocation(uid string) bool {
 		return false
 	}
 	rec.state = stateRunning
+	m.observeInvocationsLocked()
 	return true
 }
 
@@ -419,6 +446,7 @@ func (m *Manager) requestCancellation(uid string) (invocationState, bool) {
 
 	if rec.state == stateQueued && m.scheduler != nil {
 		m.scheduler.cancelQueued(rec.scheduleKey, uid)
+		m.observeSchedulerPending()
 	}
 
 	if rec.state == stateRunning || rec.state == stateAwaitingResult {
@@ -492,6 +520,7 @@ func (m *Manager) tryFinalize(uid, source string, emit func()) bool {
 	if _, ok := m.tombstones[uid]; ok {
 		m.invStateMux.Unlock()
 		m.Debugf("dropping late terminal response for uid '%s' (source=%s)", uid, source)
+		m.observeLateTerminalDropped()
 		return false
 	}
 
@@ -502,10 +531,12 @@ func (m *Manager) tryFinalize(uid, source string, emit func()) bool {
 	}
 	delete(m.invState, uid)
 	m.tombstones[uid] = now.Add(m.tombstoneTTL)
+	m.observeInvocationsLocked()
 	m.invStateMux.Unlock()
 
 	if scheduleKey != "" && m.scheduler != nil {
 		m.scheduler.complete(scheduleKey, uid)
+		m.observeSchedulerPending()
 	}
 
 	emit()
@@ -553,6 +584,7 @@ func (m *Manager) startCancelFallbackTimerLocked(uid string, rec *invocationReco
 
 	uidCopy := uid
 	rec.fallbackTimer = time.AfterFunc(m.cancelFallbackDelay, func() {
+		m.observeCancelFallback()
 		m.respUID(uidCopy, 499, "request canceled")
 	})
 }

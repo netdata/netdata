@@ -220,3 +220,9 @@ func (s *keyScheduler) removeReadyLocked(uid string) bool {
 	}
 	return false
 }
+
+func (s *keyScheduler) pendingCount() int {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	return s.pending
+}

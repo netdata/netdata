@@ -103,6 +103,31 @@ Awaiting-result observability:
 - manager starts a warning timer (`defaultAwaitingWarnDelay = 30s`, capped by function timeout if lower)
 - timer emits a warning log if UID is still `awaiting_result` (diagnostic only, no forced finalize)
 
+## Runtime metrics
+
+Functions manager owns an internal runtime store (`metrix.NewRuntimeStore()`), and
+can register it as a runtime component when runtime service is injected via
+`SetRuntimeService(...)`.
+
+Registered component metadata:
+
+- component name: `functions.manager`
+- module: `functions`
+- job: `manager`
+- autogen charts: enabled
+
+Pathology-focused metrics currently exposed:
+
+- gauges:
+    - `netdata.go.plugin.framework.functions.manager.invocations_active`
+    - `netdata.go.plugin.framework.functions.manager.invocations_awaiting_result`
+    - `netdata.go.plugin.framework.functions.manager.scheduler_pending`
+- counters:
+    - `netdata.go.plugin.framework.functions.manager.queue_full_total`
+    - `netdata.go.plugin.framework.functions.manager.cancel_fallback_total`
+    - `netdata.go.plugin.framework.functions.manager.late_terminal_dropped_total`
+    - `netdata.go.plugin.framework.functions.manager.duplicate_uid_ignored_total`
+
 ## Cancellation semantics
 
 ### 1) Queued request

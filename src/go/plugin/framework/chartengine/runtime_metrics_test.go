@@ -42,20 +42,20 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				require.NotNil(t, rs)
 				r := rs.Read(metrix.ReadRaw())
 
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.build_success_total", nil, 2)
-				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.chartengine.build_duration_seconds", nil, 2)
-				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.chartengine.build_phase_duration_seconds", metrix.Labels{"phase": "scan"}, 2)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_misses_total", nil, 1)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_hits_total", nil, 1)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_entries", nil, 1)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.route_cache_retained_total", nil, 1)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.series_scanned_total", nil, 2)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.planner_actions_total", metrix.Labels{"kind": "update_chart"}, 2)
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.plan_chart_instances", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_success_total", nil, 2)
+				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_duration_seconds", nil, 2)
+				assertSummaryCountAtLeast(t, r, "netdata.go.plugin.framework.chartengine.build_phase_duration_seconds", metrix.Labels{"phase": "scan"}, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_misses_total", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_hits_total", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_entries", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.route_cache_retained_total", nil, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.series_scanned_total", nil, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.planner_actions_total", metrix.Labels{"kind": "update_chart"}, 2)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.plan_chart_instances", nil, 1)
 				assertMetricMeta(
 					t,
 					r,
-					"netdata.go.plugin.chartengine.build_success_total",
+					"netdata.go.plugin.framework.chartengine.build_success_total",
 					metrix.MetricMeta{
 						Description: "Successful BuildPlan calls",
 						ChartFamily: "ChartEngine/Build",
@@ -65,7 +65,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				assertMetricMeta(
 					t,
 					r,
-					"netdata.go.plugin.chartengine.planner_actions_total",
+					"netdata.go.plugin.framework.chartengine.planner_actions_total",
 					metrix.MetricMeta{
 						Description: "Planner actions by kind",
 						ChartFamily: "ChartEngine/Actions",
@@ -91,7 +91,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				require.NoError(t, err)
 
 				before := e.RuntimeStore().Read(metrix.ReadRaw())
-				beforeCharts, ok := before.Value("netdata.go.plugin.chartengine.plan_chart_instances", nil)
+				beforeCharts, ok := before.Value("netdata.go.plugin.framework.chartengine.plan_chart_instances", nil)
 				require.True(t, ok)
 				require.GreaterOrEqual(t, beforeCharts, float64(1))
 
@@ -101,10 +101,10 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				require.NoError(t, err)
 
 				after := e.RuntimeStore().Read(metrix.ReadRaw())
-				assertMetricValueAtLeast(t, after, "netdata.go.plugin.chartengine.build_skipped_failed_collect_total", nil, 1)
-				assertMetricValueAtLeast(t, after, "netdata.go.plugin.chartengine.build_success_total", nil, 1)
+				assertMetricValueAtLeast(t, after, "netdata.go.plugin.framework.chartengine.build_skipped_failed_collect_total", nil, 1)
+				assertMetricValueAtLeast(t, after, "netdata.go.plugin.framework.chartengine.build_success_total", nil, 1)
 
-				afterCharts, ok := after.Value("netdata.go.plugin.chartengine.plan_chart_instances", nil)
+				afterCharts, ok := after.Value("netdata.go.plugin.framework.chartengine.plan_chart_instances", nil)
 				require.True(t, ok)
 				assert.Equal(t, beforeCharts, afterCharts)
 			},
@@ -129,7 +129,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				require.NoError(t, err)
 
 				r := e.RuntimeStore().Read(metrix.ReadRaw())
-				assertMetricValueAtLeast(t, r, "netdata.go.plugin.chartengine.series_filtered_total", metrix.Labels{"reason": "by_selector"}, 1)
+				assertMetricValueAtLeast(t, r, "netdata.go.plugin.framework.chartengine.series_filtered_total", metrix.Labels{"reason": "by_selector"}, 1)
 			},
 		},
 		"expiry removals are counted by scope and reason": {
@@ -162,7 +162,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				assertMetricValueAtLeast(
 					t,
 					r,
-					"netdata.go.plugin.chartengine.lifecycle_removed_total",
+					"netdata.go.plugin.framework.chartengine.lifecycle_removed_total",
 					metrix.Labels{"scope": "dimension", "reason": "expiry"},
 					1,
 				)
@@ -226,13 +226,13 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				assert.Equal(t, "ChartEngine/Build", create.Meta.Family)
 				assert.Equal(t, "builds/s", create.Meta.Units)
 
-				duration := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_seconds")
+				duration := findCreateChartByID(plan.Actions, "netdata.go.plugin.framework.chartengine.build_duration_seconds")
 				require.NotNil(t, duration)
 				assert.Equal(t, "BuildPlan duration in seconds", duration.Meta.Title)
 				assert.Equal(t, "ChartEngine/Build", duration.Meta.Family)
 				assert.Equal(t, "seconds", duration.Meta.Units)
 
-				durationSum := findCreateChartByID(plan.Actions, "netdata.go.plugin.chartengine.build_duration_seconds_sum")
+				durationSum := findCreateChartByID(plan.Actions, "netdata.go.plugin.framework.chartengine.build_duration_seconds_sum")
 				require.NotNil(t, durationSum)
 				assert.Equal(t, "BuildPlan duration in seconds", durationSum.Meta.Title)
 				assert.Equal(t, "ChartEngine/Build", durationSum.Meta.Family)

@@ -10,6 +10,7 @@ func (m *Manager) runWorker() {
 			return
 		}
 		req, ok := m.scheduler.next()
+		m.observeSchedulerPending()
 		if !ok {
 			return
 		}
