@@ -22,6 +22,24 @@ type functionSet struct {
 	prefixes map[string]func(Function) // for prefix-multiplexed names
 }
 
+const (
+	defaultWorkerCount = 1
+	defaultQueueSize   = 64
+)
+
+type invocationState uint8
+
+const (
+	stateQueued invocationState = iota + 1
+	stateRunning
+	stateAwaitingResult
+)
+
+type invocationRequest struct {
+	fn      *Function
+	handler func(Function)
+}
+
 func NewManager() *Manager {
 	return &Manager{
 		Logger: logger.New().With(
@@ -31,6 +49,10 @@ func NewManager() *Manager {
 		input:            newStdinInput(),
 		mux:              &sync.Mutex{},
 		FunctionRegistry: make(map[string]*functionSet),
+		workerCount:      defaultWorkerCount,
+		queueSize:        defaultQueueSize,
+		invStateMux:      &sync.Mutex{},
+		invState:         make(map[string]invocationState),
 	}
 }
 
@@ -43,6 +65,12 @@ type Manager struct {
 
 	mux              *sync.Mutex
 	FunctionRegistry map[string]*functionSet
+
+	workerCount int
+	queueSize   int
+
+	invStateMux *sync.Mutex
+	invState    map[string]invocationState
 }
 
 func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
@@ -61,6 +89,20 @@ func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
 
 func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 	parser := newInputParser()
+	workCh := make(chan *invocationRequest, m.queueSize)
+	var workersWG sync.WaitGroup
+
+	for range m.workerCount {
+		workersWG.Add(1)
+		go func() {
+			defer workersWG.Done()
+			m.runWorker(ctx, workCh)
+		}()
+	}
+	defer func() {
+		close(workCh)
+		workersWG.Wait()
+	}()
 
 	for {
 		select {
@@ -70,38 +112,123 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 			if !ok {
 				return
 			}
-			if line == "QUIT" {
-				if quitCh != nil {
-					quitCh <- struct{}{}
-					return
-				}
-				continue
-			}
-
-			fn, err := parser.parse(line)
+			event, err := parser.parseEvent(line)
 			if err != nil {
 				m.Warningf("parse function: %v ('%s')", err, line)
 				continue
 			}
-			if fn == nil {
-				continue
-			}
 
-			handler, ok := m.lookupFunction(fn.Name)
-			if !ok {
-				m.Infof("skipping execution of '%s': unregistered function", fn.Name)
-				m.respf(fn, 501, "unregistered function: %s", fn.Name)
+			switch event.kind {
+			case inputEventNone, inputEventProgress:
 				continue
-			}
-			if handler == nil {
-				m.Warningf("skipping execution of '%s': nil function registered", fn.Name)
-				m.respf(fn, 501, "nil function: %s", fn.Name)
+			case inputEventQuit:
+				if quitCh != nil {
+					quitCh <- struct{}{}
+					return
+				}
+			case inputEventCancel:
+				// Step 4 handles cancellation semantics.
 				continue
+			case inputEventCall:
+				m.dispatchInvocation(event.fn, workCh)
 			}
-
-			handler(*fn)
 		}
 	}
+}
+
+func (m *Manager) dispatchInvocation(fn *Function, workCh chan<- *invocationRequest) {
+	if fn == nil {
+		return
+	}
+
+	handler, ok := m.lookupFunction(fn.Name)
+	if !ok {
+		m.Infof("skipping execution of '%s': unregistered function", fn.Name)
+		m.respf(fn, 501, "unregistered function: %s", fn.Name)
+		return
+	}
+	if handler == nil {
+		m.Warningf("skipping execution of '%s': nil function registered", fn.Name)
+		m.respf(fn, 501, "nil function: %s", fn.Name)
+		return
+	}
+
+	if !m.trySetInvocationState(fn.UID, stateQueued) {
+		m.respf(fn, 409, "duplicate active transaction id: %s", fn.UID)
+		return
+	}
+
+	req := &invocationRequest{
+		fn:      fn,
+		handler: handler,
+	}
+
+	select {
+	case workCh <- req:
+	default:
+		m.deleteInvocationState(fn.UID)
+		m.respf(fn, 503, "function queue is full")
+	}
+}
+
+func (m *Manager) runWorker(ctx context.Context, workCh <-chan *invocationRequest) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case req, ok := <-workCh:
+			if !ok {
+				return
+			}
+			if req == nil || req.fn == nil || req.handler == nil {
+				continue
+			}
+
+			m.setInvocationState(req.fn.UID, stateRunning)
+			req.handler(*req.fn)
+			m.setInvocationState(req.fn.UID, stateAwaitingResult)
+			m.deleteInvocationState(req.fn.UID)
+		}
+	}
+}
+
+func (m *Manager) trySetInvocationState(uid string, state invocationState) bool {
+	if uid == "" {
+		return false
+	}
+
+	m.invStateMux.Lock()
+	defer m.invStateMux.Unlock()
+
+	if _, ok := m.invState[uid]; ok {
+		return false
+	}
+	m.invState[uid] = state
+	return true
+}
+
+func (m *Manager) setInvocationState(uid string, state invocationState) {
+	if uid == "" {
+		return
+	}
+
+	m.invStateMux.Lock()
+	defer m.invStateMux.Unlock()
+
+	if _, ok := m.invState[uid]; ok {
+		m.invState[uid] = state
+	}
+}
+
+func (m *Manager) deleteInvocationState(uid string) {
+	if uid == "" {
+		return
+	}
+
+	m.invStateMux.Lock()
+	defer m.invStateMux.Unlock()
+
+	delete(m.invState, uid)
 }
 
 func (m *Manager) lookupFunction(name string) (func(Function), bool) {

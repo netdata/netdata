@@ -262,13 +262,13 @@ FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
 		"valid function: multiple": {
 			register: []string{"fn1", "fn2"},
 			input: `
-FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
-FUNCTION UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
+FUNCTION UID1 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
+FUNCTION UID2 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
 `,
 			expected: []Function{
 				{
 					key:         lineFunction,
-					UID:         "UID",
+					UID:         "UID1",
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
@@ -279,7 +279,7 @@ FUNCTION UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
 				},
 				{
 					key:         lineFunction,
-					UID:         "UID",
+					UID:         "UID2",
 					Timeout:     time.Second,
 					Name:        "fn2",
 					Args:        []string{"arg1", "arg2"},
@@ -315,12 +315,12 @@ FUNCTION_PAYLOAD_END
 		"valid function: multiple with payload": {
 			register: []string{"fn1", "fn2"},
 			input: `
-FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+FUNCTION_PAYLOAD UID1 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
 payload line1
 payload line2
 FUNCTION_PAYLOAD_END
 
-FUNCTION_PAYLOAD UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+FUNCTION_PAYLOAD UID2 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test" application/json
 payload line3
 payload line4
 FUNCTION_PAYLOAD_END
@@ -328,7 +328,7 @@ FUNCTION_PAYLOAD_END
 			expected: []Function{
 				{
 					key:         lineFunctionPayload,
-					UID:         "UID",
+					UID:         "UID1",
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
@@ -339,7 +339,7 @@ FUNCTION_PAYLOAD_END
 				},
 				{
 					key:         lineFunctionPayload,
-					UID:         "UID",
+					UID:         "UID2",
 					Timeout:     time.Second,
 					Name:        "fn2",
 					Args:        []string{"arg1", "arg2"},
@@ -353,15 +353,15 @@ FUNCTION_PAYLOAD_END
 		"valid function: multiple with and without payload": {
 			register: []string{"fn1", "fn2", "fn3", "fn4"},
 			input: `
-FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+FUNCTION_PAYLOAD UID1 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
 payload line1
 payload line2
 FUNCTION_PAYLOAD_END
 
-FUNCTION UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
-FUNCTION UID 1 "fn3 arg1 arg2" 0xFFFF "method=api,role=test"
+FUNCTION UID2 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
+FUNCTION UID3 1 "fn3 arg1 arg2" 0xFFFF "method=api,role=test"
 
-FUNCTION_PAYLOAD UID 1 "fn4 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+FUNCTION_PAYLOAD UID4 1 "fn4 arg1 arg2" 0xFFFF "method=api,role=test" application/json
 payload line3
 payload line4
 FUNCTION_PAYLOAD_END
@@ -369,7 +369,7 @@ FUNCTION_PAYLOAD_END
 			expected: []Function{
 				{
 					key:         lineFunctionPayload,
-					UID:         "UID",
+					UID:         "UID1",
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
@@ -380,7 +380,7 @@ FUNCTION_PAYLOAD_END
 				},
 				{
 					key:         lineFunction,
-					UID:         "UID",
+					UID:         "UID2",
 					Timeout:     time.Second,
 					Name:        "fn2",
 					Args:        []string{"arg1", "arg2"},
@@ -391,7 +391,7 @@ FUNCTION_PAYLOAD_END
 				},
 				{
 					key:         lineFunction,
-					UID:         "UID",
+					UID:         "UID3",
 					Timeout:     time.Second,
 					Name:        "fn3",
 					Args:        []string{"arg1", "arg2"},
@@ -402,7 +402,7 @@ FUNCTION_PAYLOAD_END
 				},
 				{
 					key:         lineFunctionPayload,
-					UID:         "UID",
+					UID:         "UID4",
 					Timeout:     time.Second,
 					Name:        "fn4",
 					Args:        []string{"arg1", "arg2"},
