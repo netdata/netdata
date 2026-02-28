@@ -44,7 +44,7 @@ func newManagerRuntimeMetrics(store metrix.RuntimeStore) *managerRuntimeMetrics 
 		),
 		queueFullTotal: meter.Counter(
 			"queue_full_total",
-			metrix.WithDescription("Total number of function requests rejected due queue full"),
+			metrix.WithDescription("Total number of function requests rejected due to queue full"),
 			metrix.WithChartFamily("Framework/Functions/Failures"),
 			metrix.WithUnit("requests"),
 		),
