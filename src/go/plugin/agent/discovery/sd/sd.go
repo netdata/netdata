@@ -58,6 +58,11 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
 	}
+	if provider, ok := cfg.FnReg.(interface {
+		TerminalFinalizer() functions.TerminalFinalizer
+	}); ok {
+		d.dyncfgApi.SetTerminalFinalizer(provider.TerminalFinalizer())
+	}
 	d.newPipeline = func(config pipeline.Config) (sdPipeline, error) {
 		return pipeline.New(config, d.newDiscoverersFromRegistry)
 	}
@@ -122,6 +127,9 @@ type (
 
 // SetDyncfgResponder allows overriding the default responder (e.g., to silence output in tests).
 func (d *ServiceDiscovery) SetDyncfgResponder(api *dyncfg.Responder) {
+	if api != nil && d.dyncfgApi != nil {
+		api.SetTerminalFinalizer(d.dyncfgApi.TerminalFinalizer())
+	}
 	dyncfg.BindResponder(&d.dyncfgApi, d.handler, api)
 }
 

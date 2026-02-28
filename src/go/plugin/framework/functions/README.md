@@ -80,8 +80,8 @@ Active requests are tracked by UID:
 
 All terminal outputs go through:
 
-- `FinalizeTerminal(...)` in `finalizer.go`
-- hooked during `Run()` to `m.tryFinalize(...)`
+- manager-bound terminal finalizer (`m.finalizeTerminal`)
+- dyncfg responders receive manager finalizer wiring at component construction time
 
 `tryFinalize` guarantees:
 
@@ -119,17 +119,22 @@ Important limitation:
 
 ## Shutdown behavior
 
-Two shutdown styles exist:
+Shutdown uses one bounded path for `ctx.Done()`, `QUIT`, and input close (EOF):
 
-- canceling shutdown (`ctx.Done()` or `QUIT`):
-    - set stopping
+- set stopping
+- stop scheduler admission
+- wait up to `defaultShutdownDrainTimeout = 8s` for natural drain
+- if drain times out:
     - cancel in-flight
-    - stop scheduler admission
-    - wait up to `defaultShutdownDrainTimeout = 8s`
     - force-finalize unresolved UIDs with `499`
-- drain-only shutdown (input close/EOF):
+    - hard-stop scheduler waiters
+
+Input close still enters the same bounded path above:
+
+- input close/EOF:
     - stop scheduler admission
-    - drain workers without blanket cancel
+    - attempt bounded drain first
+    - escalate to cancel/force-finalize only on timeout
 
 ## Flow diagram
 
@@ -161,7 +166,7 @@ flowchart TD
     D1 -->|running/awaiting| TMR["cancel() + fallback timer"]
     D1 -->|unknown/done| NOP["debug no-op"]
     TMR -->|timer fires & still unresolved| C499
-    R501 --> FIN["FinalizeTerminal()"]
+    R501 --> FIN["manager finalizer"]
     R503 --> FIN
     R409 --> FIN
     R500 --> FIN
@@ -173,5 +178,5 @@ flowchart TD
     TF --> OUT["stdout FUNCRESULT"]
     HRESP -->|late duplicate| DROP["drop + debug log"]
     A -->|ctx . Done| F
-    A -->|input close| F2["Shutdown(drain-only)"]
+    A -->|input close| F2["Shutdown(bounded canceling path)"]
 ```

@@ -14,6 +14,8 @@ func (m *Manager) runWorker() {
 		if req == nil || req.fn == nil || req.handler == nil {
 			continue
 		}
+		// Safe to skip: cancel/finalization path calls tryFinalize(), which in turn
+		// advances per-key lanes via scheduler.complete().
 		if req.ctx != nil && req.ctx.Err() != nil {
 			continue
 		}

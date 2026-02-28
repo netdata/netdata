@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -15,11 +16,43 @@ import (
 // Responder handles standardized responses for dyncfg operations
 type Responder struct {
 	api *netdataapi.API
+
+	finalizeMux sync.RWMutex
+	finalize    fnpkg.TerminalFinalizer
 }
 
 // NewResponder creates a new responder
 func NewResponder(api *netdataapi.API) *Responder {
-	return &Responder{api: api}
+	return &Responder{
+		api:      api,
+		finalize: fnpkg.DirectTerminalFinalizer,
+	}
+}
+
+// SetTerminalFinalizer overrides terminal response finalization behavior.
+func (r *Responder) SetTerminalFinalizer(finalize fnpkg.TerminalFinalizer) {
+	r.finalizeMux.Lock()
+	defer r.finalizeMux.Unlock()
+
+	if finalize == nil {
+		r.finalize = fnpkg.DirectTerminalFinalizer
+		return
+	}
+	r.finalize = finalize
+}
+
+// TerminalFinalizer returns the currently configured terminal finalizer.
+func (r *Responder) TerminalFinalizer() fnpkg.TerminalFinalizer {
+	r.finalizeMux.RLock()
+	defer r.finalizeMux.RUnlock()
+	return r.finalize
+}
+
+func (r *Responder) finalizeTerminal(uid, source string, emit func()) bool {
+	r.finalizeMux.RLock()
+	finalize := r.finalize
+	r.finalizeMux.RUnlock()
+	return finalize(uid, source, emit)
 }
 
 // SendCodef sends a response with a specific code and message
@@ -59,7 +92,7 @@ func (r *Responder) SendCodef(fn Function, code int, message string, args ...any
 		Code:            strconv.Itoa(code),
 		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
 	}
-	fnpkg.FinalizeTerminal(fn.UID(), "dyncfg.responder.sendcodef", func() {
+	r.finalizeTerminal(fn.UID(), "dyncfg.responder.sendcodef", func() {
 		r.api.FUNCRESULT(res)
 	})
 }
@@ -82,7 +115,7 @@ func (r *Responder) SendJSONWithCode(fn Function, payload string, code int) {
 		Code:            strconv.Itoa(code),
 		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
 	}
-	fnpkg.FinalizeTerminal(fn.UID(), "dyncfg.responder.sendjsonwithcode", func() {
+	r.finalizeTerminal(fn.UID(), "dyncfg.responder.sendjsonwithcode", func() {
 		r.api.FUNCRESULT(res)
 	})
 }
@@ -105,7 +138,7 @@ func (r *Responder) sendPayload(fn Function, payload, contentType string) {
 		Code:            "200",
 		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
 	}
-	fnpkg.FinalizeTerminal(fn.UID(), "dyncfg.responder.sendpayload", func() {
+	r.finalizeTerminal(fn.UID(), "dyncfg.responder.sendpayload", func() {
 		r.api.FUNCRESULT(res)
 	})
 }

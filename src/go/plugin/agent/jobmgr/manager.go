@@ -63,6 +63,11 @@ func New(cfg Config) *Manager {
 	if fnReg == nil {
 		fnReg = noop{}
 	}
+	if provider, ok := fnReg.(interface {
+		TerminalFinalizer() functions.TerminalFinalizer
+	}); ok {
+		api.SetTerminalFinalizer(provider.TerminalFinalizer())
+	}
 	vnodesReg := cfg.Vnodes
 	if vnodesReg == nil {
 		vnodesReg = make(map[string]*vnodes.VirtualNode)
@@ -135,6 +140,9 @@ func New(cfg Config) *Manager {
 
 // SetDyncfgResponder allows overriding the default responder (e.g., to silence output in CLI mode).
 func (m *Manager) SetDyncfgResponder(responder *dyncfg.Responder) {
+	if responder != nil && m.dyncfgApi != nil {
+		responder.SetTerminalFinalizer(m.dyncfgApi.TerminalFinalizer())
+	}
 	dyncfg.BindResponder(&m.dyncfgApi, m.handler, responder)
 }
 

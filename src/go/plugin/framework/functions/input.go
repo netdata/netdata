@@ -22,6 +22,7 @@ type stdinReader struct {
 }
 
 func (in *stdinReader) run() {
+	defer close(in.linesCh)
 	sc := bufio.NewScanner(bufio.NewReader(os.Stdin))
 
 	for sc.Scan() {

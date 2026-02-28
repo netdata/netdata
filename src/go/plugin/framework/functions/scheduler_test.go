@@ -4,6 +4,7 @@ package functions
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -149,5 +150,83 @@ func TestKeyScheduler_EnqueueValidation(t *testing.T) {
 			}
 			require.ErrorIs(t, err, tc.want)
 		})
+	}
+}
+
+func TestKeyScheduler_StopPaths(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"stopAccepting on drained scheduler makes next return false": {
+			run: func(t *testing.T) {
+				s := newKeyScheduler(1)
+				s.stopAccepting()
+
+				req, ok := s.next()
+				assert.False(t, ok)
+				assert.Nil(t, req)
+			},
+		},
+		"stop wakes blocked next waiter": {
+			run: func(t *testing.T) {
+				s := newKeyScheduler(1)
+				done := make(chan struct{})
+
+				go func() {
+					defer close(done)
+					req, ok := s.next()
+					assert.False(t, ok)
+					assert.Nil(t, req)
+				}()
+
+				time.Sleep(20 * time.Millisecond)
+				s.stop()
+
+				select {
+				case <-done:
+				case <-time.After(time.Second):
+					t.Fatal("timed out waiting for next() waiter to exit after stop()")
+				}
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
+func TestKeyScheduler_QueueFullRecovery(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"full queue recovers after dequeue and completion": {
+			run: func(t *testing.T) {
+				s := newKeyScheduler(1)
+				req1 := &invocationRequest{
+					fn:          &Function{UID: "tx1"},
+					scheduleKey: "k",
+				}
+				req2 := &invocationRequest{
+					fn:          &Function{UID: "tx2"},
+					scheduleKey: "k",
+				}
+
+				require.NoError(t, s.enqueue(req1))
+				require.ErrorIs(t, s.enqueue(req2), errSchedulerQueueFull)
+
+				got, ok := s.next()
+				require.True(t, ok)
+				require.NotNil(t, got)
+				require.Equal(t, "tx1", got.fn.UID)
+
+				s.complete("k", "tx1")
+				require.NoError(t, s.enqueue(req2))
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
 	}
 }

@@ -366,6 +366,66 @@ func TestManager_FlowScenarios(t *testing.T) {
 				assert.Equal(t, 0, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 499"))
 			},
 		},
+		"stdin close uses canceling shutdown and force-finalizes unresolved requests": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				mgr.shutdownDrainTimeout = 50 * time.Millisecond
+				started := make(chan struct{}, 1)
+				block := make(chan struct{})
+
+				mgr.Register("fn", func(fn Function) {
+					started <- struct{}{}
+					<-block
+					mgr.respUID(fn.UID, 200, "late")
+				})
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- functionLine("tx1", "fn")
+				<-started
+				close(in.ch)
+				waitForDone(t, done)
+
+				got := out.String()
+				assert.Equal(t, 1, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 0, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 200"))
+			},
+		},
+		"late terminal output after shutdown is dropped by tombstone guard": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				mgr.shutdownDrainTimeout = 50 * time.Millisecond
+				started := make(chan struct{}, 1)
+				block := make(chan struct{})
+				doneResp := make(chan struct{})
+
+				mgr.Register("fn", func(fn Function) {
+					started <- struct{}{}
+					<-block
+					mgr.respUID(fn.UID, 200, "late")
+					close(doneResp)
+				})
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- functionLine("tx1", "fn")
+				<-started
+				close(in.ch)
+				waitForDone(t, done)
+
+				// Release handler after manager has already force-finalized and returned.
+				close(block)
+				select {
+				case <-doneResp:
+				case <-time.After(time.Second):
+					t.Fatal("timed out waiting for late handler response")
+				}
+
+				got := out.String()
+				assert.Equal(t, 1, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 0, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 200"))
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -573,6 +633,36 @@ func TestManager_WorkerPoolConcurrencyBound(t *testing.T) {
 			got := out.String()
 			assert.Equal(t, len(tc.input), countSubstring(got, "FUNCTION_RESULT_BEGIN tx-"))
 			tc.assertions(t, maxSeen.Load())
+		})
+	}
+}
+
+func TestManager_DispatchInvocationStopping(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T, mgr *Manager, out *safeBuffer)
+	}{
+		"stopping manager rejects dispatch without tracking state": {
+			run: func(t *testing.T, mgr *Manager, out *safeBuffer) {
+				mgr.Register("fn", func(Function) { t.Fatal("handler should not execute when manager is stopping") })
+				mgr.setStopping(true)
+
+				fn := &Function{UID: "tx-stop", Name: "fn"}
+				mgr.dispatchInvocation(context.Background(), fn)
+
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx-stop 503", time.Second)
+
+				mgr.invStateMux.Lock()
+				_, ok := mgr.invState["tx-stop"]
+				mgr.invStateMux.Unlock()
+				assert.False(t, ok)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr, out := newFlowManager()
+			tc.run(t, mgr, out)
 		})
 	}
 }

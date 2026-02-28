@@ -11,11 +11,11 @@ func (m *Manager) Register(name string, fn func(Function)) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	fs, ok := m.FunctionRegistry[name]
+	fs, ok := m.functionRegistry[name]
 	if !ok {
 		m.Debugf("registering function '%s' (direct)", name)
 		fs = &functionSet{prefixes: make(map[string]func(Function))}
-		m.FunctionRegistry[name] = fs
+		m.functionRegistry[name] = fs
 	} else {
 		if fs.direct != nil {
 			m.Warningf("re-registering direct function '%s'", name)
@@ -31,8 +31,8 @@ func (m *Manager) Unregister(name string) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	if _, ok := m.FunctionRegistry[name]; ok {
-		delete(m.FunctionRegistry, name)
+	if _, ok := m.functionRegistry[name]; ok {
+		delete(m.functionRegistry, name)
 		m.Debugf("unregistering function '%s'", name)
 	}
 }
@@ -50,10 +50,10 @@ func (m *Manager) RegisterPrefix(name, prefix string, fn func(Function)) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	fs := m.FunctionRegistry[name]
+	fs := m.functionRegistry[name]
 	if fs == nil {
 		fs = &functionSet{prefixes: make(map[string]func(Function))}
-		m.FunctionRegistry[name] = fs
+		m.functionRegistry[name] = fs
 	}
 
 	if _, exists := fs.prefixes[prefix]; exists {
@@ -69,7 +69,7 @@ func (m *Manager) UnregisterPrefix(name, prefix string) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	fs, ok := m.FunctionRegistry[name]
+	fs, ok := m.functionRegistry[name]
 	if !ok || fs.prefixes == nil {
 		return
 	}
@@ -80,6 +80,6 @@ func (m *Manager) UnregisterPrefix(name, prefix string) {
 	}
 
 	if fs.direct == nil && len(fs.prefixes) == 0 {
-		delete(m.FunctionRegistry, name)
+		delete(m.functionRegistry, name)
 	}
 }

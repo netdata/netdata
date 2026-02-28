@@ -99,6 +99,15 @@ func TestInputParser_ParseEvent(t *testing.T) {
 				assert.Equal(t, []byte("line1\nline2"), events[1].fn.Payload)
 			},
 		},
+		"payload data line with FUNCTION prefix text is preserved": {
+			lines: []string{testPayloadStartLine, "line1", "FUNCTIONALITY=true", "line2", "FUNCTION_PAYLOAD_END"},
+			assertEvent: func(t *testing.T, events []inputEvent) {
+				require.Len(t, events, 1)
+				assert.Equal(t, inputEventCall, events[0].kind)
+				require.NotNil(t, events[0].fn)
+				assert.Equal(t, []byte("line1\nFUNCTIONALITY=true\nline2"), events[0].fn.Payload)
+			},
+		},
 		"unexpected control line during payload aborts partial payload": {
 			lines: []string{testPayloadStartLine, "line1", testFunctionLine},
 			assertEvent: func(t *testing.T, events []inputEvent) {

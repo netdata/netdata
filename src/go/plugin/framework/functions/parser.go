@@ -140,7 +140,7 @@ func (p *inputParser) handlePayloadLine(line string) (inputEvent, error) {
 		return parseProgressEvent(line), nil
 	}
 
-	if strings.HasPrefix(line, lineFunction) {
+	if hasLinePrefix(line, lineFunction) || hasLinePrefix(line, lineFunctionPayload) {
 		p.resetPayloadState()
 		return p.parseEvent(line)
 	}

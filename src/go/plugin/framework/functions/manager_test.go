@@ -19,7 +19,7 @@ func TestNewManager(t *testing.T) {
 	mgr := NewManager()
 
 	assert.NotNilf(t, mgr.input, "Input")
-	assert.NotNilf(t, mgr.FunctionRegistry, "FunctionRegistry")
+	assert.NotNilf(t, mgr.functionRegistry, "FunctionRegistry")
 }
 
 func TestManager_Register(t *testing.T) {
@@ -68,7 +68,7 @@ func TestManager_Register(t *testing.T) {
 			}
 
 			var got []string
-			for name := range mgr.FunctionRegistry {
+			for name := range mgr.functionRegistry {
 				got = append(got, name)
 			}
 			sort.Strings(got)
@@ -134,7 +134,7 @@ func TestManager_RegisterPrefix(t *testing.T) {
 			}
 
 			var got []string
-			for fname, fs := range mgr.FunctionRegistry {
+			for fname, fs := range mgr.functionRegistry {
 				if fs == nil || len(fs.prefixes) == 0 {
 					continue
 				}
@@ -219,7 +219,7 @@ func TestManager_UnregisterPrefix(t *testing.T) {
 			}
 
 			var got []string
-			for fname, fs := range mgr.FunctionRegistry {
+			for fname, fs := range mgr.functionRegistry {
 				if fs == nil || len(fs.prefixes) == 0 {
 					continue
 				}

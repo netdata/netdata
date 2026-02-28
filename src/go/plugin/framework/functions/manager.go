@@ -69,7 +69,7 @@ func NewManager() *Manager {
 		api:                  netdataapi.New(safewriter.Stdout),
 		input:                newStdinInput(),
 		mux:                  &sync.Mutex{},
-		FunctionRegistry:     make(map[string]*functionSet),
+		functionRegistry:     make(map[string]*functionSet),
 		workerCount:          defaultWorkerCount,
 		queueSize:            defaultQueueSize,
 		invStateMux:          &sync.Mutex{},
@@ -89,7 +89,7 @@ type Manager struct {
 	input input
 
 	mux              *sync.Mutex
-	FunctionRegistry map[string]*functionSet
+	functionRegistry map[string]*functionSet
 
 	workerCount int
 	queueSize   int
@@ -108,8 +108,6 @@ type Manager struct {
 func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
 	m.Info("instance is started")
 	defer func() { m.Info("instance is stopped") }()
-	restoreFinalizeHook := setFinalizeHook(m.tryFinalize)
-	defer restoreFinalizeHook()
 	m.run(ctx, quitCh)
 }
 
@@ -131,9 +129,6 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 			quitCh <- struct{}{}
 		}
 
-		if cancelInflight {
-			m.cancelAllInvocations()
-		}
 		if m.scheduler != nil {
 			m.scheduler.stopAccepting()
 		}
@@ -147,12 +142,15 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 			workersWG.Wait()
 		}()
 
+		timedOut := false
 		select {
 		case <-done:
 		case <-drainCtx.Done():
+			timedOut = true
 		}
 
-		if cancelInflight {
+		if cancelInflight && timedOut {
+			m.cancelAllInvocations()
 			m.forceFinalizeAll(499, "request canceled during shutdown")
 			if m.scheduler != nil {
 				m.scheduler.stop()
@@ -167,7 +165,7 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 			return
 		case line, ok := <-m.input.lines():
 			if !ok {
-				shutdown(false, false)
+				shutdown(false, true)
 				return
 			}
 			event, err := parser.parseEvent(line)
@@ -364,6 +362,15 @@ func (m *Manager) isStopping() bool {
 	return m.stopping.Load()
 }
 
+// TerminalFinalizer returns the manager-bound terminal finalizer for responder wiring.
+func (m *Manager) TerminalFinalizer() TerminalFinalizer {
+	return m.finalizeTerminal
+}
+
+func (m *Manager) finalizeTerminal(uid, source string, emit func()) bool {
+	return m.tryFinalize(uid, source, emit)
+}
+
 func (m *Manager) cancelAllInvocations() {
 	m.invStateMux.Lock()
 	defer m.invStateMux.Unlock()
@@ -436,100 +443,112 @@ func (m *Manager) pruneExpiredTombstonesLocked(now time.Time) {
 	}
 }
 
-func (m *Manager) lookupFunctionRoute(fn Function) (handler func(Function), scheduleKey string, ok bool) {
-	name := fn.Name
+type functionSnapshot struct {
+	direct   func(Function)
+	prefixes map[string]func(Function)
+}
+
+func (m *Manager) snapshotFunction(name string) (functionSnapshot, bool) {
 	m.mux.Lock()
-	fs, ok := m.FunctionRegistry[name]
-	var (
-		direct   func(Function)
-		prefixes map[string]func(Function)
-	)
+	fs, ok := m.functionRegistry[name]
+	snap := functionSnapshot{}
 	if ok && fs != nil {
-		direct = fs.direct
+		snap.direct = fs.direct
 		if len(fs.prefixes) > 0 {
-			prefixes = make(map[string]func(Function), len(fs.prefixes))
+			snap.prefixes = make(map[string]func(Function), len(fs.prefixes))
 			for prefix, handler := range fs.prefixes {
-				prefixes[prefix] = handler
+				snap.prefixes[prefix] = handler
 			}
 		}
 	}
 	m.mux.Unlock()
 
 	if !ok || fs == nil {
+		return functionSnapshot{}, false
+	}
+	return snap, true
+}
+
+func matchBestPrefix(prefixes map[string]func(Function), id string) (string, func(Function), bool) {
+	if len(prefixes) == 0 || id == "" {
+		return "", nil, false
+	}
+
+	var (
+		bestPrefix  string
+		bestHandler func(Function)
+		matched     bool
+	)
+	for prefix, handler := range prefixes {
+		if !strings.HasPrefix(id, prefix) {
+			continue
+		}
+		if !matched ||
+			len(prefix) > len(bestPrefix) ||
+			(len(prefix) == len(bestPrefix) && prefix < bestPrefix) {
+			bestPrefix = prefix
+			bestHandler = handler
+			matched = true
+		}
+	}
+
+	if !matched {
+		return "", nil, false
+	}
+	return bestPrefix, bestHandler, true
+}
+
+func (m *Manager) lookupFunctionRoute(fn Function) (handler func(Function), scheduleKey string, ok bool) {
+	snap, ok := m.snapshotFunction(fn.Name)
+	if !ok {
 		return nil, "", false
 	}
 
-	if len(prefixes) > 0 {
+	if len(snap.prefixes) > 0 {
 		if len(fn.Args) > 0 {
 			id := fn.Args[0]
-			for prefix, routeHandler := range prefixes {
-				if strings.HasPrefix(id, prefix) {
-					if routeHandler != nil {
-						return routeHandler, routeScheduleKey(name, prefix), true
-					}
-					break
-				}
+			if prefix, routeHandler, matched := matchBestPrefix(snap.prefixes, id); matched && routeHandler != nil {
+				return routeHandler, routeScheduleKey(fn.Name, prefix), true
 			}
 		}
 
 		return func(f Function) {
 			m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
-		}, routeScheduleKey(name, "__unmatched__"), true
+		}, routeScheduleKey(fn.Name, "__unmatched__"), true
 	}
 
-	if direct != nil {
-		return direct, routeScheduleKey(name, ""), true
+	if snap.direct != nil {
+		return snap.direct, routeScheduleKey(fn.Name, ""), true
 	}
 
 	return func(f Function) {
 		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
-	}, routeScheduleKey(name, "__direct_missing__"), true
+	}, routeScheduleKey(fn.Name, "__direct_missing__"), true
 }
 
 // lookupFunction returns a snapshot handler used by existing tests to verify
 // registry snapshot semantics at lookup time.
 func (m *Manager) lookupFunction(name string) (func(Function), bool) {
-	m.mux.Lock()
-	fs, ok := m.FunctionRegistry[name]
-	var (
-		direct   func(Function)
-		prefixes map[string]func(Function)
-	)
-	if ok && fs != nil {
-		direct = fs.direct
-		if len(fs.prefixes) > 0 {
-			prefixes = make(map[string]func(Function), len(fs.prefixes))
-			for prefix, handler := range fs.prefixes {
-				prefixes[prefix] = handler
-			}
-		}
-	}
-	m.mux.Unlock()
-
-	if !ok || fs == nil {
+	snap, ok := m.snapshotFunction(name)
+	if !ok {
 		return nil, false
 	}
 
 	return func(f Function) {
-		if len(prefixes) > 0 {
+		if len(snap.prefixes) > 0 {
 			if len(f.Args) > 0 {
 				id := f.Args[0]
-				for prefix, handler := range prefixes {
-					if strings.HasPrefix(id, prefix) {
-						if handler != nil {
-							handler(f)
-							return
-						}
-						break
-					}
+				if _, handler, matched := matchBestPrefix(snap.prefixes, id); matched && handler != nil {
+					handler(f)
+					return
 				}
 			}
 			m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
 			return
 		}
 
-		if direct != nil {
-			direct(f)
+		if snap.direct != nil {
+			snap.direct(f)
 			return
 		}
 
@@ -585,7 +604,7 @@ func (m *Manager) respf(fn *Function, code int, msgf string, a ...any) {
 		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
 	}
 
-	FinalizeTerminal(fn.UID, "functions.manager.respf", func() {
+	m.finalizeTerminal(fn.UID, "functions.manager.respf", func() {
 		m.api.FUNCRESULT(res)
 	})
 }
