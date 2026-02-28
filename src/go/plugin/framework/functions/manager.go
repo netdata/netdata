@@ -23,9 +23,10 @@ type functionSet struct {
 }
 
 const (
-	defaultWorkerCount  = 1
-	defaultQueueSize    = 64
-	defaultTombstoneTTL = 60 * time.Second
+	defaultWorkerCount         = 1
+	defaultQueueSize           = 64
+	defaultCancelFallbackDelay = 5 * time.Second
+	defaultTombstoneTTL        = 60 * time.Second
 )
 
 type invocationState uint8
@@ -39,6 +40,14 @@ const (
 type invocationRequest struct {
 	fn      *Function
 	handler func(Function)
+	ctx     context.Context
+}
+
+type invocationRecord struct {
+	state           invocationState
+	cancel          context.CancelFunc
+	cancelRequested bool
+	fallbackTimer   *time.Timer
 }
 
 func NewManager() *Manager {
@@ -46,16 +55,17 @@ func NewManager() *Manager {
 		Logger: logger.New().With(
 			slog.String("component", "functions manager"),
 		),
-		api:              netdataapi.New(safewriter.Stdout),
-		input:            newStdinInput(),
-		mux:              &sync.Mutex{},
-		FunctionRegistry: make(map[string]*functionSet),
-		workerCount:      defaultWorkerCount,
-		queueSize:        defaultQueueSize,
-		invStateMux:      &sync.Mutex{},
-		invState:         make(map[string]invocationState),
-		tombstones:       make(map[string]time.Time),
-		tombstoneTTL:     defaultTombstoneTTL,
+		api:                 netdataapi.New(safewriter.Stdout),
+		input:               newStdinInput(),
+		mux:                 &sync.Mutex{},
+		FunctionRegistry:    make(map[string]*functionSet),
+		workerCount:         defaultWorkerCount,
+		queueSize:           defaultQueueSize,
+		invStateMux:         &sync.Mutex{},
+		invState:            make(map[string]*invocationRecord),
+		tombstones:          make(map[string]time.Time),
+		tombstoneTTL:        defaultTombstoneTTL,
+		cancelFallbackDelay: defaultCancelFallbackDelay,
 	}
 }
 
@@ -72,10 +82,11 @@ type Manager struct {
 	workerCount int
 	queueSize   int
 
-	invStateMux  *sync.Mutex
-	invState     map[string]invocationState
-	tombstones   map[string]time.Time
-	tombstoneTTL time.Duration
+	invStateMux         *sync.Mutex
+	invState            map[string]*invocationRecord
+	tombstones          map[string]time.Time
+	tombstoneTTL        time.Duration
+	cancelFallbackDelay time.Duration
 }
 
 func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
@@ -134,16 +145,16 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 					return
 				}
 			case inputEventCancel:
-				// Step 4 handles cancellation semantics.
+				m.handleCancelEvent(event)
 				continue
 			case inputEventCall:
-				m.dispatchInvocation(event.fn, workCh)
+				m.dispatchInvocation(ctx, event.fn, workCh)
 			}
 		}
 	}
 }
 
-func (m *Manager) dispatchInvocation(fn *Function, workCh chan<- *invocationRequest) {
+func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function, workCh chan<- *invocationRequest) {
 	if fn == nil {
 		return
 	}
@@ -160,7 +171,9 @@ func (m *Manager) dispatchInvocation(fn *Function, workCh chan<- *invocationRequ
 		return
 	}
 
-	if !m.trySetInvocationState(fn.UID, stateQueued) {
+	reqCtx, cancel := context.WithCancel(parentCtx)
+	if !m.trySetInvocationState(fn.UID, stateQueued, cancel) {
+		cancel()
 		m.respf(fn, 409, "duplicate active transaction id: %s", fn.UID)
 		return
 	}
@@ -168,11 +181,13 @@ func (m *Manager) dispatchInvocation(fn *Function, workCh chan<- *invocationRequ
 	req := &invocationRequest{
 		fn:      fn,
 		handler: handler,
+		ctx:     reqCtx,
 	}
 
 	select {
 	case workCh <- req:
 	default:
+		cancel()
 		m.respf(fn, 503, "function queue is full")
 	}
 }
@@ -189,15 +204,20 @@ func (m *Manager) runWorker(ctx context.Context, workCh <-chan *invocationReques
 			if req == nil || req.fn == nil || req.handler == nil {
 				continue
 			}
+			if req.ctx != nil && req.ctx.Err() != nil {
+				continue
+			}
+			if !m.startInvocation(req.fn.UID) {
+				continue
+			}
 
-			m.setInvocationState(req.fn.UID, stateRunning)
 			req.handler(*req.fn)
 			m.setInvocationState(req.fn.UID, stateAwaitingResult)
 		}
 	}
 }
 
-func (m *Manager) trySetInvocationState(uid string, state invocationState) bool {
+func (m *Manager) trySetInvocationState(uid string, state invocationState, cancel context.CancelFunc) bool {
 	if uid == "" {
 		return false
 	}
@@ -214,7 +234,10 @@ func (m *Manager) trySetInvocationState(uid string, state invocationState) bool 
 	if _, ok := m.invState[uid]; ok {
 		return false
 	}
-	m.invState[uid] = state
+	m.invState[uid] = &invocationRecord{
+		state:  state,
+		cancel: cancel,
+	}
 	return true
 }
 
@@ -226,9 +249,75 @@ func (m *Manager) setInvocationState(uid string, state invocationState) {
 	m.invStateMux.Lock()
 	defer m.invStateMux.Unlock()
 
-	if _, ok := m.invState[uid]; ok {
-		m.invState[uid] = state
+	if rec, ok := m.invState[uid]; ok {
+		rec.state = state
 	}
+}
+
+func (m *Manager) startInvocation(uid string) bool {
+	if uid == "" {
+		return false
+	}
+
+	m.invStateMux.Lock()
+	defer m.invStateMux.Unlock()
+
+	rec, ok := m.invState[uid]
+	if !ok || rec == nil || rec.cancelRequested {
+		return false
+	}
+	rec.state = stateRunning
+	return true
+}
+
+func (m *Manager) handleCancelEvent(event inputEvent) {
+	uid := event.uid
+	if uid == "" {
+		return
+	}
+
+	if event.preAdmission {
+		m.respUID(uid, 499, "request canceled")
+		return
+	}
+
+	state, ok := m.requestCancellation(uid)
+	if !ok {
+		m.Debugf("ignoring cancel for unknown transaction id: %s", uid)
+		return
+	}
+	if state == stateQueued {
+		m.respUID(uid, 499, "request canceled")
+	}
+}
+
+func (m *Manager) requestCancellation(uid string) (invocationState, bool) {
+	m.invStateMux.Lock()
+	defer m.invStateMux.Unlock()
+
+	rec, ok := m.invState[uid]
+	if !ok || rec == nil {
+		return 0, false
+	}
+
+	if rec.cancelRequested {
+		return rec.state, true
+	}
+	rec.cancelRequested = true
+	if rec.cancel != nil {
+		rec.cancel()
+	}
+
+	if rec.state == stateRunning || rec.state == stateAwaitingResult {
+		if rec.fallbackTimer == nil {
+			uidCopy := uid
+			rec.fallbackTimer = time.AfterFunc(m.cancelFallbackDelay, func() {
+				m.respUID(uidCopy, 499, "request canceled")
+			})
+		}
+	}
+
+	return rec.state, true
 }
 
 // TryFinalize emits a terminal response once per transaction UID.
@@ -247,6 +336,12 @@ func (m *Manager) TryFinalize(uid, source string, emit func()) bool {
 		return false
 	}
 
+	if rec, ok := m.invState[uid]; ok && rec != nil {
+		if rec.fallbackTimer != nil {
+			rec.fallbackTimer.Stop()
+			rec.fallbackTimer = nil
+		}
+	}
 	delete(m.invState, uid)
 	m.tombstones[uid] = now.Add(m.tombstoneTTL)
 	m.invStateMux.Unlock()
@@ -317,7 +412,18 @@ func (m *Manager) handlePrefixRouting(f Function, prefixes map[string]func(Funct
 	m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
 }
 
+func (m *Manager) respUID(uid string, code int, msgf string, a ...any) {
+	if uid == "" {
+		return
+	}
+	m.respf(&Function{UID: uid}, code, msgf, a...)
+}
+
 func (m *Manager) respf(fn *Function, code int, msgf string, a ...any) {
+	if fn == nil || fn.UID == "" {
+		return
+	}
+
 	msg := fmt.Sprintf(msgf, a...)
 
 	var bs []byte
