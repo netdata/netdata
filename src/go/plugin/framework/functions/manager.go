@@ -4,7 +4,6 @@ package functions
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -624,25 +623,7 @@ func (m *Manager) respf(fn *Function, code int, msgf string, a ...any) {
 	}
 
 	msg := fmt.Sprintf(msgf, a...)
-
-	var bs []byte
-	if code >= 400 && code < 600 {
-		bs, _ = json.Marshal(struct {
-			Status       int    `json:"status"`
-			ErrorMessage string `json:"errorMessage"`
-		}{
-			Status:       code,
-			ErrorMessage: msg,
-		})
-	} else {
-		bs, _ = json.Marshal(struct {
-			Status  int    `json:"status"`
-			Message string `json:"message"`
-		}{
-			Status:  code,
-			Message: msg,
-		})
-	}
+	bs := BuildJSONPayload(code, msg)
 
 	res := netdataapi.FunctionResult{
 		UID:             fn.UID,

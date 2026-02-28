@@ -3,7 +3,6 @@
 package dyncfg
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"sync"
@@ -66,24 +65,7 @@ func (r *Responder) SendCodef(fn Function, code int, message string, args ...any
 		msg = fmt.Sprintf(message, args...)
 	}
 
-	var payload []byte
-	if code >= 400 && code < 600 {
-		payload, _ = json.Marshal(struct {
-			Status       int    `json:"status"`
-			ErrorMessage string `json:"errorMessage"`
-		}{
-			Status:       code,
-			ErrorMessage: msg,
-		})
-	} else {
-		payload, _ = json.Marshal(struct {
-			Status  int    `json:"status"`
-			Message string `json:"message"`
-		}{
-			Status:  code,
-			Message: msg,
-		})
-	}
+	payload := fnpkg.BuildJSONPayload(code, msg)
 
 	res := netdataapi.FunctionResult{
 		UID:             fn.UID(),
