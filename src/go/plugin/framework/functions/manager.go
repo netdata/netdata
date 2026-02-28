@@ -97,7 +97,7 @@ type Manager struct {
 func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
 	m.Info("instance is started")
 	defer func() { m.Info("instance is stopped") }()
-	restoreFinalizeHook := setFinalizeHook(m.TryFinalize)
+	restoreFinalizeHook := setFinalizeHook(m.tryFinalize)
 	defer restoreFinalizeHook()
 	m.run(ctx, quitCh)
 }
@@ -388,9 +388,9 @@ func (m *Manager) forceFinalizeAll(code int, message string) {
 	}
 }
 
-// TryFinalize emits a terminal response once per transaction UID.
+// tryFinalize emits a terminal response once per transaction UID.
 // Later terminal attempts for the same UID are dropped while tombstone is active.
-func (m *Manager) TryFinalize(uid, source string, emit func()) bool {
+func (m *Manager) tryFinalize(uid, source string, emit func()) bool {
 	if uid == "" || emit == nil {
 		return false
 	}

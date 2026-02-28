@@ -9,114 +9,174 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const payloadStartLine = `FUNCTION_PAYLOAD tx1 1 "fn1 arg1" 0xFFFF "method=api,role=test" application/json`
+const testPayloadStartLine = `FUNCTION_PAYLOAD tx1 1 "fn1 arg1" 0xFFFF "method=api,role=test" application/json`
+const testFunctionLine = `FUNCTION tx2 1 "fn2 arg1" 0xFFFF "method=api,role=test"`
 
-func TestInputParser_ParseEvent_Cancel(t *testing.T) {
-	p := newInputParser()
+func TestInputParser_ParseEvent(t *testing.T) {
+	tests := map[string]struct {
+		lines       []string
+		wantErr     bool
+		assertEvent func(t *testing.T, events []inputEvent)
+		assertState func(t *testing.T, p *inputParser)
+	}{
+		"cancel in normal mode": {
+			lines: []string{"FUNCTION_CANCEL tx1"},
+			assertEvent: func(t *testing.T, events []inputEvent) {
+				require.Len(t, events, 1)
+				assert.Equal(t, inputEventCancel, events[0].kind)
+				assert.Equal(t, "tx1", events[0].uid)
+				assert.False(t, events[0].preAdmission)
+			},
+		},
+		"progress in normal mode": {
+			lines: []string{"FUNCTION_PROGRESS tx1 10 100"},
+			assertEvent: func(t *testing.T, events []inputEvent) {
+				require.Len(t, events, 1)
+				assert.Equal(t, inputEventProgress, events[0].kind)
+				assert.Equal(t, "tx1", events[0].uid)
+			},
+		},
+		"malformed cancel with extra token": {
+			lines:   []string{"FUNCTION_CANCEL tx1 extra"},
+			wantErr: true,
+		},
+		"malformed cancel with missing uid": {
+			lines:   []string{"FUNCTION_CANCEL"},
+			wantErr: true,
+		},
+		"payload cancel with different uid keeps payload": {
+			lines: []string{testPayloadStartLine, "line1", "FUNCTION_CANCEL tx-other", "line2", "FUNCTION_PAYLOAD_END"},
+			assertEvent: func(t *testing.T, events []inputEvent) {
+				require.Len(t, events, 2)
+				assert.Equal(t, inputEventCancel, events[0].kind)
+				assert.Equal(t, "tx-other", events[0].uid)
+				assert.False(t, events[0].preAdmission)
 
-	ev, err := p.parseEvent("FUNCTION_CANCEL tx1")
-	require.NoError(t, err)
-	assert.Equal(t, inputEventCancel, ev.kind)
-	assert.Equal(t, "tx1", ev.uid)
-	assert.False(t, ev.preAdmission)
-}
+				assert.Equal(t, inputEventCall, events[1].kind)
+				require.NotNil(t, events[1].fn)
+				assert.Equal(t, "tx1", events[1].fn.UID)
+				assert.Equal(t, []byte("line1\nline2"), events[1].fn.Payload)
+			},
+			assertState: func(t *testing.T, p *inputParser) {
+				assert.False(t, p.readingPayload)
+				assert.Nil(t, p.currentFn)
+				assert.Equal(t, 0, p.payloadBuf.Len())
+			},
+		},
+		"payload cancel with same uid is pre-admission": {
+			lines: []string{testPayloadStartLine, "line1", "FUNCTION_CANCEL tx1"},
+			assertEvent: func(t *testing.T, events []inputEvent) {
+				require.Len(t, events, 1)
+				assert.Equal(t, inputEventCancel, events[0].kind)
+				assert.Equal(t, "tx1", events[0].uid)
+				assert.True(t, events[0].preAdmission)
+			},
+			assertState: func(t *testing.T, p *inputParser) {
+				assert.False(t, p.readingPayload)
+				assert.Nil(t, p.currentFn)
+				assert.Equal(t, 0, p.payloadBuf.Len())
+			},
+		},
+		"malformed cancel during payload keeps parser state": {
+			lines:   []string{testPayloadStartLine, "line1", "FUNCTION_CANCEL tx1 extra"},
+			wantErr: true,
+			assertState: func(t *testing.T, p *inputParser) {
+				assert.True(t, p.readingPayload)
+				require.NotNil(t, p.currentFn)
+				assert.Equal(t, "tx1", p.currentFn.UID)
+				assert.Equal(t, "line1", p.payloadBuf.String())
+			},
+		},
+		"progress during payload keeps payload": {
+			lines: []string{testPayloadStartLine, "line1", "FUNCTION_PROGRESS tx1 10 100", "line2", "FUNCTION_PAYLOAD_END"},
+			assertEvent: func(t *testing.T, events []inputEvent) {
+				require.Len(t, events, 2)
+				assert.Equal(t, inputEventProgress, events[0].kind)
+				assert.Equal(t, "tx1", events[0].uid)
 
-func TestInputParser_ParseEvent_MalformedCancel(t *testing.T) {
-	p := newInputParser()
+				assert.Equal(t, inputEventCall, events[1].kind)
+				require.NotNil(t, events[1].fn)
+				assert.Equal(t, []byte("line1\nline2"), events[1].fn.Payload)
+			},
+		},
+		"unexpected control line during payload aborts partial payload": {
+			lines: []string{testPayloadStartLine, "line1", testFunctionLine},
+			assertEvent: func(t *testing.T, events []inputEvent) {
+				require.Len(t, events, 1)
+				assert.Equal(t, inputEventCall, events[0].kind)
+				require.NotNil(t, events[0].fn)
+				assert.Equal(t, "tx2", events[0].fn.UID)
+				assert.Nil(t, events[0].fn.Payload)
+			},
+			assertState: func(t *testing.T, p *inputParser) {
+				assert.False(t, p.readingPayload)
+				assert.Nil(t, p.currentFn)
+			},
+		},
+	}
 
-	_, err := p.parseEvent("FUNCTION_CANCEL tx1 extra")
-	require.Error(t, err)
-}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := newInputParser()
+			events := make([]inputEvent, 0, len(tc.lines))
+			var parseErr error
 
-func TestInputParser_ParseEvent_Progress(t *testing.T) {
-	p := newInputParser()
+			for _, line := range tc.lines {
+				ev, err := p.parseEvent(line)
+				if err != nil {
+					parseErr = err
+					break
+				}
+				if ev.kind != inputEventNone {
+					events = append(events, ev)
+				}
+			}
 
-	ev, err := p.parseEvent("FUNCTION_PROGRESS tx1 10 100")
-	require.NoError(t, err)
-	assert.Equal(t, inputEventProgress, ev.kind)
-	assert.Equal(t, "tx1", ev.uid)
-}
-
-func TestInputParser_ParseEvent_PayloadCancelDifferentUIDContinues(t *testing.T) {
-	p := newInputParser()
-
-	_, err := p.parseEvent(payloadStartLine)
-	require.NoError(t, err)
-	_, err = p.parseEvent("line1")
-	require.NoError(t, err)
-
-	ev, err := p.parseEvent("FUNCTION_CANCEL tx-other")
-	require.NoError(t, err)
-	assert.Equal(t, inputEventCancel, ev.kind)
-	assert.Equal(t, "tx-other", ev.uid)
-	assert.False(t, ev.preAdmission)
-	assert.True(t, p.readingPayload)
-	require.NotNil(t, p.currentFn)
-	assert.Equal(t, "tx1", p.currentFn.UID)
-
-	_, err = p.parseEvent("line2")
-	require.NoError(t, err)
-	ev, err = p.parseEvent("FUNCTION_PAYLOAD_END")
-	require.NoError(t, err)
-	assert.Equal(t, inputEventCall, ev.kind)
-	require.NotNil(t, ev.fn)
-	assert.Equal(t, []byte("line1\nline2"), ev.fn.Payload)
-}
-
-func TestInputParser_ParseEvent_PayloadCancelSameUIDPreAdmission(t *testing.T) {
-	p := newInputParser()
-
-	_, err := p.parseEvent(payloadStartLine)
-	require.NoError(t, err)
-	_, err = p.parseEvent("line1")
-	require.NoError(t, err)
-
-	ev, err := p.parseEvent("FUNCTION_CANCEL tx1")
-	require.NoError(t, err)
-	assert.Equal(t, inputEventCancel, ev.kind)
-	assert.Equal(t, "tx1", ev.uid)
-	assert.True(t, ev.preAdmission)
-	assert.False(t, p.readingPayload)
-	assert.Nil(t, p.currentFn)
-	assert.Equal(t, 0, p.payloadBuf.Len())
-}
-
-func TestInputParser_ParseEvent_PayloadMalformedCancelDoesNotMutateState(t *testing.T) {
-	p := newInputParser()
-
-	_, err := p.parseEvent(payloadStartLine)
-	require.NoError(t, err)
-	_, err = p.parseEvent("line1")
-	require.NoError(t, err)
-
-	_, err = p.parseEvent("FUNCTION_CANCEL tx1 extra")
-	require.Error(t, err)
-	assert.True(t, p.readingPayload)
-	require.NotNil(t, p.currentFn)
-	assert.Equal(t, "tx1", p.currentFn.UID)
-
-	_, err = p.parseEvent("line2")
-	require.NoError(t, err)
-	ev, err := p.parseEvent("FUNCTION_PAYLOAD_END")
-	require.NoError(t, err)
-	assert.Equal(t, inputEventCall, ev.kind)
-	require.NotNil(t, ev.fn)
-	assert.Equal(t, []byte("line1\nline2"), ev.fn.Payload)
+			if tc.wantErr {
+				require.Error(t, parseErr)
+			} else {
+				require.NoError(t, parseErr)
+			}
+			if !tc.wantErr && tc.assertEvent != nil {
+				tc.assertEvent(t, events)
+			}
+			if tc.assertState != nil {
+				tc.assertState(t, p)
+			}
+		})
+	}
 }
 
 func TestInputParser_Parse_Wrapper(t *testing.T) {
-	p := newInputParser()
+	tests := map[string]struct {
+		line   string
+		wantFn bool
+		wantID string
+	}{
+		"function line returns function": {
+			line:   `FUNCTION tx1 1 "fn1 arg1" 0xFFFF "method=api,role=test"`,
+			wantFn: true,
+			wantID: "tx1",
+		},
+		"cancel line returns nil function": {
+			line: "FUNCTION_CANCEL tx1",
+		},
+		"progress line returns nil function": {
+			line: "FUNCTION_PROGRESS tx1 10 100",
+		},
+	}
 
-	fn, err := p.parse(`FUNCTION tx1 1 "fn1 arg1" 0xFFFF "method=api,role=test"`)
-	require.NoError(t, err)
-	require.NotNil(t, fn)
-	assert.Equal(t, "tx1", fn.UID)
-
-	fn, err = p.parse("FUNCTION_CANCEL tx1")
-	require.NoError(t, err)
-	assert.Nil(t, fn)
-
-	fn, err = p.parse("FUNCTION_PROGRESS tx1 10 100")
-	require.NoError(t, err)
-	assert.Nil(t, fn)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := newInputParser()
+			fn, err := p.parse(tc.line)
+			require.NoError(t, err)
+			if tc.wantFn {
+				require.NotNil(t, fn)
+				assert.Equal(t, tc.wantID, fn.UID)
+				return
+			}
+			assert.Nil(t, fn)
+		})
+	}
 }

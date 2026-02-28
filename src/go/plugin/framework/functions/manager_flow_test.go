@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -81,214 +82,395 @@ func countSubstring(s, substr string) int {
 	}
 }
 
-func TestManager_CancelQueued_Emits499AndSkipsExecution(t *testing.T) {
-	mgr, out := newFlowManager()
-	in := &chanInput{ch: make(chan string, 8)}
-	mgr.input = in
+func startFlowManager(t *testing.T, mgr *Manager) (context.CancelFunc, chan struct{}) {
+	t.Helper()
 
-	var (
-		mu       sync.Mutex
-		executed []string
-	)
-	started := make(chan struct{}, 1)
-	release := make(chan struct{})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		mgr.Run(ctx, nil)
+	}()
+	return cancel, done
+}
 
-	mgr.Register("fn", func(fn Function) {
-		mu.Lock()
-		executed = append(executed, fn.UID)
-		mu.Unlock()
-		if fn.UID == "tx1" {
-			started <- struct{}{}
-			<-release
+func waitForDone(t *testing.T, done <-chan struct{}) {
+	t.Helper()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for manager run to complete")
+	}
+}
+
+func waitForCondition(t *testing.T, timeout time.Duration, fn func() bool, desc string) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if fn() {
+			return
 		}
-	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	done := make(chan struct{})
-	go func() { defer close(done); mgr.Run(ctx, nil) }()
-
-	in.ch <- functionLine("tx1", "fn")
-	<-started
-	in.ch <- functionLine("tx2", "fn")
-	in.ch <- "FUNCTION_CANCEL tx2"
-	close(release)
-	close(in.ch)
-	<-done
-
-	waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx2 499", time.Second)
-	mu.Lock()
-	defer mu.Unlock()
-	assert.Equal(t, []string{"tx1"}, executed)
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timeout waiting for condition: %s", desc)
 }
 
-func TestManager_CancelRunning_Fallback499Once(t *testing.T) {
-	mgr, out := newFlowManager()
-	mgr.cancelFallbackDelay = 50 * time.Millisecond
-	in := &chanInput{ch: make(chan string, 8)}
-	mgr.input = in
+func TestManager_FlowScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer)
+	}{
+		"queued cancel emits 499 and skips execution": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				var (
+					mu       sync.Mutex
+					executed []string
+				)
+				started := make(chan struct{}, 1)
+				release := make(chan struct{})
 
-	started := make(chan struct{}, 1)
-	release := make(chan struct{})
+				mgr.Register("fn", func(fn Function) {
+					mu.Lock()
+					executed = append(executed, fn.UID)
+					mu.Unlock()
+					if fn.UID == "tx1" {
+						started <- struct{}{}
+						<-release
+					}
+				})
 
-	mgr.Register("fn", func(fn Function) {
-		if fn.UID == "tx1" {
-			started <- struct{}{}
-			<-release
-		}
-	})
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	done := make(chan struct{})
-	go func() { defer close(done); mgr.Run(ctx, nil) }()
+				in.ch <- functionLine("tx1", "fn")
+				<-started
+				in.ch <- functionLine("tx2", "fn")
+				in.ch <- "FUNCTION_CANCEL tx2"
+				close(release)
+				close(in.ch)
+				waitForDone(t, done)
 
-	in.ch <- functionLine("tx1", "fn")
-	<-started
-	in.ch <- "FUNCTION_CANCEL tx1"
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx2 499", time.Second)
+				mu.Lock()
+				defer mu.Unlock()
+				assert.Equal(t, []string{"tx1"}, executed)
+			},
+		},
+		"running cancel fallback emits 499 once": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				mgr.cancelFallbackDelay = 50 * time.Millisecond
+				started := make(chan struct{}, 1)
+				release := make(chan struct{})
 
-	waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
+				mgr.Register("fn", func(fn Function) {
+					if fn.UID == "tx1" {
+						started <- struct{}{}
+						<-release
+					}
+				})
 
-	close(release)
-	close(in.ch)
-	<-done
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
 
-	got := out.String()
-	assert.Equal(t, 1, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				in.ch <- functionLine("tx1", "fn")
+				<-started
+				in.ch <- "FUNCTION_CANCEL tx1"
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
+
+				close(release)
+				close(in.ch)
+				waitForDone(t, done)
+
+				assert.Equal(t, 1, countSubstring(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
+			},
+		},
+		"repeated cancel for same uid still emits one terminal response": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				mgr.cancelFallbackDelay = 50 * time.Millisecond
+				started := make(chan struct{}, 1)
+				release := make(chan struct{})
+
+				mgr.Register("fn", func(fn Function) {
+					if fn.UID == "tx1" {
+						started <- struct{}{}
+						<-release
+					}
+				})
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- functionLine("tx1", "fn")
+				<-started
+				in.ch <- "FUNCTION_CANCEL tx1"
+				in.ch <- "FUNCTION_CANCEL tx1"
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
+
+				close(release)
+				close(in.ch)
+				waitForDone(t, done)
+
+				assert.Equal(t, 1, countSubstring(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
+			},
+		},
+		"running cancel drops late terminal response": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				mgr.cancelFallbackDelay = 50 * time.Millisecond
+				started := make(chan struct{}, 1)
+				release := make(chan struct{})
+
+				mgr.Register("fn", func(fn Function) {
+					if fn.UID == "tx1" {
+						started <- struct{}{}
+						<-release
+						mgr.respUID(fn.UID, 200, "late response")
+					}
+				})
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- functionLine("tx1", "fn")
+				<-started
+				in.ch <- "FUNCTION_CANCEL tx1"
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
+
+				close(release)
+				close(in.ch)
+				waitForDone(t, done)
+
+				got := out.String()
+				assert.Equal(t, 1, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 0, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 200"))
+			},
+		},
+		"payload pre-admission cancel emits 499 and skips handler": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				var calls atomic.Int32
+				mgr.Register("fn", func(Function) { calls.Add(1) })
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- payloadStartCmd("tx1", "fn")
+				in.ch <- "payload line"
+				in.ch <- "FUNCTION_CANCEL tx1"
+				close(in.ch)
+				waitForDone(t, done)
+
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
+				assert.EqualValues(t, 0, calls.Load())
+			},
+		},
+		"duplicate uid is rejected with 409": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				started := make(chan struct{}, 1)
+				release := make(chan struct{})
+				var calls atomic.Int32
+
+				mgr.Register("fn", func(fn Function) {
+					calls.Add(1)
+					if fn.UID == "tx1" {
+						started <- struct{}{}
+						<-release
+					}
+				})
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- functionLine("tx1", "fn")
+				<-started
+				in.ch <- functionLine("tx1", "fn")
+				close(release)
+				close(in.ch)
+				waitForDone(t, done)
+
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 409", time.Second)
+				assert.EqualValues(t, 1, calls.Load())
+			},
+		},
+		"queue full is rejected with 503": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				mgr.queueSize = 1
+				mgr.workerCount = 1
+				started := make(chan struct{}, 1)
+				release := make(chan struct{})
+
+				mgr.Register("fn", func(fn Function) {
+					if fn.UID == "tx1" {
+						started <- struct{}{}
+						<-release
+					}
+				})
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- functionLine("tx1", "fn")
+				<-started
+				in.ch <- functionLine("tx2", "fn")
+				in.ch <- functionLine("tx3", "fn")
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx3 503", time.Second)
+
+				close(release)
+				close(in.ch)
+				waitForDone(t, done)
+			},
+		},
+		"panic in handler emits 500": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				mgr.Register("fn", func(Function) { panic("boom") })
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- functionLine("tx1", "fn")
+				close(in.ch)
+				waitForDone(t, done)
+
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 500", time.Second)
+			},
+		},
+		"cancel for unknown uid is no-op": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- "FUNCTION_CANCEL unknown"
+				close(in.ch)
+				waitForDone(t, done)
+
+				assert.Equal(t, 0, countSubstring(out.String(), "FUNCTION_RESULT_BEGIN"))
+			},
+		},
+		"cancel after completion is no-op": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				mgr.Register("fn", func(fn Function) {
+					mgr.respUID(fn.UID, 200, "done")
+				})
+
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
+
+				in.ch <- functionLine("tx1", "fn")
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 200", time.Second)
+				in.ch <- "FUNCTION_CANCEL tx1"
+				close(in.ch)
+				waitForDone(t, done)
+
+				got := out.String()
+				assert.Equal(t, 1, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 200"))
+				assert.Equal(t, 0, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr, out := newFlowManager()
+			in := &chanInput{ch: make(chan string, 16)}
+			mgr.input = in
+			tc.run(t, mgr, in, out)
+		})
+	}
 }
 
-func TestManager_PreAdmissionPayloadCancel_Emits499(t *testing.T) {
-	mgr, out := newFlowManager()
-	in := &chanInput{ch: make(chan string, 8)}
-	mgr.input = in
+func TestManager_InvocationStateScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer)
+	}{
+		"worker return transitions to awaiting_result until terminal output": {
+			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				mgr.workerCount = 1
+				returned := make(chan struct{}, 1)
+				releaseResponse := make(chan struct{})
 
-	calls := 0
-	mgr.Register("fn", func(Function) {
-		calls++
-	})
+				mgr.Register("fn", func(fn Function) {
+					go func() {
+						<-releaseResponse
+						mgr.respUID(fn.UID, 200, "ok")
+					}()
+					returned <- struct{}{}
+				})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	done := make(chan struct{})
-	go func() { defer close(done); mgr.Run(ctx, nil) }()
+				cancel, done := startFlowManager(t, mgr)
+				defer cancel()
 
-	in.ch <- payloadStartCmd("tx1", "fn")
-	in.ch <- "payload line"
-	in.ch <- "FUNCTION_CANCEL tx1"
-	close(in.ch)
-	<-done
+				in.ch <- functionLine("tx1", "fn")
+				<-returned
 
-	waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
-	assert.Equal(t, 0, calls)
+				waitForCondition(t, time.Second, func() bool {
+					mgr.invStateMux.Lock()
+					defer mgr.invStateMux.Unlock()
+					rec, ok := mgr.invState["tx1"]
+					return ok && rec != nil && rec.state == stateAwaitingResult
+				}, "transaction tx1 reaches awaiting_result state")
+
+				close(releaseResponse)
+				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 200", time.Second)
+
+				waitForCondition(t, time.Second, func() bool {
+					mgr.invStateMux.Lock()
+					defer mgr.invStateMux.Unlock()
+					_, ok := mgr.invState["tx1"]
+					return !ok
+				}, "transaction tx1 is removed from active state after finalization")
+
+				close(in.ch)
+				waitForDone(t, done)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr, out := newFlowManager()
+			in := &chanInput{ch: make(chan string, 16)}
+			mgr.input = in
+			tc.run(t, mgr, in, out)
+		})
+	}
 }
 
-func TestManager_DuplicateUID_Rejected409(t *testing.T) {
-	mgr, out := newFlowManager()
-	in := &chanInput{ch: make(chan string, 8)}
-	mgr.input = in
+func TestManager_tryFinalize(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T, mgr *Manager)
+	}{
+		"first finalization wins and tombstone blocks immediate reuse": {
+			run: func(t *testing.T, mgr *Manager) {
+				calls := 0
+				ok := mgr.tryFinalize("uid1", "test.first", func() { calls++ })
+				require.True(t, ok)
+				assert.Equal(t, 1, calls)
 
-	started := make(chan struct{}, 1)
-	release := make(chan struct{})
-	calls := 0
-	mgr.Register("fn", func(fn Function) {
-		calls++
-		if fn.UID == "tx1" {
-			started <- struct{}{}
-			<-release
-		}
-	})
+				ok = mgr.tryFinalize("uid1", "test.late", func() { calls++ })
+				require.False(t, ok)
+				assert.Equal(t, 1, calls)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	done := make(chan struct{})
-	go func() { defer close(done); mgr.Run(ctx, nil) }()
+				admitted := mgr.trySetInvocationState("uid1", stateQueued, func() {})
+				assert.False(t, admitted)
 
-	in.ch <- functionLine("tx1", "fn")
-	<-started
-	in.ch <- functionLine("tx1", "fn")
-	close(release)
-	close(in.ch)
-	<-done
+				mgr.invStateMux.Lock()
+				mgr.tombstones["uid1"] = time.Now().Add(-time.Second)
+				mgr.invStateMux.Unlock()
 
-	waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 409", time.Second)
-	assert.Equal(t, 1, calls)
-}
+				admitted = mgr.trySetInvocationState("uid1", stateQueued, func() {})
+				assert.True(t, admitted)
+			},
+		},
+		"empty uid or nil emitter is rejected": {
+			run: func(t *testing.T, mgr *Manager) {
+				assert.False(t, mgr.tryFinalize("", "source", func() {}))
+				assert.False(t, mgr.tryFinalize("uid1", "source", nil))
+			},
+		},
+	}
 
-func TestManager_QueueFull_Rejected503(t *testing.T) {
-	mgr, out := newFlowManager()
-	mgr.queueSize = 1
-	mgr.workerCount = 1
-	in := &chanInput{ch: make(chan string, 8)}
-	mgr.input = in
-
-	started := make(chan struct{}, 1)
-	release := make(chan struct{})
-	mgr.Register("fn", func(fn Function) {
-		if fn.UID == "tx1" {
-			started <- struct{}{}
-			<-release
-		}
-	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	done := make(chan struct{})
-	go func() { defer close(done); mgr.Run(ctx, nil) }()
-
-	in.ch <- functionLine("tx1", "fn")
-	<-started
-	in.ch <- functionLine("tx2", "fn")
-	in.ch <- functionLine("tx3", "fn")
-
-	waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx3 503", time.Second)
-
-	close(release)
-	close(in.ch)
-	<-done
-}
-
-func TestManager_PanicRecovery_Emits500(t *testing.T) {
-	mgr, out := newFlowManager()
-	in := &chanInput{ch: make(chan string, 4)}
-	mgr.input = in
-
-	mgr.Register("fn", func(Function) {
-		panic("boom")
-	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	done := make(chan struct{})
-	go func() { defer close(done); mgr.Run(ctx, nil) }()
-
-	in.ch <- functionLine("tx1", "fn")
-	close(in.ch)
-	<-done
-
-	waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 500", time.Second)
-}
-
-func TestManager_TryFinalize_TombstoneReuseWindow(t *testing.T) {
-	mgr := NewManager()
-
-	calls := 0
-	ok := mgr.TryFinalize("uid1", "test.first", func() { calls++ })
-	require.True(t, ok)
-	assert.Equal(t, 1, calls)
-
-	ok = mgr.TryFinalize("uid1", "test.late", func() { calls++ })
-	require.False(t, ok)
-	assert.Equal(t, 1, calls)
-
-	cancel := func() {}
-	admitted := mgr.trySetInvocationState("uid1", stateQueued, cancel)
-	assert.False(t, admitted)
-
-	mgr.invStateMux.Lock()
-	mgr.tombstones["uid1"] = time.Now().Add(-time.Second)
-	mgr.invStateMux.Unlock()
-
-	admitted = mgr.trySetInvocationState("uid1", stateQueued, cancel)
-	assert.True(t, admitted)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc.run(t, NewManager())
+		})
+	}
 }
