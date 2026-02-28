@@ -17,6 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testPermissions = "0xFFFF"
+	testSource      = "method=api,role=test"
+)
+
 type chanInput struct {
 	ch chan string
 }
@@ -50,11 +55,11 @@ func newFlowManager() (*Manager, *safeBuffer) {
 }
 
 func functionLine(uid, name string) string {
-	return fmt.Sprintf(`FUNCTION %s 10 "%s" 0xFFFF "method=api,role=test"`, uid, name)
+	return fmt.Sprintf(`FUNCTION %s 10 "%s" %s "%s"`, uid, name, testPermissions, testSource)
 }
 
 func payloadStartCmd(uid, name string) string {
-	return fmt.Sprintf(`FUNCTION_PAYLOAD %s 10 "%s" 0xFFFF "method=api,role=test" application/json`, uid, name)
+	return fmt.Sprintf(`FUNCTION_PAYLOAD %s 10 "%s" %s "%s" application/json`, uid, name, testPermissions, testSource)
 }
 
 func waitForSubstring(t *testing.T, f func() string, substr string, timeout time.Duration) {
@@ -68,18 +73,6 @@ func waitForSubstring(t *testing.T, f func() string, substr string, timeout time
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("timeout waiting for substring %q in output: %s", substr, f())
-}
-
-func countSubstring(s, substr string) int {
-	count := 0
-	for {
-		idx := strings.Index(s, substr)
-		if idx < 0 {
-			return count
-		}
-		count++
-		s = s[idx+len(substr):]
-	}
 }
 
 func startFlowManager(t *testing.T, mgr *Manager) (context.CancelFunc, chan struct{}) {
@@ -182,7 +175,7 @@ func TestManager_FlowScenarios(t *testing.T) {
 				close(in.ch)
 				waitForDone(t, done)
 
-				assert.Equal(t, 1, countSubstring(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 1, strings.Count(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
 			},
 		},
 		"repeated cancel for same uid still emits one terminal response": {
@@ -211,7 +204,7 @@ func TestManager_FlowScenarios(t *testing.T) {
 				close(in.ch)
 				waitForDone(t, done)
 
-				assert.Equal(t, 1, countSubstring(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 1, strings.Count(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
 			},
 		},
 		"running cancel drops late terminal response": {
@@ -241,8 +234,8 @@ func TestManager_FlowScenarios(t *testing.T) {
 				waitForDone(t, done)
 
 				got := out.String()
-				assert.Equal(t, 1, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 499"))
-				assert.Equal(t, 0, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 200"))
+				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 200"))
 			},
 		},
 		"payload pre-admission cancel emits 499 and skips handler": {
@@ -343,7 +336,7 @@ func TestManager_FlowScenarios(t *testing.T) {
 				close(in.ch)
 				waitForDone(t, done)
 
-				assert.Equal(t, 0, countSubstring(out.String(), "FUNCTION_RESULT_BEGIN"))
+				assert.Equal(t, 0, strings.Count(out.String(), "FUNCTION_RESULT_BEGIN"))
 			},
 		},
 		"cancel after completion is no-op": {
@@ -362,8 +355,8 @@ func TestManager_FlowScenarios(t *testing.T) {
 				waitForDone(t, done)
 
 				got := out.String()
-				assert.Equal(t, 1, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 200"))
-				assert.Equal(t, 0, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 200"))
+				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 499"))
 			},
 		},
 		"stdin close uses canceling shutdown and force-finalizes unresolved requests": {
@@ -387,8 +380,8 @@ func TestManager_FlowScenarios(t *testing.T) {
 				waitForDone(t, done)
 
 				got := out.String()
-				assert.Equal(t, 1, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 499"))
-				assert.Equal(t, 0, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 200"))
+				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 200"))
 			},
 		},
 		"late terminal output after shutdown is dropped by tombstone guard": {
@@ -422,8 +415,8 @@ func TestManager_FlowScenarios(t *testing.T) {
 				}
 
 				got := out.String()
-				assert.Equal(t, 1, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 499"))
-				assert.Equal(t, 0, countSubstring(got, "FUNCTION_RESULT_BEGIN tx1 200"))
+				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 200"))
 			},
 		},
 	}
@@ -631,7 +624,7 @@ func TestManager_WorkerPoolConcurrencyBound(t *testing.T) {
 			waitForDone(t, done)
 
 			got := out.String()
-			assert.Equal(t, len(tc.input), countSubstring(got, "FUNCTION_RESULT_BEGIN tx-"))
+			assert.Equal(t, len(tc.input), strings.Count(got, "FUNCTION_RESULT_BEGIN tx-"))
 			tc.assertions(t, maxSeen.Load())
 		})
 	}

@@ -36,6 +36,7 @@ const (
 	defaultCancelFallbackDelay  = 5 * time.Second
 	defaultShutdownDrainTimeout = 8 * time.Second
 	defaultTombstoneTTL         = 60 * time.Second
+	defaultAwaitingWarnDelay    = 30 * time.Second
 )
 
 type invocationState uint8
@@ -58,6 +59,8 @@ type invocationRecord struct {
 	cancel          context.CancelFunc
 	cancelRequested bool
 	fallbackTimer   *time.Timer
+	awaitingTimer   *time.Timer
+	awaitingSince   time.Time
 	scheduleKey     string
 }
 
@@ -78,6 +81,7 @@ func NewManager() *Manager {
 		tombstoneTTL:         defaultTombstoneTTL,
 		cancelFallbackDelay:  defaultCancelFallbackDelay,
 		shutdownDrainTimeout: defaultShutdownDrainTimeout,
+		awaitingWarnDelay:    defaultAwaitingWarnDelay,
 	}
 }
 
@@ -102,6 +106,7 @@ type Manager struct {
 	tombstoneTTL         time.Duration
 	cancelFallbackDelay  time.Duration
 	shutdownDrainTimeout time.Duration
+	awaitingWarnDelay    time.Duration
 	stopping             atomic.Bool
 }
 
@@ -271,17 +276,51 @@ func (m *Manager) trySetInvocationState(uid string, state invocationState, cance
 	return true
 }
 
-func (m *Manager) setInvocationState(uid string, state invocationState) {
+func (m *Manager) setAwaitingResultState(uid string, fnTimeout time.Duration) {
 	if uid == "" {
 		return
 	}
 
 	m.invStateMux.Lock()
-	defer m.invStateMux.Unlock()
-
 	if rec, ok := m.invState[uid]; ok {
-		rec.state = state
+		rec.state = stateAwaitingResult
+		rec.awaitingSince = time.Now()
+
+		delay := m.awaitingWarnDelay
+		if fnTimeout > 0 && fnTimeout < delay {
+			delay = fnTimeout
+		}
+		if delay <= 0 {
+			m.invStateMux.Unlock()
+			return
+		}
+
+		if rec.awaitingTimer != nil {
+			rec.awaitingTimer.Stop()
+		}
+		uidCopy := uid
+		rec.awaitingTimer = time.AfterFunc(delay, func() {
+			m.logAwaitingResult(uidCopy)
+		})
 	}
+	m.invStateMux.Unlock()
+}
+
+func (m *Manager) logAwaitingResult(uid string) {
+	if uid == "" {
+		return
+	}
+
+	m.invStateMux.Lock()
+	rec, ok := m.invState[uid]
+	if !ok || rec == nil || rec.state != stateAwaitingResult {
+		m.invStateMux.Unlock()
+		return
+	}
+	age := time.Since(rec.awaitingSince)
+	m.invStateMux.Unlock()
+
+	m.Warningf("transaction uid '%s' is still awaiting terminal response after %s", uid, age)
 }
 
 func (m *Manager) startInvocation(uid string) bool {
@@ -421,6 +460,10 @@ func (m *Manager) tryFinalize(uid, source string, emit func()) bool {
 			rec.fallbackTimer.Stop()
 			rec.fallbackTimer = nil
 		}
+		if rec.awaitingTimer != nil {
+			rec.awaitingTimer.Stop()
+			rec.awaitingTimer = nil
+		}
 		scheduleKey = rec.scheduleKey
 	}
 	delete(m.invState, uid)
@@ -514,7 +557,7 @@ func (m *Manager) lookupFunctionRoute(fn Function) (handler func(Function), sche
 
 		return func(f Function) {
 			m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
-		}, routeScheduleKey(fn.Name, "__unmatched__"), true
+		}, routeScheduleKey(fn.Name, scheduleKeyUnmatched), true
 	}
 
 	if snap.direct != nil {
@@ -523,7 +566,7 @@ func (m *Manager) lookupFunctionRoute(fn Function) (handler func(Function), sche
 
 	return func(f Function) {
 		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
-	}, routeScheduleKey(fn.Name, "__direct_missing__"), true
+	}, routeScheduleKey(fn.Name, scheduleKeyDirectMissing), true
 }
 
 // lookupFunction returns a snapshot handler used by existing tests to verify
@@ -555,6 +598,11 @@ func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
 	}, true
 }
+
+const (
+	scheduleKeyUnmatched     = "__unmatched__"
+	scheduleKeyDirectMissing = "__direct_missing__"
+)
 
 func routeScheduleKey(name, discriminator string) string {
 	if discriminator == "" {

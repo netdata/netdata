@@ -2,6 +2,8 @@
 
 package functions
 
+import "runtime/debug"
+
 func (m *Manager) runWorker() {
 	for {
 		if m.scheduler == nil {
@@ -26,7 +28,8 @@ func (m *Manager) runWorker() {
 		panicked := false
 		func() {
 			defer func() {
-				if recover() != nil {
+				if v := recover(); v != nil {
+					m.Errorf("function handler panic (uid=%s): %v\n%s", req.fn.UID, v, string(debug.Stack()))
 					panicked = true
 				}
 			}()
@@ -38,6 +41,6 @@ func (m *Manager) runWorker() {
 			continue
 		}
 
-		m.setInvocationState(req.fn.UID, stateAwaitingResult)
+		m.setAwaitingResultState(req.fn.UID, req.fn.Timeout)
 	}
 }

@@ -88,7 +88,14 @@ All terminal outputs go through:
 - first terminal writer wins
 - late terminal duplicates are dropped
 - fallback timer is stopped on finalization
+- awaiting-result warning timer is stopped on finalization
 - UID becomes tombstoned for a short window
+
+Awaiting-result observability:
+
+- when a worker returns without terminal output, manager moves UID to `awaiting_result`
+- manager starts a warning timer (`defaultAwaitingWarnDelay = 30s`, capped by function timeout if lower)
+- timer emits a warning log if UID is still `awaiting_result` (diagnostic only, no forced finalize)
 
 ## Cancellation semantics
 

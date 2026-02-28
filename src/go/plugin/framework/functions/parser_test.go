@@ -9,8 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testPayloadStartLine = `FUNCTION_PAYLOAD tx1 1 "fn1 arg1" 0xFFFF "method=api,role=test" application/json`
-const testFunctionLine = `FUNCTION tx2 1 "fn2 arg1" 0xFFFF "method=api,role=test"`
+const (
+	parserTestPermissions = "0xFFFF"
+	parserTestSource      = "method=api,role=test"
+	testPayloadStartLine  = `FUNCTION_PAYLOAD tx1 1 "fn1 arg1" ` + parserTestPermissions + ` "` + parserTestSource + `" application/json`
+	testFunctionLine      = `FUNCTION tx2 1 "fn2 arg1" ` + parserTestPermissions + ` "` + parserTestSource + `"`
+)
 
 func TestInputParser_ParseEvent(t *testing.T) {
 	tests := map[string]struct {
@@ -163,7 +167,7 @@ func TestInputParser_Parse_Wrapper(t *testing.T) {
 		wantID string
 	}{
 		"function line returns function": {
-			line:   `FUNCTION tx1 1 "fn1 arg1" 0xFFFF "method=api,role=test"`,
+			line:   `FUNCTION tx1 1 "fn1 arg1" ` + parserTestPermissions + ` "` + parserTestSource + `"`,
 			wantFn: true,
 			wantID: "tx1",
 		},
