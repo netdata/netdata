@@ -143,12 +143,8 @@ func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 		return
 	}
 
-	// State-changing commands are queued for serial execution
-	select {
-	case <-d.ctx.Done():
-		d.dyncfgApi.SendCodef(fn, 503, "Service discovery is shutting down.")
-	case d.dyncfgCh <- fn:
-	}
+	// State-changing commands are queued for serial execution.
+	d.enqueueDyncfgFunction(fn)
 }
 
 // dyncfgSeqExec executes state-changing dyncfg commands serially.

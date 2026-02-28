@@ -82,12 +82,7 @@ func (m *Manager) dyncfgVnodeExec(fn dyncfg.Function) {
 		m.dyncfgApi.SendJSON(fn, vnodes.ConfigSchema)
 		return
 	}
-
-	select {
-	case <-m.ctx.Done():
-		m.dyncfgApi.SendCodef(fn, 503, "Job manager is shutting down.")
-	case m.dyncfgCh <- fn:
-	}
+	m.enqueueDyncfgFunction(fn)
 }
 
 func (m *Manager) dyncfgVnodeSeqExec(fn dyncfg.Function) {

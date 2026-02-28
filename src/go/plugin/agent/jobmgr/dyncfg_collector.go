@@ -85,12 +85,7 @@ func (m *Manager) dyncfgCollectorExec(fn dyncfg.Function) {
 		m.dyncfgCmdSchema(fn)
 		return
 	}
-
-	select {
-	case <-m.ctx.Done():
-		m.dyncfgApi.SendCodef(fn, 503, "Job manager is shutting down.")
-	case m.dyncfgCh <- fn:
-	}
+	m.enqueueDyncfgFunction(fn)
 }
 
 func (m *Manager) dyncfgCollectorSeqExec(fn dyncfg.Function) {
