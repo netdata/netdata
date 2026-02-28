@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -23,10 +24,11 @@ type functionSet struct {
 }
 
 const (
-	defaultWorkerCount         = 1
-	defaultQueueSize           = 64
-	defaultCancelFallbackDelay = 5 * time.Second
-	defaultTombstoneTTL        = 60 * time.Second
+	defaultWorkerCount          = 1
+	defaultQueueSize            = 64
+	defaultCancelFallbackDelay  = 5 * time.Second
+	defaultShutdownDrainTimeout = 8 * time.Second
+	defaultTombstoneTTL         = 60 * time.Second
 )
 
 type invocationState uint8
@@ -55,17 +57,18 @@ func NewManager() *Manager {
 		Logger: logger.New().With(
 			slog.String("component", "functions manager"),
 		),
-		api:                 netdataapi.New(safewriter.Stdout),
-		input:               newStdinInput(),
-		mux:                 &sync.Mutex{},
-		FunctionRegistry:    make(map[string]*functionSet),
-		workerCount:         defaultWorkerCount,
-		queueSize:           defaultQueueSize,
-		invStateMux:         &sync.Mutex{},
-		invState:            make(map[string]*invocationRecord),
-		tombstones:          make(map[string]time.Time),
-		tombstoneTTL:        defaultTombstoneTTL,
-		cancelFallbackDelay: defaultCancelFallbackDelay,
+		api:                  netdataapi.New(safewriter.Stdout),
+		input:                newStdinInput(),
+		mux:                  &sync.Mutex{},
+		FunctionRegistry:     make(map[string]*functionSet),
+		workerCount:          defaultWorkerCount,
+		queueSize:            defaultQueueSize,
+		invStateMux:          &sync.Mutex{},
+		invState:             make(map[string]*invocationRecord),
+		tombstones:           make(map[string]time.Time),
+		tombstoneTTL:         defaultTombstoneTTL,
+		cancelFallbackDelay:  defaultCancelFallbackDelay,
+		shutdownDrainTimeout: defaultShutdownDrainTimeout,
 	}
 }
 
@@ -82,11 +85,13 @@ type Manager struct {
 	workerCount int
 	queueSize   int
 
-	invStateMux         *sync.Mutex
-	invState            map[string]*invocationRecord
-	tombstones          map[string]time.Time
-	tombstoneTTL        time.Duration
-	cancelFallbackDelay time.Duration
+	invStateMux          *sync.Mutex
+	invState             map[string]*invocationRecord
+	tombstones           map[string]time.Time
+	tombstoneTTL         time.Duration
+	cancelFallbackDelay  time.Duration
+	shutdownDrainTimeout time.Duration
+	stopping             atomic.Bool
 }
 
 func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
@@ -94,15 +99,7 @@ func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
 	defer func() { m.Info("instance is stopped") }()
 	restoreFinalizeHook := setFinalizeHook(m.TryFinalize)
 	defer restoreFinalizeHook()
-
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-	go func() { defer wg.Done(); m.run(ctx, quitCh) }()
-
-	wg.Wait()
-
-	<-ctx.Done()
+	m.run(ctx, quitCh)
 }
 
 func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
@@ -114,20 +111,47 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 		workersWG.Add(1)
 		go func() {
 			defer workersWG.Done()
-			m.runWorker(ctx, workCh)
+			m.runWorker(workCh)
 		}()
 	}
-	defer func() {
+	shutdown := func(signalQuit, cancelInflight bool) {
+		m.setStopping(true)
+		if signalQuit && quitCh != nil {
+			quitCh <- struct{}{}
+		}
+
+		if cancelInflight {
+			m.cancelAllInvocations()
+		}
 		close(workCh)
-		workersWG.Wait()
-	}()
+
+		drainCtx, cancelDrain := context.WithTimeout(context.Background(), m.shutdownDrainTimeout)
+		defer cancelDrain()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			workersWG.Wait()
+		}()
+
+		select {
+		case <-done:
+		case <-drainCtx.Done():
+		}
+
+		if cancelInflight {
+			m.forceFinalizeAll(499, "request canceled during shutdown")
+		}
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
+			shutdown(false, true)
 			return
 		case line, ok := <-m.input.lines():
 			if !ok {
+				shutdown(false, false)
 				return
 			}
 			event, err := parser.parseEvent(line)
@@ -140,10 +164,8 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 			case inputEventNone, inputEventProgress:
 				continue
 			case inputEventQuit:
-				if quitCh != nil {
-					quitCh <- struct{}{}
-					return
-				}
+				shutdown(true, true)
+				return
 			case inputEventCancel:
 				m.handleCancelEvent(event)
 				continue
@@ -156,6 +178,10 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 
 func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function, workCh chan<- *invocationRequest) {
 	if fn == nil {
+		return
+	}
+	if m.isStopping() {
+		m.respf(fn, 503, "functions manager is stopping")
 		return
 	}
 
@@ -192,28 +218,34 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function, wo
 	}
 }
 
-func (m *Manager) runWorker(ctx context.Context, workCh <-chan *invocationRequest) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case req, ok := <-workCh:
-			if !ok {
-				return
-			}
-			if req == nil || req.fn == nil || req.handler == nil {
-				continue
-			}
-			if req.ctx != nil && req.ctx.Err() != nil {
-				continue
-			}
-			if !m.startInvocation(req.fn.UID) {
-				continue
-			}
-
-			req.handler(*req.fn)
-			m.setInvocationState(req.fn.UID, stateAwaitingResult)
+func (m *Manager) runWorker(workCh <-chan *invocationRequest) {
+	for req := range workCh {
+		if req == nil || req.fn == nil || req.handler == nil {
+			continue
 		}
+		if req.ctx != nil && req.ctx.Err() != nil {
+			continue
+		}
+		if !m.startInvocation(req.fn.UID) {
+			continue
+		}
+
+		panicked := false
+		func() {
+			defer func() {
+				if recover() != nil {
+					panicked = true
+				}
+			}()
+			req.handler(*req.fn)
+		}()
+
+		if panicked {
+			m.respUID(req.fn.UID, 500, "function handler panic")
+			continue
+		}
+
+		m.setInvocationState(req.fn.UID, stateAwaitingResult)
 	}
 }
 
@@ -318,6 +350,42 @@ func (m *Manager) requestCancellation(uid string) (invocationState, bool) {
 	}
 
 	return rec.state, true
+}
+
+func (m *Manager) setStopping(v bool) {
+	m.stopping.Store(v)
+}
+
+func (m *Manager) isStopping() bool {
+	return m.stopping.Load()
+}
+
+func (m *Manager) cancelAllInvocations() {
+	m.invStateMux.Lock()
+	defer m.invStateMux.Unlock()
+
+	for _, rec := range m.invState {
+		if rec == nil {
+			continue
+		}
+		rec.cancelRequested = true
+		if rec.cancel != nil {
+			rec.cancel()
+		}
+	}
+}
+
+func (m *Manager) forceFinalizeAll(code int, message string) {
+	m.invStateMux.Lock()
+	uids := make([]string, 0, len(m.invState))
+	for uid := range m.invState {
+		uids = append(uids, uid)
+	}
+	m.invStateMux.Unlock()
+
+	for _, uid := range uids {
+		m.respUID(uid, code, "%s", message)
+	}
 }
 
 // TryFinalize emits a terminal response once per transaction UID.
