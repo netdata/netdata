@@ -25,59 +25,55 @@ func newManagerRuntimeMetrics(store metrix.RuntimeStore) *managerRuntimeMetrics 
 
 	meter := store.Write().StatefulMeter(functionsRuntimeMetricPrefix)
 	metrics := &managerRuntimeMetrics{
-		invocationsActive: meter.Gauge(
+		invocationsActive: metrix.SeededGauge(meter,
 			"invocations_active",
 			metrix.WithDescription("Current number of active function invocations tracked by UID"),
 			metrix.WithChartFamily("Framework/Functions/Invocations"),
 			metrix.WithUnit("invocations"),
 		),
-		invocationsAwaitingResult: meter.Gauge(
+		invocationsAwaitingResult: metrix.SeededGauge(meter,
 			"invocations_awaiting_result",
 			metrix.WithDescription("Current number of active invocations waiting for terminal response"),
 			metrix.WithChartFamily("Framework/Functions/Invocations"),
 			metrix.WithUnit("invocations"),
 		),
-		schedulerPending: meter.Gauge(
+		schedulerPending: metrix.SeededGauge(meter,
 			"scheduler_pending",
 			metrix.WithDescription("Current number of invocations pending in scheduler"),
 			metrix.WithChartFamily("Framework/Functions/Scheduler"),
 			metrix.WithUnit("invocations"),
 		),
-		functionCallsTotal: meter.Counter(
+		functionCallsTotal: metrix.SeededCounter(meter,
 			"calls_total",
 			metrix.WithDescription("Total number of parsed function call requests"),
 			metrix.WithChartFamily("Framework/Functions/Calls"),
 			metrix.WithUnit("calls"),
 		),
-		queueFullTotal: meter.Counter(
+		queueFullTotal: metrix.SeededCounter(meter,
 			"queue_full_total",
 			metrix.WithDescription("Total number of function requests rejected due to queue full"),
 			metrix.WithChartFamily("Framework/Functions/Failures"),
 			metrix.WithUnit("requests"),
 		),
-		cancelFallbackTotal: meter.Counter(
+		cancelFallbackTotal: metrix.SeededCounter(meter,
 			"cancel_fallback_total",
 			metrix.WithDescription("Total number of function requests finalized by cancel fallback timer"),
 			metrix.WithChartFamily("Framework/Functions/Cancellation"),
 			metrix.WithUnit("requests"),
 		),
-		lateTerminalDropped: meter.Counter(
+		lateTerminalDropped: metrix.SeededCounter(meter,
 			"late_terminal_dropped_total",
 			metrix.WithDescription("Total number of late terminal responses dropped by tombstone guard"),
 			metrix.WithChartFamily("Framework/Functions/Finalization"),
 			metrix.WithUnit("responses"),
 		),
-		duplicateUIDIgnored: meter.Counter(
+		duplicateUIDIgnored: metrix.SeededCounter(meter,
 			"duplicate_uid_ignored_total",
 			metrix.WithDescription("Total number of duplicate transaction IDs ignored at admission"),
 			metrix.WithChartFamily("Framework/Functions/Admission"),
 			metrix.WithUnit("requests"),
 		),
 	}
-
-	metrics.invocationsActive.Set(0)
-	metrics.invocationsAwaitingResult.Set(0)
-	metrics.schedulerPending.Set(0)
 
 	return metrics
 }

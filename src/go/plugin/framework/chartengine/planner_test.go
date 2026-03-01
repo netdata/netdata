@@ -1853,8 +1853,9 @@ groups:
 				cacheHits, ok := metricsReader.Value("netdata.go.plugin.framework.chartengine.route_cache_hits_total", nil)
 				require.True(t, ok)
 				assert.GreaterOrEqual(t, cacheHits, float64(1))
-				_, fullDropsSeen := metricsReader.Value("netdata.go.plugin.framework.chartengine.route_cache_full_drops_total", nil)
-				assert.False(t, fullDropsSeen)
+				fullDrops, fullDropsSeen := metricsReader.Value("netdata.go.plugin.framework.chartengine.route_cache_full_drops_total", nil)
+				require.True(t, fullDropsSeen)
+				assert.Equal(t, float64(0), fullDrops)
 
 				matChart = e.state.materialized.charts["component_load"]
 				require.NotNil(t, matChart)

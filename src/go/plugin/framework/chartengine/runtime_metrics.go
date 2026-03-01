@@ -135,19 +135,19 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 		metrix.WithUnit("transitions"),
 	)
 	return &runtimeMetrics{
-		buildSuccessTotal: meter.Counter(
+		buildSuccessTotal: metrix.SeededCounter(meter,
 			"build_success_total",
 			metrix.WithDescription("Successful BuildPlan calls"),
 			metrix.WithChartFamily("ChartEngine/Build"),
 			metrix.WithUnit("builds"),
 		),
-		buildErrorTotal: meter.Counter(
+		buildErrorTotal: metrix.SeededCounter(meter,
 			"build_error_total",
 			metrix.WithDescription("Failed BuildPlan calls"),
 			metrix.WithChartFamily("ChartEngine/Build"),
 			metrix.WithUnit("builds"),
 		),
-		buildSkippedFailedTotal: meter.Counter(
+		buildSkippedFailedTotal: metrix.SeededCounter(meter,
 			"build_skipped_failed_collect_total",
 			metrix.WithDescription("BuildPlan calls skipped due failed collect cycle"),
 			metrix.WithChartFamily("ChartEngine/Build"),
@@ -171,69 +171,69 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 
 		buildSeqBrokenTotal:    buildSeqTransitions.WithLabelValues("broken"),
 		buildSeqRecoveredTotal: buildSeqTransitions.WithLabelValues("recovered"),
-		buildSeqViolation: meter.Gauge(
+		buildSeqViolation: metrix.SeededGauge(meter,
 			"build_seq_violation_active",
 			metrix.WithDescription("1 when build sequence monotonicity is currently violated"),
 			metrix.WithChartFamily("ChartEngine/Build"),
 			metrix.WithUnit("state"),
 		),
 
-		routeCacheHitsTotal: meter.Counter(
+		routeCacheHitsTotal: metrix.SeededCounter(meter,
 			"route_cache_hits_total",
 			metrix.WithDescription("Route cache lookup hits"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("hits"),
 		),
-		routeCacheMissesTotal: meter.Counter(
+		routeCacheMissesTotal: metrix.SeededCounter(meter,
 			"route_cache_misses_total",
 			metrix.WithDescription("Route cache lookup misses"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("misses"),
 		),
-		routeCacheEntries: meter.Gauge(
+		routeCacheEntries: metrix.SeededGauge(meter,
 			"route_cache_entries",
 			metrix.WithDescription("Current number of route cache entries"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("entries"),
 		),
-		routeCacheRetainedTotal: meter.Counter(
+		routeCacheRetainedTotal: metrix.SeededCounter(meter,
 			"route_cache_retained_total",
 			metrix.WithDescription("Route cache entries retained after prune"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("entries"),
 		),
-		routeCachePrunedTotal: meter.Counter(
+		routeCachePrunedTotal: metrix.SeededCounter(meter,
 			"route_cache_pruned_total",
 			metrix.WithDescription("Route cache entries pruned"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("entries"),
 		),
-		routeCacheFullDropsTotal: meter.Counter(
+		routeCacheFullDropsTotal: metrix.SeededCounter(meter,
 			"route_cache_full_drops_total",
 			metrix.WithDescription("Route cache full-drop prune events"),
 			metrix.WithChartFamily("ChartEngine/Route Cache"),
 			metrix.WithUnit("events"),
 		),
 
-		seriesScannedTotal: meter.Counter(
+		seriesScannedTotal: metrix.SeededCounter(meter,
 			"series_scanned_total",
 			metrix.WithDescription("Series scanned by planner"),
 			metrix.WithChartFamily("ChartEngine/Series"),
 			metrix.WithUnit("series"),
 		),
-		seriesMatchedTotal: meter.Counter(
+		seriesMatchedTotal: metrix.SeededCounter(meter,
 			"series_matched_total",
 			metrix.WithDescription("Series matched by template or autogen"),
 			metrix.WithChartFamily("ChartEngine/Series"),
 			metrix.WithUnit("series"),
 		),
-		seriesUnmatchedTotal: meter.Counter(
+		seriesUnmatchedTotal: metrix.SeededCounter(meter,
 			"series_unmatched_total",
 			metrix.WithDescription("Series left unmatched after routing"),
 			metrix.WithChartFamily("ChartEngine/Series"),
 			metrix.WithUnit("series"),
 		),
-		seriesAutogenMatchedTotal: meter.Counter(
+		seriesAutogenMatchedTotal: metrix.SeededCounter(meter,
 			"series_autogen_matched_total",
 			metrix.WithDescription("Series matched by autogen fallback"),
 			metrix.WithChartFamily("ChartEngine/Series"),
@@ -242,13 +242,13 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 		seriesFilteredBySeq:      seriesFiltered.WithLabelValues("by_seq"),
 		seriesFilteredBySelector: seriesFiltered.WithLabelValues("by_selector"),
 
-		planChartInstances: meter.Gauge(
+		planChartInstances: metrix.SeededGauge(meter,
 			"plan_chart_instances",
 			metrix.WithDescription("Chart instances in last successful build plan"),
 			metrix.WithChartFamily("ChartEngine/Plan"),
 			metrix.WithUnit("charts"),
 		),
-		planInferredDimensions: meter.Gauge(
+		planInferredDimensions: metrix.SeededGauge(meter,
 			"plan_inferred_dimensions",
 			metrix.WithDescription("Inferred dimensions in last successful build plan"),
 			metrix.WithChartFamily("ChartEngine/Plan"),
