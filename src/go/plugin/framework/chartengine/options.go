@@ -98,7 +98,7 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 			if err != nil {
 				return fmt.Errorf("invalid engine selector: %w", err)
 			}
-			cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: selector != nil, value: selector}
+			cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: true, value: selector}
 			cfg.selector = selector
 		}
 		return nil
