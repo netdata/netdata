@@ -13,7 +13,30 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-func TestBuildScalarAutogenRoute(t *testing.T) {
+func TestAutogenRouteBuilderScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"build scalar autogen route": {
+			run: runTestBuildScalarAutogenRoute,
+		},
+		"build histogram bucket autogen route": {
+			run: runTestBuildHistogramBucketAutogenRoute,
+		},
+		"build summary quantile autogen route": {
+			run: runTestBuildSummaryQuantileAutogenRoute,
+		},
+		"build state-set autogen route": {
+			run: runTestBuildStateSetAutogenRoute,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
+func runTestBuildScalarAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -68,7 +91,7 @@ func TestBuildScalarAutogenRoute(t *testing.T) {
 	}
 }
 
-func TestBuildHistogramBucketAutogenRoute(t *testing.T) {
+func runTestBuildHistogramBucketAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -106,7 +129,7 @@ func TestBuildHistogramBucketAutogenRoute(t *testing.T) {
 	}
 }
 
-func TestBuildSummaryQuantileAutogenRoute(t *testing.T) {
+func runTestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -144,7 +167,7 @@ func TestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 	}
 }
 
-func TestBuildStateSetAutogenRoute(t *testing.T) {
+func runTestBuildStateSetAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string

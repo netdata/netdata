@@ -308,7 +308,9 @@ func (j *JobV2) postCheck() error {
 		// Chartengine autogen type.id budget must use the actual emitted type.id.
 		// JobV2 always emits with fullName as TypeID.
 		if policy.Autogen != nil {
-			policy.Autogen.TypeID = j.fullName
+			autogen := *policy.Autogen
+			autogen.TypeID = j.fullName
+			policy.Autogen = &autogen
 		}
 		opts = append(opts, chartengine.WithEnginePolicy(policy))
 	}

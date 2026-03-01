@@ -49,7 +49,7 @@ type AutogenPolicy = runtimecomp.AutogenPolicy
 // EnginePolicy controls chartengine matching/materialization behavior.
 type EnginePolicy struct {
 	// Selector filters input series globally before template/autogen routing.
-	// Nil or empty selector means "allow all".
+	// Nil means "no override", and an explicitly empty expr means "override to allow all".
 	Selector *metrixselector.Expr
 
 	// Autogen controls unmatched-series fallback behavior.
