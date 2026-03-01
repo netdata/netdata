@@ -29,7 +29,7 @@ func resolveEffectivePolicy(cfg engineConfig, templatePolicy *charttpl.Engine) (
 		}
 
 		if templatePolicy.Selector != nil {
-			compiled, err := compileEngineSelector(templatePolicy.Selector)
+			compiled, err := compileEngineSelector(*templatePolicy.Selector)
 			if err != nil {
 				return AutogenPolicy{}, nil, fmt.Errorf("template engine.selector: %w", err)
 			}

@@ -216,7 +216,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 
 				observer, err := New(
 					WithRuntimeStore(nil),
-					WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}),
+					WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}),
 					WithSeriesSelectionAllVisible(),
 					WithRuntimePlannerMode(),
 				)

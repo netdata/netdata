@@ -53,7 +53,7 @@ type EnginePolicy struct {
 	Selector *metrixselector.Expr
 
 	// Autogen controls unmatched-series fallback behavior.
-	Autogen AutogenPolicy
+	Autogen *AutogenPolicy
 }
 
 func defaultAutogenPolicy() AutogenPolicy {
@@ -75,8 +75,8 @@ func normalizeAutogenPolicy(policy AutogenPolicy) (AutogenPolicy, error) {
 	return policy, nil
 }
 
-func compileEngineSelector(expr *metrixselector.Expr) (metrixselector.Selector, error) {
-	if expr == nil || expr.Empty() {
+func compileEngineSelector(expr metrixselector.Expr) (metrixselector.Selector, error) {
+	if expr.Empty() {
 		return nil, nil
 	}
 	return expr.Parse()
@@ -85,18 +85,22 @@ func compileEngineSelector(expr *metrixselector.Expr) (metrixselector.Selector, 
 // WithEnginePolicy configures chartengine matching/materialization policy.
 func WithEnginePolicy(policy EnginePolicy) Option {
 	return func(cfg *engineConfig) error {
-		autogen, err := normalizeAutogenPolicy(policy.Autogen)
-		if err != nil {
-			return err
+		if policy.Autogen != nil {
+			autogen, err := normalizeAutogenPolicy(*policy.Autogen)
+			if err != nil {
+				return err
+			}
+			cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: autogen}
+			cfg.autogen = autogen
 		}
-		selector, err := compileEngineSelector(policy.Selector)
-		if err != nil {
-			return fmt.Errorf("invalid engine selector: %w", err)
+		if policy.Selector != nil {
+			selector, err := compileEngineSelector(*policy.Selector)
+			if err != nil {
+				return fmt.Errorf("invalid engine selector: %w", err)
+			}
+			cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: selector != nil, value: selector}
+			cfg.selector = selector
 		}
-		cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: autogen}
-		cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: selector != nil, value: selector}
-		cfg.autogen = autogen
-		cfg.selector = selector
 		return nil
 	}
 }

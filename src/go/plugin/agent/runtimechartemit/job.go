@@ -189,7 +189,7 @@ func (j *runtimeMetricsJob) ensureComponent(spec componentSpec) (*runtimeCompone
 		chartengine.WithRuntimeStore(nil), // Two-engine policy: observer engine has no self-metrics.
 		chartengine.WithSeriesSelectionAllVisible(),
 		chartengine.WithRuntimePlannerMode(),
-		chartengine.WithEnginePolicy(chartengine.EnginePolicy{Autogen: spec.Autogen}),
+		chartengine.WithEnginePolicy(chartengine.EnginePolicy{Autogen: &spec.Autogen}),
 		chartengine.WithLogger(engineLog),
 	)
 	if err != nil {

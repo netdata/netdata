@@ -741,7 +741,7 @@ func TestBuildPlanEnginePolicySelectorFiltersSeriesBeforeRouting(t *testing.T) {
 	}
 	e, err := New(WithEnginePolicy(EnginePolicy{
 		Selector: &selectorExpr,
-		Autogen:  AutogenPolicy{Enabled: true},
+		Autogen:  &AutogenPolicy{Enabled: true},
 	}))
 	require.NoError(t, err)
 
@@ -832,7 +832,7 @@ func TestBuildPlanEnginePolicyOptionOverridesTemplatePolicy(t *testing.T) {
 	}
 	e, err := New(WithEnginePolicy(EnginePolicy{
 		Selector: &overrideSelector,
-		Autogen:  AutogenPolicy{Enabled: true},
+		Autogen:  &AutogenPolicy{Enabled: true},
 	}))
 	require.NoError(t, err)
 
@@ -871,7 +871,7 @@ groups:
 }
 
 func TestBuildPlanAutogenOptionKeepsTemplateSelector(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -909,7 +909,7 @@ groups:
 }
 
 func TestBuildPlanAutogenCreatesChartForUnmatchedScalar(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -957,7 +957,7 @@ groups:
 }
 
 func TestBuildPlanAutogenUsesMetricMetadataForScalar(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1000,7 +1000,7 @@ groups:
 }
 
 func TestBuildPlanAutogenUsesMetricMetadataForHistogram(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1057,7 +1057,7 @@ groups:
 }
 
 func TestBuildPlanAutogenUsesMetricFloatMetadataForScalar(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1109,7 +1109,7 @@ groups:
 }
 
 func TestBuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1155,7 +1155,7 @@ groups:
 }
 
 func TestBuildPlanTemplatePrecedenceOverAutogen(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1211,7 +1211,7 @@ groups:
 }
 
 func TestBuildPlanAutogenStrictOverflowDrop(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
 		Enabled:      true,
 		TypeID:       "collector.job",
 		MaxTypeIDLen: 32,
@@ -1250,7 +1250,7 @@ groups:
 }
 
 func TestBuildPlanAutogenUsesFlattenMetadataForHistogramBuckets(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1319,7 +1319,7 @@ groups:
 }
 
 func TestBuildPlanAutogenCreatesChartForUnmatchedGauge(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1367,7 +1367,7 @@ groups:
 }
 
 func TestBuildPlanAutogenCreatesChartForUnmatchedStateSet(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1428,7 +1428,7 @@ groups:
 }
 
 func TestBuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1473,7 +1473,7 @@ groups:
 }
 
 func TestBuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1522,7 +1522,7 @@ groups:
 }
 
 func TestBuildPlanAutogenRemovalLifecycleExpiry(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
 		Enabled:                  true,
 		ExpireAfterSuccessCycles: 1,
 	}}))
