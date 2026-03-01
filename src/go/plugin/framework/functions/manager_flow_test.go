@@ -260,29 +260,27 @@ func TestManager_FlowScenarios(t *testing.T) {
 			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
 				mgr.workerCount = 2
 				started := make(chan struct{}, 1)
+				tx2Started := make(chan struct{}, 1)
 				release := make(chan struct{})
-				var (
-					calls   atomic.Int32
-					running atomic.Int32
-					maxSeen atomic.Int32
-				)
+				var calls atomic.Int32
 
 				mgr.Register("fn", func(fn Function) {
 					calls.Add(1)
 
-					curr := running.Add(1)
-					for {
-						prev := maxSeen.Load()
-						if curr <= prev || maxSeen.CompareAndSwap(prev, curr) {
-							break
-						}
-					}
-					defer running.Add(-1)
-
 					if fn.UID == "tx1" {
 						started <- struct{}{}
 						<-release
+						mgr.respUID(fn.UID, 200, "ok")
+						return
 					}
+
+					if fn.UID == "tx2" {
+						select {
+						case tx2Started <- struct{}{}:
+						default:
+						}
+					}
+
 					mgr.respUID(fn.UID, 200, "ok")
 				})
 
@@ -295,7 +293,19 @@ func TestManager_FlowScenarios(t *testing.T) {
 				in.ch <- functionLine("tx2", "fn")
 				// Duplicate active UID must not advance lanes or finalize tx1.
 				in.ch <- functionLine("tx1", "fn")
+
+				select {
+				case <-tx2Started:
+					t.Fatal("tx2 started before tx1 was released")
+				default:
+				}
+
 				close(release)
+				select {
+				case <-tx2Started:
+				case <-time.After(time.Second):
+					t.Fatal("tx2 did not start after tx1 was released")
+				}
 				close(in.ch)
 				waitForDone(t, done)
 
@@ -304,8 +314,6 @@ func TestManager_FlowScenarios(t *testing.T) {
 				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx2 200"))
 				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 409"))
 				assert.EqualValues(t, 2, calls.Load())
-				// Same key must remain serialized despite duplicate UID input.
-				assert.EqualValues(t, 1, maxSeen.Load())
 			},
 		},
 		"duplicate tombstoned uid is ignored without extra terminal output": {
