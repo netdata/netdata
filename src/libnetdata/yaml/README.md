@@ -274,15 +274,9 @@ The module includes comprehensive unit tests covering:
    - Round-trip conversion
 
 2. **Comprehensive tests** (`yaml-comprehensive-unittest.c`):
-   - All YAML string styles
-   - All number formats
-   - Edge cases
-   - Unicode and special characters
-   - Multiline strings
-
-3. **Comprehensive testing** (`yaml-comprehensive-unittest.c`):
-   - Large documents
-   - Deep nesting
+   - All YAML string styles and number formats
+   - Edge cases, unicode and special characters
+   - Large documents and deep nesting
    - Round-trip fidelity
 
 ## Implementation Notes
