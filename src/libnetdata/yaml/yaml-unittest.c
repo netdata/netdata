@@ -668,14 +668,16 @@ int yaml_unittest(void) {
     
     printf("\n=========================================\n");
     printf("YAML unit tests summary:\n");
-    printf("  Tests run: %d\n", passed + (failed > 0 ? 1 : 0));
+    int total = 0;
+    for (int i = 0; tests[i].name; i++) total++;
+    printf("  Tests run: %d\n", total);
     printf("  Passed: %d\n", passed);
     printf("  Failed: %d\n", failed);
     printf("=========================================\n");
-    
+
     // Run comprehensive tests
     int comprehensive_failed = yaml_comprehensive_unittest();
     failed += comprehensive_failed;
-    
+
     return failed;
 }

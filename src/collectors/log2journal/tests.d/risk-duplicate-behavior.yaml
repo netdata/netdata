@@ -43,14 +43,14 @@ rewrite:
 
 # Test duplicate keys in rename arrays (first should win)
 rename:
-  - old_key: level
+  - old_key: LEVEL
     new_key: FIRST_RENAME
-    
-  - old_key: level
+
+  - old_key: LEVEL
     new_key: SECOND_RENAME_SHOULD_NOT_APPLY
-    
-  - old_key: message
+
+  - old_key: MESSAGE
     new_key: MSG_FIRST
-    
-  - old_key: message
+
+  - old_key: MESSAGE
     new_key: MSG_SECOND_IGNORED

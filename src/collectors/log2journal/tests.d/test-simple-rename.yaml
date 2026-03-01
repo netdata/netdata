@@ -1,8 +1,7 @@
 ---
-# Simple test to prove rename is broken
+# Test rename with uppercase keys (journal_key_characters_map uppercases captured keys)
 pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
 
 rename:
-  - old_key: level
+  - old_key: LEVEL
     new_key: SEVERITY
-    # This should rename 'level' to 'SEVERITY' but doesn't work

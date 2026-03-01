@@ -54,7 +54,7 @@ inject:
 # Test complex rewrite chains
 rewrite:
   - key: CHAIN_1
-    value: "${msg}"
+    value: "${MSG}"
     inject: yes
     stop: no
     
@@ -91,7 +91,7 @@ rewrite:
 
 # Test multiple renames
 rename:
-  - old_key: msg
+  - old_key: MSG
     new_key: MESSAGE_V1
   - old_key: MESSAGE_V1
     new_key: MESSAGE_V2

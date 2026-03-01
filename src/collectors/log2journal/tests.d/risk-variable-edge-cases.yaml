@@ -24,11 +24,11 @@ inject:
     value: "${DEEP_4}"
     
   - key: DEEP_4
-    value: "Final: ${user}"
+    value: "Final: ${USER}"
     
   # Test variables with special characters
   - key: SPECIAL_VARS
-    value: "User: ${user}, Action: ${action}, Resource: ${resource}"
+    value: "User: ${USER}, Action: ${ACTION}, Resource: ${RESOURCE}"
     
   # Test undefined variable handling
   - key: UNDEFINED_TEST
@@ -44,17 +44,17 @@ inject:
 rewrite:
   # Test variables in different contexts
   - key: VAR_IN_MATCH
-    match: "${action}"
-    value: "Matched action: ${action}"
+    match: "${ACTION}"
+    value: "Matched action: ${ACTION}"
     
   # Test variables in key names (if supported)
   - key: DYNAMIC_KEY_TEST
-    value: "Dynamic key based on action: ${action}"
+    value: "Dynamic key based on action: ${ACTION}"
     inject: yes
     
   # Test complex variable combinations
   - key: COMPLEX_SUBSTITUTION
-    value: "${user} performed ${action} on ${resource} at ${UNDEFINED_TIME:-unknown_time}"
+    value: "${USER} performed ${ACTION} on ${RESOURCE} at ${UNDEFINED_TIME:-unknown_time}"
     inject: yes
     
   # Test variables with default values (if supported)
@@ -64,8 +64,8 @@ rewrite:
 
 # Test variables in rename operations  
 rename:
-  - old_key: user
+  - old_key: USER
     new_key: USERNAME
-    
-  - old_key: action
+
+  - old_key: ACTION
     new_key: USER_ACTION

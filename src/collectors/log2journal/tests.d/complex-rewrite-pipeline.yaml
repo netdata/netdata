@@ -9,11 +9,11 @@ inject:
     value: "log2journal-test"
 
 rename:
-  - old_key: level
+  - old_key: LEVEL
     new_key: LOG_LEVEL
-  - old_key: component  
+  - old_key: COMPONENT
     new_key: MODULE
-  - old_key: message
+  - old_key: MESSAGE
     new_key: MSG
 
 rewrite:
@@ -74,12 +74,12 @@ rewrite:
     
   # Stage 4: Create formatted message
   - key: FORMATTED_MSG
-    value: "[${timestamp}] ${HOSTNAME}/${APPLICATION}/${MODULE} (${LOG_LEVEL}): ${MSG}"
+    value: "[${TIMESTAMP}] ${HOSTNAME}/${APPLICATION}/${MODULE} (${LOG_LEVEL}): ${MSG}"
     inject: yes
 
 filter:
   include: "LOG_LEVEL|MODULE|MSG|FORMATTED_MSG|USERNAME|CLIENT_IP|SEVERITY"
-  exclude: "timestamp|message|component|level"
+  exclude: "TIMESTAMP|MESSAGE|COMPONENT|LEVEL"
 
 unmatched:
   key: PARSE_ERROR

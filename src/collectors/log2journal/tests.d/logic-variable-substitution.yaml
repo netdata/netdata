@@ -3,32 +3,32 @@ pattern: "(?P<user>\\w+)\\s+(?P<action>\\w+)\\s+(?P<resource>\\S+)"
 
 inject:
   - key: BASE_MSG
-    value: "User ${user} performed ${action}"
-    
+    value: "User ${USER} performed ${ACTION}"
+
   - key: FULL_MSG
-    value: "${BASE_MSG} on ${resource}"
-    
+    value: "${BASE_MSG} on ${RESOURCE}"
+
   - key: UNDEFINED_VAR
     value: "${NONEXISTENT} should be empty"
-    
+
   - key: CIRCULAR_TEST
     value: "${CIRCULAR_TEST}"  # Self-reference
-    
+
   - key: LINE_VAR
     value: "Original: ${LINE}"
 
 rewrite:
   # Test variable in match pattern
-  - key: action
+  - key: ACTION
     match: "delete"
-    value: "DANGEROUS_${action}"
-    
+    value: "DANGEROUS_${ACTION}"
+
   # Test using rewritten value
   - key: ACTION_LEVEL
-    value: "${action}"
+    value: "${ACTION}"
     inject: yes
-    
+
   # Test multiple variables
   - key: SUMMARY
-    value: "${user}:${action}:${resource}"
+    value: "${USER}:${ACTION}:${RESOURCE}"
     inject: yes

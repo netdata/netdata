@@ -1,6 +1,8 @@
-DURATION=150ms
-LEVEL=info
+MESSAGE=User list retrieved
 METHOD=GET
 PATH=/api/users
+REQUEST_ID=abc-123
+SOURCE=logfmt-parser
 STATUS=200
+STRUCTURED_MSG=method=GET path=/api/users status=200 duration=ms
 

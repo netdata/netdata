@@ -1,9 +1,8 @@
 ---
-# Simple test to prove rewrite is broken
+# Test rewrite with uppercase keys (journal_key_characters_map uppercases captured keys)
 pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
 
 rewrite:
-  - key: level
+  - key: LEVEL
     match: "ERROR"
     value: "CRITICAL"
-    # This should change ERROR to CRITICAL but doesn't work
