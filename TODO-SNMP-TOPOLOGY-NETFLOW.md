@@ -1,3 +1,9 @@
+## 0) Mandatory Install/Reinstall Order (Costa)
+- Backend first (Netdata agent + plugins): `cd ~/src/netdata-ktsaou.git && ./install.sh`
+- This also installs the default frontend.
+- Frontend second (modified UI): `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh`
+- Always run frontend installation only after backend installation completes.
+
 # YOU MUST READ THE WHOLE OF THIS TODO FILE, AND YOU MUST ALWAYS UPDATE IT WITH YOUR PROGRESS - TRY TO KEEP THE TODO FILE AT A MANAGEABLE SIZE, OVERWRITING PREVIOUSLY PENDING ITEMS WITH THEIR COMPLETION AND VERIFICATION. YOU MUST READ THE TODO IN WHOLE, AFTER EACH COMPACTION OF YOUR MEMORY.
 # Feature Analysis: SNMP Topology Map & NetFlow/IPFIX/sFlow
 
