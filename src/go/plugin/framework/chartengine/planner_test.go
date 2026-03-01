@@ -871,7 +871,7 @@ groups:
 }
 
 func TestBuildPlanAutogenOptionKeepsTemplateSelector(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -909,7 +909,7 @@ groups:
 }
 
 func TestBuildPlanAutogenCreatesChartForUnmatchedScalar(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -957,7 +957,7 @@ groups:
 }
 
 func TestBuildPlanAutogenUsesMetricMetadataForScalar(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1000,7 +1000,7 @@ groups:
 }
 
 func TestBuildPlanAutogenUsesMetricMetadataForHistogram(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1057,7 +1057,7 @@ groups:
 }
 
 func TestBuildPlanAutogenUsesMetricFloatMetadataForScalar(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1109,7 +1109,7 @@ groups:
 }
 
 func TestBuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1155,7 +1155,7 @@ groups:
 }
 
 func TestBuildPlanTemplatePrecedenceOverAutogen(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1211,11 +1211,11 @@ groups:
 }
 
 func TestBuildPlanAutogenStrictOverflowDrop(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{
 		Enabled:      true,
 		TypeID:       "collector.job",
 		MaxTypeIDLen: 32,
-	}))
+	}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1250,7 +1250,7 @@ groups:
 }
 
 func TestBuildPlanAutogenUsesFlattenMetadataForHistogramBuckets(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1319,7 +1319,7 @@ groups:
 }
 
 func TestBuildPlanAutogenCreatesChartForUnmatchedGauge(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1367,7 +1367,7 @@ groups:
 }
 
 func TestBuildPlanAutogenCreatesChartForUnmatchedStateSet(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1428,7 +1428,7 @@ groups:
 }
 
 func TestBuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1473,7 +1473,7 @@ groups:
 }
 
 func TestBuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1522,10 +1522,10 @@ groups:
 }
 
 func TestBuildPlanAutogenRemovalLifecycleExpiry(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{
 		Enabled:                  true,
 		ExpireAfterSuccessCycles: 1,
-	}))
+	}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1727,6 +1727,109 @@ groups:
 	require.Contains(t, matChart.scratchEntries, "ok")
 }
 
+func TestBuildPlanSequenceModeScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"collector mode keeps static success-seq dedupe semantics": {
+			run: func(t *testing.T) {
+				e, err := New()
+				require.NoError(t, err)
+				require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - component.load
+    charts:
+      - id: component_load
+        title: Component Load
+        context: component_load
+        units: load
+        dimensions:
+          - selector: component.load
+            name: value
+`), 1))
+
+				store := metrix.NewCollectorStore()
+				cc := mustCycleController(t, store)
+				g := store.Write().SnapshotMeter("component").Gauge("load")
+
+				cc.BeginCycle()
+				g.Observe(5)
+				cc.CommitCycleSuccess()
+
+				plan1, err := e.BuildPlan(store.Read())
+				require.NoError(t, err)
+				require.NotNil(t, findUpdateAction(plan1))
+
+				plan2, err := e.BuildPlan(store.Read())
+				require.NoError(t, err)
+				assert.Empty(t, plan2.Actions)
+			},
+		},
+		"runtime mode re-emits updates on no-write ticks and keeps scratch entries": {
+			run: func(t *testing.T) {
+				e, err := New(WithSeriesSelectionAllVisible(), WithRuntimePlannerMode())
+				require.NoError(t, err)
+				require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Runtime
+    metrics:
+      - component.load
+    charts:
+      - id: component_load
+        title: Component Load
+        context: component_load
+        units: load
+        dimensions:
+          - selector: component.load
+            name_from_label: id
+`), 1))
+
+				store := metrix.NewRuntimeStore()
+				vec := store.Write().StatefulMeter("component").Vec("id").Gauge("load")
+				vec.WithLabelValues("ok").Set(1)
+				vec.WithLabelValues("warn").Set(2)
+
+				reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
+				plan1, err := e.BuildPlan(reader)
+				require.NoError(t, err)
+				require.NotNil(t, findUpdateAction(plan1))
+
+				matChart := e.state.materialized.charts["component_load"]
+				require.NotNil(t, matChart)
+				require.Contains(t, matChart.scratchEntries, "ok")
+				require.Contains(t, matChart.scratchEntries, "warn")
+				okEntry := matChart.scratchEntries["ok"]
+				require.NotNil(t, okEntry)
+
+				plan2, err := e.BuildPlan(reader)
+				require.NoError(t, err)
+				assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(plan2.Actions))
+				require.NotNil(t, findUpdateAction(plan2))
+				metricsReader := e.RuntimeStore().Read(metrix.ReadRaw())
+				cacheHits, ok := metricsReader.Value("netdata.go.plugin.framework.chartengine.route_cache_hits_total", nil)
+				require.True(t, ok)
+				assert.GreaterOrEqual(t, cacheHits, float64(1))
+				_, fullDropsSeen := metricsReader.Value("netdata.go.plugin.framework.chartengine.route_cache_full_drops_total", nil)
+				assert.False(t, fullDropsSeen)
+
+				matChart = e.state.materialized.charts["component_load"]
+				require.NotNil(t, matChart)
+				require.Contains(t, matChart.scratchEntries, "ok")
+				require.Contains(t, matChart.scratchEntries, "warn")
+				assert.Equal(t, okEntry, matChart.scratchEntries["ok"])
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
 func TestPlannerStageBoundaries(t *testing.T) {
 	tests := map[string]func(t *testing.T){
 		"scan stage accumulates per-chart state": func(t *testing.T) {
@@ -1767,7 +1870,8 @@ groups:
 				InferredDimensions: make([]InferredDimension, 0),
 			}
 			reader := store.Read()
-			ctx, err := e.preparePlanBuildContext(reader, &out, reader.CollectMeta())
+			meta := reader.CollectMeta()
+			ctx, err := e.preparePlanBuildContext(reader, &out, meta, meta.LastSuccessSeq)
 			require.NoError(t, err)
 			require.NoError(t, e.scanPlanSeries(ctx))
 
@@ -1816,7 +1920,8 @@ groups:
 				InferredDimensions: make([]InferredDimension, 0),
 			}
 			reader := store.Read()
-			ctx, err := e.preparePlanBuildContext(reader, &out, reader.CollectMeta())
+			meta := reader.CollectMeta()
+			ctx, err := e.preparePlanBuildContext(reader, &out, meta, meta.LastSuccessSeq)
 			require.NoError(t, err)
 			require.NoError(t, e.scanPlanSeries(ctx))
 			require.NoError(t, e.materializePlanCharts(ctx))

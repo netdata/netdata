@@ -16,10 +16,13 @@ type engineState struct {
 	materialized materializedState
 	hints        plannerSizingHints
 	buildSeq     buildSeqState
-	stats        engineStats
-	runtimeStore metrix.RuntimeStore
-	runtimeStats *runtimeMetrics
-	log          *logger.Logger
+	// plannerBuildSeq is runtime-mode build-cycle sequence used only by
+	// per-build dedupe/scratch bookkeeping.
+	plannerBuildSeq uint64
+	stats           engineStats
+	runtimeStore    metrix.RuntimeStore
+	runtimeStats    *runtimeMetrics
+	log             *logger.Logger
 }
 
 type plannerSizingHints struct {

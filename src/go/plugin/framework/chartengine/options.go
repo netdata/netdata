@@ -20,6 +20,7 @@ type engineConfig struct {
 	runtimeStoreSet  bool
 	log              *logger.Logger
 	seriesSelection  seriesSelectionMode
+	runtimePlanner   bool
 }
 
 type policyOverride[T any] struct {
@@ -93,23 +94,9 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 			return fmt.Errorf("invalid engine selector: %w", err)
 		}
 		cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: autogen}
-		cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: true, value: selector}
+		cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: selector != nil, value: selector}
 		cfg.autogen = autogen
 		cfg.selector = selector
-		return nil
-	}
-}
-
-// WithAutogenPolicy configures unmatched-series autogen behavior.
-// Deprecated: prefer WithEnginePolicy.
-func WithAutogenPolicy(policy AutogenPolicy) Option {
-	return func(cfg *engineConfig) error {
-		autogen, err := normalizeAutogenPolicy(policy)
-		if err != nil {
-			return err
-		}
-		cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: autogen}
-		cfg.autogen = autogen
 		return nil
 	}
 }
@@ -138,6 +125,16 @@ func WithLogger(l *logger.Logger) Option {
 func WithSeriesSelectionAllVisible() Option {
 	return func(cfg *engineConfig) error {
 		cfg.seriesSelection = seriesSelectionAllVisible
+		return nil
+	}
+}
+
+// WithRuntimePlannerMode enables runtime/internal planner semantics for
+// build-cycle dedupe bookkeeping while keeping lifecycle/cache tied to
+// source LastSuccessSeq.
+func WithRuntimePlannerMode() Option {
+	return func(cfg *engineConfig) error {
+		cfg.runtimePlanner = true
 		return nil
 	}
 }

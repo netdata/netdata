@@ -178,7 +178,11 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				component := rs.Write().StatefulMeter("component").Counter("jobs_total")
 				component.Add(7)
 
-				observer, err := New(WithRuntimeStore(nil))
+				observer, err := New(
+					WithRuntimeStore(nil),
+					WithSeriesSelectionAllVisible(),
+					WithRuntimePlannerMode(),
+				)
 				require.NoError(t, err)
 				require.NoError(t, observer.LoadYAML([]byte(runtimeComponentTemplateYAML()), 1))
 
@@ -212,8 +216,9 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 
 				observer, err := New(
 					WithRuntimeStore(nil),
-					WithAutogenPolicy(AutogenPolicy{Enabled: true}),
+					WithEnginePolicy(EnginePolicy{Autogen: AutogenPolicy{Enabled: true}}),
 					WithSeriesSelectionAllVisible(),
+					WithRuntimePlannerMode(),
 				)
 				require.NoError(t, err)
 				require.NoError(t, observer.LoadYAML([]byte(runtimeDummyTemplateYAML()), 1))
