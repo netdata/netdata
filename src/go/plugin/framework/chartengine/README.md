@@ -39,6 +39,7 @@ For `ModuleV2` collectors, the runtime integration expects:
 | `WithRuntimeStore(...)`                             | Override/disable self-metrics store                                                                                                                                     |
 | `WithSeriesSelectionAllVisible()`                   | Process all visible series instead of filtering to latest successful collect cycle. Intended for runtime/internal stores that commit immediately (no cycle boundaries). |
 | `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks                                                                                                          |
+| `WithRuntimePlannerMode(...)`                       | Enable runtime planner mode with no-write-tick semantics, for jobs/tests that drive planning directly from runtime metrics instead of collect-cycle boundaries.        |
 
 ## End-to-End Example (Single Flow)
 
