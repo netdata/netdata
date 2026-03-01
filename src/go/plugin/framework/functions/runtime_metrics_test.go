@@ -125,6 +125,7 @@ func TestManager_RuntimeMetricsScenarios(t *testing.T) {
 				assert.GreaterOrEqual(t, runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".cancel_fallback_total", nil), float64(1))
 				assert.GreaterOrEqual(t, runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".late_terminal_dropped_total", nil), float64(1))
 				assert.GreaterOrEqual(t, runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".duplicate_uid_ignored_total", nil), float64(2))
+				assert.Equal(t, float64(5), runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".calls_total", nil))
 
 				assert.Equal(t, float64(0), runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".invocations_active", nil))
 				assert.Equal(t, float64(0), runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".invocations_awaiting_result", nil))

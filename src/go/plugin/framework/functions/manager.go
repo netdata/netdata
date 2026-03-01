@@ -176,6 +176,7 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 				m.handleCancelEvent(event)
 				continue
 			case inputEventCall:
+				m.observeFunctionCall()
 				m.dispatchInvocation(ctx, event.fn)
 			}
 		}
