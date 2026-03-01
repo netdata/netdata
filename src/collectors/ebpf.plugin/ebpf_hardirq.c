@@ -148,9 +148,18 @@ hardirq_val_t *ebpf_hardirq_get(int irq)
     if (PValue && *PValue)
         return *PValue;
 
-    PValue = JudyLIns(&ebpf_hardirq_JudyL, (Word_t)irq, PJE0);
-    if (PValue == PJERR)
+    JError_t J_Error;
+    PValue = JudyLIns(&ebpf_hardirq_JudyL, (Word_t)irq, &J_Error);
+    if (unlikely(PValue == PJERR)) {
+        netdata_log_error(
+            "Cannot insert IRQ %d to JudyL, JU_ERRNO_* == %u, ID == %d", irq, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
         return NULL;
+    }
+
+    if (unlikely(!PValue)) {
+        netdata_log_error("JudyLIns returned NULL for IRQ %d", irq);
+        return NULL;
+    }
 
     hardirq_val_t *target = callocz(1, sizeof(hardirq_val_t));
     target->irq = irq;
@@ -238,10 +247,25 @@ static void hardirq_cleanup(void *pptr)
     }
 #ifdef LIBBPF_MAJOR_VERSION
     else if (hardirq_bpf_obj) {
-        hardirq_bpf__destroy(hardirq_bpf_obj);
+        //hardirq_bpf__destroy(hardirq_bpf_obj);
         hardirq_bpf_obj = NULL;
     }
 #endif
+
+    /*
+    if (unlikely(ebpf_hardirq_JudyL)) {
+        Word_t index = 0;
+        Pvoid_t *PValue;
+        for (PValue = JudyLFirst(ebpf_hardirq_JudyL, &index, PJE0); PValue != NULL && PValue != PJERR;
+             PValue = JudyLNext(ebpf_hardirq_JudyL, &index, PJE0)) {
+            hardirq_val_t *v = *PValue;
+            if (v)
+                freez(v);
+        }
+        JudyLFreeArray(&ebpf_hardirq_JudyL, PJE0);
+        ebpf_hardirq_JudyL = NULL;
+    }
+    */
 
     for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
         ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
@@ -344,6 +368,11 @@ static int hardirq_read_latency_map(int mapfd)
             continue;
         }
 
+        if (unlikely(key.irq < 0 || key.irq >= NETDATA_HARDIRQ_MAX_IRQS)) {
+            key = next_key;
+            continue;
+        }
+
         hardirq_val_t *v = ebpf_hardirq_get(key.irq);
         if (unlikely(!v)) {
             key = next_key;
@@ -410,8 +439,10 @@ static void hardirq_read_latency_static_map(int mapfd)
  */
 static int hardirq_reader(void)
 {
+    /*
     if (hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd))
         return -1;
+        */
 
     hardirq_read_latency_static_map(hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd);
 
@@ -518,12 +549,10 @@ static inline void hardirq_write_static_dims(void)
 static void hardirq_collector(ebpf_module_t *em)
 {
     netdata_mutex_lock(&lock);
-    /*
     ebpf_create_hardirq_charts(em->update_every);
     hardirq_create_static_dims();
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-    */
     netdata_mutex_unlock(&lock);
 
     heartbeat_t hb;
@@ -539,19 +568,19 @@ static void hardirq_collector(ebpf_module_t *em)
             continue;
 
         counter = 0;
-        if (hardirq_reader())
+        if (hardirq_reader()) {
+            hardirq_safe_clean = false;
             break;
+        }
 
-        /*
         netdata_mutex_lock(&lock);
 
         ebpf_write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, "hardirq_latency", "");
-        avl_traverse_lock(&hardirq_pub, hardirq_write_dims, NULL);
+        //hardirq_write_all_dims();
         hardirq_write_static_dims();
         ebpf_write_end_chart();
 
         netdata_mutex_unlock(&lock);
-        */
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time)

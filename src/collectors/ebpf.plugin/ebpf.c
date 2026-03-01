@@ -11,6 +11,7 @@
 #include "ebpf_unittest.h"
 #include "libbpf_api/ebpf_library.h"
 #include "libnetdata/required_dummies.h"
+#include "libnetdata/libjudy/judy-malloc.h"
 
 /*****************************************************************
  *
@@ -2240,6 +2241,8 @@ int main(int argc, char **argv)
 {
     nd_log_initialize_for_external_plugins(NETDATA_EBPF_PLUGIN_NAME);
     netdata_threads_init_for_external_plugins(0);
+
+    libjudy_malloc_init();
 
     ebpf_set_global_variables();
     if (ebpf_can_plugin_load_code(running_on_kernel, NETDATA_EBPF_PLUGIN_NAME))
