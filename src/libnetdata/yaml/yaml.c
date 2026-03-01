@@ -285,7 +285,7 @@ static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_nod
     }
 }
 
-struct json_object *yaml_document_to_json(yaml_document_t *document, BUFFER *error) {
+static struct json_object *yaml_document_to_json(yaml_document_t *document, BUFFER *error) {
     yaml_node_t *root = yaml_document_get_root_node(document);
     if (!root) {
         // Empty document - this is valid YAML but we return NULL
@@ -584,7 +584,7 @@ static int yaml_add_json_to_document(yaml_document_t *document, struct json_obje
     }
 }
 
-bool json_to_yaml_document(struct json_object *json, yaml_document_t *document, BUFFER *error) {
+static bool json_to_yaml_document(struct json_object *json, yaml_document_t *document, BUFFER *error) {
     // Initialize with implicit_start=1 and implicit_end=1 to avoid "---" and "..."
     if (!yaml_document_initialize(document, NULL, NULL, NULL, 1, 1)) {
         buffer_strcat(error, "Failed to initialize YAML document");

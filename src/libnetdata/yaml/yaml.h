@@ -30,10 +30,6 @@ bool yaml_generate_to_fd(int fd, struct json_object *json, BUFFER *error);
 int yaml_unittest(void);
 int yaml_comprehensive_unittest(void);
 
-// Internal helper functions
-struct json_object *yaml_document_to_json(yaml_document_t *document, BUFFER *error);
-bool json_to_yaml_document(struct json_object *json, yaml_document_t *document, BUFFER *error);
-
 #ifdef __cplusplus
 }
 #endif

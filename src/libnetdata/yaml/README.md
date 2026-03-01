@@ -223,7 +223,7 @@ Some invalid YAML syntax may be accepted by libyaml:
 // Parse from string
 BUFFER *error = buffer_create(0, NULL);
 const char *yaml = "name: Netdata\nversion: 1.0\n";
-struct json_object *json = yaml_parse_string(yaml, error);
+struct json_object *json = yaml_parse_string(yaml, error, YAML2JSON_DEFAULT);
 
 if (buffer_strlen(error) > 0) {
     fprintf(stderr, "Parse error: %s\n", buffer_tostring(error));
@@ -280,11 +280,10 @@ The module includes comprehensive unit tests covering:
    - Unicode and special characters
    - Multiline strings
 
-3. **Stress testing** (`yaml-comprehensive-test.c`):
-   - Random YAML generation
-   - Large documents (up to 1MB)
+3. **Comprehensive testing** (`yaml-comprehensive-unittest.c`):
+   - Large documents
    - Deep nesting
-   - Memory leak detection
+   - Round-trip fidelity
 
 ## Implementation Notes
 
