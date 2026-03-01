@@ -54,9 +54,6 @@
         "enabled": {
           "type": "boolean"
         },
-        "type_id": {
-          "type": "string"
-        },
         "max_type_id_len": {
           "oneOf": [
             {

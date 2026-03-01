@@ -1251,11 +1251,13 @@ groups:
 }
 
 func runTestBuildPlanAutogenStrictOverflowDrop(t *testing.T) {
-	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
-		Enabled:      true,
-		TypeID:       "collector.job",
-		MaxTypeIDLen: 32,
-	}}))
+	e, err := New(
+		WithEmitTypeIDBudgetPrefix("collector.job"),
+		WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
+			Enabled:      true,
+			MaxTypeIDLen: 32,
+		}}),
+	)
 	require.NoError(t, err)
 
 	yaml := `

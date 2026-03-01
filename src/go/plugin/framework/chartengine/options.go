@@ -13,6 +13,7 @@ import (
 
 type engineConfig struct {
 	autogen          AutogenPolicy
+	autogenTypeID    string
 	selector         metrixselector.Selector
 	autogenOverride  policyOverride[AutogenPolicy]
 	selectorOverride policyOverride[metrixselector.Selector]
@@ -139,6 +140,15 @@ func WithSeriesSelectionAllVisible() Option {
 func WithRuntimePlannerMode() Option {
 	return func(cfg *engineConfig) error {
 		cfg.runtimePlanner = true
+		return nil
+	}
+}
+
+// WithEmitTypeIDBudgetPrefix configures chartengine autogen type-id budget
+// checks to use the effective emission type-id prefix (for example job fullName).
+func WithEmitTypeIDBudgetPrefix(typeID string) Option {
+	return func(cfg *engineConfig) error {
+		cfg.autogenTypeID = typeID
 		return nil
 	}
 }

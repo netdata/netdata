@@ -106,7 +106,6 @@ The metric name prefix is required; label-only selectors like `{label=value}` ar
 | `selector.allow`                      | array[string] | Global include selectors                                                  |
 | `selector.deny`                       | array[string] | Global exclude selectors                                                  |
 | `autogen.enabled`                     | bool          | Enable unmatched-series autogen fallback                                  |
-| `autogen.type_id`                     | string        | `type.id` prefix budget base                                              |
 | `autogen.max_type_id_len`             | int           | Max full `type.id` length (`0` = default; must be `0` or `>= 4` when set) |
 | `autogen.expire_after_success_cycles` | uint64        | Autogen lifecycle expiry                                                  |
 

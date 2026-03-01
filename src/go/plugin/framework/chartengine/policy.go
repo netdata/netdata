@@ -4,7 +4,6 @@ package chartengine
 
 import (
 	"fmt"
-	"strings"
 
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
@@ -18,7 +17,6 @@ func resolveEffectivePolicy(cfg engineConfig, templatePolicy *charttpl.Engine) (
 		if templatePolicy.Autogen != nil {
 			normalized, err := normalizeAutogenPolicy(AutogenPolicy{
 				Enabled:                  templatePolicy.Autogen.Enabled,
-				TypeID:                   strings.TrimSpace(templatePolicy.Autogen.TypeID),
 				MaxTypeIDLen:             templatePolicy.Autogen.MaxTypeIDLen,
 				ExpireAfterSuccessCycles: templatePolicy.Autogen.ExpireAfterSuccessCycles,
 			})
