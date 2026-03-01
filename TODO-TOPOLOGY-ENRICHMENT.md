@@ -1,3 +1,9 @@
+## 0) Mandatory Install/Reinstall Order (Costa)
+- Backend first (Netdata agent + plugins): `cd ~/src/netdata-ktsaou.git && ./install.sh`
+- This also installs the default frontend.
+- Frontend second (modified UI): `cd ~/src/dashboard/cloud-frontend && sudo ./agent.sh`
+- Always run frontend installation only after backend installation completes.
+
 # TODO: Topology Actor Enrichment for Network Engineering UI
 
 ## 1. TL;DR

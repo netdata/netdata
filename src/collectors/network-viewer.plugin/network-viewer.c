@@ -28,11 +28,11 @@ static SPAWN_SERVER *spawn_srv = NULL;
 
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Shows active network connections with protocol details, states, addresses, ports, and performance metrics."
-#define NETWORK_TOPOLOGY_VIEWER_FUNCTION "topology:network-viewer"
-#define NETWORK_TOPOLOGY_VIEWER_HELP "Shows live L7 topology from observed local sockets, including process and endpoint relations."
+#define NETWORK_TOPOLOGY_VIEWER_FUNCTION "topology:network-connections"
+#define NETWORK_TOPOLOGY_VIEWER_HELP "Shows live network-connections topology with self/process/endpoint actors and ownership/socket links."
 // Keep in sync with the topology schema contract used across topology producers.
 #define NETWORK_TOPOLOGY_SCHEMA_VERSION "2.0"
-#define NETWORK_TOPOLOGY_SOURCE "network-viewer"
+#define NETWORK_TOPOLOGY_SOURCE "network-connections"
 #define NETWORK_TOPOLOGY_LAYER "l7"
 
 #define NV_TOPOLOGY_USERNAME_MAX 128
@@ -68,12 +68,22 @@ typedef struct {
     uint64_t pid;
     uint64_t uid;
     uint64_t net_ns_inode;
+    char process[TASK_COMM_LEN + 1];
+} NV_ENDPOINT_OWNER;
+
+typedef struct {
+    uint64_t pid;
+    uint64_t uid;
+    uint64_t net_ns_inode;
     uint64_t sockets;
     uint64_t retransmissions;
     uint32_t max_rtt_usec;
     uint32_t max_rcv_rtt_usec;
     uint16_t local_port;
     uint16_t remote_port;
+    uint16_t peer_port;
+    uint16_t protocol_id;
+    uint8_t direction_id;
     char process[TASK_COMM_LEN + 1];
     char username[NV_TOPOLOGY_USERNAME_MAX];
     char namespace_type[16];
@@ -83,6 +93,7 @@ typedef struct {
     char state[32];
     char local_ip[INET6_ADDRSTRLEN];
     char remote_ip[INET6_ADDRSTRLEN];
+    char peer_ip[INET6_ADDRSTRLEN];
     char local_address_space[16];
     char remote_address_space[16];
     char port_name[64];
@@ -90,15 +101,34 @@ typedef struct {
 } NV_TOPOLOGY_LINK;
 
 typedef struct {
+    bool info_only;
+    bool processes_by_pid;
+    bool sockets_listening;
+    bool sockets_local;
+    bool sockets_inbound;
+    bool sockets_outbound;
+    bool protocols_ipv4_tcp;
+    bool protocols_ipv6_tcp;
+    bool protocols_ipv4_udp;
+    bool protocols_ipv6_udp;
+    bool endpoints_by_as;
+} NV_TOPOLOGY_OPTIONS;
+
+typedef struct {
     DICTIONARY *process_actors;
     DICTIONARY *remote_actors;
     DICTIONARY *local_ips;
+    DICTIONARY *endpoint_owners_exact;
+    DICTIONARY *endpoint_owners_exact_any_ns;
+    DICTIONARY *endpoint_owners_service;
+    DICTIONARY *endpoint_owners_service_any_ns;
     DICTIONARY *links;
     usec_t now_ut;
     uint64_t sockets_total;
     uint64_t skipped_sockets;
     char hostname[256];
     char machine_guid[128];
+    NV_TOPOLOGY_OPTIONS options;
 } NV_TOPOLOGY_CONTEXT;
 
 #define SIMPLE_HASHTABLE_VALUE_TYPE LOCAL_SOCKET *
@@ -163,6 +193,149 @@ static inline const char *network_viewer_machine_guid(void) {
     return (guid && *guid) ? guid : NULL;
 }
 
+static inline void topology_options_defaults(NV_TOPOLOGY_OPTIONS *opts) {
+    if(!opts)
+        return;
+
+    memset(opts, 0, sizeof(*opts));
+    opts->processes_by_pid = false; // default: by_name
+    opts->sockets_listening = false;
+    opts->sockets_local = false;
+    opts->sockets_inbound = true;
+    opts->sockets_outbound = true;
+    opts->protocols_ipv4_tcp = true;
+    opts->protocols_ipv6_tcp = true;
+    opts->protocols_ipv4_udp = true;
+    opts->protocols_ipv6_udp = true;
+    opts->endpoints_by_as = true; // default: by_as
+}
+
+static inline bool topology_sockets_any_enabled(const NV_TOPOLOGY_OPTIONS *opts) {
+    if(!opts)
+        return false;
+
+    return (opts->sockets_listening ||
+            opts->sockets_local ||
+            opts->sockets_inbound ||
+            opts->sockets_outbound);
+}
+
+static inline bool topology_protocols_any_enabled(const NV_TOPOLOGY_OPTIONS *opts) {
+    if(!opts)
+        return false;
+
+    return (opts->protocols_ipv4_tcp ||
+            opts->protocols_ipv6_tcp ||
+            opts->protocols_ipv4_udp ||
+            opts->protocols_ipv6_udp);
+}
+
+static inline bool topology_endpoint_address_space_is_private(const char *address_space) {
+    if(!address_space || !*address_space)
+        return false;
+
+    return (strcmp(address_space, "private") == 0 ||
+            strcmp(address_space, "loopback") == 0 ||
+            strcmp(address_space, "zero") == 0);
+}
+
+static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *opts) {
+    topology_options_defaults(opts);
+    if(!function || !*function || !opts)
+        return;
+
+    bool protocols_selected_explicitly = false;
+    bool sockets_selected_explicitly = false;
+
+    char *function_copy = strdupz(function);
+    char *words[1024];
+    size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
+    for(size_t i = 1; i < num_words; i++) {
+        char *param = get_word(words, num_words, i);
+        if(!param || !*param)
+            continue;
+
+        if(strcmp(param, "info") == 0) {
+            opts->info_only = true;
+            continue;
+        }
+
+        if(strcmp(param, "processes:by_name") == 0 || strcmp(param, "processes:by-name") == 0) {
+            opts->processes_by_pid = false;
+            continue;
+        }
+        if(strcmp(param, "processes:by_pid") == 0 || strcmp(param, "processes:by-pid") == 0) {
+            opts->processes_by_pid = true;
+            continue;
+        }
+
+        if(strcmp(param, "endpoints:by_as") == 0 || strcmp(param, "endpoints:by-as") == 0) {
+            opts->endpoints_by_as = true;
+            continue;
+        }
+        if(strcmp(param, "endpoints:by_ip") == 0 || strcmp(param, "endpoints:by-ip") == 0) {
+            opts->endpoints_by_as = false;
+            continue;
+        }
+
+        if(strncmp(param, "sockets:", 8) == 0) {
+            if(!sockets_selected_explicitly) {
+                opts->sockets_listening = false;
+                opts->sockets_local = false;
+                opts->sockets_inbound = false;
+                opts->sockets_outbound = false;
+                sockets_selected_explicitly = true;
+            }
+
+            const char *socket_kind = &param[8];
+            if(strcmp(socket_kind, "listening") == 0)
+                opts->sockets_listening = true;
+            else if(strcmp(socket_kind, "local") == 0)
+                opts->sockets_local = true;
+            else if(strcmp(socket_kind, "inbound") == 0)
+                opts->sockets_inbound = true;
+            else if(strcmp(socket_kind, "outbound") == 0)
+                opts->sockets_outbound = true;
+            continue;
+        }
+
+        if(strncmp(param, "protocols:", 10) == 0) {
+            if(!protocols_selected_explicitly) {
+                opts->protocols_ipv4_tcp = false;
+                opts->protocols_ipv6_tcp = false;
+                opts->protocols_ipv4_udp = false;
+                opts->protocols_ipv6_udp = false;
+                protocols_selected_explicitly = true;
+            }
+
+            const char *protocol = &param[10];
+            if(strcmp(protocol, "ipv4_tcp") == 0 || strcmp(protocol, "ipv4-tcp") == 0)
+                opts->protocols_ipv4_tcp = true;
+            else if(strcmp(protocol, "ipv6_tcp") == 0 || strcmp(protocol, "ipv6-tcp") == 0)
+                opts->protocols_ipv6_tcp = true;
+            else if(strcmp(protocol, "ipv4_udp") == 0 || strcmp(protocol, "ipv4-udp") == 0)
+                opts->protocols_ipv4_udp = true;
+            else if(strcmp(protocol, "ipv6_udp") == 0 || strcmp(protocol, "ipv6-udp") == 0)
+                opts->protocols_ipv6_udp = true;
+        }
+    }
+    freez(function_copy);
+
+    if(!topology_sockets_any_enabled(opts)) {
+        opts->sockets_listening = false;
+        opts->sockets_local = false;
+        opts->sockets_inbound = true;
+        opts->sockets_outbound = true;
+    }
+
+    if(!topology_protocols_any_enabled(opts)) {
+        opts->protocols_ipv4_tcp = true;
+        opts->protocols_ipv6_tcp = true;
+        opts->protocols_ipv4_udp = true;
+        opts->protocols_ipv6_udp = true;
+    }
+}
+
 static inline const char *socket_protocol_name(uint16_t protocol) {
     return (protocol == IPPROTO_UDP) ? "udp" : "tcp";
 }
@@ -195,6 +368,47 @@ static bool socket_endpoint_to_ip_text(const struct socket_endpoint *ep, char *d
     return false;
 }
 
+static inline bool topology_ip_is_unspecified(const char *ip) {
+    if(!ip || !*ip)
+        return true;
+
+    return (strcmp(ip, "*") == 0 || strcmp(ip, "0.0.0.0") == 0 || strcmp(ip, "::") == 0);
+}
+
+static inline bool topology_ip_is_self_range(const char *ip) {
+    if(!ip || !*ip)
+        return false;
+
+    if(strncmp(ip, "127.", 4) == 0)
+        return true;
+    if(strncmp(ip, "0.", 2) == 0)
+        return true;
+    if(strcmp(ip, "::1") == 0)
+        return true;
+    if(strncmp(ip, "::ffff:127.", 10) == 0)
+        return true;
+
+    return false;
+}
+
+static inline bool topology_ip_belongs_to_self(const NV_TOPOLOGY_CONTEXT *ctx, const char *ip, const char *address_space) {
+    if(topology_ip_is_unspecified(ip))
+        return true;
+
+    if(topology_ip_is_self_range(ip))
+        return true;
+
+    if(address_space && *address_space) {
+        if(strcmp(address_space, "loopback") == 0 || strcmp(address_space, "zero") == 0)
+            return true;
+    }
+
+    if(ctx && ctx->local_ips && ip && *ip && dictionary_get(ctx->local_ips, ip))
+        return true;
+
+    return false;
+}
+
 static void topology_add_single_item_string_array(BUFFER *wb, const char *key, const char *value) {
     if(!value || !*value)
         return;
@@ -212,13 +426,142 @@ static void topology_add_single_item_string_array(BUFFER *wb, const char *key, c
 static void topology_add_process_match(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx, const NV_PROCESS_ACTOR *pa) {
     buffer_json_member_add_object(wb, "match");
     {
-        if(ctx->machine_guid[0])
-            buffer_json_member_add_string(wb, "netdata_machine_guid", ctx->machine_guid);
-
-        topology_add_single_item_string_array(wb, "hostnames", ctx->hostname);
-        topology_add_single_item_string_array(wb, "ip_addresses", pa->local_ip);
+        buffer_json_member_add_string(wb, "process_name", pa->process);
+        if(ctx && ctx->options.processes_by_pid) {
+            buffer_json_member_add_uint64(wb, "pid", pa->pid);
+            buffer_json_member_add_uint64(wb, "uid", pa->uid);
+            buffer_json_member_add_uint64(wb, "net_ns_inode", pa->net_ns_inode);
+        }
     }
     buffer_json_object_close(wb);
+}
+
+static void topology_add_process_identity_match(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx, uint64_t pid, uint64_t uid, uint64_t net_ns_inode, const char *process_name) {
+    buffer_json_member_add_object(wb, "match");
+    {
+        buffer_json_member_add_string(wb, "process_name", process_name && *process_name ? process_name : "[unknown]");
+        if(ctx && ctx->options.processes_by_pid) {
+            buffer_json_member_add_uint64(wb, "pid", pid);
+            buffer_json_member_add_uint64(wb, "uid", uid);
+            buffer_json_member_add_uint64(wb, "net_ns_inode", net_ns_inode);
+        }
+    }
+    buffer_json_object_close(wb);
+}
+
+static void topology_endpoint_owner_exact_key(char *dst, size_t dst_size, uint64_t net_ns_inode, uint16_t protocol, const char *ip, uint16_t port, bool include_ns) {
+    if(!dst || !dst_size)
+        return;
+
+    if(include_ns)
+        snprintf(dst, dst_size, "ns=%llu|proto=%u|ip=%s|port=%u",
+                 (unsigned long long)net_ns_inode, (unsigned)protocol, ip, (unsigned)port);
+    else
+        snprintf(dst, dst_size, "proto=%u|ip=%s|port=%u", (unsigned)protocol, ip, (unsigned)port);
+}
+
+static void topology_endpoint_owner_service_key(char *dst, size_t dst_size, uint64_t net_ns_inode, uint16_t protocol, uint16_t port, bool include_ns) {
+    if(!dst || !dst_size)
+        return;
+
+    if(include_ns)
+        snprintf(dst, dst_size, "ns=%llu|proto=%u|port=%u",
+                 (unsigned long long)net_ns_inode, (unsigned)protocol, (unsigned)port);
+    else
+        snprintf(dst, dst_size, "proto=%u|port=%u", (unsigned)protocol, (unsigned)port);
+}
+
+static void topology_register_endpoint_owner(
+    NV_TOPOLOGY_CONTEXT *ctx,
+    uint64_t net_ns_inode,
+    uint16_t protocol,
+    const char *ip,
+    uint16_t port,
+    const NV_PROCESS_ACTOR *pa,
+    bool service_candidate
+) {
+    if(!ctx || !pa || !port)
+        return;
+
+    NV_ENDPOINT_OWNER owner = {
+        .pid = pa->pid,
+        .uid = pa->uid,
+        .net_ns_inode = pa->net_ns_inode,
+    };
+    snprintf(owner.process, sizeof(owner.process), "%s", pa->process);
+
+    char key[NV_TOPOLOGY_KEY_MAX];
+    if(ip && *ip && strcmp(ip, "*") != 0) {
+        if(ctx->endpoint_owners_exact) {
+            topology_endpoint_owner_exact_key(key, sizeof(key), net_ns_inode, protocol, ip, port, true);
+            dictionary_set(ctx->endpoint_owners_exact, key, &owner, sizeof(owner));
+        }
+        if(ctx->endpoint_owners_exact_any_ns) {
+            topology_endpoint_owner_exact_key(key, sizeof(key), 0, protocol, ip, port, false);
+            dictionary_set(ctx->endpoint_owners_exact_any_ns, key, &owner, sizeof(owner));
+        }
+    }
+
+    if(service_candidate) {
+        if(ctx->endpoint_owners_service) {
+            topology_endpoint_owner_service_key(key, sizeof(key), net_ns_inode, protocol, port, true);
+            dictionary_set(ctx->endpoint_owners_service, key, &owner, sizeof(owner));
+        }
+        if(ctx->endpoint_owners_service_any_ns) {
+            topology_endpoint_owner_service_key(key, sizeof(key), 0, protocol, port, false);
+            dictionary_set(ctx->endpoint_owners_service_any_ns, key, &owner, sizeof(owner));
+        }
+    }
+}
+
+static NV_ENDPOINT_OWNER *topology_lookup_endpoint_owner(
+    const NV_TOPOLOGY_CONTEXT *ctx,
+    uint64_t net_ns_inode,
+    uint16_t protocol,
+    const char *ip,
+    uint16_t port,
+    bool allow_service_fallback
+) {
+    if(!ctx || !port)
+        return NULL;
+
+    char key[NV_TOPOLOGY_KEY_MAX];
+    NV_ENDPOINT_OWNER *owner = NULL;
+
+    if(ip && *ip && strcmp(ip, "*") != 0) {
+        if(ctx->endpoint_owners_exact) {
+            topology_endpoint_owner_exact_key(key, sizeof(key), net_ns_inode, protocol, ip, port, true);
+            owner = dictionary_get(ctx->endpoint_owners_exact, key);
+            if(owner)
+                return owner;
+        }
+
+        if(ctx->endpoint_owners_exact_any_ns) {
+            topology_endpoint_owner_exact_key(key, sizeof(key), 0, protocol, ip, port, false);
+            owner = dictionary_get(ctx->endpoint_owners_exact_any_ns, key);
+            if(owner)
+                return owner;
+        }
+    }
+
+    if(!allow_service_fallback)
+        return NULL;
+
+    if(ctx->endpoint_owners_service) {
+        topology_endpoint_owner_service_key(key, sizeof(key), net_ns_inode, protocol, port, true);
+        owner = dictionary_get(ctx->endpoint_owners_service, key);
+        if(owner)
+            return owner;
+    }
+
+    if(ctx->endpoint_owners_service_any_ns) {
+        topology_endpoint_owner_service_key(key, sizeof(key), 0, protocol, port, false);
+        owner = dictionary_get(ctx->endpoint_owners_service_any_ns, key);
+        if(owner)
+            return owner;
+    }
+
+    return NULL;
 }
 
 static void topology_add_host_match(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) {
@@ -233,6 +576,7 @@ static void topology_add_host_match(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx) 
             NV_LOCAL_IP *lip;
             dfe_start_read(ctx->local_ips, lip) {
                 if(!lip->ip[0]) continue;
+                if(topology_ip_is_unspecified(lip->ip)) continue;
                 buffer_json_add_array_item_string(wb, lip->ip);
             }
             dfe_done(lip);
@@ -248,6 +592,79 @@ static void topology_add_remote_match(BUFFER *wb, const char *ip) {
         topology_add_single_item_string_array(wb, "ip_addresses", ip);
     }
     buffer_json_object_close(wb);
+}
+
+static void topology_actor_id_for_host(const NV_TOPOLOGY_CONTEXT *ctx, char *dst, size_t dst_size) {
+    if(!dst || !dst_size)
+        return;
+
+    if(ctx && ctx->machine_guid[0])
+        snprintf(dst, dst_size, "netdata-machine-guid:%s", ctx->machine_guid);
+    else if(ctx && ctx->hostname[0])
+        snprintf(dst, dst_size, "hostname:%s", ctx->hostname);
+    else
+        snprintf(dst, dst_size, "host:unknown");
+}
+
+static void topology_actor_id_for_process(
+    const NV_TOPOLOGY_CONTEXT *ctx,
+    uint64_t pid,
+    uint64_t uid,
+    uint64_t net_ns_inode,
+    const char *process,
+    char *dst,
+    size_t dst_size
+) {
+    if(!dst || !dst_size)
+        return;
+
+    const char *node_identity = (ctx && ctx->machine_guid[0]) ? ctx->machine_guid : (ctx && ctx->hostname[0] ? ctx->hostname : "unknown");
+    const char *safe_process = (process && *process) ? process : "[unknown]";
+    if(ctx && !ctx->options.processes_by_pid) {
+        snprintf(dst, dst_size, "process:%s|comm=%s", node_identity, safe_process);
+    }
+    else {
+        snprintf(dst, dst_size, "process:%s|pid=%llu|uid=%llu|ns=%llu|comm=%s",
+                 node_identity,
+                 (unsigned long long)pid,
+                 (unsigned long long)uid,
+                 (unsigned long long)net_ns_inode,
+                 safe_process);
+    }
+}
+
+static void topology_actor_id_for_remote_endpoint(const NV_TOPOLOGY_CONTEXT *ctx, const char *ip, const char *address_space, char *dst, size_t dst_size) {
+    if(!dst || !dst_size)
+        return;
+
+    bool private_endpoint = topology_endpoint_address_space_is_private(address_space);
+    bool endpoint_by_as = (ctx && ctx->options.endpoints_by_as);
+
+    // AS grouping is intentionally staged with the shared IP->AS resolver rollout.
+    // Until AS data is available in this plugin, fall back to IP identity for non-private endpoints too.
+    (void)private_endpoint;
+    (void)endpoint_by_as;
+    if(ip && *ip)
+        snprintf(dst, dst_size, "ip:%s", ip);
+    else
+        snprintf(dst, dst_size, "ip:unknown");
+}
+
+static void topology_process_display_name(
+    const NV_TOPOLOGY_CONTEXT *ctx,
+    const char *process_name,
+    uint64_t pid,
+    char *dst,
+    size_t dst_size
+) {
+    if(!dst || !dst_size)
+        return;
+
+    const char *safe_process = (process_name && *process_name) ? process_name : "[unknown]";
+    if(ctx && !ctx->options.processes_by_pid)
+        snprintf(dst, dst_size, "%s", safe_process);
+    else
+        snprintf(dst, dst_size, "%s[%llu]", safe_process, (unsigned long long)pid);
 }
 
 static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOCKET *n, uint64_t proc_self_net_ns_inode, bool aggregated) {
@@ -579,14 +996,17 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
 
     char local_ip[INET6_ADDRSTRLEN] = "";
     char remote_ip[INET6_ADDRSTRLEN] = "";
+    char remote_peer_ip[INET6_ADDRSTRLEN] = "";
 
     if(is_local_socket_ipv46(n))
         strncpyz(local_ip, "*", sizeof(local_ip) - 1);
     else if(!socket_endpoint_to_ip_text(&n->local, local_ip))
         return;
 
-    if(!local_sockets_is_zero_address(&n->remote))
+    if(!local_sockets_is_zero_address(&n->remote)) {
         socket_endpoint_to_ip_text(&n->remote, remote_ip);
+        snprintf(remote_peer_ip, sizeof(remote_peer_ip), "%s", remote_ip);
+    }
 
     const char *namespace_type;
     if(n->net_ns_inode == ls->proc_self_net_ns_inode)
@@ -610,7 +1030,7 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         cached_username_release(cu);
     }
 
-    if(local_ip[0] && strcmp(local_ip, "*") != 0) {
+    if(local_ip[0] && !topology_ip_is_unspecified(local_ip)) {
         NV_LOCAL_IP *local_actor = dictionary_get(ctx->local_ips, local_ip);
         if(!local_actor) {
             NV_LOCAL_IP tmp = { 0 };
@@ -622,12 +1042,16 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
     }
 
     char process_key[NV_TOPOLOGY_KEY_MAX];
-    snprintf(process_key, sizeof(process_key), "pid=%d|uid=%u|ns=%llu|comm=%s|local=%s",
-             n->pid,
-             (unsigned)n->uid,
-             (unsigned long long)n->net_ns_inode,
-             process_name,
-             local_ip);
+    if(ctx->options.processes_by_pid) {
+        snprintf(process_key, sizeof(process_key), "pid=%d|uid=%u|ns=%llu|comm=%s",
+                 n->pid,
+                 (unsigned)n->uid,
+                 (unsigned long long)n->net_ns_inode,
+                 process_name);
+    }
+    else {
+        snprintf(process_key, sizeof(process_key), "comm=%s", process_name);
+    }
 
     NV_PROCESS_ACTOR *pa = dictionary_get(ctx->process_actors, process_key);
     if(!pa) {
@@ -645,32 +1069,61 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         pa = dictionary_set(ctx->process_actors, process_key, &tmp, sizeof(tmp));
     }
     pa->sockets++;
+    if((!pa->local_ip[0] || topology_ip_is_unspecified(pa->local_ip)) && local_ip[0] && !topology_ip_is_unspecified(local_ip))
+        snprintf(pa->local_ip, sizeof(pa->local_ip), "%s", local_ip);
+
+    bool service_candidate = (n->direction == SOCKET_DIRECTION_LISTEN ||
+                              n->direction == SOCKET_DIRECTION_INBOUND ||
+                              n->direction == SOCKET_DIRECTION_LOCAL_INBOUND);
+    topology_register_endpoint_owner(ctx, n->net_ns_inode, n->local.protocol, local_ip, n->local.port, pa, service_candidate);
 
     if(!remote_ip[0]) {
+        if(n->direction == SOCKET_DIRECTION_LISTEN || n->direction == SOCKET_DIRECTION_LOCAL_INBOUND) {
+            if(strcmp(local_ip, "*") == 0 || local_sockets_is_zero_address(&n->local)) {
+                ctx->skipped_sockets++;
+                return;
+            }
+            snprintf(remote_ip, sizeof(remote_ip), "%s", local_ip);
+            remote_address_space = local_address_space;
+        }
+        else {
+            ctx->skipped_sockets++;
+            return;
+        }
+    }
+
+    if(topology_ip_is_unspecified(remote_ip)) {
         ctx->skipped_sockets++;
         return;
     }
 
-    NV_REMOTE_ACTOR *ra = dictionary_get(ctx->remote_actors, remote_ip);
-    if(!ra) {
-        NV_REMOTE_ACTOR tmp = { 0 };
-        snprintf(tmp.ip, sizeof(tmp.ip), "%s", remote_ip);
-        snprintf(tmp.address_space, sizeof(tmp.address_space), "%s", remote_address_space);
-        ra = dictionary_set(ctx->remote_actors, remote_ip, &tmp, sizeof(tmp));
+    if(!topology_ip_belongs_to_self(ctx, remote_ip, remote_address_space)) {
+        char endpoint_actor_key[NV_TOPOLOGY_KEY_MAX];
+        topology_actor_id_for_remote_endpoint(ctx, remote_ip, remote_address_space, endpoint_actor_key, sizeof(endpoint_actor_key));
+        NV_REMOTE_ACTOR *ra = dictionary_get(ctx->remote_actors, endpoint_actor_key);
+        if(!ra) {
+            NV_REMOTE_ACTOR tmp = { 0 };
+            snprintf(tmp.ip, sizeof(tmp.ip), "%s", remote_ip);
+            snprintf(tmp.address_space, sizeof(tmp.address_space), "%s", remote_address_space);
+            ra = dictionary_set(ctx->remote_actors, endpoint_actor_key, &tmp, sizeof(tmp));
+        }
+        ra->sockets++;
     }
-    ra->sockets++;
 
     const struct socket_endpoint *server_endpoint = NULL;
+    uint16_t endpoint_port = n->remote.port;
     switch(n->direction) {
         case SOCKET_DIRECTION_LISTEN:
         case SOCKET_DIRECTION_INBOUND:
         case SOCKET_DIRECTION_LOCAL_INBOUND:
             server_endpoint = &n->local;
+            endpoint_port = n->local.port;
             break;
 
         case SOCKET_DIRECTION_OUTBOUND:
         case SOCKET_DIRECTION_LOCAL_OUTBOUND:
             server_endpoint = &n->remote;
+            endpoint_port = n->remote.port;
             break;
 
         default:
@@ -696,7 +1149,7 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
              (unsigned)n->direction,
              (unsigned)n->state,
              n->local.port,
-             n->remote.port);
+             endpoint_port);
 
     NV_TOPOLOGY_LINK *link = dictionary_get(ctx->links, link_key);
     if(!link) {
@@ -705,7 +1158,10 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         tmp.uid = n->uid;
         tmp.net_ns_inode = n->net_ns_inode;
         tmp.local_port = n->local.port;
-        tmp.remote_port = n->remote.port;
+        tmp.remote_port = endpoint_port;
+        tmp.peer_port = n->remote.port;
+        tmp.protocol_id = n->local.protocol;
+        tmp.direction_id = (uint8_t)n->direction;
         snprintf(tmp.process, sizeof(tmp.process), "%s", process_name);
         snprintf(tmp.username, sizeof(tmp.username), "%s", username);
         snprintf(tmp.namespace_type, sizeof(tmp.namespace_type), "%s", namespace_type);
@@ -716,6 +1172,7 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
                  n->local.protocol == IPPROTO_TCP ? TCP_STATE_2str(n->state) : "stateless");
         snprintf(tmp.local_ip, sizeof(tmp.local_ip), "%s", local_ip);
         snprintf(tmp.remote_ip, sizeof(tmp.remote_ip), "%s", remote_ip);
+        snprintf(tmp.peer_ip, sizeof(tmp.peer_ip), "%s", remote_peer_ip);
         snprintf(tmp.local_address_space, sizeof(tmp.local_address_space), "%s", local_address_space);
         snprintf(tmp.remote_address_space, sizeof(tmp.remote_address_space), "%s", remote_address_space);
         snprintf(tmp.port_name, sizeof(tmp.port_name), "%s", port_name);
@@ -739,7 +1196,8 @@ static void network_viewer_topology_function(
 
     time_t now_s = now_realtime_sec();
     usec_t now_ut = now_realtime_usec();
-    bool info_only = false;
+    NV_TOPOLOGY_OPTIONS options = { 0 };
+    topology_parse_options(function, &options);
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
@@ -752,33 +1210,170 @@ static void network_viewer_topology_function(
     buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", NETWORK_TOPOLOGY_VIEWER_HELP);
     buffer_json_member_add_array(wb, "accepted_params");
-    buffer_json_array_close(wb);
-    buffer_json_member_add_array(wb, "required_params");
-    buffer_json_array_close(wb);
-
-    char function_copy[strlen(function) + 1];
-    memcpy(function_copy, function, sizeof(function_copy));
-    char *words[1024];
-    size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
-    for(size_t i = 1; i < num_words ;i++) {
-        char *param = get_word(words, num_words, i);
-        if(strcmp(param, "info") == 0) {
-            info_only = true;
-            break;
-        }
+    {
+        buffer_json_add_array_item_string(wb, "processes");
+        buffer_json_add_array_item_string(wb, "sockets");
+        buffer_json_add_array_item_string(wb, "protocols");
+        buffer_json_add_array_item_string(wb, "endpoints");
     }
+    buffer_json_array_close(wb); // accepted_params
+    buffer_json_member_add_array(wb, "required_params");
+    {
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_string(wb, "id", "processes");
+            buffer_json_member_add_string(wb, "name", "Processes");
+            buffer_json_member_add_string(wb, "help", "Group process actors by process name or by PID.");
+            buffer_json_member_add_boolean(wb, "unique_view", true);
+            buffer_json_member_add_string(wb, "type", "select");
+            buffer_json_member_add_array(wb, "options");
+            {
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "by_name");
+                    buffer_json_member_add_string(wb, "name", "Processes by Name");
+                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
+                }
+                buffer_json_object_close(wb);
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "by_pid");
+                    buffer_json_member_add_string(wb, "name", "Processes by PID");
+                }
+                buffer_json_object_close(wb);
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_string(wb, "id", "sockets");
+            buffer_json_member_add_string(wb, "name", "Sockets");
+            buffer_json_member_add_string(wb, "help", "Select one or more socket directions.");
+            buffer_json_member_add_string(wb, "type", "multiselect");
+            buffer_json_member_add_array(wb, "options");
+            {
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "listening");
+                    buffer_json_member_add_string(wb, "name", "Listening");
+                }
+                buffer_json_object_close(wb);
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "local");
+                    buffer_json_member_add_string(wb, "name", "Local");
+                }
+                buffer_json_object_close(wb);
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "inbound");
+                    buffer_json_member_add_string(wb, "name", "Inbound");
+                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
+                }
+                buffer_json_object_close(wb);
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "outbound");
+                    buffer_json_member_add_string(wb, "name", "Outbound");
+                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
+                }
+                buffer_json_object_close(wb);
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_string(wb, "id", "protocols");
+            buffer_json_member_add_string(wb, "name", "Protocols");
+            buffer_json_member_add_string(wb, "help", "Select one or more socket protocol families.");
+            buffer_json_member_add_string(wb, "type", "multiselect");
+            buffer_json_member_add_array(wb, "options");
+            {
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "ipv4_tcp");
+                    buffer_json_member_add_string(wb, "name", "IPv4 TCP");
+                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
+                }
+                buffer_json_object_close(wb);
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "ipv6_tcp");
+                    buffer_json_member_add_string(wb, "name", "IPv6 TCP");
+                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
+                }
+                buffer_json_object_close(wb);
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "ipv4_udp");
+                    buffer_json_member_add_string(wb, "name", "IPv4 UDP");
+                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
+                }
+                buffer_json_object_close(wb);
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "ipv6_udp");
+                    buffer_json_member_add_string(wb, "name", "IPv6 UDP");
+                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
+                }
+                buffer_json_object_close(wb);
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_add_array_item_object(wb);
+        {
+            buffer_json_member_add_string(wb, "id", "endpoints");
+            buffer_json_member_add_string(wb, "name", "Endpoints");
+            buffer_json_member_add_string(wb, "help", "Group non-private endpoints by AS or keep endpoints by IP.");
+            buffer_json_member_add_boolean(wb, "unique_view", true);
+            buffer_json_member_add_string(wb, "type", "select");
+            buffer_json_member_add_array(wb, "options");
+            {
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "by_as");
+                    buffer_json_member_add_string(wb, "name", "Non-Private Endpoints by AS");
+                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
+                }
+                buffer_json_object_close(wb);
+                buffer_json_add_array_item_object(wb);
+                {
+                    buffer_json_member_add_string(wb, "id", "by_ip");
+                    buffer_json_member_add_string(wb, "name", "Non-Private Endpoints by IP");
+                }
+                buffer_json_object_close(wb);
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_array_close(wb); // required_params
 
     NV_TOPOLOGY_CONTEXT ctx = {
         .now_ut = now_ut,
+        .options = options,
     };
 
-    if(!info_only) {
+    if(!ctx.options.info_only) {
         ctx.process_actors = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_PROCESS_ACTOR));
         ctx.remote_actors = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_REMOTE_ACTOR));
         ctx.local_ips = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_LOCAL_IP));
+        ctx.endpoint_owners_exact = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_ENDPOINT_OWNER));
+        ctx.endpoint_owners_exact_any_ns = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_ENDPOINT_OWNER));
+        ctx.endpoint_owners_service = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_ENDPOINT_OWNER));
+        ctx.endpoint_owners_service_any_ns = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_ENDPOINT_OWNER));
         ctx.links = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(NV_TOPOLOGY_LINK));
 
-        if(ctx.process_actors && ctx.remote_actors && ctx.local_ips && ctx.links) {
+        if(ctx.process_actors && ctx.remote_actors && ctx.local_ips &&
+           ctx.endpoint_owners_exact && ctx.endpoint_owners_exact_any_ns &&
+           ctx.endpoint_owners_service && ctx.endpoint_owners_service_any_ns &&
+           ctx.links) {
             if(!os_hostname(ctx.hostname, sizeof(ctx.hostname), netdata_configured_host_prefix))
                 snprintf(ctx.hostname, sizeof(ctx.hostname), "%s", "localhost");
 
@@ -788,14 +1383,14 @@ static void network_viewer_topology_function(
 
             LS_STATE ls = {
                 .config = {
-                    .listening = true,
-                    .inbound = true,
-                    .outbound = true,
-                    .local = true,
-                    .tcp4 = true,
-                    .tcp6 = true,
-                    .udp4 = true,
-                    .udp6 = true,
+                    .listening = ctx.options.sockets_listening,
+                    .local = ctx.options.sockets_local,
+                    .inbound = ctx.options.sockets_inbound,
+                    .outbound = ctx.options.sockets_outbound,
+                    .tcp4 = ctx.options.protocols_ipv4_tcp,
+                    .tcp6 = ctx.options.protocols_ipv6_tcp,
+                    .udp4 = ctx.options.protocols_ipv4_udp,
+                    .udp6 = ctx.options.protocols_ipv6_udp,
                     .pid = true,
                     .uid = true,
                     .cmdline = true,
@@ -821,9 +1416,12 @@ static void network_viewer_topology_function(
             buffer_json_member_add_object(wb, "data");
             {
                 size_t process_actor_count = dictionary_entries(ctx.process_actors);
-                size_t remote_actor_count = dictionary_entries(ctx.remote_actors);
-                size_t link_count = dictionary_entries(ctx.links);
+                size_t socket_link_count = dictionary_entries(ctx.links);
                 size_t local_ip_count = dictionary_entries(ctx.local_ips);
+                size_t endpoint_actor_count = 0;
+                size_t ownership_link_count = 0;
+                char host_actor_id[NV_TOPOLOGY_KEY_MAX];
+                topology_actor_id_for_host(&ctx, host_actor_id, sizeof(host_actor_id));
 
                 buffer_json_member_add_string(wb, "schema_version", NETWORK_TOPOLOGY_SCHEMA_VERSION);
                 buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
@@ -835,8 +1433,9 @@ static void network_viewer_topology_function(
                 {
                     buffer_json_add_array_item_object(wb);
                     {
-                        buffer_json_member_add_string(wb, "actor_type", "host");
-                        buffer_json_member_add_string(wb, "layer", "l3");
+                        buffer_json_member_add_string(wb, "actor_id", host_actor_id);
+                        buffer_json_member_add_string(wb, "actor_type", "self");
+                        buffer_json_member_add_string(wb, "layer", NETWORK_TOPOLOGY_LAYER);
                         buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
                         topology_add_host_match(wb, &ctx);
 
@@ -845,6 +1444,8 @@ static void network_viewer_topology_function(
                             buffer_json_member_add_string(wb, "hostname", ctx.hostname);
                             buffer_json_member_add_uint64(wb, "local_ip_count", local_ip_count);
                             buffer_json_member_add_uint64(wb, "observed_sockets", ctx.sockets_total);
+                            buffer_json_member_add_string(wb, "display_name", ctx.hostname);
+                            buffer_json_member_add_string(wb, "actor_class", "self");
                         }
                         buffer_json_object_close(wb);
 
@@ -854,6 +1455,8 @@ static void network_viewer_topology_function(
                             if(ctx.machine_guid[0])
                                 buffer_json_member_add_string(wb, "machine_guid", ctx.machine_guid);
                             buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
+                            buffer_json_member_add_string(wb, "display_name", ctx.hostname);
+                            buffer_json_member_add_string(wb, "actor_class", "self");
                         }
                         buffer_json_object_close(wb);
                     }
@@ -861,8 +1464,13 @@ static void network_viewer_topology_function(
 
                     NV_PROCESS_ACTOR *pa;
                     dfe_start_read(ctx.process_actors, pa) {
+                        char process_actor_id[NV_TOPOLOGY_KEY_MAX];
+                        char process_display_name[NV_TOPOLOGY_KEY_MAX];
+                        topology_actor_id_for_process(&ctx, pa->pid, pa->uid, pa->net_ns_inode, pa->process, process_actor_id, sizeof(process_actor_id));
+                        topology_process_display_name(&ctx, pa->process, pa->pid, process_display_name, sizeof(process_display_name));
                         buffer_json_add_array_item_object(wb);
                         {
+                            buffer_json_member_add_string(wb, "actor_id", process_actor_id);
                             buffer_json_member_add_string(wb, "actor_type", "process");
                             buffer_json_member_add_string(wb, "layer", NETWORK_TOPOLOGY_LAYER);
                             buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
@@ -878,12 +1486,16 @@ static void network_viewer_topology_function(
 
                             buffer_json_member_add_object(wb, "attributes");
                             {
-                                buffer_json_member_add_uint64(wb, "pid", pa->pid);
-                                buffer_json_member_add_uint64(wb, "uid", pa->uid);
-                                buffer_json_member_add_uint64(wb, "net_ns_inode", pa->net_ns_inode);
+                                if(ctx.options.processes_by_pid) {
+                                    buffer_json_member_add_uint64(wb, "pid", pa->pid);
+                                    buffer_json_member_add_uint64(wb, "uid", pa->uid);
+                                    buffer_json_member_add_uint64(wb, "net_ns_inode", pa->net_ns_inode);
+                                }
                                 buffer_json_member_add_uint64(wb, "socket_count", pa->sockets);
                                 buffer_json_member_add_string(wb, "local_ip", pa->local_ip);
                                 buffer_json_member_add_string(wb, "local_address_space", pa->local_address_space);
+                                buffer_json_member_add_string(wb, "display_name", process_display_name);
+                                buffer_json_member_add_string(wb, "actor_class", "process");
                                 if(pa->cmdline[0])
                                     buffer_json_member_add_string(wb, "cmdline", pa->cmdline);
                             }
@@ -895,6 +1507,8 @@ static void network_viewer_topology_function(
                                 buffer_json_member_add_string(wb, "user", pa->username);
                                 buffer_json_member_add_string(wb, "namespace", pa->namespace_type);
                                 buffer_json_member_add_string(wb, "local_address_space", pa->local_address_space);
+                                buffer_json_member_add_string(wb, "display_name", process_display_name);
+                                buffer_json_member_add_string(wb, "actor_class", "process");
                             }
                             buffer_json_object_close(wb);
                         }
@@ -904,22 +1518,37 @@ static void network_viewer_topology_function(
 
                     NV_REMOTE_ACTOR *ra;
                     dfe_start_read(ctx.remote_actors, ra) {
+                        if(topology_ip_belongs_to_self(&ctx, ra->ip, ra->address_space))
+                            continue;
+
+                        char endpoint_actor_id[NV_TOPOLOGY_KEY_MAX];
+                        topology_actor_id_for_remote_endpoint(&ctx, ra->ip, ra->address_space, endpoint_actor_id, sizeof(endpoint_actor_id));
+                        endpoint_actor_count++;
                         buffer_json_add_array_item_object(wb);
                         {
-                            buffer_json_member_add_string(wb, "actor_type", "ip");
-                            buffer_json_member_add_string(wb, "layer", "l3");
+                            buffer_json_member_add_string(wb, "actor_id", endpoint_actor_id);
+                            buffer_json_member_add_string(wb, "actor_type", "endpoint");
+                            buffer_json_member_add_string(wb, "layer", NETWORK_TOPOLOGY_LAYER);
                             buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
                             topology_add_remote_match(wb, ra->ip);
 
                             buffer_json_member_add_object(wb, "attributes");
                             {
                                 buffer_json_member_add_uint64(wb, "socket_count", ra->sockets);
+                                buffer_json_member_add_uint64(wb, "local_socket_count", 0);
+                                buffer_json_member_add_uint64(wb, "remote_socket_count", ra->sockets);
+                                buffer_json_member_add_string(wb, "endpoint_scope", "remote");
+                                buffer_json_member_add_string(wb, "display_name", ra->ip);
+                                buffer_json_member_add_string(wb, "actor_class", "endpoint");
                             }
                             buffer_json_object_close(wb);
 
                             buffer_json_member_add_object(wb, "labels");
                             {
                                 buffer_json_member_add_string(wb, "address_space", ra->address_space);
+                                buffer_json_member_add_string(wb, "endpoint_scope", "remote");
+                                buffer_json_member_add_string(wb, "display_name", ra->ip);
+                                buffer_json_member_add_string(wb, "actor_class", "endpoint");
                             }
                             buffer_json_object_close(wb);
                         }
@@ -931,14 +1560,146 @@ static void network_viewer_topology_function(
 
                 buffer_json_member_add_array(wb, "links");
                 {
+                    NV_PROCESS_ACTOR *pa;
+                    dfe_start_read(ctx.process_actors, pa) {
+                        char process_actor_id[NV_TOPOLOGY_KEY_MAX];
+                        char process_display_name[NV_TOPOLOGY_KEY_MAX];
+                        char ownership_display_name[NV_TOPOLOGY_KEY_MAX];
+                        topology_actor_id_for_process(&ctx, pa->pid, pa->uid, pa->net_ns_inode, pa->process, process_actor_id, sizeof(process_actor_id));
+                        topology_process_display_name(&ctx, pa->process, pa->pid, process_display_name, sizeof(process_display_name));
+                        snprintf(ownership_display_name, sizeof(ownership_display_name), "%s owns %s", ctx.hostname, process_display_name);
+                        ownership_link_count++;
+
+                        buffer_json_add_array_item_object(wb);
+                        {
+                            buffer_json_member_add_string(wb, "layer", NETWORK_TOPOLOGY_LAYER);
+                            buffer_json_member_add_string(wb, "protocol", "ownership");
+                            buffer_json_member_add_string(wb, "direction", "contains");
+                            buffer_json_member_add_string(wb, "state", "active");
+                            buffer_json_member_add_string(wb, "src_actor_id", host_actor_id);
+                            buffer_json_member_add_string(wb, "dst_actor_id", process_actor_id);
+                            buffer_json_member_add_datetime_rfc3339(wb, "discovered_at", ctx.now_ut, true);
+                            buffer_json_member_add_datetime_rfc3339(wb, "last_seen", ctx.now_ut, true);
+
+                            buffer_json_member_add_object(wb, "src");
+                            {
+                                topology_add_host_match(wb, &ctx);
+
+                                buffer_json_member_add_object(wb, "attributes");
+                                {
+                                    buffer_json_member_add_string(wb, "actor_type", "self");
+                                    buffer_json_member_add_string(wb, "display_name", ctx.hostname);
+                                }
+                                buffer_json_object_close(wb);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "dst");
+                            {
+                                topology_add_process_match(wb, &ctx, pa);
+
+                                buffer_json_member_add_object(wb, "attributes");
+                                {
+                                    buffer_json_member_add_string(wb, "actor_type", "process");
+                                    if(ctx.options.processes_by_pid) {
+                                        buffer_json_member_add_uint64(wb, "pid", pa->pid);
+                                        buffer_json_member_add_uint64(wb, "uid", pa->uid);
+                                        buffer_json_member_add_uint64(wb, "net_ns_inode", pa->net_ns_inode);
+                                    }
+                                    buffer_json_member_add_string(wb, "process", pa->process);
+                                    buffer_json_member_add_string(wb, "display_name", process_display_name);
+                                }
+                                buffer_json_object_close(wb);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "metrics");
+                            {
+                                buffer_json_member_add_uint64(wb, "socket_count", pa->sockets);
+                                buffer_json_member_add_string(wb, "display_name", ownership_display_name);
+                            }
+                            buffer_json_object_close(wb);
+
+                            buffer_json_member_add_object(wb, "labels");
+                            {
+                                buffer_json_member_add_string(wb, "link_class", "ownership");
+                                buffer_json_member_add_string(wb, "render_intent", "dark");
+                                buffer_json_member_add_string(wb, "display_name", ownership_display_name);
+                            }
+                            buffer_json_object_close(wb);
+                        }
+                        buffer_json_object_close(wb);
+                    }
+                    dfe_done(pa);
+
                     NV_TOPOLOGY_LINK *link;
                     dfe_start_read(ctx.links, link) {
+                        char process_actor_id[NV_TOPOLOGY_KEY_MAX];
+                        char dst_actor_id[NV_TOPOLOGY_KEY_MAX];
+                        char endpoint_actor_id[NV_TOPOLOGY_KEY_MAX];
+                        char local_bind_port[128];
+                        char remote_endpoint_port[128];
+                        char process_display_name[NV_TOPOLOGY_KEY_MAX];
+                        char dst_process_display_name[NV_TOPOLOGY_KEY_MAX];
+                        char dst_process_port_name[64] = "";
+                        char link_display_name[NV_TOPOLOGY_KEY_MAX];
+                        bool remote_is_self = topology_ip_belongs_to_self(&ctx, link->remote_ip, link->remote_address_space);
+                        bool dst_is_process = false;
+                        bool dst_local_peer_unresolved = false;
+                        uint64_t dst_pid = link->pid;
+                        uint64_t dst_uid = link->uid;
+                        uint64_t dst_net_ns_inode = link->net_ns_inode;
+                        const char *dst_process_name = link->process;
+                        uint16_t dst_process_port = 0;
+
+                        topology_actor_id_for_process(&ctx, link->pid, link->uid, link->net_ns_inode, link->process, process_actor_id, sizeof(process_actor_id));
+                        topology_actor_id_for_remote_endpoint(&ctx, link->remote_ip, link->remote_address_space, endpoint_actor_id, sizeof(endpoint_actor_id));
+                        snprintf(local_bind_port, sizeof(local_bind_port), "%u", link->local_port);
+                        snprintf(remote_endpoint_port, sizeof(remote_endpoint_port), "%s:%u", link->remote_ip, link->remote_port);
+                        topology_process_display_name(&ctx, link->process, link->pid, process_display_name, sizeof(process_display_name));
+
+                        if(remote_is_self) {
+                            const char *peer_ip = link->peer_ip[0] ? link->peer_ip : link->remote_ip;
+                            bool allow_service_fallback = true;
+                            NV_ENDPOINT_OWNER *owner = topology_lookup_endpoint_owner(&ctx, link->net_ns_inode, link->protocol_id, peer_ip, link->peer_port, allow_service_fallback);
+
+                            if(owner) {
+                                dst_pid = owner->pid;
+                                dst_uid = owner->uid;
+                                dst_net_ns_inode = owner->net_ns_inode;
+                                dst_process_name = owner->process;
+                                dst_process_port = link->peer_port;
+                            }
+                            else {
+                                dst_local_peer_unresolved = (link->direction_id != SOCKET_DIRECTION_LISTEN);
+                                dst_process_port = (link->direction_id == SOCKET_DIRECTION_LISTEN) ? link->local_port : (link->peer_port ? link->peer_port : link->remote_port);
+                            }
+
+                            dst_is_process = true;
+                            topology_actor_id_for_process(&ctx, dst_pid, dst_uid, dst_net_ns_inode, dst_process_name, dst_actor_id, sizeof(dst_actor_id));
+                            topology_process_display_name(&ctx, dst_process_name, dst_pid, dst_process_display_name, sizeof(dst_process_display_name));
+                            if(dst_process_port)
+                                snprintf(dst_process_port_name, sizeof(dst_process_port_name), "%u", dst_process_port);
+                            else
+                                snprintf(dst_process_port_name, sizeof(dst_process_port_name), "unknown");
+
+                            snprintf(link_display_name, sizeof(link_display_name), "%s:%s -> %s:%s",
+                                     process_display_name, local_bind_port, dst_process_display_name, dst_process_port_name);
+                        }
+                        else {
+                            snprintf(dst_actor_id, sizeof(dst_actor_id), "%s", endpoint_actor_id);
+                            snprintf(link_display_name, sizeof(link_display_name), "%s:%s -> %s",
+                                     process_display_name, local_bind_port, remote_endpoint_port);
+                        }
+
                         buffer_json_add_array_item_object(wb);
                         {
                             buffer_json_member_add_string(wb, "layer", NETWORK_TOPOLOGY_LAYER);
                             buffer_json_member_add_string(wb, "protocol", link->protocol);
                             buffer_json_member_add_string(wb, "direction", link->direction);
                             buffer_json_member_add_string(wb, "state", link->state);
+                            buffer_json_member_add_string(wb, "src_actor_id", process_actor_id);
+                            buffer_json_member_add_string(wb, "dst_actor_id", dst_actor_id);
                             buffer_json_member_add_datetime_rfc3339(wb, "discovered_at", ctx.now_ut, true);
                             buffer_json_member_add_datetime_rfc3339(wb, "last_seen", ctx.now_ut, true);
 
@@ -956,15 +1717,20 @@ static void network_viewer_topology_function(
                                 buffer_json_member_add_object(wb, "attributes");
                                 {
                                     buffer_json_member_add_string(wb, "actor_type", "process");
-                                    buffer_json_member_add_uint64(wb, "pid", link->pid);
-                                    buffer_json_member_add_uint64(wb, "uid", link->uid);
-                                    buffer_json_member_add_uint64(wb, "net_ns_inode", link->net_ns_inode);
+                                    if(ctx.options.processes_by_pid) {
+                                        buffer_json_member_add_uint64(wb, "pid", link->pid);
+                                        buffer_json_member_add_uint64(wb, "uid", link->uid);
+                                        buffer_json_member_add_uint64(wb, "net_ns_inode", link->net_ns_inode);
+                                    }
                                     buffer_json_member_add_string(wb, "process", link->process);
                                     buffer_json_member_add_string(wb, "user", link->username);
                                     buffer_json_member_add_string(wb, "namespace", link->namespace_type);
                                     buffer_json_member_add_string(wb, "address_space", link->local_address_space);
                                     buffer_json_member_add_uint64(wb, "port", link->local_port);
-                                    buffer_json_member_add_string(wb, "port_name", link->port_name);
+                                    buffer_json_member_add_string(wb, "port_name", local_bind_port);
+                                    buffer_json_member_add_string(wb, "bind_ip", link->local_ip);
+                                    buffer_json_member_add_string(wb, "service_name", link->port_name);
+                                    buffer_json_member_add_string(wb, "display_name", process_display_name);
                                     buffer_json_member_add_string(wb, "protocol_family", link->protocol_family);
                                     if(link->cmdline[0])
                                         buffer_json_member_add_string(wb, "cmdline", link->cmdline);
@@ -975,12 +1741,37 @@ static void network_viewer_topology_function(
 
                             buffer_json_member_add_object(wb, "dst");
                             {
-                                topology_add_remote_match(wb, link->remote_ip);
+                                if(dst_is_process)
+                                    topology_add_process_identity_match(wb, &ctx, dst_pid, dst_uid, dst_net_ns_inode, dst_process_name);
+                                else
+                                    topology_add_remote_match(wb, link->remote_ip);
 
                                 buffer_json_member_add_object(wb, "attributes");
                                 {
-                                    buffer_json_member_add_string(wb, "address_space", link->remote_address_space);
-                                    buffer_json_member_add_uint64(wb, "port", link->remote_port);
+                                    if(dst_is_process) {
+                                        buffer_json_member_add_string(wb, "actor_type", "process");
+                                        if(ctx.options.processes_by_pid) {
+                                            buffer_json_member_add_uint64(wb, "pid", dst_pid);
+                                            buffer_json_member_add_uint64(wb, "uid", dst_uid);
+                                            buffer_json_member_add_uint64(wb, "net_ns_inode", dst_net_ns_inode);
+                                        }
+                                        buffer_json_member_add_string(wb, "process", dst_process_name);
+                                        buffer_json_member_add_string(wb, "address_space", "self");
+                                        if(dst_process_port) {
+                                            buffer_json_member_add_uint64(wb, "port", dst_process_port);
+                                            buffer_json_member_add_string(wb, "port_name", dst_process_port_name);
+                                        }
+                                        buffer_json_member_add_string(wb, "display_name", dst_process_display_name);
+                                        if(dst_local_peer_unresolved)
+                                            buffer_json_member_add_boolean(wb, "unresolved_local_peer", true);
+                                    }
+                                    else {
+                                        buffer_json_member_add_string(wb, "actor_type", "endpoint");
+                                        buffer_json_member_add_string(wb, "address_space", link->remote_address_space);
+                                        buffer_json_member_add_uint64(wb, "port", link->remote_port);
+                                        buffer_json_member_add_string(wb, "port_name", remote_endpoint_port);
+                                        buffer_json_member_add_string(wb, "display_name", link->remote_ip);
+                                    }
                                 }
                                 buffer_json_object_close(wb);
                             }
@@ -992,6 +1783,7 @@ static void network_viewer_topology_function(
                                 buffer_json_member_add_uint64(wb, "retransmissions", link->retransmissions);
                                 buffer_json_member_add_double(wb, "rtt_ms_max", (double)link->max_rtt_usec / (double)USEC_PER_MS);
                                 buffer_json_member_add_double(wb, "recv_rtt_ms_max", (double)link->max_rcv_rtt_usec / (double)USEC_PER_MS);
+                                buffer_json_member_add_string(wb, "display_name", link_display_name);
                             }
                             buffer_json_object_close(wb);
 
@@ -1006,7 +1798,13 @@ static void network_viewer_topology_function(
                                 buffer_json_member_add_string(wb, "protocol_family", link->protocol_family);
                                 buffer_json_member_add_string(wb, "local_address_space", link->local_address_space);
                                 buffer_json_member_add_string(wb, "remote_address_space", link->remote_address_space);
-                                buffer_json_member_add_string(wb, "port_name", link->port_name);
+                                buffer_json_member_add_string(wb, "port_name", local_bind_port);
+                                buffer_json_member_add_string(wb, "bind_ip", link->local_ip);
+                                buffer_json_member_add_string(wb, "service_name", link->port_name);
+                                buffer_json_member_add_string(wb, "link_class", "socket");
+                                buffer_json_member_add_string(wb, "socket_kind", link->direction);
+                                buffer_json_member_add_string(wb, "render_intent", "socket");
+                                buffer_json_member_add_string(wb, "display_name", link_display_name);
                             }
                             buffer_json_object_close(wb);
                         }
@@ -1018,11 +1816,25 @@ static void network_viewer_topology_function(
 
                 buffer_json_member_add_object(wb, "stats");
                 {
+                    size_t links_total = socket_link_count + ownership_link_count;
+                    buffer_json_member_add_string(wb, "processes_mode", ctx.options.processes_by_pid ? "by_pid" : "by_name");
+                    buffer_json_member_add_boolean(wb, "sockets_listening", ctx.options.sockets_listening);
+                    buffer_json_member_add_boolean(wb, "sockets_local", ctx.options.sockets_local);
+                    buffer_json_member_add_boolean(wb, "sockets_inbound", ctx.options.sockets_inbound);
+                    buffer_json_member_add_boolean(wb, "sockets_outbound", ctx.options.sockets_outbound);
+                    buffer_json_member_add_string(wb, "endpoints_mode_selected", ctx.options.endpoints_by_as ? "by_as" : "by_ip");
+                    buffer_json_member_add_string(wb, "endpoints_mode_effective", "by_ip");
+                    buffer_json_member_add_boolean(wb, "protocol_ipv4_tcp", ctx.options.protocols_ipv4_tcp);
+                    buffer_json_member_add_boolean(wb, "protocol_ipv6_tcp", ctx.options.protocols_ipv6_tcp);
+                    buffer_json_member_add_boolean(wb, "protocol_ipv4_udp", ctx.options.protocols_ipv4_udp);
+                    buffer_json_member_add_boolean(wb, "protocol_ipv6_udp", ctx.options.protocols_ipv6_udp);
                     buffer_json_member_add_uint64(wb, "sockets_total", ctx.sockets_total);
                     buffer_json_member_add_uint64(wb, "sockets_without_remote_endpoint", ctx.skipped_sockets);
                     buffer_json_member_add_uint64(wb, "local_process_actors", process_actor_count);
-                    buffer_json_member_add_uint64(wb, "remote_ip_actors", remote_actor_count);
-                    buffer_json_member_add_uint64(wb, "links_total", link_count);
+                    buffer_json_member_add_uint64(wb, "endpoint_actors", endpoint_actor_count);
+                    buffer_json_member_add_uint64(wb, "socket_links", socket_link_count);
+                    buffer_json_member_add_uint64(wb, "ownership_links", ownership_link_count);
+                    buffer_json_member_add_uint64(wb, "links_total", links_total);
                 }
                 buffer_json_object_close(wb);
             }
@@ -1032,6 +1844,14 @@ static void network_viewer_topology_function(
 
     if(ctx.links)
         dictionary_destroy(ctx.links);
+    if(ctx.endpoint_owners_service_any_ns)
+        dictionary_destroy(ctx.endpoint_owners_service_any_ns);
+    if(ctx.endpoint_owners_service)
+        dictionary_destroy(ctx.endpoint_owners_service);
+    if(ctx.endpoint_owners_exact_any_ns)
+        dictionary_destroy(ctx.endpoint_owners_exact_any_ns);
+    if(ctx.endpoint_owners_exact)
+        dictionary_destroy(ctx.endpoint_owners_exact);
     if(ctx.local_ips)
         dictionary_destroy(ctx.local_ips);
     if(ctx.remote_actors)
@@ -1636,7 +2456,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 //        for(int i = 0; i < 100; i++) {
             bool cancelled = false;
             usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
-            char topo_buf[] = "topology:network-viewer";
+            char topo_buf[] = "topology:network-connections";
             network_viewer_topology_function("123", topo_buf, &stop_monotonic_ut, &cancelled,
                                              NULL, HTTP_ACCESS_ALL, NULL, NULL);
 

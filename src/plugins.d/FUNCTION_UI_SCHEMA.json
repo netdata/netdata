@@ -255,6 +255,7 @@
       "type": "object",
       "required": ["actor_type", "layer", "source", "match"],
       "properties": {
+        "actor_id": { "type": "string" },
         "actor_type": { "type": "string" },
         "layer": { "type": "string" },
         "source": { "type": "string" },
@@ -282,6 +283,8 @@
         "protocol": { "type": "string" },
         "direction": { "type": "string" },
         "state": { "type": "string" },
+        "src_actor_id": { "type": "string" },
+        "dst_actor_id": { "type": "string" },
         "src": { "$ref": "#/definitions/topology_link_endpoint" },
         "dst": { "$ref": "#/definitions/topology_link_endpoint" },
         "discovered_at": { "type": "string", "format": "date-time" },
