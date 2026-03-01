@@ -1,4 +1,12 @@
-# YAML/JSON Support for inicfg - Migration Guide
+> **WARNING: THIS DOCUMENT IS NOT AUTHORITATIVE**
+>
+> This is an auto-generated snapshot captured at a single point in time.
+> It is **not** official Netdata documentation, it is **not** kept up to date,
+> and it **must not** be treated as a reliable reference for Netdata's
+> configuration system. Refer to the official Netdata documentation for
+> current and accurate information.
+
+# YAML/JSON Support for inicfg - Migration Guide (WIP)
 
 This document outlines the complexities involved in adding YAML and JSON support to Netdata's inicfg configuration system, and the proposed solutions.
 
@@ -141,7 +149,7 @@ src/libnetdata/inicfg/
 ├── inicfg_yaml.c              # YAML loading support (new)
 ├── inicfg_json.c              # JSON loading support (new)
 ├── inicfg_converter.c         # Bidirectional conversion logic (new)
-└── MIGRATE_TO_YAML.md         # This document
+└── MIGRATE_TO_YAML_WIP.md     # This document
 ```
 
 ### Key Functions
