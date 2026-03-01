@@ -37,3 +37,30 @@ func TestObserveBuildSuccessSeqTransitions(t *testing.T) {
 	assert.Equal(t, buildSeqTransitionNone, obs.transition)
 	assert.Equal(t, uint64(11), obs.previous)
 }
+
+func TestObserveBuildSuccessSeqTransitionsRuntimeMode(t *testing.T) {
+	e, err := New(WithRuntimePlannerMode())
+	require.NoError(t, err)
+
+	obs := e.observeBuildSuccessSeq(10)
+	assert.Equal(t, buildSeqTransitionNone, obs.transition)
+	assert.Equal(t, uint64(0), obs.previous)
+
+	// Stable sequence is expected in runtime mode (no-write ticks).
+	obs = e.observeBuildSuccessSeq(10)
+	assert.Equal(t, buildSeqTransitionNone, obs.transition)
+	assert.Equal(t, uint64(10), obs.previous)
+
+	obs = e.observeBuildSuccessSeq(9)
+	assert.Equal(t, buildSeqTransitionBroken, obs.transition)
+	assert.Equal(t, uint64(10), obs.previous)
+
+	// Recovery is allowed once sequence catches up to previous value.
+	obs = e.observeBuildSuccessSeq(10)
+	assert.Equal(t, buildSeqTransitionRecovered, obs.transition)
+	assert.Equal(t, uint64(10), obs.previous)
+
+	obs = e.observeBuildSuccessSeq(10)
+	assert.Equal(t, buildSeqTransitionNone, obs.transition)
+	assert.Equal(t, uint64(10), obs.previous)
+}
