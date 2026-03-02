@@ -203,8 +203,14 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
                 rrddim_acquired_release(prd->rda);
 
             prd->rda = rrddim_find_and_acquire(st, string2str(rd->id), true);
-            prd->rd = rrddim_acquired_to_rrddim(prd->rda);
-            prd->id = string2str(prd->rd->id);
+            if(unlikely(!prd->rda)) {
+                prd->rd = NULL;
+                prd->id = NULL;
+            }
+            else {
+                prd->rd = rrddim_acquired_to_rrddim(prd->rda);
+                prd->id = string2str(prd->rd->id);
+            }
         }
 
         if(obsolete)
