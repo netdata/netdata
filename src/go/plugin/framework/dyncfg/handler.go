@@ -654,6 +654,7 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 
 			h.api.SendCodef(fn, 200, "%v", err)
 			h.NotifyJobStatus(oldCfg, oldStatus)
+			// No OnStatusChange call here: effective state did not change.
 			return
 		}
 
