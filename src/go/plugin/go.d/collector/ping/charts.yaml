@@ -65,7 +65,7 @@ groups:
       - id: host_rtt_variance
         title: Ping round-trip time variance
         context: host_rtt_variance
-        units: ms^2
+        units: ms²
         instances:
           by_labels: [host]
         dimensions:
