@@ -252,10 +252,10 @@ static ALWAYS_INLINE RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *s
         rd = prd->rd;
         if(likely(rd)) {
 #ifdef NETDATA_INTERNAL_CHECKS
-            if(strcmp(prd->id, dimension) != 0) {
+            if(!prd->id || strcmp(prd->id, dimension) != 0) {
                 ssize_t t;
                 for(t = 0; t < (ssize_t)prd_size ;t++) {
-                    if (strcmp(arr->entries[t].id, dimension) == 0)
+                    if (arr->entries[t].id && strcmp(arr->entries[t].id, dimension) == 0)
                         break;
                 }
                 if(t >= (ssize_t)prd_size)
@@ -264,7 +264,7 @@ static ALWAYS_INLINE RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *s
                 internal_fatal(true,
                                "PLUGINSD: expected to find dimension '%s' on slot %zd, but found '%s', "
                                "the right slot is %zd",
-                               dimension, slot, prd->id, t);
+                               dimension, slot, prd->id ? prd->id : "(null)", t);
             }
 #endif
             return rd;
