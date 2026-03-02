@@ -9,6 +9,7 @@
 #include "web/mcp/mcp.h"
 
 #include "database/engine/page_test.h"
+#include "database/rrdset-slots.h"
 #include <curl/curl.h>
 
 #ifdef OS_WINDOWS
