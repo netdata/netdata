@@ -687,6 +687,12 @@ func prepareMockOkTypeSataNonFatalExitStatus() *mockSmartctlCliExec {
 			default:
 				return nil, fmt.Errorf("unexpected device name %s", deviceName)
 			}
+
+			// Verify that the modified payload actually encodes smartctl.exit_status == 32.
+			v := gjson.GetBytes(data, "smartctl.exit_status")
+			if !v.Exists() || v.Int() != 32 {
+				panic("prepareMockOkTypeSataNonFatalExitStatus: failed to construct payload with smartctl.exit_status == 32")
+			}
 			return data, fmt.Errorf("exit status 32")
 		},
 	}
