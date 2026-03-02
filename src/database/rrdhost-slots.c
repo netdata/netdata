@@ -23,7 +23,7 @@ void rrdhost_pluginsd_send_chart_slots_free(RRDHOST *host) {
 }
 
 void rrdhost_pluginsd_receive_chart_slots_free(RRDHOST *host) {
-    rrd_slot_memory_removed(host->stream.rcv.pluginsd_chart_slots.size * sizeof(uint32_t));
+    rrd_slot_memory_removed(host->stream.rcv.pluginsd_chart_slots.size * sizeof(RRDSET *));
 
     spinlock_lock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
 

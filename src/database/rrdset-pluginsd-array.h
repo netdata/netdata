@@ -52,6 +52,7 @@ static inline PRD_ARRAY *prd_array_create(size_t size) {
     PRD_ARRAY *arr = callocz(1, sizeof(PRD_ARRAY) + size * sizeof(struct pluginsd_rrddim));
     arr->refcount = 1;
     arr->size = size;
+    rrd_slot_memory_added(sizeof(PRD_ARRAY) + size * sizeof(struct pluginsd_rrddim));
     return arr;
 }
 
@@ -110,6 +111,7 @@ static inline void prd_array_release(PRD_ARRAY *arr) {
         // We were the last reference - free the array
         // Note: The caller is responsible for releasing any RRDDIM_ACQUIRED references
         // in the entries before the final release
+        rrd_slot_memory_removed(sizeof(PRD_ARRAY) + arr->size * sizeof(struct pluginsd_rrddim));
         freez(arr);
     }
 }
