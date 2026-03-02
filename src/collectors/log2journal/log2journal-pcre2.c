@@ -138,9 +138,11 @@ bool pcre2_parse_document(PCRE2_STATE *pcre2, const char *txt, size_t len) {
 
 void pcre2_test(void) {
     LOG_JOB jb = { .prefix = "NIGNX_" };
+    log_job_init(&jb);
     PCRE2_STATE *pcre2 = pcre2_parser_create(&jb);
 
     pcre2_parse_document(pcre2, "{\"value\":\"\\u\\u039A\\u03B1\\u03BB\\u03B7\\u03BC\\u03AD\\u03C1\\u03B1\"}", 0);
 
     pcre2_parser_destroy(pcre2);
+    log_job_cleanup(&jb);
 }

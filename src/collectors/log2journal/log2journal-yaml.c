@@ -18,89 +18,110 @@ static bool log2journal_config_from_json(json_object *jobj, void *data, BUFFER *
 
     // Parse pattern (optional - despite being conceptually required, we handle it gracefully)
     CLEAN_CHAR_P *pattern = NULL;
-    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "pattern", pattern, error, false);
+    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "pattern", pattern, error, JSONC_OPTIONAL);
     if(pattern) {
-        log_job_pattern_set(jb, pattern, strlen(pattern));
+        if(!log_job_pattern_set(jb, pattern, strlen(pattern))) {
+            buffer_sprintf(error, "failed to set pattern");
+            return false;
+        }
     }
 
     // Parse prefix (optional)
     CLEAN_CHAR_P *prefix = NULL;
-    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "prefix", prefix, error, false);
+    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "prefix", prefix, error, JSONC_OPTIONAL);
     if(prefix) {
-        log_job_key_prefix_set(jb, prefix, strlen(prefix));
+        if(!log_job_key_prefix_set(jb, prefix, strlen(prefix))) {
+            buffer_sprintf(error, "failed to set prefix");
+            return false;
+        }
     }
 
     // Parse filename injection (optional)
-    JSONC_PARSE_SUBOBJECT(jobj, path, "filename", error, false, {
+    JSONC_PARSE_SUBOBJECT(jobj, path, "filename", error, JSONC_STRICT, {
         CLEAN_CHAR_P *key = NULL;
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "key", key, error, true);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "key", key, error, JSONC_REQUIRED);
         if(key) {
-            log_job_filename_key_set(jb, key, strlen(key));
+            if(!log_job_filename_key_set(jb, key, strlen(key))) {
+                buffer_sprintf(error, "failed to set filename key");
+                return false;
+            }
         }
     });
 
     // Parse filter (optional)
-    JSONC_PARSE_SUBOBJECT(jobj, path, "filter", error, false, {
+    JSONC_PARSE_SUBOBJECT(jobj, path, "filter", error, JSONC_STRICT, {
         CLEAN_CHAR_P *include = NULL;
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "include", include, error, false);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "include", include, error, JSONC_OPTIONAL);
         if(include) {
-            log_job_include_pattern_set(jb, include, strlen(include));
+            if(!log_job_include_pattern_set(jb, include, strlen(include))) {
+                buffer_sprintf(error, "failed to set include pattern");
+                return false;
+            }
         }
 
         CLEAN_CHAR_P *exclude = NULL;
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "exclude", exclude, error, false);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "exclude", exclude, error, JSONC_OPTIONAL);
         if(exclude) {
-            log_job_exclude_pattern_set(jb, exclude, strlen(exclude));
+            if(!log_job_exclude_pattern_set(jb, exclude, strlen(exclude))) {
+                buffer_sprintf(error, "failed to set exclude pattern");
+                return false;
+            }
         }
     });
 
     // Parse injections array (optional)
-    JSONC_PARSE_ARRAY(jobj, path, "inject", error, false, {
+    JSONC_PARSE_ARRAY(jobj, path, "inject", error, JSONC_STRICT, {
         size_t i;
-        JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, true, {
+        JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, JSONC_REQUIRED, {
             CLEAN_CHAR_P *key = NULL;
             CLEAN_CHAR_P *value = NULL;
-            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "key", key, error, true);
-            JSONC_PARSE_SCALAR2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "value", value, error, true);
+            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "key", key, error, JSONC_REQUIRED);
+            JSONC_PARSE_SCALAR2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "value", value, error, JSONC_REQUIRED);
             if(key && value) {
-                log_job_injection_add(jb, key, strlen(key), value, strlen(value), false);
+                if(!log_job_injection_add(jb, key, strlen(key), value, strlen(value), false)) {
+                    buffer_sprintf(error, "failed to add injection for '%s.inject'", path);
+                    return false;
+                }
             }
         });
     });
 
     // Parse rename array (optional)
-    JSONC_PARSE_ARRAY(jobj, path, "rename", error, false, {
+    JSONC_PARSE_ARRAY(jobj, path, "rename", error, JSONC_STRICT, {
         size_t i;
-        JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, true, {
+        JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, JSONC_REQUIRED, {
             CLEAN_CHAR_P *new_key = NULL;
             CLEAN_CHAR_P *old_key = NULL;
-            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "new_key", new_key, error, true);
-            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "old_key", old_key, error, true);
+            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "new_key", new_key, error, JSONC_REQUIRED);
+            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "old_key", old_key, error, JSONC_REQUIRED);
             if(new_key && old_key) {
-                log_job_rename_add(jb, new_key, strlen(new_key), old_key, strlen(old_key));
+                if(!log_job_rename_add(jb, new_key, strlen(new_key), old_key, strlen(old_key))) {
+                    buffer_sprintf(error, "failed to add rename for '%s.rename'", path);
+                    return false;
+                }
             }
         });
     });
 
     // Parse rewrite array (optional)
-    JSONC_PARSE_ARRAY(jobj, path, "rewrite", error, false, {
+    JSONC_PARSE_ARRAY(jobj, path, "rewrite", error, JSONC_STRICT, {
         size_t i;
-        JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, true, {
+        JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, JSONC_REQUIRED, {
             CLEAN_CHAR_P *key = NULL;
             CLEAN_CHAR_P *match = NULL;
             CLEAN_CHAR_P *not_empty = NULL;
             CLEAN_CHAR_P *value = NULL;
             RW_FLAGS flags = RW_NONE;
-            
-            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "key", key, error, true);
-            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "match", match, error, false);
-            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "not_empty", not_empty, error, false);
-            JSONC_PARSE_SCALAR2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "value", value, error, true);
-            
+
+            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "key", key, error, JSONC_REQUIRED);
+            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "match", match, error, JSONC_OPTIONAL);
+            JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "not_empty", not_empty, error, JSONC_OPTIONAL);
+            JSONC_PARSE_SCALAR2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "value", value, error, JSONC_REQUIRED);
+
             bool stop = true;
             bool inject = false;
-            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "stop", stop, error, false);
-            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "inject", inject, error, false);
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "stop", stop, error, JSONC_OPTIONAL);
+            JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "inject", inject, error, JSONC_OPTIONAL);
             
             if(match) flags |= RW_MATCH_PCRE2;
             else if(not_empty) flags |= RW_MATCH_NON_EMPTY;
@@ -108,29 +129,35 @@ static bool log2journal_config_from_json(json_object *jobj, void *data, BUFFER *
             if(inject) flags |= RW_INJECT;
             
             if(key && value) {
-                log_job_rewrite_add(jb, key, flags, match ? match : not_empty, value);
+                if(!log_job_rewrite_add(jb, key, flags, match ? match : not_empty, value)) {
+                    buffer_sprintf(error, "failed to add rewrite for '%s.rewrite'", path);
+                    return false;
+                }
             }
         });
     });
 
     // Parse unmatched section (optional)
-    JSONC_PARSE_SUBOBJECT(jobj, path, "unmatched", error, false, {
+    JSONC_PARSE_SUBOBJECT(jobj, path, "unmatched", error, JSONC_STRICT, {
         CLEAN_CHAR_P *key = NULL;
-        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "key", key, error, false);
+        JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "key", key, error, JSONC_OPTIONAL);
         if(key) {
             hashed_key_set(&jb->unmatched.key, key, strlen(key));
         }
 
         // Parse unmatched injections
-        JSONC_PARSE_ARRAY(jobj, path, "inject", error, false, {
+        JSONC_PARSE_ARRAY(jobj, path, "inject", error, JSONC_STRICT, {
             size_t i;
-            JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, true, {
+            JSONC_PARSE_ARRAY_ITEM_OBJECT(jobj, path, i, JSONC_REQUIRED, {
                 CLEAN_CHAR_P *inj_key = NULL;
                 CLEAN_CHAR_P *inj_value = NULL;
-                JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "key", inj_key, error, true);
-                JSONC_PARSE_SCALAR2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "value", inj_value, error, true);
+                JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "key", inj_key, error, JSONC_REQUIRED);
+                JSONC_PARSE_SCALAR2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, "value", inj_value, error, JSONC_REQUIRED);
                 if(inj_key && inj_value) {
-                    log_job_injection_add(jb, inj_key, strlen(inj_key), inj_value, strlen(inj_value), true);
+                    if(!log_job_injection_add(jb, inj_key, strlen(inj_key), inj_value, strlen(inj_value), true)) {
+                        buffer_sprintf(error, "failed to add unmatched injection for '%s.unmatched.inject'", path);
+                        return false;
+                    }
                 }
             });
         });

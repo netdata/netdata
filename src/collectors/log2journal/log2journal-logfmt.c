@@ -218,9 +218,11 @@ bool logfmt_parse_document(LOGFMT_STATE *lfs, const char *txt) {
 
 void logfmt_test(void) {
     LOG_JOB jb = { .prefix = "NIGNX_" };
+    log_job_init(&jb);
     LOGFMT_STATE *logfmt = logfmt_parser_create(&jb);
 
     logfmt_parse_document(logfmt, "x=1 y=2 z=\"3 \\ 4\" 5  ");
 
     logfmt_parser_destroy(logfmt);
+    log_job_cleanup(&jb);
 }

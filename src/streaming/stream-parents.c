@@ -343,21 +343,21 @@ int stream_info_to_json_v1(BUFFER *wb, const char *machine_guid) {
 
 static bool stream_info_json_parse_v1(struct json_object *jobj, const char *path, STREAM_PARENT *d, BUFFER *error) {
     uint32_t version = 0; (void)version;
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, JSONC_REQUIRED);
 
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "status", d->remote.status, error, true);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "host_id", d->remote.host_id.uuid, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nodes", d->remote.nodes, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "receivers", d->remote.receivers, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nonce", d->remote.nonce, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "status", d->remote.status, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "host_id", d->remote.host_id.uuid, error, JSONC_REQUIRED);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nodes", d->remote.nodes, error, JSONC_REQUIRED);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "receivers", d->remote.receivers, error, JSONC_REQUIRED);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nonce", d->remote.nonce, error, JSONC_REQUIRED);
 
     if(d->remote.status == HTTP_RESP_OK) {
-        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_s", d->remote.db_first_time_s, error, true);
-        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "last_time_s", d->remote.db_last_time_s, error, true);
-        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_status", RRDHOST_DB_STATUS_2id, d->remote.db_status, error, true);
-        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_liveness", RRDHOST_DB_LIVENESS_2id, d->remote.db_liveness, error, true);
-        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_type", RRDHOST_INGEST_TYPE_2id, d->remote.ingest_type, error, true);
-        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_status", RRDHOST_INGEST_STATUS_2id, d->remote.ingest_status, error, true);
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_s", d->remote.db_first_time_s, error, JSONC_REQUIRED);
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "last_time_s", d->remote.db_last_time_s, error, JSONC_REQUIRED);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_status", RRDHOST_DB_STATUS_2id, d->remote.db_status, error, JSONC_REQUIRED);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_liveness", RRDHOST_DB_LIVENESS_2id, d->remote.db_liveness, error, JSONC_REQUIRED);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_type", RRDHOST_INGEST_TYPE_2id, d->remote.ingest_type, error, JSONC_REQUIRED);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_status", RRDHOST_INGEST_STATUS_2id, d->remote.ingest_status, error, JSONC_REQUIRED);
         return true;
     }
 

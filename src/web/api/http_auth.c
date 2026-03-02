@@ -191,16 +191,16 @@ static bool bearer_token_parse_json(nd_uuid_t token, struct json_object *jobj, B
     time_t created_s = 0, expires_s = 0;
     uint64_t signature = 0;
 
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, ".", "version", version, error, true);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, ".", "host_uuid", host_uuid, error, true);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, ".", "token", token_in_file, error, true);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, ".", "cloud_account_id", cloud_account_id, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, ".", "client_name", client_name, error, true);
-    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, ".", "access", http_access2id_one, access, error, true);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, ".", "user_role", http_user_role2id, user_role, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, ".", "created_s", created_s, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, ".", "expires_s", expires_s, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, ".", "signature", signature, error, true);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, ".", "version", version, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, ".", "host_uuid", host_uuid, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, ".", "token", token_in_file, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, ".", "cloud_account_id", cloud_account_id, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, ".", "client_name", client_name, error, JSONC_REQUIRED);
+    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, ".", "access", http_access2id_one, access, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, ".", "user_role", http_user_role2id, user_role, error, JSONC_REQUIRED);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, ".", "created_s", created_s, error, JSONC_REQUIRED);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, ".", "expires_s", expires_s, error, JSONC_REQUIRED);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, ".", "signature", signature, error, JSONC_REQUIRED);
 
     if(uuid_compare(token, token_in_file) != 0) {
         buffer_flush(error);
