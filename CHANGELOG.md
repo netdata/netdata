@@ -59,6 +59,9 @@
 - Build(deps): bump github.com/microsoft/go-mssqldb from 1.9.6 to 1.9.7 in /src/go ([#21848](https://github.com/netdata/netdata/issues/21848))
 - Build(deps): bump golang.org/x/net from 0.50.0 to 0.51.0 in /src/go ([#21846](https://github.com/netdata/netdata/issues/21846))
 - Refactor(go/plugin/framework/functions): redesign manager ([#21850](https://github.com/netdata/netdata/issues/21850))
+- Fix  context hub cleanup ([#21832](https://github.com/netdata/netdata/issues/21832))
+- Fix(go/plugin/framework/chartengine): decouple runtime build-cycle dedupe from LastSuccessSeq ([#21851](https://github.com/netdata/netdata/issues/21851))
+- Preserve UTF-8 characters in RRD string fields ([#21694](https://github.com/netdata/netdata/issues/21694))
 
 ## [2.9.0] - 2026-02-16
 
