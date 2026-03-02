@@ -159,54 +159,67 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
 
     // Check if we need to grow the array
     if(wanted_size > current_size) {
-        // Create a new larger array
-        PRD_ARRAY *new_arr = prd_array_create(wanted_size);
+        // Serialize grow transfer with unslot/cleanup detach paths.
+        spinlock_lock(&st->pluginsd.spinlock);
 
-        // Copy existing entries from old array (if any) and transfer ownership
-        // to the new array by nulling old pointers.
-        if(current_arr) {
-            memcpy(new_arr->entries, current_arr->entries, current_size * sizeof(struct pluginsd_rrddim));
-            for(size_t i = 0; i < current_size; i++) {
-                current_arr->entries[i].rda = NULL;
-                current_arr->entries[i].rd = NULL;
-                current_arr->entries[i].id = NULL;
-            }
-        }
+        current_arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
+        current_size = current_arr ? current_arr->size : 0;
 
-        // Initialize the new slots (callocz already zeroed them, but be explicit)
-        for(size_t i = current_size; i < wanted_size; i++) {
-            new_arr->entries[i].rda = NULL;
-            new_arr->entries[i].rd = NULL;
-            new_arr->entries[i].id = NULL;
-        }
+        // Re-check under lock in case another path changed the array.
+        if(wanted_size > current_size) {
+            // Create a new larger array
+            PRD_ARRAY *new_arr = prd_array_create(wanted_size);
 
-        // Track memory added
-        rrd_slot_memory_added(sizeof(PRD_ARRAY) + wanted_size * sizeof(struct pluginsd_rrddim));
-
-        // Atomically replace the old array with the new one
-        // No spinlock needed: collector_tid is set, so cleanup code will skip this chart
-        PRD_ARRAY *old_arr = prd_array_replace(&st->pluginsd.prd_array, new_arr);
-
-        // Free the old array if there was one
-        if(old_arr) {
-            int32_t rc = __atomic_load_n(&old_arr->refcount, __ATOMIC_ACQUIRE);
-
-            // Track memory removed only when this release will actually free old_arr.
-            if(likely(rc == 1))
-                rrd_slot_memory_removed(sizeof(PRD_ARRAY) + old_arr->size * sizeof(struct pluginsd_rrddim));
-            else {
-                nd_log_limit_static_global_var(erl_grow_rc, 1, 0);
-                nd_log_limit(&erl_grow_rc, NDLS_COLLECTORS, NDLP_WARNING,
-                             "PLUGINSD: deferred old slot-cache free after grow due to unexpected PRD_ARRAY refcount %d",
-                             rc);
+            // Copy existing entries from old array (if any) and transfer ownership
+            // to the new array by nulling old pointers.
+            if(current_arr) {
+                memcpy(new_arr->entries, current_arr->entries, current_size * sizeof(struct pluginsd_rrddim));
+                for(size_t i = 0; i < current_size; i++) {
+                    current_arr->entries[i].rda = NULL;
+                    current_arr->entries[i].rd = NULL;
+                    current_arr->entries[i].id = NULL;
+                }
             }
 
-            // Release the old array - it will be freed when refcount reaches 0
-            prd_array_release(old_arr);
+            // Initialize the new slots (callocz already zeroed them, but be explicit)
+            for(size_t i = current_size; i < wanted_size; i++) {
+                new_arr->entries[i].rda = NULL;
+                new_arr->entries[i].rd = NULL;
+                new_arr->entries[i].id = NULL;
+            }
+
+            // Track memory added
+            rrd_slot_memory_added(sizeof(PRD_ARRAY) + wanted_size * sizeof(struct pluginsd_rrddim));
+
+            // Atomically replace the old array with the new one
+            PRD_ARRAY *old_arr = prd_array_replace(&st->pluginsd.prd_array, new_arr);
+
+            // Free the old array if there was one
+            if(old_arr) {
+                int32_t rc = __atomic_load_n(&old_arr->refcount, __ATOMIC_ACQUIRE);
+
+                // Track memory removed only when this release will actually free old_arr.
+                if(likely(rc == 1))
+                    rrd_slot_memory_removed(sizeof(PRD_ARRAY) + old_arr->size * sizeof(struct pluginsd_rrddim));
+                else {
+                    nd_log_limit_static_global_var(erl_grow_rc, 1, 0);
+                    nd_log_limit(&erl_grow_rc, NDLS_COLLECTORS, NDLP_WARNING,
+                                 "PLUGINSD: deferred old slot-cache free after grow due to unexpected PRD_ARRAY refcount %d",
+                                 rc);
+                }
+
+                // Release the old array - it will be freed when refcount reaches 0
+                prd_array_release(old_arr);
+            }
+
+            // Update our local pointer to the new array
+            current_arr = new_arr;
+        }
+        else {
+            current_arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
         }
 
-        // Update our local pointer to the new array
-        current_arr = new_arr;
+        spinlock_unlock(&st->pluginsd.spinlock);
     }
 
     // Now update the slot entry if we're using slots
