@@ -3,6 +3,7 @@
 package dyncfg
 
 import (
+	"errors"
 	"strings"
 )
 
@@ -53,4 +54,29 @@ func JoinCommands(commands ...Command) string {
 		strs[i] = string(cmd)
 	}
 	return strings.Join(strs, " ")
+}
+
+// ErrNonDisruptiveUpdate marks update failures where runtime state was not changed.
+// Handler rollback logic uses this marker to keep old config/status authoritative.
+var ErrNonDisruptiveUpdate = errors.New("non-disruptive update")
+
+type nonDisruptiveUpdateError struct {
+	err error
+}
+
+func (e *nonDisruptiveUpdateError) Error() string        { return e.err.Error() }
+func (e *nonDisruptiveUpdateError) Unwrap() error        { return e.err }
+func (e *nonDisruptiveUpdateError) Is(target error) bool { return target == ErrNonDisruptiveUpdate }
+
+// MarkNonDisruptiveUpdate wraps err to indicate update failed before disrupting runtime.
+func MarkNonDisruptiveUpdate(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if errors.Is(err, ErrNonDisruptiveUpdate) {
+		return err
+	}
+
+	return &nonDisruptiveUpdateError{err: err}
 }

@@ -4,12 +4,14 @@ package sd
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 const (
@@ -97,8 +99,7 @@ func (m *PipelineManager) Restart(ctx context.Context, key string, cfg pipeline.
 	// Validate new config first by creating the pipeline (outside lock)
 	pl, err := m.newPipeline(cfg)
 	if err != nil {
-		// New config is invalid, keep old pipeline running
-		return err
+		return dyncfg.MarkNonDisruptiveUpdate(fmt.Errorf("failed to create new pipeline config: %w", err))
 	}
 
 	m.mux.Lock()

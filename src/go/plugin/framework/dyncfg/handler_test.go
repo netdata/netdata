@@ -935,6 +935,36 @@ func TestCmdUpdate_NonConversion_StartFails(t *testing.T) {
 	assert.Equal(t, StatusFailed, entry.Status)
 }
 
+func TestCmdUpdate_NonConversion_StartFails_NonDisruptiveRollback(t *testing.T) {
+	cb := &mockCallbacks{}
+	cb.updateFn = func(_, _ testConfig) error {
+		return MarkNonDisruptiveUpdate(errors.New("update preflight failed"))
+	}
+	h := newTestHandler(cb)
+
+	oldCfg := testConfig{uid: "dyncfg:job1:v1", key: "job1", sourceType: "dyncfg", hash: 100}
+	newCfg := testConfig{uid: "dyncfg:job1:v2", key: "job1", sourceType: "dyncfg", hash: 200}
+	h.seen.Add(oldCfg)
+	h.exposed.Add(&Entry[testConfig]{Cfg: oldCfg, Status: StatusRunning})
+
+	cb.parseAndValidateFn = func(_ Function, _ string) (testConfig, error) {
+		return newCfg, nil
+	}
+
+	fn := newTestFn("test:job1", "update", "job1", []byte(`{}`))
+	h.CmdUpdate(fn)
+
+	entry, _ := h.exposed.LookupByKey("job1")
+	assert.Equal(t, StatusRunning, entry.Status)
+	assert.Equal(t, oldCfg.UID(), entry.Cfg.UID())
+
+	_, ok := h.seen.LookupByUID(oldCfg.UID())
+	assert.True(t, ok, "old config should be restored in seen cache")
+
+	_, ok = h.seen.LookupByUID(newCfg.UID())
+	assert.False(t, ok, "new config should be removed from seen cache on rollback")
+}
+
 func TestCmdUpdate_Conversion_StartFails(t *testing.T) {
 	cb := &mockCallbacks{}
 	cb.startFn = func(_ testConfig) error { return errors.New("start failed") }

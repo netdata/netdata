@@ -106,12 +106,23 @@ func (c *Collector) processDeviceResult(mx map[string]int64, result deviceInfoRe
 	err := result.err
 
 	if err != nil {
-		if resp != nil && isDeviceOpenFailedNoSuchDevice(resp) && !scanDev.extra {
-			c.Infof("smartctl reported that device '%s' type '%s' no longer exists", scanDev.name, scanDev.typ)
-			c.forceScan = true
-			return nil
+		if resp != nil {
+			if isDeviceOpenFailedNoSuchDevice(resp) && !scanDev.extra {
+				c.Infof("smartctl reported that device '%s' type '%s' no longer exists", scanDev.name, scanDev.typ)
+				c.forceScan = true
+				return nil
+			}
+			// https://manpages.debian.org/bullseye/smartmontools/smartctl.8.en.html#EXIT_STATUS
+			// Bits 0-1 indicate fatal conditions (command line error, device open failure).
+			// Bits 2-7 indicate disk health conditions but the output data is still valid.
+			if !isExitStatusHasAnyBit(resp, 0, 1) {
+				c.Debugf("device '%s' type '%s': smartctl exit status has non-fatal bits set: %v", scanDev.name, scanDev.typ, err)
+				err = nil
+			}
 		}
-		return fmt.Errorf("failed to get device info for '%s' type '%s': %v", scanDev.name, scanDev.typ, err)
+		if err != nil {
+			return fmt.Errorf("failed to get device info for '%s' type '%s': %v", scanDev.name, scanDev.typ, err)
+		}
 	}
 
 	if isDeviceInLowerPowerMode(resp) {
