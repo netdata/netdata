@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"gopkg.in/yaml.v3"
 )
 
@@ -17,6 +18,12 @@ const (
 	providerIPToASN = "iptoasn"
 	providerDBIP    = "dbip_lite"
 	providerCustom  = "custom"
+)
+
+const (
+	defaultUserConfigDir  = "/etc/netdata"
+	defaultStockConfigDir = "/usr/lib/netdata/conf.d"
+	defaultCacheDir       = "/var/cache/netdata"
 )
 
 const (
@@ -122,7 +129,7 @@ func defaultConfig() config {
 			},
 		},
 		output: outputConfig{
-			directory:    "/var/cache/netdata/topology-ip-intel",
+			directory:    filepath.Join(defaultCacheRoot(), "topology-ip-intel"),
 			asnFile:      "topology-ip-asn.mmdb",
 			countryFile:  "topology-ip-country.mmdb",
 			metadataFile: "topology-ip-intel.json",
@@ -188,8 +195,8 @@ func loadConfig(explicitPath string) (config, string, error) {
 
 func discoverDefaultConfigPath() string {
 	candidates := []string{
-		"/etc/netdata/topology-ip-intel.yaml",
-		"/usr/lib/netdata/conf.d/topology-ip-intel.yaml",
+		filepath.Join(defaultUserConfigRoot(), "topology-ip-intel.yaml"),
+		filepath.Join(defaultStockConfigRoot(), "topology-ip-intel.yaml"),
 	}
 	for _, path := range candidates {
 		if info, err := os.Stat(path); err == nil && !info.IsDir() {
@@ -197,6 +204,30 @@ func discoverDefaultConfigPath() string {
 		}
 	}
 	return ""
+}
+
+func defaultUserConfigRoot() string {
+	dir := strings.TrimSpace(buildinfo.UserConfigDir)
+	if dir == "" {
+		return defaultUserConfigDir
+	}
+	return dir
+}
+
+func defaultStockConfigRoot() string {
+	dir := strings.TrimSpace(buildinfo.StockConfigDir)
+	if dir == "" {
+		return defaultStockConfigDir
+	}
+	return dir
+}
+
+func defaultCacheRoot() string {
+	dir := strings.TrimSpace(buildinfo.CacheDir)
+	if dir == "" {
+		return defaultCacheDir
+	}
+	return dir
 }
 
 func (cfg *config) apply(fc fileConfig) error {
