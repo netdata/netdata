@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext/discoverer/dockersd"
@@ -22,7 +21,7 @@ const (
 	discovererSNMP         = "snmp"
 )
 
-func Registry() sd.Registry {
+func Registry(includeDocker bool) sd.Registry {
 	descs := []sd.Descriptor{
 		sd.NewDescriptor(
 			discovererNetListeners,
@@ -43,7 +42,7 @@ func Registry() sd.Registry {
 			newSNMPDiscoverers,
 		),
 	}
-	if !hostinfo.IsInsideK8sCluster() {
+	if includeDocker {
 		descs = append(descs, sd.NewDescriptor(
 			discovererDocker,
 			schemaDocker,

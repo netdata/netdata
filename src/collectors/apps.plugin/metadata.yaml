@@ -20,7 +20,6 @@ modules:
         - processes
         - os
         - host monitoring
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor Applications for optimal software performance and resource usage."
@@ -211,7 +210,6 @@ modules:
         - authorization
         - os
         - host monitoring
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors resource utilization on a user groups context."
@@ -400,7 +398,6 @@ modules:
         - processes
         - os
         - host monitoring
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This integration monitors resource utilization on a user context."

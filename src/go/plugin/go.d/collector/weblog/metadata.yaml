@@ -17,7 +17,6 @@ modules:
         - nginx
         - lighttpd
         - logs
-      most_popular: false
       info_provided_to_referring_integrations:
         description: ""
       related_resources:

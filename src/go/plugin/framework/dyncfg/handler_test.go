@@ -4,10 +4,12 @@ package dyncfg
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -109,6 +111,10 @@ func (m *mockCallbacks) ConfigID(cfg testConfig) string {
 }
 
 func newTestHandler(cb *mockCallbacks) *Handler[testConfig] {
+	return newTestHandlerWithWaitTimeout(cb, 5*time.Second)
+}
+
+func newTestHandlerWithWaitTimeout(cb *mockCallbacks, waitTimeout time.Duration) *Handler[testConfig] {
 	var buf bytes.Buffer
 	api := NewResponder(netdataapi.New(safewriter.New(&buf)))
 	return NewHandler(HandlerOpts[testConfig]{
@@ -120,6 +126,7 @@ func newTestHandler(cb *mockCallbacks) *Handler[testConfig] {
 		WaitKey: func(cfg testConfig) string {
 			return cfg.Source()
 		},
+		WaitTimeout: waitTimeout,
 
 		Path:                    "/test/path",
 		EnableFailCode:          200,
@@ -201,6 +208,134 @@ func TestHandler_WaitForDecision_MismatchedCommandKeepsWait(t *testing.T) {
 	// Matching command clears wait state.
 	h.SyncDecision(newTestFn("test:job1", "disable", "", nil))
 	assert.False(t, h.WaitingForDecision())
+}
+
+func TestHandler_WaitForDecision_TimeoutClearsWait(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandlerWithWaitTimeout(cb, 5*time.Second)
+
+	cfg := testConfig{
+		uid:        "uid-job1",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "mod/job1",
+	}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+
+	base := time.Unix(1000, 0)
+	h.waitGate.setNow(func() time.Time { return base })
+
+	h.WaitForDecision(cfg)
+	assert.True(t, h.WaitingForDecision())
+
+	h.waitGate.setNow(func() time.Time { return base.Add(4 * time.Second) })
+	remaining, ok := h.WaitDecisionRemaining()
+	assert.True(t, ok)
+	assert.Equal(t, time.Second, remaining)
+
+	_, timedOut := h.ExpireWaitDecision()
+	assert.False(t, timedOut)
+	assert.True(t, h.WaitingForDecision())
+
+	h.waitGate.setNow(func() time.Time { return base.Add(5 * time.Second) })
+	event, timedOut := h.ExpireWaitDecision()
+	assert.True(t, timedOut)
+	assert.Equal(t, "mod/job1", event.Key)
+	assert.Equal(t, 5*time.Second, event.Threshold)
+	assert.Equal(t, 5*time.Second, event.Elapsed)
+	assert.False(t, h.WaitingForDecision())
+
+	_, ok = h.WaitDecisionRemaining()
+	assert.False(t, ok)
+}
+
+func TestHandler_WaitForDecision_TimeoutDisabledKeepsWait(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandlerWithWaitTimeout(cb, 0)
+
+	cfg := testConfig{
+		uid:        "uid-job1",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "mod/job1",
+	}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+
+	base := time.Unix(1000, 0)
+	h.waitGate.setNow(func() time.Time { return base })
+	h.WaitForDecision(cfg)
+
+	h.waitGate.setNow(func() time.Time { return base.Add(24 * time.Hour) })
+	_, timedOut := h.ExpireWaitDecision()
+	assert.False(t, timedOut)
+	assert.True(t, h.WaitingForDecision())
+}
+
+func TestHandler_NextWaitDecisionStep_Command(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandlerWithWaitTimeout(cb, 5*time.Second)
+
+	cfg := testConfig{
+		uid:        "uid-job1",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "mod/job1",
+	}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+	h.WaitForDecision(cfg)
+
+	ch := make(chan Function, 1)
+	fn := newTestFn("test:job1", "enable", "", nil)
+	ch <- fn
+
+	step, ok := h.NextWaitDecisionStep(context.Background(), ch)
+	require.True(t, ok)
+	require.True(t, step.HasCommand)
+	assert.Equal(t, fn.UID(), step.Command.UID())
+	assert.False(t, step.TimedOut)
+}
+
+func TestHandler_NextWaitDecisionStep_Timeout(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandlerWithWaitTimeout(cb, 20*time.Millisecond)
+
+	cfg := testConfig{
+		uid:        "uid-job1",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "mod/job1",
+	}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+	h.WaitForDecision(cfg)
+
+	ch := make(chan Function)
+	step, ok := h.NextWaitDecisionStep(context.Background(), ch)
+	require.True(t, ok)
+	require.True(t, step.TimedOut)
+	assert.Equal(t, "mod/job1", step.Timeout.Key)
+	assert.False(t, h.WaitingForDecision())
+}
+
+func TestHandler_NextWaitDecisionStep_ContextCancel(t *testing.T) {
+	cb := &mockCallbacks{}
+	h := newTestHandlerWithWaitTimeout(cb, 5*time.Second)
+
+	cfg := testConfig{
+		uid:        "uid-job1",
+		key:        "job1",
+		sourceType: "stock",
+		source:     "mod/job1",
+	}
+	h.exposed.Add(&Entry[testConfig]{Cfg: cfg, Status: StatusAccepted})
+	h.WaitForDecision(cfg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	ch := make(chan Function)
+	_, ok := h.NextWaitDecisionStep(ctx, ch)
+	assert.False(t, ok)
+	assert.True(t, h.WaitingForDecision())
 }
 
 func TestHandler_AddDiscoveredConfig_TracksSeenAndExposed(t *testing.T) {

@@ -103,10 +103,15 @@ func (c *runningJobs) lookup(fullName string) (runtimeJob, bool) {
 	j, ok := c.items[fullName]
 	return j, ok
 }
-func (c *runningJobs) forEach(fn func(fullName string, job runtimeJob)) {
-	for k, j := range c.items {
-		fn(k, j)
+func (c *runningJobs) snapshot() []runtimeJob {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+
+	jobs := make([]runtimeJob, 0, len(c.items))
+	for _, job := range c.items {
+		jobs = append(jobs, job)
 	}
+	return jobs
 }
 
 func (c *retryingTasks) add(cfg confgroup.Config, retry *retryTask) {

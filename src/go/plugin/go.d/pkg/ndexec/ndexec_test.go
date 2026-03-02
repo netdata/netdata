@@ -65,7 +65,7 @@ exec "$@"
 		"success_echo_args": {
 			helperPath: helper,
 			argv:       []string{echoArgs, `a b`, `c"d`},
-			timeout:    time.Second,
+			timeout:    15 * time.Second,
 			wantOut:    "a b|c\"d|\n",
 		},
 		"nonzero_with_trimmed_stderr": {

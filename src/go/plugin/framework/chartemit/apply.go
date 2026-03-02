@@ -29,6 +29,7 @@ type normalizedActions struct {
 type dimensionEmission struct {
 	Name       string
 	Hidden     bool
+	Float      bool
 	Algorithm  string
 	Multiplier int
 	Divisor    int
@@ -124,6 +125,7 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 			emitDimension(api, dimensionEmission{
 				Name:       dim.Name,
 				Hidden:     dim.Hidden,
+				Float:      dim.Float,
 				Algorithm:  string(dim.Algorithm),
 				Multiplier: dim.Multiplier,
 				Divisor:    dim.Divisor,
@@ -151,6 +153,7 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 			emitDimension(api, dimensionEmission{
 				Name:       dim.Name,
 				Hidden:     dim.Hidden,
+				Float:      dim.Float,
 				Algorithm:  string(dim.Algorithm),
 				Multiplier: dim.Multiplier,
 				Divisor:    dim.Divisor,
@@ -167,13 +170,11 @@ func emitUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartActi
 				api.SETEMPTY(sanitizeWireID(dim.Name))
 				continue
 			}
-			value := dim.Int64
 			if dim.IsFloat {
-				// NOTE: V2 currently emits integer SET only.
-				// TODO(godv2): switch to SETFLOAT when Netdata float wire support is available.
-				value = int64(dim.Float64)
+				api.SETFLOAT(sanitizeWireID(dim.Name), dim.Float64)
+				continue
 			}
-			api.SET(sanitizeWireID(dim.Name), value)
+			api.SET(sanitizeWireID(dim.Name), dim.Int64)
 		}
 		api.END()
 	}
@@ -185,6 +186,7 @@ func emitRemovePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 		emitDimension(api, dimensionEmission{
 			Name:       removeDim.Name,
 			Hidden:     removeDim.Hidden,
+			Float:      removeDim.Float,
 			Algorithm:  string(removeDim.Algorithm),
 			Multiplier: removeDim.Multiplier,
 			Divisor:    removeDim.Divisor,
@@ -207,6 +209,6 @@ func emitDimension(api *netdataapi.API, dim dimensionEmission) {
 		Algorithm:  dim.Algorithm,
 		Multiplier: handleZero(dim.Multiplier),
 		Divisor:    handleZero(dim.Divisor),
-		Options:    makeDimensionOptions(dim.Hidden, dim.Obsolete),
+		Options:    makeDimensionOptions(dim.Hidden, dim.Obsolete, dim.Float),
 	})
 }

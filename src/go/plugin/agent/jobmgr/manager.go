@@ -7,26 +7,21 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
-	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"gopkg.in/yaml.v2"
@@ -35,31 +30,44 @@ import (
 type Config struct {
 	PluginName         string
 	Out                io.Writer
+	RunModePolicy      policy.RunModePolicy
 	Modules            collectorapi.Registry
 	RunJob             []string
 	ConfigDefaults     confgroup.Registry
 	VarLibDir          string
 	FnReg              FunctionRegistry
 	Vnodes             map[string]*vnodes.VirtualNode
-	DumpMode           bool
-	DumpAnalyzer       jobruntime.DumpAnalyzer
-	DumpDataDir        string
+	AuditMode          bool
+	AuditAnalyzer      metricsaudit.Analyzer
+	AuditDataDir       string
 	FunctionJSONWriter func(payload []byte, code int)
 	RuntimeService     runtimecomp.Service
 }
 
-func New(cfg Config) *Manager {
-	seen := dyncfg.NewSeenCache[confgroup.Config]()
-	exposed := dyncfg.NewExposedCache[confgroup.Config]()
-	api := dyncfg.NewResponder(netdataapi.New(safewriter.Stdout))
+const (
+	waitDecisionTimeout    = 5 * time.Second
+	cmdTestWorkerCap       = 4
+	cmdTestDefaultTimeout  = 60 * time.Second
+	cmdTestWorkerDrainWait = 5 * time.Second
+)
 
+func New(cfg Config) *Manager {
 	out := cfg.Out
 	if out == nil {
 		out = io.Discard
 	}
+
+	seen := dyncfg.NewSeenCache[confgroup.Config]()
+	exposed := dyncfg.NewExposedCache[confgroup.Config]()
+	api := dyncfg.NewResponder(netdataapi.New(out))
 	fnReg := cfg.FnReg
 	if fnReg == nil {
 		fnReg = noop{}
+	}
+	if provider, ok := fnReg.(interface {
+		TerminalFinalizer() functions.TerminalFinalizer
+	}); ok {
+		api.SetTerminalFinalizer(provider.TerminalFinalizer())
 	}
 	vnodesReg := cfg.Vnodes
 	if vnodesReg == nil {
@@ -72,16 +80,17 @@ func New(cfg Config) *Manager {
 		),
 		pluginName:     cfg.PluginName,
 		out:            out,
+		runModePolicy:  cfg.RunModePolicy,
 		modules:        cfg.Modules,
 		runJob:         cfg.RunJob,
 		configDefaults: cfg.ConfigDefaults,
 		varLibDir:      cfg.VarLibDir,
 		fnReg:          fnReg,
-		vnodes:         vnodesReg,
+		vnodes:         newVnodeStore(vnodesReg),
 
-		dumpMode:           cfg.DumpMode,
-		dumpAnalyzer:       cfg.DumpAnalyzer,
-		dumpDataDir:        cfg.DumpDataDir,
+		auditMode:          cfg.AuditMode,
+		auditAnalyzer:      cfg.AuditAnalyzer,
+		auditDataDir:       cfg.AuditDataDir,
 		functionJSONWriter: cfg.FunctionJSONWriter,
 		runtimeService:     cfg.RuntimeService,
 
@@ -92,11 +101,12 @@ func New(cfg Config) *Manager {
 		runningJobs:       newRunningJobsCache(),
 		retryingTasks:     newRetryingTasksCache(),
 
-		started:   make(chan struct{}),
-		addCh:     make(chan confgroup.Config),
-		rmCh:      make(chan confgroup.Config),
-		dyncfgCh:  make(chan dyncfg.Function),
-		dyncfgApi: api,
+		started:    make(chan struct{}),
+		addCh:      make(chan confgroup.Config),
+		rmCh:       make(chan confgroup.Config),
+		dyncfgCh:   make(chan dyncfg.Function),
+		cmdTestSem: make(chan struct{}, cmdTestWorkerCap),
+		dyncfgApi:  api,
 	}
 
 	mgr.collectorCb = &collectorCallbacks{mgr: mgr}
@@ -109,8 +119,9 @@ func New(cfg Config) *Manager {
 		WaitKey: func(cfg confgroup.Config) string {
 			return cfg.FullName()
 		},
+		WaitTimeout: waitDecisionTimeout,
 
-		Path:                    fmt.Sprintf(dyncfgCollectorPath, executable.Name),
+		Path:                    fmt.Sprintf(dyncfgCollectorPath, cfg.PluginName),
 		EnableFailCode:          200,
 		RemoveStockOnEnableFail: true,
 		JobCommands: []dyncfg.Command{
@@ -130,6 +141,9 @@ func New(cfg Config) *Manager {
 
 // SetDyncfgResponder allows overriding the default responder (e.g., to silence output in CLI mode).
 func (m *Manager) SetDyncfgResponder(responder *dyncfg.Responder) {
+	if responder != nil && m.dyncfgApi != nil {
+		responder.SetTerminalFinalizer(m.dyncfgApi.TerminalFinalizer())
+	}
 	dyncfg.BindResponder(&m.dyncfgApi, m.handler, responder)
 }
 
@@ -138,17 +152,18 @@ type Manager struct {
 
 	pluginName     string
 	out            io.Writer
+	runModePolicy  policy.RunModePolicy
 	modules        collectorapi.Registry
 	runJob         []string
 	configDefaults confgroup.Registry
 	varLibDir      string
 	fnReg          FunctionRegistry
-	vnodes         map[string]*vnodes.VirtualNode
+	vnodes         *vnodeStore
 
-	// Dump mode
-	dumpMode     bool
-	dumpAnalyzer jobruntime.DumpAnalyzer
-	dumpDataDir  string
+	// Metrics-audit mode.
+	auditMode     bool
+	auditAnalyzer metricsaudit.Analyzer
+	auditDataDir  string
 
 	fileStatus  *fileStatus
 	moduleFuncs *moduleFuncRegistry
@@ -162,11 +177,13 @@ type Manager struct {
 	handler     *dyncfg.Handler[confgroup.Config]
 	collectorCb *collectorCallbacks
 
-	ctx      context.Context
-	started  chan struct{}
-	addCh    chan confgroup.Config
-	rmCh     chan confgroup.Config
-	dyncfgCh chan dyncfg.Function
+	ctx        context.Context
+	started    chan struct{}
+	addCh      chan confgroup.Config
+	rmCh       chan confgroup.Config
+	dyncfgCh   chan dyncfg.Function
+	cmdTestSem chan struct{}
+	cmdTestWG  sync.WaitGroup
 
 	dyncfgApi *dyncfg.Responder
 
@@ -188,9 +205,10 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 
 	m.dyncfgVnodeModuleCreate()
 
-	for _, cfg := range m.vnodes {
+	m.vnodes.ForEach(func(cfg *vnodes.VirtualNode) bool {
 		m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
-	}
+		return true
+	})
 
 	for name, creator := range m.modules {
 		m.dyncfgCollectorModuleCreate(name)
@@ -319,11 +337,21 @@ func (m *Manager) runProcessConfGroups(in chan []*confgroup.Group) {
 func (m *Manager) run() {
 	for {
 		if m.handler.WaitingForDecision() {
-			select {
-			case <-m.ctx.Done():
+			step, ok := m.handler.NextWaitDecisionStep(m.ctx, m.dyncfgCh)
+			if !ok {
 				return
-			case fn := <-m.dyncfgCh:
-				m.dyncfgSeqExec(fn)
+			}
+			if step.HasCommand {
+				m.dyncfgSeqExec(step.Command)
+				continue
+			}
+			if step.TimedOut {
+				m.Errorf(
+					"dyncfg: timed out waiting for enable/disable decision for '%s' (elapsed=%s threshold=%s); keeping status 'accepted' and continuing",
+					step.Timeout.Key,
+					step.Timeout.Elapsed,
+					step.Timeout.Threshold,
+				)
 			}
 		} else {
 			select {
@@ -366,7 +394,7 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 
 	m.handler.NotifyJobCreate(entry.Cfg, entry.Status)
 
-	if terminal.IsTerminal() || m.pluginName == "nodyncfg" { // FIXME: quick fix of TestAgent_Run (agent_test.go)
+	if m.runModePolicy.AutoEnableDiscovered {
 		m.handler.CmdEnable(dyncfg.NewFunction(functions.Function{Args: []string{m.dyncfgJobID(entry.Cfg), "enable"}}))
 	} else {
 		m.handler.WaitForDecision(entry.Cfg)
@@ -397,9 +425,9 @@ func (m *Manager) runNotifyRunningJobs() {
 		case <-m.ctx.Done():
 			return
 		case clock := <-tk.C:
-			m.runningJobs.lock()
-			m.runningJobs.forEach(func(_ string, job runtimeJob) { job.Tick(clock) })
-			m.runningJobs.unlock()
+			for _, job := range m.runningJobs.snapshot() {
+				job.Tick(clock)
+			}
 		}
 	}
 }
@@ -407,11 +435,11 @@ func (m *Manager) runNotifyRunningJobs() {
 func (m *Manager) startRunningJob(job runtimeJob) {
 	m.stopRunningJob(job.FullName())
 
-	m.runningJobs.lock()
-	defer m.runningJobs.unlock()
-
 	go job.Start()
+
+	m.runningJobs.lock()
 	m.runningJobs.add(job.FullName(), job)
+	m.runningJobs.unlock()
 
 	// Track job for module function routing.
 	m.moduleFuncs.addJob(job.ModuleName(), job.Name(), job)
@@ -461,19 +489,53 @@ func (m *Manager) cleanup() {
 		}
 	}
 
-	m.runningJobs.lock()
-	defer m.runningJobs.unlock()
+	for _, job := range m.runningJobs.snapshot() {
+		m.stopRunningJob(job.FullName())
+	}
 
-	m.runningJobs.forEach(func(_ string, job runtimeJob) {
-		job.Stop()
-	})
+	m.waitCmdTestWorkers()
+}
+
+func (m *Manager) waitCmdTestWorkers() {
+	done := make(chan struct{})
+	go func() {
+		m.cmdTestWG.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(cmdTestWorkerDrainWait):
+		m.Warningf("dyncfg: timeout waiting %s for command test workers to drain", cmdTestWorkerDrainWait)
+	}
 }
 
 // registerJobMethods registers methods for a specific job with Netdata
 func (m *Manager) registerJobMethods(job collectorapi.RuntimeJob, methods []funcapi.MethodConfig) {
+	planned := make(map[string]struct{}, len(methods))
+
 	for _, method := range methods {
 		if method.ID == "" {
 			m.Warningf("skipping job method registration for %s[%s]: empty method ID", job.ModuleName(), job.Name())
+			continue
+		}
+
+		funcName := fmt.Sprintf("%s:%s", job.ModuleName(), method.ID)
+
+		if _, exists := planned[method.ID]; exists {
+			m.Errorf("job method registration aborted for %s[%s]: duplicate method ID in batch ('%s')", job.ModuleName(), job.Name(), funcName)
+			return
+		}
+		planned[method.ID] = struct{}{}
+
+		if collision, exists := m.moduleFuncs.findMethodCollision(job.ModuleName(), job.Name(), method.ID); exists {
+			m.Errorf("job method registration aborted for %s[%s]: collision on '%s' (%s)", job.ModuleName(), job.Name(), funcName, collision)
+			return
+		}
+	}
+
+	for _, method := range methods {
+		if method.ID == "" {
 			continue
 		}
 
@@ -538,119 +600,15 @@ func (m *Manager) unregisterJobMethods(job collectorapi.RuntimeJob) {
 	m.moduleFuncs.unregisterJobMethods(job.ModuleName(), job.Name())
 }
 
+func (m *Manager) baseContext() context.Context {
+	if m.ctx != nil {
+		return m.ctx
+	}
+	return context.Background()
+}
+
 func (m *Manager) createCollectorJob(cfg confgroup.Config) (runtimeJob, error) {
-	creator, ok := m.modules[cfg.Module()]
-	if !ok {
-		return nil, fmt.Errorf("can not find %s module", cfg.Module())
-	}
-
-	// Determine if job is function-only (module-level OR config-level)
-	functionOnly := creator.FunctionOnly || cfg.FunctionOnly()
-
-	// Reject if config sets function_only but module has no methods
-	// Note: module-level FunctionOnly without Methods is caught at registration time
-	if cfg.FunctionOnly() && creator.Methods == nil && creator.JobMethods == nil {
-		return nil, fmt.Errorf("function_only is set but %s module has no methods defined", cfg.Module())
-	}
-
-	var vnode *vnodes.VirtualNode
-
-	if cfg.Vnode() != "" {
-		n, ok := m.vnodes[cfg.Vnode()]
-		if !ok || n == nil {
-			return nil, fmt.Errorf("vnode '%s' is not found", cfg.Vnode())
-		}
-		vnode = n
-	}
-
-	m.Debugf("creating %s[%s] job, config: %v", cfg.Module(), cfg.Name(), cfg)
-
-	var jobDumpDir string
-	if m.dumpDataDir != "" {
-		jobDumpDir = filepath.Join(m.dumpDataDir, naming.Sanitize(cfg.Module()), naming.Sanitize(cfg.Name()))
-		if err := os.MkdirAll(jobDumpDir, 0o755); err != nil {
-			return nil, fmt.Errorf("creating dump directory: %w", err)
-		}
-		if m.dumpAnalyzer != nil {
-			m.dumpAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
-		}
-	}
-
-	useV2 := creator.CreateV2 != nil
-	if useV2 {
-		mod := creator.CreateV2()
-		if mod == nil {
-			return nil, fmt.Errorf("module %s CreateV2 returned nil", cfg.Module())
-		}
-		if err := applyConfig(cfg, mod); err != nil {
-			return nil, err
-		}
-		if jobDumpDir != "" {
-			if dumpAware, ok := mod.(interface{ EnableDump(string) }); ok {
-				dumpAware.EnableDump(jobDumpDir)
-			}
-		}
-
-		jobCfg := jobruntime.JobV2Config{
-			PluginName:      m.pluginName,
-			Name:            cfg.Name(),
-			ModuleName:      cfg.Module(),
-			FullName:        cfg.FullName(),
-			UpdateEvery:     cfg.UpdateEvery(),
-			AutoDetectEvery: cfg.AutoDetectionRetry(),
-			IsStock:         cfg.SourceType() == "stock",
-			Labels:          makeLabels(cfg),
-			Out:             m.out,
-			Module:          mod,
-			FunctionOnly:    functionOnly,
-			RuntimeService:  m.runtimeService,
-		}
-		if vnode != nil {
-			jobCfg.Vnode = *vnode.Copy()
-		}
-		return jobruntime.NewJobV2(jobCfg), nil
-	}
-
-	if creator.Create == nil {
-		return nil, fmt.Errorf("module %s has no compatible creator", cfg.Module())
-	}
-
-	mod := creator.Create()
-
-	if err := applyConfig(cfg, mod); err != nil {
-		return nil, err
-	}
-
-	if jobDumpDir != "" {
-		if dumpAware, ok := mod.(interface{ EnableDump(string) }); ok {
-			dumpAware.EnableDump(jobDumpDir)
-		}
-	}
-
-	jobCfg := jobruntime.JobConfig{
-		PluginName:      m.pluginName,
-		Name:            cfg.Name(),
-		ModuleName:      cfg.Module(),
-		FullName:        cfg.FullName(),
-		UpdateEvery:     cfg.UpdateEvery(),
-		AutoDetectEvery: cfg.AutoDetectionRetry(),
-		Priority:        cfg.Priority(),
-		Labels:          makeLabels(cfg),
-		IsStock:         cfg.SourceType() == "stock",
-		Module:          mod,
-		Out:             m.out,
-		DumpMode:        m.dumpMode,
-		DumpAnalyzer:    m.dumpAnalyzer,
-		FunctionOnly:    functionOnly,
-	}
-
-	if vnode != nil {
-		jobCfg.Vnode = *vnode.Copy()
-	}
-
-	job := jobruntime.NewJob(jobCfg)
-
-	return job, nil
+	return newJobFactory(m).create(cfg)
 }
 
 func runRetryTask(ctx context.Context, out chan<- confgroup.Config, cfg confgroup.Config) {

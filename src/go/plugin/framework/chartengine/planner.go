@@ -72,6 +72,7 @@ type InferredDimension struct {
 
 type dimensionState struct {
 	hidden     bool
+	float      bool
 	static     bool
 	order      int
 	algorithm  program.Algorithm
@@ -100,6 +101,7 @@ type planBuildContext struct {
 	out         *Plan
 	reader      metrix.Reader
 	collectMeta metrix.CollectMeta
+	buildCycle  uint64
 	prog        *program.Program
 	cache       *routeCache
 	index       matchIndex
@@ -150,6 +152,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	defer e.mu.Unlock()
 
 	obs := e.observeBuildSuccessSeq(collectMeta.LastSuccessSeq)
+	buildCycle := e.nextBuildCycle(collectMeta.LastSuccessSeq)
 	sample.buildSeqViolation = e.state.buildSeq.violating
 	sample.buildSeqObserved = true
 	switch obs.transition {
@@ -170,7 +173,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	}
 
 	phaseStartedAt := time.Now()
-	ctx, err := e.preparePlanBuildContext(reader, &out, collectMeta)
+	ctx, err := e.preparePlanBuildContext(reader, &out, collectMeta, buildCycle)
 	sample.phasePrepareSeconds = time.Since(phaseStartedAt).Seconds()
 	if err != nil {
 		sample.buildErr = true
@@ -294,6 +297,7 @@ func (e *Engine) preparePlanBuildContext(
 	reader metrix.Reader,
 	out *Plan,
 	collectMeta metrix.CollectMeta,
+	buildCycle uint64,
 ) (*planBuildContext, error) {
 	prog := e.state.program
 	if prog == nil {
@@ -329,6 +333,7 @@ func (e *Engine) preparePlanBuildContext(
 		out:              out,
 		reader:           reader,
 		collectMeta:      collectMeta,
+		buildCycle:       buildCycle,
 		prog:             prog,
 		cache:            cache,
 		index:            index,
@@ -485,7 +490,7 @@ func (ctx *planBuildContext) accumulateRoute(
 			lifecycle:       route.Lifecycle,
 			labels:          labelsAcc,
 			entries:         entries,
-			currentBuildSeq: ctx.collectMeta.LastSuccessSeq,
+			currentBuildSeq: ctx.buildCycle,
 		}
 		ctx.chartsByID[route.ChartID] = cs
 	}
@@ -500,6 +505,7 @@ func (ctx *planBuildContext) accumulateRoute(
 		entry.value = value
 		entry.dimensionState = dimensionState{
 			hidden:     route.Hidden,
+			float:      route.Float,
 			static:     route.Static,
 			order:      route.DimensionIndex,
 			algorithm:  route.Algorithm,
@@ -510,6 +516,9 @@ func (ctx *planBuildContext) accumulateRoute(
 	} else {
 		if entry.hidden != route.Hidden {
 			// First-observed hidden flag wins within one build; conflicting routes are ignored.
+		}
+		if entry.float != route.Float {
+			// First-observed float flag wins within one build; conflicting routes are ignored.
 		}
 		entry.value += value
 	}
@@ -578,6 +587,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 					ChartMeta:  cs.meta,
 					Name:       name,
 					Hidden:     entry.hidden,
+					Float:      entry.float,
 					Algorithm:  entry.algorithm,
 					Multiplier: entry.multiplier,
 					Divisor:    entry.divisor,
@@ -593,7 +603,8 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 			if ok && entry != nil && entry.seenSeq == cs.currentBuildSeq {
 				values = append(values, UpdateDimensionValue{
 					Name:    name,
-					IsFloat: true,
+					IsFloat: entry.float,
+					Int64:   int64(entry.value),
 					Float64: entry.value,
 				})
 				continue
@@ -664,4 +675,16 @@ func buildPlan(engine *Engine, reader metrix.Reader) (Plan, error) {
 
 func isAutogenTemplateID(templateID string) bool {
 	return strings.HasPrefix(templateID, autogenTemplatePrefix)
+}
+
+func (e *Engine) nextBuildCycle(sourceSuccessSeq uint64) uint64 {
+	if !e.state.cfg.runtimePlanner {
+		return sourceSuccessSeq
+	}
+	e.state.plannerBuildSeq++
+	// Seen-seq zero value is reserved for "never seen".
+	if e.state.plannerBuildSeq == 0 {
+		e.state.plannerBuildSeq = 1
+	}
+	return e.state.plannerBuildSeq
 }

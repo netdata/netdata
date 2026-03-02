@@ -10,18 +10,51 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO: tech debt
 func TestNew(t *testing.T) {
+	t.Run("uses injected module registry", func(t *testing.T) {
+		reg := prepareRegistry(&sync.Mutex{}, map[string]int{}, "module1")
+		a := New(Config{Name: "test", ModuleRegistry: reg})
+		assert.Equal(t, reg, a.ModuleRegistry)
+	})
 
+	t.Run("keeps nil module registry when not provided", func(t *testing.T) {
+		a := New(Config{Name: "test"})
+		assert.Nil(t, a.ModuleRegistry)
+	})
 }
 
 func TestAgent_Run(t *testing.T) {
-	a := New(Config{Name: "nodyncfg"})
+	a := New(Config{
+		Name: "test",
+		RunModePolicy: policy.RunModePolicy{
+			IsTerminal:               false,
+			AutoEnableDiscovered:     true,
+			UseFileStatusPersistence: true,
+		},
+		DiscoveryProviders: []discovery.ProviderFactory{
+			discovery.NewProviderFactory("dummy", func(ctx discovery.BuildContext) (discovery.Discoverer, bool, error) {
+				if len(ctx.DummyNames) == 0 {
+					return nil, false, nil
+				}
+				d, err := dummy.NewDiscovery(dummy.Config{
+					Registry: ctx.Registry,
+					Names:    ctx.DummyNames,
+				})
+				if err != nil {
+					return nil, false, err
+				}
+				return d, true, nil
+			}),
+		},
+	})
 
 	var buf bytes.Buffer
 	a.Out = safewriter.New(&buf)

@@ -25,7 +25,6 @@ modules:
         - fd
         - open
         - close
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor calls for functions responsible to open or close a file descriptor and possible errors."
@@ -249,7 +248,6 @@ modules:
         - fork
         - process
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor calls for function creating tasks (threads and processes) inside Linux kernel."
@@ -500,7 +498,6 @@ modules:
         - eBPF
         - latency
         - partition
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Measure latency for I/O events on disk."
@@ -606,7 +603,6 @@ modules:
       keywords:
         - HardIRQ
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor latency for each HardIRQ available."
@@ -718,7 +714,6 @@ modules:
         - Page cache
         - Hit ratio
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files."
@@ -947,7 +942,6 @@ modules:
         - eBPF
         - hard disk
         - memory
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor syscall responsible to move data from memory to storage device."
@@ -1128,7 +1122,6 @@ modules:
         - MD
         - RAID
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor when flush events happen between disks."
@@ -1238,7 +1231,6 @@ modules:
         - memory
         - eBPF
         - Hard Disk
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitors when swap has I/O events and applications executing events."
@@ -1417,7 +1409,6 @@ modules:
       keywords:
         - application
         - memory
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor applications that reach out of memory."
@@ -1550,7 +1541,6 @@ modules:
         - server
         - connection
         - socket
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor bandwidth consumption per application for protocols TCP and UDP."
@@ -1907,7 +1897,6 @@ modules:
         - Directory Cache
         - File system
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor directory cache events per application given an overall vision about files on memory or storage device."
@@ -2131,7 +2120,6 @@ modules:
         - eBPF
         - latency
         - I/O
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor latency for main actions on filesystem like I/O events."
@@ -2292,7 +2280,6 @@ modules:
         - syscall
         - shared memory
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor syscall responsible to manipulate shared memory."
@@ -2523,7 +2510,6 @@ modules:
       keywords:
         - SoftIRQ
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor latency for each SoftIRQ available."
@@ -2631,7 +2617,6 @@ modules:
         - umount
         - device
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor calls for mount and umount syscall."
@@ -2761,7 +2746,6 @@ modules:
         - eBPF
         - I/O
         - files
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor I/O events on Linux Virtual Filesystem."
@@ -3190,7 +3174,6 @@ modules:
         - Memory
         - plugin
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor internal memory usage."

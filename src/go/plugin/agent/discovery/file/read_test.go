@@ -115,3 +115,25 @@ func TestReader_Run(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigSourceType(t *testing.T) {
+	tests := map[string]struct {
+		path string
+		want string
+	}{
+		"user path under /etc": {
+			path: "/etc/netdata/go.d/module.conf",
+			want: confgroup.TypeUser,
+		},
+		"stock path outside /etc": {
+			path: "/usr/lib/netdata/conf.d/go.d/module.conf",
+			want: confgroup.TypeStock,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, configSourceType(tc.path))
+		})
+	}
+}

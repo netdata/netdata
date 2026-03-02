@@ -5,6 +5,7 @@ package agent
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"github.com/stretchr/testify/assert"
@@ -203,7 +204,38 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 	}
 }
 
-// TODO: tech debt
-func TestAgent_buildDiscoveryConf(t *testing.T) {
+func TestIsStockConfig(t *testing.T) {
+	assert.True(t, isStockConfig("/usr/lib/netdata/conf.d/go.d/module.conf"))
+	assert.False(t, isStockConfig("/etc/netdata/go.d/module.conf"))
+}
 
+func TestAgent_buildDiscoveryConf(t *testing.T) {
+	providers := []discovery.ProviderFactory{
+		discovery.NewProviderFactory("noop", nil),
+	}
+	enabled := collectorapi.Registry{
+		"module1": collectorapi.Creator{},
+	}
+
+	t.Run("inside k8s with no collectors dir disables provider list", func(t *testing.T) {
+		a := &Agent{
+			IsInsideK8s:        true,
+			DiscoveryProviders: providers,
+		}
+
+		cfg := a.buildDiscoveryConf(enabled, nil)
+		assert.True(t, cfg.BuildContext.Policy.IsInsideK8s)
+		assert.Empty(t, cfg.Providers)
+	})
+
+	t.Run("outside k8s keeps injected providers", func(t *testing.T) {
+		a := &Agent{
+			IsInsideK8s:        false,
+			DiscoveryProviders: providers,
+		}
+
+		cfg := a.buildDiscoveryConf(enabled, nil)
+		assert.False(t, cfg.BuildContext.Policy.IsInsideK8s)
+		assert.Len(t, cfg.Providers, 1)
+	})
 }

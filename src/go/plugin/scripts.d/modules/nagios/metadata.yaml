@@ -21,7 +21,6 @@ modules:
         - checks
         - scripts
         - monitoring
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

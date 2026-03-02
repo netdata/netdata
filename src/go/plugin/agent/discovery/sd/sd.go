@@ -5,24 +5,29 @@ package sd
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"sync"
+	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 )
+
+const waitDecisionTimeout = 5 * time.Second
 
 type Config struct {
 	ConfigDefaults confgroup.Registry
+	PluginName     string
+	RunModePolicy  policy.RunModePolicy
+	Out            io.Writer
 	ConfDir        multipath.MultiPath
 	FnReg          functions.Registry
 	Discoverers    Registry
@@ -35,17 +40,28 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 	if cfg.Discoverers == nil {
 		return nil, fmt.Errorf("service discovery discoverer registry is not configured")
 	}
+	out := cfg.Out
+	if out == nil {
+		out = io.Discard
+	}
 
 	d := &ServiceDiscovery{
 		Logger:         log,
 		confProv:       newConfFileReader(log, cfg.ConfDir),
 		configDefaults: cfg.ConfigDefaults,
+		pluginName:     cfg.PluginName,
+		runModePolicy:  cfg.RunModePolicy,
 		fnReg:          cfg.FnReg,
 		discoverers:    cfg.Discoverers,
-		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
+		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(out)),
 		seen:           dyncfg.NewSeenCache[sdConfig](),
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
+	}
+	if provider, ok := cfg.FnReg.(interface {
+		TerminalFinalizer() functions.TerminalFinalizer
+	}); ok {
+		d.dyncfgApi.SetTerminalFinalizer(provider.TerminalFinalizer())
 	}
 	d.newPipeline = func(config pipeline.Config) (sdPipeline, error) {
 		return pipeline.New(config, d.newDiscoverersFromRegistry)
@@ -60,8 +76,9 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		WaitKey: func(cfg sdConfig) string {
 			return cfg.PipelineKey()
 		},
+		WaitTimeout: waitDecisionTimeout,
 
-		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		Path:           fmt.Sprintf(dyncfgSDPath, cfg.PluginName),
 		EnableFailCode: 422,
 		JobCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
@@ -84,6 +101,8 @@ type (
 		confProv confFileProvider
 
 		configDefaults confgroup.Registry
+		pluginName     string
+		runModePolicy  policy.RunModePolicy
 		fnReg          functions.Registry
 		discoverers    Registry
 		dyncfgApi      *dyncfg.Responder
@@ -108,6 +127,9 @@ type (
 
 // SetDyncfgResponder allows overriding the default responder (e.g., to silence output in tests).
 func (d *ServiceDiscovery) SetDyncfgResponder(api *dyncfg.Responder) {
+	if api != nil && d.dyncfgApi != nil {
+		api.SetTerminalFinalizer(d.dyncfgApi.TerminalFinalizer())
+	}
 	dyncfg.BindResponder(&d.dyncfgApi, d.handler, api)
 }
 
@@ -157,12 +179,21 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 func (d *ServiceDiscovery) run(ctx context.Context) {
 	for {
 		if d.handler.WaitingForDecision() {
-			// Waiting for enable/disable command - only process dyncfg commands
-			select {
-			case <-ctx.Done():
+			step, ok := d.handler.NextWaitDecisionStep(ctx, d.dyncfgCh)
+			if !ok {
 				return
-			case fn := <-d.dyncfgCh:
-				d.dyncfgSeqExec(fn)
+			}
+			if step.HasCommand {
+				d.dyncfgSeqExec(step.Command)
+				continue
+			}
+			if step.TimedOut {
+				d.Errorf(
+					"dyncfg: timed out waiting for enable/disable decision for '%s' (elapsed=%s threshold=%s); keeping status 'accepted' and continuing",
+					step.Timeout.Key,
+					step.Timeout.Elapsed,
+					step.Timeout.Threshold,
+				)
 			}
 		} else {
 			select {
@@ -273,7 +304,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 		d.handler.AddDiscoveredConfig(scfg, dyncfg.StatusAccepted)
 
 		d.handler.NotifyJobCreate(scfg, dyncfg.StatusAccepted)
-		if terminal.IsTerminal() || d.fnReg == nil || d.dyncfgCh == nil {
+		if d.runModePolicy.AutoEnableDiscovered || d.fnReg == nil || d.dyncfgCh == nil {
 			// Auto-enable in terminal mode and tests.
 			// Also auto-enable when no function registry is attached, because
 			// no external enable/disable commands can be delivered.
@@ -309,7 +340,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	d.handler.NotifyJobRemove(entry.Cfg)
 	d.handler.NotifyJobCreate(scfg, dyncfg.StatusAccepted)
 
-	if terminal.IsTerminal() || d.fnReg == nil || d.dyncfgCh == nil {
+	if d.runModePolicy.AutoEnableDiscovered || d.fnReg == nil || d.dyncfgCh == nil {
 		d.autoEnableConfig(scfg)
 	} else {
 		d.handler.WaitForDecision(scfg)

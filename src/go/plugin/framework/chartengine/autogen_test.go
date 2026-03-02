@@ -13,7 +13,30 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-func TestBuildScalarAutogenRoute(t *testing.T) {
+func TestAutogenRouteBuilderScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"build scalar autogen route": {
+			run: runTestBuildScalarAutogenRoute,
+		},
+		"build histogram bucket autogen route": {
+			run: runTestBuildHistogramBucketAutogenRoute,
+		},
+		"build summary quantile autogen route": {
+			run: runTestBuildSummaryQuantileAutogenRoute,
+		},
+		"build state-set autogen route": {
+			run: runTestBuildStateSetAutogenRoute,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
+func runTestBuildScalarAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -55,6 +78,7 @@ func TestBuildScalarAutogenRoute(t *testing.T) {
 				sortedLabelView(tc.labels),
 				tc.meta,
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
@@ -68,7 +92,7 @@ func TestBuildScalarAutogenRoute(t *testing.T) {
 	}
 }
 
-func TestBuildHistogramBucketAutogenRoute(t *testing.T) {
+func runTestBuildHistogramBucketAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -93,6 +117,7 @@ func TestBuildHistogramBucketAutogenRoute(t *testing.T) {
 				tc.metricName,
 				sortedLabelView(tc.labels),
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
@@ -106,7 +131,7 @@ func TestBuildHistogramBucketAutogenRoute(t *testing.T) {
 	}
 }
 
-func TestBuildSummaryQuantileAutogenRoute(t *testing.T) {
+func runTestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -131,6 +156,7 @@ func TestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 				tc.metricName,
 				sortedLabelView(tc.labels),
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
@@ -144,7 +170,7 @@ func TestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 	}
 }
 
-func TestBuildStateSetAutogenRoute(t *testing.T) {
+func runTestBuildStateSetAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -171,6 +197,7 @@ func TestBuildStateSetAutogenRoute(t *testing.T) {
 				sortedLabelView(tc.labels),
 				tc.meta,
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
@@ -187,35 +214,38 @@ func TestBuildStateSetAutogenRoute(t *testing.T) {
 
 func TestFitsTypeIDBudget(t *testing.T) {
 	tests := map[string]struct {
-		policy  AutogenPolicy
-		chartID string
-		want    bool
+		maxLen       int
+		typeIDPrefix string
+		chartID      string
+		want         bool
 	}{
 		"empty type id at exact limit passes": {
-			policy:  AutogenPolicy{MaxTypeIDLen: 5},
+			maxLen:  5,
 			chartID: "abcde",
 			want:    true,
 		},
 		"empty type id over limit fails": {
-			policy:  AutogenPolicy{MaxTypeIDLen: 5},
+			maxLen:  5,
 			chartID: "abcdef",
 			want:    false,
 		},
 		"type id includes separator in budget": {
-			policy:  AutogenPolicy{TypeID: "collector.job", MaxTypeIDLen: 16},
-			chartID: "abc",
-			want:    false, // len("collector.job")+1+len("abc") == 17 > 16
+			maxLen:       16,
+			typeIDPrefix: "collector.job",
+			chartID:      "abc",
+			want:         false, // len("collector.job")+1+len("abc") == 17 > 16
 		},
 		"type id budget overflow fails": {
-			policy:  AutogenPolicy{TypeID: "collector.job", MaxTypeIDLen: 15},
-			chartID: "abc",
-			want:    false,
+			maxLen:       15,
+			typeIDPrefix: "collector.job",
+			chartID:      "abc",
+			want:         false,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, fitsTypeIDBudget(tc.policy, tc.chartID))
+			assert.Equal(t, tc.want, fitsTypeIDBudget(tc.maxLen, tc.typeIDPrefix, tc.chartID))
 		})
 	}
 }

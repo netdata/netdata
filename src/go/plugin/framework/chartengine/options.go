@@ -13,6 +13,7 @@ import (
 
 type engineConfig struct {
 	autogen          AutogenPolicy
+	autogenTypeID    string
 	selector         metrixselector.Selector
 	autogenOverride  policyOverride[AutogenPolicy]
 	selectorOverride policyOverride[metrixselector.Selector]
@@ -20,6 +21,7 @@ type engineConfig struct {
 	runtimeStoreSet  bool
 	log              *logger.Logger
 	seriesSelection  seriesSelectionMode
+	runtimePlanner   bool
 }
 
 type policyOverride[T any] struct {
@@ -48,11 +50,11 @@ type AutogenPolicy = runtimecomp.AutogenPolicy
 // EnginePolicy controls chartengine matching/materialization behavior.
 type EnginePolicy struct {
 	// Selector filters input series globally before template/autogen routing.
-	// Nil or empty selector means "allow all".
+	// Nil means "no override", and an explicitly empty expr means "override to allow all".
 	Selector *metrixselector.Expr
 
 	// Autogen controls unmatched-series fallback behavior.
-	Autogen AutogenPolicy
+	Autogen *AutogenPolicy
 }
 
 func defaultAutogenPolicy() AutogenPolicy {
@@ -74,8 +76,8 @@ func normalizeAutogenPolicy(policy AutogenPolicy) (AutogenPolicy, error) {
 	return policy, nil
 }
 
-func compileEngineSelector(expr *metrixselector.Expr) (metrixselector.Selector, error) {
-	if expr == nil || expr.Empty() {
+func compileEngineSelector(expr metrixselector.Expr) (metrixselector.Selector, error) {
+	if expr.Empty() {
 		return nil, nil
 	}
 	return expr.Parse()
@@ -84,32 +86,22 @@ func compileEngineSelector(expr *metrixselector.Expr) (metrixselector.Selector, 
 // WithEnginePolicy configures chartengine matching/materialization policy.
 func WithEnginePolicy(policy EnginePolicy) Option {
 	return func(cfg *engineConfig) error {
-		autogen, err := normalizeAutogenPolicy(policy.Autogen)
-		if err != nil {
-			return err
+		if policy.Autogen != nil {
+			autogen, err := normalizeAutogenPolicy(*policy.Autogen)
+			if err != nil {
+				return err
+			}
+			cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: autogen}
+			cfg.autogen = autogen
 		}
-		selector, err := compileEngineSelector(policy.Selector)
-		if err != nil {
-			return fmt.Errorf("invalid engine selector: %w", err)
+		if policy.Selector != nil {
+			selector, err := compileEngineSelector(*policy.Selector)
+			if err != nil {
+				return fmt.Errorf("invalid engine selector: %w", err)
+			}
+			cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: true, value: selector}
+			cfg.selector = selector
 		}
-		cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: autogen}
-		cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: true, value: selector}
-		cfg.autogen = autogen
-		cfg.selector = selector
-		return nil
-	}
-}
-
-// WithAutogenPolicy configures unmatched-series autogen behavior.
-// Deprecated: prefer WithEnginePolicy.
-func WithAutogenPolicy(policy AutogenPolicy) Option {
-	return func(cfg *engineConfig) error {
-		autogen, err := normalizeAutogenPolicy(policy)
-		if err != nil {
-			return err
-		}
-		cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: autogen}
-		cfg.autogen = autogen
 		return nil
 	}
 }
@@ -138,6 +130,25 @@ func WithLogger(l *logger.Logger) Option {
 func WithSeriesSelectionAllVisible() Option {
 	return func(cfg *engineConfig) error {
 		cfg.seriesSelection = seriesSelectionAllVisible
+		return nil
+	}
+}
+
+// WithRuntimePlannerMode enables runtime/internal planner semantics for
+// build-cycle dedupe bookkeeping while keeping lifecycle/cache tied to
+// source LastSuccessSeq.
+func WithRuntimePlannerMode() Option {
+	return func(cfg *engineConfig) error {
+		cfg.runtimePlanner = true
+		return nil
+	}
+}
+
+// WithEmitTypeIDBudgetPrefix configures chartengine autogen type-id budget
+// checks to use the effective emission type-id prefix (for example job fullName).
+func WithEmitTypeIDBudgetPrefix(typeID string) Option {
+	return func(cfg *engineConfig) error {
+		cfg.autogenTypeID = typeID
 		return nil
 	}
 }

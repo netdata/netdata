@@ -9,12 +9,13 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
@@ -25,7 +26,7 @@ const (
 )
 
 func (m *Manager) dyncfgCollectorPrefixValue() string {
-	return fmt.Sprintf(dyncfgCollectorPrefixf, executable.Name)
+	return fmt.Sprintf(dyncfgCollectorPrefixf, m.pluginName)
 }
 
 func (m *Manager) dyncfgModID(name string) string {
@@ -51,7 +52,7 @@ func (m *Manager) dyncfgCollectorModuleCreate(name string) {
 		ID:                m.dyncfgModID(name),
 		Status:            dyncfg.StatusAccepted.String(),
 		ConfigType:        dyncfg.ConfigTypeTemplate.String(),
-		Path:              fmt.Sprintf(dyncfgCollectorPath, executable.Name),
+		Path:              fmt.Sprintf(dyncfgCollectorPath, m.pluginName),
 		SourceType:        "internal",
 		Source:            "internal",
 		SupportedCommands: dyncfgCollectorModCmds(),
@@ -67,24 +68,24 @@ func (m *Manager) exposedLookupByName(module, job string) (*dyncfg.Entry[confgro
 	return m.exposed.LookupByKey(key)
 }
 
+type dyncfgCmdTestTask struct {
+	fn         dyncfg.Function
+	moduleName string
+	creator    collectorapi.Creator
+	cfg        confgroup.Config
+	timeout    time.Duration
+}
+
 func (m *Manager) dyncfgCollectorExec(fn dyncfg.Function) {
 	switch fn.Command() {
 	case dyncfg.CommandUserconfig:
 		m.dyncfgCmdUserconfig(fn)
 		return
-	case dyncfg.CommandTest:
-		m.dyncfgCmdTest(fn)
-		return
 	case dyncfg.CommandSchema:
 		m.dyncfgCmdSchema(fn)
 		return
 	}
-
-	select {
-	case <-m.ctx.Done():
-		m.dyncfgApi.SendCodef(fn, 503, "Job manager is shutting down.")
-	case m.dyncfgCh <- fn:
-	}
+	m.enqueueDyncfgFunction(fn)
 }
 
 func (m *Manager) dyncfgCollectorSeqExec(fn dyncfg.Function) {
@@ -193,7 +194,7 @@ func (m *Manager) dyncfgCmdTest(fn dyncfg.Function) {
 	}
 
 	if cfg.Vnode() != "" {
-		if _, ok := m.vnodes[cfg.Vnode()]; !ok {
+		if _, ok := m.vnodes.Lookup(cfg.Vnode()); !ok {
 			m.Warningf("dyncfg: %s: module %s: vnode %s not found", cmd, mn, cfg.Vnode())
 			m.dyncfgApi.SendCodef(fn, 400, "The specified vnode '%s' is not registered.", cfg.Vnode())
 			return
@@ -203,36 +204,74 @@ func (m *Manager) dyncfgCmdTest(fn dyncfg.Function) {
 	cfg.SetModule(mn)
 	cfg.SetName(jn)
 
-	job, err := newConfigModule(creator)
-	if err != nil {
-		m.Warningf("dyncfg: %s: module %s: failed to create module: %v", cmd, mn, err)
-		m.dyncfgApi.SendCodef(fn, 500, "Module %s instantiation failed: %v.", mn, err)
+	if err := m.baseContext().Err(); err != nil {
+		m.dyncfgApi.SendCodef(fn, 503, "Job manager is shutting down.")
 		return
 	}
 
-	if err := applyConfig(cfg, job); err != nil {
-		m.Warningf("dyncfg: %s: module %s: failed to apply config: %v", cmd, mn, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
+	select {
+	case m.cmdTestSem <- struct{}{}:
+		task := dyncfgCmdTestTask{
+			fn:         fn,
+			moduleName: mn,
+			creator:    creator,
+			cfg:        cfg,
+			timeout:    m.dyncfgCmdTestTimeout(fn),
+		}
+		m.cmdTestWG.Go(func() {
+			m.runDyncfgCmdTest(task)
+		})
+	default:
+		m.Warningf("dyncfg: %s: module %s: too many concurrent test requests", cmd, mn)
+		m.dyncfgApi.SendCodef(fn, 503, "Too many concurrent test requests, try again later.")
+	}
+}
+
+func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
+	defer func() { <-m.cmdTestSem }()
+
+	job, err := newConfigModule(task.creator)
+	if err != nil {
+		m.Warningf("dyncfg: test: module %s: failed to create module: %v", task.moduleName, err)
+		m.dyncfgApi.SendCodef(task.fn, 500, "Module %s instantiation failed: %v.", task.moduleName, err)
+		return
+	}
+
+	cleanupCtx, cleanupCancel := context.WithTimeout(m.baseContext(), cmdTestWorkerDrainWait)
+	defer cleanupCancel()
+	defer job.Cleanup(cleanupCtx)
+
+	if err := applyConfig(task.cfg, job); err != nil {
+		m.Warningf("dyncfg: test: module %s: failed to apply config: %v", task.moduleName, err)
+		m.dyncfgApi.SendCodef(task.fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
 		return
 	}
 
 	job.GetBase().Logger = logger.New().With(
-		slog.String("collector", cfg.Module()),
-		slog.String("job", cfg.Name()),
+		slog.String("collector", task.cfg.Module()),
+		slog.String("job", task.cfg.Name()),
 	)
 
-	defer job.Cleanup(context.Background())
+	ctx, cancel := context.WithTimeout(m.baseContext(), task.timeout)
+	defer cancel()
 
-	if err := job.Init(context.Background()); err != nil {
-		m.dyncfgApi.SendCodef(fn, 422, "Job initialization failed: %v", err)
+	if err := job.Init(ctx); err != nil {
+		m.dyncfgApi.SendCodef(task.fn, 422, "Job initialization failed: %v", err)
 		return
 	}
-	if err := job.Check(context.Background()); err != nil {
-		m.dyncfgApi.SendCodef(fn, 422, "Job check failed: %v", err)
+	if err := job.Check(ctx); err != nil {
+		m.dyncfgApi.SendCodef(task.fn, 422, "Job check failed: %v", err)
 		return
 	}
 
-	m.dyncfgApi.SendCodef(fn, 200, "")
+	m.dyncfgApi.SendCodef(task.fn, 200, "")
+}
+
+func (m *Manager) dyncfgCmdTestTimeout(fn dyncfg.Function) time.Duration {
+	if timeout := fn.Fn().Timeout; timeout > 0 {
+		return timeout
+	}
+	return cmdTestDefaultTimeout
 }
 
 func (m *Manager) dyncfgCmdSchema(fn dyncfg.Function) {

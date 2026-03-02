@@ -27,6 +27,24 @@ func (e *Engine) observeBuildSuccessSeq(seq uint64) buildSeqObservation {
 		return obs
 	}
 
+	if e.state.cfg.runtimePlanner {
+		if seq < state.lastSuccess {
+			if !state.violating {
+				state.violating = true
+				obs.transition = buildSeqTransitionBroken
+			}
+			return obs
+		}
+		if state.violating {
+			state.violating = false
+			obs.transition = buildSeqTransitionRecovered
+		}
+		if seq > state.lastSuccess {
+			state.lastSuccess = seq
+		}
+		return obs
+	}
+
 	if seq <= state.lastSuccess {
 		if !state.violating {
 			state.violating = true

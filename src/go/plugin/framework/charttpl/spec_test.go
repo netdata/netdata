@@ -28,7 +28,6 @@ engine:
       - mysql_queries_total{db="main"}
   autogen:
     enabled: true
-    type_id: mysql.jobs
     max_type_id_len: 512
     expire_after_success_cycles: 9
 groups:
@@ -47,6 +46,7 @@ groups:
               multiplier: -8
               divisor: 1000
               hidden: true
+              float: true
 `,
 			assert: func(t *testing.T, spec *Spec) {
 				t.Helper()
@@ -58,12 +58,12 @@ groups:
 				assert.Equal(t, -8, spec.Groups[0].Charts[0].Dimensions[0].Options.Multiplier)
 				assert.Equal(t, 1000, spec.Groups[0].Charts[0].Dimensions[0].Options.Divisor)
 				assert.True(t, spec.Groups[0].Charts[0].Dimensions[0].Options.Hidden)
+				assert.True(t, spec.Groups[0].Charts[0].Dimensions[0].Options.Float)
 				require.NotNil(t, spec.Engine)
 				require.NotNil(t, spec.Engine.Selector)
 				assert.Equal(t, []string{`mysql_queries_total{db="main"}`}, spec.Engine.Selector.Allow)
 				require.NotNil(t, spec.Engine.Autogen)
 				assert.True(t, spec.Engine.Autogen.Enabled)
-				assert.Equal(t, "mysql.jobs", spec.Engine.Autogen.TypeID)
 				assert.Equal(t, 512, spec.Engine.Autogen.MaxTypeIDLen)
 				assert.Equal(t, uint64(9), spec.Engine.Autogen.ExpireAfterSuccessCycles)
 			},

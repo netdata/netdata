@@ -18,7 +18,6 @@ modules:
         description: ""
       keywords:
         - container
-      most_popular: true
     overview:
       data_collection:
         metrics_description: |

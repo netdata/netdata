@@ -21,7 +21,6 @@ modules:
         - I/O
         - space
         - inode
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor Disk space metrics for proficient storage management. Keep track of usage, free space, and error rates to prevent disk space issues."

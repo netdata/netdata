@@ -18,7 +18,6 @@ modules:
         - go
         - expvar
         - application
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This collector monitors Go applications that expose their metrics with the use of the `expvar` package from the Go standard library. It produces charts for Go runtime memory statistics and optionally any number of custom charts."

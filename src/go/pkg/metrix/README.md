@@ -81,7 +81,7 @@
 | `WithSummaryReservoirSize(...)`                                 | Stateful summary estimator size                                                             |
 | `WithStateSetStates(...)`                                       | StateSet allowed states                                                                     |
 | `WithStateSetMode(...)`                                         | `ModeBitSet` (multiple simultaneous active states) or `ModeEnum` (exactly one active state) |
-| `WithDescription(...)`, `WithChartFamily(...)`, `WithUnit(...)` | Metric metadata hints for downstream consumers (e.g., autogen)                              |
+| `WithDescription(...)`, `WithChartFamily(...)`, `WithUnit(...)`, `WithFloat(...)` | Metric metadata hints for downstream consumers (e.g., autogen chart identity + float SET mode) |
 
 ## Read Modes
 

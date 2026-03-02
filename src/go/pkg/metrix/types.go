@@ -54,6 +54,7 @@ type MetricMeta struct {
 	Description string
 	ChartFamily string
 	Unit        string
+	Float       bool
 }
 
 // MetricKind identifies the logical metric family type.

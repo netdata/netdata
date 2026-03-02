@@ -28,7 +28,6 @@ modules:
         - "maria"
         - "mariadb"
         - "sql"
-      most_popular: true
     overview:
       multi_instance: true
       data_collection:
@@ -1324,7 +1323,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-percona_mysql
-      most_popular: false
       monitored_instance:
         name: Percona MySQL
         link: https://www.percona.com/software/mysql-database/percona-server

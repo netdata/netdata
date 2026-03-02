@@ -25,22 +25,6 @@ void json_escape_string(char *dst, const char *src, size_t size) {
     *d = '\0';
 }
 
-void json_fix_string(char *s) {
-    unsigned char c;
-    while((c = (unsigned char)*s)) {
-        if(unlikely(c == '\\'))
-            *s++ = '/';
-        else if(unlikely(c == '"'))
-            *s++ = '\'';
-        else if(unlikely(isspace(c) || iscntrl(c)))
-            *s++ = ' ';
-        else if(unlikely(!isprint(c) || c > 127))
-            *s++ = '_';
-        else
-            s++;
-    }
-}
-
 char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
     char *s = fgets(buf, (int)buf_size, fp);
     if (!s) return NULL;

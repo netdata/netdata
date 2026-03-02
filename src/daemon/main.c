@@ -220,6 +220,7 @@ int dyncfg_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
 int health_config_unittest(void);
+int utf8_sanitizer_unittest(void);
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
@@ -409,6 +410,7 @@ int netdata_main(int argc, char **argv) {
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
+                            if (utf8_sanitizer_unittest()) return 1;
                             if (health_config_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
@@ -489,6 +491,10 @@ int netdata_main(int argc, char **argv) {
                             return perflibnamestest_main();
                         }
 #endif
+                        else if(strcmp(optarg, "utf8sanitizertest") == 0) {
+                            unittest_running = true;
+                            return utf8_sanitizer_unittest();
+                        }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             unittest_running = true;

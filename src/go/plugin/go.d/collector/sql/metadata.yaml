@@ -29,7 +29,6 @@ modules:
         - sqlserver
         - mssql
         - generic
-      most_popular: false
     overview:
       multi_instance: true
       data_collection:

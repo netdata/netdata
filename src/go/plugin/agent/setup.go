@@ -5,18 +5,13 @@ package agent
 import (
 	"io"
 	"os"
-	"strings"
 
-	hostinfo2 "github.com/netdata/netdata/go/plugins/pkg/hostinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext"
 	"gopkg.in/yaml.v2"
 )
 
@@ -58,8 +53,7 @@ func (a *Agent) loadEnabledModules(cfg config) collectorapi.Registry {
 			continue
 		}
 		if all {
-			// Known issue: go.d/logind high CPU usage on Alma Linux8 (https://github.com/netdata/netdata/issues/15930)
-			if !cfg.isExplicitlyEnabled(name) && (creator.Disabled || name == "logind" && hostinfo2.SystemdVersion == 239) {
+			if !cfg.isExplicitlyEnabled(name) && creator.Disabled {
 				a.Infof("'%s' module disabled by default, should be explicitly enabled in the config", name)
 				continue
 			}
@@ -91,18 +85,52 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 
 	var readPaths, dummyPaths []string
 
+	watchPaths := a.CollectorsConfigWatchPath
+	sdConfDir := a.ServiceDiscoveryConfigDir
+	if a.DisableServiceDiscovery {
+		dummyPaths = nil
+		sdConfDir = nil
+	}
+
+	cfg := discovery.Config{
+		Registry: reg,
+		BuildContext: discovery.BuildContext{
+			Policy: discovery.PlatformPolicy{
+				IsInsideK8s: a.IsInsideK8s,
+			},
+			RunMode: a.runModePolicy,
+			Identity: discovery.PluginIdentity{
+				Name: a.Name,
+			},
+			Out: a.Out,
+			Paths: discovery.PathsConfig{
+				PluginConfigDir:           a.ConfigDir,
+				CollectorsConfigDir:       a.CollectorsConfDir,
+				CollectorsConfigWatchPath: watchPaths,
+				ServiceDiscoveryConfigDir: sdConfDir,
+				VarLibDir:                 a.VarLibDir,
+			},
+			Registry:   reg,
+			ReadPaths:  readPaths,
+			DummyNames: dummyPaths,
+			FnReg:      fnReg,
+		},
+		Providers: append([]discovery.ProviderFactory(nil), a.DiscoveryProviders...),
+	}
+
 	if len(a.CollectorsConfDir) == 0 {
-		if hostinfo2.IsInsideK8sCluster() {
-			return discovery.Config{Registry: reg}
+		if a.IsInsideK8s {
+			cfg.Providers = nil
+			return cfg
 		}
 		a.Info("modules conf dir not provided, will use default config for all enabled modules")
 		for name := range enabled {
 			dummyPaths = append(dummyPaths, name)
 		}
-		return discovery.Config{
-			Registry: reg,
-			Dummy:    dummy.Config{Names: dummyPaths},
-		}
+		watchPaths = nil
+		cfg.BuildContext.Paths.CollectorsConfigWatchPath = watchPaths
+		cfg.BuildContext.DummyNames = dummyPaths
+		return cfg
 	}
 
 	for name := range enabled {
@@ -110,7 +138,7 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 		a.Debugf("looking for '%s' in %v", cfgName, a.CollectorsConfDir)
 
 		path, err := a.CollectorsConfDir.Find(cfgName)
-		if hostinfo2.IsInsideK8sCluster() {
+		if a.IsInsideK8s {
 			if err != nil {
 				a.Infof("not found '%s', won't use default (reading stock configs is disabled in k8s)", cfgName)
 				continue
@@ -129,26 +157,10 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 	}
 
 	a.Infof("dummy/read/watch paths: %d/%d/%d", len(dummyPaths), len(readPaths), len(a.CollectorsConfigWatchPath))
-
-	cfg := discovery.Config{
-		Registry: reg,
-		File: file.Config{
-			Read:  readPaths,
-			Watch: a.CollectorsConfigWatchPath,
-		},
-	}
-
-	if !a.DisableServiceDiscovery {
-		cfg.Dummy = dummy.Config{
-			Names: dummyPaths,
-		}
-		cfg.SD = sd.Config{
-			ConfigDefaults: reg,
-			ConfDir:        a.ServiceDiscoveryConfigDir,
-			FnReg:          fnReg,
-			Discoverers:    sdext.Registry(),
-		}
-	}
+	cfg.BuildContext.Paths.CollectorsConfigWatchPath = watchPaths
+	cfg.BuildContext.Paths.ServiceDiscoveryConfigDir = sdConfDir
+	cfg.BuildContext.ReadPaths = readPaths
+	cfg.BuildContext.DummyNames = dummyPaths
 
 	return cfg
 }
@@ -186,13 +198,6 @@ func loadYAML(conf any, path string) error {
 	return nil
 }
 
-var (
-	envNDStockConfigDir = os.Getenv("NETDATA_STOCK_CONFIG_DIR")
-)
-
 func isStockConfig(path string) bool {
-	if envNDStockConfigDir == "" {
-		return false
-	}
-	return strings.HasPrefix(path, envNDStockConfigDir)
+	return pluginconfig.IsStock(path)
 }

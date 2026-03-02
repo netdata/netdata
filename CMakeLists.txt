@@ -204,6 +204,12 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
     )
     FetchContent_MakeAvailable(Corrosion)
 
+    # Corrosion places cargo build artifacts under ${CMAKE_BINARY_DIR}/cargo/
+    # (see Corrosion.cmake cargo_target_dir). Register it for cleanup so that
+    # `ninja clean` removes it.  If a future Corrosion version changes this
+    # path, this line must be updated to match.
+    set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_BINARY_DIR}/cargo")
+
     if(ENABLE_NETDATA_JOURNAL_FILE_READER)
         corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml
                                CRATES journal_reader_ffi)
@@ -1068,6 +1074,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/sanitizers/chart_id_and_name.h
         src/libnetdata/sanitizers/utf8-sanitizer.c
         src/libnetdata/sanitizers/utf8-sanitizer.h
+        src/libnetdata/sanitizers/utf8-sanitizer-unittest.c
         src/libnetdata/sanitizers/sanitizers.h
         src/libnetdata/sanitizers/sanitizers-labels.c
         src/libnetdata/sanitizers/sanitizers-labels.h

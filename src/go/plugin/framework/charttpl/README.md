@@ -94,6 +94,7 @@ When multiple series share the same instance identity labels, they appear as dim
 | `options.multiplier` | int    | no       | DIM multiplier (`0` means default `1`)                         |
 | `options.divisor`    | int    | no       | DIM divisor (`0` means default `1`)                            |
 | `options.hidden`     | bool   | no       | Mark dimension hidden                                          |
+| `options.float`      | bool   | no       | Emit `type=float` and use `SETFLOAT` updates                   |
 
 **Selector syntax**: A selector takes the form `metric_name` or `metric_name{label=value, ...}`.
 The metric name prefix is required; label-only selectors like `{label=value}` are rejected.
@@ -105,7 +106,6 @@ The metric name prefix is required; label-only selectors like `{label=value}` ar
 | `selector.allow`                      | array[string] | Global include selectors                                                  |
 | `selector.deny`                       | array[string] | Global exclude selectors                                                  |
 | `autogen.enabled`                     | bool          | Enable unmatched-series autogen fallback                                  |
-| `autogen.type_id`                     | string        | `type.id` prefix budget base                                              |
 | `autogen.max_type_id_len`             | int           | Max full `type.id` length (`0` = default; must be `0` or `>= 4` when set) |
 | `autogen.expire_after_success_cycles` | uint64        | Autogen lifecycle expiry                                                  |
 

@@ -14,7 +14,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
@@ -105,6 +104,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 	var buf bytes.Buffer
 	sd := &ServiceDiscovery{
 		Logger:      logger.New(),
+		pluginName:  testPluginName,
 		dyncfgApi:   dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
 		seen:        dyncfg.NewSeenCache[sdConfig](),
 		exposed:     dyncfg.NewExposedCache[sdConfig](),
@@ -122,7 +122,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 		Exposed:   sd.exposed,
 		Callbacks: sd.sdCb,
 
-		Path:           fmt.Sprintf(dyncfgSDPath, executable.Name),
+		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
 		EnableFailCode: 422,
 		JobCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,

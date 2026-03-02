@@ -11,12 +11,12 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 )
 
 //go:embed "config_schema.json"
@@ -128,9 +128,13 @@ func readConfDir(dir string) map[string]*VirtualNode {
 
 			v := v
 
-			if v.Name == "" {
-				v.Name = v.Hostname
+			if v.Name != "" && v.Name != v.Hostname {
+				log.Warningf(
+					"ignoring virtual node name '%s' for hostname '%s'; file-based vnode identity uses hostname",
+					v.Name, v.Hostname,
+				)
 			}
+			v.Name = v.Hostname
 			v.Source = fmt.Sprintf("file=%s", path)
 			if isStockConfig(path) {
 				v.SourceType = "stock"
@@ -171,13 +175,6 @@ func loadConfigFile(conf any, path string) error {
 	return nil
 }
 
-var (
-	envNDStockConfigDir = os.Getenv("NETDATA_STOCK_CONFIG_DIR")
-)
-
 func isStockConfig(path string) bool {
-	if envNDStockConfigDir == "" {
-		return false
-	}
-	return strings.HasPrefix(path, envNDStockConfigDir)
+	return pluginconfig.IsStock(path)
 }

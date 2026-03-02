@@ -302,13 +302,10 @@ func (j *JobV2) postCheck() error {
 
 	opts := []chartengine.Option{
 		chartengine.WithLogger(j.Logger.With(slog.String("component", "chartengine"))),
+		chartengine.WithEmitTypeIDBudgetPrefix(j.fullName),
 	}
 	if v, ok := j.module.(collectorapi.CollectorV2EnginePolicy); ok {
-		policy := v.EnginePolicy()
-		// Chartengine autogen type.id budget must use the actual emitted type.id.
-		// JobV2 always emits with fullName as TypeID.
-		policy.Autogen.TypeID = j.fullName
-		opts = append(opts, chartengine.WithEnginePolicy(policy))
+		opts = append(opts, chartengine.WithEnginePolicy(v.EnginePolicy()))
 	}
 
 	engine, err := chartengine.New(opts...)

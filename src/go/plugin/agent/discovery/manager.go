@@ -11,9 +11,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
@@ -28,7 +25,7 @@ func NewManager(cfg Config) (*Manager, error) {
 		),
 		send:        make(chan struct{}, 1),
 		sendEvery:   time.Second * 2, // timeout to aggregate changes
-		discoverers: make([]discoverer, 0),
+		discoverers: make([]Discoverer, 0),
 		mux:         &sync.RWMutex{},
 		cache:       newCache(),
 	}
@@ -40,13 +37,9 @@ func NewManager(cfg Config) (*Manager, error) {
 	return mgr, nil
 }
 
-type discoverer interface {
-	Run(ctx context.Context, in chan<- []*confgroup.Group)
-}
-
 type Manager struct {
 	*logger.Logger
-	discoverers []discoverer
+	discoverers []Discoverer
 	send        chan struct{}
 	sendEvery   time.Duration
 	mux         *sync.RWMutex
@@ -65,7 +58,7 @@ func (m *Manager) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 
 	for _, d := range m.discoverers {
 		wg.Add(1)
-		go func(d discoverer) {
+		go func(d Discoverer) {
 			defer wg.Done()
 			m.runDiscoverer(ctx, d)
 		}(d)
@@ -82,29 +75,16 @@ func (m *Manager) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 }
 
 func (m *Manager) registerDiscoverers(cfg Config) error {
-	if len(cfg.File.Read) > 0 || len(cfg.File.Watch) > 0 {
-		cfg.File.Registry = cfg.Registry
-		d, err := file.NewDiscovery(cfg.File)
+	for _, provider := range cfg.Providers {
+		d, enabled, err := provider.Build(cfg.BuildContext)
 		if err != nil {
-			return err
+			return fmt.Errorf("provider '%s': %w", provider.Name(), err)
 		}
-		m.discoverers = append(m.discoverers, d)
-	}
-
-	if len(cfg.Dummy.Names) > 0 {
-		cfg.Dummy.Registry = cfg.Registry
-		d, err := dummy.NewDiscovery(cfg.Dummy)
-		if err != nil {
-			return err
+		if !enabled {
+			continue
 		}
-		m.discoverers = append(m.discoverers, d)
-	}
-
-	if len(cfg.SD.ConfDir) != 0 {
-		cfg.SD.ConfigDefaults = cfg.Registry
-		d, err := sd.NewServiceDiscovery(cfg.SD)
-		if err != nil {
-			return err
+		if d == nil {
+			return fmt.Errorf("provider '%s': enabled but returned nil discoverer", provider.Name())
 		}
 		m.discoverers = append(m.discoverers, d)
 	}
@@ -118,7 +98,7 @@ func (m *Manager) registerDiscoverers(cfg Config) error {
 	return nil
 }
 
-func (m *Manager) runDiscoverer(ctx context.Context, d discoverer) {
+func (m *Manager) runDiscoverer(ctx context.Context, d Discoverer) {
 	done := make(chan struct{})
 	updates := make(chan []*confgroup.Group)
 

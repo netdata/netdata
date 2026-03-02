@@ -22,6 +22,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 					WithDescription("Busy workers"),
 					WithChartFamily("Workers"),
 					WithUnit("workers"),
+					WithFloat(true),
 				)
 
 				cc.BeginCycle()
@@ -33,6 +34,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 				assert.Equal(t, "Busy workers", meta.Description)
 				assert.Equal(t, "Workers", meta.ChartFamily)
 				assert.Equal(t, "workers", meta.Unit)
+				assert.True(t, meta.Float)
 			},
 		},
 		"unknown metric metadata is unavailable": {
@@ -53,6 +55,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 					WithDescription("Latency"),
 					WithChartFamily("Service"),
 					WithUnit("ms"),
+					WithFloat(true),
 				)
 
 				cc.BeginCycle()
@@ -76,18 +79,21 @@ func TestMetricMetaScenarios(t *testing.T) {
 				assert.Equal(t, "Latency", meta.Description)
 				assert.Equal(t, "Service", meta.ChartFamily)
 				assert.Equal(t, "ms", meta.Unit)
+				assert.True(t, meta.Float)
 
 				meta, ok = flat.MetricMeta("svc.latency_count")
 				require.True(t, ok, "expected flattened histogram count metric metadata")
 				assert.Equal(t, "Latency", meta.Description)
 				assert.Equal(t, "Service", meta.ChartFamily)
 				assert.Equal(t, "ms", meta.Unit)
+				assert.True(t, meta.Float)
 
 				meta, ok = flat.MetricMeta("svc.latency_sum")
 				require.True(t, ok, "expected flattened histogram sum metric metadata")
 				assert.Equal(t, "Latency", meta.Description)
 				assert.Equal(t, "Service", meta.ChartFamily)
 				assert.Equal(t, "ms", meta.Unit)
+				assert.True(t, meta.Float)
 			},
 		},
 		"metadata redeclaration conflict panics": {
@@ -100,6 +106,16 @@ func TestMetricMetaScenarios(t *testing.T) {
 				})
 			},
 		},
+		"float metadata redeclaration conflict panics": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				w := s.Write().SnapshotMeter("apache")
+				_ = w.Gauge("workers_busy", WithFloat(true))
+				expectPanic(t, func() {
+					_ = w.Gauge("workers_busy", WithFloat(false))
+				})
+			},
+		},
 		"redeclare without metadata options keeps first metadata": {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
@@ -109,6 +125,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 					WithDescription("Busy workers"),
 					WithChartFamily("Workers"),
 					WithUnit("workers"),
+					WithFloat(true),
 				)
 				_ = w.Gauge("workers_busy")
 
@@ -122,6 +139,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 				assert.Equal(t, "Busy workers", meta.Description)
 				assert.Equal(t, "Workers", meta.ChartFamily)
 				assert.Equal(t, "workers", meta.Unit)
+				assert.True(t, meta.Float)
 			},
 		},
 	}

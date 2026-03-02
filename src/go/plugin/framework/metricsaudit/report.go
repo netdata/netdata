@@ -1,39 +1,59 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package agent
+package metricsaudit
 
 import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-func (da *DumpAnalyzer) PrintReport() {
+func (da *Auditor) PrintReport() {
+	_ = da.flushWriteQueue(2 * time.Second)
+
+	type reportJob struct {
+		id  JobID
+		job JobAnalysis
+	}
+
 	da.mu.RLock()
-	defer da.mu.RUnlock()
-
-	// Sort jobs for consistent output
-	var jobNames []string
-	for name := range da.jobs {
-		jobNames = append(jobNames, name)
+	jobs := make([]reportJob, 0, len(da.jobs))
+	for id, job := range da.jobs {
+		jobs = append(jobs, reportJob{id: id, job: cloneJobAnalysis(job)})
 	}
-	sort.Strings(jobNames)
+	writeErrorCount := da.writeErrorCount
+	writeErrors := append([]string(nil), da.writeErrors...)
+	da.mu.RUnlock()
 
-	for _, jobName := range jobNames {
-		job := da.jobs[jobName]
-		da.printJobAnalysis(job)
+	sort.Slice(jobs, func(i, j int) bool {
+		if jobs[i].id.Module == jobs[j].id.Module {
+			return jobs[i].id.Name < jobs[j].id.Name
+		}
+		return jobs[i].id.Module < jobs[j].id.Module
+	})
+
+	for _, entry := range jobs {
+		job := entry.job
+		da.printJobAnalysis(&job)
 	}
+
+	da.printWriteErrorSummary(writeErrorCount, writeErrors)
 }
 
 // PrintSummary prints a consolidated summary across all jobs
-func (da *DumpAnalyzer) PrintSummary() {
-	da.mu.RLock()
-	defer da.mu.RUnlock()
-
+func (da *Auditor) PrintSummary() {
 	// First print the regular report
 	da.PrintReport()
+
+	da.mu.RLock()
+	jobs := make([]JobAnalysis, 0, len(da.jobs))
+	for _, job := range da.jobs {
+		jobs = append(jobs, cloneJobAnalysis(job))
+	}
+	da.mu.RUnlock()
 
 	// Then print the consolidated summary
 	fmt.Println("\n" + strings.Repeat("═", 80))
@@ -56,7 +76,9 @@ func (da *DumpAnalyzer) PrintSummary() {
 
 	contextMap := make(map[string]*contextSummary) // context -> summary
 
-	for jobName, job := range da.jobs {
+	for i := range jobs {
+		job := &jobs[i]
+		jobLabel := fmt.Sprintf("%s[%s]", job.Module, job.Name)
 		for i := range job.Charts {
 			ca := &job.Charts[i]
 
@@ -104,7 +126,7 @@ func (da *DumpAnalyzer) PrintSummary() {
 
 			// Update instance count and job tracking
 			contextMap[ctx].instances++
-			contextMap[ctx].jobs[jobName] = true
+			contextMap[ctx].jobs[jobLabel] = true
 
 			// Update label keys and dimension names if needed
 			for _, label := range ca.Chart.Labels {
@@ -222,6 +244,23 @@ func (da *DumpAnalyzer) PrintSummary() {
 	}
 }
 
+func (da *Auditor) printWriteErrorSummary(count int, samples []string) {
+	if count == 0 {
+		return
+	}
+
+	fmt.Println("\n" + strings.Repeat("═", 80))
+	fmt.Printf("CAPTURE WRITE ERRORS: %d (showing up to %d)\n", count, len(samples))
+	fmt.Println(strings.Repeat("═", 80))
+
+	for _, msg := range samples {
+		fmt.Printf("⚠️ %s\n", msg)
+	}
+	if remaining := count - len(samples); remaining > 0 {
+		fmt.Printf("... %d additional write errors omitted\n", remaining)
+	}
+}
+
 type contextInfo struct {
 	family      string
 	context     string
@@ -229,7 +268,7 @@ type contextInfo struct {
 	minPriority int
 }
 
-func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
+func (da *Auditor) printJobAnalysis(job *JobAnalysis) {
 	// First, check for duplicate chart IDs (SEVERE BUG)
 	chartIDCounts := make(map[string]int)
 	for i := range job.Charts {
@@ -293,7 +332,7 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 	}
 
 	// Check for severe bugs - duplicate chart IDs and contexts in multiple families
-	fmt.Println("\n" + job.Name)
+	fmt.Printf("\n%s[%s]\n", job.Module, job.Name)
 
 	// Report duplicate chart IDs first (most severe)
 	for chartID, count := range chartIDCounts {
@@ -484,7 +523,72 @@ func (da *DumpAnalyzer) printJobAnalysis(job *JobAnalysis) {
 	}
 }
 
-func (da *DumpAnalyzer) printContextAnalysis(ctxInfo *contextInfo, isLast bool) []string {
+func cloneJobAnalysis(src *JobAnalysis) JobAnalysis {
+	if src == nil {
+		return JobAnalysis{}
+	}
+
+	dst := JobAnalysis{
+		Name:            src.Name,
+		Module:          src.Module,
+		CollectionCount: src.CollectionCount,
+		LastCollection:  src.LastCollection,
+		AllSeenMetrics:  make(map[string]bool, len(src.AllSeenMetrics)),
+		Charts:          make([]ChartAnalysis, len(src.Charts)),
+	}
+	for metricID, seen := range src.AllSeenMetrics {
+		dst.AllSeenMetrics[metricID] = seen
+	}
+	for i := range src.Charts {
+		dst.Charts[i] = cloneChartAnalysis(src.Charts[i])
+	}
+
+	return dst
+}
+
+func cloneChartAnalysis(src ChartAnalysis) ChartAnalysis {
+	dst := ChartAnalysis{
+		Chart:           cloneChart(src.Chart),
+		CollectedValues: make(map[string][]int64, len(src.CollectedValues)),
+		SeenDimensions:  make(map[string]bool, len(src.SeenDimensions)),
+	}
+	for id, values := range src.CollectedValues {
+		dst.CollectedValues[id] = append([]int64(nil), values...)
+	}
+	for id, seen := range src.SeenDimensions {
+		dst.SeenDimensions[id] = seen
+	}
+	return dst
+}
+
+func cloneChart(src *collectorapi.Chart) *collectorapi.Chart {
+	if src == nil {
+		return nil
+	}
+
+	dst := *src
+	dst.Labels = append([]collectorapi.Label(nil), src.Labels...)
+	dst.Dims = make(collectorapi.Dims, len(src.Dims))
+	for i, dim := range src.Dims {
+		if dim == nil {
+			continue
+		}
+		d := *dim
+		dst.Dims[i] = &d
+	}
+	dst.Vars = make(collectorapi.Vars, len(src.Vars))
+	for i, v := range src.Vars {
+		if v == nil {
+			continue
+		}
+		varCopy := *v
+		dst.Vars[i] = &varCopy
+	}
+
+	return &dst
+}
+
+func (da *Auditor) printContextAnalysis(ctxInfo *contextInfo, isLast bool) []string {
 	charts := ctxInfo.charts
 	var issues []string
 
@@ -1016,7 +1120,7 @@ func contains(slice []string, item string) bool {
 }
 
 // analyzeMetricDimensionMatching performs comprehensive analysis of dimension/metric matching
-func (da *DumpAnalyzer) analyzeMetricDimensionMatching(job *JobAnalysis, allDimIDs map[string][]string, contextIssues map[string][]string) {
+func (da *Auditor) analyzeMetricDimensionMatching(job *JobAnalysis, allDimIDs map[string][]string, contextIssues map[string][]string) {
 	// 1. Find duplicate dimension IDs across charts (already done above but let's be explicit)
 	duplicateDimensions := []string{}
 	for dimID, chartIDs := range allDimIDs {
@@ -1124,7 +1228,7 @@ func gcd(a, b int) int {
 }
 
 // analyzeFamilyStructureForJob performs family-level structural analysis for a single job
-func (da *DumpAnalyzer) analyzeFamilyStructureForJob(job *JobAnalysis, contextIssues map[string][]string) {
+func (da *Auditor) analyzeFamilyStructureForJob(job *JobAnalysis, contextIssues map[string][]string) {
 	// Get all charts from this job
 	allCharts := []*ChartAnalysis{}
 	for i := range job.Charts {
@@ -1419,15 +1523,32 @@ func isSnakeCase(s string) bool {
 }
 
 // PrintDebugInfo prints additional debug information
-func (da *DumpAnalyzer) PrintDebugInfo() {
+func (da *Auditor) PrintDebugInfo() {
 	da.mu.RLock()
 	defer da.mu.RUnlock()
 
 	fmt.Println("\n\nDEBUG INFORMATION:")
 	fmt.Println(strings.Repeat("-", 80))
 
-	for jobName, job := range da.jobs {
-		fmt.Printf("\n[%s] Chart Structure:\n", jobName)
+	type debugEntry struct {
+		id  JobID
+		job *JobAnalysis
+	}
+
+	entries := make([]debugEntry, 0, len(da.jobs))
+	for id, job := range da.jobs {
+		entries = append(entries, debugEntry{id: id, job: job})
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].id.Module == entries[j].id.Module {
+			return entries[i].id.Name < entries[j].id.Name
+		}
+		return entries[i].id.Module < entries[j].id.Module
+	})
+
+	for _, entry := range entries {
+		job := entry.job
+		fmt.Printf("\n[%s][%s] Chart Structure:\n", entry.id.Module, entry.id.Name)
 
 		for _, ca := range job.Charts {
 			fmt.Printf("\nChart ID: %s\n", ca.Chart.ID)

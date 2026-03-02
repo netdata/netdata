@@ -4,25 +4,24 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
-	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimemgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimechartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 )
 
 // Config is an Agent configuration.
@@ -42,9 +41,15 @@ type Config struct {
 
 	DisableServiceDiscovery bool
 
-	DumpMode    time.Duration
-	DumpSummary bool
-	DumpDataDir string
+	IsInsideK8s bool
+
+	RunModePolicy policy.RunModePolicy
+
+	DiscoveryProviders []discovery.ProviderFactory
+
+	AuditDuration time.Duration
+	AuditSummary  bool
+	AuditDataDir  string
 }
 
 // Agent represents orchestrator.
@@ -66,6 +71,12 @@ type Agent struct {
 
 	DisableServiceDiscovery bool
 
+	IsInsideK8s bool
+
+	runModePolicy policy.RunModePolicy
+
+	DiscoveryProviders []discovery.ProviderFactory
+
 	ModuleRegistry collectorapi.Registry
 	Out            io.Writer
 
@@ -73,14 +84,14 @@ type Agent struct {
 
 	quitCh chan struct{}
 
-	// Dump mode
-	dumpMode     time.Duration
-	dumpSummary  bool
-	dumpAnalyzer *DumpAnalyzer
-	mgr          *jobmgr.Manager
+	// Metrics-audit mode.
+	auditDuration time.Duration
+	auditSummary  bool
+	auditAnalyzer *metricsaudit.Auditor
 
-	dumpDataDir string
-	dumpOnce    sync.Once
+	auditDataDir string
+	quitOnce     sync.Once
+	auditOnce    sync.Once
 }
 
 // New creates a new Agent.
@@ -98,112 +109,92 @@ func New(cfg Config) *Agent {
 		RunModule:                 cfg.RunModule,
 		RunJob:                    cfg.RunJob,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
-		ModuleRegistry:            collectorapi.DefaultRegistry,
+		IsInsideK8s:               cfg.IsInsideK8s,
+		runModePolicy:             cfg.RunModePolicy,
+		ModuleRegistry:            cfg.ModuleRegistry,
+		DiscoveryProviders:        cfg.DiscoveryProviders,
 		Out:                       safewriter.Stdout,
 		api:                       netdataapi.New(safewriter.Stdout),
 		quitCh:                    make(chan struct{}, 1),
-		dumpMode:                  cfg.DumpMode,
-		dumpSummary:               cfg.DumpSummary,
+		auditDuration:             cfg.AuditDuration,
+		auditSummary:              cfg.AuditSummary,
 		DisableServiceDiscovery:   cfg.DisableServiceDiscovery,
 	}
 
-	if a.dumpMode > 0 {
-		a.dumpAnalyzer = NewDumpAnalyzer()
-		a.Infof("dump mode enabled: will run for %v and analyze metric structure", a.dumpMode)
-		if a.dumpSummary {
-			a.Infof("dump summary enabled: will show consolidated summary across all jobs")
+	if a.auditDuration > 0 {
+		a.auditAnalyzer = metricsaudit.New()
+		a.Infof("metrics-audit mode enabled: will run for %v and analyze metric structure", a.auditDuration)
+		if a.auditSummary {
+			a.Infof("metrics-audit summary enabled: will show consolidated summary across all jobs")
 		}
 	}
 
-	if cfg.DumpDataDir != "" {
-		a.dumpDataDir = cfg.DumpDataDir
-		if a.dumpAnalyzer == nil {
-			a.dumpAnalyzer = NewDumpAnalyzer()
+	if cfg.AuditDataDir != "" {
+		a.auditDataDir = cfg.AuditDataDir
+		if a.auditAnalyzer == nil {
+			a.auditAnalyzer = metricsaudit.New()
 		}
-		a.dumpAnalyzer.EnableDataCapture(cfg.DumpDataDir, a.signalDumpComplete)
-		a.Infof("dump data directory: %s", cfg.DumpDataDir)
+		a.auditAnalyzer.EnableDataCapture(cfg.AuditDataDir, a.signalAuditComplete)
+		a.Infof("metrics-audit data directory: %s", cfg.AuditDataDir)
 	}
 
 	return a
 }
 
-// Run starts the Agent.
-func (a *Agent) Run() {
-	go a.keepAlive()
-	serve(a)
+// RunContext runs one agent instance lifecycle on the provided context.
+func (a *Agent) RunContext(ctx context.Context) {
+	a.run(ctx)
 }
 
-func serve(a *Agent) {
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
-	signal.Ignore(syscall.SIGPIPE)
+// IsTerminalMode reports whether run-mode policy is interactive terminal.
+func (a *Agent) IsTerminalMode() bool {
+	return a.runModePolicy.IsTerminal
+}
 
-	var wg sync.WaitGroup
+// RunKeepAlive runs keepalive loop until context cancellation or too many failures.
+func (a *Agent) RunKeepAlive(ctx context.Context) error {
+	tk := time.NewTicker(time.Second)
+	defer tk.Stop()
 
-	var exit bool
-
-	// Set up dump mode timer if enabled
-	var dumpTimer *time.Timer
-	var dumpTimerCh <-chan time.Time
-	if a.dumpMode > 0 {
-		dumpTimer = time.NewTimer(a.dumpMode)
-		dumpTimerCh = dumpTimer.C
-	}
-
+	var n int
 	for {
-		collectorapi.ObsoleteCharts(true)
-
-		ctx, cancel := context.WithCancel(context.Background())
-
-		wg.Add(1)
-		go func() { defer wg.Done(); a.run(ctx) }()
-
 		select {
-		case sig := <-ch:
-			switch sig {
-			case syscall.SIGHUP:
-				a.Infof("received %s signal (%d). Restarting running instance", sig, sig)
-			default:
-				a.Infof("received %s signal (%d). Terminating...", sig, sig)
-				exit = true
+		case <-ctx.Done():
+			return nil
+		case <-tk.C:
+			if err := a.api.EMPTYLINE(); err != nil {
+				n++
+			} else {
+				n = 0
 			}
-		case <-a.quitCh:
-			a.Infof("received QUIT command. Terminating...")
-			exit = true
-		case <-dumpTimerCh:
-			a.Infof("dump mode duration expired, collecting analysis...")
-			a.collectDumpAnalysis()
-			exit = true
-		}
-
-		if exit {
-			collectorapi.ObsoleteCharts(false)
-		}
-
-		cancel()
-
-		func() {
-			timeout := time.Second * 10
-			t := time.NewTimer(timeout)
-			defer t.Stop()
-			done := make(chan struct{})
-
-			go func() { wg.Wait(); close(done) }()
-
-			select {
-			case <-t.C:
-				a.Errorf("stopping all goroutines timed out after %s. Exiting...", timeout)
-				os.Exit(0)
-			case <-done:
+			if n >= 30 {
+				return fmt.Errorf("too many keepAlive errors")
 			}
-		}()
-
-		if exit {
-			os.Exit(0)
 		}
-
-		time.Sleep(time.Second)
 	}
+}
+
+// QuitCh returns agent quit notifications (e.g., metrics-audit completion).
+func (a *Agent) QuitCh() <-chan struct{} {
+	return a.quitCh
+}
+
+// AuditDuration returns configured metrics-audit timer duration.
+func (a *Agent) AuditDuration() time.Duration {
+	return a.auditDuration
+}
+
+// FinalizeMetricsAudit prints metrics-audit analysis report once.
+func (a *Agent) FinalizeMetricsAudit(reason string) {
+	a.auditOnce.Do(func() {
+		if a.auditAnalyzer == nil {
+			return
+		}
+		if reason != "" {
+			a.Infof("finalizing metrics audit (%s)", reason)
+		}
+		a.printMetricsAudit()
+	})
 }
 
 func (a *Agent) run(ctx context.Context) {
@@ -215,9 +206,6 @@ func (a *Agent) run(ctx context.Context) {
 
 	if !cfg.Enabled {
 		a.Info("plugin is disabled in the configuration file, exiting...")
-		if terminal.IsTerminal() {
-			os.Exit(0)
-		}
 		a.api.DISABLE()
 		return
 	}
@@ -225,9 +213,6 @@ func (a *Agent) run(ctx context.Context) {
 	enabledModules := a.loadEnabledModules(cfg)
 	if len(enabledModules) == 0 {
 		a.Info("no modules to run")
-		if terminal.IsTerminal() {
-			os.Exit(0)
-		}
 		a.api.DISABLE()
 		return
 	}
@@ -239,15 +224,13 @@ func (a *Agent) run(ctx context.Context) {
 	discMgr, err := discovery.NewManager(discCfg)
 	if err != nil {
 		a.Error(err)
-		if terminal.IsTerminal() {
-			os.Exit(0)
-		}
 		return
 	}
 
-	runtimeSvc := runtimemgr.New(a.Logger.With(slog.String("component", "runtime metrics service")))
+	runtimeSvc := runtimechartemit.New(a.Logger.With(slog.String("component", "runtime metrics service")))
 	runtimeSvc.Start(a.Name, a.Out)
 	defer runtimeSvc.Stop()
+	fnMgr.SetRuntimeService(runtimeSvc)
 
 	var runJob []string
 	if a.RunModule != "" && a.RunModule != "all" {
@@ -257,20 +240,18 @@ func (a *Agent) run(ctx context.Context) {
 	jobMgr := jobmgr.New(jobmgr.Config{
 		PluginName:     a.Name,
 		Out:            a.Out,
+		RunModePolicy:  a.runModePolicy,
 		Modules:        enabledModules,
 		RunJob:         runJob,
 		ConfigDefaults: discCfg.Registry,
 		VarLibDir:      a.VarLibDir,
 		FnReg:          fnMgr,
 		Vnodes:         a.setupVnodeRegistry(),
-		DumpMode:       a.dumpMode > 0,
-		DumpAnalyzer:   a.dumpAnalyzer,
-		DumpDataDir:    a.dumpDataDir,
+		AuditMode:      a.auditDuration > 0,
+		AuditAnalyzer:  a.auditAnalyzer,
+		AuditDataDir:   a.auditDataDir,
 		RuntimeService: runtimeSvc,
 	})
-
-	// Store reference for dump mode and enable dump mode if configured
-	a.mgr = jobMgr
 
 	in := make(chan []*confgroup.Group)
 	var wg sync.WaitGroup
@@ -288,45 +269,22 @@ func (a *Agent) run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (a *Agent) keepAlive() {
-	if terminal.IsTerminal() {
-		return
-	}
-
-	tk := time.NewTicker(time.Second)
-	defer tk.Stop()
-
-	var n int
-	for range tk.C {
-		if err := a.api.EMPTYLINE(); err != nil {
-			n++
-		} else {
-			n = 0
-		}
-		if n >= 30 {
-			a.Info("too many keepAlive errors. Terminating...")
-			os.Exit(0)
-		}
-	}
-}
-
-func (a *Agent) collectDumpAnalysis() {
-	if a.dumpAnalyzer == nil || a.mgr == nil {
-		a.Error("dump analyzer or job manager not initialized")
+func (a *Agent) printMetricsAudit() {
+	if a.auditAnalyzer == nil {
 		return
 	}
 
 	// Print the analysis report
-	if a.dumpSummary {
-		a.dumpAnalyzer.PrintSummary()
+	if a.auditSummary {
+		a.auditAnalyzer.PrintSummary()
 	} else {
-		a.dumpAnalyzer.PrintReport()
+		a.auditAnalyzer.PrintReport()
 	}
 }
 
-func (a *Agent) signalDumpComplete() {
-	a.dumpOnce.Do(func() {
-		a.Infof("dump data collection complete, shutting down")
+func (a *Agent) signalAuditComplete() {
+	a.quitOnce.Do(func() {
+		a.Infof("metrics-audit data collection complete, shutting down")
 		select {
 		case a.quitCh <- struct{}{}:
 		default:

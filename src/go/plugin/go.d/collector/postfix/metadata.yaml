@@ -18,7 +18,6 @@ modules:
         - postfix
         - mail
         - mail server
-      most_popular: false
     overview:
       data_collection:
         metrics_description: >

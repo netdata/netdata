@@ -22,14 +22,6 @@
           "type": "string",
           "description": "A description of the category."
         },
-        "most_popular": {
-          "type": "boolean",
-          "description": "Indicates if the category should show up in the initial list of categories, or only in the full expanded list."
-        },
-        "priority": {
-          "type": "integer",
-          "description": "Indicates sort order for categories that are marked as most popular."
-        },
         "collector_default": {
           "type": "boolean",
           "description": "Indicates that the category should be added to collector integrations that list no categories."
@@ -46,8 +38,6 @@
         "id",
         "name",
         "description",
-        "most_popular",
-        "priority",
         "children"
       ]
     }
