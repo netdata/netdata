@@ -620,6 +620,13 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
 
     spinlock_lock(&dim->slock);
 
+    ml_host_t *host = (ml_host_t *) dim->rd->rrdset->rrdhost->ml_host;
+    if (!host || !host->ml_running) {
+        dim->training_in_progress = false;
+        spinlock_unlock(&dim->slock);
+        return;
+    }
+
     if (dim->km_contexts.size() < Cfg.num_models_to_use) {
         dim->km_contexts.emplace_back(dim->kmeans);
     } else {
@@ -1133,6 +1140,8 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
     }
     spinlock_unlock(&Dim->slock);
 
+    // Safe without Dim->slock: per-host work is serialized through a single worker queue,
+    // and stop/reset no longer writes Dim->kmeans from non-worker threads.
     Dim->kmeans = req.inlined_km;
     ml_dimension_update_models(worker, Dim);
     pulse_ml_models_received();
