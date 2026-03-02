@@ -2263,16 +2263,17 @@ func TestServiceDiscovery_DyncfgRestartErrorHandling(t *testing.T) {
 							discovererType: testDiscovererTypeNetListeners,
 							name:           "test-job",
 							sourceType:     "dyncfg",
-							status:         dyncfg.StatusFailed,
+							status:         dyncfg.StatusRunning,
 						},
 					},
-					// NOTE: When Restart fails validation (newPipeline fails), the old pipeline
-					// keeps running. This is the intended Restart behavior - validate before stopping.
-					// The status shows Failed but old pipeline continues collecting data.
+					// NOTE: When Restart fails preflight validation (newPipeline fails), the
+					// old pipeline stays running and handler rolls back to old running state.
 					wantRunning: []string{"dyncfg:net_listeners:test-job"},
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 3-update 200 application/json")
-						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job status failed")
+						line := "CONFIG test:sd:net_listeners:test-job status running"
+						assert.Equal(t, 2, strings.Count(got, line), "expected running status to be re-notified after update failure")
+						assert.NotContains(t, got, "CONFIG test:sd:net_listeners:test-job status failed")
 					},
 				}
 			},

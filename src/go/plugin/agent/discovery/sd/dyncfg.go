@@ -100,7 +100,7 @@ func (cb *sdCallbacks) Start(cfg sdConfig) error {
 func (cb *sdCallbacks) Update(oldCfg, newCfg sdConfig) error {
 	pipelineCfg, err := newCfg.ToPipelineConfig(cb.sd.configDefaults)
 	if err != nil {
-		return err
+		return dyncfg.MarkNonDisruptiveUpdate(err)
 	}
 	return cb.sd.mgr.Restart(cb.sd.ctx, newCfg.PipelineKey(), pipelineCfg)
 }

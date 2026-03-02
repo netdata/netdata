@@ -646,6 +646,17 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	}
 
 	if err != nil {
+		if !isConversion && errors.Is(err, ErrNonDisruptiveUpdate) {
+			// Update failed before runtime disruption; rollback to old cache state.
+			h.seen.Remove(newCfg)
+			h.seen.Add(oldCfg)
+			h.exposed.Add(entry)
+
+			h.api.SendCodef(fn, 200, "%v", err)
+			h.NotifyJobStatus(oldCfg, oldStatus)
+			return
+		}
+
 		newEntry.Status = StatusFailed
 		if isConversion {
 			h.NotifyJobCreate(newCfg, StatusFailed)
