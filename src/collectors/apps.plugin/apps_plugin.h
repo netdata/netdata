@@ -553,6 +553,7 @@ struct pid_stat {
 #endif
     struct pid_fd *fds;             // array of fds it uses
     uint32_t fds_size;              // the size of the fds array
+    uint32_t fds_max;               // the highest fd index ever seen + 1
 #endif
 
     uint32_t children_count;        // the number of processes directly referencing this.

@@ -112,7 +112,7 @@ static inline void cleanup_exited_pids(void) {
 #endif
 
 #if (PROCESSES_HAVE_FDS == 1)
-            for(size_t c = 0; c < p->fds_size; c++)
+            for(size_t c = 0; c < p->fds_max; c++)
                 if(p->fds[c].fd > 0) {
                     file_descriptor_not_used(p->fds[c].fd);
                     clear_pid_fd(&p->fds[c]);
@@ -198,6 +198,13 @@ void aggregate_processes_to_targets(void) {
     struct target *w = NULL, *o = NULL;
     (void)w; (void)o;
 
+#if (PROCESSES_HAVE_UID == 1)
+    update_cached_host_users();
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+    update_cached_host_groups();
+#endif
+
     // concentrate everything on the targets
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
 
@@ -217,8 +224,6 @@ void aggregate_processes_to_targets(void) {
         // user target
 
 #if (PROCESSES_HAVE_UID == 1)
-        update_cached_host_users();
-
         o = p->uid_target;
         if(likely(p->uid_target && p->uid_target->uid == p->uid))
             w = p->uid_target;
@@ -236,7 +241,6 @@ void aggregate_processes_to_targets(void) {
         // user group target
 
 #if (PROCESSES_HAVE_GID == 1)
-        update_cached_host_users();
 
         o = p->gid_target;
         if(likely(p->gid_target && p->gid_target->gid == p->gid))
