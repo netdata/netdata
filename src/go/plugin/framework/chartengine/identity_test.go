@@ -148,3 +148,31 @@ func TestSanitizeChartIDLabelValue(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderChartInstanceIDSanitizesLegacyLabelChars(t *testing.T) {
+	identity := program.ChartIdentity{
+		IDTemplate: program.Template{Raw: "win_nic_traffic"},
+		InstanceByLabels: []program.InstanceLabelSelector{
+			{Key: "nic"},
+		},
+	}
+
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "space", value: "a b", want: "a_b"},
+		{name: "backslash", value: "a\\b", want: "a_b"},
+		{name: "apostrophe", value: "a'b", want: "ab"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok, err := renderChartInstanceID(identity, map[string]string{"nic": tc.value})
+			require.NoError(t, err)
+			assert.True(t, ok)
+			assert.Equal(t, "win_nic_traffic_"+tc.want, got)
+		})
+	}
+}

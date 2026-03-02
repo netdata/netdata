@@ -276,3 +276,30 @@ func TestBuildScalarAutogenRouteSanitizesDotLabelValues(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "svc.requests_total-instance=db1_eu-job=mysql_prod", route.chartID)
 }
+
+func TestBuildScalarAutogenRouteSanitizesLegacyLabelChars(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "space", value: "a b", want: "a_b"},
+		{name: "backslash", value: "a\\b", want: "a_b"},
+		{name: "apostrophe", value: "a'b", want: "ab"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			route, ok, err := buildScalarAutogenRoute(
+				"svc.requests_total",
+				sortedLabelView(map[string]string{"instance": tc.value}),
+				metrix.SeriesMeta{Kind: metrix.MetricKindCounter},
+				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
+			)
+			require.NoError(t, err)
+			require.True(t, ok)
+			assert.Equal(t, "svc.requests_total-instance="+tc.want, route.chartID)
+		})
+	}
+}
