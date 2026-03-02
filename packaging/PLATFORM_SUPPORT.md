@@ -1,5 +1,26 @@
 # Platform support policy
 
+Netdata is evolving rapidly and new features are added at a constant pace. Therefore, we have a frequent release cadence to deliver all these features to you as soon as possible.
+
+You can choose from two Netdata Agent release channels:
+
+| Release Channel |                            Release Frequency                            |                                 Support Policy & Features                                  |                                                                   Support Duration                                                                   |                              Backwards Compatibility                              |
+|:---------------:|:-----------------------------------------------------------------------:|:------------------------------------------------------------------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------:|:---------------------------------------------------------------------------------:|
+|   **Stable**    | Usually 4-6 major/minor releases per year plus patch releases as needed |                 Receiving bug fixes and security updates between releases                  |                                                       Up to the 2nd stable release after them                                                        |     Previous configuration semantics and data are supported by newer releases     |
+|   **Nightly**   |                      Most nights around 02:00 UTC                       | • Receiving bug fixes and security updates continuously<br/>• Latest pre-released features | • Issues are generally investigated against recent nightlies<br/>• Users may be asked to reproduce on a current build before further troubleshooting | Configuration and data of unreleased features may change between nightly releases |
+
+:::info
+
+"Support Duration" defines how long we consider each release actively used in production systems. After this period, you should update to the latest release to continue receiving bug fixes and security updates.
+
+:::
+
+:::tip
+
+**Switching Between Stable and Nightly Builds**: You can switch between stable and nightly channels depending on your needs. The method depends on how you originally installed Netdata. For further information, please reference our [switching guide](https://learn.netdata.cloud/docs/netdata-agent/installation/linux/switch-install-types-and-release-channels).
+
+:::
+
 Netdata defines three tiers of official support:
 
 - [Core](#core)
@@ -97,7 +118,41 @@ Platforms in the community support tier are those which are primarily supported 
 | macOS       | 12        | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
 | macOS       | 11        | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies.                        |
 
+## Binary Distribution Packages
+
+The tier tables above are the authoritative source for supported platform versions and architectures.
+
+For quick format guidance:
+
+- Docker under Linux is distributed as a `docker image`.
+- Static builds are distributed as `.gz.run` installers.
+- Linux native packages are distributed as `DEB` and `RPM` for platforms in the Core tier where native packages are available.
+
+:::important
+
+Linux distributions frequently provide binary packages of Netdata. However, **the packages you will find in the distributions' repositories may be outdated, incomplete, missing significant features, or completely broken**. We recommend using the packages we provide.
+
+:::
+
+## Builds from Source
+
+Source builds are expected to work for all platforms in the Core tier because they are continuously validated in CI. The following additional environments should usually work, although we do not continuously validate all edge cases:
+
+|            Platform            | Platform Versions |
+|:------------------------------:|:-----------------:|
+|    **Linux Distributions**     | Latest unreleased |
+|  **FreeBSD and derivatives**   |     13-STABLE     |
+|   **Gentoo and derivatives**   |      Latest       |
+| **Arch Linux and derivatives** |  Latest from AUR  |
+|           **macOS**            |    11, 12, 13     |
+
 ## Third-party supported platforms
+
+The following distributions are maintained by third parties and generally provide recent Netdata packages:
+
+|    Platform    | Platform Versions |    Released Packages Architecture    |
+|:--------------:|:-----------------:|:------------------------------------:|
+| **Arch Linux** |      Latest       | All the Arch-supported architectures |
 
 Some platform maintainers actively support Netdata on their platforms even though we do not provide official support. Third-party supported platforms may work, but the experience of using Netdata on such platforms is not something we can guarantee. When you use an externally supported platform and report a bug, we will either ask you to reproduce the issue on a supported platform or submit a support request directly to the platform maintainers.
 
@@ -118,15 +173,15 @@ Platforms that meet these criteria will be immediately transitioned to the **Pre
 
 This is a list of platforms that we have supported in the recent past but no longer officially support:
 
-| Platform     | Version   | Notes                |
-|--------------|-----------|----------------------|
-| Debian       | 10.x      | EOL as of 2024-07-01 |
-| Fedora       | 41        | EOL as of 2025-12-15 |
-| Fedora       | 40        | EOL as of 2024-11-12 |
-| openSUSE     | Leap 15.5 | EOL as of 2024-12-31 |
-| Ubuntu       | 25.04     | EOL as of 2026-01-17 |
-| Ubuntu       | 20.04     | EOL as of 2025-05-31 |
-| Ubuntu       | 18.04     | EOL as of 2023-04-02 |
+| Platform | Version   | Notes                |
+|----------|-----------|----------------------|
+| Debian   | 10.x      | EOL as of 2024-07-01 |
+| Fedora   | 41        | EOL as of 2025-12-15 |
+| Fedora   | 40        | EOL as of 2024-11-12 |
+| openSUSE | Leap 15.5 | EOL as of 2024-12-31 |
+| Ubuntu   | 25.04     | EOL as of 2026-01-17 |
+| Ubuntu   | 20.04     | EOL as of 2025-05-31 |
+| Ubuntu   | 18.04     | EOL as of 2023-04-02 |
 
 ## Static builds
 
@@ -145,8 +200,34 @@ We currently provide static builds for the following CPU architectures:
 - ARMv6 (armv6l)
 - AArch64 (arm64)
 
-## Platform-specific support considerations
+### Limitations of Static Builds
+
+When you use static builds, you'll miss certain features that require specific operating system support, including:
+
+- IPMI hardware sensors monitoring
+- eBPF-related capabilities
 
 ### Systemd
 
 Many of our systemd integrations are not supported in our static builds. This is due to a general refusal by the systemd developers to support static linking (or any C runtime other than glibc), and is not something we can resolve.
+
+### Impact of Platform End-of-Life (EOL)
+
+When a platform is removed from the Binary Distribution Packages list:
+
+- **No automatic transitions occur**: Your existing native package installations will remain as they are
+- **Your local updater will report the Agent as up-to-date** even when newer versions exist.
+- **When a new Netdata version is published, you'll see** "_Nodes are below the recommended Agent version_" **warnings** in the Netdata Cloud UI.
+- **You will stop receiving new features, improvements, and security updates**.
+
+:::important
+
+**We strongly recommend upgrading your operating system before it reaches EOL** to maintain full Netdata functionality and continued updates.
+
+:::
+
+:::tip
+
+**Migrating from Native Package to Static Build**: If upgrading your operating system isn't possible, you can manually switch to a static build. For more information, please reference our [switching guide](https://learn.netdata.cloud/docs/netdata-agent/installation/linux/switch-install-types-and-release-channels).
+
+:::

@@ -1,0 +1,13 @@
+pattern: '(?P<MESSAGE>.*)'
+
+inject:
+  - key: BASE_VAR
+    value: 'NESTED'
+  - key: NESTED_VAR
+    value: 'final_value'
+  - key: SIMPLE_NESTED
+    value: '${NESTED_VAR}'
+  - key: UNDEFINED_NESTED
+    value: '${UNDEFINED_VAR}'
+  - key: COMBINED
+    value: 'prefix_${BASE_VAR}_${NESTED_VAR}_suffix'

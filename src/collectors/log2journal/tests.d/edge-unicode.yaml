@@ -1,0 +1,52 @@
+pattern: "(?P<message>.*)"
+
+# Test Unicode handling in various contexts
+
+inject:
+  - key: EMOJI_VALUE
+    value: "Hello 👋 World 🌍"  # Emojis
+    
+  - key: CHINESE_VALUE
+    value: "你好世界"  # Chinese characters
+    
+  - key: ARABIC_VALUE
+    value: "مرحبا بالعالم"  # Arabic (RTL text)
+    
+  - key: MIXED_UNICODE
+    value: "Test 测试 テスト тест"  # Mixed scripts
+    
+  - key: SPECIAL_UNICODE
+    value: "\u200B\u200C\u200D"  # Zero-width characters
+    
+  - key: COMBINING_CHARS
+    value: "é è ñ ü"  # Combining diacriticals
+
+rewrite:
+  - key: UNICODE_KEY_测试
+    value: "Unicode in key name"
+    inject: yes
+    
+  - key: TEST_UNICODE_MATCH
+    match: "[\u4e00-\u9fff]+"  # Match Chinese characters
+    value: "Found Chinese: ${0}"
+    
+  - key: EMOJI_MATCH  
+    match: "[\U0001F600-\U0001F64F]+"  # Match emoticons
+    value: "Found emoji: ${0}"
+
+rename:
+  - old_key: "Unicode_源"
+    new_key: "UNICODE_SOURCE"
+    
+  - old_key: "Test_🔑"
+    new_key: "TEST_KEY"
+
+filter:
+  include: ".*[\u0080-\uffff].*"  # Include if contains non-ASCII
+  exclude: ".*[\U0001F1E6-\U0001F1FF].*"  # Exclude flag emojis
+
+unmatched:
+  key: UNMATCHED_UNICODE
+  inject:
+    - key: ERROR_MSG
+      value: "Failed to parse: 错误 ❌"
