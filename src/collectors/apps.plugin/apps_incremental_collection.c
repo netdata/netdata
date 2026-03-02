@@ -120,17 +120,16 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
         p->ppid = 0;
 
     // --------------------------------------------------------------------
-    // detect kernel threads: their parent is an aggregator (e.g. kthreadd on Linux)
+    // detect kernel threads: their parent is an aggregator
+    // (e.g. kthreadd on Linux, kernel on FreeBSD).
     // kernel threads have no I/O, no file descriptors, no memory - skip expensive reads
 
     bool is_kernel_thread = false;
-#if defined(OS_LINUX)
     if(p->ppid) {
         struct pid_stat *pp = find_pid_entry(p->ppid);
         if(pp && pp->is_aggregator)
             is_kernel_thread = true;
     }
-#endif
 
     // --------------------------------------------------------------------
     // /proc/<pid>/io
