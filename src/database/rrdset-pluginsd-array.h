@@ -90,8 +90,12 @@ static inline void prd_array_release(PRD_ARRAY *arr) {
     int32_t old_refcount = __atomic_load_n(&arr->refcount, __ATOMIC_ACQUIRE);
     while(true) {
         if(unlikely(old_refcount <= 0)) {
-            // Defensive handling for production builds: keep the object stable and
-            // avoid driving refcount further negative on repeated misuse.
+            // Keep the object stable and avoid driving refcount further negative on
+            // repeated misuse. Log in all builds; internal_fatal adds extra checks.
+            nd_log_limit_static_global_var(erl_prd_refcount_underflow, 1, 0);
+            nd_log_limit(&erl_prd_refcount_underflow, NDLS_DAEMON, NDLP_WARNING,
+                         "PRD_ARRAY: refcount underflow (was %d) - double release detected",
+                         old_refcount);
             internal_fatal(true,
                            "PRD_ARRAY: refcount underflow (was %d) - double release detected", old_refcount);
             return;
