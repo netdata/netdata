@@ -19,8 +19,6 @@ macro(add_ibm_plugin_target)
     ibm_mq
     SOURCE_DIR "${IBM_MQ_BUILD_DIR}"
     CONFIGURE_COMMAND "${CMAKE_COMMAND} -E true"
-    CONFIGURE_COMMAND "${CMAKE_COMMAND} -E copy_directory bin gskit8 inc java lap lib lib64 licenses msg samp swidtag ${IBM_MQ_BUILD_DIR}"
-    COMMAND       "${CMAKE_COMMAND} -E copy MANIFEST MANIFEST.Redist README.Redist ${IBM_MQ_BUILD_DIR}"
     BUILD_COMMAND "${CMAKE_COMMAND} -E true"
     INSTALL_COMMAND "${CMAKE_COMMAND} -E true"
     DOWNLOAD_NO_PROGRESS True
