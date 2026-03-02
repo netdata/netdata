@@ -65,6 +65,31 @@ TESTS_IGNORED=0
 # Create results directory
 mkdir -p "$RESULTS_DIR"
 
+# Execute a test command with proper input redirection.
+# For .cmd files, eval is required since they may contain pipes/operators.
+# For standard commands, the command array is invoked directly (no eval).
+# Args: input_file use_cmd_file cmd_str_or_empty cmd_args...
+_exec_with_input() {
+    local input="$1"
+    local use_eval="$2"
+    local cmd_str="$3"
+    shift 3
+
+    if [ "$use_eval" = true ]; then
+        if [ -f "$input" ]; then
+            eval "$cmd_str" < "$input"
+        else
+            eval "$cmd_str" < /dev/null
+        fi
+    else
+        if [ -f "$input" ]; then
+            "$@" < "$input"
+        else
+            "$@" < /dev/null
+        fi
+    fi
+}
+
 # Function to run a single test
 run_test() {
     local test_name="$1"
@@ -74,50 +99,49 @@ run_test() {
     local expected_config="$5"
     local cmd_file="$6"
     local fail_file="$7"
-    
+
     TESTS_RUN=$((TESTS_RUN + 1))
     local test_passed=true
     local error_msg=""
-    
-    # Determine command to run
-    local cmd=""
+
+    # Determine command to run.
+    # For .cmd files: use eval (they may contain pipes/operators).
+    # For standard cases: use an array to avoid eval entirely.
+    local use_cmd_file=false
+    local cmd_str=""
+    local cmd_args=()
     if [ -f "$cmd_file" ]; then
-        # Use custom command from .cmd file
-        cmd=$(envsubst < "$cmd_file")
+        use_cmd_file=true
+        cmd_str=$(envsubst < "$cmd_file")
     elif [ -f "$yaml_file" ]; then
-        # Standard YAML file test
-        cmd="$TESTED_LOG2JOURNAL_BIN -f $yaml_file"
+        cmd_args=("$TESTED_LOG2JOURNAL_BIN" -f "$yaml_file")
     else
         # Internal config test (extract config name from test_name)
         if [[ "$test_name" =~ ^(default|nginx-combined|nginx-json|logfmt)$ ]]; then
-            cmd="$TESTED_LOG2JOURNAL_BIN -c $test_name"
+            cmd_args=("$TESTED_LOG2JOURNAL_BIN" -c "$test_name")
         else
             echo -e "${YELLOW}IGNORED${NC} (no config or cmd file)"
             TESTS_IGNORED=$((TESTS_IGNORED + 1))
             return
         fi
     fi
-    
-    # Determine input source
-    local input_args=""
-    if [ -f "$input_file" ]; then
-        input_args="< $input_file"
-    else
-        input_args="< /dev/null"
-    fi
-    
+
     if [ "$VERBOSE" = true ]; then
         echo "Running test: $test_name"
-        echo "  Command: $cmd $input_args"
+        if [ "$use_cmd_file" = true ]; then
+            echo "  Command: $cmd_str < ${input_file}"
+        else
+            echo "  Command: ${cmd_args[*]} < ${input_file}"
+        fi
     else
         echo -n "Running test: $test_name ... "
     fi
-    
+
     # Check if this is a failure test
     if [ -f "$fail_file" ]; then
         # Test should fail
         local actual_error="$RESULTS_DIR/${test_name}.err"
-        if eval "$cmd $input_args" > /dev/null 2> "$actual_error"; then
+        if _exec_with_input "$input_file" "$use_cmd_file" "$cmd_str" "${cmd_args[@]}" > /dev/null 2> "$actual_error"; then
             test_passed=false
             error_msg="Test was expected to fail but succeeded"
         else
@@ -133,8 +157,8 @@ run_test() {
         # Normal test - check output
         if [ -f "$expected_output" ]; then
             local actual_output="$RESULTS_DIR/${test_name}.out"
-            
-            if ! eval "$cmd $input_args" > "$actual_output" 2> "$RESULTS_DIR/${test_name}.err"; then
+
+            if ! _exec_with_input "$input_file" "$use_cmd_file" "$cmd_str" "${cmd_args[@]}" > "$actual_output" 2> "$RESULTS_DIR/${test_name}.err"; then
                 test_passed=false
                 error_msg="Command failed with non-zero exit code - see $RESULTS_DIR/${test_name}.err"
             else
@@ -152,7 +176,7 @@ run_test() {
                         error_msg="Output mismatch (version-agnostic) - see $RESULTS_DIR/${test_name}.diff"
                     fi
                 fi
-                
+
                 # Also verify version format is correct
                 if ! grep -q "^Netdata log2journal v[0-9]\+\.[0-9]\+\.[0-9]\+-[0-9]\+-g[a-f0-9]\+$" "$actual_output"; then
                     test_passed=false
@@ -171,13 +195,25 @@ run_test() {
             fi
             fi
         fi
-        
+
         # Check config output if expected
         if [ -f "$expected_config" ]; then
             local actual_config="$RESULTS_DIR/${test_name}-config.yaml"
-            
-            eval "$cmd --show-config $input_args" 2>/dev/null | sed '1,/^$/d' > "$actual_config" || true
-            
+
+            if [ "$use_cmd_file" = true ]; then
+                if [ -f "$input_file" ]; then
+                    eval "$cmd_str --show-config" < "$input_file" 2>/dev/null | sed '1,/^$/d' > "$actual_config" || true
+                else
+                    eval "$cmd_str --show-config" < /dev/null 2>/dev/null | sed '1,/^$/d' > "$actual_config" || true
+                fi
+            else
+                if [ -f "$input_file" ]; then
+                    "${cmd_args[@]}" --show-config < "$input_file" 2>/dev/null | sed '1,/^$/d' > "$actual_config" || true
+                else
+                    "${cmd_args[@]}" --show-config < /dev/null 2>/dev/null | sed '1,/^$/d' > "$actual_config" || true
+                fi
+            fi
+
             if ! diff -u "$expected_config" "$actual_config" > "$RESULTS_DIR/${test_name}-config.diff" 2>&1; then
                 test_passed=false
                 if [ "$VERBOSE" = true ]; then
@@ -188,7 +224,7 @@ run_test() {
             fi
         fi
     fi
-    
+
     # Report result
     if [ "$test_passed" = true ]; then
         echo -e "${GREEN}PASSED${NC}"
