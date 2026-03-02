@@ -660,4 +660,6 @@ struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER 
 // return HTTP response code
 int json_parse_payload_or_error(BUFFER *payload, BUFFER *error, json_parse_function_payload_t cb, void *cb_data);
 
+int json_c_parser_unittest(void);
+
 #endif //NETDATA_JSON_C_PARSER_INLINE_H
