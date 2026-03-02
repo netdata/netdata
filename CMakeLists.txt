@@ -3277,8 +3277,10 @@ if(ENABLE_PLUGIN_GO)
     # Build and install nd-mcp (stdio-golang bridge) exactly like go.d.plugin
     if (OS_WINDOWS)
         set(ND_MCP_NAME nd-mcp.exe)
+        set(TOPOLOGY_IP_INTEL_DOWNLOADER_BIN topology-ip-intel-downloader.exe)
     else()
         set(ND_MCP_NAME nd-mcp)
+        set(TOPOLOGY_IP_INTEL_DOWNLOADER_BIN topology-ip-intel-downloader)
     endif()
 
     add_go_target(nd-mcp-target ${ND_MCP_NAME} src/web/mcp/bridges/stdio-golang .)
@@ -3286,6 +3288,20 @@ if(ENABLE_PLUGIN_GO)
             ${CMAKE_BINARY_DIR}/${ND_MCP_NAME}
             COMPONENT plugin-go
             DESTINATION "${BINDIR}")
+
+    add_go_target(topology-ip-intel-downloader-target ${TOPOLOGY_IP_INTEL_DOWNLOADER_BIN} src/go tools/topology-ip-intel-downloader)
+    install(PROGRAMS
+            ${CMAKE_BINARY_DIR}/${TOPOLOGY_IP_INTEL_DOWNLOADER_BIN}
+            COMPONENT netdata
+            DESTINATION "${BINDIR}")
+    install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader\")"
+            COMPONENT netdata)
+    install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin\")"
+            COMPONENT netdata)
+    install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.exe\")"
+            COMPONENT netdata)
+    install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin.exe\")"
+            COMPONENT netdata)
 endif()
 
 #
@@ -3389,6 +3405,10 @@ if(ENABLE_PLUGIN_NETFLOW)
             COMPONENT plugin-netflow
             DESTINATION usr/lib/netdata/conf.d)
 endif()
+
+install(FILES src/go/tools/topology-ip-intel-downloader/configs/topology-ip-intel.yaml
+        COMPONENT netdata
+        DESTINATION usr/lib/netdata/conf.d)
 
 #
 # Generate config file
