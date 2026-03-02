@@ -351,7 +351,6 @@ static int hardirq_parse_interrupts(char *irq_name, int irq)
  * @param mapfd hash map id.
  *
  * @return it returns 0 on success and -1 otherwise
- */
 static int hardirq_read_latency_map(int mapfd)
 {
     static hardirq_ebpf_static_val_t *hardirq_ebpf_dynamic_vals = NULL;
@@ -400,6 +399,7 @@ static int hardirq_read_latency_map(int mapfd)
 
     return 0;
 }
+ */
 
 /**
  * Read Latency Static Map
