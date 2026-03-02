@@ -316,7 +316,8 @@ procfile *procfile_readall(procfile *ff) {
 
         // netdata_log_info("Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
         ff->stats.reads++;
-        r = read(ff->fd, &ff->data[s], ff->size - s);
+        ssize_t remaining = ff->size - s;
+        r = read(ff->fd, &ff->data[s], remaining);
         if(unlikely(r == -1)) {
             if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
             else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
@@ -329,6 +330,11 @@ procfile *procfile_readall(procfile *ff) {
             ff->stats.max_read_size = r;
 
         ff->len += r;
+
+        // if we read less than the buffer had available,
+        // we reached EOF - no need for another read() syscall
+        if(likely(r < remaining))
+            break;
     }
     
     if (unlikely(ff->flags & PROCFILE_FLAG_NONSEEKABLE)) {
