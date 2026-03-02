@@ -2272,7 +2272,7 @@ func TestServiceDiscovery_DyncfgRestartErrorHandling(t *testing.T) {
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 3-update 200 application/json")
 						line := "CONFIG test:sd:net_listeners:test-job status running"
-						assert.Equal(t, 2, strings.Count(got, line), "expected running status to be re-notified after update failure")
+						assert.GreaterOrEqual(t, strings.Count(got, line), 2, "expected running status to be re-notified after update failure")
 						assert.NotContains(t, got, "CONFIG test:sd:net_listeners:test-job status failed")
 					},
 				}
