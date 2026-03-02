@@ -206,6 +206,9 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
             if(unlikely(!prd->rda)) {
                 prd->rd = NULL;
                 prd->id = NULL;
+                netdata_log_error("PLUGINSD: failed to refresh slot cache for 'host:%s/chart:%s/dim:%s' (slot %zd)",
+                                  rrdhost_hostname(st->rrdhost), rrdset_id(st), string2str(rd->id), slot);
+                return;
             }
             else {
                 prd->rd = rrddim_acquired_to_rrddim(prd->rda);
