@@ -84,80 +84,102 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
     if(!st)
         return;
 
-    spinlock_lock(&st->pluginsd.spinlock);
-
-    // Check collector_tid inside spinlock
-    pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
-    bool we_are_collector = (collector_tid == gettid_cached());
-    bool different_collector_active = (collector_tid != 0 && !we_are_collector);
-
-    int32_t last_slot = st->pluginsd.last_slot;
-
-    if(different_collector_active) {
-        // Another thread is the active collector - we cannot safely touch the array.
-        // Keep pluginsd state unchanged in this path: the active collector may
-        // still read last_slot / dims_with_slots lock-free.
-        // Clear only the host slot mapping and bail out.
-        nd_log_limit_static_global_var(erl, 1, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "PLUGINSD: rrdset_pluginsd_receive_unslot called while collector (tid %d) is active, skipping",
-                     collector_tid);
-
-        spinlock_unlock(&st->pluginsd.spinlock);
-        rrdset_clear_host_chart_slot_mapping(st, last_slot);
-        return;
-    }
-
-    // Either collector_tid == 0 (collector stopped) or collector_tid == our tid
-    // (we ARE the collector). In both cases, it's safe to detach dimension references.
-    PRD_ARRAY *arr = we_are_collector ?
-            prd_array_get_unsafe(&st->pluginsd.prd_array) :
-            prd_array_acquire_locked(&st->pluginsd.prd_array);
-
     RRDDIM_ACQUIRED **detached_rdas = NULL;
+    size_t detached_capacity = 0;
     size_t detached_entries = 0;
+    bool we_are_collector = false;
+    PRD_ARRAY *arr = NULL;
+    int32_t last_slot = -1;
 
-    if (arr) {
-        if(!we_are_collector) {
-            // Verify no other thread holds an extra reference before clearing entries.
-            // After acquire_locked, refcount should be 2 (original + ours).
-            int32_t rc = __atomic_load_n(&arr->refcount, __ATOMIC_ACQUIRE);
-            internal_fatal(rc != 2,
-                           "PRD_ARRAY: expected refcount 2 after acquire, got %d - concurrent reference leak", rc);
+    while(true) {
+        spinlock_lock(&st->pluginsd.spinlock);
 
-            if(unlikely(rc != 2)) {
-                // Production guard: skip detachment when another reference is active.
-                // Clearing entries in this state can race and double-release references.
-                nd_log_limit_static_global_var(erl_rc, 1, 0);
-                nd_log_limit(&erl_rc, NDLS_DAEMON, NDLP_WARNING,
-                             "PLUGINSD: unslot skipped for chart with unexpected PRD_ARRAY refcount %d (expected 2)",
-                             rc);
+        // Check collector_tid inside spinlock
+        pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
+        we_are_collector = (collector_tid == gettid_cached());
+        bool different_collector_active = (collector_tid != 0 && !we_are_collector);
 
-                prd_array_release(arr);
+        last_slot = st->pluginsd.last_slot;
+
+        if(different_collector_active) {
+            // Another thread is the active collector - we cannot safely touch the array.
+            // Keep pluginsd state unchanged in this path: the active collector may
+            // still read last_slot / dims_with_slots lock-free.
+            // Clear only the host slot mapping and bail out.
+            nd_log_limit_static_global_var(erl, 1, 0);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                         "PLUGINSD: rrdset_pluginsd_receive_unslot called while collector (tid %d) is active, skipping",
+                         collector_tid);
+
+            spinlock_unlock(&st->pluginsd.spinlock);
+            freez(detached_rdas);
+            rrdset_clear_host_chart_slot_mapping(st, last_slot);
+            return;
+        }
+
+        // Either collector_tid == 0 (collector stopped) or collector_tid == our tid
+        // (we ARE the collector). In both cases, it's safe to detach dimension references.
+        arr = we_are_collector ?
+              prd_array_get_unsafe(&st->pluginsd.prd_array) :
+              prd_array_acquire_locked(&st->pluginsd.prd_array);
+
+        if(arr) {
+            if(!we_are_collector) {
+                // Verify no other thread holds an extra reference before clearing entries.
+                // After acquire_locked, refcount should be 2 (original + ours).
+                int32_t rc = __atomic_load_n(&arr->refcount, __ATOMIC_ACQUIRE);
+                internal_fatal(rc != 2,
+                               "PRD_ARRAY: expected refcount 2 after acquire, got %d - concurrent reference leak", rc);
+
+                if(unlikely(rc != 2)) {
+                    // Production guard: skip detachment when another reference is active.
+                    // Clearing entries in this state can race and double-release references.
+                    nd_log_limit_static_global_var(erl_rc, 1, 0);
+                    nd_log_limit(&erl_rc, NDLS_DAEMON, NDLP_WARNING,
+                                 "PLUGINSD: unslot skipped for chart with unexpected PRD_ARRAY refcount %d (expected 2)",
+                                 rc);
+
+                    prd_array_release(arr);
+                    spinlock_unlock(&st->pluginsd.spinlock);
+                    freez(detached_rdas);
+                    rrdset_clear_host_chart_slot_mapping(st, last_slot);
+                    return;
+                }
+            }
+
+            detached_entries = arr->size;
+            if(detached_entries > detached_capacity) {
+                // Allocate outside the spinlock to avoid allocator latency while other
+                // threads are spinning on this lock.
+                if(!we_are_collector)
+                    prd_array_release(arr);
+
                 spinlock_unlock(&st->pluginsd.spinlock);
-                rrdset_clear_host_chart_slot_mapping(st, last_slot);
-                return;
+
+                freez(detached_rdas);
+                detached_rdas = callocz(detached_entries, sizeof(*detached_rdas));
+                detached_capacity = detached_entries;
+                continue;
+            }
+
+            // Detach entries while holding st->pluginsd.spinlock so concurrent unslot/cleanup
+            // cannot race and release the same RRDDIM_ACQUIRED pointers twice.
+            for(size_t i = 0; i < detached_entries; i++) {
+                detached_rdas[i] = arr->entries[i].rda;
+                arr->entries[i].rda = NULL;
+                arr->entries[i].rd = NULL;
+                arr->entries[i].id = NULL;
             }
         }
+        else
+            detached_entries = 0;
 
-        // Detach entries while holding st->pluginsd.spinlock so concurrent unslot/cleanup
-        // cannot race and release the same RRDDIM_ACQUIRED pointers twice.
-        detached_entries = arr->size;
-        if(detached_entries)
-            detached_rdas = callocz(detached_entries, sizeof(*detached_rdas));
+        st->pluginsd.last_slot = -1;
+        st->pluginsd.dims_with_slots = false;
 
-        for(size_t i = 0; i < detached_entries; i++) {
-            detached_rdas[i] = arr->entries[i].rda;
-            arr->entries[i].rda = NULL;
-            arr->entries[i].rd = NULL;
-            arr->entries[i].id = NULL;
-        }
+        spinlock_unlock(&st->pluginsd.spinlock);
+        break;
     }
-
-    st->pluginsd.last_slot = -1;
-    st->pluginsd.dims_with_slots = false;
-
-    spinlock_unlock(&st->pluginsd.spinlock);
 
     // Release detached references outside the spinlock.
     if(detached_rdas) {
@@ -268,9 +290,6 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
             prd_array_release(old_arr);
             return;
         }
-
-        // Track memory being freed only when we are about to actually free old_arr.
-        rrd_slot_memory_removed(sizeof(PRD_ARRAY) + old_arr->size * sizeof(struct pluginsd_rrddim));
 
         // Release all dimension references (safe - we're the sole owner).
         prd_array_release_entries(old_arr);

@@ -97,8 +97,25 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
     //   collector tid is active.
     // Therefore, eager clear here is an ownership handoff between protocol scopes, not a signal
     // that teardown cleanup may run concurrently with an active collector loop.
-    if(st && st != preserve_collector_tid)
-        __atomic_store_n(&st->pluginsd.collector_tid, 0, __ATOMIC_RELEASE);
+    // Clear collector ownership only if we are the recorded owner (or no owner exists).
+    // If another thread owns this chart, keep its ownership intact and report it.
+    if(st && st != preserve_collector_tid) {
+        pid_t owner_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
+        pid_t self_tid = gettid_cached();
+
+        if(owner_tid == 0 || owner_tid == self_tid)
+            __atomic_store_n(&st->pluginsd.collector_tid, 0, __ATOMIC_RELEASE);
+        else {
+            netdata_log_error(
+                    "PLUGINSD: attempted to clear collector_tid %d for 'host:%s/chart:%s/' "
+                    "from non-owner thread %d during %s",
+                    (int)owner_tid,
+                    rrdhost_hostname(st->rrdhost),
+                    rrdset_id(st),
+                    (int)self_tid,
+                    keyword);
+        }
+    }
 
     parser->user.st = NULL;
     parser->user.cleanup_slots = false;
@@ -159,6 +176,9 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
 
     // Check if we need to grow the array
     if(wanted_size > current_size) {
+        // Pre-allocate outside the spinlock to keep critical section short.
+        PRD_ARRAY *new_arr = prd_array_create(wanted_size);
+
         // Serialize grow transfer with unslot/cleanup detach paths.
         spinlock_lock(&st->pluginsd.spinlock);
 
@@ -167,9 +187,6 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
 
         // Re-check under lock in case another path changed the array.
         if(wanted_size > current_size) {
-            // Create a new larger array
-            PRD_ARRAY *new_arr = prd_array_create(wanted_size);
-
             // Copy existing entries from old array (if any) and transfer ownership
             // to the new array by nulling old pointers.
             if(current_arr) {
@@ -188,38 +205,28 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
                 new_arr->entries[i].id = NULL;
             }
 
-            // Track memory added
-            rrd_slot_memory_added(sizeof(PRD_ARRAY) + wanted_size * sizeof(struct pluginsd_rrddim));
-
             // Atomically replace the old array with the new one
             PRD_ARRAY *old_arr = prd_array_replace(&st->pluginsd.prd_array, new_arr);
 
-            // Free the old array if there was one
+            // Release the old array if there was one.
             if(old_arr) {
-                int32_t rc = __atomic_load_n(&old_arr->refcount, __ATOMIC_ACQUIRE);
-
-                // Track memory removed only when this release will actually free old_arr.
-                if(likely(rc == 1))
-                    rrd_slot_memory_removed(sizeof(PRD_ARRAY) + old_arr->size * sizeof(struct pluginsd_rrddim));
-                else {
-                    nd_log_limit_static_global_var(erl_grow_rc, 1, 0);
-                    nd_log_limit(&erl_grow_rc, NDLS_COLLECTORS, NDLP_WARNING,
-                                 "PLUGINSD: deferred old slot-cache free after grow due to unexpected PRD_ARRAY refcount %d",
-                                 rc);
-                }
-
                 // Release the old array - it will be freed when refcount reaches 0
                 prd_array_release(old_arr);
             }
 
             // Update our local pointer to the new array
             current_arr = new_arr;
+            new_arr = NULL;
         }
         else {
             current_arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
         }
 
         spinlock_unlock(&st->pluginsd.spinlock);
+
+        // Another path already satisfied growth while we were waiting for the lock.
+        if(new_arr)
+            prd_array_release(new_arr);
     }
 
     // Now update the slot entry if we're using slots
@@ -400,7 +407,7 @@ static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st,
         host->stream.rcv.pluginsd_chart_slots.size = new_slots;
         spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
 
-        rrd_slot_memory_added((new_slots - old_slots) * sizeof(uint32_t));
+        rrd_slot_memory_added((new_slots - old_slots) * sizeof(RRDSET *));
     }
 
     host->stream.rcv.pluginsd_chart_slots.array[slot - 1] = st;

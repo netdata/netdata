@@ -210,7 +210,7 @@ struct rrdset {
     } alerts;
 
     struct {
-        SPINLOCK spinlock; // used only for cleanup
+        SPINLOCK spinlock; // coordinates PRD_ARRAY grow/transfer and unslot/cleanup serialization
         pid_t collector_tid;
         bool dims_with_slots;
         bool set;
