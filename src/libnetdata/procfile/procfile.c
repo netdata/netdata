@@ -296,6 +296,32 @@ procfile *procfile_readall(procfile *ff) {
 
     // netdata_log_debug(D_PROCFILE, PF_PREFIX ": Reading file '%s'.", ff->filename);
 
+    // seek to the beginning if this fd was already read before
+    // (when procfile_reopen() is called between reads, the fd is fresh and no seek is needed)
+    if(unlikely(ff->flags & PROCFILE_FLAG_NEEDS_SEEK)) {
+        if (unlikely(ff->flags & PROCFILE_FLAG_NONSEEKABLE)) {
+            char *fn = procfile_filename(ff);
+            ff = procfile_reopen(ff, fn, NULL, ff->flags & ~PROCFILE_FLAG_NEEDS_SEEK);
+            if (unlikely(!ff))
+                return NULL;
+        } else if (unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
+            if (errno == ESPIPE || errno == EINVAL) {
+                ff->flags |= PROCFILE_FLAG_NONSEEKABLE;
+                char *fn = procfile_filename(ff);
+                ff = procfile_reopen(ff, fn, NULL, ff->flags & ~PROCFILE_FLAG_NEEDS_SEEK);
+                if (unlikely(!ff))
+                    return NULL;
+            } else {
+                if (unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)))
+                    collector_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
+                else if (unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+                    netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
+                procfile_close(ff);
+                return NULL;
+            }
+        }
+    }
+
     ff->len = 0;    // zero the used size
     ssize_t r = 1;  // read at least once
     while(r > 0) {
@@ -337,29 +363,9 @@ procfile *procfile_readall(procfile *ff) {
             break;
     }
     
-    if (unlikely(ff->flags & PROCFILE_FLAG_NONSEEKABLE)) {
-        char *fn = procfile_filename(ff);
-        ff = procfile_reopen(ff, fn, NULL, ff->flags);
-        if (unlikely(!ff))
-            return NULL;
-    } else if (unlikely(lseek(ff->fd, 0, SEEK_SET) == -1)) {
-        // Some procfs files (Ubuntu HWE 24.04 / kernel 6.14) may be non-seekable.
-        // In that case, "rewind" by reopening.
-        if (errno == ESPIPE || errno == EINVAL) {
-            ff->flags |= PROCFILE_FLAG_NONSEEKABLE;
-            char *fn = procfile_filename(ff);
-            ff = procfile_reopen(ff, fn, NULL, ff->flags);
-            if (unlikely(!ff))
-                return NULL;
-        } else {
-            if (unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)))
-                collector_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
-            else if (unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
-                netdata_log_error(PF_PREFIX ": Cannot rewind on file '%s'.", procfile_filename(ff));
-            procfile_close(ff);
-            return NULL;
-        }
-    }
+    // mark that this fd needs a seek before the next read
+    // (the seek will be skipped if procfile_reopen() is called before the next readall)
+    ff->flags |= PROCFILE_FLAG_NEEDS_SEEK;
 
     procfile_lines_reset(ff->lines);
     procfile_words_reset(ff->words);
@@ -523,7 +529,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
     // as it may point to ff->filename which we're about to free
     freez(ff->filename);
     ff->filename = NULL;
-    ff->flags = flags;
+    ff->flags = flags & ~PROCFILE_FLAG_NEEDS_SEEK; // fresh fd, no seek needed
 
     // do not do the separators again if NULL is given
     if(likely(separators)) procfile_set_separators(ff, separators);
