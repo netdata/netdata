@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/stretchr/testify/require"
 )
 
@@ -60,6 +61,44 @@ http:
 func TestDefaultConfigValidation(t *testing.T) {
 	cfg := defaultConfig()
 	require.NoError(t, cfg.validate())
+}
+
+func TestDefaultConfigUsesBuildInfoCacheDir(t *testing.T) {
+	oldCacheDir := buildinfo.CacheDir
+	t.Cleanup(func() {
+		buildinfo.CacheDir = oldCacheDir
+	})
+
+	buildinfo.CacheDir = "/opt/netdata/var/cache/netdata"
+	cfg := defaultConfig()
+	require.Equal(t, "/opt/netdata/var/cache/netdata/topology-ip-intel", cfg.output.directory)
+}
+
+func TestDiscoverDefaultConfigPathUsesBuildInfoDirs(t *testing.T) {
+	oldUserConfigDir := buildinfo.UserConfigDir
+	oldStockConfigDir := buildinfo.StockConfigDir
+	t.Cleanup(func() {
+		buildinfo.UserConfigDir = oldUserConfigDir
+		buildinfo.StockConfigDir = oldStockConfigDir
+	})
+
+	root := t.TempDir()
+	userDir := filepath.Join(root, "opt", "netdata", "etc", "netdata")
+	stockDir := filepath.Join(root, "opt", "netdata", "usr", "lib", "netdata", "conf.d")
+	require.NoError(t, os.MkdirAll(userDir, 0o755))
+	require.NoError(t, os.MkdirAll(stockDir, 0o755))
+
+	userPath := filepath.Join(userDir, "topology-ip-intel.yaml")
+	stockPath := filepath.Join(stockDir, "topology-ip-intel.yaml")
+
+	buildinfo.UserConfigDir = userDir
+	buildinfo.StockConfigDir = stockDir
+
+	require.NoError(t, os.WriteFile(stockPath, []byte("output: {}\n"), 0o644))
+	require.Equal(t, stockPath, discoverDefaultConfigPath())
+
+	require.NoError(t, os.WriteFile(userPath, []byte("output: {}\n"), 0o644))
+	require.Equal(t, userPath, discoverDefaultConfigPath())
 }
 
 func TestInvalidOutputNamesRejected(t *testing.T) {

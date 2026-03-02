@@ -17,6 +17,8 @@ If `--config` is not provided, the tool loads the first existing file from:
 1. `/etc/netdata/topology-ip-intel.yaml`
 2. `/usr/lib/netdata/conf.d/topology-ip-intel.yaml`
 
+These defaults are build-time Netdata install paths. On prefixed installs (for example `/opt/netdata`), the compiled binary uses the corresponding prefixed directories.
+
 ## Run
 
 ```bash
