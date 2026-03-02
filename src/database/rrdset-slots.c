@@ -95,7 +95,9 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
 
     if(different_collector_active) {
         // Another thread is the active collector - we cannot safely touch the array.
-        // Clear only the slot mapping and bail out.
+        // Keep pluginsd state unchanged in this path: the active collector may
+        // still read last_slot / dims_with_slots lock-free.
+        // Clear only the host slot mapping and bail out.
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
                      "PLUGINSD: rrdset_pluginsd_receive_unslot called while collector (tid %d) is active, skipping",
@@ -106,16 +108,14 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
         return;
     }
 
-    st->pluginsd.last_slot = -1;
-    st->pluginsd.dims_with_slots = false;
-
     // Either collector_tid == 0 (collector stopped) or collector_tid == our tid
-    // (we ARE the collector). In both cases, it's safe to release dimension references.
+    // (we ARE the collector). In both cases, it's safe to detach dimension references.
     PRD_ARRAY *arr = we_are_collector ?
             prd_array_get_unsafe(&st->pluginsd.prd_array) :
             prd_array_acquire_locked(&st->pluginsd.prd_array);
 
-    spinlock_unlock(&st->pluginsd.spinlock);
+    RRDDIM_ACQUIRED **detached_rdas = NULL;
+    size_t detached_entries = 0;
 
     if (arr) {
         if(!we_are_collector) {
@@ -124,15 +124,52 @@ void rrdset_pluginsd_receive_unslot(RRDSET *st) {
             int32_t rc = __atomic_load_n(&arr->refcount, __ATOMIC_ACQUIRE);
             internal_fatal(rc != 2,
                            "PRD_ARRAY: expected refcount 2 after acquire, got %d - concurrent reference leak", rc);
+
+            if(unlikely(rc != 2)) {
+                // Production guard: skip detachment when another reference is active.
+                // Clearing entries in this state can race and double-release references.
+                nd_log_limit_static_global_var(erl_rc, 1, 0);
+                nd_log_limit(&erl_rc, NDLS_DAEMON, NDLP_WARNING,
+                             "PLUGINSD: unslot skipped for chart with unexpected PRD_ARRAY refcount %d (expected 2)",
+                             rc);
+
+                prd_array_release(arr);
+                spinlock_unlock(&st->pluginsd.spinlock);
+                rrdset_clear_host_chart_slot_mapping(st, last_slot);
+                return;
+            }
         }
 
-        // Release all dimension references
-        prd_array_release_entries(arr);
+        // Detach entries while holding st->pluginsd.spinlock so concurrent unslot/cleanup
+        // cannot race and release the same RRDDIM_ACQUIRED pointers twice.
+        detached_entries = arr->size;
+        if(detached_entries)
+            detached_rdas = callocz(detached_entries, sizeof(*detached_rdas));
 
-        if(!we_are_collector) {
-            // Release our acquired reference (keeps the struct's reference alive for reuse)
-            prd_array_release(arr);
+        for(size_t i = 0; i < detached_entries; i++) {
+            detached_rdas[i] = arr->entries[i].rda;
+            arr->entries[i].rda = NULL;
+            arr->entries[i].rd = NULL;
+            arr->entries[i].id = NULL;
         }
+    }
+
+    st->pluginsd.last_slot = -1;
+    st->pluginsd.dims_with_slots = false;
+
+    spinlock_unlock(&st->pluginsd.spinlock);
+
+    // Release detached references outside the spinlock.
+    if(detached_rdas) {
+        for(size_t i = 0; i < detached_entries; i++)
+            rrddim_acquired_release(detached_rdas[i]); // safe with NULL
+
+        freez(detached_rdas);
+    }
+
+    if(arr && !we_are_collector) {
+        // Release our acquired reference (keeps the struct's reference alive for reuse)
+        prd_array_release(arr);
     }
 
     rrdset_clear_host_chart_slot_mapping(st, last_slot);
@@ -212,9 +249,6 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
 
     // Now handle the old array outside the lock
     if (old_arr) {
-        // Track memory being freed
-        rrd_slot_memory_removed(sizeof(PRD_ARRAY) + old_arr->size * sizeof(struct pluginsd_rrddim));
-
         // After prd_array_replace, we hold the only reference (refcount should be 1).
         // It's safe to release entries only when we're the sole owner, to avoid clearing
         // entries that another thread might still be reading through its own reference.
@@ -222,7 +256,23 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
         internal_fatal(rc != 1,
                        "PRD_ARRAY: expected refcount 1 after replace, got %d - concurrent reference leak", rc);
 
-        // Release all dimension references (safe - we're the sole owner)
+        if(unlikely(rc != 1)) {
+            // Production guard: another reference still exists, so clearing entries
+            // here could race with readers and double-release RRDDIM_ACQUIRED.
+            nd_log_limit_static_global_var(erl_cleanup_rc, 1, 0);
+            nd_log_limit(&erl_cleanup_rc, NDLS_DAEMON, NDLP_WARNING,
+                         "PLUGINSD: cleanup deferred for chart with unexpected PRD_ARRAY refcount %d (expected 1)",
+                         rc);
+
+            // Drop our reference only; remaining owners will eventually release.
+            prd_array_release(old_arr);
+            return;
+        }
+
+        // Track memory being freed only when we are about to actually free old_arr.
+        rrd_slot_memory_removed(sizeof(PRD_ARRAY) + old_arr->size * sizeof(struct pluginsd_rrddim));
+
+        // Release all dimension references (safe - we're the sole owner).
         prd_array_release_entries(old_arr);
 
         // Release our reference - this will free the array (refcount 1 -> 0)
