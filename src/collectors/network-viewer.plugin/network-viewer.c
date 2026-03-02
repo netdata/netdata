@@ -295,15 +295,25 @@ static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *op
                 sockets_selected_explicitly = true;
             }
 
-            const char *socket_kind = &param[8];
-            if(strcmp(socket_kind, "listening") == 0)
-                opts->sockets_listening = true;
-            else if(strcmp(socket_kind, "local") == 0)
-                opts->sockets_local = true;
-            else if(strcmp(socket_kind, "inbound") == 0)
-                opts->sockets_inbound = true;
-            else if(strcmp(socket_kind, "outbound") == 0)
-                opts->sockets_outbound = true;
+            char *sockets_copy = strdupz(&param[8]);
+            char *sockets_remaining = sockets_copy;
+            char *socket_kind;
+            while(sockets_remaining && *sockets_remaining &&
+                  (socket_kind = strsep_skip_consecutive_separators(&sockets_remaining, ","))) {
+                socket_kind = trim(socket_kind);
+                if(!socket_kind || !*socket_kind)
+                    continue;
+
+                if(strcmp(socket_kind, "listening") == 0)
+                    opts->sockets_listening = true;
+                else if(strcmp(socket_kind, "local") == 0)
+                    opts->sockets_local = true;
+                else if(strcmp(socket_kind, "inbound") == 0)
+                    opts->sockets_inbound = true;
+                else if(strcmp(socket_kind, "outbound") == 0)
+                    opts->sockets_outbound = true;
+            }
+            freez(sockets_copy);
             continue;
         }
 
@@ -316,15 +326,25 @@ static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *op
                 protocols_selected_explicitly = true;
             }
 
-            const char *protocol = &param[10];
-            if(strcmp(protocol, "ipv4_tcp") == 0 || strcmp(protocol, "ipv4-tcp") == 0)
-                opts->protocols_ipv4_tcp = true;
-            else if(strcmp(protocol, "ipv6_tcp") == 0 || strcmp(protocol, "ipv6-tcp") == 0)
-                opts->protocols_ipv6_tcp = true;
-            else if(strcmp(protocol, "ipv4_udp") == 0 || strcmp(protocol, "ipv4-udp") == 0)
-                opts->protocols_ipv4_udp = true;
-            else if(strcmp(protocol, "ipv6_udp") == 0 || strcmp(protocol, "ipv6-udp") == 0)
-                opts->protocols_ipv6_udp = true;
+            char *protocols_copy = strdupz(&param[10]);
+            char *protocols_remaining = protocols_copy;
+            char *protocol;
+            while(protocols_remaining && *protocols_remaining &&
+                  (protocol = strsep_skip_consecutive_separators(&protocols_remaining, ","))) {
+                protocol = trim(protocol);
+                if(!protocol || !*protocol)
+                    continue;
+
+                if(strcmp(protocol, "ipv4_tcp") == 0 || strcmp(protocol, "ipv4-tcp") == 0)
+                    opts->protocols_ipv4_tcp = true;
+                else if(strcmp(protocol, "ipv6_tcp") == 0 || strcmp(protocol, "ipv6-tcp") == 0)
+                    opts->protocols_ipv6_tcp = true;
+                else if(strcmp(protocol, "ipv4_udp") == 0 || strcmp(protocol, "ipv4-udp") == 0)
+                    opts->protocols_ipv4_udp = true;
+                else if(strcmp(protocol, "ipv6_udp") == 0 || strcmp(protocol, "ipv6-udp") == 0)
+                    opts->protocols_ipv6_udp = true;
+            }
+            freez(protocols_copy);
         }
     }
     freez(function_copy);
