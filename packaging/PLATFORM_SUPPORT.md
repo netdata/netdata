@@ -4,10 +4,10 @@ Netdata is evolving rapidly and new features are added at a constant pace. There
 
 You can choose from two Netdata Agent release channels:
 
-| Release Channel |                            Release Frequency                            |                 Support Policy & Features                 |             Support Duration             |                              Backwards Compatibility                              |
-|:---------------:|:-----------------------------------------------------------------------:|:---------------------------------------------------------:|:----------------------------------------:|:---------------------------------------------------------------------------------:|
-|   **Stable**    | Usually 4-6 major/minor releases per year plus patch releases as needed | Receiving bug fixes and security updates between releases | Up to the 2nd stable release after them  |     Previous configuration semantics and data are supported by newer releases     |
-|   **Nightly**   |                      Most nights around 02:00 UTC                       |               Latest pre-released features                | Up to the 2nd nightly release after them | Configuration and data of unreleased features may change between nightly releases |
+| Release Channel |                            Release Frequency                            |                                 Support Policy & Features                                  |                                                                   Support Duration                                                                   |                              Backwards Compatibility                              |
+|:---------------:|:-----------------------------------------------------------------------:|:------------------------------------------------------------------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------:|:---------------------------------------------------------------------------------:|
+|   **Stable**    | Usually 4-6 major/minor releases per year plus patch releases as needed |                 Receiving bug fixes and security updates between releases                  |                                                       Up to the 2nd stable release after them                                                        |     Previous configuration semantics and data are supported by newer releases     |
+|   **Nightly**   |                      Most nights around 02:00 UTC                       | • Receiving bug fixes and security updates continuously<br/>• Latest pre-released features | • Issues are generally investigated against recent nightlies<br/>• Users may be asked to reproduce on a current build before further troubleshooting | Configuration and data of unreleased features may change between nightly releases |
 
 :::info
 
