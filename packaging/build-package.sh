@@ -58,6 +58,8 @@ add_cmake_option ENABLE_LIBBACKTRACE On
 
 add_cmake_option BUILD_FOR_PACKAGING On
 
+[ -d "${SOURCE_DIR}/tmp/ibm-mq" ] && add_cmake_option FETCHCONTENT_SOURCE_DIR_IBM_MQ "${SOURCE_DIR}/tmp/ibm-mq"
+
 case "${PKG_TYPE}" in
     DEB)
         case "$(dpkg-architecture -q DEB_TARGET_ARCH)" in

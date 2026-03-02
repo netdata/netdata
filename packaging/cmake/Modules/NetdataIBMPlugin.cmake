@@ -2,6 +2,7 @@
 # Build configuration for ibm.d.plugin which requires CGO
 
 include(FetchContent)
+include(NetdataUtil)
 
 # add_ibm_plugin_target: Add target for building ibm.d.plugin with CGO
 #
@@ -11,6 +12,8 @@ macro(add_ibm_plugin_target)
   set(IBM_MQ_DIR_NAME "ibm-mqclient")
   set(IBM_MQ_BUILD_DIR "${CMAKE_BINARY_DIR}/${IBM_MQ_DIR_NAME}")
   set(IBM_MQ_INSTALL_SUFFIX "lib/netdata/${IBM_MQ_DIR_NAME}")
+
+  get_vendored_url_and_hash(ibm_mq IBM_MQ)
 
   FetchContent_Declare(
     ibm_mq
@@ -22,14 +25,12 @@ macro(add_ibm_plugin_target)
     INSTALL_COMMAND "${CMAKE_COMMAND} -E true"
     DOWNLOAD_NO_PROGRESS True
     STEP_TARGETS build
-    URL https://public.dhe.ibm.com/ibmdl/export/pub/software/websphere/messaging/mqdev/redist/9.4.3.1-IBM-MQC-Redist-LinuxX64.tar.gz
-    URL_HASH SHA256=9df98ab0ab69954fa080dc7765c9a3eb7cd6c683e5d596ae10c4fbb32eec2ad8
+    URL ${IBM_MQ_URL}
+    URL_HASH SHA256=${IBM_MQ_HASH}
   )
 
-  message(STATUS "Fetching IBM MQ client libraries for build")
-  FetchContent_MakeAvailable(ibm_mq)
-
   if(DEFINED FETCHCONTENT_SOURCE_DIR_IBM_MQ)
+    message(STATUS "Copying IBM MQ client library sources from ${FETCHCONTENT_SOURCE_DIR_IBM_MQ} to ${IBM_MQ_BUILD_DIR}")
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_directory ${FETCHCONTENT_SOURCE_DIR_IBM_MQ} ${IBM_MQ_BUILD_DIR}
       RESULT_VARIABLE IBM_MQ_COPY_STATUS
@@ -38,6 +39,10 @@ macro(add_ibm_plugin_target)
     if(IBM_MQ_COPY_STATUS)
       message(FATAL_ERROR "Failed to prepare IBM MQ client library directory")
     endif()
+    FetchContent_MakeAvailable(ibm_mq)
+  else()
+    message(STATUS "Fetching IBM MQ client libraries for build")
+    FetchContent_MakeAvailable(ibm_mq)
   endif()
 
   # Find all Go source files - resolve symlinks for consistent dependency tracking

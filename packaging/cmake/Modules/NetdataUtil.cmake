@@ -241,3 +241,13 @@ function(precompile_python dir component)
     COMPONENT ${component}
   )
 endfunction()
+
+# Load the URL and hash for a vendored component
+function(get_vendored_url_and_hash component prefix)
+  file(READ "${CMAKE_SOURCE_DIR}/packaging/vendor/${component}.url" url)
+  file(READ "${CMAKE_SOURCE_DIR}/packaging/vendor/${component}.sha256" hash)
+  string(STRIP "${url}" url)
+  string(STRIP "${hash}" hash)
+  set("${prefix}_URL" "${url}" PARENT_SCOPE)
+  set("${prefix}_HASH" "${hash}" PARENT_SCOPE)
+endfunction()
