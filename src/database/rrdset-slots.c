@@ -361,8 +361,11 @@ static void prd_stress_writer_thread(void *arg __maybe_unused) {
 
             if (current_arr && current_size > 0) {
                 size_t copy_count = (current_size < new_size) ? current_size : new_size;
-                memcpy(new_arr->entries, current_arr->entries,
-                       copy_count * sizeof(struct pluginsd_rrddim));
+                for(size_t i = 0; i < copy_count; i++) {
+                    new_arr->entries[i].rd = current_arr->entries[i].rd;
+                    new_arr->entries[i].id = current_arr->entries[i].id;
+                    new_arr->entries[i].rda = NULL;
+                }
             }
 
             for (size_t i = (current_size < new_size ? current_size : 0); i < new_size; i++) {
