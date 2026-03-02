@@ -495,9 +495,6 @@ func buildJoinedLabelAutogenID(metricName string, labels metrix.LabelView, exclu
 }
 
 func normalizeAutogenLabelValue(value string) string {
-	if strings.IndexByte(value, ' ') != -1 {
-		value = strings.ReplaceAll(value, " ", "_")
-	}
 	if strings.IndexByte(value, '\\') != -1 {
 		if v := decodeAutogenLabelValue(value); strings.IndexByte(v, '\\') != -1 {
 			value = strings.ReplaceAll(v, `\`, "_")
@@ -505,10 +502,7 @@ func normalizeAutogenLabelValue(value string) string {
 			value = v
 		}
 	}
-	if strings.IndexByte(value, '\'') != -1 {
-		value = strings.ReplaceAll(value, "'", "")
-	}
-	return value
+	return sanitizeChartIDLabelValue(value)
 }
 
 func decodeAutogenLabelValue(value string) string {
