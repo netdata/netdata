@@ -146,8 +146,6 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     if(!st)
         return;
 
-    RRDHOST *host = st->rrdhost;
-
     spinlock_lock(&st->pluginsd.spinlock);
 
     // Check if collector is still active.
