@@ -25,12 +25,8 @@
   "app": "ok",
   "label_prefix": "ok",
   "selector": {
-    "allow": [
-      "ok"
-    ],
-    "deny": [
-      "ok"
-    ]
+    "allow": null,
+    "deny": null
   },
   "selector_groups": [
     {
@@ -58,9 +54,9 @@
         {
           "match": "^test_.*",
           "context": "test_context_group",
-          "title": "",
-          "units": "",
-          "type": ""
+          "title": "Test Title Group",
+          "units": "items",
+          "type": "stacked"
         }
       ],
       "dimension_rules": [
@@ -82,30 +78,7 @@
       "ok"
     ]
   },
-  "label_relabel": [
-    {
-      "source_labels": [
-        "project"
-      ],
-      "regex": "org/([^/]+)/(.+)",
-      "target_label": "group",
-      "replacement": "$1",
-      "action": "replace"
-    }
-  ],
-  "context_rules": [
-    {
-      "match": "^test_.*",
-      "context": "test_context",
-      "title": "Test Title",
-      "units": "items",
-      "type": "stacked"
-    }
-  ],
-  "dimension_rules": [
-    {
-      "match": "^test_.*",
-      "dimension": "${state}"
-    }
-  ]
+  "label_relabel": null,
+  "context_rules": null,
+  "dimension_rules": null
 }

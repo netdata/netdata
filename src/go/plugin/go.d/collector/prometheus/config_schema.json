@@ -3,6 +3,152 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Prometheus collector configuration.",
     "type": "object",
+    "$defs": {
+      "selector_expr": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "allow": {
+            "title": "Allow",
+            "description": "Allow time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Selector",
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "deny": {
+            "title": "Deny",
+            "description": "Deny time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Selector",
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "relabel_rules": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Relabel rule",
+          "type": "object",
+          "properties": {
+            "source_labels": {
+              "title": "Source labels",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "regex": {
+              "title": "Regex",
+              "type": "string"
+            },
+            "target_label": {
+              "title": "Target label",
+              "type": "string"
+            },
+            "replacement": {
+              "title": "Replacement",
+              "type": "string"
+            },
+            "action": {
+              "title": "Action",
+              "type": "string",
+              "enum": [
+                "replace",
+                "labelmap",
+                "labeldrop",
+                "labelkeep"
+              ]
+            }
+          }
+        }
+      },
+      "context_rules": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Context rule",
+          "type": "object",
+          "properties": {
+            "match": {
+              "title": "Match",
+              "type": "string"
+            },
+            "context": {
+              "title": "Context",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "units": {
+              "title": "Units",
+              "type": "string"
+            },
+            "type": {
+              "title": "Chart type",
+              "type": "string",
+              "enum": [
+                "line",
+                "area",
+                "stacked",
+                "heatmap"
+              ]
+            }
+          },
+          "required": [
+            "match"
+          ]
+        }
+      },
+      "dimension_rules": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Dimension rule",
+          "type": "object",
+          "properties": {
+            "match": {
+              "title": "Match",
+              "type": "string"
+            },
+            "dimension": {
+              "title": "Dimension template",
+              "description": "Dimension name template (for example `${status}` or `value`). Reserved labels `${quantile}` and `${le}` are not allowed.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "match",
+            "dimension"
+          ]
+        }
+      }
+    },
     "properties": {
       "update_every": {
         "title": "Update every",
@@ -59,38 +205,7 @@
       "selector": {
         "title": "Selectors",
         "description": "Configuration for selecting and filtering a set of time series using Prometheus selectors. If left empty, no filtering is applied.",
-        "type": [
-          "object",
-          "null"
-        ],
-        "properties": {
-          "allow": {
-            "title": "Allow",
-            "description": "Allow time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "title": "Selector",
-              "type": "string"
-            },
-            "uniqueItems": true
-          },
-          "deny": {
-            "title": "Deny",
-            "description": "Deny time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "title": "Selector",
-              "type": "string"
-            },
-            "uniqueItems": true
-          }
-        }
+        "$ref": "#/$defs/selector_expr"
       },
       "selector_groups": {
         "title": "Selector groups",
@@ -110,149 +225,19 @@
             "selector": {
               "title": "Selectors",
               "description": "Group-specific selector. If empty, all scraped metrics are eligible for this group.",
-              "type": [
-                "object",
-                "null"
-              ],
-              "properties": {
-                "allow": {
-                  "title": "Allow",
-                  "type": [
-                    "array",
-                    "null"
-                  ],
-                  "items": {
-                    "title": "Selector",
-                    "type": "string"
-                  },
-                  "uniqueItems": true
-                },
-                "deny": {
-                  "title": "Deny",
-                  "type": [
-                    "array",
-                    "null"
-                  ],
-                  "items": {
-                    "title": "Selector",
-                    "type": "string"
-                  },
-                  "uniqueItems": true
-                }
-              }
+              "$ref": "#/$defs/selector_expr"
             },
             "label_relabel": {
               "title": "Label relabel",
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "title": "Relabel rule",
-                "type": "object",
-                "properties": {
-                  "source_labels": {
-                    "title": "Source labels",
-                    "type": [
-                      "array",
-                      "null"
-                    ],
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "regex": {
-                    "title": "Regex",
-                    "type": "string"
-                  },
-                  "target_label": {
-                    "title": "Target label",
-                    "type": "string"
-                  },
-                  "replacement": {
-                    "title": "Replacement",
-                    "type": "string"
-                  },
-                  "action": {
-                    "title": "Action",
-                    "type": "string",
-                    "enum": [
-                      "replace",
-                      "labelmap",
-                      "labeldrop",
-                      "labelkeep"
-                    ]
-                  }
-                }
-              }
+              "$ref": "#/$defs/relabel_rules"
             },
             "context_rules": {
               "title": "Context rules",
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "title": "Context rule",
-                "type": "object",
-                "properties": {
-                  "match": {
-                    "title": "Match",
-                    "type": "string"
-                  },
-                  "context": {
-                    "title": "Context",
-                    "type": "string"
-                  },
-                  "title": {
-                    "title": "Title",
-                    "type": "string"
-                  },
-                  "units": {
-                    "title": "Units",
-                    "type": "string"
-                  },
-                  "type": {
-                    "title": "Chart type",
-                    "type": "string",
-                    "enum": [
-                      "line",
-                      "area",
-                      "stacked",
-                      "heatmap"
-                    ]
-                  }
-                },
-                "required": [
-                  "match"
-                ]
-              }
+              "$ref": "#/$defs/context_rules"
             },
             "dimension_rules": {
               "title": "Dimension rules",
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "title": "Dimension rule",
-                "type": "object",
-                "properties": {
-                  "match": {
-                    "title": "Match",
-                    "type": "string"
-                  },
-                  "dimension": {
-                    "title": "Dimension template",
-                    "description": "Dimension name template (for example `${status}` or `value`). Reserved labels `${quantile}` and `${le}` are not allowed.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "match",
-                  "dimension"
-                ]
-              }
+              "$ref": "#/$defs/dimension_rules"
             }
           }
         }
@@ -310,118 +295,17 @@
       "label_relabel": {
         "title": "Label relabel",
         "description": "Transform label sets before chart IDs and chart labels are generated.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "items": {
-          "title": "Relabel rule",
-          "type": "object",
-          "properties": {
-            "source_labels": {
-              "title": "Source labels",
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "type": "string"
-              }
-            },
-            "regex": {
-              "title": "Regex",
-              "type": "string"
-            },
-            "target_label": {
-              "title": "Target label",
-              "type": "string"
-            },
-            "replacement": {
-              "title": "Replacement",
-              "type": "string"
-            },
-            "action": {
-              "title": "Action",
-              "type": "string",
-              "enum": [
-                "replace",
-                "labelmap",
-                "labeldrop",
-                "labelkeep"
-              ]
-            }
-          }
-        }
+        "$ref": "#/$defs/relabel_rules"
       },
       "context_rules": {
         "title": "Context rules",
         "description": "Override context, title, units, and chart type by metric family name regex.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "items": {
-          "title": "Context rule",
-          "type": "object",
-          "properties": {
-            "match": {
-              "title": "Match",
-              "type": "string"
-            },
-            "context": {
-              "title": "Context",
-              "type": "string"
-            },
-            "title": {
-              "title": "Title",
-              "type": "string"
-            },
-            "units": {
-              "title": "Units",
-              "type": "string"
-            },
-            "type": {
-              "title": "Chart type",
-              "type": "string",
-              "enum": [
-                "line",
-                "area",
-                "stacked",
-                "heatmap"
-              ]
-            }
-          },
-          "required": [
-            "match"
-          ]
-        }
+        "$ref": "#/$defs/context_rules"
       },
       "dimension_rules": {
         "title": "Dimension rules",
         "description": "Group multiple Gauge, Counter, Summary, or Histogram series into a single multi-dimensional chart.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "items": {
-          "title": "Dimension rule",
-          "type": "object",
-          "properties": {
-            "match": {
-              "title": "Match",
-              "type": "string"
-            },
-            "dimension": {
-              "title": "Dimension template",
-              "description": "Dimension name template (for example `${status}` or `value`). Reserved labels `${quantile}` and `${le}` are not allowed.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "match",
-            "dimension"
-          ]
-        }
+        "$ref": "#/$defs/dimension_rules"
       },
       "username": {
         "title": "Username",
@@ -507,6 +391,94 @@
     },
     "required": [
       "url"
+    ],
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "selector_groups": {
+              "type": "array",
+              "minItems": 1
+            }
+          },
+          "required": [
+            "selector_groups"
+          ]
+        },
+        "then": {
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "selector": {
+                    "type": "object",
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "allow": {
+                            "type": "array",
+                            "minItems": 1
+                          }
+                        },
+                        "required": [
+                          "allow"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "deny": {
+                            "type": "array",
+                            "minItems": 1
+                          }
+                        },
+                        "required": [
+                          "deny"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "selector"
+                ]
+              },
+              {
+                "properties": {
+                  "label_relabel": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "label_relabel"
+                ]
+              },
+              {
+                "properties": {
+                  "context_rules": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "context_rules"
+                ]
+              },
+              {
+                "properties": {
+                  "dimension_rules": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "dimension_rules"
+                ]
+              }
+            ]
+          }
+        }
+      }
     ]
   },
   "uiSchema": {

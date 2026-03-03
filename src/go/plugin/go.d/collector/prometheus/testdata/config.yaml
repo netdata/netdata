@@ -22,11 +22,6 @@ force_http2: yes
 name: "ok"
 app: "ok"
 label_prefix: "ok"
-selector:
-  allow:
-    - "ok"
-  deny:
-    - "ok"
 selector_groups:
   - name: "group_1"
     selector:
@@ -43,6 +38,9 @@ selector_groups:
     context_rules:
       - match: "^test_.*"
         context: "test_context_group"
+        title: "Test Title Group"
+        units: "items"
+        type: "stacked"
     dimension_rules:
       - match: "^test_.*"
         dimension: "${state}"
@@ -54,18 +52,3 @@ fallback_type:
     - "ok"
   counter:
     - "ok"
-label_relabel:
-  - source_labels: ["project"]
-    regex: "org/([^/]+)/(.+)"
-    target_label: "group"
-    replacement: "$1"
-    action: "replace"
-context_rules:
-  - match: "^test_.*"
-    context: "test_context"
-    title: "Test Title"
-    units: "items"
-    type: "stacked"
-dimension_rules:
-  - match: "^test_.*"
-    dimension: "${state}"
