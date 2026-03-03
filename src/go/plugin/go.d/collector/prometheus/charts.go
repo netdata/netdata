@@ -25,12 +25,14 @@ func (c *Collector) addGaugeChart(id, name, help string, labels labels.Labels) {
 		cType = collectorapi.Area
 	}
 
+	title, ctx, units, cType := c.chartMeta(name, help, units, cType)
+
 	chart := &collectorapi.Chart{
 		ID:       id,
-		Title:    getChartTitle(name, help),
+		Title:    title,
 		Units:    units,
 		Fam:      getChartFamily(name),
-		Ctx:      getChartContext(c.application(), name),
+		Ctx:      ctx,
 		Type:     cType,
 		Priority: getChartPriority(name),
 		Dims: collectorapi.Dims{
@@ -55,6 +57,44 @@ func (c *Collector) addGaugeChart(id, name, help string, labels labels.Labels) {
 	c.cache.addChart(id, chart)
 }
 
+func (c *Collector) addGaugeChartWithDim(id, name, help string, labels labels.Labels, dimID, dimName string) {
+	units := getChartUnits(name)
+
+	cType := collectorapi.Line
+	if strings.HasSuffix(units, "bytes") {
+		cType = collectorapi.Area
+	}
+
+	title, ctx, units, cType := c.chartMeta(name, help, units, cType)
+
+	chart := &collectorapi.Chart{
+		ID:       id,
+		Title:    title,
+		Units:    units,
+		Fam:      getChartFamily(name),
+		Ctx:      ctx,
+		Type:     cType,
+		Priority: getChartPriority(name),
+		Dims: collectorapi.Dims{
+			{ID: dimID, Name: dimName, Div: precision},
+		},
+	}
+
+	for _, lbl := range labels {
+		chart.Labels = append(chart.Labels, collectorapi.Label{
+			Key:   c.labelName(lbl.Name),
+			Value: apostropheReplacer.Replace(lbl.Value),
+		})
+	}
+
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
+		return
+	}
+
+	c.cache.addChart(id, chart)
+}
+
 func (c *Collector) addCounterChart(id, name, help string, labels labels.Labels) {
 	units := getChartUnits(name)
 
@@ -69,12 +109,14 @@ func (c *Collector) addCounterChart(id, name, help string, labels labels.Labels)
 		cType = collectorapi.Area
 	}
 
+	title, ctx, units, cType := c.chartMeta(name, help, units, cType)
+
 	chart := &collectorapi.Chart{
 		ID:       id,
-		Title:    getChartTitle(name, help),
+		Title:    title,
 		Units:    units,
 		Fam:      getChartFamily(name),
-		Ctx:      getChartContext(c.application(), name),
+		Ctx:      ctx,
 		Type:     cType,
 		Priority: getChartPriority(name),
 		Dims: collectorapi.Dims{
@@ -98,6 +140,50 @@ func (c *Collector) addCounterChart(id, name, help string, labels labels.Labels)
 	c.cache.addChart(id, chart)
 }
 
+func (c *Collector) addCounterChartWithDim(id, name, help string, labels labels.Labels, dimID, dimName string) {
+	units := getChartUnits(name)
+
+	switch units {
+	case "seconds", "time":
+	default:
+		units += "/s"
+	}
+
+	cType := collectorapi.Line
+	if strings.HasSuffix(units, "bytes/s") {
+		cType = collectorapi.Area
+	}
+
+	title, ctx, units, cType := c.chartMeta(name, help, units, cType)
+
+	chart := &collectorapi.Chart{
+		ID:       id,
+		Title:    title,
+		Units:    units,
+		Fam:      getChartFamily(name),
+		Ctx:      ctx,
+		Type:     cType,
+		Priority: getChartPriority(name),
+		Dims: collectorapi.Dims{
+			{ID: dimID, Name: dimName, Algo: collectorapi.Incremental, Div: precision},
+		},
+	}
+
+	for _, lbl := range labels {
+		chart.Labels = append(chart.Labels, collectorapi.Label{
+			Key:   c.labelName(lbl.Name),
+			Value: apostropheReplacer.Replace(lbl.Value),
+		})
+	}
+
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
+		return
+	}
+
+	c.cache.addChart(id, chart)
+}
+
 func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels, quantiles []prometheus.Quantile) {
 	units := getChartUnits(name)
 
@@ -107,13 +193,16 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 		units += "/s"
 	}
 
+	title, ctx, units, cType := c.chartMeta(name, help, units, collectorapi.Line)
+
 	charts := collectorapi.Charts{
 		{
 			ID:       id,
-			Title:    getChartTitle(name, help),
+			Title:    title,
 			Units:    units,
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(c.application(), name),
+			Ctx:      ctx,
+			Type:     cType,
 			Priority: getChartPriority(name),
 			Dims: func() (dims collectorapi.Dims) {
 				for _, v := range quantiles {
@@ -129,10 +218,11 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 		},
 		{
 			ID:       id + "_sum",
-			Title:    getChartTitle(name, help),
+			Title:    title,
 			Units:    units,
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(c.application(), name) + "_sum",
+			Ctx:      ctx + "_sum",
+			Type:     cType,
 			Priority: getChartPriority(name),
 			Dims: collectorapi.Dims{
 				{ID: id + "_sum", Name: name + "_sum", Algo: collectorapi.Incremental, Div: precision},
@@ -140,10 +230,11 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 		},
 		{
 			ID:       id + "_count",
-			Title:    getChartTitle(name, help),
+			Title:    title,
 			Units:    "events/s",
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(c.application(), name) + "_count",
+			Ctx:      ctx + "_count",
+			Type:     cType,
 			Priority: getChartPriority(name),
 			Dims: collectorapi.Dims{
 				{ID: id + "_count", Name: name + "_count", Algo: collectorapi.Incremental},
@@ -175,13 +266,16 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 		units += "/s"
 	}
 
+	title, ctx, units, cType := c.chartMeta(name, help, units, collectorapi.Line)
+
 	charts := collectorapi.Charts{
 		{
 			ID:       id,
-			Title:    getChartTitle(name, help),
+			Title:    title,
 			Units:    "observations/s",
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(c.application(), name),
+			Ctx:      ctx,
+			Type:     cType,
 			Priority: getChartPriority(name),
 			Dims: func() (dims collectorapi.Dims) {
 				for _, v := range buckets {
@@ -197,10 +291,11 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 		},
 		{
 			ID:       id + "_sum",
-			Title:    getChartTitle(name, help),
+			Title:    title,
 			Units:    units,
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(c.application(), name) + "_sum",
+			Ctx:      ctx + "_sum",
+			Type:     cType,
 			Priority: getChartPriority(name),
 			Dims: collectorapi.Dims{
 				{ID: id + "_sum", Name: name + "_sum", Algo: collectorapi.Incremental, Div: precision},
@@ -208,10 +303,11 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 		},
 		{
 			ID:       id + "_count",
-			Title:    getChartTitle(name, help),
+			Title:    title,
 			Units:    "events/s",
 			Fam:      getChartFamily(name),
-			Ctx:      getChartContext(c.application(), name) + "_count",
+			Ctx:      ctx + "_count",
+			Type:     cType,
 			Priority: getChartPriority(name),
 			Dims: collectorapi.Dims{
 				{ID: id + "_count", Name: name + "_count", Algo: collectorapi.Incremental},
@@ -232,6 +328,28 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 		}
 		c.cache.addChart(id, chart)
 	}
+}
+
+func (c *Collector) chartMeta(name, help, units string, cType collectorapi.ChartType) (title, ctx, outUnits string, outType collectorapi.ChartType) {
+	ov := c.chartOverrides(name)
+	title = getChartTitle(name, help)
+	if ov.title != "" {
+		title = ov.title
+	}
+	outUnits = units
+	if ov.units != "" {
+		outUnits = ov.units
+	}
+	outType = cType
+	if ov.hasType {
+		outType = ov.cType
+	}
+	contextName := name
+	if ov.context != "" {
+		contextName = ov.context
+	}
+	ctx = getChartContext(c.application(), contextName)
+	return title, ctx, outUnits, outType
 }
 
 func (c *Collector) application() string {

@@ -32,6 +32,45 @@
       "ok"
     ]
   },
+  "selector_groups": [
+    {
+      "name": "group_1",
+      "selector": {
+        "allow": [
+          "ok"
+        ],
+        "deny": [
+          "ok"
+        ]
+      },
+      "label_relabel": [
+        {
+          "source_labels": [
+            "project"
+          ],
+          "regex": "org/([^/]+)/(.+)",
+          "target_label": "group",
+          "replacement": "$1",
+          "action": "replace"
+        }
+      ],
+      "context_rules": [
+        {
+          "match": "^test_.*",
+          "context": "test_context_group",
+          "title": "",
+          "units": "",
+          "type": ""
+        }
+      ],
+      "dimension_rules": [
+        {
+          "match": "^test_.*",
+          "dimension": "${state}"
+        }
+      ]
+    }
+  ],
   "expected_prefix": "ok",
   "max_time_series": 123,
   "max_time_series_per_metric": 123,
@@ -42,5 +81,31 @@
     "counter": [
       "ok"
     ]
-  }
+  },
+  "label_relabel": [
+    {
+      "source_labels": [
+        "project"
+      ],
+      "regex": "org/([^/]+)/(.+)",
+      "target_label": "group",
+      "replacement": "$1",
+      "action": "replace"
+    }
+  ],
+  "context_rules": [
+    {
+      "match": "^test_.*",
+      "context": "test_context",
+      "title": "Test Title",
+      "units": "items",
+      "type": "stacked"
+    }
+  ],
+  "dimension_rules": [
+    {
+      "match": "^test_.*",
+      "dimension": "${state}"
+    }
+  ]
 }

@@ -53,6 +53,28 @@ func TestCollector_Init(t *testing.T) {
 				Selector:   selector.Expr{Allow: []string{`name{label=#"value"}`}},
 			},
 		},
+		"fail if selector_groups and flat selector are both set": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				Selector:   selector.Expr{Allow: []string{"ok"}},
+				SelectorGroups: []SelectorGroup{
+					{Name: "g1"},
+				},
+			},
+		},
+		"fail if selector_groups and flat rules are both set": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				LabelRelabel: []RelabelRule{
+					{Action: "labeldrop", Regex: "^x$"},
+				},
+				SelectorGroups: []SelectorGroup{
+					{Name: "g1"},
+				},
+			},
+		},
 		"default": {
 			wantFail: true,
 			config:   New().Config,

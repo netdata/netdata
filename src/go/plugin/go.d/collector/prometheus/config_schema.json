@@ -92,6 +92,171 @@
           }
         }
       },
+      "selector_groups": {
+        "title": "Selector groups",
+        "description": "Apply multiple selector/rules pipelines within a single scrape. Each group can have its own selector and customization rules. Mutually exclusive with top-level selector/label_relabel/context_rules/dimension_rules.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Selector group",
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Group name",
+              "type": "string"
+            },
+            "selector": {
+              "title": "Selectors",
+              "description": "Group-specific selector. If empty, all scraped metrics are eligible for this group.",
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "allow": {
+                  "title": "Allow",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "title": "Selector",
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                },
+                "deny": {
+                  "title": "Deny",
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "title": "Selector",
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              }
+            },
+            "label_relabel": {
+              "title": "Label relabel",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "title": "Relabel rule",
+                "type": "object",
+                "properties": {
+                  "source_labels": {
+                    "title": "Source labels",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "regex": {
+                    "title": "Regex",
+                    "type": "string"
+                  },
+                  "target_label": {
+                    "title": "Target label",
+                    "type": "string"
+                  },
+                  "replacement": {
+                    "title": "Replacement",
+                    "type": "string"
+                  },
+                  "action": {
+                    "title": "Action",
+                    "type": "string",
+                    "enum": [
+                      "replace",
+                      "labelmap",
+                      "labeldrop",
+                      "labelkeep"
+                    ]
+                  }
+                }
+              }
+            },
+            "context_rules": {
+              "title": "Context rules",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "title": "Context rule",
+                "type": "object",
+                "properties": {
+                  "match": {
+                    "title": "Match",
+                    "type": "string"
+                  },
+                  "context": {
+                    "title": "Context",
+                    "type": "string"
+                  },
+                  "title": {
+                    "title": "Title",
+                    "type": "string"
+                  },
+                  "units": {
+                    "title": "Units",
+                    "type": "string"
+                  },
+                  "type": {
+                    "title": "Chart type",
+                    "type": "string",
+                    "enum": [
+                      "line",
+                      "area",
+                      "stacked",
+                      "heatmap"
+                    ]
+                  }
+                },
+                "required": [
+                  "match"
+                ]
+              }
+            },
+            "dimension_rules": {
+              "title": "Dimension rules",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "title": "Dimension rule",
+                "type": "object",
+                "properties": {
+                  "match": {
+                    "title": "Match",
+                    "type": "string"
+                  },
+                  "dimension": {
+                    "title": "Dimension template",
+                    "description": "Dimension name template (for example `${status}` or `value`). Reserved labels `${quantile}` and `${le}` are not allowed.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "match",
+                  "dimension"
+                ]
+              }
+            }
+          }
+        }
+      },
       "max_time_series": {
         "title": "Time series limit",
         "description": "If an endpoint returns more time series than this limit, the data is not processed. Set to 0 for no limit.",
@@ -140,6 +305,122 @@
             },
             "uniqueItems": true
           }
+        }
+      },
+      "label_relabel": {
+        "title": "Label relabel",
+        "description": "Transform label sets before chart IDs and chart labels are generated.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Relabel rule",
+          "type": "object",
+          "properties": {
+            "source_labels": {
+              "title": "Source labels",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "regex": {
+              "title": "Regex",
+              "type": "string"
+            },
+            "target_label": {
+              "title": "Target label",
+              "type": "string"
+            },
+            "replacement": {
+              "title": "Replacement",
+              "type": "string"
+            },
+            "action": {
+              "title": "Action",
+              "type": "string",
+              "enum": [
+                "replace",
+                "labelmap",
+                "labeldrop",
+                "labelkeep"
+              ]
+            }
+          }
+        }
+      },
+      "context_rules": {
+        "title": "Context rules",
+        "description": "Override context, title, units, and chart type by metric family name regex.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Context rule",
+          "type": "object",
+          "properties": {
+            "match": {
+              "title": "Match",
+              "type": "string"
+            },
+            "context": {
+              "title": "Context",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "units": {
+              "title": "Units",
+              "type": "string"
+            },
+            "type": {
+              "title": "Chart type",
+              "type": "string",
+              "enum": [
+                "line",
+                "area",
+                "stacked",
+                "heatmap"
+              ]
+            }
+          },
+          "required": [
+            "match"
+          ]
+        }
+      },
+      "dimension_rules": {
+        "title": "Dimension rules",
+        "description": "Group multiple Gauge, Counter, Summary, or Histogram series into a single multi-dimensional chart.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Dimension rule",
+          "type": "object",
+          "properties": {
+            "match": {
+              "title": "Match",
+              "type": "string"
+            },
+            "dimension": {
+              "title": "Dimension template",
+              "description": "Dimension name template (for example `${status}` or `value`). Reserved labels `${quantile}` and `${le}` are not allowed.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "match",
+            "dimension"
+          ]
         }
       },
       "username": {
@@ -251,7 +532,8 @@
         {
           "title": "Selectors",
           "fields": [
-            "selector"
+            "selector",
+            "selector_groups"
           ]
         },
         {
@@ -265,6 +547,14 @@
           "title": "Untyped fallback",
           "fields": [
             "fallback_type"
+          ]
+        },
+        {
+          "title": "Customization",
+          "fields": [
+            "label_relabel",
+            "context_rules",
+            "dimension_rules"
           ]
         },
         {
@@ -314,6 +604,9 @@
     },
     "selector": {
       "ui:help": "The logic is as follows: `(allow1 OR allow2) AND !(deny1 OR deny2)`."
+    },
+    "selector_groups": {
+      "ui:help": "Each group gets its own selector + relabel/context/dimension rules, while metrics are fetched once per job. Do not combine with top-level selector/label_relabel/context_rules/dimension_rules."
     },
     "username": {
       "ui:widget": "password"
