@@ -480,7 +480,7 @@ jobs:
       - name: Check agent buildinfo
         id: agent-check
         if: needs.file-check.outputs.run == 'true'
-        run: "& \"C:\\Program Files\\Netdata\\usr\\sbin\\netdata.exe\" -W buildinfo"
+        run: "& \"C:\\Program Files\\Netdata\\usr\\bin\\netdata.exe\" -W buildinfo"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
