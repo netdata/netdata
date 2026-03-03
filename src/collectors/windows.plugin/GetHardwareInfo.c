@@ -12,6 +12,8 @@ struct cpu_data {
     RRDDIM *rd_cpu_temp;
 
     collected_number cpu_temp;
+    collected_number last_valid_temp;
+    int read_errors;
 };
 
 struct cpu_data *cpus = NULL;
@@ -20,6 +22,14 @@ static ND_THREAD *hardware_info_thread = NULL;
 static collected_number (*temperature_fcnt)(MSR_REQUEST *) = NULL;
 static CRITICAL_SECTION cpus_lock;
 bool cpus_lock_initialized = false;
+static HANDLE msr_device = INVALID_HANDLE_VALUE;
+static CRITICAL_SECTION device_lock;
+bool device_lock_initialized = false;
+static int consecutive_errors = 0;
+static const int MAX_CONSECUTIVE_ERRORS = 5;
+static const int IOCTL_RETRIES = 3;
+static const int IOCTL_RETRY_DELAY_MS = 10;
+#define INVALID_TEMP ((collected_number)(-1))
 
 static void netdata_stop_driver()
 {
@@ -143,10 +153,40 @@ static inline HANDLE netdata_open_device()
     return msr_h;
 }
 
+static bool netdata_reopen_device_if_needed()
+{
+    if (msr_device != INVALID_HANDLE_VALUE) {
+        return true;
+    }
+
+    msr_device = netdata_open_device();
+    return (msr_device != INVALID_HANDLE_VALUE);
+}
+
+static bool netdata_read_msr(MSR_REQUEST *req)
+{
+    if (!req || msr_device == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    for (int retry = 0; retry < IOCTL_RETRIES; retry++) {
+        DWORD bytes = 0;
+        if (DeviceIoControl(msr_device, IOCTL_MSR_READ, req, sizeof(*req), req, sizeof(*req), &bytes, NULL)) {
+            return true;
+        }
+
+        if (retry < IOCTL_RETRIES - 1) {
+            Sleep(IOCTL_RETRY_DELAY_MS);
+        }
+    }
+
+    return false;
+}
+
 static collected_number netdata_intel_cpu_temp(MSR_REQUEST *req)
 {
     if (!req)
-        return 0;
+        return INVALID_TEMP;
 
     const ULONG TJMAX = 100;
     ULONG digital_readout = (req->low >> 16) & 0x7F; // bits [22:16]
@@ -154,7 +194,7 @@ static collected_number netdata_intel_cpu_temp(MSR_REQUEST *req)
     collected_number temp = (collected_number)(TJMAX - digital_readout);
 
     if (temp < 0 || temp > 150)
-        return 0;
+        return INVALID_TEMP;
 
     return temp;
 }
@@ -162,43 +202,55 @@ static collected_number netdata_intel_cpu_temp(MSR_REQUEST *req)
 static collected_number netdata_amd_cpu_temp(MSR_REQUEST *req)
 {
     if (!req)
-        return 0;
+        return INVALID_TEMP;
 
     ULONG amd_temp = (req->low >> 21) & 0x7FF;
     collected_number temp = (collected_number)amd_temp / 8;
 
     if (temp < 0 || temp > 150)
-        return 0;
+        return INVALID_TEMP;
 
     return temp;
 }
 
 void netdata_collect_cpu_chart()
 {
-    HANDLE device = netdata_open_device();
-    if (device == INVALID_HANDLE_VALUE) {
+    if (!netdata_reopen_device_if_needed()) {
+        consecutive_errors++;
+        if (consecutive_errors >= MAX_CONSECUTIVE_ERRORS) {
+            nd_log(
+                NDLS_COLLECTORS, NDLP_ERR, "MSR device unavailable for %d consecutive attempts\n", consecutive_errors);
+        }
         return;
     }
 
+    consecutive_errors = 0;
     const uint32_t MSR_THERM_STATUS = 0x19C;
 
     EnterCriticalSection(&cpus_lock);
     for (size_t cpu = 0; cpu < ncpus; cpu++) {
-        DWORD bytes = 0;
         MSR_REQUEST req = {MSR_THERM_STATUS, (ULONG)cpu, 0, 0};
 
-        if (DeviceIoControl(device, IOCTL_MSR_READ, &req, sizeof(req), &req, sizeof(req), &bytes, NULL)) {
-            if (temperature_fcnt)
-                cpus[cpu].cpu_temp = temperature_fcnt(&req);
-            else
-                cpus[cpu].cpu_temp = 0;
+        if (netdata_read_msr(&req)) {
+            collected_number temp = 0;
+            if (temperature_fcnt) {
+                temp = temperature_fcnt(&req);
+            }
+
+            if (temp != INVALID_TEMP) {
+                cpus[cpu].last_valid_temp = temp;
+                cpus[cpu].cpu_temp = temp;
+                cpus[cpu].read_errors = 0;
+            } else {
+                cpus[cpu].cpu_temp = cpus[cpu].last_valid_temp;
+                cpus[cpu].read_errors++;
+            }
         } else {
-            cpus[cpu].cpu_temp = 0;
+            cpus[cpu].cpu_temp = cpus[cpu].last_valid_temp;
+            cpus[cpu].read_errors++;
         }
     }
     LeaveCriticalSection(&cpus_lock);
-
-    CloseHandle(device);
 }
 
 static void get_hardware_info_thread(void *ptr __maybe_unused)
@@ -240,8 +292,27 @@ static void netdata_detect_cpu()
 
 static int initialize()
 {
+    char expanded_path[MAX_PATH];
+    if (ExpandEnvironmentStringsA(drv_path, expanded_path, sizeof(expanded_path)) == 0) {
+        nd_log(
+            NDLS_COLLECTORS, NDLP_ERR, "Cannot expand driver path environment strings. Error= %lu \n", GetLastError());
+        return -1;
+    }
+
+    if (GetFileAttributesA(expanded_path) == INVALID_FILE_ATTRIBUTES) {
+        nd_log(
+            NDLS_COLLECTORS,
+            NDLP_ERR,
+            "Driver not found at '%s'. Please ensure the driver is properly installed.\n",
+            expanded_path);
+        return -1;
+    }
+
     InitializeCriticalSection(&cpus_lock);
     cpus_lock_initialized = true;
+
+    InitializeCriticalSection(&device_lock);
+    device_lock_initialized = true;
 
     netdata_detect_cpu();
     if (!temperature_fcnt) {
@@ -258,6 +329,12 @@ static int initialize()
 
     ncpus = os_get_system_cpus();
     cpus = callocz(ncpus, sizeof(struct cpu_data));
+
+    for (size_t i = 0; i < ncpus; i++) {
+        cpus[i].cpu_temp = INVALID_TEMP;
+        cpus[i].last_valid_temp = INVALID_TEMP;
+        cpus[i].read_errors = 0;
+    }
 
     hardware_info_thread =
         nd_thread_create("hw_info_thread", NETDATA_THREAD_OPTION_DEFAULT, get_hardware_info_thread, NULL);
@@ -299,7 +376,12 @@ static void netdata_loop_cpu_chart(int update_every)
             snprintfz(id, RRD_ID_LENGTH_MAX, "cpu%d.temp", i);
             lcpu->rd_cpu_temp = rrddim_add(chart, id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        rrddim_set_by_pointer(chart, lcpu->rd_cpu_temp, lcpu->cpu_temp);
+
+        if (lcpu->cpu_temp != INVALID_TEMP) {
+            rrddim_set_by_pointer(chart, lcpu->rd_cpu_temp, lcpu->cpu_temp);
+        } else {
+            rrddim_set_by_pointer(chart, lcpu->rd_cpu_temp, 0);
+        }
     }
     LeaveCriticalSection(&cpus_lock);
 
@@ -328,10 +410,18 @@ void do_GetHardwareInfo_cleanup()
             nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
     }
 
+    if (msr_device != INVALID_HANDLE_VALUE) {
+        CloseHandle(msr_device);
+        msr_device = INVALID_HANDLE_VALUE;
+    }
+
     netdata_stop_driver();
 
     if (cpus_lock_initialized)
         DeleteCriticalSection(&cpus_lock);
+
+    if (device_lock_initialized)
+        DeleteCriticalSection(&device_lock);
 
     if (cpus) {
         freez(cpus);
