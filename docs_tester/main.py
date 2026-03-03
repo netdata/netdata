@@ -32,7 +32,7 @@ def main():
     vm_host = args.vm_host or VM_HOST
     vm_user = args.vm_user or VM_USER
     vm_password = os.environ.get('TEST_VM_PASSWORD', VM_PASSWORD)
-    netdata_url = args.netdata_url or NETDATA_URL
+    netdata_url = args.netdata_url or NETDATA_URL or (f'http://{vm_host}:19999' if vm_host else '')
 
     print(f"Testing documentation: {args.doc_file}")
     print(f"Test VM: {vm_host}")
