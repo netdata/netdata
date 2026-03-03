@@ -450,6 +450,60 @@ jobs:
             && needs.file-check.outputs.run == 'true'
           }}
 
+  windows-test: # Test the Windows installer
+    name: Test Windows installer
+    runs-on: windows-latest
+    needs:
+      - windows-build
+      - file-check
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: Write-Output "SKIPPED"
+      - name: Retrieve Windows Artifacts
+        id: fetch-windows
+        if: needs.file-check.outputs.run == 'true'
+        uses: Wandalen/wretry.action@v3
+        with:
+          action: actions/download-artifact@v4
+          with: |
+            pattern: windows-*-installer
+            path: dist-artifacts
+            merge-multiple: true
+          attempt_limit: 3
+          attempt_delay: 2000
+      - name: Install Netdata
+        id: install-netdata
+        if: needs.file-check.outputs.run == 'true'
+        run: msiexec /qm /i dist-artifacts\\netdata-x64-install.msi NDDRVINST=0
+      - name: Check agent buildinfo
+        id: agent-check
+        if: needs.file-check.outputs.run == 'true'
+        run: "& \"C:\\Program Files\\Netdata\\usr\\sbin\\netdata.exe\" -W buildinfo"
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Windows install test failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Windows install test failed.
+              Fetch Windows installers: ${{ steps.fetch-windows.outcome }}
+              Install Netdata: ${{ steps.install-netdata.outcome }}
+              Check agent buildinfo: ${{ steps.agent-check.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
+          }}
+
   prepare-upload: # Consolidate the artifacts for uploading or releasing.
     name: Prepare Artifacts
     runs-on: ubuntu-latest
@@ -754,6 +808,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
     needs:
       - prepare-upload
+      - windows-test
       - artifact-verification-dist
       - artifact-verification-static
     steps:
@@ -889,6 +944,7 @@ jobs:
     needs:
       - artifact-verification-dist
       - artifact-verification-static
+      - windows-test
       - normalize-tag
     steps:
       - name: Checkout
