@@ -75,6 +75,13 @@ class Executor:
             file_match = re.search(r'/etc/netdata/[\w./-]+', config_content)
             config_file = file_match.group(0) if file_match else config_file
 
+            # Check if we can write to the config directory
+            check_result = self.ssh.execute(f'test -w {config_file} && echo "writable" || echo "not_writable"')
+            if 'not_writable' in check_result.get('stdout', ''):
+                result['status'] = 'SKIP'
+                result['error'] = f'Config file {config_file} is not writable on test VM'
+                return result
+
             result['steps'].append({
                 'action': 'backup',
                 'description': f"Backing up {config_file}"

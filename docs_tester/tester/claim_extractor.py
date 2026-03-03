@@ -212,17 +212,18 @@ class ClaimExtractor:
                         associated_code = block['content']
                         break
                 
+                # Skip this step if there's no associated code block - it's just prose
+                if not associated_code:
+                    continue
+                
                 step_text = re.sub(r'^\d+[.)]\s+', '', stripped)
                 
-                step_type = self._classify_step_type(step_text)
-                
-                # If there's associated code, use it as the instruction
-                instruction = associated_code if associated_code else step_text
+                step_type = self._classify_step_type(associated_code)
                 
                 step_num += 1
                 current_steps.append(Step(
                     type=step_type,
-                    instruction=instruction,
+                    instruction=associated_code,
                     expected="Step completes successfully",
                     number=step_num
                 ))
