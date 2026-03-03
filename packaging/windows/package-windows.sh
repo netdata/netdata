@@ -45,7 +45,8 @@ rm -rf /opt/netdata/msys64/
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Configure Editor"}
-if [ -f /opt/netdata/etc/profile ]; then
+if [ ! -f "/opt/netdata/etc/profile" ]; then
     echo 'EDITOR="/usr/bin/nano.exe"' >> /opt/netdata/etc/profile
 fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
+

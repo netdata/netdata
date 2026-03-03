@@ -113,7 +113,7 @@ Metrics and charts are **defined by your SQL queries and metric blocks** at runt
 ## Functions
 
 This collector supports user-defined SQL functions that expose query results as
-interactive table views in Netdata's **Top** tab. Functions are configured per job
+interactive table views in Netdata's **Live** tab. Functions are configured per job
 in the `functions` section of the job configuration. Since functions are entirely
 user-defined, no predefined functions are listed here.
 
@@ -630,7 +630,7 @@ jobs:
 PostgreSQL example that provides an interactive slow query analysis view
 without collecting any time-series metrics.
 
-This is useful for ad-hoc troubleshooting via the Netdata **Top** tab.
+This is useful for ad-hoc troubleshooting via the Netdata **Live** tab.
 The function queries `pg_stat_statements` to show the slowest queries
 sorted by total execution time.
 

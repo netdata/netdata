@@ -4013,6 +4013,7 @@ install(CODE "
 
 if(OS_WINDOWS)
         install(FILES /usr/bin/msys-protobuf-32.dll
+                      /usr/bin/msys-yaml-0-2.dll
                       /usr/bin/msys-uv-1.dll
                       DESTINATION "${BINDIR}")
 

@@ -50,7 +50,7 @@ static struct proc_module {
      .cleanup = do_Sensors_cleanup},
     {.name = "GetHardwareInfo",
      .dim = "GetHardwareInfo",
-     .enabled = CONFIG_BOOLEAN_NO,
+     .enabled = CONFIG_BOOLEAN_YES,
      .update_every = 10 * UPDATE_EVERY_MIN,
      .func = do_GetHardwareInfo,
      .rd = NULL,
