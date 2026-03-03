@@ -111,11 +111,11 @@ type Collector struct {
 		counter matcher.Matcher
 		gauge   matcher.Matcher
 	}
-	labelRelabelRules []compiledRelabelRule
-	contextRules      []compiledContextRule
-	dimensionRules    []compiledDimensionRule
-	selectorGroups    []compiledSelectorGroup
-	chartIDPrefix     string
+	labelRelabelRules       []compiledRelabelRule
+	contextRules            []compiledContextRule
+	dimensionRules          []compiledDimensionRule
+	selectorGroups          []compiledSelectorGroup
+	chartIDPrefix           string
 	expectedPrefixValidated bool
 	maxTSValidated          bool
 }
