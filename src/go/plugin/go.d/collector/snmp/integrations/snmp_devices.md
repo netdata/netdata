@@ -126,7 +126,7 @@ If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or
 
 ## Functions
 
-This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+This collector exposes real-time functions for interactive troubleshooting in the Live tab.
 
 
 ### Network Interfaces

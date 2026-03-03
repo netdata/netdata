@@ -41,7 +41,7 @@ modules:
           and inspect the charts and dimensions it created.
 
           Jobs can also define **functions** that provide interactive table views in
-          Netdata's Top tab. A job can have metrics only, functions only, or both.
+          Netdata's Live tab. A job can have metrics only, functions only, or both.
 
           :::tip
 
@@ -64,7 +64,7 @@ modules:
           dimensions.
 
           Additionally, you can define **functions** that expose SQL query results as
-          interactive table views in Netdata's Top tab. Functions support filtering,
+          interactive table views in Netdata's Live tab. Functions support filtering,
           sorting, and searching without creating persistent metrics.
 
           ### Result Processing Modes
@@ -215,7 +215,7 @@ modules:
             # Set function_only: true if this job only provides functions (no metrics).
             function_only: <true|false>                    # OPTIONAL. Default: false.
 
-            # Expose SQL queries as interactive table views in Netdata's Top tab.
+            # Expose SQL queries as interactive table views in Netdata's Live tab.
             functions:
               - id: <function_id>                          # REQUIRED. Unique identifier.
                 name: <display_name>                       # OPTIONAL. Derived from id if not set.
@@ -294,7 +294,7 @@ modules:
 
             - name: functions
               description: >
-                A list of SQL functions exposed as interactive table views in Netdata's Top tab.
+                A list of SQL functions exposed as interactive table views in Netdata's Live tab.
                 Each function runs a SQL query and displays results in a filterable, sortable table.
                 See [Functions](#functions) for details.
               default_value: "[]"
@@ -711,7 +711,7 @@ modules:
         in the `functions` section of the job configuration. Since functions are entirely
         user-defined, no predefined functions are listed here.
 
-        In the Top tab, functions appear in a hierarchical menu:
+        In the Live tab, functions appear in a hierarchical menu:
 
         ```
         Databases

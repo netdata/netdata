@@ -137,7 +137,7 @@ Metrics:
 
 ## Functions
 
-This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+This collector exposes real-time functions for interactive troubleshooting in the Live tab.
 
 
 ### Top Queries

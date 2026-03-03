@@ -1,6 +1,6 @@
-# Top Tab
+# Live Tab
 
-The **Top tab** gives you access to [Netdata Functions](/docs/top-monitoring-netdata-functions.md) that can be executed on any node running the Netdata Agent. These specialized routines, provided by various collectors, offer enhanced insights and allow you to trigger specific actions directly on the monitored node.
+The **Live tab** gives you real-time access to [Netdata Functions](/docs/top-monitoring-netdata-functions.md) that can be executed on any node running the Netdata Agent. These specialized routines, provided by various collectors, deliver live information from your monitored nodes—including database monitoring functions, network topology maps, process explorers, and more.
 
 You can **use these Functions to**:
 
@@ -15,11 +15,11 @@ You can also execute a Function from the [Nodes tab](/docs/dashboards-and-charts
 
 :::note
 
-If you receive an error saying that your node can’t execute Functions, check the [prerequisites](/docs/top-monitoring-netdata-functions.md) to ensure your node is configured properly.
+If you receive an error saying that your node can't execute Functions, check the [prerequisites](/docs/top-monitoring-netdata-functions.md) to ensure your node is configured properly.
 
 :::
 
-## Top Tab Structure Overview
+## Live Tab Structure Overview
 
 ```mermaid
 flowchart TD
@@ -42,13 +42,13 @@ flowchart TD
 
 :::tip
 
-The diagram above shows how Function selection and execution work in the Top tab, helping you visualize the flow from choosing a Function to viewing the results.
+The diagram above shows how Function selection and execution work in the Live tab, helping you visualize the flow from choosing a Function to viewing the results.
 
 :::
 
-## Top Tab View
+## Live Tab View
 
-The main view of the Top tab provides two elements, depending on the selected Function:
+The main view of the Live tab provides two elements, depending on the selected Function:
 
 | Element           | Description                                                                                                                  |
 |-------------------|------------------------------------------------------------------------------------------------------------------------------|
@@ -66,7 +66,7 @@ You can control the data refresh and update settings in the top right-hand corne
 
 ## Functions Bar
 
-The **Functions bar**, located on the right-hand side of the Top tab, lets you select which Function to run, on which node, and apply filtering where available.
+The **Functions bar**, located on the right-hand side of the Live tab, lets you select which Function to run, on which node, and apply filtering where available.
 
 | Option              | Description                                                                                                                                                                  |
 |---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
