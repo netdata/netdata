@@ -88,16 +88,22 @@ def main():
     for i, claim in enumerate(workflow_claims, 1):
         print(f"[{i}/{len(workflow_claims)}] Testing workflow: {claim['description']}")
 
-        # Convert dict steps to Step objects
+        # Convert dict steps to Step objects (if not already Step objects)
         step_objects = []
-        for idx, step_dict in enumerate(claim.get('steps', []), 1):
-            step = Step(
-                type=StepType[step_dict.get('type', 'COMMAND').upper()] if isinstance(step_dict.get('type'), str) else step_dict.get('type', StepType.COMMAND),
-                instruction=step_dict.get('instruction', ''),
-                expected=step_dict.get('expected', 'Step completes successfully'),
-                number=idx
-            )
-            step_objects.append(step)
+        for idx, step_item in enumerate(claim.get('steps', []), 1):
+            # Check if already a Step object
+            if hasattr(step_item, 'instruction'):
+                step_item.number = idx
+                step_objects.append(step_item)
+            else:
+                # It's a dict, convert to Step
+                step = Step(
+                    type=StepType[step_item.get('type', 'COMMAND').upper()] if isinstance(step_item.get('type'), str) else step_item.get('type', StepType.COMMAND),
+                    instruction=step_item.get('instruction', ''),
+                    expected=step_item.get('expected', 'Step completes successfully'),
+                    number=idx
+                )
+                step_objects.append(step)
 
         # Create Workflow object
         workflow = type('Workflow', (), {
