@@ -8,41 +8,41 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioJailBannedIPs = module.Priority + iota
+	prioJailBannedIPs = collectorapi.Priority + iota
 	prioJailActiveFailures
 )
 
-var jailChartsTmpl = module.Charts{
+var jailChartsTmpl = collectorapi.Charts{
 	jailCurrentBannedIPs.Copy(),
 	jailActiveFailures.Copy(),
 }
 
 var (
-	jailCurrentBannedIPs = module.Chart{
+	jailCurrentBannedIPs = collectorapi.Chart{
 		ID:       "jail_%s_banned_ips",
 		Title:    "Fail2Ban Jail banned IPs",
 		Units:    "addresses",
 		Fam:      "bans",
 		Ctx:      "fail2ban.jail_banned_ips",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioJailBannedIPs,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jail_%s_currently_banned", Name: "banned"},
 		},
 	}
-	jailActiveFailures = module.Chart{
+	jailActiveFailures = collectorapi.Chart{
 		ID:       "jail_%s_active_failures",
 		Title:    "Fail2Ban Jail active failures",
 		Units:    "failures",
 		Fam:      "failures",
 		Ctx:      "fail2ban.jail_active_failures",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioJailActiveFailures,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "jail_%s_currently_failed", Name: "active_failures"},
 		},
 	}
@@ -53,7 +53,7 @@ func (c *Collector) addJailCharts(jail string) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, jail)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "jail", Value: jail},
 		}
 		for _, dim := range chart.Dims {

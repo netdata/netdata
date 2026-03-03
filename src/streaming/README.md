@@ -80,7 +80,7 @@ flowchart TB
 | Task                                     | Configuration                             | Example                                                        |
 |------------------------------------------|-------------------------------------------|----------------------------------------------------------------|
 | Enable streaming on a Child              | Set `enabled = yes` in `[stream]` section | `[stream]`<br/>`enabled = yes`<br/>`destination = 192.168.1.5` |
-| Configure a Parent to accept connections | Create an `[API_KEY]` section             | `[API_KEY]`<br/>`enabled = yes`<br/>`allow from = *`           |
+| Configure a Parent to accept connections | Create an `[API_KEY]` section             | `[API_KEY]`<br/>`type = api`<br/>`enabled = yes`<br/>`allow from = *` |
 | Set up high availability                 | Configure multiple destinations on Child  | `[stream]`<br/>`destination = parent1:19999 parent2:19999`     |
 | Filter which metrics to send             | Use `send charts matching` setting        | `send charts matching = system.* !system.uptime`               |
 
@@ -390,6 +390,7 @@ Manage database settings for data storage and retention.
 ```ini
 # Generate a random UUID first: uuidgen
 [11111111-2222-3333-4444-555555555555]
+    type = api
     # Enable this API key
     enabled = yes
     # Allow all IPs to connect with this key
@@ -417,12 +418,14 @@ Manage database settings for data storage and retention.
 ```ini
 # Configuration for accepting metrics from Children
 [11111111-2222-3333-4444-555555555555]
+    type = api
     enabled = yes
     allow from = *
     db = dbengine
 
 # Configuration for accepting metrics from other Parents
 [22222222-3333-4444-5555-666666666666]
+    type = api
     enabled = yes
     # Only allow the other Parent's IP
     allow from = 192.168.1.5 192.168.1.6
@@ -716,6 +719,7 @@ The Parent node receives and stores metrics from Child nodes.
 
    ```ini
    [11111111-2222-3333-4444-555555555555]
+       type = api
        enabled = yes
        allow from = *
    ```

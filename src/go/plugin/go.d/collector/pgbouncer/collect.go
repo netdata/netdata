@@ -4,7 +4,6 @@ package pgbouncer
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -14,6 +13,8 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlquery"
 )
 
 // 'SHOW STATS;' response was changed significantly in v1.8.0
@@ -283,27 +284,10 @@ func (c *Collector) openConnection() error {
 func (c *Collector) collectQuery(query string, assign func(column, value string)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
-	rows, err := c.db.QueryContext(ctx, query)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = rows.Close() }()
-
-	columns, err := rows.Columns()
-	if err != nil {
-		return err
-	}
-
-	values := makeNullStrings(len(columns))
-	for rows.Next() {
-		if err := rows.Scan(values...); err != nil {
-			return err
-		}
-		for i, v := range values {
-			assign(columns[i], valueToString(v))
-		}
-	}
-	return rows.Err()
+	_, err := sqlquery.QueryRows(ctx, c.db, query, func(column, value string, _ bool) {
+		assign(column, value)
+	})
+	return err
 }
 
 func (c *Collector) getDBMetrics(dbname string) *dbMetrics {
@@ -323,22 +307,6 @@ func (c *Collector) resetMetrics() {
 			hasCharts: db.hasCharts,
 		}
 	}
-}
-
-func valueToString(value any) string {
-	v, ok := value.(*sql.NullString)
-	if !ok || !v.Valid {
-		return ""
-	}
-	return v.String
-}
-
-func makeNullStrings(size int) []any {
-	vs := make([]any, size)
-	for i := range vs {
-		vs[i] = &sql.NullString{}
-	}
-	return vs
 }
 
 func parseInt(s string) int64 {

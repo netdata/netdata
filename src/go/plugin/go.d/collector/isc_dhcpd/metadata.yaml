@@ -8,12 +8,11 @@ modules:
         name: ISC DHCP
         link: https://www.isc.org/dhcp/
         categories:
-          - data-collection.dns-and-dhcp-servers
+          - data-collection.networking
         icon_filename: isc.png
       keywords:
         - dhcpd
         - dhcp
-      most_popular: false
       info_provided_to_referring_integrations:
         description: ""
       related_resources:

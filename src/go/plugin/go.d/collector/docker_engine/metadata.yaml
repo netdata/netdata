@@ -19,7 +19,6 @@ modules:
       keywords:
         - docker
         - container
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

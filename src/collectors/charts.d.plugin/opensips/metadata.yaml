@@ -7,7 +7,7 @@ modules:
         name: OpenSIPS
         link: "https://opensips.org/"
         categories:
-          - data-collection.telephony-servers
+          - data-collection.applications
         icon_filename: "opensips.png"
       related_resources:
         integrations:
@@ -20,7 +20,6 @@ modules:
         - voice
         - video
         - stream
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Examine OpenSIPS metrics for insights into SIP server operations. Study call rates, error rates, and response times for reliable voice over IP services."

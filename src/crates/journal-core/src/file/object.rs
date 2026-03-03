@@ -998,8 +998,7 @@ impl<B: ByteSlice> DataObject<B> {
                 return Err(JournalError::DecompressorError);
             }
 
-            let uncompressed_size =
-                u64::from_le_bytes(payload[..8].try_into().unwrap()) as usize;
+            let uncompressed_size = u64::from_le_bytes(payload[..8].try_into().unwrap()) as usize;
             let compressed_data = &payload[8..];
 
             buf.clear();

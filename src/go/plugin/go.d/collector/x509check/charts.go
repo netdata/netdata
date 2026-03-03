@@ -6,34 +6,34 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-var certChartsTmpl = module.Charts{
+var certChartsTmpl = collectorapi.Charts{
 	certTimeUntilExpirationChartTmpl.Copy(),
 	certRevocationStatusChartTmpl.Copy(),
 }
 
 var (
-	certTimeUntilExpirationChartTmpl = module.Chart{
+	certTimeUntilExpirationChartTmpl = collectorapi.Chart{
 		ID:    "cert_depth%d_time_until_expiration",
 		Title: "Time Until Certificate Expiration",
 		Units: "seconds",
 		Fam:   "expiration time",
 		Ctx:   "x509check.time_until_expiration",
-		Opts:  module.Opts{StoreFirst: true},
-		Dims: module.Dims{
+		Opts:  collectorapi.Opts{StoreFirst: true},
+		Dims: collectorapi.Dims{
 			{ID: "cert_depth%d_expiry", Name: "expiry"},
 		},
 	}
-	certRevocationStatusChartTmpl = module.Chart{
+	certRevocationStatusChartTmpl = collectorapi.Chart{
 		ID:    "cert_depth%d_revocation_status",
 		Title: "Revocation Status",
 		Units: "boolean",
 		Fam:   "revocation",
 		Ctx:   "x509check.revocation_status",
-		Opts:  module.Opts{StoreFirst: true},
-		Dims: module.Dims{
+		Opts:  collectorapi.Opts{StoreFirst: true},
+		Dims: collectorapi.Dims{
 			{ID: "cert_depth%d_not_revoked", Name: "not_revoked"},
 			{ID: "cert_depth%d_revoked", Name: "revoked"},
 		},
@@ -49,7 +49,7 @@ func (c *Collector) addCertCharts(commonName string, depth int) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, depth)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "source", Value: c.Source},
 			{Key: "common_name", Value: commonName},
 			{Key: "depth", Value: strconv.Itoa(depth)},

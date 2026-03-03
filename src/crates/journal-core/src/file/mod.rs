@@ -26,7 +26,7 @@ pub use cursor::JournalCursor;
 pub use filter::{FilterExpr, JournalFilter, LogicalOp};
 
 // For FFI compatibility and advanced object manipulation
-pub use object::{EntryItemsType, HashableObject, JournalState, HeaderIncompatibleFlags};
+pub use object::{EntryItemsType, HashableObject, HeaderIncompatibleFlags, JournalState};
 
 // Re-export commonly needed external types
 pub use mmap::{Mmap, MmapMut};

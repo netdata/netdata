@@ -9,14 +9,13 @@ modules:
         link: ""
         icon_filename: globe.svg
         categories:
-          - data-collection.synthetic-checks
+          - data-collection.synthetic-testing
       keywords: []
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

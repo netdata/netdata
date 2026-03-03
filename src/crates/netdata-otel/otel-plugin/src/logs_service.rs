@@ -153,7 +153,12 @@ impl LogsService for NetdataLogsService {
                 }
 
                 let entry_refs: Vec<&[u8]> = entry_data.iter().map(|v| v.as_slice()).collect();
-                if let Err(e) = self.log.lock().unwrap().write_entry(&entry_refs, source_timestamp_usec) {
+                if let Err(e) = self
+                    .log
+                    .lock()
+                    .unwrap()
+                    .write_entry(&entry_refs, source_timestamp_usec)
+                {
                     eprintln!("Failed to write log entry: {}", e);
                     return Err(Status::internal(format!(
                         "Failed to write log entry: {}",

@@ -7,7 +7,7 @@ modules:
         name: vm.loadavg
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -15,7 +15,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "System Load Average"
@@ -106,7 +105,7 @@ modules:
         name: vm.vmtotal
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "memory.svg"
       related_resources:
         integrations:
@@ -114,7 +113,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect Virtual Memory information from host."
@@ -208,7 +206,7 @@ modules:
         name: kern.cp_time
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -216,7 +214,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Total CPU utilization"
@@ -322,7 +319,7 @@ modules:
         name: dev.cpu.temperature
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.hardware-and-sensors
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -330,7 +327,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Get current CPU temperature"
@@ -399,7 +395,7 @@ modules:
         name: dev.cpu.0.freq
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -407,7 +403,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Read current CPU Scaling frequency."
@@ -476,7 +471,7 @@ modules:
         name: hw.intrcnt
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -484,7 +479,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Get total number of interrupts"
@@ -559,7 +553,7 @@ modules:
         name: vm.stats.sys.v_intr
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -567,7 +561,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Device interrupts"
@@ -636,7 +629,7 @@ modules:
         name: vm.stats.sys.v_soft
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -644,7 +637,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Software Interrupt"
@@ -713,7 +705,7 @@ modules:
         name: vm.stats.sys.v_swtch
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -721,7 +713,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "CPU context switch"
@@ -796,7 +787,7 @@ modules:
         name: vm.swap_info
         link: ""
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -804,7 +795,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about SWAP memory."
@@ -879,7 +869,7 @@ modules:
         name: system.ram
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "memory.svg"
       related_resources:
         integrations:
@@ -887,7 +877,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Show information about system memory usage."
@@ -988,7 +977,7 @@ modules:
         name: vm.stats.vm.v_swappgs
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "memory.svg"
       related_resources:
         integrations:
@@ -996,7 +985,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "The metric swap amount of data read from and written to SWAP."
@@ -1071,7 +1059,7 @@ modules:
         name: vm.stats.vm.v_pgfaults
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "memory.svg"
       related_resources:
         integrations:
@@ -1079,7 +1067,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect memory page faults events."
@@ -1152,7 +1139,7 @@ modules:
         name: kern.ipc.sem
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -1160,7 +1147,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about semaphore."
@@ -1245,7 +1231,7 @@ modules:
         name: kern.ipc.shm
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "memory.svg"
       related_resources:
         integrations:
@@ -1253,7 +1239,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect shared memory information."
@@ -1328,7 +1313,7 @@ modules:
         name: kern.ipc.msq
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -1336,7 +1321,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect number of IPC message Queues"
@@ -1418,7 +1402,7 @@ modules:
         name: uptime
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -1426,7 +1410,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Show period of time server is up."
@@ -1495,7 +1478,7 @@ modules:
         name: net.isr
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.networking
         icon_filename: "freebsd.svg"
       related_resources:
         integrations:
@@ -1503,7 +1486,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about system softnet stat."
@@ -1609,7 +1591,7 @@ modules:
         name: devstat
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.storage
         icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
@@ -1617,7 +1599,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information per hard disk available on host."
@@ -1801,7 +1782,7 @@ modules:
         name: net.inet.tcp.states
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -1809,7 +1790,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: ""
@@ -1883,7 +1863,7 @@ modules:
         name: net.inet.tcp.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -1891,7 +1871,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect overall information about TCP connections."
@@ -2070,7 +2049,7 @@ modules:
         name: net.inet.udp.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2078,7 +2057,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about UDP connections."
@@ -2172,7 +2150,7 @@ modules:
         name: net.inet.icmp.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2180,7 +2158,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about ICMP traffic."
@@ -2275,7 +2252,7 @@ modules:
         name: net.inet.ip.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2283,7 +2260,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect IP stats"
@@ -2394,7 +2370,7 @@ modules:
         name: net.inet6.ip6.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2402,7 +2378,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information abou IPv6 stats."
@@ -2515,7 +2490,7 @@ modules:
         name: net.inet6.icmp6.stats
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2523,7 +2498,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information abou IPv6 ICMP"
@@ -2681,7 +2655,7 @@ modules:
         name: ipfw
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.networking
         icon_filename: "firewall.svg"
       related_resources:
         integrations:
@@ -2689,7 +2663,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about FreeBSD firewall."
@@ -2791,7 +2764,7 @@ modules:
         name: getifaddrs
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.networking
         icon_filename: "network.svg"
       related_resources:
         integrations:
@@ -2799,7 +2772,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect traffic per network interface."
@@ -3011,7 +2983,7 @@ modules:
         name: getmntinfo
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.storage
         icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
@@ -3019,7 +2991,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information per mount point."
@@ -3124,7 +3095,7 @@ modules:
         name: zfs
         link: "https://www.freebsd.org/"
         categories:
-          - data-collection.freebsd
+          - data-collection.storage
         icon_filename: "filesystem.svg"
       related_resources:
         integrations:
@@ -3132,7 +3103,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect metrics for ZFS filesystem"

@@ -285,11 +285,11 @@ Transform troubleshooting from complex queries to natural conversation. Ask ques
 <details>
 <summary><strong>Model Context Protocol (MCP) Integration</strong></summary><br/>
 
-Every Netdata Agent and Parent is an MCP server, enabling seamless integration with AI assistants for natural language queries and automated analysis.
+MCP is available via Netdata Cloud for infrastructure-wide access (Business/Homelab plan) and on every Agent/Parent for direct local access (free, open-source), enabling seamless integration with AI assistants for natural language queries and automated analysis.
 
 **Why this matters:** Use your existing AI tools or our standalone web chat with choice of AI providers. Query live metrics, logs, processes, network connections, and system state securely.
 
-**Technical details:** MCP integration via WebSocket, choice of Claude, GPT-4, Gemini and others, two deployment options available, real-time data access, secure connection where LLM has access to your data via the LLM client.
+**Technical details:** MCP integration via WebSocket/HTTP, choice of Claude, GPT-4, Gemini and others, multiple deployment options (Cloud MCP, Agent MCP, Parent MCP), real-time data access, secure connection where LLM has access to your data via the LLM client.
 
 </details>
 

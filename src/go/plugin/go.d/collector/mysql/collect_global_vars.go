@@ -2,12 +2,14 @@
 
 package mysql
 
+import "context"
+
 const (
 	queryShowGlobalVariables = `
 SHOW GLOBAL VARIABLES 
 WHERE 
   Variable_name LIKE 'max_connections' 
-  OR Variable_name LIKE 'table_open_cache' 
+  OR Variable_name LIKE 'table_open_cache'
   OR Variable_name LIKE 'disabled_storage_engines' 
   OR Variable_name LIKE 'log_bin'
   OR Variable_name LIKE 'innodb_log_file_size'
@@ -15,14 +17,14 @@ WHERE
   OR Variable_name LIKE 'performance_schema';`
 )
 
-func (c *Collector) collectGlobalVariables() error {
+func (c *Collector) collectGlobalVariables(ctx context.Context) error {
 	// MariaDB: https://mariadb.com/kb/en/server-system-variables/
 	// MySQL: https://dev.mysql.com/doc/refman/8.0/en/server-system-variable-reference.html
 	q := queryShowGlobalVariables
 	c.Debugf("executing query: '%s'", q)
 
 	var name string
-	_, err := c.collectQuery(q, func(column, value string, _ bool) {
+	_, err := c.collectQuery(ctx, q, func(column, value string, _ bool) {
 		switch column {
 		case "Variable_name":
 			name = value
@@ -39,9 +41,7 @@ func (c *Collector) collectGlobalVariables() error {
 			case "max_connections":
 				c.varMaxConns = parseInt(value)
 			case "performance_schema":
-				c.varPerfSchemaMu.Lock()
 				c.varPerformanceSchema = value
-				c.varPerfSchemaMu.Unlock()
 			case "table_open_cache":
 				c.varTableOpenCache = parseInt(value)
 			}

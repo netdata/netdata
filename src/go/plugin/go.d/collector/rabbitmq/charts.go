@@ -7,11 +7,11 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioMessagesCount = module.Priority + iota
+	prioMessagesCount = collectorapi.Priority + iota
 	prioMessagesRate
 	prioObjectsCount
 	prioConnectionChurnRate
@@ -40,7 +40,7 @@ const (
 	prioQueueMessagesRate
 )
 
-var overviewCharts = module.Charts{
+var overviewCharts = collectorapi.Charts{
 	chartMessagesCount.Copy(),
 	chartMessagesRate.Copy(),
 	chartObjectsCount.Copy(),
@@ -50,50 +50,50 @@ var overviewCharts = module.Charts{
 }
 
 var (
-	chartMessagesCount = module.Chart{
+	chartMessagesCount = collectorapi.Chart{
 		ID:       "messages_count",
 		Title:    "Messages",
 		Units:    "messages",
 		Fam:      "messages",
 		Ctx:      "rabbitmq.messages_count",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioMessagesCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "queue_totals_messages_ready", Name: "ready"},
 			{ID: "queue_totals_messages_unacknowledged", Name: "unacknowledged"},
 		},
 	}
-	chartMessagesRate = module.Chart{
+	chartMessagesRate = collectorapi.Chart{
 		ID:       "messages_rate",
 		Title:    "Messages",
 		Units:    "messages/s",
 		Fam:      "messages",
 		Ctx:      "rabbitmq.messages_rate",
 		Priority: prioMessagesRate,
-		Dims: module.Dims{
-			{ID: "message_stats_ack", Name: "ack", Algo: module.Incremental},
-			{ID: "message_stats_publish", Name: "publish", Algo: module.Incremental},
-			{ID: "message_stats_publish_in", Name: "publish_in", Algo: module.Incremental},
-			{ID: "message_stats_publish_out", Name: "publish_out", Algo: module.Incremental},
-			{ID: "message_stats_confirm", Name: "confirm", Algo: module.Incremental},
-			{ID: "message_stats_deliver", Name: "deliver", Algo: module.Incremental},
-			{ID: "message_stats_deliver_no_ack", Name: "deliver_no_ack", Algo: module.Incremental},
-			{ID: "message_stats_get", Name: "get", Algo: module.Incremental},
-			{ID: "message_stats_get_empty", Name: "get_empty", Algo: module.Incremental},
-			{ID: "message_stats_get_no_ack", Name: "get_no_ack", Algo: module.Incremental},
-			{ID: "message_stats_deliver_get", Name: "deliver_get", Algo: module.Incremental},
-			{ID: "message_stats_redeliver", Name: "redeliver", Algo: module.Incremental},
-			{ID: "message_stats_return_unroutable", Name: "return_unroutable", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "message_stats_ack", Name: "ack", Algo: collectorapi.Incremental},
+			{ID: "message_stats_publish", Name: "publish", Algo: collectorapi.Incremental},
+			{ID: "message_stats_publish_in", Name: "publish_in", Algo: collectorapi.Incremental},
+			{ID: "message_stats_publish_out", Name: "publish_out", Algo: collectorapi.Incremental},
+			{ID: "message_stats_confirm", Name: "confirm", Algo: collectorapi.Incremental},
+			{ID: "message_stats_deliver", Name: "deliver", Algo: collectorapi.Incremental},
+			{ID: "message_stats_deliver_no_ack", Name: "deliver_no_ack", Algo: collectorapi.Incremental},
+			{ID: "message_stats_get", Name: "get", Algo: collectorapi.Incremental},
+			{ID: "message_stats_get_empty", Name: "get_empty", Algo: collectorapi.Incremental},
+			{ID: "message_stats_get_no_ack", Name: "get_no_ack", Algo: collectorapi.Incremental},
+			{ID: "message_stats_deliver_get", Name: "deliver_get", Algo: collectorapi.Incremental},
+			{ID: "message_stats_redeliver", Name: "redeliver", Algo: collectorapi.Incremental},
+			{ID: "message_stats_return_unroutable", Name: "return_unroutable", Algo: collectorapi.Incremental},
 		},
 	}
-	chartObjectsCount = module.Chart{
+	chartObjectsCount = collectorapi.Chart{
 		ID:       "objects_count",
 		Title:    "Objects",
 		Units:    "objects",
 		Fam:      "objects",
 		Ctx:      "rabbitmq.objects_count",
 		Priority: prioObjectsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "object_totals_channels", Name: "channels"},
 			{ID: "object_totals_consumers", Name: "consumers"},
 			{ID: "object_totals_connections", Name: "connections"},
@@ -102,46 +102,46 @@ var (
 		},
 	}
 
-	chartConnectionChurnRate = module.Chart{
+	chartConnectionChurnRate = collectorapi.Chart{
 		ID:       "connection_churn_rate",
 		Title:    "Connection churn",
 		Units:    "operations/s",
 		Fam:      "churn",
 		Ctx:      "rabbitmq.connection_churn_rate",
 		Priority: prioConnectionChurnRate,
-		Dims: module.Dims{
-			{ID: "churn_rates_connection_created", Name: "created", Algo: module.Incremental},
-			{ID: "churn_rates_connection_closed", Name: "closed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "churn_rates_connection_created", Name: "created", Algo: collectorapi.Incremental},
+			{ID: "churn_rates_connection_closed", Name: "closed", Algo: collectorapi.Incremental},
 		},
 	}
-	chartChannelChurnRate = module.Chart{
+	chartChannelChurnRate = collectorapi.Chart{
 		ID:       "channel_churn_rate",
 		Title:    "Channel churn",
 		Units:    "operations/s",
 		Fam:      "churn",
 		Ctx:      "rabbitmq.channel_churn_rate",
 		Priority: prioChannelChurnRate,
-		Dims: module.Dims{
-			{ID: "churn_rates_channel_created", Name: "created", Algo: module.Incremental},
-			{ID: "churn_rates_channel_closed", Name: "closed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "churn_rates_channel_created", Name: "created", Algo: collectorapi.Incremental},
+			{ID: "churn_rates_channel_closed", Name: "closed", Algo: collectorapi.Incremental},
 		},
 	}
-	chartQueueChurnRate = module.Chart{
+	chartQueueChurnRate = collectorapi.Chart{
 		ID:       "queue_churn_rate",
 		Title:    "Queue churn",
 		Units:    "operations/s",
 		Fam:      "churn",
 		Ctx:      "rabbitmq.queue_churn_rate",
 		Priority: prioQueueChurnRate,
-		Dims: module.Dims{
-			{ID: "churn_rates_queue_created", Name: "created", Algo: module.Incremental},
-			{ID: "churn_rates_queue_deleted", Name: "deleted", Algo: module.Incremental},
-			{ID: "churn_rates_queue_declared", Name: "declared", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "churn_rates_queue_created", Name: "created", Algo: collectorapi.Incremental},
+			{ID: "churn_rates_queue_deleted", Name: "deleted", Algo: collectorapi.Incremental},
+			{ID: "churn_rates_queue_declared", Name: "declared", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
-var nodeChartsTmpl = module.Charts{
+var nodeChartsTmpl = collectorapi.Charts{
 	nodeAvailStatusChartTmpl.Copy(),
 	nodeNetworkPartitionStatusChartTmpl.Copy(),
 	nodeMemAlarmStatusChartTmpl.Copy(),
@@ -156,235 +156,235 @@ var nodeChartsTmpl = module.Charts{
 }
 
 var (
-	nodeAvailStatusChartTmpl = module.Chart{
+	nodeAvailStatusChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_avail_status",
 		Title:    "Node Availability Status",
 		Units:    "status",
 		Fam:      "node status",
 		Ctx:      "rabbitmq.node_avail_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioNodeAvailStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_avail_status_running", Name: "running"},
 			{ID: "node_%s_avail_status_down", Name: "down"},
 		},
 	}
-	nodeNetworkPartitionStatusChartTmpl = module.Chart{
+	nodeNetworkPartitionStatusChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_network_partition_status",
 		Title:    "Node Network Partitioning Status",
 		Units:    "status",
 		Fam:      "node status",
 		Ctx:      "rabbitmq.node_network_partition_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioNodeNetworkPartitioningStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_network_partition_status_clear", Name: "clear"},
 			{ID: "node_%s_network_partition_status_detected", Name: "detected"},
 		},
 	}
-	nodeMemAlarmStatusChartTmpl = module.Chart{
+	nodeMemAlarmStatusChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_mem_alarm_status",
 		Title:    "Node Memory Alarm Status",
 		Units:    "status",
 		Fam:      "node status",
 		Ctx:      "rabbitmq.node_mem_alarm_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioNodeMemAlarmStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_mem_alarm_status_clear", Name: "clear"},
 			{ID: "node_%s_mem_alarm_status_triggered", Name: "triggered"},
 		},
 	}
-	nodeDiskFreeAlarmStatusChartTmpl = module.Chart{
+	nodeDiskFreeAlarmStatusChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_disk_free_alarm_status",
 		Title:    "Node Disk Free Alarm Status",
 		Units:    "status",
 		Fam:      "node status",
 		Ctx:      "rabbitmq.node_disk_free_alarm_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioNodeDiskFreeAlarmStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_disk_free_alarm_status_clear", Name: "clear"},
 			{ID: "node_%s_disk_free_alarm_status_triggered", Name: "triggered"},
 		},
 	}
-	nodeFileDescriptorsUsageChartTmpl = module.Chart{
+	nodeFileDescriptorsUsageChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_file_descriptors_usage",
 		Title:    "Node File Descriptors Usage",
 		Units:    "fd",
 		Fam:      "node fds",
 		Ctx:      "rabbitmq.node_file_descriptors_usage",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioNodeFileDescriptorsUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_fds_used", Name: "used"},
 		},
 	}
-	nodeSocketsUsageChartTmpl = module.Chart{
+	nodeSocketsUsageChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_sockets_used_usage",
 		Title:    "Node Sockets Usage",
 		Units:    "sockets",
 		Fam:      "node sockets",
 		Ctx:      "rabbitmq.node_sockets_usage",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioNodeSocketsUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_sockets_used", Name: "used"},
 		},
 	}
-	nodeErlangProcessesUsageChartTmpl = module.Chart{
+	nodeErlangProcessesUsageChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_erlang_processes_usage",
 		Title:    "Node Erlang Processes Usage",
 		Units:    "processes",
 		Fam:      "node erlang",
 		Ctx:      "rabbitmq.node_erlang_processes_usage",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioNodeErlangProcessesUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_procs_used", Name: "used"},
 		},
 	}
-	nodeErlangRunQueueProcessesCountChartTmpl = module.Chart{
+	nodeErlangRunQueueProcessesCountChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_erlang_run_queue_processes_count",
 		Title:    "Node Erlang Run Queue",
 		Units:    "processes",
 		Fam:      "node erlang",
 		Ctx:      "rabbitmq.node_erlang_run_queue_processes_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioNodeErlangRunQueueProcessesCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_run_queue", Name: "length"},
 		},
 	}
-	nodeMemoryUsageChartTmpl = module.Chart{
+	nodeMemoryUsageChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_memory_usage",
 		Title:    "Node Memory Usage",
 		Units:    "bytes",
 		Fam:      "node mem",
 		Ctx:      "rabbitmq.node_memory_usage",
 		Priority: prioNodeMemoryUsage,
-		Type:     module.Area,
-		Dims: module.Dims{
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_mem_used", Name: "used"},
 		},
 	}
-	nodeDiskSpaceFreeSizeChartTmpl = module.Chart{
+	nodeDiskSpaceFreeSizeChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_disk_space_free_size",
 		Title:    "Node Disk Free Space",
 		Units:    "bytes",
 		Fam:      "node disk",
 		Ctx:      "rabbitmq.node_disk_space_free_size",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNodeDiskSpaceFreeSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_disk_free_bytes", Name: "free"},
 		},
 	}
-	nodeUptimeChartTmpl = module.Chart{
+	nodeUptimeChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_uptime",
 		Title:    "Node Uptime",
 		Units:    "seconds",
 		Fam:      "node uptime",
 		Ctx:      "rabbitmq.node_uptime",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioNodeUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "node_%s_uptime", Name: "uptime"},
 		},
 	}
 )
 
-var nodeClusterPeerChartsTmpl = module.Charts{
+var nodeClusterPeerChartsTmpl = collectorapi.Charts{
 	nodeClusterLinkPeerTrafficChartTmpl.Copy(),
 }
 
 var (
-	nodeClusterLinkPeerTrafficChartTmpl = module.Chart{
+	nodeClusterLinkPeerTrafficChartTmpl = collectorapi.Chart{
 		ID:       "node_%s_peer_%s_cluster_link_traffic",
 		Title:    "Node Cluster Link Peer Traffic",
 		Units:    "bytes/s",
 		Fam:      "node cluster link",
 		Ctx:      "rabbitmq.node_peer_cluster_link_traffic",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNodeClusterLinkPeerTraffic,
-		Dims: module.Dims{
-			{ID: "node_%s_peer_%s_cluster_link_recv_bytes", Name: "received", Algo: module.Incremental},
-			{ID: "node_%s_peer_%s_cluster_link_send_bytes", Name: "sent", Mul: -1, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "node_%s_peer_%s_cluster_link_recv_bytes", Name: "received", Algo: collectorapi.Incremental},
+			{ID: "node_%s_peer_%s_cluster_link_send_bytes", Name: "sent", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
 )
 
-var vhostChartsTmpl = module.Charts{
+var vhostChartsTmpl = collectorapi.Charts{
 	vhostStatusChartTmpl.Copy(),
 	vhostMessageCountChartTmpl.Copy(),
 	vhostMessagesRateChartTmpl.Copy(),
 }
 
 var (
-	vhostStatusChartTmpl = module.Chart{
+	vhostStatusChartTmpl = collectorapi.Chart{
 		ID:       "vhost_%s_status",
 		Title:    "Vhost Status",
 		Units:    "status",
 		Fam:      "vhost status",
 		Ctx:      "rabbitmq.vhost_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioVhostStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "vhost_%s_status_running", Name: "running"},
 			{ID: "vhost_%s_status_stopped", Name: "stopped"},
 			{ID: "vhost_%s_status_partial", Name: "partial"},
 		},
 	}
-	vhostMessageCountChartTmpl = module.Chart{
+	vhostMessageCountChartTmpl = collectorapi.Chart{
 		ID:       "vhost_%s_message_count",
 		Title:    "Vhost messages",
 		Units:    "messages",
 		Fam:      "vhost messages",
 		Ctx:      "rabbitmq.vhost_messages_count",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioVhostMessagesCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "vhost_%s_messages_ready", Name: "ready"},
 			{ID: "vhost_%s_messages_unacknowledged", Name: "unacknowledged"},
 		},
 	}
-	vhostMessagesRateChartTmpl = module.Chart{
+	vhostMessagesRateChartTmpl = collectorapi.Chart{
 		ID:       "vhost_%s_message_stats",
 		Title:    "Vhost messages rate",
 		Units:    "messages/s",
 		Fam:      "vhost messages",
 		Ctx:      "rabbitmq.vhost_messages_rate",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioVhostMessagesRate,
-		Dims: module.Dims{
-			{ID: "vhost_%s_message_stats_ack", Name: "ack", Algo: module.Incremental},
-			{ID: "vhost_%s_message_stats_confirm", Name: "confirm", Algo: module.Incremental},
-			{ID: "vhost_%s_message_stats_deliver", Name: "deliver", Algo: module.Incremental},
-			{ID: "vhost_%s_message_stats_get", Name: "get", Algo: module.Incremental},
-			{ID: "vhost_%s_message_stats_get_no_ack", Name: "get_no_ack", Algo: module.Incremental},
-			{ID: "vhost_%s_message_stats_publish", Name: "publish", Algo: module.Incremental},
-			{ID: "vhost_%s_message_stats_redeliver", Name: "redeliver", Algo: module.Incremental},
-			{ID: "vhost_%s_message_stats_return_unroutable", Name: "return_unroutable", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "vhost_%s_message_stats_ack", Name: "ack", Algo: collectorapi.Incremental},
+			{ID: "vhost_%s_message_stats_confirm", Name: "confirm", Algo: collectorapi.Incremental},
+			{ID: "vhost_%s_message_stats_deliver", Name: "deliver", Algo: collectorapi.Incremental},
+			{ID: "vhost_%s_message_stats_get", Name: "get", Algo: collectorapi.Incremental},
+			{ID: "vhost_%s_message_stats_get_no_ack", Name: "get_no_ack", Algo: collectorapi.Incremental},
+			{ID: "vhost_%s_message_stats_publish", Name: "publish", Algo: collectorapi.Incremental},
+			{ID: "vhost_%s_message_stats_redeliver", Name: "redeliver", Algo: collectorapi.Incremental},
+			{ID: "vhost_%s_message_stats_return_unroutable", Name: "return_unroutable", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
-var queueChartsTmpl = module.Charts{
+var queueChartsTmpl = collectorapi.Charts{
 	queueStatusChartTmpl.Copy(),
 	queueMessagesCountChartTmpl.Copy(),
 	queueMessagesRateChartTmpl.Copy(),
 }
 
 var (
-	queueStatusChartTmpl = module.Chart{
+	queueStatusChartTmpl = collectorapi.Chart{
 		ID:       "queue_%s_vhost_%s_node_%s_status",
 		Title:    "Queue status",
 		Units:    "status",
 		Fam:      "queue status",
 		Ctx:      "rabbitmq.queue_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioQueueStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "queue_%s_vhost_%s_node_%s_status_running", Name: "running"},
 			{ID: "queue_%s_vhost_%s_node_%s_status_down", Name: "down"},
 			{ID: "queue_%s_vhost_%s_node_%s_status_idle", Name: "idle"},
@@ -394,38 +394,38 @@ var (
 			{ID: "queue_%s_vhost_%s_node_%s_status_terminated", Name: "terminated"},
 		},
 	}
-	queueMessagesCountChartTmpl = module.Chart{
+	queueMessagesCountChartTmpl = collectorapi.Chart{
 		ID:       "queue_%s_vhost_%s_node_%s_message_count",
 		Title:    "Queue messages",
 		Units:    "messages",
 		Fam:      "queue messages",
 		Ctx:      "rabbitmq.queue_messages_count",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioQueueMessagesCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "queue_%s_vhost_%s_node_%s_messages_ready", Name: "ready"},
 			{ID: "queue_%s_vhost_%s_node_%s_messages_unacknowledged", Name: "unacknowledged"},
 			{ID: "queue_%s_vhost_%s_node_%s_messages_paged_out", Name: "paged_out"},
 			{ID: "queue_%s_vhost_%s_node_%s_messages_persistent", Name: "persistent"},
 		},
 	}
-	queueMessagesRateChartTmpl = module.Chart{
+	queueMessagesRateChartTmpl = collectorapi.Chart{
 		ID:       "queue_%s_vhost_%s_node_%s_message_stats",
 		Title:    "Queue messages rate",
 		Units:    "messages/s",
 		Fam:      "queue messages",
 		Ctx:      "rabbitmq.queue_messages_rate",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioQueueMessagesRate,
-		Dims: module.Dims{
-			{ID: "queue_%s_vhost_%s_node_%s_message_stats_ack", Name: "ack", Algo: module.Incremental},
-			{ID: "queue_%s_vhost_%s_node_%s_message_stats_confirm", Name: "confirm", Algo: module.Incremental},
-			{ID: "queue_%s_vhost_%s_node_%s_message_stats_deliver", Name: "deliver", Algo: module.Incremental},
-			{ID: "queue_%s_vhost_%s_node_%s_message_stats_get", Name: "get", Algo: module.Incremental},
-			{ID: "queue_%s_vhost_%s_node_%s_message_stats_get_no_ack", Name: "get_no_ack", Algo: module.Incremental},
-			{ID: "queue_%s_vhost_%s_node_%s_message_stats_publish", Name: "publish", Algo: module.Incremental},
-			{ID: "queue_%s_vhost_%s_node_%s_message_stats_redeliver", Name: "redeliver", Algo: module.Incremental},
-			{ID: "queue_%s_vhost_%s_node_%s_message_stats_return_unroutable", Name: "return_unroutable", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "queue_%s_vhost_%s_node_%s_message_stats_ack", Name: "ack", Algo: collectorapi.Incremental},
+			{ID: "queue_%s_vhost_%s_node_%s_message_stats_confirm", Name: "confirm", Algo: collectorapi.Incremental},
+			{ID: "queue_%s_vhost_%s_node_%s_message_stats_deliver", Name: "deliver", Algo: collectorapi.Incremental},
+			{ID: "queue_%s_vhost_%s_node_%s_message_stats_get", Name: "get", Algo: collectorapi.Incremental},
+			{ID: "queue_%s_vhost_%s_node_%s_message_stats_get_no_ack", Name: "get_no_ack", Algo: collectorapi.Incremental},
+			{ID: "queue_%s_vhost_%s_node_%s_message_stats_publish", Name: "publish", Algo: collectorapi.Incremental},
+			{ID: "queue_%s_vhost_%s_node_%s_message_stats_redeliver", Name: "redeliver", Algo: collectorapi.Incremental},
+			{ID: "queue_%s_vhost_%s_node_%s_message_stats_return_unroutable", Name: "return_unroutable", Algo: collectorapi.Incremental},
 		},
 	}
 )
@@ -488,7 +488,7 @@ func (c *Collector) addOverviewCharts() {
 	charts := overviewCharts.Copy()
 
 	for _, chart := range *charts {
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_id", Value: c.clusterId},
 			{Key: "cluster_name", Value: c.clusterName},
 		}
@@ -504,7 +504,7 @@ func (c *Collector) addNodeCharts(node *nodeCacheItem) {
 
 	for _, chart := range *charts {
 		chart.ID = cleanChartId(fmt.Sprintf(chart.ID, node.name))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_id", Value: c.clusterId},
 			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "node", Value: node.name},
@@ -529,7 +529,7 @@ func (c *Collector) addNodeClusterPeerCharts(peer *peerCacheItem) {
 
 	for _, chart := range *charts {
 		chart.ID = cleanChartId(fmt.Sprintf(chart.ID, peer.node, peer.name))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_id", Value: c.clusterId},
 			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "node", Value: peer.node},
@@ -556,7 +556,7 @@ func (c *Collector) addVhostCharts(vhost *vhostCacheItem) {
 
 	for _, chart := range *charts {
 		chart.ID = cleanChartId(fmt.Sprintf(chart.ID, vhost.name))
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_id", Value: c.clusterId},
 			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "vhost", Value: vhost.name},
@@ -582,7 +582,7 @@ func (c *Collector) addQueueCharts(q *queueCacheItem) {
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, q.name, q.vhost, q.node)
 		chart.ID = cleanChartId(chart.ID)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "cluster_id", Value: c.clusterId},
 			{Key: "cluster_name", Value: c.clusterName},
 			{Key: "node", Value: q.node},

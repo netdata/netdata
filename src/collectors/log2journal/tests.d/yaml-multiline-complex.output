@@ -1,0 +1,11 @@
+COMPLEX_QUOTES=Single quotes with 'embedded singles' and "escaped doubles"
+DATA=test complex data
+MESSAGE=Processed: 
+MULTILINE_FOLDED=This is a folded scalar that should be joined into a single line with spaces replacing newlines.
+
+MULTILINE_LITERAL=This is a literal scalar
+that preserves exact formatting
+including newlines and spacing.
+
+YAML_SPECIAL=Contains: colons, [brackets], {braces}, and | pipes
+

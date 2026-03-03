@@ -7,7 +7,7 @@ modules:
         name: Processor
         link: "https://learn.microsoft.com/en-us/windows-hardware/design/minimum/windows-processor-requirements"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -19,7 +19,6 @@ modules:
         - microsoft
         - processor
         - CPU
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -113,7 +112,7 @@ modules:
         name: Memory statistics
         link: "https://learn.microsoft.com/en-us/windows/win32/Memory/memory-management"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -123,7 +122,6 @@ modules:
       keywords:
         - memory
         - swap
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -216,7 +214,7 @@ modules:
         name: System statistics
         link: "https://learn.microsoft.com/en-us/windows/win32/procthread/processes-and-threads"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -227,7 +225,6 @@ modules:
         - process counts
         - threads
         - context switch
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -317,7 +314,7 @@ modules:
         name: Physical and Logical Disk Performance Metrics
         link: "https://learn.microsoft.com/en-us/windows/win32/fileio/disk-management"
         categories:
-          - data-collection.windows-systems
+          - data-collection.storage
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -331,7 +328,6 @@ modules:
         - volume
         - physical
         - logical
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -500,7 +496,7 @@ modules:
         name: Network Subsystem
         link: "https://learn.microsoft.com/en-us/windows/win32/networking"
         categories:
-          - data-collection.windows-systems
+          - data-collection.networking
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -514,7 +510,6 @@ modules:
         - udp
         - tcp
         - interface
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -824,7 +819,7 @@ modules:
         name: Semaphore statistics
         link: "https://learn.microsoft.com/en-us/windows/win32/sync/semaphore-objects"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -834,7 +829,6 @@ modules:
       keywords:
         - ipc
         - semaphores
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -916,7 +910,7 @@ modules:
         name: Hardware information collected from kernel ring.
         link: "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -926,7 +920,6 @@ modules:
       keywords:
         - cpu
         - temperature
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -998,7 +991,7 @@ modules:
         name: System thermal zone
         link: "https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/design-guide"
         categories:
-          - data-collection.windows-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -1008,7 +1001,6 @@ modules:
       keywords:
         - thermal
         - temperature
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1080,7 +1072,7 @@ modules:
         name: Power supply
         link: "https://learn.microsoft.com/en-us/windows/win32/power/power-management-portal"
         categories:
-          - data-collection.windows-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "powersupply.svg"
       related_resources:
         integrations:
@@ -1089,7 +1081,6 @@ modules:
         description: ""
       keywords:
         - power supply
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1173,7 +1164,7 @@ modules:
         name: Sensors
         link: "https://learn.microsoft.com/en-us/windows/win32/sensorsapi/portal"
         categories:
-          - data-collection.windows-systems
+          - data-collection.hardware-and-sensors
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -1183,7 +1174,6 @@ modules:
       keywords:
         - Sensors
         - Windows
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1399,7 +1389,7 @@ modules:
         name: IIS
         link: "https://www.iis.net/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.web-servers-and-proxies
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -1410,7 +1400,6 @@ modules:
         - IIS
         - HTTP
         - Web service
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -1716,7 +1705,7 @@ modules:
         name: Hyper-V
         link: "https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/about/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.containers-and-vms
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -1729,7 +1718,6 @@ modules:
         - hyperv
         - virtualization
         - vm
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2084,7 +2072,7 @@ modules:
         name: MS SQL Server
         link: "https://www.microsoft.com/en-us/sql-server/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.databases
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -2096,7 +2084,6 @@ modules:
         - microsoft
         - sql
         - queries
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2707,7 +2694,7 @@ modules:
         name: NET Framework
         link: "https://dotnet.microsoft.com/en-us/learn/dotnet/what-is-dotnet-framework"
         categories:
-          - data-collection.windows-systems
+          - data-collection.applications
         icon_filename: "dotnet.svg"
       related_resources:
         integrations:
@@ -2719,7 +2706,6 @@ modules:
         - microsoft
         - netframework
         - dotnet
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -2973,7 +2959,7 @@ modules:
         name: Active Directory
         link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview"
         categories:
-          - data-collection.windows-systems
+          - data-collection.applications
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -2985,7 +2971,6 @@ modules:
         - microsoft
         - active directory
         - ad
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3139,7 +3124,7 @@ modules:
         name: Active Directory Certificate Service
         link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-cs/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.applications
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3152,7 +3137,6 @@ modules:
         - active directory
         - adcs
         - ad
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3316,7 +3300,7 @@ modules:
         name: Active Directory Federation Service
         link: "https://learn.microsoft.com/en-us/windows-server/identity/ad-fs/ad-fs-overview"
         categories:
-          - data-collection.windows-systems
+          - data-collection.applications
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3329,7 +3313,6 @@ modules:
         - active directory
         - adfs
         - ad
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3594,7 +3577,7 @@ modules:
         name: Windows Services
         link: "https://learn.microsoft.com/en-us/dotnet/framework/windows-services/"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3605,7 +3588,6 @@ modules:
         - windows
         - microsoft
         - services
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3686,7 +3668,7 @@ modules:
         name: MS Exchange
         link: "https://www.microsoft.com/en-us/microsoft-365/exchange/email"
         categories:
-          - data-collection.windows-systems
+          - data-collection.applications
         icon_filename: "exchange.svg"
       related_resources:
         integrations:
@@ -3698,7 +3680,6 @@ modules:
         - microsoft
         - exchange
         - mail
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -3951,7 +3932,7 @@ modules:
         name: NUMA Architecture
         link: "https://learn.microsoft.com/en-us/windows/win32/procthread/numa-support"
         categories:
-          - data-collection.windows-systems
+          - data-collection.operating-systems
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -3962,7 +3943,6 @@ modules:
         - windows
         - NUMA
         - processor
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -4037,7 +4017,7 @@ modules:
         name: ASP.NET
         link: "https://dotnet.microsoft.com/en-us/apps/aspnet"
         categories:
-          - data-collection.windows-systems
+          - data-collection.web-servers-and-proxies
         icon_filename: "windows.svg"
       related_resources:
         integrations:
@@ -4048,7 +4028,6 @@ modules:
         - windows
         - ASP
         - webservice
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

@@ -1,0 +1,43 @@
+# Test logfmt pattern parsing
+pattern: logfmt
+
+inject:
+  - key: SOURCE
+    value: "logfmt-parser"
+
+rewrite:
+  # Convert level to uppercase
+  - key: LEVEL
+    match: "(.+)"
+    value: "${1^^}"  # Bash-style uppercase - may not work
+
+  # Alternative uppercase conversion
+  - key: LEVEL_UPPER
+    value: "${LEVEL}"
+    inject: yes
+
+  # Extract duration and convert to ms
+  - key: DURATION
+    match: "(\\d+)ms"
+    value: "${1}"
+
+  - key: DURATION
+    match: "(\\d+)s"
+    value: "${1}000"
+
+  # Build structured message
+  - key: STRUCTURED_MSG
+    value: "method=${METHOD} path=${PATH} status=${STATUS} duration=${DURATION}ms"
+    inject: yes
+
+rename:
+  - old_key: MSG
+    new_key: MESSAGE
+  - old_key: ERR
+    new_key: ERROR
+  - old_key: REQ_ID
+    new_key: REQUEST_ID
+
+filter:
+  include: "MESSAGE|ERROR|LEVEL|STATUS|METHOD|PATH|DURATION|STRUCTURED_MSG|LEVEL_UPPER|SOURCE|REQUEST_ID"
+  exclude: "password|token|secret"

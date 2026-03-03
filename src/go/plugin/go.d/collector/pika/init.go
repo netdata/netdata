@@ -8,7 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func (c *Collector) validateConfig() error {
@@ -42,6 +42,6 @@ func (c *Collector) initRedisClient() (*redis.Client, error) {
 	return redis.NewClient(opts), nil
 }
 
-func (c *Collector) initCharts() (*module.Charts, error) {
+func (c *Collector) initCharts() (*collectorapi.Charts, error) {
 	return pikaCharts.Copy(), nil
 }

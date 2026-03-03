@@ -9,15 +9,14 @@ modules:
         link: https://www.elastic.co/products/logstash
         icon_filename: elastic-logstash.svg
         categories:
-          - data-collection.logs-servers
+          - data-collection.applications
       keywords:
-        - logstatsh
+        - logstash
       related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

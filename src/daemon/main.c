@@ -220,6 +220,9 @@ int dyncfg_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
 int health_config_unittest(void);
+int utf8_sanitizer_unittest(void);
+int yaml_unittest(void);
+int json_c_parser_unittest(void);
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
@@ -372,6 +375,20 @@ int netdata_main(int argc, char **argv) {
                             return 0;
                         }
 
+                        if(strcmp(optarg, "jsonctest") == 0) {
+                            unittest_running = true;
+                            if (json_c_parser_unittest()) return 1;
+                            fprintf(stderr, "\n\nJSON-C PARSER TESTS PASSED\n\n");
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "yamltest") == 0) {
+                            unittest_running = true;
+                            if (yaml_unittest()) return 1;
+                            fprintf(stderr, "\n\nYAML TESTS PASSED\n\n");
+                            return 0;
+                        }
+                        
                         if(strcmp(optarg, "unittest") == 0) {
                             unittest_running = true;
 
@@ -403,12 +420,16 @@ int netdata_main(int argc, char **argv) {
                             if (dictionary_unittest(10000)) return 1;
                             if (aral_unittest(10000)) return 1;
                             if (rrdlabels_unittest()) return 1;
+                            if (rrdhost_labels_unittest()) return 1;
                             if (ctx_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
+                            if (utf8_sanitizer_unittest()) return 1;
                             if (health_config_unittest()) return 1;
+                            if (yaml_unittest()) return 1;
+                            if (json_c_parser_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
@@ -488,6 +509,10 @@ int netdata_main(int argc, char **argv) {
                             return perflibnamestest_main();
                         }
 #endif
+                        else if(strcmp(optarg, "utf8sanitizertest") == 0) {
+                            unittest_running = true;
+                            return utf8_sanitizer_unittest();
+                        }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             unittest_running = true;

@@ -30,15 +30,15 @@
 // # Let's say it's 259:0, Set a 10MB/s read and write limit
 // echo "259:0 rbps=10485760 wbps=10485760" | sudo tee /sys/fs/cgroup/slow-io/io.max
 
-use foundation::Timeout;
 use journal_engine::{
-    Facets, FileIndexCacheBuilder, FileIndexKey, QueryTimeRange, batch_compute_file_indexes,
+    Facets, FileIndexCacheBuilder, FileIndexKey, IndexingLimits, QueryTimeRange,
+    batch_compute_file_indexes,
 };
 use journal_index::FieldName;
 use journal_registry::{Monitor, Registry};
 use std::env;
 use std::path::PathBuf;
-use std::time::Duration;
+use tokio_util::sync::CancellationToken;
 
 #[allow(unused_imports)]
 use tracing::{info, warn};
@@ -109,19 +109,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs() as u32;
     let time_range = QueryTimeRange::new(now - 86400, now)?;
-    let timeout = Timeout::new(Duration::from_secs(60));
+    let cancellation = CancellationToken::new();
 
     info!(
-        "computing {} file indexes with timeout {:?}, bucket duration: {}s",
+        "computing {} file indexes, bucket duration: {}s",
         keys.len(),
-        timeout.remaining(),
         time_range.bucket_duration()
     );
 
     // Run batch indexing
     let start = std::time::Instant::now();
-    let responses =
-        batch_compute_file_indexes(&cache, &registry, keys, &time_range, timeout).await?;
+    let responses = batch_compute_file_indexes(
+        &cache,
+        &registry,
+        keys,
+        &time_range,
+        cancellation,
+        IndexingLimits::default(),
+        None,
+    )
+    .await?;
 
     let elapsed = start.elapsed();
 

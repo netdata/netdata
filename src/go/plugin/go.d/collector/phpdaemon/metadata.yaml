@@ -9,7 +9,7 @@ modules:
         link: https://github.com/kakserpom/phpdaemon
         icon_filename: php.svg
         categories:
-          - data-collection.apm
+          - data-collection.applications
       keywords:
         - phpdaemon
         - php
@@ -18,7 +18,6 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

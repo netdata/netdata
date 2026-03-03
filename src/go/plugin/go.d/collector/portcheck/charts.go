@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioCheckStatus = module.Priority + iota
+	prioCheckStatus = collectorapi.Priority + iota
 	prioCheckInStatusDuration
 	prioCheckLatency
 
@@ -18,76 +18,76 @@ const (
 	prioUDPCheckInStatusDuration
 )
 
-var tcpPortChartsTmpl = module.Charts{
+var tcpPortChartsTmpl = collectorapi.Charts{
 	tcpPortCheckStatusChartTmpl.Copy(),
 	tcpPortCheckInStateDurationChartTmpl.Copy(),
 	tcpPortCheckConnectionLatencyChartTmpl.Copy(),
 }
 
-var udpPortChartsTmpl = module.Charts{
+var udpPortChartsTmpl = collectorapi.Charts{
 	udpPortCheckStatusChartTmpl.Copy(),
 	udpPortCheckInStatusDurationChartTmpl.Copy(),
 }
 
 var (
-	tcpPortCheckStatusChartTmpl = module.Chart{
+	tcpPortCheckStatusChartTmpl = collectorapi.Chart{
 		ID:       "port_%d_status",
 		Title:    "TCP Check Status",
 		Units:    "boolean",
 		Fam:      "status",
 		Ctx:      "portcheck.status",
 		Priority: prioCheckStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "tcp_port_%d_success", Name: "success"},
 			{ID: "tcp_port_%d_failed", Name: "failed"},
 			{ID: "tcp_port_%d_timeout", Name: "timeout"},
 		},
 	}
-	tcpPortCheckInStateDurationChartTmpl = module.Chart{
+	tcpPortCheckInStateDurationChartTmpl = collectorapi.Chart{
 		ID:       "port_%d_current_state_duration",
 		Title:    "Current State Duration",
 		Units:    "seconds",
 		Fam:      "status duration",
 		Ctx:      "portcheck.state_duration",
 		Priority: prioCheckInStatusDuration,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "tcp_port_%d_current_state_duration", Name: "time"},
 		},
 	}
-	tcpPortCheckConnectionLatencyChartTmpl = module.Chart{
+	tcpPortCheckConnectionLatencyChartTmpl = collectorapi.Chart{
 		ID:       "port_%d_connection_latency",
 		Title:    "TCP Connection Latency",
 		Units:    "ms",
 		Fam:      "latency",
 		Ctx:      "portcheck.latency",
 		Priority: prioCheckLatency,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "tcp_port_%d_latency", Name: "time"},
 		},
 	}
 )
 
 var (
-	udpPortCheckStatusChartTmpl = module.Chart{
+	udpPortCheckStatusChartTmpl = collectorapi.Chart{
 		ID:       "udp_port_%d_check_status",
 		Title:    "UDP Port Check Status",
 		Units:    "status",
 		Fam:      "status",
 		Ctx:      "portcheck.udp_port_status",
 		Priority: prioUDPCheckStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "udp_port_%d_open_filtered", Name: "open/filtered"},
 			{ID: "udp_port_%d_closed", Name: "closed"},
 		},
 	}
-	udpPortCheckInStatusDurationChartTmpl = module.Chart{
+	udpPortCheckInStatusDurationChartTmpl = collectorapi.Chart{
 		ID:       "udp_port_%d_current_status_duration",
 		Title:    "UDP Port Current Status Duration",
 		Units:    "seconds",
 		Fam:      "status duration",
 		Ctx:      "portcheck.udp_port_status_duration",
 		Priority: prioUDPCheckInStatusDuration,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "udp_port_%d_current_status_duration", Name: "time"},
 		},
 	}
@@ -109,9 +109,9 @@ func (c *Collector) addUDPPortCharts(port *udpPort) {
 	}
 }
 
-func newPortCharts(host string, port int, charts *module.Charts) *module.Charts {
+func newPortCharts(host string, port int, charts *collectorapi.Charts) *collectorapi.Charts {
 	for _, chart := range *charts {
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "host", Value: host},
 			{Key: "port", Value: strconv.Itoa(port)},
 		}

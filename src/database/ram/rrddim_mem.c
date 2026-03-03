@@ -38,6 +38,7 @@ struct mem_metric_handle {
     time_t last_updated_s;
     time_t update_every_s;
 
+    UUIDMAP_ID uuid_id;             // stored locally so cleanup doesn't need rd
     REFCOUNT refcount;
 };
 
@@ -66,6 +67,7 @@ STORAGE_METRIC_HANDLE *rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
         if(!mh) {
             mh = callocz(1, sizeof(struct mem_metric_handle));
             mh->rd = rd;
+            mh->uuid_id = rd->uuid;
             mh->refcount = 1;
             update_metric_handle_from_rrddim(mh, rd);
             *PValue = mh;
@@ -132,11 +134,10 @@ void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh) {
         // we can delete it
 
         int64_t judy_mem = 0;
-        RRDDIM *rd = mh->rd;
         netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
         {
             JudyAllocThreadPulseReset();
-            JudyLDel(&rrddim_Judy_array, rd->uuid, PJE0);
+            JudyLDel(&rrddim_Judy_array, mh->uuid_id, PJE0);
             judy_mem = JudyAllocThreadPulseGetAndReset();
         }
         netdata_rwlock_wrunlock(&rrddim_Judy_rwlock);
@@ -153,6 +154,7 @@ bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si __maybe_unused, nd_uui
 
     *first_entry_s = rrddim_query_oldest_time_s(smh);
     *last_entry_s = rrddim_query_latest_time_s(smh);
+    rrddim_metric_release(smh);
 
     return true;
 }
@@ -164,6 +166,7 @@ bool rrddim_metric_retention_by_id(STORAGE_INSTANCE *si __maybe_unused, UUIDMAP_
 
     *first_entry_s = rrddim_query_oldest_time_s(smh);
     *last_entry_s = rrddim_query_latest_time_s(smh);
+    rrddim_metric_release(smh);
 
     return true;
 }

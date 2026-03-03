@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
 )
 
@@ -321,7 +321,7 @@ func (c *Collector) addDimToChart(chartID, dimID, dimName string) {
 		return
 	}
 
-	dim := &Dim{ID: dimID, Name: dimName, Algo: module.Incremental}
+	dim := &Dim{ID: dimID, Name: dimName, Algo: collectorapi.Incremental}
 
 	if err := chart.AddDim(dim); err != nil {
 		c.Warningf("add '%s' dim: %v", dimID, err)

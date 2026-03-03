@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"github.com/miekg/dns"
 )
@@ -66,8 +66,8 @@ func (c *Collector) initRecordTypes() (map[string]uint16, error) {
 	return types, nil
 }
 
-func (c *Collector) initCharts() (*module.Charts, error) {
-	charts := module.Charts{}
+func (c *Collector) initCharts() (*collectorapi.Charts, error) {
+	charts := collectorapi.Charts{}
 
 	for _, srv := range c.Servers {
 		for _, rtype := range c.RecordTypes {

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioClusterStatus = module.Priority + iota
+	prioClusterStatus = collectorapi.Priority + iota
 	prioClusterHostsCount
 	prioClusterMonitorsCount
 	prioClusterOSDsCount
@@ -47,7 +47,7 @@ const (
 	prioPoolIOPS
 )
 
-var clusterCharts = module.Charts{
+var clusterCharts = collectorapi.Charts{
 	clusterStatusChart.Copy(),
 	clusterHostsCountChart.Copy(),
 	clusterMonitorsCountChart.Copy(),
@@ -73,7 +73,7 @@ var clusterCharts = module.Charts{
 	clusterScrubStatusChart.Copy(),
 }
 
-var osdChartsTmpl = module.Charts{
+var osdChartsTmpl = collectorapi.Charts{
 	osdStatusChartTmpl.Copy(),
 	osdSpaceUsageChartTmpl.Copy(),
 	osdIOChartTmpl.Copy(),
@@ -81,7 +81,7 @@ var osdChartsTmpl = module.Charts{
 	osdLatencyChartTmpl.Copy(),
 }
 
-var poolChartsTmpl = module.Charts{
+var poolChartsTmpl = collectorapi.Charts{
 	poolSpaceUtilizationChartTmpl.Copy(),
 	poolSpaceUsageChartTmpl.Copy(),
 	poolObjectsCountChartTmpl.Copy(),
@@ -90,117 +90,117 @@ var poolChartsTmpl = module.Charts{
 }
 
 var (
-	clusterStatusChart = module.Chart{
+	clusterStatusChart = collectorapi.Chart{
 		ID:       "cluster_status",
 		Title:    "Ceph Cluster Status",
 		Fam:      "status",
 		Units:    "status",
 		Ctx:      "ceph.cluster_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "health_ok", Name: "ok"},
 			{ID: "health_err", Name: "err"},
 			{ID: "health_warn", Name: "warn"},
 		},
 	}
-	clusterHostsCountChart = module.Chart{
+	clusterHostsCountChart = collectorapi.Chart{
 		ID:       "cluster_hosts_count",
 		Title:    "Ceph Cluster Hosts",
 		Fam:      "status",
 		Units:    "hosts",
 		Ctx:      "ceph.cluster_hosts_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterHostsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "hosts_num", Name: "hosts"},
 		},
 	}
-	clusterMonitorsCountChart = module.Chart{
+	clusterMonitorsCountChart = collectorapi.Chart{
 		ID:       "cluster_monitors_count",
 		Title:    "Ceph Cluster Monitors",
 		Fam:      "status",
 		Units:    "monitors",
 		Ctx:      "ceph.cluster_monitors_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterMonitorsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "monitors_num", Name: "monitors"},
 		},
 	}
-	clusterOsdsCountChart = module.Chart{
+	clusterOsdsCountChart = collectorapi.Chart{
 		ID:       "cluster_osds_count",
 		Title:    "Ceph Cluster OSDs",
 		Fam:      "status",
 		Units:    "osds",
 		Ctx:      "ceph.cluster_osds_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterOSDsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "osds_num", Name: "osds"},
 		},
 	}
-	clusterOsdsByStatusCountChart = module.Chart{
+	clusterOsdsByStatusCountChart = collectorapi.Chart{
 		ID:       "cluster_osds_by_status_count",
 		Title:    "Ceph Cluster OSDs by Status",
 		Fam:      "status",
 		Units:    "osds",
 		Ctx:      "ceph.cluster_osds_by_status_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterOSDsByStatusCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "osds_up_num", Name: "up"},
 			{ID: "osds_down_num", Name: "down"},
 			{ID: "osds_in_num", Name: "in"},
 			{ID: "osds_out_num", Name: "out"},
 		},
 	}
-	clusterManagersCountChart = module.Chart{
+	clusterManagersCountChart = collectorapi.Chart{
 		ID:       "cluster_managers_count",
 		Title:    "Ceph Cluster Managers",
 		Fam:      "status",
 		Units:    "managers",
 		Ctx:      "ceph.cluster_managers_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterManagersCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "mgr_active_num", Name: "active"},
 			{ID: "mgr_standby_num", Name: "standby"},
 		},
 	}
-	clusterObjectGatewaysCountChart = module.Chart{
+	clusterObjectGatewaysCountChart = collectorapi.Chart{
 		ID:       "cluster_object_gateways_count",
 		Title:    "Ceph Cluster Object Gateways (RGW)",
 		Fam:      "status",
 		Units:    "gateways",
 		Ctx:      "ceph.cluster_object_gateways_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterObjectGatewaysCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "rgw_num", Name: "object"},
 		},
 	}
-	clusterIScsiGatewaysCountChart = module.Chart{
+	clusterIScsiGatewaysCountChart = collectorapi.Chart{
 		ID:       "cluster_iscsi_gateways_count",
 		Title:    "Ceph Cluster iSCSI Gateways",
 		Fam:      "status",
 		Units:    "gateways",
 		Ctx:      "ceph.cluster_iscsi_gateways_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterIScsiGatewaysCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "iscsi_daemons_num", Name: "iscsi"},
 		},
 	}
-	clusterIScsiGatewaysByStatusCountChart = module.Chart{
+	clusterIScsiGatewaysByStatusCountChart = collectorapi.Chart{
 		ID:       "cluster_iscsi_gateways_by_status_count",
 		Title:    "Ceph Cluster iSCSI Gateways by Status",
 		Fam:      "status",
 		Units:    "gateways",
 		Ctx:      "ceph.cluster_iscsi_gateways_by_status_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterIScsiGatewaysByStatusCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "iscsi_daemons_up_num", Name: "up"},
 			{ID: "iscsi_daemons_down_num", Name: "down"},
 		},
@@ -208,159 +208,159 @@ var (
 )
 
 var (
-	clusterPhysCapacityUtilizationChart = module.Chart{
+	clusterPhysCapacityUtilizationChart = collectorapi.Chart{
 		ID:       "cluster_physical_capacity_utilization",
 		Title:    "Ceph Cluster Physical Capacity Utilization",
 		Fam:      "capacity",
 		Units:    "percent",
 		Ctx:      "ceph.cluster_physical_capacity_utilization",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioClusterPhysCapacityUtilization,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "raw_capacity_utilization", Name: "utilization", Div: precision},
 		},
 	}
-	clusterPhysCapacityUsageChart = module.Chart{
+	clusterPhysCapacityUsageChart = collectorapi.Chart{
 		ID:       "cluster_physical_capacity_usage",
 		Title:    "Ceph Cluster Physical Capacity Usage",
 		Fam:      "capacity",
 		Units:    "bytes",
 		Ctx:      "ceph.cluster_physical_capacity_usage",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioClusterPhysCapacityUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "raw_capacity_avail_bytes", Name: "avail"},
 			{ID: "raw_capacity_used_bytes", Name: "used"},
 		},
 	}
-	clusterObjectsCountChart = module.Chart{
+	clusterObjectsCountChart = collectorapi.Chart{
 		ID:       "cluster_objects_count",
 		Title:    "Ceph Cluster Objects",
 		Fam:      "capacity",
 		Units:    "objects",
 		Ctx:      "ceph.cluster_objects_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterObjectsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "objects_num", Name: "objects"},
 		},
 	}
-	clusterObjectsByStatusPercentChart = module.Chart{
+	clusterObjectsByStatusPercentChart = collectorapi.Chart{
 		ID:       "cluster_objects_by_status",
 		Title:    "Ceph Cluster Objects by Status",
 		Fam:      "capacity",
 		Units:    "percent",
 		Ctx:      "ceph.cluster_objects_by_status_distribution",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioClusterObjectsByStatusPercent,
-		Dims: module.Dims{
-			{ID: "objects_healthy_num", Name: "healthy", Algo: module.PercentOfAbsolute},
-			{ID: "objects_misplaced_num", Name: "misplaced", Algo: module.PercentOfAbsolute},
-			{ID: "objects_degraded_num", Name: "degraded", Algo: module.PercentOfAbsolute},
-			{ID: "objects_unfound_num", Name: "unfound", Algo: module.PercentOfAbsolute},
+		Dims: collectorapi.Dims{
+			{ID: "objects_healthy_num", Name: "healthy", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "objects_misplaced_num", Name: "misplaced", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "objects_degraded_num", Name: "degraded", Algo: collectorapi.PercentOfAbsolute},
+			{ID: "objects_unfound_num", Name: "unfound", Algo: collectorapi.PercentOfAbsolute},
 		},
 	}
-	clusterPoolsCountChart = module.Chart{
+	clusterPoolsCountChart = collectorapi.Chart{
 		ID:       "cluster_pools_count",
 		Title:    "Ceph Cluster Pools",
 		Fam:      "capacity",
 		Units:    "pools",
 		Ctx:      "ceph.cluster_pools_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterPoolsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "pools_num", Name: "pools"},
 		},
 	}
-	clusterPGsCountChart = module.Chart{
+	clusterPGsCountChart = collectorapi.Chart{
 		ID:       "cluster_pgs_count",
 		Title:    "Ceph Cluster Placement Groups",
 		Fam:      "capacity",
 		Units:    "pgs",
 		Ctx:      "ceph.cluster_pgs_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterPGsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "pgs_num", Name: "pgs"},
 		},
 	}
-	clusterPGsByStatusCountChart = module.Chart{
+	clusterPGsByStatusCountChart = collectorapi.Chart{
 		ID:       "cluster_pgs_by_status_count",
 		Title:    "Ceph Cluster Placement Groups by Status",
 		Fam:      "capacity",
 		Units:    "pgs",
 		Ctx:      "ceph.cluster_pgs_by_status_count",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioClusterPGsByStatusCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "pg_status_category_clean", Name: "clean"},
 			{ID: "pg_status_category_working", Name: "working"},
 			{ID: "pg_status_category_warning", Name: "warning"},
 			{ID: "pg_status_category_unknown", Name: "unknown"},
 		},
 	}
-	clusterPgsPerOsdCountChart = module.Chart{
+	clusterPgsPerOsdCountChart = collectorapi.Chart{
 		ID:       "cluster_pgs_per_osd_count",
 		Title:    "Ceph Cluster Placement Groups per OSD",
 		Fam:      "capacity",
 		Units:    "pgs",
 		Ctx:      "ceph.cluster_pgs_per_osd_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterPGsPerOsdCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "pgs_per_osd", Name: "per_osd"},
 		},
 	}
 )
 
 var (
-	clusterClientIOChart = module.Chart{
+	clusterClientIOChart = collectorapi.Chart{
 		ID:       "cluster_client_io",
 		Title:    "Ceph Cluster Client IO",
 		Fam:      "performance",
 		Units:    "bytes/s",
 		Ctx:      "ceph.cluster_client_io",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioClusterClientIO,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "client_perf_read_bytes_sec", Name: "read"},
 			{ID: "client_perf_write_bytes_sec", Name: "written", Mul: -1},
 		},
 	}
-	clusterClientIOPSChart = module.Chart{
+	clusterClientIOPSChart = collectorapi.Chart{
 		ID:       "cluster_client_iops",
 		Title:    "Ceph Cluster Client IOPS",
 		Fam:      "performance",
 		Units:    "ops/s",
 		Ctx:      "ceph.cluster_client_iops",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterClientIOPS,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "client_perf_read_op_per_sec", Name: "read"},
 			{ID: "client_perf_write_op_per_sec", Name: "write", Mul: -1},
 		},
 	}
-	clusterRecoveryThroughputChart = module.Chart{
+	clusterRecoveryThroughputChart = collectorapi.Chart{
 		ID:       "cluster_recovery_throughput",
 		Title:    "Ceph Cluster Recovery Throughput",
 		Fam:      "performance",
 		Units:    "bytes/s",
 		Ctx:      "ceph.cluster_recovery_throughput",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterClientRecoveryThroughput,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "client_perf_recovering_bytes_per_sec", Name: "recovery"},
 		},
 	}
-	clusterScrubStatusChart = module.Chart{
+	clusterScrubStatusChart = collectorapi.Chart{
 		ID:       "cluster_scrub_status",
 		Title:    "Ceph Cluster Scrubbing Status",
 		Fam:      "performance",
 		Units:    "status",
 		Ctx:      "ceph.cluster_scrub_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioClusterScrubStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "scrub_status_disabled", Name: "disabled"},
 			{ID: "scrub_status_active", Name: "active"},
 			{ID: "scrub_status_inactive", Name: "inactive"},
@@ -369,69 +369,69 @@ var (
 )
 
 var (
-	osdStatusChartTmpl = module.Chart{
+	osdStatusChartTmpl = collectorapi.Chart{
 		ID:       "osd_%s_status",
 		Title:    "Ceph OSD Status",
 		Fam:      "osd",
 		Units:    "status",
 		Ctx:      "ceph.osd_status",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioOsdStatus,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "osd_%s_status_up", Name: "up"},
 			{ID: "osd_%s_status_down", Name: "down"},
 			{ID: "osd_%s_status_in", Name: "in"},
 			{ID: "osd_%s_status_out", Name: "out"},
 		},
 	}
-	osdSpaceUsageChartTmpl = module.Chart{
+	osdSpaceUsageChartTmpl = collectorapi.Chart{
 		ID:       "osd_%s_space_usage",
 		Title:    "Ceph OSD Space Usage",
 		Fam:      "osd",
 		Units:    "bytes",
 		Ctx:      "ceph.osd_space_usage",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioOsdSpaceUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "osd_%s_space_avail_bytes", Name: "avail"},
 			{ID: "osd_%s_space_used_bytes", Name: "used"},
 		},
 	}
-	osdIOChartTmpl = module.Chart{
+	osdIOChartTmpl = collectorapi.Chart{
 		ID:       "osd_%s_io",
 		Title:    "Ceph OSD IO",
 		Fam:      "osd",
 		Units:    "bytes/s",
 		Ctx:      "ceph.osd_io",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioOsdIO,
-		Dims: module.Dims{
-			{ID: "osd_%s_read_bytes", Name: "read", Algo: module.Incremental},
-			{ID: "osd_%s_written_bytes", Name: "written", Algo: module.Incremental, Mul: -1},
+		Dims: collectorapi.Dims{
+			{ID: "osd_%s_read_bytes", Name: "read", Algo: collectorapi.Incremental},
+			{ID: "osd_%s_written_bytes", Name: "written", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	}
-	osdIOPSChartTmpl = module.Chart{
+	osdIOPSChartTmpl = collectorapi.Chart{
 		ID:       "osd_%s_iops",
 		Title:    "Ceph OSD IOPS",
 		Fam:      "osd",
 		Units:    "ops/s",
 		Ctx:      "ceph.osd_iops",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioOsdIOPS,
-		Dims: module.Dims{
-			{ID: "osd_%s_read_ops", Name: "read", Algo: module.Incremental},
-			{ID: "osd_%s_write_ops", Name: "write", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "osd_%s_read_ops", Name: "read", Algo: collectorapi.Incremental},
+			{ID: "osd_%s_write_ops", Name: "write", Algo: collectorapi.Incremental},
 		},
 	}
-	osdLatencyChartTmpl = module.Chart{
+	osdLatencyChartTmpl = collectorapi.Chart{
 		ID:       "osd_%s_latency",
 		Title:    "Ceph OSD Latency",
 		Fam:      "osd",
 		Units:    "milliseconds",
 		Ctx:      "ceph.osd_latency",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioOsdLatency,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "osd_%s_commit_latency_ms", Name: "commit"},
 			{ID: "osd_%s_apply_latency_ms", Name: "apply"},
 		},
@@ -439,67 +439,67 @@ var (
 )
 
 var (
-	poolSpaceUtilizationChartTmpl = module.Chart{
+	poolSpaceUtilizationChartTmpl = collectorapi.Chart{
 		ID:       "pool_%s_space_utilization",
 		Title:    "Ceph Pool Space Utilization",
 		Fam:      "pool",
 		Units:    "percent",
 		Ctx:      "ceph.pool_space_utilization",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioPoolSpaceUtilization,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "pool_%s_space_utilization", Name: "utilization", Div: precision},
 		},
 	}
-	poolSpaceUsageChartTmpl = module.Chart{
+	poolSpaceUsageChartTmpl = collectorapi.Chart{
 		ID:       "pool_%s_space_usage",
 		Title:    "Ceph Pool Space Usage",
 		Fam:      "pool",
 		Units:    "bytes",
 		Ctx:      "ceph.pool_space_usage",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioPoolSpaceUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "pool_%s_space_avail_bytes", Name: "avail"},
 			{ID: "pool_%s_space_used_bytes", Name: "used"},
 		},
 	}
-	poolObjectsCountChartTmpl = module.Chart{
+	poolObjectsCountChartTmpl = collectorapi.Chart{
 		ID:       "pool_%s_objects_count",
 		Title:    "Ceph Pool Objects",
 		Fam:      "pool",
 		Units:    "objects",
 		Ctx:      "ceph.pool_objects_count",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPoolObjectsCount,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "pool_%s_objects", Name: "objects"},
 		},
 	}
-	poolIOChartTmpl = module.Chart{
+	poolIOChartTmpl = collectorapi.Chart{
 		ID:       "pool_%s_io",
 		Title:    "Ceph Pool IO",
 		Fam:      "pool",
 		Units:    "bytes/s",
 		Ctx:      "ceph.pool_io",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioPoolIO,
-		Dims: module.Dims{
-			{ID: "pool_%s_read_bytes", Name: "read", Algo: module.Incremental},
-			{ID: "pool_%s_written_bytes", Name: "written", Algo: module.Incremental, Mul: -1},
+		Dims: collectorapi.Dims{
+			{ID: "pool_%s_read_bytes", Name: "read", Algo: collectorapi.Incremental},
+			{ID: "pool_%s_written_bytes", Name: "written", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	}
-	poolIOPSChartTmpl = module.Chart{
+	poolIOPSChartTmpl = collectorapi.Chart{
 		ID:       "pool_%s_iops",
 		Title:    "Ceph Pool IOPS",
 		Fam:      "pool",
 		Units:    "ops/s",
 		Ctx:      "ceph.pool_iops",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioPoolIOPS,
-		Dims: module.Dims{
-			{ID: "pool_%s_read_ops", Name: "read", Algo: module.Incremental},
-			{ID: "pool_%s_write_ops", Name: "write", Algo: module.Incremental, Mul: -1},
+		Dims: collectorapi.Dims{
+			{ID: "pool_%s_read_ops", Name: "read", Algo: collectorapi.Incremental},
+			{ID: "pool_%s_write_ops", Name: "write", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	}
 )
@@ -508,7 +508,7 @@ func (c *Collector) addClusterCharts() {
 	charts := clusterCharts.Copy()
 
 	for _, chart := range *charts {
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "fsid", Value: c.fsid},
 		}
 	}
@@ -524,7 +524,7 @@ func (c *Collector) addOsdCharts(osdUuid, devClass, osdName string) {
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, osdUuid)
 		chart.ID = cleanChartID(chart.ID)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "fsid", Value: c.fsid},
 			{Key: "osd_uuid", Value: osdUuid},
 			{Key: "osd_name", Value: osdName},
@@ -546,7 +546,7 @@ func (c *Collector) addPoolCharts(poolName string) {
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, poolName)
 		chart.ID = cleanChartID(chart.ID)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "fsid", Value: c.fsid},
 			{Key: "pool_name", Value: poolName},
 		}

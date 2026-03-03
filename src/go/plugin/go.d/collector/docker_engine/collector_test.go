@@ -14,7 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 var (
@@ -41,7 +41,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Cleanup(t *testing.T) {
@@ -258,7 +258,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			require.NotNil(t, mx)
 			require.Equal(t, test.expected, mx)
-			module.TestMetricsHasAllChartsDims(t, pulsar.Charts(), mx)
+			collecttest.TestMetricsHasAllChartsDims(t, pulsar.Charts(), mx)
 		})
 	}
 }

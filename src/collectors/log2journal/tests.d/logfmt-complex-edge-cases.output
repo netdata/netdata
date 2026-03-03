@@ -1,0 +1,11 @@
+BOOLEAN=true
+LEVEL=info
+MSG=Server started
+NUMBER=42.5
+PORT=8080
+QUOTED_SPACES=hello world
+SPECIAL_CHARS=key=value&data
+SYSLOG_IDENTIFIER=logfmt-app
+TAGS=web,api
+TIMEOUT=30s
+

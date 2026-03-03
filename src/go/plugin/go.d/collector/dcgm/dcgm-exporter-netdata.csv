@@ -1,0 +1,1272 @@
+# Netdata recommended dcgm-exporter profile.
+#
+# Usage:
+#   dcgm-exporter -f /path/to/dcgm-exporter-netdata.csv
+#
+# Keep exporter interval aligned with Netdata update_every.
+# Example:
+#   dcgm-exporter -f /path/to/dcgm-exporter-netdata.csv -c 30000
+#
+# This file documents all known DCGM fields (623 in current source dataset).
+# Exactly 123 fields are enabled by default below (127 max per field group).
+# To enable a different field, uncomment one line and comment another enabled line.
+#
+# IMPORTANT: Fields with DCGM_FT_BINARY type (structs/blobs) MUST remain disabled.
+# They return non-numeric values that break Prometheus metric parsing.
+# Known BINARY fields: ACCOUNTING_DATA, COMPUTE_PIDS, CREATABLE_VGPU_TYPE_IDS,
+# ENC_STATS, FBC_SESSIONS_INFO, FBC_STATS, GRAPHICS_PIDS, SUPPORTED_CLOCKS,
+# SUPPORTED_TYPE_INFO, VGPU_ENC_SESSIONS_INFO, VGPU_ENC_STATS,
+# VGPU_FBC_SESSIONS_INFO, VGPU_FBC_STATS, VGPU_INSTANCE_IDS,
+# VGPU_PER_PROCESS_UTILIZATION, VGPU_UTILIZATIONS, GPU_TOPOLOGY_AFFINITY,
+# GPU_TOPOLOGY_NVLINK, GPU_TOPOLOGY_PCI, SYNC_BOOST
+#
+# Format:
+# DCGM FIELD, Prometheus metric type, help message
+
+# context=dcgm.exporter.health.status family=exporter health dimension=bind_unbind_event
+# DCGM_FI_BIND_UNBIND_EVENT, gauge, Bind unbind event
+# context=dcgm.exporter.inventory.software family=exporter inventory dimension=cuda_driver_version
+DCGM_FI_CUDA_DRIVER_VERSION, label, Cuda driver version
+# context=dcgm.gpu.workload.sessions family=gpu workload dimension=accounting_data
+# DCGM_FI_DEV_ACCOUNTING_DATA, gauge, Accounting data
+# context=dcgm.gpu.clock.frequency family=gpu clock dimension=app_mem_clock
+DCGM_FI_DEV_APP_MEM_CLOCK, gauge, App mem clock
+# context=dcgm.gpu.clock.frequency family=gpu clock dimension=app_sm_clock
+DCGM_FI_DEV_APP_SM_CLOCK, gauge, App sm clock
+# context=dcgm.gpu.state.configuration family=gpu state dimension=autoboost
+# DCGM_FI_DEV_AUTOBOOST, gauge, Autoboost
+# context=dcgm.gpu.reliability.memory_health family=gpu reliability dimension=banks_remap_rows_avail_high
+# DCGM_FI_DEV_BANKS_REMAP_ROWS_AVAIL_HIGH, gauge, Banks remap rows avail high
+# context=dcgm.gpu.reliability.memory_health family=gpu reliability dimension=banks_remap_rows_avail_low
+# DCGM_FI_DEV_BANKS_REMAP_ROWS_AVAIL_LOW, gauge, Banks remap rows avail low
+# context=dcgm.gpu.reliability.memory_health family=gpu reliability dimension=banks_remap_rows_avail_max
+# DCGM_FI_DEV_BANKS_REMAP_ROWS_AVAIL_MAX, gauge, Banks remap rows avail max
+# context=dcgm.gpu.reliability.memory_health family=gpu reliability dimension=banks_remap_rows_avail_none
+# DCGM_FI_DEV_BANKS_REMAP_ROWS_AVAIL_NONE, gauge, Banks remap rows avail none
+# context=dcgm.gpu.reliability.memory_health family=gpu reliability dimension=banks_remap_rows_avail_partial
+# DCGM_FI_DEV_BANKS_REMAP_ROWS_AVAIL_PARTIAL, gauge, Banks remap rows avail partial
+# context=dcgm.gpu.memory.bar1_usage family=gpu memory dimension=free
+DCGM_FI_DEV_BAR1_FREE, gauge, Bar1 free
+# context=dcgm.gpu.memory.bar1_capacity family=gpu memory dimension=total
+DCGM_FI_DEV_BAR1_TOTAL, gauge, Bar1 total
+# context=dcgm.gpu.memory.bar1_usage family=gpu memory dimension=used
+DCGM_FI_DEV_BAR1_USED, gauge, Bar1 used
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=board_limit_violation
+# DCGM_FI_DEV_BOARD_LIMIT_VIOLATION, counter, Board limit violation
+# context=dcgm.gpu.inventory.identity family=gpu inventory dimension=brand
+DCGM_FI_DEV_BRAND, label, Brand
+# context=dcgm.gpu.interconnect.state family=gpu interconnect/overview dimension=c2c_link
+# DCGM_FI_DEV_C2C_LINK_COUNT, counter, C2c link count
+# context=dcgm.gpu.interconnect.error_rate family=gpu interconnect/overview dimension=c2c_link_error_intr
+# DCGM_FI_DEV_C2C_LINK_ERROR_INTR, counter, C2c link error intr
+# context=dcgm.gpu.interconnect.error_rate family=gpu interconnect/overview dimension=c2c_link_error_replay
+# DCGM_FI_DEV_C2C_LINK_ERROR_REPLAY, counter, C2c link error replay
+# context=dcgm.gpu.interconnect.error_rate family=gpu interconnect/overview dimension=c2c_link_error_replay_b2b
+# DCGM_FI_DEV_C2C_LINK_ERROR_REPLAY_B2B, counter, C2c link error replay b2b
+# context=dcgm.gpu.interconnect.state family=gpu interconnect/overview dimension=c2c_link_power_state
+# DCGM_FI_DEV_C2C_LINK_POWER_STATE, gauge, C2c link power state
+# context=dcgm.gpu.interconnect.state family=gpu interconnect/overview dimension=c2c_link_status
+# DCGM_FI_DEV_C2C_LINK_STATUS, gauge, C2c link status
+# context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_max_bandwidth
+# DCGM_FI_DEV_C2C_MAX_BANDWIDTH, gauge, C2c max bandwidth
+# context=dcgm.gpu.capability.support family=gpu capability dimension=cc_mode
+# DCGM_FI_DEV_CC_MODE, gauge, Cc mode
+# Legacy name in older stacks: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS.
+# context=dcgm.gpu.throttle.reasons family=gpu throttle dimension=clocks_event_reasons
+DCGM_FI_DEV_CLOCKS_EVENT_REASONS, gauge, Clocks event reasons
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=hw_power_brake_slowdown
+DCGM_FI_DEV_CLOCKS_EVENT_REASON_HW_POWER_BRAKE_SLOWDOWN_NS, counter, Clocks event reason hw power brake slowdown ns
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=hw_therm_slowdown
+DCGM_FI_DEV_CLOCKS_EVENT_REASON_HW_THERM_SLOWDOWN_NS, counter, Clocks event reason hw therm slowdown ns
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=sw_power_cap
+DCGM_FI_DEV_CLOCKS_EVENT_REASON_SW_POWER_CAP_NS, counter, Clocks event reason sw power cap ns
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=sw_therm_slowdown
+DCGM_FI_DEV_CLOCKS_EVENT_REASON_SW_THERM_SLOWDOWN_NS, counter, Clocks event reason sw therm slowdown ns
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=sync_boost
+# DCGM_FI_DEV_CLOCKS_EVENT_REASON_SYNC_BOOST_NS, counter, Clocks event reason sync boost ns
+# context=dcgm.gpu.state.configuration family=gpu state dimension=compute_mode
+DCGM_FI_DEV_COMPUTE_MODE, gauge, Compute mode
+# context=dcgm.gpu.interconnect.connectx.link family=gpu interconnect/pcie dimension=connectx_active_pcie_link_speed
+# DCGM_FI_DEV_CONNECTX_ACTIVE_PCIE_LINK_SPEED, gauge, Connectx active pcie link speed
+# context=dcgm.gpu.interconnect.pcie.link.width family=gpu interconnect/pcie dimension=connectx_active_pcie_link_width
+# DCGM_FI_DEV_CONNECTX_ACTIVE_PCIE_LINK_WIDTH, gauge, Connectx active pcie link width
+# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect/pcie dimension=connectx_correctable_err_mask
+# DCGM_FI_DEV_CONNECTX_CORRECTABLE_ERR_MASK, gauge, Connectx correctable err mask
+# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect/pcie dimension=connectx_correctable_err_status
+# DCGM_FI_DEV_CONNECTX_CORRECTABLE_ERR_STATUS, gauge, Connectx correctable err status
+# context=dcgm.gpu.thermal.temperature family=gpu thermal dimension=connectx_device_temperature
+# DCGM_FI_DEV_CONNECTX_DEVICE_TEMPERATURE, gauge, Connectx device temperature
+# context=dcgm.gpu.interconnect.connectx.link family=gpu interconnect/pcie dimension=connectx_expect_pcie_link_speed
+# DCGM_FI_DEV_CONNECTX_EXPECT_PCIE_LINK_SPEED, gauge, Connectx expect pcie link speed
+# context=dcgm.gpu.interconnect.pcie.link.width family=gpu interconnect/pcie dimension=connectx_expect_pcie_link_width
+# DCGM_FI_DEV_CONNECTX_EXPECT_PCIE_LINK_WIDTH, gauge, Connectx expect pcie link width
+# context=dcgm.gpu.interconnect.connectx.status family=gpu interconnect/pcie dimension=connectx_health
+# DCGM_FI_DEV_CONNECTX_HEALTH, gauge, Connectx health
+# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect/pcie dimension=connectx_uncorrectable_err_mask
+# DCGM_FI_DEV_CONNECTX_UNCORRECTABLE_ERR_MASK, gauge, Connectx uncorrectable err mask
+# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect/pcie dimension=connectx_uncorrectable_err_severity
+# DCGM_FI_DEV_CONNECTX_UNCORRECTABLE_ERR_SEVERITY, gauge, Connectx uncorrectable err severity
+# context=dcgm.gpu.interconnect.connectx.error_status family=gpu interconnect/pcie dimension=connectx_uncorrectable_err_status
+# DCGM_FI_DEV_CONNECTX_UNCORRECTABLE_ERR_STATUS, gauge, Connectx uncorrectable err status
+# context=dcgm.gpu.reliability.row_remap_events family=gpu reliability dimension=correctable_remapped_rows
+DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS, counter, Correctable remapped rows
+# context=dcgm.gpu.inventory.identity family=gpu inventory dimension=count
+DCGM_FI_DEV_COUNT, gauge, Count
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=cpu_affinity_0
+# DCGM_FI_DEV_CPU_AFFINITY_0, gauge, Cpu affinity 0
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=cpu_affinity_1
+# DCGM_FI_DEV_CPU_AFFINITY_1, gauge, Cpu affinity 1
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=cpu_affinity_2
+# DCGM_FI_DEV_CPU_AFFINITY_2, gauge, Cpu affinity 2
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=cpu_affinity_3
+# DCGM_FI_DEV_CPU_AFFINITY_3, gauge, Cpu affinity 3
+# context=dcgm.cpu.clock.frequency family=cpu clock dimension=cpu_clock_current
+# DCGM_FI_DEV_CPU_CLOCK_CURRENT, gauge, Cpu clock current
+# context=dcgm.gpu.cpu.info family=gpu cpu dimension=cpu_model
+# DCGM_FI_DEV_CPU_MODEL, label, Cpu model
+# context=dcgm.cpu.cpu.power family=cpu cpu dimension=cpu_power_limit
+# DCGM_FI_DEV_CPU_POWER_LIMIT, gauge, Cpu power limit
+# context=dcgm.cpu.cpu.power family=cpu cpu dimension=cpu_power_util_current
+# DCGM_FI_DEV_CPU_POWER_UTIL_CURRENT, gauge, Cpu power util current
+# context=dcgm.cpu.cpu.temperature family=cpu cpu dimension=cpu_temp_critical
+# DCGM_FI_DEV_CPU_TEMP_CRITICAL, gauge, Cpu temp critical
+# context=dcgm.cpu.cpu.temperature family=cpu cpu dimension=cpu_temp_current
+# DCGM_FI_DEV_CPU_TEMP_CURRENT, gauge, Cpu temp current
+# context=dcgm.cpu.cpu.temperature family=cpu cpu dimension=cpu_temp_warning
+# DCGM_FI_DEV_CPU_TEMP_WARNING, gauge, Cpu temp warning
+# context=dcgm.cpu.cpu.utilization family=cpu cpu dimension=cpu_util_irq
+# DCGM_FI_DEV_CPU_UTIL_IRQ, gauge, Cpu util irq
+# context=dcgm.cpu.cpu.utilization family=cpu cpu dimension=cpu_util_nice
+# DCGM_FI_DEV_CPU_UTIL_NICE, gauge, Cpu util nice
+# context=dcgm.cpu.cpu.utilization family=cpu cpu dimension=cpu_util_sys
+# DCGM_FI_DEV_CPU_UTIL_SYS, gauge, Cpu util sys
+# context=dcgm.cpu.cpu.utilization family=cpu cpu dimension=cpu_util
+# DCGM_FI_DEV_CPU_UTIL_TOTAL, gauge, Cpu util total
+# context=dcgm.cpu.cpu.utilization family=cpu cpu dimension=cpu_util_user
+# DCGM_FI_DEV_CPU_UTIL_USER, gauge, Cpu util user
+# context=dcgm.gpu.cpu.info family=gpu cpu dimension=cpu_vendor
+# DCGM_FI_DEV_CPU_VENDOR, label, Cpu vendor
+# context=dcgm.gpu.virtualization.vgpu.type family=gpu virtualization dimension=creatable_vgpu_type_ids
+# DCGM_FI_DEV_CREATABLE_VGPU_TYPE_IDS, gauge, Creatable vgpu type ids
+# context=dcgm.gpu.capability.support family=gpu capability dimension=cuda_compute_capability
+# DCGM_FI_DEV_CUDA_COMPUTE_CAPABILITY, gauge, Cuda compute capability
+# context=dcgm.gpu.inventory.identity family=gpu inventory dimension=cuda_visible_devices_str
+# DCGM_FI_DEV_CUDA_VISIBLE_DEVICES_STR, label, Cuda visible devices str
+# context=dcgm.gpu.compute.utilization family=gpu compute dimension=decoder
+DCGM_FI_DEV_DEC_UTIL, gauge, Dec util
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_cpu_eud_result
+# DCGM_FI_DEV_DIAG_CPU_EUD_RESULT, gauge, Diag cpu eud result
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_diagnostic_result
+# DCGM_FI_DEV_DIAG_DIAGNOSTIC_RESULT, gauge, Diag diagnostic result
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_eud_result
+# DCGM_FI_DEV_DIAG_EUD_RESULT, gauge, Diag eud result
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_memory_bandwidth_result
+# DCGM_FI_DEV_DIAG_MEMORY_BANDWIDTH_RESULT, gauge, Diag memory bandwidth result
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_memory_result
+# DCGM_FI_DEV_DIAG_MEMORY_RESULT, gauge, Diag memory result
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_memtest_result
+# DCGM_FI_DEV_DIAG_MEMTEST_RESULT, gauge, Diag memtest result
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_nccl_tests_result
+# DCGM_FI_DEV_DIAG_NCCL_TESTS_RESULT, gauge, Diag nccl tests result
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_nvbandwidth_result
+# DCGM_FI_DEV_DIAG_NVBANDWIDTH_RESULT, gauge, Diag nvbandwidth result
+# context=dcgm.gpu.interconnect.pcie.state family=gpu interconnect/pcie dimension=diag_pcie_result
+# DCGM_FI_DEV_DIAG_PCIE_RESULT, gauge, Diag pcie result
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_pulse_test_result
+# DCGM_FI_DEV_DIAG_PULSE_TEST_RESULT, gauge, Diag pulse test result
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_software_result
+# DCGM_FI_DEV_DIAG_SOFTWARE_RESULT, gauge, Diag software result
+# context=dcgm.gpu.diagnostics.status family=gpu diagnostics dimension=diag_status
+# DCGM_FI_DEV_DIAG_STATUS, gauge, Diag status
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_targeted_power_result
+# DCGM_FI_DEV_DIAG_TARGETED_POWER_RESULT, gauge, Diag targeted power result
+# context=dcgm.gpu.diagnostics.results family=gpu diagnostics dimension=diag_targeted_stress_result
+# DCGM_FI_DEV_DIAG_TARGETED_STRESS_RESULT, gauge, Diag targeted stress result
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_current
+DCGM_FI_DEV_ECC_CURRENT, gauge, Ecc current
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_agg_cbu
+# DCGM_FI_DEV_ECC_DBE_AGG_CBU, gauge, Ecc dbe agg cbu
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_agg_dev
+# DCGM_FI_DEV_ECC_DBE_AGG_DEV, gauge, Ecc dbe agg dev
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_agg_l1
+# DCGM_FI_DEV_ECC_DBE_AGG_L1, gauge, Ecc dbe agg l1
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_agg_l2
+DCGM_FI_DEV_ECC_DBE_AGG_L2, gauge, Ecc dbe agg l2
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_agg_reg
+# DCGM_FI_DEV_ECC_DBE_AGG_REG, gauge, Ecc dbe agg reg
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_agg_shm
+# DCGM_FI_DEV_ECC_DBE_AGG_SHM, gauge, Ecc dbe agg shm
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_agg_srm
+# DCGM_FI_DEV_ECC_DBE_AGG_SRM, gauge, Ecc dbe agg srm
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_agg_tex
+# DCGM_FI_DEV_ECC_DBE_AGG_TEX, gauge, Ecc dbe agg tex
+# context=dcgm.gpu.memory.ecc_error_rate family=gpu memory dimension=ecc_dbe_agg
+DCGM_FI_DEV_ECC_DBE_AGG_TOTAL, counter, Ecc dbe agg total
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_vol_cbu
+# DCGM_FI_DEV_ECC_DBE_VOL_CBU, gauge, Ecc dbe vol cbu
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_vol_dev
+DCGM_FI_DEV_ECC_DBE_VOL_DEV, gauge, Ecc dbe vol dev
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_vol_l1
+# DCGM_FI_DEV_ECC_DBE_VOL_L1, gauge, Ecc dbe vol l1
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_vol_l2
+DCGM_FI_DEV_ECC_DBE_VOL_L2, gauge, Ecc dbe vol l2
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_vol_reg
+# DCGM_FI_DEV_ECC_DBE_VOL_REG, gauge, Ecc dbe vol reg
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_vol_shm
+# DCGM_FI_DEV_ECC_DBE_VOL_SHM, gauge, Ecc dbe vol shm
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_vol_srm
+# DCGM_FI_DEV_ECC_DBE_VOL_SRM, gauge, Ecc dbe vol srm
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_dbe_vol_tex
+# DCGM_FI_DEV_ECC_DBE_VOL_TEX, gauge, Ecc dbe vol tex
+# context=dcgm.gpu.memory.ecc_error_rate family=gpu memory dimension=ecc_dbe_vol
+DCGM_FI_DEV_ECC_DBE_VOL_TOTAL, counter, Ecc dbe vol total
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_inforom_ver
+# DCGM_FI_DEV_ECC_INFOROM_VER, label, Ecc inforom ver
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_pending
+DCGM_FI_DEV_ECC_PENDING, gauge, Ecc pending
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_agg_cbu
+# DCGM_FI_DEV_ECC_SBE_AGG_CBU, gauge, Ecc sbe agg cbu
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_agg_dev
+# DCGM_FI_DEV_ECC_SBE_AGG_DEV, gauge, Ecc sbe agg dev
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_agg_l1
+# DCGM_FI_DEV_ECC_SBE_AGG_L1, gauge, Ecc sbe agg l1
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_agg_l2
+DCGM_FI_DEV_ECC_SBE_AGG_L2, gauge, Ecc sbe agg l2
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_agg_reg
+# DCGM_FI_DEV_ECC_SBE_AGG_REG, gauge, Ecc sbe agg reg
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_agg_shm
+# DCGM_FI_DEV_ECC_SBE_AGG_SHM, gauge, Ecc sbe agg shm
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_agg_srm
+# DCGM_FI_DEV_ECC_SBE_AGG_SRM, gauge, Ecc sbe agg srm
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_agg_tex
+# DCGM_FI_DEV_ECC_SBE_AGG_TEX, gauge, Ecc sbe agg tex
+# context=dcgm.gpu.memory.ecc_error_rate family=gpu memory dimension=ecc_sbe_agg
+DCGM_FI_DEV_ECC_SBE_AGG_TOTAL, counter, Ecc sbe agg total
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_vol_cbu
+# DCGM_FI_DEV_ECC_SBE_VOL_CBU, gauge, Ecc sbe vol cbu
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_vol_dev
+DCGM_FI_DEV_ECC_SBE_VOL_DEV, gauge, Ecc sbe vol dev
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_vol_l1
+# DCGM_FI_DEV_ECC_SBE_VOL_L1, gauge, Ecc sbe vol l1
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_vol_l2
+DCGM_FI_DEV_ECC_SBE_VOL_L2, gauge, Ecc sbe vol l2
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_vol_reg
+# DCGM_FI_DEV_ECC_SBE_VOL_REG, gauge, Ecc sbe vol reg
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_vol_shm
+# DCGM_FI_DEV_ECC_SBE_VOL_SHM, gauge, Ecc sbe vol shm
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_vol_srm
+# DCGM_FI_DEV_ECC_SBE_VOL_SRM, gauge, Ecc sbe vol srm
+# context=dcgm.gpu.memory.ecc_errors family=gpu memory dimension=ecc_sbe_vol_tex
+# DCGM_FI_DEV_ECC_SBE_VOL_TEX, gauge, Ecc sbe vol tex
+# context=dcgm.gpu.memory.ecc_error_rate family=gpu memory dimension=ecc_sbe_vol
+DCGM_FI_DEV_ECC_SBE_VOL_TOTAL, counter, Ecc sbe vol total
+# context=dcgm.gpu.workload.sessions family=gpu workload dimension=enc_stats
+# DCGM_FI_DEV_ENC_STATS, gauge, Enc stats
+# context=dcgm.gpu.compute.utilization family=gpu compute dimension=encoder
+DCGM_FI_DEV_ENC_UTIL, gauge, Enc util
+# context=dcgm.gpu.power.usage family=gpu power dimension=enforced_limit
+DCGM_FI_DEV_ENFORCED_POWER_LIMIT, gauge, Enforced power limit
+# context=dcgm.gpu.power.profiles family=gpu power dimension=enforced_power_profile_mask
+# DCGM_FI_DEV_ENFORCED_POWER_PROFILE_MASK, counter, Enforced power profile mask
+# context=dcgm.gpu.interconnect.fabric family=gpu interconnect/overview dimension=fabric_clique_id
+# DCGM_FI_DEV_FABRIC_CLIQUE_ID, gauge, Fabric clique id
+# context=dcgm.gpu.interconnect.fabric family=gpu interconnect/overview dimension=fabric_cluster_uuid
+# DCGM_FI_DEV_FABRIC_CLUSTER_UUID, label, Fabric cluster uuid
+# context=dcgm.gpu.interconnect.fabric family=gpu interconnect/overview dimension=fabric_health_mask
+# DCGM_FI_DEV_FABRIC_HEALTH_MASK, gauge, Fabric health mask
+# context=dcgm.gpu.interconnect.fabric family=gpu interconnect/overview dimension=fabric_manager_error_code
+DCGM_FI_DEV_FABRIC_MANAGER_ERROR_CODE, counter, Fabric manager error code
+# context=dcgm.gpu.interconnect.fabric family=gpu interconnect/overview dimension=fabric_manager_status
+DCGM_FI_DEV_FABRIC_MANAGER_STATUS, gauge, Fabric manager status
+# context=dcgm.gpu.thermal.fan_speed family=gpu thermal dimension=fan_speed
+DCGM_FI_DEV_FAN_SPEED, gauge, Fan speed
+# context=dcgm.gpu.workload.sessions family=gpu workload dimension=fbc_sessions_info
+# DCGM_FI_DEV_FBC_SESSIONS_INFO, gauge, Fbc sessions info
+# context=dcgm.gpu.workload.sessions family=gpu workload dimension=fbc_stats
+# DCGM_FI_DEV_FBC_STATS, gauge, Fbc stats
+# context=dcgm.gpu.memory.usage family=gpu memory dimension=free
+DCGM_FI_DEV_FB_FREE, gauge, Fb free
+# context=dcgm.gpu.memory.usage family=gpu memory dimension=reserved
+DCGM_FI_DEV_FB_RESERVED, gauge, Fb reserved
+# context=dcgm.gpu.memory.capacity family=gpu memory dimension=total
+DCGM_FI_DEV_FB_TOTAL, gauge, Fb total
+# context=dcgm.gpu.memory.usage family=gpu memory dimension=used
+DCGM_FI_DEV_FB_USED, gauge, Fb used
+# context=dcgm.gpu.memory.utilization family=gpu memory dimension=used_percent
+DCGM_FI_DEV_FB_USED_PERCENT, gauge, Fb used percent
+# context=dcgm.gpu.internal.boundary family=gpu internal dimension=first_connectx_field_id
+# DCGM_FI_DEV_FIRST_CONNECTX_FIELD_ID, gauge, First connectx field id
+# context=dcgm.gpu.reliability.recovery_action family=gpu reliability dimension=get_gpu_recovery_action
+# DCGM_FI_DEV_GET_GPU_RECOVERY_ACTION, counter, Get gpu recovery action
+# context=dcgm.gpu.capability.support family=gpu capability dimension=gpm_support
+# DCGM_FI_DEV_GPM_SUPPORT, gauge, Gpm support
+# context=dcgm.gpu.thermal.temperature family=gpu thermal dimension=gpu_max_op_temp
+DCGM_FI_DEV_GPU_MAX_OP_TEMP, gauge, Gpu max op temp
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=gpu_nvlink_errors
+DCGM_FI_DEV_GPU_NVLINK_ERRORS, counter, Gpu nvlink errors
+# context=dcgm.gpu.thermal.temperature family=gpu thermal dimension=gpu
+DCGM_FI_DEV_GPU_TEMP, gauge, Gpu temp
+# context=dcgm.gpu.thermal.temperature family=gpu thermal dimension=gpu_temp_limit
+DCGM_FI_DEV_GPU_TEMP_LIMIT, gauge, Gpu temp limit
+# context=dcgm.gpu.compute.utilization family=gpu compute dimension=gpu
+DCGM_FI_DEV_GPU_UTIL, gauge, Gpu util
+# context=dcgm.gpu.inventory.software family=gpu inventory dimension=inforom_config_check
+# DCGM_FI_DEV_INFOROM_CONFIG_CHECK, label, Inforom config check
+# context=dcgm.gpu.inventory.software family=gpu inventory dimension=inforom_config_valid
+# DCGM_FI_DEV_INFOROM_CONFIG_VALID, label, Inforom config valid
+# context=dcgm.gpu.inventory.software family=gpu inventory dimension=inforom_image_ver
+# DCGM_FI_DEV_INFOROM_IMAGE_VER, label, Inforom image ver
+# context=dcgm.gpu.internal.boundary family=gpu internal dimension=last_connectx_field_id
+# DCGM_FI_DEV_LAST_CONNECTX_FIELD_ID, gauge, Last connectx field id
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=low_utilization_violation
+# DCGM_FI_DEV_LOW_UTIL_VIOLATION, gauge, Low util violation
+# context=dcgm.gpu.clock.frequency family=gpu clock dimension=max_mem_clock
+DCGM_FI_DEV_MAX_MEM_CLOCK, gauge, Max mem clock
+# context=dcgm.gpu.clock.frequency family=gpu clock dimension=max_sm_clock
+DCGM_FI_DEV_MAX_SM_CLOCK, gauge, Max sm clock
+# context=dcgm.gpu.clock.frequency family=gpu clock dimension=max_video_clock
+DCGM_FI_DEV_MAX_VIDEO_CLOCK, gauge, Max video clock
+# context=dcgm.gpu.thermal.temperature family=gpu thermal dimension=memory
+DCGM_FI_DEV_MEMORY_TEMP, gauge, Memory temp
+# context=dcgm.gpu.reliability.memory_health family=gpu reliability dimension=memory_unrepairable_flag
+# DCGM_FI_DEV_MEMORY_UNREPAIRABLE_FLAG, gauge, Memory unrepairable flag
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=mem_affinity_0
+# DCGM_FI_DEV_MEM_AFFINITY_0, gauge, Mem affinity 0
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=mem_affinity_1
+# DCGM_FI_DEV_MEM_AFFINITY_1, gauge, Mem affinity 1
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=mem_affinity_2
+# DCGM_FI_DEV_MEM_AFFINITY_2, gauge, Mem affinity 2
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=mem_affinity_3
+# DCGM_FI_DEV_MEM_AFFINITY_3, gauge, Mem affinity 3
+# context=dcgm.gpu.clock.frequency family=gpu clock dimension=memory
+DCGM_FI_DEV_MEM_CLOCK, gauge, Mem clock
+# context=dcgm.gpu.compute.utilization family=gpu compute dimension=memory_copy
+DCGM_FI_DEV_MEM_COPY_UTIL, gauge, Mem copy util
+# context=dcgm.gpu.thermal.temperature family=gpu thermal dimension=mem_max_op_temp
+DCGM_FI_DEV_MEM_MAX_OP_TEMP, gauge, Mem max op temp
+# context=dcgm.gpu.capability.support family=gpu capability dimension=mig_attributes
+# DCGM_FI_DEV_MIG_ATTRIBUTES, gauge, Mig attributes
+# context=dcgm.gpu.capability.support family=gpu capability dimension=mig_ci_info
+# DCGM_FI_DEV_MIG_CI_INFO, gauge, Mig ci info
+# context=dcgm.gpu.capability.support family=gpu capability dimension=mig_gi_info
+# DCGM_FI_DEV_MIG_GI_INFO, gauge, Mig gi info
+# context=dcgm.gpu.capability.support family=gpu capability dimension=mig_max_slices
+DCGM_FI_DEV_MIG_MAX_SLICES, gauge, Mig max slices
+# context=dcgm.gpu.state.virtualization family=gpu state dimension=mig_mode
+DCGM_FI_DEV_MIG_MODE, gauge, Mig mode
+# context=dcgm.gpu.inventory.identity family=gpu inventory dimension=minor_number
+# DCGM_FI_DEV_MINOR_NUMBER, label, Minor number
+# context=dcgm.gpu.cpu.power family=gpu cpu dimension=module_power_util_current
+# DCGM_FI_DEV_MODULE_POWER_UTIL_CURRENT, gauge, Module power util current
+# context=dcgm.gpu.inventory.identity family=gpu inventory dimension=name
+# DCGM_FI_DEV_NAME, label, Name
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l0
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L0, counter, Nvlink bandwidth l0
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l1
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L1, counter, Nvlink bandwidth l1
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l10
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L10, counter, Nvlink bandwidth l10
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l11
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L11, counter, Nvlink bandwidth l11
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l12
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L12, counter, Nvlink bandwidth l12
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l13
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L13, counter, Nvlink bandwidth l13
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l14
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L14, counter, Nvlink bandwidth l14
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l15
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L15, counter, Nvlink bandwidth l15
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l16
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L16, counter, Nvlink bandwidth l16
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l17
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L17, counter, Nvlink bandwidth l17
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l2
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L2, counter, Nvlink bandwidth l2
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l3
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L3, counter, Nvlink bandwidth l3
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l4
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L4, counter, Nvlink bandwidth l4
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l5
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L5, counter, Nvlink bandwidth l5
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l6
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L6, counter, Nvlink bandwidth l6
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l7
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L7, counter, Nvlink bandwidth l7
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l8
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L8, counter, Nvlink bandwidth l8
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth_l9
+# DCGM_FI_DEV_NVLINK_BANDWIDTH_L9, counter, Nvlink bandwidth l9
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_bandwidth
+DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL, counter, Nvlink bandwidth total
+# context=dcgm.nvlink.interconnect.ber family=nvlink interconnect dimension=nvlink_count_effective_ber
+# DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER, counter, Nvlink count effective ber
+# context=dcgm.nvlink.interconnect.ber family=nvlink interconnect dimension=nvlink_count_effective_ber_float
+# DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_BER_FLOAT, counter, Nvlink count effective ber float
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_effective_errors
+# DCGM_FI_DEV_NVLINK_COUNT_EFFECTIVE_ERRORS, counter, Nvlink count effective errors
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_0
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_0, counter, Nvlink count fec history 0
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_1
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_1, counter, Nvlink count fec history 1
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_10
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_10, counter, Nvlink count fec history 10
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_11
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_11, counter, Nvlink count fec history 11
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_12
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_12, counter, Nvlink count fec history 12
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_13
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_13, counter, Nvlink count fec history 13
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_14
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_14, counter, Nvlink count fec history 14
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_15
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_15, counter, Nvlink count fec history 15
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_2
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_2, counter, Nvlink count fec history 2
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_3
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_3, counter, Nvlink count fec history 3
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_4
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_4, counter, Nvlink count fec history 4
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_5
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_5, counter, Nvlink count fec history 5
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_6
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_6, counter, Nvlink count fec history 6
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_7
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_7, counter, Nvlink count fec history 7
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_8
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_8, counter, Nvlink count fec history 8
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_fec_history_9
+# DCGM_FI_DEV_NVLINK_COUNT_FEC_HISTORY_9, counter, Nvlink count fec history 9
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_link_recovery_events
+# DCGM_FI_DEV_NVLINK_COUNT_LINK_RECOVERY_EVENTS, counter, Nvlink count link recovery events
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_link_recovery_failed_events
+# DCGM_FI_DEV_NVLINK_COUNT_LINK_RECOVERY_FAILED_EVENTS, counter, Nvlink count link recovery failed events
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_link_recovery_successful_events
+# DCGM_FI_DEV_NVLINK_COUNT_LINK_RECOVERY_SUCCESSFUL_EVENTS, counter, Nvlink count link recovery successful events
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_local_link_integrity_errors
+# DCGM_FI_DEV_NVLINK_COUNT_LOCAL_LINK_INTEGRITY_ERRORS, counter, Nvlink count local link integrity errors
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_rx_buffer_overrun_errors
+# DCGM_FI_DEV_NVLINK_COUNT_RX_BUFFER_OVERRUN_ERRORS, counter, Nvlink count rx buffer overrun errors
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_count_rx
+DCGM_FI_DEV_NVLINK_COUNT_RX_BYTES, counter, Nvlink count rx bytes
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_rx_errors
+# DCGM_FI_DEV_NVLINK_COUNT_RX_ERRORS, counter, Nvlink count rx errors
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_rx_general_errors
+# DCGM_FI_DEV_NVLINK_COUNT_RX_GENERAL_ERRORS, counter, Nvlink count rx general errors
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_rx_malformed_packet_errors
+# DCGM_FI_DEV_NVLINK_COUNT_RX_MALFORMED_PACKET_ERRORS, counter, Nvlink count rx malformed packet errors
+# context=dcgm.nvlink.interconnect.traffic family=nvlink interconnect dimension=nvlink_count_rx_packets
+# DCGM_FI_DEV_NVLINK_COUNT_RX_PACKETS, counter, Nvlink count rx packets
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_rx_remote_errors
+# DCGM_FI_DEV_NVLINK_COUNT_RX_REMOTE_ERRORS, counter, Nvlink count rx remote errors
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_rx_symbol_errors
+# DCGM_FI_DEV_NVLINK_COUNT_RX_SYMBOL_ERRORS, counter, Nvlink count rx symbol errors
+# context=dcgm.nvlink.interconnect.ber family=nvlink interconnect dimension=nvlink_count_symbol_ber
+# DCGM_FI_DEV_NVLINK_COUNT_SYMBOL_BER, counter, Nvlink count symbol ber
+# context=dcgm.nvlink.interconnect.ber family=nvlink interconnect dimension=nvlink_count_symbol_ber_float
+# DCGM_FI_DEV_NVLINK_COUNT_SYMBOL_BER_FLOAT, counter, Nvlink count symbol ber float
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_count_tx
+DCGM_FI_DEV_NVLINK_COUNT_TX_BYTES, counter, Nvlink count tx bytes
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_count_tx_discards
+# DCGM_FI_DEV_NVLINK_COUNT_TX_DISCARDS, counter, Nvlink count tx discards
+# context=dcgm.nvlink.interconnect.traffic family=nvlink interconnect dimension=nvlink_count_tx_packets
+# DCGM_FI_DEV_NVLINK_COUNT_TX_PACKETS, counter, Nvlink count tx packets
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l0
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L0, counter, Nvlink crc data error count l0
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l1
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L1, counter, Nvlink crc data error count l1
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l10
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L10, counter, Nvlink crc data error count l10
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l11
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L11, counter, Nvlink crc data error count l11
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l12
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L12, counter, Nvlink crc data error count l12
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l13
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L13, counter, Nvlink crc data error count l13
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l14
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L14, counter, Nvlink crc data error count l14
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l15
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L15, counter, Nvlink crc data error count l15
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l16
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L16, counter, Nvlink crc data error count l16
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l17
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L17, counter, Nvlink crc data error count l17
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l2
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L2, counter, Nvlink crc data error count l2
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l3
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L3, counter, Nvlink crc data error count l3
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l4
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L4, counter, Nvlink crc data error count l4
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l5
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L5, counter, Nvlink crc data error count l5
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l6
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L6, counter, Nvlink crc data error count l6
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l7
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L7, counter, Nvlink crc data error count l7
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l8
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L8, counter, Nvlink crc data error count l8
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error_count_l9
+# DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_L9, counter, Nvlink crc data error count l9
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_data_error
+DCGM_FI_DEV_NVLINK_CRC_DATA_ERROR_COUNT_TOTAL, counter, Nvlink crc data error count total
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l0
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L0, counter, Nvlink crc flit error count l0
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l1
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L1, counter, Nvlink crc flit error count l1
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l10
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L10, counter, Nvlink crc flit error count l10
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l11
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L11, counter, Nvlink crc flit error count l11
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l12
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L12, counter, Nvlink crc flit error count l12
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l13
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L13, counter, Nvlink crc flit error count l13
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l14
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L14, counter, Nvlink crc flit error count l14
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l15
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L15, counter, Nvlink crc flit error count l15
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l16
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L16, counter, Nvlink crc flit error count l16
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l17
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L17, counter, Nvlink crc flit error count l17
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l2
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L2, counter, Nvlink crc flit error count l2
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l3
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L3, counter, Nvlink crc flit error count l3
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l4
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L4, counter, Nvlink crc flit error count l4
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l5
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L5, counter, Nvlink crc flit error count l5
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l6
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L6, counter, Nvlink crc flit error count l6
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l7
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L7, counter, Nvlink crc flit error count l7
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l8
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L8, counter, Nvlink crc flit error count l8
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error_count_l9
+# DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_L9, counter, Nvlink crc flit error count l9
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_crc_flit_error
+DCGM_FI_DEV_NVLINK_CRC_FLIT_ERROR_COUNT_TOTAL, counter, Nvlink crc flit error count total
+# context=dcgm.nvlink.memory.ecc_error_rate family=nvlink memory dimension=nvlink_ecc_data_error
+# DCGM_FI_DEV_NVLINK_ECC_DATA_ERROR_COUNT_TOTAL, counter, Nvlink ecc data error count total
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_error_dl_crc
+DCGM_FI_DEV_NVLINK_ERROR_DL_CRC, counter, Nvlink error dl crc
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_error_dl_recovery
+DCGM_FI_DEV_NVLINK_ERROR_DL_RECOVERY, counter, Nvlink error dl recovery
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_error_dl_replay
+DCGM_FI_DEV_NVLINK_ERROR_DL_REPLAY, counter, Nvlink error dl replay
+# context=dcgm.nvlink.interconnect.state family=nvlink interconnect dimension=nvlink_get_state
+# DCGM_FI_DEV_NVLINK_GET_STATE, gauge, Nvlink get state
+# context=dcgm.nvlink.interconnect.congestion family=nvlink interconnect dimension=nvlink_ppcnt_ibpc_port_xmit_wait
+# DCGM_FI_DEV_NVLINK_PPCNT_IBPC_PORT_XMIT_WAIT, gauge, Nvlink ppcnt ibpc port xmit wait
+# context=dcgm.nvlink.interconnect.state family=nvlink interconnect dimension=nvlink_ppcnt_physical_link_down_counter
+# DCGM_FI_DEV_NVLINK_PPCNT_PHYSICAL_LINK_DOWN_COUNTER, counter, Nvlink ppcnt physical link down counter
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_ppcnt_physical_successful_recovery_events
+# DCGM_FI_DEV_NVLINK_PPCNT_PHYSICAL_SUCCESSFUL_RECOVERY_EVENTS, counter, Nvlink ppcnt physical successful recovery events
+# context=dcgm.nvlink.interconnect.traffic family=nvlink interconnect dimension=nvlink_ppcnt_plr_rcv_codes
+# DCGM_FI_DEV_NVLINK_PPCNT_PLR_RCV_CODES, counter, Nvlink ppcnt plr rcv codes
+# context=dcgm.nvlink.interconnect.state family=nvlink interconnect dimension=nvlink_ppcnt_plr_rcv_code_err
+# DCGM_FI_DEV_NVLINK_PPCNT_PLR_RCV_CODE_ERR, gauge, Nvlink ppcnt plr rcv code err
+# context=dcgm.nvlink.interconnect.errors family=nvlink interconnect dimension=nvlink_ppcnt_plr_rcv_uncorrectable_code
+# DCGM_FI_DEV_NVLINK_PPCNT_PLR_RCV_UNCORRECTABLE_CODE, gauge, Nvlink ppcnt plr rcv uncorrectable code
+# context=dcgm.nvlink.interconnect.state family=nvlink interconnect dimension=nvlink_ppcnt_plr_sync_events
+# DCGM_FI_DEV_NVLINK_PPCNT_PLR_SYNC_EVENTS, gauge, Nvlink ppcnt plr sync events
+# context=dcgm.nvlink.interconnect.traffic family=nvlink interconnect dimension=nvlink_ppcnt_plr_xmit_codes
+# DCGM_FI_DEV_NVLINK_PPCNT_PLR_XMIT_CODES, counter, Nvlink ppcnt plr xmit codes
+# context=dcgm.nvlink.interconnect.traffic family=nvlink interconnect dimension=nvlink_ppcnt_plr_xmit_retry_codes
+# DCGM_FI_DEV_NVLINK_PPCNT_PLR_XMIT_RETRY_CODES, counter, Nvlink ppcnt plr xmit retry codes
+# context=dcgm.nvlink.interconnect.state family=nvlink interconnect dimension=nvlink_ppcnt_plr_xmit_retry_events
+# DCGM_FI_DEV_NVLINK_PPCNT_PLR_XMIT_RETRY_EVENTS, gauge, Nvlink ppcnt plr xmit retry events
+# context=dcgm.nvlink.internal.boundary family=nvlink internal dimension=nvlink_ppcnt_recovery_time_between_last_two
+# DCGM_FI_DEV_NVLINK_PPCNT_RECOVERY_TIME_BETWEEN_LAST_TWO, counter, Nvlink ppcnt recovery time between last two
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_ppcnt_recovery_time_since_last
+# DCGM_FI_DEV_NVLINK_PPCNT_RECOVERY_TIME_SINCE_LAST, counter, Nvlink ppcnt recovery time since last
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_ppcnt_recovery_total_successful_events
+# DCGM_FI_DEV_NVLINK_PPCNT_RECOVERY_TOTAL_SUCCESSFUL_EVENTS, counter, Nvlink ppcnt recovery total successful events
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_pprm_oper_recovery
+# DCGM_FI_DEV_NVLINK_PPRM_OPER_RECOVERY, counter, Nvlink pprm oper recovery
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l0
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L0, counter, Nvlink recovery error count l0
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l1
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L1, counter, Nvlink recovery error count l1
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l10
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L10, counter, Nvlink recovery error count l10
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l11
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L11, counter, Nvlink recovery error count l11
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l12
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L12, counter, Nvlink recovery error count l12
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l13
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L13, counter, Nvlink recovery error count l13
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l14
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L14, counter, Nvlink recovery error count l14
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l15
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L15, counter, Nvlink recovery error count l15
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l16
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L16, counter, Nvlink recovery error count l16
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l17
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L17, counter, Nvlink recovery error count l17
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l2
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L2, counter, Nvlink recovery error count l2
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l3
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L3, counter, Nvlink recovery error count l3
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l4
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L4, counter, Nvlink recovery error count l4
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l5
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L5, counter, Nvlink recovery error count l5
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l6
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L6, counter, Nvlink recovery error count l6
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l7
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L7, counter, Nvlink recovery error count l7
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l8
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L8, counter, Nvlink recovery error count l8
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error_count_l9
+# DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_L9, counter, Nvlink recovery error count l9
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_recovery_error
+DCGM_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_TOTAL, counter, Nvlink recovery error count total
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l0
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L0, counter, Nvlink replay error count l0
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l1
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L1, counter, Nvlink replay error count l1
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l10
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L10, counter, Nvlink replay error count l10
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l11
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L11, counter, Nvlink replay error count l11
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l12
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L12, counter, Nvlink replay error count l12
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l13
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L13, counter, Nvlink replay error count l13
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l14
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L14, counter, Nvlink replay error count l14
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l15
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L15, counter, Nvlink replay error count l15
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l16
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L16, counter, Nvlink replay error count l16
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l17
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L17, counter, Nvlink replay error count l17
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l2
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L2, counter, Nvlink replay error count l2
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l3
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L3, counter, Nvlink replay error count l3
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l4
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L4, counter, Nvlink replay error count l4
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l5
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L5, counter, Nvlink replay error count l5
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l6
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L6, counter, Nvlink replay error count l6
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l7
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L7, counter, Nvlink replay error count l7
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l8
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L8, counter, Nvlink replay error count l8
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error_count_l9
+# DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_L9, counter, Nvlink replay error count l9
+# context=dcgm.nvlink.interconnect.error_rate family=nvlink interconnect dimension=nvlink_replay_error
+DCGM_FI_DEV_NVLINK_REPLAY_ERROR_COUNT_TOTAL, counter, Nvlink replay error count total
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l0
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L0, counter, Nvlink rx bandwidth l0
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l1
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L1, counter, Nvlink rx bandwidth l1
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l10
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L10, counter, Nvlink rx bandwidth l10
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l11
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L11, counter, Nvlink rx bandwidth l11
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l12
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L12, counter, Nvlink rx bandwidth l12
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l13
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L13, counter, Nvlink rx bandwidth l13
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l14
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L14, counter, Nvlink rx bandwidth l14
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l15
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L15, counter, Nvlink rx bandwidth l15
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l16
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L16, counter, Nvlink rx bandwidth l16
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l17
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L17, counter, Nvlink rx bandwidth l17
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l2
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L2, counter, Nvlink rx bandwidth l2
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l3
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L3, counter, Nvlink rx bandwidth l3
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l4
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L4, counter, Nvlink rx bandwidth l4
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l5
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L5, counter, Nvlink rx bandwidth l5
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l6
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L6, counter, Nvlink rx bandwidth l6
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l7
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L7, counter, Nvlink rx bandwidth l7
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l8
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L8, counter, Nvlink rx bandwidth l8
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth_l9
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_L9, counter, Nvlink rx bandwidth l9
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx_bandwidth
+# DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_TOTAL, counter, Nvlink rx bandwidth total
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l0
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L0, counter, Nvlink tx bandwidth l0
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l1
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L1, counter, Nvlink tx bandwidth l1
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l10
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L10, counter, Nvlink tx bandwidth l10
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l11
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L11, counter, Nvlink tx bandwidth l11
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l12
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L12, counter, Nvlink tx bandwidth l12
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l13
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L13, counter, Nvlink tx bandwidth l13
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l14
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L14, counter, Nvlink tx bandwidth l14
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l15
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L15, counter, Nvlink tx bandwidth l15
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l16
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L16, counter, Nvlink tx bandwidth l16
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l17
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L17, counter, Nvlink tx bandwidth l17
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l2
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L2, counter, Nvlink tx bandwidth l2
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l3
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L3, counter, Nvlink tx bandwidth l3
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l4
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L4, counter, Nvlink tx bandwidth l4
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l5
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L5, counter, Nvlink tx bandwidth l5
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l6
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L6, counter, Nvlink tx bandwidth l6
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l7
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L7, counter, Nvlink tx bandwidth l7
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l8
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L8, counter, Nvlink tx bandwidth l8
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth_l9
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_L9, counter, Nvlink tx bandwidth l9
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx_bandwidth
+# DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_TOTAL, counter, Nvlink tx bandwidth total
+# context=dcgm.gpu.inventory.identity family=gpu inventory dimension=nvml_index
+# DCGM_FI_DEV_NVML_INDEX, gauge, Nvml index
+# context=dcgm.nvswitch.interconnect.nvswitch.current family=nvswitch interconnect dimension=nvswitch_current_iddq
+# DCGM_FI_DEV_NVSWITCH_CURRENT_IDDQ, gauge, Nvswitch current iddq
+# context=dcgm.nvswitch.interconnect.nvswitch.current family=nvswitch interconnect dimension=nvswitch_current_iddq_dvdd
+# DCGM_FI_DEV_NVSWITCH_CURRENT_IDDQ_DVDD, gauge, Nvswitch current iddq dvdd
+# context=dcgm.nvswitch.interconnect.nvswitch.current family=nvswitch interconnect dimension=nvswitch_current_iddq_rev
+# DCGM_FI_DEV_NVSWITCH_CURRENT_IDDQ_REV, gauge, Nvswitch current iddq rev
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_device_uuid
+# DCGM_FI_DEV_NVSWITCH_DEVICE_UUID, label, Nvswitch device uuid
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_fatal_errors
+DCGM_FI_DEV_NVSWITCH_FATAL_ERRORS, counter, Nvswitch fatal errors
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_crc_errors
+# DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS, counter, Nvswitch link crc errors
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_crc_errors_lane0
+# DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE0, counter, Nvswitch link crc errors lane0
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_crc_errors_lane1
+# DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE1, counter, Nvswitch link crc errors lane1
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_crc_errors_lane2
+# DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE2, counter, Nvswitch link crc errors lane2
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_crc_errors_lane3
+# DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE3, counter, Nvswitch link crc errors lane3
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_crc_errors_lane4
+# DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE4, counter, Nvswitch link crc errors lane4
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_crc_errors_lane5
+# DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE5, counter, Nvswitch link crc errors lane5
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_crc_errors_lane6
+# DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE6, counter, Nvswitch link crc errors lane6
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_crc_errors_lane7
+# DCGM_FI_DEV_NVSWITCH_LINK_CRC_ERRORS_LANE7, counter, Nvswitch link crc errors lane7
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_link_device_link_id
+# DCGM_FI_DEV_NVSWITCH_LINK_DEVICE_LINK_ID, gauge, Nvswitch link device link id
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_link_device_link_sid
+# DCGM_FI_DEV_NVSWITCH_LINK_DEVICE_LINK_SID, gauge, Nvswitch link device link sid
+# context=dcgm.nvswitch.memory.ecc_error_rate family=nvswitch memory dimension=nvswitch_link_ecc_errors
+# DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS, counter, Nvswitch link ecc errors
+# context=dcgm.nvswitch.memory.ecc_error_rate family=nvswitch memory dimension=nvswitch_link_ecc_errors_lane0
+# DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE0, counter, Nvswitch link ecc errors lane0
+# context=dcgm.nvswitch.memory.ecc_error_rate family=nvswitch memory dimension=nvswitch_link_ecc_errors_lane1
+# DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE1, counter, Nvswitch link ecc errors lane1
+# context=dcgm.nvswitch.memory.ecc_error_rate family=nvswitch memory dimension=nvswitch_link_ecc_errors_lane2
+# DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE2, counter, Nvswitch link ecc errors lane2
+# context=dcgm.nvswitch.memory.ecc_error_rate family=nvswitch memory dimension=nvswitch_link_ecc_errors_lane3
+# DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE3, counter, Nvswitch link ecc errors lane3
+# context=dcgm.nvswitch.memory.ecc_error_rate family=nvswitch memory dimension=nvswitch_link_ecc_errors_lane4
+# DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE4, counter, Nvswitch link ecc errors lane4
+# context=dcgm.nvswitch.memory.ecc_error_rate family=nvswitch memory dimension=nvswitch_link_ecc_errors_lane5
+# DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE5, counter, Nvswitch link ecc errors lane5
+# context=dcgm.nvswitch.memory.ecc_error_rate family=nvswitch memory dimension=nvswitch_link_ecc_errors_lane6
+# DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE6, counter, Nvswitch link ecc errors lane6
+# context=dcgm.nvswitch.memory.ecc_error_rate family=nvswitch memory dimension=nvswitch_link_ecc_errors_lane7
+# DCGM_FI_DEV_NVSWITCH_LINK_ECC_ERRORS_LANE7, counter, Nvswitch link ecc errors lane7
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_fatal_errors
+DCGM_FI_DEV_NVSWITCH_LINK_FATAL_ERRORS, counter, Nvswitch link fatal errors
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_flit_errors
+# DCGM_FI_DEV_NVSWITCH_LINK_FLIT_ERRORS, counter, Nvswitch link flit errors
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_link_id
+# DCGM_FI_DEV_NVSWITCH_LINK_ID, gauge, Nvswitch link id
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_count_vc0
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_COUNT_VC0, counter, Nvswitch link latency count vc0
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_count_vc1
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_COUNT_VC1, counter, Nvswitch link latency count vc1
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_count_vc2
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_COUNT_VC2, counter, Nvswitch link latency count vc2
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_count_vc3
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_COUNT_VC3, counter, Nvswitch link latency count vc3
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_high_vc0
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_HIGH_VC0, counter, Nvswitch link latency high vc0
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_high_vc1
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_HIGH_VC1, counter, Nvswitch link latency high vc1
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_high_vc2
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_HIGH_VC2, counter, Nvswitch link latency high vc2
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_high_vc3
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_HIGH_VC3, counter, Nvswitch link latency high vc3
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_low_vc0
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_LOW_VC0, counter, Nvswitch link latency low vc0
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_low_vc1
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_LOW_VC1, counter, Nvswitch link latency low vc1
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_low_vc2
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_LOW_VC2, counter, Nvswitch link latency low vc2
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_low_vc3
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_LOW_VC3, counter, Nvswitch link latency low vc3
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_medium_vc0
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_MEDIUM_VC0, counter, Nvswitch link latency medium vc0
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_medium_vc1
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_MEDIUM_VC1, counter, Nvswitch link latency medium vc1
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_medium_vc2
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_MEDIUM_VC2, counter, Nvswitch link latency medium vc2
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_medium_vc3
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_MEDIUM_VC3, counter, Nvswitch link latency medium vc3
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_panic_vc0
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_PANIC_VC0, counter, Nvswitch link latency panic vc0
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_panic_vc1
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_PANIC_VC1, counter, Nvswitch link latency panic vc1
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_panic_vc2
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_PANIC_VC2, counter, Nvswitch link latency panic vc2
+# context=dcgm.nvswitch.interconnect.nvswitch.latency family=nvswitch interconnect dimension=nvswitch_link_latency_panic_vc3
+# DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_PANIC_VC3, counter, Nvswitch link latency panic vc3
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_non_fatal_errors
+DCGM_FI_DEV_NVSWITCH_LINK_NON_FATAL_ERRORS, counter, Nvswitch link non fatal errors
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_recovery_errors
+# DCGM_FI_DEV_NVSWITCH_LINK_RECOVERY_ERRORS, counter, Nvswitch link recovery errors
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_link_remote_pcie_bus
+# DCGM_FI_DEV_NVSWITCH_LINK_REMOTE_PCIE_BUS, gauge, Nvswitch link remote pcie bus
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_link_remote_pcie_device
+# DCGM_FI_DEV_NVSWITCH_LINK_REMOTE_PCIE_DEVICE, gauge, Nvswitch link remote pcie device
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_link_remote_pcie_domain
+# DCGM_FI_DEV_NVSWITCH_LINK_REMOTE_PCIE_DOMAIN, gauge, Nvswitch link remote pcie domain
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_link_remote_pcie_function
+# DCGM_FI_DEV_NVSWITCH_LINK_REMOTE_PCIE_FUNCTION, gauge, Nvswitch link remote pcie function
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_link_replay_errors
+DCGM_FI_DEV_NVSWITCH_LINK_REPLAY_ERRORS, counter, Nvswitch link replay errors
+# context=dcgm.nvswitch.interconnect.nvswitch.status family=nvswitch interconnect dimension=nvswitch_link_status
+# DCGM_FI_DEV_NVSWITCH_LINK_STATUS, gauge, Nvswitch link status
+# context=dcgm.nvswitch.interconnect.nvswitch.throughput family=nvswitch interconnect dimension=nvswitch_link_throughput_rx
+DCGM_FI_DEV_NVSWITCH_LINK_THROUGHPUT_RX, counter, Nvswitch link throughput rx
+# context=dcgm.nvswitch.interconnect.nvswitch.throughput family=nvswitch interconnect dimension=nvswitch_link_throughput_tx
+DCGM_FI_DEV_NVSWITCH_LINK_THROUGHPUT_TX, counter, Nvswitch link throughput tx
+# context=dcgm.nvswitch.interconnect.nvswitch.status family=nvswitch interconnect dimension=nvswitch_link_type
+# DCGM_FI_DEV_NVSWITCH_LINK_TYPE, gauge, Nvswitch link type
+# context=dcgm.nvswitch.interconnect.nvswitch.errors family=nvswitch interconnect dimension=nvswitch_non_fatal_errors
+DCGM_FI_DEV_NVSWITCH_NON_FATAL_ERRORS, counter, Nvswitch non fatal errors
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_pcie_bus
+# DCGM_FI_DEV_NVSWITCH_PCIE_BUS, gauge, Nvswitch pcie bus
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_pcie_device
+# DCGM_FI_DEV_NVSWITCH_PCIE_DEVICE, gauge, Nvswitch pcie device
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_pcie_domain
+# DCGM_FI_DEV_NVSWITCH_PCIE_DOMAIN, gauge, Nvswitch pcie domain
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_pcie_function
+# DCGM_FI_DEV_NVSWITCH_PCIE_FUNCTION, gauge, Nvswitch pcie function
+# context=dcgm.nvswitch.interconnect.nvswitch.topology family=nvswitch interconnect dimension=nvswitch_phys_id
+# DCGM_FI_DEV_NVSWITCH_PHYS_ID, gauge, Nvswitch phys id
+# context=dcgm.nvswitch.interconnect.nvswitch.power family=nvswitch interconnect dimension=nvswitch_power_dvdd
+# DCGM_FI_DEV_NVSWITCH_POWER_DVDD, gauge, Nvswitch power dvdd
+# context=dcgm.nvswitch.interconnect.nvswitch.power family=nvswitch interconnect dimension=nvswitch_power_hvdd
+# DCGM_FI_DEV_NVSWITCH_POWER_HVDD, gauge, Nvswitch power hvdd
+# context=dcgm.nvswitch.interconnect.nvswitch.power family=nvswitch interconnect dimension=nvswitch_power_vdd
+# DCGM_FI_DEV_NVSWITCH_POWER_VDD, gauge, Nvswitch power vdd
+# context=dcgm.nvswitch.interconnect.nvswitch.status family=nvswitch interconnect dimension=nvswitch_reset_required
+# DCGM_FI_DEV_NVSWITCH_RESET_REQUIRED, gauge, Nvswitch reset required
+# context=dcgm.nvswitch.thermal.temperature family=nvswitch thermal dimension=nvswitch_temperature_current
+DCGM_FI_DEV_NVSWITCH_TEMPERATURE_CURRENT, gauge, Nvswitch temperature current
+# context=dcgm.nvswitch.thermal.temperature family=nvswitch thermal dimension=nvswitch_temperature_limit_shutdown
+# DCGM_FI_DEV_NVSWITCH_TEMPERATURE_LIMIT_SHUTDOWN, gauge, Nvswitch temperature limit shutdown
+# context=dcgm.nvswitch.thermal.temperature family=nvswitch thermal dimension=nvswitch_temperature_limit_slowdown
+# DCGM_FI_DEV_NVSWITCH_TEMPERATURE_LIMIT_SLOWDOWN, gauge, Nvswitch temperature limit slowdown
+# context=dcgm.nvswitch.interconnect.nvswitch.throughput family=nvswitch interconnect dimension=nvswitch_throughput_rx
+# DCGM_FI_DEV_NVSWITCH_THROUGHPUT_RX, counter, Nvswitch throughput rx
+# context=dcgm.nvswitch.interconnect.nvswitch.throughput family=nvswitch interconnect dimension=nvswitch_throughput_tx
+# DCGM_FI_DEV_NVSWITCH_THROUGHPUT_TX, counter, Nvswitch throughput tx
+# context=dcgm.nvswitch.interconnect.nvswitch.voltage family=nvswitch interconnect dimension=nvswitch_voltage_mvolt
+# DCGM_FI_DEV_NVSWITCH_VOLTAGE_MVOLT, gauge, Nvswitch voltage mvolt
+# context=dcgm.gpu.inventory.software family=gpu inventory dimension=oem_inforom_ver
+# DCGM_FI_DEV_OEM_INFOROM_VER, label, Oem inforom ver
+# context=dcgm.nvlink.interconnect.state family=nvlink interconnect dimension=p2p_nvlink_status
+# DCGM_FI_DEV_P2P_NVLINK_STATUS, gauge, P2p nvlink status
+# context=dcgm.gpu.interconnect.pcie.error_rate family=gpu interconnect/pcie dimension=pcie_count_correctable_errors
+# DCGM_FI_DEV_PCIE_COUNT_CORRECTABLE_ERRORS, counter, Pcie count correctable errors
+# context=dcgm.gpu.interconnect.pcie.link.generation family=gpu interconnect/pcie dimension=link_gen
+DCGM_FI_DEV_PCIE_LINK_GEN, gauge, Pcie link gen
+# context=dcgm.gpu.interconnect.pcie.link.width family=gpu interconnect/pcie dimension=link_width
+DCGM_FI_DEV_PCIE_LINK_WIDTH, gauge, Pcie link width
+# context=dcgm.gpu.interconnect.pcie.link.generation family=gpu interconnect/pcie dimension=max_link_gen
+# DCGM_FI_DEV_PCIE_MAX_LINK_GEN, gauge, Pcie max link gen
+# context=dcgm.gpu.interconnect.pcie.link.width family=gpu interconnect/pcie dimension=max_link_width
+# DCGM_FI_DEV_PCIE_MAX_LINK_WIDTH, gauge, Pcie max link width
+# context=dcgm.gpu.interconnect.pcie.error_rate family=gpu interconnect/pcie dimension=pcie_replay
+DCGM_FI_DEV_PCIE_REPLAY_COUNTER, counter, Pcie replay counter
+# context=dcgm.gpu.interconnect.pcie.throughput family=gpu interconnect/pcie dimension=pcie_rx_throughput
+DCGM_FI_DEV_PCIE_RX_THROUGHPUT, counter, Pcie rx throughput
+# context=dcgm.gpu.interconnect.pcie.throughput family=gpu interconnect/pcie dimension=pcie_tx_throughput
+DCGM_FI_DEV_PCIE_TX_THROUGHPUT, counter, Pcie tx throughput
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=pci_busid
+# DCGM_FI_DEV_PCI_BUSID, label, Pci busid
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=pci_combined_id
+# DCGM_FI_DEV_PCI_COMBINED_ID, gauge, Pci combined id
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=pci_subsys_id
+# DCGM_FI_DEV_PCI_SUBSYS_ID, gauge, Pci subsys id
+# context=dcgm.gpu.state.configuration family=gpu state dimension=persistence_mode
+DCGM_FI_DEV_PERSISTENCE_MODE, gauge, Persistence mode
+# context=dcgm.gpu.inventory.platform family=gpu inventory dimension=platform_chassis_serial_number
+# DCGM_FI_DEV_PLATFORM_CHASSIS_SERIAL_NUMBER, label, Platform chassis serial number
+# context=dcgm.gpu.inventory.platform family=gpu inventory dimension=platform_chassis_slot_number
+# DCGM_FI_DEV_PLATFORM_CHASSIS_SLOT_NUMBER, gauge, Platform chassis slot number
+# context=dcgm.gpu.inventory.platform family=gpu inventory dimension=platform_host_id
+# DCGM_FI_DEV_PLATFORM_HOST_ID, gauge, Platform host id
+# context=dcgm.gpu.inventory.platform family=gpu inventory dimension=platform_infiniband_guid
+# DCGM_FI_DEV_PLATFORM_INFINIBAND_GUID, gauge, Platform infiniband guid
+# context=dcgm.gpu.inventory.platform family=gpu inventory dimension=platform_module_id
+# DCGM_FI_DEV_PLATFORM_MODULE_ID, gauge, Platform module id
+# context=dcgm.gpu.inventory.platform family=gpu inventory dimension=platform_peer_type
+# DCGM_FI_DEV_PLATFORM_PEER_TYPE, gauge, Platform peer type
+# context=dcgm.gpu.inventory.platform family=gpu inventory dimension=platform_tray_index
+# DCGM_FI_DEV_PLATFORM_TRAY_INDEX, gauge, Platform tray index
+# context=dcgm.gpu.inventory.software family=gpu inventory dimension=power_inforom_ver
+# DCGM_FI_DEV_POWER_INFOROM_VER, label, Power inforom ver
+# context=dcgm.gpu.power.usage family=gpu power dimension=power_mgmt_limit
+DCGM_FI_DEV_POWER_MGMT_LIMIT, gauge, Power mgmt limit
+# context=dcgm.gpu.power.usage family=gpu power dimension=power_mgmt_limit_def
+DCGM_FI_DEV_POWER_MGMT_LIMIT_DEF, gauge, Power mgmt limit def
+# context=dcgm.gpu.power.usage family=gpu power dimension=power_mgmt_limit_max
+DCGM_FI_DEV_POWER_MGMT_LIMIT_MAX, gauge, Power mgmt limit max
+# context=dcgm.gpu.power.usage family=gpu power dimension=power_mgmt_limit_min
+DCGM_FI_DEV_POWER_MGMT_LIMIT_MIN, gauge, Power mgmt limit min
+# context=dcgm.gpu.power.usage family=gpu power dimension=draw
+DCGM_FI_DEV_POWER_USAGE, gauge, Power usage
+# context=dcgm.gpu.power.usage family=gpu power dimension=power_usage_instant
+DCGM_FI_DEV_POWER_USAGE_INSTANT, gauge, Power usage instant
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=power_violation
+DCGM_FI_DEV_POWER_VIOLATION, counter, Power violation
+# context=dcgm.gpu.state.performance family=gpu state dimension=pstate
+DCGM_FI_DEV_PSTATE, gauge, Pstate
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_active_preset_profile
+# DCGM_FI_DEV_PWR_SMOOTHING_ACTIVE_PRESET_PROFILE, gauge, Pwr smoothing active preset profile
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_admin_override_percent_tmp_floor
+# DCGM_FI_DEV_PWR_SMOOTHING_ADMIN_OVERRIDE_PERCENT_TMP_FLOOR, gauge, Pwr smoothing admin override percent tmp floor
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_admin_override_ramp_down_hyst_val
+# DCGM_FI_DEV_PWR_SMOOTHING_ADMIN_OVERRIDE_RAMP_DOWN_HYST_VAL, gauge, Pwr smoothing admin override ramp down hyst val
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_admin_override_ramp_down_rate
+# DCGM_FI_DEV_PWR_SMOOTHING_ADMIN_OVERRIDE_RAMP_DOWN_RATE, gauge, Pwr smoothing admin override ramp down rate
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_admin_override_ramp_up_rate
+# DCGM_FI_DEV_PWR_SMOOTHING_ADMIN_OVERRIDE_RAMP_UP_RATE, gauge, Pwr smoothing admin override ramp up rate
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_applied_tmp_ceil
+# DCGM_FI_DEV_PWR_SMOOTHING_APPLIED_TMP_CEIL, gauge, Pwr smoothing applied tmp ceil
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_applied_tmp_floor
+# DCGM_FI_DEV_PWR_SMOOTHING_APPLIED_TMP_FLOOR, gauge, Pwr smoothing applied tmp floor
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_enabled
+# DCGM_FI_DEV_PWR_SMOOTHING_ENABLED, gauge, Pwr smoothing enabled
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_hw_circuitry_percent_lifetime_remaining
+# DCGM_FI_DEV_PWR_SMOOTHING_HW_CIRCUITRY_PERCENT_LIFETIME_REMAINING, gauge, Pwr smoothing hw circuitry percent lifetime remaining
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_imm_ramp_down_enabled
+# DCGM_FI_DEV_PWR_SMOOTHING_IMM_RAMP_DOWN_ENABLED, gauge, Pwr smoothing imm ramp down enabled
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_max_num_preset_profiles
+# DCGM_FI_DEV_PWR_SMOOTHING_MAX_NUM_PRESET_PROFILES, gauge, Pwr smoothing max num preset profiles
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_max_percent_tmp_floor_setting
+# DCGM_FI_DEV_PWR_SMOOTHING_MAX_PERCENT_TMP_FLOOR_SETTING, gauge, Pwr smoothing max percent tmp floor setting
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_min_percent_tmp_floor_setting
+# DCGM_FI_DEV_PWR_SMOOTHING_MIN_PERCENT_TMP_FLOOR_SETTING, gauge, Pwr smoothing min percent tmp floor setting
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_priv_lvl
+# DCGM_FI_DEV_PWR_SMOOTHING_PRIV_LVL, gauge, Pwr smoothing priv lvl
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_profile_percent_tmp_floor
+# DCGM_FI_DEV_PWR_SMOOTHING_PROFILE_PERCENT_TMP_FLOOR, gauge, Pwr smoothing profile percent tmp floor
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_profile_ramp_down_hyst_val
+# DCGM_FI_DEV_PWR_SMOOTHING_PROFILE_RAMP_DOWN_HYST_VAL, gauge, Pwr smoothing profile ramp down hyst val
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_profile_ramp_down_rate
+# DCGM_FI_DEV_PWR_SMOOTHING_PROFILE_RAMP_DOWN_RATE, gauge, Pwr smoothing profile ramp down rate
+# context=dcgm.gpu.power.smoothing family=gpu power dimension=pwr_smoothing_profile_ramp_up_rate
+# DCGM_FI_DEV_PWR_SMOOTHING_PROFILE_RAMP_UP_RATE, gauge, Pwr smoothing profile ramp up rate
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=reliability_violation
+# DCGM_FI_DEV_RELIABILITY_VIOLATION, counter, Reliability violation
+# context=dcgm.gpu.power.profiles family=gpu power dimension=requested_power_profile_mask
+# DCGM_FI_DEV_REQUESTED_POWER_PROFILE_MASK, counter, Requested power profile mask
+# context=dcgm.gpu.memory.page_retirements family=gpu memory dimension=retired_dbe
+DCGM_FI_DEV_RETIRED_DBE, counter, Retired dbe
+# context=dcgm.gpu.memory.page_retirements family=gpu memory dimension=retired_pending
+DCGM_FI_DEV_RETIRED_PENDING, counter, Retired pending
+# context=dcgm.gpu.memory.page_retirements family=gpu memory dimension=retired_sbe
+DCGM_FI_DEV_RETIRED_SBE, counter, Retired sbe
+# context=dcgm.gpu.reliability.row_remap_status family=gpu reliability dimension=row_remap_failure
+DCGM_FI_DEV_ROW_REMAP_FAILURE, gauge, Row remap failure
+# context=dcgm.gpu.reliability.row_remap_status family=gpu reliability dimension=row_remap_pending
+DCGM_FI_DEV_ROW_REMAP_PENDING, gauge, Row remap pending
+# context=dcgm.gpu.inventory.identity family=gpu inventory dimension=serial
+DCGM_FI_DEV_SERIAL, label, Serial
+# context=dcgm.gpu.thermal.temperature family=gpu thermal dimension=shutdown_temp
+DCGM_FI_DEV_SHUTDOWN_TEMP, gauge, Shutdown temp
+# context=dcgm.gpu.thermal.temperature family=gpu thermal dimension=slowdown_temp
+DCGM_FI_DEV_SLOWDOWN_TEMP, gauge, Slowdown temp
+# context=dcgm.gpu.clock.frequency family=gpu clock dimension=sm
+DCGM_FI_DEV_SM_CLOCK, gauge, Sm clock
+# context=dcgm.gpu.capability.support family=gpu capability dimension=supported_clocks
+# DCGM_FI_DEV_SUPPORTED_CLOCKS, gauge, Supported clocks
+# context=dcgm.gpu.capability.support family=gpu capability dimension=supported_type_info
+# DCGM_FI_DEV_SUPPORTED_TYPE_INFO, label, Supported type info
+# context=dcgm.gpu.virtualization.vgpu.type family=gpu virtualization dimension=supported_vgpu_type_ids
+# DCGM_FI_DEV_SUPPORTED_VGPU_TYPE_IDS, gauge, Supported vgpu type ids
+# context=dcgm.gpu.state.configuration family=gpu state dimension=sync_boost_violation
+# DCGM_FI_DEV_SYNC_BOOST_VIOLATION, counter, Sync boost violation
+# context=dcgm.gpu.cpu.power family=gpu cpu dimension=sysio_power_util_current
+# DCGM_FI_DEV_SYSIO_POWER_UTIL_CURRENT, gauge, Sysio power util current
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=thermal_violation
+DCGM_FI_DEV_THERMAL_VIOLATION, counter, Thermal violation
+# context=dcgm.gpu.reliability.memory_health family=gpu reliability dimension=threshold_srm
+DCGM_FI_DEV_THRESHOLD_SRM, gauge, Threshold srm
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=total_app_clocks_violation
+# DCGM_FI_DEV_TOTAL_APP_CLOCKS_VIOLATION, counter, Total app clocks violation
+# context=dcgm.gpu.throttle.violations family=gpu throttle dimension=total_base_clocks_violation
+# DCGM_FI_DEV_TOTAL_BASE_CLOCKS_VIOLATION, counter, Total base clocks violation
+# context=dcgm.gpu.power.energy family=gpu power dimension=total
+DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION, counter, Total energy consumption
+# context=dcgm.gpu.reliability.row_remap_events family=gpu reliability dimension=uncorrectable_remapped_rows
+DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS, counter, Uncorrectable remapped rows
+# context=dcgm.gpu.inventory.identity family=gpu inventory dimension=uuid
+# DCGM_FI_DEV_UUID, label, Uuid
+# context=dcgm.gpu.power.profiles family=gpu power dimension=valid_power_profile_mask
+# DCGM_FI_DEV_VALID_POWER_PROFILE_MASK, counter, Valid power profile mask
+# context=dcgm.gpu.inventory.software family=gpu inventory dimension=vbios_version
+# DCGM_FI_DEV_VBIOS_VERSION, label, Vbios version
+# context=dcgm.gpu.virtualization.vgpu.software family=gpu virtualization dimension=vgpu_driver_version
+# DCGM_FI_DEV_VGPU_DRIVER_VERSION, label, Vgpu driver version
+# context=dcgm.gpu.virtualization.vgpu.sessions family=gpu virtualization dimension=vgpu_enc_sessions_info
+# DCGM_FI_DEV_VGPU_ENC_SESSIONS_INFO, gauge, Vgpu enc sessions info
+# context=dcgm.gpu.virtualization.vgpu.sessions family=gpu virtualization dimension=vgpu_enc_stats
+# DCGM_FI_DEV_VGPU_ENC_STATS, gauge, Vgpu enc stats
+# context=dcgm.gpu.virtualization.vgpu.sessions family=gpu virtualization dimension=vgpu_fbc_sessions_info
+# DCGM_FI_DEV_VGPU_FBC_SESSIONS_INFO, gauge, Vgpu fbc sessions info
+# context=dcgm.gpu.virtualization.vgpu.sessions family=gpu virtualization dimension=vgpu_fbc_stats
+# DCGM_FI_DEV_VGPU_FBC_STATS, gauge, Vgpu fbc stats
+# context=dcgm.gpu.virtualization.vgpu.frame_rate family=gpu virtualization dimension=vgpu_frame_rate_limit
+# DCGM_FI_DEV_VGPU_FRAME_RATE_LIMIT, gauge, Vgpu frame rate limit
+# context=dcgm.gpu.virtualization.vgpu.instance family=gpu virtualization dimension=vgpu_instance_ids
+# DCGM_FI_DEV_VGPU_INSTANCE_IDS, gauge, Vgpu instance ids
+# context=dcgm.gpu.virtualization.vgpu.license family=gpu virtualization dimension=vgpu_instance_license_state
+# DCGM_FI_DEV_VGPU_INSTANCE_LICENSE_STATE, gauge, Vgpu instance license state
+# context=dcgm.gpu.virtualization.vgpu.license family=gpu virtualization dimension=vgpu_license_status
+DCGM_FI_DEV_VGPU_LICENSE_STATUS, gauge, Vgpu license status
+# context=dcgm.gpu.virtualization.vgpu.memory family=gpu virtualization dimension=vgpu_memory_usage
+DCGM_FI_DEV_VGPU_MEMORY_USAGE, gauge, Vgpu memory usage
+# context=dcgm.gpu.virtualization.vgpu.instance family=gpu virtualization dimension=vgpu_pci_id
+# DCGM_FI_DEV_VGPU_PCI_ID, gauge, Vgpu pci id
+# context=dcgm.gpu.virtualization.vgpu.utilization family=gpu virtualization dimension=vgpu_per_process_utilization
+# DCGM_FI_DEV_VGPU_PER_PROCESS_UTILIZATION, gauge, Vgpu per process utilization
+# context=dcgm.gpu.virtualization.vgpu.type family=gpu virtualization dimension=vgpu_type
+# DCGM_FI_DEV_VGPU_TYPE, gauge, Vgpu type
+# context=dcgm.gpu.virtualization.vgpu.type family=gpu virtualization dimension=vgpu_type_class
+# DCGM_FI_DEV_VGPU_TYPE_CLASS, gauge, Vgpu type class
+# context=dcgm.gpu.virtualization.vgpu.type family=gpu virtualization dimension=vgpu_type_info
+# DCGM_FI_DEV_VGPU_TYPE_INFO, label, Vgpu type info
+# context=dcgm.gpu.virtualization.vgpu.license family=gpu virtualization dimension=vgpu_type_license
+# DCGM_FI_DEV_VGPU_TYPE_LICENSE, gauge, Vgpu type license
+# context=dcgm.gpu.virtualization.vgpu.type family=gpu virtualization dimension=vgpu_type_name
+# DCGM_FI_DEV_VGPU_TYPE_NAME, label, Vgpu type name
+# context=dcgm.gpu.virtualization.vgpu.utilization family=gpu virtualization dimension=vgpu_utilizations
+# DCGM_FI_DEV_VGPU_UTILIZATIONS, gauge, Vgpu utilizations
+# context=dcgm.gpu.virtualization.vgpu.instance family=gpu virtualization dimension=vgpu_uuid
+# DCGM_FI_DEV_VGPU_UUID, label, Vgpu uuid
+# context=dcgm.gpu.virtualization.vgpu.vm family=gpu virtualization dimension=vgpu_vm_gpu_instance_id
+# DCGM_FI_DEV_VGPU_VM_GPU_INSTANCE_ID, gauge, Vgpu vm gpu instance id
+# context=dcgm.gpu.virtualization.vgpu.vm family=gpu virtualization dimension=vgpu_vm_id
+# DCGM_FI_DEV_VGPU_VM_ID, label, Vgpu vm id
+# context=dcgm.gpu.virtualization.vgpu.vm family=gpu virtualization dimension=vgpu_vm_name
+# DCGM_FI_DEV_VGPU_VM_NAME, label, Vgpu vm name
+# context=dcgm.gpu.clock.frequency family=gpu clock dimension=video_clock
+DCGM_FI_DEV_VIDEO_CLOCK, gauge, Video clock
+# context=dcgm.gpu.state.virtualization family=gpu state dimension=virtual_mode
+DCGM_FI_DEV_VIRTUAL_MODE, gauge, Virtual mode
+# context=dcgm.gpu.reliability.xid family=gpu reliability dimension=xid
+DCGM_FI_DEV_XID_ERRORS, counter, Xid errors
+# context=dcgm.exporter.inventory.software family=exporter inventory dimension=driver_version
+DCGM_FI_DRIVER_VERSION, label, Driver version
+# context=dcgm.nvswitch.internal.boundary family=nvswitch internal dimension=first_nvswitch_field_id
+# DCGM_FI_FIRST_NVSWITCH_FIELD_ID, gauge, First nvswitch field id
+# context=dcgm.gpu.internal.boundary family=gpu internal dimension=first_vgpu_field_id
+# DCGM_FI_FIRST_VGPU_FIELD_ID, gauge, First vgpu field id
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=gpu_topology_affinity
+# DCGM_FI_GPU_TOPOLOGY_AFFINITY, gauge, Gpu topology affinity
+# context=dcgm.nvlink.interconnect.state family=nvlink interconnect dimension=gpu_topology_nvlink
+# DCGM_FI_GPU_TOPOLOGY_NVLINK, gauge, Gpu topology nvlink
+# context=dcgm.gpu.topology.affinity family=gpu topology dimension=gpu_topology_pci
+# DCGM_FI_GPU_TOPOLOGY_PCI, gauge, Gpu topology pci
+# context=dcgm.gpu.health.status family=gpu health dimension=imex_daemon_status
+# DCGM_FI_IMEX_DAEMON_STATUS, gauge, Imex daemon status
+# context=dcgm.gpu.health.status family=gpu health dimension=imex_domain_status
+# DCGM_FI_IMEX_DOMAIN_STATUS, gauge, Imex domain status
+# context=dcgm.gpu.internal.boundary family=gpu internal dimension=internal_fields_0_end
+# DCGM_FI_INTERNAL_FIELDS_0_END, gauge, Internal fields 0 end
+# context=dcgm.gpu.internal.boundary family=gpu internal dimension=internal_fields_0_start
+# DCGM_FI_INTERNAL_FIELDS_0_START, gauge, Internal fields 0 start
+# context=dcgm.nvswitch.internal.boundary family=nvswitch internal dimension=last_nvswitch_field_id
+# DCGM_FI_LAST_NVSWITCH_FIELD_ID, gauge, Last nvswitch field id
+# context=dcgm.gpu.internal.boundary family=gpu internal dimension=last_vgpu_field_id
+# DCGM_FI_LAST_VGPU_FIELD_ID, gauge, Last vgpu field id
+# context=dcgm.exporter.inventory.software family=exporter inventory dimension=nvml_version
+# DCGM_FI_NVML_VERSION, label, Nvml version
+# context=dcgm.gpu.inventory.software family=gpu inventory dimension=process_name
+# DCGM_FI_PROCESS_NAME, label, Process name
+# context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_rx_all_bytes
+# DCGM_FI_PROF_C2C_RX_ALL_BYTES, gauge, C2c rx all bytes
+# context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_rx_data_bytes
+# DCGM_FI_PROF_C2C_RX_DATA_BYTES, gauge, C2c rx data bytes
+# context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_tx_all_bytes
+# DCGM_FI_PROF_C2C_TX_ALL_BYTES, gauge, C2c tx all bytes
+# context=dcgm.gpu.interconnect.throughput family=gpu interconnect/overview dimension=c2c_tx_data_bytes
+# DCGM_FI_PROF_C2C_TX_DATA_BYTES, gauge, C2c tx data bytes
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=dram
+DCGM_FI_PROF_DRAM_ACTIVE, gauge, Dram active
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=graphics_engine_active
+DCGM_FI_PROF_GR_ENGINE_ACTIVE, gauge, Gr engine active
+# context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=hostmem_cache_hit
+DCGM_FI_PROF_HOSTMEM_CACHE_HIT, gauge, Hostmem cache hit
+# context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=hostmem_cache_miss
+DCGM_FI_PROF_HOSTMEM_CACHE_MISS, gauge, Hostmem cache miss
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec0_active
+# DCGM_FI_PROF_NVDEC0_ACTIVE, gauge, Nvdec0 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec1_active
+# DCGM_FI_PROF_NVDEC1_ACTIVE, gauge, Nvdec1 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec2_active
+# DCGM_FI_PROF_NVDEC2_ACTIVE, gauge, Nvdec2 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec3_active
+# DCGM_FI_PROF_NVDEC3_ACTIVE, gauge, Nvdec3 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec4_active
+# DCGM_FI_PROF_NVDEC4_ACTIVE, gauge, Nvdec4 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec5_active
+# DCGM_FI_PROF_NVDEC5_ACTIVE, gauge, Nvdec5 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec6_active
+# DCGM_FI_PROF_NVDEC6_ACTIVE, gauge, Nvdec6 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvdec7_active
+# DCGM_FI_PROF_NVDEC7_ACTIVE, gauge, Nvdec7 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg0_active
+# DCGM_FI_PROF_NVJPG0_ACTIVE, gauge, Nvjpg0 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg1_active
+# DCGM_FI_PROF_NVJPG1_ACTIVE, gauge, Nvjpg1 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg2_active
+# DCGM_FI_PROF_NVJPG2_ACTIVE, gauge, Nvjpg2 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg3_active
+# DCGM_FI_PROF_NVJPG3_ACTIVE, gauge, Nvjpg3 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg4_active
+# DCGM_FI_PROF_NVJPG4_ACTIVE, gauge, Nvjpg4 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg5_active
+# DCGM_FI_PROF_NVJPG5_ACTIVE, gauge, Nvjpg5 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg6_active
+# DCGM_FI_PROF_NVJPG6_ACTIVE, gauge, Nvjpg6 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvjpg7_active
+# DCGM_FI_PROF_NVJPG7_ACTIVE, gauge, Nvjpg7 active
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l0_rx
+# DCGM_FI_PROF_NVLINK_L0_RX_BYTES, gauge, Nvlink l0 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l0_tx
+# DCGM_FI_PROF_NVLINK_L0_TX_BYTES, gauge, Nvlink l0 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l10_rx
+# DCGM_FI_PROF_NVLINK_L10_RX_BYTES, gauge, Nvlink l10 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l10_tx
+# DCGM_FI_PROF_NVLINK_L10_TX_BYTES, gauge, Nvlink l10 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l11_rx
+# DCGM_FI_PROF_NVLINK_L11_RX_BYTES, gauge, Nvlink l11 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l11_tx
+# DCGM_FI_PROF_NVLINK_L11_TX_BYTES, gauge, Nvlink l11 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l12_rx
+# DCGM_FI_PROF_NVLINK_L12_RX_BYTES, gauge, Nvlink l12 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l12_tx
+# DCGM_FI_PROF_NVLINK_L12_TX_BYTES, gauge, Nvlink l12 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l13_rx
+# DCGM_FI_PROF_NVLINK_L13_RX_BYTES, gauge, Nvlink l13 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l13_tx
+# DCGM_FI_PROF_NVLINK_L13_TX_BYTES, gauge, Nvlink l13 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l14_rx
+# DCGM_FI_PROF_NVLINK_L14_RX_BYTES, gauge, Nvlink l14 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l14_tx
+# DCGM_FI_PROF_NVLINK_L14_TX_BYTES, gauge, Nvlink l14 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l15_rx
+# DCGM_FI_PROF_NVLINK_L15_RX_BYTES, gauge, Nvlink l15 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l15_tx
+# DCGM_FI_PROF_NVLINK_L15_TX_BYTES, gauge, Nvlink l15 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l16_rx
+# DCGM_FI_PROF_NVLINK_L16_RX_BYTES, gauge, Nvlink l16 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l16_tx
+# DCGM_FI_PROF_NVLINK_L16_TX_BYTES, gauge, Nvlink l16 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l17_rx
+# DCGM_FI_PROF_NVLINK_L17_RX_BYTES, gauge, Nvlink l17 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l17_tx
+# DCGM_FI_PROF_NVLINK_L17_TX_BYTES, gauge, Nvlink l17 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l1_rx
+# DCGM_FI_PROF_NVLINK_L1_RX_BYTES, gauge, Nvlink l1 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l1_tx
+# DCGM_FI_PROF_NVLINK_L1_TX_BYTES, gauge, Nvlink l1 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l2_rx
+# DCGM_FI_PROF_NVLINK_L2_RX_BYTES, gauge, Nvlink l2 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l2_tx
+# DCGM_FI_PROF_NVLINK_L2_TX_BYTES, gauge, Nvlink l2 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l3_rx
+# DCGM_FI_PROF_NVLINK_L3_RX_BYTES, gauge, Nvlink l3 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l3_tx
+# DCGM_FI_PROF_NVLINK_L3_TX_BYTES, gauge, Nvlink l3 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l4_rx
+# DCGM_FI_PROF_NVLINK_L4_RX_BYTES, gauge, Nvlink l4 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l4_tx
+# DCGM_FI_PROF_NVLINK_L4_TX_BYTES, gauge, Nvlink l4 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l5_rx
+# DCGM_FI_PROF_NVLINK_L5_RX_BYTES, gauge, Nvlink l5 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l5_tx
+# DCGM_FI_PROF_NVLINK_L5_TX_BYTES, gauge, Nvlink l5 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l6_rx
+# DCGM_FI_PROF_NVLINK_L6_RX_BYTES, gauge, Nvlink l6 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l6_tx
+# DCGM_FI_PROF_NVLINK_L6_TX_BYTES, gauge, Nvlink l6 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l7_rx
+# DCGM_FI_PROF_NVLINK_L7_RX_BYTES, gauge, Nvlink l7 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l7_tx
+# DCGM_FI_PROF_NVLINK_L7_TX_BYTES, gauge, Nvlink l7 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l8_rx
+# DCGM_FI_PROF_NVLINK_L8_RX_BYTES, gauge, Nvlink l8 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l8_tx
+# DCGM_FI_PROF_NVLINK_L8_TX_BYTES, gauge, Nvlink l8 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l9_rx
+# DCGM_FI_PROF_NVLINK_L9_RX_BYTES, gauge, Nvlink l9 rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_l9_tx
+# DCGM_FI_PROF_NVLINK_L9_TX_BYTES, gauge, Nvlink l9 tx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_rx
+DCGM_FI_PROF_NVLINK_RX_BYTES, gauge, Nvlink rx bytes
+# context=dcgm.nvlink.interconnect.throughput family=nvlink interconnect dimension=nvlink_tx
+DCGM_FI_PROF_NVLINK_TX_BYTES, gauge, Nvlink tx bytes
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvofa0_active
+# DCGM_FI_PROF_NVOFA0_ACTIVE, gauge, Nvofa0 active
+# context=dcgm.gpu.compute.media.activity family=gpu compute dimension=nvofa1_active
+# DCGM_FI_PROF_NVOFA1_ACTIVE, gauge, Nvofa1 active
+# context=dcgm.gpu.interconnect.pcie.throughput family=gpu interconnect/pcie dimension=pcie_rx
+DCGM_FI_PROF_PCIE_RX_BYTES, gauge, Pcie rx bytes
+# context=dcgm.gpu.interconnect.pcie.throughput family=gpu interconnect/pcie dimension=pcie_tx
+DCGM_FI_PROF_PCIE_TX_BYTES, gauge, Pcie tx bytes
+# context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=peermem_cache_hit
+DCGM_FI_PROF_PEERMEM_CACHE_HIT, gauge, Peermem cache hit
+# context=dcgm.gpu.compute.cache.activity family=gpu compute dimension=peermem_cache_miss
+DCGM_FI_PROF_PEERMEM_CACHE_MISS, gauge, Peermem cache miss
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=fp16
+DCGM_FI_PROF_PIPE_FP16_ACTIVE, gauge, Pipe fp16 active
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=fp32
+DCGM_FI_PROF_PIPE_FP32_ACTIVE, gauge, Pipe fp32 active
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=fp64
+DCGM_FI_PROF_PIPE_FP64_ACTIVE, gauge, Pipe fp64 active
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=integer
+DCGM_FI_PROF_PIPE_INT_ACTIVE, gauge, Pipe int active
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=tensor
+DCGM_FI_PROF_PIPE_TENSOR_ACTIVE, gauge, Pipe tensor active
+# context=dcgm.gpu.compute.tensor.activity family=gpu compute dimension=tensor_dfma
+DCGM_FI_PROF_PIPE_TENSOR_DFMA_ACTIVE, gauge, Pipe tensor dfma active
+# context=dcgm.gpu.compute.tensor.activity family=gpu compute dimension=tensor_hmma
+DCGM_FI_PROF_PIPE_TENSOR_HMMA_ACTIVE, gauge, Pipe tensor hmma active
+# context=dcgm.gpu.compute.tensor.activity family=gpu compute dimension=tensor_imma
+DCGM_FI_PROF_PIPE_TENSOR_IMMA_ACTIVE, gauge, Pipe tensor imma active
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=sm_active
+DCGM_FI_PROF_SM_ACTIVE, gauge, Sm active
+# context=dcgm.gpu.compute.activity family=gpu compute dimension=sm_occupancy
+DCGM_FI_PROF_SM_OCCUPANCY, gauge, Sm occupancy
+# context=dcgm.gpu.state.configuration family=gpu state dimension=sync_boost
+# DCGM_FI_SYNC_BOOST, gauge, Sync boost

@@ -97,7 +97,7 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_PREDEPENDS "netdata-user, libcap2-bin")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
 		"netdata-plugin-cups, netdata-plugin-freeipmi, netdata-plugin-ibm")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
-		"netdata-plugin-systemd-units, \
+		"netdata-plugin-systemd-journal, netdata-plugin-systemd-units, \
 netdata-plugin-network-viewer")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
@@ -108,10 +108,6 @@ endif()
 
 if(ENABLE_PLUGIN_OTEL)
   list(APPEND _main_deps "netdata-plugin-otel")
-endif()
-
-if(ENABLE_NETDATA_JOURNAL_FILE_READER)
-  list(APPEND _main_deps "netdata-plugin-journal-viewer")
 endif()
 
 if(ENABLE_PLUGIN_CHARTS)
@@ -360,6 +356,28 @@ set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 
 #
+# scripts.d.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-SCRIPTS_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-SCRIPTS_DESCRIPTION
+		"The scripts metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics using scripts
+that provide data in an extended version of the output format used by
+Nagios plugins. This provides compatibility with most Nagios plugins,
+as well as enabling simple active checks.")
+
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_NAME "netdata-plugin-scripts")
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_CONFLICTS "netdata (<< 2.8)")
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_PREDEPENDS "netdata-user")
+
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-scripts/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_DEBUGINFO_PACKAGE Off)
+
+#
 # ibm.plugin
 #
 
@@ -429,6 +447,7 @@ set(CPACK_COMPONENT_PLUGIN-OTEL_DESCRIPTION
 
 set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_NAME "netdata-plugin-otel")
 set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_DEPENDS "netdata-plugin-otel-signal-viewer (= ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_PREDEPENDS "netdata-user")
 
@@ -436,6 +455,25 @@ set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-otel/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-OTEL_DEBUGINFO_PACKAGE Off)
+
+#
+# otel-signal-viewer
+#
+
+set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_DESCRIPTION
+		"The OTel signal viewer plugin for the Netdata Agent
+ This plugin provides OTel signal viewing and querying functionality
+ with histogram analysis and faceted search capabilities.")
+
+set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_NAME "netdata-plugin-otel-signal-viewer")
+set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+
+set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_PACKAGE_CONTROL_EXTRA
+		"${PKG_FILES_PATH}/deb/plugin-otel-signal-viewer/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_DEBUGINFO_PACKAGE Off)
 
 #
 # nfacct.plugin
@@ -522,27 +560,33 @@ set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-SLABINFO-DEBUGINFO_PACKAGE On)
 
 #
-# journal-viewer.plugin
+# systemd-journal.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-JOURNAL-VIEWER_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-SYSTEMD-JOURNAL_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-SYSTEMD-JOURNAL_DESCRIPTION
+		"The systemd-journal collector for the Netdata Agent
+ This plugin allows the Netdata Agent to present logs from the systemd
+ journal on Netdata Cloud or the local Agent dashboard.")
+
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_NAME "netdata-plugin-systemd-journal")
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-systemd-journal/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_DEBUGINFO_PACKAGE On)
+
 set(CPACK_COMPONENT_PLUGIN-JOURNAL-VIEWER_DESCRIPTION
-		"The journal viewer plugin for the Netdata Agent
- This plugin provides systemd journal log viewing and querying functionality
- with histogram analysis and faceted search capabilities.")
+		"Transitional dummy package.
+ This package simply ensures a clean upgrade to the renamed
+ netdata-plugin-systemd-journal package. Once that package is installed,
+ you can safely remove this one.")
 
 set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_NAME "netdata-plugin-journal-viewer")
 set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_SECTION "net")
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
-
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES_PATH}/deb/plugin-journal-viewer/postinst")
-
-# Replaces old systemd-journal plugin
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_CONFLICTS "netdata-plugin-systemd-journal")
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_REPLACES "netdata-plugin-systemd-journal")
-
-set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_DEPENDS "netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION})")
 
 #
 # systemd-units.plugin
@@ -619,6 +663,9 @@ if(ENABLE_PLUGIN_IBM)
   list(APPEND CPACK_COMPONENTS_ALL "plugin-ibm")
   list(APPEND CPACK_COMPONENTS_ALL "plugin-ibm-libs")
 endif()
+if(ENABLE_PLUGIN_SCRIPTS)
+  list(APPEND CPACK_COMPONENTS_ALL "plugin-scripts")
+endif()
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-network-viewer")
 endif()
@@ -634,8 +681,9 @@ endif()
 if(ENABLE_PLUGIN_SLABINFO)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-slabinfo")
 endif()
-if(ENABLE_PLUGIN_OTEL)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-journal-viewer")
+if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
+  list(APPEND CPACK_COMPONENTS_ALL "plugin-journal-viewer")
+  list(APPEND CPACK_COMPONENTS_ALL "plugin-systemd-journal")
 endif()
 if(ENABLE_PLUGIN_SYSTEMD_UNITS)
   list(APPEND CPACK_COMPONENTS_ALL "plugin-systemd-units")
@@ -645,6 +693,9 @@ if(ENABLE_PLUGIN_XENSTAT)
 endif()
 if(ENABLE_PLUGIN_OTEL)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-otel")
+endif()
+if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
+        list(APPEND CPACK_COMPONENTS_ALL "plugin-otel-signal-viewer")
 endif()
 
 include(CPack)

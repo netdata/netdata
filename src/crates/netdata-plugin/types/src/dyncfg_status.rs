@@ -87,19 +87,43 @@ mod tests {
     #[test]
     fn test_from_name() {
         assert_eq!(DynCfgStatus::from_name("none"), Some(DynCfgStatus::None));
-        assert_eq!(DynCfgStatus::from_name("accepted"), Some(DynCfgStatus::Accepted));
-        assert_eq!(DynCfgStatus::from_name("running"), Some(DynCfgStatus::Running));
-        assert_eq!(DynCfgStatus::from_name("failed"), Some(DynCfgStatus::Failed));
-        assert_eq!(DynCfgStatus::from_name("disabled"), Some(DynCfgStatus::Disabled));
-        assert_eq!(DynCfgStatus::from_name("orphan"), Some(DynCfgStatus::Orphan));
-        assert_eq!(DynCfgStatus::from_name("incomplete"), Some(DynCfgStatus::Incomplete));
+        assert_eq!(
+            DynCfgStatus::from_name("accepted"),
+            Some(DynCfgStatus::Accepted)
+        );
+        assert_eq!(
+            DynCfgStatus::from_name("running"),
+            Some(DynCfgStatus::Running)
+        );
+        assert_eq!(
+            DynCfgStatus::from_name("failed"),
+            Some(DynCfgStatus::Failed)
+        );
+        assert_eq!(
+            DynCfgStatus::from_name("disabled"),
+            Some(DynCfgStatus::Disabled)
+        );
+        assert_eq!(
+            DynCfgStatus::from_name("orphan"),
+            Some(DynCfgStatus::Orphan)
+        );
+        assert_eq!(
+            DynCfgStatus::from_name("incomplete"),
+            Some(DynCfgStatus::Incomplete)
+        );
         assert_eq!(DynCfgStatus::from_name("invalid"), None);
     }
 
     #[test]
     fn test_from_slice() {
-        assert_eq!(DynCfgStatus::from_slice(b"running"), Some(DynCfgStatus::Running));
-        assert_eq!(DynCfgStatus::from_slice(b"  failed  "), Some(DynCfgStatus::Failed));
+        assert_eq!(
+            DynCfgStatus::from_slice(b"running"),
+            Some(DynCfgStatus::Running)
+        );
+        assert_eq!(
+            DynCfgStatus::from_slice(b"  failed  "),
+            Some(DynCfgStatus::Failed)
+        );
         assert_eq!(DynCfgStatus::from_slice(b"invalid"), None);
         assert_eq!(DynCfgStatus::from_slice(&[0xFF, 0xFE]), None); // Invalid UTF-8
     }

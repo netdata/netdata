@@ -1,0 +1,87 @@
+pattern: "(?P<key>\\w+)=(?P<value>.*)"
+
+# Test various YAML multiline string formats
+
+inject:
+  # Literal style (preserves newlines and trailing spaces)
+  - key: LITERAL_STYLE
+    value: |
+      This is a literal style multi-line string.
+      It preserves newlines exactly as written.
+      Even trailing spaces are preserved.   
+      
+      Empty lines are preserved too.
+      
+  # Folded style (folds newlines into spaces)
+  - key: FOLDED_STYLE
+    value: >
+      This is a folded style multi-line string.
+      Newlines are folded into spaces,
+      creating a single long line.
+      
+      But paragraph breaks (empty lines) are preserved.
+      
+  # Literal style with block chomping indicators
+  - key: LITERAL_STRIP
+    value: |-
+      This literal block strips
+      the final newline.
+      
+  - key: LITERAL_KEEP
+    value: |+
+      This literal block keeps
+      all trailing newlines.
+      
+      
+  # Folded style with chomping
+  - key: FOLDED_STRIP  
+    value: >-
+      This folded block strips
+      the final newline.
+      
+  - key: FOLDED_KEEP
+    value: >+  
+      This folded block keeps
+      all trailing newlines.
+      
+      
+  # Indentation indicators
+  - key: LITERAL_INDENT
+    value: |2
+        This literal block
+        has explicit indentation
+        of 2 spaces.
+        
+  # Complex multi-line with special characters
+  - key: COMPLEX_MULTILINE
+    value: |
+      Line with "quotes" and 'apostrophes'
+      Line with \backslashes\ and /forward/slashes/
+      Line with ${variables} and $(substitutions)
+      Line with special chars: @#$%^&*()
+      Unicode: αβγ 🚀 中文
+      
+rewrite:
+  # Multi-line patterns in rewrite rules
+  - key: MULTILINE_PATTERN
+    match: |
+      This will be treated as
+      a single line pattern
+      with spaces between.
+    value: "Matched multi-line"
+    
+  - key: MULTILINE_REPLACEMENT
+    match: "error"
+    value: |
+      ERROR DETECTED!
+      Please check the logs.
+      Contact support if needed.
+      
+  # Variable substitution in multi-line
+  - key: TEMPLATE
+    value: >
+      Error in ${key}:
+      Value was: ${value}
+      Time: ${timestamp}
+      Please investigate.
+    inject: yes

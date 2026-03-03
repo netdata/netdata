@@ -909,6 +909,7 @@ bool collect_data_for_all_pids(void) {
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
         p->read = p->updated = p->merged = false;
         p->children_count = 0;
+        p->parent = NULL; // clear stale parent pointers from previous iteration to prevent use-after-free
 
 #if (INCREMENTAL_DATA_COLLECTION == 0)
         p->last_stat_collected_usec = p->stat_collected_usec;

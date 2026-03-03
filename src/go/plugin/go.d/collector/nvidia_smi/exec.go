@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -24,6 +25,13 @@ type nvidiaSmiBinary interface {
 
 func newNvidiaSmiBinary(path string, cfg Config, log *logger.Logger) (nvidiaSmiBinary, error) {
 	if !cfg.LoopMode {
+		if runtime.GOOS == "windows" {
+			return &nvidiaSmiDirectExec{
+				Logger:  log,
+				binPath: path,
+				timeout: cfg.Timeout.Duration(),
+			}, nil
+		}
 		return &nvidiaSmiExec{
 			Logger:  log,
 			binPath: path,
@@ -45,6 +53,7 @@ func newNvidiaSmiBinary(path string, cfg Config, log *logger.Logger) (nvidiaSmiB
 	return smi, nil
 }
 
+// nvidiaSmiExec executes nvidia-smi via nd-run (Linux/BSD)
 type nvidiaSmiExec struct {
 	*logger.Logger
 
@@ -57,6 +66,20 @@ func (e *nvidiaSmiExec) queryGPUInfo() ([]byte, error) {
 }
 
 func (e *nvidiaSmiExec) stop() error { return nil }
+
+// nvidiaSmiDirectExec executes nvidia-smi directly (Windows)
+type nvidiaSmiDirectExec struct {
+	*logger.Logger
+
+	binPath string
+	timeout time.Duration
+}
+
+func (e *nvidiaSmiDirectExec) queryGPUInfo() ([]byte, error) {
+	return ndexec.RunDirect(e.Logger, e.timeout, e.binPath, "-q", "-x")
+}
+
+func (e *nvidiaSmiDirectExec) stop() error { return nil }
 
 type nvidiaSmiLoopExec struct {
 	*logger.Logger

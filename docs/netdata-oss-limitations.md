@@ -86,9 +86,12 @@ Functions provide on-demand, detailed information beyond standard metrics.
 
 ## MCP (Model Context Protocol)
 
-Netdata's MCP server is available directly at Netdata Agents and Parents, independent of Netdata Cloud authentication. This allows AI assistants and tools to query metrics and execute functions through the MCP protocol.
+Netdata provides MCP in two ways:
 
-When accessing Netdata via MCP:
+- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — infrastructure-wide access to all your nodes (requires Business or Homelab plan)
+- **Agent/Parent MCP** — available directly at Netdata Agents and Parents, free and open-source
+
+When accessing Netdata via Agent/Parent MCP:
 
 - **Without Cloud connection**: MCP can access public functions and metrics, but sensitive functions follow the same restrictions as the dashboard
 - **With Cloud connection**: MCP inherits the user's Cloud permissions, enabling access to sensitive functions for authenticated users

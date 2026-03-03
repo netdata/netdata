@@ -7,11 +7,11 @@ import (
 	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func (c *Collector) initCharts() (*Charts, error) {
-	var bucketCharts = module.Charts{
+	var bucketCharts = collectorapi.Charts{
 		bucketQuotaPercentUsedChart.Copy(),
 		bucketOpsPerSecChart.Copy(),
 		bucketDiskFetchesChart.Copy(),

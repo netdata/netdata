@@ -336,20 +336,20 @@ static inline bool lqs_request_parse_json_payload(json_object *jobj, void *data,
 
     buffer_flush(error);
 
-    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_INFO, rq->info, error, false);
-    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_DELTA, rq->delta, error, false);
-    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_TAIL, rq->tail, error, false);
-    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_SLICE, rq->slice, error, false);
-    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_DATA_ONLY, rq->data_only, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_SAMPLING, rq->sampling, error, false);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_AFTER, rq->after_s, error, false);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_BEFORE, rq->before_s, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_IF_MODIFIED_SINCE, rq->if_modified_since, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_ANCHOR, rq->anchor, error, false);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_LAST, rq->entries, error, false);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_DIRECTION, lgs_get_direction, rq->direction, error, false);
-    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_QUERY, rq->query, error, false);
-    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_HISTOGRAM, rq->histogram, error, false);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_INFO, rq->info, error, JSONC_OPTIONAL);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_DELTA, rq->delta, error, JSONC_OPTIONAL);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_TAIL, rq->tail, error, JSONC_OPTIONAL);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_SLICE, rq->slice, error, JSONC_OPTIONAL);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_DATA_ONLY, rq->data_only, error, JSONC_OPTIONAL);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_SAMPLING, rq->sampling, error, JSONC_OPTIONAL);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_AFTER, rq->after_s, error, JSONC_OPTIONAL);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_BEFORE, rq->before_s, error, JSONC_OPTIONAL);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_IF_MODIFIED_SINCE, rq->if_modified_since, error, JSONC_OPTIONAL);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_ANCHOR, rq->anchor, error, JSONC_OPTIONAL);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_LAST, rq->entries, error, JSONC_OPTIONAL);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_DIRECTION, lgs_get_direction, rq->direction, error, JSONC_OPTIONAL);
+    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_QUERY, rq->query, error, JSONC_OPTIONAL);
+    JSONC_PARSE_TXT2STRDUPZ_OR_ERROR_AND_RETURN(jobj, path, LQS_PARAMETER_HISTOGRAM, rq->histogram, error, JSONC_OPTIONAL);
 
     json_object *fcts;
     if (json_object_object_get_ex(jobj, LQS_PARAMETER_FACETS, &fcts)) {

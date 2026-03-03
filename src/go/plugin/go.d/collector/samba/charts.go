@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioSyscallCalls = module.Priority + iota
+	prioSyscallCalls = collectorapi.Priority + iota
 	prioSyscallTransferredData
 
 	prioSmb2CallCalls
@@ -18,54 +18,54 @@ const (
 )
 
 var (
-	syscallCallsChartTmpl = module.Chart{
+	syscallCallsChartTmpl = collectorapi.Chart{
 		ID:       "syscall_%s_calls",
 		Title:    "Syscalls Count",
 		Units:    "calls/s",
 		Fam:      "syscalls",
 		Ctx:      "samba.syscall_calls",
 		Priority: prioSyscallCalls,
-		Type:     module.Line,
-		Dims: module.Dims{
-			{ID: "syscall_%s_count", Name: "syscalls", Algo: module.Incremental},
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
+			{ID: "syscall_%s_count", Name: "syscalls", Algo: collectorapi.Incremental},
 		},
 	}
-	syscallTransferredDataChartTmpl = module.Chart{
+	syscallTransferredDataChartTmpl = collectorapi.Chart{
 		ID:       "syscall_%s_transferred_data",
 		Title:    "Syscall Transferred Data",
 		Units:    "bytes/s",
 		Fam:      "syscalls",
 		Ctx:      "samba.syscall_transferred_data",
 		Priority: prioSyscallTransferredData,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "syscall_%s_bytes", Name: "transferred", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "syscall_%s_bytes", Name: "transferred", Algo: collectorapi.Incremental},
 		},
 	}
 
-	smb2CallCallsChartTmpl = module.Chart{
+	smb2CallCallsChartTmpl = collectorapi.Chart{
 		ID:       "smb2_call_%s_calls",
 		Title:    "SMB2 Calls Count",
 		Units:    "calls/s",
 		Fam:      "smb2 calls",
 		Ctx:      "samba.smb2_call_calls",
 		Priority: prioSmb2CallCalls,
-		Type:     module.Line,
-		Dims: module.Dims{
-			{ID: "smb2_%s_count", Name: "smb2", Algo: module.Incremental},
+		Type:     collectorapi.Line,
+		Dims: collectorapi.Dims{
+			{ID: "smb2_%s_count", Name: "smb2", Algo: collectorapi.Incremental},
 		},
 	}
-	smb2CallTransferredDataChartTmpl = module.Chart{
+	smb2CallTransferredDataChartTmpl = collectorapi.Chart{
 		ID:       "smb2_call_%s_transferred_data",
 		Title:    "SMB2 Call Transferred Data",
 		Units:    "bytes/s",
 		Fam:      "smb2 calls",
 		Ctx:      "samba.smb2_call_transferred_data",
 		Priority: prioSmb2CallTransferredData,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "smb2_%s_inbytes", Name: "in", Algo: module.Incremental},
-			{ID: "smb2_%s_outbytes", Name: "out", Algo: module.Incremental, Mul: -1},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "smb2_%s_inbytes", Name: "in", Algo: collectorapi.Incremental},
+			{ID: "smb2_%s_outbytes", Name: "out", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	}
 )
@@ -84,10 +84,10 @@ func (c *Collector) addCharts(mx map[string]int64) {
 	}
 }
 
-func (c *Collector) addSysCallChart(syscall string, chart *module.Chart) {
+func (c *Collector) addSysCallChart(syscall string, chart *collectorapi.Chart) {
 	chart = chart.Copy()
 	chart.ID = fmt.Sprintf(chart.ID, syscall)
-	chart.Labels = []module.Label{
+	chart.Labels = []collectorapi.Label{
 		{Key: "syscall", Value: syscall},
 	}
 	for _, dim := range chart.Dims {
@@ -99,10 +99,10 @@ func (c *Collector) addSysCallChart(syscall string, chart *module.Chart) {
 	}
 }
 
-func (c *Collector) addSmb2CallChart(smb2Call string, chart *module.Chart) {
+func (c *Collector) addSmb2CallChart(smb2Call string, chart *collectorapi.Chart) {
 	chart = chart.Copy()
 	chart.ID = fmt.Sprintf(chart.ID, smb2Call)
-	chart.Labels = []module.Label{
+	chart.Labels = []collectorapi.Label{
 		{Key: "smb2call", Value: smb2Call},
 	}
 	for _, dim := range chart.Dims {

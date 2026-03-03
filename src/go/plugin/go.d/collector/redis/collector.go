@@ -15,8 +15,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 //go:embed "config_schema.json"
@@ -29,9 +29,9 @@ func (noopLogger) Printf(context.Context, string, ...any) {}
 func init() {
 	redis.SetLogger(noopLogger{})
 
-	module.Register("redis", module.Creator{
+	collectorapi.Register("redis", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         redisMethods,
 		MethodHandler:   redisFunctionHandler,
@@ -53,7 +53,7 @@ func New() *Collector {
 
 		addAOFChartsOnce:       &sync.Once{},
 		addReplSlaveChartsOnce: &sync.Once{},
-		pingSummary:            metrix.NewSummary(),
+		pingSummary:            oldmetrix.NewSummary(),
 		collectedCommands:      make(map[string]bool),
 		collectedDbs:           make(map[string]bool),
 	}
@@ -100,10 +100,10 @@ func (c Config) topQueriesLimit() int {
 
 type (
 	Collector struct {
-		module.Base
+		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts                 *module.Charts
+		charts                 *collectorapi.Charts
 		addAOFChartsOnce       *sync.Once
 		addReplSlaveChartsOnce *sync.Once
 
@@ -113,7 +113,7 @@ type (
 
 		server            string
 		version           *semver.Version
-		pingSummary       metrix.Summary
+		pingSummary       oldmetrix.Summary
 		collectedCommands map[string]bool
 		collectedDbs      map[string]bool
 	}
@@ -161,7 +161,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

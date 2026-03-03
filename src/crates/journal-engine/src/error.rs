@@ -46,9 +46,9 @@ pub enum EngineError {
     #[error("Foyer IO error: {0}")]
     FoyerIo(#[from] foyer::IoError),
 
-    /// Time budget exceeded during batch processing
-    #[error("Time budget exceeded")]
-    TimeBudgetExceeded,
+    /// Operation was cancelled
+    #[error("Operation cancelled")]
+    Cancelled,
 
     /// Invalid time range (start >= end)
     #[error("Invalid time range: start={start} >= end={end}")]

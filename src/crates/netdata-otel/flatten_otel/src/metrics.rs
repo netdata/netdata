@@ -1,10 +1,10 @@
-use serde_json::{json, Map as JsonMap, Value as JsonValue};
+use serde_json::{Map as JsonMap, Value as JsonValue, json};
 
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
     metrics::v1::{
-        metric::Data, AggregationTemporality, Gauge, Histogram, HistogramDataPoint, Metric,
-        NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
+        AggregationTemporality, Gauge, Histogram, HistogramDataPoint, Metric, NumberDataPoint,
+        ResourceMetrics, ScopeMetrics, Sum, metric::Data,
     },
 };
 

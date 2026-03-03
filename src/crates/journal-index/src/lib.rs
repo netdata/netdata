@@ -20,7 +20,10 @@ pub use file_index::{
 };
 
 pub mod file_indexer;
-pub use file_indexer::FileIndexer;
+pub use file_indexer::{
+    DEFAULT_MAX_FIELD_PAYLOAD_SIZE, DEFAULT_MAX_UNIQUE_VALUES_PER_FIELD, FileIndexer,
+    IndexingLimits,
+};
 
 pub mod bitmap;
 pub use bitmap::Bitmap;

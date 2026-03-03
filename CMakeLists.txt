@@ -37,12 +37,17 @@ if(STATIC_BUILD)
 endif()
 
 set(CMAKE_INSTALL_MESSAGE LAZY)
-
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME "netdata")
 
-option(USE_CXX_11 "Use C++11 instead of C++14 (should only be used on legacy systems that cannot support C++14, may disable some features)" False)
+if("c_std_17" IN_LIST CMAKE_C_KNOWN_FEATURES)
+    set(CMAKE_C_STANDARD 17)
+else()
+    set(CMAKE_C_STANDARD 11)
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+
+option(USE_CXX_11 "Use C++11 instead of C++17 (should only be used on legacy systems that cannot support C++17, may disable some features)" False)
 mark_as_advanced(USE_CXX_11)
 
 if(USE_CXX_11)
@@ -131,8 +136,9 @@ mark_as_advanced(ENABLE_DASHBOARD)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" OFF)
 option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable journal viewer plugin" ${DEFAULT_FEATURE_STATE})
+cmake_dependent_option(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER "Enable OTel signal viewer plugin" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
 cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD OR OS_MACOS OR OS_WINDOWS" False)
@@ -151,6 +157,7 @@ cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer funct
 cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SLABINFO "Enable Linux kernel SLAB allocator monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "Enable systemd journal log collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_UNITS "Enable systemd units information collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_XENSTAT "Enable Xen domain monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 
@@ -184,9 +191,10 @@ mark_as_advanced(ENABLE_LIBUNWIND)
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
+cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
 
 # Setup Rust/Corrosion for plugins that need it
-if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL)
+if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
     include(FetchContent)
     FetchContent_Declare(
         Corrosion
@@ -195,33 +203,28 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL)
     )
     FetchContent_MakeAvailable(Corrosion)
 
-    if(ENABLE_NETDATA_JOURNAL_FILE_READER AND ENABLE_PLUGIN_OTEL)
-        corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
-                               CRATES journal-viewer-plugin otel-plugin)
-    elseif(ENABLE_NETDATA_JOURNAL_FILE_READER)
-        corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
-                               CRATES journal-viewer-plugin)
-    elseif(ENABLE_PLUGIN_OTEL)
-        corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
-                               CRATES otel-plugin)
-    endif()
+    # Corrosion places cargo build artifacts under ${CMAKE_BINARY_DIR}/cargo/
+    # (see Corrosion.cmake cargo_target_dir). Register it for cleanup so that
+    # `ninja clean` removes it.  If a future Corrosion version changes this
+    # path, this line must be updated to match.
+    set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_BINARY_DIR}/cargo")
 
     if(ENABLE_NETDATA_JOURNAL_FILE_READER)
-      set(JOURNAL_VIEWER_RUSTFLAGS --cfg=tracing_unstable)
+        corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml
+                               CRATES journal_reader_ffi)
+    endif()
 
-      # We depend (transitively) on the `io-uring` crate which doesn't provide
-      # prebuilt bindings for 32-bit arches. Considering this is a compile-time
-      # and not a runtime dependency (because we don't use foyer's io-uring
-      # engine), we can simply skip the check.
-      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        list(APPEND JOURNAL_VIEWER_RUSTFLAGS --cfg=io_uring_skip_arch_check)
-      endif()
-
-      if(STATIC_BUILD)
-        list(APPEND JOURNAL_VIEWER_RUSTFLAGS "-C" "target-feature=+crt-static")
-      endif()
-
-      corrosion_add_target_rustflags(journal-viewer-plugin ${JOURNAL_VIEWER_RUSTFLAGS})
+    # Import crates from the main cargo workspace
+    set(_WORKSPACE_CRATES "")
+    if(ENABLE_PLUGIN_OTEL)
+        list(APPEND _WORKSPACE_CRATES otel-plugin)
+    endif()
+    if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
+        list(APPEND _WORKSPACE_CRATES otel-signal-viewer-plugin)
+    endif()
+    if(_WORKSPACE_CRATES)
+        corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
+                               CRATES ${_WORKSPACE_CRATES})
     endif()
 
     if(ENABLE_PLUGIN_OTEL)
@@ -230,6 +233,24 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL)
       else()
         corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable)
       endif()
+    endif()
+
+    if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
+      set(OTEL_SIGNAL_VIEWER_RUSTFLAGS --cfg=tracing_unstable)
+
+      # We depend (transitively) on the `io-uring` crate which doesn't provide
+      # prebuilt bindings for 32-bit arches. Considering this is a compile-time
+      # and not a runtime dependency (because we don't use foyer's io-uring
+      # engine), we can simply skip the check.
+      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        list(APPEND OTEL_SIGNAL_VIEWER_RUSTFLAGS --cfg=io_uring_skip_arch_check)
+      endif()
+
+      if(STATIC_BUILD)
+        list(APPEND OTEL_SIGNAL_VIEWER_RUSTFLAGS "-C" "target-feature=+crt-static")
+      endif()
+
+      corrosion_add_target_rustflags(otel-signal-viewer-plugin ${OTEL_SIGNAL_VIEWER_RUSTFLAGS})
     endif()
 endif()
 
@@ -321,7 +342,7 @@ if(ENABLE_JEMALLOC)
     endif()
 endif()
 
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
@@ -329,7 +350,7 @@ if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM)
     find_package(Go "${MIN_GO_VERSION}" REQUIRED)
 endif()
 
-if(ENABLE_PLUGIN_GO)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
     set(NEED_NDSUDO TRUE)
 else()
     set(NEED_NDSUDO FALSE)
@@ -882,6 +903,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/json/json-keys.h
         src/libnetdata/json/vendored/jsmn.c
         src/libnetdata/json/vendored/jsmn.h
+        src/libnetdata/yaml/yaml.c
+        src/libnetdata/yaml/yaml.h
+        src/libnetdata/yaml/yaml-unittest.c
+        src/libnetdata/yaml/yaml-comprehensive-unittest.c
         src/libnetdata/libnetdata.c
         src/libnetdata/libnetdata.h
         src/libnetdata/line_splitter/line_splitter.c
@@ -1013,6 +1038,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
         src/libnetdata/json/json-c-parser-inline.c
+        src/libnetdata/json/json-c-parser-unittest.c
         src/libnetdata/parsers/duration.h
         src/libnetdata/parsers/timeframe.c
         src/libnetdata/parsers/timeframe.h
@@ -1029,6 +1055,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/sanitizers/chart_id_and_name.h
         src/libnetdata/sanitizers/utf8-sanitizer.c
         src/libnetdata/sanitizers/utf8-sanitizer.h
+        src/libnetdata/sanitizers/utf8-sanitizer-unittest.c
         src/libnetdata/sanitizers/sanitizers.h
         src/libnetdata/sanitizers/sanitizers-labels.c
         src/libnetdata/sanitizers/sanitizers-labels.h
@@ -1708,6 +1735,22 @@ set(STATSD_PLUGIN_FILES
         src/collectors/statsd.plugin/statsd.c
 )
 
+set(SYSTEMD_JOURNAL_PLUGIN_FILES
+        src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
+        src/collectors/systemd-journal.plugin/systemd-internals.h
+        src/collectors/systemd-journal.plugin/systemd-main.c
+        src/collectors/systemd-journal.plugin/systemd-journal.c
+        src/collectors/systemd-journal.plugin/systemd-journal-annotations.c
+        src/collectors/systemd-journal.plugin/systemd-journal-files.c
+        src/collectors/systemd-journal.plugin/systemd-journal-watcher.c
+        src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
+        src/collectors/systemd-journal.plugin/provider/netdata_provider.c
+        src/collectors/systemd-journal.plugin/provider/netdata_provider.h
+        src/collectors/systemd-journal.plugin/provider/rust_provider.h
+        src/libnetdata/os/system-maps/system-services.h
+        src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
+)
+
 set(SYSTEMD_UNITS_PLUGIN_FILES
         src/collectors/systemd-units.plugin/plugin_systemd_units.c
 )
@@ -2375,19 +2418,15 @@ else()
         target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
 endif()
 
-# lz4 - try to find a version that is compatible with streaming compression
-# otherwise pick whichever one we can find to support dbengine but don't set
-# ENABLE_LZ4.
-pkg_check_modules(LIBLZ4 liblz4>=1.9.0)
+# lz4
+pkg_check_modules(LIBLZ4 REQUIRED liblz4>=1.7.1)
 if(LIBLZ4_FOUND)
-        set(ENABLE_LZ4 On)
-else()
-        pkg_check_modules(LIBLZ4 REQUIRED liblz4)
-endif()
+  set(ENABLE_LZ4 On)
 
-target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
-target_compile_options(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
+  target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
+  target_compile_options(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
+  target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
+endif()
 
 # zstd
 pkg_check_modules(LIBZSTD libzstd)
@@ -2760,6 +2799,36 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
     install(TARGETS cgroup-network
             COMPONENT netdata
             DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+# Enable rust implementation if we don't have systemd and we want the journal plugin
+if(ENABLE_PLUGIN_SYSTEMD_JOURNAL AND NOT SYSTEMD_FOUND)
+        if (NOT ENABLE_NETDATA_JOURNAL_FILE_READER)
+                message(WARNING "Systemd journal package not found, will try netdata's journal reader which requires cargo.")
+                set(ENABLE_NETDATA_JOURNAL_FILE_READER True)
+        endif()
+endif()
+
+if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
+        add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
+
+        if(ENABLE_NETDATA_JOURNAL_FILE_READER)
+                target_compile_definitions(systemd-journal.plugin PRIVATE HAVE_RUST_PROVIDER)
+                target_link_libraries(systemd-journal.plugin journal_reader_ffi)
+        endif()
+
+        target_link_libraries(systemd-journal.plugin libnetdata)
+
+        install(TARGETS systemd-journal.plugin
+                COMPONENT plugin-systemd-journal
+                DESTINATION usr/libexec/netdata/plugins.d)
+
+        if(BUILD_FOR_PACKAGING)
+                install(FILES
+                        ${PKG_FILES_PATH}/copyright
+                        COMPONENT plugin-systemd-journal
+                        DESTINATION usr/share/doc/netdata-plugin-systemd-journal)
+        endif()
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_UNITS)
@@ -3188,6 +3257,33 @@ if(ENABLE_PLUGIN_GO)
 endif()
 
 #
+# Build scripts.d.plugin
+#
+
+if(ENABLE_PLUGIN_SCRIPTS)
+    if (OS_WINDOWS)
+        set(SCRIPTS_PLUGIN_BIN scripts.d.plugin.exe)
+    else()
+        set(SCRIPTS_PLUGIN_BIN scripts.d.plugin)
+    endif()
+
+    add_go_target(scripts-plugin ${SCRIPTS_PLUGIN_BIN} src/go cmd/scriptsdplugin)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/${SCRIPTS_PLUGIN_BIN}
+            COMPONENT plugin-scripts
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    install(FILES src/go/plugin/scripts.d/config/scripts.d.conf
+            COMPONENT plugin-scripts
+            DESTINATION usr/lib/netdata/conf.d)
+
+    install(DIRECTORY src/go/plugin/scripts.d/config/scripts.d
+            COMPONENT plugin-scripts
+            DESTINATION usr/lib/netdata/conf.d
+            FILES_MATCHING PATTERN "*.conf")
+endif()
+
+#
 # Build ibm.d.plugin
 #
 
@@ -3229,10 +3325,6 @@ if(ENABLE_PLUGIN_OTEL)
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
                       COMPONENT plugin-otel)
 
-    install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.yaml
-            COMPONENT plugin-otel
-            DESTINATION usr/lib/netdata/conf.d)
-
     install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml
             COMPONENT plugin-otel
             DESTINATION usr/lib/netdata/conf.d/otel.d/v1/metrics)
@@ -3241,14 +3333,14 @@ if(ENABLE_PLUGIN_OTEL)
 endif()
 
 #
-# journal-viewer-plugin
+# otel-signal-viewer
 #
-# Handle journal-viewer plugin
-if(ENABLE_NETDATA_JOURNAL_FILE_READER)
-    corrosion_install(TARGETS journal-viewer-plugin
+# Handle OTel signal viewer plugin
+if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
+    corrosion_install(TARGETS otel-signal-viewer-plugin
                       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
-                      COMPONENT plugin-journal-viewer)
+                      COMPONENT plugin-otel-signal-viewer)
 endif()
 
 #
@@ -3325,16 +3417,6 @@ set(logdir_POST "${LOG_DIR}")
 set(netdata_user_POST "${NETDATA_USER}")
 set(netdata_group_POST "${NETDATA_USER}")
 
-if(ENABLE_NETDATA_JOURNAL_FILE_READER)
-    configure_file(src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yaml.in
-                   src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yaml
-                   @ONLY)
-
-    install(FILES ${CMAKE_BINARY_DIR}/src/crates/netdata-log-viewer/journal-viewer-plugin/configs/journal-viewer.yaml
-            COMPONENT plugin-journal-viewer
-            DESTINATION usr/lib/netdata/conf.d)
-endif()
-
 if(NOT OS_WINDOWS)
         configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
         install(PROGRAMS
@@ -3365,6 +3447,32 @@ install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-name.sh
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
+
+#
+# otel config
+#
+if(ENABLE_PLUGIN_OTEL)
+    configure_file(src/crates/netdata-otel/otel-plugin/configs/otel.yaml.in
+                   src/crates/netdata-otel/otel-plugin/configs/otel.yaml
+                   @ONLY)
+
+    install(FILES ${CMAKE_BINARY_DIR}/src/crates/netdata-otel/otel-plugin/configs/otel.yaml
+            COMPONENT plugin-otel
+            DESTINATION usr/lib/netdata/conf.d)
+endif()
+
+#
+# otel-signal-viewer config
+#
+if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
+    configure_file(src/crates/netdata-log-viewer/otel-signal-viewer-plugin/configs/otel-signal-viewer.yaml.in
+                   src/crates/netdata-log-viewer/otel-signal-viewer-plugin/configs/otel-signal-viewer.yaml
+                   @ONLY)
+
+    install(FILES ${CMAKE_BINARY_DIR}/src/crates/netdata-log-viewer/otel-signal-viewer-plugin/configs/otel-signal-viewer.yaml
+            COMPONENT plugin-otel-signal-viewer
+            DESTINATION usr/lib/netdata/conf.d)
+endif()
 
 #
 # statsd
@@ -3753,6 +3861,7 @@ endif()
 
 # confs
 install(FILES
+        src/collectors/systemd-journal.plugin/schema.d/systemd-journal%3Amonitored-directories.json
         src/health/schema.d/health%3Aalert%3Aprototype.json
         COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d/schema.d)
@@ -3916,6 +4025,12 @@ if(OS_WINDOWS)
         # Make curl work with ssl
         install(DIRECTORY /usr/ssl DESTINATION usr)
 endif()
+
+#
+# Optional: render integration docs from metadata.yaml
+#
+
+include(NetdataRenderDocs)
 
 #
 # Include packaging logic

@@ -7,7 +7,7 @@ modules:
         name: eBPF Filedescriptor
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -15,7 +15,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -24,7 +25,6 @@ modules:
         - fd
         - open
         - close
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor calls for functions responsible to open or close a file descriptor and possible errors."
@@ -231,7 +231,7 @@ modules:
         name: eBPF Processes
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -239,7 +239,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -247,7 +248,6 @@ modules:
         - fork
         - process
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor calls for function creating tasks (threads and processes) inside Linux kernel."
@@ -486,7 +486,7 @@ modules:
         name: eBPF Disk
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -498,7 +498,6 @@ modules:
         - eBPF
         - latency
         - partition
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Measure latency for I/O events on disk."
@@ -594,7 +593,7 @@ modules:
         name: eBPF Hardirq
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -604,7 +603,6 @@ modules:
       keywords:
         - HardIRQ
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor latency for each HardIRQ available."
@@ -700,7 +698,7 @@ modules:
         name: eBPF Cachestat
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -708,14 +706,14 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
         - Page cache
         - Hit ratio
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files."
@@ -932,7 +930,7 @@ modules:
         name: eBPF Sync
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -944,7 +942,6 @@ modules:
         - eBPF
         - hard disk
         - memory
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor syscall responsible to move data from memory to storage device."
@@ -1114,7 +1111,7 @@ modules:
         name: eBPF MDflush
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1125,7 +1122,6 @@ modules:
         - MD
         - RAID
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor when flush events happen between disks."
@@ -1218,7 +1214,7 @@ modules:
         name: eBPF SWAP
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1226,7 +1222,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1234,7 +1231,6 @@ modules:
         - memory
         - eBPF
         - Hard Disk
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitors when swap has I/O events and applications executing events."
@@ -1398,7 +1394,7 @@ modules:
         name: eBPF OOMkill
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1406,13 +1402,13 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
         - application
         - memory
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor applications that reach out of memory."
@@ -1526,7 +1522,7 @@ modules:
         name: eBPF Socket
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.networking
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1534,7 +1530,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -1544,7 +1541,6 @@ modules:
         - server
         - connection
         - socket
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor bandwidth consumption per application for protocols TCP and UDP."
@@ -1885,7 +1881,7 @@ modules:
         name: eBPF DCstat
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -1893,14 +1889,14 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
         - Directory Cache
         - File system
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor directory cache events per application given an overall vision about files on memory or storage device."
@@ -2107,7 +2103,7 @@ modules:
         name: eBPF Filesystem
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2124,7 +2120,6 @@ modules:
         - eBPF
         - latency
         - I/O
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor latency for main actions on filesystem like I/O events."
@@ -2269,7 +2264,7 @@ modules:
         name: eBPF SHM
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2277,14 +2272,14 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
         - syscall
         - shared memory
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor syscall responsible to manipulate shared memory."
@@ -2505,7 +2500,7 @@ modules:
         name: eBPF SoftIRQ
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2515,7 +2510,6 @@ modules:
       keywords:
         - SoftIRQ
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor latency for each SoftIRQ available."
@@ -2611,7 +2605,7 @@ modules:
         name: eBPF Mount
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2623,7 +2617,6 @@ modules:
         - umount
         - device
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor calls for mount and umount syscall."
@@ -2735,7 +2728,7 @@ modules:
         name: eBPF VFS
         link: "https://kernel.org/"
         categories:
-          - data-collection.ebpf
+          - data-collection.storage
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -2743,7 +2736,8 @@ modules:
             - plugin_name: apps.plugin
               module_name: apps
             - plugin_name: cgroups.plugin
-              module_name: cgroups
+              module_name: /sys/fs/cgroup
+              monitored_instance_name: Containers
       info_provided_to_referring_integrations:
         description: ""
       keywords:
@@ -2752,7 +2746,6 @@ modules:
         - eBPF
         - I/O
         - files
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor I/O events on Linux Virtual Filesystem."
@@ -3170,7 +3163,7 @@ modules:
         name: eBPF Process
         link: "https://github.com/netdata/netdata/"
         categories:
-          - data-collection.ebpf
+          - data-collection.operating-systems
         icon_filename: "ebpf.jpg"
       related_resources:
         integrations:
@@ -3181,7 +3174,6 @@ modules:
         - Memory
         - plugin
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor internal memory usage."

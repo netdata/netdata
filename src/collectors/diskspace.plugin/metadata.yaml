@@ -7,7 +7,7 @@ modules:
         name: Disk space
         link: ""
         categories:
-          - data-collection.linux-systems
+          - data-collection.storage
         icon_filename: "hard-drive.svg"
       related_resources:
         integrations:
@@ -21,7 +21,6 @@ modules:
         - I/O
         - space
         - inode
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor Disk space metrics for proficient storage management. Keep track of usage, free space, and error rates to prevent disk space issues."

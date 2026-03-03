@@ -11,15 +11,15 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
 func init() {
-	module.Register("sql", module.Creator{
-		Create:          func() module.Module { return New() },
+	collectorapi.Register("sql", collectorapi.Creator{
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		JobConfigSchema: configSchema,
 		Config:          func() any { return &Config{} },
 		JobMethods:      sqlJobMethods,
@@ -33,16 +33,16 @@ func New() *Collector {
 			Driver:  "mysql",
 			Timeout: confopt.Duration(time.Second * 5),
 		},
-		charts:     &module.Charts{},
+		charts:     &collectorapi.Charts{},
 		seenCharts: make(map[string]bool),
 	}
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts *module.Charts
+	charts *collectorapi.Charts
 
 	dbMu     sync.RWMutex
 	db       *sql.DB
@@ -58,7 +58,7 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	if c.Config.FunctionOnly {
 		return nil
 	}

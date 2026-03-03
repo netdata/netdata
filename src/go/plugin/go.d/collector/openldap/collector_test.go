@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 var (
@@ -31,7 +31,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -201,7 +201,7 @@ func TestCollector_Collect(t *testing.T) {
 			require.Equal(t, test.wantMetrics, mx)
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 
 			assert.Equal(t, test.disconnectBeforeCleanup, mock.disconnectCalled, "disconnect before cleanup")

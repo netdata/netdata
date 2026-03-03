@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioConnections = module.Priority + iota
+	prioConnections = collectorapi.Priority + iota
 
 	prioSlowReads
 	prioReadBackoff
@@ -91,7 +91,7 @@ const (
 	prioUptime
 )
 
-var chCharts = module.Charts{
+var chCharts = collectorapi.Charts{
 	chartConnections.Copy(),
 
 	chartMemoryUsage.Copy(),
@@ -168,14 +168,14 @@ var chCharts = module.Charts{
 }
 
 var (
-	chartConnections = module.Chart{
+	chartConnections = collectorapi.Chart{
 		ID:       "connections",
 		Title:    "Connections",
 		Units:    "connections",
 		Fam:      "conns",
 		Ctx:      "clickhouse.connections",
 		Priority: prioConnections,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "metrics_TCPConnection", Name: "tcp"},
 			{ID: "metrics_HTTPConnection", Name: "http"},
 			{ID: "metrics_MySQLConnection", Name: "mysql"},
@@ -186,59 +186,59 @@ var (
 )
 
 var (
-	chartSlowReads = module.Chart{
+	chartSlowReads = collectorapi.Chart{
 		ID:       "slow_reads",
 		Title:    "Slow reads from a file",
 		Units:    "reads/s",
 		Fam:      "slow reads",
 		Ctx:      "clickhouse.slow_reads",
 		Priority: prioSlowReads,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "events_SlowRead", Name: "slow"},
 		},
 	}
-	chartReadBackoff = module.Chart{
+	chartReadBackoff = collectorapi.Chart{
 		ID:       "read_backoff",
 		Title:    "Read backoff events",
 		Units:    "events/s",
 		Fam:      "slow reads",
 		Ctx:      "clickhouse.read_backoff",
 		Priority: prioReadBackoff,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "events_ReadBackoff", Name: "read_backoff"},
 		},
 	}
 )
 
 var (
-	chartMemoryUsage = module.Chart{
+	chartMemoryUsage = collectorapi.Chart{
 		ID:       "memory_usage",
 		Title:    "Memory usage",
 		Units:    "bytes",
 		Fam:      "mem",
 		Ctx:      "clickhouse.memory_usage",
 		Priority: prioMemoryUsage,
-		Type:     module.Area,
-		Dims: module.Dims{
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
 			{ID: "metrics_MemoryTracking", Name: "used"},
 		},
 	}
 )
 
-var diskChartsTmpl = module.Charts{
+var diskChartsTmpl = collectorapi.Charts{
 	diskSpaceUsageChartTmpl.Copy(),
 }
 
 var (
-	diskSpaceUsageChartTmpl = module.Chart{
+	diskSpaceUsageChartTmpl = collectorapi.Chart{
 		ID:       "disk_%s_space_usage",
 		Title:    "Disk space usage",
 		Units:    "bytes",
 		Fam:      "disk space",
 		Ctx:      "clickhouse.disk_space_usage",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioDiskSpaceUsage,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "disk_%s_free_space_bytes", Name: "free"},
 			{ID: "disk_%s_used_space_bytes", Name: "used"},
 		},
@@ -246,566 +246,566 @@ var (
 )
 
 var (
-	chartRunningQueries = module.Chart{
+	chartRunningQueries = collectorapi.Chart{
 		ID:       "running_queries",
 		Title:    "Running queries",
 		Units:    "queries",
 		Fam:      "queries",
 		Ctx:      "clickhouse.running_queries",
 		Priority: prioRunningQueries,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "metrics_Query", Name: "running"},
 		},
 	}
-	chartQueriesPreempted = module.Chart{
+	chartQueriesPreempted = collectorapi.Chart{
 		ID:       "queries_preempted",
 		Title:    "Queries waiting due to priority",
 		Units:    "queries",
 		Fam:      "queries",
 		Ctx:      "clickhouse.queries_preempted",
 		Priority: prioQueriesPreempted,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "metrics_QueryPreempted", Name: "preempted"},
 		},
 	}
-	chartQueries = module.Chart{
+	chartQueries = collectorapi.Chart{
 		ID:       "queries",
 		Title:    "Queries",
 		Units:    "queries/s",
 		Fam:      "queries",
 		Ctx:      "clickhouse.queries",
 		Priority: prioQueries,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "events_SuccessfulQuery", Name: "successful", Algo: module.Incremental},
-			{ID: "events_FailedQuery", Name: "failed", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "events_SuccessfulQuery", Name: "successful", Algo: collectorapi.Incremental},
+			{ID: "events_FailedQuery", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	}
-	chartSelectQueries = module.Chart{
+	chartSelectQueries = collectorapi.Chart{
 		ID:       "select_queries",
 		Title:    "Select queries",
 		Units:    "selects/s",
 		Fam:      "queries",
 		Ctx:      "clickhouse.select_queries",
 		Priority: prioSelectQueries,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "events_SuccessfulSelectQuery", Name: "successful", Algo: module.Incremental},
-			{ID: "events_FailedSelectQuery", Name: "failed", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "events_SuccessfulSelectQuery", Name: "successful", Algo: collectorapi.Incremental},
+			{ID: "events_FailedSelectQuery", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	}
-	chartInsertQueries = module.Chart{
+	chartInsertQueries = collectorapi.Chart{
 		ID:       "insert_queries",
 		Title:    "Insert queries",
 		Units:    "inserts/s",
 		Fam:      "queries",
 		Ctx:      "clickhouse.insert_queries",
 		Priority: prioInsertQueries,
-		Type:     module.Stacked,
-		Dims: module.Dims{
-			{ID: "events_SuccessfulInsertQuery", Name: "successful", Algo: module.Incremental},
-			{ID: "events_FailedInsertQuery", Name: "failed", Algo: module.Incremental},
+		Type:     collectorapi.Stacked,
+		Dims: collectorapi.Dims{
+			{ID: "events_SuccessfulInsertQuery", Name: "successful", Algo: collectorapi.Incremental},
+			{ID: "events_FailedInsertQuery", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	}
-	chartQueriesMemoryLimitExceeded = module.Chart{
+	chartQueriesMemoryLimitExceeded = collectorapi.Chart{
 		ID:       "queries_memory_limit_exceeded",
 		Title:    "Memory limit exceeded for query",
 		Units:    "queries/s",
 		Fam:      "queries",
 		Ctx:      "clickhouse.queries_memory_limit_exceeded",
 		Priority: prioQueriesMemoryLimitExceeded,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "events_QueryMemoryLimitExceeded", Name: "mem_limit_exceeded"},
 		},
 	}
 )
 
 var (
-	chartLongestRunningQueryTime = module.Chart{
+	chartLongestRunningQueryTime = collectorapi.Chart{
 		ID:       "longest_running_query_time",
 		Title:    "Longest running query time",
 		Units:    "seconds",
 		Fam:      "query latency",
 		Ctx:      "clickhouse.longest_running_query_time",
 		Priority: prioLongestRunningQueryTime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "LongestRunningQueryTime", Name: "longest_query_time", Div: precision},
 		},
 	}
-	chartQueriesLatency = module.Chart{
+	chartQueriesLatency = collectorapi.Chart{
 		ID:       "queries_latency",
 		Title:    "Queries latency",
 		Units:    "microseconds",
 		Fam:      "query latency",
 		Ctx:      "clickhouse.queries_latency",
 		Priority: prioQueriesLatency,
-		Dims: module.Dims{
-			{ID: "events_QueryTimeMicroseconds", Name: "queries_time", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_QueryTimeMicroseconds", Name: "queries_time", Algo: collectorapi.Incremental},
 		},
 	}
-	chartSelectQueriesLatency = module.Chart{
+	chartSelectQueriesLatency = collectorapi.Chart{
 		ID:       "select_queries_latency",
 		Title:    "Select queries latency",
 		Units:    "microseconds",
 		Fam:      "query latency",
 		Ctx:      "clickhouse.select_queries_latency",
 		Priority: prioSelectQueriesLatency,
-		Dims: module.Dims{
-			{ID: "events_SelectQueryTimeMicroseconds", Name: "selects_time", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_SelectQueryTimeMicroseconds", Name: "selects_time", Algo: collectorapi.Incremental},
 		},
 	}
-	chartInsertQueriesLatency = module.Chart{
+	chartInsertQueriesLatency = collectorapi.Chart{
 		ID:       "insert_queries_latency",
 		Title:    "Insert queries latency",
 		Units:    "microseconds",
 		Fam:      "query latency",
 		Ctx:      "clickhouse.insert_queries_latency",
 		Priority: prioInsertQueriesLatency,
-		Dims: module.Dims{
-			{ID: "events_InsertQueryTimeMicroseconds", Name: "inserts_time", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_InsertQueryTimeMicroseconds", Name: "inserts_time", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	chartFileDescriptorIO = module.Chart{
+	chartFileDescriptorIO = collectorapi.Chart{
 		ID:       "file_descriptor_io",
 		Title:    "Read and written data",
 		Units:    "bytes/s",
 		Fam:      "io",
 		Ctx:      "clickhouse.io",
 		Priority: prioIO,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "events_ReadBufferFromFileDescriptorReadBytes", Name: "reads", Algo: module.Incremental},
-			{ID: "events_WriteBufferFromFileDescriptorWriteBytes", Name: "writes", Mul: -1, Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "events_ReadBufferFromFileDescriptorReadBytes", Name: "reads", Algo: collectorapi.Incremental},
+			{ID: "events_WriteBufferFromFileDescriptorWriteBytes", Name: "writes", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	chartFileDescriptorIOPS = module.Chart{
+	chartFileDescriptorIOPS = collectorapi.Chart{
 		ID:       "file_descriptor_iops",
 		Title:    "Read and write operations",
 		Units:    "ops/s",
 		Fam:      "io",
 		Ctx:      "clickhouse.iops",
 		Priority: prioIOPS,
-		Dims: module.Dims{
-			{ID: "events_ReadBufferFromFileDescriptorRead", Name: "reads", Algo: module.Incremental},
-			{ID: "events_WriteBufferFromFileDescriptorWrite", Name: "writes", Mul: -1, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_ReadBufferFromFileDescriptorRead", Name: "reads", Algo: collectorapi.Incremental},
+			{ID: "events_WriteBufferFromFileDescriptorWrite", Name: "writes", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
-	chartFileDescriptorIOErrors = module.Chart{
+	chartFileDescriptorIOErrors = collectorapi.Chart{
 		ID:       "file_descriptor_io_errors",
 		Title:    "Read and write errors",
 		Units:    "errors/s",
 		Fam:      "io",
 		Ctx:      "clickhouse.io_errors",
 		Priority: prioIOErrors,
-		Dims: module.Dims{
-			{ID: "events_ReadBufferFromFileDescriptorReadFailed", Name: "read", Algo: module.Incremental},
-			{ID: "events_WriteBufferFromFileDescriptorWriteFailed", Name: "write", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_ReadBufferFromFileDescriptorReadFailed", Name: "read", Algo: collectorapi.Incremental},
+			{ID: "events_WriteBufferFromFileDescriptorWriteFailed", Name: "write", Algo: collectorapi.Incremental},
 		},
 	}
-	chartIOSeeks = module.Chart{
+	chartIOSeeks = collectorapi.Chart{
 		ID:       "io_seeks",
 		Title:    "lseek function calls",
 		Units:    "ops/s",
 		Fam:      "io",
 		Ctx:      "clickhouse.io_seeks",
 		Priority: prioIOSeeks,
-		Dims: module.Dims{
-			{ID: "events_Seek", Name: "lseek", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_Seek", Name: "lseek", Algo: collectorapi.Incremental},
 		},
 	}
-	chartIOFileOpens = module.Chart{
+	chartIOFileOpens = collectorapi.Chart{
 		ID:       "io_file_opens",
 		Title:    "File opens",
 		Units:    "ops/s",
 		Fam:      "io",
 		Ctx:      "clickhouse.io_file_opens",
 		Priority: prioIOFileOpens,
-		Dims: module.Dims{
-			{ID: "events_FileOpen", Name: "file_open", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_FileOpen", Name: "file_open", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
-var tableChartsTmpl = module.Charts{
+var tableChartsTmpl = collectorapi.Charts{
 	tableSizeChartTmpl.Copy(),
 	tablePartsChartTmpl.Copy(),
 	tableRowsChartTmpl.Copy(),
 }
 
 var (
-	tableSizeChartTmpl = module.Chart{
+	tableSizeChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_database_%s_size",
 		Title:    "Table size",
 		Units:    "bytes",
 		Fam:      "tables",
 		Ctx:      "clickhouse.database_table_size",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioDatabaseTableSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_database_%s_size_bytes", Name: "size"},
 		},
 	}
-	tablePartsChartTmpl = module.Chart{
+	tablePartsChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_database_%s_parts",
 		Title:    "Table parts",
 		Units:    "parts",
 		Fam:      "tables",
 		Ctx:      "clickhouse.database_table_parts",
 		Priority: prioDatabaseTableParts,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_database_%s_parts", Name: "parts"},
 		},
 	}
-	tableRowsChartTmpl = module.Chart{
+	tableRowsChartTmpl = collectorapi.Chart{
 		ID:       "table_%s_database_%s_rows",
 		Title:    "Table rows",
 		Units:    "rows",
 		Fam:      "tables",
 		Ctx:      "clickhouse.database_table_rows",
 		Priority: prioDatabaseTableRows,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "table_%s_database_%s_rows", Name: "rows"},
 		},
 	}
 )
 
 var (
-	chartReplicatedPartsActivity = module.Chart{
+	chartReplicatedPartsActivity = collectorapi.Chart{
 		ID:       "replicated_parts_activity",
 		Title:    "Replicated parts current activity",
 		Units:    "parts",
 		Fam:      "replicas",
 		Ctx:      "clickhouse.replicated_parts_current_activity",
 		Priority: prioReplicatedPartsCurrentActivity,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "metrics_ReplicatedFetch", Name: "fetch"},
 			{ID: "metrics_ReplicatedSend", Name: "send"},
 			{ID: "metrics_ReplicatedChecks", Name: "check"},
 		},
 	}
-	chartReplicasMaxAbsoluteDelay = module.Chart{
+	chartReplicasMaxAbsoluteDelay = collectorapi.Chart{
 		ID:       "replicas_max_absolute_delay",
 		Title:    "Replicas max absolute delay",
 		Units:    "seconds",
 		Fam:      "replicas",
 		Ctx:      "clickhouse.replicas_max_absolute_delay",
 		Priority: prioReplicasMaxAbsoluteDelay,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "async_metrics_ReplicasMaxAbsoluteDelay", Name: "replication_delay", Div: precision},
 		},
 	}
-	chartReadonlyReplica = module.Chart{
+	chartReadonlyReplica = collectorapi.Chart{
 		ID:       "readonly_replica",
 		Title:    "Replicated tables in readonly state",
 		Units:    "tables",
 		Fam:      "replicas",
 		Ctx:      "clickhouse.replicated_readonly_tables",
 		Priority: prioReadOnlyReplica,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "metrics_ReadonlyReplica", Name: "read_only"},
 		},
 	}
-	chartReplicatedDataLoss = module.Chart{
+	chartReplicatedDataLoss = collectorapi.Chart{
 		ID:       "replicated_data_loss",
 		Title:    "Replicated data loss",
 		Units:    "events/s",
 		Fam:      "replicas",
 		Ctx:      "clickhouse.replicated_data_loss",
 		Priority: prioReplicatedDataLoss,
-		Dims: module.Dims{
-			{ID: "events_ReplicatedDataLoss", Name: "data_loss", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_ReplicatedDataLoss", Name: "data_loss", Algo: collectorapi.Incremental},
 		},
 	}
-	chartReplicatedPartFetches = module.Chart{
+	chartReplicatedPartFetches = collectorapi.Chart{
 		ID:       "replicated_part_fetches",
 		Title:    "Replicated part fetches",
 		Units:    "fetches/s",
 		Fam:      "replicas",
 		Ctx:      "clickhouse.replicated_part_fetches",
 		Priority: prioReplicatedPartFetches,
-		Dims: module.Dims{
-			{ID: "events_ReplicatedPartFetches", Name: "successful", Algo: module.Incremental},
-			{ID: "events_ReplicatedPartFailedFetches", Name: "failed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_ReplicatedPartFetches", Name: "successful", Algo: collectorapi.Incremental},
+			{ID: "events_ReplicatedPartFailedFetches", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	}
-	chartReplicatedPartFetchesOfMerged = module.Chart{
+	chartReplicatedPartFetchesOfMerged = collectorapi.Chart{
 		ID:       "replicated_part_fetches_of_merged",
 		Title:    "Replicated part fetches of merged",
 		Units:    "fetches/s",
 		Fam:      "replicas",
 		Ctx:      "clickhouse.replicated_part_fetches_of_merged",
 		Priority: prioReplicatedPartFetchesOfMerged,
-		Dims: module.Dims{
-			{ID: "events_ReplicatedPartFetchesOfMerged", Name: "merged", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_ReplicatedPartFetchesOfMerged", Name: "merged", Algo: collectorapi.Incremental},
 		},
 	}
-	chartReplicatedPartMerges = module.Chart{
+	chartReplicatedPartMerges = collectorapi.Chart{
 		ID:       "replicated_part_merges",
 		Title:    "Replicated part merges",
 		Units:    "merges/s",
 		Fam:      "replicas",
 		Ctx:      "clickhouse.replicated_part_merges",
 		Priority: prioReplicatedPartMerges,
-		Dims: module.Dims{
-			{ID: "events_ReplicatedPartMerges", Name: "merges", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_ReplicatedPartMerges", Name: "merges", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	chartInsertedBytes = module.Chart{
+	chartInsertedBytes = collectorapi.Chart{
 		ID:       "inserted_bytes",
 		Title:    "Inserted data",
 		Units:    "bytes/s",
 		Fam:      "inserts",
 		Ctx:      "clickhouse.inserted_bytes",
 		Priority: prioInsertedBytes,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "events_InsertedBytes", Name: "inserted", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "events_InsertedBytes", Name: "inserted", Algo: collectorapi.Incremental},
 		},
 	}
-	chartInsertedRows = module.Chart{
+	chartInsertedRows = collectorapi.Chart{
 		ID:       "inserted_rows",
 		Title:    "Inserted rows",
 		Units:    "rows/s",
 		Fam:      "inserts",
 		Ctx:      "clickhouse.inserted_rows",
 		Priority: prioInsertedRows,
-		Dims: module.Dims{
-			{ID: "events_InsertedRows", Name: "inserted", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_InsertedRows", Name: "inserted", Algo: collectorapi.Incremental},
 		},
 	}
-	chartRejectedInserts = module.Chart{
+	chartRejectedInserts = collectorapi.Chart{
 		ID:       "rejected_inserts",
 		Title:    "Rejected inserts",
 		Units:    "inserts/s",
 		Fam:      "inserts",
 		Ctx:      "clickhouse.rejected_inserts",
 		Priority: prioRejectedInserts,
-		Dims: module.Dims{
-			{ID: "events_RejectedInserts", Name: "rejected", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_RejectedInserts", Name: "rejected", Algo: collectorapi.Incremental},
 		},
 	}
-	chartDelayedInserts = module.Chart{
+	chartDelayedInserts = collectorapi.Chart{
 		ID:       "delayed_inserts",
 		Title:    "Delayed inserts",
 		Units:    "inserts/s",
 		Fam:      "inserts",
 		Ctx:      "clickhouse.delayed_inserts",
 		Priority: prioDelayedInserts,
-		Dims: module.Dims{
-			{ID: "events_DelayedInserts", Name: "delayed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_DelayedInserts", Name: "delayed", Algo: collectorapi.Incremental},
 		},
 	}
-	chartDelayedInsertsThrottleTime = module.Chart{
+	chartDelayedInsertsThrottleTime = collectorapi.Chart{
 		ID:       "delayed_inserts_throttle_time",
 		Title:    "Delayed inserts throttle time",
 		Units:    "milliseconds",
 		Fam:      "inserts",
 		Ctx:      "clickhouse.delayed_inserts_throttle_time",
 		Priority: prioDelayedInsertsThrottleTime,
-		Dims: module.Dims{
-			{ID: "events_DelayedInsertsMilliseconds", Name: "delayed_inserts_throttle_time", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_DelayedInsertsMilliseconds", Name: "delayed_inserts_throttle_time", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	chartSelectedBytes = module.Chart{
+	chartSelectedBytes = collectorapi.Chart{
 		ID:       "selected_bytes",
 		Title:    "Selected data",
 		Units:    "bytes/s",
 		Fam:      "selects",
 		Ctx:      "clickhouse.selected_bytes",
 		Priority: prioSelectedBytes,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "events_SelectedBytes", Name: "selected", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "events_SelectedBytes", Name: "selected", Algo: collectorapi.Incremental},
 		},
 	}
-	chartSelectedRows = module.Chart{
+	chartSelectedRows = collectorapi.Chart{
 		ID:       "selected_rows",
 		Title:    "Selected rows",
 		Units:    "rows/s",
 		Fam:      "selects",
 		Ctx:      "clickhouse.selected_rows",
 		Priority: prioSelectedRows,
-		Dims: module.Dims{
-			{ID: "events_SelectedRows", Name: "selected", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_SelectedRows", Name: "selected", Algo: collectorapi.Incremental},
 		},
 	}
-	chartSelectedParts = module.Chart{
+	chartSelectedParts = collectorapi.Chart{
 		ID:       "selected_parts",
 		Title:    "Selected parts",
 		Units:    "parts/s",
 		Fam:      "selects",
 		Ctx:      "clickhouse.selected_parts",
 		Priority: prioSelectedParts,
-		Dims: module.Dims{
-			{ID: "events_SelectedParts", Name: "selected", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_SelectedParts", Name: "selected", Algo: collectorapi.Incremental},
 		},
 	}
-	chartSelectedRanges = module.Chart{
+	chartSelectedRanges = collectorapi.Chart{
 		ID:       "selected_ranges",
 		Title:    "Selected ranges",
 		Units:    "ranges/s",
 		Fam:      "selects",
 		Ctx:      "clickhouse.selected_ranges",
 		Priority: prioSelectedRanges,
-		Dims: module.Dims{
-			{ID: "events_SelectedRanges", Name: "selected", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_SelectedRanges", Name: "selected", Algo: collectorapi.Incremental},
 		},
 	}
-	chartSelectedMarks = module.Chart{
+	chartSelectedMarks = collectorapi.Chart{
 		ID:       "selected_marks",
 		Title:    "Selected marks",
 		Units:    "marks/s",
 		Fam:      "selects",
 		Ctx:      "clickhouse.selected_marks",
 		Priority: prioSelectedMarks,
-		Dims: module.Dims{
-			{ID: "events_SelectedMarks", Name: "selected", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_SelectedMarks", Name: "selected", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	chartMerges = module.Chart{
+	chartMerges = collectorapi.Chart{
 		ID:       "merges",
 		Title:    "Merge operations",
 		Units:    "ops/s",
 		Fam:      "merges",
 		Ctx:      "clickhouse.merges",
 		Priority: prioMerges,
-		Dims: module.Dims{
-			{ID: "events_Merge", Name: "merge", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_Merge", Name: "merge", Algo: collectorapi.Incremental},
 		},
 	}
-	chartMergesLatency = module.Chart{
+	chartMergesLatency = collectorapi.Chart{
 		ID:       "merges_latency",
 		Title:    "Time spent for background merges",
 		Units:    "milliseconds",
 		Fam:      "merges",
 		Ctx:      "clickhouse.merges_latency",
 		Priority: prioMergesLatency,
-		Dims: module.Dims{
-			{ID: "events_MergesTimeMilliseconds", Name: "merges_time", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_MergesTimeMilliseconds", Name: "merges_time", Algo: collectorapi.Incremental},
 		},
 	}
-	chartMergedUncompressedBytes = module.Chart{
+	chartMergedUncompressedBytes = collectorapi.Chart{
 		ID:       "merged_uncompressed_bytes",
 		Title:    "Uncompressed data read for background merges",
 		Units:    "bytes/s",
 		Fam:      "merges",
 		Ctx:      "clickhouse.merged_uncompressed_bytes",
 		Priority: prioMergedUncompressedBytes,
-		Type:     module.Area,
-		Dims: module.Dims{
-			{ID: "events_MergedUncompressedBytes", Name: "merged_uncompressed", Algo: module.Incremental},
+		Type:     collectorapi.Area,
+		Dims: collectorapi.Dims{
+			{ID: "events_MergedUncompressedBytes", Name: "merged_uncompressed", Algo: collectorapi.Incremental},
 		},
 	}
-	chartMergedRows = module.Chart{
+	chartMergedRows = collectorapi.Chart{
 		ID:       "merged_rows",
 		Title:    "Merged rows",
 		Units:    "rows/s",
 		Fam:      "merges",
 		Ctx:      "clickhouse.merged_rows",
 		Priority: prioMergedRows,
-		Dims: module.Dims{
-			{ID: "events_MergedRows", Name: "merged", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_MergedRows", Name: "merged", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	chartMergeTreeDataWriterInsertedRows = module.Chart{
+	chartMergeTreeDataWriterInsertedRows = collectorapi.Chart{
 		ID:       "merge_tree_data_writer_inserted_rows",
 		Title:    "Rows INSERTed to MergeTree tables",
 		Units:    "rows/s",
 		Fam:      "merge tree",
 		Ctx:      "clickhouse.merge_tree_data_writer_inserted_rows",
 		Priority: prioMergeTreeDataWriterRows,
-		Dims: module.Dims{
-			{ID: "events_MergeTreeDataWriterRows", Name: "inserted", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_MergeTreeDataWriterRows", Name: "inserted", Algo: collectorapi.Incremental},
 		},
 	}
-	chartMergeTreeDataWriterUncompressedBytes = module.Chart{
+	chartMergeTreeDataWriterUncompressedBytes = collectorapi.Chart{
 		ID:       "merge_tree_data_writer_uncompressed_bytes",
 		Title:    "Data INSERTed to MergeTree tables",
 		Units:    "bytes/s",
 		Fam:      "merge tree",
 		Ctx:      "clickhouse.merge_tree_data_writer_uncompressed_bytes",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioMergeTreeDataWriterUncompressedBytes,
-		Dims: module.Dims{
-			{ID: "events_MergeTreeDataWriterUncompressedBytes", Name: "inserted", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_MergeTreeDataWriterUncompressedBytes", Name: "inserted", Algo: collectorapi.Incremental},
 		},
 	}
-	chartMergeTreeDataWriterCompressedBytes = module.Chart{
+	chartMergeTreeDataWriterCompressedBytes = collectorapi.Chart{
 		ID:       "merge_tree_data_writer_compressed_bytes",
 		Title:    "Data written to disk for data INSERTed to MergeTree tables",
 		Units:    "bytes/s",
 		Fam:      "merge tree",
 		Ctx:      "clickhouse.merge_tree_data_writer_compressed_bytes",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioMergeTreeDataWriterCompressedBytes,
-		Dims: module.Dims{
-			{ID: "events_MergeTreeDataWriterCompressedBytes", Name: "written", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_MergeTreeDataWriterCompressedBytes", Name: "written", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	chartUncompressedCacheRequests = module.Chart{
+	chartUncompressedCacheRequests = collectorapi.Chart{
 		ID:       "uncompressed_cache_requests",
 		Title:    "Uncompressed cache requests",
 		Units:    "requests/s",
 		Fam:      "cache",
 		Ctx:      "clickhouse.uncompressed_cache_requests",
 		Priority: prioUncompressedCacheRequests,
-		Dims: module.Dims{
-			{ID: "events_UncompressedCacheHits", Name: "hits", Algo: module.Incremental},
-			{ID: "events_UncompressedCacheMisses", Name: "misses", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_UncompressedCacheHits", Name: "hits", Algo: collectorapi.Incremental},
+			{ID: "events_UncompressedCacheMisses", Name: "misses", Algo: collectorapi.Incremental},
 		},
 	}
-	chartMarkCacheRequests = module.Chart{
+	chartMarkCacheRequests = collectorapi.Chart{
 		ID:       "mark_cache_requests",
 		Title:    "Mark cache requests",
 		Units:    "requests/s",
 		Fam:      "cache",
 		Ctx:      "clickhouse.mark_cache_requests",
 		Priority: prioMarkCacheRequests,
-		Dims: module.Dims{
-			{ID: "events_MarkCacheHits", Name: "hits", Algo: module.Incremental},
-			{ID: "events_MarkCacheMisses", Name: "misses", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_MarkCacheHits", Name: "hits", Algo: collectorapi.Incremental},
+			{ID: "events_MarkCacheMisses", Name: "misses", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	chartMaxPartCountForPartition = module.Chart{
+	chartMaxPartCountForPartition = collectorapi.Chart{
 		ID:       "max_part_count_for_partition",
 		Title:    "Max part count for partition",
 		Units:    "parts",
 		Fam:      "parts",
 		Ctx:      "clickhouse.max_part_count_for_partition",
 		Priority: prioMaxPartCountForPartition,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "async_metrics_MaxPartCountForPartition", Name: "max_parts_partition"},
 		},
 	}
-	chartPartsCount = module.Chart{
+	chartPartsCount = collectorapi.Chart{
 		ID:       "parts_count",
 		Title:    "Parts",
 		Units:    "parts",
 		Fam:      "parts",
 		Ctx:      "clickhouse.parts_count",
 		Priority: prioParts,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "metrics_PartsTemporary", Name: "temporary"},
 			{ID: "metrics_PartsPreActive", Name: "pre_active"},
 			{ID: "metrics_PartsActive", Name: "active"},
@@ -819,130 +819,130 @@ var (
 )
 
 var (
-	chartDistributedConnections = module.Chart{
+	chartDistributedConnections = collectorapi.Chart{
 		ID:       "distributes_connections",
 		Title:    "Active distributed connection",
 		Units:    "connections",
 		Fam:      "distributed conns",
 		Ctx:      "clickhouse.distributed_connections",
 		Priority: prioDistributedSend,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "metrics_DistributedSend", Name: "active"},
 		},
 	}
-	chartDistributedConnectionAttempts = module.Chart{
+	chartDistributedConnectionAttempts = collectorapi.Chart{
 		ID:       "distributes_connections_attempts",
 		Title:    "Distributed connection attempts",
 		Units:    "attempts/s",
 		Fam:      "distributed conns",
 		Ctx:      "clickhouse.distributed_connections_attempts",
 		Priority: prioDistributedConnectionTries,
-		Dims: module.Dims{
-			{ID: "events_DistributedConnectionTries", Name: "connection", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_DistributedConnectionTries", Name: "connection", Algo: collectorapi.Incremental},
 		},
 	}
-	chartDistributedConnectionFailRetries = module.Chart{
+	chartDistributedConnectionFailRetries = collectorapi.Chart{
 		ID:       "distributes_connections_fail_retries",
 		Title:    "Distributed connection fails with retry",
 		Units:    "fails/s",
 		Fam:      "distributed conns",
 		Ctx:      "clickhouse.distributed_connections_fail_retries",
 		Priority: prioDistributedConnectionFailTry,
-		Dims: module.Dims{
-			{ID: "events_DistributedConnectionFailTry", Name: "connection_retry", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_DistributedConnectionFailTry", Name: "connection_retry", Algo: collectorapi.Incremental},
 		},
 	}
-	chartDistributedConnectionFailExhaustedRetries = module.Chart{
+	chartDistributedConnectionFailExhaustedRetries = collectorapi.Chart{
 		ID:       "distributes_connections_fail_exhausted_retries",
 		Title:    "Distributed connection fails after all retries finished",
 		Units:    "fails/s",
 		Fam:      "distributed conns",
 		Ctx:      "clickhouse.distributed_connections_fail_exhausted_retries",
 		Priority: prioDistributedConnectionFailAtAll,
-		Dims: module.Dims{
-			{ID: "events_DistributedConnectionFailAtAll", Name: "connection_retry_exhausted", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_DistributedConnectionFailAtAll", Name: "connection_retry_exhausted", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	chartDistributedFilesToInsert = module.Chart{
+	chartDistributedFilesToInsert = collectorapi.Chart{
 		ID:       "distributes_files_to_insert",
 		Title:    "Pending files to process for asynchronous insertion into Distributed tables",
 		Units:    "files",
 		Fam:      "distributed inserts",
 		Ctx:      "clickhouse.distributed_files_to_insert",
 		Priority: prioDistributedFilesToInsert,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "metrics_DistributedFilesToInsert", Name: "pending_insertions"},
 		},
 	}
-	chartDistributedRejectedInserts = module.Chart{
+	chartDistributedRejectedInserts = collectorapi.Chart{
 		ID:       "distributes_rejected_inserts",
 		Title:    "Rejected INSERTs to a Distributed table",
 		Units:    "inserts/s",
 		Fam:      "distributed inserts",
 		Ctx:      "clickhouse.distributed_rejected_inserts",
 		Priority: prioDistributedRejectedInserts,
-		Dims: module.Dims{
-			{ID: "events_DistributedRejectedInserts", Name: "rejected", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_DistributedRejectedInserts", Name: "rejected", Algo: collectorapi.Incremental},
 		},
 	}
-	chartDistributedDelayedInserts = module.Chart{
+	chartDistributedDelayedInserts = collectorapi.Chart{
 		ID:       "distributes_delayed_inserts",
 		Title:    "Delayed INSERTs to a Distributed table",
 		Units:    "inserts/s",
 		Fam:      "distributed inserts",
 		Ctx:      "clickhouse.distributed_delayed_inserts",
 		Priority: prioDistributedDelayedInserts,
-		Dims: module.Dims{
-			{ID: "events_DistributedDelayedInserts", Name: "delayed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_DistributedDelayedInserts", Name: "delayed", Algo: collectorapi.Incremental},
 		},
 	}
-	chartDistributedDelayedInsertsLatency = module.Chart{
+	chartDistributedDelayedInsertsLatency = collectorapi.Chart{
 		ID:       "distributes_delayed_inserts_latency",
 		Title:    "Time spent while the INSERT of a block to a Distributed table was throttled",
 		Units:    "milliseconds",
 		Fam:      "distributed inserts",
 		Ctx:      "clickhouse.distributed_delayed_inserts_latency",
 		Priority: prioDistributedDelayedInsertsMilliseconds,
-		Dims: module.Dims{
-			{ID: "events_DistributedDelayedInsertsMilliseconds", Name: "delayed_time", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_DistributedDelayedInsertsMilliseconds", Name: "delayed_time", Algo: collectorapi.Incremental},
 		},
 	}
-	chartDistributedSyncInsertionTimeoutExceeded = module.Chart{
+	chartDistributedSyncInsertionTimeoutExceeded = collectorapi.Chart{
 		ID:       "distributes_sync_insertion_timeout_exceeded",
 		Title:    "Distributed table sync insertions timeouts",
 		Units:    "timeouts/s",
 		Fam:      "distributed inserts",
 		Ctx:      "clickhouse.distributed_sync_insertion_timeout_exceeded",
 		Priority: prioDistributedSyncInsertionTimeoutExceeded,
-		Dims: module.Dims{
-			{ID: "events_DistributedSyncInsertionTimeoutExceeded", Name: "sync_insertion", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_DistributedSyncInsertionTimeoutExceeded", Name: "sync_insertion", Algo: collectorapi.Incremental},
 		},
 	}
-	chartDistributedAsyncInsertionFailures = module.Chart{
+	chartDistributedAsyncInsertionFailures = collectorapi.Chart{
 		ID:       "distributes_async_insertions_failures",
 		Title:    "Distributed table async insertion failures",
 		Units:    "failures/s",
 		Fam:      "distributed inserts",
 		Ctx:      "clickhouse.distributed_async_insertions_failures",
 		Priority: prioDistributedAsyncInsertionFailures,
-		Dims: module.Dims{
-			{ID: "events_DistributedAsyncInsertionFailures", Name: "async_insertions", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "events_DistributedAsyncInsertionFailures", Name: "async_insertions", Algo: collectorapi.Incremental},
 		},
 	}
 )
 
 var (
-	chartUptime = module.Chart{
+	chartUptime = collectorapi.Chart{
 		ID:       "uptime",
 		Title:    "Uptime",
 		Units:    "seconds",
 		Fam:      "uptime",
 		Ctx:      "clickhouse.uptime",
 		Priority: prioUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "async_metrics_Uptime", Name: "uptime"},
 		},
 	}
@@ -953,7 +953,7 @@ func (c *Collector) addDiskCharts(disk *seenDisk) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, disk.disk)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "disk_name", Value: disk.disk},
 		}
 		for _, dim := range chart.Dims {
@@ -976,7 +976,7 @@ func (c *Collector) addTableCharts(table *seenTable) {
 
 	for _, chart := range *charts {
 		chart.ID = fmt.Sprintf(chart.ID, table.table, table.db)
-		chart.Labels = []module.Label{
+		chart.Labels = []collectorapi.Label{
 			{Key: "database", Value: table.db},
 			{Key: "table", Value: table.table},
 		}

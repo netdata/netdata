@@ -10,8 +10,7 @@ modules:
         link: https://prometheus.io/
         icon_filename: prometheus.svg
         categories:
-          - data-collection.generic-data-collection
-          # - data-collection.apm
+          - data-collection.applications
       keywords:
         - prometheus
         - openmetrics
@@ -20,7 +19,6 @@ modules:
           list: [ ]
       info_provided_to_referring_integrations:
         description: ""
-      most_popular: true
     overview: &overview
       data_collection:
         metrics_description: |
@@ -312,14 +310,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-aws_ec2
-      most_popular: false
       community: true
       monitored_instance:
         name: AWS EC2 Compute instances
         link: https://github.com/O1ahmad/aws_ec2_exporter
         icon_filename: aws-ec2.png
         categories:
-          - data-collection.cloud-provider-managed
+          - data-collection.cloud-and-devops
       keywords:
         - cloud services
         - cloud computing
@@ -342,14 +339,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-blackbox
-      most_popular: false
       community: true
       monitored_instance:
         name: Blackbox
         link: https://github.com/prometheus/blackbox_exporter
         icon_filename: prometheus.svg
         categories:
-          - data-collection.synthetic-checks
+          - data-collection.synthetic-testing
       keywords:
         - blackbox
     overview:
@@ -370,14 +366,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cilium_agent
-      most_popular: false
       community: true
       monitored_instance:
         name: Cilium Agent
         link: https://github.com/cilium/cilium
         icon_filename: cilium.png
         categories:
-          - data-collection.kubernetes
+          - data-collection.containers-and-vms
       keywords: [ ]
     overview:
       <<: *overview
@@ -397,14 +392,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cilium_operator
-      most_popular: false
       community: true
       monitored_instance:
         name: Cilium Operator
         link: https://github.com/cilium/cilium
         icon_filename: cilium.png
         categories:
-          - data-collection.kubernetes
+          - data-collection.containers-and-vms
       keywords: [ ]
     overview:
       <<: *overview
@@ -424,14 +418,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cilium_proxy
-      most_popular: false
       community: true
       monitored_instance:
         name: Cilium Proxy
         link: https://github.com/cilium/proxy
         icon_filename: cilium.png
         categories:
-          - data-collection.kubernetes
+          - data-collection.containers-and-vms
       keywords: [ ]
     overview:
       <<: *overview
@@ -451,14 +444,13 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-aws_cloudwatch
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: CloudWatch
         link: https://github.com/prometheus/cloudwatch_exporter
         icon_filename: aws-cloudwatch.png
         categories:
-          - data-collection.cloud-provider-managed
+          - data-collection.cloud-and-devops
       keywords:
         - cloud services
         - cloud computing
@@ -481,14 +473,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-concourse
-      most_popular: false
       community: true
       monitored_instance:
         name: Concourse
         link: https://concourse-ci.org
         icon_filename: concourse.png
         categories:
-          - data-collection.ci-cd-systems
+          - data-collection.cloud-and-devops
       keywords: [ ]
     overview:
       <<: *overview
@@ -508,14 +499,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-scylladb
-      most_popular: false
       community: true
       monitored_instance:
         name: ScyllaDB
         link: https://www.scylladb.com/
-        icon_filename: scylladb.png
+        icon_filename: scylladb.svg
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -528,14 +518,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-crowdsec
-      most_popular: false
       community: true
       monitored_instance:
         name: Crowdsec
         link: https://docs.crowdsec.net/docs/observability/prometheus
         icon_filename: crowdsec.png
         categories:
-          - data-collection.security-systems
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -555,14 +544,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-discourse
-      most_popular: false
       community: true
       monitored_instance:
         name: Discourse
         link: https://github.com/discourse/discourse-prometheus
         icon_filename: discourse.svg
         categories:
-          - data-collection.media-streaming-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -582,14 +570,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-dynatrace
-      most_popular: false
       community: true
       monitored_instance:
         name: Dynatrace
         link: https://github.com/Apside-TOP/dynatrace_exporter
         icon_filename: dynatrace.svg
         categories:
-          - data-collection.observability
+          - data-collection.cloud-and-devops
       keywords: [ ]
     overview:
       <<: *overview
@@ -609,14 +596,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-eos_web
-      most_popular: false
       community: true
       monitored_instance:
         name: EOS
         link: https://eos-web.web.cern.ch/eos-web/
         icon_filename: eos.png
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords: [ ]
     overview:
       <<: *overview
@@ -636,14 +622,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-etcd
-      most_popular: false
       community: true
       monitored_instance:
         name: etcd
         link: https://etcd.io/
         icon_filename: etcd.svg
         categories:
-          - data-collection.service-discovery-registry
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -656,14 +641,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-freebsd_nfs
-      most_popular: false
       community: true
       monitored_instance:
         name: FreeBSD NFS
         link: https://github.com/Axcient/freebsd-nfs-exporter
         icon_filename: freebsd.svg
         categories:
-          - data-collection.freebsd
+          - data-collection.storage
       keywords: [ ]
     overview:
       <<: *overview
@@ -683,14 +667,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-freebsd_rctl
-      most_popular: false
       community: true
       monitored_instance:
         name: FreeBSD RCTL-RACCT
         link: https://github.com/yo000/rctl_exporter
         icon_filename: freebsd.svg
         categories:
-          - data-collection.freebsd
+          - data-collection.operating-systems
       keywords: [ ]
     overview:
       <<: *overview
@@ -710,14 +693,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gcp_gce
-      most_popular: false
       community: true
       monitored_instance:
         name: GCP GCE
         link: https://github.com/O1ahmad/gcp-gce-exporter
         icon_filename: gcp-gce.svg
         categories:
-          - data-collection.cloud-provider-managed
+          - data-collection.cloud-and-devops
       keywords: [ ]
     overview:
       <<: *overview
@@ -737,14 +719,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-github_repo
-      most_popular: false
       community: true
       monitored_instance:
         name: GitHub repository
         link: https://github.com/githubexporter/github-exporter
         icon_filename: github.svg
         categories:
-          - data-collection.other
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -764,14 +745,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gitlab_runner
-      most_popular: false
       community: true
       monitored_instance:
         name: GitLab Runner
         link: https://gitlab.com/gitlab-org/gitlab-runner
         icon_filename: gitlab.png
         categories:
-          - data-collection.ci-cd-systems
+          - data-collection.cloud-and-devops
       keywords: [ ]
     overview:
       <<: *overview
@@ -791,14 +771,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gobetween
-      most_popular: false
       community: true
       monitored_instance:
         name: Gobetween
         link: https://github.com/yyyar/gobetween
         icon_filename: gobetween.svg
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
       keywords: [ ]
     overview:
       <<: *overview
@@ -811,14 +790,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gcp
-      most_popular: false
       community: true
       monitored_instance:
         name: Google Cloud Platform
         link: https://github.com/DazWilkin/gcp-exporter
         icon_filename: gcp.png
         categories:
-          - data-collection.cloud-provider-managed
+          - data-collection.cloud-and-devops
       keywords:
         - cloud services
         - cloud computing
@@ -841,14 +819,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gcp_stackdriver
-      most_popular: false
       community: true
       monitored_instance:
         name: Google Stackdriver
         link: https://github.com/prometheus-community/stackdriver_exporter
         icon_filename: gcp-stackdriver.svg
         categories:
-          - data-collection.cloud-provider-managed
+          - data-collection.cloud-and-devops
       keywords:
         - cloud services
         - cloud computing
@@ -871,14 +848,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-grafana
-      most_popular: false
       community: true
       monitored_instance:
         name: Grafana
         link: https://grafana.com/
         icon_filename: grafana.png
         categories:
-          - data-collection.observability
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -891,14 +867,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-graylog
-      most_popular: false
       community: true
       monitored_instance:
         name: Graylog Server
         link: https://github.com/Graylog2/graylog2-server/
         icon_filename: graylog.svg
         categories:
-          - data-collection.logs-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -919,14 +894,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-hana
-      most_popular: false
       community: true
       monitored_instance:
         name: HANA
         link: https://github.com/jenningsloy318/hana_exporter
         icon_filename: sap.svg
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -946,14 +920,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-honeypot
-      most_popular: false
       community: true
       monitored_instance:
         name: Honeypot
         link: https://github.com/Intrinsec/honeypot_exporter
         icon_filename: intrinsec.svg
         categories:
-          - data-collection.security-systems
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -973,14 +946,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-hubble
-      most_popular: false
       community: true
       monitored_instance:
         name: Hubble
         link: https://github.com/cilium/hubble
         icon_filename: hubble.png
         categories:
-          - data-collection.observability
+          - data-collection.cloud-and-devops
       keywords: [ ]
     overview:
       <<: *overview
@@ -1000,14 +972,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_spectrum
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM Spectrum
         link: https://github.com/topine/ibm-spectrum-exporter
         icon_filename: ibm.svg
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords: [ ]
     overview:
       <<: *overview
@@ -1027,14 +998,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-influxdb
-      most_popular: false
       community: true
       monitored_instance:
         name: InfluxDB
         link: https://github.com/prometheus/influxdb_exporter
         icon_filename: influxdb.svg
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords:
         - database
         - dbms
@@ -1057,14 +1027,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-jenkins
-      most_popular: false
       community: true
       monitored_instance:
         name: Jenkins
         link: https://www.jenkins.io/
         icon_filename: jenkins.svg
         categories:
-          - data-collection.ci-cd-systems
+          - data-collection.cloud-and-devops
       keywords: [ ]
     overview:
       <<: *overview
@@ -1084,14 +1053,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-jmx
-      most_popular: false
       community: true
       monitored_instance:
         name: JMX
         link: https://github.com/prometheus/jmx_exporter
         icon_filename: java.svg
         categories:
-          - data-collection.apm
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -1111,14 +1079,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-kafka_consumer_lag
-      most_popular: false
       community: true
       monitored_instance:
         name: Kafka Consumer Lag
         link: https://github.com/omarsmak/kafka-consumer-lag-monitoring
         icon_filename: kafka.svg
         categories:
-          - data-collection.service-discovery-registry
+          - data-collection.databases
       keywords:
         - big data
         - stream processing
@@ -1141,14 +1108,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-kafka
-      most_popular: false
       community: true
       monitored_instance:
         name: Kafka
         link: https://github.com/danielqsj/kafka_exporter/
         icon_filename: kafka.svg
         categories:
-          - data-collection.message-brokers
+          - data-collection.databases
       keywords:
         - big data
         - stream processing
@@ -1171,14 +1137,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-kafka_zookeeper
-      most_popular: false
       community: true
       monitored_instance:
         name: Kafka ZooKeeper
         link: https://github.com/cloudflare/kafka_zookeeper_exporter
         icon_filename: kafka.svg
         categories:
-          - data-collection.message-brokers
+          - data-collection.databases
       keywords:
         - big data
         - stream processing
@@ -1201,14 +1166,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-linode
-      most_popular: false
       community: true
       monitored_instance:
         name: Linode
         link: https://github.com/DazWilkin/linode-exporter
         icon_filename: linode.svg
         categories:
-          - data-collection.cloud-provider-managed
+          - data-collection.cloud-and-devops
       keywords: [ ]
     overview:
       <<: *overview
@@ -1228,14 +1192,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-loki
-      most_popular: false
       community: true
       monitored_instance:
         name: loki
         link: https://github.com/grafana/loki
         icon_filename: loki.png
         categories:
-          - data-collection.logs-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -1255,14 +1218,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-minecraft
-      most_popular: false
       community: true
       monitored_instance:
         name: Minecraft
         link: https://github.com/sladkoff/minecraft-prometheus-exporter
         icon_filename: minecraft.png
         categories:
-          - data-collection.gaming
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -1282,14 +1244,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-mosquitto
-      most_popular: false
       community: true
       monitored_instance:
         name: mosquitto
         link: https://github.com/sapcc/mosquitto-exporter
         icon_filename: mosquitto.svg
         categories:
-          - data-collection.message-brokers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -1309,14 +1270,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_mq
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM MQ
         link: https://github.com/agebhar1/mq_exporter
         icon_filename: ibm.svg
         categories:
-          - data-collection.message-brokers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -1336,14 +1296,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-mqtt_blackbox
-      most_popular: false
       community: true
       monitored_instance:
         name: MQTT Blackbox
         link: https://github.com/inovex/mqtt_blackbox_exporter
         icon_filename: mqtt.svg
         categories:
-          - data-collection.message-brokers
+          - data-collection.synthetic-testing
       keywords: [ ]
     overview:
       <<: *overview
@@ -1363,14 +1322,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-netapp_ontap
-      most_popular: false
       community: true
       monitored_instance:
         name: Netapp ONTAP API
         link: https://github.com/sapcc/netapp-api-exporter
         icon_filename: netapp.svg
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords:
         - network monitoring
         - network performance
@@ -1393,14 +1351,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-netapp_solidfire
-      most_popular: false
       community: true
       monitored_instance:
         name: NetApp Solidfire
         link: https://github.com/mjavier2k/solidfire-exporter
         icon_filename: netapp.svg
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords:
         - network monitoring
         - network performance
@@ -1423,14 +1380,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-openvswitch
-      most_popular: false
       community: true
       monitored_instance:
         name: Open vSwitch
         link: https://github.com/digitalocean/openvswitch_exporter
         icon_filename: ovs.png
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -1450,14 +1406,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-google_pagespeed
-      most_popular: false
       community: true
       monitored_instance:
         name: Google Pagespeed
         link: https://github.com/foomo/pagespeed_exporter
         icon_filename: google.svg
         categories:
-          - data-collection.apm
+          - data-collection.applications
       keywords:
         - cloud services
         - cloud computing
@@ -1480,14 +1435,13 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-philips_hue
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Philips Hue
         link: https://github.com/aexel90/hue_exporter
         icon_filename: hue.svg
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -1507,7 +1461,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-podman
-      most_popular: false
       community: true
       monitored_instance:
         name: Podman
@@ -1534,7 +1487,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-proxmox
-      most_popular: false
       community: true
       monitored_instance:
         name: Proxmox VE
@@ -1561,14 +1513,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-radius
-      most_popular: false
       community: true
       monitored_instance:
         name: RADIUS
         link: https://github.com/devon-mar/radius-exporter
         icon_filename: radius.png
         categories:
-          - data-collection.authentication-and-authorization
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -1588,14 +1539,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-aws_rds
-      most_popular: false
       community: true
       monitored_instance:
         name: AWS RDS
         link: https://github.com/percona/rds_exporter
         icon_filename: aws-rds.svg
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords:
         - cloud services
         - cloud computing
@@ -1618,14 +1568,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ripe_atlas
-      most_popular: false
       community: true
       monitored_instance:
         name: RIPE Atlas
         link: https://github.com/czerwonk/atlas_exporter
         icon_filename: ripe.png
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -1645,15 +1594,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-slurm
-      most_popular: false
       community: true
       monitored_instance:
         name: Slurm
         link: https://github.com/SckyzO/slurm_exporter
         icon_filename: slurm.png
         categories:
-          - data-collection.task-queues
-          #- data-collection.provisioning-systems
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -1673,14 +1620,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-spacelift
-      most_popular: false
       community: true
       monitored_instance:
         name: Spacelift
         link: https://github.com/spacelift-io/prometheus-exporter
         icon_filename: spacelift.png
         categories:
-          - data-collection.provisioning-systems
+          - data-collection.cloud-and-devops
       keywords: [ ]
     overview:
       <<: *overview
@@ -1700,14 +1646,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-starlink
-      most_popular: false
       community: true
       monitored_instance:
         name: Starlink (SpaceX)
         link: https://github.com/danopstech/starlink_exporter
         icon_filename: starlink.svg
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -1727,14 +1672,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-statuspage
-      most_popular: false
       community: true
       monitored_instance:
         name: StatusPage
         link: https://github.com/vladvasiliu/statuspage-exporter
         icon_filename: statuspage.png
         categories:
-          - data-collection.notifications
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -1754,14 +1698,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-tacas
-      most_popular: false
       community: true
       monitored_instance:
         name: TACACS
         link: https://github.com/devon-mar/tacacs-exporter
         icon_filename: tacacs.png
         categories:
-          - data-collection.authentication-and-authorization
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -1781,14 +1724,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-tesla_vehicle
-      most_popular: false
       community: true
       monitored_instance:
         name: Tesla vehicle
         link: https://github.com/wywywywy/tesla-prometheus-exporter
         icon_filename: tesla.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -1808,14 +1750,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-twitch
-      most_popular: false
       community: true
       monitored_instance:
         name: Twitch
         link: https://github.com/damoun/twitch_exporter
         icon_filename: twitch.svg
         categories:
-          - data-collection.media-streaming-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -1835,14 +1776,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ubiquity_ufiber
-      most_popular: false
       community: true
       monitored_instance:
         name: Ubiquiti UFiber OLT
         link: https://github.com/swoga/ufiber-exporter
         icon_filename: ubiquiti.png
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -1862,14 +1802,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-uptimerobot
-      most_popular: false
       community: true
       monitored_instance:
         name: Uptimerobot
         link: https://github.com/wosc/prometheus-uptimerobot
         icon_filename: uptimerobot.svg
         categories:
-          - data-collection.synthetic-checks
+          - data-collection.synthetic-testing
       keywords: [ ]
     overview:
       <<: *overview
@@ -1889,14 +1828,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-vault_pki
-      most_popular: false
       community: true
       monitored_instance:
         name: Vault PKI
         link: https://github.com/aarnaud/vault-pki-exporter
         icon_filename: vault.svg
         categories:
-          - data-collection.security-systems
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -1916,14 +1854,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-vertica
-      most_popular: false
       community: true
       monitored_instance:
         name: Vertica
         link: https://github.com/vertica/vertica-prometheus-exporter
         icon_filename: vertica.svg
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -1943,14 +1880,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-vscode
-      most_popular: false
       community: true
       monitored_instance:
         name: VSCode
         link: https://github.com/guicaulada/vscode-exporter
         icon_filename: vscode.svg
         categories:
-          - data-collection.apm
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -1970,14 +1906,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-4d_server
-      most_popular: false
       community: true
       monitored_instance:
         name: 4D Server
         link: https://github.com/ThomasMaul/Prometheus_4D_Exporter
         icon_filename: 4d_server.png
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -1997,14 +1932,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-8430ft-modem
-      most_popular: false
       community: true
       monitored_instance:
         name: 8430FT modem
         link: https://github.com/dernasherbrezon/8430ft_exporter
         icon_filename: mtc.svg
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -2024,14 +1958,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-steam_a2s
-      most_popular: false
       community: true
       monitored_instance:
         name: Steam
         link: https://github.com/armsnyder/a2s-exporter
         icon_filename: a2s.png
         categories:
-          - data-collection.gaming
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2051,14 +1984,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-alamos_fe2
-      most_popular: false
       community: true
       monitored_instance:
         name: Alamos FE2 server
         link: https://github.com/codemonauts/prometheus-fe2-exporter
         icon_filename: alamos_fe2.png
         categories:
-          - data-collection.apm
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2078,14 +2010,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-amd_smi
-      most_popular: false
       community: true
       monitored_instance:
         name: AMD CPU & GPU
         link: https://github.com/amd/amd_smi_exporter
         icon_filename: amd.svg
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -2105,14 +2036,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-apicast
-      most_popular: false
       community: true
       monitored_instance:
         name: APIcast
         link: https://github.com/3scale/apicast
         icon_filename: apicast.png
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.web-servers-and-proxies
       keywords: [ ]
     overview:
       <<: *overview
@@ -2132,14 +2062,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-authlog
-      most_popular: false
       community: true
       monitored_instance:
         name: AuthLog
         link: https://github.com/woblerr/authlog_exporter
         icon_filename: linux.png
         categories:
-          - data-collection.logs-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2159,14 +2088,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-aws_quota
-      most_popular: false
       community: true
       monitored_instance:
         name: AWS Quota
         link: https://github.com/emylincon/aws_quota_exporter
         icon_filename: aws.svg
         categories:
-          - data-collection.cloud-provider-managed
+          - data-collection.cloud-and-devops
       keywords:
         - cloud services
         - cloud computing
@@ -2189,14 +2117,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-bosh
-      most_popular: false
       community: true
       monitored_instance:
         name: BOSH
         link: https://github.com/bosh-prometheus/bosh_exporter
         icon_filename: bosh.png
         categories:
-          - data-collection.provisioning-systems
+          - data-collection.cloud-and-devops
       keywords: [ ]
     overview:
       <<: *overview
@@ -2216,14 +2143,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-bungeecord
-      most_popular: false
       community: true
       monitored_instance:
         name: BungeeCord
         link: https://github.com/weihao/bungeecord-prometheus-exporter
         icon_filename: bungee.png
         categories:
-          - data-collection.gaming
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2243,14 +2169,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-celery
-      most_popular: false
       community: true
       monitored_instance:
         name: Celery
         link: https://github.com/ZeitOnline/celery_redis_prometheus
         icon_filename: celery.png
         categories:
-          - data-collection.task-queues
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2270,14 +2195,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-chia
-      most_popular: false
       community: true
       monitored_instance:
         name: Chia
         link: https://github.com/chia-network/chia-exporter
         icon_filename: chia.png
         categories:
-          - data-collection.blockchain-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2297,14 +2221,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-clm5ip
-      most_popular: false
       community: true
       monitored_instance:
         name: Christ Elektronik CLM5IP power panel
         link: https://github.com/christmann/clm5ip_exporter/
         icon_filename: christelec.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -2324,14 +2247,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-clamd
-      most_popular: false
       community: true
       monitored_instance:
         name: ClamAV daemon
         link: https://github.com/sergeymakinen/clamav_exporter
         icon_filename: clamav.png
         categories:
-          - data-collection.security-systems
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2351,14 +2273,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-clamscan
-      most_popular: false
       community: true
       monitored_instance:
         name: Clamscan results
         link: https://github.com/FortnoxAB/clamscan-exporter
         icon_filename: clamav.png
         categories:
-          - data-collection.security-systems
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2378,14 +2299,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-clash
-      most_popular: false
       community: true
       monitored_instance:
         name: Clash
         link: https://github.com/elonzh/clash_exporter
         icon_filename: clash.png
         categories:
-          - data-collection.web-servers-and-web-proxies
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -2405,14 +2325,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cloud_foundry
-      most_popular: false
       community: true
       monitored_instance:
         name: Cloud Foundry
         link: https://github.com/bosh-prometheus/cf_exporter
         icon_filename: cloud-foundry.svg
         categories:
-          - data-collection.provisioning-systems
+          - data-collection.cloud-and-devops
       keywords:
         - cloud services
         - cloud computing
@@ -2435,14 +2354,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cloud_foundry_firebase
-      most_popular: false
       community: true
       monitored_instance:
         name: Cloud Foundry Firehose
         link: https://github.com/bosh-prometheus/firehose_exporter
         icon_filename: cloud-foundry.svg
         categories:
-          - data-collection.provisioning-systems
+          - data-collection.cloud-and-devops
       keywords:
         - cloud services
         - cloud computing
@@ -2465,14 +2383,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-lustre
-      most_popular: false
       community: true
       monitored_instance:
         name: Lustre metadata
         link: https://github.com/GSI-HPC/prometheus-cluster-exporter
         icon_filename: lustre.png
         categories:
-          - data-collection.cloud-provider-managed
+          - data-collection.storage
       keywords: [ ]
     overview:
       <<: *overview
@@ -2492,14 +2409,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-cmon
-      most_popular: false
       community: true
       monitored_instance:
         name: ClusterControl CMON
         link: https://github.com/severalnines/cmon_exporter
         icon_filename: cluster-control.svg
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -2519,14 +2435,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-collectd
-      most_popular: false
       community: true
       monitored_instance:
         name: Collectd
         link: https://github.com/prometheus/collectd_exporter
         icon_filename: collectd.png
         categories:
-          - data-collection.observability
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2546,14 +2461,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ftbeerpi
-      most_popular: false
       community: true
       monitored_instance:
         name: CraftBeerPi
         link: https://github.com/jo-hannes/craftbeerpi_exporter
         icon_filename: craftbeer.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -2573,14 +2487,13 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-cryptowatch
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Cryptowatch
         link: https://github.com/nbarrientos/cryptowat_exporter
         icon_filename: cryptowatch.png
         categories:
-          - data-collection.blockchain-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2600,14 +2513,13 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-dmarc
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: DMARC
         link: https://github.com/jgosmann/dmarc-metrics-exporter
         icon_filename: dmarc.png
         categories:
-          - data-collection.mail-servers
+          - data-collection.applications
       keywords:
         - email authentication
         - policy
@@ -2630,14 +2542,13 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-dnsbl
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: DNSBL
         link: https://github.com/Luzilla/dnsbl_exporter/
         icon_filename: dnsbl.png
         categories:
-          - data-collection.dns-and-dhcp-servers
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -2659,14 +2570,13 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-bird
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Bird Routing Daemon
         link: https://github.com/czerwonk/bird_exporter
         icon_filename: bird.png
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -2686,14 +2596,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-elgato_keylight
-      most_popular: false
       community: true
       monitored_instance:
         name: Elgato Key Light devices.
         link: https://github.com/mdlayher/keylight_exporter
         icon_filename: elgato.svg
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -2713,14 +2622,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-energomera
-      most_popular: false
       community: true
       monitored_instance:
         name: Energomera smart power meters
         link: https://github.com/peak-load/energomera_exporter
         icon_filename: energomera.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -2740,14 +2648,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-fastd
-      most_popular: false
       community: true
       monitored_instance:
         name: Fastd
         link: https://github.com/freifunk-darmstadt/fastd-exporter
         icon_filename: fastd.png
         categories:
-          - data-collection.vpns
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -2767,14 +2674,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-freifunk
-      most_popular: false
       community: true
       monitored_instance:
         name: Freifunk network
         link: https://github.com/xperimental/freifunk-exporter
         icon_filename: freifunk.png
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -2794,14 +2700,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-frrouting
-      most_popular: false
       community: true
       monitored_instance:
         name: FRRouting
         link: https://github.com/tynany/frr_exporter
         icon_filename: frrouting.png
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -2821,14 +2726,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-github_ratelimit
-      most_popular: false
       community: true
       monitored_instance:
         name: GitHub API rate limit
         link: https://github.com/lunarway/github-ratelimit-exporter
         icon_filename: github.svg
         categories:
-          - data-collection.other
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2849,14 +2753,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-gpsd
-      most_popular: false
       community: true
       monitored_instance:
         name: gpsd
         link: https://github.com/natesales/gpsd-exporter
         icon_filename: gpsd.png
         categories:
-          - data-collection.apm
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2876,14 +2779,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-halon
-      most_popular: false
       community: true
       monitored_instance:
         name: Halon
         link: https://github.com/tobiasbp/halon_exporter
         icon_filename: halon.svg
         categories:
-          - data-collection.mail-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2903,14 +2805,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-hitron_coda
-      most_popular: false
       community: true
       monitored_instance:
         name: Hitron CODA Cable Modem
         link: https://github.com/hairyhenderson/hitron_coda_exporter
         icon_filename: hitron.svg
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -2930,14 +2831,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-homebridge
-      most_popular: false
       community: true
       monitored_instance:
         name: Homebridge
         link: https://github.com/lstrojny/homebridge-prometheus-exporter
         icon_filename: homebridge.svg
         categories:
-          - data-collection.iot-devices
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2957,14 +2857,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-homey
-      most_popular: false
       community: true
       monitored_instance:
         name: Homey
         link: https://github.com/rickardp/homey-prometheus-exporter
         icon_filename: homey.svg
         categories:
-          - data-collection.iot-devices
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -2984,14 +2883,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_cex
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM CryptoExpress (CEX) cards
         link: https://github.com/ibm-s390-cloud/k8s-cex-dev-plugin
         icon_filename: ibm.svg
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -3011,14 +2909,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_zhmc
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM Z Hardware Management Console
         link: https://github.com/zhmcclient/zhmc-prometheus-exporter
         icon_filename: ibm.svg
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -3038,14 +2935,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-jarvis
-      most_popular: false
       community: true
       monitored_instance:
         name: Jarvis Standing Desk
         link: https://github.com/hairyhenderson/jarvis_exporter/
         icon_filename: jarvis.jpg
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -3066,14 +2962,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-enclosure
-      most_popular: false
       community: true
       monitored_instance:
         name: Generic storage enclosure tool
         link: https://github.com/Gandi/jbod-rs
         icon_filename: storage-enclosure.svg
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords: [ ]
     overview:
       <<: *overview
@@ -3093,14 +2988,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-journald
-      most_popular: false
       community: true
       monitored_instance:
         name: journald
         link: https://github.com/dead-claudia/journald-exporter
         icon_filename: linux.png
         categories:
-          - data-collection.logs-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -3120,14 +3014,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-kannel
-      most_popular: false
       community: true
       monitored_instance:
         name: Kannel
         link: https://github.com/apostvav/kannel_exporter
         icon_filename: kannel.png
         categories:
-          - data-collection.telephony-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -3147,14 +3040,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-keepalived
-      most_popular: false
       community: true
       monitored_instance:
         name: Keepalived
         link: https://github.com/gen2brain/keepalived_exporter
-        icon_filename: keepalived.png
+        icon_filename: Keepalived.png
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -3174,14 +3066,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-lynis
-      most_popular: false
       community: true
       monitored_instance:
         name: Lynis audit reports
         link: https://github.com/MauveSoftware/lynis_exporter
         icon_filename: lynis.png
         categories:
-          - data-collection.security-systems
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -3201,14 +3092,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-meilisearch
-      most_popular: false
       community: true
       monitored_instance:
         name: Meilisearch
         link: https://github.com/scottaglia/meilisearch_exporter
         icon_filename: meilisearch.svg
         categories:
-          - data-collection.search-engines
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -3228,15 +3118,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-mesos
-      most_popular: false
       community: true
       monitored_instance:
         name: Mesos
         link: http://github.com/mesosphere/mesos_exporter
         icon_filename: mesos.svg
         categories:
-          #- data-collection.provisioning-systems
-          - data-collection.task-queues
+          - data-collection.containers-and-vms
       keywords: [ ]
     overview:
       <<: *overview
@@ -3256,14 +3144,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-xiaomi_mi_flora
-      most_popular: false
       community: true
       monitored_instance:
         name: Xiaomi Mi Flora
         link: https://github.com/xperimental/flowercare-exporter
         icon_filename: xiaomi.svg
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -3283,14 +3170,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-modbus_rtu
-      most_popular: false
       community: true
       monitored_instance:
         name: Modbus protocol
         link: https://github.com/dernasherbrezon/modbusrtu_exporter
         icon_filename: modbus.svg
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords:
         - database
         - dbms
@@ -3313,14 +3199,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-mogilefs
-      most_popular: false
       community: true
       monitored_instance:
         name: MogileFS
         link: https://github.com/KKBOX/mogilefs-exporter
         icon_filename: filesystem.svg
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords: [ ]
     overview:
       <<: *overview
@@ -3340,14 +3225,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-mtail
-      most_popular: false
       community: true
       monitored_instance:
         name: mtail
         link: https://github.com/google/mtail
         icon_filename: mtail.png
         categories:
-          - data-collection.logs-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -3367,14 +3251,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-nagios
-      most_popular: false
       community: true
       monitored_instance:
         name: Nagios
         link: https://github.com/wbollock/nagios_exporter
         icon_filename: nagios.png
         categories:
-          - data-collection.observability
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -3395,14 +3278,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-nature_remo
-      most_popular: false
       community: true
       monitored_instance:
         name: Nature Remo E lite devices
         link: https://github.com/kenfdev/remo-exporter
         icon_filename: nature-remo.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -3422,14 +3304,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-netatmo
-      most_popular: false
       community: true
       monitored_instance:
         name: Netatmo sensors
         link: https://github.com/xperimental/netatmo-exporter
         icon_filename: netatmo.svg
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords:
         - network monitoring
         - network performance
@@ -3452,14 +3333,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-nextcloud
-      most_popular: false
       community: true
       monitored_instance:
         name: Nextcloud servers
         link: https://github.com/xperimental/nextcloud-exporter
         icon_filename: nextcloud.png
         categories:
-          - data-collection.cloud-provider-managed
+          - data-collection.applications
       keywords:
         - cloud services
         - cloud computing
@@ -3482,14 +3362,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-nextdns
-      most_popular: false
       community: true
       monitored_instance:
         name: NextDNS
         link: https://github.com/raylas/nextdns-exporter
         icon_filename: nextdns.png
         categories:
-          - data-collection.dns-and-dhcp-servers
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -3509,14 +3388,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_aix_njmon
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM AIX systems Njmon
         link: https://github.com/crooks/njmon_exporter
         icon_filename: ibm.svg
         categories:
-          - data-collection.apm
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -3536,14 +3414,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-nrpe
-      most_popular: false
       community: true
       monitored_instance:
         name: NRPE daemon
         link: https://github.com/canonical/nrpe_exporter
         icon_filename: nrpelinux.png
         categories:
-          - data-collection.apm
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -3563,14 +3440,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-obs_studio
-      most_popular: false
       community: true
       monitored_instance:
         name: OBS Studio
         link: https://github.com/lukegb/obs_studio_exporter
         icon_filename: obs-studio.png
         categories:
-          - data-collection.media-streaming-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -3590,14 +3466,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-openrc
-      most_popular: false
       community: true
       monitored_instance:
         name: OpenRC
         link: https://git.sr.ht/~tomleb/openrc-exporter
         icon_filename: linux.png
         categories:
-          - data-collection.linux-systems
+          - data-collection.operating-systems
       keywords: [ ]
     overview:
       <<: *overview
@@ -3617,14 +3492,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-openroadm
-      most_popular: false
       community: true
       monitored_instance:
         name: OpenROADM devices
         link: https://github.com/utdal/openroadm_exporter
         icon_filename: openroadm.png
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords:
         - network monitoring
         - network performance
@@ -3647,14 +3521,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-openweathermap
-      most_popular: false
       community: true
       monitored_instance:
         name: OpenWeatherMap
         link: https://github.com/billykwooten/openweather-exporter
         icon_filename: openweather.png
         categories:
-          - data-collection.generic-data-collection
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -3674,14 +3547,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-dutch_electricity_smart_meter
-      most_popular: false
       community: true
       monitored_instance:
         name: Dutch Electricity Smart Meter
         link: https://github.com/TobiasDeBruijn/prometheus-p1-exporter
         icon_filename: dutch-electricity.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -3702,14 +3574,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-patroni
-      most_popular: false
       community: true
       monitored_instance:
         name: Patroni
         link: https://github.com/gopaytech/patroni_exporter
         icon_filename: patroni.png
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -3729,14 +3600,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-pws
-      most_popular: false
       community: true
       monitored_instance:
         name: Personal Weather Station
         link: https://github.com/JohnOrthoefer/pws-exporter
         icon_filename: wunderground.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -3756,14 +3626,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-pgbackrest
-      most_popular: false
       community: true
       monitored_instance:
         name: pgBackRest
         link: https://github.com/woblerr/pgbackrest_exporter
         icon_filename: pgbackrest.png
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -3783,14 +3652,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-pgpool2
-      most_popular: false
       community: true
       monitored_instance:
         name: Pgpool-II
         link: https://github.com/pgpool/pgpool2_exporter
         icon_filename: pgpool2.png
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -3810,14 +3678,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-pimoroni_enviro_plus
-      most_popular: false
       community: true
       monitored_instance:
         name: Pimoroni Enviro+
         link: https://github.com/terradolor/prometheus-enviro-exporter
         icon_filename: pimorino.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -3837,14 +3704,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-powerpal
-      most_popular: false
       community: true
       monitored_instance:
         name: Powerpal devices
         link: https://github.com/aashley/powerpal_exporter
         icon_filename: powerpal.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -3864,14 +3730,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-proftpd
-      most_popular: false
       community: true
       monitored_instance:
         name: ProFTPD
         link: https://github.com/transnano/proftpd_exporter
         icon_filename: proftpd.png
         categories:
-          - data-collection.ftp-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -3891,14 +3756,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-redis_queue
-      most_popular: false
       community: true
       monitored_instance:
         name: Redis Queue
         link: https://github.com/mdawar/rq-exporter
         icon_filename: rq.png
         categories:
-          - data-collection.message-brokers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -3918,14 +3782,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-radio_thermostat
-      most_popular: false
       community: true
       monitored_instance:
         name: Radio Thermostat
         link: https://github.com/andrewlow/radio-thermostat-exporter
         icon_filename: radiots.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -3945,14 +3808,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-raritan_pdu
-      most_popular: false
       community: true
       monitored_instance:
         name: Raritan PDU
         link: https://github.com/psyinfra/prometheus-raritan-pdu-exporter
         icon_filename: raritan.svg
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -3972,14 +3834,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sabnzbd
-      most_popular: false
       community: true
       monitored_instance:
         name: SABnzbd
         link: https://github.com/msroest/sabnzbd_exporter
         icon_filename: sabnzbd.png
         categories:
-          - data-collection.media-streaming-servers
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -3999,14 +3860,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-salicru_eqx
-      most_popular: false
       community: true
       monitored_instance:
         name: Salicru EQX inverter
         link: https://github.com/alejandroscf/prometheus_salicru_exporter
         icon_filename: salicru.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -4026,14 +3886,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sense_energy
-      most_popular: false
       community: true
       monitored_instance:
         name: Sense Energy
         link: https://github.com/ejsuncy/sense_energy_prometheus_exporter
         icon_filename: sense.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -4053,14 +3912,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-shelly
-      most_popular: false
       community: true
       monitored_instance:
         name: Shelly humidity sensor
         link: https://github.com/aexel90/shelly_exporter
         icon_filename: shelly.jpg
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -4080,14 +3938,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-s7_plc
-      most_popular: false
       community: true
       monitored_instance:
         name: Siemens S7 PLC
         link: https://github.com/MarcusCalidus/s7-plc-exporter
         icon_filename: siemens.svg
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -4107,14 +3964,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-site24x7
-      most_popular: false
       community: true
       monitored_instance:
         name: Site 24x7
         link: https://github.com/svenstaro/site24x7_exporter
         icon_filename: site24x7.svg
         categories:
-          - data-collection.synthetic-checks
+          - data-collection.synthetic-testing
       keywords: [ ]
     overview:
       <<: *overview
@@ -4134,14 +3990,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sma_inverter
-      most_popular: false
       community: true
       monitored_instance:
         name: SMA Inverters
         link: https://github.com/dr0ps/sma_inverter_exporter
         icon_filename: sma.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -4161,14 +4016,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sml
-      most_popular: false
       community: true
       monitored_instance:
         name: Smart meters SML
         link: https://github.com/mweinelt/sml-exporter
         icon_filename: sml.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -4188,14 +4042,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-softether
-      most_popular: false
       community: true
       monitored_instance:
         name: SoftEther VPN Server
         link: https://github.com/dalance/softether_exporter
         icon_filename: softether.svg
         categories:
-          - data-collection.vpns
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -4215,14 +4068,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-lsx
-      most_popular: false
       community: true
       monitored_instance:
         name: Solar logging stick
         link: https://gitlab.com/bhavin192/lsx-exporter
         icon_filename: solar.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -4242,14 +4094,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-solis
-      most_popular: false
       community: true
       monitored_instance:
         name: Solis Ginlong 5G inverters
         link: https://github.com/candlerb/solis_exporter
         icon_filename: solis.jpg
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -4269,14 +4120,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sonic
-      most_popular: false
       community: true
       monitored_instance:
         name: SONiC NOS
         link: https://github.com/kamelnetworks/sonic_exporter
         icon_filename: sonic.png
         categories:
-          - data-collection.networking-stack-and-network-interfaces
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -4296,14 +4146,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-ibm_spectrum_virtualize
-      most_popular: false
       community: true
       monitored_instance:
         name: IBM Spectrum Virtualize
         link: https://github.com/bluecmd/spectrum_virtualize_exporter
         icon_filename: ibm.svg
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords: [ ]
     overview:
       <<: *overview
@@ -4323,14 +4172,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-sphinx
-      most_popular: false
       community: true
       monitored_instance:
         name: Sphinx
         link: https://github.com/foxdalas/sphinx_exporter
         icon_filename: sphinx.png
         categories:
-          - data-collection.search-engines
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -4350,14 +4198,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-storidge
-      most_popular: false
       community: true
       monitored_instance:
         name: Storidge
         link: https://github.com/Storidge/cio-user-docs/blob/master/integrations/prometheus.md
         icon_filename: storidge.png
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords: [ ]
     overview:
       <<: *overview
@@ -4377,14 +4224,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-strongswan
-      most_popular: false
       community: true
       monitored_instance:
         name: strongSwan
         link: https://github.com/jlti-dev/ipsec_exporter
         icon_filename: strongswan.svg
         categories:
-          - data-collection.vpns
+          - data-collection.networking
       keywords: [ ]
     overview:
       <<: *overview
@@ -4404,14 +4250,13 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-sunspec
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Sunspec Solar Energy
         link: https://github.com/inosion/prometheus-sunspec-exporter
         icon_filename: sunspec.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -4431,14 +4276,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-suricata
-      most_popular: false
       community: true
       monitored_instance:
         name: Suricata
         link: https://github.com/corelight/suricata_exporter
         icon_filename: suricata.png
         categories:
-          - data-collection.security-systems
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -4460,14 +4304,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-synology_activebackup
-      most_popular: false
       community: true
       monitored_instance:
         name: Synology ActiveBackup
         link: https://github.com/codemonauts/activebackup-prometheus-exporter
         icon_filename: synology.png
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords: [ ]
     overview:
       <<: *overview
@@ -4487,14 +4330,13 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-sysload
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Sysload
         link: https://github.com/egmc/sysload_exporter
         icon_filename: sysload.png
         categories:
-          - data-collection.apm
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -4514,14 +4356,13 @@ modules:
     meta:
       id: collector-go.d.plugin-prometheus-tado
       <<: *meta
-      most_popular: false
       community: true
       monitored_instance:
         name: Tado smart heating solution
         link: https://github.com/eko/tado-exporter
         icon_filename: tado.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -4542,14 +4383,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-tankerkoenig
-      most_popular: false
       community: true
       monitored_instance:
         name: Tankerkoenig API
         link: https://github.com/lukasmalkmus/tankerkoenig_exporter
         icon_filename: tanker.png
         categories:
-          - data-collection.generic-data-collection
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -4569,14 +4409,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-tesla_wall_connector
-      most_popular: false
       community: true
       monitored_instance:
         name: Tesla Wall Connector
         link: https://github.com/benclapp/tesla_wall_connector_exporter
         icon_filename: tesla.png
         categories:
-          - data-collection.iot-devices
+          - data-collection.hardware-and-sensors
       keywords: [ ]
     overview:
       <<: *overview
@@ -4596,14 +4435,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-warp10
-      most_popular: false
       community: true
       monitored_instance:
         name: Warp10
         link: https://github.com/centreon/warp10-sensision-exporter
         icon_filename: warp10.svg
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
       keywords: [ ]
     overview:
       <<: *overview
@@ -4624,14 +4462,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-yourls
-      most_popular: false
       community: true
       monitored_instance:
         name: YOURLS URL Shortener
         link: https://github.com/just1not2/prometheus-exporter-yourls
         icon_filename: yourls.png
         categories:
-          - data-collection.apm
+          - data-collection.applications
       keywords: [ ]
     overview:
       <<: *overview
@@ -4651,14 +4488,13 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-prometheus-zerto
-      most_popular: false
       community: true
       monitored_instance:
         name: Zerto
         link: https://github.com/claranet/zerto-exporter
         icon_filename: zerto.png
         categories:
-          - data-collection.cloud-provider-managed
+          - data-collection.cloud-and-devops
       keywords: [ ]
     overview:
       <<: *overview

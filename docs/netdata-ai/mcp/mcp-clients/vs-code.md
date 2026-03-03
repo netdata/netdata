@@ -42,9 +42,73 @@ VS Code extensions typically support stdio-based MCP servers:
    ```
    Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 
-## Continue Extension Setup
+## Netdata Cloud MCP
 
-### Installation
+Connect to your entire Netdata Cloud infrastructure
+through a single endpoint — no local setup, bridges,
+or firewall changes needed.
+
+**Prerequisites:**
+
+- Netdata Cloud account with Business plan
+- Nodes claimed to Netdata Cloud
+- API token with `scope:mcp`
+  ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
+
+### Continue Extension
+
+Add to `.continue/mcpServers/netdata-cloud.yaml`:
+
+```yaml
+name: Netdata Cloud
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: netdata-cloud
+    type: streamable-http
+    url: https://app.netdata.cloud/api/v1/mcp
+    requestOptions:
+      headers:
+        Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN
+```
+
+### Cline Extension
+
+Cline only supports stdio and SSE transports.
+Since Netdata Cloud MCP uses Streamable HTTP,
+you need the `mcp-remote` bridge to convert
+stdio to HTTP:
+
+```json
+{
+  "mcpServers": {
+    "netdata-cloud": {
+      "command": "npx",
+      "args": [
+        "mcp-remote@latest",
+        "https://app.netdata.cloud/api/v1/mcp",
+        "--header",
+        "Authorization: Bearer YOUR_NETDATA_CLOUD_API_TOKEN"
+      ],
+      "alwaysAllow": [],
+      "disabled": false
+    }
+  }
+}
+```
+
+Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
+Netdata Cloud API token (must have `scope:mcp`).
+For more details, see
+[Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp).
+
+## Local Agent or Parent
+
+The following methods connect directly to a Netdata Agent or Parent on your network.
+
+### Continue Extension
+
+#### Installation
 
 1. Open VS Code
 2. Go to Extensions (Ctrl+Shift+X)
@@ -52,9 +116,9 @@ VS Code extensions typically support stdio-based MCP servers:
 4. Install the Continue extension
 5. Reload VS Code
 
-### Configuration
+#### Configuration
 
-#### Step 1: Add Claude Model
+##### Step 1: Add Claude Model
 
 1. Click "**Select model**" dropdown at the bottom (next to Chat dropdown)
 2. Click "**+ Add Chat model**"
@@ -64,7 +128,7 @@ VS Code extensions typically support stdio-based MCP servers:
     - **API key**: Enter your Anthropic API key
     - Click "**Connect**"
 
-#### Step 2: Add Netdata MCP Server
+##### Step 2: Add Netdata MCP Server
 
 Continue stores MCP definitions as YAML or JSON blocks. The recommended flow is:
 
@@ -72,7 +136,10 @@ Continue stores MCP definitions as YAML or JSON blocks. The recommended flow is:
 2. Click "**+ Add MCP Servers**" to scaffold `.continue/mcpServers/<name>.yaml`
 3. Replace the contents with one of the configurations below
 
-> Continue’s reference guide documents the `type` field (`stdio`, `sse`, or `streamable-http`) and block syntax (https://docs.continue.dev/customize/deep-dives/mcp).
+> Continue's reference guide documents the `type`
+> field (`stdio`, `sse`, or `streamable-http`)
+> and block syntax
+> (https://docs.continue.dev/customize/deep-dives/mcp).
 
 **Method 1: stdio launcher (all Netdata versions)**
 
@@ -100,8 +167,9 @@ mcpServers:
   - name: netdata
     type: sse
     url: https://YOUR_NETDATA_IP:19999/mcp
-    headers:
-      Authorization: Bearer ${NETDATA_MCP_API_KEY}
+    requestOptions:
+      headers:
+        Authorization: Bearer ${NETDATA_MCP_API_KEY}
 ```
 
 **Method 3: Streamable HTTP (Netdata v2.7.2+)**
@@ -114,13 +182,14 @@ mcpServers:
   - name: netdata
     type: streamable-http
     url: https://YOUR_NETDATA_IP:19999/mcp
-    headers:
-      Authorization: Bearer ${NETDATA_MCP_API_KEY}
+    requestOptions:
+      headers:
+        Authorization: Bearer ${NETDATA_MCP_API_KEY}
 ```
 
 Continue expands environment placeholders such as `${NETDATA_MCP_API_KEY}` so you can keep API keys out of source control. After saving, reload the window to pick up the new server.
 
-### Usage
+#### Usage
 
 Press `Ctrl+L` to open Continue chat, then:
 
@@ -130,21 +199,22 @@ Press `Ctrl+L` to open Continue chat, then:
 @netdata are there any anomalies in the database servers?
 ```
 
-## Cline Extension Setup
+### Cline Extension
 
-### Installation
+#### Installation
 
 1. Search for "Cline" in Extensions
 2. Install and reload VS Code
 
-### Configuration
+#### Configuration
 
-Cline’s official docs describe two workflows (https://docs.cline.bot/mcp/configuring-mcp-servers):
+Cline's official docs describe two workflows
+(<https://docs.cline.bot/mcp/configuring-mcp-servers>):
 
 - **UI configuration** – Click the MCP Servers icon → Configure tab → add/update servers, restart, toggle, and set timeouts.
 - **JSON configuration** – Click **Configure MCP Servers** to open `cline_mcp_settings.json` and edit the underlying JSON.
 
-#### JSON examples
+##### JSON examples
 
 **Stdio (`nd-mcp`)**
 
@@ -180,9 +250,13 @@ Cline’s official docs describe two workflows (https://docs.cline.bot/mcp/confi
 }
 ```
 
-> Optional fields such as `networkTimeout`, `alwaysAllow`, and `env` map directly to Cline’s UI controls. SSE and stdio are the two transports Cline supports today; pick the one that matches your Netdata deployment.
+> Optional fields such as `networkTimeout`,
+> `alwaysAllow`, and `env` map directly to
+> Cline's UI controls. SSE and stdio are the
+> two transports Cline supports today; pick
+> the one that matches your Netdata deployment.
 
-### Usage
+#### Usage
 
 1. Open Cline (Ctrl+Shift+P → "Cline: Open Chat")
 2. Cline can autonomously:

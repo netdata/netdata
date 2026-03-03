@@ -30,6 +30,8 @@ CLOUD_STATUS claim_reload_and_wait_online(void);
 const char *cloud_config_url_get(void);
 void cloud_config_url_set(const char *url);
 const char *cloud_config_proxy_get(void);
+const char *cloud_config_proxy_source_get(void);
+bool cloud_config_proxy_is_explicitly_set(void);
 bool cloud_config_insecure_get(void);
 
 #endif //NETDATA_CLAIM_H

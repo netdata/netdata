@@ -7,7 +7,7 @@ modules:
         name: Idle OS Jitter
         link: ''
         categories:
-          - data-collection.synthetic-checks
+          - data-collection.synthetic-testing
         icon_filename: 'syslog.png'
       related_resources:
         integrations:
@@ -17,7 +17,6 @@ modules:
       keywords:
         - latency
         - jitter
-      most_popular: false
     overview:
       data_collection:
         metrics_description: >

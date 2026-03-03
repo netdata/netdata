@@ -3,25 +3,25 @@
 package exim
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioQueueEmailsCount = module.Priority + iota
+	prioQueueEmailsCount = collectorapi.Priority + iota
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	queueEmailsCountChart.Copy(),
 }
 
-var queueEmailsCountChart = module.Chart{
+var queueEmailsCountChart = collectorapi.Chart{
 	ID:       "qemails",
 	Title:    "Exim Queue Emails",
 	Units:    "emails",
 	Fam:      "queue",
 	Ctx:      "exim.qemails",
 	Priority: prioQueueEmailsCount,
-	Dims: module.Dims{
+	Dims: collectorapi.Dims{
 		{ID: "emails"},
 	},
 }

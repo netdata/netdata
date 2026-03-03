@@ -195,7 +195,15 @@ static inline int parser_action(PARSER *parser, char *input) {
                 if(buffer_strlen(parser->defer.response) > PLUGINSD_MAX_DEFERRED_SIZE) {
                     // more than PLUGINSD_MAX_DEFERRED_SIZE of data,
                     // or a bad plugin that did not send the end_keyword
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "PLUGINSD: deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "PLUGINSD: deferred response is too big (%zu bytes, limit %zu bytes) "
+                           "while waiting for keyword '%s' from plugin '%s' (transaction '%s'). "
+                           "Stopping this plugin.",
+                           buffer_strlen(parser->defer.response),
+                           (size_t)PLUGINSD_MAX_DEFERRED_SIZE,
+                           parser->defer.end_keyword ? parser->defer.end_keyword : "unknown",
+                           parser->user.cd ? string2str(parser->user.cd->filename) : "unknown",
+                           parser->defer.action_data ? string2str((STRING *)parser->defer.action_data) : "none");
                     return 1;
                 }
             }

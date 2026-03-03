@@ -8,7 +8,7 @@ modules:
         name: RethinkDB
         link: https://rethinkdb.com
         categories:
-          - data-collection.database-servers
+          - data-collection.databases
         icon_filename: "rethinkdb.png"
       related_resources:
         integrations:
@@ -19,7 +19,6 @@ modules:
         - rethinkdb
         - database
         - db
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

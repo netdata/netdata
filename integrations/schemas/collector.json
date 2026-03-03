@@ -49,12 +49,18 @@
                             "module_name": {
                               "type": "string",
                               "description": "Related integration module name."
+                            },
+                            "monitored_instance_name": {
+                              "type": "string",
+                              "description": "Related integration monitored instance name. Use to reference a specific module when a plugin+module combination has multiple monitored instances (e.g. cgroups.plugin)."
                             }
                           },
                           "required": [
-                            "plugin_name",
-                            "module_name"
-                          ]
+                            "plugin_name"
+                          ],
+                          "dependencies": {
+                            "monitored_instance_name": ["module_name"]
+                          }
                         }
                       }
                     },
@@ -80,10 +86,6 @@
                   "description"
                 ]
               },
-              "most_popular": {
-                "type": "boolean",
-                "description": "Whether or not the integration is to be flagged as most-popular, meaning it will show up at the top of the menu."
-              },
               "community": {
                 "type": "boolean",
                 "description": "Whether or not the integration should be flagged as community."
@@ -94,10 +96,9 @@
               "module_name",
               "monitored_instance",
               "keywords",
-              "related_resources",
-              "info_provided_to_referring_integrations",
-              "most_popular"
-            ]
+                "related_resources",
+                "info_provided_to_referring_integrations"
+              ]
           },
           "overview": {
             "type": "object",
@@ -346,7 +347,8 @@
                             "enum": [
                               "line",
                               "area",
-                              "stacked"
+                              "stacked",
+                              "heatmap"
                             ]
                           },
                           "dimensions": {

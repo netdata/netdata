@@ -1,7 +1,7 @@
-use crate::file::{file::JournalFile, offset_array::InlinedCursor};
-use crate::error::{JournalError, Result};
-use std::num::NonZeroU64;
 use super::mmap::MemoryMap;
+use crate::error::{JournalError, Result};
+use crate::file::{file::JournalFile, offset_array::InlinedCursor};
+use std::num::NonZeroU64;
 
 #[derive(Clone, Debug)]
 pub enum FilterExpr {

@@ -1665,6 +1665,61 @@ test_gauge_metric_2{label1="value2"} 1
 	assert.Equal(t, want, series)
 }
 
+func TestPromTextParser_parseToMetricFamilies_metricNameNotFirstLabel(t *testing.T) {
+	var p promTextParser
+
+	txt := []byte(`
+# HELP DCGM_FI_DEV_GPU_UTIL GPU utilization
+# TYPE DCGM_FI_DEV_GPU_UTIL gauge
+DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
+`)
+
+	mfs, err := p.parseToMetricFamilies(txt)
+	require.NoError(t, err)
+
+	require.Contains(t, mfs, "DCGM_FI_DEV_GPU_UTIL")
+	require.NotContains(t, mfs, "GPU-aaa")
+
+	mf := mfs["DCGM_FI_DEV_GPU_UTIL"]
+	require.Len(t, mf.metrics, 1)
+	assert.Equal(t, model.MetricTypeGauge, mf.typ)
+	assert.Equal(t, 80.0, mf.metrics[0].gauge.value)
+	assert.EqualValues(t, labels.Labels{
+		{Name: "UUID", Value: "GPU-aaa"},
+		{Name: "gpu", Value: "0"},
+	}, mf.metrics[0].labels)
+}
+
+func TestPromTextParser_parseToMetricFamilies_failsOnInvalidSeriesValue(t *testing.T) {
+	var p promTextParser
+
+	txt := []byte(`
+# HELP DCGM_FI_DEV_GPU_UTIL GPU utilization
+# TYPE DCGM_FI_DEV_GPU_UTIL gauge
+DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
+# HELP DCGM_FI_DEV_REQUESTED_POWER_PROFILE_MASK Requested power profile mask
+# TYPE DCGM_FI_DEV_REQUESTED_POWER_PROFILE_MASK gauge
+DCGM_FI_DEV_REQUESTED_POWER_PROFILE_MASK{UUID="GPU-aaa",gpu="0"} ERROR - FAILED TO CONVERT TO STRING
+`)
+
+	_, err := p.parseToMetricFamilies(txt)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse prometheus metrics")
+}
+
+func TestPromTextParser_parseToSeries_failsOnInvalidSeriesValue(t *testing.T) {
+	var p promTextParser
+
+	txt := []byte(`
+DCGM_FI_DEV_GPU_UTIL{UUID="GPU-aaa",gpu="0"} 80
+DCGM_FI_DEV_REQUESTED_POWER_PROFILE_MASK{UUID="GPU-aaa",gpu="0"} ERROR - FAILED TO CONVERT TO STRING
+`)
+
+	_, err := p.parseToSeries(txt)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse prometheus metrics")
+}
+
 func joinData(data ...[]byte) []byte {
 	var buf bytes.Buffer
 	for _, v := range data {

@@ -18,7 +18,7 @@ description: |
   visibility is preserved even when individual instances are trimmed.
 icon: ibm.svg
 categories:
-  - data-collection.database-servers
+  - data-collection.databases
 link: https://www.ibm.com/products/db2
 keywords:
   - db2

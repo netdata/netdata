@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 const (
@@ -82,8 +82,8 @@ func (c *Collector) collectInfo(mx map[string]int64, info string) {
 		case field == "aof_enabled" && value == "1":
 			c.addAOFChartsOnce.Do(c.addAOFCharts)
 		case field == "master_link_status":
-			mx["master_link_status_up"] = metrix.Bool(value == "up")
-			mx["master_link_status_down"] = metrix.Bool(value == "down")
+			mx["master_link_status_up"] = oldmetrix.Bool(value == "up")
+			mx["master_link_status_down"] = oldmetrix.Bool(value == "down")
 		default:
 			collectNumericValue(mx, field, value)
 		}
@@ -182,17 +182,17 @@ func calcKeyspaceHitRate(ms map[string]int64) float64 {
 }
 
 func (c *Collector) addCmdToCommandsCharts(cmd string) {
-	c.addDimToChart(chartCommandsCalls.ID, &module.Dim{
+	c.addDimToChart(chartCommandsCalls.ID, &collectorapi.Dim{
 		ID:   "cmd_" + cmd + "_calls",
 		Name: strings.ToUpper(cmd),
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	})
-	c.addDimToChart(chartCommandsUsec.ID, &module.Dim{
+	c.addDimToChart(chartCommandsUsec.ID, &collectorapi.Dim{
 		ID:   "cmd_" + cmd + "_usec",
 		Name: strings.ToUpper(cmd),
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	})
-	c.addDimToChart(chartCommandsUsecPerSec.ID, &module.Dim{
+	c.addDimToChart(chartCommandsUsecPerSec.ID, &collectorapi.Dim{
 		ID:   "cmd_" + cmd + "_usec_per_call",
 		Name: strings.ToUpper(cmd),
 		Div:  precision,
@@ -200,17 +200,17 @@ func (c *Collector) addCmdToCommandsCharts(cmd string) {
 }
 
 func (c *Collector) addDbToKeyspaceCharts(db string) {
-	c.addDimToChart(chartKeys.ID, &module.Dim{
+	c.addDimToChart(chartKeys.ID, &collectorapi.Dim{
 		ID:   db + "_keys",
 		Name: db,
 	})
-	c.addDimToChart(chartExpiresKeys.ID, &module.Dim{
+	c.addDimToChart(chartExpiresKeys.ID, &collectorapi.Dim{
 		ID:   db + "_expires_keys",
 		Name: db,
 	})
 }
 
-func (c *Collector) addDimToChart(chartID string, dim *module.Dim) {
+func (c *Collector) addDimToChart(chartID string, dim *collectorapi.Dim) {
 	chart := c.Charts().Get(chartID)
 	if chart == nil {
 		c.Warningf("error on adding '%s' dimension: can not find '%s' chart", dim.ID, chartID)

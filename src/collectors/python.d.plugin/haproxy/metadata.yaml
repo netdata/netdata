@@ -9,7 +9,7 @@
 #     name: HAProxy
 #     link: 'https://www.haproxy.org/'
 #     categories:
-#     - data-collection.web-servers-and-web-proxies
+#     - data-collection.web-servers-and-proxies
 #     icon_filename: 'haproxy.png'
 #   related_resources:
 #     integrations:
@@ -20,7 +20,6 @@
 #     - haproxy
 #     - tcp
 #     - balancer
-#   most_popular: false
 # overview:
 #   data_collection:
 #     metrics_description: 'This collector monitors HAProxy metrics about frontend servers, backend servers, responses and more.'

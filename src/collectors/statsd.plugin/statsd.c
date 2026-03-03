@@ -841,7 +841,7 @@ static inline size_t statsd_process(char *buffer, size_t size, int require_newli
 // statsd pollfd interface
 
 #define STATSD_TCP_BUFFER_SIZE 65536 // minimize tcp reads
-#define STATSD_UDP_BUFFER_SIZE 9000  // this should be up to MTU
+#define STATSD_UDP_BUFFER_SIZE 65536 // 65535 max IPv4 packet + 1 for null terminator
 
 typedef enum {
     STATSD_SOCKET_DATA_TYPE_TCP,

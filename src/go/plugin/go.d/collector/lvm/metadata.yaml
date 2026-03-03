@@ -9,7 +9,7 @@ modules:
         link: ""
         icon_filename: filesystem.svg
         categories:
-          - data-collection.storage-mount-points-and-filesystems
+          - data-collection.storage
       keywords:
         - lvm
         - lvs
@@ -18,7 +18,6 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      most_popular: false
     overview:
       data_collection:
         metrics_description: >

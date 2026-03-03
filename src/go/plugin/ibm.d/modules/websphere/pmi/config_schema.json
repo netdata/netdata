@@ -4,287 +4,341 @@
     "properties": {
       "cell_name": {
         "default": "",
-        "title": "CellName appends the WebSphere cell identifier label to every exported time-series.",
+        "description": "CellName appends the WebSphere cell identifier label to every exported time-series.",
+        "title": "Cell Name",
         "type": "string"
       },
       "cluster_name": {
         "default": "",
-        "title": "ClusterName appends the WebSphere cluster identifier label to every exported time-series.",
+        "description": "ClusterName appends the WebSphere cluster identifier label to every exported time-series.",
+        "title": "Cluster Name",
         "type": "string"
       },
       "collect_apps_matching": {
         "default": "",
-        "title": "CollectAppsMatching filters Web applications by name using glob patterns (supports `*`, `?`, `!` prefixes).",
+        "description": "CollectAppsMatching filters Web applications by name using glob patterns (supports `*`, `?`, `!` prefixes).",
+        "title": "Collect Apps Matching",
         "type": "string"
       },
       "collect_cluster_metrics": {
         "default": "auto",
+        "description": "CollectClusterMetrics toggles cluster-level health metrics; defaults to enabled when unset.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectClusterMetrics toggles cluster-level health metrics; defaults to enabled when unset.",
+        "title": "Collect Cluster Metrics",
         "type": "string"
       },
       "collect_ejb_metrics": {
         "default": "auto",
+        "description": "CollectEJBMetrics enables Enterprise Java Bean workload metrics; defaults to enabled when unset.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectEJBMetrics enables Enterprise Java Bean workload metrics; defaults to enabled when unset.",
+        "title": "Collect Ejb Metrics",
         "type": "string"
       },
       "collect_ejbs_matching": {
         "default": "",
-        "title": "CollectEJBsMatching filters Enterprise Java Beans by name using glob patterns (supports `*`, `?`, `!` prefixes).",
+        "description": "CollectEJBsMatching filters Enterprise Java Beans by name using glob patterns (supports `*`, `?`, `!` prefixes).",
+        "title": "Collect Ejbs Matching",
         "type": "string"
       },
       "collect_jca_metrics": {
         "default": "auto",
+        "description": "CollectJCAMetrics toggles JCA resource-adapter metrics; defaults to enabled when unset.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectJCAMetrics toggles JCA resource-adapter metrics; defaults to enabled when unset.",
+        "title": "Collect Jca Metrics",
         "type": "string"
       },
       "collect_jdbc_advanced": {
         "default": "auto",
+        "description": "CollectJDBCAdvanced enables additional JDBC latency/timing statistics; defaults to disabled when unset.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectJDBCAdvanced enables additional JDBC latency/timing statistics; defaults to disabled when unset.",
+        "title": "Collect Jdbc Advanced",
         "type": "string"
       },
       "collect_jdbc_metrics": {
         "default": "auto",
+        "description": "CollectJDBCMetrics toggles JDBC connection-pool metrics; defaults to enabled when unset.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectJDBCMetrics toggles JDBC connection-pool metrics; defaults to enabled when unset.",
+        "title": "Collect Jdbc Metrics",
         "type": "string"
       },
       "collect_jms_matching": {
         "default": "",
-        "title": "CollectJMSMatching filters JMS destinations by name using glob patterns (supports `*`, `?`, `!` prefixes).",
+        "description": "CollectJMSMatching filters JMS destinations by name using glob patterns (supports `*`, `?`, `!` prefixes).",
+        "title": "Collect Jms Matching",
         "type": "string"
       },
       "collect_jms_metrics": {
         "default": "auto",
+        "description": "CollectJMSMetrics toggles JMS destination metrics; defaults to enabled when unset.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectJMSMetrics toggles JMS destination metrics; defaults to enabled when unset.",
+        "title": "Collect Jms Metrics",
         "type": "string"
       },
       "collect_jvm_metrics": {
         "default": "auto",
+        "description": "CollectJVMMetrics toggles JVM runtime metrics; defaults to enabled when unset.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectJVMMetrics toggles JVM runtime metrics; defaults to enabled when unset.",
+        "title": "Collect Jvm Metrics",
         "type": "string"
       },
       "collect_pools_matching": {
         "default": "",
-        "title": "CollectPoolsMatching filters JDBC and JCA pools by name using glob patterns (supports `*`, `?`, `!` prefixes).",
+        "description": "CollectPoolsMatching filters JDBC and JCA pools by name using glob patterns (supports `*`, `?`, `!` prefixes).",
+        "title": "Collect Pools Matching",
         "type": "string"
       },
       "collect_servlet_metrics": {
         "default": "auto",
+        "description": "CollectServletMetrics enables servlet response-time metrics; defaults to enabled when unset (may add high-cardinality charts).",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectServletMetrics enables servlet response-time metrics; defaults to enabled when unset (may add high-cardinality charts).",
+        "title": "Collect Servlet Metrics",
         "type": "string"
       },
       "collect_servlets_matching": {
         "default": "",
-        "title": "CollectServletsMatching filters servlet contexts by name using glob patterns (supports `*`, `?`, `!` prefixes).",
+        "description": "CollectServletsMatching filters servlet contexts by name using glob patterns (supports `*`, `?`, `!` prefixes).",
+        "title": "Collect Servlets Matching",
         "type": "string"
       },
       "collect_session_metrics": {
         "default": "auto",
+        "description": "CollectSessionMetrics toggles HTTP session manager metrics; defaults to enabled when unset.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectSessionMetrics toggles HTTP session manager metrics; defaults to enabled when unset.",
+        "title": "Collect Session Metrics",
         "type": "string"
       },
       "collect_threadpool_metrics": {
         "default": "auto",
+        "description": "CollectThreadPoolMetrics toggles thread-pool metrics; defaults to enabled when unset.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectThreadPoolMetrics toggles thread-pool metrics; defaults to enabled when unset.",
+        "title": "Collect Threadpool Metrics",
         "type": "string"
       },
       "collect_transaction_metrics": {
         "default": "auto",
+        "description": "CollectTransactionMetrics toggles transaction manager metrics; defaults to enabled when unset.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectTransactionMetrics toggles transaction manager metrics; defaults to enabled when unset.",
+        "title": "Collect Transaction Metrics",
         "type": "string"
       },
       "collect_webapp_metrics": {
         "default": "auto",
+        "description": "CollectWebAppMetrics toggles Web application metrics (includes servlet/session data); defaults to enabled when unset.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectWebAppMetrics toggles Web application metrics (includes servlet/session data); defaults to enabled when unset.",
+        "title": "Collect Webapp Metrics",
         "type": "string"
       },
       "headers": {
-        "title": "Custom headers",
+        "description": "Custom headers",
+        "title": "Headers",
         "type": "object"
       },
       "max_applications": {
         "default": 100,
-        "title": "MaxApplications caps the number of web applications charted (0 disables the limit).",
+        "description": "MaxApplications caps the number of web applications charted (0 disables the limit).",
+        "title": "Max Applications",
         "type": "integer"
       },
       "max_ejbs": {
         "default": 50,
-        "title": "MaxEJBs caps the number of Enterprise Java Beans charted (0 disables the limit).",
+        "description": "MaxEJBs caps the number of Enterprise Java Beans charted (0 disables the limit).",
+        "title": "Max Ejbs",
         "type": "integer"
       },
       "max_jca_pools": {
         "default": 50,
-        "title": "MaxJCAPools caps the number of JCA resource adapters charted (0 disables the limit).",
+        "description": "MaxJCAPools caps the number of JCA resource adapters charted (0 disables the limit).",
+        "title": "Max Jca Pools",
         "type": "integer"
       },
       "max_jdbc_pools": {
         "default": 50,
-        "title": "MaxJDBCPools caps the number of JDBC connection pools charted (0 disables the limit).",
+        "description": "MaxJDBCPools caps the number of JDBC connection pools charted (0 disables the limit).",
+        "title": "Max Jdbc Pools",
         "type": "integer"
       },
       "max_jms_destinations": {
         "default": 50,
-        "title": "MaxJMSDestinations caps the number of JMS destinations charted (0 disables the limit).",
+        "description": "MaxJMSDestinations caps the number of JMS destinations charted (0 disables the limit).",
+        "title": "Max Jms Destinations",
         "type": "integer"
       },
       "max_servlets": {
         "default": 50,
-        "title": "MaxServlets caps the number of servlet contexts charted when servlet collection is enabled (0 disables the limit).",
+        "description": "MaxServlets caps the number of servlet contexts charted when servlet collection is enabled (0 disables the limit).",
+        "title": "Max Servlets",
         "type": "integer"
       },
       "max_threadpools": {
         "default": 50,
-        "title": "MaxThreadPools caps the number of thread pools charted per server (0 disables the limit).",
+        "description": "MaxThreadPools caps the number of thread pools charted per server (0 disables the limit).",
+        "title": "Max Threadpools",
         "type": "integer"
       },
       "node_name": {
         "default": "",
-        "title": "NodeName appends the WebSphere node identifier label to every exported time-series.",
+        "description": "NodeName appends the WebSphere node identifier label to every exported time-series.",
+        "title": "Node Name",
         "type": "string"
       },
       "not_follow_redirects": {
         "default": false,
-        "title": "Disable HTTP redirects",
+        "description": "Disable HTTP redirects",
+        "title": "Not Follow Redirects",
         "type": "boolean"
       },
       "password": {
         "default": "",
-        "title": "Password for authentication",
+        "description": "Password for authentication",
+        "title": "Password",
         "type": "string"
+      },
+      "pmi_custom_stats_paths": {
+        "default": "nil",
+        "description": "PMICustomStatsPaths adds extra PMI XML paths when `pmi_stats_type` is set to `custom`.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Pmi Custom Stats Paths",
+        "type": "array"
       },
       "pmi_refresh_rate": {
         "default": 60,
-        "title": "PMIRefreshRate overrides the global PMI servlet refresh interval in seconds when a value \u003e0 is provided.",
+        "description": "PMIRefreshRate overrides the global PMI servlet refresh interval in seconds when a value \u003e0 is provided.",
+        "title": "Pmi Refresh Rate",
         "type": "integer"
       },
       "pmi_stats_type": {
         "default": "extended",
-        "title": "PMIStatsType selects which PMI statistics tier to request (`basic`, `extended`, `all`, or `custom`).",
+        "description": "PMIStatsType selects which PMI statistics tier to request (`basic`, `extended`, `all`, or `custom`).",
+        "title": "Pmi Stats Type",
         "type": "string"
       },
       "proxy_password": {
         "default": "",
-        "title": "Proxy password",
+        "description": "Proxy password",
+        "title": "Proxy Password",
         "type": "string"
       },
       "proxy_url": {
         "default": "",
-        "title": "Proxy URL",
+        "description": "Proxy URL",
+        "title": "Proxy Url",
         "type": "string"
       },
       "proxy_username": {
         "default": "",
-        "title": "Proxy username",
+        "description": "Proxy username",
+        "title": "Proxy Username",
         "type": "string"
       },
       "server_type": {
         "default": "",
-        "title": "ServerType records the WebSphere server type label (for example `app_server`, `dmgr`, `nodeagent`).",
+        "description": "ServerType records the WebSphere server type label (for example `app_server`, `dmgr`, `nodeagent`).",
+        "title": "Server Type",
         "type": "string"
       },
       "timeout": {
         "default": 5000000000,
-        "title": "Request timeout in seconds",
+        "description": "Request timeout in seconds",
+        "title": "Timeout",
         "type": "integer"
       },
       "tls_ca": {
         "default": "",
-        "title": "Custom CA bundle path",
+        "description": "Custom CA bundle path",
+        "title": "TLS Ca",
         "type": "string"
       },
       "tls_cert": {
         "default": "",
-        "title": "Client certificate path",
+        "description": "Client certificate path",
+        "title": "TLS Cert",
         "type": "string"
       },
       "tls_key": {
         "default": "",
-        "title": "Client key path",
+        "description": "Client key path",
+        "title": "TLS Key",
         "type": "string"
       },
       "tls_skip_verify": {
         "default": false,
-        "title": "Skip TLS certificate verification",
+        "description": "Skip TLS certificate verification",
+        "title": "TLS Skip Verify",
         "type": "boolean"
       },
       "update_every": {
         "default": 5,
+        "description": "Data collection frequency",
         "minimum": 1,
-        "title": "Data collection frequency",
+        "title": "Update Every",
         "type": "integer"
       },
       "url": {
         "default": "",
-        "title": "Target URL",
+        "description": "Target URL",
+        "title": "Url",
         "type": "string"
       },
       "username": {
         "default": "",
-        "title": "Username for authentication",
+        "description": "Username for authentication",
+        "title": "Username",
         "type": "string"
       },
       "vnode": {
         "default": "",
-        "title": "Vnode allows binding the collector to a virtual node.",
+        "description": "Vnode allows binding the collector to a virtual node.",
+        "title": "Vnode",
         "type": "string"
       }
     },
@@ -294,6 +348,9 @@
   "uiSchema": {
     "password": {
       "ui:widget": "password"
+    },
+    "pmi_custom_stats_paths": {
+      "ui:listFlavour": "list"
     },
     "proxy_password": {
       "ui:widget": "password"
@@ -329,7 +386,8 @@
         {
           "fields": [
             "pmi_stats_type",
-            "pmi_refresh_rate"
+            "pmi_refresh_rate",
+            "pmi_custom_stats_paths"
           ],
           "title": "PMI Settings"
         },

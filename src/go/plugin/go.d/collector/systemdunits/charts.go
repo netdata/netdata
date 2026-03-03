@@ -9,29 +9,29 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
 
 const (
-	prioUnitState = module.Priority + iota
+	prioUnitState = collectorapi.Priority + iota
 	prioUnitFileState
 )
 
 func (c *Collector) addUnitCharts(name, typ string) {
-	chart := module.Chart{
+	chart := collectorapi.Chart{
 		ID:       "unit_%s_%s_state",
 		Title:    "%s Unit State",
 		Units:    "state",
 		Fam:      "%s units",
 		Ctx:      "systemd.%s_unit_state",
 		Priority: prioUnitState,
-		Labels: []module.Label{
+		Labels: []collectorapi.Label{
 			{Key: "unit_name", Value: name},
 		},
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "unit_%s_%s_state_%s", Name: unitStateActive},
 			{ID: "unit_%s_%s_state_%s", Name: unitStateInactive},
 			{ID: "unit_%s_%s_state_%s", Name: unitStateActivating},
@@ -63,19 +63,19 @@ func (c *Collector) addUnitFileCharts(unitPath string) {
 	_, unitName := filepath.Split(unitPath)
 	unitType := strings.TrimPrefix(filepath.Ext(unitPath), ".")
 
-	chart := module.Chart{
+	chart := collectorapi.Chart{
 		ID:       "unit_file_%s_state",
 		Title:    "Unit File State",
 		Units:    "state",
 		Fam:      "unit files",
 		Ctx:      "systemd.unit_file_state",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioUnitFileState,
-		Labels: []module.Label{
+		Labels: []collectorapi.Label{
 			{Key: "unit_file_name", Value: unitName},
 			{Key: "unit_file_type", Value: unitType},
 		},
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "unit_file_%s_state_enabled", Name: "enabled"},
 			{ID: "unit_file_%s_state_enabled-runtime", Name: "enabled-runtime"},
 			{ID: "unit_file_%s_state_linked", Name: "linked"},

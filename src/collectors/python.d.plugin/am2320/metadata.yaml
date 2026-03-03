@@ -7,7 +7,7 @@ modules:
         name: AM2320
         link: 'https://learn.adafruit.com/adafruit-am2320-temperature-humidity-i2c-sensor/overview'
         categories:
-          - data-collection.hardware-devices-and-sensors
+          - data-collection.hardware-and-sensors
         icon_filename: 'microchip.svg'
       related_resources:
         integrations:
@@ -19,7 +19,6 @@ modules:
         - am2320
         - sensor
         - humidity
-      most_popular: false
     overview:
       data_collection:
         metrics_description: 'This collector monitors AM2320 sensor metrics about temperature and humidity.'
