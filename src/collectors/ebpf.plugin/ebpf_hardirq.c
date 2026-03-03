@@ -219,6 +219,7 @@ static void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
  */
 static void hardirq_cleanup(void *pptr)
 {
+    return;
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if (!em)
         return;
@@ -660,6 +661,7 @@ static void ebpf_hardirq_allocate_global_vectors()
  */
 void ebpf_hardirq_thread(void *ptr)
 {
+    return;
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(hardirq_cleanup) cleanup_ptr = em;
