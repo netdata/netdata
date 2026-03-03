@@ -62,6 +62,16 @@
 - Fix  context hub cleanup ([#21832](https://github.com/netdata/netdata/issues/21832))
 - Fix(go/plugin/framework/chartengine): decouple runtime build-cycle dedupe from LastSuccessSeq ([#21851](https://github.com/netdata/netdata/issues/21851))
 - Preserve UTF-8 characters in RRD string fields ([#21694](https://github.com/netdata/netdata/issues/21694))
+- Build(deps): bump actions/download-artifact from 7 to 8 ([#21856](https://github.com/netdata/netdata/issues/21856))
+- Build(deps): bump actions/upload-artifact from 6.0.0 to 7.0.0 ([#21855](https://github.com/netdata/netdata/issues/21855))
+- Consolidate info into one file ([#21829](https://github.com/netdata/netdata/issues/21829))
+- Update units in ping RTT variance chart from `ms^2` to `ms²` for consistency ([#21857](https://github.com/netdata/netdata/issues/21857))
+- Yaml support ([#20544](https://github.com/netdata/netdata/issues/20544))
+- Fix(go/plugin/chartengine): sanitize label value dots in chart IDs ([#21859](https://github.com/netdata/netdata/issues/21859))
+- Fix(go.d/smartctl): handle non-fatal smartctl exit codes (bits 2-7) ([#21858](https://github.com/netdata/netdata/issues/21858))
+- Fix(go.d/mongodb): set 30s default timeout for top-queries function ([#21860](https://github.com/netdata/netdata/issues/21860))
+- Fix(dyncfg): rollback non-disruptive sd update failures ([#21861](https://github.com/netdata/netdata/issues/21861))
+- Fix data race in ML training during host stop ([#21844](https://github.com/netdata/netdata/issues/21844))
 
 ## [2.9.0] - 2026-02-16
 
