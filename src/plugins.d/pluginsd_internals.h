@@ -151,7 +151,18 @@ static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDI
         struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[slot - 1];
 
         if(prd->rd != rd) {
+            rrddim_acquired_release(prd->rda);
+            prd->rda = NULL;
+            prd->rd = NULL;
+            prd->id = NULL;
+
             prd->rda = rrddim_find_and_acquire(st, string2str(rd->id), true);
+            if(unlikely(!prd->rda)) {
+                netdata_log_error("PLUGINSD: failed to acquire dimension '%s' for chart '%s' while updating slot cache",
+                                  rrddim_id(rd), rrdset_id(st));
+                return;
+            }
+
             prd->rd = rrddim_acquired_to_rrddim(prd->rda);
             prd->id = string2str(prd->rd->id);
         }

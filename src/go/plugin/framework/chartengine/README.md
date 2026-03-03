@@ -38,6 +38,8 @@ For `ModuleV2` collectors, the runtime integration expects:
 | `WithEnginePolicy(...)`                             | Configure selector + autogen behavior                                                                                                                                   |
 | `WithRuntimeStore(...)`                             | Override/disable self-metrics store                                                                                                                                     |
 | `WithSeriesSelectionAllVisible()`                   | Process all visible series instead of filtering to latest successful collect cycle. Intended for runtime/internal stores that commit immediately (no cycle boundaries). |
+| `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks                                                                                                          |
+| `WithRuntimePlannerMode(...)`                       | Enable runtime planner mode with no-write-tick semantics, for jobs/tests that drive planning directly from runtime metrics instead of collect-cycle boundaries.        |
 
 ## End-to-End Example (Single Flow)
 
@@ -50,7 +52,7 @@ meter.Counter("requests_total").ObserveTotal(100)
 // 2) Engine loads chart template.
 engine, err := chartengine.New(
     chartengine.WithEnginePolicy(chartengine.EnginePolicy{
-        Autogen: chartengine.AutogenPolicy{Enabled: false},
+        Autogen: &chartengine.AutogenPolicy{Enabled: false},
     }),
 )
 // handle err
@@ -160,7 +162,7 @@ Default lifecycle policy when template omits lifecycle:
 |-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
 | Trigger               | Unmatched series only when autogen is enabled                                                                                                  |
 | Metric metadata usage | Uses `metrix.MetricMeta` hints for title/family/unit where allowed                                                                             |
-| Type ID budget        | Enforced via `AutogenPolicy.MaxTypeIDLen` (`type.id` length guard)                                                                             |
+| Type ID budget        | Enforced via `AutogenPolicy.MaxTypeIDLen` + effective emit type-id prefix (`WithEmitTypeIDBudgetPrefix(...)`)                                  |
 | Lifecycle             | Autogen applies `ExpireAfterSuccessCycles` to **both** chart and dimension expiry (unlike template lifecycle where they default independently) |
 
 ## Runtime Metrics

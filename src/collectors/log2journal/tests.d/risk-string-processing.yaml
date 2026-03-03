@@ -1,0 +1,69 @@
+# Test string processing differences between parsers
+pattern: "(?P<message>.*)"
+
+inject:
+  # Test strings with embedded null bytes (potential parser difference)
+  - key: NULL_BYTE_STRING
+    value: "Before null\x00After null"
+    
+  # Test very long strings
+  - key: LONG_STRING
+    value: "This is a very long string that repeats many times to test buffer handling. This is a very long string that repeats many times to test buffer handling. This is a very long string that repeats many times to test buffer handling. This is a very long string that repeats many times to test buffer handling. This is a very long string that repeats many times to test buffer handling."
+    
+  # Test strings with all types of quotes
+  - key: MIXED_QUOTES
+    value: "Double \"quoted\" with 'single' and `backtick` quotes"
+    
+  # Test control characters
+  - key: CONTROL_CHARS
+    value: "Tab\tNewline\nCarriage\rReturn\fForm\bBackspace"
+    
+  # Test Unicode edge cases
+  - key: UNICODE_TEST
+    value: "Unicode: αβγ 中文 🚀 العربية"
+    
+  # Test zero-width characters
+  - key: ZERO_WIDTH
+    value: "Zero\u200Bwidth\u200Cjoiner\u200Dtest"
+    
+  # Test string with only whitespace
+  - key: WHITESPACE_ONLY
+    value: "   \t\n\r   "
+    
+  # Test string with regex metacharacters
+  - key: REGEX_CHARS
+    value: ".*?+[]{}()^$|\\special"
+    
+  # Test URL-encoded strings
+  - key: URL_ENCODED
+    value: "Hello%20World%21%40%23%24%25%5E%26%2A%28%29"
+    
+  # Test HTML entities
+  - key: HTML_ENTITIES
+    value: "&lt;script&gt;alert(&#39;test&#39;);&lt;/script&gt;"
+    
+  # Test Base64-like strings
+  - key: BASE64_LIKE
+    value: "VGhpcyBpcyBhIHRlc3Qgc3RyaW5nIGZvciBiYXNlNjQgbGlrZSBkYXRh"
+    
+  # Test strings with newlines in different formats
+  - key: UNIX_NEWLINES
+    value: "Line1\nLine2\nLine3"
+    
+  - key: WINDOWS_NEWLINES
+    value: "Line1\r\nLine2\r\nLine3"
+    
+  - key: MAC_NEWLINES
+    value: "Line1\rLine2\rLine3"
+
+rewrite:
+  # Test string matching with special characters
+  - key: SPECIAL_MATCH_TEST
+    match: ".*[\\x00-\\x1f].*"  # Match control characters
+    value: "Contains control characters"
+    inject: yes
+    
+  # Test very long replacement
+  - key: LONG_REPLACEMENT
+    value: "${message} - This replacement text is intentionally very long to test how the parser handles large string operations and memory allocation during variable substitution processing."
+    inject: yes

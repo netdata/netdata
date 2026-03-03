@@ -372,27 +372,27 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
     // change management, version to know which fields to expect
     uint64_t version = 0;
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, JSONC_REQUIRED);
     ds->v = version;
 
-    bool strict = false; // allow missing fields and values
-    bool required_v1 = version >= 1 ? strict : false;
-    bool required_v3 = version >= 3 ? strict : false;
-    bool required_v4 = version >= 4 ? strict : false;
-    bool required_v5 = version >= 5 ? strict : false;
-    bool required_v10 = version >= 10 ? strict : false;
-    bool required_v14 = version >= 14 ? strict : false;
-    bool required_v16 = version >= 16 ? strict : false;
-    bool required_v17 = version >= 17 ? strict : false;
-    bool required_v18 = version >= 18 ? strict : false;
-    bool required_v20 = version >= 20 ? strict : false;
-    bool required_v21 = version >= 21 ? strict : false;
-    bool required_v22 = version >= 22 ? strict : false;
-    bool required_v23 = version >= 23 ? strict : false;
-    bool required_v24 = version >= 24 ? strict : false;
-    bool required_v25 = version >= 25 ? strict : false;
-    bool required_v26 = version >= 26 ? strict : false;
-    bool required_v27 = version >= 27 ? strict : false;
+    unsigned strict = JSONC_OPTIONAL; // allow missing fields and values
+    unsigned required_v1 = version >= 1 ? strict : JSONC_OPTIONAL;
+    unsigned required_v3 = version >= 3 ? strict : JSONC_OPTIONAL;
+    unsigned required_v4 = version >= 4 ? strict : JSONC_OPTIONAL;
+    unsigned required_v5 = version >= 5 ? strict : JSONC_OPTIONAL;
+    unsigned required_v10 = version >= 10 ? strict : JSONC_OPTIONAL;
+    unsigned required_v14 = version >= 14 ? strict : JSONC_OPTIONAL;
+    unsigned required_v16 = version >= 16 ? strict : JSONC_OPTIONAL;
+    unsigned required_v17 = version >= 17 ? strict : JSONC_OPTIONAL;
+    unsigned required_v18 = version >= 18 ? strict : JSONC_OPTIONAL;
+    unsigned required_v20 = version >= 20 ? strict : JSONC_OPTIONAL;
+    unsigned required_v21 = version >= 21 ? strict : JSONC_OPTIONAL;
+    unsigned required_v22 = version >= 22 ? strict : JSONC_OPTIONAL;
+    unsigned required_v23 = version >= 23 ? strict : JSONC_OPTIONAL;
+    unsigned required_v24 = version >= 24 ? strict : JSONC_OPTIONAL;
+    unsigned required_v25 = version >= 25 ? strict : JSONC_OPTIONAL;
+    unsigned required_v26 = version >= 26 ? strict : JSONC_OPTIONAL;
+    unsigned required_v27 = version >= 27 ? strict : JSONC_OPTIONAL;
 
     // Parse timestamp
     JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->timestamp_ut, error, required_v1);
@@ -441,7 +441,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             
         // Only try to parse PID if we're at version 27 or later
         if(version >= 27)
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "pid", ds->pid, error, false);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "pid", ds->pid, error, JSONC_OPTIONAL);
 
         if(version >= 22) {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "posts", ds->posts, error, required_v22);
@@ -483,8 +483,8 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         });
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "memory", error, required_v1, {
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->memory.ram_total_bytes, error, false);
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, false);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->memory.ram_total_bytes, error, JSONC_OPTIONAL);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, JSONC_OPTIONAL);
             if(!OS_SYSTEM_MEMORY_OK(ds->memory))
                 ds->memory = OS_SYSTEM_MEMORY_EMPTY;
 
@@ -496,11 +496,11 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "disk", error, required_v1, {
             JSONC_PARSE_SUBOBJECT(jobj, path, "db", error, required_v1, {
-                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->var_cache.total_bytes, error, false);
-                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->var_cache.free_bytes, error, false);
-                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_total", ds->var_cache.total_inodes, error, false);
-                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_free", ds->var_cache.free_inodes, error, false);
-                JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "read_only", ds->var_cache.is_read_only, error, false);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->var_cache.total_bytes, error, JSONC_OPTIONAL);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->var_cache.free_bytes, error, JSONC_OPTIONAL);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_total", ds->var_cache.total_inodes, error, JSONC_OPTIONAL);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_free", ds->var_cache.free_inodes, error, JSONC_OPTIONAL);
+                JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "read_only", ds->var_cache.is_read_only, error, JSONC_OPTIONAL);
                 if(!OS_SYSTEM_DISK_SPACE_OK(ds->var_cache))
                     ds->var_cache = OS_SYSTEM_DISK_SPACE_EMPTY;
             });

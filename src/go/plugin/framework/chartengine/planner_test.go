@@ -197,7 +197,47 @@ groups:
 	}
 }
 
-func TestBuildPlanRequiresFlattenedReaderForInference(t *testing.T) {
+func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"BuildPlanRequiresFlattenedReaderForInference":                 {run: runTestBuildPlanRequiresFlattenedReaderForInference},
+		"BuildPlanUsesRouteCacheReuse":                                 {run: runTestBuildPlanUsesRouteCacheReuse},
+		"BuildPlanLifecycleDimensionExpiry":                            {run: runTestBuildPlanLifecycleDimensionExpiry},
+		"BuildPlanLifecycleChartExpiry":                                {run: runTestBuildPlanLifecycleChartExpiry},
+		"BuildPlanLifecycleNoRemovalOnFailedCycle":                     {run: runTestBuildPlanLifecycleNoRemovalOnFailedCycle},
+		"BuildPlanRendersChartIDsFromInstances":                        {run: runTestBuildPlanRendersChartIDsFromInstances},
+		"BuildPlanEnforcesMaxInstancesDeterministically":               {run: runTestBuildPlanEnforcesMaxInstancesDeterministically},
+		"BuildPlanEnforcesMaxDimsDeterministically":                    {run: runTestBuildPlanEnforcesMaxDimsDeterministically},
+		"BuildPlanComputesChartLabelsIntersectionAndExclusions":        {run: runTestBuildPlanComputesChartLabelsIntersectionAndExclusions},
+		"BuildPlanAutogenDisabledSkipsUnmatchedSeries":                 {run: runTestBuildPlanAutogenDisabledSkipsUnmatchedSeries},
+		"BuildPlanEnginePolicySelectorFiltersSeriesBeforeRouting":      {run: runTestBuildPlanEnginePolicySelectorFiltersSeriesBeforeRouting},
+		"BuildPlanTemplateEnginePolicyControlsSelectorAndAutogen":      {run: runTestBuildPlanTemplateEnginePolicyControlsSelectorAndAutogen},
+		"BuildPlanEnginePolicyOptionOverridesTemplatePolicy":           {run: runTestBuildPlanEnginePolicyOptionOverridesTemplatePolicy},
+		"BuildPlanAutogenOptionKeepsTemplateSelector":                  {run: runTestBuildPlanAutogenOptionKeepsTemplateSelector},
+		"BuildPlanAutogenCreatesChartForUnmatchedScalar":               {run: runTestBuildPlanAutogenCreatesChartForUnmatchedScalar},
+		"BuildPlanAutogenUsesMetricMetadataForScalar":                  {run: runTestBuildPlanAutogenUsesMetricMetadataForScalar},
+		"BuildPlanAutogenUsesMetricMetadataForHistogram":               {run: runTestBuildPlanAutogenUsesMetricMetadataForHistogram},
+		"BuildPlanAutogenUsesMetricFloatMetadataForScalar":             {run: runTestBuildPlanAutogenUsesMetricFloatMetadataForScalar},
+		"BuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles": {run: runTestBuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles},
+		"BuildPlanTemplatePrecedenceOverAutogen":                       {run: runTestBuildPlanTemplatePrecedenceOverAutogen},
+		"BuildPlanAutogenStrictOverflowDrop":                           {run: runTestBuildPlanAutogenStrictOverflowDrop},
+		"BuildPlanAutogenUsesFlattenMetadataForHistogramBuckets":       {run: runTestBuildPlanAutogenUsesFlattenMetadataForHistogramBuckets},
+		"BuildPlanAutogenCreatesChartForUnmatchedGauge":                {run: runTestBuildPlanAutogenCreatesChartForUnmatchedGauge},
+		"BuildPlanAutogenCreatesChartForUnmatchedStateSet":             {run: runTestBuildPlanAutogenCreatesChartForUnmatchedStateSet},
+		"BuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet":    {run: runTestBuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet},
+		"BuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries":   {run: runTestBuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries},
+		"BuildPlanAutogenRemovalLifecycleExpiry":                       {run: runTestBuildPlanAutogenRemovalLifecycleExpiry},
+		"BuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes":         {run: runTestBuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes},
+		"BuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles":       {run: runTestBuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
+func runTestBuildPlanRequiresFlattenedReaderForInference(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -236,7 +276,7 @@ groups:
 	require.NoError(t, err)
 }
 
-func TestBuildPlanUsesRouteCacheReuse(t *testing.T) {
+func runTestBuildPlanUsesRouteCacheReuse(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -287,7 +327,7 @@ groups:
 	assert.Equal(t, float64(20), findUpdateAction(plan2).Values[0].Float64)
 }
 
-func TestBuildPlanLifecycleDimensionExpiry(t *testing.T) {
+func runTestBuildPlanLifecycleDimensionExpiry(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -341,7 +381,7 @@ groups:
 	assert.Equal(t, "ok", removeDim.Name)
 }
 
-func TestBuildPlanLifecycleChartExpiry(t *testing.T) {
+func runTestBuildPlanLifecycleChartExpiry(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -383,7 +423,7 @@ groups:
 	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan2.Actions))
 }
 
-func TestBuildPlanLifecycleNoRemovalOnFailedCycle(t *testing.T) {
+func runTestBuildPlanLifecycleNoRemovalOnFailedCycle(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -432,7 +472,7 @@ groups:
 	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan3.Actions))
 }
 
-func TestBuildPlanRendersChartIDsFromInstances(t *testing.T) {
+func runTestBuildPlanRendersChartIDsFromInstances(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -502,7 +542,7 @@ groups:
 	assert.Equal(t, []ActionKind{ActionUpdateChart, ActionUpdateChart}, actionKinds(plan2.Actions))
 }
 
-func TestBuildPlanEnforcesMaxInstancesDeterministically(t *testing.T) {
+func runTestBuildPlanEnforcesMaxInstancesDeterministically(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -570,7 +610,7 @@ groups:
 	}, actionKinds(plan3.Actions))
 }
 
-func TestBuildPlanEnforcesMaxDimsDeterministically(t *testing.T) {
+func runTestBuildPlanEnforcesMaxDimsDeterministically(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -640,7 +680,7 @@ groups:
 	}, actionKinds(plan3.Actions))
 }
 
-func TestBuildPlanComputesChartLabelsIntersectionAndExclusions(t *testing.T) {
+func runTestBuildPlanComputesChartLabelsIntersectionAndExclusions(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -702,7 +742,7 @@ groups:
 	assert.False(t, hasDirection)
 }
 
-func TestBuildPlanAutogenDisabledSkipsUnmatchedSeries(t *testing.T) {
+func runTestBuildPlanAutogenDisabledSkipsUnmatchedSeries(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -735,13 +775,13 @@ groups:
 	assert.Empty(t, plan.Actions)
 }
 
-func TestBuildPlanEnginePolicySelectorFiltersSeriesBeforeRouting(t *testing.T) {
+func runTestBuildPlanEnginePolicySelectorFiltersSeriesBeforeRouting(t *testing.T) {
 	selectorExpr := metrixselector.Expr{
 		Allow: []string{`svc.errors_total{method="GET"}`},
 	}
 	e, err := New(WithEnginePolicy(EnginePolicy{
 		Selector: &selectorExpr,
-		Autogen:  AutogenPolicy{Enabled: true},
+		Autogen:  &AutogenPolicy{Enabled: true},
 	}))
 	require.NoError(t, err)
 
@@ -788,7 +828,7 @@ groups:
 	assert.Equal(t, float64(10), update.Values[0].Float64)
 }
 
-func TestBuildPlanTemplateEnginePolicyControlsSelectorAndAutogen(t *testing.T) {
+func runTestBuildPlanTemplateEnginePolicyControlsSelectorAndAutogen(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -826,13 +866,13 @@ groups:
 	assert.Equal(t, "svc.errors_total-method=GET", create.ChartID)
 }
 
-func TestBuildPlanEnginePolicyOptionOverridesTemplatePolicy(t *testing.T) {
+func runTestBuildPlanEnginePolicyOptionOverridesTemplatePolicy(t *testing.T) {
 	overrideSelector := metrixselector.Expr{
 		Allow: []string{`svc.errors_total{method="POST"}`},
 	}
 	e, err := New(WithEnginePolicy(EnginePolicy{
 		Selector: &overrideSelector,
-		Autogen:  AutogenPolicy{Enabled: true},
+		Autogen:  &AutogenPolicy{Enabled: true},
 	}))
 	require.NoError(t, err)
 
@@ -870,8 +910,8 @@ groups:
 	assert.Equal(t, "svc.errors_total-method=POST", create.ChartID)
 }
 
-func TestBuildPlanAutogenOptionKeepsTemplateSelector(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanAutogenOptionKeepsTemplateSelector(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -908,8 +948,8 @@ groups:
 	assert.Equal(t, "svc.errors_total-method=GET", create.ChartID)
 }
 
-func TestBuildPlanAutogenCreatesChartForUnmatchedScalar(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanAutogenCreatesChartForUnmatchedScalar(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -956,8 +996,8 @@ groups:
 	assert.Equal(t, float64(10), update.Values[0].Float64)
 }
 
-func TestBuildPlanAutogenUsesMetricMetadataForScalar(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanAutogenUsesMetricMetadataForScalar(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -999,8 +1039,8 @@ groups:
 	assert.Equal(t, "bytes/s", create.Meta.Units)
 }
 
-func TestBuildPlanAutogenUsesMetricMetadataForHistogram(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanAutogenUsesMetricMetadataForHistogram(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1056,8 +1096,8 @@ groups:
 	assert.Equal(t, "ms/s", sum.Meta.Units)
 }
 
-func TestBuildPlanAutogenUsesMetricFloatMetadataForScalar(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanAutogenUsesMetricFloatMetadataForScalar(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1108,8 +1148,8 @@ groups:
 	assert.Equal(t, float64(10.5), update.Values[0].Float64)
 }
 
-func TestBuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1154,8 +1194,8 @@ groups:
 	assert.Equal(t, "ms/s", sum.Meta.Units)
 }
 
-func TestBuildPlanTemplatePrecedenceOverAutogen(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanTemplatePrecedenceOverAutogen(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1210,12 +1250,14 @@ groups:
 	assert.Equal(t, int64(10), update.Values[0].Int64)
 }
 
-func TestBuildPlanAutogenStrictOverflowDrop(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{
-		Enabled:      true,
-		TypeID:       "collector.job",
-		MaxTypeIDLen: 32,
-	}))
+func runTestBuildPlanAutogenStrictOverflowDrop(t *testing.T) {
+	e, err := New(
+		WithEmitTypeIDBudgetPrefix("collector.job"),
+		WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
+			Enabled:      true,
+			MaxTypeIDLen: 32,
+		}}),
+	)
 	require.NoError(t, err)
 
 	yaml := `
@@ -1249,8 +1291,8 @@ groups:
 	assert.Empty(t, plan.Actions)
 }
 
-func TestBuildPlanAutogenUsesFlattenMetadataForHistogramBuckets(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanAutogenUsesFlattenMetadataForHistogramBuckets(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1318,8 +1360,8 @@ groups:
 	assert.Contains(t, dims, "bucket_+Inf")
 }
 
-func TestBuildPlanAutogenCreatesChartForUnmatchedGauge(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanAutogenCreatesChartForUnmatchedGauge(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1366,8 +1408,8 @@ groups:
 	assert.Equal(t, float64(7), update.Values[0].Float64)
 }
 
-func TestBuildPlanAutogenCreatesChartForUnmatchedStateSet(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanAutogenCreatesChartForUnmatchedStateSet(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1427,8 +1469,8 @@ groups:
 	assert.Contains(t, dims, "operational")
 }
 
-func TestBuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1472,8 +1514,8 @@ groups:
 	assert.Equal(t, "state", create.Meta.Units)
 }
 
-func TestBuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{Enabled: true}))
+func runTestBuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1521,11 +1563,11 @@ groups:
 	assert.Equal(t, float64(7), update.Values[0].Float64)
 }
 
-func TestBuildPlanAutogenRemovalLifecycleExpiry(t *testing.T) {
-	e, err := New(WithAutogenPolicy(AutogenPolicy{
+func runTestBuildPlanAutogenRemovalLifecycleExpiry(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
 		Enabled:                  true,
 		ExpireAfterSuccessCycles: 1,
-	}))
+	}}))
 	require.NoError(t, err)
 
 	yaml := `
@@ -1564,7 +1606,7 @@ groups:
 	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan2.Actions))
 }
 
-func TestBuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes(t *testing.T) {
+func runTestBuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -1637,7 +1679,7 @@ groups:
 	assert.Equal(t, float64(8), update.Values[0].Float64)
 }
 
-func TestBuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles(t *testing.T) {
+func runTestBuildPlanEmptyEmissionAndScratchReusePruneAcrossCycles(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
@@ -1727,6 +1769,110 @@ groups:
 	require.Contains(t, matChart.scratchEntries, "ok")
 }
 
+func TestBuildPlanSequenceModeScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"collector mode keeps static success-seq dedupe semantics": {
+			run: func(t *testing.T) {
+				e, err := New()
+				require.NoError(t, err)
+				require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - component.load
+    charts:
+      - id: component_load
+        title: Component Load
+        context: component_load
+        units: load
+        dimensions:
+          - selector: component.load
+            name: value
+`), 1))
+
+				store := metrix.NewCollectorStore()
+				cc := mustCycleController(t, store)
+				g := store.Write().SnapshotMeter("component").Gauge("load")
+
+				cc.BeginCycle()
+				g.Observe(5)
+				cc.CommitCycleSuccess()
+
+				plan1, err := e.BuildPlan(store.Read())
+				require.NoError(t, err)
+				require.NotNil(t, findUpdateAction(plan1))
+
+				plan2, err := e.BuildPlan(store.Read())
+				require.NoError(t, err)
+				assert.Empty(t, plan2.Actions)
+			},
+		},
+		"runtime mode re-emits updates on no-write ticks and keeps scratch entries": {
+			run: func(t *testing.T) {
+				e, err := New(WithSeriesSelectionAllVisible(), WithRuntimePlannerMode())
+				require.NoError(t, err)
+				require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Runtime
+    metrics:
+      - component.load
+    charts:
+      - id: component_load
+        title: Component Load
+        context: component_load
+        units: load
+        dimensions:
+          - selector: component.load
+            name_from_label: id
+`), 1))
+
+				store := metrix.NewRuntimeStore()
+				vec := store.Write().StatefulMeter("component").Vec("id").Gauge("load")
+				vec.WithLabelValues("ok").Set(1)
+				vec.WithLabelValues("warn").Set(2)
+
+				reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
+				plan1, err := e.BuildPlan(reader)
+				require.NoError(t, err)
+				require.NotNil(t, findUpdateAction(plan1))
+
+				matChart := e.state.materialized.charts["component_load"]
+				require.NotNil(t, matChart)
+				require.Contains(t, matChart.scratchEntries, "ok")
+				require.Contains(t, matChart.scratchEntries, "warn")
+				okEntry := matChart.scratchEntries["ok"]
+				require.NotNil(t, okEntry)
+
+				plan2, err := e.BuildPlan(reader)
+				require.NoError(t, err)
+				assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(plan2.Actions))
+				require.NotNil(t, findUpdateAction(plan2))
+				metricsReader := e.RuntimeStore().Read(metrix.ReadRaw())
+				cacheHits, ok := metricsReader.Value("netdata.go.plugin.framework.chartengine.route_cache_hits_total", nil)
+				require.True(t, ok)
+				assert.GreaterOrEqual(t, cacheHits, float64(1))
+				fullDrops, fullDropsSeen := metricsReader.Value("netdata.go.plugin.framework.chartengine.route_cache_full_drops_total", nil)
+				require.True(t, fullDropsSeen)
+				assert.Equal(t, float64(0), fullDrops)
+
+				matChart = e.state.materialized.charts["component_load"]
+				require.NotNil(t, matChart)
+				require.Contains(t, matChart.scratchEntries, "ok")
+				require.Contains(t, matChart.scratchEntries, "warn")
+				assert.Equal(t, okEntry, matChart.scratchEntries["ok"])
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
 func TestPlannerStageBoundaries(t *testing.T) {
 	tests := map[string]func(t *testing.T){
 		"scan stage accumulates per-chart state": func(t *testing.T) {
@@ -1767,7 +1913,8 @@ groups:
 				InferredDimensions: make([]InferredDimension, 0),
 			}
 			reader := store.Read()
-			ctx, err := e.preparePlanBuildContext(reader, &out, reader.CollectMeta())
+			meta := reader.CollectMeta()
+			ctx, err := e.preparePlanBuildContext(reader, &out, meta, meta.LastSuccessSeq)
 			require.NoError(t, err)
 			require.NoError(t, e.scanPlanSeries(ctx))
 
@@ -1816,7 +1963,8 @@ groups:
 				InferredDimensions: make([]InferredDimension, 0),
 			}
 			reader := store.Read()
-			ctx, err := e.preparePlanBuildContext(reader, &out, reader.CollectMeta())
+			meta := reader.CollectMeta()
+			ctx, err := e.preparePlanBuildContext(reader, &out, meta, meta.LastSuccessSeq)
 			require.NoError(t, err)
 			require.NoError(t, e.scanPlanSeries(ctx))
 			require.NoError(t, e.materializePlanCharts(ctx))

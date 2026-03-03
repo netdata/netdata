@@ -56,7 +56,7 @@ sidebar:
     items:
       - meta:
           label: Versions & Platforms
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/versions-and-platforms.md
+          edit_url: https://github.com/netdata/netdata/edit/master/packaging/PLATFORM_SUPPORT.md
           description: Present all the supported platform in the Netdata solution
       - meta:
           label: Quickstart Deployment

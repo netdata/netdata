@@ -8,17 +8,23 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	managerTestPermissions = "0xFFFF"
+	managerTestSource      = "method=api,role=test"
+)
+
 func TestNewManager(t *testing.T) {
 	mgr := NewManager()
 
 	assert.NotNilf(t, mgr.input, "Input")
-	assert.NotNilf(t, mgr.FunctionRegistry, "FunctionRegistry")
+	assert.NotNilf(t, mgr.functionRegistry, "FunctionRegistry")
 }
 
 func TestManager_Register(t *testing.T) {
@@ -67,7 +73,7 @@ func TestManager_Register(t *testing.T) {
 			}
 
 			var got []string
-			for name := range mgr.FunctionRegistry {
+			for name := range mgr.functionRegistry {
 				got = append(got, name)
 			}
 			sort.Strings(got)
@@ -118,6 +124,20 @@ func TestManager_RegisterPrefix(t *testing.T) {
 			},
 			expected: []string{"config:collector:"},
 		},
+		"overlapping prefix is rejected (short first)": {
+			input: []inputFn{
+				{name: "config", prefix: "collector:"},
+				{name: "config", prefix: "collector:job:"},
+			},
+			expected: []string{"config:collector:"},
+		},
+		"overlapping prefix is rejected (long first)": {
+			input: []inputFn{
+				{name: "config", prefix: "collector:job:"},
+				{name: "config", prefix: "collector:"},
+			},
+			expected: []string{"config:collector:job:"},
+		},
 	}
 
 	for name, test := range tests {
@@ -133,7 +153,7 @@ func TestManager_RegisterPrefix(t *testing.T) {
 			}
 
 			var got []string
-			for fname, fs := range mgr.FunctionRegistry {
+			for fname, fs := range mgr.functionRegistry {
 				if fs == nil || len(fs.prefixes) == 0 {
 					continue
 				}
@@ -218,7 +238,7 @@ func TestManager_UnregisterPrefix(t *testing.T) {
 			}
 
 			var got []string
-			for fname, fs := range mgr.FunctionRegistry {
+			for fname, fs := range mgr.functionRegistry {
 				if fs == nil || len(fs.prefixes) == 0 {
 					continue
 				}
@@ -242,9 +262,9 @@ func TestManager_Run(t *testing.T) {
 	}{
 		"valid function: single": {
 			register: []string{"fn1"},
-			input: `
-FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
-`,
+			input: fmt.Sprintf(`
+FUNCTION UID 1 "fn1 arg1 arg2" %s "%s"
+`, managerTestPermissions, managerTestSource),
 			expected: []Function{
 				{
 					key:         lineFunction,
@@ -252,8 +272,8 @@ FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "",
 					Payload:     nil,
 				},
@@ -261,30 +281,30 @@ FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
 		},
 		"valid function: multiple": {
 			register: []string{"fn1", "fn2"},
-			input: `
-FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
-FUNCTION UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
-`,
+			input: fmt.Sprintf(`
+FUNCTION UID1 1 "fn1 arg1 arg2" %s "%s"
+FUNCTION UID2 1 "fn2 arg1 arg2" %s "%s"
+`, managerTestPermissions, managerTestSource, managerTestPermissions, managerTestSource),
 			expected: []Function{
 				{
 					key:         lineFunction,
-					UID:         "UID",
+					UID:         "UID1",
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "",
 					Payload:     nil,
 				},
 				{
 					key:         lineFunction,
-					UID:         "UID",
+					UID:         "UID2",
 					Timeout:     time.Second,
 					Name:        "fn2",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "",
 					Payload:     nil,
 				},
@@ -292,12 +312,12 @@ FUNCTION UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
 		},
 		"valid function: single with payload": {
 			register: []string{"fn1", "fn2"},
-			input: `
-FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+			input: fmt.Sprintf(`
+FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2" %s "%s" application/json
 payload line1
 payload line2
 FUNCTION_PAYLOAD_END
-`,
+`, managerTestPermissions, managerTestSource),
 			expected: []Function{
 				{
 					key:         lineFunctionPayload,
@@ -305,8 +325,8 @@ FUNCTION_PAYLOAD_END
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "application/json",
 					Payload:     []byte("payload line1\npayload line2"),
 				},
@@ -314,37 +334,37 @@ FUNCTION_PAYLOAD_END
 		},
 		"valid function: multiple with payload": {
 			register: []string{"fn1", "fn2"},
-			input: `
-FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+			input: fmt.Sprintf(`
+FUNCTION_PAYLOAD UID1 1 "fn1 arg1 arg2" %s "%s" application/json
 payload line1
 payload line2
 FUNCTION_PAYLOAD_END
 
-FUNCTION_PAYLOAD UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+FUNCTION_PAYLOAD UID2 1 "fn2 arg1 arg2" %s "%s" application/json
 payload line3
 payload line4
 FUNCTION_PAYLOAD_END
-`,
+`, managerTestPermissions, managerTestSource, managerTestPermissions, managerTestSource),
 			expected: []Function{
 				{
 					key:         lineFunctionPayload,
-					UID:         "UID",
+					UID:         "UID1",
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "application/json",
 					Payload:     []byte("payload line1\npayload line2"),
 				},
 				{
 					key:         lineFunctionPayload,
-					UID:         "UID",
+					UID:         "UID2",
 					Timeout:     time.Second,
 					Name:        "fn2",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "application/json",
 					Payload:     []byte("payload line3\npayload line4"),
 				},
@@ -352,62 +372,65 @@ FUNCTION_PAYLOAD_END
 		},
 		"valid function: multiple with and without payload": {
 			register: []string{"fn1", "fn2", "fn3", "fn4"},
-			input: `
-FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+			input: fmt.Sprintf(`
+FUNCTION_PAYLOAD UID1 1 "fn1 arg1 arg2" %s "%s" application/json
 payload line1
 payload line2
 FUNCTION_PAYLOAD_END
 
-FUNCTION UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
-FUNCTION UID 1 "fn3 arg1 arg2" 0xFFFF "method=api,role=test"
+FUNCTION UID2 1 "fn2 arg1 arg2" %s "%s"
+FUNCTION UID3 1 "fn3 arg1 arg2" %s "%s"
 
-FUNCTION_PAYLOAD UID 1 "fn4 arg1 arg2" 0xFFFF "method=api,role=test" application/json
+FUNCTION_PAYLOAD UID4 1 "fn4 arg1 arg2" %s "%s" application/json
 payload line3
 payload line4
 FUNCTION_PAYLOAD_END
-`,
+`, managerTestPermissions, managerTestSource,
+				managerTestPermissions, managerTestSource,
+				managerTestPermissions, managerTestSource,
+				managerTestPermissions, managerTestSource),
 			expected: []Function{
 				{
 					key:         lineFunctionPayload,
-					UID:         "UID",
+					UID:         "UID1",
 					Timeout:     time.Second,
 					Name:        "fn1",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "application/json",
 					Payload:     []byte("payload line1\npayload line2"),
 				},
 				{
 					key:         lineFunction,
-					UID:         "UID",
+					UID:         "UID2",
 					Timeout:     time.Second,
 					Name:        "fn2",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "",
 					Payload:     nil,
 				},
 				{
 					key:         lineFunction,
-					UID:         "UID",
+					UID:         "UID3",
 					Timeout:     time.Second,
 					Name:        "fn3",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "",
 					Payload:     nil,
 				},
 				{
 					key:         lineFunctionPayload,
-					UID:         "UID",
+					UID:         "UID4",
 					Timeout:     time.Second,
 					Name:        "fn4",
 					Args:        []string{"arg1", "arg2"},
-					Permissions: "0xFFFF",
-					Source:      "method=api,role=test",
+					Permissions: managerTestPermissions,
+					Source:      managerTestSource,
 					ContentType: "application/json",
 					Payload:     []byte("payload line3\npayload line4"),
 				},
@@ -416,44 +439,61 @@ FUNCTION_PAYLOAD_END
 	}
 
 	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			mgr := NewManager()
+		for workerProfile, workerCount := range map[string]int{
+			"single-worker": 1,
+			"multi-worker":  4,
+		} {
+			t.Run(name+"/"+workerProfile, func(t *testing.T) {
+				mgr := NewManager()
+				mgr.workerCount = workerCount
 
-			mgr.input = newMockInput(test.input)
+				mgr.input = newMockInput(test.input)
 
-			mock := &mockFunctionExecutor{}
-			for _, v := range test.register {
-				mgr.Register(v, mock.execute)
-			}
+				mock := &mockFunctionExecutor{}
+				for _, v := range test.register {
+					mgr.Register(v, mock.execute)
+				}
 
-			testTime := time.Second * 5
-			ctx, cancel := context.WithTimeout(context.Background(), testTime)
-			defer cancel()
+				testTime := time.Second * 5
+				ctx, cancel := context.WithTimeout(context.Background(), testTime)
+				defer cancel()
 
-			done := make(chan struct{})
+				done := make(chan struct{})
 
-			go func() { defer close(done); mgr.Run(ctx, nil) }()
+				go func() { defer close(done); mgr.Run(ctx, nil) }()
 
-			timeout := testTime + time.Second*2
-			tk := time.NewTimer(timeout)
-			defer tk.Stop()
+				timeout := testTime + time.Second*2
+				tk := time.NewTimer(timeout)
+				defer tk.Stop()
 
-			select {
-			case <-done:
-				assert.Equal(t, test.expected, mock.executed)
-			case <-tk.C:
-				t.Errorf("timed out after %s", timeout)
-			}
-		})
+				select {
+				case <-done:
+					assert.ElementsMatch(t, test.expected, mock.snapshot())
+				case <-tk.C:
+					t.Errorf("timed out after %s", timeout)
+				}
+			})
+		}
 	}
 }
 
 type mockFunctionExecutor struct {
+	mu       sync.Mutex
 	executed []Function
 }
 
 func (m *mockFunctionExecutor) execute(fn Function) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.executed = append(m.executed, fn)
+}
+
+func (m *mockFunctionExecutor) snapshot() []Function {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]Function, len(m.executed))
+	copy(out, m.executed)
+	return out
 }
 
 func newMockInput(data string) *mockInput {
@@ -472,6 +512,6 @@ type mockInput struct {
 	chLines chan string
 }
 
-func (m *mockInput) lines() chan string {
+func (m *mockInput) lines() <-chan string {
 	return m.chLines
 }

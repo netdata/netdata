@@ -1,0 +1,5 @@
+MESSAGE=Parsing error on: Invalid log line that doesn't match any pattern
+ERROR_TYPE=unmatched-pattern
+PRIORITY=3
+SYSLOG_IDENTIFIER=error-recovery
+

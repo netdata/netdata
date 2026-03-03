@@ -32,8 +32,6 @@ int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
 
 void json_escape_string(char *dst, const char *src, size_t size);
-void json_fix_string(char *s);
-
 
 extern struct rlimit rlimit_nofile;
 
@@ -125,11 +123,11 @@ extern const char *netdata_configured_host_prefix;
 #include "url/url.h"
 #include "json/json.h"
 #include "json/json-c-parser-inline.h"
+#include "yaml/yaml.h"
 #include "string/utf8.h"
 #include "libnetdata/aral/aral.h"
 #include "onewayalloc/onewayalloc.h"
 #include "worker_utilization/worker_utilization.h"
-#include "yaml.h"
 #include "http/http_defs.h"
 #include "gorilla/gorilla.h"
 #include "facets/facets.h"

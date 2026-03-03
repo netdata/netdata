@@ -78,7 +78,7 @@ func (cb *sdCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, ok bool
 
 func (cb *sdCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (sdConfig, error) {
 	dt, _, _ := cb.sd.extractDiscovererAndName(fn.ID())
-	if _, err := parseDyncfgPayload(fn.Payload(), dt, cb.sd.configDefaults, cb.sd.discovererRegistry()); err != nil {
+	if _, err := parseDyncfgPayload(fn.Payload(), dt, cb.sd.configDefaults, cb.sd.discovererRegistry(), true); err != nil {
 		return nil, err
 	}
 	pkey := pipelineKey(dt, name)
@@ -100,7 +100,7 @@ func (cb *sdCallbacks) Start(cfg sdConfig) error {
 func (cb *sdCallbacks) Update(oldCfg, newCfg sdConfig) error {
 	pipelineCfg, err := newCfg.ToPipelineConfig(cb.sd.configDefaults)
 	if err != nil {
-		return err
+		return dyncfg.MarkNonDisruptiveUpdate(err)
 	}
 	return cb.sd.mgr.Restart(cb.sd.ctx, newCfg.PipelineKey(), pipelineCfg)
 }
@@ -143,12 +143,8 @@ func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 		return
 	}
 
-	// State-changing commands are queued for serial execution
-	select {
-	case <-d.ctx.Done():
-		d.dyncfgApi.SendCodef(fn, 503, "Service discovery is shutting down.")
-	case d.dyncfgCh <- fn:
-	}
+	// State-changing commands are queued for serial execution.
+	d.enqueueDyncfgFunction(fn)
 }
 
 // dyncfgSeqExec executes state-changing dyncfg commands serially.
@@ -246,7 +242,7 @@ func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 	}
 
 	// Parse and validate the config without storing it
-	_, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults, d.discovererRegistry())
+	_, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults, d.discovererRegistry(), true)
 	if err != nil {
 		d.Warningf("dyncfg: test: failed to parse config for '%s': %v", dt, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
@@ -279,7 +275,7 @@ func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn dyncfg.Function) {
 		return
 	}
 
-	if _, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults, d.discovererRegistry()); err != nil {
+	if _, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults, d.discovererRegistry(), false); err != nil {
 		d.Warningf("dyncfg: userconfig: failed to parse config for '%s': %v", id, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
 		return

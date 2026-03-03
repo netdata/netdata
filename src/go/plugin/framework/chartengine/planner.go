@@ -101,6 +101,7 @@ type planBuildContext struct {
 	out         *Plan
 	reader      metrix.Reader
 	collectMeta metrix.CollectMeta
+	buildCycle  uint64
 	prog        *program.Program
 	cache       *routeCache
 	index       matchIndex
@@ -151,6 +152,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	defer e.mu.Unlock()
 
 	obs := e.observeBuildSuccessSeq(collectMeta.LastSuccessSeq)
+	buildCycle := e.nextBuildCycle(collectMeta.LastSuccessSeq)
 	sample.buildSeqViolation = e.state.buildSeq.violating
 	sample.buildSeqObserved = true
 	switch obs.transition {
@@ -171,7 +173,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	}
 
 	phaseStartedAt := time.Now()
-	ctx, err := e.preparePlanBuildContext(reader, &out, collectMeta)
+	ctx, err := e.preparePlanBuildContext(reader, &out, collectMeta, buildCycle)
 	sample.phasePrepareSeconds = time.Since(phaseStartedAt).Seconds()
 	if err != nil {
 		sample.buildErr = true
@@ -295,6 +297,7 @@ func (e *Engine) preparePlanBuildContext(
 	reader metrix.Reader,
 	out *Plan,
 	collectMeta metrix.CollectMeta,
+	buildCycle uint64,
 ) (*planBuildContext, error) {
 	prog := e.state.program
 	if prog == nil {
@@ -330,6 +333,7 @@ func (e *Engine) preparePlanBuildContext(
 		out:              out,
 		reader:           reader,
 		collectMeta:      collectMeta,
+		buildCycle:       buildCycle,
 		prog:             prog,
 		cache:            cache,
 		index:            index,
@@ -486,7 +490,7 @@ func (ctx *planBuildContext) accumulateRoute(
 			lifecycle:       route.Lifecycle,
 			labels:          labelsAcc,
 			entries:         entries,
-			currentBuildSeq: ctx.collectMeta.LastSuccessSeq,
+			currentBuildSeq: ctx.buildCycle,
 		}
 		ctx.chartsByID[route.ChartID] = cs
 	}
@@ -671,4 +675,16 @@ func buildPlan(engine *Engine, reader metrix.Reader) (Plan, error) {
 
 func isAutogenTemplateID(templateID string) bool {
 	return strings.HasPrefix(templateID, autogenTemplatePrefix)
+}
+
+func (e *Engine) nextBuildCycle(sourceSuccessSeq uint64) uint64 {
+	if !e.state.cfg.runtimePlanner {
+		return sourceSuccessSeq
+	}
+	e.state.plannerBuildSeq++
+	// Seen-seq zero value is reserved for "never seen".
+	if e.state.plannerBuildSeq == 0 {
+		e.state.plannerBuildSeq = 1
+	}
+	return e.state.plannerBuildSeq
 }

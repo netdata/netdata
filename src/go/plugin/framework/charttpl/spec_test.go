@@ -28,7 +28,6 @@ engine:
       - mysql_queries_total{db="main"}
   autogen:
     enabled: true
-    type_id: mysql.jobs
     max_type_id_len: 512
     expire_after_success_cycles: 9
 groups:
@@ -65,7 +64,6 @@ groups:
 				assert.Equal(t, []string{`mysql_queries_total{db="main"}`}, spec.Engine.Selector.Allow)
 				require.NotNil(t, spec.Engine.Autogen)
 				assert.True(t, spec.Engine.Autogen.Enabled)
-				assert.Equal(t, "mysql.jobs", spec.Engine.Autogen.TypeID)
 				assert.Equal(t, 512, spec.Engine.Autogen.MaxTypeIDLen)
 				assert.Equal(t, uint64(9), spec.Engine.Autogen.ExpireAfterSuccessCycles)
 			},

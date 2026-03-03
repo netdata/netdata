@@ -1,0 +1,39 @@
+---
+# Advanced edge cases test
+# Tests boundary conditions and unusual configurations
+
+pattern: "(?P<key>\\w+)=(?P<value>.*)"
+
+# No prefix specified (should work like no prefix)
+
+inject:
+  - key: EMPTY_VALUE
+    value: ""
+  - key: WHITESPACE_VALUE  
+    value: "   "
+  - key: SPECIAL_CHARS
+    value: "!@#$%^&*(){}[]|\\:;\"'<>?/~`"
+
+rewrite:
+  # Test with empty match pattern
+  - key: ALWAYS_APPLIES
+    value: "always set"
+    inject: yes
+    
+  # Test variable substitution with non-existent variables
+  - key: MISSING_VAR_TEST
+    value: "${NONEXISTENT_VAR}_suffix"
+    inject: yes
+    
+  # Test recursive variable references
+  - key: SELF_REF
+    value: "${SELF_REF}_loop"
+    inject: yes
+
+# Test empty filter patterns
+filter:
+  include: ".*"
+  exclude: ""
+
+filename:
+  key: FILENAME

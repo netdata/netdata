@@ -39,7 +39,8 @@ func New() *Collector {
 			},
 			Functions: FunctionsConfig{
 				TopQueries: TopQueriesConfig{
-					Limit: 500,
+					Timeout: confopt.Duration(10 * time.Second),
+					Limit:   500,
 				},
 			},
 		},

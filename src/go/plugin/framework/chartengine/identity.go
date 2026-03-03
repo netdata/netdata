@@ -96,7 +96,7 @@ func renderInstanceSuffix(identity program.ChartIdentity, labels labelAccessor) 
 	parts := make([]string, 0, len(values))
 	hasNonEmpty := false
 	for _, item := range values {
-		part := sanitizeIDComponent(item.Value)
+		part := sanitizeChartIDLabelValue(item.Value)
 		if strings.TrimSpace(part) != "" {
 			hasNonEmpty = true
 		}
@@ -180,9 +180,13 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAcce
 	return out, true, nil
 }
 
-func sanitizeIDComponent(value string) string {
-	value = strings.ReplaceAll(value, " ", "_")
-	value = strings.ReplaceAll(value, "\\", "_")
-	value = strings.ReplaceAll(value, "'", "")
-	return value
+var chartIDLabelValueSanitizer = strings.NewReplacer(
+	"\\", "_",
+	"'", "",
+	" ", "_",
+	".", "_",
+)
+
+func sanitizeChartIDLabelValue(value string) string {
+	return chartIDLabelValueSanitizer.Replace(value)
 }

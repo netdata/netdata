@@ -6,6 +6,8 @@ Include "Fixes #nnn" if you are fixing an existing issue.
 
 ##### Test Plan
 
+- [ ] AI-generated or AI-assisted content has been manually verified (examples/instructions tested where applicable).
+
 <!--
 Provide enough detail so that your reviewer can understand which test cases you
 have covered, and recreate them if necessary. If our CI covers sufficient tests, then state which tests cover the change.

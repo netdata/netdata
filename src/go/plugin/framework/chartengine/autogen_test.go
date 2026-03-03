@@ -13,7 +13,30 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-func TestBuildScalarAutogenRoute(t *testing.T) {
+func TestAutogenRouteBuilderScenarios(t *testing.T) {
+	tests := map[string]struct {
+		run func(t *testing.T)
+	}{
+		"build scalar autogen route": {
+			run: runTestBuildScalarAutogenRoute,
+		},
+		"build histogram bucket autogen route": {
+			run: runTestBuildHistogramBucketAutogenRoute,
+		},
+		"build summary quantile autogen route": {
+			run: runTestBuildSummaryQuantileAutogenRoute,
+		},
+		"build state-set autogen route": {
+			run: runTestBuildStateSetAutogenRoute,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, tc.run)
+	}
+}
+
+func runTestBuildScalarAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -55,6 +78,7 @@ func TestBuildScalarAutogenRoute(t *testing.T) {
 				sortedLabelView(tc.labels),
 				tc.meta,
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
@@ -68,7 +92,7 @@ func TestBuildScalarAutogenRoute(t *testing.T) {
 	}
 }
 
-func TestBuildHistogramBucketAutogenRoute(t *testing.T) {
+func runTestBuildHistogramBucketAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -93,6 +117,7 @@ func TestBuildHistogramBucketAutogenRoute(t *testing.T) {
 				tc.metricName,
 				sortedLabelView(tc.labels),
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
@@ -106,7 +131,7 @@ func TestBuildHistogramBucketAutogenRoute(t *testing.T) {
 	}
 }
 
-func TestBuildSummaryQuantileAutogenRoute(t *testing.T) {
+func runTestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -131,6 +156,7 @@ func TestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 				tc.metricName,
 				sortedLabelView(tc.labels),
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
@@ -144,7 +170,7 @@ func TestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 	}
 }
 
-func TestBuildStateSetAutogenRoute(t *testing.T) {
+func runTestBuildStateSetAutogenRoute(t *testing.T) {
 	tests := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -171,6 +197,7 @@ func TestBuildStateSetAutogenRoute(t *testing.T) {
 				sortedLabelView(tc.labels),
 				tc.meta,
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
 			)
 			require.NoError(t, err)
 			require.True(t, ok)
@@ -187,35 +214,38 @@ func TestBuildStateSetAutogenRoute(t *testing.T) {
 
 func TestFitsTypeIDBudget(t *testing.T) {
 	tests := map[string]struct {
-		policy  AutogenPolicy
-		chartID string
-		want    bool
+		maxLen       int
+		typeIDPrefix string
+		chartID      string
+		want         bool
 	}{
 		"empty type id at exact limit passes": {
-			policy:  AutogenPolicy{MaxTypeIDLen: 5},
+			maxLen:  5,
 			chartID: "abcde",
 			want:    true,
 		},
 		"empty type id over limit fails": {
-			policy:  AutogenPolicy{MaxTypeIDLen: 5},
+			maxLen:  5,
 			chartID: "abcdef",
 			want:    false,
 		},
 		"type id includes separator in budget": {
-			policy:  AutogenPolicy{TypeID: "collector.job", MaxTypeIDLen: 16},
-			chartID: "abc",
-			want:    false, // len("collector.job")+1+len("abc") == 17 > 16
+			maxLen:       16,
+			typeIDPrefix: "collector.job",
+			chartID:      "abc",
+			want:         false, // len("collector.job")+1+len("abc") == 17 > 16
 		},
 		"type id budget overflow fails": {
-			policy:  AutogenPolicy{TypeID: "collector.job", MaxTypeIDLen: 15},
-			chartID: "abc",
-			want:    false,
+			maxLen:       15,
+			typeIDPrefix: "collector.job",
+			chartID:      "abc",
+			want:         false,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, fitsTypeIDBudget(tc.policy, tc.chartID))
+			assert.Equal(t, tc.want, fitsTypeIDBudget(tc.maxLen, tc.typeIDPrefix, tc.chartID))
 		})
 	}
 }
@@ -229,4 +259,47 @@ func sortedLabelView(labels map[string]string) metrix.LabelView {
 		return items[i].Key < items[j].Key
 	})
 	return labelSliceView{items: items}
+}
+
+func TestBuildScalarAutogenRouteSanitizesDotLabelValues(t *testing.T) {
+	route, ok, err := buildScalarAutogenRoute(
+		"svc.requests_total",
+		sortedLabelView(map[string]string{
+			"instance": "db1.eu",
+			"job":      "mysql.prod",
+		}),
+		metrix.SeriesMeta{Kind: metrix.MetricKindCounter},
+		AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+		"",
+	)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "svc.requests_total-instance=db1_eu-job=mysql_prod", route.chartID)
+}
+
+func TestBuildScalarAutogenRouteSanitizesLegacyLabelChars(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "space", value: "a b", want: "a_b"},
+		{name: "backslash", value: "a\\b", want: "a_b"},
+		{name: "apostrophe", value: "a'b", want: "ab"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			route, ok, err := buildScalarAutogenRoute(
+				"svc.requests_total",
+				sortedLabelView(map[string]string{"instance": tc.value}),
+				metrix.SeriesMeta{Kind: metrix.MetricKindCounter},
+				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
+			)
+			require.NoError(t, err)
+			require.True(t, ok)
+			assert.Equal(t, "svc.requests_total-instance="+tc.want, route.chartID)
+		})
+	}
 }

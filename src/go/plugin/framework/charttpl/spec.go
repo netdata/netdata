@@ -25,9 +25,6 @@ type Engine struct {
 type EngineAutogen struct {
 	Enabled bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 
-	// TypeID is the chart-type prefix used by Netdata runtime checks
-	// (`type.id` length guard). Typically this is `<plugin>.<job>`.
-	TypeID string `yaml:"type_id,omitempty" json:"type_id,omitempty"`
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
 	MaxTypeIDLen int `yaml:"max_type_id_len,omitempty" json:"max_type_id_len,omitempty"`

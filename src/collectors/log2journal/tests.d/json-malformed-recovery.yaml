@@ -1,0 +1,7 @@
+pattern: json
+
+unmatched:
+  key: MESSAGE
+  inject:
+    - key: PRIORITY
+      value: 3

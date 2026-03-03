@@ -104,3 +104,75 @@ func TestRenderChartInstanceIDScenarios(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderChartInstanceIDSanitizesDotLabelValues(t *testing.T) {
+	identity := program.ChartIdentity{
+		IDTemplate: program.Template{Raw: "win_nic_traffic"},
+		InstanceByLabels: []program.InstanceLabelSelector{
+			{Key: "nic"},
+		},
+	}
+
+	got, ok, err := renderChartInstanceID(identity, map[string]string{"nic": "eth0.100"})
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, "win_nic_traffic_eth0_100", got)
+}
+
+func TestSanitizeChartIDLabelValue(t *testing.T) {
+	tests := map[string]struct {
+		value string
+		want  string
+	}{
+		"empty": {
+			value: "",
+			want:  "",
+		},
+		"no dots unchanged": {
+			value: "eth0",
+			want:  "eth0",
+		},
+		"single dot replaced": {
+			value: "db1.eu",
+			want:  "db1_eu",
+		},
+		"multiple dots replaced": {
+			value: "a.b.c",
+			want:  "a_b_c",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, sanitizeChartIDLabelValue(tc.value))
+		})
+	}
+}
+
+func TestRenderChartInstanceIDSanitizesLegacyLabelChars(t *testing.T) {
+	identity := program.ChartIdentity{
+		IDTemplate: program.Template{Raw: "win_nic_traffic"},
+		InstanceByLabels: []program.InstanceLabelSelector{
+			{Key: "nic"},
+		},
+	}
+
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "space", value: "a b", want: "a_b"},
+		{name: "backslash", value: "a\\b", want: "a_b"},
+		{name: "apostrophe", value: "a'b", want: "ab"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok, err := renderChartInstanceID(identity, map[string]string{"nic": tc.value})
+			require.NoError(t, err)
+			assert.True(t, ok)
+			assert.Equal(t, "win_nic_traffic_"+tc.want, got)
+		})
+	}
+}

@@ -1,0 +1,7 @@
+---
+# Test rename with uppercase keys (journal_key_characters_map uppercases captured keys)
+pattern: "(?P<level>\\w+)\\s+(?P<message>.*)"
+
+rename:
+  - old_key: LEVEL
+    new_key: SEVERITY

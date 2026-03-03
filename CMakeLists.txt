@@ -903,6 +903,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/json/json-keys.h
         src/libnetdata/json/vendored/jsmn.c
         src/libnetdata/json/vendored/jsmn.h
+        src/libnetdata/yaml/yaml.c
+        src/libnetdata/yaml/yaml.h
+        src/libnetdata/yaml/yaml-unittest.c
+        src/libnetdata/yaml/yaml-comprehensive-unittest.c
         src/libnetdata/libnetdata.c
         src/libnetdata/libnetdata.h
         src/libnetdata/line_splitter/line_splitter.c
@@ -1034,6 +1038,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
         src/libnetdata/json/json-c-parser-inline.c
+        src/libnetdata/json/json-c-parser-unittest.c
         src/libnetdata/parsers/duration.h
         src/libnetdata/parsers/timeframe.c
         src/libnetdata/parsers/timeframe.h
@@ -1050,6 +1055,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/sanitizers/chart_id_and_name.h
         src/libnetdata/sanitizers/utf8-sanitizer.c
         src/libnetdata/sanitizers/utf8-sanitizer.h
+        src/libnetdata/sanitizers/utf8-sanitizer-unittest.c
         src/libnetdata/sanitizers/sanitizers.h
         src/libnetdata/sanitizers/sanitizers-labels.c
         src/libnetdata/sanitizers/sanitizers-labels.h

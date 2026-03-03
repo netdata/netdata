@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
@@ -19,6 +20,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 )
+
+const waitDecisionTimeout = 5 * time.Second
 
 type Config struct {
 	ConfigDefaults confgroup.Registry
@@ -55,6 +58,11 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
 	}
+	if provider, ok := cfg.FnReg.(interface {
+		TerminalFinalizer() functions.TerminalFinalizer
+	}); ok {
+		d.dyncfgApi.SetTerminalFinalizer(provider.TerminalFinalizer())
+	}
 	d.newPipeline = func(config pipeline.Config) (sdPipeline, error) {
 		return pipeline.New(config, d.newDiscoverersFromRegistry)
 	}
@@ -68,6 +76,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		WaitKey: func(cfg sdConfig) string {
 			return cfg.PipelineKey()
 		},
+		WaitTimeout: waitDecisionTimeout,
 
 		Path:           fmt.Sprintf(dyncfgSDPath, cfg.PluginName),
 		EnableFailCode: 422,
@@ -118,6 +127,9 @@ type (
 
 // SetDyncfgResponder allows overriding the default responder (e.g., to silence output in tests).
 func (d *ServiceDiscovery) SetDyncfgResponder(api *dyncfg.Responder) {
+	if api != nil && d.dyncfgApi != nil {
+		api.SetTerminalFinalizer(d.dyncfgApi.TerminalFinalizer())
+	}
 	dyncfg.BindResponder(&d.dyncfgApi, d.handler, api)
 }
 
@@ -167,12 +179,21 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 func (d *ServiceDiscovery) run(ctx context.Context) {
 	for {
 		if d.handler.WaitingForDecision() {
-			// Waiting for enable/disable command - only process dyncfg commands
-			select {
-			case <-ctx.Done():
+			step, ok := d.handler.NextWaitDecisionStep(ctx, d.dyncfgCh)
+			if !ok {
 				return
-			case fn := <-d.dyncfgCh:
-				d.dyncfgSeqExec(fn)
+			}
+			if step.HasCommand {
+				d.dyncfgSeqExec(step.Command)
+				continue
+			}
+			if step.TimedOut {
+				d.Errorf(
+					"dyncfg: timed out waiting for enable/disable decision for '%s' (elapsed=%s threshold=%s); keeping status 'accepted' and continuing",
+					step.Timeout.Key,
+					step.Timeout.Elapsed,
+					step.Timeout.Threshold,
+				)
 			}
 		} else {
 			select {
