@@ -4,6 +4,7 @@ package docker
 
 import (
 	"errors"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/docker/dockerfunc"
 )
 
@@ -14,18 +15,8 @@ type funcDepsAdapter struct {
 }
 
 func (a funcDepsAdapter) DockerClient() (dockerfunc.DockerClient, error) {
-	return a.collector.currentDockerClient()
-}
-
-func (c *Collector) dockerClientReady() bool {
-	return c.client != nil
-}
-
-func (c *Collector) currentDockerClient() (dockerfunc.DockerClient, error) {
-	if c.client == nil {
+	if a.collector.client == nil {
 		return nil, errDockerClientNotReady
 	}
-	return c.client, nil
+	return a.collector.client, nil
 }
-
-var _ dockerfunc.Deps = (*funcDepsAdapter)(nil)
