@@ -110,7 +110,7 @@ class Executor:
                 'description': 'Restarting Netdata service'
             })
 
-            restart_result = self.ssh.execute('sudo systemctl restart netdata')
+            restart_result = self.ssh.sudo('systemctl restart netdata')
             if not restart_result['success']:
                 result['status'] = 'FAIL'
                 result['error'] = f'Failed to restart netdata: {restart_result.get("stderr")}'
