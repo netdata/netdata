@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/docker/dockerfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 
 	"github.com/docker/docker/api/types"
@@ -28,11 +30,19 @@ func init() {
 		JobConfigSchema: configSchema,
 		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
+		Methods:         dockerfunc.Methods,
+		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
+			c, ok := job.Collector().(*Collector)
+			if !ok {
+				return nil
+			}
+			return c.funcRouter
+		},
 	})
 }
 
 func New() *Collector {
-	return &Collector{
+	c := &Collector{
 		Config: Config{
 			Address:              docker.DefaultDockerHost,
 			Timeout:              confopt.Duration(time.Second * 2),
@@ -47,6 +57,8 @@ func New() *Collector {
 		cntrSr:     matcher.TRUE(),
 		containers: make(map[string]bool),
 	}
+	c.funcRouter = dockerfunc.NewRouter(funcDepsAdapter{collector: c})
+	return c
 }
 
 type Config struct {
@@ -68,6 +80,8 @@ type (
 
 		client    dockerClient
 		newClient func(Config) (dockerClient, error)
+
+		funcRouter funcapi.MethodHandler
 
 		verNegotiated bool
 		containers    map[string]bool
@@ -97,6 +111,9 @@ func (c *Collector) Init(context.Context) error {
 			return err
 		}
 		c.cntrSr = sr
+	}
+	if c.funcRouter == nil {
+		c.funcRouter = dockerfunc.NewRouter(funcDepsAdapter{collector: c})
 	}
 
 	return nil
@@ -130,7 +147,10 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
+	if c.funcRouter != nil {
+		c.funcRouter.Cleanup(ctx)
+	}
 	if c.client == nil {
 		return
 	}
