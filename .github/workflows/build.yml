@@ -477,17 +477,17 @@ jobs:
         id: install-netdata
         if: needs.file-check.outputs.run == 'true'
         run: |
-          msiexec /qm /i dist-artifacts\\netdata-x64.msi /l* .\\install.log NDDRVINST=0
-          if ($LastExitcode -ne 0) {
-              Get-Content .\\install.log
+          $installerProc = Start-Process "msiexec" "/qn /i `"$PWD\dist-artifacts\netdata-x64.msi`" /l*v `"$PWD\msi.log`" NDDRVINST=0" -Wait -NoNewWindow
+          if ($installerProc.ExitCode -ne 0) {
+              Get-Content "$PWD\msi.log"
               exit 1
           }
-          Get-Content .\\install.log
+          Get-Content "$PWD\msi.log"
       - name: Check agent buildinfo
         id: agent-check
         if: needs.file-check.outputs.run == 'true'
         run: |
-          & "C:\\Program Files\\Netdata\\usr\\bin\\netdata.exe" -W buildinfo
+          & "C:\Program Files\Netdata\usr\bin\netdata.exe" -W buildinfo
           if ($LastExitcode -ne 0) {
               exit 1
           }
