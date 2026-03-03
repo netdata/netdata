@@ -476,7 +476,7 @@ jobs:
       - name: Install Netdata
         id: install-netdata
         if: needs.file-check.outputs.run == 'true'
-        run: msiexec /qm /i dist-artifacts\\netdata-x64-install.msi NDDRVINST=0
+        run: msiexec /qm /i dist-artifacts\\netdata-x64.msi NDDRVINST=0
       - name: Check agent buildinfo
         id: agent-check
         if: needs.file-check.outputs.run == 'true'
