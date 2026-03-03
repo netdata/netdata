@@ -444,7 +444,7 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
     journalfile->mmap.fd = fd;
     journalfile->mmap.data = journal_data;
     journalfile->mmap.size = journal_data_size;
-    journalfile->v2.not_needed_since_s = 0;
+    journalfile->v2.not_needed_since_s = now_monotonic_sec();
     journalfile->v2.flags |= JOURNALFILE_FLAG_IS_AVAILABLE | JOURNALFILE_FLAG_IS_MOUNTED;
 
     struct journal_v2_header *j2_header = journalfile->mmap.data;
@@ -452,10 +452,7 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
     journalfile->v2.last_time_s = (time_t)(j2_header->end_time_ut / USEC_PER_SEC);
     journalfile->v2.size_of_directory = j2_header->metric_offset + j2_header->metric_count * sizeof(struct journal_metric_list);
 
-    // keep the mapping alive — apply advisories that _mounted_data_get would set on re-mmap
-    madvise_dontfork(journalfile->mmap.data, journalfile->mmap.size);
-    madvise_dontdump(journalfile->mmap.data, journalfile->mmap.size);
-    madvise_random(journalfile->mmap.data, journalfile->mmap.size);
+    journalfile_v2_mounted_data_unmount(journalfile, true, true);
 
     spinlock_unlock(&journalfile->data_spinlock);
 
