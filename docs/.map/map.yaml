@@ -494,9 +494,9 @@ sidebar:
               edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/active_journal_centralization_guide_no_encryption.md
       - type: integration_placeholder
         integration_kind: logs
-  # Top Consumers
+  # Live
   - meta:
-      label: Top Consumers
+      label: Live View
       edit_url: https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md
       description: Present the Netdata Functions what these are and why they should be used.
     items:
