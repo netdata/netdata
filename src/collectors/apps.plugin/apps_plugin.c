@@ -28,6 +28,7 @@ bool enable_users_charts = true;
 bool enable_groups_charts = true;
 bool include_exited_childs = true;
 bool proc_pid_cmdline_is_needed = true; // true when we need to read /proc/cmdline
+bool enable_skip_idle = true;
 
 #if defined(OS_FREEBSD) || defined(OS_MACOS)
 int enable_file_charts = CONFIG_BOOLEAN_NO;
@@ -527,6 +528,16 @@ static void parse_args(int argc, char **argv)
             continue;
         }
 
+        if(strcmp("with-skip-idle", argv[i]) == 0) {
+            enable_skip_idle = true;
+            continue;
+        }
+
+        if(strcmp("without-skip-idle", argv[i]) == 0) {
+            enable_skip_idle = false;
+            continue;
+        }
+
         if(strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             fprintf(stderr,
                     "\n"
@@ -575,6 +586,13 @@ static void parse_args(int argc, char **argv)
                     " without-groups         disable reporting per user group charts\n"
                     "\n"
 #endif
+                    " with-skip-idle\n"
+                    " without-skip-idle      enable / disable skipping /proc reads for idle\n"
+                    "                        processes (no CPU change between iterations).\n"
+                    "                        When enabled, idle processes reuse cached memory\n"
+                    "                        values instead of re-reading /proc files.\n"
+                    "                        (default is disabled)\n"
+                    "\n"
                     " with-detailed-uptime   enable reporting min/avg/max uptime charts\n"
                     "\n"
 #if defined(OS_LINUX)

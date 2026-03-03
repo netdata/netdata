@@ -85,6 +85,7 @@ struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
 #if (PROCESSES_HAVE_FDS == 1)
     p->fds = mallocz(sizeof(struct pid_fd) * 3); // stdin, stdout, stderr
     p->fds_size = 3;
+    p->fds_max = 0;
     init_pid_fds(p, 0, p->fds_size);
 #endif
 
@@ -163,11 +164,17 @@ void del_pid_entry(pid_t pid) {
 
 static __thread pid_t current_pid;
 static __thread kernel_uint_t current_pid_values[PDF_MAX];
+#if (PROCESSES_HAVE_FDS == 1)
+static __thread struct openfds current_pid_openfds;
+#endif
 
 void pid_collection_started(struct pid_stat *p) {
     fatal_assert(sizeof(current_pid_values) == sizeof(p->values));
     current_pid = p->pid;
     memcpy(current_pid_values, p->values, sizeof(current_pid_values));
+#if (PROCESSES_HAVE_FDS == 1)
+    current_pid_openfds = p->openfds;
+#endif
     memset(p->values, 0, sizeof(p->values));
     p->values[PDF_PROCESSES] = 1;
     p->read = true;
@@ -183,6 +190,47 @@ void pid_collection_completed(struct pid_stat *p) {
     p->updated = true;
     p->keep = false;
     p->keeploops = 0;
+}
+
+void pid_collection_idle_cached(struct pid_stat *p) {
+    // Restore absolute memory values from the backup made by pid_collection_started().
+    // Rate values (CPU, IO, faults, ctx switches) stay at 0, which is correct for idle processes.
+    // Threads and uptime are already fresh from /proc/pid/stat.
+
+    p->values[PDF_VMSIZE] = current_pid_values[PDF_VMSIZE];
+    p->values[PDF_VMRSS] = current_pid_values[PDF_VMRSS];
+
+#if (PROCESSES_HAVE_VMSWAP == 1)
+    p->values[PDF_VMSWAP] = current_pid_values[PDF_VMSWAP];
+#endif
+
+#if (PROCESSES_HAVE_VMSHARED == 1)
+    p->values[PDF_VMSHARED] = current_pid_values[PDF_VMSHARED];
+#endif
+
+#if (PROCESSES_HAVE_RSSFILE == 1)
+    p->values[PDF_RSSFILE] = current_pid_values[PDF_RSSFILE];
+#endif
+
+#if (PROCESSES_HAVE_RSSSHMEM == 1)
+    p->values[PDF_RSSSHMEM] = current_pid_values[PDF_RSSSHMEM];
+#endif
+
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    p->values[PDF_PSS] = current_pid_values[PDF_PSS];
+    p->values[PDF_MEM_ESTIMATED] = current_pid_values[PDF_MEM_ESTIMATED];
+#endif
+
+#if (PROCESSES_HAVE_HANDLES == 1)
+    p->values[PDF_HANDLES] = current_pid_values[PDF_HANDLES];
+#endif
+
+#if (PROCESSES_HAVE_FDS == 1)
+    // Restore cached FD counts (stale by 1+ iterations, acceptable for idle processes)
+    p->openfds = current_pid_openfds;
+#endif
+
+    pid_collection_completed(p);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

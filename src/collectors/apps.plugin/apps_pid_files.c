@@ -12,6 +12,13 @@ uint32_t all_files_len_get(void) {
 }
 
 #if (PROCESSES_HAVE_FDS == 1)
+
+static uint32_t fds_generation = 0;
+
+void fds_generation_advance(void) {
+    if(++fds_generation == 0)
+        fds_generation = 1; // skip 0, since memset-initialized slots are 0
+}
 // ----------------------------------------------------------------------------
 // file descriptor
 //
@@ -104,16 +111,13 @@ static inline void aggregate_fd_on_target(int fd, struct target *w) {
     if(unlikely(!w))
         return;
 
-    if(unlikely(w->target_fds[fd])) {
-        // it is already aggregated
-        // just increase its usage counter
-        w->target_fds[fd]++;
+    if(w->target_fds[fd] == (int)fds_generation) {
+        // it is already aggregated this iteration
         return;
     }
 
-    // increase its usage counter
-    // so that we will not add it again
-    w->target_fds[fd]++;
+    // mark as seen this generation
+    w->target_fds[fd] = (int)fds_generation;
 
     aggregage_fd_type_on_openfds(all_files[fd].type, &w->openfds);
 }
@@ -162,7 +166,7 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     p->openfds.eventpolls = 0;
     p->openfds.other = 0;
 
-    uint32_t c, size = p->fds_size;
+    uint32_t c, size = p->fds_max;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
         int fd = fds[c].fd;
@@ -407,7 +411,7 @@ void clear_pid_fd(struct pid_fd *pfd) {
 }
 
 void make_all_pid_fds_negative(struct pid_stat *p) {
-    struct pid_fd *pfd = p->fds, *pfdend = &p->fds[p->fds_size];
+    struct pid_fd *pfd = p->fds, *pfdend = &p->fds[p->fds_max];
     while(pfd < pfdend) {
         pfd->fd = -(pfd->fd);
         pfd++;
@@ -415,7 +419,8 @@ void make_all_pid_fds_negative(struct pid_stat *p) {
 }
 
 static inline void cleanup_negative_pid_fds(struct pid_stat *p) {
-    struct pid_fd *pfd = p->fds, *pfdend = &p->fds[p->fds_size];
+    struct pid_fd *pfd = p->fds, *pfdend = &p->fds[p->fds_max];
+    uint32_t fds_max = 0;
 
     while(pfd < pfdend) {
         int fd = pfd->fd;
@@ -424,9 +429,13 @@ static inline void cleanup_negative_pid_fds(struct pid_stat *p) {
             file_descriptor_not_used(-(fd));
             clear_pid_fd(pfd);
         }
+        else if(fd > 0)
+            fds_max = (uint32_t)(pfd - p->fds) + 1;
 
         pfd++;
     }
+
+    p->fds_max = fds_max;
 }
 
 void init_pid_fds(struct pid_stat *p, size_t first, size_t size) {

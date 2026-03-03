@@ -120,9 +120,37 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
         p->ppid = 0;
 
     // --------------------------------------------------------------------
+    // detect kernel threads: their parent is an aggregator
+    // (e.g. kthreadd on Linux, kernel on FreeBSD).
+    // kernel threads have no I/O, no file descriptors, no memory - skip expensive reads
+
+    bool is_kernel_thread = false;
+    if(p->ppid) {
+        struct pid_stat *pp = find_pid_entry(p->ppid);
+        if(pp && pp->is_aggregator)
+            is_kernel_thread = true;
+    }
+
+    // --------------------------------------------------------------------
+    // skip expensive /proc reads for idle processes (no CPU or fault activity)
+
+    if(enable_skip_idle
+        && !is_kernel_thread
+        && p->last_stat_collected_usec != 0
+        && p->values[PDF_UTIME] == 0
+        && p->values[PDF_STIME] == 0
+        && p->values[PDF_MINFLT] == 0) {
+        // Process is idle (no CPU, no faults) and this is not its first collection.
+        // Restore absolute values from the backup and skip io/status/fd/limits reads.
+        pid_collection_idle_cached(p);
+        return 1;
+    }
+
+    // --------------------------------------------------------------------
     // /proc/<pid>/io
 
-    managed_log(p, PID_LOG_IO, incrementally_read_pid_io(p, ptr));
+    if(likely(!is_kernel_thread))
+        managed_log(p, PID_LOG_IO, incrementally_read_pid_io(p, ptr));
 
     // --------------------------------------------------------------------
     // /proc/<pid>/status
@@ -137,7 +165,7 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     // /proc/<pid>/fd
 
 #if (PROCESSES_HAVE_FDS == 1)
-    if(enable_file_charts) {
+    if(likely(!is_kernel_thread) && enable_file_charts) {
         managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p, ptr));
 #if (PROCESSES_HAVE_PID_LIMITS == 1)
         managed_log(p, PID_LOG_LIMITS, OS_FUNCTION(apps_os_read_pid_limits)(p, ptr));

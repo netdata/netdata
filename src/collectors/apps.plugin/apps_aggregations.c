@@ -25,7 +25,10 @@ static size_t zero_all_targets(struct target *root) {
 #if (PROCESSES_HAVE_FDS == 1)
         // zero file counters
         if(w->target_fds) {
-            memset(w->target_fds, 0, sizeof(int) * w->target_fds_size);
+            // target_fds is not zeroed here - we use a generation counter
+            // fds_generation_advance() is called once per iteration in
+            // aggregate_processes_to_targets(), so stale entries from
+            // previous iterations won't match the current generation.
             w->openfds.files = 0;
             w->openfds.pipes = 0;
             w->openfds.sockets = 0;
@@ -112,7 +115,7 @@ static inline void cleanup_exited_pids(void) {
 #endif
 
 #if (PROCESSES_HAVE_FDS == 1)
-            for(size_t c = 0; c < p->fds_size; c++)
+            for(size_t c = 0; c < p->fds_max; c++)
                 if(p->fds[c].fd > 0) {
                     file_descriptor_not_used(p->fds[c].fd);
                     clear_pid_fd(&p->fds[c]);
@@ -203,6 +206,12 @@ void aggregate_processes_to_targets(void) {
 #endif
 #if (PROCESSES_HAVE_GID == 1)
     update_cached_host_groups();
+#endif
+
+#if (PROCESSES_HAVE_FDS == 1)
+    // advance the generation counter so that target_fds entries from
+    // the previous iteration are considered stale without zeroing the arrays
+    fds_generation_advance();
 #endif
 
     // concentrate everything on the targets

@@ -175,6 +175,7 @@ extern bool enable_groups_charts;
 extern bool include_exited_childs;
 extern bool enable_function_cmdline;
 extern bool proc_pid_cmdline_is_needed;
+extern bool enable_skip_idle;
 extern int enable_file_charts;
 extern bool obsolete_file_charts;
 
@@ -490,6 +491,9 @@ struct pid_fd {
 #define pid_stat_comm(p) (string2str((p)->comm))
 #define pid_stat_cmdline(p) (string2str((p)->cmdline))
 uint32_t all_files_len_get(void);
+#if (PROCESSES_HAVE_FDS == 1)
+void fds_generation_advance(void);
+#endif
 
 struct pid_stat {
     int32_t pid;
@@ -553,6 +557,7 @@ struct pid_stat {
 #endif
     struct pid_fd *fds;             // array of fds it uses
     uint32_t fds_size;              // the size of the fds array
+    uint32_t fds_max;               // the highest fd index ever seen + 1
 #endif
 
     uint32_t children_count;        // the number of processes directly referencing this.
@@ -686,6 +691,7 @@ bool collect_data_for_all_pids(void);
 void pid_collection_started(struct pid_stat *p);
 void pid_collection_failed(struct pid_stat *p);
 void pid_collection_completed(struct pid_stat *p);
+void pid_collection_idle_cached(struct pid_stat *p);
 
 #if (INCREMENTAL_DATA_COLLECTION == 1)
 bool collect_parents_before_children(void);
