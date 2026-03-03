@@ -76,11 +76,12 @@ class Executor:
             config_file = file_match.group(0) if file_match else config_file
 
             # Skip partial configs (just sections like [web] or single options like value_color=)
+            lines = config_content.strip().split('\n')
             is_partial = (
                 re.match(r'^\s*\[[\w-]+\]\s*$', config_content, re.MULTILINE) or  # [section] only
-                re.match(r'^[\w-+=]+\s*=\s*[\w#]+$', config_content.strip())  # single option=value
+                (len(lines) < 3 and all(re.match(r'^[\w-]+=.*$', line.strip()) for line in lines))  # few option= lines
             )
-            if is_partial and len(config_content.strip().split('\n')) < 3:
+            if is_partial:
                 result['status'] = 'SKIP'
                 result['error'] = 'Partial config snippet detected (not a full config)'
                 return result
