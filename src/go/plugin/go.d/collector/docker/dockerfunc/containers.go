@@ -27,6 +27,7 @@ const (
 	colCommand
 	colCreated
 	colStatus
+	colState
 	colPorts
 	colNames
 	colContainerIDFull
@@ -39,6 +40,7 @@ const (
 	containersColCommand     = "command"
 	containersColCreated     = "created"
 	containersColStatus      = "status"
+	containersColState       = "state"
 	containersColPorts       = "ports"
 	containersColNames       = "names"
 	containersColIDFull      = "container_id_full"
@@ -125,6 +127,7 @@ func buildContainerRow(cntr typesContainer.Summary, now time.Time) []any {
 	row[colCommand] = strings.TrimSpace(cntr.Command)
 	row[colCreated] = formatCreated(cntr.Created, now)
 	row[colStatus] = formatStatus(cntr)
+	row[colState] = strings.TrimSpace(cntr.State)
 	row[colPorts] = formatPorts(cntr.Ports)
 	row[colNames] = formatContainerNames(cntr.Names)
 	row[colContainerIDFull] = cntr.ID
@@ -191,11 +194,23 @@ func buildContainerColumns() map[string]any {
 			Type:          funcapi.FieldTypeString,
 			Visualization: funcapi.FieldVisualValue,
 			Sort:          funcapi.FieldSortAscending,
-			Sortable:      true,
+			Sortable:      false,
 			Summary:       funcapi.FieldSummaryCount,
 			Filter:        funcapi.FieldFilterNone,
 			Visible:       true,
 			Wrap:          true,
+			ValueOptions:  funcapi.ValueOptions{Transform: funcapi.FieldTransformText},
+		}.BuildColumn(),
+		containersColState: funcapi.Column{
+			Index:         colState,
+			Name:          "State (Raw)",
+			Type:          funcapi.FieldTypeString,
+			Visualization: funcapi.FieldVisualValue,
+			Sort:          funcapi.FieldSortAscending,
+			Sortable:      true,
+			Summary:       funcapi.FieldSummaryCount,
+			Filter:        funcapi.FieldFilterMultiselect,
+			Visible:       false,
 			ValueOptions:  funcapi.ValueOptions{Transform: funcapi.FieldTransformText},
 		}.BuildColumn(),
 		containersColPorts: funcapi.Column{
@@ -204,7 +219,7 @@ func buildContainerColumns() map[string]any {
 			Type:          funcapi.FieldTypeString,
 			Visualization: funcapi.FieldVisualValue,
 			Sort:          funcapi.FieldSortAscending,
-			Sortable:      true,
+			Sortable:      false,
 			Summary:       funcapi.FieldSummaryCount,
 			Filter:        funcapi.FieldFilterNone,
 			Visible:       true,

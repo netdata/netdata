@@ -47,6 +47,7 @@ func TestFuncContainers_HandleSuccess(t *testing.T) {
 				Command: "docker-entrypoint.sh postgres",
 				Created: olderCreated,
 				Status:  "Exited (0) 4 days ago",
+				State:   "exited",
 				Ports: []types.Port{
 					{IP: "[::]", PrivatePort: 5432, PublicPort: 5432, Type: "tcp"},
 					{IP: "0.0.0.0", PrivatePort: 5432, PublicPort: 5432, Type: "tcp"},
@@ -79,6 +80,7 @@ func TestFuncContainers_HandleSuccess(t *testing.T) {
 		containersColCommand,
 		containersColCreated,
 		containersColStatus,
+		containersColState,
 		containersColPorts,
 		containersColNames,
 		containersColIDFull,
@@ -99,6 +101,7 @@ func TestFuncContainers_HandleSuccess(t *testing.T) {
 	assert.Contains(t, data[0][colCreated].(string), "ago")
 	assert.Equal(t, "sleep infinity", data[0][colCommand])
 	assert.Equal(t, "Exited", data[0][colStatus])
+	assert.Equal(t, "exited", data[0][colState])
 
 	// second row includes formatted ports and truncated command
 	assert.Equal(t, "postgres-dev", data[1][colNames])
@@ -106,6 +109,7 @@ func TestFuncContainers_HandleSuccess(t *testing.T) {
 	assert.Equal(t, "aaaaaaaaaaaa", data[1][colContainerID])
 	assert.Equal(t, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", data[1][colContainerIDFull])
 	assert.Equal(t, "docker-entrypoint.sh postgres", data[1][colCommand])
+	assert.Equal(t, "exited", data[1][colState])
 }
 
 func TestFormatHelpers(t *testing.T) {
