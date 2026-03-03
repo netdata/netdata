@@ -2,7 +2,7 @@
 
 ## Overview
 
-Database query functions provide deep visibility into SQL and NoSQL database performance through Netdata's Top tab. They help you identify problematic queries, detect deadlocks, and understand error patterns—all from the Netdata dashboard.
+Database query functions provide deep visibility into SQL and NoSQL database performance through Netdata's Live tab. They help you identify problematic queries, detect deadlocks, and understand error patterns—all from the Netdata dashboard.
 
 | Capability | Description |
 |------------|-------------|

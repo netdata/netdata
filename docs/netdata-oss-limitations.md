@@ -37,7 +37,7 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 | Multi-node views | 5 nodes | 5 nodes | Unlimited |
 | Custom dashboards | 1 per agent | 1 per room | Unlimited |
 
-### Functions (Top Tab)
+### Functions (Live Tab)
 
 Functions provide on-demand, detailed information beyond standard metrics.
 

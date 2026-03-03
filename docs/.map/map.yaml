@@ -727,9 +727,9 @@ sidebar:
               edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/nodes-tab.md
               description: See charts from all your nodes in one pane of glass, then dive in to embedded dashboards for granular troubleshooting of ongoing issues.
           - meta:
-              label: Top
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/top-tab.md
-              description: Instructions on how to use Functions
+              label: Live
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/live-tab.md
+              description: Access live information from monitored nodes through Netdata Functions
       - meta:
           label: Theme
           edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/themes.md

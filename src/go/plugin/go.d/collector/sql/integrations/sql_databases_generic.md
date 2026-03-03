@@ -29,7 +29,7 @@ To see what a specific job collects, open that job's dashboard in Netdata
 and inspect the charts and dimensions it created.
 
 Jobs can also define **functions** that provide interactive table views in
-Netdata's Top tab. A job can have metrics only, functions only, or both.
+Netdata's Live tab. A job can have metrics only, functions only, or both.
 
 :::tip
 
@@ -53,7 +53,7 @@ For each metric block you define, it executes the SQL query (inline or via
 dimensions.
 
 Additionally, you can define **functions** that expose SQL query results as
-interactive table views in Netdata's Top tab. Functions support filtering,
+interactive table views in Netdata's Live tab. Functions support filtering,
 sorting, and searching without creating persistent metrics.
 
 ### Result Processing Modes
@@ -117,7 +117,7 @@ interactive table views in Netdata's **Top** tab. Functions are configured per j
 in the `functions` section of the job configuration. Since functions are entirely
 user-defined, no predefined functions are listed here.
 
-In the Top tab, functions appear in a hierarchical menu:
+In the Live tab, functions appear in a hierarchical menu:
 
 ```
 Databases
@@ -272,7 +272,7 @@ metrics:
 # Set function_only: true if this job only provides functions (no metrics).
 function_only: <true|false>                    # OPTIONAL. Default: false.
 
-# Expose SQL queries as interactive table views in Netdata's Top tab.
+# Expose SQL queries as interactive table views in Netdata's Live tab.
 functions:
   - id: <function_id>                          # REQUIRED. Unique identifier.
     name: <display_name>                       # OPTIONAL. Derived from id if not set.
@@ -307,7 +307,7 @@ functions:
 | **Labels** | static_labels | A map of static labels added to every chart created by this job. Useful for tagging charts with environment, region, or role. | {} | no |
 | **Queries & Metrics** | queries | A list of reusable queries. Metric blocks can reference these via `query_ref` to avoid repeating SQL. See [Configuration Structure](#configuration) for details. | [] | no |
 |  | metrics | A list of metric blocks. Each block defines how a query is executed and how its result is transformed into one or more charts. See [Configuration Structure](#configuration) for details. | [] | no |
-| **Functions** | functions | A list of SQL functions exposed as interactive table views in Netdata's Top tab. Each function runs a SQL query and displays results in a filterable, sortable table. See [Functions](#functions) for details. | [] | no |
+| **Functions** | functions | A list of SQL functions exposed as interactive table views in Netdata's Live tab. Each function runs a SQL query and displays results in a filterable, sortable table. See [Functions](#functions) for details. | [] | no |
 |  | functions[].id | Unique identifier for this function. |  | yes |
 |  | functions[].name | Display name shown in the UI. Auto-derived from ID if not set. |  | no |
 |  | functions[].description | Help text shown in the UI. |  | no |
