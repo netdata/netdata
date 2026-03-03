@@ -75,8 +75,9 @@ class SSHClient:
         """Write content to file on remote VM using sudo"""
         quoted_path = shlex.quote(path)
         escaped_content = content.replace("'", "'\\''")
+        # Use bash -c with sudo -S to write file - password first, then content
         cmd = self._ssh_base + [
-            f"printf '%s\\n' '{escaped_content}' | sudo -S tee {quoted_path} > /dev/null"
+            f"bash -c 'echo {self._quoted_password} | sudo -S tee {quoted_path} > /dev/null' <<< '{escaped_content}'"
         ]
         
         try:
