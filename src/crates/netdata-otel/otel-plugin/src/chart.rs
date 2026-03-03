@@ -2,34 +2,50 @@
 //!
 //! A `Chart` manages dimensions and slot-based aggregation, mapping OpenTelemetry's
 //! event-based metrics to Netdata's fixed-interval collection model.
+//!
+//! Ingestion is purely additive: data points are recorded into per-slot
+//! accumulators within a `BTreeMap`. Emission drains ready slots in order,
+//! handling finalization, gap-filling, and output.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Duration, Instant};
 
 use opentelemetry_proto::tonic::metrics::v1::AggregationTemporality;
 
 use crate::aggregation::{
-    Aggregator, CumulativeSumAggregator, DeltaSumAggregator, GaugeAggregator,
+    CrossSlotContext, CumulativeSumContext, DeltaSumContext, GaugeContext, SlotAccumulator,
 };
 use crate::iter::MetricDataKind;
 use crate::output::{ChartDefinition, ChartType, DimensionValue, write_data_slot};
 
-/// A dimension with its name, aggregator, and slot state.
-struct Dimension<A: Aggregator> {
-    // The name of the dimension.
+/// A dimension with its cross-slot context and per-slot accumulators.
+///
+/// # Multi-Slot Architecture
+///
+/// Unlike the previous design which tracked only a single active slot, this
+/// implementation maintains a `BTreeMap` of slot accumulators. This enables:
+///
+/// - Out-of-order ingestion: Data points can arrive for any slot that
+///   hasn't been emitted yet, not just the "current" slot.
+/// - Batch emission: Multiple ready slots can be emitted in a single tick,
+///   in chronological order.
+/// - Late data acceptance: Data arriving late (but before emission) is
+///   properly accumulated rather than dropped.
+struct Dimension<Ctx: CrossSlotContext> {
+    /// The name of the dimension.
     name: String,
-    // The aggregator that ingests values of the dimension.
-    aggregator: A,
-    /// Whether this dimension has received data in the current slot.
-    has_data_in_slot: bool,
+    /// Cross-slot context (persists across slot boundaries).
+    context: Ctx,
+    /// Per-slot accumulators, keyed by slot timestamp.
+    slots: BTreeMap<u64, Ctx::Slot>,
 }
 
-impl<A: Aggregator + Default> Dimension<A> {
+impl<Ctx: CrossSlotContext> Dimension<Ctx> {
     fn new(name: String) -> Self {
         Self {
             name,
-            aggregator: A::default(),
-            has_data_in_slot: false,
+            context: Ctx::default(),
+            slots: BTreeMap::new(),
         }
     }
 }
@@ -49,14 +65,14 @@ impl Default for ChartConfig {
     fn default() -> Self {
         Self {
             collection_interval: 10,
-            grace_period: Duration::from_secs(60),
             expiry_duration: Duration::from_secs(900),
+            grace_period: Duration::from_secs(60),
         }
     }
 }
 
-/// The type of aggregation used by a chart.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The aggregation type for a chart.
+#[derive(Debug, Clone, Copy)]
 pub enum ChartAggregationType {
     Gauge,
     DeltaSum,
@@ -71,52 +87,52 @@ impl ChartAggregationType {
         is_monotonic: Option<bool>,
     ) -> Option<Self> {
         match data_kind {
-            MetricDataKind::Gauge => Some(ChartAggregationType::Gauge),
-            MetricDataKind::Sum => match temporality {
-                Some(AggregationTemporality::Delta) => Some(ChartAggregationType::DeltaSum),
-                Some(AggregationTemporality::Cumulative) => {
+            MetricDataKind::Gauge => Some(Self::Gauge),
+            MetricDataKind::Sum => match temporality? {
+                AggregationTemporality::Delta => Some(Self::DeltaSum),
+                AggregationTemporality::Cumulative => {
+                    // Non-monotonic cumulative sums behave as gauges: the
+                    // value can go up or down, so delta computation is
+                    // meaningless.  Default (None) is treated as monotonic.
                     if is_monotonic == Some(false) {
-                        // Non-monotonic cumulative sum: treat as gauge (absolute value)
-                        Some(ChartAggregationType::Gauge)
+                        Some(Self::Gauge)
                     } else {
-                        // Monotonic (or unspecified) cumulative sum: compute deltas
-                        Some(ChartAggregationType::CumulativeSum)
+                        Some(Self::CumulativeSum)
                     }
                 }
-                _ => None, // Unspecified temporality
+                _ => None,
             },
-            // Histograms, ExponentialHistograms, and Summaries not supported yet
             _ => None,
         }
     }
 }
 
-/// Tracks whether a chart's definition has been emitted to Netdata.
+/// Tracks whether the chart definition has been emitted.
 enum DefinitionState {
-    /// No definition yet.
+    /// No definition set yet.
     Unset,
-    /// Definition needs to be emitted (new chart or new dimensions added).
+    /// Definition ready but not yet written to output.
     Pending(ChartDefinition),
-    /// Definition has been emitted and is up to date.
+    /// Definition has been written to output.
     Emitted(ChartDefinition),
 }
 
 impl DefinitionState {
     fn as_ref(&self) -> Option<&ChartDefinition> {
         match self {
-            Self::Unset => None,
             Self::Pending(def) | Self::Emitted(def) => Some(def),
+            Self::Unset => None,
         }
     }
 
     fn as_mut(&mut self) -> Option<&mut ChartDefinition> {
         match self {
-            Self::Unset => None,
             Self::Pending(def) | Self::Emitted(def) => Some(def),
+            Self::Unset => None,
         }
     }
 
-    /// Transition `Emitted` → `Pending` (no-op for other states).
+    /// Mark the definition as needing (re-)emission.
     fn mark_pending(&mut self) {
         let prev = std::mem::replace(self, Self::Unset);
         *self = match prev {
@@ -125,7 +141,7 @@ impl DefinitionState {
         };
     }
 
-    /// Transition `Pending` → `Emitted` (no-op for other states).
+    /// Mark the definition as emitted.
     fn mark_emitted(&mut self) {
         let prev = std::mem::replace(self, Self::Unset);
         *self = match prev {
@@ -147,28 +163,37 @@ pub struct Chart {
     expiry_duration: Duration,
     /// How long to wait for data before gap-filling on a tick with no data.
     grace_period: Duration,
-    /// The currently active slot timestamp (if any).
-    active_slot: Option<u64>,
     /// The quantized slot of the last successful emission.
     last_emission_slot: Option<u64>,
     /// When the chart last received data (for expiry).
     last_ingest_instant: Option<Instant>,
-    /// Per-dimension aggregator storage.
+    /// Per-dimension aggregator storage with per-slot accumulators.
     dimensions: DimensionStore,
     /// The chart definition and its emission state.
     definition: DefinitionState,
-    /// Scratch buffer for finalized dimension values.
-    dim_values: Vec<DimensionValue>,
+}
+
+/// Apply per-second rate normalization to a value.
+///
+/// DeltaSum and CumulativeSum metrics report totals over the collection
+/// interval, so we divide by `update_every` to produce a per-second rate.
+/// Gauge metrics pass `None` and are not normalized.
+fn normalize(value: Option<f64>, interval_divisor: Option<u64>) -> Option<f64> {
+    match (value, interval_divisor) {
+        (Some(v), Some(d)) => Some(v / d as f64),
+        _ => value,
+    }
 }
 
 /// Type-erased dimension storage for different aggregator types.
 enum DimensionStore {
-    Gauge(HashMap<String, Dimension<GaugeAggregator>>),
-    DeltaSum(HashMap<String, Dimension<DeltaSumAggregator>>),
-    CumulativeSum(HashMap<String, Dimension<CumulativeSumAggregator>>),
+    Gauge(HashMap<String, Dimension<GaugeContext>>),
+    DeltaSum(HashMap<String, Dimension<DeltaSumContext>>),
+    CumulativeSum(HashMap<String, Dimension<CumulativeSumContext>>),
 }
 
 impl DimensionStore {
+    #[allow(dead_code)]
     fn len(&self) -> usize {
         match self {
             Self::Gauge(dims) => dims.len(),
@@ -198,12 +223,10 @@ impl Chart {
             update_every: config.collection_interval,
             expiry_duration: config.expiry_duration,
             grace_period: config.grace_period,
-            active_slot: None,
             last_emission_slot: None,
             last_ingest_instant: None,
             dimensions,
             definition: DefinitionState::Unset,
-            dim_values: Vec::new(),
         }
     }
 
@@ -228,7 +251,7 @@ impl Chart {
         (timestamp_secs / self.update_every) * self.update_every
     }
 
-    /// Ingest a data point into a dimension's aggregator.
+    /// Ingest a data point into a dimension's per-slot accumulator.
     pub fn ingest(
         &mut self,
         dimension_name: &str,
@@ -236,40 +259,14 @@ impl Chart {
         timestamp_ns: u64,
         start_time_ns: u64,
     ) {
-        // Update last data time.
         self.last_ingest_instant = Some(Instant::now());
 
-        let new_slot = self.slot_for_timestamp(timestamp_ns);
+        let slot = self.slot_for_timestamp(timestamp_ns);
 
-        // Figure out how to handle the data slot:
-        // - active_slot is None: set it to data slot
-        // - new_slot < active_slot: drop it
-        // - new_slot = active_slot: update aggregator with value
-        // - new_slot > active_slot: flush the aggregator and set active_slot = data_slot
-
-        match self.active_slot {
-            None => {
-                self.active_slot = Some(new_slot);
-            }
-            Some(active_slot) if new_slot < active_slot => {
-                // Data for a previous slot — drop it.
-                return;
-            }
-            Some(active_slot) if new_slot > active_slot => {
-                // Data for a newer slot — finalize aggregator per-slot state
-                // so it resets properly, then advance the active slot.
-                self.dimensions.finalize_into(&mut self.dim_values);
-                self.active_slot = Some(new_slot);
-            }
-            Some(_) => {
-                // Data for the current active slot.
-            }
-        }
-
-        // Ingest into the dimension's aggregator.
+        // Record into the correct slot's accumulator.
         let new_dimension =
             self.dimensions
-                .ingest(dimension_name, value, timestamp_ns, start_time_ns);
+                .ingest(dimension_name, value, timestamp_ns, start_time_ns, slot);
 
         // If a new dimension was added, update the definition and mark it
         // for re-emission.
@@ -281,17 +278,24 @@ impl Chart {
         }
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.dimensions.len()
     }
 
-    /// Finalize the current slot and write output into `buf`.
+    /// Finalize ready slots and write output into `buf`.
+    ///
+    /// A slot is considered ready when its end time (`slot + update_every`) is
+    /// at least 1 second before `tick_timestamp`. This gives in-flight data
+    /// points a 1-second window to land before the slot is finalized.
     ///
     /// Three emission scenarios:
-    /// 1. **Data present**: emit gap-filled catchup slots for missed intervals, then the data slot.
-    /// 2. **No data, within grace period**: emit nothing (wait for late data).
-    /// 3. **No data, grace expired**: emit one gap-filled slot per tick (drain oldest first).
-    pub fn emit(&mut self, slot_timestamp: u64, buf: &mut String) {
+    /// 1. **Ready slots exist**: emit them in order with gap-fill catchup
+    ///    for any gaps.
+    /// 2. **Data pending but not ready**: slot hasn't fully elapsed yet — skip.
+    /// 3. **No data at all**: respect grace period, then gap-fill one slot
+    ///    per tick.
+    pub fn emit(&mut self, tick_timestamp: u64, buf: &mut String) {
         // Chart must have received data at some point.
         let Some(last_ingest_instant) = self.last_ingest_instant else {
             return;
@@ -302,72 +306,70 @@ impl Chart {
             return;
         }
 
-        // Slot boundary self-regulation: only emit once per interval boundary.
-        let current_slot = (slot_timestamp / self.update_every) * self.update_every;
+        // A slot S is ready when tick_timestamp > S + update_every, i.e.,
+        // at least 1 second has passed since the slot ended (integer seconds).
+        // Using this as the exclusive upper bound for ready_slots means:
+        // slot < cutoff  ⟹  slot + update_every < tick_timestamp.
+        let cutoff = tick_timestamp.saturating_sub(self.update_every);
+
+        // Nothing can be ready if the cutoff hasn't advanced past the last emission.
         if let Some(last_emission_slot) = self.last_emission_slot {
-            if current_slot <= last_emission_slot {
+            if cutoff <= last_emission_slot {
                 return;
             }
         }
 
-        if self.dimensions.has_data() {
-            // Data present — emit definition if needed, catchup slots, then data slot.
-            self.emit_definition_if_needed(buf);
+        // Collect slots that are ready: after last_emission_slot, before cutoff.
+        let ready_slots = self.dimensions.ready_slots(self.last_emission_slot, cutoff);
 
-            // Emit gap-filled catchup slots for any missed intervals between
-            // last emission and current.
-            if let Some(last) = self.last_emission_slot {
-                let mut catchup_slot = last + self.update_every;
+        self.emit_definition_if_needed(buf);
 
-                while catchup_slot < current_slot {
-                    self.dimensions.gap_fill_into(&mut self.dim_values);
+        if !ready_slots.is_empty() {
+            for &slot in &ready_slots {
+                // Gap-fill from last emission up to this slot.
+                if let Some(last) = self.last_emission_slot {
+                    let mut catchup = last + self.update_every;
+                    while catchup < slot {
+                        let values = self.dimensions.gap_fill(self.update_every);
+                        write_data_slot(buf, &self.chart_name, self.update_every, catchup, &values)
+                            .expect("infallible string write");
+                        catchup += self.update_every;
+                    }
+                }
 
-                    write_data_slot(
-                        buf,
-                        &self.chart_name,
-                        self.update_every,
-                        catchup_slot,
-                        &self.dim_values,
-                    )
+                // Finalize this slot across all dimensions.
+                let values = self.dimensions.finalize_slot(slot, self.update_every);
+                write_data_slot(buf, &self.chart_name, self.update_every, slot, &values)
                     .expect("infallible string write");
 
-                    catchup_slot += self.update_every;
-                }
+                self.last_emission_slot = Some(slot);
             }
 
-            // Finalize and emit the data slot.
-            self.dimensions.finalize_into(&mut self.dim_values);
-
-            write_data_slot(
-                buf,
-                &self.chart_name,
-                self.update_every,
-                current_slot,
-                &self.dim_values,
-            )
-            .expect("infallible string write");
-
-            self.last_emission_slot = Some(current_slot);
+            // Drop any stale slot entries at or below what we just emitted.
+            if let Some(last) = self.last_emission_slot {
+                self.dimensions.drain_up_to(last);
+            }
+        } else if self.dimensions.has_any_data() {
+            // Data exists but isn't ready yet (slot hasn't fully elapsed).
+            // Don't gap-fill — wait for the slot to become ready.
         } else if last_ingest_instant.elapsed() < self.grace_period {
-            // No data, within grace period — skip this tick.
+            // No data anywhere, within grace period — skip this tick.
         } else {
-            // No data, grace period expired — gap-fill and emit one slot.
+            // No data anywhere, grace period expired — gap-fill one slot.
             let Some(last) = self.last_emission_slot else {
                 return;
             };
 
-            self.emit_definition_if_needed(buf);
-
             let fill_slot = last + self.update_every;
-            self.dimensions.finalize_into(&mut self.dim_values);
-            write_data_slot(
-                buf,
-                &self.chart_name,
-                self.update_every,
-                fill_slot,
-                &self.dim_values,
-            )
-            .expect("infallible string write");
+
+            // Don't gap-fill a slot whose end time hasn't passed the cutoff.
+            if fill_slot >= cutoff {
+                return;
+            }
+
+            let values = self.dimensions.gap_fill(self.update_every);
+            write_data_slot(buf, &self.chart_name, self.update_every, fill_slot, &values)
+                .expect("infallible string write");
 
             self.last_emission_slot = Some(fill_slot);
         }
@@ -411,10 +413,16 @@ impl Chart {
     ) {
         debug_assert!(matches!(self.definition, DefinitionState::Unset));
 
+        let units = if self.is_rate_normalized() && !units.is_empty() {
+            format!("{units}/s")
+        } else {
+            units.to_string()
+        };
+
         self.definition = DefinitionState::Pending(ChartDefinition {
             chart_name: self.chart_name.clone(),
             title: title.to_string(),
-            units: units.to_string(),
+            units,
             family: metric_name.replace('.', "/"),
             context: format!("otel.{}", metric_name),
             chart_type: self.chart_type,
@@ -427,6 +435,14 @@ impl Chart {
     /// Whether a definition has been set.
     pub fn has_definition(&self) -> bool {
         !matches!(self.definition, DefinitionState::Unset)
+    }
+
+    /// Whether this chart's values are divided by `update_every` to produce per-second rates.
+    fn is_rate_normalized(&self) -> bool {
+        matches!(
+            self.dimensions,
+            DimensionStore::DeltaSum(_) | DimensionStore::CumulativeSum(_)
+        )
     }
 
     /// Returns `true` if the chart needs its definition (re-)emitted.
@@ -447,114 +463,160 @@ impl Chart {
     fn definition(&self) -> Option<&ChartDefinition> {
         self.definition.as_ref()
     }
-
-    /// Access finalized dimension values (for testing).
-    #[cfg(test)]
-    pub(crate) fn dim_values(&self) -> &[DimensionValue] {
-        &self.dim_values
-    }
 }
 
 impl DimensionStore {
-    /// Check whether any dimension has pending data in the current slot.
-    fn has_data(&self) -> bool {
+    /// Whether any dimension has pending data in any slot.
+    fn has_any_data(&self) -> bool {
         match self {
-            Self::Gauge(dims) => Self::any_has_data(dims),
-            Self::DeltaSum(dims) => Self::any_has_data(dims),
-            Self::CumulativeSum(dims) => Self::any_has_data(dims),
+            Self::Gauge(dims) => dims.values().any(|d| !d.slots.is_empty()),
+            Self::DeltaSum(dims) => dims.values().any(|d| !d.slots.is_empty()),
+            Self::CumulativeSum(dims) => dims.values().any(|d| !d.slots.is_empty()),
         }
     }
 
-    fn any_has_data<A: Aggregator>(dims: &HashMap<String, Dimension<A>>) -> bool {
-        dims.values().any(|dim| dim.has_data_in_slot)
-    }
-
-    /// Ingest a value into a dimension's aggregator, creating the dimension if needed.
+    /// Ingest a value into a dimension's per-slot accumulator, creating the
+    /// dimension and/or slot entry if needed.
+    ///
     /// Returns `true` if a new dimension was created.
-    fn ingest(&mut self, name: &str, value: f64, timestamp_ns: u64, start_time_ns: u64) -> bool {
-        match self {
-            Self::Gauge(dims) => Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns),
-            Self::DeltaSum(dims) => {
-                Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns)
-            }
-            Self::CumulativeSum(dims) => {
-                Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns)
-            }
-        }
-    }
-
-    fn ingest_into<A: Aggregator + Default>(
-        dims: &mut HashMap<String, Dimension<A>>,
+    fn ingest(
+        &mut self,
         name: &str,
         value: f64,
         timestamp_ns: u64,
         start_time_ns: u64,
+        slot: u64,
+    ) -> bool {
+        match self {
+            Self::Gauge(dims) => {
+                Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns, slot)
+            }
+            Self::DeltaSum(dims) => {
+                Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns, slot)
+            }
+            Self::CumulativeSum(dims) => {
+                Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns, slot)
+            }
+        }
+    }
+
+    fn ingest_into<Ctx: CrossSlotContext>(
+        dims: &mut HashMap<String, Dimension<Ctx>>,
+        name: &str,
+        value: f64,
+        timestamp_ns: u64,
+        start_time_ns: u64,
+        slot: u64,
     ) -> bool {
         let new_dimension = !dims.contains_key(name);
         let dim = dims
             .entry(name.to_string())
             .or_insert_with(|| Dimension::new(name.to_string()));
-        dim.aggregator.ingest(value, timestamp_ns, start_time_ns);
-        dim.has_data_in_slot = true;
+
+        let acc = dim.slots.entry(slot).or_default();
+        acc.record(value, timestamp_ns, start_time_ns);
+
         new_dimension
     }
 
-    /// Finalize all dimensions into the provided buffer.
-    fn finalize_into(&mut self, out: &mut Vec<DimensionValue>) {
-        out.clear();
-
+    /// Get all slot timestamps with data in the range `(after, cutoff)`,
+    /// sorted ascending. Slots at or below `after` are skipped.
+    fn ready_slots(&self, after: Option<u64>, cutoff: u64) -> Vec<u64> {
+        let mut slots = BTreeSet::new();
         match self {
-            Self::Gauge(dims) => Self::finalize_dims(dims, out),
-            Self::DeltaSum(dims) => Self::finalize_dims(dims, out),
-            Self::CumulativeSum(dims) => Self::finalize_dims(dims, out),
+            Self::Gauge(dims) => Self::collect_slots(dims, after, cutoff, &mut slots),
+            Self::DeltaSum(dims) => Self::collect_slots(dims, after, cutoff, &mut slots),
+            Self::CumulativeSum(dims) => Self::collect_slots(dims, after, cutoff, &mut slots),
         }
+        slots.into_iter().collect()
     }
 
-    /// Gap-fill all dimensions into the provided buffer.
-    fn gap_fill_into(&self, out: &mut Vec<DimensionValue>) {
-        out.clear();
-
-        match self {
-            Self::Gauge(dims) => Self::gap_fill_dims(dims, out),
-            Self::DeltaSum(dims) => Self::gap_fill_dims(dims, out),
-            Self::CumulativeSum(dims) => Self::gap_fill_dims(dims, out),
-        }
-    }
-
-    fn finalize_dims<A: Aggregator>(
-        dims: &mut HashMap<String, Dimension<A>>,
-        out: &mut Vec<DimensionValue>,
+    fn collect_slots<Ctx: CrossSlotContext>(
+        dims: &HashMap<String, Dimension<Ctx>>,
+        after: Option<u64>,
+        cutoff: u64,
+        slots: &mut BTreeSet<u64>,
     ) {
-        out.reserve(dims.len());
-
-        for dim in dims.values_mut() {
-            let value = if dim.has_data_in_slot {
-                dim.aggregator.finalize_slot()
-            } else {
-                Some(dim.aggregator.gap_fill())
-            };
-
-            out.push(DimensionValue {
-                name: dim.name.clone(),
-                value,
-            });
-
-            dim.has_data_in_slot = false;
-        }
-    }
-
-    fn gap_fill_dims<A: Aggregator>(
-        dims: &HashMap<String, Dimension<A>>,
-        out: &mut Vec<DimensionValue>,
-    ) {
-        out.reserve(dims.len());
-
+        let start = after.map_or(0, |a| a + 1);
         for dim in dims.values() {
-            out.push(DimensionValue {
-                name: dim.name.clone(),
-                value: Some(dim.aggregator.gap_fill()),
-            });
+            for (&slot, _) in dim.slots.range(start..cutoff) {
+                slots.insert(slot);
+            }
         }
+    }
+
+    /// Drop all slot entries with keys <= `cutoff` from all dimensions.
+    fn drain_up_to(&mut self, cutoff: u64) {
+        match self {
+            Self::Gauge(dims) => Self::drain_dims(dims, cutoff),
+            Self::DeltaSum(dims) => Self::drain_dims(dims, cutoff),
+            Self::CumulativeSum(dims) => Self::drain_dims(dims, cutoff),
+        }
+    }
+
+    fn drain_dims<Ctx: CrossSlotContext>(dims: &mut HashMap<String, Dimension<Ctx>>, cutoff: u64) {
+        for dim in dims.values_mut() {
+            // split_off(&K) returns all entries with keys >= K, leaving < K in the original map.
+            // To drop slots <= cutoff and keep slots > cutoff, we must split at cutoff + 1.
+            let kept = dim.slots.split_off(&(cutoff + 1));
+            let _ = std::mem::replace(&mut dim.slots, kept);
+        }
+    }
+
+    /// Finalize a specific slot across all dimensions.
+    ///
+    /// For each dimension, removes the slot's accumulator (if present) and
+    /// calls `context.finalize()`, or calls `context.gap_fill()` if the
+    /// dimension had no data for this slot.
+    fn finalize_slot(&mut self, slot: u64, update_every: u64) -> Vec<DimensionValue> {
+        match self {
+            Self::Gauge(dims) => Self::finalize_slot_dims(dims, slot, None),
+            Self::DeltaSum(dims) => Self::finalize_slot_dims(dims, slot, Some(update_every)),
+            Self::CumulativeSum(dims) => Self::finalize_slot_dims(dims, slot, Some(update_every)),
+        }
+    }
+
+    fn finalize_slot_dims<Ctx: CrossSlotContext>(
+        dims: &mut HashMap<String, Dimension<Ctx>>,
+        slot: u64,
+        interval_divisor: Option<u64>,
+    ) -> Vec<DimensionValue> {
+        dims.values_mut()
+            .map(|dim| {
+                let value = match dim.slots.remove(&slot) {
+                    Some(acc) => dim.context.finalize(acc),
+                    None => Some(dim.context.gap_fill()),
+                };
+
+                DimensionValue {
+                    name: dim.name.clone(),
+                    value: normalize(value, interval_divisor),
+                }
+            })
+            .collect()
+    }
+
+    /// Gap-fill all dimensions.
+    ///
+    /// Uses the same per-second normalization as [`finalize_slot`](Self::finalize_slot).
+    fn gap_fill(&self, update_every: u64) -> Vec<DimensionValue> {
+        match self {
+            Self::Gauge(dims) => Self::gap_fill_dims(dims, None),
+            Self::DeltaSum(dims) => Self::gap_fill_dims(dims, Some(update_every)),
+            Self::CumulativeSum(dims) => Self::gap_fill_dims(dims, Some(update_every)),
+        }
+    }
+
+    fn gap_fill_dims<Ctx: CrossSlotContext>(
+        dims: &HashMap<String, Dimension<Ctx>>,
+        interval_divisor: Option<u64>,
+    ) -> Vec<DimensionValue> {
+        dims.values()
+            .map(|dim| DimensionValue {
+                name: dim.name.clone(),
+                value: normalize(Some(dim.context.gap_fill()), interval_divisor),
+            })
+            .collect()
     }
 }
 
@@ -605,9 +667,46 @@ mod tests {
         )
     }
 
-    /// Helper to find a dimension value by name in the chart's dim_values.
-    fn find_dim<'a>(chart: &'a Chart, name: &str) -> &'a DimensionValue {
-        chart.dim_values().iter().find(|d| d.name == name).unwrap()
+    /// Parse a SET line into (dimension_name, Option<f64>).
+    ///
+    /// Format: "SET dim_name = 12345" → ("dim_name", Some(12.345))
+    ///         "SET dim_name ="       → ("dim_name", None)
+    fn parse_set(line: &str) -> (&str, Option<f64>) {
+        let rest = line.strip_prefix("SET ").expect("not a SET line");
+        let (name, rhs) = rest.split_once(" = ").unwrap_or_else(|| {
+            let (name, _) = rest.split_once(" =").expect("malformed SET");
+            (name, "")
+        });
+        let value = if rhs.is_empty() {
+            None
+        } else {
+            Some(rhs.trim().parse::<i64>().expect("bad SET value") as f64 / 1000.0)
+        };
+        (name, value)
+    }
+
+    /// Extract the SET values from the last BEGIN/END block in `buf`.
+    fn last_block_sets(buf: &str) -> Vec<(&str, Option<f64>)> {
+        let lines: Vec<&str> = buf.lines().collect();
+        // Find the last BEGIN line.
+        let begin_idx = lines
+            .iter()
+            .rposition(|l| l.starts_with("BEGIN "))
+            .expect("no BEGIN in buf");
+        lines[begin_idx..]
+            .iter()
+            .filter(|l| l.starts_with("SET "))
+            .map(|l| parse_set(l))
+            .collect()
+    }
+
+    /// Get the value of a dimension from the last emitted block.
+    fn last_dim_value(buf: &str, name: &str) -> Option<f64> {
+        last_block_sets(buf)
+            .into_iter()
+            .find(|(n, _)| *n == name)
+            .expect("dimension not found in last block")
+            .1
     }
 
     /// Count how many SET lines are in the buf.
@@ -697,20 +796,21 @@ mod tests {
             )
             .unwrap();
 
-            // Ingest values — should keep last by timestamp (gauge behavior).
-            chart.ingest("dim1", 42.0, ns(1), 0);
-            chart.ingest("dim1", 50.0, ns(3), 0); // Latest
-            chart.ingest("dim1", 45.0, ns(2), 0);
+            // Ingest values within the same slot — should keep last by timestamp
+            // (gauge behavior). Use ms() to stay within slot 0.
+            chart.ingest("dim1", 42.0, ms(100), 0);
+            chart.ingest("dim1", 50.0, ms(300), 0); // Latest
+            chart.ingest("dim1", 45.0, ms(200), 0);
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(50.0));
+            chart.emit(2, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
 
             // Gap fill: repeats last value (gauge behavior, not 0).
             buf.clear();
-            chart.emit(2, &mut buf);
+            chart.emit(3, &mut buf);
             assert!(!buf.is_empty());
-            assert_eq!(chart.dim_values()[0].value, Some(50.0));
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
         }
 
         #[test]
@@ -734,7 +834,7 @@ mod tests {
         fn tick_without_data_emits_nothing() {
             let mut chart = gauge_chart();
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -742,15 +842,16 @@ mod tests {
         fn ingest_then_tick_produces_update() {
             let mut chart = gauge_chart();
 
-            chart.ingest("dim1", 42.0, ns(5), 0);
+            chart.ingest("dim1", 42.0, ms(500), 0);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
             assert!(!buf.is_empty());
 
-            assert_eq!(chart.dim_values().len(), 1);
-            assert_eq!(chart.dim_values()[0].name, "dim1");
-            assert_eq!(chart.dim_values()[0].value, Some(42.0));
-            assert!(buf.contains("END 2\n")); // slot 1 + interval 1
+            let sets = last_block_sets(&buf);
+            assert_eq!(sets.len(), 1);
+            assert_eq!(sets[0].0, "dim1");
+            assert_eq!(sets[0].1, Some(42.0));
+            assert!(buf.contains("END 1\n")); // slot 0 + interval 1
         }
 
         #[test]
@@ -770,7 +871,7 @@ mod tests {
 
             // With zero expiry, the chart is immediately expired.
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -779,34 +880,35 @@ mod tests {
             let mut chart = gauge_chart();
 
             // Ingest data, then tick to finalize.
-            chart.ingest("dim1", 42.0, ns(5), 0);
+            chart.ingest("dim1", 42.0, ms(500), 0);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
             assert!(!buf.is_empty());
-            assert_eq!(chart.dim_values()[0].value, Some(42.0));
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(42.0));
 
             // Second tick with no new data and zero grace: gap-fills by
             // repeating the last gauge value.
             buf.clear();
-            chart.emit(2, &mut buf);
+            chart.emit(3, &mut buf);
             assert!(!buf.is_empty());
-            assert!(buf.contains("END 3\n")); // slot 2 + interval 1
-            assert_eq!(chart.dim_values()[0].value, Some(42.0));
+            assert!(buf.contains("END 2\n")); // gap-fill slot 1 + interval 1
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(42.0));
         }
 
         #[test]
         fn tick_sets_slot_timestamp_from_caller() {
             let mut chart = gauge_chart();
 
-            chart.ingest("dim1", 1.0, ns(1), 0);
+            // Ingest in slot 0. Slot 0 ends at t=1; with 1s buffer, ready at t=2.
+            chart.ingest("dim1", 1.0, ms(500), 0);
             let mut buf = String::new();
-            chart.emit(1000, &mut buf);
-            assert!(buf.contains("END 1001\n")); // slot 1000 + interval 1
+            chart.emit(2, &mut buf);
+            assert!(buf.contains("END 1\n")); // slot 0 + interval 1
 
-            // Second tick with no data → gap slot at 1001.
+            // Next tick with no data and zero grace -> gap-fill slot 1.
             buf.clear();
-            chart.emit(1001, &mut buf);
-            assert!(buf.contains("END 1002\n")); // slot 1001 + interval 1
+            chart.emit(3, &mut buf);
+            assert!(buf.contains("END 2\n")); // gap-fill slot 1 + interval 1
         }
 
         #[test]
@@ -823,15 +925,15 @@ mod tests {
             );
 
             // Ingest data and tick to emit.
-            chart.ingest("dim1", 42.0, ns(5), 0);
+            chart.ingest("dim1", 42.0, ms(500), 0);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
             assert!(!buf.is_empty());
 
             // Tick again with no new data — grace period is still active,
             // so the tick should skip.
             buf.clear();
-            chart.emit(2, &mut buf);
+            chart.emit(3, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -849,19 +951,19 @@ mod tests {
             );
 
             // Ingest data and tick to emit.
-            chart.ingest("dim1", 42.0, ns(5), 0);
+            chart.ingest("dim1", 42.0, ms(500), 0);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
             assert!(!buf.is_empty());
-            assert_eq!(chart.dim_values()[0].value, Some(42.0));
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(42.0));
 
             // Tick with no new data and zero grace period — gap-fill repeats
             // the last gauge value.
             buf.clear();
-            chart.emit(2, &mut buf);
+            chart.emit(3, &mut buf);
             assert!(!buf.is_empty());
-            assert!(buf.contains("END 3\n")); // slot 2 + interval 1
-            assert_eq!(chart.dim_values()[0].value, Some(42.0));
+            assert!(buf.contains("END 2\n")); // gap-fill slot 1 + interval 1
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(42.0));
         }
 
         #[test]
@@ -877,39 +979,41 @@ mod tests {
                 },
             );
 
-            // Ingest data so the chart is active.
+            // Ingest data in slot 0.
             chart.ingest("dim1", 42.0, ns(5), 0);
 
-            // Tick at t=5: slot boundary = 0, first emission.
+            // Tick at t=11: slot 0 ends at t=10, +1s buffer -> ready.
             let mut buf = String::new();
-            chart.emit(5, &mut buf);
-            assert!(!buf.is_empty());
-
-            // Tick at t=9: same slot boundary (0), should not emit.
-            chart.ingest("dim1", 43.0, ns(9), 0);
-            buf.clear();
-            chart.emit(9, &mut buf);
-            assert!(buf.is_empty());
-
-            // Tick at t=10: new slot boundary (10), should emit.
-            chart.ingest("dim1", 44.0, ns(10), 0);
-            buf.clear();
-            chart.emit(10, &mut buf);
-            assert!(!buf.is_empty());
-            assert_eq!(chart.dim_values()[0].value, Some(44.0));
-
-            // Tick at t=11: same slot boundary (10), should not emit.
-            chart.ingest("dim1", 45.0, ns(11), 0);
-            buf.clear();
             chart.emit(11, &mut buf);
+            assert!(!buf.is_empty());
+
+            // Ingest data in slot 10 (ns(15) -> slot 10).
+            chart.ingest("dim1", 43.0, ns(15), 0);
+
+            // Tick at t=16: slot 10 ends at t=20, not ready yet.
+            buf.clear();
+            chart.emit(16, &mut buf);
             assert!(buf.is_empty());
 
-            // Tick at t=20: new slot boundary (20), should emit.
-            chart.ingest("dim1", 46.0, ns(20), 0);
+            // Tick at t=21: slot 10 ends at t=20, +1s buffer -> ready.
             buf.clear();
-            chart.emit(20, &mut buf);
+            chart.emit(21, &mut buf);
             assert!(!buf.is_empty());
-            assert_eq!(chart.dim_values()[0].value, Some(46.0));
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(43.0));
+
+            // Ingest data in slot 20 (ns(25) -> slot 20).
+            chart.ingest("dim1", 44.0, ns(25), 0);
+
+            // Tick at t=26: slot 20 ends at t=30, not ready yet.
+            buf.clear();
+            chart.emit(26, &mut buf);
+            assert!(buf.is_empty());
+
+            // Tick at t=31: slot 20 ends at t=30, +1s buffer -> ready.
+            buf.clear();
+            chart.emit(31, &mut buf);
+            assert!(!buf.is_empty());
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(44.0));
         }
 
         #[test]
@@ -928,7 +1032,7 @@ mod tests {
             chart.ingest("dim1", 10.0, ns(5), 0);
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -945,14 +1049,14 @@ mod tests {
                 },
             );
 
-            chart.ingest("dim1", 10.0, ns(5), 0);
+            chart.ingest("dim1", 10.0, ms(500), 0);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
             assert!(!buf.is_empty());
 
             // Tick again with no new data — grace period is still active.
             buf.clear();
-            chart.emit(2, &mut buf);
+            chart.emit(3, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -972,7 +1076,7 @@ mod tests {
             chart.ingest("dim1", 100.0, ns(5), 1_000_000_000);
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -989,14 +1093,14 @@ mod tests {
                 },
             );
 
-            chart.ingest("dim1", 100.0, ns(5), 1_000_000_000);
+            chart.ingest("dim1", 100.0, ms(500), 1_000_000_000);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
             assert!(!buf.is_empty());
 
             // Tick again with no new data — grace period is still active.
             buf.clear();
-            chart.emit(2, &mut buf);
+            chart.emit(3, &mut buf);
             assert!(buf.is_empty());
         }
     }
@@ -1020,14 +1124,14 @@ mod tests {
             // Data at slot 0.
             chart.ingest("dim1", 1.0, ns(5), 0);
             let mut buf = String::new();
-            chart.emit(0, &mut buf);
+            chart.emit(11, &mut buf);
             assert!(!buf.is_empty());
 
             // Data at slot 30 — should produce gap-filled catchup slots at
             // 10 and 20 (repeating gauge value 1.0), then data at 30.
             chart.ingest("dim1", 2.0, ns(30), 0);
             buf.clear();
-            chart.emit(30, &mut buf);
+            chart.emit(41, &mut buf);
             assert!(!buf.is_empty());
 
             // 2 catchup slots + 1 data slot = 3 BEGIN lines.
@@ -1044,17 +1148,17 @@ mod tests {
             // The data slot at 30 must have the NEW value (2.0), not a
             // gap-fill. This verifies that catchup slots don't consume
             // the pending data.
-            assert_eq!(chart.dim_values()[0].value, Some(2.0));
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(2.0));
         }
 
         #[test]
         fn tick_drains_one_fill_per_tick() {
             let mut chart = gauge_chart();
 
-            // Ingest and emit at slot 1.
-            chart.ingest("dim1", 1.0, ns(5), 0);
+            // Ingest in slot 0 and emit.
+            chart.ingest("dim1", 1.0, ms(500), 0);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
             assert!(!buf.is_empty());
 
             // Grace = ZERO, so each subsequent tick with no data emits one
@@ -1063,19 +1167,19 @@ mod tests {
             chart.emit(5, &mut buf);
             assert_eq!(count_begins(&buf), 1);
             assert_eq!(count_sets(&buf), 1);
-            assert!(buf.contains("END 3\n")); // slot 2 + interval 1
-            assert_eq!(chart.dim_values()[0].value, Some(1.0));
+            assert!(buf.contains("END 2\n")); // gap-fill slot 1 + interval 1
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(1.0));
 
             buf.clear();
             chart.emit(5, &mut buf);
             assert_eq!(count_begins(&buf), 1);
-            assert!(buf.contains("END 4\n")); // slot 3 + interval 1
-            assert_eq!(chart.dim_values()[0].value, Some(1.0));
+            assert!(buf.contains("END 3\n")); // gap-fill slot 2 + interval 1
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(1.0));
 
             buf.clear();
             chart.emit(5, &mut buf);
-            assert!(buf.contains("END 5\n")); // slot 4 + interval 1
-            assert_eq!(chart.dim_values()[0].value, Some(1.0));
+            assert!(buf.contains("END 4\n")); // gap-fill slot 3 + interval 1
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(1.0));
         }
 
         #[test]
@@ -1085,7 +1189,7 @@ mod tests {
             // First data ever — no catchup slots should precede it.
             chart.ingest("dim1", 1.0, ns(100), 0);
             let mut buf = String::new();
-            chart.emit(100, &mut buf);
+            chart.emit(102, &mut buf);
 
             assert_eq!(count_begins(&buf), 1);
             assert_eq!(count_sets(&buf), 1);
@@ -1096,17 +1200,17 @@ mod tests {
         fn delta_sum_gap_fills_with_zero() {
             let mut chart = delta_sum_chart();
 
-            chart.ingest("dim1", 10.0, ns(1), 0);
+            chart.ingest("dim1", 10.0, ms(500), 0);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(10.0));
+            chart.emit(2, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(10.0));
 
             // No new data — gap-fill emits 0 for delta sums.
             buf.clear();
-            chart.emit(2, &mut buf);
+            chart.emit(3, &mut buf);
             assert!(!buf.is_empty());
             assert_eq!(count_sets(&buf), 1);
-            assert_eq!(chart.dim_values()[0].value, Some(0.0));
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(0.0));
         }
 
         #[test]
@@ -1125,12 +1229,12 @@ mod tests {
             // Emit at slot 0 with value 42.0.
             chart.ingest("dim1", 42.0, ns(5), 0);
             let mut buf = String::new();
-            chart.emit(0, &mut buf);
+            chart.emit(11, &mut buf);
 
             // Data at slot 20 — catchup at slot 10 should repeat 42.0.
             chart.ingest("dim1", 99.0, ns(20), 0);
             buf.clear();
-            chart.emit(20, &mut buf);
+            chart.emit(31, &mut buf);
 
             // 1 catchup + 1 data = 2 BEGIN/SET/END blocks.
             assert_eq!(count_begins(&buf), 2);
@@ -1152,16 +1256,16 @@ mod tests {
                 },
             );
 
-            // Emit at slot 0 with delta 10.
+            // Emit at slot 0 with delta 10; divided by update_every (10) = 1.0/s.
             chart.ingest("dim1", 10.0, ns(5), 0);
             let mut buf = String::new();
-            chart.emit(0, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(10.0));
+            chart.emit(11, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(1.0));
 
             // Data at slot 20 — catchup at slot 10 should emit 0.
             chart.ingest("dim1", 5.0, ns(20), ns(10));
             buf.clear();
-            chart.emit(20, &mut buf);
+            chart.emit(31, &mut buf);
 
             // 1 catchup + 1 data = 2 BEGIN/SET/END blocks.
             assert_eq!(count_begins(&buf), 2);
@@ -1169,8 +1273,8 @@ mod tests {
             assert!(buf.contains("END 20\n")); // catchup slot 10 + interval 10
             assert!(buf.contains("END 30\n")); // data slot 20 + interval 10
 
-            // Data slot has the new delta value.
-            assert_eq!(chart.dim_values()[0].value, Some(5.0));
+            // Data slot: delta 5 / update_every 10 = 0.5/s.
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(0.5));
         }
 
         #[test]
@@ -1191,21 +1295,21 @@ mod tests {
             // Slot 0: baseline (first slot returns None for cumulative sum).
             chart.ingest("dim1", 100.0, ns(5), START_TIME);
             let mut buf = String::new();
-            chart.emit(0, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, None);
+            chart.emit(11, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), None);
 
             // Data at slot 20 — catchup at slot 10 should gap-fill with 0.
             chart.ingest("dim1", 150.0, ns(20), START_TIME);
             buf.clear();
-            chart.emit(20, &mut buf);
+            chart.emit(31, &mut buf);
 
             // 1 catchup + 1 data = 2 BEGIN/SET/END blocks.
             assert_eq!(count_begins(&buf), 2);
             assert!(buf.contains("END 20\n")); // catchup slot 10 + interval 10
             assert!(buf.contains("END 30\n")); // data slot 20 + interval 10
 
-            // Data slot: delta = 150 - 100 = 50.
-            assert_eq!(chart.dim_values()[0].value, Some(50.0));
+            // Data slot: delta = 150 - 100 = 50, divided by update_every (10) = 5.0/s.
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(5.0));
         }
     }
 
@@ -1213,38 +1317,71 @@ mod tests {
         use super::*;
 
         #[test]
-        fn drops_data_for_previous_slot() {
+        fn accepts_earlier_slot_if_not_yet_emitted() {
             let mut chart = gauge_chart();
 
-            // Active slot becomes 1.
+            // Ingest into slot 1 first, then slot 0.
             chart.ingest("dim1", 50.0, ns(1), 0);
-
-            // Data for slot 0 — should be dropped.
             chart.ingest("dim1", 42.0, ns(0), 0);
 
+            // Both slots are in the BTreeMap. Emit drains them in order.
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(50.0));
+            chart.emit(3, &mut buf);
+
+            // Slot 0 emitted first (42.0), then slot 1 (50.0).
+            // Last emitted block reflects the last finalized slot.
+            assert_eq!(count_begins(&buf), 2);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
         }
 
         #[test]
-        fn delta_sum_slot_transition_resets_accumulator() {
+        fn drops_data_for_already_emitted_slot() {
+            let mut chart = gauge_chart();
+
+            // Ingest and emit slot 0.
+            chart.ingest("dim1", 10.0, ms(500), 0);
+            let mut buf = String::new();
+            chart.emit(2, &mut buf);
+
+            // Late arrival for slot 0 — already emitted, should be dropped.
+            chart.ingest("dim1", 99.0, ms(600), 0);
+
+            // Ingest into slot 1.
+            chart.ingest("dim1", 50.0, ns(1), 0);
+
+            buf.clear();
+            chart.emit(3, &mut buf);
+
+            // Only slot 1 emitted. The late 99.0 for slot 0 was dropped.
+            assert_eq!(count_begins(&buf), 1);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
+        }
+
+        #[test]
+        fn delta_sum_slot_transition_preserved_in_btreemap() {
             let mut chart = delta_sum_chart();
 
             // Slot 0: accumulate delta=10.
             chart.ingest("dim1", 10.0, ns(0), 0);
 
-            // Slot 1: transition resets per-slot state; accumulate delta=5.
+            // Slot 1: accumulate delta=5.
             chart.ingest("dim1", 5.0, ns(1), ns(0));
 
-            // Tick should see only the slot-1 delta (10 was finalized on transition).
+            // Tick at 2: both slots drained in order.
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(5.0));
+            chart.emit(3, &mut buf);
+
+            // Two slots emitted: slot 0 + slot 1.
+            assert_eq!(count_begins(&buf), 2);
+            assert!(buf.contains("END 1\n")); // slot 0 + interval 1
+            assert!(buf.contains("END 2\n")); // slot 1 + interval 1
+
+            // Last emitted block reflects the last finalize (slot 1).
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(5.0));
         }
 
         #[test]
-        fn cumulative_sum_slot_transition_advances_baseline() {
+        fn cumulative_sum_slot_transition_preserved_in_btreemap() {
             let mut chart = cumulative_sum_chart();
 
             const START_TIME: u64 = 1_000_000_000;
@@ -1252,14 +1389,13 @@ mod tests {
             // Slot 0: baseline cumulative=100.
             chart.ingest("dim1", 100.0, ns(0), START_TIME);
 
-            // Slot 1: transition finalizes slot 0 (promoting 100 to previous),
-            // then ingest cumulative=150.
+            // Slot 1: cumulative=150.
             chart.ingest("dim1", 150.0, ns(1), START_TIME);
 
-            // Tick: delta should be 150 - 100 = 50.
+            // Tick at 2: slot 0 (baseline, None) + slot 1 (delta=150-100=50).
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(50.0));
+            chart.emit(3, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
         }
 
         #[test]
@@ -1278,10 +1414,10 @@ mod tests {
             let new_start = START_TIME + 1_000_000;
             chart.ingest("dim1", 20.0, ns(2), new_start);
 
-            // Tick: restart slot should report 0.
+            // Tick at 3: should report 0 for the restart slot.
             let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(0.0));
+            chart.emit(4, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(0.0));
         }
 
         #[test]
@@ -1293,11 +1429,10 @@ mod tests {
             chart.ingest("dim1", 20.0, ns(1), 0);
             chart.ingest("dim1", 30.0, ns(2), 0);
 
-            // Tick sees only the last slot's value (slot transitions
-            // finalized the earlier ones).
+            // Tick at 3: all three slots drained in order.
             let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(30.0));
+            chart.emit(4, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(30.0));
         }
 
         #[test]
@@ -1308,15 +1443,69 @@ mod tests {
             chart.ingest("dim1", 10.0, ns(0), 0);
             chart.ingest("dim2", 20.0, ns(0), 0);
 
-            // Slot 1: only dim1 — triggers slot transition which finalizes
-            // dim2 via gap_fill, establishing its last_emitted value.
+            // Slot 1: only dim1.
             chart.ingest("dim1", 15.0, ns(1), 0);
 
-            // Tick: dim1 has slot-1 data, dim2 should gap-fill.
+            // Tick at 2: slot 0 and 1 drained. dim2 gap-fills for slot 1.
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(find_dim(&chart, "dim1").value, Some(15.0));
-            assert_eq!(find_dim(&chart, "dim2").value, Some(20.0));
+            chart.emit(3, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(15.0));
+            assert_eq!(last_dim_value(&buf, "dim2"), Some(20.0));
+        }
+
+        #[test]
+        fn late_arrival_for_emitted_slot_is_dropped() {
+            let mut chart = delta_sum_chart();
+
+            // Ingest and emit slot 0.
+            chart.ingest("dim1", 10.0, ns(0), 0);
+            let mut buf = String::new();
+            chart.emit(2, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(10.0));
+
+            // Late arrival for slot 0 — dropped (already emitted).
+            chart.ingest("dim1", 3.0, ns(0), 0);
+            // Data for slot 1.
+            chart.ingest("dim1", 5.0, ns(1), ns(0));
+
+            buf.clear();
+            chart.emit(3, &mut buf);
+
+            // Only slot 1 emitted. The 3.0 was dropped because slot 0
+            // was already emitted.
+            assert_eq!(count_begins(&buf), 1);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(5.0));
+        }
+
+        #[test]
+        fn delta_sum_no_data_loss_with_early_arrival() {
+            // When data for the next slot arrives before the tick fires,
+            // both slots are preserved in the BTreeMap and drained in order.
+            let mut chart = Chart::new(
+                "test",
+                ChartAggregationType::DeltaSum,
+                ChartType::Line,
+                ChartConfig {
+                    collection_interval: 10,
+                    expiry_duration: Duration::from_secs(300),
+                    grace_period: Duration::ZERO,
+                },
+            );
+
+            // 10 data points for slot 0 (ts=0..9s), then 1 for slot 10.
+            for t in 0..11 {
+                chart.ingest("dim1", 1.0, ns(t), 0);
+            }
+
+            // emit() drains both: slot 0 (10 deltas) + slot 10 (1 delta).
+            let mut buf = String::new();
+            chart.emit(21, &mut buf);
+
+            // Slot 0 + slot 10 = 2 BEGIN blocks.
+            assert_eq!(count_begins(&buf), 2);
+
+            assert!(buf.contains("END 10\n")); // slot 0 + interval 10
+            assert!(buf.contains("END 20\n")); // slot 10 + interval 10
         }
     }
 
@@ -1327,76 +1516,78 @@ mod tests {
         fn keeps_last_value_by_timestamp() {
             let mut chart = gauge_chart();
 
-            chart.ingest("dim1", 10.0, ns(1), 0);
-            chart.ingest("dim1", 30.0, ns(3), 0); // Latest
-            chart.ingest("dim1", 20.0, ns(2), 0);
+            // Use ms() to keep all ingests within the same slot.
+            chart.ingest("dim1", 10.0, ms(100), 0);
+            chart.ingest("dim1", 30.0, ms(300), 0); // Latest
+            chart.ingest("dim1", 20.0, ms(200), 0);
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(30.0));
+            chart.emit(2, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(30.0));
         }
 
         #[test]
         fn gap_fills_missing_dimension() {
             let mut chart = gauge_chart();
 
-            // Both dimensions get data.
-            chart.ingest("dim1", 10.0, ns(5), 0);
-            chart.ingest("dim2", 20.0, ns(5), 0);
+            // Both dimensions get data in slot 0.
+            chart.ingest("dim1", 10.0, ms(500), 0);
+            chart.ingest("dim2", 20.0, ms(500), 0);
 
-            // Tick finalizes both.
+            // Tick at 1: finalizes slot 0.
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(find_dim(&chart, "dim1").value, Some(10.0));
-            assert_eq!(find_dim(&chart, "dim2").value, Some(20.0));
-
-            // Only dim1 gets new data.
-            chart.ingest("dim1", 15.0, ns(6), 0);
-
-            // Tick: dim2 should be gap-filled with previous value.
-            buf.clear();
             chart.emit(2, &mut buf);
-            assert_eq!(find_dim(&chart, "dim1").value, Some(15.0));
-            assert_eq!(find_dim(&chart, "dim2").value, Some(20.0));
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(10.0));
+            assert_eq!(last_dim_value(&buf, "dim2"), Some(20.0));
+
+            // Only dim1 gets new data in slot 1.
+            chart.ingest("dim1", 15.0, ms(1500), 0);
+
+            // Tick at 2: dim2 should be gap-filled with previous value.
+            buf.clear();
+            chart.emit(3, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(15.0));
+            assert_eq!(last_dim_value(&buf, "dim2"), Some(20.0));
         }
 
         #[test]
         fn out_of_order_timestamps_keeps_latest() {
             let mut chart = gauge_chart();
 
-            chart.ingest("dim1", 20.0, ns(2), 0);
-            chart.ingest("dim1", 30.0, ns(3), 0); // Latest
-            chart.ingest("dim1", 10.0, ns(1), 0);
+            // Use ms() to keep all ingests within the same slot.
+            chart.ingest("dim1", 20.0, ms(200), 0);
+            chart.ingest("dim1", 30.0, ms(300), 0); // Latest
+            chart.ingest("dim1", 10.0, ms(100), 0);
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(30.0));
+            chart.emit(2, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(30.0));
         }
 
         #[test]
         fn multi_dimension_gap_fill() {
             let mut chart = gauge_chart();
 
-            // All three dimensions get data.
-            chart.ingest("dim1", 100.0, ns(5), 0);
-            chart.ingest("dim2", 200.0, ns(5), 0);
-            chart.ingest("dim3", 300.0, ns(5), 0);
+            // All three dimensions get data in slot 0.
+            chart.ingest("dim1", 100.0, ms(500), 0);
+            chart.ingest("dim2", 200.0, ms(500), 0);
+            chart.ingest("dim3", 300.0, ms(500), 0);
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values().len(), 3);
-            assert_eq!(find_dim(&chart, "dim1").value, Some(100.0));
-            assert_eq!(find_dim(&chart, "dim2").value, Some(200.0));
-            assert_eq!(find_dim(&chart, "dim3").value, Some(300.0));
+            chart.emit(2, &mut buf);
+            assert_eq!(last_block_sets(&buf).len(), 3);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(100.0));
+            assert_eq!(last_dim_value(&buf, "dim2"), Some(200.0));
+            assert_eq!(last_dim_value(&buf, "dim3"), Some(300.0));
 
-            // Only dim1 gets new data.
-            chart.ingest("dim1", 110.0, ns(6), 0);
+            // Only dim1 gets new data in slot 1.
+            chart.ingest("dim1", 110.0, ms(1500), 0);
 
             buf.clear();
-            chart.emit(2, &mut buf);
-            assert_eq!(find_dim(&chart, "dim1").value, Some(110.0));
-            assert_eq!(find_dim(&chart, "dim2").value, Some(200.0)); // gap-fill
-            assert_eq!(find_dim(&chart, "dim3").value, Some(300.0)); // gap-fill
+            chart.emit(3, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(110.0));
+            assert_eq!(last_dim_value(&buf, "dim2"), Some(200.0)); // gap-fill
+            assert_eq!(last_dim_value(&buf, "dim3"), Some(300.0)); // gap-fill
         }
     }
 
@@ -1413,8 +1604,8 @@ mod tests {
             chart.ingest("dim1", 5.0, ms(300), ms(200));
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(35.0));
+            chart.emit(2, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(35.0));
         }
 
         #[test]
@@ -1428,25 +1619,25 @@ mod tests {
             chart.ingest("dim1", 20.0, ms(400), ms(300));
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(50.0));
+            chart.emit(2, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
         }
 
         #[test]
         fn no_data_gap_fills_with_zero() {
             let mut chart = delta_sum_chart();
 
-            chart.ingest("dim1", 10.0, ns(1), 0);
+            chart.ingest("dim1", 10.0, ms(500), 0);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(10.0));
+            chart.emit(2, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(10.0));
 
             // No new data — gap-fill emits 0 for delta sums.
             buf.clear();
-            chart.emit(2, &mut buf);
+            chart.emit(3, &mut buf);
             assert!(!buf.is_empty());
             assert_eq!(count_sets(&buf), 1);
-            assert_eq!(chart.dim_values()[0].value, Some(0.0));
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(0.0));
         }
 
         #[test]
@@ -1468,8 +1659,8 @@ mod tests {
             chart.ingest("dim1", 5.0, ms(300), ms(200));
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(12.0));
+            chart.emit(2, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(12.0));
         }
     }
 
@@ -1482,50 +1673,50 @@ mod tests {
         fn first_slot_returns_none() {
             let mut chart = cumulative_sum_chart();
 
-            chart.ingest("dim1", 100.0, ns(5), START_TIME);
+            chart.ingest("dim1", 100.0, ms(500), START_TIME);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, None);
+            chart.emit(2, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), None);
         }
 
         #[test]
         fn computes_deltas_across_ticks() {
             let mut chart = cumulative_sum_chart();
 
-            // First tick: baseline, no delta.
-            chart.ingest("dim1", 100.0, ns(5), START_TIME);
+            // First tick: baseline in slot 0, no delta.
+            chart.ingest("dim1", 100.0, ms(500), START_TIME);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, None);
-
-            // Second tick: delta = 150 - 100 = 50.
-            chart.ingest("dim1", 150.0, ns(6), START_TIME);
-            buf.clear();
             chart.emit(2, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(50.0));
+            assert_eq!(last_dim_value(&buf, "dim1"), None);
+
+            // Second tick: data in slot 1, delta = 150 - 100 = 50.
+            chart.ingest("dim1", 150.0, ns(1), START_TIME);
+            buf.clear();
+            chart.emit(3, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
         }
 
         #[test]
         fn detects_restart() {
             let mut chart = cumulative_sum_chart();
 
-            // Establish baseline.
-            chart.ingest("dim1", 100.0, ns(5), START_TIME);
+            // Establish baseline in slot 0.
+            chart.ingest("dim1", 100.0, ms(500), START_TIME);
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
-
-            // Normal delta.
-            chart.ingest("dim1", 150.0, ns(6), START_TIME);
-            buf.clear();
             chart.emit(2, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(50.0));
 
-            // Restart: new start_time.
-            let new_start = START_TIME + 1_000_000;
-            chart.ingest("dim1", 20.0, ns(7), new_start);
+            // Normal delta in slot 1.
+            chart.ingest("dim1", 150.0, ns(1), START_TIME);
             buf.clear();
             chart.emit(3, &mut buf);
-            assert_eq!(chart.dim_values()[0].value, Some(0.0));
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
+
+            // Restart in slot 2: new start_time.
+            let new_start = START_TIME + 1_000_000;
+            chart.ingest("dim1", 20.0, ns(2), new_start);
+            buf.clear();
+            chart.emit(4, &mut buf);
+            assert_eq!(last_dim_value(&buf, "dim1"), Some(0.0));
         }
     }
 
@@ -1570,7 +1761,7 @@ mod tests {
             chart.ingest("dim1", 1.0, ns(1), 0);
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
 
             // The CHART line should include 'store_first'.
             let chart_line = buf.lines().find(|l| l.starts_with("CHART ")).unwrap();
@@ -1594,7 +1785,7 @@ mod tests {
             chart.ingest("dim1", 1.0, ns(1), 0);
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
 
             let chart_line = buf.lines().find(|l| l.starts_with("CHART ")).unwrap();
             assert!(
@@ -1617,7 +1808,7 @@ mod tests {
             chart.ingest("dim1", 1.0, ns(1), 0);
 
             let mut buf = String::new();
-            chart.emit(1, &mut buf);
+            chart.emit(2, &mut buf);
 
             let chart_line = buf.lines().find(|l| l.starts_with("CHART ")).unwrap();
             assert!(
