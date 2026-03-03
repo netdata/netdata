@@ -97,6 +97,58 @@ Metrics:
 
 
 
+## Functions
+
+This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+
+
+### Containers
+
+Retrieves container list data equivalent to `docker ps -a`.
+
+This function calls the Docker Container List API with `all=true` and returns both running and non-running containers in a table similar to Docker CLI output.
+
+Use cases:
+- Quickly inspect all containers (running, exited, paused, dead) from Netdata
+- Correlate container lifecycle with metric changes and alerts
+- Verify exposed ports, image tags, and container names without shell access
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Docker:container-ls` |
+| Require Cloud | yes |
+| Performance | Executes a single Docker API request (`ContainerList` with `all=true`):<br/>• No per-container inspect requests are issued<br/>• Response size grows with total container count<br/>• Large histories with many stopped containers may return more rows |
+| Security | Exposes container metadata that may include sensitive details:<br/>• Container command text may include runtime arguments<br/>• Image names, ports, and container names are visible<br/>• Restrict access to authorized operators |
+| Availability | Available when:<br/>• Docker collector is initialized and connected<br/>• Docker API list-containers request succeeds<br/>• Returns HTTP 503 while collector is initializing<br/>• Returns HTTP 500 on Docker API errors<br/>• Returns HTTP 504 on timeout |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Container inventory from Docker Engine. Each row represents one container returned by `docker ps -a`.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| CONTAINER ID | string |  |  | Short container ID (12 characters). |
+| IMAGE | string |  |  | Container image reference. |
+| COMMAND | string |  |  | Container command as reported by Docker API. |
+| CREATED | string |  |  | Human-readable container creation age (for example, '5 days ago'). |
+| STATUS | string |  |  | Docker status string (for example, 'Up 3 weeks' or 'Exited (0) 4 weeks ago'). |
+| State (Raw) | string |  | hidden | Raw Docker state value (for example, running, exited, paused, restarting, dead). |
+| PORTS | string |  |  | Published or exposed ports summary. |
+| NAMES | string |  |  | Container name. |
+| Container ID (Full) | string |  | hidden | Full 64-character container ID. |
+| Created (Unix) | integer | seconds | hidden | Container creation timestamp in Unix seconds. |
+
+
+
 ## Alerts
 
 
