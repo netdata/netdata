@@ -477,12 +477,12 @@ jobs:
         id: install-netdata
         if: needs.file-check.outputs.run == 'true'
         run: |
-          msiexec /qm /i dist-artifacts\\netdata-x64.msi /l* .\\install.log NDDRVINST=0
+          msiexec /qm /i dist-artifacts\\netdata-x64.msi /L* D:\\a\\netdata\\netdata\\install.log NDDRVINST=0
           if ($LastExitcode -ne 0) {
-              Get-Content .\\install.log
+              Get-Content install.log
               exit 1
           }
-          Get-Content .\\install.log
+          Get-Content install.log
       - name: Check agent buildinfo
         id: agent-check
         if: needs.file-check.outputs.run == 'true'
