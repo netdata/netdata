@@ -41,13 +41,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -150,13 +144,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -259,13 +247,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -368,13 +350,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -556,13 +532,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -885,13 +855,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -978,13 +942,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -1065,13 +1023,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           section_name: "[plugin:windows:PerflibThermalZone]"
@@ -1151,13 +1103,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           section_name: "[plugin:windows:GetPowerSupply]"
@@ -1250,13 +1196,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           section_name: "[plugin:windows:GetSensors]"
@@ -1482,13 +1422,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -1806,13 +1740,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -2139,634 +2067,6 @@ modules:
                 - name: purged
   - meta:
       plugin_name: windows.plugin
-      module_name: PerflibMSSQL
-      monitored_instance:
-        name: MS SQL Server
-        link: "https://www.microsoft.com/en-us/sql-server/"
-        categories:
-          - data-collection.databases
-        icon_filename: "windows.svg"
-      related_resources:
-        integrations:
-          list: []
-      info_provided_to_referring_integrations:
-        description: ""
-      keywords:
-        - windows
-        - microsoft
-        - sql
-        - queries
-    overview:
-      data_collection:
-        metrics_description: |
-          This collector monitors Microsoft SQL Server statistics.
-        method_description: |
-          It queries different SQL objects per instance from Perflib in order to gather the metrics.
-      supported_platforms:
-        include: ["windows"]
-        exclude: []
-      multi_instance: false
-      additional_permissions:
-        description: ""
-      default_behavior:
-        auto_detection:
-          description: |
-            The collector automatically discovers and monitors standard SQL Server metrics without additional setup. However, for transaction-level metrics,
-            the size of all the data files, and the wait stats in the database you must:
-
-            - Complete the "Configure SQL Server for Monitoring" steps in the Setup -> Prerequisites section.
-            - Configure a database connection (see Setup → Configuration → Examples).
-        limits:
-          description: ""
-        performance_impact:
-          description: ""
-    setup:
-      prerequisites:
-        list:
-          - title: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
-          - title: Configure SQL Server for Monitoring
-            description: |
-              For **each SQL Server** instance you want to monitor, complete the following steps:
-
-              1. **Create Monitoring User**
-
-                 Create an SQL Server user with the necessary permissions to collect monitoring data:
-
-                 ```tsql
-                 USE master;
-                 CREATE LOGIN netdata_user WITH PASSWORD = '1ReallyStrongPasswordShouldBeInsertedHere';
-                 CREATE USER netdata_user FOR LOGIN netdata_user;
-                 GRANT CONNECT SQL TO netdata_user;
-                 GRANT VIEW SERVER STATE TO netdata_user;
-                 GO
-                 ```
-
-              2. **Enable Query Store**
-
-                 Enable the [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16) and grant access               to    the monitoring user on all relevant databases:
-
-                 ```tsql
-                 DECLARE @dbname NVARCHAR(max)
-                 DECLARE nd_user_cursor CURSOR FOR SELECT name
-                                     FROM master.dbo.sysdatabases
-                                     WHERE name NOT IN ('master')
-
-                 OPEN nd_user_cursor
-                 FETCH NEXT FROM nd_user_cursor INTO @dbname
-                 WHILE @@FETCH_STATUS = 0
-                 BEGIN
-                   EXECUTE ("USE "+ @dbname+"; CREATE USER netdata_user FOR LOGIN netdata_user; ALTER DATABASE "+@dbname+" SET QUERY_STORE = ON ( QUERY_CAPTURE_MODE = ALL, DATA_FLUSH_INTERVAL_SECONDS               =    900 )");
-                   FETCH next FROM nd_user_cursor INTO @dbname;
-                 END
-                 CLOSE nd_user_cursor
-                 DEALLOCATE nd_user_cursor
-                 GO
-                 ```
-
-              3. **Enable Query Job status**
-
-                 Connect to your database and grant `SELECT` permission to `netdata_user`:
-
-                ```tsql
-                USE msdb;
-                GO
-                GRANT SELECT ON SCHEMA::[dbo] TO netdata_user;
-                GO
-                ```
-
-              4. **Enable Query replication stored procedure**
-
-                 Connect to your database and add `netdata_user` to `replmonitor`:
-
-                ```tsql
-                USE distribution;
-                GO
-                EXEC sp_addrolemember 'replmonitor', 'netdata_user';
-                GO
-                ```
-
-              5. **Configure SQL Server Network Settings**
-
-                 Enable SQL Server to accept TCP connections:
-
-                - Open `SQL Server Configuration Manager`
-                - Expand `SQL Server Network Configuration`
-                - Select `Protocols for <instance name>` in the console panel
-                - Double-click the `TCP` protocol in the details panel and set `Enabled` to `Yes`
-                - Go to the `IP Address` tab and locate the `IPAII` section:
-                  - Clear any value from the `TCP Dynamic Ports` field
-                  - Enter a port number in the `TCP Port` field (default is `1433`)
-                - Select `SQL Server Services` and restart your SQL Server instance
-
-              6. **Configure SQL Server Authentication (Optional)**
-
-                 If you're using SQL Server authentication (rather than Windows authentication):
-
-                - Open `SQL Server Management Studio`
-                - Right-click your server and select `Properties`
-                - Select `Security` in the left panel
-                - Choose `SQL Server and Windows Authentication mode` under `Server authentication`
-                - Click `OK`
-                - Right-click your server and select `Restart`
-      configuration:
-        file:
-          name: "netdata.conf"
-          section_name: "[plugin:windows:PerflibMSSQL]"
-          description: "The Netdata main configuration file"
-        options:
-          description: "These options allow the collector to connect to your MSSQL instance and collect transaction data from it."
-          folding:
-            title: "Config option"
-            enabled: false
-          list:
-            - name: update every
-              description: Data collection frequency.
-              default_value: 10
-              required: false
-            - name: driver
-              description: ODBC driver used to connect to the SQL Server.
-              default_value: SQL Server
-              required: false
-            - name: instance
-              description: Instance name
-              default_value: empty
-              required: true
-            - name: server
-              description: Server address or instance name.
-              default_value: empty
-              required: true
-            - name: address
-              description: Alternative to `server`; supports named pipes if the server supports them.
-              default_value: empty
-              required: true
-            - name: uid
-              description: SQL Server user identifier.
-              default_value: empty
-              required: true
-            - name: pwd
-              description: Password for the specified user.
-              default_value: empty
-              required: true
-            - name: additional instances
-              description: Number of additional SQL Server instances to monitor.
-              default_value: 0
-              required: false
-            - name: windows authentication
-              description: Set to yes to use Windows credentials instead of SQL Server authentication.
-              default_value: no
-              required: false
-            - name: trust server certificate
-              description: Set to yes to trust the server's SSL certificate chain.
-              default_value: yes
-              required: false
-            - name: express
-              description: Set to yes when running SQL Express version.
-              default_value: no
-              required: false
-            - name: collect transactions
-              description: Run queries to collect information from the server's transactions.
-              default_value: yes
-              required: false
-            - name: collect waits
-              description: Run queries to collect information from the server's lock waits.
-              default_value: yes
-              required: false
-            - name: collect lock metrics
-              description: Run queries to collect information from the server's overall locks.
-              default_value: yes
-              required: false
-            - name: collect replication
-              description: Run queries to collect information from the server's replication.
-              default_value: yes
-              required: false
-            - name: collect jobs
-              description: Run queries to collect information from the server's jobs.
-              default_value: yes
-              required: false
-            - name: collect buffer stats
-              description: Run queries to collect information from the server's buffer statistics.
-              default_value: yes
-              required: false
-            - name: collect database size
-              description: Run queries to collect information from the server's database size.
-              default_value: yes
-              required: false
-            - name: collect user connections
-              description: Run queries to collect information from the server's connection.
-              default_value: yes
-              required: false
-            - name: collect blocked processes
-              description: Run queries to collect information from the server's blocked processes.
-              default_value: yes
-              required: false
-        examples:
-          folding:
-            enabled: true
-            title: ""
-          list:
-            - name: Single Instance
-              description: An example configuration with one instance.
-              folding:
-                enabled: false
-              config: |
-                [plugin:windows:PerflibMSSQL]
-                   driver = SQL Server
-                   instance = Dev
-                   server = 127.0.0.1\\Dev, 1433
-                   uid = netdata_user
-                   pwd = 1ReallyStrongPasswordShouldBeInsertedHere
-                   express = no
-            - name: Multiple Instances
-              description: An example configuration with two instances.
-              folding:
-                enabled: false
-              config: |
-                [plugin:windows:PerflibMSSQL]
-                  driver = SQL Server
-                  server = 127.0.0.1\\Dev, 1433
-                  instance = Dev
-                  uid = netdata_user
-                  pwd = 1ReallyStrongPasswordShouldBeInsertedHere
-                  additional instances = 1
-                  express = no
-                [plugin:windows:PerflibMSSQL1]
-                  driver = SQL Server
-                  server = 127.0.0.1\\Production, 1434
-                  instance = Production
-                  uid = netdata_user
-                  pwd = AnotherReallyStrongPasswordShouldBeInsertedHere2
-                  express = no
-    troubleshooting:
-      problems:
-        list: []
-    alerts: []
-    metrics:
-      folding:
-        title: Metrics
-        enabled: false
-      description: ""
-      availability: []
-      scopes:
-        - name: MSSQL instance
-          description: "These metrics refer to the Microsoft SQL Servers instances defined on host."
-          labels:
-            - name: mssql_instance
-              description: The instance name.
-          metrics:
-            - name: mssql.instance_user_connections
-              description: User connections
-              unit: connections
-              chart_type: line
-              dimensions:
-                - name: user
-            - name: mssql.instance_sessions_connections
-              description: Session connections
-              unit: connections
-              chart_type: line
-              dimensions:
-                - name: session
-            - name: mssql.instance_sqlstats_batch_requests
-              description: Total of batches requests
-              unit: requests/s
-              chart_type: line
-              dimensions:
-                - name: batch
-            - name: mssql.instance_sql_errors
-              description: Errors
-              unit: errors/s
-              chart_type: line
-              dimensions:
-                - name: errors
-            - name: mssql.instance_sqlstats_sql_compilations
-              description: SQL compilations
-              unit: compilations/s
-              chart_type: line
-              dimensions:
-                - name: compilations
-            - name: mssql.instance_sqlstats_sql_recompilations
-              description: SQL re-compilations
-              unit: recompiles/s
-              chart_type: line
-              dimensions:
-                - name: recompiles
-            - name: mssql.instance_sqlstats_auto_parameterization_attempts
-              description: Failed auto-parameterization attempts
-              unit: attempts/s
-              chart_type: line
-              dimensions:
-                - name: failed
-            - name: mssql.instance_sqlstats_safe_auto_parameterization_attempts
-              description: Safe auto-parameterization attempts
-              unit: attempts/s
-              chart_type: line
-              dimensions:
-                - name: safe
-            - name: mssql.instance_accessmethods_page_splits
-              description: Pages splits
-              unit: splits/s
-              chart_type: line
-              dimensions:
-                - name: page
-            - name: mssql.instance_cache_hit_ratio
-              description: Buffer Cache hit ratio
-              unit: percentage
-              chart_type: line
-              dimensions:
-                - name: hit_ratio
-            - name: mssql.instance_bufman_iops
-              description: Number of pages input and output
-              unit: pages/s
-              chart_type: line
-              dimensions:
-                - name: read
-                - name: written
-            - name: mssql.instance_bufman_checkpoint_pages
-              description: Flushed pages
-              unit: pages/s
-              chart_type: line
-              dimensions:
-                - name: log
-            - name: mssql.instance_bufman_page_life_expectancy
-              description: Page life expectancy
-              unit: seconds
-              chart_type: line
-              dimensions:
-                - name: life_expectancy
-            - name: mssql.instance_bufman_lazy_write
-              description: Buffers written by buffer manager's lazy writer
-              unit: writes/s
-              chart_type: line
-              dimensions:
-                - name: writes
-            - name: mssql.instance_bufman_page_lookups
-              description: Requests to find a page in the buffer pool.
-              unit: lookups/s
-              chart_type: line
-              dimensions:
-                - name: lookups
-            - name: mssql.instance_memmgr_server_memory
-              description: Memory committed
-              unit: bytes
-              chart_type: line
-              dimensions:
-                - name: memory
-            - name: mssql.database_readonly
-              description: Current database write status.
-              unit: status
-              chart_type: line
-              dimensions:
-                - name: writable
-                - name: readonly
-            - name: mssql.database_state
-              description: Current database state.
-              unit: status
-              chart_type: line
-              dimensions:
-                - name: online
-                - name: restoring
-                - name: recovering
-                - name: recovering_pending
-                - name: suspect
-                - name: offline
-            - name: mssql.instance_memmgr_connection_memory_bytes
-              description: Amount of dynamic memory to maintain connections
-              unit: bytes
-              chart_type: line
-              dimensions:
-                - name: memory
-            - name: mssql.instance_memmgr_pending_memory_grants
-              description: Process waiting for memory grant
-              unit: processes
-              chart_type: line
-              dimensions:
-                - name: pending
-            - name: mssql.instance_memmgr_external_benefit_of_memory
-              description: Performance benefit from adding memory to a specific cache
-              unit: bytes
-              chart_type: line
-              dimensions:
-                - name: benefit
-            - name: mssql.instance_blocked_processes
-              description: Blocked processes
-              unit: processes
-              chart_type: line
-              dimensions:
-                - name: blocked
-        - name: MSSQL Jobs
-          description: "These metrics refer to the Microsoft SQL Servers jobs on host."
-          labels:
-            - name: mssql_instance
-              description: The instance name.
-            - name: job_name
-              description: The job name.
-          metrics:
-            - name: mssql.instance_jobs_status
-              description: Jobs running
-              unit: jobs
-              chart_type: line
-              dimensions:
-                - name: enabled
-                - name: disabled
-        - name: MSSQL Resource Locks
-          description: "Monitors SQL Server resource locks by type. SQL Server uses locks to manage concurrent access to database resources during transactions, preventing conflicts when multiple users access the same data simultaneously. This metric tracks locks on different [resource types](https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object?view=sql-server-ver17) like rows, pages, tables, and databases."
-          labels:
-            - name: mssql_instance
-              description: The SQL Server instance name (e.g., 'MSSQLSERVER' for default instance or named instance like 'INSTANCE01').
-            - name: resource
-              description: "The specific resource type being locked (e.g., 'Database', 'Table', 'Page', 'Row', 'Key', 'Extent', 'RID', 'Application', 'Metadata', 'Allocation_Unit')."
-          metrics:
-            - name: mssql.instance_resource_deadlocks
-              description: Active lock requests that resulted in deadlock per resource
-              unit: deadlock/s
-              chart_type: line
-              dimensions:
-                - name: locks
-            - name: mssql.instance_resource_lock_waits
-              description: Lock requests that required the caller to wait per resource
-              unit: lock/s
-              chart_type: line
-              dimensions:
-                - name: locks
-        - name: MSSQL Waits
-          description: "These metrics refer to the Microsoft SQL Server instances defined on the host and their associated wait events."
-          labels:
-            - name: mssql_instance
-              description: The instance name.
-            - name: wait_type
-              description: A wait defined in https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16#WaitTypes.
-            - name: wait_category
-              description: "Wait categories are groupings of specific wait types that indicate the reason a SQL Server worker is waiting."
-          metrics:
-            - name: mssql.instance_total_wait_time
-              description: Wait time for each wait type and category
-              unit: ms
-              chart_type: line
-              dimensions:
-                - name: duration
-            - name: mssql.instance_resource_wait_time
-              description: Wait time for threads waiting on specific resource types for each wait type and category
-              unit: ms
-              chart_type: line
-              dimensions:
-                - name: duration
-            - name: mssql.instance_signal_wait_time
-              description: Delay between thread wakeup signal and actual execution start for each wait type and category
-              unit: ms
-              chart_type: line
-              dimensions:
-                - name: duration
-            - name: mssql.instance_max_wait_time
-              description: Maximum wait time for each wait type and category
-              unit: ms
-              chart_type: line
-              dimensions:
-                - name: duration
-            - name: mssql.instance_waits
-              description: Number of waits for each wait type and category
-              unit: waits/s
-              chart_type: line
-              dimensions:
-                - name: waits
-        - name: Database
-          description: "These metrics refer to Microsoft SQL Server databases."
-          labels:
-            - name: mssql_instance
-              description: The instance name.
-            - name: database
-              description: The database name.
-          metrics:
-            - name: mssql.database_active_transactions
-              description: Active transactions per database
-              unit: transactions
-              chart_type: line
-              dimensions:
-                - name: active
-            - name: mssql.database_transactions
-              description: Transactions
-              unit: transactions/s
-              chart_type: line
-              dimensions:
-                - name: transactions
-            - name: mssql.database_write_transactions
-              description: Write transactions
-              unit: transactions/s
-              chart_type: line
-              dimensions:
-                - name: write
-            - name: mssql.database_lockwait
-              description: Lock requests that required the caller to wait.
-              unit: locks/s
-              chart_type: line
-              dimensions:
-                - name: lock
-            - name: mssql.database_deadlocks
-              description: Lock requests that resulted in deadlock.
-              unit: deadlocks/s
-              chart_type: line
-              dimensions:
-                - name: deadlocks
-            - name: mssql.database_lock_timeouts
-              description: Lock that timed out.
-              unit: timeouts/s
-              chart_type: line
-              dimensions:
-                - name: timeouts
-            - name: mssql.database_lock_requests
-              description: Number of new locks and lock conversions requested.
-              unit: requests/s
-              chart_type: line
-              dimensions:
-                - name: requests
-            - name: mssql.database_backup_restore_operations
-              description: Backup IO per database
-              unit: operations/s
-              chart_type: line
-              dimensions:
-                - name: backup
-            - name: mssql.database_log_flushes
-              description: Log flushes
-              unit: flushes/s
-              chart_type: line
-              dimensions:
-                - name: log
-            - name: mssql.database_log_flushed
-              description: Log flushed
-              unit: bytes/s
-              chart_type: line
-              dimensions:
-                - name: flushed
-            - name: mssql.database_data_files_size
-              description: Current database size
-              unit: bytes
-              chart_type: line
-              dimensions:
-                - name: size
-        - name: MSSQL Replication
-          description: "These metrics refer to the Microsoft SQL Servers replication on host."
-          labels:
-            - name: mssql_instance
-              description: The instance name.
-            - name: publisher
-              description: The SQL server publisher name.
-            - name: database
-              description: The database being replicated.
-            - name: publication
-              description: The publication name.
-          metrics:
-            - name: mssql.replication_status
-              description: Current replication status
-              unit: status
-              chart_type: line
-              dimensions:
-                - name: started
-                - name: succeeded
-                - name: in_progress
-                - name: idle
-                - name: retrying
-                - name: failed
-            - name: mssql.replication_warning
-              description: Maximum threshold warning.
-              unit: status
-              chart_type: line
-              dimensions:
-                - name: expiration
-                - name: latency
-                - name: merge expiration
-                - name: fast duration
-                - name: low duration
-                - name: fast run speed
-                - name: low run speed
-            - name: mssql.replication_avg_latency
-              description: Average latency for a transactional publication.
-              unit: seconds
-              chart_type: line
-              dimensions:
-                - name: latency
-            - name: mssql.replication_subscription
-              description: Number of subscriptions to a publication.
-              unit: subscription
-              chart_type: line
-              dimensions:
-                - name: subscription
-            - name: mssql.replication_agent_running
-              description: Distribution agents running.
-              unit: agents
-              chart_type: line
-              dimensions:
-                - name: agents
-            - name: mssql.replication_synchronization
-              description: The shortest synchronization.
-              unit: seconds
-              chart_type: line
-              dimensions:
-                - name: seconds
-  - meta:
-      plugin_name: windows.plugin
       module_name: PerflibNetFramework
       monitored_instance:
         name: NET Framework
@@ -2806,13 +2106,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3077,13 +2371,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3249,13 +2537,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3431,13 +2713,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3712,13 +2988,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3810,13 +3080,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -4079,13 +3343,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -4170,13 +3428,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
