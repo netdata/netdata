@@ -253,7 +253,9 @@ fi
 run_mcp_acl_tests "$BASICURL:19999" 412 412 412
 run_mcp_acl_tests "$BASICURL:19999" 412 412 412 "00000000-0000-0000-0000-000000000000"
 if [ "$MCP_TOKEN" != "NULL" ] ; then
+    set +x
     run_mcp_acl_tests "$BASICURL:19999" 200 200 101 "$MCP_TOKEN"
+    set -x
 else
     echo -e "${YELLOW}Could not find MCP API key file, skipping authenticated MCP bearer check ${NOCOLOR}"
 fi
