@@ -48,7 +48,6 @@ ENUM_STR_DEFINE_FUNCTIONS_EXTERN(https_client_resp_t);
 typedef enum http_req_type {
     HTTP_REQ_GET = 0,
     HTTP_REQ_POST,
-    HTTP_REQ_CONNECT,
     HTTP_REQ_INVALID
 } http_req_type_t;
 
