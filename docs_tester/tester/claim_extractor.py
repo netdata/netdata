@@ -205,7 +205,8 @@ class ClaimExtractor:
             is_step_marker = re.match(r'^(?:first|next|then|finally|step|to|edit|run|execute|restart|stop|start|add|create|remove|delete|configure)\b', stripped, re.IGNORECASE)
             
             if is_numbered or is_step_marker:
-                if not in_workflow:
+                # Set workflow_start when first step is detected
+                if not in_workflow or workflow_start == 0:
                     in_workflow = True
                     workflow_start = i
                 
