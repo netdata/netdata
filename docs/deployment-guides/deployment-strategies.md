@@ -83,7 +83,7 @@ This example helps you configure a Parent with intelligent storage tiers to stor
 <details>
 <summary><strong>Click to see Parent with tiered storage configuration</strong></summary><br/>
 
-This example provides configuration for multiple [tiers of metrics storage](/src/database/README.md#tiers), for 10 Children with about 2k metrics each.
+This example provides configuration for multiple [tiers of metrics storage](/src/database/README.md#tiers), for 10 Children with about 2k metrics each. The example below restricts retention in each tier both in time and storage space, whichever is met first. See [retention settings](src/database/CONFIGURATION.md#retention-settings) for fine-tuning retention.
 
 **What this gives you:**
 
@@ -105,17 +105,21 @@ Edit `netdata.conf` on the Parent using the [edit-config](/docs/netdata-agent/co
     storage tiers = 3
     dbengine page cache size = 1.4GiB
 
-    # storage tier 0
+    # storage tier 0, 1 second resolution
     update every = 1
     dbengine tier 0 retention size = 12GiB
+    dbengine tier 0 retention time = 7d
 
-    # storage tier 1
+    # storage tier 1, 60 seconds = 1 minute resolution
     dbengine tier 1 update every iterations = 60
     dbengine tier 1 retention size = 4GiB
+    dbengine tier 1 retention time = 1mo
 
-    # storage tier 2
+    # storage tier 2, 60 * 60 seconds = 1 hour resolution
     dbengine tier 2 update every iterations = 60
     dbengine tier 2 retention size = 2GiB
+    dbengine tier 2 retention time = 1y
+
 [ml]
     # Enabled by default
     # enabled = yes
