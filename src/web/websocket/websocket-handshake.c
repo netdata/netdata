@@ -10,7 +10,7 @@
 
 // Global array of WebSocket threads
 WEBSOCKET_THREAD websocket_threads[WEBSOCKET_MAX_THREADS];
-static bool websocket_mcp_query_api_key_compat_notice_logged = false;
+static _Atomic bool websocket_mcp_query_api_key_compat_notice_logged = false;
 
 // Initialize WebSocket thread system
 void websocket_threads_init(void) {
