@@ -1192,6 +1192,11 @@ send_pushover() {
     *) priority=-2 ;; # lowest priority: no notification at all
     esac
 
+    # Pushover API limits: title=250, message=1024, url=512, url_title=100
+    [ ${#title} -gt 250 ] && title="${title:0:247}..."
+    [ ${#message} -gt 1024 ] && message="${message:0:1021}..."
+    [ ${#url} -gt 512 ] && url=""
+
     for user in ${usertokens}; do
       httpcode=$(docurl \
         --form-string "token=${apptoken}" \
