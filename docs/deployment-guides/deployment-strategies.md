@@ -74,7 +74,7 @@ Edit `stream.conf` on the Child using the [edit-config](/docs/netdata-agent/conf
 
 ### Parent with Tiered Storage
 
-This example helps you configure a Parent with multiple [tiers of metrics storage](/src/database/README.md#tiers) to store different time ranges at different resolutionsm, for 10 Children with about 2k metrics each. Retention in each tier is restricted both in time and storage space, whichever is met first. See [retention settings](/src/database/CONFIGURATION.md#retention-settings) for fine-tuning retention.
+This example helps you configure a Parent with multiple [tiers of metrics storage](/src/database/README.md#tiers) to store different time ranges at different resolutions, for 10 Children with about 2k metrics each. Retention in each tier is restricted both in time and storage space, whichever is met first. See [retention settings](/src/database/CONFIGURATION.md#retention-settings) for fine-tuning retention.
 
 **What this gives you:**
 
