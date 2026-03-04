@@ -613,6 +613,30 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         return HTTP_RESP_OK;
     }
 
+    {
+        RRDHOST *existing = rrdhost_find_by_guid(rpt->machine_guid);
+        if(existing && rrdhost_is_virtual(existing)) {
+            stream_receiver_takeover_web_connection(w, rpt);
+
+            stream_receiver_log_status(
+                rpt,
+                "rejecting streaming connection; this is a locally collected vnode",
+                STREAM_HANDSHAKE_PARENT_VNODE_IS_LOCAL, NDLP_DEBUG);
+
+            char initial_response[HTTP_HEADER_SIZE + 1];
+            snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_LOCAL_VNODE);
+
+            if(nd_sock_send_timeout(&rpt->sock, initial_response, strlen(initial_response), 0, 60) !=
+                (ssize_t)strlen(initial_response)) {
+                nd_log_daemon(NDLP_ERR, "STREAM RCV '%s' [from [%s]:%s]: failed to reply.",
+                              rpt->hostname, rpt->remote_ip, rpt->remote_port);
+            }
+
+            stream_receiver_free(rpt);
+            return HTTP_RESP_OK;
+        }
+    }
+
     if(unlikely(web_client_streaming_rate_t > 0)) {
         static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
         static time_t last_stream_accepted_t = 0;
