@@ -142,7 +142,7 @@ install_go_toolchain() {
     return 1
   fi
 
-  if ! tar -C /usr/local/ -xzf "${GOLANG_ARCHIVE_NAME}"; then
+  if ! tar -C /usr/local/ --no-same-owner -xzf "${GOLANG_ARCHIVE_NAME}"; then
     GOLANG_FAILURE_REASON="Failed to extract Go toolchain."
     return 1
   fi
