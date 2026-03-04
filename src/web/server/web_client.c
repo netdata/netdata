@@ -1353,6 +1353,8 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     return;
                 
                 case HTTP_REQUEST_MODE_WEBSOCKET:
+                    // Coarse gate: allow handshake only for clients that can access at least one WebSocket surface.
+                    // websocket_handle_handshake() performs the protocol-specific ACL check (MCP vs dashboard).
                     if(unlikely(!http_can_access_dashboard(w) && !http_can_access_mcp(w))) {
                         web_client_permission_denied_acl(w);
                         return;
@@ -1368,6 +1370,9 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     return;
 
                 case HTTP_REQUEST_MODE_OPTIONS:
+                    // Coarse pre-filter only: this permits the request to reach URL dispatch.
+                    // Route-specific ACL is enforced in web_client_process_url() for each endpoint
+                    // (for example: /mcp and /sse require MCP ACL, /api requires dashboard/API ACL).
                     if(unlikely(
                             !http_can_access_dashboard(w) &&
                             !http_can_access_registry(w) &&
@@ -1390,6 +1395,8 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 case HTTP_REQUEST_MODE_GET:
                 case HTTP_REQUEST_MODE_PUT:
                 case HTTP_REQUEST_MODE_DELETE:
+                    // Coarse pre-filter only: this does not grant endpoint access by itself.
+                    // URL routing below applies endpoint-specific authorization checks.
                     if(unlikely(
                             !http_can_access_dashboard(w) &&
                             !http_can_access_registry(w) &&

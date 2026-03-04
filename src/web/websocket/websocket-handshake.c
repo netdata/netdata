@@ -10,6 +10,7 @@
 
 // Global array of WebSocket threads
 WEBSOCKET_THREAD websocket_threads[WEBSOCKET_MAX_THREADS];
+static bool websocket_mcp_query_api_key_compat_notice_logged = false;
 
 // Initialize WebSocket thread system
 void websocket_threads_init(void) {
@@ -345,9 +346,17 @@ short int websocket_handle_handshake(struct web_client *w) {
         
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
         if (!mcp_api_key_verified) {
-            // Check for api_key parameter for MCP developer preview
+            // Backward-compatibility fallback for older MCP websocket clients.
+            // Preferred path is Authorization: Bearer, but we intentionally keep
+            // ?api_key= support to avoid breaking existing client integrations.
             char *api_key_str = strstr(query, "api_key=");
             if (api_key_str) {
+                if (!websocket_mcp_query_api_key_compat_notice_logged) {
+                    websocket_mcp_query_api_key_compat_notice_logged = true;
+                    netdata_log_info("WEBSOCKET: MCP query-string API key is accepted for backward compatibility. "
+                                     "Prefer Authorization: Bearer for better credential hygiene.");
+                }
+
                 api_key_str += strlen("api_key=");
 
                 // Extract the API key value (until & or end of string)

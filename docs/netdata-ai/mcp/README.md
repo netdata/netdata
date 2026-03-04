@@ -164,6 +164,8 @@ Netdata implements the MCP protocol with multiple transport options:
 
 - **Direct Connection** (v2.7.2+): AI clients that support HTTP or SSE transports can connect directly to Netdata
 - **Bridge Required**: AI clients that only support stdio need the `nd-mcp` (stdio-to-websocket) or `mcp-remote` (stdio-to-http or stdio-to-sse) bridge
+- **Preferred authentication**: pass the MCP API key via `Authorization: Bearer <mcp_key>`.
+- **Backward compatibility**: WebSocket also accepts `?api_key=<mcp_key>`. Keep this only for legacy clients, since URL query strings are more likely to be logged by proxies and tools.
 
 ### MCP Access Control in `netdata.conf`
 
