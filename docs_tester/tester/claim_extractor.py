@@ -1,7 +1,7 @@
 """Claim extraction from documentation"""
 
 import re
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
