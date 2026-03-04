@@ -1377,15 +1377,15 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                         web_client_permission_denied_acl(w);
                         return;
                     }
-                    
-                    // Handle WebSocket handshake - this will take over the socket
-                    // similar to how stream_receiver_accept_connection works
+
                     w->response.code = websocket_handle_handshake(w);
-                    
-                    // After this point the socket has been taken over
-                    // No need to send a response as the WebSocket handler
-                    // has already sent the handshake response
-                    return;
+
+                    if(w->response.code == HTTP_RESP_WEBSOCKET_HANDSHAKE)
+                        // socket taken over successfully, handshake response already sent
+                        return;
+
+                    // handshake failed - fall through to send the HTTP error response
+                    break;
 
                 case HTTP_REQUEST_MODE_OPTIONS: {
                     // Path-aware coarse pre-filter:
