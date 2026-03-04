@@ -9,10 +9,12 @@ executing every testable claim on a live Netdata installation.
 import sys
 import argparse
 import os
+import json
 from pathlib import Path
+from datetime import datetime
 
 from tester import SSHClient, ClaimExtractor, Executor, Reporter
-from tester.claim_extractor import Step, StepType
+from tester.claim_extractor import Step, StepType, contains_sensitive_placeholder
 from config import VM_HOST, VM_USER, VM_PASSWORD, NETDATA_URL, OUTPUT_DIR
 
 
@@ -24,6 +26,9 @@ def main():
     parser.add_argument('--netdata-url', help='Netdata URL (or set NETDATA_URL env var)')
     parser.add_argument('--output-dir', default=OUTPUT_DIR, help='Output directory')
     parser.add_argument('--format', choices=['markdown', 'json'], default='markdown', help='Report format')
+    parser.add_argument('--dry-run', action='store_true', help='Extract claims and print test plan without executing')
+    parser.add_argument('--timeout', type=int, default=30, help='Timeout per test in seconds (default: 30)')
+    parser.add_argument('--log-dir', default='/var/log/netdata_tester', help='Log directory')
 
     args = parser.parse_args()
 
@@ -40,28 +45,23 @@ def main():
     print(f"Testing documentation: {args.doc_file}")
     print(f"Test VM: {vm_host}")
     print(f"Netdata URL: {netdata_url}")
+    print(f"Timeout: {args.timeout}s per test")
+    if args.dry_run:
+        print("MODE: DRY RUN (no execution)")
     print("-" * 60)
 
-    ssh_client = SSHClient(vm_host, vm_user, vm_password)
     claim_extractor = ClaimExtractor()
-    executor = Executor(ssh_client, netdata_url)
-    reporter = Reporter(args.output_dir)
 
-    # Capture Netdata version at start
-    print("\nCapturing Netdata version...")
-    version = executor.capture_version()
-    print(f"Netdata version: {version}")
-    print("-" * 60)
-
+    # Write claim extraction review file
     print("\nParsing documentation...")
     claims = claim_extractor.parse_file(args.doc_file)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    claims_file = f'/tmp/netdata_tester_claims_{timestamp}.json'
+    with open(claims_file, 'w') as f:
+        json.dump(claims, f, indent=2)
+    print(f"Claims written to: {claims_file}")
 
-    # Check for prerequisites first
-    prereq_claim = None
-    if claims and claims[0].get('type') == 'prerequisite':
-        prereq_claim = claims[0]
-        print(f"\nFound prerequisites: {prereq_claim.get('prerequisites', [])}")
-
+    # Filter claims
     code_claims = [c for c in claims if c['type'] in ['configuration', 'command', 'api', 'behavioral']]
     workflow_claims = [c for c in claims if c['type'] == 'workflow']
 
@@ -73,6 +73,10 @@ def main():
     for i, claim in enumerate(all_claims, 1):
         desc = claim.get('description', 'N/A')[:80]
         claim_type = claim.get('type', 'N/A')
+        # Check for sensitive placeholders
+        content = claim.get('content', '') or claim.get('description', '')
+        if contains_sensitive_placeholder(content):
+            desc += " [CONTAINS SENSITIVE PLACEHOLDER]"
         print(f"[{i}] {claim_type}: {desc}")
     print()
 
@@ -84,6 +88,45 @@ def main():
     if not all_claims:
         print("No testable claims found in documentation")
         sys.exit(0)
+
+    # Dry run mode - just print plan
+    if args.dry_run:
+        print("=" * 60)
+        print("DRY RUN - No tests executed")
+        print("=" * 60)
+        sys.exit(0)
+
+    # Initialize actual test components
+    ssh_client = SSHClient(vm_host, vm_user, vm_password)
+    executor = Executor(ssh_client, netdata_url, timeout=args.timeout)
+    reporter = Reporter(args.output_dir)
+
+    # Start logging
+    executor.logger.start(args.doc_file)
+    log_file = executor.logger.log_file
+
+    # Capture Netdata version at start
+    print("\nCapturing Netdata version...")
+    version = executor.capture_version()
+    print(f"Netdata version: {version}")
+
+    # Check Netdata health before starting
+    print("\nChecking Netdata health...")
+    if not executor.check_netdata_health():
+        print("WARNING: Netdata is not responding to API requests")
+        print("Attempting to wait for Netdata to become healthy...")
+        if not executor.wait_for_netdata(max_wait=60):
+            print("ERROR: Netdata is not healthy. Aborting tests.")
+            sys.exit(1)
+    else:
+        print("Netdata is healthy")
+    print("-" * 60)
+
+    # Check for prerequisites first
+    prereq_claim = None
+    if claims and claims[0].get('type') == 'prerequisite':
+        prereq_claim = claims[0]
+        print(f"\nFound prerequisites: {prereq_claim.get('prerequisites', [])}")
 
     test_results = []
 
@@ -102,7 +145,16 @@ def main():
     for i, claim in enumerate(code_claims, 1):
         print(f"[{i}/{len(code_claims)}] Testing {claim['type']}: {claim['description']}")
 
-        if claim['type'] == 'command':
+        # Check for sensitive placeholders
+        content = claim.get('content', '') or claim.get('description', '')
+        if contains_sensitive_placeholder(content):
+            result = {
+                'claim': claim,
+                'status': 'SKIPPED',
+                'error': 'SKIPPED: requires real credentials (contains placeholder)'
+            }
+            print(f"  Status: SKIPPED (contains sensitive placeholder)")
+        elif claim['type'] == 'command':
             result = executor.test_command(claim)
         elif claim['type'] == 'configuration':
             result = executor.test_configuration(claim)

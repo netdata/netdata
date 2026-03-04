@@ -2,8 +2,11 @@
 
 import re
 import time
+import os
 import urllib.request
 import urllib.error
+import json
+from datetime import datetime
 from typing import Dict, Any, Optional, List
 from .ssh_client import SSHClient
 from .claim_extractor import StepType, Step, Workflow
@@ -11,16 +14,86 @@ from .claim_extractor import StepType, Step, Workflow
 MAX_SLEEP_SECONDS = 300  # Cap sleep at 5 minutes
 MAX_RETRIES = 3
 RETRY_DELAY = 2  # seconds between retries
+DEFAULT_TIMEOUT = 30  # seconds per test
+
+
+class ExecutionLogger:
+    """Log all execution details to file"""
+
+    def __init__(self, log_dir: str = '/var/log/netdata_tester'):
+        self.log_dir = log_dir
+        self.log_file = None
+        self._ensure_log_dir()
+
+    def _ensure_log_dir(self):
+        """Create log directory if it doesn't exist"""
+        try:
+            os.makedirs(self.log_dir, exist_ok=True)
+        except PermissionError:
+            self.log_dir = '/tmp/netdata_tester'
+            os.makedirs(self.log_dir, exist_ok=True)
+
+    def start(self, doc_file: str):
+        """Start logging for a test run"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.log_file = os.path.join(self.log_dir, f'run_{timestamp}.log')
+        self._write(f"=== Test Run Started: {datetime.now().isoformat()} ===")
+        self._write(f"Documentation: {doc_file}")
+        self._write("")
+
+    def _write(self, message: str):
+        """Write to log file with timestamp"""
+        if self.log_file:
+            with open(self.log_file, 'a') as f:
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                f.write(f"[{timestamp}] {message}\n")
+
+    def command(self, cmd: str, use_sudo: bool = False):
+        """Log command execution"""
+        sudo_str = "sudo " if use_sudo else ""
+        self._write(f"COMMAND: {sudo_str}{cmd}")
+
+    def output(self, stdout: str, stderr: str = "", returncode: Optional[int] = None):
+        """Log command output"""
+        if stdout:
+            self._write(f"STDOUT:\n{stdout[:2000]}")
+        if stderr:
+            self._write(f"STDERR:\n{stderr[:2000]}")
+        if returncode is not None:
+            self._write(f"RETURNCODE: {returncode}")
+
+    def retry(self, attempt: int, max_retries: int):
+        """Log retry attempt"""
+        self._write(f"RETRY: Attempt {attempt + 1}/{max_retries}")
+
+    def result(self, status: str, details: str = ""):
+        """Log test result"""
+        self._write(f"RESULT: {status}" + (f" - {details}" if details else ""))
+
+    def info(self, message: str):
+        """Log info message"""
+        self._write(f"INFO: {message}")
+
+    def error(self, message: str):
+        """Log error"""
+        self._write(f"ERROR: {message}")
+
+    def finish(self):
+        """Finish logging"""
+        self._write(f"=== Test Run Finished: {datetime.now().isoformat()} ===")
+        return self.log_file
 
 
 class Executor:
     """Execute commands, configurations, and workflows"""
 
-    def __init__(self, ssh_client: SSHClient, netdata_url: str):
+    def __init__(self, ssh_client: SSHClient, netdata_url: str, timeout: int = DEFAULT_TIMEOUT):
         self.ssh = ssh_client
         self.netdata_url = netdata_url
         self.netdata_version = None
         self.backed_up_files: List[Dict[str, Any]] = []
+        self.timeout = timeout
+        self.logger = ExecutionLogger()
 
     def capture_version(self) -> str:
         """Capture Netdata version at start of test run"""
@@ -29,7 +102,35 @@ class Executor:
         if not version_output:
             version_output = result.get('stderr', '').strip()
         self.netdata_version = version_output
+        self.logger.info(f"Netdata version: {version_output}")
         return version_output
+
+    def check_netdata_health(self) -> bool:
+        """Check if Netdata is running and responding to API requests"""
+        try:
+            import urllib.request
+            import json
+            url = f"{self.netdata_url}/api/v1/info"
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=10) as response:
+                data = json.loads(response.read().decode())
+                if data.get('version'):
+                    self.logger.info("Netdata health check: OK")
+                    return True
+        except Exception as e:
+            self.logger.error(f"Netdata health check failed: {e}")
+        return False
+
+    def wait_for_netdata(self, max_wait: int = 60) -> bool:
+        """Wait for Netdata to become healthy"""
+        self.logger.info(f"Waiting for Netdata to be healthy (max {max_wait}s)...")
+        start = time.time()
+        while time.time() - start < max_wait:
+            if self.check_netdata_health():
+                return True
+            time.sleep(2)
+        self.logger.error("Netdata did not become healthy in time")
+        return False
 
     def track_backup(self, backup_path: str, original_path: str):
         """Track a backed up file for later restoration"""

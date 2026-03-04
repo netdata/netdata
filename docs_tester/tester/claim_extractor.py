@@ -30,6 +30,31 @@ class Workflow:
     end_line: int = 0
 
 
+SENSITIVE_PLACEHOLDERS = [
+    r'YOUR_API_KEY',
+    r'YOUR_API_SECRET',
+    r'YOUR_TOKEN',
+    r'YOUR_PASSWORD',
+    r'YOUR_USERNAME',
+    r'YOUR_EMAIL',
+    r'<[A-Z_]+>',  # <TOKEN>, <API_KEY>, etc.
+    r'<\w+>',      # <placeholder>
+    r'\{[\w-]+\}', # {api-key}, {secret}
+    r'xx-xxxx-xx', # example API keys
+    r'[:/]{2}(?:api|secret|key|token|password)[^\s]*',
+]
+
+
+def contains_sensitive_placeholder(text: str) -> bool:
+    """Check if text contains sensitive placeholder values"""
+    if not text:
+        return False
+    for pattern in SENSITIVE_PLACEHOLDERS:
+        if re.search(pattern, text, re.IGNORECASE):
+            return True
+    return False
+
+
 class ClaimExtractor:
     """Extract testable claims from documentation"""
 
