@@ -58,8 +58,13 @@ class Executor:
                 'description': f'Executing: {command[:100]}...'
             })
 
-            # Check if command needs sudo
-            needs_sudo = any(cmd in command.lower() for cmd in ['sudo', 'systemctl', 'chmod', 'chown', 'mkdir', 'rm ', 'tee', 'edit-config'])
+            # Check if command needs sudo (excluding 'sudo' itself from the list to avoid double sudo)
+            needs_sudo = any(cmd in command.lower() for cmd in ['systemctl', 'chmod', 'chown', 'mkdir', 'rm ', 'tee', 'edit-config'])
+            
+            # Strip 'sudo ' prefix if present to avoid double sudo
+            if command.lower().startswith('sudo '):
+                command = command[5:].strip()
+                needs_sudo = True
             
             test_result = self._execute_with_retry(command, use_sudo=needs_sudo)
 
@@ -313,8 +318,13 @@ class Executor:
             'description': f'Executing: {command[:100]}...'
         })
 
-        # Check if command needs sudo
-        needs_sudo = any(cmd in command.lower() for cmd in ['sudo', 'systemctl', 'chmod', 'chown', 'mkdir', 'rm ', 'tee'])
+        # Check if command needs sudo (excluding 'sudo' itself from the list to avoid double sudo)
+        needs_sudo = any(cmd in command.lower() for cmd in ['systemctl', 'chmod', 'chown', 'mkdir', 'rm ', 'tee'])
+        
+        # Strip 'sudo ' prefix if present to avoid double sudo
+        if command.lower().startswith('sudo '):
+            command = command[5:].strip()
+            needs_sudo = True
         
         # Use retry logic
         test_result = self._execute_with_retry(command, use_sudo=needs_sudo)
