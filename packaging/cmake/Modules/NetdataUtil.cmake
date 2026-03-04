@@ -261,7 +261,7 @@ function(get_vendored_url_and_hash component prefix)
     file(READ "${${item}_file}" "${item}")
     string(STRIP "${${item}}" "${item}")
 
-    if("${item}" STREQUAL "")
+    if("${${item}}" STREQUAL "")
       message(FATAL_ERROR "${${item}_file} is empty")
     endif()
   endforeach()
