@@ -97,8 +97,11 @@ def main():
                 step_objects.append(step_item)
             else:
                 # It's a dict, convert to Step
+                step_type = step_item.get('type', 'COMMAND')
+                if isinstance(step_type, str):
+                    step_type = StepType[step_type.upper()]
                 step = Step(
-                    type=StepType[step_item.get('type', 'COMMAND').upper()] if isinstance(step_item.get('type'), str) else step_item.get('type', StepType.COMMAND),
+                    type=step_type,
                     instruction=step_item.get('instruction', ''),
                     expected=step_item.get('expected', 'Step completes successfully'),
                     number=idx
@@ -106,10 +109,17 @@ def main():
                 step_objects.append(step)
 
         # Create Workflow object
+        line_range = claim['line_range']
+        if '-' in line_range:
+            start_line = int(line_range.split('-')[0])
+            end_line = int(line_range.split('-')[1])
+        else:
+            start_line = end_line = int(line_range)
+
         workflow = type('Workflow', (), {
             'description': claim['description'],
-            'start_line': int(claim['line_range'].split('-')[0]) if '-' in claim['line_range'] else int(claim['line_range']),
-            'end_line': int(claim['line_range'].split('-')[1]) if '-' in claim['line_range'] else int(claim['line_range']),
+            'start_line': start_line,
+            'end_line': end_line,
             'steps': step_objects
         })()
 
