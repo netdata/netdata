@@ -4,11 +4,33 @@ import re
 import time
 import urllib.request
 import urllib.error
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from .ssh_client import SSHClient
 from .claim_extractor import StepType, Step, Workflow
 
 MAX_SLEEP_SECONDS = 300  # Cap sleep at 5 minutes
+MAX_RETRIES = 3
+RETRY_DELAY = 2  # seconds between retries
+
+
+def with_retry(func: Callable) -> Callable:
+    """Decorator to retry a function on failure"""
+    def wrapper(*args, **kwargs):
+        last_error = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                result = func(*args, **kwargs)
+                if result.get('success', False):
+                    return result
+                last_error = result.get('stderr', result.get('error', 'Unknown error'))
+            except Exception as e:
+                last_error = str(e)
+            
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_DELAY)
+        
+        return {'success': False, 'error': f'Failed after {MAX_RETRIES} attempts: {last_error}'}
+    return wrapper
 
 
 class Executor:
@@ -17,6 +39,28 @@ class Executor:
     def __init__(self, ssh_client: SSHClient, netdata_url: str):
         self.ssh = ssh_client
         self.netdata_url = netdata_url
+
+    def _execute_with_retry(self, command: str, use_sudo: bool = False) -> Dict[str, Any]:
+        """Execute SSH command with retry logic"""
+        last_error = None
+        
+        for attempt in range(MAX_RETRIES):
+            try:
+                if use_sudo:
+                    test_result = self.ssh.sudo(command)
+                else:
+                    test_result = self.ssh.execute(command)
+                
+                if test_result.get('success', False):
+                    return test_result
+                last_error = test_result.get('stderr', test_result.get('error', 'Unknown error'))
+            except Exception as e:
+                last_error = str(e)
+            
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_DELAY)
+        
+        return {'success': False, 'stderr': f'Failed after {MAX_RETRIES} attempts: {last_error}'}
 
     def test_command(self, claim: Dict[str, Any]) -> Dict[str, Any]:
         """Test a command claim"""
@@ -37,10 +81,7 @@ class Executor:
             # Check if command needs sudo
             needs_sudo = any(cmd in command.lower() for cmd in ['sudo', 'systemctl', 'chmod', 'chown', 'mkdir', 'rm ', 'tee', 'edit-config'])
             
-            if needs_sudo:
-                test_result = self.ssh.sudo(command)
-            else:
-                test_result = self.ssh.execute(command)
+            test_result = self._execute_with_retry(command, use_sudo=needs_sudo)
 
             result['stdout'] = test_result.get('stdout', '')
             result['stderr'] = test_result.get('stderr', '')
@@ -109,7 +150,11 @@ class Executor:
                 'description': f"Applying configuration to {config_file}"
             })
 
-            apply_result = self.ssh.write_file(config_file, config_content)
+            # Retry write operation
+            apply_result = self._execute_with_retry(
+                f'cat > {config_file} << "EOF"\n{config_content}\nEOF',
+                use_sudo=True
+            )
             if not apply_result['success']:
                 result['status'] = 'FAIL'
                 result['error'] = f'Failed to apply config: {apply_result.get("stderr")}'
@@ -121,7 +166,8 @@ class Executor:
                 'description': 'Restarting Netdata service'
             })
 
-            restart_result = self.ssh.sudo('systemctl restart netdata')
+            # Retry restart operation
+            restart_result = self._execute_with_retry('systemctl restart netdata', use_sudo=True)
             if not restart_result['success']:
                 result['status'] = 'FAIL'
                 result['error'] = f'Failed to restart netdata: {restart_result.get("stderr")}'
@@ -172,24 +218,41 @@ class Executor:
                 'description': f'Querying API endpoint: {url}'
             })
 
-            request = urllib.request.Request(url)
-            with urllib.request.urlopen(request, timeout=10) as response:
-                result['status_code'] = response.getcode()
-                response_body = response.read().decode('utf-8')[:500]
-                result['response_body'] = response_body
+            # Retry logic for API calls
+            last_error = None
+            for attempt in range(MAX_RETRIES):
+                try:
+                    request = urllib.request.Request(url)
+                    with urllib.request.urlopen(request, timeout=10) as response:
+                        result['status_code'] = response.getcode()
+                        response_body = response.read().decode('utf-8')[:500]
+                        result['response_body'] = response_body
 
-            if response.getcode() == 200:
-                result['status'] = 'PASS'
+                    if response.getcode() == 200:
+                        result['status'] = 'PASS'
+                    else:
+                        result['status'] = 'FAIL'
+                        result['error'] = f'API returned status code {response.getcode()}'
+                    break  # Success or definite failure, no retry
+                    
+                except urllib.error.HTTPError as e:
+                    last_error = f'HTTP error: {e.code} - {str(e.reason)}'
+                except urllib.error.URLError as e:
+                    last_error = f'URL error: {str(e)}'
+                except Exception as e:
+                    last_error = str(e)
+                
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(RETRY_DELAY)
+                    result['steps'].append({
+                        'action': 'retry',
+                        'description': f'Retrying API call (attempt {attempt + 2}/{MAX_RETRIES})...'
+                    })
             else:
+                # All retries exhausted
                 result['status'] = 'FAIL'
-                result['error'] = f'API returned status code {response.getcode()}'
+                result['error'] = f'API call failed after {MAX_RETRIES} attempts: {last_error}'
 
-        except urllib.error.HTTPError as e:
-            result['status'] = 'FAIL'
-            result['error'] = f'HTTP error: {e.code} - {str(e.reason)}'
-        except urllib.error.URLError as e:
-            result['status'] = 'FAIL'
-            result['error'] = f'URL error: {str(e)}'
         except Exception as e:
             result['status'] = 'FAIL'
             result['error'] = str(e)
@@ -263,7 +326,7 @@ class Executor:
             return step_result
 
     def _execute_command_step(self, step: Step, step_result: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a command step"""
+        """Execute a command step with retry"""
         command = step.instruction
         step_result['evidence'].append({
             'action': 'execute_command',
@@ -273,10 +336,8 @@ class Executor:
         # Check if command needs sudo
         needs_sudo = any(cmd in command.lower() for cmd in ['sudo', 'systemctl', 'chmod', 'chown', 'mkdir', 'rm ', 'tee'])
         
-        if needs_sudo:
-            test_result = self.ssh.sudo(command)
-        else:
-            test_result = self.ssh.execute(command)
+        # Use retry logic
+        test_result = self._execute_with_retry(command, use_sudo=needs_sudo)
         
         step_result['evidence'].append({
             'output': test_result.get('stdout', '')[:500]
@@ -315,11 +376,8 @@ class Executor:
             })
             return step_result
         
-        # If the instruction is a command, execute it with sudo if needed
-        if instruction.startswith('sudo ') or instruction.startswith('systemctl') or '/etc/' in instruction:
-            cmd_result = self.ssh.sudo(instruction)
-        else:
-            cmd_result = self.ssh.sudo(instruction)
+        # If the instruction is a command, execute it with retry
+        cmd_result = self._execute_with_retry(instruction, use_sudo=True)
         
         step_result['evidence'].append({
             'action': 'file_operation',
