@@ -210,7 +210,7 @@ class ClaimExtractor:
             
             if is_numbered or is_step_marker:
                 # Set workflow_start when first step is detected
-                if not in_workflow or workflow_start == 0:
+                if not in_workflow:
                     in_workflow = True
                     workflow_start = i
                 
