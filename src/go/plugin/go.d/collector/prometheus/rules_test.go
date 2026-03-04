@@ -127,6 +127,32 @@ func TestCollector_ApplyRelabel_LabelMapKeepOrder(t *testing.T) {
 	assert.Equal(t, "", out.Get("project"))
 }
 
+func TestDimensionRuleRender_NoCascadingSubstitution(t *testing.T) {
+	rule := compiledDimensionRule{
+		template: "${a}-${b}",
+		vars:     []string{"a", "b"},
+	}
+	lbls := labels.Labels{
+		{Name: "a", Value: "${b}"},
+		{Name: "b", Value: "x"},
+	}
+
+	repl, consumed, ok := rule.render(lbls)
+	require.True(t, ok)
+	assert.Equal(t, "${b}-x", repl)
+	assert.True(t, consumed["a"])
+	assert.True(t, consumed["b"])
+}
+
+func TestDimensionMetricID_NoSanitizationCollision(t *testing.T) {
+	chartID := "test_status-project=a"
+
+	idWithSpace := dimensionMetricID(chartID, "a b")
+	idWithUnderscore := dimensionMetricID(chartID, "a_b")
+
+	assert.NotEqual(t, idWithSpace, idWithUnderscore)
+}
+
 func TestCollector_DimensionRulesGauge(t *testing.T) {
 	var (
 		mu   sync.RWMutex

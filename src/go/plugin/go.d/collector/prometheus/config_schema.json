@@ -3,7 +3,7 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Prometheus collector configuration.",
     "type": "object",
-    "$defs": {
+    "definitions": {
       "selector_expr": {
         "type": [
           "object",
@@ -205,7 +205,7 @@
       "selector": {
         "title": "Selectors",
         "description": "Configuration for selecting and filtering a set of time series using Prometheus selectors. If left empty, no filtering is applied.",
-        "$ref": "#/$defs/selector_expr"
+        "$ref": "#/definitions/selector_expr"
       },
       "selector_groups": {
         "title": "Selector groups",
@@ -225,19 +225,19 @@
             "selector": {
               "title": "Selectors",
               "description": "Group-specific selector. If empty, all scraped metrics are eligible for this group.",
-              "$ref": "#/$defs/selector_expr"
+              "$ref": "#/definitions/selector_expr"
             },
             "label_relabel": {
               "title": "Label relabel",
-              "$ref": "#/$defs/relabel_rules"
+              "$ref": "#/definitions/relabel_rules"
             },
             "context_rules": {
               "title": "Context rules",
-              "$ref": "#/$defs/context_rules"
+              "$ref": "#/definitions/context_rules"
             },
             "dimension_rules": {
               "title": "Dimension rules",
-              "$ref": "#/$defs/dimension_rules"
+              "$ref": "#/definitions/dimension_rules"
             }
           }
         }
@@ -295,17 +295,17 @@
       "label_relabel": {
         "title": "Label relabel",
         "description": "Transform label sets before chart IDs and chart labels are generated.",
-        "$ref": "#/$defs/relabel_rules"
+        "$ref": "#/definitions/relabel_rules"
       },
       "context_rules": {
         "title": "Context rules",
         "description": "Override context, title, units, and chart type by metric family name regex.",
-        "$ref": "#/$defs/context_rules"
+        "$ref": "#/definitions/context_rules"
       },
       "dimension_rules": {
         "title": "Dimension rules",
         "description": "Group multiple Gauge, Counter, Summary, or Histogram series into a single multi-dimensional chart.",
-        "$ref": "#/$defs/dimension_rules"
+        "$ref": "#/definitions/dimension_rules"
       },
       "username": {
         "title": "Username",

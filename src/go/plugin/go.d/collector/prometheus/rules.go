@@ -378,15 +378,24 @@ func (c *Collector) matchDimensionRule(metricName string) *compiledDimensionRule
 
 func (r compiledDimensionRule) render(labels labels.Labels) (string, map[string]bool, bool) {
 	consumed := make(map[string]bool, len(r.vars))
-	repl := r.template
-	for _, name := range r.vars {
+	missing := false
+	repl := dimVarRe.ReplaceAllStringFunc(r.template, func(match string) string {
+		sub := dimVarRe.FindStringSubmatch(match)
+		if len(sub) < 2 {
+			return match
+		}
+		name := sub[1]
 		value, ok := getLabelValue(labels, name)
 		if !ok {
-			// Missing template variables make the dimension ambiguous; callers skip this sample.
-			return "", nil, false
+			missing = true
+			return ""
 		}
 		consumed[name] = true
-		repl = strings.ReplaceAll(repl, "${"+name+"}", value)
+		return value
+	})
+	if missing {
+		// Missing template variables make the dimension ambiguous; callers skip this sample.
+		return "", nil, false
 	}
 	repl = strings.TrimSpace(repl)
 	if repl == "" {

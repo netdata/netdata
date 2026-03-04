@@ -237,7 +237,7 @@ func (c *Collector) collectSummary(mx map[string]int64, mf *prometheus.MetricFam
 
 		for _, v := range m.Summary().Quantiles() {
 			if !math.IsNaN(v.Value()) {
-				dimID := fmt.Sprintf("%s_quantile=%s-dim=%s", chartID, formatFloat(v.Quantile()), sanitizeMetricIDPart(dimName))
+				dimID := fmt.Sprintf("%s_quantile=%s-dim=%s", chartID, formatFloat(v.Quantile()), encodeDimensionIDPart(dimName))
 				ensureChartDim(c.Charts().Get(chartID), dimID, dimName+"_quantile_"+formatFloat(v.Quantile()), collectorapi.Absolute, precision*precision)
 				trackSeenDim(seenDims, chartID, dimID)
 				mx[dimID] = int64(v.Value() * precision * precision)
@@ -246,8 +246,8 @@ func (c *Collector) collectSummary(mx map[string]int64, mf *prometheus.MetricFam
 
 		sumChartID := chartID + "_sum"
 		countChartID := chartID + "_count"
-		sumDimID := fmt.Sprintf("%s-dim=%s", sumChartID, sanitizeMetricIDPart(dimName))
-		countDimID := fmt.Sprintf("%s-dim=%s", countChartID, sanitizeMetricIDPart(dimName))
+		sumDimID := fmt.Sprintf("%s-dim=%s", sumChartID, encodeDimensionIDPart(dimName))
+		countDimID := fmt.Sprintf("%s-dim=%s", countChartID, encodeDimensionIDPart(dimName))
 
 		ensureChartDim(c.Charts().Get(sumChartID), sumDimID, dimName, collectorapi.Incremental, precision)
 		ensureChartDim(c.Charts().Get(countChartID), countDimID, dimName, collectorapi.Incremental, 1)
@@ -304,7 +304,7 @@ func (c *Collector) collectHistogram(mx map[string]int64, mf *prometheus.MetricF
 
 		for _, v := range m.Histogram().Buckets() {
 			if !math.IsNaN(v.CumulativeCount()) {
-				dimID := fmt.Sprintf("%s_bucket=%s-dim=%s", chartID, formatFloat(v.UpperBound()), sanitizeMetricIDPart(dimName))
+				dimID := fmt.Sprintf("%s_bucket=%s-dim=%s", chartID, formatFloat(v.UpperBound()), encodeDimensionIDPart(dimName))
 				ensureChartDim(c.Charts().Get(chartID), dimID, dimName+"_bucket_"+formatFloat(v.UpperBound()), collectorapi.Incremental, 1)
 				trackSeenDim(seenDims, chartID, dimID)
 				mx[dimID] = int64(v.CumulativeCount())
@@ -313,8 +313,8 @@ func (c *Collector) collectHistogram(mx map[string]int64, mf *prometheus.MetricF
 
 		sumChartID := chartID + "_sum"
 		countChartID := chartID + "_count"
-		sumDimID := fmt.Sprintf("%s-dim=%s", sumChartID, sanitizeMetricIDPart(dimName))
-		countDimID := fmt.Sprintf("%s-dim=%s", countChartID, sanitizeMetricIDPart(dimName))
+		sumDimID := fmt.Sprintf("%s-dim=%s", sumChartID, encodeDimensionIDPart(dimName))
+		countDimID := fmt.Sprintf("%s-dim=%s", countChartID, encodeDimensionIDPart(dimName))
 
 		ensureChartDim(c.Charts().Get(sumChartID), sumDimID, dimName, collectorapi.Incremental, precision)
 		ensureChartDim(c.Charts().Get(countChartID), countDimID, dimName, collectorapi.Incremental, 1)
@@ -404,7 +404,7 @@ func filterMetricFamily(mf *prometheus.MetricFamily, metricName string, sr selec
 }
 
 func dimensionMetricID(chartID, dimName string) string {
-	return chartID + "-dim=" + sanitizeMetricIDPart(dimName)
+	return chartID + "-dim=" + encodeDimensionIDPart(dimName)
 }
 
 func sanitizeMetricIDPart(v string) string {
@@ -421,6 +421,33 @@ func sanitizeMetricIDPart(v string) string {
 		return "value"
 	}
 	return v
+}
+
+func encodeDimensionIDPart(v string) string {
+	if v == "" {
+		return "value"
+	}
+	var b strings.Builder
+	b.Grow(len(v))
+	for i := 0; i < len(v); i++ {
+		switch v[i] {
+		case '_':
+			b.WriteString("__")
+		case ' ':
+			b.WriteString("_s")
+		case '\\':
+			b.WriteString("_b")
+		case '\'':
+			b.WriteString("_a")
+		default:
+			b.WriteByte(v[i])
+		}
+	}
+	out := b.String()
+	if out == "" {
+		return "value"
+	}
+	return out
 }
 
 func ensureChartDim(chart *collectorapi.Chart, dimID, dimName string, algo collectorapi.DimAlgo, div int) {
