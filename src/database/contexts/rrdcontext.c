@@ -201,7 +201,7 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
 // ----------------------------------------------------------------------------
 // ACLK interface
 
-static inline const char *aclk_ctx_defer_reason_to_string(uint8_t reason) {
+static inline const char *aclk_ctx_defer_reason_to_string(ACLK_CTX_DEFER_REASON reason) {
     switch(reason) {
         case ACLK_CTX_DEFER_REASON_PENDING_CONTEXT_LOAD:
             return "pending_context_load";
@@ -210,6 +210,42 @@ static inline const char *aclk_ctx_defer_reason_to_string(uint8_t reason) {
         default:
             return "unknown";
     }
+}
+
+// Record a deferred checkpoint and queue a node info update.
+// Returns true if the checkpoint should be deferred, false if the deferral limit has been reached
+// and the checkpoint should proceed anyway.
+static bool rrdcontext_checkpoint_defer(RRDHOST *host, ACLK_CTX_DEFER_REASON reason) {
+    time_t now_s = now_realtime_sec();
+
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    if(aclk_host_config) {
+        uint32_t count = __atomic_add_fetch(&aclk_host_config->context_checkpoint_deferred_count, 1, __ATOMIC_RELAXED);
+        __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_reason, reason, __ATOMIC_RELAXED);
+        __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_last_time_s, now_s, __ATOMIC_RELAXED);
+
+        // set first deferral time if this is the first one
+        time_t first_time_s = __atomic_load_n(&aclk_host_config->context_checkpoint_deferred_first_time_s, __ATOMIC_RELAXED);
+        if(!first_time_s) {
+            __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_first_time_s, now_s, __ATOMIC_RELAXED);
+            first_time_s = now_s;
+        }
+
+        // check if we exceeded the deferral limits
+        if(count >= ACLK_CTX_CHECKPOINT_MAX_DEFERRALS ||
+           (first_time_s > 0 && now_s - first_time_s >= ACLK_CTX_CHECKPOINT_DEFER_MAX_TIME_S)) {
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "RRDCONTEXT: host '%s' exceeded deferral limits (%u deferrals, %lld sec since first). "
+                   "Proceeding with checkpoint despite '%s'.",
+                   rrdhost_hostname(host), count,
+                   (first_time_s > 0) ? (long long)(now_s - first_time_s) : 0LL,
+                   aclk_ctx_defer_reason_to_string(reason));
+            return false;
+        }
+    }
+
+    aclk_queue_node_info(host, false);
+    return true;
 }
 
 void rrdcontext_hub_checkpoint_command(void *ptr) {
@@ -242,17 +278,8 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
                "but host '%s' is still loading contexts. Deferring hash check and snapshot decision.",
                cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
-        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
-        if(aclk_host_config) {
-            __atomic_add_fetch(&aclk_host_config->context_checkpoint_deferred_count, 1, __ATOMIC_RELAXED);
-            __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_reason,
-                             ACLK_CTX_DEFER_REASON_PENDING_CONTEXT_LOAD, __ATOMIC_RELAXED);
-            __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_last_time_s, now_realtime_sec(), __ATOMIC_RELAXED);
-        }
-
-        aclk_queue_node_info(host, false);
-
-        return;
+        if(rrdcontext_checkpoint_defer(host, ACLK_CTX_DEFER_REASON_PENDING_CONTEXT_LOAD))
+            return;
     }
 
     if(rrdcontext_queue_entries(&host->rrdctx.pp_queue) > 0) {
@@ -261,17 +288,8 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
                "but host '%s' still has pending context post-processing. Deferring hash check and snapshot decision.",
                cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
-        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
-        if(aclk_host_config) {
-            __atomic_add_fetch(&aclk_host_config->context_checkpoint_deferred_count, 1, __ATOMIC_RELAXED);
-            __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_reason,
-                             ACLK_CTX_DEFER_REASON_PENDING_POST_PROCESSING, __ATOMIC_RELAXED);
-            __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_last_time_s, now_realtime_sec(), __ATOMIC_RELAXED);
-        }
-
-        aclk_queue_node_info(host, false);
-
-        return;
+        if(rrdcontext_checkpoint_defer(host, ACLK_CTX_DEFER_REASON_PENDING_POST_PROCESSING))
+            return;
     }
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
@@ -319,17 +337,18 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
     if(aclk_host_config) {
         uint32_t deferred_count = __atomic_exchange_n(&aclk_host_config->context_checkpoint_deferred_count, 0, __ATOMIC_RELAXED);
-        uint8_t deferred_reason = __atomic_exchange_n(&aclk_host_config->context_checkpoint_deferred_reason,
-                                                       ACLK_CTX_DEFER_REASON_NONE, __ATOMIC_RELAXED);
+        ACLK_CTX_DEFER_REASON deferred_reason = __atomic_exchange_n(&aclk_host_config->context_checkpoint_deferred_reason,
+                                                                     ACLK_CTX_DEFER_REASON_NONE, __ATOMIC_RELAXED);
         time_t deferred_last_time_s = __atomic_exchange_n(&aclk_host_config->context_checkpoint_deferred_last_time_s, 0, __ATOMIC_RELAXED);
+        __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_first_time_s, 0, __ATOMIC_RELAXED);
         if(deferred_count) {
-        time_t now_s = now_realtime_sec();
-        long long age_s = (deferred_last_time_s > 0 && now_s >= deferred_last_time_s) ? (long long)(now_s - deferred_last_time_s) : -1;
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "RRDCONTEXT: host '%s' Activated context streaming after %u deferred checkpoint(s), "
-               "last reason '%s', last deferred at %lld (age %lld sec).",
-               rrdhost_hostname(host), deferred_count, aclk_ctx_defer_reason_to_string(deferred_reason),
-               (long long)deferred_last_time_s, age_s);
+            time_t now_s = now_realtime_sec();
+            long long age_s = (deferred_last_time_s > 0 && now_s >= deferred_last_time_s) ? (long long)(now_s - deferred_last_time_s) : -1;
+            nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                   "RRDCONTEXT: host '%s' activated context streaming after %u deferred checkpoint(s), "
+                   "last reason '%s', last deferred at %lld (age %lld sec).",
+                   rrdhost_hostname(host), deferred_count, aclk_ctx_defer_reason_to_string(deferred_reason),
+                   (long long)deferred_last_time_s, age_s);
         }
     }
 
