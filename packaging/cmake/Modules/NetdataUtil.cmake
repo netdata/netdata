@@ -244,10 +244,28 @@ endfunction()
 
 # Load the URL and hash for a vendored component
 function(get_vendored_url_and_hash component prefix)
-  file(READ "${CMAKE_SOURCE_DIR}/packaging/vendor/${component}.url" url)
-  file(READ "${CMAKE_SOURCE_DIR}/packaging/vendor/${component}.sha256" hash)
-  string(STRIP "${url}" url)
-  string(STRIP "${hash}" hash)
+  set(url_file "${CMAKE_SOURCE_DIR}/packaging/vendor/${component}.url")
+  set(hash_file "${CMAKE_SOURCE_DIR}/packaging/vendor/${component}.sha256")
+
+  foreach(item ITEMS url hash)
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.29)
+      if(NOT IS_READABLE ${${item}_file})
+        message(FATAL_ERROR "Unable to read data from ${${item}_file}")
+      endif()
+    else()
+      if(NOT EXISTS ${${item}_file})
+        message(FATAL_ERROR "Unable to read data from ${${item}_file}")
+      endif()
+    endif()
+
+    file(READ "${${item}_file}" "${item}")
+    string(STRIP "${${item}}" "${item}")
+
+    if("${item}" STREQUAL "")
+      message(FATAL_ERROR "${${item}_file} is empty")
+    endif()
+  endforeach()
+
   set("${prefix}_URL" "${url}" PARENT_SCOPE)
   set("${prefix}_HASH" "${hash}" PARENT_SCOPE)
 endfunction()

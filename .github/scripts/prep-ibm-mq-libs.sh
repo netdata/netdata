@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 url="$(cat packaging/vendor/ibm_mq.url)"
 sha256="$(cat packaging/vendor/ibm_mq.sha256)"
@@ -13,6 +13,7 @@ cache_path="${cache_dir}/${file}"
 extract_path="${tmp_dir}/ibm_mq"
 need_to_fetch=1
 
+rm -rf "${extract_path}"
 mkdir -p "${tmp_dir}" "${cache_dir}" "${extract_path}"
 
 hash_valid() {

@@ -29,6 +29,7 @@ macro(add_ibm_plugin_target)
 
   if(DEFINED FETCHCONTENT_SOURCE_DIR_IBM_MQ)
     message(STATUS "Copying IBM MQ client library sources from ${FETCHCONTENT_SOURCE_DIR_IBM_MQ} to ${IBM_MQ_BUILD_DIR}")
+    file(REMOVE_RECURSE "${IBM_MQ_BUILD_DIR}")
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E copy_directory ${FETCHCONTENT_SOURCE_DIR_IBM_MQ} ${IBM_MQ_BUILD_DIR}
       RESULT_VARIABLE IBM_MQ_COPY_STATUS
@@ -59,7 +60,7 @@ macro(add_ibm_plugin_target)
   set(IBM_RPATH_FLAGS "")
 
   # Add MQ support if MQ client libraries are available
-  if(EXISTS "${ibm_mq_SOURCE_DIR}/inc/cmqc.h")
+  if(EXISTS "${IBM_MQ_BUILD_DIR}/inc/cmqc.h")
     set(IBM_CGO_CFLAGS "-I${IBM_MQ_BUILD_DIR}/inc")
     set(IBM_CGO_LDFLAGS "-L${IBM_MQ_BUILD_DIR}/lib64 -lmqic_r")
     set(IBM_RPATH_FLAGS "-Wl,-rpath,$ORIGIN/../../../${IBM_MQ_INSTALL_SUFFIX}/lib64")

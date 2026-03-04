@@ -268,7 +268,7 @@ jobs:
         uses: actions/upload-artifact@v6.0.0
         with:
           name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
-          path: ${{ github.workspace }}/artifacts/*
+          path: ${{ github.workspace }}/artifacts/*${{ matrix.format }}
       - name: Test Packages
         id: test
         if: needs.file-check.outputs.run == 'true'
