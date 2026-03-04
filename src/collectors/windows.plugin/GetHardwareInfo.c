@@ -445,6 +445,9 @@ static RRDSET *netdata_publish_cpu_chart(int update_every)
 
 static void netdata_loop_cpu_chart(int update_every)
 {
+    if (unlikely(!cpus_lock_initialized || !cpus))
+        return;
+
     RRDSET *chart = netdata_publish_cpu_chart(update_every);
 
     EnterCriticalSection(&cpus_lock);
@@ -470,11 +473,17 @@ static void netdata_loop_cpu_chart(int update_every)
 int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
+    static bool init_failed = false;
+
+    if (unlikely(init_failed))
+        return -1;
+
     if (unlikely(!initialized)) {
-        initialized = true;
         if (initialize()) {
+            init_failed = true;
             return -1;
         }
+        initialized = true;
     }
 
     netdata_loop_cpu_chart(update_every);
