@@ -456,7 +456,12 @@ class Executor:
                 duration *= 60
             elif time_unit == 'hour':
                 duration *= 3600
-            duration = min(duration, MAX_SLEEP_SECONDS)
+
+            if duration > MAX_SLEEP_SECONDS:
+                step_result['evidence'].append({
+                    'warning': f'Wait capped from {duration}s to {MAX_SLEEP_SECONDS}s for practicality'
+                })
+                duration = MAX_SLEEP_SECONDS
             time.sleep(duration)
         else:
             step_result['evidence'].append({
