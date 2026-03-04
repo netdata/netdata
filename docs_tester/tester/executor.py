@@ -107,7 +107,8 @@ class Executor:
             # 1. Only contains section headers (no key=value pairs)
             # 2. Less than 3 lines AND all are simple key=value (no sections)
             has_section = bool(re.search(r'^\s*\[[\w-]+\]\s*$', config_content, re.MULTILINE))
-            has_keyvalue = bool(re.search(r'^[\w-]+=', config_content, re.MULTILINE))
+            # Allow for indented key=value lines (common in config files)
+            has_keyvalue = bool(re.search(r'^\s*[\w-]+=', config_content, re.MULTILINE))
             
             is_partial = False
             if has_section and not has_keyvalue:
