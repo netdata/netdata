@@ -41,13 +41,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -150,13 +144,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -259,13 +247,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -368,13 +350,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -556,13 +532,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -885,13 +855,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -978,13 +942,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -1065,13 +1023,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           section_name: "[plugin:windows:PerflibThermalZone]"
@@ -1151,13 +1103,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           section_name: "[plugin:windows:GetPowerSupply]"
@@ -1250,13 +1196,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           section_name: "[plugin:windows:GetSensors]"
@@ -1482,13 +1422,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -1806,13 +1740,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -2182,101 +2110,11 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - title: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
-          - title: Configure SQL Server for Monitoring
-            description: |
-              For **each SQL Server** instance you want to monitor, complete the following steps:
-
-              1. **Create Monitoring User**
-
-                 Create an SQL Server user with the necessary permissions to collect monitoring data:
-
-                 ```tsql
-                 USE master;
-                 CREATE LOGIN netdata_user WITH PASSWORD = '1ReallyStrongPasswordShouldBeInsertedHere';
-                 CREATE USER netdata_user FOR LOGIN netdata_user;
-                 GRANT CONNECT SQL TO netdata_user;
-                 GRANT VIEW SERVER STATE TO netdata_user;
-                 GO
-                 ```
-
-              2. **Enable Query Store**
-
-                 Enable the [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store?view=sql-server-ver16) and grant access               to    the monitoring user on all relevant databases:
-
-                 ```tsql
-                 DECLARE @dbname NVARCHAR(max)
-                 DECLARE nd_user_cursor CURSOR FOR SELECT name
-                                     FROM master.dbo.sysdatabases
-                                     WHERE name NOT IN ('master')
-
-                 OPEN nd_user_cursor
-                 FETCH NEXT FROM nd_user_cursor INTO @dbname
-                 WHILE @@FETCH_STATUS = 0
-                 BEGIN
-                   EXECUTE ("USE "+ @dbname+"; CREATE USER netdata_user FOR LOGIN netdata_user; ALTER DATABASE "+@dbname+" SET QUERY_STORE = ON ( QUERY_CAPTURE_MODE = ALL, DATA_FLUSH_INTERVAL_SECONDS               =    900 )");
-                   FETCH next FROM nd_user_cursor INTO @dbname;
-                 END
-                 CLOSE nd_user_cursor
-                 DEALLOCATE nd_user_cursor
-                 GO
-                 ```
-
-              3. **Enable Query Job status**
-
-                 Connect to your database and grant `SELECT` permission to `netdata_user`:
-
-                ```tsql
-                USE msdb;
-                GO
-                GRANT SELECT ON SCHEMA::[dbo] TO netdata_user;
-                GO
-                ```
-
-              4. **Enable Query replication stored procedure**
-
-                 Connect to your database and add `netdata_user` to `replmonitor`:
-
-                ```tsql
-                USE distribution;
-                GO
-                EXEC sp_addrolemember 'replmonitor', 'netdata_user';
-                GO
-                ```
-
-              5. **Configure SQL Server Network Settings**
-
-                 Enable SQL Server to accept TCP connections:
-
-                - Open `SQL Server Configuration Manager`
-                - Expand `SQL Server Network Configuration`
-                - Select `Protocols for <instance name>` in the console panel
-                - Double-click the `TCP` protocol in the details panel and set `Enabled` to `Yes`
-                - Go to the `IP Address` tab and locate the `IPAII` section:
-                  - Clear any value from the `TCP Dynamic Ports` field
-                  - Enter a port number in the `TCP Port` field (default is `1433`)
-                - Select `SQL Server Services` and restart your SQL Server instance
-
-              6. **Configure SQL Server Authentication (Optional)**
-
-                 If you're using SQL Server authentication (rather than Windows authentication):
-
-                - Open `SQL Server Management Studio`
-                - Right-click your server and select `Properties`
-                - Select `Security` in the left panel
-                - Choose `SQL Server and Windows Authentication mode` under `Server authentication`
-                - Click `OK`
-                - Right-click your server and select `Restart`
+        list: []
       configuration:
         file:
           name: "netdata.conf"
-          section_name: "[plugin:windows:PerflibMSSQL]"
+          section_name: "[plugin:windows:MsSql]"
           description: "The Netdata main configuration file"
         options:
           description: "These options allow the collector to connect to your MSSQL instance and collect transaction data from it."
@@ -2806,13 +2644,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3077,13 +2909,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3249,13 +3075,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3431,13 +3251,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3712,13 +3526,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3810,13 +3618,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -4079,13 +3881,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -4170,13 +3966,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
