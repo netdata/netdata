@@ -94,11 +94,13 @@ class SSHClient:
             return {'success': False, 'error': str(e)}
 
     def backup_file(self, path: str) -> Optional[str]:
-        """Create backup of remote file"""
+        """Create backup of remote file with timestamp directory structure"""
         import time
         quoted_path = shlex.quote(path)
         timestamp = int(time.time())
-        backup_path = f"{path}.backup.{timestamp}"
+        backup_base = f"/tmp/netdata_test_backup_{timestamp}"
+        self.sudo(f"mkdir -p {backup_base}{path.rsplit('/', 1)[0] if '/' in path else ''}")
+        backup_path = f"{backup_base}{path}"
         result = self.sudo(f"cp {quoted_path} {shlex.quote(backup_path)}")
         if result['success']:
             return backup_path

@@ -61,8 +61,44 @@ class ClaimExtractor:
         # Third pass: extract behavioral claims
         behavioral_claims = self._extract_behavioral_claims(content)
         claims.extend(behavioral_claims)
-        
+
+        # Fourth pass: extract prerequisites
+        prerequisites = self._extract_prerequisites(content)
+        if prerequisites:
+            claims.insert(0, {
+                'type': 'prerequisite',
+                'description': 'Prerequisites for this documentation',
+                'prerequisites': prerequisites
+            })
+
         return claims
+
+    def _extract_prerequisites(self, content: str) -> List[Dict[str, Any]]:
+        """Extract prerequisites from documentation content"""
+        prerequisites = []
+
+        prerequisite_patterns = [
+            (r'(?:requires?|need|you must have|ensure|make sure)\s+([^.]+)', 'service'),
+            (r'(?:install(?:ed|ing)?|package)\s+([^.]+\.deb|\.rpm|[^\s]+(?:package|debian|rpm))', 'package'),
+            (r'(?:enable(?:d|s)?|turn on)\s+([^.]+plugin)', 'plugin'),
+            (r'(?:start(?:ed|ing|ed)?|running)\s+([^.]+service)', 'service'),
+            (r'(?:VPN|connection|network access)\s+to\s+([^.]+)', 'network'),
+            (r'(?:access to|credentials?|login)\s+([^.]+)', 'access'),
+        ]
+
+        lines = content.split('\n')
+        for i, line in enumerate(lines, 1):
+            line_lower = line.lower()
+            for pattern, prereq_type in prerequisite_patterns:
+                match = re.search(pattern, line_lower)
+                if match:
+                    prerequisites.append({
+                        'type': prereq_type,
+                        'description': match.group(0),
+                        'line': i
+                    })
+
+        return prerequisites
 
     def _extract_all_code_blocks(self, content: str) -> List[Dict[str, Any]]:
         """Extract all code blocks as testable claims"""

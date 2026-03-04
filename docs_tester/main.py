@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
 Netdata Documentation Tester - Main CLI Entry Point
+
+This tester follows the documentation exactly as a developer would,
+executing every testable claim on a live Netdata installation.
 """
 
 import sys
@@ -44,22 +47,54 @@ def main():
     executor = Executor(ssh_client, netdata_url)
     reporter = Reporter(args.output_dir)
 
-    print("Parsing documentation...")
+    # Capture Netdata version at start
+    print("\nCapturing Netdata version...")
+    version = executor.capture_version()
+    print(f"Netdata version: {version}")
+    print("-" * 60)
+
+    print("\nParsing documentation...")
     claims = claim_extractor.parse_file(args.doc_file)
+
+    # Check for prerequisites first
+    prereq_claim = None
+    if claims and claims[0].get('type') == 'prerequisite':
+        prereq_claim = claims[0]
+        print(f"\nFound prerequisites: {prereq_claim.get('prerequisites', [])}")
 
     code_claims = [c for c in claims if c['type'] in ['configuration', 'command', 'api', 'behavioral']]
     workflow_claims = [c for c in claims if c['type'] == 'workflow']
 
-    print(f"Found {len(code_claims)} code block claims")
-    print(f"Found {len(workflow_claims)} workflow claims")
-    print(f"Total: {len(claims)} testable claims")
+    # Print test plan
+    print("\n" + "=" * 60)
+    print("TEST PLAN")
+    print("=" * 60)
+    all_claims = code_claims + workflow_claims
+    for i, claim in enumerate(all_claims, 1):
+        desc = claim.get('description', 'N/A')[:80]
+        claim_type = claim.get('type', 'N/A')
+        print(f"[{i}] {claim_type}: {desc}")
     print()
 
-    if not claims:
+    print(f"Found {len(code_claims)} code block claims")
+    print(f"Found {len(workflow_claims)} workflow claims")
+    print(f"Total: {len(all_claims)} testable claims")
+    print()
+
+    if not all_claims:
         print("No testable claims found in documentation")
         sys.exit(0)
 
     test_results = []
+
+    # Test prerequisites first
+    if prereq_claim:
+        print("=" * 60)
+        print("CHECKING PREREQUISITES")
+        print("=" * 60)
+        # TODO: Implement prerequisite checking logic
+        print("Prerequisites assumed satisfied (manual check required)")
+        print()
 
     print("=" * 60)
     print("TESTING CODE BLOCKS")
@@ -76,7 +111,7 @@ def main():
         elif claim['type'] == 'behavioral':
             result = executor.test_behavioral_claim(claim)
         else:
-            result = {'claim': claim, 'status': 'SKIP', 'error': 'Unknown claim type'}
+            result = {'claim': claim, 'status': 'SKIPPED', 'error': 'Unknown claim type'}
 
         test_results.append(result)
         print(f"  Status: {result['status']}")
@@ -131,6 +166,24 @@ def main():
             print(f"  Error: {result.get('error', 'Unknown error')}")
         print()
 
+    # Restore all backed up files
+    print("=" * 60)
+    print("CLEANING UP")
+    print("=" * 60)
+    restore_results = executor.restore_all()
+    for r in restore_results:
+        status = "restored" if r['restored'] else "FAILED"
+        print(f"  {r['file']}: {status}")
+
+    # Restart Netdata service
+    print("\nRestarting Netdata service...")
+    restart_result = ssh_client.sudo('systemctl restart netdata')
+    if restart_result.get('success'):
+        print("  Netdata service restarted")
+    else:
+        print(f"  WARNING: Failed to restart Netdata: {restart_result.get('stderr', '')}")
+    print()
+
     print("Generating report...")
     if args.format == 'markdown':
         report = reporter.generate_markdown_report(test_results, args.doc_file, netdata_url)
@@ -139,17 +192,25 @@ def main():
 
     report_file = reporter.save_report(report, args.doc_file, args.format)
 
+    # Count statuses
     total = len(test_results)
-    passed = sum(1 for r in test_results if r['status'] == 'PASS')
-    failed = sum(1 for r in test_results if r['status'] == 'FAIL')
-    partial = sum(1 for r in test_results if r['status'] == 'PARTIAL')
+    passed = sum(1 for r in test_results if r.get('status') == 'PASS')
+    failed = sum(1 for r in test_results if r.get('status') == 'FAIL')
+    skipped = sum(1 for r in test_results if r.get('status') in ['SKIPPED', 'SKIP'])
+    blocked = sum(1 for r in test_results if any(s.get('status') == 'BLOCKED' for s in r.get('steps', [])))
 
     print()
     print("=" * 60)
     print("TEST SUMMARY")
     print("=" * 60)
-    print(f"Total: {total} | Passed: {passed} | Failed: {failed} | Partial: {partial}")
-    print(f"Report: {report_file}")
+    print(f"Documentation page: {args.doc_file}")
+    print(f"Netdata version: {version}")
+    print(f"Total claims tested: {total}")
+    print(f"PASS:     {passed}")
+    print(f"FAIL:     {failed}")
+    print(f"SKIPPED:  {skipped}")
+    print(f"BLOCKED:  {blocked}")
+    print()
     print("=" * 60)
 
     if failed > 0:

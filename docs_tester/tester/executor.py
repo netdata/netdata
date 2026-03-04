@@ -4,7 +4,7 @@ import re
 import time
 import urllib.request
 import urllib.error
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from .ssh_client import SSHClient
 from .claim_extractor import StepType, Step, Workflow
 
@@ -19,6 +19,33 @@ class Executor:
     def __init__(self, ssh_client: SSHClient, netdata_url: str):
         self.ssh = ssh_client
         self.netdata_url = netdata_url
+        self.netdata_version = None
+        self.backed_up_files: List[Dict[str, Any]] = []
+
+    def capture_version(self) -> str:
+        """Capture Netdata version at start of test run"""
+        result = self.ssh.execute('netdata -v')
+        version_output = result.get('stdout', '').strip()
+        if not version_output:
+            version_output = result.get('stderr', '').strip()
+        self.netdata_version = version_output
+        return version_output
+
+    def track_backup(self, backup_path: str, original_path: str):
+        """Track a backed up file for later restoration"""
+        self.backed_up_files.append({'backup': backup_path, 'original': original_path})
+
+    def restore_all(self) -> List[Dict[str, Any]]:
+        """Restore all backed up files and return status"""
+        restore_results = []
+        for item in self.backed_up_files:
+            success = self.ssh.restore_file(item['backup'], item['original'])
+            restore_results.append({
+                'file': item['original'],
+                'restored': success
+            })
+        self.backed_up_files.clear()
+        return restore_results
 
     def _execute_with_retry(self, command: str, use_sudo: bool = False) -> Dict[str, Any]:
         """Execute SSH command with retry logic"""
@@ -280,16 +307,30 @@ class Executor:
             'timestamp': self._timestamp()
         }
 
+        failed_step = None
         for i, step in enumerate(workflow.steps, 1):
+            if failed_step is not None:
+                step_result = {
+                    'step_number': i,
+                    'instruction': step.instruction,
+                    'type': step.type.value,
+                    'success': False,
+                    'status': 'BLOCKED',
+                    'evidence': [],
+                    'error': f'BLOCKED: depends on failed step {failed_step}'
+                }
+                result['steps'].append(step_result)
+                continue
+
             step_result = self._execute_step(step, i)
             result['steps'].append(step_result)
             result['evidence'].extend(step_result.get('evidence', []))
 
             if not step_result['success']:
                 result['status'] = 'FAIL'
+                failed_step = i
                 result['failed_at_step'] = i
                 result['error'] = f"Step {i} failed: {step_result.get('error', 'Unknown error')}"
-                break
 
         return result
 
