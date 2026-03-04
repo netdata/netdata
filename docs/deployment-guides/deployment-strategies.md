@@ -18,7 +18,6 @@ Check out our [configuration documentation](/docs/netdata-agent/configuration/RE
 
 This example helps you make Children super lightweight by offloading work to Parents, minimizing resource usage on production systems.
 
-<details>
 <summary><strong>Click to see lightweight Child configuration</strong></summary><br/>
 
 **Why minimize Child footprint?**
@@ -74,13 +73,11 @@ Edit `stream.conf` on the Child using the [edit-config](/docs/netdata-agent/conf
 
 **Perfect for:** IoT devices, containers, or any resource-constrained system.
 
-</details><br/>
 
 ### Parent with Tiered Storage
 
 This example helps you configure a Parent with intelligent storage tiers to store different time ranges at different resolutions.
 
-<details>
 <summary><strong>Click to see Parent with tiered storage configuration</strong></summary><br/>
 
 This example provides configuration for multiple [tiers of metrics storage](/src/database/README.md#tiers), for 10 Children with about 2k metrics each. The example below restricts retention in each tier both in time and storage space, whichever is met first. See [retention settings](src/database/CONFIGURATION.md#retention-settings) for fine-tuning retention.
@@ -141,13 +138,11 @@ Edit `stream.conf` on the Parent using the [edit-config](/docs/netdata-agent/con
 
 **Perfect for:** Central monitoring servers with enough storage for historical data.
 
-</details><br/>
 
 ### Active-Active Parents
 
 This example guides you through setting up active-active Parents that sync with each other for high availability.
 
-<details>
 <summary><strong>Click to see high availability configuration</strong></summary><br/>
 
 :::info
@@ -199,7 +194,6 @@ This example guides you through setting up active-active Parents that sync with 
     api key = API_KEY
 ```
 
-</details><br/>
 
 ## Further Reading
 
