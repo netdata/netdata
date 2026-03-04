@@ -299,10 +299,11 @@ func (c *Collector) applyRelabel(in labels.Labels) labels.Labels {
 				values = append(values, lbls[name])
 			}
 			src := strings.Join(values, ";")
-			if !rule.re.MatchString(src) {
+			indexes := rule.re.FindStringSubmatchIndex(src)
+			if indexes == nil {
 				continue
 			}
-			out := rule.re.ReplaceAllString(src, rule.replacement)
+			out := string(rule.re.ExpandString(nil, rule.replacement, src, indexes))
 			if out == "" {
 				delete(lbls, rule.targetLabel)
 			} else {

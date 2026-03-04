@@ -99,6 +99,27 @@ func TestCollector_ApplyRelabel(t *testing.T) {
 	assert.Equal(t, "success", out.Get("status"))
 }
 
+func TestCollector_ApplyRelabel_ReplaceUsesSingleMatchExpansion(t *testing.T) {
+	c := New()
+	c.labelRelabelRules = []compiledRelabelRule{
+		{
+			sourceLabels: []string{"src"},
+			re:           mustCompile(`foo`),
+			targetLabel:  "dst",
+			replacement:  "$0",
+			action:       relabelReplace,
+		},
+	}
+
+	in := labels.Labels{
+		{Name: "src", Value: "foofoo"},
+	}
+	out := c.applyRelabel(in)
+
+	// Prometheus replace semantics: expand replacement for the first match only.
+	assert.Equal(t, "foo", out.Get("dst"))
+}
+
 func TestCollector_ApplyRelabel_LabelMapKeepOrder(t *testing.T) {
 	c := New()
 	c.labelRelabelRules = []compiledRelabelRule{
