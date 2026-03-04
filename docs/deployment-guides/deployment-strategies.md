@@ -80,7 +80,7 @@ This example helps you configure a Parent with intelligent storage tiers to stor
 
 <summary><strong>Click to see Parent with tiered storage configuration</strong></summary><br/>
 
-This example provides configuration for multiple [tiers of metrics storage](/src/database/README.md#tiers), for 10 Children with about 2k metrics each. The example below restricts retention in each tier both in time and storage space, whichever is met first. See [retention settings](src/database/CONFIGURATION.md#retention-settings) for fine-tuning retention.
+This example provides configuration for multiple [tiers of metrics storage](/src/database/README.md#tiers), for 10 Children with about 2k metrics each. The example below restricts retention in each tier both in time and storage space, whichever is met first. See [retention settings](/src/database/CONFIGURATION.md#retention-settings) for fine-tuning retention.
 
 **What this gives you:**
 
