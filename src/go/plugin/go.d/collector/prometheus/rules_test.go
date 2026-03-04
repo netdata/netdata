@@ -538,8 +538,9 @@ test_pipeline_status{project="org/cloud/my-service",status="success"} 1
 }
 
 func TestCollector_UntypedWithFallbackTypeGaugeDimensionRules(t *testing.T) {
-	// Untyped metrics treated as gauge via fallback_type should fully support
+	// Untyped metrics treated as gauge via fallback_type should support
 	// label_relabel, context_rules, and dimension_rules — same as native gauge metrics.
+	// label_relabel drops "project" label; the chart ID must not contain "project=" as proof.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`
 # HELP test_status Test status (untyped)
@@ -552,6 +553,9 @@ test_status{project="a",status="failed"} 2
 	c := New()
 	c.URL = srv.URL
 	c.FallbackType.Gauge = []string{"test_status"}
+	c.LabelRelabel = []RelabelRule{
+		{Action: "labeldrop", Regex: "^project$"},
+	}
 	c.ContextRules = []ContextRule{
 		{Match: "^test_status$", Context: "pipeline_status", Title: "Pipeline Status", Units: "pipelines", Type: "stacked"},
 	}
@@ -563,7 +567,8 @@ test_status{project="a",status="failed"} 2
 	mx := c.Collect(context.Background())
 	require.NotNil(t, mx)
 
-	chartID := "test_status-project=a"
+	// "project" was dropped by label_relabel, so the chart has no instance labels.
+	chartID := "test_status"
 	successDim := chartID + "-dim=success"
 	failedDim := chartID + "-dim=failed"
 
@@ -580,6 +585,10 @@ test_status{project="a",status="failed"} 2
 	assert.True(t, ch.HasDim(failedDim))
 	// Gauge dims use the default algo (empty string = absolute in Netdata).
 	assert.NotEqual(t, collectorapi.Incremental, ch.GetDim(successDim).Algo)
+	// Verify label_relabel actually dropped "project" from chart labels.
+	for _, lbl := range ch.Labels {
+		assert.NotEqual(t, "project", lbl.Key, "label_relabel should have dropped project label")
+	}
 }
 
 func TestCollector_UntypedWithFallbackTypeCounterDimensionRules(t *testing.T) {
@@ -639,9 +648,10 @@ test_other_metric{label="x"} 42
 	}
 
 	require.NoError(t, c.Init(context.Background()))
-	mx := c.Collect(context.Background())
-	// No charts should be created for unmatched untyped metrics
-	assert.Empty(t, mx)
+	c.Collect(context.Background())
+	// No charts should be created for unmatched untyped metrics.
+	// Checking chart count (not mx) distinguishes "no matching metrics" from scrape failure.
+	assert.Empty(t, *c.Charts())
 }
 
 func TestCollector_HistogramStructuralDims(t *testing.T) {

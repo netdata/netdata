@@ -39,8 +39,9 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 
 func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
-		config   Config
-		wantFail bool
+		config          Config
+		wantFail        bool
+		wantErrContains string
 	}{
 		"non empty URL": {
 			wantFail: false,
@@ -76,7 +77,8 @@ func TestCollector_Init(t *testing.T) {
 			},
 		},
 		"fail if selector_groups and context_rules are both set": {
-			wantFail: true,
+			wantFail:        true,
+			wantErrContains: "mutually exclusive",
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
 				ContextRules: []ContextRule{
@@ -88,7 +90,8 @@ func TestCollector_Init(t *testing.T) {
 			},
 		},
 		"fail if selector_groups and dimension_rules are both set": {
-			wantFail: true,
+			wantFail:        true,
+			wantErrContains: "mutually exclusive",
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
 				DimensionRules: []DimensionRule{
@@ -110,10 +113,14 @@ func TestCollector_Init(t *testing.T) {
 			collr := New()
 			collr.Config = test.config
 
+			err := collr.Init(context.Background())
 			if test.wantFail {
-				assert.Error(t, collr.Init(context.Background()))
+				require.Error(t, err)
+				if test.wantErrContains != "" {
+					assert.ErrorContains(t, err, test.wantErrContains)
+				}
 			} else {
-				assert.NoError(t, collr.Init(context.Background()))
+				assert.NoError(t, err)
 			}
 		})
 	}

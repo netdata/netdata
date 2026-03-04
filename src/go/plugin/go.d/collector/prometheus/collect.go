@@ -347,10 +347,12 @@ func (c *Collector) collectUntyped(mx map[string]int64, mf *prometheus.MetricFam
 
 	// Route through collectScalar so that label_relabel, context_rules, and dimension_rules
 	// work on untyped metrics when fallback_type is configured — same as gauge/counter.
+	// else if prevents both paths from running on the same metric family, which would cause
+	// a type conflict: the gauge path creates the chart (Absolute algo) and the counter path
+	// would then overwrite dim values with Incremental semantics on an Absolute chart.
 	if c.isFallbackTypeGauge(mf.Name()) {
 		c.collectScalar(mx, mf, seenDims, getValue, c.addGaugeChart, c.addGaugeChartWithDim, collectorapi.Absolute)
-	}
-	if c.isFallbackTypeCounter(mf.Name()) || strings.HasSuffix(mf.Name(), "_total") {
+	} else if c.isFallbackTypeCounter(mf.Name()) || strings.HasSuffix(mf.Name(), "_total") {
 		c.collectScalar(mx, mf, seenDims, getValue, c.addCounterChart, c.addCounterChartWithDim, collectorapi.Incremental)
 	}
 }
