@@ -4,33 +4,13 @@ import re
 import time
 import urllib.request
 import urllib.error
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
 from .ssh_client import SSHClient
 from .claim_extractor import StepType, Step, Workflow
 
 MAX_SLEEP_SECONDS = 300  # Cap sleep at 5 minutes
 MAX_RETRIES = 3
 RETRY_DELAY = 2  # seconds between retries
-
-
-def with_retry(func: Callable) -> Callable:
-    """Decorator to retry a function on failure"""
-    def wrapper(*args, **kwargs):
-        last_error = None
-        for attempt in range(MAX_RETRIES):
-            try:
-                result = func(*args, **kwargs)
-                if result.get('success', False):
-                    return result
-                last_error = result.get('stderr', result.get('error', 'Unknown error'))
-            except Exception as e:
-                last_error = str(e)
-            
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(RETRY_DELAY)
-        
-        return {'success': False, 'error': f'Failed after {MAX_RETRIES} attempts: {last_error}'}
-    return wrapper
 
 
 class Executor:
