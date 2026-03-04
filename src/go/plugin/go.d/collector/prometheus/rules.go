@@ -115,7 +115,7 @@ func compileSelectorGroups(groups []SelectorGroup) ([]compiledSelectorGroup, err
 			name = fmt.Sprintf("group_%d", i+1)
 		}
 		if seen[name] {
-			return nil, fmt.Errorf("group %d: duplicate name %q", i, name)
+			return nil, fmt.Errorf("group %d: duplicate name %q", i+1, name)
 		}
 		seen[name] = true
 

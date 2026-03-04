@@ -277,7 +277,7 @@
             },
             "uniqueItems": true
           },
-          "Counter": {
+          "counter": {
             "title": "As Counter",
             "description": "Untyped metrics matching any [pattern](https://golang.org/pkg/path/filepath/#Match) will be processed as Counter.",
             "type": [

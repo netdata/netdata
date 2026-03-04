@@ -75,6 +75,30 @@ func TestCollector_Init(t *testing.T) {
 				},
 			},
 		},
+		"fail if selector_groups and context_rules are both set": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				ContextRules: []ContextRule{
+					{Match: ".*", Context: "x"},
+				},
+				SelectorGroups: []SelectorGroup{
+					{Name: "g1"},
+				},
+			},
+		},
+		"fail if selector_groups and dimension_rules are both set": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				DimensionRules: []DimensionRule{
+					{Match: ".*", Dimension: "x"},
+				},
+				SelectorGroups: []SelectorGroup{
+					{Name: "g1"},
+				},
+			},
+		},
 		"default": {
 			wantFail: true,
 			config:   New().Config,

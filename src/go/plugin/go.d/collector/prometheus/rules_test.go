@@ -537,6 +537,259 @@ test_pipeline_status{project="org/cloud/my-service",status="success"} 1
 	require.NotNil(t, c.Collect(context.Background()))
 }
 
+func TestCollector_UntypedWithFallbackTypeGaugeDimensionRules(t *testing.T) {
+	// Untyped metrics treated as gauge via fallback_type should fully support
+	// label_relabel, context_rules, and dimension_rules — same as native gauge metrics.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP test_status Test status (untyped)
+test_status{project="a",status="success"} 1
+test_status{project="a",status="failed"} 2
+`))
+	}))
+	defer srv.Close()
+
+	c := New()
+	c.URL = srv.URL
+	c.FallbackType.Gauge = []string{"test_status"}
+	c.ContextRules = []ContextRule{
+		{Match: "^test_status$", Context: "pipeline_status", Title: "Pipeline Status", Units: "pipelines", Type: "stacked"},
+	}
+	c.DimensionRules = []DimensionRule{
+		{Match: "^test_status$", Dimension: "${status}"},
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	mx := c.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	chartID := "test_status-project=a"
+	successDim := chartID + "-dim=success"
+	failedDim := chartID + "-dim=failed"
+
+	assert.Equal(t, int64(1000), mx[successDim])
+	assert.Equal(t, int64(2000), mx[failedDim])
+
+	ch := c.Charts().Get(chartID)
+	require.NotNil(t, ch)
+	assert.Equal(t, "prometheus.pipeline_status", ch.Ctx)
+	assert.Equal(t, "Pipeline Status", ch.Title)
+	assert.Equal(t, "pipelines", ch.Units)
+	assert.Equal(t, "stacked", ch.Type.String())
+	assert.True(t, ch.HasDim(successDim))
+	assert.True(t, ch.HasDim(failedDim))
+	// Gauge dims use the default algo (empty string = absolute in Netdata).
+	assert.NotEqual(t, collectorapi.Incremental, ch.GetDim(successDim).Algo)
+}
+
+func TestCollector_UntypedWithFallbackTypeCounterDimensionRules(t *testing.T) {
+	// Untyped metrics treated as counter via fallback_type should fully support dimension_rules.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP test_requests_total Test requests (untyped)
+test_requests_total{project="a",status="success"} 10
+test_requests_total{project="a",status="failed"} 2
+`))
+	}))
+	defer srv.Close()
+
+	c := New()
+	c.URL = srv.URL
+	c.FallbackType.Counter = []string{"test_requests_total"}
+	c.DimensionRules = []DimensionRule{
+		{Match: "^test_requests_total$", Dimension: "${status}"},
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	mx := c.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	chartID := "test_requests_total-project=a"
+	successDim := chartID + "-dim=success"
+	failedDim := chartID + "-dim=failed"
+
+	assert.Equal(t, int64(10000), mx[successDim])
+	assert.Equal(t, int64(2000), mx[failedDim])
+
+	ch := c.Charts().Get(chartID)
+	require.NotNil(t, ch)
+	require.True(t, ch.HasDim(successDim))
+	require.True(t, ch.HasDim(failedDim))
+	// Incremental (counter) algo expected
+	assert.Equal(t, collectorapi.Incremental, ch.GetDim(successDim).Algo)
+}
+
+func TestCollector_UntypedWithoutFallbackTypeIgnored(t *testing.T) {
+	// Untyped metrics without a matching fallback_type should produce no charts,
+	// even when dimension_rules are configured — same behavior as before.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP test_other_metric Some untyped metric
+test_other_metric{label="x"} 42
+`))
+	}))
+	defer srv.Close()
+
+	c := New()
+	c.URL = srv.URL
+	// fallback_type only matches a different metric name, so test_other_metric is ignored
+	c.FallbackType.Gauge = []string{"something_else"}
+	c.DimensionRules = []DimensionRule{
+		{Match: ".*", Dimension: "${label}"},
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	mx := c.Collect(context.Background())
+	// No charts should be created for unmatched untyped metrics
+	assert.Empty(t, mx)
+}
+
+func TestCollector_HistogramStructuralDims(t *testing.T) {
+	// Verifies that bucket/sum/count dims are pre-declared in the chart (withDims=true path).
+	// Without this, values in mx are silently dropped by the plugin wire protocol.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP test_latency_seconds Latency
+# TYPE test_latency_seconds histogram
+test_latency_seconds_bucket{le="0.1"} 1
+test_latency_seconds_bucket{le="0.5"} 2
+test_latency_seconds_bucket{le="+Inf"} 3
+test_latency_seconds_sum 1.5
+test_latency_seconds_count 3
+`))
+	}))
+	defer srv.Close()
+
+	c := New()
+	c.URL = srv.URL
+	require.NoError(t, c.Init(context.Background()))
+	require.NotNil(t, c.Collect(context.Background()))
+
+	id := "test_latency_seconds"
+	ch := c.Charts().Get(id)
+	require.NotNil(t, ch)
+	assert.True(t, ch.HasDim(id+"_bucket=0.1"), "bucket dim must be pre-declared")
+	assert.True(t, ch.HasDim(id+"_bucket=0.5"), "bucket dim must be pre-declared")
+	assert.True(t, ch.HasDim(id+"_bucket=+Inf"), "bucket dim must be pre-declared")
+
+	chSum := c.Charts().Get(id + "_sum")
+	require.NotNil(t, chSum)
+	assert.True(t, chSum.HasDim(id+"_sum"), "sum dim must be pre-declared")
+
+	chCount := c.Charts().Get(id + "_count")
+	require.NotNil(t, chCount)
+	assert.True(t, chCount.HasDim(id+"_count"), "count dim must be pre-declared")
+}
+
+func TestCollector_SummaryStructuralDims(t *testing.T) {
+	// Verifies that quantile/sum/count dims are pre-declared in the chart (withDims=true path).
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP test_latency_seconds Latency
+# TYPE test_latency_seconds summary
+test_latency_seconds{quantile="0.5"} 0.1
+test_latency_seconds{quantile="0.9"} 0.2
+test_latency_seconds_sum 5.0
+test_latency_seconds_count 10
+`))
+	}))
+	defer srv.Close()
+
+	c := New()
+	c.URL = srv.URL
+	require.NoError(t, c.Init(context.Background()))
+	require.NotNil(t, c.Collect(context.Background()))
+
+	id := "test_latency_seconds"
+	ch := c.Charts().Get(id)
+	require.NotNil(t, ch)
+	assert.True(t, ch.HasDim(id+"_quantile=0.5"), "quantile dim must be pre-declared")
+	assert.True(t, ch.HasDim(id+"_quantile=0.9"), "quantile dim must be pre-declared")
+
+	chSum := c.Charts().Get(id + "_sum")
+	require.NotNil(t, chSum)
+	assert.True(t, chSum.HasDim(id+"_sum"), "sum dim must be pre-declared")
+
+	chCount := c.Charts().Get(id + "_count")
+	require.NotNil(t, chCount)
+	assert.True(t, chCount.HasDim(id+"_count"), "count dim must be pre-declared")
+}
+
+func TestCollector_DimensionRulesSummaryNoGhostDims(t *testing.T) {
+	// When a dimension_rule matches a summary metric, no structural (phantom) dims
+	// (e.g. _quantile=0.5) should appear on the chart — only rule-based dims.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP test_latency_seconds Test latency
+# TYPE test_latency_seconds summary
+test_latency_seconds{project="a",quantile="0.5"} 0.1
+test_latency_seconds{project="a",quantile="0.9"} 0.2
+test_latency_seconds_sum{project="a"} 5.0
+test_latency_seconds_count{project="a"} 10
+`))
+	}))
+	defer srv.Close()
+
+	c := New()
+	c.URL = srv.URL
+	c.DimensionRules = []DimensionRule{
+		{Match: "^test_latency_seconds$", Dimension: "${project}"},
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	mx := c.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	chartID := "test_latency_seconds"
+	ch := c.Charts().Get(chartID)
+	require.NotNil(t, ch)
+
+	// Only rule-based dims (with -dim= suffix) must exist; no bare _quantile= dims.
+	assert.NotEmpty(t, ch.Dims, "chart must have at least one rule-based dim")
+	for _, dim := range ch.Dims {
+		assert.Contains(t, dim.ID, "-dim=", "unexpected bare dimension ID: %s", dim.ID)
+		assert.False(t, dim.Obsolete, "no dim should be obsolete after first collect: %s", dim.ID)
+	}
+}
+
+func TestCollector_DimensionRulesHistogramNoGhostDims(t *testing.T) {
+	// When a dimension_rule matches a histogram metric, no structural (phantom) dims
+	// (e.g. _bucket=0.1) should appear on the chart — only rule-based dims.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP test_duration_seconds Test duration
+# TYPE test_duration_seconds histogram
+test_duration_seconds_bucket{project="a",le="0.1"} 3
+test_duration_seconds_bucket{project="a",le="0.5"} 7
+test_duration_seconds_bucket{project="a",le="+Inf"} 10
+test_duration_seconds_sum{project="a"} 3.5
+test_duration_seconds_count{project="a"} 10
+`))
+	}))
+	defer srv.Close()
+
+	c := New()
+	c.URL = srv.URL
+	c.DimensionRules = []DimensionRule{
+		{Match: "^test_duration_seconds$", Dimension: "${project}"},
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	mx := c.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	chartID := "test_duration_seconds"
+	ch := c.Charts().Get(chartID)
+	require.NotNil(t, ch)
+
+	// Only rule-based dims (with -dim= suffix) must exist; no bare _bucket= dims.
+	assert.NotEmpty(t, ch.Dims, "chart must have at least one rule-based dim")
+	for _, dim := range ch.Dims {
+		assert.Contains(t, dim.ID, "-dim=", "unexpected bare dimension ID: %s", dim.ID)
+		assert.False(t, dim.Obsolete, "no dim should be obsolete after first collect: %s", dim.ID)
+	}
+}
+
 func mustCompile(expr string) *regexp.Regexp {
 	re, err := regexp.Compile(expr)
 	if err != nil {

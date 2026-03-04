@@ -102,7 +102,7 @@ func (c *Collector) collectMetricFamilies(mx map[string]int64, mfs prometheus.Me
 		case model.MetricTypeHistogram:
 			c.collectHistogram(mx, mf, seenDims)
 		case model.MetricTypeUnknown:
-			c.collectUntyped(mx, mf)
+			c.collectUntyped(mx, mf, seenDims)
 		}
 	}
 }
@@ -208,7 +208,7 @@ func (c *Collector) collectSummary(mx map[string]int64, mf *prometheus.MetricFam
 			id := metricIDBase + c.joinLabels(lbls)
 
 			if !c.cache.hasP(id) {
-				c.addSummaryCharts(id, mf.Name(), mf.Help(), lbls, m.Summary().Quantiles())
+				c.addSummaryCharts(id, mf.Name(), mf.Help(), lbls, m.Summary().Quantiles(), true)
 			}
 
 			for _, v := range m.Summary().Quantiles() {
@@ -232,7 +232,8 @@ func (c *Collector) collectSummary(mx map[string]int64, mf *prometheus.MetricFam
 		chartID := metricIDBase + c.joinLabels(instanceLabels)
 
 		if !c.cache.hasP(chartID) {
-			c.addSummaryCharts(chartID, mf.Name(), mf.Help(), instanceLabels, m.Summary().Quantiles())
+			// withDims=false: no structural dims pre-populated; ensureChartDim fills only rule-based dims.
+			c.addSummaryCharts(chartID, mf.Name(), mf.Help(), instanceLabels, nil, false)
 		}
 
 		for _, v := range m.Summary().Quantiles() {
@@ -275,7 +276,7 @@ func (c *Collector) collectHistogram(mx map[string]int64, mf *prometheus.MetricF
 			id := metricIDBase + c.joinLabels(lbls)
 
 			if !c.cache.hasP(id) {
-				c.addHistogramCharts(id, mf.Name(), mf.Help(), lbls, m.Histogram().Buckets())
+				c.addHistogramCharts(id, mf.Name(), mf.Help(), lbls, m.Histogram().Buckets(), true)
 			}
 
 			for _, v := range m.Histogram().Buckets() {
@@ -299,7 +300,8 @@ func (c *Collector) collectHistogram(mx map[string]int64, mf *prometheus.MetricF
 		chartID := metricIDBase + c.joinLabels(instanceLabels)
 
 		if !c.cache.hasP(chartID) {
-			c.addHistogramCharts(chartID, mf.Name(), mf.Help(), instanceLabels, m.Histogram().Buckets())
+			// withDims=false: no structural dims pre-populated; ensureChartDim fills only rule-based dims.
+			c.addHistogramCharts(chartID, mf.Name(), mf.Help(), instanceLabels, nil, false)
 		}
 
 		for _, v := range m.Histogram().Buckets() {
@@ -334,34 +336,22 @@ func (c *Collector) warnMissingTemplateLabel(metricName, template string, warned
 	c.Warningf("metric '%s': dimension template %q references labels missing from a time series, skipping affected series", metricName, template)
 }
 
-func (c *Collector) collectUntyped(mx map[string]int64, mf *prometheus.MetricFamily) {
-	metricIDBase := c.metricIDBase(mf.Name())
-	for _, m := range mf.Metrics() {
+func (c *Collector) collectUntyped(mx map[string]int64, mf *prometheus.MetricFamily, seenDims map[string]map[string]bool) {
+	// Read the untyped value; this extractor is shared for both gauge and counter fallback paths.
+	getValue := func(m prometheus.Metric) (float64, bool) {
 		if m.Untyped() == nil || math.IsNaN(m.Untyped().Value()) {
-			continue
+			return 0, false
 		}
+		return m.Untyped().Value(), true
+	}
 
-		if c.isFallbackTypeGauge(mf.Name()) {
-			lbls := c.applyRelabel(m.Labels())
-			id := metricIDBase + c.joinLabels(lbls)
-
-			if !c.cache.hasP(id) {
-				c.addGaugeChart(id, mf.Name(), mf.Help(), lbls)
-			}
-
-			mx[id] = int64(m.Untyped().Value() * precision)
-		}
-
-		if c.isFallbackTypeCounter(mf.Name()) || strings.HasSuffix(mf.Name(), "_total") {
-			lbls := c.applyRelabel(m.Labels())
-			id := metricIDBase + c.joinLabels(lbls)
-
-			if !c.cache.hasP(id) {
-				c.addCounterChart(id, mf.Name(), mf.Help(), lbls)
-			}
-
-			mx[id] = int64(m.Untyped().Value() * precision)
-		}
+	// Route through collectScalar so that label_relabel, context_rules, and dimension_rules
+	// work on untyped metrics when fallback_type is configured — same as gauge/counter.
+	if c.isFallbackTypeGauge(mf.Name()) {
+		c.collectScalar(mx, mf, seenDims, getValue, c.addGaugeChart, c.addGaugeChartWithDim, collectorapi.Absolute)
+	}
+	if c.isFallbackTypeCounter(mf.Name()) || strings.HasSuffix(mf.Name(), "_total") {
+		c.collectScalar(mx, mf, seenDims, getValue, c.addCounterChart, c.addCounterChartWithDim, collectorapi.Incremental)
 	}
 }
 

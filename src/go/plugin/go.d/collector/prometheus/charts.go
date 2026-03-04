@@ -184,7 +184,10 @@ func (c *Collector) addCounterChartWithDim(id, name, help string, labels labels.
 	c.cache.addChart(id, chart)
 }
 
-func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels, quantiles []prometheus.Quantile) {
+// addSummaryCharts creates the three summary sub-charts (quantile, _sum, _count).
+// Pass withDims=false when a dimension_rule is active so ensureChartDim populates
+// dims instead, avoiding phantom structural dims that would become immediately stale.
+func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels, quantiles []prometheus.Quantile, withDims bool) {
 	units := getChartUnits(name)
 
 	switch units {
@@ -194,6 +197,12 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 	}
 
 	title, ctx, units, cType := c.chartMeta(name, help, units, collectorapi.Line)
+
+	var sumDims, countDims collectorapi.Dims
+	if withDims {
+		sumDims = collectorapi.Dims{{ID: id + "_sum", Name: name + "_sum", Algo: collectorapi.Incremental, Div: precision}}
+		countDims = collectorapi.Dims{{ID: id + "_count", Name: name + "_count", Algo: collectorapi.Incremental}}
+	}
 
 	charts := collectorapi.Charts{
 		{
@@ -205,6 +214,9 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 			Type:     cType,
 			Priority: getChartPriority(name),
 			Dims: func() (dims collectorapi.Dims) {
+				if !withDims {
+					return nil
+				}
 				for _, v := range quantiles {
 					s := formatFloat(v.Quantile())
 					dims = append(dims, &collectorapi.Dim{
@@ -224,9 +236,7 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 			Ctx:      ctx + "_sum",
 			Type:     cType,
 			Priority: getChartPriority(name),
-			Dims: collectorapi.Dims{
-				{ID: id + "_sum", Name: name + "_sum", Algo: collectorapi.Incremental, Div: precision},
-			},
+			Dims:     sumDims,
 		},
 		{
 			ID:       id + "_count",
@@ -236,9 +246,7 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 			Ctx:      ctx + "_count",
 			Type:     cType,
 			Priority: getChartPriority(name),
-			Dims: collectorapi.Dims{
-				{ID: id + "_count", Name: name + "_count", Algo: collectorapi.Incremental},
-			},
+			Dims:     countDims,
 		},
 	}
 
@@ -257,7 +265,10 @@ func (c *Collector) addSummaryCharts(id, name, help string, labels labels.Labels
 	}
 }
 
-func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labels, buckets []prometheus.Bucket) {
+// addHistogramCharts creates the three histogram sub-charts (bucket, _sum, _count).
+// Pass withDims=false when a dimension_rule is active so ensureChartDim populates
+// dims instead, avoiding phantom structural dims that would become immediately stale.
+func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labels, buckets []prometheus.Bucket, withDims bool) {
 	units := getChartUnits(name)
 
 	switch units {
@@ -267,6 +278,12 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 	}
 
 	title, ctx, units, cType := c.chartMeta(name, help, units, collectorapi.Line)
+
+	var sumDims, countDims collectorapi.Dims
+	if withDims {
+		sumDims = collectorapi.Dims{{ID: id + "_sum", Name: name + "_sum", Algo: collectorapi.Incremental, Div: precision}}
+		countDims = collectorapi.Dims{{ID: id + "_count", Name: name + "_count", Algo: collectorapi.Incremental}}
+	}
 
 	charts := collectorapi.Charts{
 		{
@@ -278,6 +295,9 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 			Type:     cType,
 			Priority: getChartPriority(name),
 			Dims: func() (dims collectorapi.Dims) {
+				if !withDims {
+					return nil
+				}
 				for _, v := range buckets {
 					s := formatFloat(v.UpperBound())
 					dims = append(dims, &collectorapi.Dim{
@@ -297,9 +317,7 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 			Ctx:      ctx + "_sum",
 			Type:     cType,
 			Priority: getChartPriority(name),
-			Dims: collectorapi.Dims{
-				{ID: id + "_sum", Name: name + "_sum", Algo: collectorapi.Incremental, Div: precision},
-			},
+			Dims:     sumDims,
 		},
 		{
 			ID:       id + "_count",
@@ -309,9 +327,7 @@ func (c *Collector) addHistogramCharts(id, name, help string, labels labels.Labe
 			Ctx:      ctx + "_count",
 			Type:     cType,
 			Priority: getChartPriority(name),
-			Dims: collectorapi.Dims{
-				{ID: id + "_count", Name: name + "_count", Algo: collectorapi.Incremental},
-			},
+			Dims:     countDims,
 		},
 	}
 
