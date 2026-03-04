@@ -20,7 +20,7 @@ Crush has comprehensive MCP transport support, making it highly flexible for con
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Direct HTTP/SSE support available (recommended)
 3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP/SSE connections on v2.7.2+.
-4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
+4. **Netdata MCP API key** - required when `[web].bearer token protection = yes`. When bearer protection is disabled, it is optional and unlocks sensitive observability data (protected functions, full access to logs). Each Netdata Agent or Parent has its own unique MCP API key - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 
 > Export `ND_MCP_BEARER_TOKEN` with your MCP key before launching Crush so credentials never appear in command-line arguments or config files:
 > ```bash
