@@ -1294,6 +1294,24 @@ static bool web_server_log_transport(BUFFER *wb, void *ptr) {
     return true;
 }
 
+static inline bool web_client_targets_mcp_route(const struct web_client *w) {
+    const char *path = buffer_tostring(w->url_path_decoded);
+    if(!path)
+        return false;
+
+    while(*path == '/')
+        path++;
+
+    if(!*path)
+        return false;
+
+    if((strncmp(path, "mcp", 3) == 0 && (!path[3] || path[3] == '/' || path[3] == '?')) ||
+       (strncmp(path, "sse", 3) == 0 && (!path[3] || path[3] == '/' || path[3] == '?')))
+        return true;
+
+    return false;
+}
+
 void web_client_process_request_from_web_server(struct web_client *w) {
     // entry point for web server requests
 
@@ -1369,17 +1387,17 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     // has already sent the handshake response
                     return;
 
-                case HTTP_REQUEST_MODE_OPTIONS:
-                    // Coarse pre-filter only: this permits the request to reach URL dispatch.
-                    // Route-specific ACL is enforced in web_client_process_url() for each endpoint
-                    // (for example: /mcp and /sse require MCP ACL, /api requires dashboard/API ACL).
+                case HTTP_REQUEST_MODE_OPTIONS: {
+                    // Path-aware coarse pre-filter:
+                    // MCP ACL is accepted only for MCP endpoints (/mcp, /sse), not as generic API access.
+                    bool mcp_route_requested = web_client_targets_mcp_route(w);
                     if(unlikely(
                             !http_can_access_dashboard(w) &&
                             !http_can_access_registry(w) &&
                             !http_can_access_badges(w) &&
                             !http_can_access_mgmt(w) &&
-                            !http_can_access_mcp(w) &&
-                            !http_can_access_netdataconf(w)
+                            !http_can_access_netdataconf(w) &&
+                            !(mcp_route_requested && http_can_access_mcp(w))
                     )) {
                         web_client_permission_denied_acl(w);
                         break;
@@ -1390,20 +1408,22 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     buffer_strcat(w->response.data, "OK");
                     w->response.code = HTTP_RESP_OK;
                     break;
+                }
 
                 case HTTP_REQUEST_MODE_POST:
                 case HTTP_REQUEST_MODE_GET:
                 case HTTP_REQUEST_MODE_PUT:
-                case HTTP_REQUEST_MODE_DELETE:
-                    // Coarse pre-filter only: this does not grant endpoint access by itself.
-                    // URL routing below applies endpoint-specific authorization checks.
+                case HTTP_REQUEST_MODE_DELETE: {
+                    // Path-aware coarse pre-filter:
+                    // MCP ACL may open only MCP routes, while all other routes still require their own ACL surface.
+                    bool mcp_route_requested = web_client_targets_mcp_route(w);
                     if(unlikely(
                             !http_can_access_dashboard(w) &&
                             !http_can_access_registry(w) &&
                             !http_can_access_badges(w) &&
                             !http_can_access_mgmt(w) &&
-                            !http_can_access_mcp(w) &&
-                            !http_can_access_netdataconf(w)
+                            !http_can_access_netdataconf(w) &&
+                            !(mcp_route_requested && http_can_access_mcp(w))
                     )) {
                         web_client_permission_denied_acl(w);
                         break;
@@ -1437,6 +1457,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
                     w->response.code = (short)web_client_process_url(localhost, w, path);
                     break;
+                }
 
                 default:
                     web_client_permission_denied_acl(w);
