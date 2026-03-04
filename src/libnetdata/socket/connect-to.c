@@ -229,6 +229,14 @@ int connect_to_this_ip46(
 // PORT      = port number or service name
 
 int connect_to_this(const char *definition, int default_port, struct timeval *timeout) {
+    if(!definition || !*definition) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "Definition '%s' does not specify a host.",
+               definition ? definition : "(null)");
+
+        return -ND_SOCK_ERR_NO_HOST_IN_DEFINITION;
+    }
+
     char buffer[strlen(definition) + 1];
     strcpy(buffer, definition);
 

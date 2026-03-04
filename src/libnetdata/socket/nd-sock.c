@@ -64,10 +64,18 @@ static bool nd_sock_open_ssl(ND_SOCK *s) {
 }
 
 bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_port, time_t timeout, bool ssl) {
+    if(!s)
+        return false;
+
     nd_sock_close(s);
 
+    if(!definition || !*definition) {
+        s->error = ND_SOCK_ERR_NO_HOST_IN_DEFINITION;
+        return false;
+    }
+
     // Extract hostname for SNI before establishing connection
-    if(ssl && definition) {
+    if(ssl) {
         char buffer[strlen(definition) + 1];
         strcpy(buffer, definition);
         
