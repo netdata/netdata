@@ -78,15 +78,20 @@ def parse_report(report_file: str) -> dict:
 
 
 def generate_line_comment(claim: dict, doc_file: str) -> str:
-    """Generate detailed line comment for a failed test"""
+    """Generate detailed line comment for a failed test in suggestion format"""
     error = claim.get('error', 'Unknown error')
+    
+    # Extract just the file name from path
+    filename = doc_file.split('/')[-1] if '/' in doc_file else doc_file
     
     comment = f"""❌ **THIS DIDN'T REPRODUCE THE DOCUMENTED EXPECTED OUTCOME**
 
 **Error**: {error}
 
-The documentation claims this should work, but the live test failed."""
+The documentation claims this should work, but the live test failed.
 
+Please verify this example works as documented."""
+    
     return comment
 
 
