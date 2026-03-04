@@ -128,11 +128,17 @@ class ClaimExtractor:
         elif code_type in ['yaml', 'yml', 'conf', 'ini', 'text']:
             # Check if it's a config file example (INI [section], key=value, or YAML key: value)
             # Note: We don't skip blocks containing URLs here - a config may legitimately have URL values
-                
+
             is_ini = re.search(r'^\[', content_str, re.MULTILINE)
             is_keyvalue = '=' in content_str
-            is_yaml = re.search(r'^\s*[\w-]+:', content_str, re.MULTILINE)
-            
+            is_yaml = re.search(r'^\s*[\w-]+:\s+\S', content_str, re.MULTILINE)
+
+            # For text blocks, require multiple YAML-like lines to reduce false positives
+            # from things like "Step 1: do this" or "Answer: something"
+            if code_type == 'text':
+                yaml_matches = re.findall(r'^\s*[\w-]+:\s+\S', content_str, re.MULTILINE)
+                is_yaml = len(yaml_matches) >= 2
+
             if is_ini or is_keyvalue or is_yaml:
                 # Extract file path from nearby text
                 file_match = re.search(r'(?:file|path|edit|create|add to)\s+[`"]?([/\w.-]+)[`"]?', content_str, re.IGNORECASE)
