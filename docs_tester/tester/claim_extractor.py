@@ -127,9 +127,7 @@ class ClaimExtractor:
             
         elif code_type in ['yaml', 'yml', 'conf', 'ini', 'text']:
             # Check if it's a config file example (INI [section], key=value, or YAML key: value)
-            # Skip if it looks like a URL (contains http:// or https://)
-            if re.search(r'https?://', content_str):
-                return None
+            # Note: We don't skip blocks containing URLs here - a config may legitimately have URL values
                 
             is_ini = re.search(r'^\[', content_str, re.MULTILINE)
             is_keyvalue = '=' in content_str
