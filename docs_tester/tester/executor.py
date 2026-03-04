@@ -103,10 +103,20 @@ class Executor:
 
             # Skip partial configs (just sections like [web] or single options like value_color=)
             lines = config_content.strip().split('\n')
-            is_partial = (
-                re.match(r'^\s*\[[\w-]+\]\s*$', config_content, re.MULTILINE) or  # [section] only
-                (len(lines) < 3 and all(re.match(r'^[\w-]+=.*$', line.strip()) for line in lines))  # few option= lines
-            )
+            # Only skip truly partial configs:
+            # 1. Only contains section headers (no key=value pairs)
+            # 2. Less than 3 lines AND all are simple key=value (no sections)
+            has_section = bool(re.search(r'^\s*\[[\w-]+\]\s*$', config_content, re.MULTILINE))
+            has_keyvalue = bool(re.search(r'^[\w-]+=', config_content, re.MULTILINE))
+            
+            is_partial = False
+            if has_section and not has_keyvalue:
+                # Only section headers, no key=value pairs - partial
+                is_partial = True
+            elif len(lines) < 3 and has_keyvalue and not has_section:
+                # Very short config without sections - partial
+                is_partial = True
+            
             if is_partial:
                 result['status'] = 'SKIP'
                 result['error'] = 'Partial config snippet detected (not a full config)'
