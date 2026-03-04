@@ -9,6 +9,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;43m'
 NOCOLOR='\033[0m'
+MCP_REQUEST='{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}'
 
 #change the previous acl file and with a new 
 #and store it on a new file
@@ -58,6 +59,105 @@ run_acl_tests() {
     echo -e "${GREEN}ACLs were applied correctly ${NOCOLOR}"
 }
 
+run_mcp_acl_tests() {
+    URL="$1"
+    EXPECTED_MCP_HTTP="$2"
+    EXPECTED_SSE="$3"
+    EXPECTED_WS="$4"
+    AUTH_HEADER="$5"
+
+    #Give a time for netdata start properly
+    sleep 1
+
+    if [ -n "$AUTH_HEADER" ]; then
+        MCP_HTTP_CODE=$(curl -sS -k --tls-max 1.2 --create-dirs -o mcp_http.json \
+            -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $AUTH_HEADER" \
+            --data "$MCP_REQUEST" \
+            "$URL/mcp" 2> log_mcp_http.txt || true)
+        MCP_SSE_CODE=$(curl -sS -k --tls-max 1.2 --create-dirs -o mcp_sse.txt \
+            -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $AUTH_HEADER" \
+            --data "$MCP_REQUEST" \
+            "$URL/sse" 2> log_mcp_sse.txt || true)
+        MCP_WS_CODE=$(curl -sS -k --tls-max 1.2 --http1.1 --create-dirs --max-time 2 -o mcp_ws.txt \
+            -w "%{http_code}" \
+            -H "Connection: Upgrade" \
+            -H "Upgrade: websocket" \
+            -H "Sec-WebSocket-Version: 13" \
+            -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+            -H "Sec-WebSocket-Protocol: mcp" \
+            -H "Authorization: Bearer $AUTH_HEADER" \
+            "$URL/mcp" 2> log_mcp_ws.txt || true)
+    else
+        MCP_HTTP_CODE=$(curl -sS -k --tls-max 1.2 --create-dirs -o mcp_http.json \
+            -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --data "$MCP_REQUEST" \
+            "$URL/mcp" 2> log_mcp_http.txt || true)
+        MCP_SSE_CODE=$(curl -sS -k --tls-max 1.2 --create-dirs -o mcp_sse.txt \
+            -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --data "$MCP_REQUEST" \
+            "$URL/sse" 2> log_mcp_sse.txt || true)
+        MCP_WS_CODE=$(curl -sS -k --tls-max 1.2 --http1.1 --create-dirs --max-time 2 -o mcp_ws.txt \
+            -w "%{http_code}" \
+            -H "Connection: Upgrade" \
+            -H "Upgrade: websocket" \
+            -H "Sec-WebSocket-Version: 13" \
+            -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+            -H "Sec-WebSocket-Protocol: mcp" \
+            "$URL/mcp" 2> log_mcp_ws.txt || true)
+    fi
+
+    if [ "$MCP_HTTP_CODE" != "$EXPECTED_MCP_HTTP" ]; then
+        echo -e "${RED}Unexpected /mcp HTTP response ($MCP_HTTP_CODE), expected $EXPECTED_MCP_HTTP on $URL ${NOCOLOR}"
+        kill $NETDATAPID
+        rm log_* netdata.conf.test* netdata.txt health.csv index.html badge.csv tmp* key.pem cert.pem info.txt mcp_*
+        exit 1
+    fi
+
+    if [ "$MCP_SSE_CODE" != "$EXPECTED_SSE" ]; then
+        echo -e "${RED}Unexpected /sse HTTP response ($MCP_SSE_CODE), expected $EXPECTED_SSE on $URL ${NOCOLOR}"
+        kill $NETDATAPID
+        rm log_* netdata.conf.test* netdata.txt health.csv index.html badge.csv tmp* key.pem cert.pem info.txt mcp_*
+        exit 1
+    fi
+
+    if [ "$MCP_WS_CODE" != "$EXPECTED_WS" ]; then
+        echo -e "${RED}Unexpected MCP WebSocket handshake response ($MCP_WS_CODE), expected $EXPECTED_WS on $URL ${NOCOLOR}"
+        kill $NETDATAPID
+        rm log_* netdata.conf.test* netdata.txt health.csv index.html badge.csv tmp* key.pem cert.pem info.txt mcp_*
+        exit 1
+    fi
+
+    echo -e "${GREEN}MCP ACL checks passed for $URL (${EXPECTED_MCP_HTTP}/${EXPECTED_SSE}/${EXPECTED_WS}) ${NOCOLOR}"
+}
+
+change_file_with_mcp_acl() {
+    sed "s/$1/$2/g" netdata.cfg > "$5"
+    {
+        echo ""
+        echo "[web]"
+        echo "    allow mcp from = $3"
+    } >> "$5"
+}
+
+change_file_with_bearer_protection() {
+    sed "s/$1/$2/g" netdata.cfg > "$4"
+    {
+        echo ""
+        echo "[web]"
+        echo "    bearer token protection = yes"
+    } >> "$4"
+}
+
 CONF=$(grep "bind" netdata.cfg)
 MUSER=$(grep run netdata.cfg | cut -d= -f2|sed 's/^[ \t]*//')
 
@@ -75,6 +175,7 @@ change_file "$CONF" "    bind to = *" "$CWD" "netdata.conf.test0"
 netdata -c "netdata.conf.test0" -D &
 NETDATAPID=$!
 run_acl_tests $TOKEN "$BASICURL:19999" 5 0
+run_mcp_acl_tests "$BASICURL:19999" 200 200 101
 kill $NETDATAPID
 
 change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|netdata.conf *:20000=dashboard|registry|badges|management *:20001=dashboard|registry|netdata.conf^SSL=optional *:20002=dashboard|registry" "$CWD" "netdata.conf.test1"
@@ -91,6 +192,10 @@ run_acl_tests $TOKEN "$BASICURLS:20001" 4 0
 
 run_acl_tests $TOKEN "$BASICURL:20002" 3 5 
 run_acl_tests $TOKEN "$BASICURLS:20002" 3 0 
+run_mcp_acl_tests "$BASICURLS:19999" 451 451 451
+run_mcp_acl_tests "$BASICURLS:20000" 451 451 451
+run_mcp_acl_tests "$BASICURLS:20001" 451 451 451
+run_mcp_acl_tests "$BASICURLS:20002" 451 451 451
 kill $NETDATAPID
 
 change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|netdata.conf *:20000=dashboard|registry|badges|management *:20001=dashboard|registry|netdata.conf^SSL=force *:20002=dashboard|registry" "$CWD" "netdata.conf.test2"
@@ -107,6 +212,10 @@ run_acl_tests $TOKEN "$BASICURLS:20001" 4 0
 
 run_acl_tests $TOKEN "$BASICURL:20002" 3 5 
 run_acl_tests $TOKEN "$BASICURLS:20002" 3 0 
+run_mcp_acl_tests "$BASICURLS:19999" 451 451 451
+run_mcp_acl_tests "$BASICURLS:20000" 451 451 451
+run_mcp_acl_tests "$BASICURLS:20001" 451 451 451
+run_mcp_acl_tests "$BASICURLS:20002" 451 451 451
 kill $NETDATAPID
 
 change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|netdata.conf *:20000=dashboard|registry|badges|management^SSL=optional *:20001=dashboard|registry|netdata.conf^SSL=force" "$CWD" "netdata.conf.test3"
@@ -120,7 +229,34 @@ run_acl_tests $TOKEN "$BASICURLS:20000" 4 0
 
 run_acl_tests $TOKEN "$BASICURL:20001" 4 5
 run_acl_tests $TOKEN "$BASICURLS:20001" 4 0
+run_mcp_acl_tests "$BASICURLS:19999" 451 451 451
+run_mcp_acl_tests "$BASICURLS:20000" 451 451 451
+run_mcp_acl_tests "$BASICURLS:20001" 451 451 451
 kill $NETDATAPID
 
-rm log_* netdata.conf.test* netdata.txt health.csv index.html badge.csv tmp* key.pem cert.pem info.txt
+change_file_with_mcp_acl "$CONF" "    bind to = *" "10.*" "$CWD" "netdata.conf.test4"
+netdata -c "netdata.conf.test4" -D &
+NETDATAPID=$!
+run_acl_tests $TOKEN "$BASICURL:19999" 5 0
+run_mcp_acl_tests "$BASICURL:19999" 451 451 451
+kill $NETDATAPID
+
+change_file_with_bearer_protection "$CONF" "    bind to = *" "$CWD" "netdata.conf.test5"
+netdata -c "netdata.conf.test5" -D &
+NETDATAPID=$!
+sleep 2
+if [ -f "${NETDATA_VARLIB_DIR}/mcp_dev_preview_api_key" ] ;then
+    read -r MCP_TOKEN < "${NETDATA_VARLIB_DIR}/mcp_dev_preview_api_key"
+else
+    MCP_TOKEN="NULL"
+fi
+run_mcp_acl_tests "$BASICURL:19999" 412 412 412
+if [ "$MCP_TOKEN" != "NULL" ] ; then
+    run_mcp_acl_tests "$BASICURL:19999" 200 200 101 "$MCP_TOKEN"
+else
+    echo -e "${YELLOW}Could not find MCP API key file, skipping authenticated MCP bearer check ${NOCOLOR}"
+fi
+kill $NETDATAPID
+
+rm log_* netdata.conf.test* netdata.txt health.csv index.html badge.csv tmp* key.pem cert.pem info.txt mcp_*
 echo "All the tests were successful ${NOCOLOR}"

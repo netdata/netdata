@@ -34,7 +34,7 @@ AI assistants have different visibility depending on where they connect:
 | **Scope** | All nodes | Single agent/parent |
 | **Endpoint** | `app.netdata.cloud/api/v1/mcp` | `YOUR_IP:19999/mcp` |
 | **Transport** | Streamable HTTP | HTTP, SSE, WebSocket |
-| **Authentication** | Cloud API token (`scope:mcp`) | Local MCP API key |
+| **Authentication** | Cloud API token (`scope:mcp`) | Local MCP API key (mandatory when bearer protection is enabled) |
 | **Network access** | Internet only | Direct access to Netdata IP required |
 | **Local setup** | None | Bridge may be needed for some clients |
 
@@ -147,7 +147,10 @@ Replace `YOUR_NETDATA_CLOUD_API_TOKEN` with your
 
 Connect directly to any Netdata Agent or Parent on your network. All Netdata Agents and Parents (v2.6.0+) include a built-in MCP server at `http://YOUR_IP:19999/mcp`.
 
-Some MCP features — such as live process information, network connections, and full log access — are considered sensitive. These are protected by a local API key that Netdata generates automatically on startup. Without this key, AI assistants can still access metrics, alerts, and node information, but sensitive functions remain locked.
+Netdata generates a local MCP API key automatically on startup. Authentication behavior depends on `[web].bearer token protection`:
+
+- **Bearer protection disabled (`no`)**: anonymous MCP access works for non-sensitive operations (metrics, alerts, node info). The API key unlocks sensitive operations.
+- **Bearer protection enabled (`yes`)**: anonymous MCP access is rejected on all MCP transports (HTTP, SSE, WebSocket). The API key is required for all MCP requests.
 
 ### Transport Options
 
@@ -161,6 +164,23 @@ Netdata implements the MCP protocol with multiple transport options:
 
 - **Direct Connection** (v2.7.2+): AI clients that support HTTP or SSE transports can connect directly to Netdata
 - **Bridge Required**: AI clients that only support stdio need the `nd-mcp` (stdio-to-websocket) or `mcp-remote` (stdio-to-http or stdio-to-sse) bridge
+
+### MCP Access Control in `netdata.conf`
+
+Use a dedicated MCP ACL to control network-level MCP access independently from dashboard and streaming:
+
+```ini
+[web]
+    allow connections from = 10.* 192.168.* localhost
+    allow dashboard from = 10.* 192.168.* localhost
+    allow mcp from = 10.* 192.168.* localhost
+    allow streaming from = *
+    allow mcp by dns = heuristic
+```
+
+- `allow mcp from` controls `/mcp`, `/sse`, and MCP WebSocket protocol access.
+- `allow connections from` is still the global first gate for all features.
+- For internet-facing Parents, keep `allow mcp from` restricted to trusted networks.
 
 #### Official MCP Remote Client (mcp-remote)
 
@@ -455,7 +475,7 @@ For more details, see the [official mcp-remote documentation](https://github.com
 
 ### Finding Your API Key
 
-To access sensitive functions like logs and live system information, you need an API key. Netdata automatically generates an API key on startup. The key is stored in a file on the Netdata server you want to connect to.
+You need the MCP API key when bearer protection is enabled. When bearer protection is disabled, the key is still needed for sensitive functions like logs and live system information. Netdata automatically generates an API key on startup. The key is stored in a file on the Netdata server you want to connect to.
 
 You need the API key of the Netdata you will connect to (usually a Netdata Parent).
 

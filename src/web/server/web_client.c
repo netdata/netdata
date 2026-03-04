@@ -1161,12 +1161,12 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
         else if(likely(hash == hash_mcp && strcmp(tok, "mcp") == 0)) {
-            if(unlikely(!http_can_access_dashboard(w)))
+            if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_http_handle_request(host, w);
         }
         else if(likely(hash == hash_sse && strcmp(tok, "sse") == 0)) {
-            if(unlikely(!http_can_access_dashboard(w)))
+            if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_sse_handle_request(host, w);
         }
@@ -1353,7 +1353,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     return;
                 
                 case HTTP_REQUEST_MODE_WEBSOCKET:
-                    if(unlikely(!http_can_access_dashboard(w))) {
+                    if(unlikely(!http_can_access_dashboard(w) && !http_can_access_mcp(w))) {
                         web_client_permission_denied_acl(w);
                         return;
                     }
@@ -1373,6 +1373,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                             !http_can_access_registry(w) &&
                             !http_can_access_badges(w) &&
                             !http_can_access_mgmt(w) &&
+                            !http_can_access_mcp(w) &&
                             !http_can_access_netdataconf(w)
                     )) {
                         web_client_permission_denied_acl(w);
@@ -1394,6 +1395,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                             !http_can_access_registry(w) &&
                             !http_can_access_badges(w) &&
                             !http_can_access_mgmt(w) &&
+                            !http_can_access_mcp(w) &&
                             !http_can_access_netdataconf(w)
                     )) {
                         web_client_permission_denied_acl(w);

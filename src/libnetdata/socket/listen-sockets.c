@@ -33,6 +33,7 @@ static HTTP_ACL read_acl(char *st) {
     if (!strcmp(st,"management")) ret |= HTTP_ACL_MANAGEMENT;
     if (!strcmp(st,"streaming")) ret |= HTTP_ACL_STREAMING;
     if (!strcmp(st,"netdata.conf")) ret |= HTTP_ACL_NETDATACONF;
+    if (!strcmp(st,"mcp")) ret |= HTTP_ACL_MCP;
 
     return ret;
 }
@@ -376,7 +377,8 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             sockets->failed++;
         } else {
             acl_flags = HTTP_ACL_API_UNIX | HTTP_ACL_DASHBOARD | HTTP_ACL_REGISTRY | HTTP_ACL_BADGES |
-                        HTTP_ACL_MANAGEMENT | HTTP_ACL_NETDATACONF | HTTP_ACL_STREAMING | HTTP_ACL_SSL_DEFAULT;
+                        HTTP_ACL_MANAGEMENT | HTTP_ACL_NETDATACONF | HTTP_ACL_STREAMING | HTTP_ACL_MCP |
+                        HTTP_ACL_SSL_DEFAULT;
             listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0, acl_flags);
             added++;
         }
@@ -426,7 +428,8 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         }
         acl_flags |= read_acl(portconfig);
     } else {
-        acl_flags |= HTTP_ACL_DASHBOARD | HTTP_ACL_REGISTRY | HTTP_ACL_BADGES | HTTP_ACL_MANAGEMENT | HTTP_ACL_NETDATACONF | HTTP_ACL_STREAMING | HTTP_ACL_SSL_DEFAULT;
+        acl_flags |= HTTP_ACL_DASHBOARD | HTTP_ACL_REGISTRY | HTTP_ACL_BADGES | HTTP_ACL_MANAGEMENT |
+                     HTTP_ACL_NETDATACONF | HTTP_ACL_STREAMING | HTTP_ACL_MCP | HTTP_ACL_SSL_DEFAULT;
     }
 
     //Case the user does not set the option SSL in the "bind to", but he has
