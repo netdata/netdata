@@ -72,6 +72,17 @@
 - Fix(go.d/mongodb): set 30s default timeout for top-queries function ([#21860](https://github.com/netdata/netdata/issues/21860))
 - Fix(dyncfg): rollback non-disruptive sd update failures ([#21861](https://github.com/netdata/netdata/issues/21861))
 - Fix data race in ML training during host stop ([#21844](https://github.com/netdata/netdata/issues/21844))
+- Refactor UID/GID cache updates in apps plugin aggregation logic ([#21864](https://github.com/netdata/netdata/issues/21864))
+- Build(deps): update go toolchain to v1.26.0 ([#21866](https://github.com/netdata/netdata/issues/21866))
+- Feat(go.d/docker): add docker ps -a function ([#21868](https://github.com/netdata/netdata/issues/21868))
+- Regenerate integrations docs ([#21870](https://github.com/netdata/netdata/issues/21870))
+- Rename Top tab to Live tab across all documentation ([#21872](https://github.com/netdata/netdata/issues/21872))
+- Docs: fix Top tab leftovers ([#21873](https://github.com/netdata/netdata/issues/21873))
+- Regenerate integrations docs ([#21874](https://github.com/netdata/netdata/issues/21874))
+- Docs: fix Top tab leftovers ([#21875](https://github.com/netdata/netdata/issues/21875))
+- Add msys-yaml DLL to Windows install dependencies ([#21867](https://github.com/netdata/netdata/issues/21867))
+- Update Windows.plugin ([#21797](https://github.com/netdata/netdata/issues/21797))
+- Add compatibility for TCP(SSL) multiplexing ([#21715](https://github.com/netdata/netdata/issues/21715))
 
 ## [2.9.0] - 2026-02-16
 

@@ -41,13 +41,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -150,13 +144,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -259,13 +247,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -368,13 +350,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -556,13 +532,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -885,13 +855,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -978,13 +942,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -1065,13 +1023,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           section_name: "[plugin:windows:PerflibThermalZone]"
@@ -1151,13 +1103,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           section_name: "[plugin:windows:GetPowerSupply]"
@@ -1250,13 +1196,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           section_name: "[plugin:windows:GetSensors]"
@@ -1482,13 +1422,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -1806,13 +1740,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -2178,13 +2106,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -2449,13 +2371,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -2621,13 +2537,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -2803,13 +2713,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3084,13 +2988,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3182,13 +3080,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3451,13 +3343,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
@@ -3542,13 +3428,7 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list:
-          - name: Netdata installation
-            description: |
-              When Netdata is installed on Windows, it automatically registers as a Windows Service
-              and appears in "Add or remove programs" (also known as "Programs and Features" or
-              "Apps & features" in newer Windows versions). The service can be managed through
-              Windows Services (services.msc) or via the Netdata UI.
+        list: []
       configuration:
         file:
           name: "netdata.conf"
