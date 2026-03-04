@@ -174,24 +174,24 @@ fi
 change_file "$CONF" "    bind to = *" "$CWD" "netdata.conf.test0"
 netdata -c "netdata.conf.test0" -D &
 NETDATAPID=$!
-run_acl_tests $TOKEN "$BASICURL:19999" 5 0
+run_acl_tests "$TOKEN" "$BASICURL:19999" 5 0
 run_mcp_acl_tests "$BASICURL:19999" 200 200 101
 kill $NETDATAPID
 
 change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|netdata.conf *:20000=dashboard|registry|badges|management *:20001=dashboard|registry|netdata.conf^SSL=optional *:20002=dashboard|registry" "$CWD" "netdata.conf.test1"
 netdata -c "netdata.conf.test1" -D &
 NETDATAPID=$!
-run_acl_tests $TOKEN "$BASICURL:19999" 5 5
-run_acl_tests $TOKEN "$BASICURLS:19999" 5 0
+run_acl_tests "$TOKEN" "$BASICURL:19999" 5 5
+run_acl_tests "$TOKEN" "$BASICURLS:19999" 5 0
 
-run_acl_tests $TOKEN "$BASICURL:20000" 4 5
-run_acl_tests $TOKEN "$BASICURLS:20000" 4 0
+run_acl_tests "$TOKEN" "$BASICURL:20000" 4 5
+run_acl_tests "$TOKEN" "$BASICURLS:20000" 4 0
 
-run_acl_tests $TOKEN "$BASICURL:20001" 4 0
-run_acl_tests $TOKEN "$BASICURLS:20001" 4 0
+run_acl_tests "$TOKEN" "$BASICURL:20001" 4 0
+run_acl_tests "$TOKEN" "$BASICURLS:20001" 4 0
 
-run_acl_tests $TOKEN "$BASICURL:20002" 3 5 
-run_acl_tests $TOKEN "$BASICURLS:20002" 3 0 
+run_acl_tests "$TOKEN" "$BASICURL:20002" 3 5 
+run_acl_tests "$TOKEN" "$BASICURLS:20002" 3 0 
 run_mcp_acl_tests "$BASICURLS:19999" 451 451 451
 run_mcp_acl_tests "$BASICURLS:20000" 451 451 451
 run_mcp_acl_tests "$BASICURLS:20001" 451 451 451
@@ -201,17 +201,17 @@ kill $NETDATAPID
 change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|netdata.conf *:20000=dashboard|registry|badges|management *:20001=dashboard|registry|netdata.conf^SSL=force *:20002=dashboard|registry" "$CWD" "netdata.conf.test2"
 netdata -c "netdata.conf.test2" -D &
 NETDATAPID=$!
-run_acl_tests $TOKEN "$BASICURL:19999" 5 5
-run_acl_tests $TOKEN "$BASICURLS:19999" 5 0
+run_acl_tests "$TOKEN" "$BASICURL:19999" 5 5
+run_acl_tests "$TOKEN" "$BASICURLS:19999" 5 0
 
-run_acl_tests $TOKEN "$BASICURL:20000" 4 5
-run_acl_tests $TOKEN "$BASICURLS:20000" 4 0
+run_acl_tests "$TOKEN" "$BASICURL:20000" 4 5
+run_acl_tests "$TOKEN" "$BASICURLS:20000" 4 0
 
-run_acl_tests $TOKEN "$BASICURL:20001" 4 5
-run_acl_tests $TOKEN "$BASICURLS:20001" 4 0
+run_acl_tests "$TOKEN" "$BASICURL:20001" 4 5
+run_acl_tests "$TOKEN" "$BASICURLS:20001" 4 0
 
-run_acl_tests $TOKEN "$BASICURL:20002" 3 5 
-run_acl_tests $TOKEN "$BASICURLS:20002" 3 0 
+run_acl_tests "$TOKEN" "$BASICURL:20002" 3 5 
+run_acl_tests "$TOKEN" "$BASICURLS:20002" 3 0 
 run_mcp_acl_tests "$BASICURLS:19999" 451 451 451
 run_mcp_acl_tests "$BASICURLS:20000" 451 451 451
 run_mcp_acl_tests "$BASICURLS:20001" 451 451 451
@@ -221,14 +221,14 @@ kill $NETDATAPID
 change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|netdata.conf *:20000=dashboard|registry|badges|management^SSL=optional *:20001=dashboard|registry|netdata.conf^SSL=force" "$CWD" "netdata.conf.test3"
 netdata -c "netdata.conf.test3" -D &
 NETDATAPID=$!
-run_acl_tests $TOKEN "$BASICURL:19999" 5 5
-run_acl_tests $TOKEN "$BASICURLS:19999" 5 0
+run_acl_tests "$TOKEN" "$BASICURL:19999" 5 5
+run_acl_tests "$TOKEN" "$BASICURLS:19999" 5 0
 
-run_acl_tests $TOKEN "$BASICURL:20000" 4 0
-run_acl_tests $TOKEN "$BASICURLS:20000" 4 0
+run_acl_tests "$TOKEN" "$BASICURL:20000" 4 0
+run_acl_tests "$TOKEN" "$BASICURLS:20000" 4 0
 
-run_acl_tests $TOKEN "$BASICURL:20001" 4 5
-run_acl_tests $TOKEN "$BASICURLS:20001" 4 0
+run_acl_tests "$TOKEN" "$BASICURL:20001" 4 5
+run_acl_tests "$TOKEN" "$BASICURLS:20001" 4 0
 run_mcp_acl_tests "$BASICURLS:19999" 451 451 451
 run_mcp_acl_tests "$BASICURLS:20000" 451 451 451
 run_mcp_acl_tests "$BASICURLS:20001" 451 451 451
@@ -237,7 +237,7 @@ kill $NETDATAPID
 change_file_with_mcp_acl "$CONF" "    bind to = *" "10.*" "$CWD" "netdata.conf.test4"
 netdata -c "netdata.conf.test4" -D &
 NETDATAPID=$!
-run_acl_tests $TOKEN "$BASICURL:19999" 5 0
+run_acl_tests "$TOKEN" "$BASICURL:19999" 5 0
 run_mcp_acl_tests "$BASICURL:19999" 451 451 451
 kill $NETDATAPID
 
