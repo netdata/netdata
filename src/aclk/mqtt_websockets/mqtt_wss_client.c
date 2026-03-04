@@ -309,6 +309,7 @@ int mqtt_wss_connect(
         client->port = port;
         client->target_host = client->host;
         client->target_port = port;
+        client->proxy_type = MQTT_WSS_DIRECT;
     }
 
     client->ssl_flags = ssl_flags;
@@ -357,10 +358,14 @@ int mqtt_wss_connect(
         return -8;
     }
 
-    if (client->proxy_type != MQTT_WSS_DIRECT)
+    if (client->proxy_type != MQTT_WSS_DIRECT) {
         if (aclk_proxy_negotiation_connect(client->sockfd, client->proxy_type, client->proxy_uname, client->proxy_passwd,
                                            client->target_host, client->target_port, 10000))
             return -4;
+
+        // Credentials are only needed for proxy negotiation; wipe them now.
+        aclk_sensitive_free(&client->proxy_passwd);
+    }
 
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
 #if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)

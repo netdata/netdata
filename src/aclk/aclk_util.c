@@ -466,7 +466,7 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd,
 
     if (!*ptr) {
         aclk_sensitive_free(&proxy);
-        freez(*uname);
+        aclk_sensitive_free(uname);
         aclk_sensitive_free(pwd);
         return;
     }
@@ -483,7 +483,7 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd,
         *port = default_port;
 
     if (!type) {
-        freez(*uname);
+        aclk_sensitive_free(uname);
         aclk_sensitive_free(pwd);
     }
 
@@ -620,6 +620,7 @@ static int aclk_http_proxy_negotiate(int sockfd, const char *proxy_username, con
 {
     int result = 1;
     bool has_creds = (proxy_username && *proxy_username);
+    usec_t start = now_monotonic_usec();
     char req[4096];
     size_t off = 0;
     int rc = snprintf(req + off, sizeof(req) - off, "CONNECT %s:%d HTTP/1.1\r\nHost: %s\r\n",
@@ -652,12 +653,13 @@ static int aclk_http_proxy_negotiate(int sockfd, const char *proxy_username, con
     req[off++] = '\r';
     req[off++] = '\n';
 
-    if (aclk_write_all_timeout(sockfd, req, off, timeout_ms))
+    if (aclk_write_all_timeout(sockfd, req, off, aclk_timeout_remaining_ms(start, timeout_ms)))
         goto cleanup;
 
-    char resp[8192];
+    // Read the HTTP response one byte at a time to avoid over-reading
+    // beyond the header terminator into TLS handshake data.
+    char resp[4096];
     size_t used = 0;
-    usec_t start = now_monotonic_usec();
     while (used < sizeof(resp) - 1) {
         int remaining_ms = aclk_timeout_remaining_ms(start, timeout_ms);
         if (remaining_ms <= 0)
@@ -667,7 +669,7 @@ static int aclk_http_proxy_negotiate(int sockfd, const char *proxy_username, con
         if (prc <= 0)
             goto cleanup;
 
-        ssize_t n = read(sockfd, resp + used, sizeof(resp) - 1 - used);
+        ssize_t n = read(sockfd, resp + used, 1);
         if (n == 0)
             goto cleanup;
         if (n < 0) {
@@ -677,11 +679,13 @@ static int aclk_http_proxy_negotiate(int sockfd, const char *proxy_username, con
         }
         used += (size_t)n;
         resp[used] = '\0';
-        if (strstr(resp, "\r\n\r\n"))
+
+        // Check if we have received the complete header terminator
+        if (used >= 4 && memcmp(resp + used - 4, "\r\n\r\n", 4) == 0)
             break;
     }
 
-    if (!strstr(resp, "\r\n\r\n"))
+    if (used < 4 || memcmp(resp + used - 4, "\r\n\r\n", 4) != 0)
         goto cleanup;
 
     if (strncmp(resp, "HTTP/1.1 ", 9) != 0 && strncmp(resp, "HTTP/1.0 ", 9) != 0)

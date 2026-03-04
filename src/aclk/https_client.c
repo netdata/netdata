@@ -138,8 +138,6 @@ static const char *http_req_type_to_str(http_req_type_t req) {
             return "GET";
         case HTTP_REQ_POST:
             return "POST";
-        case HTTP_REQ_CONNECT:
-            return "CONNECT";
         default:
             return "unknown";
     }
@@ -645,7 +643,6 @@ static https_client_resp_t read_parse_response(https_req_ctx_t *ctx) {
 static const char *http_methods[] = {
     [HTTP_REQ_GET] = "GET ",
     [HTTP_REQ_POST] = "POST ",
-    [HTTP_REQ_CONNECT] = "CONNECT ",
 };
 
 
@@ -809,11 +806,16 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
         if (proxy_type == MQTT_WSS_DIRECT)
             proxy_type = MQTT_WSS_PROXY_HTTP;
 
+        int proxy_timeout_ms = (request->timeout_s > 0 && request->timeout_s <= 2000000)
+                                    ? (int)request->timeout_s * 1000
+                                    : 30000;
+
         if (aclk_proxy_negotiation_connect(ctx->sock, proxy_type, request->proxy_username, request->proxy_password,
-                                           request->host, request->port, (int)request->timeout_s * 1000)) {
+                                           request->host, request->port, proxy_timeout_ms)) {
             rc = HTTPS_CLIENT_RESP_PROXY_NEGOTIATION_FAILED;
-            netdata_log_error("ACLK: proxy negotiation failed via proxy %s%s:%d to %s:%d",
-                              proxy_proto, request->proxy_host, request->proxy_port,
+            netdata_log_error("ACLK: %sproxy negotiation failed via %s:%d to %s:%d",
+                              aclk_mqtt_proxy_type_to_scheme(proxy_type),
+                              request->proxy_host, request->proxy_port,
                               request->host, request->port);
             goto exit_sock;
         }
