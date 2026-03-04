@@ -154,6 +154,7 @@ class Executor:
                 result['status'] = 'FAIL'
                 result['error'] = f'Failed to apply config: {apply_result.get("stderr")}'
                 self.ssh.restore_file(backup_path, config_file)
+                backup_path = None  # Prevent finally from restoring again
                 return result
 
             result['steps'].append({
@@ -167,6 +168,7 @@ class Executor:
                 result['status'] = 'FAIL'
                 result['error'] = f'Failed to restart netdata: {restart_result.get("stderr")}'
                 self.ssh.restore_file(backup_path, config_file)
+                backup_path = None  # Prevent finally from restoring again
                 return result
 
             time.sleep(10)
