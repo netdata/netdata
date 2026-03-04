@@ -377,6 +377,9 @@ class Executor:
                 'status': 'skipped',
                 'note': 'Instruction appears to be prose description, not a valid command'
             })
+            # Mark as failed so workflow fails properly
+            step_result['success'] = False
+            step_result['error'] = 'Step skipped - appears to be prose, not a valid command'
             return step_result
         
         # If the instruction is a command, execute it with retry
