@@ -3113,6 +3113,16 @@ if(OS_WINDOWS)
         )
         target_link_libraries(netdata_driver kernel32 ntoskrnl)
 
+        add_custom_command(TARGET netdata_driver POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy
+                        ${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/netdata_driver.inf
+                        ${CMAKE_BINARY_DIR}/netdata_driver.inf
+                COMMAND ${CMAKE_COMMAND} -E copy
+                        ${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/netdata_driver.cat
+                        ${CMAKE_BINARY_DIR}/netdata_driver.cat
+                COMMENT "Copying driver INF and CAT files to build directory"
+        )
+
         install(FILES "${NETDATA_DRIVER_FILE}"
                 COMPONENT netdata_driver
                 DESTINATION "${BINDIR}")
