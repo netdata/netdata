@@ -952,6 +952,7 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
         return;
 
     struct aclk_sync_cfg_t *aclk_host_config = callocz(1, sizeof(struct aclk_sync_cfg_t));
+    spinlock_init(&aclk_host_config->pending_ctx_spinlock);
     if (node_id && !uuid_is_null(*node_id))
         uuid_unparse_lower(*node_id, aclk_host_config->node_id);
 

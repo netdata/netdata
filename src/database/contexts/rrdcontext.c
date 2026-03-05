@@ -207,13 +207,14 @@ static void rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkp
     if(!aclk_host_config)
         return;
 
+    spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
     freez(aclk_host_config->pending_ctx_claim_id);
     freez(aclk_host_config->pending_ctx_node_id);
-
     aclk_host_config->pending_ctx_claim_id = strdupz(cmd->claim_id);
     aclk_host_config->pending_ctx_node_id = strdupz(cmd->node_id);
     aclk_host_config->pending_ctx_version_hash = cmd->version_hash;
     aclk_host_config->pending_ctx_checkpoint = true;
+    spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
 }
 
 // Execute the checkpoint: compare version hash, send snapshot if needed, enable streaming.
@@ -350,7 +351,12 @@ void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
     if(!aclk_host_config || !aclk_host_config->pending_ctx_checkpoint)
         return;
 
-    // clear the pending flag first to avoid re-entry
+    spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
+    if(!aclk_host_config->pending_ctx_checkpoint) {
+        spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
+        return;
+    }
+
     aclk_host_config->pending_ctx_checkpoint = false;
 
     char *claim_id = aclk_host_config->pending_ctx_claim_id;
@@ -360,6 +366,7 @@ void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
     aclk_host_config->pending_ctx_claim_id = NULL;
     aclk_host_config->pending_ctx_node_id = NULL;
     aclk_host_config->pending_ctx_version_hash = 0;
+    spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
 
     if(!claim_id || !node_id) {
         freez(claim_id);
