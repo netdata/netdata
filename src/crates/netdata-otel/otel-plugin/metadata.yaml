@@ -83,6 +83,8 @@ modules:
         options:
           description: |
             The plugin is configured via `otel.yaml` in the Netdata configuration directory.
+            Only the fields you want to change need to be specified. Environment variables
+            (`NETDATA_OTEL_*`) can also override any option.
           folding:
             title: Config options
             enabled: true
@@ -151,6 +153,38 @@ modules:
               description: Maximum age of journal files.
               default_value: "7 days"
               required: false
+            - name: logs.store_otlp_json
+              description: Store the complete OTLP JSON representation in each log entry. Useful for debugging and reprocessing, but increases storage usage.
+              default_value: false
+              required: false
+            - name: ""
+              description: |
+                **Environment variable overrides**
+
+                Any configuration option can be overridden via environment variables with the
+                `NETDATA_OTEL_` prefix. Environment variables have the highest priority.
+
+                | Environment Variable | Config Option |
+                |:---------------------|:--------------|
+                | `NETDATA_OTEL_ENDPOINT_PATH` | `endpoint.path` |
+                | `NETDATA_OTEL_ENDPOINT_TLS_CERT_PATH` | `endpoint.tls_cert_path` |
+                | `NETDATA_OTEL_ENDPOINT_TLS_KEY_PATH` | `endpoint.tls_key_path` |
+                | `NETDATA_OTEL_ENDPOINT_TLS_CA_CERT_PATH` | `endpoint.tls_ca_cert_path` |
+                | `NETDATA_OTEL_METRICS_CHART_CONFIGS_DIR` | `metrics.chart_configs_dir` |
+                | `NETDATA_OTEL_METRICS_INTERVAL_SECS` | `metrics.interval_secs` |
+                | `NETDATA_OTEL_METRICS_GRACE_PERIOD_SECS` | `metrics.grace_period_secs` |
+                | `NETDATA_OTEL_METRICS_EXPIRY_DURATION_SECS` | `metrics.expiry_duration_secs` |
+                | `NETDATA_OTEL_METRICS_MAX_NEW_CHARTS_PER_REQUEST` | `metrics.max_new_charts_per_request` |
+                | `NETDATA_OTEL_LOGS_JOURNAL_DIR` | `logs.journal_dir` |
+                | `NETDATA_OTEL_LOGS_SIZE_OF_JOURNAL_FILE` | `logs.size_of_journal_file` |
+                | `NETDATA_OTEL_LOGS_ENTRIES_OF_JOURNAL_FILE` | `logs.entries_of_journal_file` |
+                | `NETDATA_OTEL_LOGS_NUMBER_OF_JOURNAL_FILES` | `logs.number_of_journal_files` |
+                | `NETDATA_OTEL_LOGS_SIZE_OF_JOURNAL_FILES` | `logs.size_of_journal_files` |
+                | `NETDATA_OTEL_LOGS_DURATION_OF_JOURNAL_FILES` | `logs.duration_of_journal_files` |
+                | `NETDATA_OTEL_LOGS_DURATION_OF_JOURNAL_FILE` | `logs.duration_of_journal_file` |
+                | `NETDATA_OTEL_LOGS_STORE_OTLP_JSON` | `logs.store_otlp_json` |
+              default_value: ""
+              required: false
         examples:
           folding:
             title: Config
@@ -171,6 +205,17 @@ modules:
                   max_new_charts_per_request: 100
                 logs:
                   journal_dir: /var/log/netdata/otel-journals
+            - name: Partial user override
+              description: |
+                Override only specific fields in the user config. All other settings
+                are inherited from the stock config. Unknown fields are ignored for
+                forward compatibility.
+              config: |
+                endpoint:
+                  path: "0.0.0.0:4317"
+                logs:
+                  number_of_journal_files: 20
+                  duration_of_journal_files: "14 days"
             - name: Metric mapping file
               description: |
                 Place YAML files like this in `/etc/netdata/otel.d/v1/metrics/` to control how
