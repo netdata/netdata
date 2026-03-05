@@ -688,6 +688,12 @@ def render_collectors(categories, collectors, ids):
 
         clean_item = deepcopy(item)
 
+        # Keep structured functions payload for docs generation.
+        # item['functions'] gets replaced by rendered markdown below.
+        if 'functions' in item:
+            item['functions_data'] = deepcopy(item['functions'])
+            clean_item['functions_data'] = deepcopy(clean_item['functions'])
+
         related = []
         seen_ids = set()
 

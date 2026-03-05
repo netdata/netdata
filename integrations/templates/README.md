@@ -22,6 +22,11 @@ integrations objects in that file. Those templates get passed the
 integration data using the name `entry`, plus the composed related
 resource data using the name `rel_res`.
 
+The `function_tile.md` template is an exception: it is used by
+`integrations/gen_docs_integrations.py` to render standalone
+collector function pages under each collector's
+`integrations/functions/` directory.
+
 The `integrations.js` template is used to compose the final file. It gets
 passed the JSON-formatted category and integration data using the names
 `categories` and `integrations` respectively.
