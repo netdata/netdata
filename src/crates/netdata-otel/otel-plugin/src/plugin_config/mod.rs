@@ -154,7 +154,7 @@ impl PluginConfig {
         }
 
         // Validate TLS configuration
-        match (
+        let tls_enabled = match (
             &self.endpoint.tls_cert_path,
             &self.endpoint.tls_key_path,
         ) {
@@ -165,6 +165,7 @@ impl PluginConfig {
                 if key_path.is_empty() {
                     anyhow::bail!("TLS private key path cannot be empty when provided");
                 }
+                true
             }
             (Some(_), None) => {
                 anyhow::bail!(
@@ -176,9 +177,13 @@ impl PluginConfig {
                     "TLS certificate path must be provided when TLS private key is provided"
                 );
             }
-            (None, None) => {
-                // TLS disabled, which is fine
-            }
+            (None, None) => false,
+        };
+
+        if self.endpoint.tls_ca_cert_path.is_some() && !tls_enabled {
+            anyhow::bail!(
+                "TLS CA certificate path requires both TLS certificate and key to be configured"
+            );
         }
 
         Ok(())

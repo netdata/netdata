@@ -8,45 +8,56 @@ use super::logs::LogsConfigOverride;
 use super::metrics::MetricsConfigOverride;
 use super::PluginConfigOverride;
 
-pub(super) fn env_var(name: &str) -> Option<String> {
-    env::var(name).ok()
+/// Read an environment variable, returning `None` if not set and an error if not valid UTF-8.
+fn read_env(name: &str) -> Result<Option<String>> {
+    match env::var(name) {
+        Ok(val) => Ok(Some(val)),
+        Err(env::VarError::NotPresent) => Ok(None),
+        Err(env::VarError::NotUnicode(_)) => {
+            Err(anyhow::anyhow!("{} contains invalid UTF-8", name))
+        }
+    }
+}
+
+pub(super) fn env_var(name: &str) -> Result<Option<String>> {
+    read_env(name)
 }
 
 pub(super) fn parse_env_var<T: std::str::FromStr>(name: &str) -> Result<Option<T>>
 where
     T::Err: std::fmt::Display,
 {
-    match env::var(name) {
-        Ok(val) => val
+    match read_env(name)? {
+        Some(val) => val
             .parse::<T>()
             .map(Some)
             .map_err(|e| anyhow::anyhow!("invalid value for {}: '{}': {}", name, val, e)),
-        Err(_) => Ok(None),
+        None => Ok(None),
     }
 }
 
 pub(super) fn parse_env_bytesize(name: &str) -> Result<Option<ByteSize>> {
-    match env::var(name) {
-        Ok(val) => val
+    match read_env(name)? {
+        Some(val) => val
             .parse::<ByteSize>()
             .map(Some)
             .map_err(|e| anyhow::anyhow!("invalid value for {}: '{}': {}", name, val, e)),
-        Err(_) => Ok(None),
+        None => Ok(None),
     }
 }
 
 pub(super) fn parse_env_duration(name: &str) -> Result<Option<Duration>> {
-    match env::var(name) {
-        Ok(val) => humantime::parse_duration(&val)
+    match read_env(name)? {
+        Some(val) => humantime::parse_duration(&val)
             .map(Some)
             .map_err(|e| anyhow::anyhow!("invalid value for {}: '{}': {}", name, val, e)),
-        Err(_) => Ok(None),
+        None => Ok(None),
     }
 }
 
 pub(super) fn parse_env_bool(name: &str) -> Result<Option<bool>> {
-    match env::var(name) {
-        Ok(val) => match val.to_lowercase().as_str() {
+    match read_env(name)? {
+        Some(val) => match val.to_lowercase().as_str() {
             "true" | "1" | "yes" => Ok(Some(true)),
             "false" | "0" | "no" => Ok(Some(false)),
             _ => Err(anyhow::anyhow!(
@@ -55,7 +66,7 @@ pub(super) fn parse_env_bool(name: &str) -> Result<Option<bool>> {
                 val
             )),
         },
-        Err(_) => Ok(None),
+        None => Ok(None),
     }
 }
 
@@ -76,10 +87,10 @@ impl PluginConfigOverride {
 impl EndpointConfigOverride {
     fn from_env() -> Result<Self> {
         Ok(Self {
-            path: env_var("NETDATA_OTEL_ENDPOINT_PATH"),
-            tls_cert_path: env_var("NETDATA_OTEL_ENDPOINT_TLS_CERT_PATH"),
-            tls_key_path: env_var("NETDATA_OTEL_ENDPOINT_TLS_KEY_PATH"),
-            tls_ca_cert_path: env_var("NETDATA_OTEL_ENDPOINT_TLS_CA_CERT_PATH"),
+            path: env_var("NETDATA_OTEL_ENDPOINT_PATH")?,
+            tls_cert_path: env_var("NETDATA_OTEL_ENDPOINT_TLS_CERT_PATH")?,
+            tls_key_path: env_var("NETDATA_OTEL_ENDPOINT_TLS_KEY_PATH")?,
+            tls_ca_cert_path: env_var("NETDATA_OTEL_ENDPOINT_TLS_CA_CERT_PATH")?,
         })
     }
 
@@ -94,7 +105,7 @@ impl EndpointConfigOverride {
 impl MetricsConfigOverride {
     fn from_env() -> Result<Self> {
         Ok(Self {
-            chart_configs_dir: env_var("NETDATA_OTEL_METRICS_CHART_CONFIGS_DIR"),
+            chart_configs_dir: env_var("NETDATA_OTEL_METRICS_CHART_CONFIGS_DIR")?,
             interval_secs: parse_env_var("NETDATA_OTEL_METRICS_INTERVAL_SECS")?,
             grace_period_secs: parse_env_var("NETDATA_OTEL_METRICS_GRACE_PERIOD_SECS")?,
             expiry_duration_secs: parse_env_var("NETDATA_OTEL_METRICS_EXPIRY_DURATION_SECS")?,
@@ -116,7 +127,7 @@ impl MetricsConfigOverride {
 impl LogsConfigOverride {
     fn from_env() -> Result<Self> {
         Ok(Self {
-            journal_dir: env_var("NETDATA_OTEL_LOGS_JOURNAL_DIR"),
+            journal_dir: env_var("NETDATA_OTEL_LOGS_JOURNAL_DIR")?,
             size_of_journal_file: parse_env_bytesize(
                 "NETDATA_OTEL_LOGS_SIZE_OF_JOURNAL_FILE",
             )?,
