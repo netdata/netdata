@@ -129,8 +129,9 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Collection** | update_every | Data collection interval (seconds). | 1 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | leases_path | Path to DHCP client lease database. | /var/lib/dhcp/dhcpd.leases | no |
-|  | pools | DHCP IP pools to monitor. |  | yes |
+|  | [pools](#option-target-pools) | DHCP IP pools to monitor. |  | yes |
 
+<a id="option-target-pools"></a>
 ##### pools
 
 List of IP pools to monitor.

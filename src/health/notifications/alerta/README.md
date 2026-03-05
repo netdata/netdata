@@ -47,10 +47,11 @@ The following options can be defined for this notification
 |:-----|:------------|:--------|:---------:|
 | SEND_ALERTA | Set `SEND_ALERTA` to YES |  | yes |
 | ALERTA_WEBHOOK_URL | set `ALERTA_WEBHOOK_URL` to the API url you defined when you installed the Alerta server. |  | yes |
-| ALERTA_API_KEY | Set `ALERTA_API_KEY` to your API key. |  | yes |
+| [ALERTA_API_KEY](#option-alerta-api-key) | Set `ALERTA_API_KEY` to your API key. |  | yes |
 | DEFAULT_RECIPIENT_ALERTA | Set `DEFAULT_RECIPIENT_ALERTA` to the default recipient environment you want the alert notifications to be sent to. All roles will default to this variable if left unconfigured. |  | yes |
-| DEFAULT_RECIPIENT_CUSTOM | Set different recipient environments per role, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name of your choice |  | no |
+| [DEFAULT_RECIPIENT_CUSTOM](#option-default-recipient-custom) | Set different recipient environments per role, by editing `DEFAULT_RECIPIENT_CUSTOM` with the environment name of your choice |  | no |
 
+<a id="option-alerta-api-key"></a>
 ##### ALERTA_API_KEY
 
 You will need an API key to send messages from any source, if Alerta is configured to use authentication (recommended). To create a new API key:
@@ -58,6 +59,7 @@ You will need an API key to send messages from any source, if Alerta is configur
 2. Create a new API key called "netdata" with `write:alerts` permission.
 
 
+<a id="option-default-recipient-custom"></a>
 ##### DEFAULT_RECIPIENT_CUSTOM
 
 The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bottom of the same file:

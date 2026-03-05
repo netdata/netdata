@@ -118,10 +118,10 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | url | Target endpoint URL. |  | yes |
 |  | timeout | HTTP request timeout (seconds). | 10 | no |
-| **Filters** | selector | Time series selector (filter). |  | no |
+| **Filters** | [selector](#option-filters-selector) | Time series selector (filter). |  | no |
 | **Limits** | max_time_series | Global time series limit. If an endpoint returns more time series than this, the data is not processed. | 2000 | no |
 |  | max_time_series_per_metric | Per-metric time series limit. Metrics with more time series than this are skipped. | 200 | no |
-| **Customization** | fallback_type | Fallback type rules for untyped metrics. |  | no |
+| **Customization** | [fallback_type](#option-customization-fallback-type) | Fallback type rules for untyped metrics. |  | no |
 |  | label_prefix | Optional prefix added to all labels of all charts. Labels will be formatted as `prefix_name`. |  | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
@@ -140,6 +140,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
+<a id="option-filters-selector"></a>
 ##### selector
 
 This option allows you to filter out unwanted time series. Only metrics matching the selector will be collected.
@@ -159,6 +160,7 @@ selector:
 ```
 
 
+<a id="option-customization-fallback-type"></a>
 ##### fallback_type
 
 This option allows you to process Untyped metrics as Counter or Gauge instead of ignoring them.
