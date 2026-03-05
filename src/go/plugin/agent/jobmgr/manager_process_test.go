@@ -170,6 +170,83 @@ func TestRunNotifyRunningJobs_TickOutsideLock(t *testing.T) {
 	}
 }
 
+func TestRun_DoesNotRegisterModuleMethodsBeforeAnyJobStarts(t *testing.T) {
+	fnReg := &recordingFunctionRegistry{}
+	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
+
+	mgr.modules = collectorapi.Registry{
+		"mod": collectorapi.Creator{
+			Methods: func() []funcapi.MethodConfig {
+				return []funcapi.MethodConfig{{ID: "a"}}
+			},
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	in := make(chan []*confgroup.Group)
+	done := make(chan struct{})
+	go func() {
+		mgr.Run(ctx, in)
+		close(done)
+	}()
+
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	require.True(t, mgr.WaitStarted(waitCtx), "manager did not report started")
+
+	cancel()
+	close(in)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("manager did not stop after cancel")
+	}
+
+	assert.Empty(t, fnReg.registeredNames(), "static methods must not be registered before first started job")
+}
+
+func TestStartRunningJob_RegistersModuleMethodsOnFirstStartedJob(t *testing.T) {
+	fnReg := &recordingFunctionRegistry{}
+	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
+	creator := collectorapi.Creator{
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{ID: "a"}, {ID: "b"}}
+		},
+	}
+	mgr.modules = collectorapi.Registry{"mod": creator}
+	mgr.moduleFuncs.registerModule("mod", creator)
+
+	job := &lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
+	mgr.startRunningJob(job)
+
+	assert.ElementsMatch(t, []string{"mod:a", "mod:b"}, fnReg.registeredNames())
+}
+
+func TestStartRunningJob_DoesNotReregisterModuleMethods(t *testing.T) {
+	fnReg := &recordingFunctionRegistry{}
+	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
+	creator := collectorapi.Creator{
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{{ID: "a"}, {ID: "b"}}
+		},
+	}
+	mgr.modules = collectorapi.Registry{"mod": creator}
+	mgr.moduleFuncs.registerModule("mod", creator)
+
+	job1 := &lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
+	mgr.startRunningJob(job1)
+
+	job2 := &lockProbeJob{fullName: "mod_job2", moduleName: "mod", name: "job2"}
+	mgr.startRunningJob(job2)
+
+	registered := fnReg.registeredNames()
+	assert.Len(t, registered, 2)
+	assert.ElementsMatch(t, []string{"mod:a", "mod:b"}, registered)
+}
+
 func TestRegisterJobMethods_FailFastOnCollisionWithStaticMethod(t *testing.T) {
 	fnReg := &recordingFunctionRegistry{}
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})

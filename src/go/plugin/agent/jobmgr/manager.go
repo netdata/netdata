@@ -94,6 +94,7 @@ func New(cfg Config) *Manager {
 		runtimeService:     cfg.RuntimeService,
 
 		moduleFuncs:       newModuleFuncRegistry(),
+		staticMethodsSeen: make(map[string]struct{}),
 		discoveredConfigs: newDiscoveredConfigsCache(),
 		seen:              seen,
 		exposed:           exposed,
@@ -166,6 +167,9 @@ type Manager struct {
 
 	fileStatus  *fileStatus
 	moduleFuncs *moduleFuncRegistry
+	// staticMethodsSeen tracks modules whose static methods were already exposed.
+	// Registration is delayed until the first started job for a module.
+	staticMethodsSeen map[string]struct{}
 
 	discoveredConfigs *discoveredConfigs
 	seen              *dyncfg.SeenCache[confgroup.Config]
@@ -217,41 +221,7 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 			m.moduleFuncs.registerModule(name, creator)
 		}
 
-		// Register static module-level functions
-		if creator.Methods != nil {
-			methods := creator.Methods()
-			for _, method := range methods {
-				if method.ID == "" {
-					m.Warningf("skipping function registration for module '%s': empty method ID", name)
-					continue
-				}
-				funcName := fmt.Sprintf("%s:%s", name, method.ID)
-				m.fnReg.Register(funcName, m.makeMethodFuncHandler(name, method.ID))
-
-				// Notify Netdata about this function so it appears in the functions API
-				help := method.Help
-				if help == "" {
-					help = fmt.Sprintf("%s %s data function", name, method.ID)
-				}
-
-				// https://github.com/netdata/netdata/blob/1bc1775a17590b3c0fe3a4fe547dc6146d07be89/src/libnetdata/user-auth/http-access.h#L21
-				const cloudAccess = "0x0013" // SIGNED_ID | SAME_SPACE | SENSITIVE_DATA
-				access := "0x0000"
-				if method.RequireCloud {
-					access = cloudAccess
-				}
-				m.dyncfgApi.FunctionGlobal(netdataapi.FunctionGlobalOpts{
-					Name:     funcName,
-					Timeout:  60,
-					Help:     help,
-					Tags:     "top",
-					Access:   access,
-					Priority: 100,
-					Version:  3,
-				})
-			}
-		}
-		// Note: Per-job methods (JobMethods) are registered in startRunningJob
+		// Note: Static module methods and per-job methods are registered in startRunningJob.
 	}
 
 	m.loadFileStatus()
@@ -435,6 +405,7 @@ func (m *Manager) startRunningJob(job runtimeJob) {
 
 	// Track job for module function routing.
 	m.moduleFuncs.addJob(job.ModuleName(), job.Name(), job)
+	m.registerModuleMethodsOnFirstJobStart(job.ModuleName())
 
 	// Register job-specific methods if module provides JobMethods callback
 	creator, ok := m.modules.Lookup(job.ModuleName())
@@ -460,6 +431,9 @@ func (m *Manager) stopRunningJob(name string) {
 		m.unregisterJobMethods(job)
 		// Remove job from module function registry.
 		m.moduleFuncs.removeJob(job.ModuleName(), job.Name())
+		// Static module methods remain registered for now. Once Netdata supports
+		// function removal, this should unregister static methods when the last
+		// running job for the module is removed.
 		job.Stop()
 	}
 }
@@ -500,6 +474,50 @@ func (m *Manager) waitCmdTestWorkers() {
 	case <-time.After(cmdTestWorkerDrainWait):
 		m.Warningf("dyncfg: timeout waiting %s for command test workers to drain", cmdTestWorkerDrainWait)
 	}
+}
+
+func (m *Manager) registerModuleMethodsOnFirstJobStart(moduleName string) {
+	if _, ok := m.staticMethodsSeen[moduleName]; ok {
+		return
+	}
+
+	creator, ok := m.modules.Lookup(moduleName)
+	if !ok || creator.Methods == nil {
+		return
+	}
+
+	methods := creator.Methods()
+	for _, method := range methods {
+		if method.ID == "" {
+			m.Warningf("skipping function registration for module '%s': empty method ID", moduleName)
+			continue
+		}
+		funcName := fmt.Sprintf("%s:%s", moduleName, method.ID)
+		m.fnReg.Register(funcName, m.makeMethodFuncHandler(moduleName, method.ID))
+
+		help := method.Help
+		if help == "" {
+			help = fmt.Sprintf("%s %s data function", moduleName, method.ID)
+		}
+
+		// https://github.com/netdata/netdata/blob/1bc1775a17590b3c0fe3a4fe547dc6146d07be89/src/libnetdata/user-auth/http-access.h#L21
+		const cloudAccess = "0x0013" // SIGNED_ID | SAME_SPACE | SENSITIVE_DATA
+		access := "0x0000"
+		if method.RequireCloud {
+			access = cloudAccess
+		}
+		m.dyncfgApi.FunctionGlobal(netdataapi.FunctionGlobalOpts{
+			Name:     funcName,
+			Timeout:  60,
+			Help:     help,
+			Tags:     "top",
+			Access:   access,
+			Priority: 100,
+			Version:  3,
+		})
+	}
+
+	m.staticMethodsSeen[moduleName] = struct{}{}
 }
 
 // registerJobMethods registers methods for a specific job with Netdata

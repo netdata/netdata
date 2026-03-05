@@ -64,9 +64,10 @@ The following options can be defined for this notification
 |:-----|:------------|:--------|:---------:|
 | aws path | The full path of the aws command. If empty, the system `$PATH` will be searched for it. If not found, Amazon SNS notifications will be silently disabled. |  | yes |
 | SEND_AWSNS | Set `SEND_AWSNS` to YES | YES | yes |
-| AWSSNS_MESSAGE_FORMAT | Set `AWSSNS_MESSAGE_FORMAT` to to the string that you want the alert to be sent into. | ${status} on ${host} at ${date}: ${chart} ${value_string} | yes |
-| DEFAULT_RECIPIENT_AWSSNS | Set `DEFAULT_RECIPIENT_AWSSNS` to the Topic ARN you noted down upon creating the Topic. |  | yes |
+| [AWSSNS_MESSAGE_FORMAT](#option-awssns-message-format) | Set `AWSSNS_MESSAGE_FORMAT` to to the string that you want the alert to be sent into. | ${status} on ${host} at ${date}: ${chart} ${value_string} | yes |
+| [DEFAULT_RECIPIENT_AWSSNS](#option-default-recipient-awssns) | Set `DEFAULT_RECIPIENT_AWSSNS` to the Topic ARN you noted down upon creating the Topic. |  | yes |
 
+<a id="option-awssns-message-format"></a>
 ##### AWSSNS_MESSAGE_FORMAT
 
 The supported variables are:
@@ -109,6 +110,7 @@ The supported variables are:
 | `${total_critical}`         | The total number of alarms in CRITICAL state on the host                         |
 
 
+<a id="option-default-recipient-awssns"></a>
 ##### DEFAULT_RECIPIENT_AWSSNS
 
 All roles will default to this variable if left unconfigured.
