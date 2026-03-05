@@ -125,6 +125,10 @@ def render_functions_index(integration: dict, base_path: str) -> str:
     if not functions:
         return integration.get("functions", "")
 
+    function_list = functions.get("list")
+    if not function_list:
+        return integration.get("functions", "")
+
     integration_slug = integration_doc_slug(integration)
     lines = ["## Functions", ""]
     description = functions.get("description", "")
@@ -132,10 +136,12 @@ def render_functions_index(integration: dict, base_path: str) -> str:
         lines.append(description.strip())
         lines.append("")
 
-    for func in functions.get("list", []):
+    rendered_links = 0
+    for func in function_list:
         slug = function_slug(func.get("id"))
         if not slug:
             continue
+        rendered_links += 1
         lines.append(f'<a id="{slug}"></a>')
         lines.append(f"### {func.get('name', slug)}")
         lines.append("")
@@ -147,6 +153,9 @@ def render_functions_index(integration: dict, base_path: str) -> str:
             f"[Full documentation]({build_repo_root_function_path(base_path, integration_slug, slug)})"
         )
         lines.append("")
+
+    if rendered_links == 0:
+        return integration.get("functions", "")
 
     return "\n".join(lines).strip()
 
