@@ -46,8 +46,9 @@ The following options can be defined for this notification
 |:-----|:------------|:--------|:---------:|
 | SEND_MSTEAMS | Set `SEND_MSTEAMS` to YES | YES | yes |
 | MSTEAMS_WEBHOOK_URL | set `MSTEAMS_WEBHOOK_URL` to the incoming webhook URL as given by Microsoft Teams. |  | yes |
-| DEFAULT_RECIPIENT_MSTEAMS | Set `DEFAULT_RECIPIENT_MSTEAMS` to the encoded Microsoft Teams channel name you want the alert notifications to be sent to. |  | yes |
+| [DEFAULT_RECIPIENT_MSTEAMS](#option-default-recipient-msteams) | Set `DEFAULT_RECIPIENT_MSTEAMS` to the encoded Microsoft Teams channel name you want the alert notifications to be sent to. |  | yes |
 
+<a id="option-default-recipient-msteams"></a>
 ##### DEFAULT_RECIPIENT_MSTEAMS
 
 In Microsoft Teams the channel name is encoded in the URI after `/IncomingWebhook/`. You can define multiple channels like this: `CHANNEL1` `CHANNEL2`.

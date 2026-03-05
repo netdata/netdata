@@ -218,22 +218,23 @@ Notes:
 |  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | **Target** | path | Path to the web server log file. |  | yes |
 |  | exclude_path | Path to exclude. | *.gz | no |
-| **Customization** | url_patterns | List of URL patterns. | [] | no |
+| **Customization** | [url_patterns](#option-customization-url-patterns) | List of URL patterns. | [] | no |
 |  | url_patterns.name | Used as a dimension name. |  | yes |
 |  | url_patterns.pattern | Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format). |  | yes |
-| **Parser** | log_type | Log parser type. | auto | no |
+| **Parser** | [log_type](#option-parser-log-type) | Log parser type. | auto | no |
 |  | csv_config | CSV log parser config. |  | no |
 |  | csv_config.delimiter | CSV field delimiter. | , | no |
 |  | csv_config.format | CSV log format. |  | no |
 |  | ltsv_config | LTSV log parser config. |  | no |
 |  | ltsv_config.field_delimiter | LTSV field delimiter. | \t | no |
 |  | ltsv_config.value_delimiter | LTSV value delimiter. | : | no |
-|  | ltsv_config.mapping | LTSV fields mapping to **known fields**. |  | yes |
+|  | [ltsv_config.mapping](#option-parser-ltsv-config-mapping) | LTSV fields mapping to **known fields**. |  | yes |
 |  | json_config | JSON log parser config. |  | no |
-|  | json_config.mapping | JSON fields mapping to **known fields**. |  | yes |
+|  | [json_config.mapping](#option-parser-json-config-mapping) | JSON fields mapping to **known fields**. |  | yes |
 |  | regexp_config | RegExp log parser config. |  | no |
-|  | regexp_config.pattern | RegExp pattern with named groups. |  | yes |
+|  | [regexp_config.pattern](#option-parser-regexp-config-pattern) | RegExp pattern with named groups. |  | yes |
 
+<a id="option-customization-url-patterns"></a>
 ##### url_patterns
 
 "URL pattern" scope metrics will be collected for each URL pattern. 
@@ -249,6 +250,7 @@ url_patterns:
 ```
 
 
+<a id="option-parser-log-type"></a>
 ##### log_type
 
 Weblog supports 5 different log parsers:
@@ -289,6 +291,7 @@ If `log_type` parameter set to `auto` (which is default), weblog will try to aut
   If you're using the default Apache/NGINX log format, auto-detect will work for you. If it doesn't work you need to set the format manually.
 
 
+<a id="option-parser-ltsv-config-mapping"></a>
 ##### ltsv_config.mapping
 
 The mapping is a dictionary where the key is a field, as in logs, and the value is the corresponding **known field**.
@@ -304,6 +307,7 @@ ltsv_config:
 ```
 
 
+<a id="option-parser-json-config-mapping"></a>
 ##### json_config.mapping
 
 The mapping is a dictionary where the key is a field, as in logs, and the value is the corresponding **known field**.
@@ -319,6 +323,7 @@ json_config:
 ```
 
 
+<a id="option-parser-regexp-config-pattern"></a>
 ##### regexp_config.pattern
 
 Use pattern with subexpressions names. These names should be **known fields**.
