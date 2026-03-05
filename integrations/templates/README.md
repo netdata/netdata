@@ -25,7 +25,8 @@ resource data using the name `rel_res`.
 The `function_tile.md` template is an exception: it is used by
 `integrations/gen_docs_integrations.py` to render standalone
 collector function pages under each collector's
-`integrations/functions/` directory.
+`integrations/functions/` directory using per-integration filenames
+(`{integration-slug}-{function-slug}.md`).
 
 The `integrations.js` template is used to compose the final file. It gets
 passed the JSON-formatted category and integration data using the names

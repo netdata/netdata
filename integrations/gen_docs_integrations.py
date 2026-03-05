@@ -101,8 +101,23 @@ def function_slug(func_id: str) -> str:
     return anchorfy(func_id or "")
 
 
-def build_repo_root_function_path(base_path: str, slug: str) -> str:
-    return f"/{base_path}/integrations/functions/{slug}.md"
+def integration_doc_slug(integration: dict) -> str:
+    monitored = integration.get("meta", {}).get("monitored_instance", {})
+    name = monitored.get("name") or integration.get("id") or "integration"
+    return clean_string(name)
+
+
+def function_tile_filename(integration_slug: str, func_slug: str) -> str:
+    return f"{integration_slug}-{func_slug}.md"
+
+
+def build_repo_root_integration_path(base_path: str, integration_slug: str) -> str:
+    return f"/{base_path}/integrations/{integration_slug}.md"
+
+
+def build_repo_root_function_path(base_path: str, integration_slug: str, func_slug: str) -> str:
+    filename = function_tile_filename(integration_slug, func_slug)
+    return f"/{base_path}/integrations/functions/{filename}"
 
 
 def render_functions_index(integration: dict, base_path: str) -> str:
@@ -110,6 +125,7 @@ def render_functions_index(integration: dict, base_path: str) -> str:
     if not functions:
         return integration.get("functions", "")
 
+    integration_slug = integration_doc_slug(integration)
     lines = ["## Functions", ""]
     description = functions.get("description", "")
     if description:
@@ -127,15 +143,29 @@ def render_functions_index(integration: dict, base_path: str) -> str:
         if summary:
             lines.append(summary)
             lines.append("")
-        lines.append(f"[Full documentation]({build_repo_root_function_path(base_path, slug)})")
+        lines.append(
+            f"[Full documentation]({build_repo_root_function_path(base_path, integration_slug, slug)})"
+        )
         lines.append("")
 
     return "\n".join(lines).strip()
 
 
-def render_function_tile(integration: dict, func: dict, meta_yaml: str, learn_rel_path: str) -> str:
+def render_function_tile(
+    integration: dict,
+    func: dict,
+    meta_yaml: str,
+    learn_rel_path: str,
+    integration_doc_path: str,
+) -> str:
     template = get_jinja_env().get_template("function_tile.md")
-    return template.render(entry=integration, func=func, meta_yaml=meta_yaml, learn_rel_path=learn_rel_path)
+    return template.render(
+        entry=integration,
+        func=func,
+        meta_yaml=meta_yaml,
+        learn_rel_path=learn_rel_path,
+        integration_doc_path=integration_doc_path,
+    )
 
 
 def write_function_tiles(base_path: str, integration: dict, meta_yaml: str, learn_rel_path: str):
@@ -143,23 +173,26 @@ def write_function_tiles(base_path: str, integration: dict, meta_yaml: str, lear
     if not functions or not functions.get("list"):
         return
 
+    int_slug = integration_doc_slug(integration)
+    integration_doc_path = build_repo_root_integration_path(base_path, int_slug)
     functions_dir = Path(base_path) / "integrations" / "functions"
     functions_dir.mkdir(parents=True, exist_ok=True)
 
     for func in functions["list"]:
-        slug = function_slug(func.get("id"))
-        if not slug:
+        func_slug = function_slug(func.get("id"))
+        if not func_slug:
             raise ValueError(f"Function id is missing or invalid for integration '{integration.get('id')}'.")
 
-        outfile = functions_dir / f"{slug}.md"
-        rendered = render_function_tile(integration, func, meta_yaml, learn_rel_path)
+        filename = function_tile_filename(int_slug, func_slug)
+        outfile = functions_dir / filename
+        rendered = render_function_tile(integration, func, meta_yaml, learn_rel_path, integration_doc_path)
         rendered_clean = normalize_markdown(rendered)
 
         if outfile.exists():
             existing = outfile.read_text(encoding="utf-8")
             if existing != rendered_clean:
                 raise ValueError(
-                    f"Conflicting function tile slug '{slug}' for collector path '{base_path}'. "
+                    f"Conflicting function tile filename '{filename}' for collector path '{base_path}'. "
                     f"File '{outfile}' already exists with different content."
                 )
             continue
