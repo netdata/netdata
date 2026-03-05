@@ -201,51 +201,70 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
 // ----------------------------------------------------------------------------
 // ACLK interface
 
-static inline const char *aclk_ctx_defer_reason_to_string(ACLK_CTX_DEFER_REASON reason) {
-    switch(reason) {
-        case ACLK_CTX_DEFER_REASON_PENDING_CONTEXT_LOAD:
-            return "pending_context_load";
-        case ACLK_CTX_DEFER_REASON_PENDING_POST_PROCESSING:
-            return "pending_post_processing";
-        default:
-            return "unknown";
-    }
+// Save a pending checkpoint to be replayed when context processing completes.
+static void rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkpoint *cmd) {
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    if(!aclk_host_config)
+        return;
+
+    freez(aclk_host_config->pending_ctx_claim_id);
+    freez(aclk_host_config->pending_ctx_node_id);
+
+    aclk_host_config->pending_ctx_claim_id = strdupz(cmd->claim_id);
+    aclk_host_config->pending_ctx_node_id = strdupz(cmd->node_id);
+    aclk_host_config->pending_ctx_version_hash = cmd->version_hash;
+    aclk_host_config->pending_ctx_checkpoint = true;
 }
 
-// Record a deferred checkpoint and queue a node info update.
-// Returns true if the checkpoint should be deferred, false if the deferral limit has been reached
-// and the checkpoint should proceed anyway.
-static bool rrdcontext_checkpoint_defer(RRDHOST *host, ACLK_CTX_DEFER_REASON reason) {
-    time_t now_s = now_realtime_sec();
+// Execute the checkpoint: compare version hash, send snapshot if needed, enable streaming.
+static void rrdcontext_checkpoint_execute(RRDHOST *host, const char *claim_id, const char *node_id, uint64_t version_hash) {
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "RRDCONTEXT: checkpoint for claim id '%s', node id '%s', "
+               "while node '%s' has an active context streaming.",
+               claim_id, node_id, rrdhost_hostname(host));
 
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
-    if(aclk_host_config) {
-        uint32_t count = __atomic_add_fetch(&aclk_host_config->context_checkpoint_deferred_count, 1, __ATOMIC_RELAXED);
-        __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_reason, reason, __ATOMIC_RELAXED);
-        __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_last_time_s, now_s, __ATOMIC_RELAXED);
-
-        // set first deferral time if this is the first one
-        time_t first_time_s = __atomic_load_n(&aclk_host_config->context_checkpoint_deferred_first_time_s, __ATOMIC_RELAXED);
-        if(!first_time_s) {
-            __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_first_time_s, now_s, __ATOMIC_RELAXED);
-            first_time_s = now_s;
-        }
-
-        // check if we exceeded the deferral limits
-        if(count >= ACLK_CTX_CHECKPOINT_MAX_DEFERRALS ||
-           (first_time_s > 0 && now_s - first_time_s >= ACLK_CTX_CHECKPOINT_DEFER_MAX_TIME_S)) {
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "RRDCONTEXT: host '%s' exceeded deferral limits (%u deferrals, %lld sec since first). "
-                   "Proceeding with checkpoint despite '%s'.",
-                   rrdhost_hostname(host), count,
-                   (first_time_s > 0) ? (long long)(now_s - first_time_s) : 0LL,
-                   aclk_ctx_defer_reason_to_string(reason));
-            return false;
-        }
+        // disable it temporarily, so that our worker will not attempt to send messages in parallel
+        rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
     }
 
-    aclk_queue_node_info(host, false);
-    return true;
+    uint64_t our_version_hash = rrdcontext_version_hash(host);
+
+    if(version_hash != our_version_hash) {
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "RRDCONTEXT: received version hash %"PRIu64" for host '%s', does not match our version hash %"PRIu64". "
+               "Sending snapshot of all contexts.",
+               version_hash, rrdhost_hostname(host), our_version_hash);
+
+        // prepare the snapshot
+        char uuid_str[UUID_STR_LEN];
+        uuid_unparse_lower(host->node_id.uuid, uuid_str);
+        contexts_snapshot_t bundle = contexts_snapshot_new(claim_id, uuid_str, our_version_hash);
+
+        // do a deep scan on every metric of the host to make sure all our data are updated
+        rrdcontext_recalculate_host_retention(host, RRD_FLAG_NONE, false);
+
+        // calculate version hash and pack all the messages together in one go
+        our_version_hash = rrdcontext_version_hash_with_callback(host, rrdcontext_message_send_unsafe, true, bundle);
+
+        // update the version
+        contexts_snapshot_set_version(bundle, our_version_hash);
+
+        // send it
+        aclk_send_contexts_snapshot(bundle);
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "RRDCONTEXT: host '%s' enabling streaming of contexts",
+           rrdhost_hostname(host));
+
+    rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
+
+    char node_str[UUID_STR_LEN];
+    uuid_unparse_lower(host->node_id.uuid, node_str);
+    nd_log(NDLS_ACCESS, NDLP_DEBUG,
+           "ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED",
+           node_str, rrdhost_hostname(host));
 }
 
 void rrdcontext_hub_checkpoint_command(void *ptr) {
@@ -272,91 +291,18 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
         return;
     }
 
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
+    if(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD) ||
+       rrdcontext_queue_entries(&host->rrdctx.pp_queue) > 0) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', "
-               "but host '%s' is still loading contexts. Deferring hash check and snapshot decision.",
+               "but host '%s' has pending context work. Saving checkpoint for replay after processing completes.",
                cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
-        if(rrdcontext_checkpoint_defer(host, ACLK_CTX_DEFER_REASON_PENDING_CONTEXT_LOAD))
-            return;
+        rrdcontext_checkpoint_save_pending(host, cmd);
+        return;
     }
 
-    if(rrdcontext_queue_entries(&host->rrdctx.pp_queue) > 0) {
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', "
-               "but host '%s' still has pending context post-processing. Deferring hash check and snapshot decision.",
-               cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
-
-        if(rrdcontext_checkpoint_defer(host, ACLK_CTX_DEFER_REASON_PENDING_POST_PROCESSING))
-            return;
-    }
-
-    if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', "
-               "while node '%s' has an active context streaming.",
-               cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
-
-        // disable it temporarily, so that our worker will not attempt to send messages in parallel
-        rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
-    }
-
-    uint64_t our_version_hash = rrdcontext_version_hash(host);
-
-    if(cmd->version_hash != our_version_hash) {
-        nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "RRDCONTEXT: received version hash %"PRIu64" for host '%s', does not match our version hash %"PRIu64". "
-               "Sending snapshot of all contexts.",
-               cmd->version_hash, rrdhost_hostname(host), our_version_hash);
-
-        // prepare the snapshot
-        char uuid_str[UUID_STR_LEN];
-        uuid_unparse_lower(host->node_id.uuid, uuid_str);
-        contexts_snapshot_t bundle = contexts_snapshot_new(cmd->claim_id, uuid_str, our_version_hash);
-
-        // do a deep scan on every metric of the host to make sure all our data are updated
-        rrdcontext_recalculate_host_retention(host, RRD_FLAG_NONE, false);
-
-        // calculate version hash and pack all the messages together in one go
-        our_version_hash = rrdcontext_version_hash_with_callback(host, rrdcontext_message_send_unsafe, true, bundle);
-
-        // update the version
-        contexts_snapshot_set_version(bundle, our_version_hash);
-
-        // send it
-        aclk_send_contexts_snapshot(bundle);
-    }
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "RRDCONTEXT: host '%s' enabling streaming of contexts",
-           rrdhost_hostname(host));
-
-    rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
-
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
-    if(aclk_host_config) {
-        uint32_t deferred_count = __atomic_exchange_n(&aclk_host_config->context_checkpoint_deferred_count, 0, __ATOMIC_RELAXED);
-        ACLK_CTX_DEFER_REASON deferred_reason = __atomic_exchange_n(&aclk_host_config->context_checkpoint_deferred_reason,
-                                                                     ACLK_CTX_DEFER_REASON_NONE, __ATOMIC_RELAXED);
-        time_t deferred_last_time_s = __atomic_exchange_n(&aclk_host_config->context_checkpoint_deferred_last_time_s, 0, __ATOMIC_RELAXED);
-        __atomic_store_n(&aclk_host_config->context_checkpoint_deferred_first_time_s, 0, __ATOMIC_RELAXED);
-        if(deferred_count) {
-            time_t now_s = now_realtime_sec();
-            long long age_s = (deferred_last_time_s > 0 && now_s >= deferred_last_time_s) ? (long long)(now_s - deferred_last_time_s) : -1;
-            nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                   "RRDCONTEXT: host '%s' activated context streaming after %u deferred checkpoint(s), "
-                   "last reason '%s', last deferred at %lld (age %lld sec).",
-                   rrdhost_hostname(host), deferred_count, aclk_ctx_defer_reason_to_string(deferred_reason),
-                   (long long)deferred_last_time_s, age_s);
-        }
-    }
-
-    char node_str[UUID_STR_LEN];
-    uuid_unparse_lower(host->node_id.uuid, node_str);
-    nd_log(NDLS_ACCESS, NDLP_DEBUG,
-           "ACLK REQ [%s (%s)]: STREAM CONTEXTS ENABLED",
-           node_str, rrdhost_hostname(host));
+    rrdcontext_checkpoint_execute(host, cmd->claim_id, cmd->node_id, cmd->version_hash);
 }
 
 void rrdcontext_hub_stop_streaming_command(void *ptr) {
@@ -397,6 +343,48 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
            rrdhost_hostname(host));
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
+}
+
+void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
+    if(!aclk_host_config || !aclk_host_config->pending_ctx_checkpoint)
+        return;
+
+    // clear the pending flag first to avoid re-entry
+    aclk_host_config->pending_ctx_checkpoint = false;
+
+    char *claim_id = aclk_host_config->pending_ctx_claim_id;
+    char *node_id = aclk_host_config->pending_ctx_node_id;
+    uint64_t version_hash = aclk_host_config->pending_ctx_version_hash;
+
+    aclk_host_config->pending_ctx_claim_id = NULL;
+    aclk_host_config->pending_ctx_node_id = NULL;
+    aclk_host_config->pending_ctx_version_hash = 0;
+
+    if(!claim_id || !node_id) {
+        freez(claim_id);
+        freez(node_id);
+        return;
+    }
+
+    // verify claim id is still valid
+    if(!claim_id_matches(claim_id)) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "RRDCONTEXT: pending checkpoint for host '%s' has stale claim id '%s'. Discarding.",
+               rrdhost_hostname(host), claim_id);
+        freez(claim_id);
+        freez(node_id);
+        return;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+           "RRDCONTEXT: replaying deferred checkpoint for host '%s', claim id '%s', node id '%s'.",
+           rrdhost_hostname(host), claim_id, node_id);
+
+    rrdcontext_checkpoint_execute(host, claim_id, node_id, version_hash);
+
+    freez(claim_id);
+    freez(node_id);
 }
 
 ALWAYS_INLINE
