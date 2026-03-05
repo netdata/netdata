@@ -108,20 +108,13 @@ impl PluginConfig {
                 .as_ref()
                 .map(|path| path.join("otel.yaml"))
             {
-                match Self::load_overrides(&user_path) {
-                    Ok(overrides) => {
-                        config.apply_overrides(&overrides);
-                        config.log_config(ConfigSource::User);
-                    }
-                    Err(e) => {
-                        if user_path.exists() {
-                            tracing::error!(
-                                "failed to load user config from {}: {:#}. Using stock config only.",
-                                user_path.display(),
-                                e
-                            );
-                        }
-                    }
+                if let Some(overrides) = Self::load_overrides(&user_path)
+                    .with_context(|| {
+                        format!("loading user config from {}", user_path.display())
+                    })?
+                {
+                    config.apply_overrides(&overrides);
+                    config.log_config(ConfigSource::User);
                 }
             }
 
@@ -203,13 +196,20 @@ impl PluginConfig {
         }
     }
 
-    fn load_overrides<P: AsRef<Path>>(path: P) -> Result<PluginConfigOverride> {
+    fn load_overrides<P: AsRef<Path>>(path: P) -> Result<Option<PluginConfigOverride>> {
         let path = path.as_ref();
-        let contents = fs::read_to_string(path)
-            .with_context(|| format!("failed to read config file: {}", path.display()))?;
+        let contents = match fs::read_to_string(path) {
+            Ok(contents) => contents,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => {
+                return Err(
+                    anyhow::Error::new(e).context(format!("reading {}", path.display()))
+                );
+            }
+        };
         let overrides: PluginConfigOverride = serde_yaml::from_str(&contents)
             .with_context(|| format!("failed to parse user config file: {}", path.display()))?;
-        Ok(overrides)
+        Ok(Some(overrides))
     }
 
     pub fn from_yaml_file<P: AsRef<Path>>(path: P) -> Result<Self> {
