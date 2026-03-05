@@ -83,6 +83,16 @@
 - Add msys-yaml DLL to Windows install dependencies ([#21867](https://github.com/netdata/netdata/issues/21867))
 - Update Windows.plugin ([#21797](https://github.com/netdata/netdata/issues/21797))
 - Add compatibility for TCP(SSL) multiplexing ([#21715](https://github.com/netdata/netdata/issues/21715))
+- Build(deps): bump github.com/microsoft/go-mssqldb from 1.9.7 to 1.9.8 in /src/go ([#21865](https://github.com/netdata/netdata/issues/21865))
+- Fix uninitialized string assignment in `json-c-parser-inline.h` ([#21878](https://github.com/netdata/netdata/issues/21878))
+- Fix(packaging): add --no-same-owner to tar in Go toolchain install ([#21883](https://github.com/netdata/netdata/issues/21883))
+- Revert "build(deps): bump github.com/microsoft/go-mssqldb from 1.9.7 to 1.9.8 in /src/go" ([#21884](https://github.com/netdata/netdata/issues/21884))
+- Health/notifications: enforce Pushover API field length limits ([#21882](https://github.com/netdata/netdata/issues/21882))
+- Fix initialization handling in `GetHardwareInfo` function ([#21885](https://github.com/netdata/netdata/issues/21885))
+- Fix integration ([#21886](https://github.com/netdata/netdata/issues/21886))
+- Regenerate integrations docs ([#21877](https://github.com/netdata/netdata/issues/21877))
+- Add input validation for socket connection definitions ([#21881](https://github.com/netdata/netdata/issues/21881))
+- Clarify retention in Parent with tiered storage examples ([#21887](https://github.com/netdata/netdata/issues/21887))
 
 ## [2.9.0] - 2026-02-16
 
