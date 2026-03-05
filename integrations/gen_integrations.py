@@ -191,7 +191,7 @@ def get_jinja_env():
             lstrip_blocks=True,
         )
 
-        _jinja_env.globals.update(strfy=strfy)
+        _jinja_env.globals.update(strfy=strfy, anchorfy=anchorfy)
 
     return _jinja_env
 
@@ -202,6 +202,17 @@ def strfy(value):
     if isinstance(value, str):
         return ' '.join([v.strip() for v in value.strip().split("\n") if v]).replace('|', '/')
     return value
+
+
+def anchorfy(value):
+    if value is None:
+        return ''
+
+    anchor = str(value).strip().lower()
+    anchor = re.sub(r'[^a-z0-9]+', '-', anchor)
+    anchor = re.sub(r'-{2,}', '-', anchor).strip('-')
+
+    return anchor
 
 
 def get_category_sets(categories):
