@@ -31,14 +31,24 @@ fn deserialize_opt_bytesize<'de, D>(d: D) -> Result<Option<ByteSize>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    bytesize_serde::deserialize(d).map(Some)
+    let opt = Option::<String>::deserialize(d)?;
+    match opt {
+        None => Ok(None),
+        Some(s) => s.parse().map(Some).map_err(serde::de::Error::custom),
+    }
 }
 
 fn deserialize_opt_duration<'de, D>(d: D) -> Result<Option<Duration>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    humantime_serde::deserialize(d).map(Some)
+    let opt = Option::<String>::deserialize(d)?;
+    match opt {
+        None => Ok(None),
+        Some(s) => humantime::parse_duration(&s)
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+    }
 }
 
 #[derive(Parser, Debug, Clone, Serialize, Deserialize)]
