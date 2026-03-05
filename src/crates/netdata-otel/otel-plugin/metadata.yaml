@@ -83,8 +83,12 @@ modules:
         options:
           description: |
             The plugin is configured via `otel.yaml` in the Netdata configuration directory.
-            Only the fields you want to change need to be specified. Environment variables
-            (`NETDATA_OTEL_*`) can also override any option.
+            Only the fields you want to change need to be specified.
+
+            Any option can also be overridden via environment variables with the `NETDATA_OTEL_`
+            prefix (highest priority). The variable name is the config option in all caps with
+            dots replaced by underscores — e.g. `endpoint.tls_cert_path` becomes
+            `NETDATA_OTEL_ENDPOINT_TLS_CERT_PATH`.
           folding:
             title: Config options
             enabled: true
@@ -106,7 +110,12 @@ modules:
               default_value: ""
               required: false
             - name: metrics.chart_configs_dir
-              description: Directory containing YAML files that define how OTLP metrics are mapped to Netdata charts. Each file can match metrics by instrumentation scope and name, set the dimension attribute key, and override timing parameters. The plugin ships stock mappings; user files in this directory take priority.
+              description: Directory containing metric mapping YAML files.
+              detailed_description: |
+                Each file defines how OTLP metrics are mapped to Netdata charts.
+                Files can match metrics by instrumentation scope and name, set the
+                dimension attribute key, and override timing parameters. The plugin
+                ships stock mappings; user files in this directory take priority.
               default_value: "/etc/netdata/otel.d/v1/metrics/"
               required: false
             - name: metrics.interval_secs
@@ -122,7 +131,9 @@ modules:
               default_value: 900
               required: false
             - name: metrics.max_new_charts_per_request
-              description: Maximum number of new charts that can be created per gRPC request. Limits cardinality explosion from high-cardinality label combinations.
+              description: Maximum new charts created per gRPC request.
+              detailed_description: |
+                Limits cardinality explosion from high-cardinality label combinations.
               default_value: 100
               required: false
             - name: logs.journal_dir
@@ -154,36 +165,10 @@ modules:
               default_value: "7 days"
               required: false
             - name: logs.store_otlp_json
-              description: Store the complete OTLP JSON representation in each log entry. Useful for debugging and reprocessing, but increases storage usage.
+              description: Store the complete OTLP JSON in each log entry.
+              detailed_description: |
+                Useful for debugging and reprocessing, but increases storage usage.
               default_value: false
-              required: false
-            - name: ""
-              description: |
-                **Environment variable overrides**
-
-                Any configuration option can be overridden via environment variables with the
-                `NETDATA_OTEL_` prefix. Environment variables have the highest priority.
-
-                | Environment Variable | Config Option |
-                |:---------------------|:--------------|
-                | `NETDATA_OTEL_ENDPOINT_PATH` | `endpoint.path` |
-                | `NETDATA_OTEL_ENDPOINT_TLS_CERT_PATH` | `endpoint.tls_cert_path` |
-                | `NETDATA_OTEL_ENDPOINT_TLS_KEY_PATH` | `endpoint.tls_key_path` |
-                | `NETDATA_OTEL_ENDPOINT_TLS_CA_CERT_PATH` | `endpoint.tls_ca_cert_path` |
-                | `NETDATA_OTEL_METRICS_CHART_CONFIGS_DIR` | `metrics.chart_configs_dir` |
-                | `NETDATA_OTEL_METRICS_INTERVAL_SECS` | `metrics.interval_secs` |
-                | `NETDATA_OTEL_METRICS_GRACE_PERIOD_SECS` | `metrics.grace_period_secs` |
-                | `NETDATA_OTEL_METRICS_EXPIRY_DURATION_SECS` | `metrics.expiry_duration_secs` |
-                | `NETDATA_OTEL_METRICS_MAX_NEW_CHARTS_PER_REQUEST` | `metrics.max_new_charts_per_request` |
-                | `NETDATA_OTEL_LOGS_JOURNAL_DIR` | `logs.journal_dir` |
-                | `NETDATA_OTEL_LOGS_SIZE_OF_JOURNAL_FILE` | `logs.size_of_journal_file` |
-                | `NETDATA_OTEL_LOGS_ENTRIES_OF_JOURNAL_FILE` | `logs.entries_of_journal_file` |
-                | `NETDATA_OTEL_LOGS_NUMBER_OF_JOURNAL_FILES` | `logs.number_of_journal_files` |
-                | `NETDATA_OTEL_LOGS_SIZE_OF_JOURNAL_FILES` | `logs.size_of_journal_files` |
-                | `NETDATA_OTEL_LOGS_DURATION_OF_JOURNAL_FILES` | `logs.duration_of_journal_files` |
-                | `NETDATA_OTEL_LOGS_DURATION_OF_JOURNAL_FILE` | `logs.duration_of_journal_file` |
-                | `NETDATA_OTEL_LOGS_STORE_OTLP_JSON` | `logs.store_otlp_json` |
-              default_value: ""
               required: false
         examples:
           folding:
