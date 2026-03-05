@@ -2021,8 +2021,8 @@ set(WINDOWS_PLUGIN_FILES
 )
 
 set(WINDOWS_PLUGIN_DRIVER
-        src/collectors/windows.plugin/netdata_win_driver.c
-        src/collectors/windows.plugin/netdata_win_driver.h
+        src/collectors/windows.plugin/netdata_driver.c
+        src/collectors/windows.plugin/netdata_driver.h
 )
 
 set(PROC_PLUGIN_FILES
@@ -3114,7 +3114,7 @@ if(OS_WINDOWS)
         target_link_libraries(netdata_driver kernel32 ntoskrnl)
 
         install(FILES "${NETDATA_DRIVER_FILE}"
-                COMPONENT netdata_win_driver
+                COMPONENT netdata_driver
                 DESTINATION "${BINDIR}")
 endif()
 

@@ -1,0 +1,51 @@
+;
+; Netdata Driver INF File
+;
+; Installation file for the Netdata Windows Driver
+; This driver provides read access to Model Specific Registers (MSR)
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider=%Provider%
+DriverVer=1.0.0.0
+CatalogFile=netdata_driver.cat
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+netdata_driver.sys = 1
+
+[Manufacturer]
+%Manufacturer%=DeviceSection
+
+[DeviceSection]
+%DeviceDesc%=DriverInstall,NTamd64,MSR\NetdataDrv
+
+[DriverInstall]
+CopyFiles=DriverCopyFiles
+AddReg=DriverAddReg
+
+[DriverCopyFiles]
+netdata_driver.sys,,,0x100
+
+[DriverAddReg]
+HKR,,,0x00010001,"NetdataDriver"
+
+[DriverServices]
+HKR,Services\NetdataWinDriver,Type,0x00000001,1
+HKR,Services\NetdataWinDriver,Start,0x00010001,3
+HKR,Services\NetdataWinDriver,ErrorControl,0x00010001,1
+HKR,Services\NetdataWinDriver,ImagePath,0x00020000,"\SystemRoot\System32\netdata_driver.sys"
+
+[Strings]
+Provider = "Netdata"
+Manufacturer = "Netdata"
+DeviceDesc = "Netdata Driver"
+DiskName = "Netdata Driver Disk"
