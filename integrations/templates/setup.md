@@ -63,19 +63,25 @@ No action required.
 |:------|:-----|:------------|:--------|:---------:|
 [% set ns = namespace(last_group=None) %]
 [% for item in entry.setup.configuration.options.list %]
-| [[ ("**" ~ item.group ~ "**") if (item.group is defined and item.group != ns.last_group) else "" ]] | [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
+[% set anchor_source = (item.group ~ "-" ~ item.name) if (item.group is defined and item.group) else item.name %]
+[% set item_anchor = "option-" ~ anchorfy(anchor_source) %]
+| [[ ("**" ~ item.group ~ "**") if (item.group is defined and item.group != ns.last_group) else "" ]] | [[ ("[" ~ strfy(item.name) ~ "](#" ~ item_anchor ~ ")") if ('detailed_description' in item) else strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
 [% set ns.last_group = item.group if item.group is defined else ns.last_group %]
 [% endfor %]
 [% else %]
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 [% for item in entry.setup.configuration.options.list %]
-| [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
+[% set anchor_source = (item.group ~ "-" ~ item.name) if (item.group is defined and item.group) else item.name %]
+[% set item_anchor = "option-" ~ anchorfy(anchor_source) %]
+| [[ ("[" ~ strfy(item.name) ~ "](#" ~ item_anchor ~ ")") if ('detailed_description' in item) else strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
 [% endfor %]
 [% endif %]
 
 [% for item in entry.setup.configuration.options.list %]
 [% if 'detailed_description' in item %]
+[% set anchor_source = (item.group ~ "-" ~ item.name) if (item.group is defined and item.group) else item.name %]
+<a id="[[ "option-" ~ anchorfy(anchor_source) ]]"></a>
 ##### [[ item.name ]]
 
 [[ item.detailed_description ]]
