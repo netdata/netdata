@@ -130,13 +130,21 @@ func (s *runSim) run(t *testing.T) {
 	}
 
 	var lines []string
+	skipNextEmpty := false
 	for _, s := range strings.Split(out.String(), "\n") {
 		if strings.HasPrefix(s, "CONFIG") && strings.Contains(s, " template ") {
+			skipNextEmpty = false
 			continue
 		}
 		if strings.HasPrefix(s, "FUNCTION GLOBAL") {
+			skipNextEmpty = true
 			continue
 		}
+		if skipNextEmpty && s == "" {
+			skipNextEmpty = false
+			continue
+		}
+		skipNextEmpty = false
 		if strings.HasPrefix(s, "FUNCTION_RESULT_BEGIN") {
 			parts := strings.Fields(s)
 			s = strings.Join(parts[:len(parts)-1], " ") // remove timestamp
