@@ -601,7 +601,7 @@ endpoint:
         with_env_vars(&[("NETDATA_OTEL_ENDPOINT_PATH", "0.0.0.0:4317")], || {
             let env_overrides = PluginConfigOverride::from_env().unwrap();
             config.apply_overrides(&env_overrides);
+            assert_eq!(config.endpoint.path, "0.0.0.0:4317");
         });
-        assert_eq!(config.endpoint.path, "0.0.0.0:4317");
     }
 }
