@@ -1,0 +1,57 @@
+# Shared Topology IP intelligence configuration.
+#
+# Lookup order used by downloader and future consumers:
+# 1. /etc/netdata/topology-ip-intel.yaml
+# 2. /usr/lib/netdata/conf.d/topology-ip-intel.yaml
+
+source:
+  # one of: iptoasn, dbip_lite, custom
+  provider: iptoasn
+
+  # Used by provider=iptoasn and by provider=custom when populated.
+  combined:
+    url: "https://iptoasn.com/data/ip2asn-combined.tsv.gz"
+    format: iptoasn_combined_tsv
+    compression: auto
+
+  # Used by provider=dbip_lite and provider=custom.
+  asn:
+    url: ""
+    path: ""
+    format: dbip_asn_csv
+    compression: auto
+
+  # Used by provider=dbip_lite and provider=custom.
+  country:
+    url: ""
+    path: ""
+    format: dbip_country_csv
+    compression: auto
+
+output:
+  # Destination directory for generated databases.
+  directory: /var/cache/netdata/topology-ip-intel
+  asn_file: topology-ip-asn.mmdb
+  country_file: topology-ip-country.mmdb
+  metadata_file: topology-ip-intel.json
+
+policy:
+  # All plugins must use the same CIDR classes.
+  localhost_cidrs:
+    - 127.0.0.0/8
+    - ::1/128
+  private_cidrs:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    - 100.64.0.0/10
+    - fc00::/7
+    - fe80::/10
+
+  # Additional public CIDRs to track individually.
+  # Keep empty by default.
+  interesting_cidrs: []
+
+http:
+  timeout: 2m
+  user_agent: netdata-topology-ip-intel-downloader/1.0

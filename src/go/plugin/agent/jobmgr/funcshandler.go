@@ -116,19 +116,32 @@ func (m *Manager) makeMethodFuncHandler(moduleName, methodID string) func(functi
 
 		payload := parsePayload(fn.Payload)
 		argValues := parseArgsParams(fn.Args)
+		includeJobParam := methodRequiresJobParam(methodCfg)
 
 		jobs := m.moduleFuncs.getJobNames(moduleName)
 		if len(jobs) == 0 {
 			m.respondError(fn, 503, "no %s instances configured", moduleName)
 			return
 		}
-		jobParam := buildJobParamConfig(jobs)
-		jobValues := paramValues(argValues, payload, paramJob)
-		resolvedJob := funcapi.ResolveParam(jobParam, jobValues)
-		jobName := resolvedJob.GetOne()
-		if jobName == "" {
-			m.respondError(fn, 404, "no %s instances configured", moduleName)
-			return
+		jobName := jobs[0]
+		var resolvedJob funcapi.ResolvedParam
+		if includeJobParam {
+			jobParam := buildJobParamConfig(jobs)
+			jobValues := paramValues(argValues, payload, paramJob)
+			if len(jobValues) > 1 {
+				m.respondError(fn, 400, "parameter '%s' expects a single value", paramJob)
+				return
+			}
+			if len(jobValues) == 1 && !slices.Contains(jobs, jobValues[0]) {
+				m.respondError(fn, 404, "unknown job '%s', available: %v", jobValues[0], jobs)
+				return
+			}
+			resolvedJob = funcapi.ResolveParam(jobParam, jobValues)
+			jobName = resolvedJob.GetOne()
+			if jobName == "" {
+				m.respondError(fn, 404, "no %s instances configured", moduleName)
+				return
+			}
 		}
 
 		// Get job WITH generation for race condition detection
@@ -154,10 +167,12 @@ func (m *Manager) makeMethodFuncHandler(moduleName, methodID string) func(functi
 				return m.resolveMethodParamsForJob(ctx, moduleName, methodID, methodCfg, job, handler)
 			},
 			augmentParams: func(resolvedParams funcapi.ResolvedParams) {
-				resolvedParams[paramJob] = resolvedJob
+				if includeJobParam {
+					resolvedParams[paramJob] = resolvedJob
+				}
 			},
 			respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
-				m.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery)
+				m.respondWithParams(fn, moduleName, dataResp, methodParams, updateEvery, methodCfg.ResponseType, includeJobParam)
 			},
 		})
 	}
@@ -170,6 +185,7 @@ func (m *Manager) handleMethodFuncInfo(moduleName, methodID string, fn functions
 		m.respondError(fn, 404, "unknown method '%s' for module '%s'", methodID, moduleName)
 		return
 	}
+	includeJobParam := methodRequiresJobParam(methodCfg)
 
 	// Use static params for info. Actual requests return job-specific params in the response.
 	methodParams := methodCfg.RequiredParams
@@ -187,26 +203,29 @@ func (m *Manager) handleMethodFuncInfo(moduleName, methodID string, fn functions
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          200,
-		"type":            "table",
+		"type":            resolveResponseType("", methodCfg.ResponseType),
 		"has_history":     false,
 		"help":            help,
-		"accepted_params": buildAcceptedParams(methodParams),
-		"required_params": m.buildRequiredParams(moduleName, methodParams),
+		"accepted_params": buildAcceptedParams(methodParams, includeJobParam),
+		"required_params": m.buildRequiredParams(moduleName, methodParams, includeJobParam),
 	}
 
 	m.respondJSON(fn, resp)
 }
 
 // respondWithParams wraps the module's data response with current required_params
-func (m *Manager) respondWithParams(fn functions.Function, moduleName string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
+func (m *Manager) respondWithParams(fn functions.Function, moduleName string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string, includeJobParam bool) {
 	m.respondMethodDataWithParams(
 		fn,
 		dataResp,
 		methodParams,
 		updateEvery,
-		buildAcceptedParams,
+		methodType,
+		func(params []funcapi.ParamConfig) []string {
+			return buildAcceptedParams(params, includeJobParam)
+		},
 		func(params []funcapi.ParamConfig) []map[string]any {
-			return m.buildRequiredParams(moduleName, params)
+			return m.buildRequiredParams(moduleName, params, includeJobParam)
 		},
 	)
 }
@@ -216,6 +235,7 @@ func (m *Manager) respondMethodDataWithParams(
 	dataResp *funcapi.FunctionResponse,
 	methodParams []funcapi.ParamConfig,
 	updateEvery int,
+	methodType string,
 	buildAccepted func([]funcapi.ParamConfig) []string,
 	buildRequired func([]funcapi.ParamConfig) []map[string]any,
 ) {
@@ -238,7 +258,7 @@ func (m *Manager) respondMethodDataWithParams(
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          dataResp.Status,
-		"type":            "table",
+		"type":            resolveResponseType(dataResp.ResponseType, methodType),
 		"has_history":     false,
 		"help":            dataResp.Help,
 		"accepted_params": buildAccepted(paramsForResponse),
@@ -276,12 +296,22 @@ func (m *Manager) respondError(fn functions.Function, status int, format string,
 	m.respondJSON(fn, resp)
 }
 
-// buildRequiredParams creates the required_params array with current job list
-func (m *Manager) buildRequiredParams(moduleName string, methodParams []funcapi.ParamConfig) []map[string]any {
-	jobs := m.moduleFuncs.getJobNames(moduleName)
+func resolveResponseType(dataType, methodType string) string {
+	if dataType != "" {
+		return dataType
+	}
+	if methodType != "" {
+		return methodType
+	}
+	return "table"
+}
 
-	paramConfigs := []funcapi.ParamConfig{
-		buildJobParamConfig(jobs),
+// buildRequiredParams creates the required_params array with current job list
+func (m *Manager) buildRequiredParams(moduleName string, methodParams []funcapi.ParamConfig, includeJobParam bool) []map[string]any {
+	paramConfigs := make([]funcapi.ParamConfig, 0, len(methodParams)+1)
+	if includeJobParam {
+		jobs := m.moduleFuncs.getJobNames(moduleName)
+		paramConfigs = append(paramConfigs, buildJobParamConfig(jobs))
 	}
 	paramConfigs = append(paramConfigs, methodParams...)
 
@@ -388,6 +418,9 @@ func parseArgsParams(args []string) map[string][]string {
 			continue
 		}
 		parts := strings.SplitN(arg, ":", 2)
+		if len(parts) != 2 {
+			parts = strings.SplitN(arg, "=", 2)
+		}
 		if len(parts) != 2 {
 			continue
 		}
@@ -496,14 +529,21 @@ func buildJobParamConfig(jobs []string) funcapi.ParamConfig {
 	}
 }
 
-func buildAcceptedParams(methodParams []funcapi.ParamConfig) []string {
-	accepted := []string{paramJob}
+func buildAcceptedParams(methodParams []funcapi.ParamConfig, includeJobParam bool) []string {
+	accepted := make([]string, 0, len(methodParams)+1)
+	if includeJobParam {
+		accepted = append(accepted, paramJob)
+	}
 	for _, p := range methodParams {
 		if !slices.Contains(accepted, p.ID) {
 			accepted = append(accepted, p.ID)
 		}
 	}
 	return accepted
+}
+
+func methodRequiresJobParam(cfg *funcapi.MethodConfig) bool {
+	return cfg == nil || !cfg.AgentWide
 }
 
 // makeJobMethodFuncHandler creates a function handler for a job-specific method.
@@ -548,7 +588,7 @@ func (m *Manager) makeJobMethodFuncHandler(moduleName, jobName, methodID string)
 				return m.resolveJobMethodParams(ctx, methodCfg, handler, methodID)
 			},
 			respond: func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
-				m.respondJobMethodWithParams(fn, dataResp, methodParams, updateEvery)
+				m.respondJobMethodWithParams(fn, dataResp, methodParams, updateEvery, methodCfg.ResponseType)
 			},
 		})
 	}
@@ -577,7 +617,7 @@ func (m *Manager) handleJobMethodFuncInfo(moduleName, jobName, methodID string, 
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          200,
-		"type":            "table",
+		"type":            resolveResponseType("", methodCfg.ResponseType),
 		"has_history":     false,
 		"help":            help,
 		"accepted_params": buildJobMethodAcceptedParams(methodParams),
@@ -603,12 +643,13 @@ func (m *Manager) resolveJobMethodParams(ctx context.Context, methodCfg *funcapi
 }
 
 // respondJobMethodWithParams wraps the module's data response for job-specific methods
-func (m *Manager) respondJobMethodWithParams(fn functions.Function, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int) {
+func (m *Manager) respondJobMethodWithParams(fn functions.Function, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string) {
 	m.respondMethodDataWithParams(
 		fn,
 		dataResp,
 		methodParams,
 		updateEvery,
+		methodType,
 		buildJobMethodAcceptedParams,
 		buildJobMethodRequiredParams,
 	)

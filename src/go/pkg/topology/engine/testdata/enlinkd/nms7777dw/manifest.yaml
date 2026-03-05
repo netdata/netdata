@@ -1,0 +1,20 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms7777dw
+scenarios:
+  - id: nms7777dw_lldp_no_links
+    description: >-
+      Enlinkd NMS-7777DW LLDP no-links parity scenario from OpenNMS
+      integration test corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: dw
+        walk_file: ../upstream/linkd/nms7777dw/dw-walk.txt
+    golden_yaml: golden/nms7777dw_lldp_no_links.yaml
+    golden_json: golden/nms7777dw_lldp_no_links.json

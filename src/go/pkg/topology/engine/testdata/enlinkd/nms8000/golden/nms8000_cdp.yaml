@@ -1,0 +1,88 @@
+version: v1
+scenario_id: nms8000_cdp
+description: >-
+  Expected directed CDP adjacencies for the NMS-8000 topology scenario from
+  OpenNMS Enlinkd integration expectations.
+devices:
+  - id: netlabsw03.informatik.hs-fulda.de
+    hostname: netlabSW03.informatik.hs-fulda.de
+  - id: nmmr1
+    hostname: NMM-R1.informatik.hs-fulda.de
+  - id: nmmr2
+    hostname: NMM-R2.informatik.hs-fulda.de
+  - id: nmmr3
+    hostname: NMM-R3.informatik.hs-fulda.de
+  - id: nmmsw1
+    hostname: NMM-SW1.informatik.hs-fulda.de
+  - id: nmmsw2
+    hostname: NMM-SW2.informatik.hs-fulda.de
+adjacencies:
+  - protocol: cdp
+    source_device: nmmr1
+    source_port: Gi0/0
+    target_device: nmmr3
+    target_port: GigabitEthernet0/1
+  - protocol: cdp
+    source_device: nmmr1
+    source_port: Gi0/1
+    target_device: nmmsw1
+    target_port: FastEthernet0/1
+  - protocol: cdp
+    source_device: nmmr1
+    source_port: Gi0/2
+    target_device: nmmsw2
+    target_port: FastEthernet0/2
+  - protocol: cdp
+    source_device: nmmr2
+    source_port: Gi0/0
+    target_device: nmmr3
+    target_port: GigabitEthernet0/2
+  - protocol: cdp
+    source_device: nmmr2
+    source_port: Gi0/1
+    target_device: nmmsw2
+    target_port: FastEthernet0/1
+  - protocol: cdp
+    source_device: nmmr2
+    source_port: Gi0/2
+    target_device: nmmsw1
+    target_port: FastEthernet0/2
+  - protocol: cdp
+    source_device: nmmr3
+    source_port: Gi0/0
+    target_device: netlabsw03.informatik.hs-fulda.de
+    target_port: GigabitEthernet2/0/18
+  - protocol: cdp
+    source_device: nmmr3
+    source_port: Gi0/1
+    target_device: nmmr1
+    target_port: GigabitEthernet0/0
+  - protocol: cdp
+    source_device: nmmr3
+    source_port: Gi0/2
+    target_device: nmmr2
+    target_port: GigabitEthernet0/0
+  - protocol: cdp
+    source_device: nmmsw1
+    source_port: Fa0/1
+    target_device: nmmr1
+    target_port: GigabitEthernet0/1
+  - protocol: cdp
+    source_device: nmmsw1
+    source_port: Fa0/2
+    target_device: nmmr2
+    target_port: GigabitEthernet0/2
+  - protocol: cdp
+    source_device: nmmsw2
+    source_port: Fa0/1
+    target_device: nmmr2
+    target_port: GigabitEthernet0/1
+  - protocol: cdp
+    source_device: nmmsw2
+    source_port: Fa0/2
+    target_device: nmmr1
+    target_port: GigabitEthernet0/2
+expectations:
+  directional_adjacencies: 13
+  bidirectional_pairs: 6
+  devices: 6

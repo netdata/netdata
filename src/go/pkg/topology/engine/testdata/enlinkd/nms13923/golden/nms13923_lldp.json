@@ -1,0 +1,541 @@
+{
+  "version": "v1",
+  "scenario_id": "nms13923_lldp",
+  "description": "Enlinkd NMS-13923 LLDP parity scenario from OpenNMS integration test corpus.",
+  "devices": [
+    {
+      "id": "srv005",
+      "hostname": "srv005"
+    },
+    {
+      "id": "zhalbs1zac001",
+      "hostname": "ZHALBS1Zac001"
+    },
+    {
+      "id": "zhalbs1zac002",
+      "hostname": "ZHALBS1Zac002"
+    },
+    {
+      "id": "zhalbs1zac003",
+      "hostname": "ZHALBS1Zac003"
+    },
+    {
+      "id": "zhalbs1zac004",
+      "hostname": "ZHALBS1Zac004"
+    },
+    {
+      "id": "zhalbs1zac005",
+      "hostname": "ZHALBS1Zac005"
+    },
+    {
+      "id": "zhalbs1zac006",
+      "hostname": "ZHALBS1Zac006"
+    },
+    {
+      "id": "zhalss1zac001",
+      "hostname": "ZHALSS1Zac001"
+    },
+    {
+      "id": "zhalss1zac002",
+      "hostname": "ZHALSS1Zac002"
+    },
+    {
+      "id": "zhalss1zac003",
+      "hostname": "ZHALSS1Zac003"
+    },
+    {
+      "id": "zhalss1zac004",
+      "hostname": "ZHALSS1Zac004"
+    },
+    {
+      "id": "zhalss1zac005",
+      "hostname": "ZHALSS1Zac005"
+    },
+    {
+      "id": "zhauss1zac003",
+      "hostname": "ZHAUSS1Zac003"
+    },
+    {
+      "id": "zhauss1zac004",
+      "hostname": "ZHAUSS1Zac004"
+    },
+    {
+      "id": "zhauwa1zbb001",
+      "hostname": "ZHAUWA1Zbb001"
+    },
+    {
+      "id": "zhengs1zac001",
+      "hostname": "ZHENGS1Zac001"
+    },
+    {
+      "id": "zhengs1zac003",
+      "hostname": "ZHENGS1Zac003"
+    },
+    {
+      "id": "zhengs1zac004",
+      "hostname": "ZHENGS1Zac004"
+    },
+    {
+      "id": "zhfloe1zac002",
+      "hostname": "ZHFLOE1Zac002"
+    },
+    {
+      "id": "zhharg1zbb001",
+      "hostname": "ZHHARG1Zbb001"
+    },
+    {
+      "id": "zhhiss1zac001",
+      "hostname": "ZHHISS1Zac001"
+    },
+    {
+      "id": "zhhiss1zac002",
+      "hostname": "ZHHISS1Zac002"
+    },
+    {
+      "id": "zhhiss1zac004",
+      "hostname": "ZHHISS1Zac004"
+    },
+    {
+      "id": "zhhiss1zac005",
+      "hostname": "ZHHISS1Zac005"
+    },
+    {
+      "id": "zhhots1zac001",
+      "hostname": "ZHHOTS1Zac001"
+    },
+    {
+      "id": "zhhots1zac002",
+      "hostname": "ZHHOTS1Zac002"
+    },
+    {
+      "id": "zhhots1zac003",
+      "hostname": "ZHHOTS1Zac003"
+    },
+    {
+      "id": "zhhots1zac004",
+      "hostname": "ZHHOTS1Zac004"
+    },
+    {
+      "id": "zhries1zac001",
+      "hostname": "ZHRIES1Zac001"
+    },
+    {
+      "id": "zhries1zac002",
+      "hostname": "ZHRIES1Zac002"
+    },
+    {
+      "id": "zhries1zac003",
+      "hostname": "ZHRIES1Zac003"
+    },
+    {
+      "id": "zhries1zac004",
+      "hostname": "ZHRIES1Zac004"
+    },
+    {
+      "id": "zhries1zac005",
+      "hostname": "ZHRIES1Zac005"
+    },
+    {
+      "id": "zhries1zac006",
+      "hostname": "ZHRIES1Zac006"
+    },
+    {
+      "id": "zhries1zac007",
+      "hostname": "ZHRIES1Zac007"
+    },
+    {
+      "id": "zhries1zac008",
+      "hostname": "ZHRIES1Zac008"
+    },
+    {
+      "id": "zhuraa1zac001",
+      "hostname": "ZHURAA1Zac001"
+    },
+    {
+      "id": "zhwids1zac001",
+      "hostname": "ZHWIDS1Zac001"
+    },
+    {
+      "id": "zhwids1zac002",
+      "hostname": "ZHWIDS1Zac002"
+    },
+    {
+      "id": "zhwids1zac003",
+      "hostname": "ZHWIDS1Zac003"
+    },
+    {
+      "id": "zhwids1zac004",
+      "hostname": "ZHWIDS1Zac004"
+    },
+    {
+      "id": "zhwids1zac005",
+      "hostname": "ZHWIDS1Zac005"
+    },
+    {
+      "id": "zhwids1zac006",
+      "hostname": "ZHWIDS1Zac006"
+    },
+    {
+      "id": "zhwols1zac001",
+      "hostname": "ZHWOLS1Zac001"
+    },
+    {
+      "id": "zhwols1zac002",
+      "hostname": "ZHWOLS1Zac002"
+    },
+    {
+      "id": "zhwols1zac003",
+      "hostname": "ZHWOLS1Zac003"
+    }
+  ],
+  "adjacencies": [
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "1/1/1",
+      "target_device": "zhharg1zbb001",
+      "target_port": "35717120"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "1/1/3",
+      "target_device": "zhauss1zac003",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "1/2/1",
+      "target_device": "zhhiss1zac004",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "1/2/2",
+      "target_device": "zhfloe1zac002",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "1/2/3",
+      "target_device": "zhalss1zac003",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "1/2/4",
+      "target_device": "zhwids1zac001",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "2/1/1",
+      "target_device": "zhauwa1zbb001",
+      "target_port": "35717120"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "2/1/3",
+      "target_device": "zhalbs1zac004",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "2/1/4",
+      "target_device": "zhalbs1zac003",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "2/1/5",
+      "target_device": "zhries1zac005",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "2/2/1",
+      "target_device": "zhries1zac003",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "2/2/2",
+      "target_device": "zhalss1zac002",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "2/2/3",
+      "target_device": "zhalss1zac001",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "2/2/4",
+      "target_device": "zhalbs1zac001",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "2/2/5",
+      "target_device": "zhalbs1zac002",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "2/2/6",
+      "target_device": "zhwids1zac002",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "3/1/1",
+      "target_device": "zhries1zac001",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "3/1/2",
+      "target_device": "zhhiss1zac001",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "3/1/3",
+      "target_device": "zhengs1zac001",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "3/1/4",
+      "target_device": "zhharg1zbb001",
+      "target_port": "37814272"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "3/2/1",
+      "target_device": "zhhiss1zac002",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "3/2/2",
+      "target_device": "zhries1zac002",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "3/2/3",
+      "target_device": "zhwids1zac003",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "3/2/4",
+      "target_device": "zhries1zac004",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "4/1/1",
+      "target_device": "zhries1zac008",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "4/1/2",
+      "target_device": "zhalss1zac005",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "4/1/3",
+      "target_device": "zhauss1zac004",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "4/2/2",
+      "target_device": "zhhots1zac004",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "4/2/6",
+      "target_device": "zhharg1zbb001",
+      "target_port": "205717504"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/1/1",
+      "target_device": "zhwols1zac001",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/1/2",
+      "target_device": "zhries1zac006",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/1/3",
+      "target_device": "zhalbs1zac005",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/1/4",
+      "target_device": "zhalss1zac004",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/1/5",
+      "target_device": "zhhots1zac001",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/1/6",
+      "target_device": "zhuraa1zac001",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/2/1",
+      "target_device": "zhwids1zac004",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/2/2",
+      "target_device": "zhhots1zac002",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/2/3",
+      "target_device": "zhries1zac007",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/2/4",
+      "target_device": "zhhiss1zac005",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/2/5",
+      "target_device": "zhwids1zac005",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "5/2/6",
+      "target_device": "zhalbs1zac006",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "6/1/5",
+      "target_device": "zhauwa1zbb001",
+      "target_port": "37814272"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "6/1/6",
+      "target_device": "zhhots1zac003",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "6/2/1",
+      "target_device": "zhengs1zac003",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "6/2/2",
+      "target_device": "zhwols1zac002",
+      "target_port": "36044800"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "6/2/3",
+      "target_device": "zhwids1zac006",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "6/2/4",
+      "target_device": "zhengs1zac004",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "6/2/5",
+      "target_device": "zhwols1zac003",
+      "target_port": "35880960"
+    },
+    {
+      "protocol": "lldp",
+      "source_device": "srv005",
+      "source_port": "6/2/6",
+      "target_device": "zhauwa1zbb001",
+      "target_port": "205717504"
+    }
+  ],
+  "expectations": {
+    "directional_adjacencies": 49,
+    "bidirectional_pairs": 0,
+    "devices": 46
+  }
+}

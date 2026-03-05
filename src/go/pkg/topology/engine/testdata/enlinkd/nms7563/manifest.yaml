@@ -1,0 +1,50 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms7563
+scenarios:
+  - id: nms7563_cisco01
+    description: >-
+      Enlinkd NMS-7563 Cisco01 mixed LLDP/CDP parity scenario from OpenNMS
+      integration test corpus.
+    protocols:
+      lldp: true
+      cdp: true
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: cisco01
+        walk_file: ../upstream/linkd/nms7563/cisco01-walk.txt
+    golden_yaml: golden/nms7563_cisco01.yaml
+    golden_json: golden/nms7563_cisco01.json
+
+  - id: nms7563_homeserver_lldp
+    description: >-
+      Enlinkd NMS-7563 HomeServer LLDP parity scenario from OpenNMS
+      integration test corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: homeserver
+        walk_file: ../upstream/linkd/nms7563/homeserver-walk.txt
+    golden_yaml: golden/nms7563_homeserver_lldp.yaml
+    golden_json: golden/nms7563_homeserver_lldp.json
+
+  - id: nms7563_switch02_cdp
+    description: >-
+      Enlinkd NMS-7563 Switch02 CDP parity scenario from OpenNMS
+      integration test corpus.
+    protocols:
+      lldp: false
+      cdp: true
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: switch02
+        walk_file: ../upstream/linkd/nms7563/switch02-walk.txt
+    golden_yaml: golden/nms7563_switch02_cdp.yaml
+    golden_json: golden/nms7563_switch02_cdp.json

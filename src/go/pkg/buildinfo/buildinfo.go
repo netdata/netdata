@@ -28,16 +28,20 @@ var PluginsDir = "/usr/libexec/netdata/plugins.d"
 // NetdataBinDir is the path to the installed executables directory.
 var NetdataBinDir = "/usr/sbin"
 
+// CacheDir is the path to the Netdata cache directory.
+var CacheDir = "/var/cache/netdata"
+
 // Info returns all build information as a single line with snake_case keys.
 func Info() string {
 	return fmt.Sprintf(
-		"version=%s go_version=%s user_config_dir=%s stock_config_dir=%s plugins_dir=%s netdata_bin_dir=%s",
+		"version=%s go_version=%s user_config_dir=%s stock_config_dir=%s plugins_dir=%s netdata_bin_dir=%s cache_dir=%s",
 		Version,
 		runtime.Version(),
 		UserConfigDir,
 		StockConfigDir,
 		PluginsDir,
 		NetdataBinDir,
+		CacheDir,
 	)
 }
 
@@ -137,4 +141,5 @@ func init() {
 	StockConfigDir = rebuild(StockConfigDir)
 	PluginsDir = rebuild(PluginsDir)
 	NetdataBinDir = rebuild(NetdataBinDir)
+	CacheDir = rebuild(CacheDir)
 }
