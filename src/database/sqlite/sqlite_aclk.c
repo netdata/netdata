@@ -1181,6 +1181,8 @@ void destroy_aclk_config(RRDHOST *host)
     }
 
     struct aclk_sync_cfg_t *old_aclk_host_config = __atomic_exchange_n(&host->aclk_host_config, NULL, __ATOMIC_RELAXED);
+    freez(old_aclk_host_config->pending_ctx_claim_id);
+    freez(old_aclk_host_config->pending_ctx_node_id);
     freez(old_aclk_host_config);
 }
 

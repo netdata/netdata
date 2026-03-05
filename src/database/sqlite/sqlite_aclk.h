@@ -34,23 +34,17 @@ enum aclk_database_opcode {
     ACLK_MAX_ENUMERATIONS_DEFINED
 };
 
-typedef enum {
-    ACLK_CTX_DEFER_REASON_NONE = 0,
-    ACLK_CTX_DEFER_REASON_PENDING_CONTEXT_LOAD = 1,
-    ACLK_CTX_DEFER_REASON_PENDING_POST_PROCESSING = 2,
-} ACLK_CTX_DEFER_REASON;
-
-#define ACLK_CTX_CHECKPOINT_MAX_DEFERRALS 60
-#define ACLK_CTX_CHECKPOINT_DEFER_MAX_TIME_S 300
-
 typedef struct aclk_sync_cfg_t {
     RRDHOST *host;
     uv_timer_t timer;
     bool timer_initialized;
-    uint32_t context_checkpoint_deferred_count;
-    ACLK_CTX_DEFER_REASON context_checkpoint_deferred_reason;
-    time_t context_checkpoint_deferred_last_time_s;
-    time_t context_checkpoint_deferred_first_time_s;
+
+    // pending context checkpoint - saved when deferred during context load or post-processing
+    bool pending_ctx_checkpoint;
+    char *pending_ctx_claim_id;
+    char *pending_ctx_node_id;
+    uint64_t pending_ctx_version_hash;
+
     int8_t send_snapshot;
     bool stream_alerts;
     int alert_count;
