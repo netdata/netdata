@@ -1,55 +1,70 @@
-#![allow(dead_code)]
-
 //! Aggregation logic for mapping OpenTelemetry's event-based metrics to Netdata's
 //! fixed-interval collection model.
 //!
-//! Each aggregator is a state machine that:
-//! - Accepts data points via `ingest()`
-//! - Produces a value for the current slot via `finalize_slot()`
-//! - Provides gap-fill values when no data arrives via `gap_fill()`
+//! The design separates per-slot accumulation from cross-slot context:
+//!
+//! - [`SlotAccumulator`]: collects data points within a single time slot.
+//!   One instance per (dimension, slot) pair, created on demand.
+//! - [`CrossSlotContext`]: persistent per-dimension state that spans slot
+//!   boundaries (e.g. the previous cumulative value for delta computation).
+//!   Owns finalization logic that consumes a slot accumulator and produces
+//!   the value to emit.
 
-/// Trait for metric aggregators that map OpenTelemetry data points to Netdata values.
+/// Per-slot accumulation state.
 ///
-/// Aggregators maintain state across collection intervals and handle the conversion
-/// from OpenTelemetry's event-based model to Netdata's fixed-interval model.
-pub trait Aggregator {
-    /// Ingest a data point for the current pending slot.
-    ///
-    /// # Arguments
-    /// * `value` - The numeric value from the data point
-    /// * `timestamp_ns` - The `time_unix_nano` field (when the measurement became current)
-    /// * `start_time_ns` - The `start_time_unix_nano` field (start of observation interval)
-    fn ingest(&mut self, value: f64, timestamp_ns: u64, start_time_ns: u64);
+/// One instance per (dimension, slot) pair. Created on demand when the first
+/// data point for a slot arrives, consumed by [`CrossSlotContext::finalize`]
+/// at emission time.
+pub trait SlotAccumulator: Default + std::fmt::Debug {
+    /// Record a data point into this slot's accumulator.
+    fn record(&mut self, value: f64, timestamp_ns: u64, start_time_ns: u64);
 
-    /// Finalize the current slot and return the value to emit to Netdata.
-    ///
-    /// This is called when the slot's grace period has expired and we need to
-    /// produce a final value. After this call, internal per-slot accumulators
-    /// should be reset, but cross-slot state (like previous cumulative values)
-    /// should be preserved.
-    ///
-    /// Returns `None` if no value can be produced (e.g., first observation for cumulative).
-    fn finalize_slot(&mut self) -> Option<f64>;
+    /// Whether any data was recorded into this accumulator.
+    #[allow(dead_code)]
+    fn has_data(&self) -> bool;
+}
 
-    /// Return the value to use when no data arrived for a slot (gap filling).
+/// Cross-slot context that persists across slot boundaries.
+///
+/// One instance per dimension (not per slot). Holds state needed to convert
+/// raw slot data into emittable values (e.g. the previous cumulative value
+/// for computing deltas).
+pub trait CrossSlotContext: Default + std::fmt::Debug {
+    /// The slot accumulator type paired with this context.
+    type Slot: SlotAccumulator;
+
+    /// Finalize a slot accumulator into an emittable value, updating
+    /// cross-slot state as needed.
     ///
-    /// This is called when a slot is finalized but no data points were ingested.
+    /// Returns `None` if no value can be produced (e.g. first cumulative
+    /// observation establishing a baseline).
+    fn finalize(&mut self, slot: Self::Slot) -> Option<f64>;
+
+    /// Value to emit when no data arrived for a slot (gap filling).
     fn gap_fill(&self) -> f64;
 
-    /// Reset all state. Called when the dimension is being re-initialized.
+    /// Reset all cross-slot state. Called when the dimension is re-initialized.
+    #[allow(dead_code)]
     fn reset(&mut self);
 }
 
-/// Aggregator for Gauge metrics.
+// ---------------------------------------------------------------------------
+// Gauge
+// ---------------------------------------------------------------------------
+
+/// Per-slot state for Gauge metrics.
 ///
-/// Gauges represent instantaneous values with no defined aggregation semantics.
-/// When multiple values arrive within a slot, we keep the last one (by timestamp).
-/// Gap filling repeats the last observed value.
+/// Keeps the last value by timestamp within the slot.
 #[derive(Debug, Default)]
-pub struct GaugeAggregator {
-    /// The last value seen in the current slot (with its timestamp for ordering)
+pub struct GaugeSlot {
     pending: Option<PendingValue>,
-    /// The last emitted value (for gap filling)
+}
+
+/// Cross-slot context for Gauge metrics.
+///
+/// Tracks the last emitted value for gap-fill (repeat last known value).
+#[derive(Debug, Default)]
+pub struct GaugeContext {
     last_emitted: Option<f64>,
 }
 
@@ -59,19 +74,10 @@ struct PendingValue {
     timestamp_ns: u64,
 }
 
-impl GaugeAggregator {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl Aggregator for GaugeAggregator {
-    fn ingest(&mut self, value: f64, timestamp_ns: u64, _start_time_ns: u64) {
-        // Keep the value with the latest timestamp
+impl SlotAccumulator for GaugeSlot {
+    fn record(&mut self, value: f64, timestamp_ns: u64, _start_time_ns: u64) {
         match &self.pending {
-            Some(pending) if timestamp_ns <= pending.timestamp_ns => {
-                // Ignore older or equal timestamp
-            }
+            Some(pending) if timestamp_ns <= pending.timestamp_ns => {}
             _ => {
                 self.pending = Some(PendingValue {
                     value,
@@ -81,8 +87,16 @@ impl Aggregator for GaugeAggregator {
         }
     }
 
-    fn finalize_slot(&mut self) -> Option<f64> {
-        let value = self.pending.take().map(|p| p.value);
+    fn has_data(&self) -> bool {
+        self.pending.is_some()
+    }
+}
+
+impl CrossSlotContext for GaugeContext {
+    type Slot = GaugeSlot;
+
+    fn finalize(&mut self, slot: GaugeSlot) -> Option<f64> {
+        let value = slot.pending.map(|p| p.value);
         if let Some(v) = value {
             self.last_emitted = Some(v);
         }
@@ -94,42 +108,46 @@ impl Aggregator for GaugeAggregator {
     }
 
     fn reset(&mut self) {
-        self.pending = None;
         self.last_emitted = None;
     }
 }
 
-/// Aggregator for Sum metrics with Delta temporality.
+// ---------------------------------------------------------------------------
+// Delta Sum
+// ---------------------------------------------------------------------------
+
+/// Per-slot state for Delta Sum metrics.
 ///
-/// Delta sums report the change since the last report. When multiple deltas
-/// arrive within a slot, we sum them (addition is the decomposable aggregate).
-/// Gap filling returns 0 (no change occurred).
+/// Accumulates deltas within a slot by summing them.
 #[derive(Debug, Default)]
-pub struct DeltaSumAggregator {
-    /// Accumulated delta for the current slot
+pub struct DeltaSumSlot {
     accumulated: f64,
-    /// Whether we've received any data for the current slot
     has_data: bool,
 }
 
-impl DeltaSumAggregator {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
+/// Cross-slot context for Delta Sum metrics.
+///
+/// No cross-slot state needed — each slot is independent.
+#[derive(Debug, Default)]
+pub struct DeltaSumContext;
 
-impl Aggregator for DeltaSumAggregator {
-    fn ingest(&mut self, value: f64, _timestamp_ns: u64, _start_time_ns: u64) {
+impl SlotAccumulator for DeltaSumSlot {
+    fn record(&mut self, value: f64, _timestamp_ns: u64, _start_time_ns: u64) {
         self.accumulated += value;
         self.has_data = true;
     }
 
-    fn finalize_slot(&mut self) -> Option<f64> {
-        if self.has_data {
-            let value = self.accumulated;
-            self.accumulated = 0.0;
-            self.has_data = false;
-            Some(value)
+    fn has_data(&self) -> bool {
+        self.has_data
+    }
+}
+
+impl CrossSlotContext for DeltaSumContext {
+    type Slot = DeltaSumSlot;
+
+    fn finalize(&mut self, slot: DeltaSumSlot) -> Option<f64> {
+        if slot.has_data {
+            Some(slot.accumulated)
         } else {
             None
         }
@@ -139,69 +157,58 @@ impl Aggregator for DeltaSumAggregator {
         0.0
     }
 
-    fn reset(&mut self) {
-        self.accumulated = 0.0;
-        self.has_data = false;
-    }
+    #[allow(dead_code)]
+    fn reset(&mut self) {}
 }
 
-/// Aggregator for Sum metrics with Cumulative temporality.
+// ---------------------------------------------------------------------------
+// Cumulative Sum
+// ---------------------------------------------------------------------------
+
+/// Per-slot state for Cumulative Sum metrics.
 ///
-/// Cumulative sums report the total since a fixed start time. We convert to
-/// deltas by tracking the previous cumulative value and computing the difference.
-///
-/// Restart detection uses `start_time_unix_nano` - when it changes, we know
-/// the counter has reset and we cannot compute a meaningful delta across
-/// the boundary.
+/// Keeps the latest cumulative value by timestamp within the slot.
 #[derive(Debug, Default)]
-pub struct CumulativeSumAggregator {
-    /// State from the previous finalized slot
-    previous: Option<CumulativeState>,
-    /// Pending data for the current slot (last value by timestamp)
+pub struct CumulativeSumSlot {
     pending: Option<CumulativePending>,
-    /// The last emitted delta (for gap filling)
-    last_emitted_delta: Option<f64>,
+}
+
+/// Cross-slot context for Cumulative Sum metrics.
+///
+/// Tracks the previous cumulative value across slot boundaries to compute
+/// deltas. Detects counter restarts via `start_time_unix_nano` changes.
+#[derive(Debug, Default)]
+pub struct CumulativeSumContext {
+    /// State from the previous finalized slot.
+    previous: Option<CumulativeState>,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct CumulativeState {
-    /// The cumulative value at the end of the last slot
     value: f64,
-    /// The start_time_unix_nano from that observation
     start_time_ns: u64,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct CumulativePending {
-    /// The last cumulative value seen in this slot
     value: f64,
-    /// Timestamp of that observation (for keeping "last by timestamp")
     timestamp_ns: u64,
-    /// The start_time_unix_nano from that observation
     start_time_ns: u64,
 }
 
-impl CumulativeSumAggregator {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Check if a restart occurred between the previous state and the pending data.
+impl CumulativeSumContext {
     fn is_restart(&self, pending: &CumulativePending) -> bool {
         match &self.previous {
             Some(prev) => prev.start_time_ns != pending.start_time_ns,
-            None => false, // No previous state, so not a restart
+            None => false,
         }
     }
 }
 
-impl Aggregator for CumulativeSumAggregator {
-    fn ingest(&mut self, value: f64, timestamp_ns: u64, start_time_ns: u64) {
-        // Keep the value with the latest timestamp within the slot
+impl SlotAccumulator for CumulativeSumSlot {
+    fn record(&mut self, value: f64, timestamp_ns: u64, start_time_ns: u64) {
         match &self.pending {
-            Some(pending) if timestamp_ns <= pending.timestamp_ns => {
-                // Ignore older or equal timestamp
-            }
+            Some(pending) if timestamp_ns <= pending.timestamp_ns => {}
             _ => {
                 self.pending = Some(CumulativePending {
                     value,
@@ -212,52 +219,48 @@ impl Aggregator for CumulativeSumAggregator {
         }
     }
 
-    fn finalize_slot(&mut self) -> Option<f64> {
-        let pending = self.pending.take()?;
+    fn has_data(&self) -> bool {
+        self.pending.is_some()
+    }
+}
 
-        let delta = if self.is_restart(&pending) {
-            // Restart detected - we can't compute a meaningful delta
-            // Update state to track the new sequence
+impl CrossSlotContext for CumulativeSumContext {
+    type Slot = CumulativeSumSlot;
+
+    fn finalize(&mut self, slot: CumulativeSumSlot) -> Option<f64> {
+        let pending = slot.pending?;
+
+        if self.is_restart(&pending) {
             self.previous = Some(CumulativeState {
                 value: pending.value,
                 start_time_ns: pending.start_time_ns,
             });
-            // Return 0 for the restart slot (no contribution)
             Some(0.0)
         } else if let Some(prev) = &self.previous {
-            // Normal case: compute delta from previous cumulative value
             let delta = pending.value - prev.value;
             self.previous = Some(CumulativeState {
                 value: pending.value,
                 start_time_ns: pending.start_time_ns,
             });
-            Some(delta)
+            // Negative delta on a monotonic counter means a wrap or silent
+            // restart that didn't update start_time. Treat as reset.
+            if delta < 0.0 { Some(0.0) } else { Some(delta) }
         } else {
-            // First observation - establish baseline, can't compute delta yet
             self.previous = Some(CumulativeState {
                 value: pending.value,
                 start_time_ns: pending.start_time_ns,
             });
-            // Return None to indicate no value for this slot
             None
-        };
-
-        if let Some(d) = delta {
-            self.last_emitted_delta = Some(d);
         }
-
-        delta
     }
 
     fn gap_fill(&self) -> f64 {
-        // No new cumulative value means no change in delta
         0.0
     }
 
+    #[allow(dead_code)]
     fn reset(&mut self) {
         self.previous = None;
-        self.pending = None;
-        self.last_emitted_delta = None;
     }
 }
 
@@ -270,49 +273,53 @@ mod tests {
 
         #[test]
         fn keeps_last_value_by_timestamp() {
-            let mut agg = GaugeAggregator::new();
+            let mut slot = GaugeSlot::default();
 
-            // Ingest multiple values with different timestamps
-            agg.ingest(10.0, 1000, 0);
-            agg.ingest(30.0, 3000, 0); // Latest timestamp
-            agg.ingest(20.0, 2000, 0); // Earlier timestamp, should be ignored
+            slot.record(10.0, 1000, 0);
+            slot.record(30.0, 3000, 0); // Latest timestamp
+            slot.record(20.0, 2000, 0); // Earlier timestamp, should be ignored
 
-            assert_eq!(agg.finalize_slot(), Some(30.0));
+            let mut ctx = GaugeContext::default();
+            assert_eq!(ctx.finalize(slot), Some(30.0));
         }
 
         #[test]
         fn returns_none_when_no_data() {
-            let mut agg = GaugeAggregator::new();
-            assert_eq!(agg.finalize_slot(), None);
+            let slot = GaugeSlot::default();
+            let mut ctx = GaugeContext::default();
+            assert_eq!(ctx.finalize(slot), None);
         }
 
         #[test]
         fn gap_fill_returns_last_emitted() {
-            let mut agg = GaugeAggregator::new();
+            let mut slot = GaugeSlot::default();
+            slot.record(42.0, 1000, 0);
 
-            agg.ingest(42.0, 1000, 0);
-            agg.finalize_slot();
+            let mut ctx = GaugeContext::default();
+            ctx.finalize(slot);
 
-            // Now gap fill should return 42.0
-            assert_eq!(agg.gap_fill(), 42.0);
+            assert_eq!(ctx.gap_fill(), 42.0);
         }
 
         #[test]
         fn gap_fill_returns_zero_when_never_emitted() {
-            let agg = GaugeAggregator::new();
-            assert_eq!(agg.gap_fill(), 0.0);
+            let ctx = GaugeContext::default();
+            assert_eq!(ctx.gap_fill(), 0.0);
         }
 
         #[test]
         fn reset_clears_state() {
-            let mut agg = GaugeAggregator::new();
-            agg.ingest(42.0, 1000, 0);
-            agg.finalize_slot();
+            let mut slot = GaugeSlot::default();
+            slot.record(42.0, 1000, 0);
 
-            agg.reset();
+            let mut ctx = GaugeContext::default();
+            ctx.finalize(slot);
 
-            assert_eq!(agg.finalize_slot(), None);
-            assert_eq!(agg.gap_fill(), 0.0);
+            ctx.reset();
+
+            let empty = GaugeSlot::default();
+            assert_eq!(ctx.finalize(empty), None);
+            assert_eq!(ctx.gap_fill(), 0.0);
         }
     }
 
@@ -321,49 +328,56 @@ mod tests {
 
         #[test]
         fn sums_multiple_deltas() {
-            let mut agg = DeltaSumAggregator::new();
+            let mut slot = DeltaSumSlot::default();
 
-            agg.ingest(10.0, 1000, 0);
-            agg.ingest(20.0, 2000, 1000);
-            agg.ingest(5.0, 3000, 2000);
+            slot.record(10.0, 1000, 0);
+            slot.record(20.0, 2000, 1000);
+            slot.record(5.0, 3000, 2000);
 
-            assert_eq!(agg.finalize_slot(), Some(35.0));
+            let mut ctx = DeltaSumContext;
+            assert_eq!(ctx.finalize(slot), Some(35.0));
         }
 
         #[test]
         fn returns_none_when_no_data() {
-            let mut agg = DeltaSumAggregator::new();
-            assert_eq!(agg.finalize_slot(), None);
+            let slot = DeltaSumSlot::default();
+            let mut ctx = DeltaSumContext;
+            assert_eq!(ctx.finalize(slot), None);
         }
 
         #[test]
         fn gap_fill_returns_zero() {
-            let mut agg = DeltaSumAggregator::new();
-            agg.ingest(100.0, 1000, 0);
-            agg.finalize_slot();
+            let mut slot = DeltaSumSlot::default();
+            slot.record(100.0, 1000, 0);
 
-            assert_eq!(agg.gap_fill(), 0.0);
+            let mut ctx = DeltaSumContext;
+            ctx.finalize(slot);
+
+            assert_eq!(ctx.gap_fill(), 0.0);
         }
 
         #[test]
         fn resets_accumulator_after_finalize() {
-            let mut agg = DeltaSumAggregator::new();
+            let mut ctx = DeltaSumContext;
 
-            agg.ingest(10.0, 1000, 0);
-            assert_eq!(agg.finalize_slot(), Some(10.0));
+            let mut slot1 = DeltaSumSlot::default();
+            slot1.record(10.0, 1000, 0);
+            assert_eq!(ctx.finalize(slot1), Some(10.0));
 
-            agg.ingest(5.0, 2000, 1000);
-            assert_eq!(agg.finalize_slot(), Some(5.0));
+            let mut slot2 = DeltaSumSlot::default();
+            slot2.record(5.0, 2000, 1000);
+            assert_eq!(ctx.finalize(slot2), Some(5.0));
         }
 
         #[test]
         fn handles_negative_deltas() {
-            let mut agg = DeltaSumAggregator::new();
+            let mut slot = DeltaSumSlot::default();
 
-            agg.ingest(10.0, 1000, 0);
-            agg.ingest(-3.0, 2000, 1000);
+            slot.record(10.0, 1000, 0);
+            slot.record(-3.0, 2000, 1000);
 
-            assert_eq!(agg.finalize_slot(), Some(7.0));
+            let mut ctx = DeltaSumContext;
+            assert_eq!(ctx.finalize(slot), Some(7.0));
         }
     }
 
@@ -374,111 +388,150 @@ mod tests {
 
         #[test]
         fn first_observation_returns_none() {
-            let mut agg = CumulativeSumAggregator::new();
+            let mut slot = CumulativeSumSlot::default();
+            slot.record(100.0, 1000, START_TIME);
 
-            agg.ingest(100.0, 1000, START_TIME);
-
-            // First observation establishes baseline, no delta yet
-            assert_eq!(agg.finalize_slot(), None);
+            let mut ctx = CumulativeSumContext::default();
+            assert_eq!(ctx.finalize(slot), None);
         }
 
         #[test]
         fn computes_delta_from_previous() {
-            let mut agg = CumulativeSumAggregator::new();
+            let mut ctx = CumulativeSumContext::default();
 
             // First slot: establish baseline
-            agg.ingest(100.0, 1000, START_TIME);
-            agg.finalize_slot();
+            let mut slot1 = CumulativeSumSlot::default();
+            slot1.record(100.0, 1000, START_TIME);
+            ctx.finalize(slot1);
 
             // Second slot: should compute delta
-            agg.ingest(150.0, 2000, START_TIME);
-            assert_eq!(agg.finalize_slot(), Some(50.0));
+            let mut slot2 = CumulativeSumSlot::default();
+            slot2.record(150.0, 2000, START_TIME);
+            assert_eq!(ctx.finalize(slot2), Some(50.0));
 
             // Third slot: another delta
-            agg.ingest(160.0, 3000, START_TIME);
-            assert_eq!(agg.finalize_slot(), Some(10.0));
+            let mut slot3 = CumulativeSumSlot::default();
+            slot3.record(160.0, 3000, START_TIME);
+            assert_eq!(ctx.finalize(slot3), Some(10.0));
         }
 
         #[test]
         fn detects_restart_via_start_time_change() {
-            let mut agg = CumulativeSumAggregator::new();
+            let mut ctx = CumulativeSumContext::default();
 
             // Establish baseline
-            agg.ingest(100.0, 1000, START_TIME);
-            agg.finalize_slot();
+            let mut slot1 = CumulativeSumSlot::default();
+            slot1.record(100.0, 1000, START_TIME);
+            ctx.finalize(slot1);
 
-            agg.ingest(150.0, 2000, START_TIME);
-            agg.finalize_slot();
+            let mut slot2 = CumulativeSumSlot::default();
+            slot2.record(150.0, 2000, START_TIME);
+            ctx.finalize(slot2);
 
             // Restart: start_time changes, value resets
             let new_start_time = START_TIME + 1_000_000;
-            agg.ingest(20.0, 3000, new_start_time);
-
-            // Should return 0 for restart slot
-            assert_eq!(agg.finalize_slot(), Some(0.0));
+            let mut slot3 = CumulativeSumSlot::default();
+            slot3.record(20.0, 3000, new_start_time);
+            assert_eq!(ctx.finalize(slot3), Some(0.0));
 
             // Next slot should compute delta from new baseline
-            agg.ingest(30.0, 4000, new_start_time);
-            assert_eq!(agg.finalize_slot(), Some(10.0));
+            let mut slot4 = CumulativeSumSlot::default();
+            slot4.record(30.0, 4000, new_start_time);
+            assert_eq!(ctx.finalize(slot4), Some(10.0));
         }
 
         #[test]
         fn keeps_last_value_by_timestamp_in_slot() {
-            let mut agg = CumulativeSumAggregator::new();
+            let mut ctx = CumulativeSumContext::default();
 
             // Establish baseline
-            agg.ingest(100.0, 1000, START_TIME);
-            agg.finalize_slot();
+            let mut slot1 = CumulativeSumSlot::default();
+            slot1.record(100.0, 1000, START_TIME);
+            ctx.finalize(slot1);
 
             // Multiple values in one slot - should use latest by timestamp
-            agg.ingest(150.0, 2000, START_TIME);
-            agg.ingest(200.0, 4000, START_TIME); // Latest timestamp
-            agg.ingest(175.0, 3000, START_TIME); // Earlier, should be ignored
+            let mut slot2 = CumulativeSumSlot::default();
+            slot2.record(150.0, 2000, START_TIME);
+            slot2.record(200.0, 4000, START_TIME); // Latest timestamp
+            slot2.record(175.0, 3000, START_TIME); // Earlier, should be ignored
 
-            assert_eq!(agg.finalize_slot(), Some(100.0)); // 200 - 100
+            assert_eq!(ctx.finalize(slot2), Some(100.0)); // 200 - 100
         }
 
         #[test]
         fn gap_fill_returns_zero() {
-            let mut agg = CumulativeSumAggregator::new();
+            let mut ctx = CumulativeSumContext::default();
 
-            agg.ingest(100.0, 1000, START_TIME);
-            agg.finalize_slot();
+            let mut slot1 = CumulativeSumSlot::default();
+            slot1.record(100.0, 1000, START_TIME);
+            ctx.finalize(slot1);
 
-            agg.ingest(150.0, 2000, START_TIME);
-            agg.finalize_slot();
+            let mut slot2 = CumulativeSumSlot::default();
+            slot2.record(150.0, 2000, START_TIME);
+            ctx.finalize(slot2);
 
-            // No change in cumulative value = no delta
-            assert_eq!(agg.gap_fill(), 0.0);
+            assert_eq!(ctx.gap_fill(), 0.0);
         }
 
         #[test]
         fn returns_none_when_no_data_in_slot() {
-            let mut agg = CumulativeSumAggregator::new();
-            assert_eq!(agg.finalize_slot(), None);
+            let mut ctx = CumulativeSumContext::default();
+
+            let empty = CumulativeSumSlot::default();
+            assert_eq!(ctx.finalize(empty), None);
 
             // Even after establishing baseline, empty slot returns None
-            agg.ingest(100.0, 1000, START_TIME);
-            agg.finalize_slot();
+            let mut slot1 = CumulativeSumSlot::default();
+            slot1.record(100.0, 1000, START_TIME);
+            ctx.finalize(slot1);
 
-            assert_eq!(agg.finalize_slot(), None);
+            let empty2 = CumulativeSumSlot::default();
+            assert_eq!(ctx.finalize(empty2), None);
+        }
+
+        #[test]
+        fn counter_wrap_emits_zero_and_resets_baseline() {
+            let mut ctx = CumulativeSumContext::default();
+
+            // Establish baseline
+            let mut slot1 = CumulativeSumSlot::default();
+            slot1.record(100.0, 1000, START_TIME);
+            ctx.finalize(slot1);
+
+            // Normal increment
+            let mut slot2 = CumulativeSumSlot::default();
+            slot2.record(200.0, 2000, START_TIME);
+            assert_eq!(ctx.finalize(slot2), Some(100.0));
+
+            // Counter wraps: value drops but start_time unchanged
+            let mut slot3 = CumulativeSumSlot::default();
+            slot3.record(5.0, 3000, START_TIME);
+            assert_eq!(ctx.finalize(slot3), Some(0.0));
+
+            // Next slot computes delta from new baseline
+            let mut slot4 = CumulativeSumSlot::default();
+            slot4.record(15.0, 4000, START_TIME);
+            assert_eq!(ctx.finalize(slot4), Some(10.0));
         }
 
         #[test]
         fn reset_clears_all_state() {
-            let mut agg = CumulativeSumAggregator::new();
+            let mut ctx = CumulativeSumContext::default();
 
-            agg.ingest(100.0, 1000, START_TIME);
-            agg.finalize_slot();
+            let mut slot1 = CumulativeSumSlot::default();
+            slot1.record(100.0, 1000, START_TIME);
+            ctx.finalize(slot1);
 
-            agg.ingest(150.0, 2000, START_TIME);
-            agg.finalize_slot();
+            let mut slot2 = CumulativeSumSlot::default();
+            slot2.record(150.0, 2000, START_TIME);
+            ctx.finalize(slot2);
 
-            agg.reset();
+            ctx.reset();
 
             // After reset, next observation is treated as first
-            agg.ingest(50.0, 3000, START_TIME);
-            assert_eq!(agg.finalize_slot(), None); // First observation again
+            let mut slot3 = CumulativeSumSlot::default();
+            slot3.record(50.0, 3000, START_TIME);
+            assert_eq!(ctx.finalize(slot3), None);
         }
     }
 }
