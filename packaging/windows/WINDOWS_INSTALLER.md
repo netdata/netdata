@@ -96,6 +96,13 @@ By using silent installation, you agree to:
 - [GPL-3 License](https://raw.githubusercontent.com/netdata/netdata/refs/heads/master/LICENSE) — Netdata Agent
 - [NCUL1 License](https://app.netdata.cloud/LICENSE.txt) — Netdata Web Interface
 
+## Where is Netdata?
+
+When Netdata is installed on Windows, it automatically registers as a Windows Service and appears in
+**Add or remove programs** (also known as **Programs and Features** or **Apps & features** in newer Windows versions).
+The service can be monitored through the [Netdata Dashboard](http://localhost:19999).
+To start, stop, or restart the service, use Windows Services (services.msc) or command-line tools
+
 ## Automatic Updates
 
 For users who want to keep their Windows agents automatically updated with the latest releases, you can set up automated updates.
