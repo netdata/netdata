@@ -344,34 +344,30 @@ impl Chart {
 
                 self.last_emission_slot = Some(slot);
             }
-
-            // Drop any stale slot entries at or below what we just emitted.
-            if let Some(last) = self.last_emission_slot {
-                self.dimensions.drain_up_to(last);
-            }
         } else if self.dimensions.has_any_data() {
             // Data exists but isn't ready yet (slot hasn't fully elapsed).
             // Don't gap-fill — wait for the slot to become ready.
         } else if last_ingest_instant.elapsed() < self.grace_period {
             // No data anywhere, within grace period — skip this tick.
-        } else {
+        } else if let Some(last) = self.last_emission_slot {
             // No data anywhere, grace period expired — gap-fill one slot.
-            let Some(last) = self.last_emission_slot else {
-                return;
-            };
-
             let fill_slot = last + self.update_every;
 
             // Don't gap-fill a slot whose end time hasn't passed the cutoff.
-            if fill_slot >= cutoff {
-                return;
+            if fill_slot < cutoff {
+                let values = self.dimensions.gap_fill(self.update_every);
+                write_data_slot(buf, &self.chart_name, self.update_every, fill_slot, &values)
+                    .expect("infallible string write");
+
+                self.last_emission_slot = Some(fill_slot);
             }
+        }
 
-            let values = self.dimensions.gap_fill(self.update_every);
-            write_data_slot(buf, &self.chart_name, self.update_every, fill_slot, &values)
-                .expect("infallible string write");
-
-            self.last_emission_slot = Some(fill_slot);
+        // Unconditionally drain slots at or below the last emission point.
+        // Late-arriving data for already-emitted slots is silently discarded
+        // to prevent unbounded BTreeMap growth and stale `has_any_data()`.
+        if let Some(last) = self.last_emission_slot {
+            self.dimensions.drain_up_to(last);
         }
     }
 
