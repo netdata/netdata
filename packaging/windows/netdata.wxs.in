@@ -204,6 +204,8 @@
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.inf" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.cat" />
                 </Files>
             </ComponentGroup>
 
@@ -278,6 +280,10 @@
             <!-- Install netdata driver file -->
             <FeatureGroup Id="NetdataDriver">
                 <File Id="NetdataDrv" Name="netdata_driver.sys" Directory="System64Folder" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" Condition="NDDRVINST=1">
+                </File>
+                <File Id="NetdataDrvInf" Name="netdata_driver.inf" Directory="System64Folder" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.inf" Condition="NDDRVINST=1">
+                </File>
+                <File Id="NetdataDrvCat" Name="netdata_driver.cat" Directory="System64Folder" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.cat" Condition="NDDRVINST=1">
                 </File>
             </FeatureGroup>
 
