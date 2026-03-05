@@ -102,6 +102,21 @@
             <ui:WixUI Id="FeatureTree_ViewLicense" />
 
             <SetProperty
+                Id="NDStopService"
+                Value="&quot;[WindowsFolder]System32\sc.exe&quot; stop &quot;Netdata&quot;"
+                Before="NDKillProcess"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="NDStopService"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+
+            <SetProperty
                 Id="NDKillProcess"
                 Value="&quot;[WindowsFolder]System32\taskkill.exe&quot; /T /F /IM netdata.exe"
                 Before="NDKillProcess"
@@ -164,6 +179,7 @@
             <InstallExecuteSequence>
                 <Custom Action="NDConfigureServiceRecovery" After="InstallServices" Condition="NOT REMOVE" />
 
+                <Custom Action="NDStopService" Before="NDKillProcess" />
                 <Custom Action="NDKillProcess" Before="RemoveFiles" />
                 <Custom Action="NDStopDriverSrv" After="NDKillProcess" />
                 <Custom Action="NDRemoveDriverSrv" After="RemoveFiles" />
@@ -172,6 +188,7 @@
 
     <Fragment>
         <UI>
+            <ProgressText Action="NDStopService" Message="Stopping Netdata service before update..." />
             <ProgressText Action="NDKillProcess" Message="Stopping Netdata service before update..." />
             <ProgressText Action="NDStopDriverSrv" Message="Stopping Netdata driver service.." />
             <ProgressText Action="NDRemoveDriverSrv" Message="Removing Netdata driver service.." />
