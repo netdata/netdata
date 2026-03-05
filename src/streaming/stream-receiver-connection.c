@@ -615,6 +615,10 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
     {
         RRDHOST *existing = rrdhost_find_by_guid(rpt->machine_guid);
+        // RRDHOST_OPTION_VIRTUAL_HOST is only set by local collectors (pluginsd_host_define_end),
+        // never by streaming. The stale detection in pluginsd_host() clears it when a vnode stops
+        // being collected, so archived/orphaned vnodes will not have this flag set.
+        // No additional checks for RRDHOST_FLAG_COLLECTOR_ONLINE or RRDHOST_FLAG_ARCHIVED are needed.
         if(existing && rrdhost_is_virtual(existing)) {
             stream_receiver_takeover_web_connection(w, rpt);
 
