@@ -1,0 +1,41 @@
+{
+  "update_every": 60,
+  "autodetection_retry": 0,
+  "subscription_id": "sub-1",
+  "cloud": "public",
+  "discovery_every": 300,
+  "query_offset": 180,
+  "max_concurrency": 4,
+  "max_batch_resources": 50,
+  "max_metrics_per_query": 20,
+  "profiles": [
+    "sql_managed_instance"
+  ],
+  "resource_groups": [
+    "rg-a"
+  ],
+  "custom_profiles": [
+    {
+      "name": "Custom Redis",
+      "resource_type": "Microsoft.Cache/Redis",
+      "metrics": [
+        {
+          "name": "connectedclients",
+          "display_name": "Connected Clients",
+          "units": "clients",
+          "aggregations": [
+            "average"
+          ],
+          "time_grain": "PT1M"
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "mode": "service_principal",
+    "tenant_id": "11111111-1111-1111-1111-111111111111",
+    "client_id": "22222222-2222-2222-2222-222222222222",
+    "client_secret": "secret"
+  },
+  "vnode": ""
+}

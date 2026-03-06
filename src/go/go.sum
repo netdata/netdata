@@ -17,6 +17,12 @@ github.com/Azure/azure-sdk-for-go/sdk/azidentity/cache v0.3.2 h1:yz1bePFlP5Vws5+
 github.com/Azure/azure-sdk-for-go/sdk/azidentity/cache v0.3.2/go.mod h1:Pa9ZNPuoNu/GztvBSKk9J1cDJW6vk/n0zLtV4mgd8N8=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 h1:9iefClla7iYpfYWdzPCRDozdmndjTm8DXdpCzPajMgA=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2/go.mod h1:XtLgD3ZD34DAaVIIAyG3objl5DynM3CQ/vMcbBNJZGI=
+github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics v1.3.0 h1:blbWEpcsg2EFqXe64sRPdWPKnLWm0fPY4iHyo4MoHVM=
+github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics v1.3.0/go.mod h1:jWOswzu+YEJ01Csz2ZUir7KecMjHJNYwxufLqAYi+ls=
+github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0 h1:Ds0KRF8ggpEGg4Vo42oX1cIt/IfOhHWJBikksZbVxeg=
+github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0/go.mod h1:jj6P8ybImR+5topJ+eH6fgcemSFBmU6/6bFF8KkwuDI=
+github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph v0.9.0 h1:zLzoX5+W2l95UJoVwiyNS4dX8vHyQ6x2xRLoBBL9wMk=
+github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph v0.9.0/go.mod h1:wVEOJfGTj0oPAUGA1JuRAvz/lxXQsWW16axmHPP47Bk=
 github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.4.0 h1:E4MgwLBGeVB5f2MdcIVD3ELVAWpr+WD6MUe1i+tM/PA=
 github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.4.0/go.mod h1:Y2b/1clN4zsAoUd/pgNAQHjLDnTis/6ROkUfyob6psM=
 github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.2.0 h1:nCYfgcSyHZXJI8J0IWE5MsCGlb2xp9fJiXyxWgmOFg4=

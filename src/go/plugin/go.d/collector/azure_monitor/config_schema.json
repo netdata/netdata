@@ -1,0 +1,277 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Azure Monitor collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 60,
+        "default": 60
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "subscription_id": {
+        "title": "Subscription ID",
+        "description": "Azure subscription ID.",
+        "type": "string",
+        "default": ""
+      },
+      "cloud": {
+        "title": "Azure cloud",
+        "description": "Azure cloud environment.",
+        "type": "string",
+        "enum": [
+          "public",
+          "government",
+          "china"
+        ],
+        "default": "public"
+      },
+      "discovery_every": {
+        "title": "Discovery every",
+        "description": "Resource discovery refresh interval, in seconds.",
+        "type": "integer",
+        "minimum": 60,
+        "default": 300
+      },
+      "query_offset": {
+        "title": "Query offset",
+        "description": "How many seconds to shift queries into the past to avoid partial Azure Monitor windows.",
+        "type": "integer",
+        "minimum": 60,
+        "default": 180
+      },
+      "max_concurrency": {
+        "title": "Max concurrency",
+        "description": "Maximum concurrent Azure Monitor batch requests.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 64,
+        "default": 4
+      },
+      "max_batch_resources": {
+        "title": "Max resources per batch",
+        "description": "Maximum resource IDs per batch API call.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50,
+        "default": 50
+      },
+      "max_metrics_per_query": {
+        "title": "Max metrics per query",
+        "description": "Maximum metric names per batch API call.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20,
+        "default": 20
+      },
+      "resource_groups": {
+        "title": "Resource groups",
+        "description": "Optional list of Azure resource groups to include.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "profiles": {
+        "title": "Built-in profiles",
+        "description": "Built-in Azure service profiles to enable.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string",
+          "enum": [
+            "sql_managed_instance",
+            "sql_database",
+            "postgres_flexible",
+            "cosmos_db",
+            "logic_apps",
+            "virtual_machines",
+            "aks",
+            "storage_accounts",
+            "load_balancers"
+          ]
+        }
+      },
+      "custom_profiles": {
+        "title": "Custom profiles",
+        "description": "Additional user-defined Azure Monitor profiles.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "resource_type": {
+              "type": "string"
+            },
+            "metric_namespace": {
+              "type": "string"
+            },
+            "metrics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "display_name": {
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "string"
+                  },
+                  "time_grain": {
+                    "type": "string",
+                    "enum": [
+                      "PT1M",
+                      "PT5M",
+                      "PT15M",
+                      "PT30M",
+                      "PT1H"
+                    ]
+                  },
+                  "aggregations": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "average",
+                        "minimum",
+                        "maximum",
+                        "total",
+                        "count"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "name",
+            "resource_type",
+            "metrics"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "auth": {
+        "title": "Authentication",
+        "description": "Azure authentication mode and credentials.",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "service_principal",
+              "managed_identity",
+              "default"
+            ],
+            "default": "default"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "client_secret": {
+            "type": "string",
+            "sensitive": true
+          },
+          "managed_identity_client_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "vnode": {
+        "title": "Virtual Node",
+        "description": "Associates this data collection job with a Virtual Node.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "subscription_id",
+      "auth"
+    ],
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "resource_groups": {
+      "ui:listFlavour": "list"
+    },
+    "profiles": {
+      "ui:listFlavour": "multiselect"
+    },
+    "custom_profiles": {
+      "ui:listFlavour": "list"
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "subscription_id",
+            "cloud",
+            "discovery_every",
+            "query_offset",
+            "max_concurrency",
+            "max_batch_resources",
+            "max_metrics_per_query",
+            "resource_groups",
+            "profiles",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Auth",
+          "fields": [
+            "auth"
+          ]
+        },
+        {
+          "title": "Custom",
+          "fields": [
+            "custom_profiles"
+          ]
+        }
+      ]
+    }
+  }
+}
