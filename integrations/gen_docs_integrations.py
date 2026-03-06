@@ -270,6 +270,53 @@ def resolve_related_links():
         p.write_text(md, encoding="utf-8")
 
 
+def expected_output_path_for_integration(integration: dict):
+    """
+    Best-effort path prediction used to resolve relatedResource links even in
+    targeted (-c) generation mode where only a subset of files is rewritten.
+    """
+    iid = integration.get("id")
+    itype = integration.get("integration_type")
+    edit_link = integration.get("edit_link")
+    if not iid or not itype or not edit_link:
+        return None
+
+    meta_yaml = edit_link.replace("blob", "edit")
+    base = Path(build_path(meta_yaml))
+    meta = integration.get("meta", {})
+
+    if itype == "collector":
+        name = meta.get("monitored_instance", {}).get("name")
+        if not name:
+            return None
+        return str(base / "integrations" / f"{clean_string(name)}.md")
+
+    if itype in {"exporter", "cloud_notification", "logs", "authentication"}:
+        name = meta.get("name")
+        if not name:
+            return None
+        return str(base / "integrations" / f"{clean_string(name)}.md")
+
+    if itype == "agent_notification":
+        return str(base / "README.md")
+
+    return None
+
+
+def seed_id_to_expected_paths(integrations):
+    """
+    Seed id_to_path with deterministic expected paths for all integrations.
+    Actual writes later overwrite these entries with exact output paths.
+    """
+    for integration in integrations:
+        iid = integration.get("id")
+        if not iid:
+            continue
+        expected = expected_output_path_for_integration(integration)
+        if expected:
+            id_to_path[iid] = expected
+
+
 def build_path(meta_yaml_link: str) -> str:
     """
     Convert GitHub edit link to local repo path (without trailing /metadata.yaml).
@@ -718,6 +765,7 @@ def main():
     args = parser.parse_args()
 
     categories, integrations = read_integrations_js("integrations/integrations.js")
+    seed_id_to_expected_paths(integrations)
 
     if args.collector:
         # compute targets and CLEAN ONLY those
