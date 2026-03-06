@@ -1182,6 +1182,8 @@ void destroy_aclk_config(RRDHOST *host)
     }
 
     struct aclk_sync_cfg_t *old_aclk_host_config = __atomic_exchange_n(&host->aclk_host_config, NULL, __ATOMIC_RELAXED);
+    if (!old_aclk_host_config)
+        return;
 
     // detach pending checkpoint strings under lock, to avoid racing with save/replay
     spinlock_lock(&old_aclk_host_config->pending_ctx_spinlock);
