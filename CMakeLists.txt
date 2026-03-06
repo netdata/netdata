@@ -3124,6 +3124,8 @@ if(OS_WINDOWS)
         )
 
         install(FILES "${NETDATA_DRIVER_FILE}"
+                        "${CMAKE_BINARY_DIR}/netdata_driver.inf"
+                        "${CMAKE_BINARY_DIR}/netdata_driver.cat"
                 COMPONENT netdata_driver
                 DESTINATION "${BINDIR}")
 endif()
