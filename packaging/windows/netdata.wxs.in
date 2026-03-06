@@ -242,8 +242,8 @@
             <ProgressText Action="NDKillProcess" Message="Stopping Netdata service before update..." />
             <ProgressText Action="NDInstallDriverPkg" Message="Registering Netdata driver package..." />
             <ProgressText Action="NDDeleteDriverStaging" Message="Cleaning temporary driver staging files..." />
-            <ProgressText Action="NDStopDriverSrv" Message="Stopping Netdata driver service.." />
-            <ProgressText Action="NDRemoveDriverSrv" Message="Removing Netdata driver service.." />
+            <ProgressText Action="NDStopDriverSrv" Message="Stopping Netdata driver service..." />
+            <ProgressText Action="NDRemoveDriverSrv" Message="Removing Netdata driver service..." />
             <ProgressText Action="NDUninstallDriverPkg" Message="Removing Netdata driver package..." />
         </UI>
 
