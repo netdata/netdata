@@ -74,6 +74,10 @@ func (h *runtimeHost) collectMetrics() map[string]int64 {
 	return h.sched.CollectMetrics()
 }
 
+func (h *runtimeHost) collectSnapshot() runtime.SchedulerSnapshot {
+	return h.sched.Snapshot()
+}
+
 func (h *runtimeHost) jobCount() int {
 	h.mu.Lock()
 	defer h.mu.Unlock()

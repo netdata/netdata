@@ -107,7 +107,7 @@ type jobState struct {
 	retryInterval   time.Duration
 	maxAttempts     int
 	timeoutState    string
-	perfdata        map[string]output.PerfDatum
+	perfdata        []output.PerfDatum
 	statusLine      string
 	longOutput      string
 	jitterRange     time.Duration
@@ -574,7 +574,15 @@ func (s *Scheduler) CollectMetrics() map[string]int64 {
 		metrics[id.TelemetryMetricID(charts.TelemetryDiskMetric, "write")] = js.lastDiskWrite
 
 		if len(js.perfdata) > 0 {
-			for labelID, datum := range js.perfdata {
+			perfByLabel := make(map[string]output.PerfDatum, len(js.perfdata))
+			for _, datum := range js.perfdata {
+				labelID := ids.Sanitize(datum.Label)
+				if labelID == "" {
+					continue
+				}
+				perfByLabel[labelID] = datum
+			}
+			for labelID, datum := range perfByLabel {
 				scale := units.NewScale(datum.Unit)
 				metrics[id.PerfdataMetricID(labelID, "value")] = scale.Apply(datum.Value)
 				if datum.Min != nil {
@@ -590,6 +598,53 @@ func (s *Scheduler) CollectMetrics() map[string]int64 {
 	}
 
 	return metrics
+}
+
+// Snapshot returns typed scheduler state suitable for v2 collectors.
+func (s *Scheduler) Snapshot() SchedulerSnapshot {
+	stats := s.executor.Stats()
+	snapshot := SchedulerSnapshot{
+		Scheduler: s.schedulerName,
+		Running:   int64(stats.Executing),
+		Queued:    int64(stats.QueueDepth),
+		Scheduled: int64(s.scheduledCount()),
+		Started:   s.counters.started.Load(),
+		Finished:  s.counters.finished.Load(),
+		Skipped:   s.counters.skipped.Load(),
+		Next:      s.nextRunDelay(),
+	}
+
+	s.jobMu.RLock()
+	defer s.jobMu.RUnlock()
+
+	snapshot.Jobs = make([]JobMetricsSnapshot, 0, len(s.jobs))
+	for _, js := range s.jobs {
+		missingCPU := !js.cpuMeasured && js.lastDuration > 0
+		item := JobMetricsSnapshot{
+			JobName: js.runtime.Spec.Name,
+
+			State:      js.state,
+			Attempt:    js.currentAttempt(),
+			MaxAttempt: js.maxAttempts,
+
+			Running:     js.running,
+			Retrying:    js.retrying,
+			PeriodSkip:  js.periodSkipped,
+			CPUMissing:  missingCPU,
+			Duration:    js.lastDuration,
+			CPUTime:     js.lastCPU,
+			RSS:         js.lastRSS,
+			DiskRead:    js.lastDiskRead,
+			DiskWrite:   js.lastDiskWrite,
+			PerfSamples: clonePerfDatumList(js.perfdata),
+		}
+		snapshot.Jobs = append(snapshot.Jobs, item)
+	}
+
+	sort.Slice(snapshot.Jobs, func(i, j int) bool {
+		return snapshot.Jobs[i].JobName < snapshot.Jobs[j].JobName
+	})
+	return snapshot
 }
 
 func (s *Scheduler) nextRunDelay() time.Duration {
@@ -834,13 +889,12 @@ func (js *jobState) updatePerfdata(perf []output.PerfDatum) {
 		js.perfdata = nil
 		return
 	}
-	mp := make(map[string]output.PerfDatum, len(perf))
+	mp := make([]output.PerfDatum, 0, len(perf))
 	for _, datum := range perf {
-		labelID := ids.Sanitize(datum.Label)
-		if labelID == "" {
+		if strings.TrimSpace(datum.Label) == "" {
 			continue
 		}
-		mp[labelID] = datum
+		mp = append(mp, datum)
 	}
 	js.perfdata = mp
 }

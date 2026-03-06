@@ -5,10 +5,10 @@ package scriptsd
 import (
 	"context"
 	_ "embed"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/charts"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/schedulers"
 )
@@ -46,6 +46,7 @@ type Collector struct {
 
 	store    metrix.CollectorStore
 	registry schedulers.SchedulerRegistry
+	router   *perfdataRouter
 }
 
 func New() *Collector {
@@ -65,6 +66,7 @@ func NewWithRegistry(reg schedulers.SchedulerRegistry) *Collector {
 		},
 		store:    metrix.NewCollectorStore(),
 		registry: reg,
+		router:   newPerfdataRouter(defaultPerfdataMetricKeyBudget),
 	}
 }
 
@@ -93,22 +95,51 @@ func (c *Collector) Init(context.Context) error {
 func (c *Collector) Check(context.Context) error { return nil }
 
 func (c *Collector) Collect(context.Context) error {
-	metrics := c.registry.Collect(c.Scheduler)
+	snapshot, ok := c.registry.Snapshot(c.Scheduler)
+	if !ok {
+		return nil
+	}
 
 	sm := c.store.Write().SnapshotMeter("scriptsd")
 	lbl := sm.LabelSet(metrix.Label{Key: "nagios_scheduler", Value: c.Scheduler})
 
-	observe := func(name string, key string) {
-		v := metrics[key]
-		sm.Gauge(name).Observe(float64(v), lbl)
+	observe := func(name string, value float64) {
+		sm.Gauge(name).Observe(value, lbl)
+	}
+	observe("scheduler.running", float64(snapshot.Running))
+	observe("scheduler.queued", float64(snapshot.Queued))
+	observe("scheduler.scheduled", float64(snapshot.Scheduled))
+	observe("scheduler.started", float64(snapshot.Started))
+	observe("scheduler.finished", float64(snapshot.Finished))
+	observe("scheduler.skipped", float64(snapshot.Skipped))
+
+	for _, job := range snapshot.Jobs {
+		jobLbl := sm.LabelSet(
+			metrix.Label{Key: "nagios_scheduler", Value: c.Scheduler},
+			metrix.Label{Key: "nagios_job", Value: job.JobName},
+		)
+		observeJob := func(name string, value float64) {
+			sm.Gauge(name).Observe(value, jobLbl)
+		}
+
+		observeJob("job.state.ok", boolToFloat(strings.EqualFold(job.State, "OK")))
+		observeJob("job.state.warning", boolToFloat(strings.EqualFold(job.State, "WARNING")))
+		observeJob("job.state.critical", boolToFloat(strings.EqualFold(job.State, "CRITICAL")))
+		observeJob("job.state.unknown", boolToFloat(strings.EqualFold(job.State, "UNKNOWN")))
+		observeJob("job.attempt", float64(job.Attempt))
+		observeJob("job.max_attempts", float64(job.MaxAttempt))
+
+		perf := c.router.route(c.Scheduler, job.JobName, job.PerfSamples)
+		for _, sample := range perf {
+			observeJob(sample.name, sample.value)
+		}
 	}
 
-	observe("scheduler.running", charts.SchedulerMetricKey(c.Scheduler, charts.ChartSchedulerJobs, "running"))
-	observe("scheduler.queued", charts.SchedulerMetricKey(c.Scheduler, charts.ChartSchedulerJobs, "queued"))
-	observe("scheduler.scheduled", charts.SchedulerMetricKey(c.Scheduler, charts.ChartSchedulerJobs, "scheduled"))
-	observe("scheduler.started", charts.SchedulerMetricKey(c.Scheduler, charts.ChartSchedulerRate, "started"))
-	observe("scheduler.finished", charts.SchedulerMetricKey(c.Scheduler, charts.ChartSchedulerRate, "finished"))
-	observe("scheduler.skipped", charts.SchedulerMetricKey(c.Scheduler, charts.ChartSchedulerRate, "skipped"))
+	counters := c.router.dropCounters()
+	sm.Counter("perfdata_dropped_invalid_total").ObserveTotal(float64(counters.Invalid), lbl)
+	sm.Counter("perfdata_dropped_collision_total").ObserveTotal(float64(counters.Collision), lbl)
+	sm.Counter("perfdata_dropped_unit_drift_total").ObserveTotal(float64(counters.UnitDrift), lbl)
+	sm.Counter("perfdata_dropped_budget_total").ObserveTotal(float64(counters.Budget), lbl)
 
 	return nil
 }
@@ -125,3 +156,10 @@ func (c *Collector) Cleanup(context.Context) {
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
 func (c *Collector) ChartTemplateYAML() string { return scriptsdChartTemplateV2 }
+
+func boolToFloat(v bool) float64 {
+	if v {
+		return 1
+	}
+	return 0
+}

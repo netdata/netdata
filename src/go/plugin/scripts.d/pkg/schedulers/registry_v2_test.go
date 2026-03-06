@@ -63,6 +63,13 @@ func (h *fakeHost) collectMetrics() map[string]int64 {
 	return map[string]int64{"jobs": int64(len(h.jobs))}
 }
 
+func (h *fakeHost) collectSnapshot() runtime.SchedulerSnapshot {
+	return runtime.SchedulerSnapshot{
+		Scheduler: h.def.Name,
+		Scheduled: int64(len(h.jobs)),
+	}
+}
+
 func (h *fakeHost) jobCount() int { return len(h.jobs) }
 
 func (h *fakeHost) snapshotJobs() map[string]runtime.JobRegistration {
