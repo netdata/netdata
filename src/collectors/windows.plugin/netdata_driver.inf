@@ -29,7 +29,7 @@ CopyFiles=DriverCopyFiles
 AddReg=DriverAddReg
 
 [DriverInstall.NTamd64.Services]
-AddService=NetdataWinDriver,,DriverServiceInstall
+AddService=NetdataDriver,,DriverServiceInstall
 
 [DriverCopyFiles]
 netdata_driver.sys,,,0x100
