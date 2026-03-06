@@ -246,6 +246,10 @@ jobs:
           command: |
             docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}
             docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
+      - name: Fetch IBM MQ libs
+        id: fetch-ibm-mq
+        if: matrix.arch == 'x86_64' && needs.file-check.outputs.run == 'true'
+        run: .github/scripts/prep-ibm-mq-libs.sh
       - name: Build Packages
         id: build
         if: needs.file-check.outputs.run == 'true'
@@ -264,7 +268,7 @@ jobs:
         uses: actions/upload-artifact@v6.0.0
         with:
           name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
-          path: ${{ github.workspace }}/artifacts/*
+          path: ${{ github.workspace }}/artifacts/*${{ matrix.format }}
       - name: Test Packages
         id: test
         if: needs.file-check.outputs.run == 'true'
@@ -326,6 +330,7 @@ jobs:
               Checkout: ${{ steps.checkout.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Fetch images: ${{ steps.fetch-images.outcome }}
+              Fetch IBM MQ libs: ${{ steps.fetch-ibm-mq.outcome }}
               Build: ${{ steps.build.outcome }}
               Test: ${{ steps.test.outcome }}
               Import GPG Keys: ${{ steps.import-keys.outcome }}
