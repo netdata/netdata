@@ -34,7 +34,7 @@ Query text and wait resource strings are truncated at 4096 characters for displa
 | Require Cloud | yes |
 | Performance | Executes on-demand queries against the `system_health` ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing |
 | Security | Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `deadlock_info_function_enabled` is true<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled<br/>• Returns HTTP 504 if the query times out |
+| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `functions.deadlock_info.disabled` is false<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled<br/>• Returns HTTP 504 if the query times out |
 
 ### Prerequisites
 

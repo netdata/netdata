@@ -34,7 +34,7 @@ Command text is truncated at 4096 characters for display purposes.
 | Require Cloud | yes |
 | Performance | Executes `SLOWLOG GET` command to retrieve entries from Redis memory:<br/>• Minimal overhead as SLOWLOG is stored in memory<br/>• Default limit of 500 entries balances completeness with performance<br/>• Large slowlogs with many entries may take slightly longer to transfer |
 | Security | Command arguments may contain unmasked literal values including potentially sensitive data:<br/>• Redis keys and values in command arguments<br/>• Application-specific identifiers or session tokens<br/>• Access should be restricted to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to Redis<br/>• SLOWLOG is enabled (`slowlog-log-slower-than` > 0)<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the command fails<br/>• Returns HTTP 504 if the command times out |
+| Availability | Available when:<br/>• The collector has successfully connected to Redis<br/>• SLOWLOG is enabled (`slowlog-log-slower-than` >= 0)<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the command fails<br/>• Returns HTTP 504 if the command times out |
 
 ### Prerequisites
 

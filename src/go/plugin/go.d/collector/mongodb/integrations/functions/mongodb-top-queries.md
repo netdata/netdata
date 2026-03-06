@@ -61,13 +61,15 @@ Database profiling must be enabled on each database you want to monitor, and the
    db.getProfilingStatus()
    ```
 
-4. Enable the function in Netdata collector config:
+4. Ensure the function is not disabled in Netdata collector config:
 
    ```yaml
    jobs:
      - name: local
        uri: mongodb://localhost:27017
-       top_queries_function_enabled: true
+       functions:
+         top_queries:
+           disabled: false
    ```
 
 :::info
