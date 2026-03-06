@@ -9,6 +9,17 @@
     "update_every": {
       "type": "integer",
       "minimum": 1
+    },
+    "scheduler": {
+      "type": "string"
+    },
+    "workers": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "queue_size": {
+      "type": "integer",
+      "minimum": 1
     }
   },
   "additionalProperties": true
