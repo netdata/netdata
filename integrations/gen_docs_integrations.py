@@ -120,7 +120,7 @@ def build_repo_root_function_path(base_path: str, integration_slug: str, func_sl
     return f"/{base_path}/integrations/functions/{filename}"
 
 
-def function_learn_rel_path(collector_learn_rel_path: str, integration: dict, func: dict) -> str:
+def function_learn_rel_path(collector_learn_rel_path: str, integration: dict) -> str:
     category_path = ""
     if collector_learn_rel_path == "Collecting Metrics":
         category_path = ""
@@ -130,15 +130,12 @@ def function_learn_rel_path(collector_learn_rel_path: str, integration: dict, fu
         category_path = collector_learn_rel_path
 
     monitored_name = integration.get("meta", {}).get("monitored_instance", {}).get("name")
-    func_name = func.get("name") or func.get("id")
 
     parts = ["Live View"]
     if category_path:
         parts.extend([part for part in str(category_path).strip("/").split("/") if part])
     if monitored_name:
         parts.append(str(monitored_name).strip())
-    if func_name:
-        parts.append(str(func_name).strip())
     return "/".join(parts)
 
 
@@ -237,7 +234,7 @@ def write_function_tiles(
             integration,
             func,
             meta_yaml,
-            function_learn_rel_path(collector_learn_rel_path, integration, func),
+            function_learn_rel_path(collector_learn_rel_path, integration),
             integration_doc_path,
             function_keywords(integration, func),
             community_badge,
