@@ -132,7 +132,7 @@ def function_learn_rel_path(collector_learn_rel_path: str, integration: dict, fu
     monitored_name = integration.get("meta", {}).get("monitored_instance", {}).get("name")
     func_name = func.get("name") or func.get("id")
 
-    parts = ["LiveView"]
+    parts = ["Live View"]
     if category_path:
         parts.extend([part for part in str(category_path).strip("/").split("/") if part])
     if monitored_name:
