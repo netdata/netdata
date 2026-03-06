@@ -1,0 +1,31 @@
+name: Azure SQL Database
+resource_type: Microsoft.Sql/servers/databases
+metrics:
+  - name: cpu_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: dtu_consumption_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: storage_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: sessions_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: workers_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: physical_data_read_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: log_write_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M

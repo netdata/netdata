@@ -202,19 +202,29 @@ func TestCollector_TimeGrainScheduling(t *testing.T) {
 	}
 
 	cfg := testConfig()
-	cfg.CustomProfiles = []ProfileConfig{
-		{
-			Name:         "Storage Slow",
-			ResourceType: "Microsoft.Storage/storageAccounts",
-			Metrics: []MetricConfig{
-				{Name: "UsedCapacity", Aggregations: []string{"average"}, TimeGrain: "PT5M", Units: "bytes"},
+	cfg.Profiles = []string{"storage_slow"}
+
+	catalog := profileCatalog{
+		byName: map[string]ProfileConfig{
+			"storage_slow": {
+				Name:         "Azure Storage Slow",
+				ResourceType: "Microsoft.Storage/storageAccounts",
+				Metrics: []MetricConfig{
+					{Name: "UsedCapacity", Aggregations: []string{"average"}, TimeGrain: "PT5M", Units: "bytes"},
+				},
 			},
+		},
+		stockProfileSet: map[string]struct{}{
+			"storage_slow": {},
 		},
 	}
 
 	c := New()
 	c.Config = cfg
 	c.now = func() time.Time { return now }
+	c.loadProfileCatalog = func() (profileCatalog, error) {
+		return catalog, nil
+	}
 	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
 		return rg, nil
 	}
@@ -239,21 +249,28 @@ func TestCollector_TimeGrainScheduling(t *testing.T) {
 func TestBuildRuntimePlan_DetectsProfileCollision(t *testing.T) {
 	c := New()
 	cfg := testConfig()
-	cfg.Profiles = nil
-	cfg.CustomProfiles = []ProfileConfig{
-		{
-			Name:         "Redis",
-			ResourceType: "Microsoft.Cache/Redis",
-			Metrics:      []MetricConfig{{Name: "connectedclients", Aggregations: []string{"average"}, TimeGrain: "PT1M"}},
+	cfg.Profiles = []string{"redis_upper", "redis_lower"}
+
+	catalog := profileCatalog{
+		byName: map[string]ProfileConfig{
+			"redis_upper": {
+				Name:         "Azure Redis Cache",
+				ResourceType: "Microsoft.Cache/Redis",
+				Metrics:      []MetricConfig{{Name: "connectedclients", Aggregations: []string{"average"}, TimeGrain: "PT1M"}},
+			},
+			"redis_lower": {
+				Name:         "azure redis cache",
+				ResourceType: "Microsoft.Cache/Redis",
+				Metrics:      []MetricConfig{{Name: "cachehits", Aggregations: []string{"average"}, TimeGrain: "PT1M"}},
+			},
 		},
-		{
-			Name:         "redis",
-			ResourceType: "Microsoft.Cache/Redis",
-			Metrics:      []MetricConfig{{Name: "cachehits", Aggregations: []string{"average"}, TimeGrain: "PT1M"}},
+		stockProfileSet: map[string]struct{}{
+			"redis_upper": {},
+			"redis_lower": {},
 		},
 	}
 
-	_, err := c.buildRuntimePlanFromConfig(cfg)
+	_, err := c.buildRuntimePlanFromConfig(cfg, catalog)
 	require.Error(t, err)
 }
 
@@ -268,18 +285,8 @@ func testConfig() Config {
 		MaxConcurrency:     4,
 		MaxBatchResources:  50,
 		MaxMetricsPerQuery: 20,
-		Profiles:           nil,
-		CustomProfiles: []ProfileConfig{
-			{
-				Name:         "Postgres Test",
-				ResourceType: "Microsoft.DBforPostgreSQL/flexibleServers",
-				Metrics: []MetricConfig{
-					{Name: "cpu_percent", DisplayName: "CPU", Units: "percentage", Aggregations: []string{"average"}, TimeGrain: "PT1M"},
-					{Name: "storage_percent", DisplayName: "Storage", Units: "percentage", Aggregations: []string{"average"}, TimeGrain: "PT1M"},
-				},
-			},
-		},
-		Auth: AuthConfig{Mode: "default"},
+		Profiles:           []string{"postgres_flexible"},
+		Auth:               AuthConfig{Mode: "default"},
 	}
 }
 

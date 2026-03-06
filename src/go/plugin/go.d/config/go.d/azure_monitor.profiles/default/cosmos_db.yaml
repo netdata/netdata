@@ -1,0 +1,51 @@
+name: Azure Cosmos DB Account
+resource_type: Microsoft.DocumentDB/databaseAccounts
+metrics:
+  - name: TotalRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TotalRequestUnits
+    units: RU/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: NormalizedRUConsumption
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ServerSideLatencyDirect
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT5M
+  - name: ServerSideLatencyGateway
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT5M
+  - name: ReplicationLatency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT5M
+  - name: DataUsage
+    units: bytes
+    aggregations: [maximum]
+    time_grain: PT1H
+  - name: DocumentCount
+    units: documents
+    aggregations: [maximum]
+    time_grain: PT1H
+  - name: ProvisionedThroughput
+    units: RU/s
+    aggregations: [maximum]
+    time_grain: PT1H
+  - name: ServiceAvailability
+    units: percentage
+    aggregations: [average]
+    time_grain: PT5M
+  - name: MongoRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: CassandraRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M

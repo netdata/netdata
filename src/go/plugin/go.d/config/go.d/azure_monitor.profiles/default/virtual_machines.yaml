@@ -1,0 +1,23 @@
+name: Azure Virtual Machine
+resource_type: Microsoft.Compute/virtualMachines
+metrics:
+  - name: Percentage CPU
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Network In Total
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Network Out Total
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Disk Read Bytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Disk Write Bytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M

@@ -1,0 +1,23 @@
+name: Azure Load Balancer
+resource_type: Microsoft.Network/loadBalancers
+metrics:
+  - name: VipAvailability
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ByteCount
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: PacketCount
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SYNCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SnatConnectionCount
+    units: connections
+    aggregations: [average]
+    time_grain: PT1M

@@ -1,6 +1,7 @@
 plugin_name: go.d.plugin
 modules:
-  - meta:
+  - &module
+    meta: &meta
       id: collector-go.d.plugin-azure_monitor
       plugin_name: go.d.plugin
       module_name: azure_monitor
@@ -19,7 +20,7 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-    overview:
+    overview: &overview
       data_collection:
         metrics_description: |
           This collector monitors Azure resources through Azure Monitor Metrics API.
@@ -47,7 +48,7 @@ modules:
         performance_impact:
           description: |
             The collector uses bounded request concurrency and batches resources/metrics to reduce API load.
-    setup:
+    setup: &setup
       prerequisites:
         list:
           - title: Create and authorize Azure principal
@@ -61,6 +62,12 @@ modules:
         options:
           description: |
             The following options can be defined globally: update_every, autodetection_retry.
+
+            Profile files are loaded from:
+            - Stock: `/usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/`
+            - User: `/etc/netdata/go.d/azure_monitor.profiles/`
+
+            User profile files with the same filename key override stock profiles.
           folding:
             title: Config options
             enabled: true
@@ -111,13 +118,8 @@ modules:
               required: false
               group: Limits
             - name: profiles
-              description: Enabled built-in profile names.
-              default_value: "all defaults"
-              required: false
-              group: Profiles
-            - name: custom_profiles
-              description: User-defined custom profiles.
-              default_value: "[]"
+              description: Profile file keys to enable. Defaults to all stock profile keys.
+              default_value: "all stock profile keys"
               required: false
               group: Profiles
             - name: resource_groups
@@ -161,7 +163,7 @@ modules:
             enabled: true
           list:
             - name: Service principal
-              description: Collect built-in Azure profiles with service principal authentication.
+              description: Collect Azure Monitor profiles with service principal authentication.
               config: |
                 jobs:
                   - name: prod
@@ -179,27 +181,21 @@ modules:
                     subscription_id: "<subscription-id>"
                     auth:
                       mode: managed_identity
-            - name: Custom profile
-              description: Monitor a custom Azure resource type and metric list.
+            - name: User profile file
+              description: Enable a user profile file key from `/etc/netdata/go.d/azure_monitor.profiles/`.
               config: |
                 jobs:
                   - name: custom
                     subscription_id: "<subscription-id>"
-                    profiles: []
-                    custom_profiles:
-                      - name: redis
-                        resource_type: Microsoft.Cache/Redis
-                        metrics:
-                          - name: connectedclients
-                            aggregations: [average]
-                            time_grain: PT1M
+                    profiles:
+                      - redis_cache
                     auth:
                       mode: default
-    troubleshooting:
+    troubleshooting: &troubleshooting
       problems:
         list: []
-    alerts: []
-    metrics:
+    alerts: &alerts []
+    metrics: &metrics
       folding:
         title: Metrics
         enabled: false
@@ -207,3 +203,102 @@ modules:
         Metric contexts and dimensions are generated from enabled profiles and Azure metric definitions.
       availability: []
       scopes: []
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-sql_managed_instance
+      monitored_instance:
+        name: Azure SQL Managed Instance
+        link: https://learn.microsoft.com/azure/azure-sql/managed-instance/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-sql_database
+      monitored_instance:
+        name: Azure SQL Database
+        link: https://learn.microsoft.com/azure/azure-sql/database/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-postgres_flexible
+      monitored_instance:
+        name: Azure PostgreSQL Flexible Server
+        link: https://learn.microsoft.com/azure/postgresql/flexible-server/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-cosmos_db
+      monitored_instance:
+        name: Azure Cosmos DB Account
+        link: https://learn.microsoft.com/azure/cosmos-db/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-logic_apps
+      monitored_instance:
+        name: Azure Logic Apps Workflow
+        link: https://learn.microsoft.com/azure/logic-apps/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-virtual_machines
+      monitored_instance:
+        name: Azure Virtual Machine
+        link: https://learn.microsoft.com/azure/virtual-machines/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-aks
+      monitored_instance:
+        name: Azure Kubernetes Service Cluster
+        link: https://learn.microsoft.com/azure/aks/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-storage_accounts
+      monitored_instance:
+        name: Azure Storage Account
+        link: https://learn.microsoft.com/azure/storage/common/storage-account-overview
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-load_balancers
+      monitored_instance:
+        name: Azure Load Balancer
+        link: https://learn.microsoft.com/azure/load-balancer/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud

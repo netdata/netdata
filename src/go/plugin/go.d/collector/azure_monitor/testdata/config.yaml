@@ -10,16 +10,6 @@ profiles:
   - sql_managed_instance
 resource_groups:
   - rg-a
-custom_profiles:
-  - name: Custom Redis
-    resource_type: Microsoft.Cache/Redis
-    metrics:
-      - name: connectedclients
-        display_name: Connected Clients
-        units: clients
-        aggregations:
-          - average
-        time_grain: PT1M
 auth:
   mode: service_principal
   tenant_id: 11111111-1111-1111-1111-111111111111

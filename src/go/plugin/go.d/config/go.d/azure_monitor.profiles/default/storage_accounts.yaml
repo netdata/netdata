@@ -1,0 +1,23 @@
+name: Azure Storage Account
+resource_type: Microsoft.Storage/storageAccounts
+metrics:
+  - name: Availability
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Transactions
+    units: transactions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Ingress
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Egress
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: UsedCapacity
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1H

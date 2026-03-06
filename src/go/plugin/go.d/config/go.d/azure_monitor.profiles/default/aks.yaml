@@ -1,0 +1,23 @@
+name: Azure Kubernetes Service Cluster
+resource_type: Microsoft.ContainerService/managedClusters
+metrics:
+  - name: node_cpu_usage_millicores
+    units: millicores
+    aggregations: [average]
+    time_grain: PT1M
+  - name: node_memory_working_set_bytes
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: node_disk_usage_bytes
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: node_network_in_bytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: node_network_out_bytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M

@@ -17,8 +17,7 @@ and collects metrics in 1-minute or coarser native Azure time grains.
 
 ### Important options
 
-- `profiles`: built-in profiles to enable.
-- `custom_profiles`: add custom resource type + metric definitions.
+- `profiles`: profile file keys to enable (defaults to all stock profiles).
 - `resource_groups`: optional backend filter.
 - `query_offset`: defaults to 180s to avoid partial Azure windows.
 - `max_concurrency`: bounded concurrent batch calls.
@@ -69,6 +68,12 @@ jobs:
 - `aks`
 - `storage_accounts`
 - `load_balancers`
+
+## Profile files
+
+- Stock profiles (packaged with Netdata): `/usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/`
+- User profiles and overrides: `/etc/netdata/go.d/azure_monitor.profiles/`
+- User files override stock files when they share the same filename key.
 
 ## Notes
 

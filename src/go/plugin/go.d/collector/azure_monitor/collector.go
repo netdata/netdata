@@ -47,7 +47,6 @@ func New() *Collector {
 			MaxConcurrency:     defaultMaxConcurrency,
 			MaxBatchResources:  defaultMaxBatchResource,
 			MaxMetricsPerQuery: defaultMaxMetricsQuery,
-			Profiles:           defaultBuiltInProfileNames(),
 			Auth: AuthConfig{
 				Mode: authModeDefault,
 			},
@@ -57,10 +56,11 @@ func New() *Collector {
 		newResourceGraph:     defaultNewResourceGraphClient,
 		newMetricDefinitions: defaultNewMetricDefinitionsClient,
 		newMetricsClient:     defaultNewMetricsClient,
+		loadProfileCatalog:   loadProfileCatalog,
 		nextCollectByGrain:   make(map[string]time.Time),
 		metricsClients:       make(map[string]metricsQueryClient),
 	}
-	c.chartTemplate = c.mustBuildDefaultTemplate()
+	c.chartTemplate = c.defaultChartTemplate()
 	return c
 }
 
@@ -77,6 +77,7 @@ type Collector struct {
 	metricDefs    metricDefinitionsClient
 
 	runtimePlan *runtimePlan
+	profiles    profileCatalog
 
 	discovery discoveryState
 
@@ -85,6 +86,7 @@ type Collector struct {
 	newResourceGraph     func(subscriptionID string, cred azcore.TokenCredential, cloud azcloud.Configuration) (resourceGraphClient, error)
 	newMetricDefinitions func(subscriptionID string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricDefinitionsClient, error)
 	newMetricsClient     func(endpoint string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricsQueryClient, error)
+	loadProfileCatalog   func() (profileCatalog, error)
 
 	metricsClientsMu syncMapMutex
 	metricsClients   map[string]metricsQueryClient
@@ -96,6 +98,15 @@ func (c *Collector) Configuration() any { return c.Config }
 
 func (c *Collector) Init(context.Context) error {
 	c.Config.applyDefaults()
+
+	catalog, err := c.loadProfileCatalog()
+	if err != nil {
+		return fmt.Errorf("load profiles catalog: %w", err)
+	}
+	c.profiles = catalog
+	if len(c.Config.Profiles) == 0 {
+		c.Config.Profiles = c.profiles.defaultProfileNames()
+	}
 	if err := c.Config.validate(); err != nil {
 		return fmt.Errorf("config validation: %w", err)
 	}
@@ -203,10 +214,6 @@ func defaultNewMetricsClient(endpoint string, cred azcore.TokenCredential, cloud
 	return client, nil
 }
 
-func (c *Collector) mustBuildDefaultTemplate() string {
-	plan, err := c.buildRuntimePlanFromConfig(c.Config)
-	if err != nil {
-		return "version: v1\ncontext_namespace: azure_monitor\ngroups:\n  - family: Azure Monitor\n    metrics:\n      - azure_monitor_up\n    charts:\n      - id: azure_monitor_up\n        title: Azure Monitor Up\n        context: up\n        units: state\n        algorithm: absolute\n        dimensions:\n          - selector: azure_monitor_up\n            name: up\n"
-	}
-	return plan.ChartTemplateYAML
+func (c *Collector) defaultChartTemplate() string {
+	return "version: v1\ncontext_namespace: azure_monitor\ngroups:\n  - family: Azure Monitor\n    metrics:\n      - azure_monitor_up\n    charts:\n      - id: azure_monitor_up\n        title: Azure Monitor Up\n        context: up\n        units: state\n        algorithm: absolute\n        dimensions:\n          - selector: azure_monitor_up\n            name: up\n"
 }
