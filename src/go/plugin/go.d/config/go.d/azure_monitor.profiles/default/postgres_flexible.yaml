@@ -1,0 +1,67 @@
+name: Azure PostgreSQL Flexible Server
+resource_type: Microsoft.DBforPostgreSQL/flexibleServers
+metrics:
+  - name: cpu_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: memory_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: storage_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: iops
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: read_iops
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: write_iops
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: active_connections
+    units: connections
+    aggregations: [average]
+    time_grain: PT1M
+  - name: tps
+    units: transactions/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: deadlocks
+    units: deadlocks/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: xact_commit
+    units: transactions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: xact_rollback
+    units: transactions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: is_db_alive
+    units: state
+    aggregations: [average]
+    time_grain: PT1M
+  - name: network_bytes_egress
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: network_bytes_ingress
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: backup_storage_used
+    units: bytes
+    aggregations: [average]
+    time_grain: PT30M
+  - name: physical_replication_delay_in_seconds
+    units: seconds
+    aggregations: [average]
+    time_grain: PT30M

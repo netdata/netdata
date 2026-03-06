@@ -38,20 +38,19 @@ var (
 )
 
 type Config struct {
-	Vnode              string          `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int             `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int             `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	SubscriptionID     string          `yaml:"subscription_id" json:"subscription_id"`
-	Cloud              string          `yaml:"cloud,omitempty" json:"cloud"`
-	DiscoveryEvery     int             `yaml:"discovery_every,omitempty" json:"discovery_every"`
-	QueryOffset        int             `yaml:"query_offset,omitempty" json:"query_offset"`
-	MaxConcurrency     int             `yaml:"max_concurrency,omitempty" json:"max_concurrency"`
-	MaxBatchResources  int             `yaml:"max_batch_resources,omitempty" json:"max_batch_resources"`
-	MaxMetricsPerQuery int             `yaml:"max_metrics_per_query,omitempty" json:"max_metrics_per_query"`
-	ResourceGroups     []string        `yaml:"resource_groups,omitempty" json:"resource_groups"`
-	Profiles           []string        `yaml:"profiles,omitempty" json:"profiles"`
-	CustomProfiles     []ProfileConfig `yaml:"custom_profiles,omitempty" json:"custom_profiles"`
-	Auth               AuthConfig      `yaml:"auth" json:"auth"`
+	Vnode              string     `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int        `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int        `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	SubscriptionID     string     `yaml:"subscription_id" json:"subscription_id"`
+	Cloud              string     `yaml:"cloud,omitempty" json:"cloud"`
+	DiscoveryEvery     int        `yaml:"discovery_every,omitempty" json:"discovery_every"`
+	QueryOffset        int        `yaml:"query_offset,omitempty" json:"query_offset"`
+	MaxConcurrency     int        `yaml:"max_concurrency,omitempty" json:"max_concurrency"`
+	MaxBatchResources  int        `yaml:"max_batch_resources,omitempty" json:"max_batch_resources"`
+	MaxMetricsPerQuery int        `yaml:"max_metrics_per_query,omitempty" json:"max_metrics_per_query"`
+	ResourceGroups     []string   `yaml:"resource_groups,omitempty" json:"resource_groups"`
+	Profiles           []string   `yaml:"profiles,omitempty" json:"profiles"`
+	Auth               AuthConfig `yaml:"auth" json:"auth"`
 }
 
 type AuthConfig struct {
@@ -102,9 +101,6 @@ func (c *Config) applyDefaults() {
 	if c.MaxMetricsPerQuery <= 0 {
 		c.MaxMetricsPerQuery = defaultMaxMetricsQuery
 	}
-	if len(c.Profiles) == 0 && len(c.CustomProfiles) == 0 {
-		c.Profiles = defaultBuiltInProfileNames()
-	}
 	if strings.TrimSpace(c.Auth.Mode) == "" {
 		c.Auth.Mode = authModeDefault
 	}
@@ -152,19 +148,11 @@ func (c Config) validate() error {
 			errs = append(errs, errors.New("'profiles' contains an empty value"))
 			continue
 		}
-		if _, ok := seenProfiles[n]; ok {
+		norm := stringsLowerTrim(n)
+		if _, ok := seenProfiles[norm]; ok {
 			errs = append(errs, fmt.Errorf("'profiles' contains duplicate value '%s'", n))
 		}
-		seenProfiles[n] = struct{}{}
-		if !hasBuiltInProfile(n) {
-			errs = append(errs, fmt.Errorf("unknown built-in profile '%s'", n))
-		}
-	}
-
-	for i, p := range c.CustomProfiles {
-		if err := p.validate(i); err != nil {
-			errs = append(errs, err)
-		}
+		seenProfiles[norm] = struct{}{}
 	}
 
 	return errors.Join(errs...)
@@ -196,8 +184,7 @@ func (a AuthConfig) validate() error {
 	}
 }
 
-func (p ProfileConfig) validate(i int) error {
-	prefix := fmt.Sprintf("'custom_profiles[%d]'", i)
+func (p ProfileConfig) validate(prefix string) error {
 	var errs []error
 
 	if strings.TrimSpace(p.Name) == "" {

@@ -85,100 +85,14 @@
         }
       },
       "profiles": {
-        "title": "Built-in profiles",
-        "description": "Built-in Azure service profiles to enable.",
+        "title": "Profiles",
+        "description": "Profile file keys to enable. Profiles are loaded from go.d/azure_monitor.profiles (user) and go.d/azure_monitor.profiles/default (stock).",
         "type": [
           "array",
           "null"
         ],
         "items": {
-          "type": "string",
-          "enum": [
-            "sql_managed_instance",
-            "sql_database",
-            "postgres_flexible",
-            "cosmos_db",
-            "logic_apps",
-            "virtual_machines",
-            "aks",
-            "storage_accounts",
-            "load_balancers"
-          ]
-        }
-      },
-      "custom_profiles": {
-        "title": "Custom profiles",
-        "description": "Additional user-defined Azure Monitor profiles.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "items": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "resource_type": {
-              "type": "string"
-            },
-            "metric_namespace": {
-              "type": "string"
-            },
-            "metrics": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "display_name": {
-                    "type": "string"
-                  },
-                  "units": {
-                    "type": "string"
-                  },
-                  "time_grain": {
-                    "type": "string",
-                    "enum": [
-                      "PT1M",
-                      "PT5M",
-                      "PT15M",
-                      "PT30M",
-                      "PT1H"
-                    ]
-                  },
-                  "aggregations": {
-                    "type": [
-                      "array",
-                      "null"
-                    ],
-                    "items": {
-                      "type": "string",
-                      "enum": [
-                        "average",
-                        "minimum",
-                        "maximum",
-                        "total",
-                        "count"
-                      ]
-                    }
-                  }
-                },
-                "required": [
-                  "name"
-                ],
-                "additionalProperties": false
-              }
-            }
-          },
-          "required": [
-            "name",
-            "resource_type",
-            "metrics"
-          ],
-          "additionalProperties": false
+          "type": "string"
         }
       },
       "auth": {
@@ -234,9 +148,6 @@
       "ui:listFlavour": "list"
     },
     "profiles": {
-      "ui:listFlavour": "multiselect"
-    },
-    "custom_profiles": {
       "ui:listFlavour": "list"
     },
     "ui:flavour": "tabs",
@@ -263,12 +174,6 @@
           "title": "Auth",
           "fields": [
             "auth"
-          ]
-        },
-        {
-          "title": "Custom",
-          "fields": [
-            "custom_profiles"
           ]
         }
       ]

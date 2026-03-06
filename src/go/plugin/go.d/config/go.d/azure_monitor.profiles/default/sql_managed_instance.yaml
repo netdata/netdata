@@ -1,0 +1,31 @@
+name: Azure SQL Managed Instance
+resource_type: Microsoft.Sql/managedInstances
+metrics:
+  - name: avg_cpu_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: io_bytes_read
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: io_bytes_written
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: io_requests
+    units: requests/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: reserved_storage_mb
+    units: MiB
+    aggregations: [average]
+    time_grain: PT1M
+  - name: storage_space_used_mb
+    units: MiB
+    aggregations: [average]
+    time_grain: PT1M
+  - name: virtual_core_count
+    units: cores
+    aggregations: [average]
+    time_grain: PT1M

@@ -1,0 +1,59 @@
+name: Azure Logic Apps Workflow
+resource_type: Microsoft.Logic/workflows
+metrics:
+  - name: RunsStarted
+    units: runs/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RunsSucceeded
+    units: runs/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RunsFailed
+    units: runs/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RunLatency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: RunSuccessLatency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: RunFailurePercentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ActionsStarted
+    units: actions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ActionsSucceeded
+    units: actions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ActionsFailed
+    units: actions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TriggersStarted
+    units: triggers/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TriggersFired
+    units: triggers/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TriggersFailed
+    units: triggers/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TotalBillableExecutions
+    units: executions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RunThrottledEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M

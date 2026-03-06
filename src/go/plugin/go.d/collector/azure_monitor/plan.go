@@ -12,19 +12,14 @@ import (
 )
 
 func (c *Collector) buildRuntimePlan() (*runtimePlan, error) {
-	return c.buildRuntimePlanFromConfig(c.Config)
+	return c.buildRuntimePlanFromConfig(c.Config, c.profiles)
 }
 
-func (c *Collector) buildRuntimePlanFromConfig(cfg Config) (*runtimePlan, error) {
-	profiles := make([]ProfileConfig, 0, len(cfg.Profiles)+len(cfg.CustomProfiles))
-	for _, name := range cfg.Profiles {
-		builtIn, ok := builtInProfiles[stringsLowerTrim(name)]
-		if !ok {
-			return nil, fmt.Errorf("unknown built-in profile %q", name)
-		}
-		profiles = append(profiles, builtIn)
+func (c *Collector) buildRuntimePlanFromConfig(cfg Config, catalog profileCatalog) (*runtimePlan, error) {
+	profiles, err := catalog.resolve(cfg.Profiles)
+	if err != nil {
+		return nil, err
 	}
-	profiles = append(profiles, cfg.CustomProfiles...)
 
 	plan := &runtimePlan{
 		Profiles: make([]*profileRuntime, 0, len(profiles)),
