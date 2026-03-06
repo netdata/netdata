@@ -120,14 +120,16 @@ def build_repo_root_function_path(base_path: str, integration_slug: str, func_sl
     return f"/{base_path}/integrations/functions/{filename}"
 
 
-def function_learn_rel_path(collector_learn_rel_path: str) -> str:
-    if not collector_learn_rel_path:
-        return "Live View"
-    if collector_learn_rel_path == "Collecting Metrics":
-        return "Live View"
-    if collector_learn_rel_path.startswith("Collecting Metrics/"):
-        return collector_learn_rel_path.replace("Collecting Metrics/", "Live View/", 1)
-    return collector_learn_rel_path
+def function_learn_rel_path(integration: dict, func: dict) -> str:
+    monitored_name = integration.get("meta", {}).get("monitored_instance", {}).get("name")
+    func_name = func.get("name") or func.get("id")
+
+    parts = ["Live View"]
+    if monitored_name:
+        parts.append(str(monitored_name).strip())
+    if func_name:
+        parts.append(str(func_name).strip())
+    return "/".join(parts)
 
 
 def function_keywords(integration: dict, func: dict):
@@ -184,6 +186,7 @@ def render_function_tile(
     learn_rel_path: str,
     integration_doc_path: str,
     keywords,
+    community_badge: str,
 ) -> str:
     template = get_jinja_env().get_template("function_tile.md")
     return template.render(
@@ -193,15 +196,15 @@ def render_function_tile(
         learn_rel_path=learn_rel_path,
         integration_doc_path=integration_doc_path,
         keywords=keywords,
+        community_badge=community_badge,
     )
 
 
-def write_function_tiles(base_path: str, integration: dict, meta_yaml: str, learn_rel_path: str):
+def write_function_tiles(base_path: str, integration: dict, meta_yaml: str, community_badge: str):
     functions = integration.get("functions_data")
     if not functions or not functions.get("list"):
         return
 
-    tile_learn_rel_path = function_learn_rel_path(learn_rel_path)
     int_slug = integration_doc_slug(integration)
     integration_doc_path = build_repo_root_integration_path(base_path, int_slug)
     functions_dir = Path(base_path) / "integrations" / "functions"
@@ -218,9 +221,10 @@ def write_function_tiles(base_path: str, integration: dict, meta_yaml: str, lear
             integration,
             func,
             meta_yaml,
-            tile_learn_rel_path,
+            function_learn_rel_path(integration, func),
             integration_doc_path,
             function_keywords(integration, func),
+            community_badge,
         )
         rendered_clean = normalize_markdown(rendered)
 
@@ -798,11 +802,11 @@ def main():
             collector_path = build_path(collector_meta_yaml)
             integration["functions_index"] = render_functions_index(integration, collector_path)
 
-            meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
+            meta_yaml, sidebar_label, _learn_rel_path, md, community = build_readme_from_integration(
                 integration, categories, mode="collector"
             )
             write_to_file(collector_path, md, meta_yaml, sidebar_label, community, integration_id=iid)
-            write_function_tiles(collector_path, integration, meta_yaml, learn_rel_path)
+            write_function_tiles(collector_path, integration, meta_yaml, community)
 
         elif itype == "exporter" and not args.collector:
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(

@@ -16,6 +16,8 @@ endmeta-->
 
 [Back to collector page: [[ entry.meta.monitored_instance.name ]]]([[ integration_doc_path ]])
 
+[[ community_badge ]]
+
 ## [[ func.name ]]
 
 [[ func.description ]]
