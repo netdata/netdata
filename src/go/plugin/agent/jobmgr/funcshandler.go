@@ -119,7 +119,7 @@ func (m *Manager) makeMethodFuncHandler(moduleName, methodID string) func(functi
 
 		jobs := m.moduleFuncs.getJobNames(moduleName)
 		if len(jobs) == 0 {
-			m.respondError(fn, 503, "no %s instances configured", moduleName)
+			m.respondError(fn, 422, "no %s instances configured", moduleName)
 			return
 		}
 		jobParam := buildJobParamConfig(jobs)
