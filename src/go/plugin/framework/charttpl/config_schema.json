@@ -103,6 +103,9 @@
             "type": "string"
           }
         },
+        "chart_defaults": {
+          "$ref": "#/$defs/chart_defaults"
+        },
         "groups": {
           "type": "array",
           "items": {
@@ -182,6 +185,21 @@
           "items": {
             "$ref": "#/$defs/dimension"
           }
+        }
+      }
+    },
+    "chart_defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label_promotion": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "instances": {
+          "$ref": "#/$defs/instances"
         }
       }
     },

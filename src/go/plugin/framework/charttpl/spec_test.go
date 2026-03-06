@@ -68,6 +68,60 @@ groups:
 				assert.Equal(t, uint64(9), spec.Engine.Autogen.ExpireAfterSuccessCycles)
 			},
 		},
+		"group chart defaults apply recursively with nearest-scope replace semantics": {
+			input: `
+version: v1
+groups:
+  - family: Root
+    metrics:
+      - mysql_queries_total
+    chart_defaults:
+      label_promotion: [resource_name, region]
+      instances:
+        by_labels: [resource_uid]
+    groups:
+      - family: Child
+        chart_defaults:
+          instances:
+            by_labels: [resource_uid, region]
+        charts:
+          - title: Queries
+            context: queries
+            units: queries/s
+            dimensions:
+              - selector: mysql_queries_total
+                name: total
+        groups:
+          - family: Leaf
+            charts:
+              - title: Overrides
+                context: overrides
+                units: queries/s
+                label_promotion: []
+                instances:
+                  by_labels: [region]
+                dimensions:
+                  - selector: mysql_queries_total
+                    name: total
+`,
+			assert: func(t *testing.T, spec *Spec) {
+				t.Helper()
+				root := spec.Groups[0]
+				child := root.Groups[0]
+				require.Len(t, child.Charts, 1)
+				assert.Equal(t, "line", child.Charts[0].Type)
+				assert.Equal(t, []string{"resource_name", "region"}, child.Charts[0].LabelPromoted)
+				require.NotNil(t, child.Charts[0].Instances)
+				assert.Equal(t, []string{"resource_uid", "region"}, child.Charts[0].Instances.ByLabels)
+
+				leaf := child.Groups[0]
+				require.Len(t, leaf.Charts, 1)
+				assert.Equal(t, "line", leaf.Charts[0].Type)
+				assert.Empty(t, leaf.Charts[0].LabelPromoted)
+				require.NotNil(t, leaf.Charts[0].Instances)
+				assert.Equal(t, []string{"region"}, leaf.Charts[0].Instances.ByLabels)
+			},
+		},
 		"rejects unknown yaml field via strict unmarshal": {
 			input: `
 version: v1
