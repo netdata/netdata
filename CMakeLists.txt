@@ -3117,15 +3117,11 @@ if(OS_WINDOWS)
                 COMMAND ${CMAKE_COMMAND} -E copy
                         ${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/netdata_driver.inf
                         ${CMAKE_BINARY_DIR}/netdata_driver.inf
-                COMMAND ${CMAKE_COMMAND} -E copy
-                        ${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/netdata_driver.cat
-                        ${CMAKE_BINARY_DIR}/netdata_driver.cat
                 COMMENT "Copying driver INF and CAT files to build directory"
         )
 
         install(FILES "${NETDATA_DRIVER_FILE}"
                         "${CMAKE_BINARY_DIR}/netdata_driver.inf"
-                        "${CMAKE_BINARY_DIR}/netdata_driver.cat"
                 COMPONENT netdata_driver
                 DESTINATION "${BINDIR}")
 endif()
