@@ -93,6 +93,16 @@
 - Regenerate integrations docs ([#21877](https://github.com/netdata/netdata/issues/21877))
 - Add input validation for socket connection definitions ([#21881](https://github.com/netdata/netdata/issues/21881))
 - Clarify retention in Parent with tiered storage examples ([#21887](https://github.com/netdata/netdata/issues/21887))
+- Build(deps): bump github.com/microsoft/go-mssqldb from 1.9.7 to 1.9.8 in /src/go ([#21892](https://github.com/netdata/netdata/issues/21892))
+- Cleanup win plugin (Remove MSSQL) ([#21876](https://github.com/netdata/netdata/issues/21876))
+- Update documentation (Windows installer) ([#21888](https://github.com/netdata/netdata/issues/21888))
+- Support multi-slot ingestion and batch emission ([#21893](https://github.com/netdata/netdata/issues/21893))
+- Fix(jobmgr): register collector static functions on first job start ([#21894](https://github.com/netdata/netdata/issues/21894))
+- Improve agent startup time ([#21891](https://github.com/netdata/netdata/issues/21891))
+- Fix(packaging): update min go version in check-for-go-toolchain.sh ([#21895](https://github.com/netdata/netdata/issues/21895))
+- Feat(integrations): link setup option names to detailed configuration sections ([#21897](https://github.com/netdata/netdata/issues/21897))
+- Regenerate integrations docs ([#21898](https://github.com/netdata/netdata/issues/21898))
+- Restructure otel-plugin configuration with layered overrides ([#21896](https://github.com/netdata/netdata/issues/21896))
 
 ## [2.9.0] - 2026-02-16
 
