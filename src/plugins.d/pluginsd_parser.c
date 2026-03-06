@@ -245,6 +245,11 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         parser->user.host_define.rrdlabels = NULL;
     }
 
+    if(SERVING_PLUGINSD(parser)) {
+        rrdlabels_add(host->rrdlabels, "_collector_machine_guid",
+                      localhost->machine_guid, RRDLABEL_SRC_AUTO);
+    }
+
     pluginsd_update_host_ephemerality(host);
     pluginsd_host_define_cleanup(parser);
 

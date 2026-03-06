@@ -11,6 +11,7 @@
 #define START_STREAMING_PROMPT_VN "Hit me baby, push them over with the version="
 
 #define START_STREAMING_ERROR_SAME_LOCALHOST "Don't hit me baby, you are trying to stream my localhost back"
+#define START_STREAMING_ERROR_LOCAL_VNODE "Don't hit me baby, you are trying to stream my vnode back"
 #define START_STREAMING_ERROR_ALREADY_STREAMING "This GUID is already streaming to this server"
 #define START_STREAMING_ERROR_NOT_PERMITTED "You are not permitted to access this. Check the logs for more info."
 #define START_STREAMING_ERROR_BUSY_TRY_LATER "The server is too busy now to accept this request. Try later."
@@ -72,9 +73,10 @@ typedef enum {
     STREAM_HANDSHAKE_SP_CONNECTED                       = -36,
     STREAM_HANDSHAKE_SP_NO_STREAM_INFO                  = -37,
     STREAM_HANDSHAKE_SP_NO_DESTINATION                  = -38,
+    STREAM_HANDSHAKE_PARENT_VNODE_IS_LOCAL              = -39, // sent by parent - DO NOT CHANGE
 
     // terminator - keep this positive, bigger than all negative values
-    STREAM_HANDSHAKE_NEGATIVE_MAX                       = 39,
+    STREAM_HANDSHAKE_NEGATIVE_MAX                       = 40,
 } STREAM_HANDSHAKE;
 
 const char *stream_handshake_error_to_string(STREAM_HANDSHAKE reason);
