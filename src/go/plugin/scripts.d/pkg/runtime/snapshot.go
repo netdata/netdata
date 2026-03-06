@@ -25,6 +25,7 @@ type SchedulerSnapshot struct {
 
 // JobMetricsSnapshot contains per-job runtime metrics and raw perfdata samples.
 type JobMetricsSnapshot struct {
+	JobID   string
 	JobName string
 
 	State      string

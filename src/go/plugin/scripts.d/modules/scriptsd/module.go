@@ -11,6 +11,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/schedulers"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
 )
 
 //go:embed config_schema.json
@@ -32,11 +34,9 @@ func init() {
 
 // Config is the initial v2 skeleton config surface.
 type Config struct {
-	Vnode       string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
-	Scheduler   string `yaml:"scheduler,omitempty" json:"scheduler"`
-	Workers     int    `yaml:"workers,omitempty" json:"workers"`
-	QueueSize   int    `yaml:"queue_size,omitempty" json:"queue_size"`
+	spec.JobConfig `yaml:",inline" json:",inline"`
+	Workers        int `yaml:"workers,omitempty" json:"workers"`
+	QueueSize      int `yaml:"queue_size,omitempty" json:"queue_size"`
 }
 
 // Collector is a v2 skeleton collector used as migration scaffold.
@@ -47,6 +47,10 @@ type Collector struct {
 	store    metrix.CollectorStore
 	registry schedulers.SchedulerRegistry
 	router   *perfdataRouter
+
+	jobSpec   spec.JobSpec
+	periods   *timeperiod.Set
+	jobHandle *schedulers.SchedulerJobHandle
 }
 
 func New() *Collector {
@@ -59,10 +63,11 @@ func NewWithRegistry(reg schedulers.SchedulerRegistry) *Collector {
 	}
 	return &Collector{
 		Config: Config{
-			UpdateEvery: 10,
-			Scheduler:   "default",
-			Workers:     50,
-			QueueSize:   128,
+			JobConfig: spec.JobConfig{
+				Scheduler: "default",
+			},
+			Workers:   50,
+			QueueSize: 128,
 		},
 		store:    metrix.NewCollectorStore(),
 		registry: reg,
@@ -73,12 +78,17 @@ func NewWithRegistry(reg schedulers.SchedulerRegistry) *Collector {
 func (c *Collector) Configuration() any { return c.Config }
 
 func (c *Collector) Init(context.Context) error {
-	if c.Scheduler == "" {
-		c.Scheduler = "default"
+	if err := c.compileTimePeriods(); err != nil {
+		return err
 	}
+	sp, err := c.JobConfig.ToSpec()
+	if err != nil {
+		return err
+	}
+	c.jobSpec = sp
 
 	def := schedulers.Definition{
-		Name:           c.Scheduler,
+		Name:           c.jobSpec.Scheduler,
 		Workers:        c.Workers,
 		QueueSize:      c.QueueSize,
 		LoggingEnabled: true,
@@ -89,19 +99,35 @@ func (c *Collector) Init(context.Context) error {
 			Headers:  map[string]string{},
 		},
 	}
-	return c.registry.Ensure(def, c.Logger)
+	if err := c.registry.Ensure(def, c.Logger); err != nil {
+		return err
+	}
+
+	handle, err := c.registry.Attach(c.jobSpec.Scheduler, runtime.JobRegistration{
+		Spec:    c.jobSpec,
+		Emitter: runtime.NewLogEmitter(c.Logger),
+		Periods: c.periods,
+	}, c.Logger)
+	if err != nil {
+		return err
+	}
+	c.jobHandle = handle
+	return nil
 }
 
-func (c *Collector) Check(context.Context) error { return nil }
+func (c *Collector) Check(context.Context) error {
+	_, err := c.JobConfig.ToSpec()
+	return err
+}
 
 func (c *Collector) Collect(context.Context) error {
-	snapshot, ok := c.registry.Snapshot(c.Scheduler)
+	snapshot, ok := c.registry.Snapshot(c.jobSpec.Scheduler)
 	if !ok {
 		return nil
 	}
 
 	sm := c.store.Write().SnapshotMeter("scriptsd")
-	lbl := sm.LabelSet(metrix.Label{Key: "nagios_scheduler", Value: c.Scheduler})
+	lbl := sm.LabelSet(metrix.Label{Key: "nagios_scheduler", Value: c.jobSpec.Scheduler})
 
 	observe := func(name string, value float64) {
 		sm.Gauge(name).Observe(value, lbl)
@@ -114,8 +140,12 @@ func (c *Collector) Collect(context.Context) error {
 	observe("scheduler.skipped", float64(snapshot.Skipped))
 
 	for _, job := range snapshot.Jobs {
+		if c.jobHandle != nil && job.JobID != c.jobHandle.JobID() {
+			continue
+		}
+
 		jobLbl := sm.LabelSet(
-			metrix.Label{Key: "nagios_scheduler", Value: c.Scheduler},
+			metrix.Label{Key: "nagios_scheduler", Value: c.jobSpec.Scheduler},
 			metrix.Label{Key: "nagios_job", Value: job.JobName},
 		)
 		observeJob := func(name string, value float64) {
@@ -129,7 +159,7 @@ func (c *Collector) Collect(context.Context) error {
 		observeJob("job.attempt", float64(job.Attempt))
 		observeJob("job.max_attempts", float64(job.MaxAttempt))
 
-		perf := c.router.route(c.Scheduler, job.JobName, job.PerfSamples)
+		perf := c.router.route(c.jobSpec.Scheduler, job.JobName, job.PerfSamples)
 		for _, sample := range perf {
 			observeJob(sample.name, sample.value)
 		}
@@ -145,11 +175,19 @@ func (c *Collector) Collect(context.Context) error {
 }
 
 func (c *Collector) Cleanup(context.Context) {
-	if c.registry == nil || c.Scheduler == "" {
+	if c.registry == nil {
 		return
 	}
-	if err := c.registry.Remove(c.Scheduler); err != nil {
-		c.Warningf("scheduler cleanup remove %q: %v", c.Scheduler, err)
+	if c.jobHandle != nil {
+		c.registry.Detach(c.jobHandle)
+		c.jobHandle = nil
+	}
+	scheduler := c.jobSpec.Scheduler
+	if scheduler == "" {
+		scheduler = "default"
+	}
+	if err := c.registry.Remove(scheduler); err != nil {
+		c.Warningf("scheduler cleanup remove %q: %v", scheduler, err)
 	}
 }
 
@@ -162,4 +200,13 @@ func boolToFloat(v bool) float64 {
 		return 1
 	}
 	return 0
+}
+
+func (c *Collector) compileTimePeriods() error {
+	set, err := timeperiod.Compile([]timeperiod.Config{timeperiod.DefaultPeriodConfig()})
+	if err != nil {
+		return err
+	}
+	c.periods = set
+	return nil
 }

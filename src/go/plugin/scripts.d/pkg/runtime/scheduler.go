@@ -621,6 +621,7 @@ func (s *Scheduler) Snapshot() SchedulerSnapshot {
 	for _, js := range s.jobs {
 		missingCPU := !js.cpuMeasured && js.lastDuration > 0
 		item := JobMetricsSnapshot{
+			JobID:   js.runtime.ID,
 			JobName: js.runtime.Spec.Name,
 
 			State:      js.state,

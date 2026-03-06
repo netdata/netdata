@@ -18,6 +18,20 @@ type SchedulerJobHandle struct {
 	generation uint64
 }
 
+func (h *SchedulerJobHandle) SchedulerName() string {
+	if h == nil {
+		return ""
+	}
+	return h.scheduler
+}
+
+func (h *SchedulerJobHandle) JobID() string {
+	if h == nil {
+		return ""
+	}
+	return h.jobID
+}
+
 // SchedulerRegistry provides injected, non-global scheduler ownership.
 type SchedulerRegistry interface {
 	Ensure(def Definition, log *logger.Logger) error
