@@ -120,11 +120,21 @@ def build_repo_root_function_path(base_path: str, integration_slug: str, func_sl
     return f"/{base_path}/integrations/functions/{filename}"
 
 
-def function_learn_rel_path(integration: dict, func: dict) -> str:
+def function_learn_rel_path(collector_learn_rel_path: str, integration: dict, func: dict) -> str:
+    category_path = ""
+    if collector_learn_rel_path == "Collecting Metrics":
+        category_path = ""
+    elif collector_learn_rel_path.startswith("Collecting Metrics/"):
+        category_path = collector_learn_rel_path[len("Collecting Metrics/"):]
+    elif collector_learn_rel_path:
+        category_path = collector_learn_rel_path
+
     monitored_name = integration.get("meta", {}).get("monitored_instance", {}).get("name")
     func_name = func.get("name") or func.get("id")
 
-    parts = ["Live View"]
+    parts = ["LiveView"]
+    if category_path:
+        parts.extend([part for part in str(category_path).strip("/").split("/") if part])
     if monitored_name:
         parts.append(str(monitored_name).strip())
     if func_name:
@@ -200,7 +210,13 @@ def render_function_tile(
     )
 
 
-def write_function_tiles(base_path: str, integration: dict, meta_yaml: str, community_badge: str):
+def write_function_tiles(
+    base_path: str,
+    integration: dict,
+    meta_yaml: str,
+    collector_learn_rel_path: str,
+    community_badge: str,
+):
     functions = integration.get("functions_data")
     if not functions or not functions.get("list"):
         return
@@ -221,7 +237,7 @@ def write_function_tiles(base_path: str, integration: dict, meta_yaml: str, comm
             integration,
             func,
             meta_yaml,
-            function_learn_rel_path(integration, func),
+            function_learn_rel_path(collector_learn_rel_path, integration, func),
             integration_doc_path,
             function_keywords(integration, func),
             community_badge,
@@ -802,11 +818,11 @@ def main():
             collector_path = build_path(collector_meta_yaml)
             integration["functions_index"] = render_functions_index(integration, collector_path)
 
-            meta_yaml, sidebar_label, _learn_rel_path, md, community = build_readme_from_integration(
+            meta_yaml, sidebar_label, collector_learn_rel_path, md, community = build_readme_from_integration(
                 integration, categories, mode="collector"
             )
             write_to_file(collector_path, md, meta_yaml, sidebar_label, community, integration_id=iid)
-            write_function_tiles(collector_path, integration, meta_yaml, community)
+            write_function_tiles(collector_path, integration, meta_yaml, collector_learn_rel_path, community)
 
         elif itype == "exporter" and not args.collector:
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
