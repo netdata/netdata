@@ -202,10 +202,11 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
 // ACLK interface
 
 // Save a pending checkpoint to be replayed when context processing completes.
-static void rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkpoint *cmd) {
+// Returns true if saved successfully, false if save failed (caller should execute immediately).
+static bool rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkpoint *cmd) {
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
     if(!aclk_host_config)
-        return;
+        return false;
 
     spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
     freez(aclk_host_config->pending_ctx_claim_id);
@@ -213,8 +214,10 @@ static void rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkp
     aclk_host_config->pending_ctx_claim_id = strdupz(cmd->claim_id);
     aclk_host_config->pending_ctx_node_id = strdupz(cmd->node_id);
     aclk_host_config->pending_ctx_version_hash = cmd->version_hash;
-    aclk_host_config->pending_ctx_checkpoint = true;
+    aclk_host_config->pending_ctx_saved_time_s = now_realtime_sec();
+    __atomic_store_n(&aclk_host_config->pending_ctx_checkpoint, true, __ATOMIC_RELEASE);
     spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
+    return true;
 }
 
 // Execute the checkpoint: compare version hash, send snapshot if needed, enable streaming.
@@ -299,8 +302,12 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
                "but host '%s' has pending context work. Saving checkpoint for replay after processing completes.",
                cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
 
-        rrdcontext_checkpoint_save_pending(host, cmd);
-        return;
+        if(rrdcontext_checkpoint_save_pending(host, cmd))
+            return;
+
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "RRDCONTEXT: failed to save pending checkpoint for host '%s' (no aclk config). Executing immediately.",
+               rrdhost_hostname(host));
     }
 
     rrdcontext_checkpoint_execute(host, cmd->claim_id, cmd->node_id, cmd->version_hash);
@@ -346,18 +353,28 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 }
 
+#define PENDING_CTX_CHECKPOINT_MAX_AGE_S 300
+
 void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
-    if(!aclk_host_config || !aclk_host_config->pending_ctx_checkpoint)
+    if(!aclk_host_config || !__atomic_load_n(&aclk_host_config->pending_ctx_checkpoint, __ATOMIC_ACQUIRE))
         return;
 
+    bool pp_queue_empty = rrdcontext_queue_entries(&host->rrdctx.pp_queue) <= 0;
+
     spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
-    if(!aclk_host_config->pending_ctx_checkpoint) {
+    if(!__atomic_load_n(&aclk_host_config->pending_ctx_checkpoint, __ATOMIC_RELAXED)) {
         spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
         return;
     }
 
-    aclk_host_config->pending_ctx_checkpoint = false;
+    // replay when pp_queue is empty, or force replay on timeout
+    time_t now_s = now_realtime_sec();
+    bool timed_out = (now_s - aclk_host_config->pending_ctx_saved_time_s >= PENDING_CTX_CHECKPOINT_MAX_AGE_S);
+    if(!pp_queue_empty && !timed_out) {
+        spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
+        return;
+    }
 
     char *claim_id = aclk_host_config->pending_ctx_claim_id;
     char *node_id = aclk_host_config->pending_ctx_node_id;
@@ -366,7 +383,14 @@ void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
     aclk_host_config->pending_ctx_claim_id = NULL;
     aclk_host_config->pending_ctx_node_id = NULL;
     aclk_host_config->pending_ctx_version_hash = 0;
+    aclk_host_config->pending_ctx_saved_time_s = 0;
+    __atomic_store_n(&aclk_host_config->pending_ctx_checkpoint, false, __ATOMIC_RELEASE);
     spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
+
+    if(timed_out && !pp_queue_empty)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "RRDCONTEXT: pending checkpoint for host '%s' timed out after %d sec with pp_queue still active. Forcing replay.",
+               rrdhost_hostname(host), PENDING_CTX_CHECKPOINT_MAX_AGE_S);
 
     if(!claim_id || !node_id) {
         freez(claim_id);
