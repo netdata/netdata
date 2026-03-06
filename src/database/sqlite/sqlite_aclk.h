@@ -46,6 +46,7 @@ typedef struct aclk_sync_cfg_t {
     char *pending_ctx_claim_id;
     char *pending_ctx_node_id;
     uint64_t pending_ctx_version_hash;
+    time_t pending_ctx_saved_time_s;
 
     int8_t send_snapshot;
     bool stream_alerts;

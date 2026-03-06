@@ -1182,8 +1182,18 @@ void destroy_aclk_config(RRDHOST *host)
     }
 
     struct aclk_sync_cfg_t *old_aclk_host_config = __atomic_exchange_n(&host->aclk_host_config, NULL, __ATOMIC_RELAXED);
-    freez(old_aclk_host_config->pending_ctx_claim_id);
-    freez(old_aclk_host_config->pending_ctx_node_id);
+
+    // detach pending checkpoint strings under lock, to avoid racing with save/replay
+    spinlock_lock(&old_aclk_host_config->pending_ctx_spinlock);
+    char *pending_claim_id = old_aclk_host_config->pending_ctx_claim_id;
+    char *pending_node_id = old_aclk_host_config->pending_ctx_node_id;
+    old_aclk_host_config->pending_ctx_claim_id = NULL;
+    old_aclk_host_config->pending_ctx_node_id = NULL;
+    __atomic_store_n(&old_aclk_host_config->pending_ctx_checkpoint, false, __ATOMIC_RELEASE);
+    spinlock_unlock(&old_aclk_host_config->pending_ctx_spinlock);
+
+    freez(pending_claim_id);
+    freez(pending_node_id);
     freez(old_aclk_host_config);
 }
 
